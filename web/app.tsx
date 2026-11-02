@@ -19,12 +19,14 @@ import {
 import { DesktopLinkPreview } from "./components/desktop-link-preview";
 import { DiscussionPanel } from "./components/discussion-panel";
 import { FileDialog } from "./components/file-dialog";
+import { textFileUrl } from "./file-paths";
 import { PageSwitch } from "./components/page-switch";
 import { NO_PLANS, Plans } from "./components/plan-usage";
 import { useNoticeToasts } from "./components/use-notice-toasts";
 import { RenderBoundary } from "./components/render-boundary";
 import { ScheduledSends } from "./components/scheduled";
 import { SessionDetails } from "./components/session-details";
+import { GoalDialog } from "./components/session-goal";
 import { ProjectTrustDialog } from "./components/project-trust-dialog";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { GetStarted } from "./components/get-started";
@@ -40,7 +42,7 @@ import { botRows } from "./bots-model";
 import { routeOf } from "./dashboard-state";
 import { useOpenPullRequest } from "./open-pull-request";
 import { integrationsStore } from "./reads";
-import { hashForRoute, hashForView, type NotesListView, type OpenMode, type TodoListView } from "./routing";
+import { hashForLayout, hashForPage, hashForRoute, hashForView, type NotesListView, type OpenMode, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, workspaceSession, workspaceSwitch } from "./sessions";
 import { placedTabs, useSidebarTabs } from "./sidebar-tabs";
@@ -75,8 +77,12 @@ export function App() {
 	const display = useTranscriptDisplay();
 	const terminal = useTerminalPanel();
 	useNoticeToasts(state.notices, state.connected, send, start);
-	useAttention(state, page, openBot?.view ?? null, send);
+	useAttention(state, openBot?.view ?? null, send);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
+	const [goalEditor, setGoalEditor] = useState<{ instanceId: string; focus: "objective" | "budget" } | null>(null);
+	const editGoal = useCallback((instanceId: string, focus: "objective" | "budget") => setGoalEditor({ instanceId, focus }), []);
+	const goalHost = goalEditor ? state.hosts.find(host => host.instanceId === goalEditor.instanceId) : null;
+	const editedGoal = goalHost?.source === "dashboard" && goalHost.goal.kind !== "off" && goalHost.control.phase === "live" && !goalHost.control.readOnly ? goalHost : null;
 	const integrations = integrationsStore.usePolling().read?.data.integrations;
 	const linear = integrations?.linear ?? null;
 	const { signedOut: signedOutTabs, shown: tabs } = useSidebarTabs();
@@ -89,6 +95,7 @@ export function App() {
 	const barTabs = useMemo(() => placedTabs(tabs, "bar"), [tabs]);
 	const headerTabs = useMemo(() => placedTabs(tabs, "header"), [tabs]);
 	const maximized = layout.maximized && !page;
+	const address = page ? hashForPage(page) : hashForLayout(layout);
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
 	const detailsView = page || (layout.panes.length > 1 && !maximized) ? null : focused.view;
 	const defaultWorkspace = defaultCwd(focused.view, visible.hosts, visible.past, workspace);
@@ -144,9 +151,10 @@ export function App() {
 		[workspaces, pickWorkspace, navigate],
 	);
 
-	const { setShortcutsOpen, setFilePath, setNewTicket, dispatchPalette } = overlays;
+	const { setShortcutsOpen, setOpenedFile, setNewTicket, dispatchPalette } = overlays;
 	// The command menu's **Open pull request** acts on the focused pane's session while the panes show, as its header's **Open PR** does.
 	const openPullRequest = useOpenPullRequest(page ? null : focused.view, focused.host, request);
+	const focusedGoal = page === null && focused.view?.kind === "live" && focused.view.agentId === null && focused.host?.source === "dashboard" && focused.host.goal.kind !== "off" && focused.host.control.phase === "live" && !focused.host.control.readOnly ? focused.host : null;
 	const { handlers, unavailable } = usePageShortcuts({
 		page,
 		layout,
@@ -160,6 +168,7 @@ export function App() {
 		linearCallable,
 		hasDetails: detailsView !== null || openBot !== null,
 		openPullRequest: openPullRequest.state.kind === "ready" ? openPullRequest.run : null,
+		setGoal: focusedGoal ? () => editGoal(focusedGoal.instanceId, "objective") : null,
 		palette: overlays.palette,
 		dispatchPalette,
 		setShortcutsOpen,
@@ -177,8 +186,8 @@ export function App() {
 	});
 
 	const actions = useMemo(
-		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, changeBot, end: endHost, openFile: setFilePath, openNewTicket: setNewTicket, workspaceSettings }),
-		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, changeBot, endHost, setFilePath, setNewTicket, workspaceSettings],
+		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, changeBot, end: endHost, openFile: setOpenedFile, openNewTicket: setNewTicket, editGoal, workspaceSettings }),
+		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, changeBot, endHost, setOpenedFile, setNewTicket, editGoal, workspaceSettings],
 	);
 	const fork = startOf(state.starts, "fork");
 	const replay = startOf(state.starts, "replay");
@@ -227,7 +236,7 @@ export function App() {
 							<div className="flex h-svh flex-col">
 								{DESKTOP_TITLE_BAR && <DesktopTitleBar title={focused.title} controls={headerControls} />}
 								<SidebarProvider className="min-h-0 flex-1">
-									<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")}>
+									<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")} address={address}>
 										<AppSidebar
 											scope={scope}
 											sessions={sessions}
@@ -242,7 +251,6 @@ export function App() {
 											notesView={notesView}
 											hosts={state.hosts}
 											past={state.past}
-											notices={state.notices}
 											bots={state.bots}
 											botLasts={state.botLasts}
 											todoView={todoView}
@@ -281,7 +289,6 @@ export function App() {
 																	connected={state.connected}
 																	listed={state.listed}
 																	rosterError={state.rosterError}
-																	notices={state.notices}
 																	newStart={startOf(state.starts, "new")}
 																	scope={scope}
 																	defaultWorkspace={defaultWorkspace}
@@ -306,7 +313,7 @@ export function App() {
 										<TerminalPanel panel={terminal} cwd={focused.workDir ?? workspace ?? "~"} />
 									</SidebarInset>
 									{(detailsView || openBot) && (
-										<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
+										<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")} address={address}>
 											{detailsView ? (
 												<SessionDetails
 													key={hashForView(detailsView)}
@@ -325,6 +332,8 @@ export function App() {
 														open={openBot}
 														session={openBot.host ?? state.past.find(({ sessionId }) => sessionId === openBot.bot.sessionId) ?? null}
 														memory={state.botMemories[openBot.bot.id] ?? ""}
+														tasks={state.routerTasks.filter(({ botId }) => botId === openBot.bot.id)}
+														hosts={state.hosts}
 														connected={state.connected}
 													/>
 												)
@@ -340,8 +349,18 @@ export function App() {
 										rosterError={state.rosterError}
 										onClose={() => show(layout)}
 									/>
-									{overlays.filePath !== null && <FileDialog key={overlays.filePath} path={overlays.filePath} onClose={() => setFilePath(null)} />}
+									{overlays.openedFile !== null && <FileDialog key={textFileUrl(overlays.openedFile)} target={overlays.openedFile} onClose={() => setOpenedFile(null)} />}
 									{overlays.newTicket !== null && <NewTicketDialog title={overlays.newTicket} onClose={() => setNewTicket(null)} />}
+									{goalEditor && editedGoal && editedGoal.goal.kind !== "off" && (
+										<GoalDialog
+											key={goalEditor.instanceId}
+											goal={editedGoal.goal.kind === "set" && editedGoal.goal.goal.status !== "complete" ? editedGoal.goal.goal : null}
+											focus={goalEditor.focus}
+											continues={editedGoal.goal.continues}
+											onClose={() => setGoalEditor(null)}
+											onSave={async change => { await request({ t: "goal", instanceId: goalEditor.instanceId, change }); setGoalEditor(null); }}
+										/>
+									)}
 									<DiscussionPanel />
 									<CommandPalette
 										state={overlays.palette}

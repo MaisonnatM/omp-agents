@@ -10,11 +10,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
-import { type NoticeAction as Action, type NoticeFace, type NoticeSource, presentNotice } from "../notice-model";
+import { type NoticeAction as Action, type NoticeFace, type NoticeSource, follow, presentNotice } from "../notice-model";
 import { readPinnedSkill } from "../pinned-skill";
 import { pendingOf, pullRequestStart, QUICK_ACTIONS } from "../quick-actions";
 import { providerLabel, providerOrg } from "../labels";
-import { hashForPullRequests } from "../routing";
 import { Age } from "./age";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { BrandMark, GOOGLE_CALENDAR_LOGO, SLACK_LOGO } from "./integrations/brand-logos";
@@ -180,8 +179,8 @@ function NoticeMerge({ pr, onMerged }: { pr: PullRequestSummary; onMerged: () =>
 	);
 }
 
-/** A notice's button: **Update**, the quick action that makes a pull request's move, **Merge**, or **Continue all**; the bell and the Inbox show it. */
-export function NoticeAction({ id, action, send, onDone }: { id: string; action: Action; send: Send; onDone: () => void }) {
+/** A notice's button: **Update**, the quick action that makes a pull request's move, **Merge**, or **Continue all**; `onDone` runs once it acted. */
+function NoticeAction({ id, action, send, onDone }: { id: string; action: Action; send: Send; onDone: () => void }) {
 	const { start } = useDashboardActions();
 	const { connected, starts } = useDashboardStatus();
 	const read = () => send({ t: "notice", ids: [id], op: "read" });
@@ -190,8 +189,15 @@ export function NoticeAction({ id, action, send, onDone }: { id: string; action:
 			return null;
 		case "update":
 			return (
-				<Button {...activityControl("notices.update")} variant="secondary" size="compact" disabled={!connected || !action.ready} onClick={() => send({ t: "notice", ids: [id], op: "update" })}>
-					{action.label}
+				<Button
+					{...activityControl("notices.update")}
+					variant="secondary"
+					size="compact"
+					loading={action.updating}
+					disabled={!connected || !action.ready}
+					onClick={() => send({ t: "notice", ids: [id], op: "update" })}
+				>
+					{action.updating ? "Updating" : "Update"}
 				</Button>
 			);
 		case "merge":
@@ -216,7 +222,6 @@ export function NoticeAction({ id, action, send, onDone }: { id: string; action:
 						start(pullRequestStart(pr, action.action, cwd, readPinnedSkill()));
 						read();
 						onDone();
-						location.hash = hashForPullRequests(pr);
 					}}
 				>
 					{QUICK_ACTIONS[action.action].label}
@@ -256,6 +261,14 @@ function NoticeRow({ notice, send, onDone }: { notice: Notice; send: Send; onDon
 		if (!notice.read) send({ t: "notice", ids: [notice.id], op: "read" });
 	};
 	const label = `${notice.read ? "" : "Unread: "}${headline}`;
+	// After its quick action, a pull request's notice opens the pull request, where the session it started shows.
+	const done =
+		action.kind === "quick"
+			? () => {
+					onDone();
+					follow(link);
+				}
+			: onDone;
 	return (
 		<li className="group relative flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/70 has-[>a:focus-visible]:bg-muted/70">
 			{link ? (
@@ -285,7 +298,7 @@ function NoticeRow({ notice, send, onDone }: { notice: Notice; send: Send; onDon
 					{preview}
 				</p>
 				<div className="pointer-events-auto relative mt-1 flex empty:hidden">
-					<NoticeAction id={notice.id} action={action} send={send} onDone={onDone} />
+					<NoticeAction id={notice.id} action={action} send={send} onDone={done} />
 				</div>
 			</div>
 			<Tooltip content="Clear">

@@ -51,7 +51,7 @@ test("create_bot leaves one create request per call with a fresh id, its fields 
 test("an empty name, an unknown kind, a workspace that is no absolute directory, or a session that is not a designer leaves nothing", async () => {
 	const { dir, create, left } = loaded();
 	await expect(create({ name: "  ", job: "Watch the build." })).rejects.toThrow("name is empty.");
-	await expect(create({ name: "Watcher", job: "Watch the build.", kind: "janitor" })).rejects.toThrow("kind must be one of bot-designer, routines, pr-shepherd.");
+	await expect(create({ name: "Watcher", job: "Watch the build.", kind: "janitor" })).rejects.toThrow("kind must be one of bot-designer, routines, pr-shepherd, router.");
 	await expect(create({ name: "Watcher", job: "Watch the build.", cwd: "work/lab" })).rejects.toThrow("is not the absolute path of a directory.");
 	await expect(create({ name: "Watcher", job: "Watch the build.", cwd: join(dir, "missing") })).rejects.toThrow("is not the absolute path of a directory.");
 	expect(left()).toEqual([]);

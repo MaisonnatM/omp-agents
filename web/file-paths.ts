@@ -47,6 +47,38 @@ export function absoluteFilePath(path: string, base: string | null): string | nu
 	return `/${segments.join("/")}`;
 }
 
+/** Where a relative path in a text starts: `dir`, and the session whose text it is, `null` for a file's text. */
+export interface FileBase {
+	dir: string;
+	session: string | null;
+}
+
+/**
+ * A file that a text names: `path`, absolute. A relative path in a session's text keeps its `session` and the path as
+ * written, so that when `path` holds no file the server looks in the directories that session's commands ran in.
+ */
+export interface FileTarget {
+	path: string;
+	lookup: { session: string; relative: string } | null;
+}
+
+/** The file that `path` in a text with `base` names, `null` when it is relative and the text has no base. */
+export function fileTarget(path: string, base: FileBase | null): FileTarget | null {
+	const absolute = absoluteFilePath(path, base?.dir ?? null);
+	if (absolute === null) return null;
+	return { path: absolute, lookup: base?.session && !isAbsolutePath(path) ? { session: base.session, relative: path } : null };
+}
+
+/** The query `GET /api/file` and `GET /api/media` read for `target`. */
+const fileQuery = ({ path, lookup }: FileTarget): URLSearchParams =>
+	new URLSearchParams(lookup ? { path, session: lookup.session, relative: lookup.relative } : { path });
+
+/** The `GET /api/file` address of the text file `target` names. */
+export const textFileUrl = (target: FileTarget): string => `/api/file?${fileQuery(target)}`;
+
+/** The `GET /api/media` address of the image or video `target` names. */
+export const mediaFileUrl = (target: FileTarget): string => `/api/media?${fileQuery(target)}`;
+
 interface MdNode {
 	type: string;
 	value?: string;

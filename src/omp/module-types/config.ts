@@ -4,6 +4,7 @@ import type { RetrySettings } from "../../shared/models";
 export interface DirsModule {
 	getSessionsDir(): string;
 	getAgentDir(): string;
+	getPluginsDir(): string;
 	getProjectDir(): string;
 	/** omp's user-level MCP config, `mcp.json` in the agent directory. */
 	getMCPConfigPath(scope: "user"): string;
@@ -40,6 +41,7 @@ export interface OmpSettingsInstance {
 export interface ConfigModule {
 	Settings: {
 		loadReadOnly(options: { cwd: string }): Promise<OmpSettingsInstance>;
+		isolated(values: Record<string, unknown>): OmpSettingsInstance;
 		/** A private instance that persists what is set on it, unlike omp's process-wide `Settings.init`. */
 		loadIsolated(options: { cwd: string }): Promise<OmpSettingsInstance>;
 	};
@@ -58,10 +60,12 @@ export interface SettingHandle {
 	readonly isCredential: boolean;
 	/** The environment variable that can supply the value. */
 	readonly envName: string | undefined;
+	get(settings: OmpSettingsInstance): unknown;
 	pinDefault(settings: OmpSettingsInstance): void;
 	readonly enumValues: readonly string[] | undefined;
 	/** @throws Error when `value` does not fit the setting. */
 	assertWritable(value: unknown): void;
+	get(settings: OmpSettingsInstance): unknown;
 	set(settings: OmpSettingsInstance, value: unknown): void;
 	setEntry(settings: OmpSettingsInstance, key: string, value: unknown): void;
 	/** Stages the removal of the key from the global `config.yml`, so the workspace's value, the variable's, or the default applies. */
@@ -134,6 +138,24 @@ export interface SessionSettingsModule {
 }
 export interface ModelSettingsModule {
 	cfgModelProviderOrder: SettingsReader<string[]>;
+}
+export interface GoalSettingsModule {
+	cfgGoalEnabled: SettingsReader<boolean>;
+	cfgGoalContinuationModes: SettingsReader<string[]>;
+}
+export interface AdvisorConfigModule {
+	discoverAdvisorConfigs(cwd: string): Promise<{ advisors: { model?: string; enabled?: boolean }[] }>;
+}
+export interface AdvisorSettingsModule {
+	cfgAdvisorEnabled: SettingsReader<boolean>;
+}
+/** Opaque native settings passed straight from omp's model resolver to its threshold resolver. */
+export type ModelCompactionSettings = Record<string, unknown>;
+export interface ModelCompactionSettingsModule {
+	resolveModelCompactionSettings(scope: OmpSettingsInstance, model: { provider: string; id: string } | undefined): ModelCompactionSettings;
+}
+export interface CompactionModule {
+	resolveThresholdTokens(window: number, settings: ModelCompactionSettings): number;
 }
 /** omp's release lookup (src/cli/update-cli.ts), the one `omp update` makes. */
 export interface UpdateCliModule {

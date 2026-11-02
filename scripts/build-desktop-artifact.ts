@@ -46,6 +46,7 @@ async function buildResources(): Promise<void> {
 	await bundle(join(ROOT, "src", "omp", "session-visuals-extension.ts"), RESOURCES, "session-visuals-extension.js", { target: "bun" });
 	await bundle(join(ROOT, "src", "omp", "bot-extension.ts"), RESOURCES, "bot-extension.js", { target: "bun" });
 	await bundle(join(ROOT, "src", "omp", "shepherd-extension.ts"), RESOURCES, "shepherd-extension.js", { target: "bun" });
+	await bundle(join(ROOT, "src", "omp", "router-extension.ts"), RESOURCES, "router-extension.js", { target: "bun" });
 	await bundle(join(ROOT, "src", "omp", "designer-extension.ts"), RESOURCES, "designer-extension.js", { target: "bun" });
 	// The installer reads its layers beside itself, as `templates/omp/install.ts` does in a checkout.
 	const kitOut = join(RESOURCES, "templates", "omp");
@@ -101,6 +102,8 @@ function builderConfig(): Record<string, unknown> {
 			entitlements: signed ? entitlements : undefined,
 			entitlementsInherit: signed ? entitlements : undefined,
 			notarize: signed,
+			// Dictation records in the bundled server, which macOS asks about in the app's name.
+			extendInfo: { NSMicrophoneUsageDescription: "omp-agents records your voice when you dictate a prompt, and turns it into text in the composer." },
 			identity: signed ? undefined : "-",
 		},
 		publish: mockPort ? { provider: "generic", url: `http://127.0.0.1:${mockPort}` } : { provider: "github", ...REPOSITORY },

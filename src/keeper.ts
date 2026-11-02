@@ -24,7 +24,7 @@ const WATCH_MS = 10_000;
 /** How long after a tool call ends the keeper notes them again: an async tool call starts its background job just after it returns. */
 const AFTER_TOOL_MS = 1_000;
 /** omp's `extension_ui_request` methods that wait for an answer; the others only show something. */
-const DIALOGS: Record<string, true> = { select: true, confirm: true, input: true, editor: true };
+const DIALOGS: Record<string, true> = { select: true, confirm: true, input: true, editor: true, ask: true };
 
 type Frame = Record<string, unknown>;
 

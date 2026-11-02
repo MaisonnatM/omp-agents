@@ -27,6 +27,8 @@ export interface PageShortcutInput {
 	hasDetails: boolean;
 	/** Sends the focused session **Open PR**'s prompt, or `null` while its header offers no **Open PR** to press. */
 	openPullRequest: (() => void) | null;
+	/** Opens the focused live dashboard session's goal editor, or `null` when unavailable. */
+	setGoal: (() => void) | null;
 	palette: PaletteState | null;
 	dispatchPalette: Dispatch<PaletteEvent>;
 	setShortcutsOpen: Dispatch<SetStateAction<boolean>>;
@@ -89,10 +91,6 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			switcher: () => latest.current.dispatchPalette(latest.current.palette ? { type: "close" } : { type: "open" }),
 			newSession: () => latest.current.openNewSession(),
 			getStarted: () => latest.current.navigate({ kind: "get-started" }),
-			inbox: () => {
-				if (latest.current.page?.kind === "inbox") return;
-				latest.current.navigate({ kind: "inbox", open: null });
-			},
 			previousSession: () => step(-1),
 			nextSession: () => step(1),
 			// ↑ and ↓ step only while the panes show: a page's list, or its native scrolling, keeps them.
@@ -138,11 +136,17 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				if (!openPullRequest) return false;
 				openPullRequest();
 			},
+			setGoal: () => {
+				const { setGoal } = latest.current;
+				if (!setGoal) return false;
+				setGoal();
+			},
 		};
 	}, []);
 	useShortcuts(handlers);
 	const { signedOutTabs, linearCallable, hasDetails } = input;
 	const canOpenPullRequest = input.openPullRequest !== null;
+	const canSetGoal = input.setGoal !== null;
 	const { canGoBack, canGoForward } = useHistoryPosition();
 	/** Commands that would do nothing now. */
 	const unavailable = useMemo(
@@ -153,10 +157,11 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				...(linearCallable ? [] : ["newTicket" as const]),
 				...(hasDetails ? [] : ["detailsSidebar" as const]),
 				...(canOpenPullRequest ? [] : ["openPullRequest" as const]),
+				...(canSetGoal ? [] : ["setGoal" as const]),
 				...(canGoBack ? [] : ["back" as const]),
 				...(canGoForward ? [] : ["forward" as const]),
 			]),
-		[signedOutTabs, linearCallable, hasDetails, canOpenPullRequest, canGoBack, canGoForward],
+		[signedOutTabs, linearCallable, hasDetails, canOpenPullRequest, canSetGoal, canGoBack, canGoForward],
 	);
 	return { handlers, unavailable };
 }

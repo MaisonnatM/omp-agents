@@ -1,6 +1,6 @@
 /** `DashboardSidebar`, one of the dashboard's two sidebars, resizable and closeable; `useSidebarPanels` keeps both panels' state and `SidebarToggle` shows or hides one. */
 import { type LucideIcon, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
-import { type ReactNode, useEffect, useState, useSyncExternalStore } from "react";
+import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Sidebar, type SidebarSide } from "@/components/ui/sidebar";
@@ -82,6 +82,8 @@ export interface SidebarPanel {
 	width: number;
 	/** The widest the sidebar can be in the window now, in px. */
 	max: number;
+	/** The window is too narrow to keep the sidebar beside a usable page, so the open sidebar floats over the page instead of shrinking it. */
+	floating: boolean;
 }
 
 const clamp = (width: number, max: number): number => Math.round(Math.min(max, Math.max(MIN_WIDTH, width)));
@@ -120,10 +122,13 @@ export interface SidebarPanels {
 export function useSidebarPanels(): SidebarPanels {
 	const sides: Record<SidebarSide, StoredPanel> = { left: useStoredPanel("left"), right: useStoredPanel("right") };
 	const windowWidth = useSyncExternalStore(subscribeResize, () => window.innerWidth);
-	const panel = (side: SidebarSide, max: number): SidebarPanel => ({ open: sides[side].open, width: clamp(sides[side].width, max), max });
-	const left = panel("left", SIDEBARS.left.maxWidth);
+	const floating = windowWidth < MIN_WIDTH + PANE_MIN_WIDTH;
+	const panel = (side: SidebarSide, max: number): SidebarPanel => ({ open: sides[side].open, width: clamp(sides[side].width, max), max, floating });
+	// A floating sidebar leaves the left rail uncovered, so its toggle stays in reach.
+	const floatingMax = Math.max(MIN_WIDTH, windowWidth - SIDEBARS.left.rail);
+	const left = panel("left", floating ? floatingMax : SIDEBARS.left.maxWidth);
 	const leftShown = left.open ? left.width : SIDEBARS.left.rail;
-	const panels = { left, right: panel("right", Math.max(MIN_WIDTH, Math.min(SIDEBARS.right.maxWidth, windowWidth - leftShown - PANE_MIN_WIDTH))) };
+	const panels = { left, right: panel("right", floating ? floatingMax : Math.max(MIN_WIDTH, Math.min(SIDEBARS.right.maxWidth, windowWidth - leftShown - PANE_MIN_WIDTH))) };
 	return {
 		panels,
 		resize: (side, width) => sides[side].setWidth(clamp(width, panels[side].max)),
@@ -220,6 +225,8 @@ interface DashboardSidebarProps {
 	panel: SidebarPanel;
 	onResize: (width: number) => void;
 	onToggle: () => void;
+	/** The address of what the page shows; a change closes a floating sidebar. */
+	address: string;
 	children: ReactNode;
 }
 
@@ -228,7 +235,7 @@ interface DashboardSidebarProps {
  * outer edge, so the toggle glides from the header's corner to the rail with the edge and follows a resize drag. The
  * hidden sidebar stays mounted, so its filter and scroll survive; the right one's toggle sits in the pane header (see `App`).
  */
-export function DashboardSidebar({ side, panel, onResize, onToggle, children }: DashboardSidebarProps) {
+export function DashboardSidebar({ side, panel, onResize, onToggle, address, children }: DashboardSidebarProps) {
 	const { id, rail, frame } = SIDEBARS[side];
 	// While the width moves: the transition applies only then, so a resize drag follows the pointer without lag.
 	const [moving, setMoving] = useState(false);
@@ -242,26 +249,46 @@ export function DashboardSidebar({ side, panel, onResize, onToggle, children }: 
 		const timer = window.setTimeout(() => setMoving(false), MOTION_MS);
 		return () => window.clearTimeout(timer);
 	}, [moving, panel.open]);
+	// A floating sidebar is a place to pick where to go: once a pick changes the address, it gets out of the page's way.
+	const floatingOpen = panel.floating && panel.open;
+	const shownAddress = useRef(address);
+	useEffect(() => {
+		if (shownAddress.current === address) return;
+		shownAddress.current = address;
+		if (floatingOpen) onToggle();
+	}, [address, floatingOpen, onToggle]);
 	// While a resize drag runs: a page in a `<webview>`, the Browser's, would take the pointer from the handle's capture once it crosses into it.
 	const [dragging, setDragging] = useState(false);
+	const sliding = !panel.floating && moving;
 	return (
 		<div
 			className={cn(
 				"relative flex h-full shrink-0",
 				frame,
-				(!panel.open || moving) && "overflow-hidden",
-				moving && cn("transition-[width]", MOTION),
-				rail > 0 && !panel.open && "border-r border-border",
+				!panel.floating && (!panel.open || moving) && "overflow-hidden",
+				sliding && cn("transition-[width]", MOTION),
+				rail > 0 && (!panel.open || panel.floating) && "border-r border-border",
 			)}
-			style={{ width: panel.open ? panel.width : rail, transitionDuration: `${MOTION_MS}ms` }}
+			style={{ width: panel.open && !panel.floating ? panel.width : rail, transitionDuration: `${MOTION_MS}ms` }}
 		>
+			{floatingOpen && <button type="button" aria-label={`Hide the ${SIDEBARS[side].name.toLowerCase()} sidebar`} className="fixed inset-0 z-30 cursor-default bg-black/20" onClick={onToggle} />}
 			{/* Closing, it turns inert at once so focus and clicks leave it, and hidden once the width has slid shut. */}
-			<Sidebar id={id} side={side} hidden={!panel.open && !moving} inert={!panel.open} className={cn("relative h-full", dragging && "[&_webview]:pointer-events-none")} style={{ width: panel.width }}>
+			<Sidebar
+				id={id}
+				side={side}
+				hidden={!panel.open && !sliding}
+				inert={!panel.open}
+				className={cn(panel.floating ? cn("absolute inset-y-0 z-40 bg-background shadow-xl", side === "left" ? "left-0" : "right-0") : "relative", "h-full", dragging && "[&_webview]:pointer-events-none")}
+				style={{ width: panel.width }}
+			>
 				{children}
 				<SidebarResizeHandle side={side} width={panel.width} max={panel.max} onWidth={onResize} onDragging={setDragging} />
 			</Sidebar>
 			{rail > 0 && (
-				<div className="absolute top-[calc((var(--page-header-height)-1.75rem)/2)] right-[9px] z-10">
+				<div
+					className={cn("absolute top-[calc((var(--page-header-height)-1.75rem)/2)]", floatingOpen ? "z-50" : "right-[9px] z-10")}
+					style={floatingOpen ? { left: panel.width - 9 - 28 } : undefined}
+				>
 					<SidebarToggle side={side} open={panel.open} onToggle={onToggle} />
 				</div>
 			)}

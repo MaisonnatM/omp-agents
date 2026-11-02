@@ -20,19 +20,19 @@ test("an event stays toasted and opens the Calendar page when kept on this compu
 
 test("an update's action, failure, and toast follow its status", () => {
 	const update = (status: Extract<Notice, { kind: "omp" }>["status"], seen = false): Notice => ({ id: "u", ...flags, seen, kind: "omp", current: "1", latest: "2", status });
-	expect(presentNotice(update({ state: "available" }, true), NOW)).toMatchObject({ source: "updates", headline: "omp 2 is out", link: null, action: { kind: "update", label: "Update", ready: true }, toast: { kind: "update", dismissedElsewhere: true } });
-	expect(presentNotice(update({ state: "updating" }), NOW)).toMatchObject({ busy: true, action: { label: "Updating", ready: false } });
+	expect(presentNotice(update({ state: "available" }, true), NOW)).toMatchObject({ source: "updates", headline: "omp 2 is out", link: null, action: { kind: "update", updating: false, ready: true }, toast: { kind: "update", dismissedElsewhere: true } });
+	expect(presentNotice(update({ state: "updating" }), NOW)).toMatchObject({ busy: true, action: { updating: true, ready: false } });
 	expect(presentNotice(update({ state: "failed", error: "boom" }), NOW)).toMatchObject({ failed: true, preview: "boom", action: { ready: true } });
 	expect(presentNotice(update({ state: "updated", note: "done" }), NOW).action).toEqual({ kind: "none" });
 });
 
 test("new omp-agents commits name their count and branch, and their Update pulls and restarts", () => {
 	const dashboard = (commits: number): Notice => ({ id: "d", ...flags, kind: "dashboard", branch: "main", commits, status: { state: "available" } });
-	expect(presentNotice(dashboard(1), NOW)).toMatchObject({ source: "updates", headline: "omp-agents update: 1 new commit on main", preview: "Update pulls them and restarts omp-agents.", action: { kind: "update", label: "Update", ready: true } });
+	expect(presentNotice(dashboard(1), NOW)).toMatchObject({ source: "updates", headline: "omp-agents update: 1 new commit on main", preview: "Update pulls them and restarts omp-agents.", action: { kind: "update", updating: false, ready: true } });
 	expect(presentNotice(dashboard(4), NOW).headline).toBe("omp-agents update: 4 new commits on main");
 });
 
-test("sessions that stopped mid-turn are counted, named as past sessions are, stay toasted, and Continue all carries their ids", () => {
+test("sessions that stopped mid-turn are counted, named as past sessions are, stay toasted, open the first of them, and Continue all carries their ids", () => {
 	const stopped = (sessions: StoppedSession[]): Notice => ({ id: "x", ...flags, kind: "stopped", sessions });
 	expect(presentNotice(stopped([{ sessionId: "s1", title: "Fix the login", cwdDisplay: "~/code/webapp" }]), NOW)).toMatchObject({ source: "sessions", headline: "1 session stopped mid-turn", preview: "Fix the login" });
 	expect(
@@ -47,7 +47,7 @@ test("sessions that stopped mid-turn are counted, named as past sessions are, st
 	).toMatchObject({
 		headline: "3 sessions stopped mid-turn",
 		preview: "Fix the login · api · Untitled session",
-		link: null,
+		link: { href: "#session/s1", external: false },
 		action: { kind: "continue-all", sessionIds: ["s1", "s2", "s3"] },
 		toast: { kind: "news", timeout: 0 },
 	});

@@ -7,6 +7,7 @@ import { type LinkedPullRequest, parsePullRequest, type PullRequest, samePullReq
 import type { ModelOption } from "./models";
 import type { TrustAsk } from "./project-trust";
 import type { ReplayFacts } from "./replay";
+import type { AdvisorState, CompactionState, GoalSlot } from "./session-controls";
 import { TICKET_ID } from "./tickets";
 import type { Workspace } from "./workspaces";
 
@@ -132,25 +133,17 @@ interface RosterHostBase extends SessionFacts {
 	unread: UnreadTurn | null;
 }
 
-/**
- * A turn that ended unseen: when, in ms since the epoch, the first line of its reply, the reply itself cut to {@link UNREAD_BODY_MAX}
- * characters, both `null` when it ended on none, and the prompts its `Suggestions:` block offered, which the Inbox sends in one click.
- */
+/** A turn that ended unseen: when, in ms since the epoch, and the first line of its reply, `null` when it ended on none. */
 export interface UnreadTurn {
 	at: number;
 	reply: string | null;
-	body: string | null;
-	suggestions: string[];
 }
-
-/** The most characters of an unread turn's reply each roster push carries. */
-export const UNREAD_BODY_MAX = 4000;
 
 export type RosterHost = RosterHostBase &
 	(
 		| { source: "terminal"; participants: number; relayConnected: boolean }
 		/** Started by this dashboard, which can end it. */
-		| { source: "dashboard"; thinkingLevels: string[]; switching: boolean; fast: FastMode | null }
+		| { source: "dashboard"; thinkingLevels: string[]; switching: boolean; fast: FastMode | null; compaction: CompactionState; advisor: AdvisorState | null; goal: GoalSlot }
 	);
 
 /** omp's `/fast` for the session's model: whether you turned it on, and whether requests go out on the priority tier. */

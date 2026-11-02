@@ -5,8 +5,53 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-02
 
-- Storage cleans up omp's files.
 - Behind the scenes: checked against omp 18.15.0, which keeps the daily compression log that Storage reads.
+- In a narrow window, such as a phone, an open sidebar now slides over the page instead of squeezing it to a sliver; picking a page or tapping outside closes it.
+- Behind the scenes: every test now ignores the session it runs from, so a test added later cannot stamp an agent's session on its commits and fail "Merge on main".
+- Settings, Workspaces: long folder paths now wrap onto a second line instead of being cut off, in both the workspace list and Trusted projects.
+- Agents working in a separate copy of a project can no longer read or edit the main copy by mistake through a short file path; they are told the full path to use instead.
+- Fixed: a question an agent asks you, such as whether to mark its pull request ready, no longer disappears when the dashboard updates and restarts, which left the session waiting on an answer you could not give.
+- A /ship session now asks you once before marking its pull request ready for review, instead of twice.
+- A routine scheduled only on some weekdays now ignores its triggers on the other days, so a weekdays-only routine no longer wakes on weekend pull requests or Slack messages.
+- A Router's task whose session crashes or is killed mid-step is now restarted right away instead of waiting for your review; ending its session yourself still moves it to Needs you.
+- A Router can now start a task on a pull request it read about or whose branch its own folder holds; its own conversation no longer counts as working on that pull request.
+- A /ship session that ticks a review box and moves on right away is no longer refused for a missing box: the check reads the pull request once more before it says no.
+- The Inbox page is gone: the Sessions sidebar no longer shows its row and G then I no longer opens it, while the notification bell and the Sessions tab's count of sessions that need you stay.
+- The context button in the composer, and any button whose label holds an icon, now centers its icon instead of sitting a few pixels high.
+- New Bot type, Router: a Bot named Atlas that answers at once and hands real work to background sessions, which its new Tasks tab groups into Needs you, In progress, and Done.
+- A Router's task moves to Needs you when its session finishes, and the Router tells you in one line; Mark done and Stop in a task's menu close it.
+- A Router's task that gets stuck, repeats the same step, or whose session dies is restarted with what went wrong; after two restarts it is stopped and the Router tells you why.
+- A task the Router cannot restart is stopped at once, with the reason in the Tasks tab, and the Router tells you.
+- A Router's task in the middle of a long build or test run gets 30 minutes before it counts as stuck, instead of six.
+- A new Router comes with a Team events routine, so it hears about Slack messages waiting on you and pull requests that need your move.
+- A Router skips team messages that need nothing, such as "thanks!", and its next run tells you how many it skipped.
+- News on a pull request or Slack thread a Router's task follows goes straight to that task, without waking the Router.
+- A Router starts a quiet task for a bug report nobody answered, which posts in the thread only once it has a result.
+- You can click an image in a pull request's description or comments to open it large.
+- Diff code blocks in a pull request's description and comments now show as colored diffs, one card per file, with line numbers when the block has them.
+- Fixed: a file or image an agent names relative to a folder it moved into with `cd` now opens, instead of showing "No file".
+- Fixed: the Inbox no longer jumps to a new question while you work on another item.
+- Fixed: on a narrow window, Close or Escape in the Inbox brings the list back.
+- Fixed: the Inbox lists questions from pinned sessions first, as the sidebar does.
+- Fixed: the Inbox no longer offers End session for a session you can only watch.
+- Fixed: a pull request's quick action in the Inbox keeps you in the Inbox.
+- Fixed: Open on a stopped-sessions notice now opens the first session it names.
+- Fixed: the Sessions tab's count now matches the Inbox, leaving out turns you already read.
+- Behind the scenes: What's new now drops its oldest days on its own when the list grows too long, so new changes always fit.
+- Fixed: a turn a terminal session finished stays in the Inbox when the dashboard restarts, and one it finished while the dashboard was stopped shows up once it starts again.
+- The Inbox shows a session's whole conversation and message box, R puts the cursor there, and opening an item leaves it unread.
+- Inbox buttons show a spinner, the 1 to 9 and 0 keys send through the message box, and the next item opens once the item is done.
+- The starter kit's models match the current setup: Opus picks its own effort, Haiku 5.5 runs cheap roles, fallbacks use newer Codex models, and OpenRouter is gone.
+- The starter kit's /poteto-mode now finds pstack's poteto style where the pstack plugin actually installs it, so it works on a new computer.
+- Fixed: finished turns stay in the Inbox when the dashboard restarts, such as after an update, and a turn that finishes while the dashboard is stopped shows up once it starts again.
+- Fixed: opening an Inbox item no longer marks the session it replaces on screen as read.
+- You can dictate a prompt: press the microphone in the message box, or Cmd+Shift+M, speak, and your words land where your cursor was, ready for you to check before you send.
+- The first time you dictate, the message box offers to turn dictation on, and says where your speech is turned into text.
+- Settings now has an Extensions library for installed packages, marketplace catalogs, registry skills, and their contributions, with native install, update, enable, disable, and uninstall actions.
+- Settings › Extensions manages plugins and registry skills and previews their files.
+- Packaged workflows open read-only, with a link to manage their package.
+- Settings › Agents previews new-session agents, with model overrides and execution defaults.
+- Clean up omp's disk use from the disk reading in the bottom bar: review files, confirm each cleanup run, and edit the rules in Settings, Storage.
 - A long folder name in the message box now ends in … instead of running past the box and under the model switch.
 - /ship now plans before it builds: the agent compares up to three ways to do the work, keeps the best, and posts that plan on the Linear issue, or in the pull request when there is no issue.
 - /ship no longer needs a Linear ticket: it uses the one you name or one that matches the work, and otherwise ships without one instead of creating a ticket.
@@ -14,6 +59,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The Ship card shows the new Plan step between Ticket and Implement.
 - Settings has a new omp settings section: omp's own settings in omp's tabs, with search, saved to your config.yml as you change them.
 - In omp settings, a dot marks a setting changed from omp's default, Reset puts it back, and a setting this workspace sets shows locked, with a link to its file.
+- The context ring now opens Compact, Shake out, Hand off, and a session-only Auto-compact switch.
+- The model menu has an Advisor switch, and the session header lets you set, edit, pause, resume, or clear a goal with an optional token budget.
 - You can drag a Bot in the Bots tab onto Pinned, a section, or Other Bots.
 - Fixed: routines no longer start during the few seconds a sleeping Mac wakes on its own for Power Nap; they wait until you wake it, and news that came in overnight starts one run.
 - Fixed: a routine's command no longer counts time the Mac spent asleep toward its 10-minute limit, and when the Mac slept during a run, the routine's message to the Bot says for how long.
@@ -199,79 +246,3 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Behind the scenes: the Pull requests list now uses about a twenty-fifth of the GitHub allowance it used before.
 - Behind the scenes: quick actions on pull requests and tickets start in the branch's own folder, and agents can no longer wipe a pull request's description by mistake.
 - Behind the scenes: agents suggest more useful next prompts, and the agent starter kit gained upkeep scripts and a checklist for setting up a new computer.
-
-## 2026-10-26
-
-- A Dev and Ops switch in the header splits the sidebar tabs into two groups, and Settings moved to the gear button in the header.
-- Cmd+1 through Cmd+4 now count only the tabs of the group the switch shows.
-- The command menu and the bell moved to the desktop app's title bar and the page headers.
-- The dashboard now runs only in the desktop app, and a browser tab can no longer sign in.
-- Opening a ticket shows its details beside the list, laid out like a pull request, and Cmd+N creates a ticket on the tickets page.
-- Click a session's title in its header to rename it.
-- The folder and branch pickers and the context usage ring now sit inside the message box.
-- Session rows are simpler: the status dot comes before the title, and the workspace name sits beside the age.
-- In the Pull requests list you can change a pull request's reviewers from its row and right-click a row for its menu, and the reviewer pickers show people's pictures and names.
-- Right-click a todo, a note, or a mail conversation for a menu of actions.
-- Hover the CPU reading in the status bar to see what each session runs, with a Stop button for each, in place of the Processes tab.
-- Settings › Activity shows which pages, shortcuts, and commands you used over the last 30 days, and which features you never touch.
-- Settings › Worktrees shows totals and disk use, filters for All, Merged, and Removable, and lets you act on several rows at once.
-- The Calendar's Show routines checkbox hides routine runs from the month.
-- Agents can now edit, file, and delete your todos, not only add them.
-- A session's header now links only the pull requests and tickets it actually worked on.
-- The Projects page is gone.
-- Behind the scenes: two sessions sharing a folder can no longer overwrite each other's unsaved work.
-- Behind the scenes: a security, speed, and quality review made the dashboard safer and quicker to load.
-- Behind the scenes: checked against omp 18.12.6.
-
-## 2026-10-23
-
-- Conversations can now show diagrams and charts.
-- An agent's file edits now show as cards with the lines it removed and added.
-- A changes card above the message box gathers the files and images a session touched.
-- New Notes page, G then N, for your own notes, which agents can add to as well.
-- The new session screen lists your todos, recent sessions, and pull requests waiting on you, so you can pick one up in one click.
-- The clock button in the message box opens Chat history, which gathers every prompt you sent in a session.
-- Conversations are narrower and easier to read, the buttons by a session's title appear on hover, and pointing at a link shows its address at the bottom of the window.
-- When sessions stop in the middle of their work, the bell offers Continue all to pick them all back up.
-- A session that stops on a dropped connection or a brief provider error now tries again on its own, waiting longer each time.
-- Rebase on main, in a pull request's menu, brings it up to date with no agent involved, and Rebase N behind does it for every pull request that is behind.
-- A session's details list the programs it runs, each with Stop, and the dashboard stops them for you once the session has sat idle for a while.
-- Fixed: ending one session no longer stops the browser and helpers that other sessions share.
-- Behind the scenes: the usage guides are now one page per feature, so agents find the right one faster.
-
-## 2026-10-22
-
-- Pull request details have a new look, with a cleaner header, Summary, Timeline, and Code tabs, and a popover for checks.
-- In the Code tab you can mark files as Viewed and comment on a line or a range of lines.
-- A round button at the bottom right of a pull request's details opens a box to comment, or to submit a review that comments, approves, or requests changes.
-- The Check out menu opens a pull request in a separate folder with a new session, or checks it out in your repository.
-- The Board view shows pull requests in columns by whose move it is, and dragging a card to another column does the step that moves it there.
-- Todo, session, ticket, and pull request chips in your sent messages now open inside the dashboard.
-- Behind the scenes: agents check more carefully before they publish a pull request, such as a ticked browser proof box when the pull request asks for one.
-
-## 2026-10-21
-
-- Select text in a conversation or in a pull request's code and choose Ask about this to ask a side question without disturbing the session.
-- The Review quick action now saves its findings as a review draft that you check, edit, and post yourself, from the Review draft tab.
-- Settings › Sync keeps your setup the same on all your computers, through a private Git repository of yours.
-- You can select images a session made and attach them to its pull request or Linear issue.
-- Open PR now goes away as soon as the session opens its pull request.
-- Buttons and colors got a refreshed look.
-- Behind the scenes: agents now work directly in the branch's folder when it is not main.
-
-## 2026-10-20
-
-- Sessions started from the dashboard keep running when the dashboard restarts or crashes.
-- You get a notification when a session asks you something or finishes, and the Dock icon counts the sessions waiting on you.
-- Open PR, in a working session's header and in the command menu, asks the agent to commit, review its work, and open a pull request.
-- Merge now waits until GitHub allows it, Merge stack merges a whole stack from the bottom up, and After a merge ends the finished sessions and tidies up after them.
-- Update dashboard, from the bell or the command menu, loads the newest version and restarts in place.
-- A session stopped by a provider's usage limit now continues on its own when the limit resets.
-- Each message box keeps what you typed but didn't send, per session, when you switch away or reload.
-- Images and videos from an agent's tools or named in its messages now show in the conversation, and one viewer steps through them all.
-- An agent's questions now come as one form, one question at a time, with checkboxes where several answers fit.
-- Session rows are tidier, their actions open on right-click, and a button next to a session's title copies its ID.
-- Picking several suggested prompts sends them together as one list.
-- Fixed: a pull request that is ready but behind its base now says so instead of Ready to merge.
-- Fixed: routines keep track of their sessions after the dashboard restarts.
-- Behind the scenes: every update to the main code now ships a new version, and agents got a glossary and a log of past decisions.

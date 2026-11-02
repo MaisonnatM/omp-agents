@@ -30,7 +30,7 @@
   Unread notices list under **New** with a blue dot, and read ones under **Earlier**.
   A pull request's or Slack message's notice shows the picture of who it comes from, or their initial when Slack's sign-in cannot read profiles without `users:read`.
 - A notice you open is read: a pull request's opens its details on the Pull requests page, a Slack message's opens it in Slack in your default browser, a provider's opens **Settings › Providers**, and an event's opens it in Google Calendar in your default browser, or the **Calendar** page for an event on this computer.
-  Selecting an update's or stopped sessions' notice marks it read.
+  Selecting an update's notice marks it read, and a stopped sessions' notice opens the first session it names.
   The check mark in the header marks every notice in the filter read.
 - Each pull request notice offers the move's quick action, such as **Review** or **Fix CI**, which starts a session on it and opens its page, or **Merge** for one ready to merge.
   **Merge** asks before it merges, with the merge methods the repository allows, as the pull request's details do, and marks the notice read once the dashboard took the merge, which it makes at once or once GitHub allows it; when the dashboard refuses it, a toast says why.
@@ -57,7 +57,8 @@
   Clicking it brings the window up on that session.
 - Each question and each finished turn raises one notification, and a newer one of the same session replaces the one before; a session that asks while its turn is unread notifies the question.
   A session that already waited when the page loads, or when the page reconnects, raises none.
-- A finished turn stays unread until a pane shows the session, not one of its subagents, in a focused window, or its next turn starts; the server keeps which turns are unread, so every window agrees.
+- A finished turn stays unread until a pane shows the session, not one of its subagents, in a focused window, or its next turn starts; the server keeps which turns are unread, so every window agrees, and keeps them when the dashboard restarts, as it does after an update.
+  A turn that finishes while the dashboard is stopped shows unread once it starts again, in a session started from the dashboard or in a terminal.
 - The app shows them unless **Settings › Preferences › Notifications** turns them off, and keeps its choices in its localStorage:
   - **Also when a session finishes a turn** off notifies questions only; a turn finished meanwhile raises nothing when you turn it back on.
   - **Sound** picks what a notification plays: **None**, **System default**, or one of macOS's sounds, such as Glass or Ping; picking one plays it.

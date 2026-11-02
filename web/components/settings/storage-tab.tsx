@@ -2,18 +2,15 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Check, Circle, LoaderCircle, RefreshCw, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorText } from "../../../src/json";
-import type { AgentSettingChange, AgentSettingRow } from "../../../src/shared/agent-settings";
-import type { OmpSettings } from "../../../src/shared/models";
 import { CLEANUP_STEPS, type CleanupStep, type GcAnswer, type SandboxPlan, type StorageUsage } from "../../../src/shared/storage";
 import { Button } from "@/components/ui/button";
-import { ApiError, getJson, putJson } from "../../api";
+import { getJson, putJson } from "../../api";
 import { activityControl } from "../../activity";
 import { age, formatBytes } from "../../labels";
 import { valueOf } from "../../omp-settings";
 import { hashForSettings } from "../../routing";
 import { cleanupRows, runCleanup, type CleanupRow, type CleanupRun, type StepProgress } from "../../storage";
-import { ErrorText, LINK, Section } from "./editor";
-import { SettingRow } from "./omp-settings-tab";
+import { ErrorText, LINK, type RowContext, Section, SettingRow } from "./editor";
 
 function UsageSection({ usage, error }: { usage: StorageUsage | null; error: string | null }) {
 	return (
@@ -90,21 +87,25 @@ function ChecklistRow({ row, status, loading, finished, disabled, checked, onChe
 }
 
 function Rules({ usage, onRefresh, onSaved, busy }: { usage: StorageUsage; onRefresh: () => Promise<void>; onSaved: () => void; busy: boolean }) {
-	const save = async (row: AgentSettingRow, change: AgentSettingChange): Promise<void> => {
-		try {
-			await putJson<OmpSettings>("/api/settings/agent", { id: row.id, expected: row.user ?? null, ...change });
-			onSaved();
-		} catch (error) {
-			if (error instanceof ApiError && error.conflict) throw new ApiError(`${row.label} changed on disk. It has been reloaded; review it and try again.`, true);
-			throw error;
-		} finally { await onRefresh(); }
+	const editing: RowContext["editing"] = {
+		cwd: null,
+		reload: () => void onRefresh(),
+		write: async send => {
+			try {
+				const settings = await send();
+				onSaved();
+				return settings;
+			} finally {
+				await onRefresh();
+			}
+		},
 	};
 	const overrides = usage.rules.filter(row => usage.overrides.includes(row.id)).map(row => row.label.toLowerCase());
 	return (
 		<Section title="Cleanup rules" meta="Changes save immediately for all workspaces. These switches choose the default checklist, not a daily cleanup.">
 			{usage.settingsError ? <ErrorText>Cannot load cleanup rules. {usage.settingsError}</ErrorText> : (
 				<ul className="divide-y divide-border">
-					{usage.rules.map(row => <SettingRow key={row.id} row={row} context={{ save }} disabled={busy} />)}
+					{usage.rules.map(row => <SettingRow key={row.id} row={row} context={{ editing }} disabled={busy} />)}
 				</ul>
 			)}
 			{overrides.length > 0 && (

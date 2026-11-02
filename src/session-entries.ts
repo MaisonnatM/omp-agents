@@ -1,5 +1,6 @@
 /** The vocabulary of omp's session-file entries: what the folds over a transcript read out of an entry, each in one place. */
-import { isObject, str } from "./json";
+import { isObject, parseJson, str } from "./json";
+import { readTail } from "./read-tail";
 import { PROMPT_IMAGE_TYPES } from "./shared/sessions";
 
 const SUMMARY_MAX = 160;
@@ -57,6 +58,21 @@ export function toolSummary(args: unknown, intent: unknown): string {
 export function entryTime(entry: Record<string, unknown>): number | null {
 	const at = Date.parse(str(entry.timestamp) ?? "");
 	return Number.isFinite(at) ? at : null;
+}
+
+/** How much of a session file's end {@link tailEntries} reads; an entry further back is not looked at. */
+const SESSION_TAIL = 256 * 1024;
+
+/**
+ * The entries in the last {@link SESSION_TAIL} bytes of session file `path`, newest first, read as the caller asks for
+ * the next one; none when the file is gone. Throws what reading the file throws otherwise.
+ */
+export function* tailEntries(path: string): Generator<Record<string, unknown>> {
+	const lines = readTail(path, SESSION_TAIL)?.text.split("\n") ?? [];
+	for (let i = lines.length - 1; i >= 0; i--) {
+		const entry = parseJson(lines[i]!);
+		if (isObject(entry)) yield entry;
+	}
 }
 
 /** The entry a Claude Code or Codex reader makes of a line it does not know, which the transcript shows as a warning. */

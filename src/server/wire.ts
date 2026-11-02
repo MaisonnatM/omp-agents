@@ -8,6 +8,7 @@
 import { BASE64, isDay, isNonEmpty, isObject, isSafeInteger, isTexts, oneOf, parseAll, type Parsed, str } from "../json";
 import { parseRoutineSpec, type RoutineChange } from "../routines";
 import { parseBotChange } from "../shared/bots";
+import { parseRouterTaskChange } from "../shared/router";
 import {
 	GOOGLE_CLIENT_ID,
 	type GoogleClientInput,
@@ -32,6 +33,7 @@ import {
 import { type CalendarShownInput, type EventRef, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar, parseEventWhen } from "../shared/calendar";
 import { MAX_MAIL_BODY, type MailDraft, type MailPerson, type MailReply, type MailSend, type MailTrash } from "../shared/gmail";
 import { parseImages, parseModel, parseNewSessionRequest, parseSkill, parseThinking } from "../shared/sessions";
+import { parseContextAction, parseGoalChange } from "../shared/session-controls";
 import { MAX_PROMPT_DOCUMENT_BYTES, type PromptDocument } from "../shared/prompt-files";
 import type { DevServerRequest, ProcessStop } from "../shared/processes";
 import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
@@ -67,6 +69,7 @@ import { canSubmitReview, FINDING_STATES, REVIEW_VERDICTS, type ReviewDraftEdit,
 import { MERGE_METHODS, type SourceControlChange } from "../shared/source-control";
 import { isSyncSide, type SyncSide } from "../shared/settings-sync";
 import { type ActivityEvent, isActivityEvent, MAX_ACTIVITY_BATCH } from "../shared/activity";
+import { MAX_CAPTURE_ID } from "../shared/dictation";
 import type { AckedFrame, ClientFrame, ClientMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
 import type { AskReply, CompletionScope, LiveView, StartRequest, UserAnswer, View } from "../shared/sessions";
@@ -268,6 +271,8 @@ function parseViews(value: unknown): View[] | null {
 
 const withinLength = (value: unknown, max: number): value is string => isNonEmpty(value) && value.length <= max;
 
+const isCaptureId = (value: unknown): value is string => withinLength(value, MAX_CAPTURE_ID);
+
 function parseDiscussionTurn(value: unknown): DiscussionTurn | null {
 	if (!isObject(value)) return null;
 	const { question, answer } = value;
@@ -365,6 +370,18 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 		typeof instanceId === "string" && typeof level === "string" ? { ok: { t: "set-thinking", instanceId, level } } : null,
 	"set-fast": ({ instanceId, enabled }) =>
 		typeof instanceId === "string" && typeof enabled === "boolean" ? { ok: { t: "set-fast", instanceId, enabled } } : null,
+	context({ instanceId, action }) {
+		const parsed = parseContextAction(action);
+		return typeof instanceId === "string" && parsed ? { ok: { t: "context", instanceId, action: parsed } } : null;
+	},
+	"set-auto-compaction": ({ instanceId, enabled }) =>
+		typeof instanceId === "string" && typeof enabled === "boolean" ? { ok: { t: "set-auto-compaction", instanceId, enabled } } : null,
+	"set-advisor": ({ instanceId, enabled }) =>
+		typeof instanceId === "string" && typeof enabled === "boolean" ? { ok: { t: "set-advisor", instanceId, enabled } } : null,
+	goal({ instanceId, change }) {
+		const parsed = parseGoalChange(change);
+		return typeof instanceId === "string" && parsed ? { ok: { t: "goal", instanceId, change: parsed } } : null;
+	},
 	answer(value) {
 		const { instanceId, requestId } = value;
 		const answer = parseAnswer(value.answer);
@@ -385,6 +402,10 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	bot(value) {
 		const change = parseBotChange(value.change);
 		return change && { ok: { t: "bot", change } };
+	},
+	"router-task"(value) {
+		const change = parseRouterTaskChange(value.change);
+		return change && { ok: { t: "router-task", change } };
 	},
 	schedule(value) {
 		const change = parseScheduledChange(value.change);
@@ -408,6 +429,9 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 		return isCounter(value.id) && request ? { ok: { t: "discuss", id: value.id, request: request.ok } } : null;
 	},
 	"discuss-stop": ({ id }) => (isCounter(id) ? { ok: { t: "discuss-stop", id } } : null),
+	"dictation-start": ({ captureId, cwd }) => (isCaptureId(captureId) && isNonEmpty(cwd) ? { ok: { t: "dictation-start", captureId, cwd } } : null),
+	"dictation-stop": ({ captureId }) => (isCaptureId(captureId) ? { ok: { t: "dictation-stop", captureId } } : null),
+	"dictation-discard": ({ captureId }) => (isCaptureId(captureId) ? { ok: { t: "dictation-discard", captureId } } : null),
 	activity({ client, first, events }) {
 		if (typeof client !== "string" || !UUID.test(client) || !isCounter(first) || !Array.isArray(events) || events.length === 0 || events.length > MAX_ACTIVITY_BATCH) return null;
 		const parsed = parseAll(events, parseActivityEvent);

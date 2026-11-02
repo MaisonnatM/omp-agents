@@ -17,10 +17,11 @@ Start a UI change here, then read that file's entry under [Page](#page).
 
 - Composer, the box you type a prompt in: `InputMessage` in `web/components/ui/input-message.tsx`, with its text field, `PromptEditor`, in `web/components/prompt-editor.tsx`.
   A live session mounts it in `web/components/conversation.tsx`, and the new-session page in `web/components/new-session.tsx`.
-- The composer's directory, branch, and context ring: the directory is `DirectoryPicker` in `web/components/workspace-picker.tsx`, or `DirectoryLabel` in `web/components/composer.tsx` where the session cannot move, in the composer's `leftSlot`, followed in the new-session draft by `BranchPicker` in `web/components/git.tsx`; the ring is `ContextRing` in `web/components/context-ring.tsx`, in its `rightSlot`.
+- The composer's directory, branch, and context ring: the directory is `DirectoryPicker` in `web/components/workspace-picker.tsx`, or `DirectoryLabel` in `web/components/composer.tsx` where the session cannot move, in the composer's `leftSlot`, followed in the new-session draft by `BranchPicker` in `web/components/git.tsx`; the ring is `ContextRingMenu` for dashboard sessions and read-only `ContextRing` for terminal sessions in `web/components/context-ring.tsx`, in its `rightSlot`.
 - Rows above the composer: queued prompts in `web/components/composer-queue.tsx`, suggested prompts in `web/components/composer-suggestions.tsx`, scheduled sends in `web/components/scheduled.tsx`, and the open question, `UserRequestCard` in `web/components/user-request.tsx`, drawn by `question-card.tsx`.
 - `/` and `@` menus: `CompletionPopup` in `web/components/completion-popup.tsx`, over `web/mentions.ts`.
 - Model and thinking switch: `ModelSlot` in `web/components/model-slot.tsx`, whose menu is `web/components/model-picker.tsx`.
+- Session goal: `SessionGoalControl` in `web/components/session-goal.tsx` mounts in the conversation header; `App` owns its `GoalDialog` and the shared `editGoal` action, which the focused-session palette command runs through `use-page-shortcuts.ts`.
 - Conversation pane: `web/components/pane.tsx`, laid out by `PaneGrid` in `web/components/pane-grid.tsx`, with the panes' divider in `web/components/split-resize-handle.tsx`.
   Its header is `ConversationHeader` in `web/components/conversation-header.tsx`, and a past session's view is `web/components/past-conversation.tsx`.
   The session title in either header, which a click turns into a field that renames the session, is `SessionTitle` in `web/components/session-title.tsx`.
@@ -53,7 +54,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Left sidebar: `Roster` in `web/components/roster.tsx`, wired by `web/components/app-sidebar.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which slides it open and shut and draws its toggle over the header's corner; the Sessions tab is `web/components/session-list.tsx` and a row is `web/components/session-row.tsx`.
 - Right sidebar, the session details: `SessionDetails` in `web/components/session-details.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which `web/app.tsx` mounts.
   Its tabs are **PRs** in `session-pull-requests-tab.tsx`, **Browser** in `browser-panel.tsx`, and **Tickets** in `session-tickets-tab.tsx`, all in `web/components/`.
-  The **Images** section and the transcript share `ImageViewer` from `web/components/media-viewer.tsx`, with the image, its caption, `N of M`, previous and next buttons and arrow keys, open in the default browser, and Close.
+  The **Images** section, the transcript, and a pull request's Markdown share `ImageViewer` from `web/components/media-viewer.tsx`, with the image, its caption, `N of M`, previous and next buttons and arrow keys, open in the default browser, and Close.
 - Pull request details, with the **Summary**, **Timeline**, **Code**, and **Review draft** tabs: `PullRequestDetailContent` in `web/components/pull-requests/pr-details/index.tsx`, with **Summary** in `summary.tsx` and **Review draft** in `review-draft.tsx` beside it.
   The floating comment and review composer at its bottom right, on the Pull requests page only, is `PullRequestComposer` in `pr-details/composer.tsx`.
   `header.tsx` draws T3's crumbs, **Check out** menu, inline-confirmed primary action, title editor, base freshness warning, copyable command and branch, stack menu, and linked-sessions count; the **Check out** menu is `CheckoutMenu` in `checkout-menu.tsx`.
@@ -75,6 +76,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - Settings › Decisions, a workspace repository's decision records: `DecisionsTab` in `web/components/settings/decisions-tab.tsx`.
 - A file opened from a path in agent text: `web/components/file-dialog.tsx`.
 - **Ask about this**, the button on selected text and the discussion panel at the top right: the button is `AskAboutSelection` in `web/components/ask-about-selection.tsx`, which wraps the transcript in `conversation.tsx` and `past-conversation.tsx` and the explorer in `web/components/pull-requests/pr-details/code.tsx`; the panel is `DiscussionPanel` in `web/components/discussion-panel.tsx`, which `web/app.tsx` mounts, over `web/discussions.ts`.
+- Dictation, the composer's microphone and the status row above its text field: `DictationButton` and `DictationRow` in `web/components/composer-dictation.tsx`, which `conversation.tsx` and `new-session.tsx` mount, over the page's one capture in `web/dictation.ts`.
 - Command palette (Cmd+K): `web/components/command-palette/`, over `web/command-palette.ts`.
 - Keyboard shortcuts: the table in `web/shortcuts.ts`, the page-wide handlers in `web/use-page-shortcuts.ts`, and the reference dialog in `web/components/shortcuts-dialog.tsx`.
 - Notes, Calendar, and Email buttons, command menu button, What's new, notification bell, and Settings button: `HeaderControls` in `web/components/header-controls.tsx`, in the desktop app's title bar, `DesktopTitleBar` there, else at the end of each page's `Header`; What's new is `WhatsNew` in `web/components/whats-new.tsx`; the bell is `NoticesBell` in `web/components/notices.tsx`; toasts come from `web/components/toaster.tsx`.
@@ -87,18 +89,19 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - Pull requests: `web/components/pull-requests/pull-requests-page.tsx`, with the **Rebase N behind** button at its top, its board view `PullRequestsKanban` in `pull-requests-kanban.tsx` with each card `PullRequestCard` in `pr-row.tsx`, and one pull request in `pr-page.tsx` beside it.
   - Tickets: `web/components/tickets/tickets-page.tsx`.
   - Todo: `web/components/todo/page.tsx`.
-  - Inbox: `web/components/inbox/page.tsx`, its items from `web/inbox-model.ts`, and the sidebar's **Inbox** row in `web/components/session-list.tsx`.
   - Notes: `web/components/notes/page.tsx`, with its sidebar lists in `web/components/notes/nav.tsx`.
   - Calendar: `web/components/calendar/calendar-page.tsx`, with **Show routines** in `web/components/calendar/calendar-nav.tsx`, both reading the saved display preference in `web/use-calendar-display.ts`.
   - Email: `web/components/email/email-page.tsx`.
   - Bots: the gallery of every Bot at `#bots` in `web/components/bots/bots-gallery.tsx`, a Bot's page and the New Bot form with its job templates in `web/components/bots/bot-page.tsx`, the Bot's details in the right sidebar in `web/components/bots/bot-details.tsx`, the card of its routines from `web/components/routines/routines-card.tsx` in place of the conversation, with each row in `web/components/routines/routine-row.tsx` and an open row's rest in `web/components/routines/routine-open.tsx`, the sidebar's **Bots** tab in `web/components/bots/bots-nav.tsx`, each Bot's face in `web/components/bots/bot-avatar.tsx`, and its shape and color choice in `web/components/bots/bot-look-picker.tsx`.
     The New Bot form's type picker starts on Bot designer and fills each type's starting name and job from `BOT_KIND_START` in `web/bots-model.ts`.
     The right-click menu of a Bot's row and card, which pins it and moves it between sections, is in `web/components/bots/bot-menu.tsx`.
+    A Router's Tasks tab, its tasks grouped into Needs you, In progress, and Done with **Mark done** and **Stop** in each open row's menu, is `BotTasks` in `web/components/bots/bot-details.tsx`, over `taskGroups` in `src/shared/router.ts`.
     Dragging a Bot's row onto a group in the Bots tab is in `web/components/bots/bots-nav.tsx`, with the changes a drop sends from `botMovesTo` in `web/bots-model.ts`.
   - Settings: `web/components/settings/settings-page.tsx`, one `*-tab.tsx` per section listed in `SETTINGS_SECTIONS` in `web/routing.ts`.
     Settings › Analytics' context-source table: `ContextSources` in `web/components/settings/context-sources.tsx`.
-    Settings › Workflows, the skills tagged `workflow` with how each starts: `Workflows` in `web/components/settings/workflows-tab.tsx`, which opens the selected skill in `FileView` from `files-tab.tsx`, over `workflowsOf` in `src/omp/workflows.ts`.
-    Settings › omp settings, omp's own settings by its tabs with search, a control per row, **Reset**, and the workspace lock: `OmpSettingsTab` in `web/components/settings/omp-settings-tab.tsx`, over `shownTabs` and `OWNED_SETTINGS`, the settings another section edits, in `web/omp-settings.ts`, and `readAgentSettings` in `src/omp/agent-settings.ts`.
+    Settings › Extensions, with Installed, Discover, Preview, and Sources: `ExtensionsTab` in `web/components/settings/extensions-tab.tsx`, a full-height split library over native package operations.
+    Settings › Workflows, the skills tagged `workflow` with how each starts: `Workflows` in `web/components/settings/workflows-tab.tsx`, which opens authored skills in `FileView` from `files-tab.tsx` and packaged skills as read-only source, over `workflowsOf` in `src/omp/workflows.ts`.
+    Settings › omp settings, omp's own settings by its tabs with search, a control per row, **Reset**, and the workspace lock: `OmpSettingsTab` in `web/components/settings/omp-settings-tab.tsx`, with the `SettingRow` and controls shared with Agents in `editor.tsx`, over `shownTabs` and `OWNED_SETTINGS` in `web/omp-settings.ts`, and `readAgentSettings` in `src/omp/agent-settings.ts`.
     Settings › Activity, with its never-used, most-used, navigation, and active-time reports: `ActivityTab` in `web/components/settings/activity-tab.tsx`.
     Settings › Integrations' Google account lines, with **Add account**, **Remove**, and the workspace picker: `GoogleAccountsRow` in `web/components/integrations/google-accounts.tsx`.
     Settings › Worktrees, with its totals, filters, **Merged** and blocker badges, selection bar, and **Remove merged**: `WorktreesTab` in `web/components/settings/worktrees-tab.tsx`.
@@ -128,6 +131,6 @@ Its files, listed by area:
 - [Shell, state, and models](code-layout/page-core.md)
 - [List models, sidebar tabs, model menu, and mentions](code-layout/page-models.md)
 - [Status bar, terminal, HTTP reads, shortcuts, and theme](code-layout/page-reads-and-chrome.md)
-- [Sidebar, Todo, Notes, Inbox, Bots, Routines, Calendar, and Email](code-layout/page-pages.md)
+- [Sidebar, Todo, Notes, Bots, Routines, Calendar, and Email](code-layout/page-pages.md)
 - [Panes, session details, and changes](code-layout/page-panes.md)
 - [Pull requests, tickets, settings, integrations, and primitives](code-layout/page-pull-requests-and-settings.md)

@@ -7,9 +7,8 @@ import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { isNotificationSound, type DesktopBridge, type NotificationSound } from "../src/shared/desktop-bridge";
 import type { ClientMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
-import { type Attention, attend, needsYou, unreadShown } from "./attention";
+import { type Attention, attend, needsYou, shownViews, unreadShown } from "./attention";
 import type { DashboardState } from "./dashboard-state";
-import type { Page } from "./routing";
 import { useStoredState } from "./stored-state";
 
 declare global {
@@ -67,11 +66,9 @@ function subscribeFocus(change: () => void): () => void {
 	};
 }
 
-const NO_VIEWS: View[] = [];
-
 /** Keeps the Dock badge, the notifications, and the read turns in step with the roster; `botConversation` is the conversation an open Bot's page shows. */
-export function useAttention(state: DashboardState, page: Page | null, botConversation: View | null, send: (msg: ClientMsg) => void): void {
-	const { hosts, connected, layout } = state;
+export function useAttention(state: DashboardState, botConversation: View | null, send: (msg: ClientMsg) => void): void {
+	const { hosts, connected, layout, cover } = state;
 	const { on, turns, sound, soundWhenFocused } = useSessionNotifications();
 	const focused = useSyncExternalStore(subscribeFocus, () => document.hasFocus());
 	const count = connected ? hosts.filter(needsYou).length : 0;
@@ -88,11 +85,7 @@ export function useAttention(state: DashboardState, page: Page | null, botConver
 		else if (soundWhenFocused) playSound(sound);
 	}, [hosts]);
 
-	// A maximized pane hides the others, and a page hides them all, but a Bot's page shows its conversation.
-	const shown = useMemo<View[]>(
-		() => (botConversation ? [botConversation] : page ? NO_VIEWS : layout.maximized ? layout.panes.slice(layout.focus, layout.focus + 1) : layout.panes),
-		[botConversation, page, layout],
-	);
+	const shown = useMemo(() => shownViews({ cover, layout }, botConversation), [botConversation, cover, layout]);
 	useEffect(() => {
 		if (focused) for (const instanceId of unreadShown(hosts, shown)) send({ t: "read", instanceId });
 	}, [focused, hosts, shown, send]);

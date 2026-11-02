@@ -2,7 +2,8 @@
 import { errorText } from "../json";
 import { HOME } from "../paths";
 import { DISCUSSION_SYSTEM_PROMPT, type DiscussionEvent, type DiscussionRequest, discussionPrompt } from "../shared/discussions";
-import { auth, config, modelRegistry, modelResolver, piStream } from "./modules";
+import { openRegistry } from "./models";
+import { modelResolver, piStream } from "./modules";
 
 /** The roles an answer comes from, the first that names a model you can call: the cheap one, else the one sessions start on. */
 const ROLES = ["smol", "default"];
@@ -23,11 +24,8 @@ export async function answerDiscussion(request: DiscussionRequest, signal: Abort
 }
 
 async function streamAnswer(request: DiscussionRequest, signal: AbortSignal, emit: (event: DiscussionEvent) => void): Promise<void> {
-	const settings = await config.Settings.loadReadOnly({ cwd: HOME });
-	const storage = await auth.discoverAuthStorage();
+	const { settings, registry, close } = await openRegistry(HOME);
 	try {
-		const registry = new modelRegistry.ModelRegistry(storage);
-		await registry.refresh();
 		const picked = modelResolver.resolveRoleSelection(ROLES, settings, registry.getAvailable());
 		if (!picked) throw new Error("No model you can call is set for omp's smol or default role.");
 		const { model } = picked;
@@ -47,6 +45,6 @@ async function streamAnswer(request: DiscussionRequest, signal: AbortSignal, emi
 			}
 		}
 	} finally {
-		storage.close();
+		close();
 	}
 }

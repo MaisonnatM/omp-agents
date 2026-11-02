@@ -1,6 +1,7 @@
 /** Which live sessions need you, and the alerts they raise, for the desktop app's Dock badge and the session notifications. */
 import type { SessionAlert } from "../src/shared/desktop-bridge";
 import { hashForSession, type RosterHost, type UnreadTurn, type UserRequest, type View } from "../src/shared/sessions";
+import type { DashboardState } from "./dashboard-state";
 import { hostLabel } from "./labels";
 
 /**
@@ -8,7 +9,7 @@ import { hostLabel } from "./labels";
  * session's own dialog, or the placeholder a terminal session shows until its host replays the question), else its
  * unread turn; `null` while it does not need you.
  */
-export type Wait = { kind: "ask"; request: UserRequest } | { kind: "input" } | { kind: "turn"; turn: UnreadTurn };
+type Wait = { kind: "ask"; request: UserRequest } | { kind: "input" } | { kind: "turn"; turn: UnreadTurn };
 
 export function waitOf(host: RosterHost): Wait | null {
 	const [request] = host.requests;
@@ -17,11 +18,6 @@ export function waitOf(host: RosterHost): Wait | null {
 	if (host.unread) return { kind: "turn", turn: host.unread };
 	return null;
 }
-
-/** What a wait with no question relayed says. */
-export const WAITS_FOR_INPUT = "Waits for your input.";
-/** What an unread turn that ended on no reply says. */
-export const FINISHED_TURN = "Finished its turn.";
 
 /** Whether live session `host` needs you: it asks you something, or it ended a turn you have not looked at since. */
 export const needsYou = (host: RosterHost): boolean => waitOf(host) !== null;
@@ -38,9 +34,9 @@ function momentOf(host: RosterHost): Moment | null {
 			return { kind: "ask", key: `ask/${request.id}`, body: request.kind === "confirm" ? `${request.title}\n${request.message}` : request.title };
 		}
 		case "input":
-			return { kind: "input", body: WAITS_FOR_INPUT };
+			return { kind: "input", body: "Waits for your input." };
 		case "turn":
-			return { kind: "turn", key: `turn/${wait.turn.at}`, body: wait.turn.reply ?? FINISHED_TURN };
+			return { kind: "turn", key: `turn/${wait.turn.at}`, body: wait.turn.reply ?? "Finished its turn." };
 		default: {
 			const unhandled: never = wait;
 			return unhandled;
@@ -105,6 +101,16 @@ export function attend(before: Attention, hosts: readonly RosterHost[]): { raise
 		else attention.set(host.instanceId, { wait: "told", heard: heard.has(moment.key) ? heard : new Set([...heard, moment.key]) });
 	}
 	return { raise, attention };
+}
+
+/**
+ * The views on screen: only the focused pane while it is maximized, and none under a page or a `#session/<id>` link,
+ * which opens its session over the panes it replaces, but a Bot's page shows its conversation.
+ */
+export function shownViews({ cover, layout }: Pick<DashboardState, "cover" | "layout">, botConversation: View | null): View[] {
+	if (botConversation) return [botConversation];
+	if (cover) return [];
+	return layout.maximized ? layout.panes.slice(layout.focus, layout.focus + 1) : layout.panes;
 }
 
 /** The live sessions among `shown`, the views on screen, that ended a turn you had not seen: showing them in a focused window reads it. */

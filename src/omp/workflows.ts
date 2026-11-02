@@ -8,7 +8,7 @@ import type { FoundFile } from "./discovery";
  * because omp's plugin loader accepts no other frontmatter key and only string values under `metadata`.
  */
 export function workflowsOf(found: FoundFile[]): Workflow[] {
-	const commands = found.filter(file => file.kind === "command").toSorted((a, b) => (a.scope === b.scope ? 0 : a.scope === "project" ? -1 : 1));
+	const commands = found.filter((file) => file.kind === "command").toSorted((a, b) => (a.scope === b.scope ? 0 : a.scope === "project" ? -1 : 1));
 	return found
 		.flatMap(({ kind, name, frontmatter, path }): Workflow[] => {
 			const metadata = frontmatter?.metadata;
@@ -20,7 +20,7 @@ export function workflowsOf(found: FoundFile[]): Workflow[] {
 					name,
 					description: typeof description === "string" ? description : "",
 					skill: path,
-					command: commands.find(command => command.name === name)?.path ?? null,
+					command: commands.find((command) => command.name === name)?.path ?? null,
 				},
 			];
 		})

@@ -21,7 +21,6 @@ import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { NewSession } from "./new-session";
 import { NewSessionBoard } from "./new-session-board";
 import { PaneGrid } from "./pane-grid";
-import { InboxPage } from "./inbox/page";
 import { NotesPage } from "./notes/page";
 import { BotPage, NewBot } from "./bots/bot-page";
 import { BotsGallery } from "./bots/bots-gallery";
@@ -42,7 +41,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError" | "notices"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -93,7 +92,6 @@ export const PageSwitch = memo(function PageSwitch({
 	connected,
 	listed,
 	rosterError,
-	notices,
 	newStart,
 	scope,
 	defaultWorkspace,
@@ -182,9 +180,6 @@ export const PageSwitch = memo(function PageSwitch({
 			);
 		case "notes":
 			return <NotesPage list={userNotes} todos={userTodos} view={page.list} openId={page.open} hosts={hosts} past={past} disabled={!connected} onChange={changeNote} />;
-		case "inbox":
-			// Every session that waits on you, whatever the sidebar's workspace.
-			return <InboxPage hosts={hosts} notices={notices} openKey={page.open} />;
 		case "bots": {
 			if (page.target === null) {
 				if (page.adding) return <NewBot workspaces={workspaces} defaultCwd={defaultWorkspace} connected={connected} />;

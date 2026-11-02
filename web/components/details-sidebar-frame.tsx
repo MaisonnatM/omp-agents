@@ -1,6 +1,6 @@
 /** The right sidebar's shell for a focused view: the directory its file references resolve against, a header of counted tabs, and each tab's panel. */
 import type { LucideIcon } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
@@ -75,8 +75,9 @@ export function DetailsSidebarFrame<T extends string>({ label, storageKey, defau
 	const [shown, setShown] = useState<ReadonlySet<string>>(() => new Set([tab]));
 	if (!shown.has(tab)) setShown(new Set(shown).add(tab));
 	const crowded = tabs.length > 4;
+	const fileBase = useMemo(() => (cwd === null ? null : { dir: cwd, session: null }), [cwd]);
 	return (
-		<FileBaseContext.Provider value={cwd}>
+		<FileBaseContext.Provider value={fileBase}>
 			<Tabs value={tab} onValueChange={value => setTab(String(value))} className="@container/sidebar flex min-h-0 flex-1 flex-col">
 				<SidebarHeader className="h-(--page-header-height) flex-row items-center gap-2 border-b border-border px-2 py-0">
 					<h2 className="sr-only">{label}</h2>

@@ -36,7 +36,7 @@ A `rename-session` message gives a session the user's own title; its parser trim
 For a session this dashboard runs, the server writes omp's `set_session_name` inside the session's `SerialLane`, so a titling `/rename` already queued lands first and none starts after, then reads omp's state for the new `sessionName`, as omp sends no frame for it.
 A terminal session refuses it, since only its own omp can retitle it.
 A session no omp runs is retitled in its file through omp's `SessionManager` (`renameSessionFile` in `src/omp/sessions.ts`), and the server reads that file again and sends the past list; a Claude Code or Codex session refuses it.
-An `agent_end` that ends the run, not one that hands over to a queued follow-up (`isTerminal: false`), makes the session report `turn-ended` with its last reply: the text of the last assistant message that has any, as `body` without the suggested prompts `splitSuggestions` takes off and those prompts as `suggestions`, or `null` when none has text.
+An `agent_end` that ends the run, not one that hands over to a queued follow-up (`isTerminal: false`), makes the session report `turn-ended` with its last reply: the text of the last assistant message that has any, without the suggested prompts `splitSuggestions` takes off, or `null` when none has text.
 The same update carries `failure`, how a provider's error ended the run, or `null`: `turnUpdate` in `src/live-session.ts` reads it with `turnFailureOf` in `src/omp/turn-failure.ts`, which reads the run's last assistant message when its `stopReason` is `error` and asks omp's `classifyMessage`, the same test omp's retry and credential rotation apply.
 A message flagged `UsageLimit` is a `usage-limit`, which keeps the wait the error names, such as `retry-after-ms=…`, through omp's `extractRetryHint`, and wins over `Transient`, which omp also sets on a `429`.
 A message flagged only `Transient`, such as a failed DNS lookup, a stalled stream, or a dropped connection that omp's own retries gave up on, is a `transient`; an abort, or an error with neither flag, such as `Usage preflight blocked`, is `null`.
@@ -88,6 +88,15 @@ The session itself sends `/move <path>` as the composer does once a turn ends an
 The dashboard serializes model, effort, and fast-mode setters with state reads in a separate `SerialLane` from turn commands.
 Event-driven refreshes coalesce while queued, so a read cannot overwrite a later switch, and switching stays visible until every queued model change has finished.
 
+The same lane runs the short auto-compaction and goal RPC setters; context and advisor slash commands use the prompt path and its turn lane instead, without holding the model lane.
+The roster carries `compaction` (enabled, running kind, and effective model threshold), nullable `advisor` (configured model selectors and tracked enabled state), and `goal` (off with a reason, none, or a set goal with status and accounting).
+`get_state` is authoritative for auto-compaction and goals, and manual/auto compaction completion and `goal_updated` trigger a refresh.
+A completed goal event is retained for the current dashboard lifetime because omp clears its goal mode on completion; Clear, a new live goal, and a session change discard it.
+Advisor state is seeded from configuration and updated after dashboard `/advisor` prompts because RPC has no advisor enabled field; a server reattachment cannot recover a runtime-only toggle.
+`loadSessionControlsConfig` reads session-only settings and discovers advisors in parallel, leaving generic routing reads free of advisor-file discovery.
+Its threshold resolver stays lazy so a model switch uses omp's current per-model override and context window.
+The dashboard does not enable `goal.continuationModes` on the user's behalf: it labels goals as prompt-driven unless the loaded configuration includes `"rpc"`.
+
 A `prompt` message, and a `start` of kind `new`, carry `images`, each `{ data, mimeType }` with the file's bytes in base64, as omp's `ImageContent` takes them.
 `parseImages` in `src/shared/sessions.ts`, which `src/server/wire.ts` uses, accepts PNG, JPEG, GIF, and WebP, up to `MAX_PROMPT_IMAGE_BYTES` (32 MB) per prompt, and a prompt of images with no text.
 The socket's `maxPayloadLength` is 64 MB so such a message fits.
@@ -124,7 +133,8 @@ The server's shutdown calls `DashboardSession.dispose`, which hangs up without s
 At startup `reattachAll` in `src/server/start.ts` connects to every socket in the directory under the instance id it had, holding back what each session reports; a socket nobody listens on loses its files.
 A keeper that takes the connection and does not greet within 3 seconds is stuck: the server hangs up, logs its instance id, and stops it by the pid in its `.pid` file with `stopTree` in `src/process-census.ts`, which lists the keeper and every process under it with one `ps`, each with its start time, sends them SIGTERM, and after 3 seconds SIGKILL only to those still running under the same start time, so a pid another process reused is never hit.
 Startup and the socket gate then wait at most about 6 seconds, no Resume starts a second omp on its file, and `recover` counts its session as interrupted.
-Once all attached, `InterruptedSessions.recover` learns which sessions survived, and only then is each listed again, and what it reported passed on, before the runners recover.
+Once all attached, `InterruptedSessions.recover` learns which sessions survived and answers those whose turn ran when the last server stopped, and only then is each listed again, and what it reported passed on, before the runners recover.
+Each comes back with the turn it left unread, and one whose turn ended while no server listened comes back with that turn unread, as [Session notifications](notifications.md#session-notifications) says; terminal sessions get theirs back at the first registry listing.
 Attaching to a keeper that greeted never stops omp: a session file without a readable header leaves the session in the directory omp started in, a replay marker that cannot be read counts as a replay, and a session that fails to attach is left running, unlisted, for the next server.
 **End session** sends the keeper `omp_agents_keeper_stop`: the keeper notes the processes under omp while omp is still their parent, sends SIGTERM to omp and to them, SIGKILL to those left after 3 seconds, removes its socket and log, and exits.
 omp exiting on its own ends the same way, except that its processes are no longer under it, so the keeper stops the ones it noted before.

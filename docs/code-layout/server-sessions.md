@@ -17,7 +17,7 @@
   `src/line-reader.ts` holds `FoldedFile`, which keeps a fold of a file's lines up to date, applying only appended complete lines and starting a fresh fold when the file shrinks.
   `src/tail.ts`, `src/media.ts`, `src/changes.ts`, `src/session-facts.ts`, and `src/foreign/usage.ts` each fold transcripts through it.
   The first two queue their reads with its `ReadQueue`, which shares one read among a burst of pokes.
-  `src/read-tail.ts` holds `readTail`, which reads only the whole lines within a limit of a file's end, as the Bot extension and the server read a Bot's memory and `lastMessage` a Bot's last words.
+  `src/read-tail.ts` holds `readTail`, which reads only the whole lines within a limit of a file's end, as the Bot extension and the server read a Bot's memory, and `tailEntries` the entries at a session file's end.
 - `src/session-formats.ts`: the registry of agents whose session files the dashboard lists, `SESSION_FORMATS`, each a `SessionFormat` with its root, its `fileOf`, `list`, and `read`, its line `decode`, and the `messageLine` conversation search parses.
   Formats other than omp also name the usage-file patterns and per-file folds for Analytics.
   `ompFormat` wraps omp's own listing in `src/omp/sessions.ts`, which also holds `sessionFileOf` and `renameSessionFile`, which retitles a saved omp session through omp's `SessionManager`; `formatOf` names the format of a file by the root that holds it, else omp's.
@@ -30,6 +30,7 @@
 - `src/foreign/usage.ts`: `ForeignUsage`, the incremental request index for Analytics, and the request, per-file usage, fold, and pricing interfaces the readers share.
   `src/omp/stats.ts` provides its `listPrice` callback through the bundled `pi-catalog` exports loaded in `src/omp/modules.ts`.
 - `src/session-entries.ts`: the vocabulary of a session file's entries, `textOf`, `oneLine`, `entryTime`, `toolCallsOf`, `toolResultOf`, `toolSummary`, `imagesOf`, and `UNREAD_LINE` with `unreadLine`, which the folds below and `src/guest.ts` read instead of walking the entry shape themselves.
+  Its `tailEntries` walks the entries at a session file's end, newest first, for `lastMessage`, a Bot's last words, and `endedTurn`, the turn a session ended while no server listened.
 - `src/transcript.ts`: folds session-file lines and live events into display items, with a dashboard session's starting prompt last; an unread line shows as a warning notice with the line's start, and a prompt the dashboard sent in the user's place as a `dashboard` item the page hides.
   Its `promptItem` folds stamped routine messages into `routine` items with their saved message and restores a skill invocation on the saved prompt.
   The fold also retains a `!` prompt's `bashExecution` output and result as `shell` on its routine item.
@@ -55,6 +56,7 @@
   Its `placement`, a `WorkspacePlacement` from `src/workspace-placement.ts`, knows which workspace each directory counts in, which a refresh asks for its sessions' directories and the server for live ones; `SessionFiles.workspaces()` and the `Dashboard`'s `knownWorkspaces()` list workspaces through it.
   Its read of a session's own file also feeds the `OwnFileFolds` it was constructed with, and it knows nothing of what those folds keep.
   The worktree comes from the `cwd` arguments of the session's own bash calls and the directories of the files its own `edit` and `write` calls changed, not its subagents', newest first: the first one in a linked worktree of the session directory's repository, other than the checkout that directory is in, passing over directories outside that repository and stopping with none at a directory that is gone.
+  `fileDirsOf` adds the directories those bash calls `cd` into, which only resolve relative file paths in the session's text and never pick the worktree, since End session removes that one.
   The branch is the one a linked worktree has checked out now, or the one a main checkout had checked out at the session's last write, from its HEAD reflog; a linked worktree's branch, or a main checkout's branch other than the default one that `origin/HEAD` names, links the pull request it heads.
   A refresh keeps git's answer for each branch to itself until the resolve publishes the whole branch at once: its name, whether its worktree is linked, its default branch from one cache per directory, and the pull request it heads.
   `git.ts`'s `worktreeAt`, the head history, and the default branch each answer a directory once per refresh, through the `CheckoutReads` it was constructed with, the repository's `git remote` only for a session whose branch links a pull request or that names one by bare number, and every per-session step of a refresh, transcript scans and git probes alike, runs at most `PROBE_PARALLEL` (16, from `src/map-limit.ts`) at a time, so a first scan of hundreds of sessions starts no burst of git processes.

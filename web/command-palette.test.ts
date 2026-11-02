@@ -180,6 +180,12 @@ describe("paletteCommands", () => {
 		expect(paletteCommands(handlers, new Set()).map(({ id }) => id)).toEqual(["help", "pull-requests", "tickets"]);
 		expect(paletteCommands(handlers, new Set(["tickets"])).map(({ id }) => id)).toEqual(["help", "pull-requests"]);
 	});
+
+	test("the focused-session goal command uses the normal availability filter", () => {
+		const handlers: ShortcutHandlers = { setGoal: noop };
+		expect(paletteCommands(handlers, new Set()).map(({ id, command }) => ({ id, command }))).toEqual([{ id: "setGoal", command: "Set or edit goal" }]);
+		expect(paletteCommands(handlers, new Set(["setGoal"]))).toEqual([]);
+	});
 });
 
 describe("chordAction", () => {

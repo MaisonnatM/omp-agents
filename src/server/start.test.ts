@@ -57,14 +57,63 @@ test("the server learns which sessions survived before it lists or hears any, an
 		const fields = { instanceId: { value: instanceId }, sessionId: { value: `s-${instanceId}` }, finished: { value: () => instanceId === "i-gone" } };
 		return fromPartial(Object.create(DashboardSession.prototype, fields));
 	});
-	const heard: string[] = [];
-	const sessions: LiveSessions = new LiveSessions((instanceId, update) => heard.push(`${update.kind} ${instanceId}, listed: ${sessions.get(instanceId) !== undefined}`));
-	const joinFor = (): SessionJoin => ({ rpc: rpc.PLAIN_LAUNCH, attach: session => { heard.push(`attach ${session.instanceId}`); } });
-	await reattachAll(sessions, joinFor, survived => heard.push(`recover ${[...survived].join(" ")}`));
-	expect(heard).toEqual(["recover s-i-kept", "attach i-kept", "roster i-kept, listed: true"]);
-	expect([sessions.get("i-gone"), sessions.get("i-broken")]).toEqual([undefined, undefined]);
-	// The cleanup after a merge ends only sessions this dashboard started, which a reattached one still is.
-	expect(sessions.started("i-kept")?.sessionId).toBe("s-i-kept");
+	const dir = mkdtempSync(join("/tmp", "ost-"));
+	try {
+		const heard: string[] = [];
+		const sessions: LiveSessions = new LiveSessions((instanceId, update) => heard.push(`${update.kind} ${instanceId}, listed: ${sessions.get(instanceId) !== undefined}`), undefined, join(dir, "unread.json"));
+		const joinFor = (): SessionJoin => ({ rpc: rpc.PLAIN_LAUNCH, attach: session => { heard.push(`attach ${session.instanceId}`); } });
+		await reattachAll(sessions, joinFor, survived => {
+			heard.push(`recover ${[...survived].join(" ")}`);
+			return new Set();
+		});
+		expect(heard).toEqual(["recover s-i-kept", "attach i-kept", "roster i-kept, listed: true"]);
+		expect([sessions.get("i-gone"), sessions.get("i-broken")]).toEqual([undefined, undefined]);
+		// The cleanup after a merge ends only sessions this dashboard started, which a reattached one still is.
+		expect(sessions.started("i-kept")?.sessionId).toBe("s-i-kept");
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("a reattached session whose turn ended while no server listened is listed with that turn unread, even one stopped before any reply, and a turn left unread before the restart comes back", async () => {
+	const dir = mkdtempSync(join("/tmp", "ost-"));
+	try {
+		const file = join(dir, "session.jsonl");
+		const line = (timestamp: string, role: string, text: string) => `${JSON.stringify({ type: "message", timestamp, message: { role, content: [{ type: "text", text }] } })}\n`;
+		writeFileSync(file, `${JSON.stringify({ type: "session", id: "s", cwd: dir })}\n${line("2026-11-02T10:00:00.000Z", "user", "Sleep 12 seconds")}${line("2026-11-02T10:00:12.000Z", "assistant", "done")}`);
+		// Stopped while its prompt waited on the model, so the file ends on the prompt, as a turn the server hears end with no reply.
+		const prompted = join(dir, "prompted.jsonl");
+		writeFileSync(prompted, `${JSON.stringify({ type: "session", id: "s", cwd: dir })}\n${line("2026-11-02T10:00:20.000Z", "user", "Run the tests")}`);
+		const unreadPath = join(dir, "unread.json");
+		new LiveSessions(() => {}, undefined, unreadPath).markUnread("i-saved", { at: 5_000, reply: "Saved reply." });
+		flushJsonFiles();
+
+		spyOn(rpc, "keptSessions").mockReturnValue(["i-ended", "i-prompted", "i-working", "i-idle", "i-saved"]);
+		spyOn(DashboardSession, "reattach").mockImplementation(async instanceId => {
+			const fields = {
+				instanceId: { value: instanceId },
+				sessionId: { value: `s-${instanceId}` },
+				sessionFile: { value: instanceId === "i-prompted" ? prompted : file },
+				cwd: { value: dir },
+				status: { value: instanceId === "i-working" ? "working" : "idle" },
+				finished: { value: () => false },
+				row: { value: () => ({ instanceId }) },
+			};
+			return fromPartial(Object.create(DashboardSession.prototype, fields));
+		});
+		const sessions = new LiveSessions(() => {}, new TaskClaims(join(dir, "claims.json")), unreadPath);
+		await reattachAll(sessions, () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }), () => new Set(["s-i-ended", "s-i-prompted", "s-i-working"]));
+		const facts: SessionFacts = { tickets: [], pullRequests: [], worktree: null, branch: null, ship: null, workspace: null };
+		expect(sessions.rows(() => facts).map(row => [row.instanceId, row.unread])).toEqual([
+			["i-ended", { at: Date.parse("2026-11-02T10:00:12.000Z"), reply: "done" }],
+			["i-prompted", { at: Date.parse("2026-11-02T10:00:20.000Z"), reply: null }],
+			["i-working", null],
+			["i-idle", null],
+			["i-saved", { at: 5_000, reply: "Saved reply." }],
+		]);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
 });
 
 /**
@@ -107,7 +156,7 @@ test("a keeper that never greets is stopped with its job within the bound, then 
 		const interrupted = new InterruptedSessions(saved);
 
 		const began = Date.now();
-		const reattached = reattachAll(new LiveSessions(() => {}), () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }), survived => interrupted.recover(survived));
+		const reattached = reattachAll(new LiveSessions(() => {}, undefined, join(dir, "unread.json")), () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }), survived => interrupted.recover(survived));
 		const notReattached = refuseUntil(reattached, "Still attaching.");
 		expect(notReattached()?.status).toBe(503);
 		await reattached;

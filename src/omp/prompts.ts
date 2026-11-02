@@ -1,5 +1,6 @@
 /** omp's own `/` and `@` completion, skills and file commands, so a dashboard prompt means what a terminal one does. */
-import { autocomplete, config, extensionSettings, skills, slashCommands } from "./modules";
+import { autocomplete, extensionSettings, skills, slashCommands } from "./modules";
+import { withDiscovery } from "./scoped-discovery";
 
 /** Subset of pi-tui's `AutocompleteItem` (pi-tui/src/autocomplete.ts). */
 export interface AutocompleteItem {
@@ -39,7 +40,10 @@ export interface FileSlashCommand {
 
 export const CombinedAutocompleteProvider = autocomplete.CombinedAutocompleteProvider;
 export const { parseSkillInvocation, buildSkillPromptMessage } = skills;
-export const { loadSlashCommands, expandSlashCommand } = slashCommands;
+export const { expandSlashCommand } = slashCommands;
+export function loadSlashCommands(options: { cwd: string }): Promise<FileSlashCommand[]> {
+	return withDiscovery(options.cwd, () => slashCommands.loadSlashCommands(options));
+}
 
 export interface SkillSettings {
 	/** `skills.enableSkillCommands`: whether `/skill:<name>` is a command at all. */
@@ -49,9 +53,10 @@ export interface SkillSettings {
 
 /** Skills the way an omp session in `cwd` discovers them: its settings, its disabled extensions, its project dirs. */
 export async function loadSessionSkills(cwd: string): Promise<SkillSettings> {
-	const settings = await config.Settings.loadReadOnly({ cwd });
-	const skillSettings = extensionSettings.cfgSkills.get(settings);
-	const disabledExtensions = extensionSettings.cfgDisabledExtensions.get(settings);
-	const { skills: found } = await skills.loadSkills({ ...skillSettings, disabledExtensions, cwd });
-	return { enableSkillCommands: skillSettings.enableSkillCommands === true, skills: found };
+	return withDiscovery(cwd, async settings => {
+		const skillSettings = extensionSettings.cfgSkills.get(settings);
+		const disabledExtensions = extensionSettings.cfgDisabledExtensions.get(settings);
+		const { skills: found } = await skills.loadSkills({ ...skillSettings, disabledExtensions, cwd });
+		return { enableSkillCommands: skillSettings.enableSkillCommands === true, skills: found };
+	});
 }

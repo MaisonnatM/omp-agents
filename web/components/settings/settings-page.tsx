@@ -12,11 +12,13 @@ import { Header } from "../page-header";
 import { AnalyticsTab } from "./analytics-tab";
 import { ActivityTab } from "./activity-tab";
 import { type Catalog, type Editing, LINK } from "./editor";
+import { AgentsTab } from "./agents-tab";
 import { DecisionsTab } from "./decisions-tab";
 import { Files } from "./files-tab";
 import { IntegrationsTab } from "./integrations-tab";
 import { McpServersTab } from "./mcp-servers-tab";
 import { OmpSettingsTab } from "./omp-settings-tab";
+import { ExtensionsTab } from "./extensions-tab";
 import { PreferencesTab } from "./preferences-tab";
 import { ProvidersTab } from "./providers-tab";
 import { ModelsTab } from "./routing-tab";
@@ -27,7 +29,7 @@ import { Workflows } from "./workflows-tab";
 import { WorkspacesTab } from "./workspaces-tab";
 import { WorktreesTab } from "./worktrees-tab";
 
-const workspaceLabel = (cwd: string, workspaces: Workspace[]): string => workspaces.find(workspace => workspace.cwd === cwd)?.cwdDisplay ?? cwd;
+const workspaceLabel = (cwd: string, workspaces: Workspace[]): string => workspaces.find((workspace) => workspace.cwd === cwd)?.cwdDisplay ?? cwd;
 
 /** The sidebar's workspace picker again, for the sections it scopes: all workspaces read your user files only. */
 function WorkspacePicker({ cwd, workspaces, onPick }: { cwd: string | null; workspaces: Workspace[]; onPick: (cwd: string | null) => void }) {
@@ -49,7 +51,7 @@ function WorkspacePicker({ cwd, workspaces, onPick }: { cwd: string | null; work
 					{
 						key: "workspaces",
 						heading: "Workspaces",
-						items: workspaces.map(workspace => ({
+						items: workspaces.map((workspace) => ({
 							value: workspace.cwd,
 							label: <span className="truncate">{workspace.cwdDisplay}</span>,
 							selected: workspace.cwd === cwd,
@@ -78,7 +80,7 @@ const loadAlert = (error: string): ReactNode => (
 );
 
 /** The omp sections' content once settings are read, else why they are empty. */
-function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Editing, selection: FileSelection): Record<"models" | "omp" | "files" | "workflows", ReactNode> {
+function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Editing, selection: FileSelection): Record<"models" | "agents" | "omp" | "files" | "workflows", ReactNode> {
 	if (read.data === null) {
 		const note =
 			read.error === null ? (
@@ -88,13 +90,15 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 					Cannot read omp's settings: {read.error}
 				</p>
 			);
-		return { models: note, omp: note, files: note, workflows: note };
+		return { models: note, agents: note, omp: note, files: note, workflows: note };
 	}
-	const { routing, agentSettings, files, workflows } = read.data;
+	const { routing, agentSettings, agents: catalog, files, workflows } = read.data;
 	const key = cwd ?? "";
 	const filesPanel = <Files key={key} files={files} editing={editing} selected={selection.path} onSelect={selection.open} />;
 	const workflowsPanel = <Workflows key={key} workflows={workflows} files={files} editing={editing} />;
 	const configFile = files.find(file => file.kind === "settings" && file.scope === "user" && file.path.endsWith("/config.yml"));
+	const projectFile = files.find(file => file.kind === "settings" && file.scope === "project" && file.body.state === "read");
+	const agents = <AgentsTab key={key} catalog={catalog} settings={agentSettings} editing={editing} stale={read.error} configFile={configFile} projectFile={projectFile} onOpenFile={selection.open} />;
 	const omp =
 		"error" in agentSettings ? (
 			<div className="space-y-2">
@@ -112,15 +116,16 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 				key={key}
 				settings={agentSettings}
 				configFile={configFile}
-				projectFile={files.find(file => file.kind === "settings" && file.scope === "project" && file.body.state === "read")}
+				projectFile={projectFile}
 				editing={editing}
 				onOpenFile={selection.open}
 			/>
 		);
-	if ("error" in routing) return { models: loadAlert(routing.error), omp, files: filesPanel, workflows: workflowsPanel };
+	if ("error" in routing) return { models: loadAlert(routing.error), agents, omp, files: filesPanel, workflows: workflowsPanel };
 	return {
 		models: <ModelsTab routing={routing} configPath={configFile?.pathDisplay} editing={editing} />,
 		omp,
+		agents,
 		files: filesPanel,
 		workflows: workflowsPanel,
 	};
@@ -150,8 +155,8 @@ export function SettingsPage({
 	const catalog = useMemo(
 		(): Catalog => ({
 			data: models.data && {
-				bySelector: new Map(models.data.models.map(model => [model.selector, model])),
-				byProvider: Map.groupBy(models.data.models, model => model.provider),
+				bySelector: new Map(models.data.models.map((model) => [model.selector, model])),
+				byProvider: Map.groupBy(models.data.models, (model) => model.provider),
 			},
 			error: models.error && `Cannot list omp's models: ${models.error}`,
 		}),
@@ -180,9 +185,10 @@ export function SettingsPage({
 		storage: <StorageTab cwd={cwd} active={section === "storage"} onSaved={settings.reload} />,
 		worktrees: <WorktreesTab cwd={cwd} active={section === "worktrees"} pins={pins} />,
 		decisions: <DecisionsTab cwd={cwd} active={section === "decisions"} />,
+		extensions: <ExtensionsTab cwd={cwd} active={section === "extensions"} onSaved={settings.reload} />,
 	};
 	// Hidden panels stay mounted so an unsaved draft survives switching sections.
-	const body = SETTINGS_SECTIONS.map(({ value, label }) => (
+	const body = SETTINGS_SECTIONS.filter(({ value }) => value !== "extensions").map(({ value, label }) => (
 		<section key={value} aria-label={label} hidden={section !== value} tabIndex={0} className={PANEL}>
 			{panels[value]}
 		</section>
@@ -199,9 +205,12 @@ export function SettingsPage({
 				<Header title={shown.label} />
 			)}
 			{/* Relative, so an absolute child such as a table's `sr-only` caption stays in this scroll and never makes the document scroll. */}
-			<div ref={scroller} className="relative min-h-0 flex-1 overflow-y-auto">
+			<div ref={scroller} hidden={section === "extensions"} className="relative min-h-0 flex-1 overflow-y-auto">
 				<div className="mx-auto w-full max-w-5xl space-y-10 px-6 py-6">{body}</div>
 			</div>
+			<section aria-label="Extensions" hidden={section !== "extensions"} className="min-h-0 flex-1">
+				{panels.extensions}
+			</section>
 		</div>
 	);
 }

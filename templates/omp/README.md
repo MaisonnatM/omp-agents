@@ -34,9 +34,9 @@ Restart running omp sessions to pick up the new files and settings.
 Settings, in `config.yml`:
 
 - `modelRoles`: an Anthropic model for every role.
-- `retry.fallbackChains`: Codex first, Cursor Composer for cheap roles, and open-weight OpenRouter last, with quota-aware skipping enabled.
+- `retry.fallbackChains`: Codex first and Cursor Composer for cheap roles, with quota-aware skipping enabled.
   Cursor Grok is opt-in rather than an automatic fallback; existing fallback settings are preserved unless `--force` is used.
-- `modelProviderOrder`: the same four providers in the same order.
+- `modelProviderOrder`: the same three providers in the same order.
 - `task.isolation`: `isolated: true` subagents work in their own clone of the checkout their `checkout` option names, the session's by default, and successful changes apply back there as a patch.
   At most two subagents run at once.
 - `collab.autoStart: control`: every terminal session publishes itself so that the omp-agents dashboard can drive it.
@@ -122,7 +122,7 @@ Files, in `agent/`:
 ## Requirements
 
 - omp, on your `PATH` or named by `OMP_PACKAGE_DIR`.
-- Accounts for the providers you want to use: Anthropic, OpenAI Codex, Cursor, and OpenRouter.
+- Accounts for the providers you want to use: Anthropic, OpenAI Codex, and Cursor.
   omp skips a provider that it cannot reach and uses the next one in the chain.
   Edit `config.yml` before you install to drop a provider, or change the roles later in the dashboard's **Settings**.
 - For `/ship`: the [GitHub CLI](https://cli.github.com) signed in, and the Linear MCP server connected to omp.

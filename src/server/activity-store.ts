@@ -22,8 +22,8 @@ CREATE INDEX IF NOT EXISTS activity_feature ON activity (kind, key, at);
 `;
 
 /**
- * Renames the Inbox page's views and commands to the Email page's, once: `PRAGMA user_version` 1 marks it done, so a
- * later Inbox feature's `inbox` rows keep their key. It holds the write lock, so a server opening the store meanwhile waits.
+ * Renames the old Inbox page's views and commands to the Email page's, once: `PRAGMA user_version` 1 marks it done, so
+ * a later `inbox` row keeps its key. It holds the write lock, so a server opening the store meanwhile waits.
  */
 function renameInboxToEmail(db: Database): void {
 	db.transaction(() => {

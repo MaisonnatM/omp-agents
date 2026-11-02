@@ -10,6 +10,7 @@ function host(instanceId: string, sessionId = `session-${instanceId}`, agents: A
 		sessionName: null, model: null, thinkingLevel: null, context: null, startedAt: 0, status: "idle",
 		control: { phase: "live", readOnly: false }, requests: [], queue: { steering: [], followUp: [] },
 		unread: null, thinkingLevels: [], switching: false, fast: null, pullRequests: [], tickets: [], ship: null,
+		compaction: { auto: true, running: null, thresholdTokens: null }, advisor: null, goal: { kind: "none", continues: false },
 		worktree: null, branch: null, workspace: null,
 	};
 }

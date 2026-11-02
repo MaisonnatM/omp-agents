@@ -60,11 +60,12 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Part | Observed by | Key |
 | --- | --- | --- |
 | Composer | action | `prompt` (sent, steered, or queued), `edit-prompt` |
-| Composer's directory, branch, and context ring | control, command, action | `composer.directory`, `composer.branch`, `composer.context-ring`; command `directory`; a move sends action `prompt` (`/move`) |
+| Composer's directory, branch, and context ring | control, command, action | `composer.directory`, `composer.branch`, `composer.context-ring`; command `directory`; actions `context`, `set-auto-compaction`, or `prompt` (`/move`) |
 | Rows above the composer | control, action | `composer-queue.send-now`, `composer-queue.edit`, `composer-queue.remove`, `composer-suggestions.pick`, `composer-suggestions.send-all`; actions `dequeue`, `promote`, `prompt`, `schedule`, `answer` |
 | Todos card (Files, Images, and Sources sections, FileChangesDialog) | control, action | `changes-card.files.fold`, `changes-card.images.fold`, `changes-card.sources.fold`, `changes-card.review`, `changes-card.file`, `changes-card.image.select`, `changes-card.image.clear`, `changes-card.image.to-pull-request`, `changes-card.image.to-ticket`, `changes-card.source`, ids kept from the card the sections came from so recorded use stays counted; sending images is a `PUT` |
 | `/` and `@` menus | control | `completion.pick` (a click; picking by keyboard records nothing) |
-| Model and thinking switch | control, command, action | `composer.model`; command `model`; actions `set-model`, `set-thinking`, `set-fast` |
+| Model and thinking switch | control, command, action | `composer.model`, `composer.advisor`; command `model`; actions `set-model`, `set-thinking`, `set-fast`, `set-advisor` |
+| Session goal | control, action | `header.goal`; action `goal` from the pill, dialog, or composer |
 | Conversation pane, pane grid, and divider | view, control | views `session`, `past`, `split`, `home`; maximize and close change the hash, so they show as views; `trajectory.toggle`, `replay-compare.open`; dragging the divider is not observed |
 | Desktop link address | not observed | display only |
 | Transcript (code blocks, session visuals, minimap, Todos card, chat history, image viewer) | control | `transcript.activity-group`, `transcript.todos`, `transcript.ship`, `minimap.jump`, `minimap.step`, `prompt-history.toggle`, `prompt-history.jump`, `media-viewer.open`, `media-viewer.step`, `media-viewer.new-tab`; the viewer's arrow keys record nothing; code block copy and session visuals are not observed |
@@ -76,7 +77,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Left sidebar | view, command, control | each tab's page view; tab and toggle shortcuts; `sidebar.left.toggle`, `sidebar.workspace`, `shortcuts.open`; untagged roster rows open a session, which records its view |
 | Right sidebar (session details, a Bot's details, Images) | control | `sidebar.right.toggle`, `session-details.tab.pull-requests`, `session-details.tab.browser`, and `session-details.tab.tickets`, the last of which a Bot's details share; images use the `media-viewer.*` controls |
 | Browser, the right sidebar's tab | control | `browser.back`, `browser.forward`, `browser.reload`, `browser.server`, `browser.start-server`, `browser.stop-server`, `browser.select-element`, `browser.screenshot`, `browser.review-visuals`, `browser.pick.select`, `browser.pick.region`, `browser.pick.draw`, `browser.pick.erase`, `browser.annotation.attach`, `browser.open-in-browser`, `browser.tab`; an address loaded with Enter, a pick in the app, the marks drawn, and the comment typed beside them are not observed |
-| Pull request details (tabs, composer, header, checkout menu, checks, timeline) | view, control, action | views `pull-requests/item`, `pull-requests/files`; `pr-details.tab.summary`, `pr-details.tab.timeline`, `pr-details.tab.code`, `pr-details.tab.review`, `pr-details.checkout`; on the page the Code tab also sets the hash, so it shows as view `pull-requests/files`; edits, comments, merges, and checkouts are `PUT`s or action `review-draft` |
+| Pull request details (tabs, composer, header, checkout menu, checks, timeline) | view, control, action | views `pull-requests/item`, `pull-requests/files`; `pr-details.tab.summary`, `pr-details.tab.timeline`, `pr-details.tab.code`, `pr-details.tab.review`, `pr-details.checkout`; on the page the Code tab also sets the hash, so it shows as view `pull-requests/files`; images in its Markdown use the `media-viewer.*` controls; edits, comments, merges, and checkouts are `PUT`s or action `review-draft` |
 | Bottom bar | control, command, action | `status-bar.terminal`, `status-bar.cpu`, `status-bar.disk`; command `terminal`; a process's Stop is a `PUT`; plan quota is display only |
 | Files: the Todos card's Files section | control | `changes-card.file`, `changes-card.files.fold` |
 | Files: the session changes dialog | control | `changes-dialog.scope.all`, `changes-dialog.scope.session`, `changes-dialog.refresh` |
@@ -84,12 +85,12 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Settings › Storage | view, control, action | `settings/storage`; `storage.stop` stops between steps; previews and applies use `PUT /api/storage/cleanup`; rule changes use `PUT /api/settings/agent` |
 | File dialog | control | `file-dialog.open`, `file-dialog.source`, `file-dialog.copy-path` |
 | Ask about this and the discussion panel | control, action | `ask-about.open`, `discussion.close`; actions `discuss`, `discuss-stop`; Send to session is action `prompt` |
+| Dictation | action, command | actions `dictation-start`, `dictation-stop`, `dictation-discard`; command `dictate`; Enable dictation is `put /api/dictation/settings` |
 | Command palette | command | the command each item runs |
 | Keyboard shortcuts | command, control | each shortcut's command key; `shortcuts.open`, `shortcuts.tab` |
 | Notes, Calendar, and Email buttons, command menu button, What's new, notification bell, and Settings button | control, command | `header.tab`; `header.command-menu`, which opens the command palette as command `switcher` does; `header.whats-new`, which opens What's new; `notices.open`, `notices.filter`, `notices.read-all`, `notices.item`, `notices.update`, `notices.clear`; the `notice` message is not an action, so these need the tags; `header.settings`, which opens or closes Settings as command `settings` does; `header.back` and `header.forward`, the title bar's Back and Forward, which go back and forward as commands `back` and `forward` do |
 | System notifications and Dock badge | presence, action | clicking one brings the window to the foreground (presence); their switches and sound in Settings › Preferences are action `preference` |
 | Pages: New session | view | `new` |
-| Pages: Inbox | view, control, command, action | views `inbox` and `inbox/item`; `inbox.filter`, `inbox.suggestion`; the `inbox*` shortcuts' command keys; answers, prompts, reads, and clears are the actions they send |
 | Pages: Get started dialog, its automatic vacant-home opening, and its bubble | view, command, control, action | explicit view `get-started` (automatic home remains `home`); command `get-started`; `get-started.next`, `get-started.back`, `get-started.skip`, `get-started.step`, `get-started.dismiss`, `get-started.close`, `get-started.bubble`, `get-started.refresh`, `get-started.install-kit`, `get-started.copy-command`, `get-started.install-gh`, `get-started.suggestion`; the terminal choice is `put /api/readiness/terminal-sessions` and a provider sign-in is the same `PUT` as in Settings, while the integrations link records its Settings view |
 | Pages: Pull requests | view, control | `pull-requests`; `pull-requests.view.list`, `pull-requests.view.board`; Rebase N behind is a `PUT` |
 | Pages: Tickets | view | `tickets`, `tickets/item` |
@@ -97,7 +98,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Pages: Notes | view | `notes`, `notes/item` |
 | Pages: Calendar | view, control | `calendar`; `calendar.routines.toggle` |
 | Pages: Email | view | `email`, `email/new`, `email/item` |
-| Pages: Bots | view, control, action | `bots`, `bots/new`, `bots/item`, `bots/routines`, `bots/routine`; `bots.delete`, `bots.details`, `bots.job.revert`, `bots.job.template`, `bots.kind`, `bots.look`, `bots.routine.delete`, `bots.routine.new`, `bots.routine.run`, `bots.tab.details`, `bots.tab.routines`; `bot`, `routine` |
+| Pages: Bots | view, control, action | `bots`, `bots/new`, `bots/item`, `bots/routines`, `bots/routine`; `bots.delete`, `bots.details`, `bots.job.revert`, `bots.job.template`, `bots.kind`, `bots.look`, `bots.routine.delete`, `bots.routine.new`, `bots.routine.run`, `bots.tab.details`, `bots.tab.routines`, `bots.tab.tasks`, `bots.task.open`; `bot`, `routine`, `router-task` |
 | Pages: Settings | view | `settings/<section>` |
 | Settings › Analytics' context-source table | view | `settings/analytics` |
 | Settings › Integrations' Google account lines | view, action | `settings/integrations`; Add account, Remove, and the workspace picker are `PUT`s |

@@ -62,6 +62,12 @@ export class SessionFiles {
 	 */
 	readonly factsOf = (sessionId: string, cwd?: string): SessionFacts => this.facts.factsOf(this.pathOf(sessionId), cwd);
 
+	/** Where a relative path in session `sessionId`'s text may start, the most recently used first; none for an unknown session. */
+	readonly fileDirsOf = (sessionId: string): string[] => {
+		const path = this.pathOf(sessionId);
+		return path === null ? [] : this.facts.fileDirsOf(path);
+	};
+
 	/** The workspace each session counts in, newest first. Sessions from old omp versions recorded no directory. */
 	workspaces(): string[] {
 		return this.#files.map(session => this.facts.placement.cwdOf(session.cwd)).filter(Boolean);

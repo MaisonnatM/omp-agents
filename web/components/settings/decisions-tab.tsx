@@ -1,10 +1,11 @@
 /** The Settings Decisions section: the workspace repository's decision records as a timeline, newest first, the ones in force by default. */
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import type { DecisionRecord, DecisionRecords } from "../../../src/shared/models";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useRead } from "../../reads";
 import { FileBaseContext } from "../file-link";
+import type { FileBase } from "../../file-paths";
 import { MessageMarkdown } from "../message-markdown";
 
 const STATUS_COLORS: Record<string, "green" | "blue" | "red" | "gray" | "amber"> = {
@@ -49,6 +50,7 @@ function RecordLinks({ label, names, records, onOpen }: { label: string; names: 
 
 function RecordEntry({ record, records, dir, expanded, onToggle, onOpen }: { record: DecisionRecord; records: DecisionRecord[]; dir: string; expanded: boolean; onToggle: () => void; onOpen: (name: string) => void }) {
 	const retired = record.status !== null && RETIRED[record.status] === true;
+	const base = useMemo((): FileBase => ({ dir, session: null }), [dir]);
 	return (
 		<li id={`decision-${record.name}`} className="grid scroll-mt-10 grid-cols-[6.5rem_minmax(0,1fr)] gap-6 border-b border-border py-6 last:border-b-0">
 			<time className="pt-0.5 text-xs tabular-nums text-muted-foreground">{record.date}</time>
@@ -67,7 +69,7 @@ function RecordEntry({ record, records, dir, expanded, onToggle, onOpen }: { rec
 							{record.decisionMakers.length > 0 ? `Decided by ${record.decisionMakers.join(", ")} · ` : ""}
 							<span className="font-mono">{record.name}.md</span>
 						</p>
-						<FileBaseContext.Provider value={dir}>
+						<FileBaseContext.Provider value={base}>
 							<div className="text-sm leading-relaxed">
 								<MessageMarkdown text={record.body} />
 							</div>

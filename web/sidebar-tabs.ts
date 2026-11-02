@@ -12,7 +12,7 @@ SIDEBAR_TABS satisfies readonly { value: ShortcutId }[];
 
 const KEY = "omp-agents.sidebar-tabs";
 
-/** The Email tab's id before its rename, which a layout stored before it still names; this goes when the new Inbox tab takes the id. */
+/** The Email tab's id before its rename, which a layout stored before it still names. */
 const LEGACY_EMAIL_TAB = "inbox";
 
 /** The user's sidebar tabs: every tab once, in the order the bar and the header show them, and whether the user hid it. */
@@ -80,7 +80,7 @@ export const tabsSignedOut = (integrations: IntegrationsAnswer["integrations"] |
  * The tab layout, kept in this browser, and the tabs it shows; every component that holds it sees a change at once.
  * `signedOut` stays the same set until a tab's service signs in or out, whatever the integrations' polls answer, and
  * `shown` stays with it until the layout changes. A stored layout that still names {@link LEGACY_EMAIL_TAB} is stored
- * again as it decodes, so the old id leaves this browser and Settings › Sync before the new Inbox tab takes it.
+ * again as it decodes, so the old id leaves this browser and Settings › Sync.
  */
 export function useSidebarTabs(): {
 	layout: TabLayout;

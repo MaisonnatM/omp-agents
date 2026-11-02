@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { loadRawHtml, MessageMarkdown } from "../message-markdown";
+import { AGENT_PRESET, loadRawHtml, MessageMarkdown, OpenMarkdownImage } from "../message-markdown";
 import { PullRequestMarkdown } from "./pr-markdown";
 
 // A static render reads the raw HTML plugins as they stand, so they load first.
@@ -32,6 +32,20 @@ test("PR media rewrites Markdown and HTML images, plays GitHub videos and cards 
 	expect(source).toContain('<video controls="" preload="metadata" src="/api/github-media?url=https%3A%2F%2Fuser-images.githubusercontent.com%2F1%2Fdemo.mp4"');
 	expect(source).not.toContain("assets%2Ffenced");
 	expect(render("![External](https://example.com/a.png)")).toContain('<a href="https://example.com/a.png" target="_blank" rel="noopener noreferrer">External</a>');
+});
+
+test("a PR image opens large from a button holding its unkeyed source, and agent text's image stays a plain image", () => {
+	const html = render("![Shot](https://private-user-images.githubusercontent.com/1/a.png)\n\n![](https://avatars.githubusercontent.com/u/1)\n\n![Elsewhere](https://example.com/a.png)");
+	expect(html).toContain('<button data-activity="media-viewer.open" type="button" data-markdown-image="/api/github-media?url=https%3A%2F%2Fprivate-user-images.githubusercontent.com%2F1%2Fa.png" data-caption="Shot" aria-label="Open Shot" class="cursor-zoom-in"><img');
+	expect(html).toContain('<button data-activity="media-viewer.open" type="button" data-markdown-image="https://avatars.githubusercontent.com/u/1" data-caption="Image" aria-label="Open image" class="cursor-zoom-in"><img');
+	expect(html.match(/<button/g)).toHaveLength(2);
+	const agent = renderToStaticMarkup(
+		<OpenMarkdownImage.Provider value={() => {}}>
+			<MessageMarkdown text="![Dot](data:image/png;base64,AAAA)" preset={AGENT_PRESET} />
+		</OpenMarkdownImage.Provider>,
+	);
+	expect(agent).toContain('<img src="data:image/png;base64,AAAA" alt="Dot"/>');
+	expect(agent).not.toContain("<button");
 });
 
 test("PR customization leaves transcript alerts, autolinks and remote-image restrictions unchanged", () => {

@@ -45,6 +45,8 @@
   Esc in the host's terminal during a tool call looks to a guest like a turn that ended, so a follow-up that the dashboard holds still runs after it.
 - Sessions started from the dashboard have a model menu, as Cursor's does: the button reads the model and its effort, such as **Opus 5.5 High**.
   **Fast** turns omp's `/fast` on or off; it is greyed out for a model without a priority tier, and reads **not active** when omp has it on but the provider refused the fast tier.
+  **Advisor**, just under Fast, turns passive review on or off for this session and names its model, or the number of configured advisors.
+  Assign an advisor model in **Settings → Models** to enable the switch.
   **Context** shows the model's context window and switches to a variant of the same model with another window, such as Cursor's `claude-opus-5-5` (300K) and `claude-opus-5-5-1m` (1M); models without such a variant have no Context row.
   **Effort** chooses the thinking level among the ones the live model supports.
   **Model** opens the model search beside the menu, with the cursor in its field.
@@ -69,6 +71,12 @@
   The numbers are the ones that omp's status line shows.
   Dashboard sessions report them after each turn and after each model or thinking change.
   Terminal sessions report them through Collab `state` frames.
+  In a dashboard session, click the ring or press Enter, Space, or ↑ on it to open its context menu.
+  **Compact** offers Summarize, Summarize locally, Server compaction, Snapshot to images, and With focus; **Shake out** removes tool results, images, or thinking.
+  **Hand off** opens a submenu to start a fresh context with a summary or add focus in the composer.
+  With focus fills the composer with `/compact ` or `/handoff ` for you to finish.
+  These actions wait until the running turn ends; **Auto-compact** remains available and changes this session only, not its config file.
+  While compaction runs, the ring reads **Compacting…** and pulses unless you prefer reduced motion.
 - Type `/` to complete discovered file commands and `/skill:<name>` skills; a skill whose name has a space is left out, since omp cannot invoke it.
   Type `@` to mention something: the list shows the last three files the session changed, then Files & Folders, Todos, Tickets, Pull requests, People, Email, Calendar, and Sessions.
   Picking a category narrows the list to it, which you can also type as a prefix: `@file:`, `@todo:`, `@ticket:`, `@pr:`, `@person:`, `@mail:`, `@event:`, or `@session:`.
@@ -95,6 +103,11 @@
   Steers and follow-ups carry their files too, and a queued row shows the files' names when you typed nothing.
   The new-session draft takes files for its first message.
   omp gives a subagent text only, so a subagent's composer takes text, documents included, but no image.
+- Dictate a prompt with the microphone before the send button, or Cmd+Shift+M in the composer.
+  The first time, a popover says dictation is off and offers **Enable dictation**, which turns on omp's dictation in your own config; press the microphone again to start.
+  A row above the text field says where your speech is transcribed, shows the words heard so far, and offers **Stop** and **Discard**; Escape or Cmd+Shift+M also stops.
+  The text field is read-only while dictation runs, and the text lands where your caret or selection was, so you review it before you send; nothing is sent for you.
+  One composer dictates at a time, and the microphone records on the computer that runs the dashboard.
 - Pasting more than 2,000 characters or 40 lines attaches the text as a file, `Pasted text.txt`, instead of filling the text field, as ChatGPT and Claude do; a second one is `Pasted text 2.txt`.
   Its tile shows the text's first lines, and it goes to the model as a text file does.
 - A prompt's images show above it in the transcript, in live and past sessions, including images sent from omp's terminal, and its files show by name in chips above the text.

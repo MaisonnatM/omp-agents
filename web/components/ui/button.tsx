@@ -279,10 +279,12 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
                   on the label span (a blockified flex item), not the flex root.
                   The button's height is fixed (h-*), so this doesn't change
                   layout — it just centers the cap-to-baseline box optically.
-                  Every label stays on one line; only a button allowed to shrink
-                  (min-w-0) ever ellipsizes it. Clip only the x axis so the
-                  trimmed box keeps its descenders. */}
-              <span className="min-w-0 overflow-x-clip text-ellipsis whitespace-nowrap [text-box:trim-both_cap_alphabetic]">{label}</span>
+                  A label holding an svg drops the trim and centers as a flex
+                  box instead: the cap-height line box would pin the taller
+                  svg to the top. Every label stays on one line; only a button
+                  allowed to shrink (min-w-0) ever ellipsizes it. Clip only the
+                  x axis so the trimmed box keeps its descenders. */}
+              <span className="min-w-0 overflow-x-clip text-ellipsis whitespace-nowrap [text-box:trim-both_cap_alphabetic] has-[svg]:flex has-[svg]:items-center has-[svg]:[text-box:normal]">{label}</span>
               {TrailingIcon && (
                 <TrailingIcon
                   size={iconSize}

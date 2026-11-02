@@ -81,10 +81,10 @@ if (input.command) {
 		// apply is an isolated subagent's changes about to land in that checkout.
 		else if (call.apply) reason = (await session.before_subagent_apply({ type: "before_subagent_apply", agent: "task", agentId: "Child", invocationKind: "task", checkout: call.apply, merge: "patch" }, ctx))?.reason ?? null;
 		else {
-			const event = { toolCallId: String(results.length), ...(call.write ? { toolName: "write", input: { path: call.write } } : { toolName: "bash", input: { command: call.bash } }) };
+			const event = { toolCallId: String(results.length), ...(call.write ? { toolName: "write", input: { path: call.write } } : call.read ? { toolName: "read", input: { path: call.read } } : { toolName: "bash", input: { command: call.bash } }) };
 			reason = (await session.tool_call(event, ctx))?.reason ?? null;
 			// An allowed call runs, unless dry asks only for the guard's answer.
-			if (reason === null && !call.dry) {
+			if (reason === null && !call.dry && !call.read) {
 				if (call.write) writeFileSync(call.write, ctx.sessionManager.getSessionId() + "\\n");
 				else await session.tool_result({ ...event, isError: spawnSync("bash", ["-c", call.bash], { cwd, stdio: "ignore" }).status !== 0 }, ctx);
 			}
@@ -412,20 +412,28 @@ describe("checked PR description CLI", () => {
 });
 
 describe("ship_stage review gates", () => {
-	// Records `stage` for a PR with this body changing `file`, checked from a checkout with `reviewPaths` and `uiPaths`.
-	const record = (stage: string, body: string, file: string, reviewPaths?: string, uiPaths?: string) => {
+	// GitHub's answer to the gate's read of a PR with this body changing `file`.
+	const prRead = (body: string, file: string) => {
 		const pullRequest = {
 			state: "OPEN", isDraft: true, mergeable: "MERGEABLE", mergeStateStatus: "CLEAN", reviewDecision: null, body,
 			changedFiles: 1, files: { nodes: [{ path: file }] },
 			reviewThreads: { nodes: [], pageInfo: { hasNextPage: false } },
 			commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
 		};
-		return exercise("ship", {
-			run: true, cwd: checkout(reviewPaths, uiPaths),
-			params: { stage, pr: 7, repo: "owner/name" },
-			response: { code: 0, stderr: "", stdout: JSON.stringify({ data: { repository: { pullRequest } } }) },
-		}).run;
+		return { code: 0, stderr: "", stdout: JSON.stringify({ data: { repository: { pullRequest } } }) };
 	};
+	// Records `stage` for a PR with this body changing `file`, checked from a checkout with `reviewPaths` and `uiPaths`.
+	const record = (stage: string, body: string, file: string, reviewPaths?: string, uiPaths?: string) =>
+		exercise("ship", { run: true, cwd: checkout(reviewPaths, uiPaths), params: { stage, pr: 7, repo: "owner/name" }, response: prRead(body, file) }).run;
+
+	test("a box GitHub returns only on the second read, just after it was added, passes the gate", () => {
+		const result = exercise("ship", {
+			run: true, cwd: checkout(), params: { stage: "ready_gate", pr: 7, repo: "owner/name" },
+			sequence: [prRead("Unreviewed PR", "README.md"), prRead("- [x] Thermo-nuclear code quality review", "README.md")],
+		});
+		expect(result.run).toEqual({ isError: false, stage: "ready_gate" });
+		expect(result.executed).toHaveLength(2);
+	});
 
 	test.each([["- [x] Thermo-nuclear code quality review", false], ["Unreviewed PR", true]])("the first call naming the PR reads its body (%s)", (body, isError) => {
 		expect(record("ready_gate", body, "README.md")).toEqual({ isError, stage: isError ? null : "ready_gate" });
@@ -586,6 +594,21 @@ describe("checkout ownership", () => {
 		claimByAnother(dir);
 		const [reason] = calls([{ bash: "git switch main", cwd: dir }]);
 		expect(held(reason, dir)).toBe(true);
+	});
+
+	test("once the session works in a linked worktree, a relative path that opens the main checkout is blocked, and an absolute one passes", () => {
+		const dir = repo();
+		const worktree = `${dir}-mine`;
+		git(dir, "worktree", "add", "-q", "-b", "mine", worktree, "main");
+		const results = calls([
+			{ read: "file.txt", cwd: dir },
+			{ write: join(worktree, "file.txt") },
+			{ read: "file.txt:1-5", cwd: dir },
+			{ write: "file.txt", cwd: dir, dry: true },
+			{ read: join(dir, "file.txt"), cwd: dir },
+			{ read: join(worktree, "file.txt"), cwd: dir },
+		]);
+		expect(results.map(reason => reason?.includes(`works in the worktree ${worktree}`) ?? null)).toEqual([null, null, true, true, null, null]);
 	});
 
 	test("a clean checkout passes to the next session that changes it", () => {

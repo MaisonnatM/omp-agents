@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -6,15 +6,8 @@ import { join } from "node:path";
 import { bypass } from "./agent/extensions/land/gate";
 import { describe as report, land } from "./agent/extensions/land/lander";
 
-// Run from an omp session, the tests inherit its `PI_SESSION_ID`, which the session-trailer hook would add to every commit.
-const sessionId = process.env.PI_SESSION_ID;
-beforeAll(() => {
-	process.env.PI_SESSION_ID = "";
-});
 const dirs: string[] = [];
 afterAll(() => {
-	if (sessionId === undefined) delete process.env.PI_SESSION_ID;
-	else process.env.PI_SESSION_ID = sessionId;
 	for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
 });
 

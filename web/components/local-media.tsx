@@ -1,19 +1,18 @@
 /** The images and videos on this computer that agent text names, shown in the message and opened large in the file dialog. */
 import { Play } from "lucide-react";
 import { useContext, useState } from "react";
-import { mediaUrl } from "../../src/shared/transcript";
 import { mediaSrc } from "../api";
-import { absoluteFilePath, linkedFile } from "../file-paths";
+import { type FileTarget, fileTarget, linkedFile, mediaFileUrl } from "../file-paths";
 import { DashboardActionsContext } from "./dashboard-context";
 import { FileBaseContext } from "./file-link";
 
-/** The absolute path of `path` against the message's base, and whether it plays as a video; `null` when nothing resolves it or it is no media file. */
-function useMedia(path: string): { target: string; video: boolean } | null {
+/** The file `path` names against the message's base, its address, and whether it plays as a video; `null` when nothing resolves it or it is no media file. */
+function useMedia(path: string): { target: FileTarget; src: string; video: boolean } | null {
 	const base = useContext(FileBaseContext);
 	const file = linkedFile(path);
-	const target = absoluteFilePath(path, base);
+	const target = fileTarget(path, base);
 	if (!file || file.kind === "text" || target === null) return null;
-	return { target, video: file.kind === "video" };
+	return { target, src: mediaSrc(mediaFileUrl(target)), video: file.kind === "video" };
 }
 
 /** An image of agent text, `![alt](path)`, in place: an image, or a video that plays there. A path that loads nothing shows its `alt`. */
@@ -22,7 +21,7 @@ export function LocalMedia({ path, alt }: { path: string; alt: string }) {
 	const openFile = useContext(DashboardActionsContext)?.openFile;
 	const [failed, setFailed] = useState(false);
 	if (media === null || failed) return <>{alt || path}</>;
-	const src = mediaSrc(mediaUrl(media.target));
+	const { src } = media;
 	if (media.video) return <video controls preload="metadata" src={src} onError={() => setFailed(true)} className="max-h-[60vh] max-w-full rounded-md bg-black" />;
 	return (
 		<img
@@ -42,12 +41,12 @@ function Thumbnail({ path }: { path: string }) {
 	const openFile = useContext(DashboardActionsContext)?.openFile;
 	const [failed, setFailed] = useState(false);
 	if (media === null || failed) return null;
-	const src = mediaSrc(mediaUrl(media.target));
-	const name = media.target.slice(media.target.lastIndexOf("/") + 1);
+	const { src } = media;
+	const name = media.target.path.slice(media.target.path.lastIndexOf("/") + 1);
 	return (
 		<button
 			type="button"
-			title={media.target}
+			title={media.target.path}
 			aria-label={`Open ${name}`}
 			disabled={!openFile}
 			onClick={() => openFile?.(media.target)}

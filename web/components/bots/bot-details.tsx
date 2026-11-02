@@ -1,21 +1,25 @@
-/** `BotDetails`, the right sidebar on a Bot's page: its Details tab with its look and name, both editable in place, where it works, its job, memory, and its conversation's token usage, then Delete; its Routines tab; and its conversation's Tickets tab once it worked on any. */
-import { Plus, Repeat, Trash2 } from "lucide-react";
+/** `BotDetails`, the right sidebar on a Bot's page: its Details tab with its look and name, both editable in place, where it works, its job, memory, and its conversation's token usage, then Delete; its Routines tab; a Router's Tasks tab; and its conversation's Tickets tab once it worked on any. */
+import { Check, CircleStop, ListChecks, Plus, Repeat, Trash2 } from "lucide-react";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import type { Routine } from "../../../src/routines";
 import { type Bot, BOT_KIND_INFO, type BotLook, type BotSpec, MAX_JOB_LENGTH } from "../../../src/shared/bots";
+import { followKey, followLabel, type RouterTask, TASK_STATUS_LABELS, taskGroups } from "../../../src/shared/router";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
+import { MenuItem } from "@/components/ui/menu";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { botAsking, memoryEntries, type OpenBot, type OpenRoutine } from "../../bots-model";
 import { PAGE_ICON } from "../../page-icons";
-import { hashForBotRoutine, hashForBots } from "../../routing";
-import { age } from "../../labels";
+import { hashForBotRoutine, hashForBots, viewForSession } from "../../routing";
+import { age, modeOf } from "../../labels";
 import { sessionUsageStore } from "../../reads";
 import { runWords, startsWords } from "../../routines-model";
 import { useDashboardActions } from "../dashboard-context";
 import { DetailsEmpty, DetailsSidebarFrame } from "../details-sidebar-frame";
+import { MoreActionsMenu } from "../more-actions-menu";
+import { StatusDot } from "../status-dot";
 import { LoadNote } from "../sheet-details";
 import { ticketsTabs } from "../session-details";
 import { TEXT_AREA } from "../form-field";
@@ -240,6 +244,96 @@ function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: r
 	);
 }
 
+/** One of a Router's tasks: its session's dot while it runs, its title, which opens its session, what it listens to, and **Mark done** and **Stop** while it is open. */
+function TaskRow({ task, hosts, connected }: { task: RouterTask; hosts: RosterHost[]; connected: boolean }) {
+	const { open, send } = useDashboardActions();
+	const { sessionId } = task;
+	const host = sessionId ? hosts.find(each => each.sessionId === sessionId) : undefined;
+	const finish = (status: "done" | "stopped"): void => send({ t: "router-task", change: { op: "finish", id: task.id, status, note: null } });
+	// Its group names its status, but for a stopped task, which shows among the done ones.
+	const ago = `${age(task.updatedAt, { compact: true })} ago`;
+	const when = task.status === "stopped" ? `${TASK_STATUS_LABELS.stopped} · ${ago}` : ago;
+	return (
+		<li className="flex items-start gap-1 rounded-md border border-border bg-card text-sm">
+			<button
+				{...activityControl("bots.task.open")}
+				type="button"
+				disabled={!sessionId}
+				onClick={event => sessionId && open(viewForSession(sessionId, hosts), modeOf(event))}
+				className="flex min-w-0 flex-1 items-start gap-2.5 rounded-md px-3 py-2 text-left outline-none enabled:hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring"
+			>
+				{host && (
+					<span className="pt-1.5">
+						<StatusDot status={host.status} />
+					</span>
+				)}
+				<span className="min-w-0 space-y-1">
+					<span className="block truncate font-medium" title={task.title}>
+						{task.title}
+					</span>
+					{task.follows.length > 0 && (
+						<span className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+							Listening to
+							{task.follows.map(follow => (
+								<span key={followKey(follow)} className="rounded-sm bg-muted px-1.5 py-px font-mono text-[11px] text-foreground">
+									{followLabel(follow)}
+								</span>
+							))}
+						</span>
+					)}
+					{task.note && <span className="block text-xs text-muted-foreground">{task.note}</span>}
+					<span className="block truncate text-xs text-muted-foreground">{when}</span>
+				</span>
+			</button>
+			{(task.status === "working" || task.status === "review") && (
+				<span className="shrink-0 p-1">
+					<MoreActionsMenu name={task.title} disabled={!connected}>
+						<MenuItem onClick={() => finish("done")}>
+							<Check />
+							Mark done
+						</MenuItem>
+						<MenuItem onClick={() => finish("stopped")}>
+							<CircleStop />
+							Stop
+						</MenuItem>
+					</MoreActionsMenu>
+				</span>
+			)}
+		</li>
+	);
+}
+
+/** A Router's tasks, in the order you act on them: the ones waiting on you, the ones at work, then the ones over. */
+function BotTasks({ bot, tasks, hosts, connected }: { bot: Bot; tasks: readonly RouterTask[]; hosts: RosterHost[]; connected: boolean }) {
+	if (tasks.length === 0) return <DetailsEmpty icon={ListChecks} title="No task yet" description={`Ask ${bot.name} for something, and it hands the work to a background session it tracks here.`} />;
+	const { review, working, done } = taskGroups(tasks);
+	const groups = [
+		{ name: "Needs you", tasks: review, empty: "Nothing waiting on you" },
+		{ name: "In progress", tasks: working, empty: "Nothing at work" },
+		{ name: "Done", tasks: done, empty: "None yet" },
+	];
+	return (
+		<div className="space-y-4">
+			{groups.map(group => (
+				<section key={group.name} className="space-y-1.5">
+					<h3 className="text-xs font-medium text-muted-foreground">
+						{group.name} <span className="tabular-nums">{group.tasks.length > 0 && group.tasks.length}</span>
+					</h3>
+					{group.tasks.length === 0 ? (
+						<Muted>{group.empty}</Muted>
+					) : (
+						<ul className="space-y-1.5">
+							{group.tasks.map(task => (
+								<TaskRow key={task.id} task={task} hosts={hosts} connected={connected} />
+							))}
+						</ul>
+					)}
+				</section>
+			))}
+		</div>
+	);
+}
+
 function Muted({ children }: { children: ReactNode }) {
 	return <p className="text-xs text-muted-foreground">{children}</p>;
 }
@@ -289,10 +383,14 @@ interface BotDetailsProps {
 	session: RosterHost | PastSession | null;
 	/** Its `memory.md`, empty while it remembers nothing. */
 	memory: string;
+	/** A Router's tasks, empty for another Bot. */
+	tasks: readonly RouterTask[];
+	/** The live sessions, which a task's row opens and shows the status of. */
+	hosts: RosterHost[];
 	connected: boolean;
 }
 
-export function BotDetails({ open: { bot, host, routines, routine, status }, session, memory, connected }: BotDetailsProps) {
+export function BotDetails({ open: { bot, host, routines, routine, status }, session, memory, tasks, hosts, connected }: BotDetailsProps) {
 	return (
 		<DetailsSidebarFrame
 			label="Bot details"
@@ -341,6 +439,22 @@ export function BotDetails({ open: { bot, host, routines, routine, status }, ses
 						</div>
 					),
 				},
+				...(bot.kind === "router"
+					? [
+							{
+								value: "tasks",
+								icon: ListChecks,
+								name: "Tasks",
+								control: "bots.tab.tasks" as const,
+								count: tasks.filter(({ status }) => status === "review").length,
+								content: (
+									<div className="px-4 pt-2 pb-4">
+										<BotTasks bot={bot} tasks={tasks} hosts={hosts} connected={connected} />
+									</div>
+								),
+							},
+						]
+					: []),
 				...ticketsTabs(session?.tickets ?? [], host?.status === "working"),
 			]}
 		/>

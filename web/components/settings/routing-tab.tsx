@@ -1,19 +1,20 @@
 import { Plus, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { type CatalogModel, type ModelChain, type ModelRouting, type OmpSettings, type RetrySettings, type RoleRoute, type RoutingEdit, splitSelector } from "../../../src/shared/models";
+import { type ModelChain, type ModelRouting, type OmpSettings, type RetrySettings, type RoleRoute, type RoutingEdit } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
-import { Tooltip } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { putJson, settingsUrl } from "../../api";
 import { providerOrg } from "../../labels";
-import { CommandPicker, fromList } from "../command-picker";
-import { MODEL_LIST, Model, modelDescription, modelGroups } from "../model-picker";
+import { CommandPicker } from "../command-picker";
+import { Model } from "../model-picker";
 import { OrgIcon } from "../org-icon";
-import { type Catalog, EditBar, type Editing, FIELD, NumberField, OrderedList, SaveError, Section, useEditor } from "./editor";
+import { type Catalog, EditBar, type Editing, FIELD, LINK, NumberField, OrderedList, SaveError, Section, useEditor, writeOrReload } from "./editor";
+import { SelectorPicker } from "./selector-picker";
+import { hashForSettings } from "../../routing";
 
 /** Each save answers with the settings as they load afterwards. */
-const saveRouting = (cwd: string | null, edit: RoutingEdit): Promise<OmpSettings> => putJson<OmpSettings>(settingsUrl("/routing", cwd), edit);
+const saveRouting = (editing: Editing, edit: RoutingEdit): Promise<OmpSettings> => writeOrReload(editing, () => putJson<OmpSettings>(settingsUrl("/routing", editing.cwd), edit));
 
 const onOff = (value: boolean | number | string): string => (value ? "On" : "Off");
 const duration = (value: boolean | number | string): string =>
@@ -48,51 +49,6 @@ function Chain({ fallbacks }: { fallbacks: string[] }) {
 	);
 }
 
-/** A model `omp models` lists, then its thinking level. The value is omp's selector, `provider/id` with an optional `:level`. */
-function SelectorPicker({ value, catalog, label, onPick }: { value: string | null; catalog: Catalog; label: string; onPick: (selector: string) => void }) {
-	const models = catalog.data?.bySelector ?? null;
-	const { model, level } = value && models ? splitSelector(value, models) : { model: value, level: null };
-	const levels = (model && models?.get(model)?.thinking) || [];
-	const pickModel = (next: CatalogModel): void => onPick(level && next.thinking.includes(level) ? `${next.selector}:${level}` : next.selector);
-	return (
-		<div className="flex min-w-0 items-center gap-1">
-			<CommandPicker
-				trigger={<span className="max-w-56 truncate">{model ? <Model selector={model} /> : "Choose a model"}</span>}
-				ariaLabel={`${label}: ${model ? modelDescription(model) : "none"}`}
-				tooltip={model ? `Model for ${label}: ${modelDescription(model)}` : `Choose a model for ${label}`}
-				className="min-w-0"
-				search={MODEL_LIST.search}
-				width="lg"
-				list={fromList(catalog, MODEL_LIST.loading, ({ byProvider }) =>
-					modelGroups(
-						byProvider,
-						option => ({ selector: option.selector, id: option.selector.slice(option.provider.length + 1), keywords: [option.name] }),
-						model,
-						pickModel,
-					),
-				)}
-				empty={MODEL_LIST.empty}
-			/>
-			{model && (levels.length > 0 || level) && (
-				<Select value={level ?? ""} onValueChange={next => onPick(next ? `${model}:${next}` : model)}>
-					<Tooltip content={`Thinking level for ${label}`}>
-						<SelectTrigger aria-label={`${label}: thinking level`}>
-							<SelectValue>{(value: string) => value || "default"}</SelectValue>
-						</SelectTrigger>
-					</Tooltip>
-					<SelectContent>
-						<SelectItem value="">default</SelectItem>
-						{[...new Set([...levels, ...(level ? [level] : [])])].map(option => (
-							<SelectItem key={option} value={option}>
-								{option}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
-			)}
-		</div>
-	);
-}
 
 function ChainEditor({ chain, catalog, onChange }: { chain: string[]; catalog: Catalog; onChange: (chain: string[]) => void }) {
 	const [adding, setAdding] = useState(false);
@@ -139,14 +95,13 @@ function RoleRow({ route, editing }: { route: RoleRoute; editing: Editing }) {
 	const editor = useEditor(
 		{ primary: route.primary, fallbacks: route.fallbacks },
 		draft =>
-			saveRouting(editing.cwd, {
+			saveRouting(editing, {
 				kind: "role",
 				role: route.role,
 				...(draft.primary !== null && draft.primary !== route.primary && { primary: draft.primary }),
 				// An unchanged inherited chain stays inherited rather than becoming a copy.
 				...(JSON.stringify(draft.fallbacks) !== JSON.stringify(route.fallbacks) && { fallbacks: draft.fallbacks }),
 			}),
-		editing,
 	);
 	const { draft } = editor;
 	const viewing = editor.state.phase === "viewing";
@@ -155,6 +110,7 @@ function RoleRow({ route, editing }: { route: RoleRoute; editing: Editing }) {
 		<tr className="border-t border-border align-baseline">
 			<th scope="row" className="py-2 pr-6 text-left font-medium">
 				{route.role}
+				{route.role === "task" && <a href={hashForSettings("agents")} className={`${LINK} mt-1 block text-xs font-normal`}>Agent model overrides</a>}
 			</th>
 			<td className="whitespace-nowrap py-2 pr-6">
 				{viewing ? (
@@ -183,7 +139,7 @@ function RoleRow({ route, editing }: { route: RoleRoute; editing: Editing }) {
 }
 
 function ModelChainRow({ chain, editing }: { chain: ModelChain; editing: Editing }) {
-	const editor = useEditor(chain.fallbacks, fallbacks => saveRouting(editing.cwd, { kind: "model-chain", key: chain.key, fallbacks }), editing);
+	const editor = useEditor(chain.fallbacks, fallbacks => saveRouting(editing, { kind: "model-chain", key: chain.key, fallbacks }));
 	return (
 		<tr className="border-t border-border align-baseline">
 			<th scope="row" className="py-2 pr-6 text-left font-mono text-xs font-medium">
@@ -209,11 +165,10 @@ function RetrySection({ routing, editing }: { routing: ModelRouting; editing: Ed
 	const editor = useEditor(
 		routing.retry,
 		draft =>
-			saveRouting(editing.cwd, {
+			saveRouting(editing, {
 				kind: "retry",
 				values: Object.fromEntries(Object.entries(draft).filter(([key, value]) => routing.retry[key as keyof RetrySettings] !== value)),
 			}),
-		editing,
 	);
 	const set = (key: keyof RetrySettings, value: boolean | number | string): void => editor.change({ ...editor.draft, [key]: value });
 	return (
@@ -298,7 +253,7 @@ function ProviderPicker({ providers, onPick }: { providers: string[]; onPick: (p
 }
 
 function ProviderOrderSection({ order, editing }: { order: string[]; editing: Editing }) {
-	const editor = useEditor(order, providers => saveRouting(editing.cwd, { kind: "provider-order", providers }), editing);
+	const editor = useEditor(order, providers => saveRouting(editing, { kind: "provider-order", providers }));
 	const { catalog } = editing;
 	const unlisted = catalog.data ? [...catalog.data.byProvider.keys()].filter(provider => !editor.draft.includes(provider)) : [];
 	const row = (provider: string): ReactNode => (

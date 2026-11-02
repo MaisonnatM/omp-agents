@@ -1,6 +1,7 @@
 import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ModelOption } from "../../src/shared/models";
 import type { Delivery, LiveView, RosterHost } from "../../src/shared/sessions";
+import type { ContextAction } from "../../src/shared/session-controls";
 import type { ChangedFile } from "../../src/shared/transcript";
 import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
@@ -23,10 +24,11 @@ import { blockedShortcut, ComposerEditor, ComposerNote, DirectoryLabel, EmptyCon
 import { QueuedMessages, useQueue } from "./composer-queue";
 import { useSuggestions } from "./composer-suggestions";
 import type { PromptEditorHandle } from "./prompt-editor";
-import { ContextRing } from "./context-ring";
+import { ContextRing, ContextRingMenu } from "./context-ring";
 import { ConversationHeader } from "./conversation-header";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
+import { DictationButton, DictationRow, useDictation } from "./composer-dictation";
 import type { ModelMenuOpen } from "./model-picker";
 import { ModelSlot } from "./model-slot";
 import { ScheduleButton, ScheduledMessages, useScheduleSend } from "./scheduled";
@@ -125,6 +127,7 @@ function LiveConversation({
 	const instanceId = view.instanceId;
 	const { request } = useDashboardActions();
 	const { connected } = useDashboardStatus();
+	const dictation = useDictation({ composer: writable && shown ? { draftKey: liveDraftKey(view), cwd: shown.cwd } : null, text: draft, editorRef, send, connected });
 	const scheduleSend = useScheduleSend();
 	const editPrompt = useCallback((entryId: string, text: string) => request({ t: "edit-prompt", instanceId, entryId, text }), [instanceId, request]);
 	const completion = useCompletion({
@@ -140,11 +143,19 @@ function LiveConversation({
 	const modelChange = useAction((model: ModelOption, level: string | null) => request({ t: "set-model", instanceId, model, thinking: level }), "Could not switch the model");
 	const thinkingChange = useAction((level: string) => request({ t: "set-thinking", instanceId, level }), "Could not change the thinking level");
 	const fastChange = useAction((enabled: boolean) => request({ t: "set-fast", instanceId, enabled }), "Could not switch fast mode");
-	const switching = (!!switchable && switchable.switching) || modelChange.pending || thinkingChange.pending || fastChange.pending;
-	const restoreDraft = (text: string): void => {
-		setDraft(current => (current ? `${text}\n${current}` : text));
-		editorRef.current?.focus();
+	const advisorChange = useAction((enabled: boolean) => request({ t: "set-advisor", instanceId, enabled }), "Could not switch the advisor");
+	const contextAction = useAction((action: ContextAction) => request({ t: "context", instanceId, action }), "Could not change the context");
+	const autoCompaction = useAction((enabled: boolean) => request({ t: "set-auto-compaction", instanceId, enabled }), "Could not switch auto-compact");
+	const switching = (!!switchable && switchable.switching) || modelChange.pending || thinkingChange.pending || fastChange.pending || advisorChange.pending;
+	const prefixDraft = (text: string, { newline = true, selectEnd = false } = {}): void => {
+		setDraft(current => current ? `${text}${newline ? "\n" : ""}${current}` : text);
+		requestAnimationFrame(() => {
+			editorRef.current?.focus();
+			if (selectEnd) editorRef.current?.select(Number.POSITIVE_INFINITY);
+		});
 	};
+	const restoreDraft = (text: string): void => prefixDraft(text);
+	const focusContextCommand = (command: string): void => prefixDraft(command, { newline: false, selectEnd: true });
 	const { queued, take, interrupt } = useQueue({
 		waiting: subject.queue,
 		withdrawn,
@@ -177,7 +188,7 @@ function LiveConversation({
 	const sendToSession = useCallback((text: string) => request({ t: "prompt", view, text, images: [], delivery: deliveryOf(latestSubject.current) }), [request, view]);
 
 	const directCommand = blockedShortcut(draft, shell);
-	const steerable = writable && (draft.trim() !== "" || attachments.files.length > 0) && !directCommand;
+	const steerable = writable && !dictation.locked && (draft.trim() !== "" || attachments.files.length > 0) && !directCommand;
 	const steerDraft = (): void => submit(draft.trim(), "steer");
 	const sessionId = session ? (shown?.sessionId ?? null) : null;
 	const schedule = useAction(async (when: ScheduleWhen) => {
@@ -197,6 +208,12 @@ function LiveConversation({
 			requestAnimationFrame(() => editorRef.current?.select(Number.POSITIVE_INFINITY));
 		},
 	});
+	const focusComposer = (): boolean => {
+		const editor = editorRef.current;
+		if (!editor?.editable()) return false;
+		editor.focus();
+		return true;
+	};
 
 	// The list refreshes on every open, whether a click or the model shortcut opened the menu.
 	const openModels = (open: ModelMenuOpen | null): void => {
@@ -207,6 +224,7 @@ function LiveConversation({
 	const movable = switchable?.status === "idle";
 
 	const onComposerKey = useShortcuts({
+		dictate: dictation.toggle,
 		// The text field's own keys, so they need no focused pane.
 		steer: () => {
 			if (!steerable) return false;
@@ -246,16 +264,13 @@ function LiveConversation({
 						if (levels.length === 0) return false;
 						thinkingChange.run(levels[(levels.indexOf(thinking ?? "") + 1) % levels.length]);
 					},
-					focusComposer: () => {
-						const editor = editorRef.current;
-						if (!editor?.editable()) return false;
-						editor.focus();
-					},
+					focusComposer,
 				}
 			: {}),
 	});
 	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
 		if (completion.onMenuKeyDown(event)) return;
+		dictation.onKeyDown(event);
 		onComposerKey(event);
 		if (!event.defaultPrevented) suggestions.onKeyDown(event);
 		if (!event.defaultPrevented && event.key === "Escape") {
@@ -337,6 +352,7 @@ function LiveConversation({
 									onSetModel={modelChange.run}
 									onSetThinking={thinkingChange.run}
 									onSetFast={fastChange.run}
+									onSetAdvisor={advisorChange.run}
 								/>
 							</>
 						}
@@ -352,16 +368,29 @@ function LiveConversation({
 										</Button>
 									</Tooltip>
 								)}
-								{session && shown?.context && <ContextRing context={shown.context} />}
+								{session && shown?.context && (switchable ? (
+									<ContextRingMenu
+										context={shown.context}
+										compaction={switchable.compaction}
+										working={working}
+										pending={contextAction.pending}
+										autoPending={autoCompaction.pending}
+										onAction={contextAction.run}
+										onAutoChange={autoCompaction.run}
+										onFocus={focusContextCommand}
+									/>
+								) : <ContextRing context={shown.context} />)}
 								{sessionId !== null && writable && (
 									<ScheduleButton draft={draft} files={attachments.files.length} disabled={!connected} pending={schedule.pending} onSchedule={schedule.run} />
 								)}
 								{!trajectory && <PromptHistoryButton view={view} />}
 								{writable && <AttachButton onClick={() => openFilePicker()} />}
+								<DictationButton dictation={dictation} />
 							</>
 						)}
 						placeholder={placeholderOf(subject, placeholder)}
 						disabled={!writable}
+						locked={dictation.locked}
 						status={working ? "streaming" : "idle"}
 						onStop={session ? interrupt : undefined}
 						stopping={stop.pending}
@@ -369,6 +398,7 @@ function LiveConversation({
 						sendLabel={working && subject.followUps ? "Queue a follow-up" : `${working ? "Steer" : "Send to"} ${agent ? "subagent" : "session"}`}
 						beforeEditor={
 							<>
+								<DictationRow dictation={dictation} />
 								<ScheduledMessages sessionId={sessionId} onEdit={restoreDraft} />
 								<QueuedMessages
 									entries={queued}

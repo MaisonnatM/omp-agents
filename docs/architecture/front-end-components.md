@@ -12,6 +12,7 @@ shadcn's `message-scroller` follows streaming content, preserves the reader's sc
 The model, thinking, and workspace pickers use shadcn's `popover` and `command` combobox pattern, and the Calendar page's day cards shadcn's `hover-card`.
 Fluid's sidebar rail, mobile drawer, cookie, and toggle shortcut are removed from the vendored sidebar, which keeps only the bordered panel.
 The dashboard sizes and toggles each sidebar in `web/components/sidebar-panel.tsx`, which gives each its own width and open state, because Fluid's provider held only one of each.
+In a window narrower than 720 px, the sidebar's least width plus the session pane's, an open sidebar floats over the page with a dimmed backdrop instead of taking width from it, and closes on a tap on the backdrop or once the address `App` passes it changes.
 Sidebar widths and the split between panes share `web/components/drag-separator.tsx`: `useDragSeparator` owns the pointer capture, arrow keys, and double-click reset, and `Separator` is the element.
 Each call site still clamps its own domain, pixels for a sidebar and a ratio for a split.
 While a sidebar's width is dragged, `DashboardSidebar` turns off pointer events on any `<webview>` inside it, the Preview's, since a guest page takes the pointer from the handle's capture once the pointer crosses into it.
@@ -55,6 +56,7 @@ In agent text, `remarkFilePaths` in `web/file-paths.ts` turns a path to a text, 
 It then ends the text with a `figure` naming the images and videos those links name, each once, but for those an image already shows; `MediaStrip` draws it as thumbnails, each dropping out when its file does not load.
 A `file://` address whose escapes do not decode renders as a link with no address, and text from GitHub keeps no `file://` path, since it renders through the default filter.
 A relative path resolves against `FileBaseContext`: the pane's session worktree, from `SessionFacts.worktree`, else its directory, or the directory of the file the dialog shows.
+In a session's text it also carries the session's id and the path as written, `FileTarget` in `web/file-paths.ts`, so `GET /api/file` and `GET /api/media` try the directories that session's commands ran in when the resolved path holds no file.
 Text from GitHub, which means pull request descriptions and comments, and Linear issues' text, renders its raw HTML through `rehype-raw` and then `rehype-sanitize` with its default schema, which follows GitHub's, plus a `<video>` and its `<source>`, each with only a `src`.
 Those two plugins are `RAW_HTML` in `web/components/raw-html.ts`, a chunk of its own that `MessageMarkdown` loads for the first such text, which renders nothing until it lands, so its HTML never shows as escaped text; should the chunk fail to load, the text renders with its HTML escaped.
 It shows GitHub's avatars and images from the route for a Linear issue's files, and shows images and plays videos uploaded to GitHub through `GET /api/github-media`; a video from anywhere else, and any other image, renders as a link.

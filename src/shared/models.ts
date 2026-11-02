@@ -1,5 +1,6 @@
 /** omp's models, model routing, plan usage, and the files and settings it reads. */
 import type { AgentSettings } from "./agent-settings";
+import type { AgentCatalog } from "./agents";
 
 /** One quota window of a provider plan. */
 export interface PlanWindow {
@@ -176,6 +177,12 @@ export interface SettingsError {
 /** What a file feeds into omp: instructions, settings, or something it can run. */
 export type OmpFileKind = "context" | "system-prompt" | "append-system" | "settings" | "agent" | "command" | "rule" | "skill" | "hook";
 
+/** A file preview without an editing contract. */
+export interface ReadOnlyFile {
+	pathDisplay: string;
+	body: { state: "read"; size: number; modifiedAt: number; text: string } | { state: "missing" } | { state: "unreadable"; error: string };
+}
+
 /** A file omp reads, as found on disk. */
 export interface OmpFile {
 	kind: OmpFileKind;
@@ -183,6 +190,7 @@ export interface OmpFile {
 	path: string;
 	/** `path` with the home directory shortened to `~`. */
 	pathDisplay: string;
+	packaged?: string;
 	/** `hash` is the SHA-256 of `text`; a save must name it, so a file changed on disk since is not overwritten. */
 	body: { state: "read"; size: number; modifiedAt: number; text: string; hash: string } | { state: "missing" } | { state: "unreadable"; error: string };
 }
@@ -206,6 +214,8 @@ export interface OmpSettings {
 	routing: ModelRouting | { error: string };
 	/** omp's own settings, as its settings panel lists them; `error` as for `routing`. */
 	agentSettings: AgentSettings | { error: string };
+	/** omp's discovered definitions and defaults for a new session, or a distinct discovery failure. */
+	agents: AgentCatalog | { error: string };
 	files: OmpFile[];
 	/** The workflow skills among `files`, by name. */
 	workflows: Workflow[];

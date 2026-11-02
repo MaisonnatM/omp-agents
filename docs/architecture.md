@@ -5,6 +5,7 @@ Read this list, then only the file for the subsystem you need.
 For installation, see the [README](../README.md); for the interface, see [Using omp-agents](usage.md); for where each file lives and what it does, see [Code layout](code-layout.md).
 
 - [omp modules](architecture/omp-modules.md)
+- [Extensions library](architecture/extensions.md)
 - [Get started](architecture/get-started.md)
 - [Transcripts](architecture/transcripts.md)
 - [Terminal sessions](architecture/terminal-sessions.md)
@@ -17,6 +18,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Socket requests](architecture/socket-requests.md)
 - [Project trust](architecture/project-trust.md)
 - [Ask about this](architecture/ask-about-this.md)
+- [Dictation](architecture/dictation.md)
 - [Desktop shell](architecture/desktop-shell.md)
   - [Packaging and releases](architecture/desktop-shell.md#packaging-and-releases)
 - [Terminal panel](architecture/terminal-panel.md)

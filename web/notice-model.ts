@@ -2,6 +2,7 @@
 import type { PullRequestSummary } from "../src/shared/github";
 import type { YourMove } from "../src/shared/moves";
 import { type Notice, type UpdateSubject, usesClause } from "../src/shared/notices";
+import { hashForSession } from "../src/shared/sessions";
 import { folderName, providerLabel } from "./labels";
 import { moveAction } from "./pull-requests-model";
 import type { PullRequestActionId } from "../src/pull-request-actions";
@@ -23,13 +24,13 @@ export type NoticeFace =
 	| { kind: "slack"; person: { name: string; avatarUrl: string | null } };
 
 /**
- * A notice's button: **Update** (`ready` when it may run: before the update, and again after it failed), **Merge**,
+ * A notice's button: **Update** (`updating` while the update runs, and `ready` when it may run: before the update, and again after it failed), **Merge**,
  * which merges after a confirmation, the quick action that makes a pull request's move, or **Continue all**, which
  * resumes `sessionIds` and sends `continue` to each.
  */
 export type NoticeAction =
 	| { kind: "none" }
-	| { kind: "update"; label: "Update" | "Updating"; ready: boolean }
+	| { kind: "update"; updating: boolean; ready: boolean }
 	| { kind: "merge"; pr: PullRequestSummary }
 	| { kind: "quick"; pr: PullRequestSummary; action: PullRequestActionId; cwd: string }
 	| { kind: "continue-all"; sessionIds: string[] };
@@ -151,13 +152,15 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 			};
 		case "stopped": {
 			const count = notice.sessions.length;
+			const [first] = notice.sessions;
 			return {
 				...NEWS,
 				source: "sessions",
 				headline: count === 1 ? "1 session stopped mid-turn" : `${count} sessions stopped mid-turn`,
 				// Named as the sidebar names a past session.
 				preview: notice.sessions.map(({ title, cwdDisplay }) => title ?? (cwdDisplay === null ? undefined : folderName(cwdDisplay)) ?? "Untitled session").join(" · "),
-				link: null,
+				// The first session it names, where you see how far its turn got before you continue it.
+				link: first ? { href: hashForSession(first.sessionId), external: false } : null,
 				face: { kind: "stopped" },
 				action: { kind: "continue-all", sessionIds: notice.sessions.map(({ sessionId }) => sessionId) },
 				// It comes at the server's start, which you may not watch.
@@ -195,7 +198,7 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 				action:
 					status.state === "updated"
 						? { kind: "none" }
-						: { kind: "update", label: status.state === "updating" ? "Updating" : "Update", ready: status.state === "available" || status.state === "failed" },
+						: { kind: "update", updating: status.state === "updating", ready: status.state === "available" || status.state === "failed" },
 				toast: { kind: "update", dismissedElsewhere: notice.seen && status.state === "available" },
 			};
 		}

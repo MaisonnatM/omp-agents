@@ -70,7 +70,7 @@ export function useNoticeToasts(notices: Notice[], connected: boolean, send: (ms
 				title: shown.headline,
 				actionProps:
 					action.kind === "update"
-						? { children: action.label, disabled: !connected || !action.ready, onClick: () => send({ t: "notice", ids: [id], op: "update" }) }
+						? { children: action.updating ? "Updating" : "Update", disabled: !connected || !action.ready, onClick: () => send({ t: "notice", ids: [id], op: "update" }) }
 						: undefined,
 				description: shown.preview,
 			};

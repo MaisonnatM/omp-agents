@@ -4,7 +4,7 @@
  * Every read goes through `get` and every write through `write`; each route group takes only the part of {@link RouteEnv} it reads.
  */
 import type { Server } from "bun";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { buildAnalytics, foldSessions, type SessionSummary, withForeignUsage } from "../analytics";
 import { buildContextReport } from "../context-sources";
 import { readDecisions } from "../decisions";
@@ -18,9 +18,18 @@ import { gitCheckout } from "../git";
 import type { GmailAccounts } from "../gmail";
 import { loadPullRequests, loadPullRequestDetail, loadPullRequestTitle } from "../pull-requests";
 import type { Integrations } from "../integrations";
-import { addMcpServerFrom, loadMcpServers, McpServerRejected, removeMcpServerNamed, setMcpServerEnabledFrom, signOutMcpServer, startMcpServerSignIn } from "../mcp-servers";
+import {
+	addMcpServerFrom,
+	loadMcpServers,
+	McpServerRejected,
+	removeMcpServerNamed,
+	setMcpServerEnabledFrom,
+	signOutMcpServer,
+	startMcpServerSignIn,
+} from "../mcp-servers";
 import { answerProviderLogin, cancelProviderLogin, loadProviders, signOutProvider, startProviderLogin } from "../providers";
-import { blobsDir, readCollabAutoStart, shareTerminalSessions } from "../omp/config";
+import { blobsDir, enableDictation, readCollabAutoStart, shareTerminalSessions } from "../omp/config";
+import { dictationSettings } from "../omp/dictation";
 import { isTerminalAccess } from "../shared/readiness";
 import { connectedModels, connectedRoles, listModels } from "../omp/models";
 import { contextIndex } from "../omp/context-index";
@@ -31,12 +40,34 @@ import { attachToPullRequest, loadPullRequestOptions, markPullRequestFileViewed,
 import { InvalidPullRequestCommit, listPullRequestChanges, readPullRequestFile } from "../pull-request-files";
 import { loadPullRequestStack } from "../pull-request-stack";
 import { loadOmpSettings, Rejected, saveAgentSetting, saveOmpFile, saveRouting } from "../settings";
-import { attachToTicket, createTicket, loadLinearUsers, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
+import { answerExtensionApproval, readExtensionContribution, readExtensionOperation, startExtensionChange } from "../extensions";
+import { discoverExtensions, loadExtensions } from "../omp/extensions";
+import {
+	attachToTicket,
+	createTicket,
+	loadLinearUsers,
+	loadTeams,
+	loadTicketDetail,
+	loadTicketMedia,
+	loadTicketOptions,
+	loadTickets,
+	saveTicket,
+} from "../tickets";
 import { isUploadPath } from "../linear-uploads";
 import { ClientConfigError } from "../mcp-clients";
 import { GOOGLE_SERVICES, type GoogleService, type IntegrationTarget, type McpIntegration } from "../shared/accounts";
 import { isAnalyticsRange } from "../shared/analytics";
-import { type CheckedOutPullRequest, MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, type PullRequest, type PullRequestCheckout, type PullRequestRebase, prKey, type RebasedPullRequest, type Repo } from "../shared/github";
+import {
+	type CheckedOutPullRequest,
+	MAX_PULL_REQUEST_ATTACHMENTS,
+	MAX_PULL_REQUEST_IMAGE_BYTES,
+	type PullRequest,
+	type PullRequestCheckout,
+	type PullRequestRebase,
+	prKey,
+	type RebasedPullRequest,
+	type Repo,
+} from "../shared/github";
 import type { ReviewDraft, ReviewPreview, ReviewSubmit } from "../shared/review-drafts";
 import { type DevServerStart, type LiveSessionProcesses, parseProcessSettings, type ProcessSettings, type ProcessStop } from "../shared/processes";
 import { type ConversationHit, type ConversationSearchAnswer, PROMPT_IMAGE_TYPES } from "../shared/sessions";
@@ -48,7 +79,7 @@ import { MEDIA_FILE_TYPES } from "../shared/transcript";
 import type { View } from "../shared/sessions";
 import { parseDevServerRequest, parseProcessStop, parseReviewDraftPost, parseView } from "./wire";
 import { SystemLoadReader } from "../system-load";
-import { findMediaFile, readTextFile } from "../local-file";
+import { findMediaFile, firstFile, readTextFile } from "../local-file";
 import type { Terminals } from "../terminals";
 import type { Worktrees } from "../worktrees";
 import { MAX_WORKTREE_BATCH } from "../worktrees-shared";
@@ -56,8 +87,44 @@ import { answer, checked, fail, type Guards } from "./http";
 import { mailDocument } from "./mail-document";
 import { createTicketForTodo, type TodoTicketEnv, TodoTicketRefused } from "./todo-ticket";
 import {
-	MAX_QUEUED_STACK, parseBranchRelease, parseGoogleClient, parseGoogleLinks, parseGraphiteToken, parseIntegrationTarget, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseMergeQueueChange, parsePromptDocument, parseProviderSignOut, parsePullRequestAttachment,
-	parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestRebase, parsePullRequestViewedEdit, parseRepoQuery, parseSlackClient, parseSourceControlChange, parseSyncRepoName, parseSyncRun, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseTrustChange, parseWorkspaceChange, parseWorktreeRemoval, SHA256, UUID,
+	MAX_QUEUED_STACK,
+	parseBranchRelease,
+	parseGoogleClient,
+	parseGoogleLinks,
+	parseGraphiteToken,
+	parseIntegrationTarget,
+	parseLoginAnswer,
+	parseLoginMethod,
+	parseMailReply,
+	parseMailSend,
+	parseMailTrash,
+	parseMcpServerAdd,
+	parseMcpServerEnabled,
+	parseMcpServerName,
+	parseMergeQueueChange,
+	parsePromptDocument,
+	parseProviderSignOut,
+	parsePullRequestAttachment,
+	parsePullRequestCheckout,
+	parsePullRequestEdit,
+	parsePullRequestFilesQuery,
+	parsePullRequestQuery,
+	parsePullRequestRebase,
+	parsePullRequestViewedEdit,
+	parseRepoQuery,
+	parseSlackClient,
+	parseSourceControlChange,
+	parseSyncRepoName,
+	parseSyncRun,
+	parseTicketAttachment,
+	parseTicketDraft,
+	parseTicketEdit,
+	parseTodoTicket,
+	parseTrustChange,
+	parseWorkspaceChange,
+	parseWorktreeRemoval,
+	SHA256,
+	UUID,
 } from "./wire";
 import type { SourceControlAnswer, SourceControlChange } from "../shared/source-control";
 import type { MergeQueueAnswer, MergeQueueChange } from "../shared/merge-queue";
@@ -105,6 +172,8 @@ export interface SessionRoutesEnv {
 export interface FileRoutesEnv {
 	worktrees: Worktrees;
 	terminals: Terminals;
+	/** Where a relative path in session `sessionId`'s text may start, the most recently used first. */
+	fileDirsOf(sessionId: string): string[];
 }
 
 /** What the todo routes read and write: the Todo page's list. */
@@ -187,14 +256,18 @@ export interface RouteKit {
 	 * A write: admitted with its JSON body (origin, content type, size), `parse`d with the request's query into an input or the
 	 * response refusing it, then `run`; `refuse` answers an error `run` throws, and any other is a 500 with its text.
 	 */
-	write<T>(parse: (body: unknown, params: URLSearchParams) => T | Response | Promise<T | Response>, run: (input: T) => Promise<unknown>, refuse?: (err: unknown) => Response | null): Handler;
+	write<T>(
+		parse: (body: unknown, params: URLSearchParams) => T | Response | Promise<T | Response>,
+		run: (input: T) => Promise<unknown>,
+		refuse?: (err: unknown) => Response | null,
+	): Handler;
 }
 
 function routeKit(guards: Guards): RouteKit {
 	return {
-		get: handle => async req => guards.admit(req) ?? handle(new URL(req.url).searchParams, req),
-		media: handle => async req => guards.admitMedia(req) ?? handle(new URL(req.url).searchParams, req),
-		write: (parse, run, refuse) => async req => {
+		get: (handle) => async (req) => guards.admit(req) ?? handle(new URL(req.url).searchParams, req),
+		media: (handle) => async (req) => guards.admitMedia(req) ?? handle(new URL(req.url).searchParams, req),
+		write: (parse, run, refuse) => async (req) => {
 			const guarded = await guards.writeBody(req);
 			if (guarded instanceof Response) return guarded;
 			const input = await parse(guarded.body, new URL(req.url).searchParams);
@@ -219,20 +292,17 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		return cwd === null || env.knownWorkspaces().includes(cwd) || env.addedCwds().includes(cwd) ? cwd : fail(404, `No session ran in ${cwd}`);
 	}
 
-	const replayRead = (compare: boolean) => get(params => answer(async () => {
-		const parsed = parseView(JSON.parse(params.get("view") ?? "null"));
-		if (!parsed || parsed.ok.kind === "live" && parsed.ok.agentId !== null) throw new Error("Replay requires a main session.");
-		const turnId = params.get("turnId");
-		if (compare) return env.replayComparison(parsed.ok);
-		if (!turnId) throw new Error("Choose a prompt turn to replay.");
-		return env.replayDetail(parsed.ok, turnId);
-	}));
-
-	/** `GET /api/settings[?cwd=<dir>]`: omp's model routing, its own settings, and its files, user-level only without `cwd`. */
-	const settings = get(params => {
-		const cwd = workspaceCwd(params);
-		return cwd instanceof Response ? cwd : answer(() => loadOmpSettings(cwd));
-	});
+	const replayRead = (compare: boolean) =>
+		get((params) =>
+			answer(async () => {
+				const parsed = parseView(JSON.parse(params.get("view") ?? "null"));
+				if (!parsed || (parsed.ok.kind === "live" && parsed.ok.agentId !== null)) throw new Error("Replay requires a main session.");
+				const turnId = params.get("turnId");
+				if (compare) return env.replayComparison(parsed.ok);
+				if (!turnId) throw new Error("Choose a prompt turn to replay.");
+				return env.replayDetail(parsed.ok, turnId);
+			}),
+		);
 
 	/**
 	 * A settings write: `PUT /api/settings/routing`, `/api/settings/agent`, or `/api/settings/file`, `?cwd=` as for reading.
@@ -245,11 +315,20 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 				return cwd instanceof Response ? cwd : { cwd, body };
 			},
 			({ cwd, body }) => save(cwd, body),
-			err => (err instanceof Rejected ? fail(err.status, err.message, err.conflict) : null),
+			(err) => (err instanceof Rejected ? fail(err.status, err.message, err.conflict) : null),
 		);
+	const settingsRead = (read: (cwd: string | null, params: URLSearchParams) => Promise<unknown> | unknown): Handler =>
+		get((params) => {
+			const cwd = workspaceCwd(params);
+			if (cwd instanceof Response) return cwd;
+			return answer(
+				async () => read(cwd, params),
+				(err) => (err instanceof Rejected ? fail(err.status, err.message, err.conflict) : null),
+			);
+		});
 
 	/** `GET /api/decisions?cwd=<dir>`: the decision records of a workspace's repository. */
-	const decisions = get(params => {
+	const decisions = get((params) => {
 		const cwd = workspaceCwd(params);
 		if (cwd instanceof Response) return cwd;
 		return cwd === null ? fail(400, "Expected ?cwd= naming a workspace") : answer(() => readDecisions(cwd));
@@ -259,19 +338,28 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	const models = get(() => answer(async () => ({ models: await listModels() })));
 
 	/** `GET /api/models/connected?cwd=<dir>`: the models of the providers you are connected to, for the new-session draft's model picker. */
-	const connected = get(async params => {
+	const connected = get(async (params) => {
 		const cwd = await dirParam(params);
 		return cwd instanceof Response ? cwd : answer(() => connectedModels(cwd));
 	});
 
 	/** `GET /api/models/roles?cwd=<dir>`: omp's model roles a session in that directory could switch to. */
-	const roles = get(async params => {
+	const roles = get(async (params) => {
 		const cwd = await dirParam(params);
 		return cwd instanceof Response ? cwd : answer(async () => ({ roles: await connectedRoles(cwd) }));
 	});
 
+	/** `PUT /api/dictation/settings?cwd=<dir>` `{ enabled: true }`: turns dictation on in the user's omp config, then answers the directory's settings as they are after. */
+	const dictationEnable = write(
+		async (body, params) => (isObject(body) && body.enabled === true ? dirParam(params) : fail(400, "Expected { enabled: true }")),
+		async cwd => {
+			await enableDictation();
+			return dictationSettings(cwd);
+		},
+	);
+
 	/** `GET /api/analytics?range=`: omp-stats' request usage and live sync state, with Claude Code's and Codex's requests. */
-	const analytics = get(params => {
+	const analytics = get((params) => {
 		const value = params.get("range") ?? "24h";
 		if (!isAnalyticsRange(value)) return fail(400, "Unknown analytics range");
 		return answer(async () => {
@@ -284,19 +372,27 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	 * `GET /api/analytics/context?range=[&cwd=<dir>][&session=<id>]`: the context sources over the range, one workspace's or
 	 * one session's when named, from the index, which syncs in the background as it answers.
 	 */
-	const contextReport = get(params => {
+	const contextReport = get((params) => {
 		const range = params.get("range") ?? "24h";
 		if (!isAnalyticsRange(range)) return fail(400, "Unknown analytics range");
 		return answer(async () => {
 			const index = contextIndex();
 			index.refresh();
 			const rows = index.read(windowOf(range, Date.now()).cutoff);
-			return buildContextReport({ range, cwd: params.get("cwd"), sessionId: params.get("session"), indexing: index.progress, ...rows, root: sessionsDir, factsOf: env.summaryOf });
+			return buildContextReport({
+				range,
+				cwd: params.get("cwd"),
+				sessionId: params.get("session"),
+				indexing: index.progress,
+				...rows,
+				root: sessionsDir,
+				factsOf: env.summaryOf,
+			});
 		});
 	});
 
 	/** `GET /api/analytics/session?session=<id>`: what that session used over all time, its subagents folded in; `null` before its first request. */
-	const sessionUsage = get(params => {
+	const sessionUsage = get((params) => {
 		const sessionId = params.get("session");
 		if (!sessionId) return fail(400, "Expected ?session= naming a session");
 		const summary = env.summaryOf(sessionId);
@@ -305,7 +401,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	});
 
 	/** `GET /api/skills?cwd=<dir>`: the skills a session started in that directory can invoke. */
-	const skills = get(async params => {
+	const skills = get(async (params) => {
 		const cwd = await dirParam(params);
 		return cwd instanceof Response ? cwd : answer(async () => ({ skills: await listSkills(cwd) }));
 	});
@@ -314,7 +410,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	 * `GET /api/pull-requests[?cwd=<dir>][&fresh]`: the pull requests of that workspace's repository, else of every workspace's.
 	 * Each answer also tells the pull-request index which branch heads which PR, which links the sessions that pushed them.
 	 */
-	const pullRequests = get(params => {
+	const pullRequests = get((params) => {
 		const cwd = workspaceCwd(params);
 		if (cwd instanceof Response) return cwd;
 		const fresh = params.has("fresh");
@@ -333,7 +429,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 			const cwd = await directoryOf(change.cwd);
 			return cwd ? { op: "add", cwd } : fail(400, `${change.cwd.trim()} is not a directory.`);
 		},
-		async change => {
+		async (change) => {
 			env.changeWorkspaces(change);
 			return {};
 		},
@@ -341,8 +437,8 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 
 	/** `PUT /api/project-trust` `{ op: "trust", root, code }` or `{ op: "forget", root }`: trust the pieces the trust dialog listed, or Settings › Workspaces' **Stop trusting**. */
 	const trustChange = write(
-		body => checked(parseTrustChange(body), "Expected { op: \"trust\", root, code: [{ id, hash }] } or { op: \"forget\", root }"),
-		async change => {
+		(body) => checked(parseTrustChange(body), 'Expected { op: "trust", root, code: [{ id, hash }] } or { op: "forget", root }'),
+		async (change) => {
 			env.changeProjectTrust(change);
 			return {};
 		},
@@ -353,8 +449,12 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 
 	/** `PUT /api/source-control` `{ op, on, repo? }`: turn automatic pulls on or off by default, or for one repository, or the cleanup after a merge. */
 	const sourceControlChange = write(
-		body => checked(parseSourceControlChange(body), "Expected { op: default, on }, { op: clean-up, on }, or { op: repo, repo, on } with on true, false, or null for a repository"),
-		async change => {
+		(body) =>
+			checked(
+				parseSourceControlChange(body),
+				"Expected { op: default, on }, { op: clean-up, on }, or { op: repo, repo, on } with on true, false, or null for a repository",
+			),
+		async (change) => {
 			env.changeSourceControl(change);
 			return env.sourceControl();
 		},
@@ -362,8 +462,8 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 
 	/** `PUT /api/source-control/graphite-sign-in` `{ token }`: signs `gt` in with the token, then answers the same as the `GET`. */
 	const graphiteSignIn = write(
-		body => checked(parseGraphiteToken(body), "Expected { token } holding a Graphite token"),
-		async token => {
+		(body) => checked(parseGraphiteToken(body), "Expected { token } holding a Graphite token"),
+		async (token) => {
 			await signInGraphite(token);
 			return env.sourceControl();
 		},
@@ -376,13 +476,13 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	}
 
 	/** `GET /api/changes?session=<id>`: the files the session's checkout changed against its branch base, and the files its own calls changed. */
-	const changes = get(params => {
+	const changes = get((params) => {
 		const place = sessionPlace(params);
 		return place instanceof Response ? place : answer(() => listChanges(place));
 	});
 
 	/** `GET /api/changes/file?session=<id>&path=<path>`: one file of that list in full, with its diff; only a path the list holds. */
-	const changedFile = get(async params => {
+	const changedFile = get(async (params) => {
 		const place = sessionPlace(params);
 		if (place instanceof Response) return place;
 		const path = params.get("path") ?? "";
@@ -392,19 +492,31 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	});
 
 	/** `GET /api/conversations?q=<words>`: the saved conversations whose prompts or replies hold every word, each by its latest such message. */
-	const conversations = get(params => {
+	const conversations = get((params) => {
 		const query = params.get("q")?.trim() ?? "";
-		return query ? answer(async (): Promise<ConversationSearchAnswer> => ({ hits: await env.searchConversations(query) })) : fail(400, "Expected ?q= with a word to search");
+		return query
+			? answer(async (): Promise<ConversationSearchAnswer> => ({ hits: await env.searchConversations(query) }))
+			: fail(400, "Expected ?q= with a word to search");
 	});
 
 	return {
-		"/api/settings": { GET: settings },
+		"/api/settings": { GET: settingsRead(loadOmpSettings) },
 		"/api/settings/routing": { PUT: settingsWrite(saveRouting) },
 		"/api/settings/agent": { PUT: settingsWrite(saveAgentSetting) },
 		"/api/settings/file": { PUT: settingsWrite(saveOmpFile) },
+		"/api/settings/extensions": { GET: settingsRead((cwd) => loadExtensions(cwd)), PUT: settingsWrite(async (cwd, body) => startExtensionChange(cwd, body)) },
+		"/api/settings/extensions/catalog": {
+			GET: settingsRead((cwd, params) =>
+				discoverExtensions(cwd, params.get("source") ?? "", params.get("q") ?? "", Math.max(1, Math.min(100, Number(params.get("page")) || 1))),
+			),
+		},
+		"/api/settings/extensions/operation": { GET: settingsRead((cwd, params) => readExtensionOperation(cwd, params.get("id") ?? "")) },
+		"/api/settings/extensions/approval": { PUT: settingsWrite(async (cwd, body) => answerExtensionApproval(cwd, body)) },
+		"/api/settings/extensions/contribution": { GET: settingsRead((cwd, params) => readExtensionContribution(cwd, Object.fromEntries(params))) },
 		"/api/decisions": { GET: decisions },
 		"/api/models": { GET: models },
 		"/api/models/connected": { GET: connected },
+		"/api/dictation/settings": { PUT: dictationEnable },
 		"/api/models/roles": { GET: roles },
 		"/api/replay/detail": { GET: replayRead(false) },
 		"/api/replay/compare": { GET: replayRead(true) },
@@ -426,11 +538,14 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 /** The MCP integrations, the other MCP servers omp loads, and Linear tickets. */
 function integrationRoutes({ get, media, write }: RouteKit, integrations: Integrations): Routes {
 	/** `GET /api/integrations[?fresh]`: where omp stands with each MCP integration's server or accounts, and the sign-in the page last started. */
-	const loaded = get(params => answer(() => integrations.load(params.has("fresh"))));
+	const loaded = get((params) => answer(() => integrations.load(params.has("fresh"))));
 
 	/** A write of `{ id, account }` naming an MCP integration and one of its accounts, answered with that integration as `act` leaves it. */
 	const integrationWrite = (act: (target: IntegrationTarget) => Promise<McpIntegration>): Handler =>
-		write(body => checked(parseIntegrationTarget(body), "Expected { id, account } naming an integration and, for Gmail or Google Calendar, an account or null"), act);
+		write(
+			(body) => checked(parseIntegrationTarget(body), "Expected { id, account } naming an integration and, for Gmail or Google Calendar, an account or null"),
+			act,
+		);
 
 	/** `PUT /api/integrations/sign-in`: starts a sign-in to an account, or adds one, and answers with its authorization address to open. */
 	const integrationSignIn = integrationWrite(integrations.startSignIn);
@@ -440,62 +555,74 @@ function integrationRoutes({ get, media, write }: RouteKit, integrations: Integr
 
 	/** `PUT /api/integrations/google-links`: `{ address, workspaces }`, the workspaces a Google address's accounts are linked to; answers every integration. */
 	const googleLinks = write(
-		body => checked(parseGoogleLinks(body), "Expected { address, workspaces } naming a Google address and absolute workspace directories"),
+		(body) => checked(parseGoogleLinks(body), "Expected { address, workspaces } naming a Google address and absolute workspace directories"),
 		integrations.linkGoogleAccount,
 	);
 
 	const refuseClient = (err: unknown): Response | null => (err instanceof ClientConfigError ? fail(400, err.message) : null);
 
 	/** `PUT /api/integrations/slack/client`: `{ clientId, clientSecret?, redirectUri, callbackPort, scope }` of your Slack app. */
-	const slackClient = write(body => checked(parseSlackClient(body)), integrations.saveSlackClient, refuseClient);
+	const slackClient = write((body) => checked(parseSlackClient(body)), integrations.saveSlackClient, refuseClient);
 
 	/** `PUT /api/integrations/<google-calendar|gmail>/client`: `{ clientId, clientSecret?, callbackPort }` of your Google OAuth client for that service. */
-	const googleClient = (id: GoogleService): Handler => write(body => checked(parseGoogleClient(body)), input => integrations.saveGoogleClient(id, input), refuseClient);
+	const googleClient = (id: GoogleService): Handler =>
+		write(
+			(body) => checked(parseGoogleClient(body)),
+			(input) => integrations.saveGoogleClient(id, input),
+			refuseClient,
+		);
 
 	/** `GET /api/mcp-servers[?fresh]`: every user-level MCP server omp loads, where omp stands with each, and its sign-in under way. */
-	const mcpServers = get(params => answer(() => loadMcpServers(params.has("fresh"))));
+	const mcpServers = get((params) => answer(() => loadMcpServers(params.has("fresh"))));
 
 	const refuseMcp = (err: unknown): Response | null => (err instanceof McpServerRejected ? fail(400, err.message) : null);
 
 	/** A write of `{ name }` naming an MCP server, answered with what `act` answers. */
 	const mcpServerWrite = (act: (name: string) => Promise<unknown>): Handler =>
-		write(body => checked(parseMcpServerName(body), "Expected { name } naming an MCP server"), act, refuseMcp);
+		write((body) => checked(parseMcpServerName(body), "Expected { name } naming an MCP server"), act, refuseMcp);
 
 	/** `PUT /api/mcp-servers/add`: a catalog entry or a server by its address, added to omp's user `mcp.json`; answers its row. */
-	const mcpServerAdd = write(body => checked(parseMcpServerAdd(body)), addMcpServerFrom, refuseMcp);
+	const mcpServerAdd = write((body) => checked(parseMcpServerAdd(body)), addMcpServerFrom, refuseMcp);
 
 	/** `PUT /api/mcp-servers/enabled`: `{ name, enabled }`, as `/mcp enable` and `/mcp disable` do; answers the row. */
 	const mcpServerEnabled = write(
-		body => checked(parseMcpServerEnabled(body), "Expected { name, enabled } naming an MCP server"),
+		(body) => checked(parseMcpServerEnabled(body), "Expected { name, enabled } naming an MCP server"),
 		({ name, enabled }) => setMcpServerEnabledFrom(name, enabled),
 		refuseMcp,
 	);
 
 	/** `PUT /api/mcp-servers/remove`: removes the server from omp's user `mcp.json`, as `/mcp remove` does; answers `{}`. */
-	const mcpServerRemove = mcpServerWrite(async name => {
+	const mcpServerRemove = mcpServerWrite(async (name) => {
 		await removeMcpServerNamed(name);
 		return {};
 	});
 
 	/** `GET /api/tickets[?fresh]`: the viewer's assigned Linear issues, or why they could not be read. */
-	const tickets = get(params => answer(() => loadTickets(params.has("fresh"))));
+	const tickets = get((params) => answer(() => loadTickets(params.has("fresh"))));
 
 	/** `GET /api/ticket?id=<identifier>`: that Linear issue in full, for the tickets page's main content. */
-	const ticket = get(params => {
+	const ticket = get((params) => {
 		const id = params.get("id") ?? "";
 		return TICKET_ID.test(id) ? answer(() => loadTicketDetail(id)) : fail(400, "Expected ?id= naming a Linear issue, such as ENG-123");
 	});
 
 	/** `PUT /api/ticket`: `TicketEdit`, applied in Linear; answers the issue in full as it is after it. */
-	const ticketWrite = write(body => checked(parseTicketEdit(body), "Expected { id } naming a Linear issue and at least one field to change"), saveTicket);
+	const ticketWrite = write((body) => checked(parseTicketEdit(body), "Expected { id } naming a Linear issue and at least one field to change"), saveTicket);
 
 	/** `PUT /api/ticket/new`: `TicketDraft`, opened in Linear; answers `{ identifier }`. */
-	const ticketCreate = write(body => checked(parseTicketDraft(body), "Expected { title, description, team } naming a Linear team by id, and fields of their own types"), createTicket);
+	const ticketCreate = write(
+		(body) => checked(parseTicketDraft(body), "Expected { title, description, team } naming a Linear team by id, and fields of their own types"),
+		createTicket,
+	);
 
 	/** `PUT /api/ticket/attachment`: `TicketAttachmentUpload`, attached to the issue in Linear; answers `{}`. */
 	const ticketAttach = write(
-		body => checked(parseTicketAttachment(body), `Expected { issue, name, type, data } naming a Linear issue, with a file of at most ${MAX_TICKET_ATTACHMENT_BYTES / 1024 / 1024} MB in base64`),
-		async upload => {
+		(body) =>
+			checked(
+				parseTicketAttachment(body),
+				`Expected { issue, name, type, data } naming a Linear issue, with a file of at most ${MAX_TICKET_ATTACHMENT_BYTES / 1024 / 1024} MB in base64`,
+			),
+		async (upload) => {
 			await attachToTicket(upload);
 			return {};
 		},
@@ -508,7 +635,7 @@ function integrationRoutes({ get, media, write }: RouteKit, integrations: Integr
 	const linearUsers = get(() => answer(loadLinearUsers));
 
 	/** `GET /api/ticket/options?team=<id>`: what the field pickers offer for an issue of that Linear team. */
-	const ticketOptions = get(params => {
+	const ticketOptions = get((params) => {
 		const team = params.get("team") ?? "";
 		return UUID.test(team) ? answer(() => loadTicketOptions(team)) : fail(400, "Expected ?team= naming a Linear team by id");
 	});
@@ -537,7 +664,7 @@ function integrationRoutes({ get, media, write }: RouteKit, integrations: Integr
 		"/api/mcp-servers/enabled": { PUT: mcpServerEnabled },
 		"/api/mcp-servers/remove": { PUT: mcpServerRemove },
 		"/api/integrations/slack/client": { PUT: slackClient },
-		...Object.fromEntries(GOOGLE_SERVICES.map(id => [`/api/integrations/${id}/client`, { PUT: googleClient(id) }])),
+		...Object.fromEntries(GOOGLE_SERVICES.map((id) => [`/api/integrations/${id}/client`, { PUT: googleClient(id) }])),
 		"/api/tickets": { GET: tickets },
 		"/api/linear/teams": { GET: teams },
 		"/api/linear/users": { GET: linearUsers },
@@ -553,9 +680,9 @@ function integrationRoutes({ get, media, write }: RouteKit, integrations: Integr
 function todoRoutes({ write }: RouteKit, env: TodoRoutesEnv): Routes {
 	/** `PUT /api/todo/ticket`: `TodoTicketRequest`; answers `TodoTicketAnswer` once the todo list holds the issue's link or could not. */
 	const todoTicket = write(
-		body => checked(parseTodoTicket(body), "Expected { todoId, team } naming a todo and a Linear team by id"),
-		request => createTicketForTodo({ ...env, createTicket }, request),
-		err => (err instanceof TodoTicketRefused ? fail(409, err.message) : null),
+		(body) => checked(parseTodoTicket(body), "Expected { todoId, team } naming a todo and a Linear team by id"),
+		(request) => createTicketForTodo({ ...env, createTicket }, request),
+		(err) => (err instanceof TodoTicketRefused ? fail(409, err.message) : null),
 	);
 	return { "/api/todo/ticket": { PUT: todoTicket } };
 }
@@ -563,15 +690,15 @@ function todoRoutes({ write }: RouteKit, env: TodoRoutesEnv): Routes {
 /** Every Gmail account's inbox: their conversations, and the mail, replies, and trashing the Email page sends. */
 function gmailRoutes({ get, media, write }: RouteKit, gmail: GmailAccounts): Routes {
 	/** `GET /api/gmail/inbox[?fresh]`: each signed-in account and their inboxes' latest conversations, newest first. */
-	const inbox = get(params => answer(() => gmail.inbox(params.has("fresh"))));
+	const inbox = get((params) => answer(() => gmail.inbox(params.has("fresh"))));
 	/** `GET /api/gmail/thread?account=<account>&id=<id>[&fresh]`: that conversation in full, for the Email page's details. */
-	const thread = get(params => {
+	const thread = get((params) => {
 		const account = params.get("account");
 		const id = params.get("id");
 		return account && id ? answer(() => gmail.thread(account, id, params.has("fresh"))) : fail(400, "Expected ?account= and ?id= naming a Gmail conversation");
 	});
 	/** `GET /api/gmail/message?account=<account>&thread=<id>&id=<id>`: a message's HTML as a document of its own, which the Email page frames. */
-	const message = media(async params => {
+	const message = media(async (params) => {
 		const account = params.get("account");
 		const threadId = params.get("thread");
 		const id = params.get("id");
@@ -583,17 +710,17 @@ function gmailRoutes({ get, media, write }: RouteKit, gmail: GmailAccounts): Rou
 	const DRAFT = "{ to, cc, bcc } of { name, address } naming someone, html, and text that is not blank";
 	/** `PUT /api/gmail/reply`: `MailReply`, sent in its conversation; answers `{}`. */
 	const reply = write(
-		body => checked(parseMailReply(body), `Expected { account, thread } naming a Gmail conversation, with ${DRAFT}`),
-		async input => (await gmail.reply(input), {}),
+		(body) => checked(parseMailReply(body), `Expected { account, thread } naming a Gmail conversation, with ${DRAFT}`),
+		async (input) => (await gmail.reply(input), {}),
 	);
 	/** `PUT /api/gmail/send`: `MailSend`, sent from its account as a new mail; answers `{}`. */
 	const send = write(
-		body => checked(parseMailSend(body), `Expected { account, subject }, with ${DRAFT}`),
-		async input => (await gmail.send(input), {}),
+		(body) => checked(parseMailSend(body), `Expected { account, subject }, with ${DRAFT}`),
+		async (input) => (await gmail.send(input), {}),
 	);
 	/** `PUT /api/gmail/trash`: `MailTrash`, moved to Gmail's Trash; answers `{}`. */
 	const trash = write(
-		body => checked(parseMailTrash(body), "Expected { account, thread } naming a Gmail conversation"),
+		(body) => checked(parseMailTrash(body), "Expected { account, thread } naming a Gmail conversation"),
 		async ({ account, thread }) => (await gmail.trash(account, thread), {}),
 	);
 	return {
@@ -610,28 +737,28 @@ function gmailRoutes({ get, media, write }: RouteKit, gmail: GmailAccounts): Rou
 function pullRequestRoutes({ get, media, write }: RouteKit, env: PullRequestRoutesEnv): Routes {
 	/** A read of the pull request `?owner=&repo=&number=` names, refused with `badRequest`. */
 	const pullRequestGet = (badRequest: string, read: (pr: PullRequest, params: URLSearchParams) => Promise<Response>): Handler =>
-		get(params => {
+		get((params) => {
 			const pr = checked(parsePullRequestQuery(params), badRequest);
 			return pr instanceof Response ? pr : read(pr, params);
 		});
 
 	/** `GET /api/pull-request?owner=<o>&repo=<r>&number=<n>`: that pull request in full, for a pull request's details. */
-	const pullRequest = pullRequestGet("Expected ?owner=&repo=&number=", pr => answer(() => loadPullRequestDetail(pr)));
+	const pullRequest = pullRequestGet("Expected ?owner=&repo=&number=", (pr) => answer(() => loadPullRequestDetail(pr)));
 
 	/** A bare link's PR title, without loading the full details. */
-	const pullRequestTitle = pullRequestGet("Expected ?owner=&repo=&number=", pr => answer(() => loadPullRequestTitle(pr)));
+	const pullRequestTitle = pullRequestGet("Expected ?owner=&repo=&number=", (pr) => answer(() => loadPullRequestTitle(pr)));
 
 	/** `GET /api/pull-request/stack?owner=<o>&repo=<r>&number=<n>`: the open pull requests stacked with that one, top first, for its details' Stack. */
-	const pullRequestStack = pullRequestGet("Expected ?owner=&repo=&number=", pr => answer(() => loadPullRequestStack(pr)));
+	const pullRequestStack = pullRequestGet("Expected ?owner=&repo=&number=", (pr) => answer(() => loadPullRequestStack(pr)));
 
 	/** Images and videos hosted by GitHub; the proxy restricts hosts and keeps the GitHub token off redirected hosts. */
-	const githubMedia = media(params => readGithubMedia(params.get("url")));
+	const githubMedia = media((params) => readGithubMedia(params.get("url")));
 	/** The icons of the sites the Todos card's sources name; the proxy asks public HTTPS hosts only. */
-	const favicon = media(params => readFavicon(params.get("host")));
+	const favicon = media((params) => readFavicon(params.get("host")));
 
 	/** `PUT /api/pull-request`: `PullRequestEdit`, made on GitHub; answers the pull request in full as it is after it. */
 	const pullRequestWrite = write(
-		body =>
+		(body) =>
 			checked(
 				parsePullRequestEdit(body),
 				"Expected { owner, repo, number, change } with a title, description, branch update, label, reviewer, state, review thread, reply, or comment",
@@ -641,8 +768,8 @@ function pullRequestRoutes({ get, media, write }: RouteKit, env: PullRequestRout
 
 	/** `PUT /api/pull-request/viewed`: `PullRequestViewedEdit`, one file marked viewed or not on GitHub; answers `{}`. */
 	const pullRequestViewed = write(
-		body => checked(parsePullRequestViewedEdit(body), "Expected { owner, repo, number, path, on }"),
-		async edit => {
+		(body) => checked(parsePullRequestViewedEdit(body), "Expected { owner, repo, number, path, on }"),
+		async (edit) => {
 			await markPullRequestFileViewed(edit);
 			return {};
 		},
@@ -650,19 +777,19 @@ function pullRequestRoutes({ get, media, write }: RouteKit, env: PullRequestRout
 
 	/** `PUT /api/pull-request/attachment`: `PullRequestAttachment`, whose images `gh pr edit --attach` appends to that pull request's description; answers `{}`. */
 	const pullRequestAttach = write(
-		body =>
+		(body) =>
 			checked(
 				parsePullRequestAttachment(body),
 				`Expected { owner, repo, number, files } with 1 to ${MAX_PULL_REQUEST_ATTACHMENTS} PNG, JPEG, GIF, WebP, or SVG images, each with a name, alt text, and at most ${MAX_PULL_REQUEST_IMAGE_BYTES / 1024 / 1024} MB in base64`,
 			),
-		async attachment => {
+		async (attachment) => {
 			await attachToPullRequest(attachment);
 			return {};
 		},
 	);
 
 	/** `GET /api/pull-request/options?owner=<o>&repo=<r>`: the labels and reviewers that repository's pull requests can take. */
-	const pullRequestOptions = get(params => {
+	const pullRequestOptions = get((params) => {
 		const repo = checked(parseRepoQuery(params), "Expected ?owner=&repo=");
 		return repo instanceof Response ? repo : answer(() => loadPullRequestOptions(repo));
 	});
@@ -670,14 +797,16 @@ function pullRequestRoutes({ get, media, write }: RouteKit, env: PullRequestRout
 	const codeRefusal = (err: unknown): Response => fail(err instanceof InvalidPullRequestCommit ? 400 : 500, errorText(err));
 
 	/** `GET /api/pull-request/files`: all changes, or `?commit=<oid>` for one commit of this pull request. */
-	const pullRequestFiles = get(async params => {
+	const pullRequestFiles = get(async (params) => {
 		const pr = checked(parsePullRequestFilesQuery(params), "Expected ?owner=&repo=&number= and optional commit=<full OID>");
 		if (pr instanceof Response) return pr;
-		return listPullRequestChanges(pr, pr.commit).then(changes => Response.json(changes)).catch(codeRefusal);
+		return listPullRequestChanges(pr, pr.commit)
+			.then((changes) => Response.json(changes))
+			.catch(codeRefusal);
 	});
 
 	/** `GET /api/pull-request/file`: a listed path's full diff, optionally scoped to `?commit=<oid>`. */
-	const pullRequestFile = get(async params => {
+	const pullRequestFile = get(async (params) => {
 		const pr = checked(parsePullRequestFilesQuery(params), "Expected ?owner=&repo=&number=&path= and optional commit=<full OID>");
 		if (pr instanceof Response) return pr;
 		const path = params.get("path") ?? "";
@@ -688,42 +817,49 @@ function pullRequestRoutes({ get, media, write }: RouteKit, env: PullRequestRout
 
 	/** `PUT /api/merge-queue`: `MergeQueueChange`, a merge of one pull request or a stack, made at once when GitHub allows it and later otherwise, or its cancel; answers a `MergeQueueAnswer`. */
 	const mergeQueue = write(
-		body => checked(parseMergeQueueChange(body), `Expected { op: add, method, prs } with 1 to ${MAX_QUEUED_STACK} pull requests, each with a head commit or null, or { op: cancel, id }`),
+		(body) =>
+			checked(
+				parseMergeQueueChange(body),
+				`Expected { op: add, method, prs } with 1 to ${MAX_QUEUED_STACK} pull requests, each with a head commit or null, or { op: cancel, id }`,
+			),
 		env.changeMergeQueue,
-		err => fail(409, errorText(err)),
+		(err) => fail(409, errorText(err)),
 	);
 
 	/** `GET /api/review-draft/preview?owner=<o>&repo=<r>&number=<n>`: the `ReviewPreview` of that pull request's review draft, against its head now. */
-	const reviewDraftPreview = pullRequestGet("Expected ?owner=&repo=&number=", pr => answer(() => env.previewReviewDraft(pr)));
+	const reviewDraftPreview = pullRequestGet("Expected ?owner=&repo=&number=", (pr) => answer(() => env.previewReviewDraft(pr)));
 
 	/** `PUT /api/review-draft/post`: `{ owner, repo, number, submit? }`, whose review draft posts as one review; answers the draft marked posted. */
 	const reviewDraftPost = write(
-		body => checked(parseReviewDraftPost(body), "Expected { owner, repo, number, submit?: { verdict, summary } }"),
+		(body) => checked(parseReviewDraftPost(body), "Expected { owner, repo, number, submit?: { verdict, summary } }"),
 		({ pr, submit }) => env.postReviewDraft(pr, submit),
-		err => fail(409, errorText(err)),
+		(err) => fail(409, errorText(err)),
 	);
 
 	/** `PUT /api/pull-request/checkout`: `PullRequestCheckout`; answers a `CheckedOutPullRequest`, or 409 with why it refused. */
 	const pullRequestCheckout = write(
-		async body => {
-			const checkout = checked(parsePullRequestCheckout(body), "Expected { owner, repo, number, cwd, place } with cwd an absolute directory, place worktree or here, and an optional one-word skill");
+		async (body) => {
+			const checkout = checked(
+				parsePullRequestCheckout(body),
+				"Expected { owner, repo, number, cwd, place } with cwd an absolute directory, place worktree or here, and an optional one-word skill",
+			);
 			if (checkout instanceof Response) return checkout;
 			const cwd = await directoryOf(checkout.cwd);
 			return cwd ? { ...checkout, cwd } : fail(404, `${checkout.cwd.trim()} is not a directory.`);
 		},
 		env.checkOutPullRequest,
-		err => fail(409, errorText(err)),
+		(err) => fail(409, errorText(err)),
 	);
 
 	const rebaseWrite = write(
-		async body => {
+		async (body) => {
 			const rebase = checked(parsePullRequestRebase(body), "Expected { owner, repo, number, cwd } with cwd an absolute directory");
 			if (rebase instanceof Response) return rebase;
 			const cwd = await directoryOf(rebase.cwd);
 			return cwd ? { ...rebase, cwd } : fail(404, `${rebase.cwd.trim()} is not a directory.`);
 		},
 		env.rebasePullRequest,
-		err => fail(409, errorText(err)),
+		(err) => fail(409, errorText(err)),
 	);
 	/**
 	 * `PUT /api/pull-request/rebase`: `PullRequestRebase`; answers a `RebasedPullRequest`, or 409 with why it refused or failed.
@@ -759,13 +895,13 @@ function fileRoutes({ get, media, write }: RouteKit, env: FileRoutesEnv): Routes
 	 * `GET /api/git?cwd=<dir>`: the git checkout of a directory, `null` outside one, for the new-session draft's branch
 	 * picker and a session's header.
 	 */
-	const git = get(async params => {
+	const git = get(async (params) => {
 		const cwd = await dirParam(params);
 		return cwd instanceof Response ? cwd : answer(() => gitCheckout(cwd));
 	});
 
 	/** `GET /api/worktrees[?cwd=]`: every registered worktree of the repositories sessions ran in, or of the repository containing `cwd`. */
-	const worktreeInventory = get(params => answer(() => env.worktrees.inventory(params.get("cwd"))));
+	const worktreeInventory = get((params) => answer(() => env.worktrees.inventory(params.get("cwd"))));
 
 	/** `GET /api/worktrees/metrics?repository=&path=`: disk use, last commit, and change counts for one registered checkout. */
 	const worktreeMetrics = get((params, req) => {
@@ -777,13 +913,16 @@ function fileRoutes({ get, media, write }: RouteKit, env: FileRoutesEnv): Routes
 
 	/** `PUT /api/worktrees/removal`: preview a removal, only of merged work when `merged` is set, or remove checkouts whose confirmation still matches. */
 	const worktreeRemoval = write(
-		body => checked(parseWorktreeRemoval(body), `Expected a preview with targets or removal with confirmed plans, up to ${MAX_WORKTREE_BATCH} worktrees.`),
-		async removal => (removal.action === "preview" ? { plans: await env.worktrees.previewAll(removal.targets, removal.merged) } : { results: await env.worktrees.remove(removal.plans, "Settings › Worktrees") }),
+		(body) => checked(parseWorktreeRemoval(body), `Expected a preview with targets or removal with confirmed plans, up to ${MAX_WORKTREE_BATCH} worktrees.`),
+		async (removal) =>
+			removal.action === "preview"
+				? { plans: await env.worktrees.previewAll(removal.targets, removal.merged) }
+				: { results: await env.worktrees.remove(removal.plans, "Settings › Worktrees") },
 	);
 
 	/** `PUT /api/worktree/release` `{ cwd, branch }`: remove the linked worktree of `cwd`'s repository that has `branch` checked out, unless something keeps it. */
 	const branchRelease = write(
-		async body => {
+		async (body) => {
 			const release = checked(parseBranchRelease(body), "Expected { cwd, branch } with cwd an absolute directory");
 			if (release instanceof Response) return release;
 			const cwd = await directoryOf(release.cwd);
@@ -802,36 +941,49 @@ function fileRoutes({ get, media, write }: RouteKit, env: FileRoutesEnv): Routes
 	 * `GET /api/image?hash=<sha256>&type=<image type>`: an image of a prompt that omp moved from its session file to its
 	 * blob store, served as `type`, one of the prompt image types, since the store keeps no type.
 	 */
-	const image = media(async params => {
+	const image = media(async (params) => {
 		const hash = params.get("hash") ?? "";
 		const type = params.get("type") ?? "";
 		if (!SHA256.test(hash) || !PROMPT_IMAGE_TYPES.includes(type)) return fail(400, "Expected ?hash= naming a blob and ?type= naming an image type");
 		const file = Bun.file(join(blobsDir, hash));
 		if (!(await file.exists())) return fail(404, `No image ${hash}`);
 		// The address names the bytes, so they never change.
-		return new Response(file, { headers: { "Content-Type": type, "Cache-Control": "private, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff" } });
+		return new Response(file, {
+			headers: { "Content-Type": type, "Cache-Control": "private, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff" },
+		});
 	});
 
 	/** `PUT /api/attachment/document`: `PromptDocument`, a file the composer attaches, as omp converts it; answers `{ text }`, or a 422 when omp cannot read it. */
 	const promptDocument = write(
-		body => checked(parsePromptDocument(body), `Expected { name, data } with a file of at most ${MAX_PROMPT_DOCUMENT_BYTES / 1024 / 1024} MB in base64`),
+		(body) => checked(parsePromptDocument(body), `Expected { name, data } with a file of at most ${MAX_PROMPT_DOCUMENT_BYTES / 1024 / 1024} MB in base64`),
 		async ({ name, data }) => ({ text: await documentText(name, Buffer.from(data, "base64")) }),
-		err => (err instanceof UnreadableDocument ? fail(422, err.message) : null),
+		(err) => (err instanceof UnreadableDocument ? fail(422, err.message) : null),
 	);
 
-	/** `GET /api/file?path=<path>`: a text file that agent text names, by an absolute or `~/` path, for the page's file dialog. */
-	const textFile = get(async params => {
-		const read = await readTextFile(params.get("path") ?? "");
+	/**
+	 * The path a file route reads: `?path=`, or when that holds no file and `?session=` and `?relative=` say a session's
+	 * text named it relative, the first file `relative` names from a directory that session's bash calls ran in or `cd` into.
+	 */
+	const pathOf = (params: URLSearchParams): Promise<string> => {
+		const path = params.get("path") ?? "";
+		const session = params.get("session");
+		const relative = params.get("relative");
+		return session && relative ? firstFile([path, ...env.fileDirsOf(session).map(dir => resolve(dir, relative))]) : Promise.resolve(path);
+	};
+
+	/** `GET /api/file?path=<path>[&session=<id>&relative=<path as written>]`: a text file that agent text names, by an absolute or `~/` path, for the page's file dialog. */
+	const textFile = get(async (params) => {
+		const read = await readTextFile(await pathOf(params));
 		return read.ok ? Response.json(read.file) : fail(read.status, read.error);
 	});
 
 	/**
-	 * `GET /api/media?path=<path>`: an image or video that agent text names, by an absolute or `~/` path, served as its
+	 * `GET /api/media?path=<path>[&session=<id>&relative=<path as written>]`: an image or video that agent text names, by an absolute or `~/` path, served as its
 	 * extension's type; Bun answers a `Range` request with its part, so a video seeks. Its own sandbox policy keeps an
 	 * SVG opened at this address from running script on the page's origin.
 	 */
-	const mediaFile = media(async params => {
-		const found = await findMediaFile(params.get("path") ?? "");
+	const mediaFile = media(async (params) => {
+		const found = await findMediaFile(await pathOf(params));
 		if (!found.ok) return fail(found.status, found.error);
 		return new Response(Bun.file(found.real), {
 			headers: {
@@ -866,13 +1018,15 @@ function providerRoutes({ get, write }: RouteKit): Routes {
 		/** Every provider with its stored accounts, and the sign-in the page last started. */
 		"/api/providers": { GET: get(() => answer(loadProviders)) },
 		/** `{ method }`: starts that `/login` entry, abandoning a sign-in under way. */
-		"/api/providers/login": { PUT: write(body => checked(parseLoginMethod(body), "Expected { method } naming a /login provider"), startProviderLogin, refuse) },
+		"/api/providers/login": {
+			PUT: write((body) => checked(parseLoginMethod(body), "Expected { method } naming a /login provider"), startProviderLogin, refuse),
+		},
 		/** `{ prompt, value }`: answers the sign-in's open question; 409 once it no longer waits on it. */
-		"/api/providers/login/answer": { PUT: write(body => checked(parseLoginAnswer(body), "Expected { prompt, value }"), answerProviderLogin, refuse) },
+		"/api/providers/login/answer": { PUT: write((body) => checked(parseLoginAnswer(body), "Expected { prompt, value }"), answerProviderLogin, refuse) },
 		/** Abandons the sign-in under way, or dismisses how the last one ended. */
 		"/api/providers/login/cancel": { PUT: write(() => null, cancelProviderLogin) },
 		/** `{ provider, credentialId }`: removes that stored credential, as `/logout` does. */
-		"/api/providers/sign-out": { PUT: write(body => checked(parseProviderSignOut(body), "Expected { provider, credentialId }"), signOutProvider) },
+		"/api/providers/sign-out": { PUT: write((body) => checked(parseProviderSignOut(body), "Expected { provider, credentialId }"), signOutProvider) },
 	};
 }
 
@@ -887,7 +1041,11 @@ function dashboardRoutes({ get, write }: RouteKit, env: DashboardRoutesEnv): Rou
 		"/api/dashboard/build": { GET: get(() => Response.json(env.build)) },
 		"/api/dashboard/update": {
 			GET: get(() => answer(() => env.status())),
-			PUT: write(() => null, () => env.update(), err => (err instanceof UpdateRefused ? fail(409, err.message) : null)),
+			PUT: write(
+				() => null,
+				() => env.update(),
+				(err) => (err instanceof UpdateRefused ? fail(409, err.message) : null),
+			),
 		},
 		/** The header's What's new: `DashboardChangelog`, the checkout's `CHANGELOG.md` read without asking origin. */
 		"/api/dashboard/changelog": { GET: get(() => answer(() => env.changelog())) },
@@ -899,11 +1057,24 @@ function syncRoutes({ get, write }: RouteKit, env: SyncRoutesEnv): Routes {
 	return {
 		"/api/sync": {
 			GET: get(() => answer(async () => env.answer())),
-			PUT: write(body => checked(parseSyncSettings(body)), async settings => env.configure(settings)),
+			PUT: write(
+				(body) => checked(parseSyncSettings(body)),
+				async (settings) => env.configure(settings),
+			),
 		},
-		"/api/sync/run": { PUT: write(body => checked(parseSyncRun(body), "Expected { choices }"), choices => env.sync(choices)) },
+		"/api/sync/run": {
+			PUT: write(
+				(body) => checked(parseSyncRun(body), "Expected { choices }"),
+				(choices) => env.sync(choices),
+			),
+		},
 		/** `{ name }`: creates the private GitHub repository, or takes the signed-in account's own, and saves it as the remote. */
-		"/api/sync/create-repo": { PUT: write(body => checked(parseSyncRepoName(body), "Expected { name } naming a GitHub repository as name or owner/name"), name => env.createRemote(name)) },
+		"/api/sync/create-repo": {
+			PUT: write(
+				(body) => checked(parseSyncRepoName(body), "Expected { name } naming a GitHub repository as name or owner/name"),
+				(name) => env.createRemote(name),
+			),
+		},
 	};
 }
 
@@ -912,14 +1083,23 @@ function processRoutes({ get, write }: RouteKit, env: ProcessRoutesEnv): Routes 
 	return {
 		"/api/session-processes": { GET: get(() => answer(() => env.list())) },
 		"/api/session-processes/stop": {
-			PUT: write(body => checked(parseProcessStop(body), "Expected { instanceId, id } naming a live session and one of its processes"), stop => env.stop(stop)),
+			PUT: write(
+				(body) => checked(parseProcessStop(body), "Expected { instanceId, id } naming a live session and one of its processes"),
+				(stop) => env.stop(stop),
+			),
 		},
 		"/api/session-processes/start-server": {
-			PUT: write(body => checked(parseDevServerRequest(body), "Expected { instanceId } naming a live session"), ({ instanceId }) => env.startServer(instanceId)),
+			PUT: write(
+				(body) => checked(parseDevServerRequest(body), "Expected { instanceId } naming a live session"),
+				({ instanceId }) => env.startServer(instanceId),
+			),
 		},
 		"/api/process-settings": {
 			GET: get(() => answer(async () => env.settings())),
-			PUT: write(body => checked(parseProcessSettings(body), "Expected { stopIdleAfterMinutes } of null, 15, 30, 60, or 120"), async settings => env.changeSettings(settings)),
+			PUT: write(
+				(body) => checked(parseProcessSettings(body), "Expected { stopIdleAfterMinutes } of null, 15, 30, 60, or 120"),
+				async (settings) => env.changeSettings(settings),
+			),
 		},
 	};
 }
@@ -932,10 +1112,13 @@ export function createRoutes(env: RouteEnv): Routes {
 		"/api/readiness/starter-kit": { GET: kit.get(() => answer(readStarterKitStatus)) },
 		"/api/readiness/terminal-sessions": {
 			GET: kit.get(() => answer(readCollabAutoStart)),
-			PUT: kit.write(body => isObject(body) && isTerminalAccess(body.access) ? body.access : fail(400, "Expected { access } of view or control"), async access => {
-				await shareTerminalSessions(access);
-				return readCollabAutoStart();
-			}),
+			PUT: kit.write(
+				(body) => (isObject(body) && isTerminalAccess(body.access) ? body.access : fail(400, "Expected { access } of view or control")),
+				async (access) => {
+					await shareTerminalSessions(access);
+					return readCollabAutoStart();
+				},
+			),
 		},
 		...integrationRoutes(kit, env.integrations),
 		...providerRoutes(kit),

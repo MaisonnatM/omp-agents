@@ -5,6 +5,7 @@ import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest } from "../shared/sessions";
 import type { RoutineSpec, Schedule } from "../routines";
 import type { BotId } from "../shared/bots";
 import { MAX_DISCUSSION_QUOTE, MAX_DISCUSSION_SOURCE, MAX_DISCUSSION_TURNS } from "../shared/discussions";
+import { MAX_CAPTURE_ID } from "../shared/dictation";
 import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, type PullRequestChange } from "../shared/github";
@@ -79,6 +80,24 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "prompt", view: live, text: "  ", delivery: "steer" })).toBeNull();
 		expect(msg({ t: "prompt", view: live, text: "go", delivery: "later" })).toBeNull();
 		expect(msg({ t: "prompt", view: { kind: "past", sessionId: "s1" }, text: "go", delivery: "steer" })).toBeNull();
+	});
+
+	test("session controls require a string instance id and their typed payload", () => {
+		const controls = [
+			{ t: "context", action: { kind: "compact", mode: "soft" } },
+			{ t: "set-auto-compaction", enabled: false },
+			{ t: "set-advisor", enabled: true },
+			{ t: "goal", change: { op: "set", objective: "ship", tokenBudget: 100000 } },
+		] as const;
+		for (const control of controls) {
+			expect(msg({ ...control, instanceId: "i1" })).toEqual({ ...control, instanceId: "i1" });
+			for (const instanceId of [undefined, null, 1, {}]) expect(msg({ ...control, instanceId })).toBeNull();
+		}
+		for (const t of ["set-auto-compaction", "set-advisor"]) {
+			for (const enabled of [undefined, null, 1, "true"]) expect(msg({ t, instanceId: "i1", enabled })).toBeNull();
+		}
+		for (const action of [undefined, null, {}, { kind: "compact", mode: "bad" }, { kind: "shake", mode: "soft" }]) expect(msg({ t: "context", instanceId: "i1", action })).toBeNull();
+		for (const change of [undefined, null, {}, { op: "set", objective: " ", tokenBudget: null }, { op: "set", objective: "ship", tokenBudget: -1 }, { op: "drop" }]) expect(msg({ t: "goal", instanceId: "i1", change })).toBeNull();
 	});
 
 	test("user-todo takes each change with the fields it needs, and drops any other field", () => {
@@ -409,6 +428,23 @@ describe("parseClientMsg", () => {
 	test("discuss-stop names the question it stops", () => {
 		expect(msg({ t: "discuss-stop", id: 2 })).toEqual({ t: "discuss-stop", id: 2 });
 		expect(msg({ t: "discuss-stop", id: "2" })).toBeNull();
+	});
+
+	test("dictation-start needs a capture id within omp's length and a directory", () => {
+		const start = { t: "dictation-start" as const, captureId: "c1", cwd: "~/code/app" };
+		expect(msg(start)).toEqual(start);
+		expect(msg({ ...start, captureId: "x".repeat(MAX_CAPTURE_ID) })).toEqual({ ...start, captureId: "x".repeat(MAX_CAPTURE_ID) });
+		expect(msg({ ...start, captureId: "x".repeat(MAX_CAPTURE_ID + 1) })).toBeNull();
+		expect(msg({ ...start, captureId: "  " })).toBeNull();
+		expect(msg({ ...start, captureId: 1 })).toBeNull();
+		expect(msg({ ...start, cwd: "" })).toBeNull();
+	});
+
+	test("dictation-stop and dictation-discard name the capture they end", () => {
+		expect(msg({ t: "dictation-stop", captureId: "c1" })).toEqual({ t: "dictation-stop", captureId: "c1" });
+		expect(msg({ t: "dictation-discard", captureId: "c1" })).toEqual({ t: "dictation-discard", captureId: "c1" });
+		expect(msg({ t: "dictation-stop", captureId: "" })).toBeNull();
+		expect(msg({ t: "dictation-discard" })).toBeNull();
 	});
 });
 

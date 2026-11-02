@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { allPrompts, chosenText, suggestionKey } from "./composer-suggestions";
+import { chosenText, suggestionKey } from "./composer-suggestions";
 
 const prompts = ["Run the tests", "Open a PR", "Update the docs"];
 
@@ -17,11 +17,6 @@ test("a row both marked and clicked appears once", () => {
 
 test("a mark whose prompt left the list takes nothing", () => {
 	expect(chosenText(prompts, new Set(["Deploy"]), 2)).toBe("Update the docs");
-});
-
-test("every prompt goes as one list, and a single prompt as itself", () => {
-	expect(allPrompts(prompts)).toBe("- Run the tests\n- Open a PR\n- Update the docs");
-	expect(allPrompts(["Ship it"])).toBe("Ship it");
 });
 
 test("with marks but no highlight, Enter sends and Tab fills just the marks, and Esc clears them", () => {

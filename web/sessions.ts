@@ -2,6 +2,7 @@
 import { newestPastFirst, type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
 import { inTempDir, type Workspace } from "../src/shared/workspaces";
 import { everyWord } from "../src/shared/every-word";
+import { needsYou } from "./attention";
 
 /** A working directory outside the temp directories, and not one Settings → Workspaces hid. */
 export function discoverableCwd(cwd: string, hidden: ReadonlySet<string>): boolean {
@@ -125,11 +126,8 @@ export function searchSessions(lists: SidebarSessions, query: string): SidebarSe
 	};
 }
 
-/** Whether live session `host` waits on your move: a turn that finished, or a question left open. */
-export const waitsOnYou = (host: RosterHost): boolean => host.status === "idle" || host.status === "needs-input";
-
-/** How many live sessions in `lists` wait on your move. */
-export const waitingCount = ({ pinned, running, idle }: SidebarSessions): number => [...pinned.hosts, ...running, ...idle].filter(waitsOnYou).length;
+/** How many live sessions in `lists` need you: each that asks you something, or finished a turn you have not looked at since, as the Dock badge counts them. */
+export const waitingCount = ({ pinned, running, idle }: SidebarSessions): number => [...pinned.hosts, ...running, ...idle].filter(needsYou).length;
 
 /** The session the Sessions tab opens when no pane shows one: of the rows `lists` holds, the live one started last, else the past one saved last. */
 export function latestSession({ pinned, running, idle, interrupted, ended }: SidebarSessions): View | null {

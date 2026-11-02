@@ -10,7 +10,7 @@ import type { RpcHostTool } from "./omp/module-types/rpc";
 import type { RpcClient } from "./omp/rpc";
 
 /**
- * A stand-in for `omp --mode rpc-ui`: omp's `ready` line, then a response to each command. `ask` raises a question,
+ * A stand-in for `omp --mode rpc-ui`: omp's `ready` line, then a response to each command. `ask` raises `frame.question` as request `q1`,
  * `call` a host tool call of tool `frame.tool`, and `big` one over omp's 1 MB line limit, which it writes as `rpc_chunk`s
  * as omp does. `job` starts a background job and `exit` exits. `get_state` reports, as `sessionName`, what it heard: how
  * often it negotiated, the answers, the host tool results, and the job's pid. Started with `v1`, it offers protocol 1 only.
@@ -35,7 +35,7 @@ for await (const chunk of Bun.stdin.stream()) {
 			heard.negotiations++;
 			reply({ protocolVersion: 2 });
 		} else if (frame.type === "ask") {
-			out({ type: "extension_ui_request", id: "q1", method: "confirm", title: "Go on?" });
+			out({ type: "extension_ui_request", id: "q1", ...frame.question });
 			reply({});
 		} else if (frame.type === "job") {
 			// A background job in a session of its own, as omp's bash tool starts one.
@@ -137,11 +137,13 @@ const alive = (pid: number): boolean => {
 };
 
 describe("session keeper", () => {
-	test("omp outlives the server that started it, and the next server attaches to it with its question still open", async () => {
+	const CONFIRM = { method: "confirm", title: "Go on?" };
+	const ASK = { method: "ask", questions: [{ id: "ready", question: "Mark it ready?", options: [{ label: "Mark ready" }, { label: "Keep as draft" }] }] };
+	test.each([["confirm", CONFIRM], ["ask", ASK]])("omp outlives the server that started it, and the next server attaches to it with its %s question still open", async (_method, question) => {
 		const dir = scratch();
 		const first = await start(dir);
 		const { client } = await drive(first);
-		first.process.stdin.write(`${JSON.stringify({ type: "ask", id: "x" })}\n`);
+		first.process.stdin.write(`${JSON.stringify({ type: "ask", id: "x", question })}\n`);
 		await eventually(async () => (await heard(client)).negotiations === 1);
 		first.detach();
 		expect(await first.ended).toBe("detach");
@@ -152,7 +154,7 @@ describe("session keeper", () => {
 		expect([second.meta, second.process.pid]).toEqual([META, first.process.pid]);
 		const { client: next, frames } = await drive(second);
 		await eventually(() => frames.length === 1);
-		expect(frames[0]).toMatchObject({ id: "q1", method: "confirm", title: "Go on?" });
+		expect(frames[0]).toEqual({ type: "extension_ui_request", id: "q1", ...question });
 		second.process.stdin.write(`${JSON.stringify({ type: "extension_ui_response", id: "q1", confirmed: true })}\n`);
 		// omp answered the second client's negotiation as it did the first's, and heard the second client's answer.
 		await eventually(async () => (await heard(next)).answers.length === 1);
