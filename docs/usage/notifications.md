@@ -57,7 +57,8 @@
   Clicking it brings the window up on that session.
 - Each question and each finished turn raises one notification, and a newer one of the same session replaces the one before; a session that asks while its turn is unread notifies the question.
   A session that already waited when the page loads, or when the page reconnects, raises none.
-- A finished turn stays unread until a pane shows the session, not one of its subagents, in a focused window, or its next turn starts; the server keeps which turns are unread, so every window agrees.
+- A finished turn stays unread until a pane shows the session, not one of its subagents, in a focused window, or its next turn starts; the server keeps which turns are unread, so every window agrees, and keeps them when the dashboard restarts, as it does after an update.
+  A turn that finishes while the dashboard is stopped shows unread once it starts again.
 - The app shows them unless **Settings › Preferences › Notifications** turns them off, and keeps its choices in its localStorage:
   - **Also when a session finishes a turn** off notifies questions only; a turn finished meanwhile raises nothing when you turn it back on.
   - **Sound** picks what a notification plays: **None**, **System default**, or one of macOS's sounds, such as Glass or Ping; picking one plays it.

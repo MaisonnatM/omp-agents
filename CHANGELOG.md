@@ -9,6 +9,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Inbox buttons show a spinner, the 1 to 9 and 0 keys send through the message box, and the next item opens once the item is done.
 - The starter kit's models match the current setup: Opus picks its own effort, Haiku 5.5 runs cheap roles, fallbacks use newer Codex models, and OpenRouter is gone.
 - The starter kit's /poteto-mode now finds pstack's poteto style where the pstack plugin actually installs it, so it works on a new computer.
+- Fixed: finished turns stay in the Inbox when the dashboard restarts, such as after an update, and a turn that finishes while the dashboard is stopped shows up once it starts again.
+- Fixed: opening an Inbox item no longer marks the session it replaces on screen as read.
 - A long folder name in the message box now ends in … instead of running past the box and under the model switch.
 - /ship now plans before it builds: the agent compares up to three ways to do the work, keeps the best, and posts that plan on the Linear issue, or in the pull request when there is no issue.
 - /ship no longer needs a Linear ticket: it uses the one you name or one that matches the work, and otherwise ships without one instead of creating a ticket.

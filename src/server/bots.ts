@@ -3,7 +3,7 @@
  * to as that session lives, and a message to a Bot, which reaches its live session or resumes it.
  */
 import { join } from "node:path";
-import { isObject, parseJson, str } from "../json";
+import { isObject, str } from "../json";
 import type { LiveSession } from "../live-session";
 import { BOT_FLAGS } from "../omp/bot-extension";
 import { SHEPHERD_FLAGS } from "../omp/shepherd-extension";
@@ -14,7 +14,7 @@ import { modelOfSelector } from "../shared/models";
 import { newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import { type RoutineMessage, taskText } from "../shared/routine-message";
 import { promptAuthor, skillInvocation } from "../shared/transcript";
-import { entryTime, oneLine, textOf } from "../session-entries";
+import { entryTime, oneLine, tailEntries, textOf } from "../session-entries";
 import { readTail } from "../read-tail";
 import { isUserPrompt, skillArgs, splitSuggestions } from "../transcript";
 import type { BotsFile } from "./bots-file";
@@ -26,26 +26,20 @@ type BotSession = Pick<LiveSession, "sessionId" | "prompt">;
 /** A Bot's memory and its conversation's last words, as read for its session `sessionId`. */
 type BotFiles = { sessionId: string | null; memory: string; last: BotLast | null };
 
-/** How much of a session file's end {@link lastMessage} reads; a conversation whose last words sit further back previews none. */
-const LAST_TAIL = 256 * 1024;
-
-/** The last prompt, routine message or reply with text in session file `path`, the user's own or the agent's without its suggested prompts; `null` when its end holds none or the file is gone. */
+/** The last prompt, routine message or reply with text at the end of session file `path`, the user's own or the agent's without its suggested prompts; `null` when its end holds none or the file is gone. */
 export function lastMessage(path: string): BotLast | null {
-	const lines = readTail(path, LAST_TAIL)?.text.split("\n") ?? [];
-	for (let i = lines.length - 1; i >= 0; i--) {
-		const last = messageOf(lines[i]!);
+	for (const entry of tailEntries(path)) {
+		const last = messageOf(entry);
 		if (last) return last;
 	}
 	return null;
 }
 
 /**
- * What session-file line `line` previews: the user's prompt or a `/skill:` prompt as typed, a routine's message, or the
- * agent's reply. A prompt the dashboard sent, a collaborator's, and a `!` command the user ran preview nothing.
+ * What session-file entry `entry` previews: the user's prompt or a `/skill:` prompt as typed, a routine's message, or
+ * the agent's reply. A prompt the dashboard sent, a collaborator's, and a `!` command the user ran preview nothing.
  */
-function messageOf(line: string): BotLast | null {
-	const entry = parseJson(line);
-	if (!isObject(entry)) return null;
+function messageOf(entry: Record<string, unknown>): BotLast | null {
 	const at = entryTime(entry) ?? 0;
 	if (entry.type === "custom_message" && isUserPrompt(entry)) {
 		const skill = isObject(entry.details) ? str(entry.details.name) : undefined;

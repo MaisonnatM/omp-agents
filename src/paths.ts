@@ -22,6 +22,8 @@ export const taskClaimsFile = join(configDir, "task-claims.json");
  * One directory per port, so a server on another port, such as a smoke run, never takes over this one's sessions.
  */
 export const keepersDir = join(configDir, "sessions", String(portFromEnv()));
+/** The turns this port's server's sessions ended that no page read yet: one file per port, as {@link keepersDir}, since instance ids are each server's own. */
+export const unreadFile = join(configDir, "unread", `${portFromEnv()}.json`);
 
 /** The Todo page's list, beside {@link tokenFile}. */
 export const userTodosFile = join(configDir, "todos.json");

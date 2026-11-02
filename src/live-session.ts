@@ -2,8 +2,9 @@
 import { isObject } from "./json";
 import type { HostSnapshot } from "./omp/collab";
 import { type TurnFailure, turnFailureOf } from "./omp/turn-failure";
+import { entryTime, tailEntries } from "./session-entries";
 import type { Delivery, MessageQueue, PromptImage, RosterHost, SessionFacts, UserAnswer, WithdrawnMessage } from "./shared/sessions";
-import { splitSuggestions } from "./transcript";
+import { isUserPrompt, splitSuggestions } from "./transcript";
 
 type WithoutKeys<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
@@ -53,6 +54,34 @@ export function turnUpdate(event: unknown): TurnUpdate | null {
 	if (!isObject(event)) return null;
 	if (event.type === "agent_start") return { kind: "turn-started" };
 	return event.type === "agent_end" && event.isTerminal !== false ? { kind: "turn-ended", reply: lastReply(event.messages), failure: turnFailureOf(event.messages) } : null;
+}
+
+/** A turn that ended: when, in ms since the epoch, and its last reply, `null` when it ended on none. */
+export interface EndedTurn {
+	at: number;
+	reply: TurnReply | null;
+}
+
+/**
+ * The last turn session file `sessionFile` holds, as it ended: the time of its last message, and the reply among the
+ * messages after its prompt, chosen as {@link turnUpdate} chooses an `agent_end`'s. For a turn that ended while no server
+ * listened. `null` when the file is gone or unreadable, or its end holds no message with a time.
+ */
+export function endedTurn(sessionFile: string): EndedTurn | null {
+	const newestFirst: unknown[] = [];
+	let at: number | null = null;
+	try {
+		for (const entry of tailEntries(sessionFile)) {
+			if (entry.type === "custom_message" && isUserPrompt(entry)) break;
+			if (entry.type !== "message" || !isObject(entry.message)) continue;
+			if (isUserPrompt(entry.message)) break;
+			newestFirst.push(entry.message);
+			at ??= entryTime(entry);
+		}
+	} catch {
+		return null;
+	}
+	return at === null ? null : { at, reply: lastReply(newestFirst.toReversed()) };
 }
 
 /** A message the session did not take; the session itself reports it, so a caller with someone to tell need not. */

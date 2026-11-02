@@ -75,7 +75,7 @@ export function App() {
 	const display = useTranscriptDisplay();
 	const terminal = useTerminalPanel();
 	useNoticeToasts(state.notices, state.connected, send, start);
-	useAttention(state, page, openBot?.view ?? null, send);
+	useAttention(state, openBot?.view ?? null, send);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
 	const integrations = integrationsStore.usePolling().read?.data.integrations;
 	const linear = integrations?.linear ?? null;

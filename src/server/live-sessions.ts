@@ -1,17 +1,31 @@
 /** Every session the dashboard can drive, in one registry: terminal sessions it joined, and sessions it started. */
 import { forgetSession } from "../commands";
 import { DashboardSession, type DashboardUpdate, newInstanceId } from "../dashboard-session";
+import { JsonFile } from "../fs";
 import { SessionGuest } from "../guest";
 import { repositoryAt } from "../git";
-import type { LiveSession, LiveUpdate, TurnReply } from "../live-session";
+import { arrayOf, decoder, fields, isNumber, isString, isTexts, nullable } from "../json";
+import type { EndedTurn, LiveSession, LiveUpdate } from "../live-session";
 import type { HostSnapshot } from "../omp/collab";
-import { displayPath } from "../paths";
+import { displayPath, unreadFile } from "../paths";
 import { oneLine } from "../session-entries";
 import { type RosterHost, type SessionFacts, UNREAD_BODY_MAX, type UnreadTurn, type WorkItem, worksOn } from "../shared/sessions";
 import { pullRequestTask, TaskClaims, ticketTask } from "../task-claims";
 import { portFromEnv } from "./address";
 
 export type SessionUpdate = LiveUpdate | DashboardUpdate;
+
+/** An unread turn with the instance id of the session that ended it, as the unread file holds it. */
+type SavedTurn = { instanceId: string } & UnreadTurn;
+
+/** The turns no page read yet. */
+interface SavedUnread {
+	turns: SavedTurn[];
+}
+
+const isSavedUnread = fields<SavedUnread>({
+	turns: arrayOf(fields<SavedTurn>({ instanceId: isString, at: isNumber, reply: nullable(isString), body: nullable(isString), suggestions: isTexts })),
+});
 
 /** `facts` with `subject` first among the session's links, unless its tool calls named it already. */
 export function withSubject(facts: SessionFacts, subject: WorkItem | undefined): SessionFacts {
@@ -29,8 +43,9 @@ export class LiveSessions {
 	readonly #sessions = new Map<string, LiveSession>();
 	/** What the sessions started from a quick action work on, by instance id, for as long as they run. */
 	readonly #subjects = new Map<string, WorkItem>();
-	/** The turn each session ended since a page showed it in a focused window, by instance id. */
+	/** The turn each session ended since a page showed it in a focused window, by instance id; {@link #unreadFile} keeps them across restarts. */
 	readonly #unread = new Map<string, UnreadTurn>();
+	readonly #unreadFile: JsonFile<SavedUnread>;
 	/**
 	 * The sessions by the session file they continue, the earliest added first. A session's id changes when omp moves it to
 	 * another file or the registry lists its host on another session, so the index is rebuilt where either can happen.
@@ -39,9 +54,10 @@ export class LiveSessions {
 	readonly #onUpdate: (instanceId: string, update: SessionUpdate) => void;
 	readonly #taskClaims: TaskClaims;
 
-	constructor(onUpdate: (instanceId: string, update: SessionUpdate) => void, taskClaims = new TaskClaims()) {
+	constructor(onUpdate: (instanceId: string, update: SessionUpdate) => void, taskClaims = new TaskClaims(), unreadPath = unreadFile) {
 		this.#onUpdate = onUpdate;
 		this.#taskClaims = taskClaims;
+		this.#unreadFile = new JsonFile(unreadPath, { parse: decoder(isSavedUnread), holds: "a list of unread turns", onInvalid: "ignore" });
 	}
 
 	get(instanceId: string): LiveSession | undefined {
@@ -114,15 +130,32 @@ export class LiveSessions {
 		this.#taskClaims.release(instanceId);
 	}
 
-	/** Session `instanceId` ended a turn with `reply`, which stays unread until a look or its next turn reads it. */
-	markUnread(instanceId: string, reply: TurnReply | null): void {
+	/** Session `instanceId` ended a turn at `at` with `reply`, which stays unread until a look or its next turn reads it, across restarts. */
+	markUnread(instanceId: string, { at, reply }: EndedTurn): void {
 		const text = reply?.body.trim() || null;
-		this.#unread.set(instanceId, { at: Date.now(), reply: firstLine(text), body: text?.slice(0, UNREAD_BODY_MAX) ?? null, suggestions: reply?.suggestions ?? [] });
+		this.#unread.set(instanceId, { at, reply: firstLine(text), body: text?.slice(0, UNREAD_BODY_MAX) ?? null, suggestions: reply?.suggestions ?? [] });
+		this.#saveUnread();
 	}
 
 	/** A page showed session `instanceId` in a focused window, or its next turn started; whether it had a turn unread. */
 	markRead(instanceId: string): boolean {
-		return this.#unread.delete(instanceId);
+		if (!this.#unread.delete(instanceId)) return false;
+		this.#saveUnread();
+		return true;
+	}
+
+	/**
+	 * The turns sessions `instanceIds` ended unread under the previous server come back; the saved turns of every other
+	 * session, which did not survive it, are forgotten. Called once, by reattachAll, before any session is listed or any
+	 * turn is marked, so the file still holds the previous server's turns.
+	 */
+	restoreUnread(instanceIds: ReadonlySet<string>): void {
+		const saved = this.#unreadFile.load()?.turns;
+		if (!saved?.length) return;
+		for (const { instanceId, ...turn } of saved) {
+			if (instanceIds.has(instanceId)) this.#unread.set(instanceId, turn);
+		}
+		this.#saveUnread();
 	}
 
 	/** Lists `session`; `false` when it already finished, as a process that exited between its spawn and now, which would stay listed with no one to remove it. */
@@ -138,7 +171,7 @@ export class LiveSessions {
 		this.releaseTask(instanceId);
 		if (!this.#sessions.delete(instanceId)) return;
 		this.#subjects.delete(instanceId);
-		this.#unread.delete(instanceId);
+		if (this.#unread.delete(instanceId)) this.#saveUnread();
 		this.#reindex();
 		forgetSession(instanceId);
 	}
@@ -147,6 +180,10 @@ export class LiveSessions {
 		const index = new Map<string, LiveSession>();
 		for (const session of this.#sessions.values()) if (!index.has(session.sessionId)) index.set(session.sessionId, session);
 		this.#bySessionId = index;
+	}
+
+	#saveUnread(): void {
+		this.#unreadFile.save({ turns: [...this.#unread].map(([instanceId, turn]) => ({ instanceId, ...turn })) });
 	}
 
 	/** Each session's roster row, with its `cwdDisplay`, its unread turn, and what the session files' index knows of it, asked with the directory it runs in now. */
