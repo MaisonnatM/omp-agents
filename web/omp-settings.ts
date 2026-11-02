@@ -4,6 +4,7 @@
  */
 import type { AgentSettingRow, AgentSettingTab } from "../src/shared/agent-settings";
 import { everyWord } from "../src/shared/every-word";
+import { GC_RULES } from "../src/shared/storage";
 import type { SettingsSection } from "./routing";
 
 /** The Settings section that edits a setting, and its name in the line that links there. */
@@ -34,18 +35,7 @@ export const OWNED_SETTINGS: Readonly<Record<string, SettingOwner>> = {
 	"retry.usageReservePct": MODELS,
 	"retry.usageReservePolicy": MODELS,
 	"retry.fallbackRevertPolicy": MODELS,
-	"gc.blobs": STORAGE,
-	"gc.archive": STORAGE,
-	"gc.wal": STORAGE,
-	"gc.stale": STORAGE,
-	"gc.compress": STORAGE,
-	"gc.coldArchiveAfterDays": STORAGE,
-	"gc.retainNewestGlobal": STORAGE,
-	"gc.retainNewestPerCwd": STORAGE,
-	"gc.staleRetainNewest": STORAGE,
-	"gc.staleRetainDays": STORAGE,
-	"gc.compressAfterDays": STORAGE,
-	"gc.autoCompress": STORAGE,
+	...Object.fromEntries(GC_RULES.map(rule => [rule.id, STORAGE])),
 };
 
 /** The section that edits `id`, from {@link OWNED_SETTINGS}; `undefined` when this section does. */

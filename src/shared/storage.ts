@@ -1,5 +1,6 @@
 /** Settings › Storage's measured usage, native cleanup reports, and editable rules. */
 import { isObject, isTexts, oneOf, type Parsed } from "../json";
+import type { AgentSettingRow } from "./agent-settings";
 
 export const GC_PHASES = ["stale", "blobs", "archive", "compress", "wal"] as const;
 export type GcPhase = (typeof GC_PHASES)[number];
@@ -8,6 +9,10 @@ export type CleanupStep = (typeof CLEANUP_STEPS)[number];
 export type SandboxKeepReason = "owner-live" | "occupied" | "changed" | "locked" | "unreadable" | "failed";
 export interface SandboxResult { path: string; kept: SandboxKeepReason | null; detail: string | null }
 export interface SandboxPlan extends SandboxResult { bytes: number | null }
+
+export class CleanupBusy extends Error {
+	constructor() { super("Another cleanup is running. Try again when it ends."); }
+}
 
 export interface GcAnswer {
 	apply: boolean;
@@ -32,11 +37,11 @@ export const GC_RULES = [
 	{ id: "gc.compressAfterDays", label: "Compress after", hint: "Days a session must be idle before compression.", kind: "number" },
 	{ id: "gc.autoCompress", label: "Compress daily", hint: "Runs at most once a day when you start omp in a terminal, not when you start a dashboard session.", kind: "toggle" },
 ] as const;
-export type GcRuleId = (typeof GC_RULES)[number]["id"];
-export interface GcRule { id: GcRuleId; value: boolean | number; default: unknown; user: unknown; workspace?: unknown }
 export interface StorageUsage {
 	folders: { label: string; path: string; bytes: number | null; error: string | null }[];
-	rules: GcRule[];
+	rules: AgentSettingRow[];
+	/** Workspace ids omitted from the rows so Storage can edit global values instead of locking them. */
+	overrides: string[];
 	settingsError: string | null;
 	autoCompress: { at: number; text: string } | null;
 }

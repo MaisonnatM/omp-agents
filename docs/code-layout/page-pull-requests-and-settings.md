@@ -15,8 +15,8 @@
   `mcp-logos.ts` holds the catalog vendors' marks as SVG markup in their brand colors, svgl's (https://svgl.app) unless a comment names another source; `brand-logos.tsx` holds the integrations' marks and `BrandMark`, which draws every one of them, black parts in the text color.
   `web/components/settings/providers-tab.tsx` is the Providers section, whose rows reuse `IntegrationList` and `Callout` from `integration-row.tsx`; it reads `providersStore` in `web/reads.ts`, kept in memory only since it names your accounts.
   `provider-logos.tsx` draws each row's mark, keyed by `/login` id: Lobe Icons' (MIT) color marks, or their monochrome ones in the text color for a brand with no color version, svgl's GitLab, Simple Icons' (CC0) Xiaomi, and the name's first letter for a provider none has.
-  `web/components/settings/storage-tab.tsx` holds Storage's folder sizes, checklist, irreversible confirmation, phase-by-phase run, and global cleanup rule editor.
-  `web/storage.ts` builds its rows in native order, labels measured sizes and results, and adapts global cleanup rules to `AgentSettingRow`; `web/storage.test.ts` covers their defaults, unknown sizes, unsupported compression, and partial failures.
+  `web/components/settings/storage-tab.tsx` holds Storage's folder sizes in `UsageSection`, phase checklist in `ChecklistRow`, irreversible `ConfirmDialog`, and global cleanup rule editor.
+  `web/storage.ts` keeps each phase's preview and result together in `PHASES` and runs selected phases sequentially through `runCleanup`; `web/storage.test.ts` covers honest estimates, partial failures, ordering, stop boundaries, sandbox progress, and unavailable free-space readings.
   `web/components/settings/omp-settings-tab.tsx` exports `SettingRow`, shared with Storage: immediate saves, native whole-number controls, Reset, busy state, changed markers, and correctly bound labels.
   `web/components/settings/editor.tsx` supplies the sections' `Section`, `useEditor`, `EditBar`, and `SaveError`, and Models' draft `NumberField`.
   `web/components/more-actions-menu.tsx` is the ⋯ menu of a row's rarer actions, which the integration rows share.

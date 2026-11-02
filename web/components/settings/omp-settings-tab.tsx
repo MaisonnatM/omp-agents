@@ -94,7 +94,7 @@ function TextControl({ row, controlId, value, disabled, onChange }: ControlProps
 	);
 }
 
-/** A whole number saved on Enter or blur; Escape restores it, and clearing it removes the user's value. */
+/** Unlike Models' draft field, this row saves on Enter or blur; Escape restores it, and clearing it removes your value. */
 function NumberControl({ controlId, value, disabled, onChange, min }: ControlProps & { min: number }) {
 	const initial = value === undefined ? "" : String(value);
 	const [draft, setDraft] = useState(initial);
@@ -109,10 +109,24 @@ function NumberControl({ controlId, value, disabled, onChange, min }: ControlPro
 	};
 	return (
 		<div className="space-y-1">
-			<input id={controlId} type="number" inputMode="numeric" min={min} step={1} disabled={disabled} value={draft} aria-invalid={invalid ? true : undefined} aria-describedby={invalid ? `${controlId}-error` : undefined}
-				onChange={event => { setDraft(event.target.value); setInvalid(null); }} onBlur={commit}
-				onKeyDown={event => { if (event.key === "Enter") commit(); else if (event.key === "Escape") { setDraft(initial); setInvalid(null); } }}
-				className={cn(FIELD, "w-28 tabular-nums disabled:cursor-not-allowed disabled:opacity-50")} />
+			<input
+				id={controlId}
+				type="number"
+				inputMode="numeric"
+				min={min}
+				step={1}
+				disabled={disabled}
+				value={draft}
+				aria-invalid={invalid ? true : undefined}
+				aria-describedby={invalid ? `${controlId}-error` : undefined}
+				onChange={event => { setDraft(event.target.value); setInvalid(null); }}
+				onBlur={commit}
+				onKeyDown={event => {
+					if (event.key === "Enter") commit();
+					else if (event.key === "Escape") { setDraft(initial); setInvalid(null); }
+				}}
+				className={cn(FIELD, "w-28 tabular-nums disabled:cursor-not-allowed disabled:opacity-50")}
+			/>
 			{invalid && <div id={`${controlId}-error`}><ErrorText>{invalid}</ErrorText></div>}
 		</div>
 	);

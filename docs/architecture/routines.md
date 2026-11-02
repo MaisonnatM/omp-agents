@@ -147,6 +147,7 @@ A sandbox with the marker but no checkout, left by an omp that exited while it m
 Just before it removes one, the sweep asks again whether an omp owns it, since a task run again takes the same directory; then it stops a retained native mount through omp's `stopRetainedMount`, renames the sandbox with the suffix `.omp-agents-removing`, and deletes it, so the next sweep finishes a removal cut short instead of reading half a sandbox.
 A mount that will not stop keeps its sandbox.
 Each sweep logs one line with how many sandboxes it removed and kept, by reason, and one more for each it could not read or remove.
-Storage shares this instance for a read-only `preview()` that measures removable sandboxes, and `remove(paths)` that rechecks each sandbox before removing it.
+Storage shares this instance for a read-only `preview()` that measures removable sandboxes, and `remove(paths)` that rechecks each sandbox because the confirmed preview may be old.
+Each operation takes one `Worktrees.inUse` snapshot; the unattended sweep judges each sandbox once, then rechecks ownership immediately before removal.
 Preview, manual removal, and the unattended sweep share a single-flight guard.
 Manual removal accepts only direct directory children of omp's sandbox root, never symlinks, and the preview does not finish interrupted removals.

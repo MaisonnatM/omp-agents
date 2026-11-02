@@ -18,7 +18,7 @@ export const RAIL_BUTTON = "flex w-full items-baseline gap-2 rounded-md px-2 py-
 /** A link in a settings note, to another section or a file. */
 export const LINK = "text-foreground underline-offset-2 hover:underline";
 
-/** A number kept as text while typing; a blank field restores the saved number on blur. */
+/** Models changes its draft while typing; Save writes it. A blank field restores the draft's number on blur. */
 export function NumberField({ value, onChange, ...props }: Omit<ComponentProps<"input">, "value" | "onChange" | "onBlur"> & { value: number; onChange: (value: number) => void }) {
 	const [text, setText] = useState(String(value));
 	return (
