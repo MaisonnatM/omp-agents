@@ -4,6 +4,7 @@ import type { QueuedMerge } from "../../src/shared/merge-queue";
 import type { ReviewDraft } from "../../src/shared/review-drafts";
 import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
+import type { FileTarget } from "../file-paths";
 import type { MentionLists } from "../mentions";
 import type { StartOf } from "../starts";
 import type { Dashboard } from "../use-dashboard";
@@ -28,8 +29,8 @@ export interface DashboardActions {
 	 * Resolves `true` once the server ended it, `false` when it was already ending or could not end.
 	 */
 	end: (instanceId: string) => Promise<boolean>;
-	/** Open the text, image, or video file at an absolute or `~/` path in the file dialog. */
-	openFile: (path: string) => void;
+	/** Open the text, image, or video file `target` names in the file dialog. */
+	openFile: (target: FileTarget) => void;
 	/** Open the new-ticket dialog with `title` as the issue's title. */
 	openNewTicket: (title: string) => void;
 	/** Open the session's goal editor, shared by its header and the focused-session palette command. */

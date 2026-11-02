@@ -114,7 +114,7 @@ test("GitHub text shows avatars, loads uploads through this server, and links ot
 const fileLinks = (text: string, base: string | null): { html: string; count: number } => {
 	const html = renderToStaticMarkup(
 		<DashboardActionsContext.Provider value={{ openFile: () => {} } as unknown as DashboardActions}>
-			<FileBaseContext.Provider value={base}>
+			<FileBaseContext.Provider value={base === null ? null : { dir: base, session: null }}>
 				<MessageMarkdown text={text} />
 			</FileBaseContext.Provider>
 		</DashboardActionsContext.Provider>,

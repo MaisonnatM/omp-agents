@@ -60,6 +60,12 @@ async function findFile(path: string, extensions: readonly string[], kind: strin
 	return { ok: true as const, named, real, extension, size: info.size };
 }
 
+/** The first of absolute `paths` that is a file, past any symlink; the first when none is, so its refusal names it. */
+export async function firstFile(paths: readonly string[]): Promise<string> {
+	for (const path of paths) if (await stat(expandHome(path)).then(info => info.isFile(), () => false)) return path;
+	return paths[0] ?? "";
+}
+
 /** The text file that `path` names, as {@link findFile} checks it, whose bytes must be UTF-8. */
 export async function readTextFile(path: string, denied: readonly DeniedDir[] = DENIED_DIRS): Promise<TextFileRead> {
 	const found = await findFile(path, TEXT_FILE_EXTENSIONS, "text files", denied);

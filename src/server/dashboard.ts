@@ -655,7 +655,7 @@ export class Dashboard {
 				localEvents: this.#localEvents,
 			},
 			gmail: this.#gmail,
-			files: { worktrees: this.#worktrees, terminals: this.terminals },
+			files: { worktrees: this.#worktrees, terminals: this.terminals, fileDirsOf: files.fileDirsOf },
 			todos: { list: () => this.#todos.value, change: change => void this.#lists.apply("user-todos", change) },
 			pullRequests: {
 				changeMergeQueue: async change => {

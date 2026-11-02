@@ -4,7 +4,7 @@
  * Every read goes through `get` and every write through `write`; each route group takes only the part of {@link RouteEnv} it reads.
  */
 import type { Server } from "bun";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { buildAnalytics, foldSessions, type SessionSummary, withForeignUsage } from "../analytics";
 import { buildContextReport } from "../context-sources";
 import { readDecisions } from "../decisions";
@@ -79,7 +79,7 @@ import { MEDIA_FILE_TYPES } from "../shared/transcript";
 import type { View } from "../shared/sessions";
 import { parseDevServerRequest, parseProcessStop, parseReviewDraftPost, parseView } from "./wire";
 import { SystemLoadReader } from "../system-load";
-import { findMediaFile, readTextFile } from "../local-file";
+import { findMediaFile, firstFile, readTextFile } from "../local-file";
 import type { Terminals } from "../terminals";
 import type { Worktrees } from "../worktrees";
 import { MAX_WORKTREE_BATCH } from "../worktrees-shared";
@@ -171,6 +171,8 @@ export interface SessionRoutesEnv {
 export interface FileRoutesEnv {
 	worktrees: Worktrees;
 	terminals: Terminals;
+	/** Where a relative path in session `sessionId`'s text may start, the most recently used first. */
+	fileDirsOf(sessionId: string): string[];
 }
 
 /** What the todo routes read and write: the Todo page's list. */
@@ -956,19 +958,30 @@ function fileRoutes({ get, media, write }: RouteKit, env: FileRoutesEnv): Routes
 		(err) => (err instanceof UnreadableDocument ? fail(422, err.message) : null),
 	);
 
-	/** `GET /api/file?path=<path>`: a text file that agent text names, by an absolute or `~/` path, for the page's file dialog. */
+	/**
+	 * The path a file route reads: `?path=`, or when that holds no file and `?session=` and `?relative=` say a session's
+	 * text named it relative, the first file `relative` names from a directory that session's bash calls ran in or `cd` into.
+	 */
+	const pathOf = (params: URLSearchParams): Promise<string> => {
+		const path = params.get("path") ?? "";
+		const session = params.get("session");
+		const relative = params.get("relative");
+		return session && relative ? firstFile([path, ...env.fileDirsOf(session).map(dir => resolve(dir, relative))]) : Promise.resolve(path);
+	};
+
+	/** `GET /api/file?path=<path>[&session=<id>&relative=<path as written>]`: a text file that agent text names, by an absolute or `~/` path, for the page's file dialog. */
 	const textFile = get(async (params) => {
-		const read = await readTextFile(params.get("path") ?? "");
+		const read = await readTextFile(await pathOf(params));
 		return read.ok ? Response.json(read.file) : fail(read.status, read.error);
 	});
 
 	/**
-	 * `GET /api/media?path=<path>`: an image or video that agent text names, by an absolute or `~/` path, served as its
+	 * `GET /api/media?path=<path>[&session=<id>&relative=<path as written>]`: an image or video that agent text names, by an absolute or `~/` path, served as its
 	 * extension's type; Bun answers a `Range` request with its part, so a video seeks. Its own sandbox policy keeps an
 	 * SVG opened at this address from running script on the page's origin.
 	 */
 	const mediaFile = media(async (params) => {
-		const found = await findMediaFile(params.get("path") ?? "");
+		const found = await findMediaFile(await pathOf(params));
 		if (!found.ok) return fail(found.status, found.error);
 		return new Response(Bun.file(found.real), {
 			headers: {

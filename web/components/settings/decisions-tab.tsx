@@ -67,7 +67,7 @@ function RecordEntry({ record, records, dir, expanded, onToggle, onOpen }: { rec
 							{record.decisionMakers.length > 0 ? `Decided by ${record.decisionMakers.join(", ")} · ` : ""}
 							<span className="font-mono">{record.name}.md</span>
 						</p>
-						<FileBaseContext.Provider value={dir}>
+						<FileBaseContext.Provider value={{ dir, session: null }}>
 							<div className="text-sm leading-relaxed">
 								<MessageMarkdown text={record.body} />
 							</div>

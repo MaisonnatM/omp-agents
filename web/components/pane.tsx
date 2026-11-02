@@ -13,6 +13,7 @@ import type { ForkPoint } from "../transcript-view";
 import { Conversation, type ConversationHandle } from "./conversation";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { FileBaseContext } from "./file-link";
+import type { FileBase } from "../file-paths";
 import { HeaderControlsContext, useHeaderControls } from "./header-controls";
 import { PastConversation } from "./past-conversation";
 import { RenderBoundary } from "./render-boundary";
@@ -148,10 +149,11 @@ export const ViewConversation = memo(function ViewConversation({ view, focused, 
 		/>
 	);
 
+	const fileBase = useFileBase(view.kind === "past" ? session : (host ?? lastHost));
 	return (
 		<HeaderControlsContext.Provider value={null}>
 			<SubagentLinks.Provider value={links}>
-				<FileBaseContext.Provider value={fileBase(view.kind === "past" ? session : (host ?? lastHost))}>
+				<FileBaseContext.Provider value={fileBase}>
 					<RenderBoundary resetKey={hashForView(view)} actions={headerActions}>
 						{content}
 						{replay && compareOf === hashForView(view) && <ReplayCompareDialog view={view} facts={replay} onClose={() => setCompareOf(null)} />}
@@ -208,5 +210,9 @@ export const Pane = memo(function Pane({
 	);
 });
 
-/** Where the agent's relative paths start: the linked worktree it works in, else its directory. */
-const fileBase = (session: { cwd: string; worktree: string | null } | null | undefined): string | null => session?.worktree ?? session?.cwd ?? null;
+/** Where the agent's relative paths start: the linked worktree it works in, else its directory; the server tries the session's other directories. */
+function useFileBase(session: { sessionId: string; cwd: string; worktree: string | null } | null | undefined): FileBase | null {
+	const dir = session?.worktree ?? session?.cwd ?? null;
+	const id = session?.sessionId ?? null;
+	return useMemo(() => (dir === null ? null : { dir, session: id }), [dir, id]);
+}
