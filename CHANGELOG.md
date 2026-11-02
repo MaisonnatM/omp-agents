@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-02
 
+- /ship now plans before it builds: the agent compares up to three ways to do the work, keeps the best, and posts that plan on the Linear issue.
+- The Ship card shows the new Plan step between Ticket and Implement.
 - You can drag a Bot in the Bots tab onto Pinned, a section, or Other Bots.
 - Fixed: routines no longer start during the few seconds a sleeping Mac wakes on its own for Power Nap; they wait until you wake it, and news that came in overnight starts one run.
 - Fixed: a routine's command no longer counts time the Mac spent asleep toward its 10-minute limit, and when the Mac slept during a run, the routine's message to the Bot says for how long.

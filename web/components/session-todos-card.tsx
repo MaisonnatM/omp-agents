@@ -19,6 +19,7 @@ const SHIP_OPEN_KEY = "omp-agents.todos-card-ship-open";
 
 const STAGE_LABEL: Record<ShipProgress["stage"], string> = {
 	ticket: "Ticket",
+	plan: "Plan",
 	implement: "Implement",
 	draft_pr: "Draft PR",
 	interface_review: "Interface review",

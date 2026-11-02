@@ -16,8 +16,9 @@ export const PROOF_BOX = "- [ ] Browser proof";
 const POLL_MS = 60_000;
 const TURN_REFRESH_MS = 15_000;
 
+// The plan comes before any code, so the implementation follows an approach chosen against its alternatives.
 // The interface review comes before the thermonuclear one, so the code-quality review sees the interface fixes.
-export const STAGES = ["ticket", "implement", "draft_pr", "interface_review", "thermonuclear", "ready_gate", "live", "merged"] as const;
+export const STAGES = ["ticket", "plan", "implement", "draft_pr", "interface_review", "thermonuclear", "ready_gate", "live", "merged"] as const;
 export type Stage = (typeof STAGES)[number];
 export const LIVE_WORK = ["rebase", "fix_comments", "fix_ci"] as const;
 export type LiveWork = (typeof LIVE_WORK)[number];
@@ -52,6 +53,7 @@ const NEEDS_CURRENT_STATUS: readonly string[] = [...STAGES.slice(STAGES.indexOf(
 
 const LABEL: Record<Stage | LiveWork, string> = {
 	ticket: "Ticket",
+	plan: "Plan",
 	implement: "Implement",
 	draft_pr: "Draft PR",
 	interface_review: REVIEWS.interface_review.label,
@@ -65,8 +67,9 @@ const LABEL: Record<Stage | LiveWork, string> = {
 };
 
 const NEXT: Record<Stage, string> = {
-	ticket: "Create or link the Linear issue, then record it with ship_stage({stage: 'implement', issue}).",
-	implement: "Implement and commit on the issue's branch. Do not open a PR in this stage.",
+	ticket: "Create or link the Linear issue, then record it with ship_stage({stage: 'plan', issue}).",
+	plan: "Write how to build the issue with the technical-writing skill. If the issue admits more than one sound approach, run the arena skill on up to three of them and keep the best. Post the chosen plan on the Linear issue, then record ship_stage({stage: 'implement'}).",
+	implement: "Implement the plan and commit on the issue's branch. Do not open a PR in this stage.",
 	draft_pr: "Create a draft with `gt submit --draft` for a Graphite repository, or push and run `gh pr create --draft` otherwise. Include the issue ID in the title and `Fixes <ID>` in the body.",
 	interface_review: `If the status says the ${REVIEWS.interface_review.label} is not needed because \`${REVIEWS.interface_review.pathsFile}\` lists no changed file, record ship_stage({stage: 'thermonuclear'}) and move on. Otherwise wait until the user approves the direction, then spawn \`task\` with \`agent: "interface-reviewer"\` on the PR, apply the findings in a fresh agent, push, then add \`${REVIEWS.interface_review.box}\` to the PR body.`,
 	thermonuclear: `If the status says the ${REVIEWS.thermonuclear.label} is not needed because \`${REVIEWS.thermonuclear.pathsFile}\` lists no changed file, skip the review. Otherwise wait until the user approves the direction, then run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${REVIEWS.thermonuclear.box}\` to the PR body. If the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
@@ -167,8 +170,9 @@ export function renderLines(s: ShipState): string[] {
 	const at = STAGES.indexOf(s.stage);
 	const ref = [s.issue, s.pr ? `PR #${s.pr}${s.prStatus?.draft ? " (draft)" : ""}` : ""].filter(Boolean).join(" · ");
 	const lines = [`ship ${ref || "(no ticket yet)"}`];
-	lines.push(STAGES.slice(0, 4).map((stage, i) => `${i < at || s.stage === "merged" ? "✓" : i === at ? "▶" : "○"} ${LABEL[stage]}`).join("  "));
-	lines.push(STAGES.slice(4).map((stage, i) => `${i + 4 < at || s.stage === "merged" ? "✓" : i + 4 === at ? "▶" : "○"} ${LABEL[stage]}`).join("  "));
+	const reviews = STAGES.indexOf(REVIEW_STAGES[0]);
+	lines.push(STAGES.slice(0, reviews).map((stage, i) => `${i < at || s.stage === "merged" ? "✓" : i === at ? "▶" : "○"} ${LABEL[stage]}`).join("  "));
+	lines.push(STAGES.slice(reviews).map((stage, i) => `${i + reviews < at || s.stage === "merged" ? "✓" : i + reviews === at ? "▶" : "○"} ${LABEL[stage]}`).join("  "));
 	if (s.stage === "live" && s.prStatus) lines.push(`Live: ${liveSummary(s.prStatus)}`);
 	if (s.stage === "live" && s.work) lines.push(`Working on: ${LABEL[s.work]}`);
 	for (const stage of REVIEW_STAGES) {
