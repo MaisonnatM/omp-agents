@@ -8,7 +8,7 @@ import { errorText } from "../../src/json";
 import { blockedByWorkspace, type DictationSettings, processingText } from "../../src/shared/dictation";
 import type { ClientMsg } from "../../src/shared/protocol";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverAnchor, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle } from "@/components/ui/popover";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import { getJson, putJson } from "../api";
 import { useComposerReplacements } from "../composer-drafts";
@@ -166,6 +166,9 @@ export function DictationButton({ dictation }: { dictation: ComposerDictation })
 							size="icon-sm"
 							aria-label="Dictate a prompt"
 							aria-pressed={active}
+							// The popover opens after the settings read, so it hangs from an anchor and its state is set here.
+							aria-haspopup="dialog"
+							aria-expanded={open}
 							// Kept focusable while it transcribes, so the focus stays on the button as the capture ends.
 							aria-disabled={own?.phase === "transcribing" || undefined}
 							disabled={elsewhere || (!connected && !active)}
@@ -184,10 +187,10 @@ export function DictationButton({ dictation }: { dictation: ComposerDictation })
 			<PopoverContent align="end" side="top" className="w-80 space-y-3 p-3">
 				{setup?.phase === "off" && <SetupOff setup={setup} onEnable={enable} onClose={closeSetup} />}
 				{setup?.phase === "enabled" && (
-					<PopoverHeader>
-						<PopoverTitle>Dictation is on</PopoverTitle>
-						<PopoverDescription>Press the microphone again to start. {describe(setup.settings)}</PopoverDescription>
-					</PopoverHeader>
+					<div className="space-y-1">
+						<p className="text-sm font-medium">Dictation is on</p>
+						<p className="text-xs text-muted-foreground">Press the microphone again to start. {describe(setup.settings)}</p>
+					</div>
 				)}
 			</PopoverContent>
 		</Popover>
@@ -215,16 +218,16 @@ function SetupOff({ setup, onEnable, onClose }: { setup: Extract<Setup, { phase:
 	const blocked = blockedByWorkspace(setup.settings);
 	return (
 		<>
-			<PopoverHeader>
-				<PopoverTitle>{blocked ? "Disabled by this workspace" : "Dictation is off"}</PopoverTitle>
-				<PopoverDescription>
+			<div className="space-y-1">
+				<p className="text-sm font-medium">{blocked ? "Disabled by this workspace" : "Dictation is off"}</p>
+				<p className="text-xs text-muted-foreground">
 					{blocked
 						? `${setup.settings.enabledBy === "env" ? "An environment variable" : "This workspace's omp config"} turns dictation off, which your own config cannot change.`
 						: `Your microphone's speech becomes text in this composer, which you review before sending. ${describe(setup.settings)}`}
-				</PopoverDescription>
-			</PopoverHeader>
+				</p>
+			</div>
 			{setup.error !== null && (
-				<p role="alert" className="text-xs text-destructive-foreground">
+				<p role="alert" className="text-xs text-red-600 dark:text-red-400">
 					Could not turn dictation on: {setup.error}
 				</p>
 			)}
@@ -309,7 +312,7 @@ export function DictationRow({ dictation }: { dictation: ComposerDictation }) {
 				return { status: "Transcribing…", detail: own.preview || null, tone: "active", actions: discardButton };
 			case "empty":
 				return {
-					status: "No speech detected. Try again.",
+					status: "No speech detected",
 					detail: null,
 					tone: "muted",
 					actions: (
@@ -336,7 +339,7 @@ export function DictationRow({ dictation }: { dictation: ComposerDictation }) {
 								</Button>
 							)}
 							<Button size="xs" variant="outline" onClick={toggle}>
-								Retry
+								Try again
 							</Button>
 							<Button size="xs" variant="ghost" onClick={dismissDictation}>
 								Dismiss
@@ -351,11 +354,12 @@ export function DictationRow({ dictation }: { dictation: ComposerDictation }) {
 		}
 	})();
 	return (
-		<div className="mb-1 flex items-start gap-2 rounded-lg bg-muted px-2.5 py-1 text-[13px]" onKeyDown={onKeyDown}>
-			{row.tone === "active" && <span aria-hidden className="mt-2 size-2 shrink-0 animate-pulse rounded-full bg-foreground motion-reduce:animate-none" />}
+		// `data-im-queue` keeps the composer from taking a click here, so the error and the preview stay selectable.
+		<div data-im-queue className="mb-1 flex items-start gap-2 rounded-lg bg-muted px-2.5 py-1 text-[13px]" onKeyDown={onKeyDown}>
+			{row.tone === "active" && <span aria-hidden className="mt-2 size-2 shrink-0 rounded-full bg-foreground motion-safe:animate-pulse" />}
 			<div className="min-w-0 flex-1 py-0.5">
 				{/* Only the status is announced: the preview changes with every word. */}
-				<p role="status" aria-live="polite" className={row.tone === "error" ? "text-destructive-foreground" : row.tone === "active" ? "text-foreground" : "text-muted-foreground"}>
+				<p role="status" aria-live="polite" className={row.tone === "error" ? "text-red-600 dark:text-red-400" : row.tone === "active" ? "text-foreground" : "text-muted-foreground"}>
 					{row.status}
 				</p>
 				{row.detail !== null && <p className="line-clamp-3 text-muted-foreground">{row.detail}</p>}
