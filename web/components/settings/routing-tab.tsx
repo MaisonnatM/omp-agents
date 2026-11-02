@@ -9,12 +9,12 @@ import { providerOrg } from "../../labels";
 import { CommandPicker } from "../command-picker";
 import { Model } from "../model-picker";
 import { OrgIcon } from "../org-icon";
-import { type Catalog, EditBar, type Editing, FIELD, LINK, OrderedList, SaveError, Section, useEditor } from "./editor";
+import { type Catalog, EditBar, type Editing, FIELD, LINK, OrderedList, SaveError, Section, useEditor, writeOrReload } from "./editor";
 import { SelectorPicker } from "./selector-picker";
 import { hashForSettings } from "../../routing";
 
 /** Each save answers with the settings as they load afterwards. */
-const saveRouting = (cwd: string | null, edit: RoutingEdit): Promise<OmpSettings> => putJson<OmpSettings>(settingsUrl("/routing", cwd), edit);
+const saveRouting = (editing: Editing, edit: RoutingEdit): Promise<OmpSettings> => writeOrReload(editing, () => putJson<OmpSettings>(settingsUrl("/routing", editing.cwd), edit));
 
 const onOff = (value: boolean | number | string): string => (value ? "On" : "Off");
 const duration = (value: boolean | number | string): string =>
@@ -95,14 +95,13 @@ function RoleRow({ route, editing }: { route: RoleRoute; editing: Editing }) {
 	const editor = useEditor(
 		{ primary: route.primary, fallbacks: route.fallbacks },
 		draft =>
-			saveRouting(editing.cwd, {
+			saveRouting(editing, {
 				kind: "role",
 				role: route.role,
 				...(draft.primary !== null && draft.primary !== route.primary && { primary: draft.primary }),
 				// An unchanged inherited chain stays inherited rather than becoming a copy.
 				...(JSON.stringify(draft.fallbacks) !== JSON.stringify(route.fallbacks) && { fallbacks: draft.fallbacks }),
 			}),
-		editing,
 	);
 	const { draft } = editor;
 	const viewing = editor.state.phase === "viewing";
@@ -140,7 +139,7 @@ function RoleRow({ route, editing }: { route: RoleRoute; editing: Editing }) {
 }
 
 function ModelChainRow({ chain, editing }: { chain: ModelChain; editing: Editing }) {
-	const editor = useEditor(chain.fallbacks, fallbacks => saveRouting(editing.cwd, { kind: "model-chain", key: chain.key, fallbacks }), editing);
+	const editor = useEditor(chain.fallbacks, fallbacks => saveRouting(editing, { kind: "model-chain", key: chain.key, fallbacks }));
 	return (
 		<tr className="border-t border-border align-baseline">
 			<th scope="row" className="py-2 pr-6 text-left font-mono text-xs font-medium">
@@ -185,11 +184,10 @@ function RetrySection({ routing, editing }: { routing: ModelRouting; editing: Ed
 	const editor = useEditor(
 		routing.retry,
 		draft =>
-			saveRouting(editing.cwd, {
+			saveRouting(editing, {
 				kind: "retry",
 				values: Object.fromEntries(Object.entries(draft).filter(([key, value]) => routing.retry[key as keyof RetrySettings] !== value)),
 			}),
-		editing,
 	);
 	const set = (key: keyof RetrySettings, value: boolean | number | string): void => editor.change({ ...editor.draft, [key]: value });
 	return (
@@ -274,7 +272,7 @@ function ProviderPicker({ providers, onPick }: { providers: string[]; onPick: (p
 }
 
 function ProviderOrderSection({ order, editing }: { order: string[]; editing: Editing }) {
-	const editor = useEditor(order, providers => saveRouting(editing.cwd, { kind: "provider-order", providers }), editing);
+	const editor = useEditor(order, providers => saveRouting(editing, { kind: "provider-order", providers }));
 	const { catalog } = editing;
 	const unlisted = catalog.data ? [...catalog.data.byProvider.keys()].filter(provider => !editor.draft.includes(provider)) : [];
 	const row = (provider: string): ReactNode => (

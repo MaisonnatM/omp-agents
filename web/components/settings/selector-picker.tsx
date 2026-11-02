@@ -20,12 +20,11 @@ export function SelectorPicker({ value, catalog, label, labelId, roles = [], dis
 	const choices = list.kind === "ready" ? { kind: "ready" as const, groups: [...groups, ...list.groups] } : groups.length ? { kind: "ready" as const, groups } : list;
 	return (
 		<div className="flex min-w-0 flex-wrap items-center gap-1">
-			{labelId && <span id={valueId} className="sr-only">{valueName}</span>}
+			<span id={valueId} className="sr-only">{valueName}</span>
 			<CommandPicker
-				trigger={<span className="max-w-56 truncate" title={labelId ? model ?? undefined : undefined}>{model ? <Model selector={model} titled={false} /> : "Choose a model"}</span>}
-				ariaLabel={labelId ? undefined : valueName}
-				ariaLabelledby={labelId ? `${labelId} ${valueId}` : undefined}
-				tooltip={labelId ? undefined : model ? `Model for ${label}: ${modelDescription(model)}` : `Choose a model for ${label}`}
+				trigger={<span className="max-w-56 truncate">{model ? <Model selector={model} titled={false} /> : "Choose a model"}</span>}
+				ariaLabelledby={[labelId, valueId].filter(Boolean).join(" ")}
+				tooltip={model ? `Model for ${label}: ${modelDescription(model)}` : `Choose a model for ${label}`}
 				className="min-w-0" disabled={disabled} search={MODEL_LIST.search} width="lg" list={choices} empty={MODEL_LIST.empty}
 			/>
 			{model && (levels.length > 0 || level) && (

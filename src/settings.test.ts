@@ -165,6 +165,8 @@ describe("parseAgentSettingEdit", () => {
 			{ id: "task.agentModelOverrides", entry: "", value: "@slow", expected: null },
 			{ id: "task.agentModelOverrides", entry: "reviewer", value: [], expected: null },
 			{ id: "task.agentModelOverrides", entry: "reviewer", value: ["@slow", ""], expected: null },
+			{ id: "task.agentModelOverrides", entry: "reviewer", value: "@slow", expected: 2 },
+			{ id: "task.agentModelOverrides", entry: "reviewer", reset: true, expected: { nested: "@slow" } },
 		]) expect(() => parseAgentSettingEdit(raw)).toThrow();
 	});
 });
