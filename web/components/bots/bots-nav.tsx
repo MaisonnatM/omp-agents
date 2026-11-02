@@ -25,7 +25,7 @@ const GROUP_ICONS: Record<BotGroup["kind"], LucideIcon> = { pinned: Pin, section
 
 const PINNED: BotPlace = { kind: "pinned" };
 
-const DROP_TARGET = "rounded-lg bg-accent/50 ring-2 ring-ring ring-inset";
+const DROP_TARGET = "rounded-lg bg-primary/5 ring-1 ring-primary/40 ring-inset";
 
 /** The Bot whose row is dragged, and the key of the group under it that would take it. */
 interface BotDrag {
@@ -111,7 +111,7 @@ export function BotsNav({ rows, openId }: BotsNavProps) {
 				{drag && connected && !groups?.some(({ kind }) => kind === "pinned") && (
 					<SidebarGroup {...target(PINNED)}>
 						<SidebarGroupLabel icon={GROUP_ICONS.pinned}>{botGroupLabel(PINNED)}</SidebarGroupLabel>
-						<p className="rounded-md border border-dashed border-border px-2 py-3 text-center text-xs text-muted-foreground">Drop a Bot here to pin it</p>
+						<p className="rounded-md border border-dashed border-primary/50 px-2 py-3 text-center text-xs text-primary">Drop a Bot here to pin it</p>
 					</SidebarGroup>
 				)}
 				{groups === null ? (
