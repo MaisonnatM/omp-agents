@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { parseBotId } from "../src/shared/bots";
+import type { RoutineMessage } from "../src/shared/routine-message";
 import type { Item } from "../src/shared/transcript";
 import { type Block, nextSuggestions, type TranscriptModel, transcriptModel, withEditedPrompt } from "./transcript-view";
 
@@ -266,6 +268,7 @@ describe("a model built from the one before", () => {
 	});
 	const shot: Item = { id: "shot", kind: "tool", name: "browser", summary: "screenshot", status: "ok", agents: [], images: ["/s.png"] };
 	const update: Item = { id: "d", kind: "dashboard", text: "[omp-agents] Project update.", entryId: "e-d" };
+	const tool = (id: string, status: "ok" | "error"): Item => ({ id, kind: "tool", name: "bash", summary: "ls", status, agents: [] });
 
 	test("matches the model built from scratch at every step, keeping settled turns and rows as the same objects", () => {
 		const p1 = prompt("p1", "Fix it");
@@ -286,13 +289,131 @@ describe("a model built from the one before", () => {
 			[[], false],
 		];
 		let model: TranscriptModel | undefined;
+		let shown: Item[] = [];
 		for (const [items, working] of steps) {
 			const before = model;
 			model = transcriptModel(items, working, before);
 			expect(model).toEqual(transcriptModel(items, working));
-			if (before && items[0] === before.items[0] && items.length >= 3 && before.items.length >= 3) {
+			if (before && items[0] === shown[0] && items.length >= 3 && shown.length >= 3) {
 				expect(model.blocks[0]).toBe(before.blocks[0]!);
 				expect(model.blocks[1]).toBe(before.blocks[1]!);
+			}
+			shown = items;
+		}
+	});
+
+	test("matches the model built from scratch around the turns' edges", () => {
+		const early = tool("early", "ok");
+		const late = tool("late", "ok");
+		const p1 = prompt("p1");
+		const r1 = reply("r1", "Done", false);
+		const steps: [Item[], boolean][] = [
+			[[], true],
+			[[], false],
+			[[early], true],
+			[[early, update], true],
+			[[early, update, late], true],
+			[[early, update, late, p1], true],
+			[[early, update, late, p1, r1], false],
+			[[early, { ...update }, late, p1, r1], false],
+			[[early, late, p1, r1], false],
+			[[early, late, p1, reply("r1", "Redone", false)], false],
+			[[p1, r1], false],
+		];
+		let model = transcriptModel([], false);
+		for (const [items, working] of steps) {
+			model = transcriptModel(items, working, model);
+			expect(model).toEqual(transcriptModel(items, working));
+		}
+		expect(ids(transcriptModel([early, update, late, p1], false).blocks)).toEqual(["early", "p1"]);
+	});
+
+	test("matches the model built from scratch through random appends, replacements, removals, and working flips", () => {
+		const message: RoutineMessage = { botId: parseBotId("scout")!, routine: { id: "r", name: "Triage" }, at: 1, triggeredBy: [], sent: { kind: "prompt", prompt: "Check the inbox." } };
+		for (const seed of [1, 2, 3, 4, 5]) {
+			let state = seed;
+			// mulberry32: a small seeded generator, so a failure replays.
+			const random = (): number => {
+				state = (state + 0x6d2b79f5) | 0;
+				let t = Math.imul(state ^ (state >>> 15), 1 | state);
+				t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+				return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+			};
+			const pick = <T,>(options: readonly T[]): T => options[Math.floor(random() * options.length)]!;
+			let next = 0;
+			const item = (): Item => {
+				const id = `i${next++}`;
+				const kind = pick(["user", "user", "routine", "dashboard", "assistant", "assistant", "thinking", "tool", "tool", "notice"] as const);
+				switch (kind) {
+					case "user":
+						return {
+							id,
+							kind: "user",
+							text: pick(["Fix it", "go", "continue", " "]),
+							skill: pick([null, null, "review"]),
+							from: null,
+							entryId: pick([`e-${id}`, `e-${id}`, null]),
+							...(random() < 0.2 ? { images: ["/p.png"] } : {}),
+						};
+					case "routine":
+						return { id, kind: "routine", message, entryId: pick([`e-${id}`, null]) };
+					case "dashboard":
+						return { id, kind: "dashboard", text: "[omp-agents] Project update.", entryId: `e-${id}` };
+					case "assistant":
+						return { id, kind: "assistant", text: pick(["Done", " Fixed. ", "", " "]), streaming: random() < 0.3, suggestions: [] };
+					case "thinking":
+						return { id, kind: "thinking", text: "hmm", streaming: false };
+					case "tool":
+						return {
+							id,
+							kind: "tool",
+							name: pick(["bash", "todo", "browser"]),
+							summary: "ls",
+							status: pick(["ok", "error", "running"]),
+							agents: [],
+							...(random() < 0.2 ? { images: ["/s.png"] } : {}),
+							...(random() < 0.2 ? { todos: [{ name: "Work", tasks: [{ content: id, status: "pending" as const }] }] } : {}),
+						};
+					case "notice":
+						return { id, kind: "notice", level: "info", text: "Compacted" };
+					default: {
+						const never: never = kind;
+						throw new Error(`unknown kind ${never}`);
+					}
+				}
+			};
+			let items: Item[] = [];
+			let working = false;
+			let model = transcriptModel(items, working);
+			for (let step = 0; step < 400; step++) {
+				const at = Math.floor(random() * items.length);
+				const change = pick(["append", "append", "append", "replace", "edit", "remove", "work", "reset"] as const);
+				switch (change) {
+					case "append":
+						items = [...items, ...Array.from({ length: 1 + Math.floor(random() * 3) }, item)];
+						break;
+					case "replace":
+						if (items.length > 0) items = items.with(at, item());
+						break;
+					case "edit":
+						if (items.length > 0) items = items.with(at, { ...items[at]! });
+						break;
+					case "remove":
+						if (items.length > 0) items = items.toSpliced(at, 1);
+						break;
+					case "work":
+						working = !working;
+						break;
+					case "reset":
+						if (random() < 0.2) items = [];
+						break;
+					default: {
+						const never: never = change;
+						throw new Error(`unknown change ${never}`);
+					}
+				}
+				model = transcriptModel(items, working, model);
+				expect(model).toEqual(transcriptModel(items, working));
 			}
 		}
 	});
@@ -310,7 +431,6 @@ describe("a model built from the one before", () => {
 		expect(done.outline[0]).toBe(first.outline[0]!);
 		expect(done.outline[1]).not.toBe(first.outline[1]);
 		expect(done.outline[1]!.reply).toEqual({ id: "r2", text: "Working" });
-		expect(done.prompts).toBe(2);
 		expect(done.todos).toEqual([{ name: "Work", tasks: [{ content: "Plan", status: "in_progress" }] }]);
 	});
 });

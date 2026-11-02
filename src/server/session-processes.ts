@@ -105,11 +105,13 @@ export class SessionProcessWatch {
 		await this.#lane.run(() => this.#fresh());
 	}
 
-	/** Every live session's processes, from a sample under {@link LIST_REUSE_MS} old, in roster order. */
+	/** Every live session's processes, from the last sample if it started under {@link LIST_REUSE_MS} before this call, in roster order. */
 	list(): Promise<LiveSessionProcesses[]> {
+		// Asked before the lane, so a slow sample that started after this call, or just before it, answers every list queued behind it.
+		const asked = this.#deps.now();
 		return this.#lane.run(async () => {
 			const last = this.#last;
-			return answerOf(last && this.#deps.now() - last.at < LIST_REUSE_MS ? last.sample : await this.#fresh());
+			return answerOf(last && last.at > asked - LIST_REUSE_MS ? last.sample : await this.#fresh());
 		});
 	}
 

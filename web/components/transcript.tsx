@@ -169,6 +169,9 @@ export const SubagentLinks = createContext<{
 	onCancel: ((view: LiveView & { agentId: string }) => Promise<void>) | null;
 } | null>(null);
 
+/** How long a resize of the transcript's lane rests before its rows lay out again at the new width. */
+const RESIZE_REST_MS = 150;
+
 /** Opens the transcript's image viewer at image `at` of tool item `id`; outside a `Transcript` it does nothing. */
 const OpenToolImage = createContext<(id: string, at: number) => void>(() => {});
 
@@ -345,18 +348,27 @@ function ToolChips({ names, chips }: { names: string[]; chips: ToolChipLabels })
 
 /**
  * One row of the transcript. A settled row, any row but the last, skips its layout and paint while it is off screen,
- * once the whole transcript has laid out, so a streamed token lays out what is on screen and not every row above it.
- * Every row remembers its last laid-out size, so a skipped row keeps its height and the scroller, the minimap, and a
- * jump to a message measure the row's own box as before. The inner box reaches 4px past the row, so a focus ring or the
- * chat history's flash at its edge is not clipped by the skip's paint containment.
+ * once the whole transcript has laid out and the row itself has laid out once, so a streamed token lays out what is on
+ * screen and not every row above it, and a row that arrives off screen, such as with a loaded history, still remembers
+ * its real height first. Every row remembers its last laid-out size, so a skipped row keeps its height and the scroller,
+ * the minimap, and a jump to a message measure the row's own box as before. The inner box reaches 4px past the row, so a
+ * focus ring or the chat history's flash at its edge is not clipped by the skip's paint containment.
  */
 function Row({ messageId, settled, className, children }: { messageId: string; settled: boolean; className?: string; children: ReactNode }) {
+	// The second frame comes after the browser laid out the row in the first one.
+	const [seen, setSeen] = useState(false);
+	useEffect(() => {
+		let frame = requestAnimationFrame(() => {
+			frame = requestAnimationFrame(() => setSeen(true));
+		});
+		return () => cancelAnimationFrame(frame);
+	}, []);
 	return (
 		<MessageScrollerItem messageId={messageId}>
 			<div
 				className={cn(
 					"-m-1 flex flex-col p-1 [contain-intrinsic-block-size:auto_6rem]",
-					settled && "group-data-[laid-out]/transcript:[content-visibility:auto]",
+					settled && seen && "group-data-[laid-out]/transcript:[content-visibility:auto]",
 					className,
 				)}
 			>
@@ -613,6 +625,8 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	// Settled rows skip layout off screen only once every row has laid out, so each remembers its real height. The
 	// second frame comes after the browser laid out the first one. Anything that changes rows' heights while off screen,
 	// another view, tools expanded or hidden, thinking hidden, or the lane's width, lays every row out in full again first.
+	// The lane's first width counts at once; a new one counts once a resize rests, so a drag does not lay every row out on
+	// each frame of it.
 	const expanded = useContext(ToolsExpanded);
 	const { hideTools, hideThinking } = useContext(ActivityVisibility);
 	const [laneWidth, setLaneWidth] = useState(0);
@@ -620,9 +634,18 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	useEffect(() => {
 		const lane = laneRef.current;
 		if (!lane) return;
-		const observer = new ResizeObserver(([entry]) => setLaneWidth(Math.round(entry?.contentRect.width ?? 0)));
+		let timer: Timer | undefined;
+		const observer = new ResizeObserver(([entry]) => {
+			const width = Math.round(entry?.contentRect.width ?? 0);
+			setLaneWidth(current => (current === 0 ? width : current));
+			clearTimeout(timer);
+			timer = setTimeout(() => setLaneWidth(width), RESIZE_REST_MS);
+		});
 		observer.observe(lane);
-		return () => observer.disconnect();
+		return () => {
+			observer.disconnect();
+			clearTimeout(timer);
+		};
 	}, []);
 	const layoutKey = `${hashForView(view)}|${expanded}|${hideTools}|${hideThinking}|${laneWidth}`;
 	const hasRows = blocks.length > 0;

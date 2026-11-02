@@ -135,13 +135,12 @@ function placeOf(dir: string): Place | null {
 interface Checkout {
 	top: string;
 	gitDir: string;
+	commonDir: string;
 	/** The repository's main checkout, not a linked worktree. */
 	main: boolean;
 	graphite: boolean;
 	/** `refs/heads/<branch>`, or the commit a detached HEAD points at. */
 	head: string;
-	/** The default branch {@link defaultBranch} found when `main` has it checked out, else `null`. */
-	defaultBranch: string | null;
 }
 
 /** The checkout `path` is in, or `null` for a path outside git or in an isolated subagent's clone. */
@@ -159,10 +158,10 @@ function checkoutAt(path: string): Checkout | null {
 	return {
 		top,
 		gitDir,
+		commonDir,
 		main,
 		graphite: existsSync(join(commonDir, ".graphite_repo_config")),
 		head,
-		defaultBranch: main ? defaultBranch(commonDir, head) : null,
 	};
 }
 
@@ -182,13 +181,15 @@ function refFile(gitDir: string, name: string): string | null {
 /** `refs/heads/<branch>`, the commit a detached HEAD points at, or `""` when `gitDir` is no longer a checkout's. Read from the file, as git would, without starting it. */
 const headOf = (gitDir: string) => refFile(gitDir, "HEAD") ?? (git(gitDir, ["symbolic-ref", "--quiet", "HEAD"]) || git(gitDir, ["rev-parse", "HEAD"]));
 
-/** `head` when it is the default branch, from `origin/HEAD`, else `main` or `master`, or `null` for any other branch. */
-function defaultBranch(commonDir: string, head: string): string | null {
-	const branch = head.replace(/^refs\/heads\//, "");
-	const remote = existsSync(join(commonDir, "reftable"))
-		? git(commonDir, ["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"])
-		: (refFile(commonDir, "refs/remotes/origin/HEAD") ?? "");
-	const originHead = remote.replace(/^refs\/remotes\/origin\//, "");
+/** The default branch when the main checkout `c` has it checked out, from `origin/HEAD`, else `main` or `master`; `null` for a linked worktree or any other branch. Only edits ask, so a bash call reads no ref. */
+function defaultBranchOf(c: Checkout): string | null {
+	if (!c.main) return null;
+	const branch = c.head.replace(/^refs\/heads\//, "");
+	const remote = existsSync(join(c.commonDir, "reftable"))
+		? git(c.commonDir, ["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"])
+		: (refFile(c.commonDir, "refs/remotes/origin/HEAD") ?? "");
+	// An `origin/HEAD` that holds a commit rather than a branch names no default, as `symbolic-ref` would fail on it.
+	const originHead = remote.startsWith("refs/remotes/origin/") ? remote.slice(20) : "";
 	return (originHead ? [originHead] : ["main", "master"]).includes(branch) ? branch : null;
 }
 
@@ -235,7 +236,7 @@ function guard(c: Checkout, kind: Kind, what: string, ctx: ExtensionContext): st
 			"Changes to this checkout stay blocked until a switch succeeds, however often you retry.",
 		].join(" ");
 	}
-	const branch = kind === "edit" ? c.defaultBranch : null;
+	const branch = kind === "edit" ? defaultBranchOf(c) : null;
 	if (branch) {
 		return [
 			`${c.top} is the repository's main checkout, on its default branch \`${branch}\`.`,
@@ -330,7 +331,7 @@ export default function worktreeGuard(pi: ExtensionAPI) {
 				if (misplaced) return { block: true, reason: misplaced };
 				if (event.toolName === "read") continue;
 				// `git check-ignore` names an ignored path and stays silent for any other, including a tracked file an ignore rule matches.
-				if (c?.defaultBranch && git(c.top, ["check-ignore", "--", file]) !== "") ignored.push(file);
+				if (c && defaultBranchOf(c) && git(c.top, ["check-ignore", "--", file]) !== "") ignored.push(file);
 				else touch(c, "edit", `This ${event.toolName} of ${path}`);
 			}
 		} else if (event.toolName === "bash" && typeof input.command === "string") {

@@ -27,35 +27,27 @@ const sameBlock = (a: Block, b: Block): boolean =>
 	a.kind === "item" ? b.kind === "item" && a.item === b.item : b.kind === "activity" && a.entries.length === b.entries.length && a.entries.every((entry, i) => entry === b.entries[i]);
 
 /**
- * The blocks of `items` from index `from`, without the prompts the dashboard sent, each with the index of its first
- * item. A block of `previous` whose items are the same objects comes back as the same object, so a row of an unchanged
- * message or tool group, memoized on its block, skips the render that a streamed token starts.
+ * The blocks of the items from `start` to `end`, without the prompts the dashboard sent. A block of `previous` whose
+ * items are the same objects comes back as the same object, so a row of an unchanged message or tool group, memoized on
+ * its block, skips the render that a streamed token starts.
  */
-function blocksFrom(items: readonly Item[], from: number, previous: readonly Block[]): { blocks: Block[]; starts: number[] } {
+function blocksOf(items: readonly Item[], start: number, end: number, previous: readonly Block[]): Block[] {
 	const blocks: Block[] = [];
-	const starts: number[] = [];
-	for (let at = from; at < items.length; at++) {
+	for (let at = start; at < end; at++) {
 		const item = items[at]!;
 		if (item.kind === "dashboard") continue;
 		const last = blocks.at(-1);
 		if (item.kind === "tool" || item.kind === "thinking") {
-			if (last?.kind === "activity") {
-				last.entries.push(item);
-				continue;
-			}
-			blocks.push({ kind: "activity", id: item.id, entries: [item] });
+			if (last?.kind === "activity") last.entries.push(item);
+			else blocks.push({ kind: "activity", id: item.id, entries: [item] });
 		} else blocks.push({ kind: "item", item });
-		starts.push(at);
 	}
-	if (previous.length === 0) return { blocks, starts };
+	if (previous.length === 0) return blocks;
 	const before = new Map(previous.map(block => [blockKey(block), block]));
-	return {
-		blocks: blocks.map(block => {
-			const kept = before.get(blockKey(block));
-			return kept && sameBlock(kept, block) ? kept : block;
-		}),
-		starts,
-	};
+	return blocks.map(block => {
+		const kept = before.get(blockKey(block));
+		return kept && sameBlock(kept, block) ? kept : block;
+	});
 }
 
 /** Keeps the prompt being edited at its original position until its resend settles, even after a transcript reset. */
@@ -150,8 +142,6 @@ type TurnHead = Pick<OutlineTurn, "id" | "prompt" | "skill" | "routine" | "nudge
  * its items in the turn before.
  */
 interface Segment {
-	/** The index of its first item, its prompt when it opens with one. */
-	start: number;
 	opener: Opener | null;
 	/** What its outline turn shows of its prompt; `null` without one, or for a prompt the dashboard sent. */
 	head: TurnHead | null;
@@ -162,10 +152,21 @@ interface Segment {
 	tools: number;
 	failed: number;
 	images: ToolImage[];
-	/** The user's prompts up to and including this segment. */
-	prompts: number;
 	/** The agent's todo list as its latest successful `todo` call up to and including this segment left it. */
-	todos: TodoPhase[];
+	todos: readonly TodoPhase[];
+}
+
+/**
+ * The items of one outline turn, from a prompt the user or a routine sent up to the next such prompt, or the items before
+ * the first one, which make no turn. Its segments split it at the prompts the dashboard sent. No activity group crosses
+ * from one region into the next, since the prompt that opens a region is a block of its own.
+ */
+interface Region {
+	/** The index of its first item. */
+	start: number;
+	segments: readonly Segment[];
+	blocks: readonly Block[];
+	turn: OutlineTurn | null;
 }
 
 /**
@@ -174,8 +175,6 @@ interface Segment {
  * the whole transcript.
  */
 export interface TranscriptModel {
-	items: readonly Item[];
-	working: boolean;
 	blocks: readonly Block[];
 	/**
 	 * Fork points by item id. A prompt forks at itself. A turn's last reply forks at the next prompt, keeping the whole
@@ -190,41 +189,60 @@ export interface TranscriptModel {
 	replies: ReadonlySet<string>;
 	/** Each turn in transcript order. A turn still running has no reply until it ends. */
 	outline: readonly OutlineTurn[];
-	/** How many prompts the user sent. */
-	prompts: number;
 	/** Every image the tool calls returned, in reading order, each captioned with its tool and what the call said it did. */
 	images: readonly ToolImage[];
 	/** The agent's todo list as its latest successful `todo` call left it; empty before its first one. */
-	todos: TodoPhase[];
+	todos: readonly TodoPhase[];
 	/**
 	 * The prompt a double-click edits: the last one, once omp has saved it. omp resends an edit as text alone, so a skill
 	 * prompt or one that carried images or files is not editable. None after a prompt a routine or the dashboard sent,
 	 * which an edit of the user's prompt before it would drop.
 	 */
 	editable: { itemId: string; entryId: string } | null;
-	/** What the next model starts from: the segments, the first item of each block, and the segment each outline turn opens. */
-	segments: readonly Segment[];
-	blockStarts: readonly number[];
-	turnStarts: readonly number[];
 }
 
-const NO_TODOS: TodoPhase[] = [];
+/** What each model was built from, which the next one starts from; kept off the model, so its readers see none of it. */
+const builtFrom = new WeakMap<TranscriptModel, { items: readonly Item[]; working: boolean; regions: readonly Region[] }>();
 
-export const EMPTY_TRANSCRIPT: TranscriptModel = {
-	items: [],
-	working: false,
-	blocks: [],
-	forks: new Map(),
-	replies: new Set(),
-	outline: [],
-	prompts: 0,
-	images: [],
-	todos: NO_TODOS,
-	editable: null,
-	segments: [],
-	blockStarts: [],
-	turnStarts: [],
+const NO_TODOS: readonly TodoPhase[] = [];
+
+export const EMPTY_TRANSCRIPT: TranscriptModel = { blocks: [], forks: new Map(), replies: new Set(), outline: [], images: [], todos: NO_TODOS, editable: null };
+builtFrom.set(EMPTY_TRANSCRIPT, { items: [], working: false, regions: [] });
+
+/** A comparer for each field of `T`, so a field added to `T` does not compile until it says how it compares. */
+type FieldEqual<T> = { [K in keyof T]-?: (a: T[K], b: T[K]) => boolean };
+
+function equalBy<T extends object>(fields: FieldEqual<T>, a: T, b: T): boolean {
+	for (const key in fields) if (!fields[key](a[key], b[key])) return false;
+	return true;
+}
+
+const same = Object.is;
+
+const TURN_EQUAL: FieldEqual<OutlineTurn> = {
+	id: same,
+	prompt: same,
+	skill: same,
+	// A turn keeps the head the model before built for the same prompt, so its routine is the same object.
+	routine: same,
+	nudge: same,
+	reply: (a, b) => a?.id === b?.id && a?.text === b?.text,
+	tools: same,
+	failed: same,
+	running: same,
 };
+
+const IMAGE_EQUAL: FieldEqual<ToolImage> = { id: same, at: same, src: same, caption: same };
+
+const FORK_EQUAL: FieldEqual<ForkPoint> = { entryId: same, prefill: same };
+
+/** Whether two segments add the same fork points, reply, and images to the model. */
+const sameFacts = (a: Segment, b: Segment): boolean =>
+	a.reply?.id === b.reply?.id &&
+	a.forks.length === b.forks.length &&
+	a.forks.every(([id, point], i) => id === b.forks[i]![0] && equalBy(FORK_EQUAL, point, b.forks[i]![1])) &&
+	a.images.length === b.images.length &&
+	a.images.every((image, i) => equalBy(IMAGE_EQUAL, image, b.images[i]!));
 
 function headOf(opener: Opener): TurnHead | null {
 	if (opener.kind === "routine") {
@@ -243,16 +261,15 @@ function headOf(opener: Opener): TurnHead | null {
 /**
  * The segment of `items` from `start` to `end`. `next` is the prompt after it; `ends` marks the last segment while the
  * transcript works. `previous` is the segment at its place in the model before, whose head it keeps for the same prompt;
- * `before` is the segment just before it, whose counts it carries on.
+ * `todos` is the todo list the segments before it left.
  */
-function segmentOf(items: readonly Item[], start: number, end: number, next: Item | undefined, ends: boolean, previous: Segment | undefined, before: Segment | undefined): Segment {
+function segmentOf(items: readonly Item[], start: number, end: number, next: Item | undefined, ends: boolean, previous: Segment | undefined, todos: readonly TodoPhase[]): Segment {
 	const first = items[start]!;
 	const opener = opensTurn(first) ? first : null;
 	let reply: AssistantItem | null = null;
 	let lastAssistant: AssistantItem | null = null;
 	let tools = 0;
 	let failed = 0;
-	let todos = before?.todos ?? NO_TODOS;
 	const images: ToolImage[] = [];
 	for (let at = start; at < end; at++) {
 		const item = items[at]!;
@@ -274,7 +291,6 @@ function segmentOf(items: readonly Item[], start: number, end: number, next: Ite
 	const nextEntry = next && opensTurn(next) ? next.entryId : null;
 	if (lastAssistant && nextEntry && !lastAssistant.streaming) forks.push([lastAssistant.id, { entryId: nextEntry, prefill: false }]);
 	return {
-		start,
 		opener,
 		head: opener && previous?.opener === opener ? previous.head : opener && headOf(opener),
 		reply: ends ? null : reply,
@@ -282,24 +298,52 @@ function segmentOf(items: readonly Item[], start: number, end: number, next: Ite
 		tools,
 		failed,
 		images,
-		prompts: (before?.prompts ?? 0) + (opener?.kind === "user" ? 1 : 0),
 		todos,
 	};
 }
 
-/** The index of the last of `count` ascending numbers, read through `at`, that is at most `value`; -1 when none is. */
-function lastAtMost(count: number, at: (index: number) => number, value: number): number {
-	let low = 0;
-	let high = count - 1;
-	let found = -1;
-	while (low <= high) {
-		const mid = (low + high) >> 1;
-		if (at(mid) <= value) {
-			found = mid;
-			low = mid + 1;
-		} else high = mid - 1;
+/**
+ * The region of `items` from `start` to `end`; `ends` marks the last one while the transcript works. `previous` is the
+ * region at its place in the model before, whose segments, blocks, and turn it keeps where they are unchanged; `before`
+ * is the region just before it.
+ */
+function regionOf(items: readonly Item[], start: number, end: number, ends: boolean, previous: Region | undefined, before: Region | undefined): Region {
+	const segments: Segment[] = [];
+	for (let from = start; from < end; ) {
+		let to = from + 1;
+		while (to < end && items[to]!.kind !== "dashboard") to++;
+		const todos = segments.at(-1)?.todos ?? before?.segments.at(-1)?.todos ?? NO_TODOS;
+		segments.push(segmentOf(items, from, to, items[to], ends && to === end, previous?.segments[segments.length], todos));
+		from = to;
 	}
-	return found;
+	const head = segments[0]!.head;
+	let turn: OutlineTurn | null = null;
+	if (head) {
+		// The prompts the dashboard sent count in the turn: their tools add to it, and the latest reply is its reply.
+		const reply = segments.findLast(segment => segment.reply)?.reply;
+		turn = {
+			...head,
+			nudge: before?.turn ? head.nudge : null,
+			reply: reply ? { id: reply.id, text: reply.text.trim() } : null,
+			tools: segments.reduce((sum, segment) => sum + segment.tools, 0),
+			failed: segments.reduce((sum, segment) => sum + segment.failed, 0),
+			running: ends,
+		};
+		if (previous?.turn && equalBy(TURN_EQUAL, previous.turn, turn)) turn = previous.turn;
+	}
+	return { start, segments, blocks: blocksOf(items, start, end, previous?.blocks ?? []), turn };
+}
+
+/** The index of the region holding item `at`: the last one that starts at or before it. The first starts at 0. */
+function regionHolding(regions: readonly Region[], at: number): number {
+	let low = 0;
+	let high = regions.length - 1;
+	while (low < high) {
+		const mid = (low + high + 1) >> 1;
+		if (regions[mid]!.start <= at) low = mid;
+		else high = mid - 1;
+	}
+	return low;
 }
 
 /** How many leading items `a` and `b` share as the same objects. */
@@ -310,97 +354,51 @@ function sharedPrefix(a: readonly Item[], b: readonly Item[]): number {
 	return at;
 }
 
-const sameTurn = (a: OutlineTurn, b: OutlineTurn): boolean =>
-	a.id === b.id && a.prompt === b.prompt && a.skill === b.skill && a.routine === b.routine && a.nudge === b.nudge &&
-	a.tools === b.tools && a.failed === b.failed && a.running === b.running && a.reply?.id === b.reply?.id && a.reply?.text === b.reply?.text;
-
-const sameImage = (a: ToolImage, b: ToolImage): boolean => a.id === b.id && a.at === b.at && a.src === b.src && a.caption === b.caption;
-
-/** `next`, or `previous` when it holds the same entries, so a reader memoized on it skips a token that left it alone. */
-function keepSame<T>(previous: readonly T[], next: readonly T[], same: (a: T, b: T) => boolean): readonly T[] {
-	return previous.length === next.length && next.every((entry, i) => same(previous[i]!, entry)) ? previous : next;
+/** `previous` with its entries from `kept` on replaced by `fresh`; `previous` itself when they are the same objects. */
+function withTail<T>(previous: readonly T[], kept: number, fresh: readonly T[]): readonly T[] {
+	return fresh.length === previous.length - kept && fresh.every((entry, i) => entry === previous[kept + i]) ? previous : [...previous.slice(0, kept), ...fresh];
 }
 
 /**
  * The model of `items` while the transcript works or not, built from `previous`, the model of the same view's items
- * before: what lies before the turn holding the first changed item comes from it as it is, the same objects included.
+ * before: the turns before the one holding the first changed item come from it as they are, the same objects included.
  */
 export function transcriptModel(items: readonly Item[], working: boolean, previous: TranscriptModel = EMPTY_TRANSCRIPT): TranscriptModel {
-	if (items === previous.items && working === previous.working) return previous;
-	const same = items === previous.items ? items.length : sharedPrefix(previous.items, items);
+	const was = builtFrom.get(previous)!;
+	if (items === was.items && working === was.working) return previous;
+	const unchanged = items === was.items ? items.length : sharedPrefix(was.items, items);
 
-	// The segment holding the last unchanged item is built again, with every one after it: it may have grown, and the last
-	// one's reply follows `working`. The ones before it, and the prompt that ends each, are unchanged.
-	const kept = same === 0 ? 0 : Math.max(0, lastAtMost(previous.segments.length, i => previous.segments[i]!.start, same - 1));
-	const from = same === 0 ? 0 : previous.segments[kept]!.start;
-	const segments = previous.segments.slice(0, kept);
-	const starts: number[] = [];
-	for (let at = from; at < items.length; at++) if (at === from || opensTurn(items[at]!)) starts.push(at);
-	starts.forEach((start, i) => {
-		const end = starts[i + 1] ?? items.length;
-		segments.push(segmentOf(items, start, end, items[end], working && end === items.length, previous.segments[segments.length], segments.at(-1)));
-	});
-
-	// A block that starts before the first changed item and is followed by another one is unchanged.
-	let blocks = previous.blocks;
-	let blockStarts = previous.blockStarts;
-	if (items !== previous.items) {
-		const last = same === 0 ? -1 : lastAtMost(previous.blockStarts.length, i => previous.blockStarts[i]!, same - 1);
-		const keep = Math.max(last, 0);
-		const tail = blocksFrom(items, last < 0 ? 0 : previous.blockStarts[last]!, previous.blocks.slice(keep));
-		blocks = [...previous.blocks.slice(0, keep), ...tail.blocks];
-		blockStarts = [...previous.blockStarts.slice(0, keep), ...tail.starts];
+	// The region holding the last unchanged item is built again, with every one after it: it may have grown, and the last
+	// one's reply and running state follow `working`. The ones before it, and the prompt that ends each, are unchanged.
+	const from = unchanged === 0 ? 0 : regionHolding(was.regions, unchanged - 1);
+	const regions = was.regions.slice(0, from);
+	for (let start = was.regions[from]?.start ?? 0; start < items.length; ) {
+		let end = start + 1;
+		while (end < items.length && items[end]!.kind !== "user" && items[end]!.kind !== "routine") end++;
+		regions.push(regionOf(items, start, end, working && end === items.length, was.regions[regions.length], regions.at(-1)));
+		start = end;
 	}
+	const fresh = regions.slice(from);
+	const stale = was.regions.slice(from);
 
-	// The outline turns before the one holding the first rebuilt segment are unchanged.
-	const turn = lastAtMost(previous.turnStarts.length, i => previous.turnStarts[i]!, kept);
-	const keepTurns = Math.max(turn, 0);
-	const turns = previous.outline.slice(0, keepTurns);
-	const turnStarts = previous.turnStarts.slice(0, keepTurns);
-	let open: OutlineTurn | null = null;
-	for (let s = turn < 0 ? kept : previous.turnStarts[turn]!; s < segments.length; s++) {
-		const segment = segments[s]!;
-		if (segment.head) {
-			open = { ...segment.head, nudge: turns.length > 0 ? segment.head.nudge : null, reply: null, tools: 0, failed: 0, running: false };
-			turns.push(open);
-			turnStarts.push(s);
-		}
-		if (!open) continue;
-		open.tools += segment.tools;
-		open.failed += segment.failed;
-		if (segment.reply) open.reply = { id: segment.reply.id, text: segment.reply.text.trim() };
-	}
-	if (open && working) open.running = true;
-	const outline = keepSame(previous.outline, turns.map((entry, i) => (i >= keepTurns && previous.outline[i] && sameTurn(previous.outline[i]!, entry) ? previous.outline[i]! : entry)), Object.is);
+	// The fork points, replies, and images stay the same objects while the rebuilt segments add the same ones.
+	const freshSegments = fresh.flatMap(region => region.segments);
+	const staleSegments = stale.flatMap(region => region.segments);
+	const factsKept = freshSegments.length === staleSegments.length && freshSegments.every((segment, i) => sameFacts(segment, staleSegments[i]!));
+	const segments = factsKept ? [] : regions.flatMap(region => region.segments);
 
-	const forks = new Map<string, ForkPoint>();
-	const replies = new Set<string>();
-	for (const segment of segments) {
-		for (const [id, point] of segment.forks) forks.set(id, point);
-		if (segment.reply) replies.add(segment.reply.id);
-	}
-	const sameForks = forks.size === previous.forks.size && [...forks].every(([id, point]) => {
-		const was = previous.forks.get(id);
-		return was?.entryId === point.entryId && was.prefill === point.prefill;
-	});
-	const sameReplies = replies.size === previous.replies.size && [...replies].every(id => previous.replies.has(id));
-
-	const last = segments.at(-1);
+	const last = regions.at(-1)?.segments.at(-1);
 	const prompt = last?.opener;
 	const editable = prompt?.kind === "user" && prompt.entryId && !prompt.skill && !prompt.images?.length && !prompt.files?.length ? { itemId: prompt.id, entryId: prompt.entryId } : null;
-	return {
-		items,
-		working,
-		blocks,
-		forks: sameForks ? previous.forks : forks,
-		replies: sameReplies ? previous.replies : replies,
-		outline,
-		prompts: last?.prompts ?? 0,
-		images: keepSame(previous.images, segments.flatMap(segment => segment.images), sameImage),
+	const model: TranscriptModel = {
+		blocks: withTail(previous.blocks, previous.blocks.length - stale.reduce((sum, region) => sum + region.blocks.length, 0), fresh.flatMap(region => region.blocks)),
+		forks: factsKept ? previous.forks : new Map(segments.flatMap(segment => segment.forks)),
+		replies: factsKept ? previous.replies : new Set(segments.flatMap(segment => (segment.reply ? [segment.reply.id] : []))),
+		outline: withTail(previous.outline, previous.outline.length - stale.filter(region => region.turn).length, fresh.flatMap(region => (region.turn ? [region.turn] : []))),
+		images: factsKept ? previous.images : segments.flatMap(segment => segment.images),
 		todos: last?.todos ?? NO_TODOS,
 		editable: editable && previous.editable?.itemId === editable.itemId && previous.editable.entryId === editable.entryId ? previous.editable : editable,
-		segments,
-		blockStarts,
-		turnStarts,
 	};
+	builtFrom.set(model, { items, working, regions });
+	return model;
 }

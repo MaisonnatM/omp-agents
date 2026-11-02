@@ -89,9 +89,12 @@ export function parseCwds(text: string): Map<number, string> {
 	return cwds;
 }
 
+/** The environment `ps` runs in: this process's, with {@link PS_ENV}'s fixed locale. */
+const psEnv = (): Record<string, string | undefined> => ({ ...process.env, ...PS_ENV });
+
 /** Every process now; `null` when `ps` failed. Only the keeper's {@link ProcessCensus.note} reads it this way, as it must note before omp exits. */
 function processTable(): ProcessTable | null {
-	const ps = Bun.spawnSync(PS_ARGV, { env: { ...process.env, ...PS_ENV } });
+	const ps = Bun.spawnSync(PS_ARGV, { env: psEnv() });
 	return ps.success ? parsePs(ps.stdout.toString()) : null;
 }
 
@@ -101,7 +104,7 @@ const PS_TIMEOUT_MS = 10_000;
 /** Every process now, read without blocking the event loop; `null` when `ps` failed or ran past {@link PS_TIMEOUT_MS}. */
 export async function readProcessTable(): Promise<ProcessTable | null> {
 	try {
-		const ps = Bun.spawn(PS_ARGV, { env: { ...process.env, ...PS_ENV }, stdout: "pipe", stderr: "ignore", timeout: PS_TIMEOUT_MS });
+		const ps = Bun.spawn(PS_ARGV, { env: psEnv(), stdout: "pipe", stderr: "ignore", timeout: PS_TIMEOUT_MS });
 		const [text, code] = await Promise.all([new Response(ps.stdout).text(), ps.exited]);
 		return code === 0 ? parsePs(text) : null;
 	} catch {
@@ -163,16 +166,16 @@ function forgetGone(processes: Processes, table: ProcessTable | null): boolean {
 
 /**
  * Stops `processes`: SIGTERM, then SIGKILL after `graceMs` to those `ps` still lists under the start time they had, so
- * a pid that a later process reuses is never signalled. Settles once none runs, or at the grace's end. `read` lists the
- * processes, without blocking unless a caller passes a reader that does.
+ * a pid that a later process reuses is never signalled. Settles once none runs, or at the grace's end. Reads `ps`
+ * without blocking.
  */
-export async function terminate(processes: Processes, graceMs: number, read: () => ProcessTable | null | Promise<ProcessTable | null> = readProcessTable): Promise<void> {
-	let listed = forgetGone(processes, await read());
+export async function terminate(processes: Processes, graceMs: number): Promise<void> {
+	let listed = forgetGone(processes, await readProcessTable());
 	for (const pid of processes.keys()) signal(pid, "SIGTERM");
 	const deadline = Date.now() + graceMs;
 	while ((processes.size > 0 || !listed) && Date.now() < deadline) {
 		await Bun.sleep(50);
-		listed = forgetGone(processes, await read());
+		listed = forgetGone(processes, await readProcessTable());
 	}
 	for (const pid of processes.keys()) signal(pid, "SIGKILL");
 	if (!listed) console.error(`omp-agents: ps failed, so these processes may still run: ${[...processes.keys()].join(" ")}`);

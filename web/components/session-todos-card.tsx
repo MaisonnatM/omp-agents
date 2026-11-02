@@ -195,7 +195,7 @@ function Phase({ phase, label }: { phase: TodoPhase; label: string }) {
 	);
 }
 
-function TodosSection({ phases }: { phases: TodoPhase[] }) {
+function TodosSection({ phases }: { phases: readonly TodoPhase[] }) {
 	const [open, setOpen] = useStoredState(OPEN_KEY, raw => raw === "true");
 	const all = phases.flatMap(phase => phase.tasks);
 	const done = all.filter(isClosed).length;
@@ -290,7 +290,7 @@ function ShipSection({ ship }: { ship: ShipProgress }) {
 
 interface SessionTodosCardProps {
 	/** The agent's todo list as its latest successful `todo` call left it. */
-	phases: TodoPhase[];
+	phases: readonly TodoPhase[];
 	view: View;
 	working: boolean;
 	/** The session whose files, images, and sources the card lists; omitted, it lists none. */

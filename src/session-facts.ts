@@ -241,17 +241,17 @@ export class SessionFactsScan {
 	readonly fileDirs = new Set<string>();
 	/** A candidate line could not be parsed, so its working-directory evidence is incomplete. */
 	unreadableLines = false;
-	/** The replay a session's own file records; `null` for a subagent's transcript, whose replay nothing reads. */
-	readonly replay: ReplayFold | null;
+	/** The fold of the replay a session's own file records, fed every entry the scan reads; `null` for a subagent's transcript, whose replay nothing reads. */
+	readonly #replay: ReplayFold | null;
 	/** The transcript's working directory, from its `session` header. */
 	#cwd: string | null = null;
 	/** The paths its successful `edit` and `write` calls changed, as omp reported them, in first-touch order. */
 	readonly #changed = new Set<string>();
 
-	/** `prompts`: whether the transcript is the session's own, whose user prompts name the work the user asked for. */
-	constructor(prompts: boolean) {
+	/** `prompts`: whether the transcript is the session's own, whose user prompts name the work the user asked for. `replay`: the session's own file's replay fold. */
+	constructor(prompts: boolean, replay: ReplayFold | null = null) {
 		this.#prompts = prompts;
-		this.replay = prompts ? new ReplayFold() : null;
+		this.#replay = replay;
 	}
 
 	/** Every changed file's absolute path, a relative one resolved against the transcript's cwd, in first-touch order. */
@@ -272,7 +272,7 @@ export class SessionFactsScan {
 			return;
 		}
 		if (!isObject(entry)) return;
-		this.replay?.applyEntry(entry);
+		this.#replay?.applyEntry(entry);
 		if (entry.type === "session") {
 			this.#cwd = str(entry.cwd) ?? null;
 			return;
@@ -490,13 +490,13 @@ export interface OwnFileFolds {
 	forget(path: string): void;
 }
 
-/** A transcript's facts, and for a session's own file the other folds of it. `own`: whether it is the session's own file, not a subagent's. */
+/** A transcript's facts, and for a session's own file the other folds of it. */
 class TranscriptFold implements LineFold {
 	readonly scan: SessionFactsScan;
 	readonly #others: readonly LineFold[];
 
-	constructor(own: boolean, others: readonly LineFold[]) {
-		this.scan = new SessionFactsScan(own);
+	constructor(scan: SessionFactsScan, others: readonly LineFold[] = []) {
+		this.scan = scan;
 		this.#others = others;
 	}
 
@@ -506,11 +506,23 @@ class TranscriptFold implements LineFold {
 	}
 }
 
+/** A session's own file: its facts, which its prompts name too, the replay it records, and the other folds of it. */
+class OwnFileFold extends TranscriptFold {
+	readonly replay: ReplayFold;
+
+	constructor(others: readonly LineFold[], replay = new ReplayFold()) {
+		super(new SessionFactsScan(true, replay), others);
+		this.replay = replay;
+	}
+}
+
 interface SessionScan {
 	modifiedAt: number;
 	cwd: string;
-	/** The session file first, then its subagents' files. */
-	transcripts: Map<string, FoldedFile<TranscriptFold>>;
+	/** The session's own file. */
+	own: FoldedFile<OwnFileFold>;
+	/** Its subagents' files, by path. */
+	subagents: Map<string, FoldedFile<TranscriptFold>>;
 	/** Every transcript's refs, in transcript order. */
 	refs: FoundRef[];
 	/** The branch each of `refs`' `gt submit` calls submitted, by its `refKey`, once found. */
@@ -532,7 +544,7 @@ interface SessionScan {
 	worktree: string | null;
 	/** The branch it works on in `worktree`, else in `cwd`, as `SessionFacts.branch` describes it; only `#resolve` writes it, whole, from git's answer, the default branch, and the pull request it heads. */
 	branch: SessionBranch | null;
-	/** The /ship stage and headless mark of its own file as the last refresh reported them: a read outside a refresh, by `changedPathsOf`, leaves them for the next one to report. */
+	/** The /ship stage and headless mark of its own file as the last refresh reported them, which `#scan` compares with. */
 	ship: ShipProgress | null;
 	headless: boolean;
 }
@@ -548,6 +560,9 @@ const linksTicket = (evidence: ReadonlySet<TicketEvidence>, onBranch: boolean): 
 
 /** The directory whose checkout a session works on: its linked worktree, else `cwd`. */
 const workDirOf = (session: SessionScan): string => session.worktree ?? session.cwd;
+
+/** The session's own file first, then its subagents' files. */
+const transcriptsOf = (session: SessionScan): FoldedFile<TranscriptFold>[] => [session.own, ...session.subagents.values()];
 
 const exists = (path: string): Promise<boolean> => access(path).then(() => true, () => false);
 
@@ -688,10 +703,10 @@ export class SessionFactsIndex {
 		const dir = cwd ?? session?.cwd;
 		const workspace = dir === undefined ? null : this.placement.at(dir);
 		if (!session || sessionPath === null) return workspace ? { ...NO_FACTS, workspace } : NO_FACTS;
-		const own = this.#own(sessionPath);
-		const replay = own?.replay?.facts();
+		const own = this.#ownFile(sessionPath)?.fold;
+		const replay = own?.replay.facts();
 		return {
-			pullRequests: session.pullRequests, tickets: session.tickets, ship: own?.ship ?? null, worktree: session.worktree, branch: session.branch,
+			pullRequests: session.pullRequests, tickets: session.tickets, ship: own?.scan.ship ?? null, worktree: session.worktree, branch: session.branch,
 			workspace, ...(replay ? { replay } : {}),
 		};
 	}
@@ -714,14 +729,19 @@ export class SessionFactsIndex {
 	 * which feeds the index's folds of it; a file the index has not scanned yet is read whole and not kept.
 	 */
 	async changedPathsOf(sessionPath: string): Promise<string[]> {
-		const own = this.#sessions.get(sessionPath)?.transcripts.get(sessionPath) ?? new FoldedFile(sessionPath, () => new TranscriptFold(true, []));
+		const own = this.#ownFile(sessionPath) ?? new FoldedFile(sessionPath, () => new TranscriptFold(new SessionFactsScan(false)));
 		await own.read();
 		return own.fold.scan.changedPaths();
 	}
 
+	/** Session `path`'s own file, not its subagents'; `undefined` before its first scan. */
+	#ownFile(path: string): FoldedFile<OwnFileFold> | undefined {
+		return this.#sessions.get(path)?.own;
+	}
+
 	/** The scan of session `path`'s own file, not its subagents'; `undefined` before its first scan. */
 	#own(path: string): SessionFactsScan | undefined {
-		return this.#sessions.get(path)?.transcripts.get(path)?.fold.scan;
+		return this.#ownFile(path)?.fold.scan;
 	}
 
 	/** Resolves once the refreshes asked for so far are done. */
@@ -803,7 +823,7 @@ export class SessionFactsIndex {
 
 	/** Collect every transcript's refs, Linear issues, and finished `gt submit` calls into the session; returns whether one of those finished since. */
 	#gather(session: SessionScan, own: SessionFactsScan): boolean {
-		const scans = [...session.transcripts.values()].map(transcript => transcript.fold.scan);
+		const scans = transcriptsOf(session).map(transcript => transcript.fold.scan);
 		session.refs = scans.flatMap(scan => [...scan.found.values()]);
 		session.named = own.named;
 		session.evidence = new Map();
@@ -885,7 +905,7 @@ export class SessionFactsIndex {
 		// The branch a `gt submit` line named heads the PR it printed until the list or GitHub names another; each line counts once, so a later answer stays.
 		let printed = false;
 		for (const session of touched) {
-			for (const transcript of session.transcripts.values()) {
+			for (const transcript of transcriptsOf(session)) {
 				const { heads } = transcript.fold.scan;
 				for (const [key, pr] of heads) {
 					if (this.#heads.has(key) && !this.#answered.has(key)) continue;
@@ -936,21 +956,23 @@ export class SessionFactsIndex {
 	/**
 	 * Read what session `path` and its subagents appended: whether its /ship stage changed, whether a `gt submit` finished, whether
 	 * its worktree needs asking again, and `writtenAt`, its listed last write, in ms.
+	 * `changedPathsOf` reads the session's own file between refreshes, so each of these compares the scan with what the session
+	 * last reported, kept on its `SessionScan`, never with the scan as it was before this read: a change that read folded first still reports here.
 	 */
 	async #scan({ path, cwd, modifiedAt }: ListedSession): Promise<{ session: SessionScan; changed: boolean; submitted: boolean; moved: boolean; writtenAt: number }> {
 		let session = this.#sessions.get(path);
 		session ??= {
-			modifiedAt: Number.NaN, cwd, transcripts: new Map([[path, new FoldedFile(path, () => new TranscriptFold(true, this.#ownFileFolds.map(folds => folds.start(path))))]]),
+			modifiedAt: Number.NaN, cwd, own: new FoldedFile(path, () => new OwnFileFold(this.#ownFileFolds.map(folds => folds.start(path)))), subagents: new Map(),
 			refs: [], submitted: new Map(), repo: null, named: new Set(), pullRequests: [], evidence: new Map(), tickets: [], submitsFinished: 0, workDirs: [], worktree: null, branch: null,
 			ship: null, headless: false,
 		};
 		this.#sessions.set(path, session);
 		for (const file of await subagentFiles(path)) {
-			if (!session.transcripts.has(file)) session.transcripts.set(file, new FoldedFile(file, () => new TranscriptFold(false, [])));
+			if (!session.subagents.has(file)) session.subagents.set(file, new FoldedFile(file, () => new TranscriptFold(new SessionFactsScan(false))));
 		}
-		const reads = await Promise.all([...session.transcripts.values()].map(transcript => transcript.read()));
+		const reads = await Promise.all(transcriptsOf(session).map(transcript => transcript.read()));
 		if (reads.every(read => read.readable)) session.modifiedAt = modifiedAt;
-		const own = session.transcripts.get(path)!.fold.scan;
+		const own = session.own.fold.scan;
 		const ship = own.ship ?? null;
 		const changed = JSON.stringify(session.ship) !== JSON.stringify(ship) || own.headless !== session.headless;
 		session.ship = ship;
