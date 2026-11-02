@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { putJson, settingsUrl } from "../../api";
+import type { Editable } from "../../editable-read";
 import { FILE_KIND_LABELS, fileGroups, fileName, formatBytes } from "../../labels";
 import { SearchField } from "../search-field";
 import { EditBar, type Editing, RAIL_BUTTON, SaveError, useEditor, writeOrReload } from "./editor";
@@ -31,6 +32,20 @@ function FileContents({ file }: { file: ReadOnlyFile }) {
 	);
 }
 
+/** Where a {@link FileView} saves: `save` sends the edit, `write` sends it in turn with the section's other saves, `reload` re-reads after a conflict. */
+export interface FileSaver<R> {
+	save: (edit: FileEdit) => Promise<R>;
+	write: Editable<R>["write"];
+	reload: () => void;
+}
+
+/** Saving a file omp's settings list, through `PUT /api/settings/file`. */
+export const settingsFiles = (editing: Editing): FileSaver<OmpSettings> => ({
+	save: edit => putJson<OmpSettings>(settingsUrl("/file", editing.cwd), edit),
+	write: editing.write,
+	reload: editing.reload,
+});
+
 function FileFrame({ file, controls, children }: { file: ReadOnlyFile; controls?: ReactNode; children: ReactNode }) {
 	return (
 		<div className="flex min-w-0 flex-col gap-2 self-start md:sticky md:top-6" role="region" aria-label={file.pathDisplay}>
@@ -51,24 +66,23 @@ function FileFrame({ file, controls, children }: { file: ReadOnlyFile; controls?
 	);
 }
 
-/** The same file presentation, with editing available only when its caller supplies an editing contract. */
-export function FileView(props: { file: ReadOnlyFile; readOnly: true } | { file: OmpFile; editing: Editing; readOnly?: false }) {
+/** One file, viewed or edited in place; the right pane of Settings › Files and Workflows, and a file of omp memory. */
+export function FileView<R>(
+	props: { file: ReadOnlyFile; readOnly: true } | { file: Pick<OmpFile, "path" | "pathDisplay" | "body">; saver: FileSaver<R>; readOnly?: false },
+) {
 	return props.readOnly ? (
 		<FileFrame file={props.file}>
 			<FileContents file={props.file} />
 		</FileFrame>
 	) : (
-		<EditableFileView file={props.file} editing={props.editing} />
+		<EditableFileView file={props.file} saver={props.saver} />
 	);
 }
 
-function EditableFileView({ file, editing }: { file: OmpFile; editing: Editing }) {
+function EditableFileView<R>({ file, saver }: { file: Pick<OmpFile, "path" | "pathDisplay" | "body">; saver: FileSaver<R> }) {
 	const { body } = file;
-	const editor = useEditor(
-		body.state === "read" ? body.text : "",
-		text => writeOrReload(editing, () =>
-			putJson<OmpSettings>(settingsUrl("/file", editing.cwd), { path: file.path, text, baseHash: body.state === "read" ? body.hash : null } satisfies FileEdit),
-		),
+	const editor = useEditor(body.state === "read" ? body.text : "", text =>
+		writeOrReload(saver, () => saver.save({ path: file.path, text, baseHash: body.state === "read" ? body.hash : null })),
 	);
 	const viewing = editor.state.phase === "viewing";
 	const conflict = editor.state.phase === "editing" && editor.state.conflict;
@@ -104,7 +118,7 @@ function EditableFileView({ file, editing }: { file: OmpFile; editing: Editing }
 								size="compact"
 								onClick={() => {
 									editor.cancel();
-									editing.reload();
+									saver.reload();
 								}}
 							>
 								Discard my edits and load the file from disk
@@ -161,7 +175,7 @@ export function Files({ files: allFiles, editing, selected, onSelect }: { files:
 					</div>
 				))}
 			</nav>
-			<FileView key={open.path} file={open} editing={editing} />
+			<FileView key={open.path} file={open} saver={settingsFiles(editing)} />
 		</div>
 	);
 }

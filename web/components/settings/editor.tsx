@@ -104,8 +104,8 @@ interface Editor<T> {
 	submit: () => Promise<void>;
 }
 
-/** Edit, then save or cancel. A failed save keeps the draft and shows why, for another try. */
-export function useEditor<T>(original: T, save: (draft: T) => Promise<OmpSettings>): Editor<T> {
+/** Edit, then save or cancel. A failed save keeps the draft and shows why, for another try. `R` is what the save answers, the page's settings unless another read. */
+export function useEditor<T, R = OmpSettings>(original: T, save: (draft: T) => Promise<R>): Editor<T> {
 	const [state, setState] = useState<EditorState<T>>({ phase: "viewing" });
 	const draft = state.phase === "viewing" ? original : state.draft;
 	return {

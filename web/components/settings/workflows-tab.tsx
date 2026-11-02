@@ -6,7 +6,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { hashForSettings } from "../../routing";
 import type { Editing } from "./editor";
-import { FileView } from "./files-tab";
+import { FileView, settingsFiles } from "./files-tab";
 
 const TAG_SNIPPET = "metadata:\n  tags: workflow";
 
@@ -86,7 +86,7 @@ export function Workflows({ workflows, files, editing }: { workflows: Workflow[]
 						<FileView readOnly file={open.skill} />
 					</>
 				) : (
-					<FileView key={open.skill.path} file={open.skill} editing={editing} />
+					<FileView key={open.skill.path} file={open.skill} saver={settingsFiles(editing)} />
 				)}
 			</div>
 		</div>
