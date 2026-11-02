@@ -144,7 +144,7 @@ interface ShownViews {
 	snapshot: () => View[];
 }
 
-function shownViews(): ShownViews {
+export function shownViews(): ShownViews {
 	const counts = new Map<string, { view: View; count: number }>();
 	const listeners = new Set<() => void>();
 	let list: View[] = [];
