@@ -63,11 +63,18 @@ export class InterruptedSessions {
 	/**
 	 * The server started and attached to the sessions `survived` names, which run on. The others that ran when the last
 	 * server stopped are interrupted, with the turn state they last had: their omp exited while no server watched.
+	 * Answers those of `survived` whose turn ran when the last server stopped: it may have ended while no server listened.
 	 */
-	recover(survived: ReadonlySet<string>): void {
+	recover(survived: ReadonlySet<string>): ReadonlySet<string> {
 		const stopped = new Set<string>();
+		const midTurn = new Set<string>();
 		for (const [id, state] of this.#sessions) {
-			if (state.interrupted || survived.has(id)) continue;
+			if (survived.has(id)) {
+				// Also when an earlier server that could not attach to it marked it interrupted, with its turn as it last ran.
+				if (state.working) midTurn.add(id);
+				continue;
+			}
+			if (state.interrupted) continue;
 			this.#sessions.set(id, { interrupted: true, working: state.working });
 			stopped.add(id);
 		}
@@ -75,6 +82,7 @@ export class InterruptedSessions {
 		// The server's start checks the sessions that stopped mid-turn itself, once their files are listed to title them.
 		this.#reportedMidTurn = this.midTurn().join("\n");
 		if (stopped.size > 0) this.#save();
+		return midTurn;
 	}
 
 	/** Whether session `sessionId` ran when the last server stopped, and did not survive it. */

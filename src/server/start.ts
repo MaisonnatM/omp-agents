@@ -3,7 +3,7 @@ import { withPinnedSkill } from "../commands";
 import { DashboardSession, type DashboardUpdate, recordedCwd } from "../dashboard-session";
 import { checkoutDir, worktreeAt } from "../git";
 import { errorText } from "../json";
-import { skipRefused } from "../live-session";
+import { endedTurn, skipRefused } from "../live-session";
 import { type AdmittedLaunch, keptSessions, type RpcLaunch } from "../omp/rpc";
 import { prepareReplay } from "../replay";
 import { directoryOf, displayPath } from "../paths";
@@ -244,18 +244,23 @@ async function attach(sessions: LiveSessions, joinFor: StartEnv["joinFor"], inst
 
 /**
  * Attaches to every session a previous server started whose omp still runs, and hands `recover` the session ids of
- * those that survived. Only then does it list each again, under the instance id it had, and pass on what it reported,
- * so no report reaches the server before it knows which sessions survived. One it reaches but cannot attach to runs on
- * unlisted, and the next server tries again.
+ * those that survived; it answers those whose turn ran when the last server stopped. Only then does it list each again,
+ * under the instance id it had, with the turn it left unread, or the one it ended while no server listened, and pass
+ * on what it reported, so no report reaches the server before it knows which sessions survived. One it reaches but
+ * cannot attach to runs on unlisted, and the next server tries again.
  */
-export async function reattachAll(sessions: LiveSessions, joinFor: StartEnv["joinFor"], recover: (survived: ReadonlySet<string>) => void): Promise<void> {
+export async function reattachAll(sessions: LiveSessions, joinFor: StartEnv["joinFor"], recover: (survived: ReadonlySet<string>) => ReadonlySet<string>): Promise<void> {
 	const attached = (await Promise.all(keptSessions().map(instanceId => attach(sessions, joinFor, instanceId)))).filter(
 		(kept): kept is Attached => kept !== null && !kept.session.finished(),
 	);
-	recover(new Set(attached.map(({ session }) => session.sessionId)));
+	const midTurn = recover(new Set(attached.map(({ session }) => session.sessionId)));
+	sessions.restoreUnread(new Set(attached.map(({ session }) => session.instanceId)));
 	for (const { session, publish } of attached) {
 		sessions.bindTask(session);
 		sessions.add(session, null);
+		// Its turn ran when the last server stopped and ended while no server listened, so nobody heard its agent_end.
+		const ended = midTurn.has(session.sessionId) && session.status === "idle" && session.sessionFile ? endedTurn(session.sessionFile) : null;
+		if (ended) sessions.markUnread(session.instanceId, ended);
 		joinFor({ kind: "resume", sessionId: session.sessionId }).attach(session);
 		publish();
 	}
