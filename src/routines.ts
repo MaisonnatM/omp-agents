@@ -230,13 +230,13 @@ export function parseCommandRun(value: unknown): CommandRun | null {
 	if (!isObject(value) || !isSafeInteger(value.startedAt)) return null;
 	const { phase, startedAt, endedAt, output, slept } = value;
 	if (phase === "running") return { phase, startedAt };
-	const asleep = slept === undefined ? {} : isSafeInteger(slept) && slept > 0 ? { slept } : null;
-	if (!isSafeInteger(endedAt) || !asleep) return null;
+	if (!isSafeInteger(endedAt)) return null;
+	const report = typeof output === "string" && (slept === undefined || (isSafeInteger(slept) && slept > 0));
 	switch (phase) {
 		case "exited":
-			return typeof value.code === "number" && Number.isSafeInteger(value.code) && typeof output === "string" ? { phase, code: value.code, output, startedAt, endedAt, ...asleep } : null;
+			return report && typeof value.code === "number" && Number.isSafeInteger(value.code) ? { phase, code: value.code, output, startedAt, endedAt, slept } : null;
 		case "stopped":
-			return (value.reason === "time-limit" || value.reason === "dashboard") && typeof output === "string" ? { phase, reason: value.reason, output, startedAt, endedAt, ...asleep } : null;
+			return report && (value.reason === "time-limit" || value.reason === "dashboard") ? { phase, reason: value.reason, output, startedAt, endedAt, slept } : null;
 		case "failed":
 			return typeof value.error === "string" ? { phase, error: value.error, startedAt, endedAt } : null;
 		default:

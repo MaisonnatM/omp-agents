@@ -103,7 +103,7 @@ A scope's first answer since the server started only sets what it knows, so a re
 Every server learns its sightings, but only the server that owns routines fires them; another drops its news, and a server that takes over routines forgets what it learned before, so its next answers set a new baseline and a takeover fires nothing old.
 
 `RoutineRunner.fire` claims one run of each routine that watches a kind of the news, holding the first 10 of those events the check listed, then drains when the Mac is fully awake, in the same `SerialLane` as ticks and **Run now**.
-Otherwise the runs stay queued for the next tick at a full wake, and news for a routine whose triggered run is still queued joins that run, up to 10 events, in `RoutinesFile.claim`, so a night of dark wakes starts one run.
+Otherwise the runs stay queued for the next tick at a full wake, and news for a routine whose triggered run is still queued joins that run, up to 10 events, through `RoutinesFile.addTriggerEvents`, so a night of dark wakes starts one run.
 A run is keyed by its time, so a claim lands at least a millisecond after the routine's newest run.
 A prompt run carries the events in the trailing JSON stamp rather than fenced trigger prose.
 A command gets the events as a JSON list in the `ROUTINE_TRIGGERS` environment variable, `[]` for a scheduled run or **Run now**, which `runShell` sets beside the server's environment.

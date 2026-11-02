@@ -32,7 +32,9 @@ describe("runShell", () => {
 
 	test("counts its time limit in awake time, so a Mac asleep past the limit lets the command finish, and says how long it slept", async () => {
 		spyOn(performance, "now").mockReturnValue(performance.now());
-		expect(await runShell("sleep 1.2; echo done", tmpdir(), { ...limits, timeoutMs: 200 })).toEqual({ exitCode: 0, output: "done\n", slept: 1000 });
+		const wallAt = Date.now();
+		spyOn(Date, "now").mockReturnValueOnce(wallAt).mockReturnValue(wallAt + 1500);
+		expect(await runShell("sleep 0.5; echo done", tmpdir(), { ...limits, timeoutMs: 200 })).toEqual({ exitCode: 0, output: "done\n", slept: 1000 });
 	});
 
 	test("stops when its signal aborts", async () => {

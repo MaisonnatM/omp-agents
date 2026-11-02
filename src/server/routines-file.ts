@@ -193,19 +193,19 @@ export class RoutinesFile extends ReducerFile<Routine[], [change: Exclude<Routin
 
 	/**
 	 * Claims a run of routine `id` at `at`, queued, keeping the newest {@link MAX_ROUTINE_RUNS} runs. A run with no
-	 * `triggeredBy` is a schedule's or Run now's, which the schedules count from. News for a routine whose triggered run
-	 * is still queued joins that run, up to {@link MAX_TRIGGER_EVENTS} events.
+	 * `triggeredBy` is a schedule's or Run now's, which the schedules count from.
 	 */
 	claim(id: string, at: number, triggeredBy: TriggerEvent[]): void {
-		this.#updateRoutine(id, routine => {
-			const waiting = triggeredBy.length > 0 && routine.runs.find(run => run.outcome.kind === "pending" && run.outcome.queued && run.triggeredBy.length > 0);
-			if (waiting) return { ...routine, runs: routine.runs.map(run => (run === waiting ? { ...run, triggeredBy: [...run.triggeredBy, ...triggeredBy].slice(0, MAX_TRIGGER_EVENTS) } : run)) };
-			return {
-				...routine,
-				scheduledAt: triggeredBy.length === 0 ? at : routine.scheduledAt,
-				runs: [{ at, outcome: { kind: "pending", queued: true }, errors: [], triggeredBy } satisfies RoutineRun, ...routine.runs].slice(0, MAX_ROUTINE_RUNS),
-			};
-		});
+		this.#updateRoutine(id, routine => ({
+			...routine,
+			scheduledAt: triggeredBy.length === 0 ? at : routine.scheduledAt,
+			runs: [{ at, outcome: { kind: "pending", queued: true }, errors: [], triggeredBy } satisfies RoutineRun, ...routine.runs].slice(0, MAX_ROUTINE_RUNS),
+		}));
+	}
+
+	/** Adds `events` to what started the run at `at`, keeping the first {@link MAX_TRIGGER_EVENTS}. */
+	addTriggerEvents(id: string, at: number, events: TriggerEvent[]): void {
+		this.#updateRun(id, at, run => ({ ...run, triggeredBy: [...run.triggeredBy, ...events].slice(0, MAX_TRIGGER_EVENTS) }));
 	}
 
 	/** Takes routine `id`'s run at `at` off the queue, saved before its message or command starts. */
