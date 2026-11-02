@@ -4,7 +4,7 @@ import { DESIGNER_JOB, DESIGNER_NAME } from "../src/shared/bot-designer";
 import type { Bot, BotId, BotLast } from "../src/shared/bots";
 import { SHEPHERD_JOB, SHEPHERD_NAME } from "../src/shared/shepherd";
 import type { RosterHost } from "../src/shared/sessions";
-import { botGroupKey, botGroupLabel, botGroupListName, botGroups, botHost, type BotRow, botRows, botSections, botsGrouped, botsNeedingYou, botStatus, botView, JOB_TEMPLATES, jobLine, memoryEntries, NEW_BOT_DRAFT, openBot, pickKind, pickTemplate, starterPrompts } from "./bots-model";
+import { botGroupKey, botGroupLabel, botGroupListName, botGroups, botHost, botMovesTo, type BotRow, botRows, botSections, botsGrouped, botsNeedingYou, botStatus, botView, JOB_TEMPLATES, jobLine, memoryEntries, NEW_BOT_DRAFT, openBot, pickKind, pickTemplate, starterPrompts } from "./bots-model";
 import type { BotRoutineRoute, Page } from "./routing";
 
 const scout = "scout" as BotId;
@@ -161,5 +161,24 @@ describe("Bots", () => {
 		expect(botsGrouped(rows.map(({ bot }) => bot))).toBe(true);
 		expect(botsGrouped([placed("cy", 7, false, null).bot])).toBe(false);
 		expect(botGroups([placed("cy", 7, false, null)]).map(botGroupKey)).toEqual(["rest"]);
+	});
+
+	test("dropping a Bot on a group pins it keeping its section, or unpins it and moves it there, and changes nothing where it already lists", () => {
+		const placed = (pinned: boolean, section: string | null): Bot => ({ ...bot(null), pinned, section });
+		expect(botMovesTo(placed(false, "Work"), { kind: "pinned" })).toEqual([{ op: "pin", id: scout, pinned: true }]);
+		expect(botMovesTo(placed(true, "Work"), { kind: "section", name: "Work" })).toEqual([{ op: "pin", id: scout, pinned: false }]);
+		expect(botMovesTo(placed(true, "Work"), { kind: "section", name: "Chores" })).toEqual([
+			{ op: "pin", id: scout, pinned: false },
+			{ op: "move", id: scout, section: "Chores" },
+		]);
+		expect(botMovesTo(placed(true, "Work"), { kind: "rest" })).toEqual([
+			{ op: "pin", id: scout, pinned: false },
+			{ op: "move", id: scout, section: null },
+		]);
+		expect(botMovesTo(placed(false, null), { kind: "section", name: "Work" })).toEqual([{ op: "move", id: scout, section: "Work" }]);
+		expect(botMovesTo(placed(false, "Work"), { kind: "rest" })).toEqual([{ op: "move", id: scout, section: null }]);
+		expect(botMovesTo(placed(true, null), { kind: "pinned" })).toEqual([]);
+		expect(botMovesTo(placed(false, "Work"), { kind: "section", name: "Work" })).toEqual([]);
+		expect(botMovesTo(placed(false, null), { kind: "rest" })).toEqual([]);
 	});
 });

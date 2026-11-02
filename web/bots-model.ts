@@ -1,7 +1,7 @@
-/** What the page shows of a Bot: the Bot its page opens, its sidebar row, its running session and conversation, its memory's lines, and the prompts a new Bot offers. */
+/** What the page shows of a Bot: the Bot its page opens, its sidebar row and group, its running session and conversation, its memory's lines, and the prompts a new Bot offers. */
 import type { Routine } from "../src/routines";
 import { DESIGNER_JOB, DESIGNER_NAME } from "../src/shared/bot-designer";
-import type { Bot, BotId, BotKind, BotLast } from "../src/shared/bots";
+import type { Bot, BotChange, BotId, BotKind, BotLast } from "../src/shared/bots";
 import { SHEPHERD_JOB, SHEPHERD_NAME } from "../src/shared/shepherd";
 import type { HostStatus, RosterHost, View } from "../src/shared/sessions";
 import { needsYou } from "./attention";
@@ -135,8 +135,11 @@ export function botRows(bots: readonly Bot[], hosts: readonly RosterHost[], last
 		.sort((a, b) => b.at - a.at || a.bot.name.localeCompare(b.bot.name));
 }
 
+/** Where a Bot lists in the Bots tab and the gallery: pinned, in one section, or in neither. */
+export type BotPlace = { kind: "pinned" } | { kind: "section"; name: string } | { kind: "rest" };
+
 /** A group the Bots tab and the gallery list: the pinned Bots, one section's, or the Bots in neither. */
-export type BotGroup = { kind: "pinned"; rows: BotRow[] } | { kind: "section"; name: string; rows: BotRow[] } | { kind: "rest"; rows: BotRow[] };
+export type BotGroup = BotPlace & { rows: BotRow[] };
 
 /** `rows` grouped: Pinned, then each section by name, then the rest, each in `rows`' order; a group with no row drops. */
 export function botGroups(rows: readonly BotRow[]): BotGroup[] {
@@ -160,7 +163,7 @@ export const botsGrouped = (bots: readonly Bot[]): boolean => bots.some(bot => b
 export const botSections = (bots: readonly Bot[]): string[] => [...new Set(bots.flatMap(bot => bot.section ?? []))].sort((a, b) => a.localeCompare(b));
 
 /** What a group's header reads. */
-export function botGroupLabel(group: BotGroup): string {
+export function botGroupLabel(group: BotPlace): string {
 	switch (group.kind) {
 		case "pinned":
 			return "Pinned";
@@ -174,8 +177,15 @@ export function botGroupLabel(group: BotGroup): string {
 /** What a group's list is called for a screen reader. */
 export const botGroupListName = (group: BotGroup): string => (group.kind === "rest" ? botGroupLabel(group) : `${botGroupLabel(group)} Bots`);
 
-/** A group's key, for React and for the collapsed groups the Bots tab stores. */
-export const botGroupKey = (group: BotGroup): string => (group.kind === "section" ? `section:${group.name}` : group.kind);
+/** A group's key, for React, for the collapsed groups the Bots tab stores, and for the group a dragged Bot is over. */
+export const botGroupKey = (group: BotPlace): string => (group.kind === "section" ? `section:${group.name}` : group.kind);
+
+/** The changes that list `bot` under `place`, as {@link botGroups} places it, none when it already lists there; pinning keeps its section, which unpinning returns it to. */
+export function botMovesTo(bot: Bot, place: BotPlace): Extract<BotChange, { op: "pin" | "move" }>[] {
+	if (place.kind === "pinned") return bot.pinned ? [] : [{ op: "pin", id: bot.id, pinned: true }];
+	const section = place.kind === "section" ? place.name : null;
+	return [...(bot.pinned ? [{ op: "pin", id: bot.id, pinned: false } as const] : []), ...(bot.section === section ? [] : [{ op: "move", id: bot.id, section } as const])];
+}
 
 /** How many of `rows` need you: their running session asks you something, or ended a turn you have not read. */
 export const botsNeedingYou = (rows: readonly BotRow[]): number => rows.filter(({ host }) => host !== null && needsYou(host)).length;
