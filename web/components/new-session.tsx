@@ -112,11 +112,10 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const starting = launch?.phase === "starting" || (scheduled?.busy ?? false);
 	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] } });
 	const { send } = useDashboardActions();
-	const dictation = useDictation({ draftKey, cwd, text: draft, editorRef, send, connected });
 	// A composer that keeps no draft, as a scheduled start's, has nowhere to put text that lands after it closes.
-	const dictates = draftKey !== null && !starting;
+	const dictation = useDictation({ composer: draftKey !== null && !starting ? { draftKey, cwd } : null, text: draft, editorRef, send, connected });
 	const onComposerKey = useShortcuts({
-		dictate: () => dictates && dictation.toggle(),
+		dictate: dictation.toggle,
 		model: () => {
 			if (starting || !connected) return false;
 			models.openModels("models");
@@ -225,7 +224,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 							<>
 								<ScheduleButton draft={draft} files={attachments.files.length} disabled={starting || !connected} pending={schedule.pending} onSchedule={schedule.run} />
 								{!scheduled && <AttachButton onClick={() => openFilePicker()} disabled={starting} />}
-								{dictates && <DictationButton dictation={dictation} />}
+								<DictationButton dictation={dictation} />
 							</>
 						)}
 						disabled={starting || !connected}

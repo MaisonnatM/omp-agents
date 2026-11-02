@@ -27,8 +27,13 @@ export interface DictationSettings {
 export const blockedByWorkspace = (settings: DictationSettings): boolean =>
 	!settings.enabled && (settings.enabledBy === "project" || settings.enabledBy === "env");
 
+/** Why a capture did not start: this computer has one microphone, and another composer holds it. */
+export const DICTATION_BUSY = "Dictation is active in another composer";
+
 /** One step of a capture: where speech goes, the microphone's state, the text so far, then always one `end`. */
 export type DictationEvent =
+	/** Dictation is off in the capture's directory, so the microphone stays closed: the settings, for the page to offer turning it on. */
+	| { kind: "off"; settings: DictationSettings }
 	| { kind: "processing"; processing: DictationProcessing }
 	| { kind: "state"; state: "starting" | "recording" | "transcribing" }
 	/** All the text so far, replacing the last preview. */

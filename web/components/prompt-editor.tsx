@@ -29,6 +29,7 @@ import {
 	type NodeKey,
 	PASTE_COMMAND,
 	type PointType,
+	type RangeSelection,
 	SELECTION_CHANGE_COMMAND,
 	type SerializedLexicalNode,
 	TextNode,
@@ -39,7 +40,7 @@ import { isChipKind, PromptChip } from "./prompt-chip";
 
 type ChipData = Pick<PromptToken, "kind" | "label" | "target"> & { text: string };
 
-class ChipNode extends DecoratorNode<JSX.Element> {
+export class ChipNode extends DecoratorNode<JSX.Element> {
 	__chip: ChipData;
 
 	static getType(): string {
@@ -123,16 +124,22 @@ function $pointAt(offset: number): { key: NodeKey; offset: number; type: "text" 
 	return { key: paragraph.getKey(), offset: paragraph.getChildrenSize(), type: "element" };
 }
 
-function $select(start: number, end = start): void {
+function $select(start: number, end = start): RangeSelection | null {
 	const [anchor, focus] = [$pointAt(start), $pointAt(end)];
-	if (!anchor || !focus) return;
+	if (!anchor || !focus) return null;
 	const selection = $createRangeSelection();
 	selection.anchor.set(anchor.key, anchor.offset, anchor.type);
 	selection.focus.set(focus.key, focus.offset, focus.type);
 	$setSelection(selection);
+	return selection;
 }
 
-function $fill(text: string): void {
+/** Puts `text` in place of offsets `start` to `end` into the prompt, the caret after it. */
+export function $replaceRange(start: number, end: number, text: string): void {
+	$select(start, end)?.insertRawText(text);
+}
+
+export function $fill(text: string): void {
 	const root = $getRoot();
 	root.clear();
 	const paragraph = $createParagraphNode();
@@ -191,15 +198,7 @@ function Sync({ value, onChange, disabled, autoFocus, handle }: { value: string;
 				editor.update(() => $select(offset), { discrete: true });
 				editor.focus();
 			},
-			replace: (start, end, text) =>
-				editor.update(
-					() => {
-						$select(start, end);
-						const selection = $getSelection();
-						if ($isRangeSelection(selection)) selection.insertRawText(text);
-					},
-					{ discrete: true },
-				),
+			replace: (start, end, text) => editor.update(() => $replaceRange(start, end, text), { discrete: true }),
 			editable: () => editor.isEditable(),
 		}),
 		[editor],

@@ -142,7 +142,7 @@ function LiveConversation({
 	const instanceId = view.instanceId;
 	const { request } = useDashboardActions();
 	const { connected } = useDashboardStatus();
-	const dictation = useDictation({ draftKey: writable ? liveDraftKey(view) : null, cwd: shown?.cwd ?? "", text: draft, editorRef, send, connected });
+	const dictation = useDictation({ composer: writable && shown ? { draftKey: liveDraftKey(view), cwd: shown.cwd } : null, text: draft, editorRef, send, connected });
 	const scheduleSend = useScheduleSend();
 	const editPrompt = useCallback((entryId: string, text: string) => request({ t: "edit-prompt", instanceId, entryId, text }), [instanceId, request]);
 	const completion = useCompletion({
@@ -232,7 +232,7 @@ function LiveConversation({
 	const movable = switchable?.status === "idle";
 
 	const onComposerKey = useShortcuts({
-		dictate: () => writable && shown !== null && dictation.toggle(),
+		dictate: dictation.toggle,
 		// The text field's own keys, so they need no focused pane.
 		steer: () => {
 			if (!steerable) return false;
@@ -381,7 +381,7 @@ function LiveConversation({
 								)}
 								{!trajectory && <PromptHistoryButton view={view} />}
 								{writable && <AttachButton onClick={() => openFilePicker()} />}
-								{writable && shown && <DictationButton dictation={dictation} />}
+								<DictationButton dictation={dictation} />
 							</>
 						)}
 						placeholder={placeholderOf(subject, placeholder)}
@@ -394,7 +394,7 @@ function LiveConversation({
 						sendLabel={working && subject.followUps ? "Queue a follow-up" : `${working ? "Steer" : "Send to"} ${agent ? "subagent" : "session"}`}
 						beforeEditor={
 							<>
-								{writable && <DictationRow dictation={dictation} />}
+								<DictationRow dictation={dictation} />
 								<ScheduledMessages sessionId={sessionId} onEdit={restoreDraft} />
 								<QueuedMessages
 									entries={queued}

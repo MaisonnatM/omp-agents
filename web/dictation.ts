@@ -4,7 +4,7 @@
  * composer while it is mounted, else in the kept draft, and is never sent on its own.
  */
 import { useSyncExternalStore } from "react";
-import type { DictationEvent, DictationProcessing } from "../src/shared/dictation";
+import { type DictationEvent, type DictationProcessing, type DictationSettings, processingText } from "../src/shared/dictation";
 import type { ClientMsg, ServerMsg } from "../src/shared/protocol";
 import { replaceInComposer } from "./composer-drafts";
 
@@ -19,10 +19,11 @@ export interface DictationTarget {
 
 /**
  * A capture under way or how it ended. `starting` until the microphone records, `listening` while it does, `transcribing`
- * once it stopped; `empty` heard nothing, `failed` says why, with what it heard before.
+ * once it stopped; `off` found dictation off in its directory, `empty` heard nothing, `failed` says why, with what it heard before.
  */
 export type Dictation =
 	| Capturing
+	| { phase: "off"; captureId: string; target: DictationTarget; settings: DictationSettings }
 	| { phase: "empty"; captureId: string; target: DictationTarget }
 	| { phase: "failed"; captureId: string; target: DictationTarget; error: string; preview: string };
 
@@ -40,6 +41,9 @@ export interface Capturing {
 export const capturing = (dictation: Dictation | null): dictation is Capturing =>
 	dictation?.phase === "starting" || dictation?.phase === "listening" || dictation?.phase === "transcribing";
 
+/** Whether Stop applies: a capture that transcribes already stopped, and only Discard ends it sooner. */
+export const stoppable = (dictation: Dictation | null): dictation is Capturing => capturing(dictation) && dictation.phase !== "transcribing";
+
 let current: Dictation | null = null;
 const listeners = new Set<() => void>();
 
@@ -52,10 +56,12 @@ const subscribe = (listener: () => void): (() => void) => {
 	listeners.add(listener);
 	return () => listeners.delete(listener);
 };
-const read = (): Dictation | null => current;
 
-/** The page's capture, `null` while there is none. */
-export const useDictationState = (): Dictation | null => useSyncExternalStore(subscribe, read, read);
+/** The page's capture now, `null` while there is none. */
+export const currentDictation = (): Dictation | null => current;
+
+/** The page's capture, `null` while there is none, rendering again as it changes. */
+export const useDictationState = (): Dictation | null => useSyncExternalStore(subscribe, currentDictation, currentDictation);
 
 type Send = (msg: ClientMsg) => void;
 
@@ -69,7 +75,7 @@ export function startDictation(target: DictationTarget, send: Send): void {
 
 /** Stops the capture: a recording one ends with what was said, a starting one ends with nothing. */
 export function stopDictation(send: Send): void {
-	if (!capturing(current) || current.phase === "transcribing") return;
+	if (!stoppable(current)) return;
 	send({ t: "dictation-stop", captureId: current.captureId });
 	if (current.phase === "starting") set({ ...current, cancelled: true });
 }
@@ -97,8 +103,12 @@ export function keepPreview(): void {
 }
 
 /** `dictation` after `event` of its capture. */
-function withEvent(dictation: Capturing, event: Exclude<DictationEvent, { kind: "end" }>): Dictation {
+function withEvent(dictation: Capturing, event: Exclude<DictationEvent, { kind: "end" }>): Dictation | null {
 	switch (event.kind) {
+		case "off": {
+			const { captureId, target, cancelled } = dictation;
+			return cancelled ? null : { phase: "off", captureId, target, settings: event.settings };
+		}
 		case "processing":
 			return { ...dictation, processing: event.processing };
 		case "preview":
@@ -129,4 +139,47 @@ export function dictationDisconnected(): void {
 	if (!capturing(current)) return;
 	const { captureId, target, preview, cancelled } = current;
 	set(cancelled ? null : { phase: "failed", captureId, target, error: "Lost the connection to the server.", preview });
+}
+
+/** What a button of the status row does: each maps to one store function, or to a new capture for `retry`. */
+export type DictationAction = "cancel" | "stop" | "discard" | "keep" | "retry" | "dismiss";
+
+/** The status row of a capture: its status line, the text under it, how it reads, and its buttons in order. */
+export interface DictationRow {
+	status: string;
+	detail: string | null;
+	tone: "muted" | "active" | "error";
+	actions: DictationAction[];
+}
+
+/** The status row `dictation` shows above its composer's text field; `off` shows the setup popover instead. */
+export function rowOf(dictation: Dictation): DictationRow | null {
+	switch (dictation.phase) {
+		case "off":
+			return null;
+		case "starting":
+			return { status: "Preparing dictation…", detail: null, tone: "muted", actions: ["cancel"] };
+		case "listening":
+			return {
+				status: dictation.processing ? `Listening on this computer · transcribed by ${processingText(dictation.processing)}` : "Listening on this computer",
+				detail: dictation.preview || "Speak now. Text appears here when available.",
+				tone: "active",
+				actions: ["stop", "discard"],
+			};
+		case "transcribing":
+			return { status: "Transcribing…", detail: dictation.preview || null, tone: "active", actions: ["discard"] };
+		case "empty":
+			return { status: "No speech detected", detail: null, tone: "muted", actions: ["retry", "dismiss"] };
+		case "failed":
+			return {
+				status: dictation.error,
+				detail: dictation.preview || null,
+				tone: "error",
+				actions: dictation.preview === "" ? ["retry", "dismiss"] : ["keep", "retry", "dismiss"],
+			};
+		default: {
+			const unhandled: never = dictation;
+			return unhandled;
+		}
+	}
 }

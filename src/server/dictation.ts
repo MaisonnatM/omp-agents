@@ -1,24 +1,16 @@
 /** The one microphone capture under way, by the socket and capture that started it, so that page can stop or discard it and its closed socket ends it. */
-import type { DictationEvent } from "../shared/dictation";
+import type { DictationCapture } from "../omp/dictation";
+import { DICTATION_BUSY, type DictationEvent } from "../shared/dictation";
 import type { Peer } from "./request-ledger";
 import type { Socket } from "./views";
 
-/** One capture under way: `stop` keeps what was said, `dispose` closes the microphone at once. */
-export interface Capture {
-	stop(): void;
-	dispose(): void;
-}
-
 /** Opens the microphone, as `startDictation` in src/omp/dictation.ts does: events through `emit`, the last an `end`. */
-export type StartCapture = (cwd: string, captureId: string, emit: (event: DictationEvent) => void) => Capture;
-
-/** Why a capture did not start: this computer has one microphone, and another composer holds it. */
-export const BUSY = "Dictation is active in another composer";
+export type StartCapture = (cwd: string, captureId: string, emit: (event: DictationEvent) => void) => DictationCapture;
 
 interface Slot {
 	socket: Socket;
 	captureId: string;
-	capture: Capture | null;
+	capture: DictationCapture | null;
 }
 
 export class Dictation {
@@ -32,7 +24,7 @@ export class Dictation {
 	/** Opens the microphone for `captureId` with the settings of `cwd`, its events going to the page as `dictation` messages; a held microphone ends it at once. */
 	start(peer: Peer, captureId: string, cwd: string): void {
 		const send = (event: DictationEvent): void => peer.send({ t: "dictation", captureId, event });
-		if (this.#slot) return send({ kind: "end", text: "", error: BUSY });
+		if (this.#slot) return send({ kind: "end", text: "", error: DICTATION_BUSY });
 		const slot: Slot = { socket: peer.socket, captureId, capture: null };
 		this.#slot = slot;
 		slot.capture = this.#start(cwd, captureId, event => {

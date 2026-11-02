@@ -269,12 +269,6 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		return cwd instanceof Response ? cwd : answer(async () => ({ roles: await connectedRoles(cwd) }));
 	});
 
-	/** `GET /api/dictation/settings?cwd=<dir>`: whether dictation is on in that directory, what decides it, and where its speech goes; opens no microphone. */
-	const dictation = get(async params => {
-		const cwd = await dirParam(params);
-		return cwd instanceof Response ? cwd : answer(() => dictationSettings(cwd));
-	});
-
 	/** `PUT /api/dictation/settings?cwd=<dir>` `{ enabled: true }`: turns dictation on in the user's omp config, then answers the directory's settings as they are after. */
 	const dictationEnable = write(
 		async (body, params) => (isObject(body) && body.enabled === true ? dirParam(params) : fail(400, "Expected { enabled: true }")),
@@ -418,7 +412,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/decisions": { GET: decisions },
 		"/api/models": { GET: models },
 		"/api/models/connected": { GET: connected },
-		"/api/dictation/settings": { GET: dictation, PUT: dictationEnable },
+		"/api/dictation/settings": { PUT: dictationEnable },
 		"/api/models/roles": { GET: roles },
 		"/api/replay/detail": { GET: replayRead(false) },
 		"/api/replay/compare": { GET: replayRead(true) },

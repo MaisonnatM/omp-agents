@@ -5,35 +5,13 @@
 import { errorText } from "../json";
 import { directoryOf } from "../paths";
 import type { DictationEvent, DictationProcessing, DictationSettings } from "../shared/dictation";
-import type { OmpSettingsInstance } from "./module-types/config";
-import type { ModelRegistryModule } from "./module-types/models";
-import { auth, config, modelRegistry, modelResolver, modelRoles, rpcDictation, sttController, sttModels, sttSettings } from "./modules";
+import { type OpenRegistry, openRegistry } from "./models";
+import { modelResolver, modelRoles, rpcDictation, sttController, sttModels, sttSettings } from "./modules";
 
 const ROLE = "dictation";
 
-interface Snapshot {
-	settings: OmpSettingsInstance;
-	registry: InstanceType<ModelRegistryModule["ModelRegistry"]>;
-	/** Closes the credential store, which a cloud model's transcription reads until the capture ends. */
-	close(): void;
-}
-
-/** The settings of `cwd` and the models you can call, read once so the disclosure and the capture agree. */
-async function snapshot(cwd: string): Promise<Snapshot> {
-	const settings = await config.Settings.loadReadOnly({ cwd });
-	const storage = await auth.discoverAuthStorage();
-	try {
-		const registry = new modelRegistry.ModelRegistry(storage);
-		await registry.refresh();
-		return { settings, registry, close: () => storage.close() };
-	} catch (error) {
-		storage.close();
-		throw error;
-	}
-}
-
 /** Where omp's controller sends speech: the first model of the `dictation` role, as it resolves it, else its default local model. */
-function processingOf({ settings, registry }: Snapshot): DictationProcessing {
+function processingOf({ settings, registry }: OpenRegistry): DictationProcessing {
 	const pool = modelRoles.roleCandidatePool(ROLE, settings, registry);
 	const model = modelResolver.resolveRoleChain(ROLE, settings, pool)[0]?.model;
 	if (model?.api === "openai-transcriptions") return { kind: "cloud", model: `${model.provider}/${model.id}` };
@@ -42,16 +20,19 @@ function processingOf({ settings, registry }: Snapshot): DictationProcessing {
 	return { kind: "local", model: spec.label, size: spec.sizeHint };
 }
 
+/** Whether dictation is on, which layer decides it, its language, and where its speech goes, as `read` has them. */
+const settingsOf = (read: OpenRegistry): DictationSettings => ({
+	enabled: sttSettings.cfgSttEnabled.get(read.settings),
+	enabledBy: sttSettings.cfgSttEnabled.provenance(read.settings),
+	language: sttSettings.cfgSttLanguage.get(read.settings),
+	processing: processingOf(read),
+});
+
 /** Whether dictation is on in `cwd`, which layer decides it, its language, and where its speech goes; opens no microphone. */
 export async function dictationSettings(cwd: string): Promise<DictationSettings> {
-	const read = await snapshot(cwd);
+	const read = await openRegistry(cwd);
 	try {
-		return {
-			enabled: sttSettings.cfgSttEnabled.get(read.settings),
-			enabledBy: sttSettings.cfgSttEnabled.provenance(read.settings),
-			language: sttSettings.cfgSttLanguage.get(read.settings),
-			processing: processingOf(read),
-		};
+		return settingsOf(read);
 	} finally {
 		read.close();
 	}
@@ -64,49 +45,46 @@ export interface DictationCapture {
 }
 
 /**
- * Opens this computer's microphone for capture `captureId` with the settings of `cwd`, refusing when dictation is off there.
- * `emit` gets where speech goes, the microphone's state, the text so far, then always one `end`. The text is never sent anywhere but `emit`.
+ * Opens this computer's microphone for capture `captureId` with the settings of `cwd`. Where dictation is off, `emit` gets
+ * the settings and the microphone stays closed; else where speech goes, the microphone's state, and the text so far.
+ * Either way the last event is one `end`. The text is never sent anywhere but `emit`.
  */
 export function startDictation(cwd: string, captureId: string, emit: (event: DictationEvent) => void): DictationCapture {
 	let bridge: InstanceType<typeof rpcDictation.RpcDictationBridge> | null = null;
+	let read: OpenRegistry | null = null;
 	let cancelled = false;
 	let ended = false;
 	const end = (text: string, error: string | null): void => {
 		if (ended) return;
 		ended = true;
+		read?.close();
 		emit({ kind: "end", text, error });
 	};
 	void (async () => {
-		let read: Snapshot;
 		try {
 			const dir = await directoryOf(cwd);
 			if (dir === null) return end("", `${cwd} is not a directory`);
-			read = await snapshot(dir);
-		} catch (error) {
-			return end("", errorText(error));
-		}
-		try {
-			if (cancelled || !sttSettings.cfgSttEnabled.get(read.settings)) {
-				read.close();
-				return end("", cancelled ? null : "Dictation is off");
+			read = await openRegistry(dir);
+			if (cancelled) return end("", null);
+			const settings = read.settings;
+			if (!sttSettings.cfgSttEnabled.get(settings)) {
+				emit({ kind: "off", settings: settingsOf(read) });
+				return end("", "Dictation is off");
 			}
 			emit({ kind: "processing", processing: processingOf(read) });
+			const registry = read.registry;
 			bridge = new rpcDictation.RpcDictationBridge(
 				null,
 				frame => {
 					if (frame.type === "dictation_state") emit({ kind: "state", state: frame.state });
 					else if (frame.type === "dictation_transcript") emit({ kind: "preview", text: frame.text });
-					else {
-						read.close();
-						end(frame.text, frame.error ?? null);
-					}
+					else end(frame.text, frame.error ?? null);
 				},
-				() => new sttController.STTController({ settings: read.settings, registry: read.registry }),
+				() => new sttController.STTController({ settings, registry }),
 			);
 			// A failed or stopped start has already sent its `dictation_end` frame.
 			bridge.start(captureId).catch(() => {});
 		} catch (error) {
-			read.close();
 			end("", errorText(error));
 		}
 	})();

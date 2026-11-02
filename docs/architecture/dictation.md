@@ -7,7 +7,8 @@ It reuses omp's own dictation, so the settings, the models, and the recorder are
 
 The server records, not the page.
 `startDictation` in `src/omp/dictation.ts` builds omp's `RpcDictationBridge` from `modes/rpc/rpc-dictation.ts` with no session and a factory for omp's `STTController`, the recorder omp's terminal uses.
-The bridge reads the directory's `stt` settings, starts the recorder, and reports `listening`, `preview`, `transcribing`, and `end` events, which `src/server/dictation.ts` sends the page as `dictation` messages under the page's capture id.
+The bridge starts the recorder and reports `listening`, `preview`, `transcribing`, and `end` events, which `src/server/dictation.ts` sends the page as `dictation` messages under the page's capture id.
+Where the directory's `stt` settings keep dictation off, `startDictation` opens no microphone: it sends an `off` event with the settings, then its `end`, so the page needs no settings read before a start.
 The microphone is the one of the computer that runs the dashboard, which in the desktop app is the user's own.
 
 ## One capture
@@ -19,8 +20,8 @@ A socket's close disposes its capture, and the page marks it failed with "Lost t
 
 ## The page
 
-`web/dictation.ts` holds the page's one capture: starting, listening, or transcribing for one draft, or ended with no speech or an error.
-Before each start, `useDictation` in `web/components/composer-dictation.tsx` reads `GET /api/dictation/settings` for the composer's directory; when dictation is off it opens the setup popover instead, whose **Enable dictation** sends `PUT /api/dictation/settings`.
+`web/dictation.ts` holds the page's one capture: starting, listening, or transcribing for one draft, or ended off, with no speech, or with an error, and `rowOf` gives the status row each phase shows.
+`useDictation` in `web/components/composer-dictation.tsx` opens the setup popover when its capture ends `off`; its **Enable dictation** sends `PUT /api/dictation/settings` for the capture's directory, and the next press starts a capture again.
 The composer's selection is saved as the microphone is pressed, and the ended text replaces that range through `replaceInComposer` in `web/composer-drafts.ts`, in the mounted composer or in the kept draft.
 While its capture runs, the composer is read-only and does not send, so the saved range still names the same text when the result lands.
 Leaving the composer stops its capture and keeps the result.

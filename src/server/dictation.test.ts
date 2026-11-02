@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import type { DictationEvent } from "../shared/dictation";
+import { DICTATION_BUSY, type DictationEvent } from "../shared/dictation";
 import type { ServerMsg } from "../shared/protocol";
-import { BUSY, Dictation, type StartCapture } from "./dictation";
+import { Dictation, type StartCapture } from "./dictation";
 import type { Peer } from "./request-ledger";
 import type { Socket } from "./views";
 
@@ -56,7 +56,7 @@ describe("Dictation", () => {
 		const second = page();
 		dictation.start(first.peer, "c1", "/app");
 		dictation.start(second.peer, "c2", "/app");
-		expect(events(second.sent, "c2")).toEqual([{ kind: "end", text: "", error: BUSY }]);
+		expect(events(second.sent, "c2")).toEqual([{ kind: "end", text: "", error: DICTATION_BUSY }]);
 		dictation.stop(first.peer.socket, "c1");
 		dictation.start(second.peer, "c3", "/app");
 		expect(calls).toEqual(["start c1 in /app", "stop c1", "start c3 in /app"]);

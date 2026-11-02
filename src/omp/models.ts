@@ -3,10 +3,32 @@ import { runJson } from "../proc";
 import { type CatalogModel, type ConnectedModels, type DraftModel, type ModelEntry, type ModelRole, selectorOf, splitSelector } from "../shared/models";
 import { loadOmpConfig, type OmpConfig, readSelector, routedSelectors } from "./config";
 import { ompCommand } from "./install";
-import { auth, modelResolver, oauth, serviceTiers } from "./modules";
-import type { ServiceTierModel } from "./module-types/models";
+import { auth, config, modelRegistry, modelResolver, oauth, serviceTiers } from "./modules";
+import type { OmpSettingsInstance } from "./module-types/config";
+import type { ModelRegistryModule, ServiceTierModel } from "./module-types/models";
 
 const MODELS_TIMEOUT_MS = 30_000;
+
+/** The settings of a directory and omp's model registry, which reads the credential store until `close`. */
+export interface OpenRegistry {
+	settings: OmpSettingsInstance;
+	registry: InstanceType<ModelRegistryModule["ModelRegistry"]>;
+	close(): void;
+}
+
+/** Loads the settings of `cwd` and the models you can call; the caller closes the credential store once its model calls end. */
+export async function openRegistry(cwd: string): Promise<OpenRegistry> {
+	const settings = await config.Settings.loadReadOnly({ cwd });
+	const storage = await auth.discoverAuthStorage();
+	try {
+		const registry = new modelRegistry.ModelRegistry(storage);
+		await registry.refresh();
+		return { settings, registry, close: () => storage.close() };
+	} catch (error) {
+		storage.close();
+		throw error;
+	}
+}
 
 /** Every model `omp models` lists for this agent dir, in omp's order. */
 export async function listModels(): Promise<CatalogModel[]> {
