@@ -4,8 +4,11 @@ import { isObject } from "../json";
 import type { CollabAutoStart, TerminalAccess } from "../shared/readiness";
 import { type RetrySettings, type RoutingEdit, selectorOf } from "../shared/models";
 import { ompVersion } from "./install";
-import { collabSettings, config, dirs, extensionSettings, fallbackChains, modelSettings, sessionSettings, settingsRegistry } from "./modules";
+import { advisorConfig, advisorSettings, collabSettings, compaction, config, dirs, extensionSettings, fallbackChains, goalSettings, modelCompactionSettings, modelSettings, sessionSettings, settingsRegistry } from "./modules";
 import type { OmpSettingsInstance, SettingHandle } from "./module-types/config";
+import { SerialLane } from "../serial-lane";
+
+export const configWrites = new SerialLane();
 
 /** omp's user config directory, `~/.omp/agent` unless `PI_CODING_AGENT_DIR` moves it. */
 export const agentDir: string = dirs.getAgentDir();
@@ -55,9 +58,36 @@ export interface OmpConfig {
 	disabledExtensions: string[];
 }
 
-/** Read-only: omp's `loadReadOnly` never writes the config files back. */
-export async function loadOmpConfig(cwd: string): Promise<OmpConfig> {
-	const settings = await config.Settings.loadReadOnly({ cwd });
+/** Native settings and configured advisors used only by a live dashboard session. */
+export interface SessionControlsConfig {
+	advisorEnabled: boolean;
+	advisorModels: string[];
+	goalEnabled: boolean;
+	goalContinues: boolean;
+	/** Resolve lazily so model switches use omp's per-model overrides with the current context window. */
+	compactionThreshold(model: { provider: string; id: string } | undefined, window: number): number;
+}
+
+/** Session-only discovery; routing and Settings readers do not need advisor files. */
+export async function loadSessionControlsConfig(cwd: string): Promise<SessionControlsConfig> {
+	const [settings, { advisors }] = await Promise.all([config.Settings.loadReadOnly({ cwd }), advisorConfig.discoverAdvisorConfigs(cwd)]);
+	const fallback = settings.getModelRoles().advisor;
+	const enabled = advisors.filter(advisor => advisor.enabled !== false);
+	const advisorModels = enabled.length ? enabled.flatMap(advisor => advisor.model ?? fallback ?? []) : fallback ? [fallback] : [];
+	return {
+		advisorEnabled: advisorSettings.cfgAdvisorEnabled.get(settings),
+		advisorModels,
+		goalEnabled: goalSettings.cfgGoalEnabled.get(settings),
+		goalContinues: goalSettings.cfgGoalContinuationModes.get(settings).includes("rpc"),
+		compactionThreshold: (model, window) => compaction.resolveThresholdTokens(window, modelCompactionSettings.resolveModelCompactionSettings(settings, model)),
+	};
+}
+
+/** omp's settings as a session in `cwd` loads them. Read-only: omp's `loadReadOnly` never writes the config files back. */
+export const loadSessionSettings = (cwd: string): Promise<OmpSettingsInstance> => config.Settings.loadReadOnly({ cwd });
+
+/** The {@link OmpConfig} `settings` holds. */
+export function ompConfigOf(settings: OmpSettingsInstance): OmpConfig {
 	return {
 		modelRoles: settings.getModelRoles(),
 		fallbackChains: sessionSettings.cfgRetryFallbackChains.get(settings),
@@ -70,7 +100,9 @@ export async function loadOmpConfig(cwd: string): Promise<OmpConfig> {
 	};
 }
 
-function setting(id: string): SettingHandle {
+export const loadOmpConfig = async (cwd: string): Promise<OmpConfig> => ompConfigOf(await loadSessionSettings(cwd));
+
+export function setting(id: string): SettingHandle {
 	const handle = settingsRegistry.lookup(id);
 	if (!handle) throw new Error(`omp ${ompVersion} has no setting ${id}`);
 	return handle;
@@ -83,7 +115,7 @@ export const retryChoices = (key: keyof RetrySettings): readonly string[] | unde
 export const assertRetryValue = (key: keyof RetrySettings, value: unknown): void => setting(`retry.${key}`).assertWritable(value);
 
 /** Loads the global config for a write; refuses while omp cannot parse it, since loading one to write moves it aside. */
-async function loadGlobalForWrite(cwd: string): Promise<OmpSettingsInstance> {
+export async function loadGlobalForWrite(cwd: string): Promise<OmpSettingsInstance> {
 	await config.Settings.loadReadOnly({ cwd });
 	return config.Settings.loadIsolated({ cwd });
 }
@@ -129,8 +161,21 @@ export async function readCollabAutoStart(): Promise<CollabAutoStart> {
 
 /** Stages only `collab.autoStart` as `access` and flushes through omp's locked global config writer; a matching value writes nothing. */
 export async function shareTerminalSessions(access: TerminalAccess): Promise<void> {
-	const settings = await loadGlobalForWrite(homedir());
-	if (globalCollabAutoStart(settings) === access) return;
-	setting("collab.autoStart").set(settings, access);
-	await settings.flush();
+	await configWrites.run(async () => {
+		const settings = await loadGlobalForWrite(homedir());
+		if (globalCollabAutoStart(settings) === access) return;
+		setting("collab.autoStart").set(settings, access);
+		await settings.flush();
+	});
+}
+
+/** Stages only the global `stt.enabled` as on and flushes through omp's locked global config writer; already on writes nothing. */
+export async function enableDictation(): Promise<void> {
+	await configWrites.run(async () => {
+		const settings = await loadGlobalForWrite(homedir());
+		const global = settings.getGlobalSettings();
+		if (isObject(global.stt) && global.stt.enabled === true) return;
+		setting("stt.enabled").set(settings, true);
+		await settings.flush();
+	});
 }

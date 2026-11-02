@@ -216,7 +216,7 @@ describe("resident checkout protection", () => {
 		if (!completed || !descendant || !unused) throw new Error("Missing fixture worktree");
 		const done = native(join(root, "completed.jsonl"), completed.path);
 		const running = native(join(root, "running.jsonl"), descendant.path);
-		const host: RosterHost = { ...terminal(main, [agent("Completed", "parked"), agent("Idle", "idle"), agent("Aborted", "aborted"), agent("Descendant", "running", "Completed")]), source: "dashboard", thinkingLevels: [], switching: false, fast: null };
+		const host: RosterHost = { ...terminal(main, [agent("Completed", "parked"), agent("Idle", "idle"), agent("Aborted", "aborted"), agent("Descendant", "running", "Completed")]), source: "dashboard", thinkingLevels: [], switching: false, fast: null, compaction: { auto: true, running: null, thresholdTokens: null }, advisor: null, goal: { kind: "none", continues: false } };
 		const occupants = await new WorktreeOccupants().snapshot([host], (_host, id) => (id === null ? null : id === "Descendant" ? running : done));
 		expect(await codes(occupants, descendant)).toEqual(["occupied"]);
 		expect(await codes(occupants, completed)).toEqual([]);

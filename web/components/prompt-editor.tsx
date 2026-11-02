@@ -11,6 +11,7 @@ import {
 	$addUpdateTag,
 	$createLineBreakNode,
 	$createParagraphNode,
+	$createRangeSelection,
 	$createTextNode,
 	$getNodeByKey,
 	$getRoot,
@@ -28,6 +29,7 @@ import {
 	type NodeKey,
 	PASTE_COMMAND,
 	type PointType,
+	type RangeSelection,
 	SELECTION_CHANGE_COMMAND,
 	type SerializedLexicalNode,
 	TextNode,
@@ -38,7 +40,7 @@ import { isChipKind, PromptChip } from "./prompt-chip";
 
 type ChipData = Pick<PromptToken, "kind" | "label" | "target"> & { text: string };
 
-class ChipNode extends DecoratorNode<JSX.Element> {
+export class ChipNode extends DecoratorNode<JSX.Element> {
 	__chip: ChipData;
 
 	static getType(): string {
@@ -108,26 +110,36 @@ function $offset(point: PointType): number {
 	return offset;
 }
 
-function $select(offset: number): void {
+/** Where offset `offset` into the prompt falls: in a text node, else before the chip or line break there, else at the end. */
+function $pointAt(offset: number): { key: NodeKey; offset: number; type: "text" | "element" } | null {
 	const paragraph = $paragraph();
-	if (!paragraph) return;
+	if (!paragraph) return null;
 	let at = 0;
 	for (const [index, child] of paragraph.getChildren().entries()) {
 		const size = child.getTextContentSize();
-		if ($isTextNode(child) && offset <= at + size) {
-			child.select(offset - at, offset - at);
-			return;
-		}
-		if (!$isTextNode(child) && offset <= at) {
-			paragraph.select(index, index);
-			return;
-		}
+		if ($isTextNode(child) && offset <= at + size) return { key: child.getKey(), offset: offset - at, type: "text" };
+		if (!$isTextNode(child) && offset <= at) return { key: paragraph.getKey(), offset: index, type: "element" };
 		at += size;
 	}
-	paragraph.selectEnd();
+	return { key: paragraph.getKey(), offset: paragraph.getChildrenSize(), type: "element" };
 }
 
-function $fill(text: string): void {
+function $select(start: number, end = start): RangeSelection | null {
+	const [anchor, focus] = [$pointAt(start), $pointAt(end)];
+	if (!anchor || !focus) return null;
+	const selection = $createRangeSelection();
+	selection.anchor.set(anchor.key, anchor.offset, anchor.type);
+	selection.focus.set(focus.key, focus.offset, focus.type);
+	$setSelection(selection);
+	return selection;
+}
+
+/** Puts `text` in place of offsets `start` to `end` into the prompt, the caret after it. */
+export function $replaceRange(start: number, end: number, text: string): void {
+	$select(start, end)?.insertRawText(text);
+}
+
+export function $fill(text: string): void {
 	const root = $getRoot();
 	root.clear();
 	const paragraph = $createParagraphNode();
@@ -153,6 +165,8 @@ export interface PromptEditorHandle {
 	selection: () => { start: number; end: number };
 	/** Focuses the field with the caret at `offset`. */
 	select: (offset: number) => void;
+	/** Puts `text` in place of offsets `start` to `end`, as one undoable edit, without taking focus; the caret follows it. */
+	replace: (start: number, end: number, text: string) => void;
 	editable: () => boolean;
 }
 
@@ -184,6 +198,7 @@ function Sync({ value, onChange, disabled, autoFocus, handle }: { value: string;
 				editor.update(() => $select(offset), { discrete: true });
 				editor.focus();
 			},
+			replace: (start, end, text) => editor.update(() => $replaceRange(start, end, text), { discrete: true }),
 			editable: () => editor.isEditable(),
 		}),
 		[editor],

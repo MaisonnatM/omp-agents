@@ -17,6 +17,15 @@ _Avoid_: CLI session, external session
 A session whose omp the dashboard started in RPC mode, under a keeper.
 _Avoid_: Managed session, RPC session
 
+**Goal**:
+An objective omp tracks for one session, with running, paused, budget-reached, and complete states and optional token accounting limits.
+By default a dashboard goal advances with your prompts; automatic continuation is an explicit omp setting.
+_Avoid_: Task (the agent's todo item), mission
+
+**Advisor**:
+The passive reviewer or reviewers configured by omp's advisor model role or WATCHDOG roster, enabled per session.
+_Avoid_: Subagent, critic
+
 **Past session**:
 A session no omp process runs, read from its session file.
 _Avoid_: Closed session, archived session
@@ -28,6 +37,11 @@ _Avoid_: Crashed session, orphan
 **Subagent**:
 A session that another session's `task` call spawned.
 _Avoid_: Child agent, worker
+
+**Agent definition**:
+The named prompt, declared tools, and model choices omp discovers for a kind of subagent, which Settings › Agents previews before a new session starts.
+It is not a running subagent or a Bot.
+_Avoid_: Worker, Bot type
 
 **Isolation sandbox**:
 The directory under `~/.omp/wt` where omp runs a subagent's isolated task, with a marker naming the omp process that owns it.
@@ -145,6 +159,14 @@ The optional omp setup in `templates/omp/` that one command installs into omp's 
 _Avoid_: Template, preset, config pack
 
 **Workflow**:
-An omp skill whose `SKILL.md` frontmatter names `workflow` in `metadata.tags`, such as the starter kit's `ship`, which Settings › Workflows lists and edits; a command of the same name starts it.
+An omp skill whose `SKILL.md` frontmatter names `workflow` in `metadata.tags`, such as the starter kit's `ship`, which Settings › Workflows lists; authored workflows are editable and packaged workflows are read-only.
 It is not a GitHub Actions workflow under `.github/workflows/`.
 _Avoid_: Playbook, procedure, pipeline
+
+**Extension package**:
+An installed marketplace plugin, npm/git/linked plugin, or registry skill, identified separately for its user or project scope.
+_Avoid_: Loaded extension, workflow
+
+**Contribution**:
+A skill, command, agent, hook, tool, MCP server, rule, prompt, or executable extension supplied by a package or discovery source; being discovered for a workspace does not mean it is loaded in a running session.
+_Avoid_: Plugin, package

@@ -30,11 +30,21 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The starter kit's /poteto-mode now finds pstack's poteto style where the pstack plugin actually installs it, so it works on a new computer.
 - Fixed: finished turns stay in the Inbox when the dashboard restarts, such as after an update, and a turn that finishes while the dashboard is stopped shows up once it starts again.
 - Fixed: opening an Inbox item no longer marks the session it replaces on screen as read.
+- You can dictate a prompt: press the microphone in the message box, or Cmd+Shift+M, speak, and your words land where your cursor was, ready for you to check before you send.
+- The first time you dictate, the message box offers to turn dictation on, and says where your speech is turned into text.
+- Settings now has an Extensions library for installed packages, marketplace catalogs, registry skills, and their contributions, with native install, update, enable, disable, and uninstall actions.
+- Settings › Extensions manages plugins and registry skills and previews their files.
+- Packaged workflows open read-only, with a link to manage their package.
+- Settings › Agents previews new-session agents, with model overrides and execution defaults.
 - A long folder name in the message box now ends in … instead of running past the box and under the model switch.
 - /ship now plans before it builds: the agent compares up to three ways to do the work, keeps the best, and posts that plan on the Linear issue, or in the pull request when there is no issue.
 - /ship no longer needs a Linear ticket: it uses the one you name or one that matches the work, and otherwise ships without one instead of creating a ticket.
 - Agents now start /ship on their own when your request will end in a pull request, and say so in their first reply; say "no ship" to work without it.
 - The Ship card shows the new Plan step between Ticket and Implement.
+- Settings has a new omp settings section: omp's own settings in omp's tabs, with search, saved to your config.yml as you change them.
+- In omp settings, a dot marks a setting changed from omp's default, Reset puts it back, and a setting this workspace sets shows locked, with a link to its file.
+- The context ring now opens Compact, Shake out, Hand off, and a session-only Auto-compact switch.
+- The model menu has an Advisor switch, and the session header lets you set, edit, pause, resume, or clear a goal with an optional token budget.
 - You can drag a Bot in the Bots tab onto Pinned, a section, or Other Bots.
 - Fixed: routines no longer start during the few seconds a sleeping Mac wakes on its own for Power Nap; they wait until you wake it, and news that came in overnight starts one run.
 - Fixed: a routine's command no longer counts time the Mac spent asleep toward its 10-minute limit, and when the Mac slept during a run, the routine's message to the Bot says for how long.

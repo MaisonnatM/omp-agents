@@ -10,6 +10,18 @@ Each file carries the SHA-256 of its text.
 The tag sits under `metadata` because omp's plugin loader (`validateAgentSkillFrontmatter` in `pi-coding-agent/src/discovery/agent-plugin-format.ts`) refuses a top-level key other than `name`, `description`, `license`, `allowed-tools`, `metadata`, and `compatibility`, and a `metadata` value that is not a string.
 Each workflow carries the skill's name as omp resolves it, its `name` field else its directory, and two paths into `files`: `skill`, and `command`, the slash command omp names the same, the project's before the user's, or `null`.
 A workflow's skill is one of `files`, so `PUT /api/settings/file` edits it.
+`agentSettings` holds omp's own settings as omp's terminal `/settings` panel lays them out, read by `readAgentSettings` in `src/omp/agent-settings.ts`, or `{ error }` when omp cannot load them.
+Its tabs, groups, and controls come from `getSettingsForTab` in `pi-tui/src/overlays/settings-defs.ts`, over the entries `orderedSettings` in `pi-coding-agent/src/config/all-settings.ts` lists, so a setting omp adds to its panel shows with no change here.
+Settings that change only how omp's terminal draws are left out: those under `tui.`, `statusLine.`, `display.`, `theme.`, `composer.`, and `terminal.`, `symbolPreset`, `colorBlindMode`, and those omp's panel shows only for an image protocol, native rendering, or vim mode.
+Each row carries omp's default and the values in your `config.yml` (`user`) and in the workspace's settings (`workspace`, `getProjectSettings`), each absent when that layer sets none, and `env`, the variable that overrides it when one is set.
+A credential's value never leaves the server: its `user` and `workspace` are `true` when set, and it carries no default.
+`unlisted` names every other setting a session reads, those omp's panel gives no control to.
+`agents` is an `AgentCatalog` from `src/shared/agents.ts`, a new-session preview read by `src/omp/agents.ts` through native `discoverAgents`, read-only classification, and model selection and resolution.
+It carries the winning definitions, scope and package origin, declared tools, model layers, explicit resolved/inherited/unresolved/source-session model states, disabled markers, missing user overrides, and an explicit bundled-seance marker.
+The four execution settings come from `agentSettings`, not a second catalog projection or settings load.
+Without `cwd`, discovery runs from `/` and filters project definitions, avoiding the home directory's project agents and config; this is a user-only preview, not a running session's extension context.
+Model resolution reads the native registry's currently available models without refreshing providers or making model requests; a model-registry failure is separate from a discovery failure.
+Bundled seance never uses the stored user override in its effective preview.
 `GET /api/models` runs `omp models --json` for the pickers.
 
 **Get started** reads `GET /api/readiness/terminal-sessions` (omp's global `collab.autoStart`) and `GET /api/readiness/starter-kit` (a genuinely read-only installer plan).
@@ -28,7 +40,7 @@ It includes the requests, their input tokens and input cost, the sources by toke
 `GET /api/activity?range=<range>` answers `ActivityRead`, the page's activity over the range, defaulting to `30d`, with the same ranges as Analytics; an unknown range returns 400 `Unknown activity range`.
 It includes each feature's uses, every feature's last use over all stored rows, the moves between views, the time on each view, each local day's active time, visits, and actions, and `serverActions`, every route that takes a `PUT`, for the inventory; see [Activity](activity.md).
 
-Edits go through two endpoints, each taking the same `?cwd=` and answering with the settings as they load after the write:
+Edits go through three endpoints, each taking the same `?cwd=` and answering with the settings as they load after the write:
 
 - `PUT /api/settings/routing` takes one change: a role's model or fallbacks, a model-keyed chain, some `retry.*` values, or the provider order.
   The server writes it through omp's own write path, the one `omp config set` uses: `Settings.loadIsolated`, the setting's `set` or `setEntry`, and `flush`.
@@ -37,6 +49,13 @@ Edits go through two endpoints, each taking the same `?cwd=` and answering with 
   A selector that the config already names passes as it is, so keeping an entry never blocks a save.
   omp checks each retry value against the setting's type and allowed values.
   If omp cannot load `config.yml`, the write is refused, because omp would move the broken file aside before it writes.
+- `PUT /api/settings/agent` takes `{ id, value, expected }` or `{ id, reset: true, expected }` for one of omp's settings, any id `agentSettings` could list, whether or not this page gives it a control.
+  `expected` is the `user` value the page showed, `null` when unset; when `config.yml` holds another value, the server answers 409 with `conflict: true` and writes nothing.
+  The server checks the value with the setting's `assertWritable`, then writes through the same path as routing: `Settings.loadIsolated`, the handle's `set`, or `unset` for a reset, and `flush`.
+  It answers 404 for an id omp does not know and for one that changes only how omp's terminal draws, and 400 for a value omp refuses.
+  An optional nonempty `entry` is accepted only for `task.agentModelOverrides` and names one agent's map entry, including a stale name discovery no longer finds.
+  In that typed entry form, `expected` must be a selector, ordered selectors, or `null` and compares only that user's entry; a new value is a nonempty selector or ordered nonempty list of selectors, and native `setEntry` writes or removes only that entry.
+  Other entries changed elsewhere and workspace-only entries are never copied into the user's map.
 - `PUT /api/settings/file` takes `{ path, text, baseHash }`.
   The server runs discovery again for that `cwd` and writes only a path that it finds there, never one the page invents.
   `baseHash` must match the file's current hash, or `null` for a missing file.

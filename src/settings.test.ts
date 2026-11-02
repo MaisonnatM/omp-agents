@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { agentDir } from "./omp/config";
-import { loadOmpSettings, parseRoutingEdit, Rejected, routeRoles, saveOmpFile } from "./settings";
-import type { CatalogModel, RoutingEdit } from "./shared/models";
+import { loadOmpSettings, parseAgentSettingEdit, parseRoutingEdit, Rejected, routeRoles, saveAgentSetting, saveOmpFile } from "./settings";
+import type { AgentSettingRow } from "./shared/agent-settings";
+import type { CatalogModel, OmpSettings, RoutingEdit } from "./shared/models";
 
 describe("routeRoles", () => {
 	test("a chat role without its own chain walks the default chain; a model-kind role does not", () => {
@@ -146,5 +148,83 @@ describe("saveOmpFile", () => {
 		const refused = await saveOmpFile(null, { path, text: "modelRoles: [\n", baseHash: await loadedHash(path) }).catch((err: Rejected) => err);
 		expect(refused).toMatchObject({ status: 400 });
 		expect(await Bun.file(path).text()).toBe("modelRoles: {}\n");
+	});
+});
+
+describe("parseAgentSettingEdit", () => {
+	test("an edit is a value or a reset, with the user value the page showed", () => {
+		expect(parseAgentSettingEdit({ id: "compaction.enabled", value: false, expected: null })).toEqual({ id: "compaction.enabled", value: false, expected: null });
+		expect(parseAgentSettingEdit({ id: "compaction.enabled", reset: true, expected: false })).toEqual({ id: "compaction.enabled", reset: true, expected: false });
+		for (const raw of [{ id: "compaction.enabled", value: false }, { id: 3, value: false, expected: null }, { id: "compaction.enabled", reset: false, expected: null }, null]) {
+			expect(() => parseAgentSettingEdit(raw)).toThrow("Expected { id, value, expected } or { id, reset: true, expected }");
+		}
+		expect(parseAgentSettingEdit({ id: "task.agentModelOverrides", entry: "reviewer", value: ["@slow:high", "provider/model"], expected: null })).toEqual({ id: "task.agentModelOverrides", entry: "reviewer", value: ["@slow:high", "provider/model"], expected: null });
+		expect(parseAgentSettingEdit({ id: "task.agentModelOverrides", entry: "legacy.agent", reset: true, expected: "@slow" })).toEqual({ id: "task.agentModelOverrides", entry: "legacy.agent", reset: true, expected: "@slow" });
+		for (const raw of [
+			{ id: "task.maxConcurrency", entry: "reviewer", value: 2, expected: null },
+			{ id: "task.agentModelOverrides", entry: "", value: "@slow", expected: null },
+			{ id: "task.agentModelOverrides", entry: "reviewer", value: [], expected: null },
+			{ id: "task.agentModelOverrides", entry: "reviewer", value: ["@slow", ""], expected: null },
+			{ id: "task.agentModelOverrides", entry: "reviewer", value: "@slow", expected: 2 },
+			{ id: "task.agentModelOverrides", entry: "reviewer", reset: true, expected: { nested: "@slow" } },
+		]) expect(() => parseAgentSettingEdit(raw)).toThrow();
+	});
+});
+
+describe("saveAgentSetting", () => {
+	const path = join(agentDir, "config.yml");
+	const row = (settings: OmpSettings, id: string): AgentSettingRow | undefined =>
+		"error" in settings.agentSettings ? undefined : settings.agentSettings.tabs.flatMap(tab => tab.groups.flatMap(group => group.rows)).find(found => found.id === id);
+
+	test("a save writes only that setting to config.yml, and a reset removes it", async () => {
+		writeFileSync(path, "modelRoles: {}\n");
+		const saved = await saveAgentSetting(null, { id: "compaction.enabled", value: false, expected: null });
+		expect(row(saved, "compaction.enabled")).toMatchObject({ user: false });
+		expect(Bun.YAML.parse(await Bun.file(path).text())).toEqual({ modelRoles: {}, compaction: { enabled: false } });
+
+		const reset = await saveAgentSetting(null, { id: "compaction.enabled", reset: true, expected: false });
+		expect(row(reset, "compaction.enabled")).not.toHaveProperty("user");
+		expect(Bun.YAML.parse(await Bun.file(path).text())).toEqual({ modelRoles: {} });
+	});
+
+	test("a value changed in config.yml since the page read it is not overwritten", async () => {
+		writeFileSync(path, "compaction:\n  enabled: true\n");
+		const stale = await saveAgentSetting(null, { id: "compaction.enabled", value: false, expected: null }).catch((err: Rejected) => err);
+		expect(stale).toMatchObject({ status: 409, conflict: true });
+		expect(await Bun.file(path).text()).toBe("compaction:\n  enabled: true\n");
+	});
+
+	test("a credential is checked against whether it is set, never its text", async () => {
+		writeFileSync(path, "hindsight:\n  apiToken: old-token\n");
+		const saved = await saveAgentSetting(null, { id: "hindsight.apiToken", value: "new-token", expected: true });
+		expect(row(saved, "hindsight.apiToken")).toMatchObject({ user: true });
+		expect(Bun.YAML.parse(await Bun.file(path).text())).toEqual({ hindsight: { apiToken: "new-token" } });
+	});
+
+	test("only a setting a session reads can be written, with a value omp accepts", async () => {
+		writeFileSync(path, "modelRoles: {}\n");
+		for (const id of ["theme.dark", "no.such.setting"]) {
+			expect(await saveAgentSetting(null, { id, value: "x", expected: null }).catch((err: Rejected) => err)).toMatchObject({ status: 404 });
+		}
+		expect(await saveAgentSetting(null, { id: "compaction.enabled", value: "yes", expected: null }).catch((err: Rejected) => err)).toMatchObject({ status: 400 });
+		expect(await Bun.file(path).text()).toBe("modelRoles: {}\n");
+	});
+
+	test("entry saves and clears preserve other user entries and never copy workspace overrides", async () => {
+		const cwd = mkdtempSync(join(tmpdir(), "agent-entry-"));
+		mkdirSync(join(cwd, ".omp"), { recursive: true });
+		writeFileSync(join(cwd, ".omp", "config.yml"), "task:\n  agentModelOverrides:\n    reviewer: workspace/model\n    workspace-only: workspace/other\n");
+		writeFileSync(path, "task:\n  maxConcurrency: 8\n  agentModelOverrides:\n    researcher: ['unknown/selector:high', '@slow']\n");
+		try {
+			const saved = await saveAgentSetting(cwd, { id: "task.agentModelOverrides", entry: "reviewer", value: ["@plan:high", "provider/*"], expected: null });
+			expect("error" in saved.agents ? saved.agents : saved.agents.userOverrides).toEqual({ researcher: ["unknown/selector:high", "@slow"], reviewer: ["@plan:high", "provider/*"] });
+			expect(Bun.YAML.parse(await Bun.file(path).text())).toEqual({ task: { maxConcurrency: 8, agentModelOverrides: { researcher: ["unknown/selector:high", "@slow"], reviewer: ["@plan:high", "provider/*"] } } });
+			const stale = await saveAgentSetting(cwd, { id: "task.agentModelOverrides", entry: "reviewer", reset: true, expected: null }).catch((err: Rejected) => err);
+			expect(stale).toMatchObject({ status: 409, conflict: true });
+			await saveAgentSetting(cwd, { id: "task.agentModelOverrides", entry: "reviewer", reset: true, expected: ["@plan:high", "provider/*"] });
+			expect(Bun.YAML.parse(await Bun.file(path).text())).toEqual({ task: { maxConcurrency: 8, agentModelOverrides: { researcher: ["unknown/selector:high", "@slow"] } } });
+		} finally {
+			rmSync(cwd, { recursive: true, force: true });
+		}
 	});
 });

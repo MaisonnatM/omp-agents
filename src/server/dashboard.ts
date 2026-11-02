@@ -19,6 +19,7 @@ import { createIntegrations, type Integrations, integrationFetch, integrationSig
 import { errorText } from "../json";
 import type { LiveSession } from "../live-session";
 import { answerDiscussion } from "../omp/discussion";
+import { startDictation } from "../omp/dictation";
 import { agentDir } from "../omp/config";
 import { type HostSnapshot, listHosts } from "../omp/collab";
 import { findMcpServers } from "../omp/mcp";
@@ -95,6 +96,7 @@ import { RequestLedger } from "./request-ledger";
 import { ACTIVITY_KEPT_DAYS, ActivityStore } from "./activity-store";
 import { DAY_MS } from "../shared/days";
 import { Discussions } from "./discussions";
+import { Dictation } from "./dictation";
 import { createClientHandler } from "./socket";
 import { botExtension, designerExtension, routerExtension, shepherdExtension } from "./resources";
 import { createStarter, reattachAll, type SessionJoin } from "./start";
@@ -189,6 +191,7 @@ export class Dashboard {
 	readonly #loops: Loops;
 	readonly #requests: RequestLedger;
 	readonly #discussions = new Discussions(answerDiscussion);
+	readonly #dictation = new Dictation(startDictation);
 	readonly #activity = new ActivityStore(activityDb);
 	readonly #selfUpdate: SelfUpdate;
 	/** The server, from {@link start} on; until then there is no socket to publish to. */
@@ -596,6 +599,7 @@ export class Dashboard {
 			messageBot: async (id, text) => void (await this.#bots.message(id, text)),
 			changeNotices: (ids, op) => notices.apply(ids, op),
 			discussions: this.#discussions,
+			dictation: this.#dictation,
 			activity: { owner: () => ownerLock.held, store: this.#activity },
 			}),
 			(t, error) => console.error(`omp-agents: ${t} failed: ${errorText(error)}`),
@@ -783,6 +787,7 @@ export class Dashboard {
 		this.#views.watch(ws, [], []);
 		this.#requests.close(ws);
 		this.#discussions.close(ws);
+		this.#dictation.close(ws);
 	}
 
 	/** The workspaces sessions count in: live ones first, then saved ones newest first. */

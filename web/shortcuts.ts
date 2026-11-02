@@ -12,11 +12,13 @@ export type ShortcutId =
 	| "steer"
 	| "deliverSteer"
 	| "dequeue"
+	| "dictate"
 	| "switcher"
 	| "newSession"
 	| "sessionSearch"
 	| "endSession"
 	| "openPullRequest"
+	| "setGoal"
 	| "previousSession"
 	| "nextSession"
 	| "sessionsNext"
@@ -173,6 +175,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		keys: [{ chord: { key: "Enter", mod: true }, scope: "composer" }],
 	},
 	{ id: "dequeue", category: "sessions", label: "Move the last queued message back into the empty composer", keys: [{ chord: { key: "ArrowUp" }, scope: "composer" }] },
+	{ id: "dictate", category: "sessions", label: "Dictate a prompt, or stop dictating", keys: [{ chord: { key: "m", mod: true, shift: true }, scope: "composer" }] },
 	{ id: "switcher", category: "general", label: "Open the command menu", keys: [{ chord: { key: "k", mod: true }, scope: "anywhere" }] },
 	{ id: "getStarted", category: "general", label: "Open Get started, the step-by-step setup", command: "Get started", keys: [] },
 	{
@@ -188,6 +191,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "sessionSearch", category: "sessions", label: "Search the sidebar's sessions", keys: [{ chord: { key: "f", mod: true }, scope: "anywhere" }] },
 	{ id: "endSession", category: "sessions", label: "End the focused session", keys: [{ chord: END_SESSION, scope: "anywhere" }] },
 	{ id: "openPullRequest", category: "sessions", label: "Review, push, and open a pull request for the focused session's branch", command: "Open pull request", keys: [] },
+	{ id: "setGoal", category: "sessions", label: "Set or edit the focused session's objective and token budget", command: "Set or edit goal", keys: [] },
 	{
 		id: "previousSession",
 		category: "sessions",

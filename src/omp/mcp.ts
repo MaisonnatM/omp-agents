@@ -10,6 +10,7 @@ import { ApiError, type Bearer } from "../signed-fetch";
 import { ompCommand } from "./install";
 import { auth, dirs, discoveryHelpers, mcpClient, mcpConfig, mcpConfigWriter, mcpCredentials, mcpOAuthDiscovery, mcpOAuthFlow, mcpRpc } from "./modules";
 import type { McpConnection, McpServerConfig, McpSourceMeta, McpToolDefinition } from "./module-types/mcp";
+import { withDiscovery } from "./scoped-discovery";
 
 export type { McpServerConfig, McpSourceMeta, McpToolDefinition };
 
@@ -34,7 +35,7 @@ const credentialIdFor = (url: string, configured: string | undefined): string | 
 
 /** The enabled servers in omp's user-level MCP config whose `url` is on `host`, in the config's order. */
 export async function findMcpServers(host: string): Promise<McpServer[]> {
-	const { configs } = await mcpConfig.loadAllMCPConfigs(process.cwd(), { enableProjectConfig: false });
+	const { configs } = await withDiscovery(process.cwd(), () => mcpConfig.loadAllMCPConfigs(process.cwd(), { enableProjectConfig: false }));
 	return serversOnHost(configs, host).flatMap(({ name, config }) => credentialFor(name, config) ?? []);
 }
 
@@ -190,7 +191,7 @@ export interface ConfiguredMcpServer {
 export async function listMcpServers(): Promise<ConfiguredMcpServer[]> {
 	const userPath = userMcpConfigPath();
 	const [{ configs, sources }, file] = await Promise.all([
-		mcpConfig.loadAllMCPConfigs(process.cwd(), { enableProjectConfig: false }),
+		withDiscovery(process.cwd(), () => mcpConfig.loadAllMCPConfigs(process.cwd(), { enableProjectConfig: false })),
 		mcpConfigWriter.readMCPConfigFile(userPath),
 	]);
 	const native: McpSourceMeta = { provider: "native", providerName: "OMP", path: userPath, level: "user" };

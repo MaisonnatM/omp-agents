@@ -5,6 +5,7 @@ import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
 import type { ActivityEvent } from "./activity";
 import type { Bot, BotChange, BotId, BotLast } from "./bots";
 import type { DiscussionEvent, DiscussionRequest } from "./discussions";
+import type { DictationEvent } from "./dictation";
 import type { ModelEntry, ModelOption, PlanUsage } from "./models";
 import type { QueuedMerge } from "./merge-queue";
 import type { Notice, NoticeOp } from "./notices";
@@ -14,6 +15,7 @@ import type { TrustAsk, TrustedProject } from "./project-trust";
 import type { ReviewDraft, ReviewDraftEdit } from "./review-drafts";
 import type { RouterTask, RouterTaskChange } from "./router";
 import type { ScheduledChange, ScheduledSend } from "./scheduled";
+import type { ContextAction, GoalChange } from "./session-controls";
 import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View, WithdrawnMessage } from "./sessions";
 import type { AgentMedia, AgentSource, ChangedFile, Item } from "./transcript";
 import type { Turn } from "./trajectory";
@@ -77,6 +79,8 @@ export type ServerMsg =
 	| { t: "review-drafts"; list: ReviewDraft[] }
 	/** One step of the answer to this socket's `discuss` with `id`, until its `end`. */
 	| { t: "discussion"; id: number; event: DiscussionEvent }
+	/** One step of this page's `dictation-start` with `captureId`, until its `end`. */
+	| { t: "dictation"; captureId: string; event: DictationEvent }
 	/** Answers the page's message tagged `ack` once its handler settled: `error` is why it threw, `null` when it did not. */
 	| { t: "done"; ack: number; error: string | null };
 
@@ -123,6 +127,14 @@ export type ClientMsg =
 	| { t: "set-thinking"; instanceId: string; level: string }
 	/** Turn omp's `/fast` on or off for a session this dashboard started. */
 	| { t: "set-fast"; instanceId: string; enabled: boolean }
+	/** Run an idle dashboard session's native context-maintenance slash command. */
+	| { t: "context"; instanceId: string; action: ContextAction }
+	/** Turn automatic compaction on or off for this dashboard session only. */
+	| { t: "set-auto-compaction"; instanceId: string; enabled: boolean }
+	/** Enable or disable this dashboard session's configured advisor through `/advisor`. */
+	| { t: "set-advisor"; instanceId: string; enabled: boolean }
+	/** Set, pause, resume, or clear a dashboard session's goal through native RPC. */
+	| { t: "goal"; instanceId: string; change: GoalChange }
 	/** Reply to one of a live session's pending `requests`. */
 	| { t: "answer"; instanceId: string; requestId: string; answer: UserAnswer }
 	/** Cancel a running subagent of a live session without stopping the session's turn. */
@@ -151,6 +163,12 @@ export type ClientMsg =
 	| { t: "discuss"; id: number; request: DiscussionRequest }
 	/** Stop the answer to this socket's `discuss` with `id`, which then ends with no error. */
 	| { t: "discuss-stop"; id: number }
+	/** Open this computer's microphone for a composer, with the settings of directory `cwd`; never replayed, so a reconnect opens none. */
+	| { t: "dictation-start"; captureId: string; cwd: string }
+	/** Stop this socket's capture `captureId`, which ends with what was said. */
+	| { t: "dictation-stop"; captureId: string }
+	/** Close the microphone of this socket's capture `captureId` at once, keeping nothing it heard. */
+	| { t: "dictation-discard"; captureId: string }
 	/** Page load `client`'s activity events, numbered from `first`; only the server holding `server.lock` stores them, and a batch sent again changes nothing. */
 	| { t: "activity"; client: string; first: number; events: ActivityEvent[] };
 

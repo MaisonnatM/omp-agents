@@ -1,6 +1,6 @@
 /**
- * Unsent composer text, one draft per session, subagent, new-session draft, and Bot, kept in this browser across
- * reloads, and the channels that append text and attach files to it from elsewhere on the page, such as the session's Browser.
+ * Unsent composer text, one draft per session, subagent, new-session draft, and Bot, kept in this browser across reloads, and
+ * the channels that append text, replace part of it, and attach files to it from elsewhere on the page, such as the session's Browser and dictation.
  */
 import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from "react";
 import type { BotId } from "../src/shared/bots";
@@ -60,6 +60,14 @@ function composerChannel<T>() {
 
 const texts = composerChannel<string>();
 const files = composerChannel<File>();
+const replacements = composerChannel<Replacement>();
+
+/** `text` in place of offsets `start` to `end` of a composer's text. */
+export interface Replacement {
+	start: number;
+	end: number;
+	text: string;
+}
 
 /** Appends `text` to the composer of `key`: in place when it is mounted, without taking focus, else to its kept draft. */
 export function appendToComposer(key: string, text: string): void {
@@ -71,6 +79,20 @@ export const attachToComposer = (key: string, file: File): boolean => files.send
 
 /** Has the composer of `key` take the files {@link attachToComposer} sends it. */
 export const useComposerFiles = files.useReceiver;
+
+/**
+ * Replaces part of the composer of `key`: in place when it is mounted, else in its kept draft, read as `base` while it keeps none.
+ * Offsets past the draft's end land at its end.
+ */
+export function replaceInComposer(key: string, base: string, replacement: Replacement): void {
+	if (replacements.send(key, replacement)) return;
+	const draft = drafts.get(key) ?? base;
+	const [start, end] = [Math.min(replacement.start, draft.length), Math.min(replacement.end, draft.length)];
+	putDraft(key, draft.slice(0, start) + replacement.text + draft.slice(end));
+}
+
+/** Has the composer of `key` take the replacements {@link replaceInComposer} sends it. */
+export const useComposerReplacements = replacements.useReceiver;
 
 /**
  * A composer's text, starting from the draft kept under `key`, else from `seed`, and kept there as it changes. Empty

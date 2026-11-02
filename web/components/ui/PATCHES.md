@@ -26,6 +26,8 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
   The dashboard renders its own queue and suggestions in `beforeEditor` and `afterActions`.
 - `clickToFocus`, `maxFiles`, and `filePreviewSize` are removed, since the dashboard never set them: a click on the frame always focuses the text field, any number of files attach, and previews are 80px.
 - `sending`: keeps the send button loading and disabled until the consumer's send settles.
+- `locked`: the text field turns read-only and the draft cannot send, while the slots and attachments stay usable and the turn's Stop button stays hidden.
+  The dashboard locks the composer while dictation fills it.
 - `beforeEditor`: a slot above the text field and below the attached files, where the dashboard renders its queued rows.
 - `afterActions`: a slot under the action bar, inside the composer's frame, where the dashboard renders its suggested prompts.
 - `useRegionHeight` and `useIsTouch` move to `hooks/use-region-height.ts` and `hooks/use-is-touch.ts`, and `FilePreviewTile` to `ui/file-preview-tile.tsx`, so the dashboard's rows in the slots animate and reveal their × as the attachments do.

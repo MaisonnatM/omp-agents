@@ -2,6 +2,15 @@
 
 - Opening a live session or subagent puts the cursor in the focused pane's composer once it accepts messages, so you can type right away.
   A session that reconnects takes the cursor back the same way.
+- A dashboard session's title controls include **Set goal** (target icon); the command palette's **Set or edit goal** opens the same editor for the focused live dashboard session.
+  Enter an objective and an optional token budget: None, 100k, 500k, 1M, or Custom.
+  Its header pill opens the full objective, token count, elapsed time, and Pause, Resume, Edit, or Clear.
+  Clear asks you to click **Clear goal?** to confirm; clicking elsewhere or pressing Escape cancels it.
+  A finished goal stays marked **Done** until cleared; a goal at its budget offers **Raise budget**.
+  Editing or raising the budget replaces the goal and resets its token and time counts.
+  By default the goal advances when you send a prompt, not on its own; automatic continuation requires `"rpc"` in omp's `goal.continuationModes`.
+  Stop pauses the goal, and Resume in its pill lets it run again.
+  `/goal <objective>`, `/goal show`, `/goal pause`, `/goal resume`, `/goal drop`, and `/goal budget <count|none>` in the composer use the same controls.
 - The road icon right after a session's title in a pane's header switches the pane between the transcript and **Trajectory**; a live session keeps its composer under either.
   **Trajectory** is a ledger of the conversation's turns, one row per prompt you or a skill sent, with a row first for what came before your first prompt.
   Its columns are the prompt's first line with its skill, the turn's model requests and tool calls, its input, output, cache-read, and cache-write tokens, and its cost, underlined by the turn's share of the session's cost; a last row adds up every turn.
