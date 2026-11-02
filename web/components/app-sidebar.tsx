@@ -1,11 +1,9 @@
 import { type Dispatch, type SetStateAction, memo, useCallback, useMemo } from "react";
-import type { Notice } from "../../src/shared/notices";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Bot, BotId, BotLast } from "../../src/shared/bots";
 import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import { botRows } from "../bots-model";
-import { inboxSections, itemCount } from "../inbox-model";
 import type { NotesListView, PullRequestsRoute, Page, SettingsRoute, SidebarPanel, SidebarTab, TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SessionLists } from "../use-session-lists";
@@ -35,8 +33,6 @@ interface AppSidebarProps {
 	/** Every session, including those in directories the sidebar hides, so a todo's linked session resolves. */
 	hosts: RosterHost[];
 	past: PastSession[];
-	/** The notices, whose pull request moves, Slack messages, and stopped sessions the Inbox counts. */
-	notices: Notice[];
 	/** The Bots, `null` until the server sends them. */
 	bots: Bot[] | null;
 	/** Each Bot's conversation's last words, `null` for a Bot with none yet. */
@@ -55,7 +51,7 @@ interface AppSidebarProps {
  */
 export const AppSidebar = memo(function AppSidebar({
 	scope: { visible, workspaces, workspace },
-	sessions: { lists, waiting, query, setQuery, togglePin, pinned },
+	sessions: { lists, waiting, query, setQuery, togglePin },
 	page,
 	panes,
 	tab,
@@ -67,7 +63,6 @@ export const AppSidebar = memo(function AppSidebar({
 	notesView,
 	hosts,
 	past,
-	notices,
 	bots,
 	botLasts,
 	todoView,
@@ -92,9 +87,6 @@ export const AppSidebar = memo(function AppSidebar({
 	const todoSessions = useMemo(() => ({ hosts, past }), [hosts, past]);
 	const botList = useMemo(() => (bots === null ? null : botRows(bots, hosts, botLasts)), [bots, hosts, botLasts]);
 	const onShowShortcuts = useCallback(() => setShortcutsOpen(true), [setShortcutsOpen]);
-	const inboxCount = useMemo(() => itemCount(inboxSections(hosts, notices, Date.now(), pinned)), [hosts, notices, pinned]);
-	const inboxOpen = page?.kind === "inbox";
-	const inbox = useMemo(() => ({ count: inboxCount, open: inboxOpen }), [inboxCount, inboxOpen]);
 	return (
 		<Roster
 			workspaces={workspaces}
@@ -125,7 +117,6 @@ export const AppSidebar = memo(function AppSidebar({
 			workspace={workspace}
 			onPickWorkspace={onPickWorkspace}
 			onShowShortcuts={onShowShortcuts}
-			inbox={inbox}
 		/>
 	);
 });

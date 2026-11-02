@@ -3,7 +3,7 @@
  * requests in, the screen their routines' events pass first, and the supervisor that restarts a stuck task. The
  * Dashboard builds one and forwards the lifecycle of every live session to it.
  */
-import type { LiveSession, TurnReply } from "../live-session";
+import type { LiveSession } from "../live-session";
 import type { Bot, BotId } from "../shared/bots";
 import type { StartRequest, StartResult } from "../shared/sessions";
 import { repeat } from "./loops";
@@ -120,7 +120,7 @@ export class Router {
 	}
 
 	/** A task's session that ends its turn waits for review, and tells its Router. */
-	turnEnded(instanceId: string, reply: TurnReply | null): void {
+	turnEnded(instanceId: string, reply: string | null): void {
 		void this.tasks.turnEnded(instanceId, reply);
 	}
 }

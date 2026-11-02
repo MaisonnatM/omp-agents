@@ -18,7 +18,7 @@
   `web/components/use-notice-toasts.tsx` holds `useNoticeToasts`, which `web/app.tsx` calls so a notice no page has shown toasts once under its `NoticeOrigin`, even with the sidebar hidden.
   Both draw each notice from `presentNotice` in `web/notice-model.ts`, the one place that tells notice kinds apart: its source, headline, preview, link, face, action, and toast policy.
   `web/use-attention.ts` holds `useAttention`, which `web/app.tsx` calls too: it sends the desktop app's Dock badge, raises a session notification through the desktop bridge, and sends `read` for the unread sessions the panes show in a focused window; `useSessionNotifications` there holds the **Settings › Preferences** choices, and `playSound` previews a sound.
-  `web/attention.ts` holds its rules: `waitOf`, what a live session waits on you for, its oldest question, a wait with no question, or its unread turn, which `needsYou` and the Inbox read too; `attend`, which keeps an episode per live session and raises each question and turn once, none for what waited when the page first saw the session; `shownViews`, the views on screen, none under a page or a session link; and `unreadShown`.
+  `web/attention.ts` holds its rules: `waitOf`, what a live session waits on you for, its oldest question, a wait with no question, or its unread turn, which `needsYou` reads too; `attend`, which keeps an episode per live session and raises each question and turn once, none for what waited when the page first saw the session; `shownViews`, the views on screen, none under a page or a session link; and `unreadShown`.
   The command palette's **Update dashboard** runs `updateDashboard` in `web/dashboard-update.ts`.
 - `web/components/todo/`: the Todo page.
   `page.tsx` is the page and its lists, **Archive** included, which `LIST_KINDS` marks read-only: its rows put a todo back or delete it for good, and its header offers **Empty** where the others offer **Clear done**.
@@ -37,15 +37,6 @@
   `web/components/notes/nav.tsx` draws its sidebar's **All** and **From agents** lists from `web/notes-views.ts`.
   A top-level todo's `detail.tsx` lists linked notes and creates a note with its todo id.
   `web/palette-records.ts` includes note titles and bodies in command-menu search.
-- `web/components/inbox/page.tsx`: the Inbox page's grouped two-line rows, which animate in and out, filters, and the open item, a `SessionDetail` or a `NoticeDetail` under the `InboxBar` they share, with its keys.
-  `web/inbox-model.ts` builds its items from the roster and the notices, with each item's title, place, and second line, groups and orders them into sections, pinned sessions' questions first, filters the sections, and picks the open item and the item the address then names with `openFor`.
-  `SessionDetail` is keyed by its session, so two items of one session share the conversation, a `ViewConversation` with no header and a composer that waits for R, which it streams through `useShowConversation` without marking it read.
-  R, 1 to 9, and 0 go through the conversation's `ConversationHandle`, so a key sends a suggestion exactly as the composer's own list does.
-  Each bar button runs through `useAction` from `web/use-action.ts`, which shows it pending and toasts a failure; the notice's button from `web/components/notices.tsx` clears the notice the same way.
-  `useOpenLatest` from `web/use-open-latest.ts` opens the first item on a bare `#inbox`, as on Email, Notes, and Todo, and the page writes the item that takes a left item's place into the address with a history replace, so an item that arrives later cannot take either over.
-  **Close** and Escape empty the address, and `useReturnFocus` from `web/components/list-page.tsx` returns the focus to the item's row.
-  **End session** and E show only for a session the page can write to, as the session pane's header decides with `subjectOf` from `web/components/subject.ts`.
-  The sidebar's **Inbox** row with its count is in `web/components/session-list.tsx`, counted in `web/components/app-sidebar.tsx`.
 - `web/components/routines/routines-card.tsx`: `RoutinesCard`, a Bot's routines as one card in place of its conversation, as Arc's Agent routines: a header with **New routine**, then a row per routine, one open at a time, the arrow keys moving between their names.
   `web/components/routines/routine-row.tsx` draws a row: its name, **Run now**, and the switch that pauses it; its schedules and its next run's countdown; its trigger logos, its task, and its last 10 runs as a strip of ticks, each with a tooltip, that opens the row on that run.
   `web/components/routines/routine-open.tsx` draws an open row: the picked run, with what triggered it, its command's output, and its errors; the task whole; the schedule as a cadence, a time, and a day that save as they change; and **Edit** and **Delete**.

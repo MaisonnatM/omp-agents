@@ -31,8 +31,6 @@ const task = (fields: Partial<RouterTask> = {}): RouterTask => ({
 	...fields,
 });
 
-const reply = (body: string) => ({ body, suggestions: [] });
-
 /** Tasks over a fresh file, with `active` whether this server holds the owner lock. */
 function harness({ active = true } = {}) {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-router-tasks-"));
@@ -58,10 +56,10 @@ test("a task whose session ends its turn waits for review and tells its Router t
 	tasks.apply({ op: "add", task: task() });
 	tasks.bind("i1", "t1", "s1");
 	expect(file.get("t1")).toMatchObject({ sessionId: "s1", status: "working" });
-	await tasks.turnEnded("i1", reply("I found the race.\n\nIt is fixed in `retry.ts`, and the test passes.\n"));
+	await tasks.turnEnded("i1", "I found the race.\n\nIt is fixed in `retry.ts`, and the test passes.\n");
 	expect(file.get("t1")).toMatchObject({ status: "review" });
 	expect(told).toEqual([[atlas, 'Task "Fix the flaky test" finished: It is fixed in `retry.ts`, and the test passes.']]);
-	await tasks.turnEnded("i1", reply("Still done."));
+	await tasks.turnEnded("i1", "Still done.");
 	await tasks.exited("i1");
 	expect(told).toHaveLength(1);
 	expect(changes()).toBe(3);
@@ -73,7 +71,7 @@ test("a quiet task moves to review without a word, and a session that exits mid-
 	tasks.apply({ op: "add", task: task({ id: "t2", title: "Review the docs" }) });
 	tasks.bind("i1", "t1", "s1");
 	tasks.bind("i2", "t2", "s2");
-	await tasks.turnEnded("i1", reply("Done."));
+	await tasks.turnEnded("i1", "Done.");
 	await tasks.exited("i2");
 	expect(file.value.map(({ status }) => status)).toEqual(["review", "review"]);
 	expect(told).toEqual([[atlas, 'Task "Review the docs" finished: its session ended without a reply.']]);
@@ -85,8 +83,8 @@ test("a task's session resumed, as after a restart, moves its task too, and a pr
 	tasks.join({ kind: "resume", sessionId: "s1" }).attach({ instanceId: "i9", sessionId: "s1", cwd: "/work/webapp" });
 	// Another session's resume binds nothing.
 	tasks.join({ kind: "resume", sessionId: "s8" }).attach({ instanceId: "i8", sessionId: "s8", cwd: "/work/webapp" });
-	await tasks.turnEnded("i8", reply("Done."));
-	await tasks.turnEnded("i9", reply("Done."));
+	await tasks.turnEnded("i8", "Done.");
+	await tasks.turnEnded("i9", "Done.");
 	expect(file.get("t1")?.status).toBe("review");
 	tasks.turnStarted("i9");
 	expect(file.get("t1")?.status).toBe("working");
@@ -98,7 +96,7 @@ test("a server without the owner lock changes no task and tells nobody", async (
 	const { file, tasks, told } = harness({ active: false });
 	tasks.apply({ op: "add", task: task({ sessionId: "s1" }) });
 	tasks.join({ kind: "resume", sessionId: "s1" }).attach({ instanceId: "i1", sessionId: "s1", cwd: "/work/webapp" });
-	await tasks.turnEnded("i1", reply("Done."));
+	await tasks.turnEnded("i1", "Done.");
 	expect(file.get("t1")?.status).toBe("working");
 	expect(told).toEqual([]);
 });

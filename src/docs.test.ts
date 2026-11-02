@@ -86,10 +86,13 @@ function anchorsIn(file: string): Set<string> {
 
 describe("docs name files and headings that exist", () => {
 	test.each(repoDocs)("%s", file => {
-		const lines = prose(readFileSync(join(root, file), "utf8").split("\n"));
+		const text = readFileSync(join(root, file), "utf8");
+		// A deprecated decision record covers code deleted with no replacement, so its paths name files that are gone.
+		const deprecated = file.startsWith("docs/decisions/") && /^---\n(?:.*\n)*?status: deprecated\n/.test(text);
+		const lines = prose(text.split("\n"));
 		const problems = lines.flatMap((line, i) => {
 			const found: string[] = [];
-			for (const [, path] of line.matchAll(REPO_PATH)) {
+			for (const [, path] of deprecated ? [] : line.matchAll(REPO_PATH)) {
 				const bare = path.replace(/:\d+(?:-\d+)?$/, "");
 				if (BUILD_OUTPUT.some(dir => bare === dir || bare.startsWith(`${dir}/`))) continue;
 				if (!existsSync(join(root, bare))) found.push(`line ${i + 1}: \`${path}\` does not exist`);

@@ -265,7 +265,7 @@ describe("DashboardSession turns", () => {
 		expect(session.status).toBe("idle");
 	});
 
-	test("a terminal agent_end reports the turn's last reply once, with its suggested prompts apart", async () => {
+	test("a terminal agent_end reports the turn's last reply once, without its suggested prompts", async () => {
 		const { client, updates } = await startSession();
 		const ended = () => updates.filter(update => update.kind === "turn-ended");
 		const assistant = (text: string) => ({ role: "assistant", content: [{ type: "text", text }] });
@@ -276,7 +276,7 @@ describe("DashboardSession turns", () => {
 			type: "agent_end",
 			messages: [assistant("Done: ok\n\nSuggestions:\n1. Ship it"), { role: "assistant", content: [{ type: "toolCall", id: "t1" }] }, { role: "toolResult", content: [] }],
 		});
-		expect(ended()).toEqual([{ kind: "turn-ended", reply: { body: "Done: ok", suggestions: ["Ship it"] }, failure: null }]);
+		expect(ended()).toEqual([{ kind: "turn-ended", reply: "Done: ok", failure: null }]);
 		client.fire({ type: "agent_end", messages: [] });
 		expect(ended().at(-1)).toEqual({ kind: "turn-ended", reply: null, failure: null });
 	});

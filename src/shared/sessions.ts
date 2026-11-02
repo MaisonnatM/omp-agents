@@ -133,19 +133,11 @@ interface RosterHostBase extends SessionFacts {
 	unread: UnreadTurn | null;
 }
 
-/**
- * A turn that ended unseen: when, in ms since the epoch, the first line of its reply, the reply itself cut to {@link UNREAD_BODY_MAX}
- * characters, both `null` when it ended on none, and the prompts its `Suggestions:` block offered, which the Inbox sends in one click.
- */
+/** A turn that ended unseen: when, in ms since the epoch, and the first line of its reply, `null` when it ended on none. */
 export interface UnreadTurn {
 	at: number;
 	reply: string | null;
-	body: string | null;
-	suggestions: string[];
 }
-
-/** The most characters of an unread turn's reply each roster push carries. */
-export const UNREAD_BODY_MAX = 4000;
 
 export type RosterHost = RosterHostBase &
 	(

@@ -85,7 +85,7 @@ test("a reattached session whose turn ended while no server listened is listed w
 		const prompted = join(dir, "prompted.jsonl");
 		writeFileSync(prompted, `${JSON.stringify({ type: "session", id: "s", cwd: dir })}\n${line("2026-11-02T10:00:20.000Z", "user", "Run the tests")}`);
 		const unreadPath = join(dir, "unread.json");
-		new LiveSessions(() => {}, undefined, unreadPath).markUnread("i-saved", { at: 5_000, reply: { body: "Saved reply.", suggestions: [] } });
+		new LiveSessions(() => {}, undefined, unreadPath).markUnread("i-saved", { at: 5_000, reply: "Saved reply." });
 		flushJsonFiles();
 
 		spyOn(rpc, "keptSessions").mockReturnValue(["i-ended", "i-prompted", "i-working", "i-idle", "i-saved"]);
@@ -105,11 +105,11 @@ test("a reattached session whose turn ended while no server listened is listed w
 		await reattachAll(sessions, () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }), () => new Set(["s-i-ended", "s-i-prompted", "s-i-working"]));
 		const facts: SessionFacts = { tickets: [], pullRequests: [], worktree: null, branch: null, ship: null, workspace: null };
 		expect(sessions.rows(() => facts).map(row => [row.instanceId, row.unread])).toEqual([
-			["i-ended", { at: Date.parse("2026-11-02T10:00:12.000Z"), reply: "done", body: "done", suggestions: [] }],
-			["i-prompted", { at: Date.parse("2026-11-02T10:00:20.000Z"), reply: null, body: null, suggestions: [] }],
+			["i-ended", { at: Date.parse("2026-11-02T10:00:12.000Z"), reply: "done" }],
+			["i-prompted", { at: Date.parse("2026-11-02T10:00:20.000Z"), reply: null }],
 			["i-working", null],
 			["i-idle", null],
-			["i-saved", { at: 5_000, reply: "Saved reply.", body: "Saved reply.", suggestions: [] }],
+			["i-saved", { at: 5_000, reply: "Saved reply." }],
 		]);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });

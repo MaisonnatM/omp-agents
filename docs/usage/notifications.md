@@ -32,7 +32,7 @@
 - A notice you open is read: a pull request's opens its details on the Pull requests page, a Slack message's opens it in Slack in your default browser, a provider's opens **Settings › Providers**, and an event's opens it in Google Calendar in your default browser, or the **Calendar** page for an event on this computer.
   Selecting an update's notice marks it read, and a stopped sessions' notice opens the first session it names.
   The check mark in the header marks every notice in the filter read.
-- Each pull request notice offers the move's quick action, such as **Review** or **Fix CI**, which starts a session on it and, in the bell, opens its page, or **Merge** for one ready to merge.
+- Each pull request notice offers the move's quick action, such as **Review** or **Fix CI**, which starts a session on it and opens its page, or **Merge** for one ready to merge.
   **Merge** asks before it merges, with the merge methods the repository allows, as the pull request's details do, and marks the notice read once the dashboard took the merge, which it makes at once or once GitHub allows it; when the dashboard refuses it, a toast says why.
 - The stopped sessions' notice offers **Continue all**, on the toast or in the bell, which resumes every session it lists and sends each the prompt `continue`, as the sidebar's **Resume all** does, and marks the notice read.
 - A notice that no page has shown yet shows as a toast at the bottom right; closing it marks it seen, so it does not show as a toast again in any tab or after a reload.

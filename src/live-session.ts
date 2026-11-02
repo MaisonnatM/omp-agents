@@ -22,26 +22,20 @@ export type LiveUpdate =
 	| TurnUpdate;
 
 /**
- * The main agent's turn started, or ran to its end; `reply` is its last text, split from the prompts its `Suggestions:` block offered,
- * `null` when it ended on none, and `failure` how a provider's error ended it, `null` when it ended any other way.
+ * The main agent's turn started, or ran to its end; `reply` is its last text without suggested prompts, `null` when it ended on none,
+ * and `failure` how a provider's error ended it, `null` when it ended any other way.
  */
-export type TurnUpdate = { kind: "turn-started" } | { kind: "turn-ended"; reply: TurnReply | null; failure: TurnFailure | null };
+export type TurnUpdate = { kind: "turn-started" } | { kind: "turn-ended"; reply: string | null; failure: TurnFailure | null };
 
-/** A turn's last text without its suggested prompts, and those prompts. */
-export interface TurnReply {
-	body: string;
-	suggestions: string[];
-}
-
-/** The text of the last assistant message among `messages` that has any, split from its suggested prompts; `null` when none has text. */
-function lastReply(messages: unknown): TurnReply | null {
+/** The text of the last assistant message among `messages` that has any, without its suggested prompts; `null` when none has text. */
+function lastReply(messages: unknown): string | null {
 	if (!Array.isArray(messages)) return null;
 	for (const message of messages.toReversed()) {
 		if (!isObject(message) || message.role !== "assistant" || !Array.isArray(message.content)) continue;
 		const text = message.content
 			.flatMap(block => (isObject(block) && block.type === "text" && typeof block.text === "string" && block.text.trim() ? [block.text] : []))
 			.join("\n\n");
-		if (text) return splitSuggestions(text);
+		if (text) return splitSuggestions(text).body;
 	}
 	return null;
 }
@@ -59,7 +53,7 @@ export function turnUpdate(event: unknown): TurnUpdate | null {
 /** A turn that ended: when, in ms since the epoch, and its last reply, `null` when it ended on none. */
 export interface EndedTurn {
 	at: number;
-	reply: TurnReply | null;
+	reply: string | null;
 }
 
 /**

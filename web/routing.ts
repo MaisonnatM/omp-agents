@@ -129,11 +129,6 @@ export interface NotesRoute {
 	open: string | null;
 }
 
-/** The Inbox, with item `open` beside its list when it is non-null and still waits on you; {@link inboxKey} names an item. */
-export interface InboxRoute {
-	open: string | null;
-}
-
 /**
  * A Bot's page, its conversation beside the right sidebar's details: its look, name, job, memory, and routines; `null` for the gallery of
  * every Bot, or the New Bot form while `adding`. `routine` names what shows in place of the conversation, `null` for none.
@@ -178,7 +173,6 @@ export interface ScheduledRoute {
 /** A page that covers the panes. */
 export type Page =
 	| { kind: "get-started" }
-	| ({ kind: "inbox" } & InboxRoute)
 	| ({ kind: "settings" } & SettingsRoute)
 	| ({ kind: "pull-requests" } & PullRequestsRoute)
 	| ({ kind: "tickets" } & TicketsRoute)
@@ -237,14 +231,12 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   `#bots/<id>/routines/<routine id>/edit` that routine's editor, and `#bots/<id>/routines/new` a new routine's editor; Bot and routine ids
  *   are UUIDs, so none reads as `new`.
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
- * - `#inbox` opens the Inbox, everything that waits on you, and `?open=<key>` opens that item beside the list.
  * - `#email` opens the Email page, your Gmail inboxes' latest conversations, `#email/new` a new mail, and
  *   `#email/<account>/<thread id>` that account's conversation in full in the main content.
  * - `#repo/<dir>` opens every file of the git checkout that directory is in, read only, and `#repo/<dir>/<path>` the file at that path; both are encoded.
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
 	"get-started": () => ({ kind: "get-started" }),
-	inbox: (_rest, query) => ({ kind: "inbox", open: query.get("open") || null }),
 	settings: rest => ({ kind: "settings", section: settingsSection(rest?.split("/")[0] ?? null) }),
 	new: (rest, query) => ({ kind: "new", cwd: decodeCwd(rest), todoId: query.get("todo") || null }),
 	scheduled: rest => ({ kind: "scheduled", id: rest ? decodeSegment(rest) : null }),
@@ -307,7 +299,6 @@ function restOfPage(page: Page): string | null {
 			return page.id === null ? null : encodeURIComponent(page.id);
 		case "calendar":
 		case "get-started":
-		case "inbox":
 			return null;
 		default: {
 			const never: never = page;
@@ -323,7 +314,6 @@ function queryOfPage(page: Page): string | null {
 			return page.todoId === null ? null : `todo=${encodeURIComponent(page.todoId)}`;
 		case "todo":
 		case "notes":
-		case "inbox":
 			return page.open === null ? null : `open=${encodeURIComponent(page.open)}`;
 		case "settings":
 		case "pull-requests":
@@ -366,7 +356,6 @@ export const hashForBots = (target: string | null): string => hashForPage(target
 export const hashForNewBot = (): string => hashForPage({ kind: "bots", target: null, adding: true });
 export const hashForBotRoutine = (botId: string, routine: BotRoutineRoute): string => hashForPage({ kind: "bots", target: botId, routine });
 export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
-export const hashForInbox = (open: string | null = null): string => hashForPage({ kind: "inbox", open });
 export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
 export const hashForScheduled = (id: string): string => hashForPage({ kind: "scheduled", id });

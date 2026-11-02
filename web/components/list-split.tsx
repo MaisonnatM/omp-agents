@@ -52,8 +52,8 @@ function BarButton({ action }: { action: BarAction }) {
 	return <Tooltip content={action.label} shortcut={action.shortcut && shortcutLabels(action.shortcut)} disabled={disabled}>{button}</Tooltip>;
 }
 
-/** The narrow bar of a split's open item: a `leading` slot, the previous and next controls, optional `children`, and the close control, if it has one. */
-export function DetailBar({ leading, previous, next, children, close }: { leading?: ReactNode; previous: BarAction; next: BarAction; children?: ReactNode; close?: BarAction }) {
+/** The narrow bar of a split's open item: a `leading` slot, the previous and next controls, optional `children`, and the close control. */
+export function DetailBar({ leading, previous, next, children, close }: { leading?: ReactNode; previous: BarAction; next: BarAction; children?: ReactNode; close: BarAction }) {
 	return (
 		<div className="sticky top-0 z-10 flex h-11 items-center gap-1 border-b border-border bg-background/95 px-4 backdrop-blur">
 			{leading !== undefined && <div className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{leading}</div>}
@@ -61,7 +61,7 @@ export function DetailBar({ leading, previous, next, children, close }: { leadin
 			<BarButton action={previous} />
 			<BarButton action={next} />
 			{children}
-			{close && <BarButton action={close} />}
+			<BarButton action={close} />
 		</div>
 	);
 }
