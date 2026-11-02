@@ -17,25 +17,23 @@ Keep selected providers in this order in the roles, their fallback chains, and `
 
 1. Anthropic — every role's configured primary.
 2. OpenAI Codex — first fallback.
-3. Cursor — Composer for cheap roles, after Codex when configured.
-4. OpenRouter — last fallback, open-weight models only, with no Anthropic, OpenAI, Google, or xAI proxies.
+3. Cursor — Composer for cheap roles (`smol`, `commit`, `tiny`), after Codex.
 
 Cursor subscription quota is not a reason to put it ahead of Anthropic or Codex.
 Cursor Grok is explicit-selection only, not an automatic role fallback.
 The retrospective found large uncached-input costs on that fallback; removing it trades fallback availability for controlled cost exposure.
 When every eligible configured coding-plan route is depleted or unavailable, use the explicit terminal `retry.paidFallback: cursor/claude-opus-5-5` if enabled; otherwise report quota exhaustion.
-Do not add Grok or other metered providers.
+Do not add Grok, OpenRouter, or other metered providers.
 Keep `retry.usageAwareFallback` enabled, `retry.usageReservePct: 0`, and `retry.usageReservePolicy: auto`.
-The first three providers use coding-plan quota; use eligible configured plans before paid Cursor or OpenRouter.
+The three providers use coding-plan quota; use eligible configured plans before paid Cursor.
 Skip a provider only when it reports zero remaining quota; a plain API key or unknown usage remains eligible.
 On quota exhaustion, try the next eligible entry in the same role's chain, then other configured chat-role primaries and fallback selectors in provider-priority order.
 Do not search the unconfigured model catalog.
 Do not select zero-quota routes as included funding.
 The separate paid Cursor selector requires inspectable credentials, explicitly enabled usable on-demand funding, and no active account block.
 Unknown quota or a positive reserve does not authorize paid fallback.
-OpenRouter is metered and remains last.
 Keep `smol`, `tiny`, and `commit` cheap.
-OpenRouter candidates are DeepSeek `deepseek-v4.1-flash` and Zhipu `glm-5.3-flash` for cheap vision, MiniMax `minimax-m3`, Moonshot `kimi-k3` for `slow` and `task`, and Zhipu `glm-5.3`; validate availability with `omp models --json` before using them.
+`judge` runs the `:auto` effort classifier that `default` and `task` use. Keep it on a chat model with quota: a failed judge does not fall back to chat models, so `:auto` silently runs every turn at `high`.
 Paid fallback applies to main and task sessions, not auxiliary callers that only read fallback chains.
 Recheck included plans at each prompt and return to restored quota even when the paid fallback was pinned.
 Cursor has no per-request billing switch; this controls deliberate routing, not server-side overages from stale or unknown usage.
@@ -69,4 +67,6 @@ omp config get retry.paidFallback
 - `slow`: `reviewer`.
 - `task`: the bundled `task` agent.
 - `plan`: plan mode, `thermonuclear-reviewer`, and `interface-reviewer`.
+- `thermo_review`: `thermo-nuclear-code-quality-review`; keep it on the `plan` model so both thermonuclear agents grade alike.
 - `advisor`, `vision`, `commit`, `tiny`: advisor runtime, image turns, commit messages, and titles, memory, and auto-thinking.
+- `judge`: the `:auto` effort classifier, unexpected-stop detection, and eval `judge()`.

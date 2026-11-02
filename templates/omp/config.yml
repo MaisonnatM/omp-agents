@@ -4,59 +4,53 @@
 
 # Primary model per role. Anthropic first; see ~/.omp/agent/docs/model-routing.md.
 modelRoles:
-  default: anthropic/claude-opus-5-5:high
+  default: anthropic/claude-opus-5-5:auto
   slow: anthropic/claude-opus-5-5:high
-  plan: anthropic/claude-fable-5-1:high
+  plan: anthropic/claude-fable-5-1:medium
+  thermo_review: anthropic/claude-fable-5-1:medium
   advisor: anthropic/claude-sonnet-5-5:medium
   vision: anthropic/claude-sonnet-5-5:medium
-  smol: anthropic/claude-haiku-4-5
-  commit: anthropic/claude-haiku-4-5
-  tiny: anthropic/claude-haiku-4-5
-  task: anthropic/claude-sonnet-5-5:high
+  smol: anthropic/claude-haiku-5-5
+  commit: anthropic/claude-haiku-5-5
+  tiny: anthropic/claude-haiku-5-5
+  judge: anthropic/claude-haiku-5-5
+  task: anthropic/claude-opus-5-5:auto
 
 retry:
   # Skip a provider whose plan reports no quota left; a plain API key stays eligible.
   usageAwareFallback: true
   usageReservePct: 0
   usageReservePolicy: auto
-  # Codex first; cheap roles may use Cursor Composer; OpenRouter remains last.
+  # Codex first; cheap roles may use Cursor Composer.
   fallbackChains:
     default:
-      - openai-codex/gpt-6-sol:high
-      - openrouter/deepseek/deepseek-v4.1-flash:high
+      - openai-codex/gpt-6.1-sol
     slow:
       - openai-codex/gpt-6-astra:xhigh
-      - openrouter/moonshotai/kimi-k3:high
     plan:
-      - openai-codex/gpt-6-sol:high
-      - openrouter/z-ai/glm-5.3:high
+      - openai-codex/gpt-6.1-sol
     advisor:
-      - openai-codex/gpt-5.6-terra:medium
-      - openrouter/z-ai/glm-5.3:low
+      - openai-codex/gpt-6.1-terra:medium
     vision:
-      - openai-codex/gpt-5.6-terra
-      - openrouter/z-ai/glm-5.3-flash:low
+      - openai-codex/gpt-6.1-terra
     smol:
       - openai-codex/gpt-6-luna
       - cursor/composer-2.5-fast
-      - openrouter/minimax/minimax-m3
     commit:
       - openai-codex/gpt-6-luna
       - cursor/composer-2.5-fast
-      - openrouter/deepseek/deepseek-v4.1-flash:high
     tiny:
       - openai-codex/gpt-6-luna
       - cursor/composer-2.5-fast
-      - openrouter/minimax/minimax-m3
+    judge:
+      - openai-codex/gpt-6-luna
     task:
-      - openai-codex/gpt-6-sol:high
-      - openrouter/moonshotai/kimi-k3:high
+      - openai-codex/gpt-6.1-sol
 
 modelProviderOrder:
   - anthropic
   - openai-codex
   - cursor
-  - openrouter
 
 # `isolated: true` subagents work in their own clone of the checkout their `checkout` option names; successful changes apply back there as a patch.
 task:

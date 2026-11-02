@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-02
 
+- The starter kit's models now match the current setup: Opus picks its own effort, Haiku 5.5 runs the cheap roles, the fallbacks use the newer Codex models, and OpenRouter is no longer a fallback.
 - The starter kit's /poteto-mode now finds pstack's poteto style where the pstack plugin actually installs it, so it works on a new computer.
 - A long folder name in the message box now ends in … instead of running past the box and under the model switch.
 - /ship now plans before it builds: the agent compares up to three ways to do the work, keeps the best, and posts that plan on the Linear issue, or in the pull request when there is no issue.
