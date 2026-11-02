@@ -27,6 +27,13 @@ It also lists, under **New patterns**, each kind of UI the change presents in a 
 The kit does not ship those skills: when one is missing, the agent names it and stops without reviewing, and the user installs it before the stage resumes.
 Apply the findings in a fresh agent, commit and push, then add its checkbox as [Review checkboxes](#review-checkboxes) says.
 
+## Stalled review and fix agents
+
+A reviewer or fixer agent that has run 20 minutes without a finished result gets one look: read `agent://<id>` for its progress, or `history://<id>` for its transcript, never the newest file under `~/.omp/agent/sessions/`, which is your own session.
+When that look shows no edit and no new tool call in the last 10 minutes, stop it with a `write` to `proc://<id>/kill` rather than waiting longer; a provider error can leave it hung for hours.
+Then start one fresh agent with the same assignment, or do the work yourself when it is small, and say in the report that the first agent stalled.
+Once fixes land, from any agent or your own, check each finding against the diff and name any finding left unapplied; a fix that went to another checkout counts as unapplied.
+
 ## Review checkboxes
 
 A review earns its PR checkbox however it ran: in `/ship`, through its reviewer agent, or with its skill invoked directly.

@@ -1,6 +1,8 @@
 // Guards the checkouts agents change in place.
 // - The main checkout on its default branch takes no `edit` or `write`: the agent works in a linked worktree, as AGENTS.md asks.
 //   A file git ignores, such as `.env`, is in no worktree, so its edit goes ahead there once the user approves it.
+// - Once this process has changed a linked worktree, a `read`, `edit`, or `write` of a relative path that lands in that
+//   repository's main checkout is blocked: the session sits on main, so the short path opened main's copy, not the worktree's.
 // - A checkout belongs to the omp process that last changed it, a session and its in-process subagents. While that process
 //   lives and the checkout holds uncommitted changes to tracked files, another process's edits, writes, and git, gt, or
 //   `gh pr checkout` commands that change the checkout are blocked, and that process works in a worktree of its own.
@@ -9,7 +11,7 @@
 // Reads, files outside git, internal URLs such as `local://`, and the clones omp makes for isolated subagents pass.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { located, positionals, within } from "./shell/commands";
 
@@ -249,6 +251,19 @@ function targets(input: Record<string, unknown>): string[] {
 	return paths.filter(path => !path.includes("://"));
 }
 
+/** The block reason for a relative `path` that resolves into the main checkout `c` while this process works in a linked worktree of the same repository, else `undefined`. */
+function wrongTree(path: string, c: Checkout, tool: string): string | undefined {
+	if (!c.main || isAbsolute(path) || path.startsWith("~")) return undefined;
+	// A linked worktree's git dir is `<main git dir>/worktrees/<name>`, and its `gitdir` file names `<worktree>/.git`.
+	const worktree = [...family().expected.keys()].find(gitDir => dirname(dirname(gitDir)) === c.gitDir && existsSync(join(gitDir, "gitdir")));
+	if (!worktree) return undefined;
+	const top = dirname(readFileSync(join(worktree, "gitdir"), "utf8").trim());
+	return [
+		`This ${tool} of the relative path ${path} opens ${c.top}, the main checkout, but this session works in the worktree ${top}.`,
+		`The main checkout's copy is not your branch's. Retry with the absolute path ${join(top, path)}, or an absolute path into the main checkout when you mean it.`,
+	].join(" ");
+}
+
 export default function worktreeGuard(pi: ExtensionAPI) {
 	pi.on("tool_call", async (event, ctx) => {
 		const input = event.input as Record<string, unknown>;
@@ -259,10 +274,13 @@ export default function worktreeGuard(pi: ExtensionAPI) {
 		};
 		// A file git ignores, such as `.env`, is in no worktree and moves with no branch, so in a main checkout on its default branch its edit waits for the user instead.
 		const ignored: string[] = [];
-		if (event.toolName === "edit" || event.toolName === "write") {
-			for (const path of targets(input)) {
+		if (event.toolName === "edit" || event.toolName === "write" || event.toolName === "read") {
+			for (const path of event.toolName === "read" ? targets({ path: input.path }) : targets(input)) {
 				const file = resolve(ctx.cwd, path.replace(/^~(?=\/)/, process.env.HOME ?? "~"));
 				const c = checkoutAt(file);
+				const misplaced = c && wrongTree(path.replace(/:[^/]*$/, ""), c, event.toolName);
+				if (misplaced) return { block: true, reason: misplaced };
+				if (event.toolName === "read") continue;
 				// `git check-ignore` names an ignored path and stays silent for any other, including a tracked file an ignore rule matches.
 				if (c && defaultBranch(c) && git(c.top, ["check-ignore", "--", file]) !== "") ignored.push(file);
 				else touch(c, "edit", `This ${event.toolName} of ${path}`);
