@@ -15,7 +15,7 @@ const invocation = (workflow: Workflow): string => (workflow.command ? `/${workf
 
 /** The skill's steps, its top-level `1. **Title.**` items, in order. */
 export function workflowSteps(text: string): string[] {
-	return [...text.matchAll(/^\d+\. \*\*(.+?)\.?\*\*/gm)].map(match => match[1]!.trim());
+	return [...text.matchAll(/^\d+\. \*\*(.+?)\.?\*\*/gm)].map((match) => match[1]!.trim());
 }
 
 /** The steps as a top-to-bottom mermaid flowchart; `null` under two steps. */
@@ -27,8 +27,8 @@ export function stepsFlowchart(steps: string[]): string | null {
 
 export function Workflows({ workflows, files, editing }: { workflows: Workflow[]; files: OmpFile[]; editing: Editing }) {
 	const [selected, setSelected] = useState<string | null>(null);
-	const listed = workflows.flatMap(workflow => {
-		const skill = files.find(file => file.path === workflow.skill);
+	const listed = workflows.flatMap((workflow) => {
+		const skill = files.find((file) => file.path === workflow.skill);
 		return skill ? [{ workflow, skill }] : [];
 	});
 	const open = listed.find(({ skill }) => skill.path === selected) ?? listed[0];
@@ -38,7 +38,8 @@ export function Workflows({ workflows, files, editing }: { workflows: Workflow[]
 				<p>omp found no workflows. A workflow is a skill whose SKILL.md frontmatter tags it, with these two lines:</p>
 				<pre className="w-fit rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs leading-relaxed text-foreground">{TAG_SNIPPET}</pre>
 				<p>
-					A command of the same name, such as <code>commands/ship.md</code> for a <code>ship</code> skill, starts it as <code>/ship</code>; without one, start it as <code>/skill:ship</code>.
+					A command of the same name, such as <code>commands/ship.md</code> for a <code>ship</code> skill, starts it as <code>/ship</code>; without one, start
+					it as <code>/skill:ship</code>.
 				</p>
 			</div>
 		);
@@ -62,7 +63,11 @@ export function Workflows({ workflows, files, editing }: { workflows: Workflow[]
 									<span className="flex w-full items-baseline gap-2">
 										<span className="truncate">{workflow.name}</span>
 										<span className="ml-auto shrink-0 text-xs font-normal text-muted-foreground">{skill.scope}</span>
-										{workflow.packageSource && <span className="max-w-24 shrink-0 truncate text-xs font-normal text-muted-foreground" title={workflow.packageSource}>{workflow.packageSource}</span>}
+										{skill.packaged && (
+											<span className="max-w-24 shrink-0 truncate text-xs font-normal text-muted-foreground" title={skill.packaged}>
+												{skill.packaged}
+											</span>
+										)}
 									</span>
 									<span className="truncate font-mono text-xs font-normal text-muted-foreground">{invocation(workflow)}</span>
 								</button>
@@ -73,16 +78,16 @@ export function Workflows({ workflows, files, editing }: { workflows: Workflow[]
 			</nav>
 			<div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4">
 				<StepsChart key={open.skill.path} file={open.skill} />
-				{open.workflow.packageSource ? (
+				{open.skill.packaged ? (
 					<>
-						<a href={hashForSettings("extensions")} className="text-xs text-foreground underline-offset-2 hover:underline">Manage package</a>
-						{open.skill.body.state === "read" ? (
-							<pre tabIndex={0} aria-label={`Contents of ${open.skill.pathDisplay}`} className="max-h-[70vh] overflow-auto rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring">
-								{open.skill.body.text}
-							</pre>
-						) : <p className="text-sm text-muted-foreground">Cannot read this packaged workflow.</p>}
+						<a href={hashForSettings("extensions")} className="text-xs text-foreground underline-offset-2 hover:underline">
+							Manage package
+						</a>
+						<FileView readOnly file={open.skill} />
 					</>
-				) : <FileView key={open.skill.path} file={open.skill} editing={editing} />}
+				) : (
+					<FileView key={open.skill.path} file={open.skill} editing={editing} />
+				)}
 			</div>
 		</div>
 	);

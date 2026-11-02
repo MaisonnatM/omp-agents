@@ -27,7 +27,7 @@ import { Workflows } from "./workflows-tab";
 import { WorkspacesTab } from "./workspaces-tab";
 import { WorktreesTab } from "./worktrees-tab";
 
-const workspaceLabel = (cwd: string, workspaces: Workspace[]): string => workspaces.find(workspace => workspace.cwd === cwd)?.cwdDisplay ?? cwd;
+const workspaceLabel = (cwd: string, workspaces: Workspace[]): string => workspaces.find((workspace) => workspace.cwd === cwd)?.cwdDisplay ?? cwd;
 
 /** The sidebar's workspace picker again, for the sections it scopes: all workspaces read your user files only. */
 function WorkspacePicker({ cwd, workspaces, onPick }: { cwd: string | null; workspaces: Workspace[]; onPick: (cwd: string | null) => void }) {
@@ -49,7 +49,7 @@ function WorkspacePicker({ cwd, workspaces, onPick }: { cwd: string | null; work
 					{
 						key: "workspaces",
 						heading: "Workspaces",
-						items: workspaces.map(workspace => ({
+						items: workspaces.map((workspace) => ({
 							value: workspace.cwd,
 							label: <span className="truncate">{workspace.cwdDisplay}</span>,
 							selected: workspace.cwd === cwd,
@@ -150,8 +150,8 @@ export function SettingsPage({
 	const catalog = useMemo(
 		(): Catalog => ({
 			data: models.data && {
-				bySelector: new Map(models.data.models.map(model => [model.selector, model])),
-				byProvider: Map.groupBy(models.data.models, model => model.provider),
+				bySelector: new Map(models.data.models.map((model) => [model.selector, model])),
+				byProvider: Map.groupBy(models.data.models, (model) => model.provider),
 			},
 			error: models.error && `Cannot list omp's models: ${models.error}`,
 		}),
@@ -202,7 +202,9 @@ export function SettingsPage({
 			<div ref={scroller} hidden={section === "extensions"} className="relative min-h-0 flex-1 overflow-y-auto">
 				<div className="mx-auto w-full max-w-5xl space-y-10 px-6 py-6">{body}</div>
 			</div>
-			<section aria-label="Extensions" hidden={section !== "extensions"} className="min-h-0 flex-1">{panels.extensions}</section>
+			<section aria-label="Extensions" hidden={section !== "extensions"} className="min-h-0 flex-1">
+				{panels.extensions}
+			</section>
 		</div>
 	);
 }

@@ -17,7 +17,7 @@ All routes share the existing authenticated settings endpoints and workspace val
 - `GET /api/settings/extensions/catalog?source=<marketplace>&q=<query>&page=<page>` reads a cached marketplace, all cached marketplaces when source is empty, or the remote skill registry when source is `registry`.
 - `GET /api/settings/extensions/operation?id=<id>` reads the operation only in the workspace that started it.
 - `PUT /api/settings/extensions/approval` answers the exact current script approval with `{ id, token, approved }` in that workspace.
-- `GET /api/settings/extensions/contribution?key=<key>` re-discovers the workspace and reads only a current contribution path, with a one-MiB preview limit.
+- `GET /api/settings/extensions/contribution?kind=<kind>&path=<path>&provider=<provider>&scope=<scope>` verifies that structured target against its capability or static manifest declarations, then reads at most one MiB.
 
 `src/extensions.ts` holds validation, the operation queue, transient approvals, and the read-only preview allowlist.
 An operation is working, needs-approval, done, or failed.
@@ -26,16 +26,23 @@ Decline or ten minutes without an answer resolves false; a stale token is refuse
 Terminal jobs expire after one hour and server restart forgets them; no credentials or catalog answers are persisted by the dashboard.
 The queue prevents two dashboard native mutations racing a registry, including while an approval waits.
 It is not a cross-process lock on an independently running omp CLI.
+Package mutations pass a structured kind, ID, and scope directly to the native manager; they never rediscover the library first.
+All dashboard writes of `config.yml`, including model routing, provider switches, registry URLs, terminal-session sharing, and raw file edits, share `configWrites` from `src/omp/config.ts`.
+The operation queue and discovery binding use independent instances of the existing `SerialLane`; waiting for script approval does not block unrelated settings writes.
 
 ## Discovery and ownership
 
 `src/omp/scoped-discovery.ts` serializes native discovery reads while binding the selected workspace's read-only settings, because the native provider registry uses a process-wide settings binding.
 The files, prompts, project-trust inspection, MCP discovery, and Extensions readers share that binding boundary.
+Discovery readers for the composer share this lane too, so a full Extensions preview can delay completion requests until its native reads finish.
+Contribution previews query only their own capability, and package mutations do not enter the discovery lane.
 Files discovery alone can fall back to isolated defaults when config is broken so users can repair their authored configuration.
 User-only views filter out project results, and package identity includes kind, ID, and scope.
 Discovered availability, static declarations, and missing declared files are distinct from a session's loaded runtime.
 Disabled or overridden portable packages may have incomplete static inventories because omp does not export a complete inventory reader.
-`src/omp/discovery.ts` marks package-owned files; `src/settings.ts` excludes them both from Files and the server save allowlist, returning only packaged workflow bodies separately.
+`src/omp/discovery.ts` marks package-owned files; `src/settings.ts` returns one file list with that marker and excludes packages from the server save allowlist.
+Files hides packaged files, while Workflows and Extensions reuse the shared read-only file viewer.
+`src/extensions.test.ts` covers structured target rejection, native lifecycle, shared config-write ordering, workspace binding ordering, release after failure, and explicit invalid-settings fallback.
 No package operation bypasses project-trust admission or sends a reload RPC.
 
 See [Extensions usage](../usage/extensions.md) and the [operation queue decision](../decisions/2026-11-02-serialize-extension-changes-and-bound-script-approvals.md).

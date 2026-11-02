@@ -74,6 +74,7 @@ The main ones:
   Get started reads these registries and the current project's registry, located by the read-only `resolveOrDefaultProjectRegistryPath` in `discovery/helpers.ts` with native `getProjectDir`.
   It never initializes CLI config, migrates plugin data, or installs anything while checking readiness.
 - Extensions library: `pi-coding-agent/src/extensibility/plugins/marketplace/manager.ts` supplies source catalogs and scoped marketplace lifecycle; `registry.ts` supplies its cache and registry paths.
+  `pi-coding-agent/src/extensibility/plugins/marketplace/registry.ts` catches parse errors and returns an empty registry, so `assertRegistryReadable` validates its top-level version and collection before passing a mutation to the manager.
   `extensibility/plugins/manager.ts` supplies npm/git/link lifecycle, and `loader.ts`'s `resolvePluginManifestEntries` reads declarations without executing entrypoints.
   `skillshare/client.ts` supplies explicit-registry search, `installer.ts` installs/updates/uninstalls with native script consent callbacks, and `manifest.ts` supplies native IDs, store paths, and scoped manifest locations.
   `discovery/index.ts` supplies provider state, foreign-user-source opt-ins, and read-only settings binding; `src/omp/scoped-discovery.ts` serializes that process-wide binding.

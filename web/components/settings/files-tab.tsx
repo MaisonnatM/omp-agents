@@ -1,6 +1,6 @@
 /** The Settings Files section: omp's config files by group, each viewed and edited in place (`Files`). */
-import { useState } from "react";
-import type { FileEdit, OmpFile, OmpSettings } from "../../../src/shared/models";
+import { useState, type ReactNode } from "react";
+import type { FileEdit, OmpFile, OmpSettings, ReadOnlyFile } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -9,32 +9,77 @@ import { FILE_KIND_LABELS, fileGroups, fileName, formatBytes } from "../../label
 import { SearchField } from "../search-field";
 import { EditBar, type Editing, RAIL_BUTTON, SaveError, useEditor } from "./editor";
 
-/** One omp file, viewed or edited in place; also the right pane of Settings › Workflows. */
-export function FileView({ file, editing }: { file: OmpFile; editing: Editing }) {
+function FileContents({ file }: { file: ReadOnlyFile }) {
+	const { body } = file;
+	return body.state === "read" ? (
+		<pre
+			tabIndex={0}
+			aria-label={`Contents of ${file.pathDisplay}`}
+			className="max-h-[70vh] overflow-auto rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring"
+		>
+			{body.text || <span className="text-muted-foreground">The file is empty.</span>}
+		</pre>
+	) : (
+		<p
+			className={cn(
+				"rounded-md border border-dashed border-border px-3 py-6 text-center text-sm",
+				body.state === "unreadable" ? "text-red-600 dark:text-red-400" : "text-muted-foreground",
+			)}
+		>
+			{body.state === "missing" ? "This file does not exist yet. omp reads it from this path once you create it." : `Cannot read this file: ${body.error}`}
+		</p>
+	);
+}
+
+function FileFrame({ file, controls, children }: { file: ReadOnlyFile; controls?: ReactNode; children: ReactNode }) {
+	return (
+		<div className="flex min-w-0 flex-col gap-2 self-start md:sticky md:top-6" role="region" aria-label={file.pathDisplay}>
+			<div className="flex min-h-7 items-center justify-between gap-3">
+				<p className="flex min-w-0 flex-wrap items-baseline gap-x-3 text-xs text-muted-foreground">
+					<span className="font-mono text-foreground">{file.pathDisplay}</span>
+					{file.body.state === "read" && (
+						<>
+							<span className="tabular-nums">{formatBytes(file.body.size)}</span>
+							<span>Changed {new Date(file.body.modifiedAt).toLocaleString()}</span>
+						</>
+					)}
+				</p>
+				{controls}
+			</div>
+			{children}
+		</div>
+	);
+}
+
+/** The same file presentation, with editing available only when its caller supplies an editing contract. */
+export function FileView(props: { file: ReadOnlyFile; readOnly: true } | { file: OmpFile; editing: Editing; readOnly?: false }) {
+	return props.readOnly ? (
+		<FileFrame file={props.file}>
+			<FileContents file={props.file} />
+		</FileFrame>
+	) : (
+		<EditableFileView file={props.file} editing={props.editing} />
+	);
+}
+
+function EditableFileView({ file, editing }: { file: OmpFile; editing: Editing }) {
 	const { body } = file;
 	const editor = useEditor(
 		body.state === "read" ? body.text : "",
-		text =>
+		(text) =>
 			putJson<OmpSettings>(settingsUrl("/file", editing.cwd), { path: file.path, text, baseHash: body.state === "read" ? body.hash : null } satisfies FileEdit),
 		editing,
 	);
 	const viewing = editor.state.phase === "viewing";
 	const conflict = editor.state.phase === "editing" && editor.state.conflict;
 	return (
-		<div className="flex min-w-0 flex-col gap-2 self-start md:sticky md:top-6" role="region" aria-label={file.pathDisplay}>
-			<div className="flex min-h-7 items-center justify-between gap-3">
-				<p className="flex min-w-0 flex-wrap items-baseline gap-x-3 text-xs text-muted-foreground">
-					<span className="font-mono text-foreground">{file.pathDisplay}</span>
-					{body.state === "read" && (
-						<>
-							<span className="tabular-nums">{formatBytes(body.size)}</span>
-							<span>Changed {new Date(body.modifiedAt).toLocaleString()}</span>
-						</>
-					)}
-				</p>
-				{body.state !== "unreadable" && <EditBar editor={editor} label={file.pathDisplay} start={body.state === "missing" ? "Create" : "Edit"} />}
-			</div>
-			{!viewing ? (
+		<FileFrame
+			file={file}
+			controls={body.state !== "unreadable" && <EditBar editor={editor} label={file.pathDisplay} start={body.state === "missing" ? "Create" : "Edit"} />}
+		>
+			{viewing ? (
+				<FileContents file={file} />
+			) : (
 				<>
 					<textarea
 						aria-label={`Contents of ${file.pathDisplay}`}
@@ -42,8 +87,8 @@ export function FileView({ file, editing }: { file: OmpFile; editing: Editing })
 						autoFocus
 						readOnly={editor.state.phase === "saving"}
 						value={editor.draft}
-						onChange={event => editor.change(event.target.value)}
-						onKeyDown={event => {
+						onChange={(event) => editor.change(event.target.value)}
+						onKeyDown={(event) => {
 							if ((event.metaKey || event.ctrlKey) && event.key === "s") {
 								event.preventDefault();
 								if (editor.dirty) void editor.submit();
@@ -67,35 +112,20 @@ export function FileView({ file, editing }: { file: OmpFile; editing: Editing })
 						)}
 					</div>
 				</>
-			) : body.state === "read" ? (
-				<pre
-					tabIndex={0}
-					className="max-h-[70vh] overflow-auto rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring"
-				>
-					{body.text || <span className="text-muted-foreground">The file is empty.</span>}
-				</pre>
-			) : (
-				<p
-					className={cn(
-						"rounded-md border border-dashed border-border px-3 py-6 text-center text-sm",
-						body.state === "unreadable" ? "text-red-600 dark:text-red-400" : "text-muted-foreground",
-					)}
-				>
-					{body.state === "missing" ? "This file does not exist yet. omp reads it from this path once you create it." : `Cannot read this file: ${body.error}`}
-				</p>
 			)}
-		</div>
+		</FileFrame>
 	);
 }
 
 /**
- * omp's files by group, a filter that narrows them by name, and the one picked, the first by default, viewed in place.
+ * Authored files only: package-owned files are previewed through their owning library.
  * The page holds `selected`, so another section can open a file here.
  */
-export function Files({ files, editing, selected, onSelect }: { files: OmpFile[]; editing: Editing; selected: string | null; onSelect: (path: string) => void }) {
+export function Files({ files: allFiles, editing, selected, onSelect }: { files: OmpFile[]; editing: Editing; selected: string | null; onSelect: (path: string) => void }) {
+	const files = allFiles.filter(file => !file.packaged);
 	const [query, setQuery] = useState("");
 	const all = fileGroups(files, "");
-	const open = files.find(file => file.path === selected) ?? all[0]?.[1][0];
+	const open = files.find((file) => file.path === selected) ?? all[0]?.[1][0];
 	if (!open) return <p className="text-sm text-muted-foreground">omp found no files.</p>;
 	const groups = query ? fileGroups(files, query) : all;
 	return (

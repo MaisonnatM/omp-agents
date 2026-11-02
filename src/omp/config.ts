@@ -6,6 +6,9 @@ import { type RetrySettings, type RoutingEdit, selectorOf } from "../shared/mode
 import { ompVersion } from "./install";
 import { advisorConfig, advisorSettings, collabSettings, compaction, config, dirs, extensionSettings, fallbackChains, goalSettings, modelCompactionSettings, modelSettings, sessionSettings, settingsRegistry } from "./modules";
 import type { OmpSettingsInstance, SettingHandle } from "./module-types/config";
+import { SerialLane } from "../serial-lane";
+
+export const configWrites = new SerialLane();
 
 /** omp's user config directory, `~/.omp/agent` unless `PI_CODING_AGENT_DIR` moves it. */
 export const agentDir: string = dirs.getAgentDir();
@@ -99,7 +102,7 @@ export function ompConfigOf(settings: OmpSettingsInstance): OmpConfig {
 
 export const loadOmpConfig = async (cwd: string): Promise<OmpConfig> => ompConfigOf(await loadSessionSettings(cwd));
 
-function setting(id: string): SettingHandle {
+export function setting(id: string): SettingHandle {
 	const handle = settingsRegistry.lookup(id);
 	if (!handle) throw new Error(`omp ${ompVersion} has no setting ${id}`);
 	return handle;
@@ -158,17 +161,21 @@ export async function readCollabAutoStart(): Promise<CollabAutoStart> {
 
 /** Stages only `collab.autoStart` as `access` and flushes through omp's locked global config writer; a matching value writes nothing. */
 export async function shareTerminalSessions(access: TerminalAccess): Promise<void> {
-	const settings = await loadGlobalForWrite(homedir());
-	if (globalCollabAutoStart(settings) === access) return;
-	setting("collab.autoStart").set(settings, access);
-	await settings.flush();
+	await configWrites.run(async () => {
+		const settings = await loadGlobalForWrite(homedir());
+		if (globalCollabAutoStart(settings) === access) return;
+		setting("collab.autoStart").set(settings, access);
+		await settings.flush();
+	});
 }
 
 /** Stages only the global `stt.enabled` as on and flushes through omp's locked global config writer; already on writes nothing. */
 export async function enableDictation(): Promise<void> {
-	const settings = await loadGlobalForWrite(homedir());
-	const global = settings.getGlobalSettings();
-	if (isObject(global.stt) && global.stt.enabled === true) return;
-	setting("stt.enabled").set(settings, true);
-	await settings.flush();
+	await configWrites.run(async () => {
+		const settings = await loadGlobalForWrite(homedir());
+		const global = settings.getGlobalSettings();
+		if (isObject(global.stt) && global.stt.enabled === true) return;
+		setting("stt.enabled").set(settings, true);
+		await settings.flush();
+	});
 }

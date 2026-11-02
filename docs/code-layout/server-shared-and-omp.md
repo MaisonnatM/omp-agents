@@ -30,6 +30,7 @@
   `discovery.ts` also lists the project files and MCP servers omp would load with `discoverProjectCode`, and `forgetReadFiles` empties omp's capability file cache.
   `extensions.ts` wraps omp's marketplace/plugin managers, registry skill client/installer, and provider settings; `module-types/extensions.ts` declares and startup-checks their native contracts.
   `scoped-discovery.ts` binds read-only settings to one native discovery read at a time across settings, prompts, project code, MCP, and Extensions.
+  `config.ts` exposes the shared `configWrites` lane and canonical setting/global-write helpers for model routing, terminal sharing, raw config edits, and Extensions settings.
   `rpc.ts`'s `startRpc` takes an `AdmittedLaunch`, an `RpcLaunch` with the required `admit` it awaits before omp spawns, and `replay-launch.ts` builds replay launches from one; see [Project trust](../architecture/project-trust.md).
   `context-index.ts` keeps the context-source index beside omp-stats' database: each request of each session file split by source, re-read only for files that changed.
   `discussion.ts` holds `answerDiscussion`, one streamed model call on omp's `smol` role, else `default`, that answers **Ask about this** outside every session; it opens omp's settings and model registry with `openRegistry` in `models.ts`, as `dictation.ts` does.

@@ -38,36 +38,49 @@ export interface FoundFile {
 
 /** The authored and packaged files omp discovers; packaged files are read-only. */
 export async function discoverOmpFiles(cwd: string, disabledExtensions: string[]): Promise<FoundFile[]> {
-	return withDiscovery(cwd, async () => {
-	const [capabilityFiles, { agents }] = await Promise.all([
-		Promise.all(
-			FILE_CAPABILITIES.map(async ([id, kind]) => {
-				const { items } = await discovery.loadCapability(id, { cwd, disabledExtensions });
-				return items.flatMap(({ _source: source, name, frontmatter }): FoundFile[] =>
-					source.level === "native" || source.provider === "builtin-defaults"
-						? []
-						: [{ kind, scope: source.level, path: source.path, name, frontmatter, ...(PACKAGED_PROVIDERS[source.provider] && { packaged: source.pluginName ?? source.provider }) }],
-				);
-			}),
-		),
-		agentDiscovery.discoverAgents(cwd),
-	]);
-	// Plugin agents report the same scopes; the user's own live in omp's `agents` dirs (task/discovery.ts).
-	const agentFiles = agents.flatMap(({ source, filePath }): FoundFile[] => {
-		if (!filePath || (source !== "user" && source !== "project")) return [];
-		const dir = dirname(filePath);
-		const own = source === "user" ? dir === join(agentDir, "agents") : dir.endsWith("/.omp/agents");
-		return own ? [{ kind: "agent", scope: source, path: filePath }] : [];
-	});
-	// omp loads the project's APPEND_SYSTEM.md instead of the user's when both exist (main.ts).
-	const appendSystem = (["project", "user"] as const).flatMap((scope): FoundFile[] => {
-		const path = configFiles.findConfigFile("APPEND_SYSTEM.md", scope === "user" ? { project: false } : { user: false, cwd });
-		return path ? [{ kind: "append-system", scope, path }] : [];
-	});
-	const overrides = configFiles.findConfigFile("plugin-overrides.json", { user: false, cwd });
-	if (overrides) capabilityFiles.push([{ kind: "settings", scope: "project", path: overrides }]);
-	return [...capabilityFiles.flat(), ...appendSystem, ...agentFiles];
-	}, true);
+	return withDiscovery(
+		cwd,
+		async () => {
+			const [capabilityFiles, { agents }] = await Promise.all([
+				Promise.all(
+					FILE_CAPABILITIES.map(async ([id, kind]) => {
+						const { items } = await discovery.loadCapability(id, { cwd, disabledExtensions });
+						return items.flatMap(({ _source: source, name, frontmatter }): FoundFile[] =>
+							source.level === "native" || source.provider === "builtin-defaults"
+								? []
+								: [
+										{
+											kind,
+											scope: source.level,
+											path: source.path,
+											name,
+											frontmatter,
+											...(PACKAGED_PROVIDERS[source.provider] && { packaged: source.pluginName ?? source.provider }),
+										},
+									],
+						);
+					}),
+				),
+				agentDiscovery.discoverAgents(cwd),
+			]);
+			// Plugin agents report the same scopes; the user's own live in omp's `agents` dirs (task/discovery.ts).
+			const agentFiles = agents.flatMap(({ source, filePath }): FoundFile[] => {
+				if (!filePath || (source !== "user" && source !== "project")) return [];
+				const dir = dirname(filePath);
+				const own = source === "user" ? dir === join(agentDir, "agents") : dir.endsWith("/.omp/agents");
+				return own ? [{ kind: "agent", scope: source, path: filePath }] : [];
+			});
+			// omp loads the project's APPEND_SYSTEM.md instead of the user's when both exist (main.ts).
+			const appendSystem = (["project", "user"] as const).flatMap((scope): FoundFile[] => {
+				const path = configFiles.findConfigFile("APPEND_SYSTEM.md", scope === "user" ? { project: false } : { user: false, cwd });
+				return path ? [{ kind: "append-system", scope, path }] : [];
+			});
+			const overrides = configFiles.findConfigFile("plugin-overrides.json", { user: false, cwd });
+			if (overrides) capabilityFiles.push([{ kind: "settings", scope: "project", path: overrides }]);
+			return [...capabilityFiles.flat(), ...appendSystem, ...agentFiles];
+		},
+		{ allowInvalidSettings: true },
+	);
 }
 
 /** A file of a project's own agent code that a session would load, as omp names it. */
@@ -82,7 +95,7 @@ export interface ProjectMcpServer {
 	config: Record<string, unknown>;
 }
 
-const ofKind = (kind: ProjectFile["kind"], paths: string[]): ProjectFile[] => paths.map(path => ({ kind, path }));
+const ofKind = (kind: ProjectFile["kind"], paths: string[]): ProjectFile[] => paths.map((path) => ({ kind, path }));
 
 /** The file of an extension, hook, tool, or settings item, which omp always names (src/capability/*.ts); one with none fails the census, as it could not be hashed. */
 function pathOf({ path, _source }: CapabilityItem): string {
@@ -105,36 +118,44 @@ export function forgetReadFiles(): void {
  */
 export async function discoverProjectCode(cwd: string): Promise<{ files: ProjectFile[]; mcpServers: ProjectMcpServer[] }> {
 	return withDiscovery(cwd, async () => {
-	const projectItems = async (id: string, options: Pick<CapabilityLoadOptions, "providers" | "filter"> = {}) =>
-		(await discovery.loadCapability(id, { cwd, ...options })).items.filter(item => item._source.level === "project");
-	const [extensions, hooks, tools, mcps, settings, commands] = await Promise.all([
-		// The extension loader asks only omp's own provider; .claude, .codex, .gemini, and .opencode extension modules never load.
-		projectItems("extension-modules", { providers: ["native"] }),
-		projectItems("hooks"),
-		// The custom-tools loader imports only these, filtered before omp dedupes by name; a tool's JSON, Markdown, or shell file runs nothing.
-		projectItems("tools", { filter: item => /\.(ts|js|mjs|cjs)$/.test(item.path ?? "") && !item.path?.endsWith(".d.ts") }),
-		projectItems("mcps"),
-		projectItems("settings"),
-		customCommands.discoverCustomCommands({ cwd }),
-	]);
-	// omp's LSP loader (lsp/config.ts) reads `cwd`'s config files and its config directories' before the user's; the
-	// census keeps those. At the home directory a file is both the project's and the user's, so it comes twice.
-	const projectDirs = new Set([cwd, ...configFiles.getConfigDirPaths("", { user: false, project: true, cwd })]);
-	const lspFiles = configSources.configFileSources("lsp", cwd, (_content, path) => (projectDirs.has(dirname(path)) ? path : null)).flatMap(source => source.read() ?? []);
-	const files = [
-		...ofKind("extension", extensions.map(pathOf)),
-		// The extension loader binds only JS and TS hooks (isExtensionFile).
-		...ofKind("hook", hooks.map(pathOf).filter(path => path.endsWith(".ts") || path.endsWith(".js"))),
-		...ofKind("tool", tools.map(pathOf)),
-		...ofKind("command", commands.paths.flatMap(({ path, source }) => (source === "project" ? [path] : []))),
-		...ofKind("settings", settings.map(pathOf)),
-		...ofKind("lsp", [...new Set(lspFiles)]),
-	];
-	// omp names every MCP server (src/capability/mcp.ts); one with no name fails the census, as it could not be hashed.
-	const mcpServers = mcps.map(({ _source, ...config }): ProjectMcpServer => {
-		if (config.name === undefined) throw new Error(`omp's ${_source.provider} provider found an MCP server in ${_source.path} with no name`);
-		return { name: config.name, config };
-	});
-	return { files, mcpServers };
+		const projectItems = async (id: string, options: Pick<CapabilityLoadOptions, "providers" | "filter"> = {}) =>
+			(await discovery.loadCapability(id, { cwd, ...options })).items.filter((item) => item._source.level === "project");
+		const [extensions, hooks, tools, mcps, settings, commands] = await Promise.all([
+			// The extension loader asks only omp's own provider; .claude, .codex, .gemini, and .opencode extension modules never load.
+			projectItems("extension-modules", { providers: ["native"] }),
+			projectItems("hooks"),
+			// The custom-tools loader imports only these, filtered before omp dedupes by name; a tool's JSON, Markdown, or shell file runs nothing.
+			projectItems("tools", { filter: (item) => /\.(ts|js|mjs|cjs)$/.test(item.path ?? "") && !item.path?.endsWith(".d.ts") }),
+			projectItems("mcps"),
+			projectItems("settings"),
+			customCommands.discoverCustomCommands({ cwd }),
+		]);
+		// omp's LSP loader (lsp/config.ts) reads `cwd`'s config files and its config directories' before the user's; the
+		// census keeps those. At the home directory a file is both the project's and the user's, so it comes twice.
+		const projectDirs = new Set([cwd, ...configFiles.getConfigDirPaths("", { user: false, project: true, cwd })]);
+		const lspFiles = configSources
+			.configFileSources("lsp", cwd, (_content, path) => (projectDirs.has(dirname(path)) ? path : null))
+			.flatMap((source) => source.read() ?? []);
+		const files = [
+			...ofKind("extension", extensions.map(pathOf)),
+			// The extension loader binds only JS and TS hooks (isExtensionFile).
+			...ofKind(
+				"hook",
+				hooks.map(pathOf).filter((path) => path.endsWith(".ts") || path.endsWith(".js")),
+			),
+			...ofKind("tool", tools.map(pathOf)),
+			...ofKind(
+				"command",
+				commands.paths.flatMap(({ path, source }) => (source === "project" ? [path] : [])),
+			),
+			...ofKind("settings", settings.map(pathOf)),
+			...ofKind("lsp", [...new Set(lspFiles)]),
+		];
+		// omp names every MCP server (src/capability/mcp.ts); one with no name fails the census, as it could not be hashed.
+		const mcpServers = mcps.map(({ _source, ...config }): ProjectMcpServer => {
+			if (config.name === undefined) throw new Error(`omp's ${_source.provider} provider found an MCP server in ${_source.path} with no name`);
+			return { name: config.name, config };
+		});
+		return { files, mcpServers };
 	});
 }

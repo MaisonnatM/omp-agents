@@ -176,6 +176,12 @@ export interface SettingsError {
 /** What a file feeds into omp: instructions, settings, or something it can run. */
 export type OmpFileKind = "context" | "system-prompt" | "append-system" | "settings" | "agent" | "command" | "rule" | "skill" | "hook";
 
+/** A file preview without an editing contract. */
+export interface ReadOnlyFile {
+	pathDisplay: string;
+	body: { state: "read"; size: number; modifiedAt: number; text: string } | { state: "missing" } | { state: "unreadable"; error: string };
+}
+
 /** A file omp reads, as found on disk. */
 export interface OmpFile {
 	kind: OmpFileKind;
@@ -183,6 +189,7 @@ export interface OmpFile {
 	path: string;
 	/** `path` with the home directory shortened to `~`. */
 	pathDisplay: string;
+	packaged?: string;
 	/** `hash` is the SHA-256 of `text`; a save must name it, so a file changed on disk since is not overwritten. */
 	body: { state: "read"; size: number; modifiedAt: number; text: string; hash: string } | { state: "missing" } | { state: "unreadable"; error: string };
 }
@@ -196,7 +203,6 @@ export interface Workflow {
 	description: string;
 	skill: string;
 	command: string | null;
-	packageSource?: string;
 }
 
 /** `GET /api/settings`: omp's model routing and files, as a session in `cwd` would load them. */
@@ -208,7 +214,6 @@ export interface OmpSettings {
 	/** omp's own settings, as its settings panel lists them; `error` as for `routing`. */
 	agentSettings: AgentSettings | { error: string };
 	files: OmpFile[];
-	workflowFiles: OmpFile[];
 	/** The workflow skills among `files`, by name. */
 	workflows: Workflow[];
 }
