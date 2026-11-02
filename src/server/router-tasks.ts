@@ -16,6 +16,10 @@ export type RouterTaskEdit =
 	| { op: "status"; id: string; status: TaskStatus; note: string | null }
 	| { op: "session"; id: string; sessionId: string }
 	| { op: "follow"; id: string; follows: TaskFollow[] }
+	/** Something the task follows happened and went to its session: it works again, as of now. */
+	| { op: "heard"; id: string }
+	/** The supervisor restarted a working task's session, for `note`. */
+	| { op: "restart"; id: string; note: string }
 	| { op: "remove-bot"; botId: BotId };
 
 /** `tasks` after `edit` at `now`, or `tasks` itself when it changes nothing; adding a task id already kept changes nothing, so a request read twice adds once. */
@@ -37,6 +41,10 @@ export function applyRouterTask(tasks: RouterTask[], edit: RouterTaskEdit, now: 
 				const follows = uniqueFollows([...task.follows, ...edit.follows]);
 				return follows.length === task.follows.length ? null : { ...task, follows };
 			});
+		case "heard":
+			return change(edit.id, task => ({ ...task, status: task.status === "review" ? "working" : task.status }));
+		case "restart":
+			return change(edit.id, task => (task.status === "working" ? { ...task, restarts: task.restarts + 1, note: edit.note } : null));
 		case "remove-bot":
 			return tasks.some(({ botId }) => botId === edit.botId) ? tasks.filter(({ botId }) => botId !== edit.botId) : tasks;
 	}
@@ -90,6 +98,8 @@ export class RouterTasks {
 	readonly #deps: RouterTasksDeps;
 	/** The task each running session works on, by instance id, so a session that moves to another file keeps its task. */
 	readonly #instances = new Map<string, string>();
+	/** The tasks whose session the supervisor stops to restart, so the turn it stops ends without moving the task to review. */
+	readonly #restarting = new Set<string>();
 
 	constructor(deps: RouterTasksDeps) {
 		this.#deps = deps;
@@ -134,7 +144,15 @@ export class RouterTasks {
 	/** Someone prompted a task waiting for review, so it works again. */
 	turnStarted(instanceId: string, sessionId: string | undefined): void {
 		const task = this.#taskOf(instanceId, sessionId);
+		if (task) this.#restarting.delete(task.id);
 		if (task?.status === "review" && this.#deps.active()) this.apply({ op: "status", id: task.id, status: "working", note: null });
+	}
+
+	/** Counts a restart of working task `id` for `note`; the turn the supervisor then stops ends without moving it to review. */
+	restart(id: string, note: string): boolean {
+		if (!this.apply({ op: "restart", id, note })) return false;
+		this.#restarting.add(id);
+		return true;
 	}
 
 	/** The task's session ended its turn with `reply`: a working task moves to review, and tells its Router unless it is quiet. */
@@ -150,7 +168,7 @@ export class RouterTasks {
 	}
 
 	async #finished(task: RouterTask | undefined, line: string | null): Promise<void> {
-		if (task?.status !== "working" || !this.#deps.active()) return;
+		if (task?.status !== "working" || !this.#deps.active() || this.#restarting.delete(task.id)) return;
 		this.apply({ op: "status", id: task.id, status: "review", note: null });
 		if (task.quiet) return;
 		await this.#deps.tell(task.botId, `Task "${task.title}" finished: ${line ?? "its session ended without a reply."}`).catch((error: unknown) => {

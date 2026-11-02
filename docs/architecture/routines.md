@@ -105,6 +105,9 @@ Every server learns its sightings, but only the server that owns routines fires 
 `RoutineRunner.fire` claims one run of each routine that watches a kind of the news, holding the first 10 of those events the check listed, then drains when the Mac is fully awake, in the same `SerialLane` as ticks and **Run now**.
 Otherwise the runs stay queued for the next tick at a full wake, and news for a routine whose triggered run is still queued joins that run, up to 10 events, through `RoutinesFile.addTriggerEvents`, so a night of dark wakes starts one run.
 A run is keyed by its time, so a claim lands at least a millisecond after the routine's newest run.
+Before a routine claims, the runner's optional `screen`, a `RoutineScreen`, takes the events it watches and returns the ones it should still run on, and a routine left with none claims nothing.
+The `Dashboard`'s screen is `RouterEvents`, which drops a Router's chatter and hands an event a Router's task follows to that task's session at once, even in a dark wake, where that session's turn may stall until the next full wake; every other Bot's events pass unchanged; see [Bots](bots.md#routers).
+The screen also adds to a prompt run's prompt as the drain sends it, so a Router's message names each event's follow and how many messages its rules dropped.
 A prompt run carries the events in the trailing JSON stamp rather than fenced trigger prose.
 A command gets the events as a JSON list in the `ROUTINE_TRIGGERS` environment variable, `[]` for a scheduled run or **Run now**, which `runShell` sets beside the server's environment.
 Each event carries its kind, a title, a detail of at most 2,000 characters, and a link when it has one.

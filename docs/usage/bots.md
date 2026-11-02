@@ -110,5 +110,16 @@
   Prompting the task's session again moves it back to **In progress**.
 - The Router sees its open tasks on every turn, so it can mark one done or stopped, or add what one listens to, when you ask.
 - A task the dashboard cannot start, such as one in a directory you have not trusted, shows under **Done** as stopped, with why, and the Router hears why in its conversation.
+- A new Router starts with a routine, **Team events**, that wakes it when a Slack message waits on you or one of your pull requests becomes your move, including failing checks and comments to address.
+  You can edit or pause it in the Router's **Routines** tab like any routine.
+- Before the Router reads them, rules in the dashboard drop team messages that need nothing: one with only emoji, or with three words or fewer, no question mark, and no word that asks for something or reports a problem, such as "thanks!" or "sounds good".
+  The next run that reaches the Router ends its prompt with how many it dropped, such as "3 team messages didn't need anything.", which the run's card shows when you open it.
+- An event on a pull request or Slack thread that one of the Router's open tasks listens to goes straight to that task's session, without a Router turn, and moves the task back to **In progress**.
+  An event no task listens to, or one a task's session could not take, reaches the Router, and the events of one check reach it together, in one run.
+- When someone reports a bug nobody answered, the Router starts a quiet task that listens to the thread and posts there only once it has a result.
+- A supervisor checks the tasks in progress every two minutes while the dashboard runs.
+  A task whose session works with no new step for six minutes, runs the same tool call four times in a row, or died, is stopped and told to continue, with the reason and its last error.
+  The Router tells you it restarted a task unless the task is quiet, and the task's row in **Tasks** shows why.
+  After two restarts, the next time the task is stuck the supervisor stops it and ends its session, and the Router hears why.
 - Deleting a Router deletes its tasks; their sessions stay in **Sessions**.
 - The server keeps the tasks in `router-tasks.json` beside `bots.json`.

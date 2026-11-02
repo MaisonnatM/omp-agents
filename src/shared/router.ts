@@ -1,8 +1,9 @@
 /**
  * Router Bots: the tasks a Router hands to background sessions, what its `start_task`, `follow`, and `finish_task`
- * tools ask of the server, and the job a new one starts with.
+ * tools ask of the server, and the job and routine a new one starts with.
  */
 import { isNonEmpty, isObject, isSafeInteger, parseAll, type Parsed } from "../json";
+import type { RoutineSpec } from "../routines";
 import { type BotId, parseBotId } from "./bots";
 import { parsePullRequest } from "./github";
 
@@ -15,8 +16,20 @@ export const ROUTER_JOB = [
 	"When a task works on a pull request, a Slack thread, or a Linear issue, name it in `follows`, so what happens there reaches that task.",
 	"When a task finishes, tell me in one line what it did and what it needs from me, then mark it with `finish_task`.",
 	"Stay quiet on events that need nothing from me.",
+	"When an event reports a bug nobody answered, start a quiet task (`quiet: true`) that follows its thread and looks into it, and tell it in its prompt to post in that thread only once it has a result, such as a cause or a fix.",
 	"Ask me only for decisions, never for what a task can find out itself.",
 ].join("\n");
+
+/** The routine a new Router starts with: a run whenever a Slack message waits on you or a pull request becomes your move. */
+export const routerRoutine = (botId: BotId): RoutineSpec => ({
+	id: `${botId}-events`,
+	botId,
+	name: "Team events",
+	schedules: [],
+	triggers: [{ kind: "slack" }, { kind: "pull-request" }],
+	task: { kind: "prompt", prompt: "Read the events this run names, and hand each that needs work to a task, as your job says; say nothing about the ones that need nothing from me." },
+	enabled: true,
+});
 
 /** Something a task listens to, so what happens there reaches the task that owns it. */
 export type TaskFollow =

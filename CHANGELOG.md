@@ -7,6 +7,11 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - New Bot type, Router: a Bot named Atlas that answers at once and hands real work to background sessions, which its new Tasks tab groups into Needs you, In progress, and Done.
 - A Router's task moves to Needs you when its session finishes, and the Router tells you in one line; Mark done and Stop in a task's menu close it.
+- A Router's task that gets stuck, repeats the same step, or whose session dies is restarted with what went wrong; after two restarts it is stopped and the Router tells you why.
+- A new Router comes with a Team events routine, so it hears about Slack messages waiting on you and pull requests that need your move.
+- A Router skips team messages that need nothing, such as "thanks!", and its next run tells you how many it skipped.
+- News on a pull request or Slack thread a Router's task follows goes straight to that task, without waking the Router.
+- A Router starts a quiet task for a bug report nobody answered, which posts in the thread only once it has a result.
 - You can click an image in a pull request's description or comments to open it large.
 - Diff code blocks in a pull request's description and comments now show as colored diffs, one card per file, with line numbers when the block has them.
 - Fixed: the Inbox no longer jumps to a new question while you work on another item.

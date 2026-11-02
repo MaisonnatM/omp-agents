@@ -26,6 +26,16 @@ export interface RoutineRunnerDeps {
 	onChange(): void;
 	/** Sends `text` into Bot `botId`'s conversation, as the user's message would; the session it went to. Rejects with why it could not. */
 	messageBot(botId: BotId, text: string): Promise<string>;
+	/** Screens each routine's trigger events before it claims a run, as a Router's rules and tasks do; every event goes through without it. */
+	screen?: RoutineScreen;
+}
+
+/** What a Bot does with its routine's trigger events before the routine runs on them. */
+export interface RoutineScreen {
+	/** The events of `events` that `routine` should still run on, in their order; it handled or dropped the rest. */
+	events(routine: Routine, events: TriggerEvent[]): Promise<TriggerEvent[]>;
+	/** The prompt `run` of `routine` sends, with what the screen adds to it. */
+	prompt(routine: Routine, run: RoutineRun, prompt: string): string;
 }
 
 export class RoutineRunner {
@@ -83,17 +93,23 @@ export class RoutineRunner {
 
 	/**
 	 * Claims one run for each enabled routine with a trigger of the kinds in `events`, holding the first
-	 * {@link MAX_TRIGGER_EVENTS} of them it watches, then drains once the Mac is fully awake, else leaves the runs for
-	 * the next tick at a full wake; waits for a tick under way rather than skip.
-	 * News for a routine whose triggered run is still queued joins that run, so a night of dark wakes starts one run.
+	 * {@link MAX_TRIGGER_EVENTS} of them it watches that its Bot's screen leaves, then drains once the Mac is fully awake,
+	 * else leaves the runs for the next tick at a full wake; waits for a tick under way rather than skip.
+	 * A routine whose screen leaves none claims nothing. News for a routine whose triggered run is still queued joins
+	 * that run, so a night of dark wakes starts one run.
 	 */
 	fire(events: readonly TriggerEvent[]): Promise<void> {
 		return this.#lane.run(async () => {
-			const { file } = this.#deps;
+			const { file, screen } = this.#deps;
 			const now = this.#deps.now();
-			for (const routine of file.value) {
-				const seen = events.filter(event => isTriggeredBy(routine, event.kind)).slice(0, MAX_TRIGGER_EVENTS);
-				if (seen.length === 0) continue;
+			// A screen may wait on a session, so each routine is read as its turn comes.
+			for (const id of file.value.map(routine => routine.id)) {
+				const watching = file.value.find(routine => routine.id === id);
+				const watched = watching ? events.filter(event => isTriggeredBy(watching, event.kind)) : [];
+				if (!watching || watched.length === 0) continue;
+				const seen = (screen ? await screen.events(watching, watched) : watched).slice(0, MAX_TRIGGER_EVENTS);
+				const routine = file.value.find(candidate => candidate.id === id);
+				if (!routine || seen.length === 0) continue;
 				const waiting = routine.runs.find(run => run.outcome.kind === "pending" && run.outcome.queued && run.triggeredBy.length > 0);
 				if (waiting) file.addTriggerEvents(routine.id, waiting.at, seen);
 				// Runs are keyed by their time, so a second claim in the same millisecond takes the next one.
@@ -120,7 +136,7 @@ export class RoutineRunner {
 			file.dequeue(routine.id, run.at);
 			switch (task.kind) {
 				case "prompt":
-					await this.#message(routine, run.at, sentText(routine, run, { kind: "prompt", prompt: task.prompt }));
+					await this.#message(routine, run.at, sentText(routine, run, { kind: "prompt", prompt: this.#deps.screen?.prompt(routine, run, task.prompt) ?? task.prompt }));
 					break;
 				case "command":
 					this.#launch(routine, run, task.command);

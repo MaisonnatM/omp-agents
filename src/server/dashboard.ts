@@ -78,9 +78,12 @@ import { RoutineRunner } from "./routine-runner";
 import { eventSightings, gmailSightings, pullRequestSightings, SLACK_SCOPE, slackSightings, TriggerWatch } from "./routine-triggers";
 import { RoutineInbox } from "./routine-inbox";
 import { RouterInbox } from "./router-inbox";
+import { RouterEvents } from "./router-events";
 import { RouterTasks, RouterTasksFile } from "./router-tasks";
+import { readTaskTail, RouterSupervisor, SUPERVISOR_TICK_MS } from "./router-supervisor";
 import { ShepherdInbox } from "./shepherd-inbox";
 import { shepherdRoutine } from "../shared/shepherd";
+import { routerRoutine } from "../shared/router";
 import { unapprovedChange } from "../pull-request-approval";
 import { configAt } from "../../templates/omp/agent/extensions/land/gate";
 import { RoutinesFile } from "./routines-file";
@@ -172,6 +175,9 @@ export class Dashboard {
 	/** The tasks Router Bots hand to background sessions, and the inbox their tools leave requests in. */
 	readonly #routerTasks: RouterTasks;
 	readonly #routerInbox: RouterInbox;
+	/** Restarts the Router tasks whose sessions are stuck, on its own loop that {@link start} starts. */
+	readonly #routerSupervisor: RouterSupervisor;
+	#stopRouterSupervisor = (): void => {};
 	readonly #worktrees: Worktrees;
 	/** omp's isolation sandboxes whose omp exited, removed once a day by the owner. */
 	readonly #isolationSweep: IsolationSweep;
@@ -347,8 +353,9 @@ export class Dashboard {
 					if (change.op === "remove") routerTasks.apply({ op: "remove-bot", botId: change.id });
 					const created = change.op === "save" && !this.#botsFile.value.some(({ id }) => id === change.bot.id);
 					if (!this.#botsFile.apply(change, new Date().toISOString())) return false;
-					// A new PR shepherd starts with the routine that wakes it as your pull requests change, after the Bot it belongs to is saved.
-					if (created && change.bot.kind === "pr-shepherd" && routines.apply({ op: "save", routine: shepherdRoutine(change.bot.id) }, Date.now())) this.#broadcasts.pushList("routines");
+					// A new PR shepherd or Router starts with the routine that wakes it as what it watches changes, after the Bot it belongs to is saved.
+					const routine = !created ? null : change.bot.kind === "pr-shepherd" ? shepherdRoutine(change.bot.id) : change.bot.kind === "router" ? routerRoutine(change.bot.id) : null;
+					if (routine && routines.apply({ op: "save", routine }, Date.now())) this.#broadcasts.pushList("routines");
 					return true;
 				},
 			},
@@ -477,6 +484,13 @@ export class Dashboard {
 			fullyAwake,
 			onChange: () => broadcasts.pushList("routines"),
 			messageBot: (botId, text) => this.#bots.message(botId, text),
+			// A Router's rules and tasks see its events first.
+			screen: new RouterEvents({
+				isRouter: botId => this.#botsFile.value.some(bot => bot.id === botId && bot.kind === "router"),
+				file: routerTasksStore,
+				apply: edit => routerTasks.apply(edit),
+				messageSession: async (sessionId, text) => (await reach(sessionId)).prompt(null, text, [], "followUp"),
+			}),
 		}));
 		const scheduledRunner = (this.#scheduledRunner = new ScheduledRunner({
 			file: scheduled,
@@ -551,6 +565,24 @@ export class Dashboard {
 			},
 			{ active: () => ownerLock.held },
 		);
+		this.#routerSupervisor = new RouterSupervisor({
+			file: routerTasksStore,
+			tasks: routerTasks,
+			active: () => ownerLock.held,
+			live: sessionId => {
+				const session = sessions.bySessionId(sessionId);
+				if (!session) return null;
+				const { status, agents } = session.row();
+				const activity = agents.flatMap(agent => (agent.status === "running" ? [`${agent.id} ${agent.activity ?? ""}`] : [])).join("\n");
+				return { busy: status === "working", activity, interrupt: () => session.interrupt() };
+			},
+			tail: sessionId => {
+				const path = sessions.bySessionId(sessionId)?.transcriptPath(null, files.pathOf) ?? files.pathOf(sessionId);
+				return path === null ? null : readTaskTail(path);
+			},
+			reach,
+			tell: (botId, text) => this.#bots.message(botId, text),
+		});
 		this.#loops = new Loops(SESSION_FORMATS, {
 			onRegistryTick: async () => {
 				if (broadcasts.listening()) await this.#listRegistry();
@@ -764,6 +796,7 @@ export class Dashboard {
 		}
 		this.#loops.start();
 		this.#stopMergeQueue = repeat("merge queue", () => this.#mergeQueue.tick(), MERGE_QUEUE_TICK_MS, 0);
+		this.#stopRouterSupervisor = repeat("Router supervisor", () => this.#routerSupervisor.check(), SUPERVISOR_TICK_MS);
 	}
 
 	/**
@@ -774,6 +807,7 @@ export class Dashboard {
 	async stop(): Promise<void> {
 		this.#loops.stop();
 		this.#stopMergeQueue();
+		this.#stopRouterSupervisor();
 		this.#todoInbox.stop();
 		this.#noteInbox.stop();
 		this.#routineInbox.stop();

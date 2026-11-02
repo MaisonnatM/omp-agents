@@ -117,3 +117,22 @@ The pages hear every task through the list registry's `router-tasks` entry, a `r
 Deleting a Bot deletes its tasks, in the registry's `bots` entry, before the Bot itself.
 `RouterTasksFile.following` lists the open tasks that follow a given pull request, Slack thread, or Linear issue, for routing what happens there to the task that owns it.
 
+A new `router` Bot's save, in the list registry's `bots` entry, also saves `routerRoutine` from `src/shared/router.ts`: routine `<bot id>-events`, **Team events**, with `slack` and `pull-request` triggers and a prompt task, so the routine runner wakes the Router with the Slack messages that wait on you and the pull requests that became your move, failing checks and comments to address among them.
+`RouterEvents` in `src/server/router-events.ts` is the runner's `screen`, which sees each routine's trigger events before the routine claims a run; it lets any other Bot's events through.
+For a Router's routine it first drops the events `needsNothing` in `src/shared/router-rules.ts` matches, rules in code and no model call: a Slack message with no words once emoji codes, links, and mentions are gone, or with at most `MAX_CHATTER_WORDS`, three, words, no `?`, and no word that asks for something or reports a problem.
+The Slack check already leaves out your own messages, bots', and Slack's own, and reports neither reactions nor edits, and a pull request event is always kept.
+It counts the dropped events per Router in memory.
+It then reads each event's `TaskFollow` with `followOf`: the pull request a pull request event's link names, or, for a Slack permalink, the channel and the `thread_ts` it carries, else the message's own timestamp.
+Each open task of that Router that `RouterTasksFile.following` finds with a session gets the events it follows in one `passThroughText` message, sent as a follow-up through `reach`, the live session else its resume, and the task's `heard` edit, which moves it from `review` back to `working` and stamps `updatedAt`; no Router turn runs for them.
+The rest go to the Router, with any a task's session refused, so a routine whose events all dropped or passed through claims no run, and one check's remaining events, up to `MAX_TRIGGER_EVENTS`, reach the Router as one run and one message.
+As the run sends, the screen's `prompt` adds to a triggered run's prompt each event's follow as JSON, from `followsText`, for `start_task` or `follow`, and, once, `droppedLine`, such as `3 team messages didn't need anything.`, which the run card shows under its prompt.
+`ROUTER_JOB` tells the Router to start a quiet task that follows the thread for a bug report nobody answered, and to tell it to post there only once it has a result.
+
+`RouterSupervisor` in `src/server/router-supervisor.ts` looks at every `working` task each `SUPERVISOR_TICK_MS`, two minutes, on `repeat`, while the dashboard runs; only the server holding the owner lock acts, and the others forget what they saw.
+It reads the end of the task's session file through `readTaskTail`: the newest entry's id, the tool call the file ends on and how many times in a row it ran since the last prompt, and the newest failed tool result.
+A live session whose turn runs is stuck when that call repeated `LOOP_REPEATS`, four, times, or when neither its newest entry nor its running subagents' activity changed for `STALL_CHECKS`, three, looks in a row; a session waiting on you, or idle, is not.
+A session that no longer runs here counts as died only once its file stays still for those looks too, so a session another server still runs is left alone.
+A restart counts in the task's `restarts` and sets its `note` to the reason through the `restart` edit, marks the task in `RouterTasks.restart` so the turn it stops ends without moving it to review, stops the turn with `interrupt`, and sends `The supervisor restarted you: <reason>. Last error: <error>. Continue the task.` as a follow-up, with the messages the stop took back, to the session, resumed through `reach` when it died.
+A task that is not `quiet` posts `FYI: the supervisor restarted task "<title>": <reason>.` into its Router's conversation.
+After `MAX_RESTARTS`, two, restarts, the next stuck look stops the task with the reason as its note, which ends its session, and posts `The supervisor stopped task "<title>" after 2 restarts: <reason>.` whether the task is quiet or not.
+
