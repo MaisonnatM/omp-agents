@@ -20,7 +20,8 @@ A foreground `docker compose up` or `docker run` is a process group under omp, s
 
 ## Sampling
 
-The server that holds the owner lock samples every 15 seconds, whether a page listens or not, and every server samples again for each `GET /api/session-processes` and each stop: one `ps -A -o pid=,ppid=,pgid=,rss=,pcpu=,lstart=,args=`, run without blocking the server, and one `collectReports`.
+The server that holds the owner lock samples every 15 seconds, whether a page listens or not, and every server samples again for each stop and for each `GET /api/session-processes` that finds no sample under 2 seconds old (`LIST_REUSE_MS`): one `ps -A -o pid=,ppid=,pgid=,rss=,pcpu=,lstart=,args=`, run without blocking the server through `readProcessTable` in `src/process-census.ts`, and one `collectReports`.
+Every open window polls the list every 5 seconds, so windows that poll within 2 seconds of each other share one `ps` and one `lsof`; a stop answers from a sample taken after it.
 `pcpu` is `ps`'s percent of one core, which macOS reads as an average that decays over the last minute, and `LC_ALL=C` keeps its decimal point a dot.
 Samples run one at a time.
 A job's id is its process group and its top process's start time, and a service's id is its broker's runtime directory, its name, and its generation, so a stop of an id that no longer runs, or now names another process, stops nothing and answers the current list.

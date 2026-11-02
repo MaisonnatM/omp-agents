@@ -73,7 +73,8 @@ import { PinsFile } from "./pins-file";
 import { PreferencesFile } from "./preferences-file";
 import { ProcessSettingsFile } from "./process-settings-file";
 import { startDevServer } from "./dev-server";
-import { readAppOf, readCwds, readListeningPorts, readProcessTable, SessionProcessWatch, stopProcesses } from "./session-processes";
+import { readProcessTable } from "../process-census";
+import { readAppOf, readCwds, readListeningPorts, SessionProcessWatch, stopProcesses } from "./session-processes";
 import { ReviewDrafts } from "./review-drafts";
 import { ReviewDraftsFile } from "./review-drafts-file";
 import { RoutineRunner } from "./routine-runner";
@@ -630,7 +631,7 @@ export class Dashboard {
 					const file = files.pathOf(sessionId);
 					const saved = files.savedOf(sessionId);
 					if (!file || !saved) return null;
-					return { file, dir: files.factsOf(sessionId).worktree ?? sessions.bySessionId(sessionId)?.cwd ?? saved.cwd };
+					return { file, dir: files.factsOf(sessionId).worktree ?? sessions.bySessionId(sessionId)?.cwd ?? saved.cwd, changedPaths: () => files.facts.changedPathsOf(file) };
 				},
 				learnHeads(repo, pullRequests) {
 					if (files.facts.learnHeads(repo, pullRequests)) broadcasts.pushAll();

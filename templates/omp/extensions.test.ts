@@ -488,6 +488,13 @@ describe("worktree guard", () => {
 	writeFileSync(join(root, "main", ".gitignore"), ".env\nforced.txt\n");
 	writeFileSync(join(root, "main", "forced.txt"), "");
 	git("-C", "main", "add", "-f", "forced.txt");
+	// `pinned` is on `main` with an `origin/HEAD` that holds a commit, not a branch, so it names no default; `detached` has no branch checked out.
+	git("clone", "-q", "upstream", "pinned");
+	git("-C", "pinned", "switch", "-q", "-c", "main");
+	const tip = Bun.spawnSync(["git", "-C", join(root, "upstream"), "rev-parse", "HEAD"]).stdout.toString().trim();
+	writeFileSync(join(root, "pinned", ".git", "refs", "remotes", "origin", "HEAD"), `${tip}\n`);
+	git("clone", "-q", "upstream", "detached");
+	git("-C", "detached", "switch", "-q", "--detach");
 	afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 	test.each([["main", true], ["plain", true], ["feature", false], ["isolated/m", false]])("a first write in the %s clone", (checkout, blocked) => {
@@ -496,7 +503,7 @@ describe("worktree guard", () => {
 	});
 
 	// `downstream` is on `trunk`, the default branch its `origin/HEAD` names; `feature` has no remote and is on neither `main` nor `master`.
-	test.each([["main", true], ["downstream", true], ["feature", false]])("a retried write in the %s checkout is blocked: %s", (checkout, blocked) => {
+	test.each([["main", true], ["downstream", true], ["pinned", true], ["feature", false], ["detached", false]])("a retried write in the %s checkout is blocked: %s", (checkout, blocked) => {
 		const { result } = exercise("worktree-guard", { write: join(root, checkout, "file.txt"), attempts: 2 });
 		expect(result?.block ?? false).toBe(blocked);
 	});

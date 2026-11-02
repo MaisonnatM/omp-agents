@@ -4,12 +4,11 @@
  * previews its turn, and a click scrolls the transcript to its prompt.
  */
 import { useReducedMotion } from "framer-motion";
-import { type ComponentProps, memo, type RefObject, useEffect, useMemo, useRef, useState } from "react";
-import type { Item } from "../../src/shared/transcript";
+import { type ComponentProps, memo, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { plainMarkdown, skillLabel } from "../labels";
-import { type OutlineTurn, outline } from "../transcript-view";
+import type { OutlineTurn } from "../transcript-view";
 import { TaskIcon } from "./routines/routine-marks";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "./ui/hover-card";
 import { Tooltip } from "./ui/tooltip";
@@ -39,7 +38,7 @@ export function scrollToMessage(viewport: HTMLElement, message: HTMLElement, red
 }
 
 /** The turn whose prompt last crossed the reading line. */
-function readingTurn(turns: OutlineTurn[], viewport: HTMLElement): string | null {
+function readingTurn(turns: readonly OutlineTurn[], viewport: HTMLElement): string | null {
 	const line = viewport.getBoundingClientRect().top + READING_LINE;
 	let current: string | null = turns[0]?.id ?? null;
 	for (const turn of turns) {
@@ -54,15 +53,15 @@ function readingTurn(turns: OutlineTurn[], viewport: HTMLElement): string | null
 /**
  * Follows the transcript's scroll and names the turn being read. A jump pins its turn until the reader scrolls, since
  * the last turns can sit below the reading line even at the transcript's end. The listeners follow the turns' ids, not
- * each streamed token: the scroll handler reads the latest `turns`.
+ * each streamed token: the scroll handler reads the latest `turns`. `jump` keeps its identity, so the memoized lines do.
  */
-function useReadingTurn(turns: OutlineTurn[], rail: RefObject<HTMLElement | null>): { current: string | null; jump: (id: string) => void } {
+function useReadingTurn(turns: readonly OutlineTurn[], rail: RefObject<HTMLElement | null>): { current: string | null; jump: (id: string) => void } {
 	const [current, setCurrent] = useState<string | null>(null);
 	const pinned = useRef<string | null>(null);
 	const latest = useRef(turns);
 	latest.current = turns;
 	const reduceMotion = useReducedMotion() ?? false;
-	const key = turns.map(turn => turn.id).join("\n");
+	const key = useMemo(() => turns.map(turn => turn.id).join("\n"), [turns]);
 	useEffect(() => {
 		const viewport = viewportOf(rail.current);
 		if (!viewport) return;
@@ -83,14 +82,14 @@ function useReadingTurn(turns: OutlineTurn[], rail: RefObject<HTMLElement | null
 			for (const type of READER_SCROLL) viewport.removeEventListener(type, unpin);
 		};
 	}, [key, rail]);
-	const jump = (id: string) => {
+	const jump = useCallback((id: string) => {
 		const viewport = viewportOf(rail.current);
 		const message = viewport && messageIn(viewport, id);
 		if (!viewport || !message) return;
 		pinned.current = id;
 		setCurrent(id);
 		scrollToMessage(viewport, message, reduceMotion);
-	};
+	}, [rail, reduceMotion]);
 	return { current, jump };
 }
 
@@ -111,7 +110,8 @@ const FALLOFF =
 
 const RAIL_BUTTON = "flex w-8 shrink-0 cursor-pointer items-center justify-start px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-function Line({ turn, index, active, onJump }: { turn: OutlineTurn; index: number; active: boolean; onJump: (id: string) => void }) {
+/** One turn's line, memoized on its turn, which keeps its identity while the turn is unchanged. */
+const Line = memo(function Line({ turn, index, active, onJump }: { turn: OutlineTurn; index: number; active: boolean; onJump: (id: string) => void }) {
 	const title = titleOf(turn);
 	const description = descriptionOf(turn);
 	return (
@@ -143,7 +143,7 @@ function Line({ turn, index, active, onJump }: { turn: OutlineTurn; index: numbe
 			</HoverCardContent>
 		</HoverCard>
 	);
-}
+});
 
 function Step({ direction, disabled, onClick }: { direction: "previous" | "next"; disabled: boolean; onClick: ComponentProps<"button">["onClick"] }) {
 	const label = direction === "previous" ? "Previous turn" : "Next turn";
@@ -172,8 +172,7 @@ function Step({ direction, disabled, onClick }: { direction: "previous" | "next"
  * The rail for a transcript's turns, on its left edge. It shows from two turns on, and only where the pane leaves room
  * beside the transcript's column; the line of the turn being read stays lit.
  */
-export const TranscriptMinimap = memo(function TranscriptMinimap({ items, working }: { items: Item[]; working: boolean }) {
-	const turns = useMemo(() => outline(items, working), [items, working]);
+export const TranscriptMinimap = memo(function TranscriptMinimap({ turns }: { turns: readonly OutlineTurn[] }) {
 	const rail = useRef<HTMLElement>(null);
 	const { current, jump } = useReadingTurn(turns, rail);
 	if (turns.length < 2) return null;

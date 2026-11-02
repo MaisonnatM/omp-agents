@@ -1,14 +1,13 @@
 import { ChevronRight, ListChecks, Ship } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { memo, type ReactNode, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { SHIP_STAGES, type ShipProgress, type View } from "../../src/shared/sessions";
-import type { Item, TodoPhase, TodoTask } from "../../src/shared/transcript";
+import type { TodoPhase, TodoTask } from "../../src/shared/transcript";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { activityControl } from "../activity";
 import { useStoredState } from "../stored-state";
-import { latestTodos } from "../transcript-view";
 import { type ChangesSession, ChangesSections, useChanges } from "./todos-card-changes";
 import { Stepper } from "./arc/stepper";
 
@@ -99,13 +98,14 @@ const INLINE: Components = {
 };
 const INLINE_ELEMENTS = ["p", "code", "strong", "em", "del", "a"];
 
-function TaskText({ text }: { text: string }) {
+/** A task's text as inline markdown; memoized on the text, so a render of the card leaves the parse alone. */
+const TaskText = memo(function TaskText({ text }: { text: string }) {
 	return (
 		<ReactMarkdown remarkPlugins={[remarkGfm]} allowedElements={INLINE_ELEMENTS} unwrapDisallowed components={INLINE}>
 			{text}
 		</ReactMarkdown>
 	);
-}
+});
 
 function TaskRow({ task }: { task: TodoTask }) {
 	const active = task.status === "in_progress";
@@ -195,7 +195,7 @@ function Phase({ phase, label }: { phase: TodoPhase; label: string }) {
 	);
 }
 
-function TodosSection({ phases }: { phases: TodoPhase[] }) {
+function TodosSection({ phases }: { phases: readonly TodoPhase[] }) {
 	const [open, setOpen] = useStoredState(OPEN_KEY, raw => raw === "true");
 	const all = phases.flatMap(phase => phase.tasks);
 	const done = all.filter(isClosed).length;
@@ -289,7 +289,8 @@ function ShipSection({ ship }: { ship: ShipProgress }) {
 }
 
 interface SessionTodosCardProps {
-	items: readonly Item[];
+	/** The agent's todo list as its latest successful `todo` call left it. */
+	phases: readonly TodoPhase[];
 	view: View;
 	working: boolean;
 	/** The session whose files, images, and sources the card lists; omitted, it lists none. */
@@ -303,9 +304,9 @@ interface SessionTodosCardProps {
  * changed, took, and opened, each a section shown once it has something to list. The todo list is a summary of progress
  * and the task in progress, which unfolds into every phase, open tasks first. The card floats at the top right of its
  * transcript when the transcript is wide enough to keep it beside the messages, and otherwise sits above them.
+ * Memoized: `phases` keeps its identity until a `todo` call changes it, so a streamed token leaves the card as it is.
  */
-export function SessionTodosCard({ items, view, working, changes, ship }: SessionTodosCardProps) {
-	const phases = useMemo(() => latestTodos(items), [items]);
+export const SessionTodosCard = memo(function SessionTodosCard({ phases, view, working, changes, ship }: SessionTodosCardProps) {
 	const [todosShown] = useTodosCardShown();
 	const todos = todosShown && phases.length > 0;
 	const found = useChanges(view, changes);
@@ -321,4 +322,4 @@ export function SessionTodosCard({ items, view, working, changes, ship }: Sessio
 			{found && changes && <ChangesSections view={view} session={changes} changes={found} working={working} />}
 		</section>
 	);
-}
+});

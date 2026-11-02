@@ -6,7 +6,7 @@
  */
 import type { DaemonReport, DaemonScope } from "../omp/module-types/processes";
 import { run } from "../proc";
-import { cwdsArgv, descendants, LISTENERS_ARGV, parseCwds, parseListeners, parsePs, PS_ARGV, PS_ENV, type Processes, type ProcessRow, type ProcessTable, sessionGroups, terminate } from "../process-census";
+import { cwdsArgv, descendants, LISTENERS_ARGV, parseCwds, parseListeners, type Processes, type ProcessRow, type ProcessTable, sessionGroups, terminate } from "../process-census";
 import { SerialLane } from "../serial-lane";
 import type { LiveSessionProcesses, SessionProcess, SessionProcesses } from "../shared/processes";
 import type { HostStatus } from "../shared/sessions";
@@ -14,6 +14,9 @@ import { errorText } from "../json";
 
 /** How long a stopped job gets to exit on SIGTERM before SIGKILL. */
 const STOP_GRACE_MS = 3_000;
+
+/** How old a sample {@link SessionProcessWatch.list} answers from may be, so every open window's status bar shares one `ps` and `lsof`. */
+export const LIST_REUSE_MS = 2_000;
 
 /** A live session, as the roster has it. */
 export interface WatchedSession {
@@ -90,6 +93,8 @@ export class SessionProcessWatch {
 	#seen = new Map<string, Seen>();
 	/** {@link SessionProcessWatchDeps.appOf} by directory, which a running server keeps. */
 	readonly #apps = new Map<string, Promise<string | null>>();
+	/** The last sample and when it was taken, which {@link list} reuses while it is under {@link LIST_REUSE_MS} old. */
+	#last: { at: number; sample: Sample } | null = null;
 
 	constructor(deps: SessionProcessWatchDeps) {
 		this.#deps = deps;
@@ -97,21 +102,34 @@ export class SessionProcessWatch {
 
 	/** Samples, which runs the idle stop and the cleanup when this server owns them. */
 	async tick(): Promise<void> {
-		await this.#lane.run(() => this.#sample());
+		await this.#lane.run(() => this.#fresh());
 	}
 
-	/** Every live session's processes now, in roster order. */
+	/** Every live session's processes, from the last sample if it started under {@link LIST_REUSE_MS} before this call, in roster order. */
 	list(): Promise<LiveSessionProcesses[]> {
-		return this.#lane.run(async () => answerOf(await this.#sample()));
+		// Asked before the lane, so a slow sample that started after this call, or just before it, answers every list queued behind it.
+		const asked = this.#deps.now();
+		return this.#lane.run(async () => {
+			const last = this.#last;
+			return answerOf(last && last.at > asked - LIST_REUSE_MS ? last.sample : await this.#fresh());
+		});
 	}
 
 	/** Stops session `instanceId`'s process `id`, unless either no longer runs, and answers what every live session runs after. */
 	stop(instanceId: string, id: string): Promise<LiveSessionProcesses[]> {
 		return this.#lane.run(async () => {
-			const item = (await this.#sample()).get(instanceId)?.items.find(each => each.id === id);
+			const item = (await this.#fresh()).get(instanceId)?.items.find(each => each.id === id);
 			if (item) await this.#stopTarget(item.target);
-			return answerOf(await this.#sample());
+			return answerOf(await this.#fresh());
 		});
+	}
+
+	/** A new sample, kept as the last one. */
+	async #fresh(): Promise<Sample> {
+		const at = this.#deps.now();
+		const sample = await this.#sample();
+		this.#last = { at, sample };
+		return sample;
 	}
 
 	async #sample(): Promise<Sample> {
@@ -279,12 +297,6 @@ function answerOf(sample: Sample): LiveSessionProcesses[] {
 	}));
 }
 
-/** Every process now, read without blocking the server; `null` when `ps` failed. */
-export async function readProcessTable(): Promise<ProcessTable | null> {
-	const ps = await run(PS_ARGV, { env: PS_ENV, timeoutMs: 10_000 });
-	return ps.code === 0 ? parsePs(ps.stdout) : null;
-}
-
 /** The TCP ports each process listens on, read without blocking the server; `null` when `lsof` failed. */
 export async function readListeningPorts(): Promise<Map<number, number[]> | null> {
 	try {
@@ -314,5 +326,5 @@ export async function readAppOf(dir: string): Promise<string | null> {
 	return git?.code === 0 ? git.stdout.trim() : null;
 }
 
-/** Stops `processes` by {@link terminate}, reading `ps` without blocking the server. */
-export const stopProcesses = (processes: Processes): Promise<void> => terminate(processes, STOP_GRACE_MS, readProcessTable);
+/** Stops `processes` by {@link terminate}, which reads `ps` without blocking the server. */
+export const stopProcesses = (processes: Processes): Promise<void> => terminate(processes, STOP_GRACE_MS);

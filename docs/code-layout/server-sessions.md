@@ -15,7 +15,7 @@
 - `src/commands.ts`: the composer's `/` and `@` completions, and the expansion of file commands and skills before a guest prompt.
 - `src/tail.ts`: reads one transcript file incrementally, decodes each line through its format's `decode` from `src/session-formats.ts`, and feeds each entry to both folds below.
   `src/line-reader.ts` holds `FoldedFile`, which keeps a fold of a file's lines up to date, applying only appended complete lines and starting a fresh fold when the file shrinks.
-  `src/tail.ts`, `src/media.ts`, `src/changes.ts`, `src/session-facts.ts`, and `src/foreign/usage.ts` each fold transcripts through it.
+  `src/tail.ts`, `src/media.ts`, `src/session-facts.ts`, and `src/foreign/usage.ts` each fold transcripts through it.
   The first two queue their reads with its `ReadQueue`, which shares one read among a burst of pokes.
   `src/read-tail.ts` holds `readTail`, which reads only the whole lines within a limit of a file's end, as the Bot extension and the server read a Bot's memory, and `tailEntries` the entries at a session file's end.
 - `src/session-formats.ts`: the registry of agents whose session files the dashboard lists, `SESSION_FORMATS`, each a `SessionFormat` with its root, its `fileOf`, `list`, and `read`, its line `decode`, and the `messageLine` conversation search parses.
@@ -55,6 +55,8 @@
 - `src/session-facts.ts`: finds the pull requests and Linear issues each session submitted or worked on, its latest /ship step (`parseShipProgress`), the linked worktree it works in, and the branch it works on; `SessionFactsIndex.factsOf(path, cwd)` answers them as one `SessionFacts`, with the workspace `cwd` counts in, and `SessionFactsIndex.headless(path)` whether omp ran the session as `omp -p`.
   Its `placement`, a `WorkspacePlacement` from `src/workspace-placement.ts`, knows which workspace each directory counts in, which a refresh asks for its sessions' directories and the server for live ones; `SessionFiles.workspaces()` and the `Dashboard`'s `knownWorkspaces()` list workspaces through it.
   Its read of a session's own file also feeds the `OwnFileFolds` it was constructed with, and it knows nothing of what those folds keep.
+  The same scan keeps the files the session's own `edit` and `write` calls changed, which `changedPathsOf` reads up to the file's end for `src/changes.ts`, so the changes view folds no transcript of its own; a refresh compares the /ship stage and headless mark with what it last reported, so that read hides no change from the next refresh.
+  Only a session's own file folds its replay through a `ReplayFold`; a subagent's transcript keeps none.
   The worktree comes from the `cwd` arguments of the session's own bash calls and the directories of the files its own `edit` and `write` calls changed, not its subagents', newest first: the first one in a linked worktree of the session directory's repository, other than the checkout that directory is in, passing over directories outside that repository and stopping with none at a directory that is gone.
   `fileDirsOf` adds the directories those bash calls `cd` into, which only resolve relative file paths in the session's text and never pick the worktree, since End session removes that one.
   The branch is the one a linked worktree has checked out now, or the one a main checkout had checked out at the session's last write, from its HEAD reflog; a linked worktree's branch, or a main checkout's branch other than the default one that `origin/HEAD` names, links the pull request it heads.
