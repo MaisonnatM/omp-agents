@@ -66,6 +66,7 @@ export type ShortcutId =
 	| "inboxOpen"
 	| "inboxDone"
 	| "inboxEnd"
+	| "inboxClose"
 	| "inboxReply"
 	| "inboxSendAll"
 	| "todoSearch"
@@ -320,6 +321,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "inboxOpen", category: "inbox", label: "Inbox: open the item's session, pull request, or message", keys: [{ chord: { key: "Enter" }, scope: "outside-fields" }] },
 	{ id: "inboxDone", category: "inbox", label: "Inbox: mark the item done, and open the next", keys: [{ chord: { key: "d" }, scope: "outside-fields" }] },
 	{ id: "inboxEnd", category: "inbox", label: "Inbox: end the item's session", keys: [{ chord: { key: "e" }, scope: "outside-fields" }] },
+	{ id: "inboxClose", category: "inbox", label: "Inbox: close the open item", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
 	{ id: "inboxReply", category: "inbox", label: "Inbox: write a reply to the item's session", keys: [{ chord: { key: "r" }, scope: "outside-fields" }] },
 	{ id: "inboxSendAll", category: "inbox", label: "Inbox: send every suggested prompt of the finished turn", keys: [{ chord: { key: "0" }, scope: "outside-fields" }] },
 	{ id: "notesSearch", category: "notes", label: "Search the Notes page's notes", keys: [{ chord: { key: "/" }, scope: "outside-fields" }] },
