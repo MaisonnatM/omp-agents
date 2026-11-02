@@ -1,5 +1,6 @@
+import { fromPartial } from "@total-typescript/shoehorn";
 import { describe, expect, test } from "bun:test";
-import type { PastSession, RosterHost } from "../src/shared/sessions";
+import type { PastSession, RosterHost, UnreadTurn } from "../src/shared/sessions";
 import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, searchSessions, sidebarSessions, waitingCount, workspaceSession, workspaceSwitch } from "./sessions";
 
 const host = (sessionId: string, cwd: string) => ({ instanceId: `i-${sessionId}`, sessionId, cwd }) as RosterHost;
@@ -165,9 +166,13 @@ describe("sidebarSessions", () => {
 		expect(ids(lists.idle)).toEqual(["h1"]);
 	});
 
-	test("the waiting count takes finished turns and open questions in the selected workspace, pinned ones included", () => {
-		const statuses = { h1: "idle", h2: "needs-input", h3: "working", h4: "idle", h5: "unknown" } as const;
-		const live = [...Object.entries(statuses).map(([id, status]) => ({ ...host(id, "~/a"), status })), { ...host("h6", "~/b"), status: "idle" as const }];
+	test("the waiting count takes unread turns and open questions in the selected workspace, pinned ones included, and not a turn already read", () => {
+		const turn = fromPartial<UnreadTurn>({ at: 1, reply: "Done." });
+		const rows = { h1: ["idle", turn], h2: ["needs-input", null], h3: ["working", null], h4: ["idle", turn], h5: ["unknown", null], h7: ["idle", null] } as const;
+		const live = [
+			...Object.entries(rows).map(([id, [status, unread]]) => ({ ...host(id, "~/a"), status, unread, requests: [] })),
+			{ ...host("h6", "~/b"), status: "idle" as const, unread: turn, requests: [] },
+		];
 		expect(waitingCount(sidebarSessions(live, [], "~/a", new Set(["h4"])))).toBe(3);
 	});
 
