@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-02
 
+- Fixed: finished turns stay in the Inbox when the dashboard restarts, such as after an update, and a turn that finishes while the dashboard is stopped shows up once it starts again.
+- Fixed: opening an Inbox item no longer marks the session it replaces on screen as read.
 - A long folder name in the message box now ends in … instead of running past the box and under the model switch.
 - /ship now plans before it builds: the agent compares up to three ways to do the work, keeps the best, and posts that plan on the Linear issue, or in the pull request when there is no issue.
 - /ship no longer needs a Linear ticket: it uses the one you name or one that matches the work, and otherwise ships without one instead of creating a ticket.
