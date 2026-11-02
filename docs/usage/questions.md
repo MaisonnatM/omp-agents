@@ -4,6 +4,7 @@
   Click an option or press its number to answer.
   A number key outside a text field answers the focused pane's question only, so with split panes it never reaches another pane's question.
   Type into a text field and press Enter (Cmd+Enter or Ctrl+Enter in a multi-line field), or click **Send**.
+  An input that asks for a secret, such as an API key, shows dots for what you type.
   **Dismiss** or Esc cancels the question, which omp treats like Esc in its terminal.
   The session continues its turn with your answer.
   Questions that wait in a queue show their count next to the first one, and a question with a timeout shows the time at which omp takes its default answer.

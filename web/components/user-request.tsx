@@ -34,7 +34,7 @@ function questionOf(request: StepRequest): Question {
 			return {
 				kind: "text",
 				title: request.title,
-				multiline: request.multiline,
+				field: request.field,
 				placeholder: request.placeholder ?? undefined,
 				submitLabel: "Send",
 			};
@@ -183,7 +183,7 @@ function AskCard({ request, queued, onAnswer, shortcuts }: UserRequestCardProps 
 		description: option.description ?? undefined,
 	}));
 	const shown: Question = typing
-		? { kind: "text", title: question.question, multiline: false, placeholder: "Type your answer…", submitLabel: last && !question.multi ? "Send" : "Next" }
+		? { kind: "text", title: question.question, field: "line", placeholder: "Type your answer…", submitLabel: last && !question.multi ? "Send" : "Next" }
 		: {
 				kind: "options",
 				title: question.question,

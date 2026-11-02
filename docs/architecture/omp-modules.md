@@ -7,13 +7,13 @@ Those files hold only types, so the app imports a type from them directly and ev
 It finds the package through `omp` on `PATH`, or `OMP_PACKAGE_DIR` when set; with a Bun global install that is `~/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent`.
 `bun run omp-release` checks a new omp release against these modules and the files listed below; the [omp release skill](../../.agents/skills/omp-release/SKILL.md) says how to read its report.
 
-Paid Cursor fallback is an external OMP runtime change, preserved in [`patches/omp-18.12.3-paid-cursor-fallback.patch`](../../patches/omp-18.12.3-paid-cursor-fallback.patch) with its regression tests.
-Its base is upstream tag `v18.12.3`, commit `53a0377db6845e0dae606146130766ec92d407fd`; do not apply it to another release without porting and verifying it.
+Paid Cursor fallback is an external OMP runtime change, preserved in [`patches/omp-18.15.0-paid-cursor-fallback.patch`](../../patches/omp-18.15.0-paid-cursor-fallback.patch) with its regression tests.
+Its base is upstream tag `v18.15.0`, commit `3fedf8d53267e32a6d7521ce725fdcc4a36fdc67`; do not apply it to another release without porting and verifying it.
 From a clean checkout of that release, check and apply the patch:
 
 ```sh
-git apply --check /absolute/path/to/omp-agents/patches/omp-18.12.3-paid-cursor-fallback.patch
-git apply /absolute/path/to/omp-agents/patches/omp-18.12.3-paid-cursor-fallback.patch
+git apply --check /absolute/path/to/omp-agents/patches/omp-18.15.0-paid-cursor-fallback.patch
+git apply /absolute/path/to/omp-agents/patches/omp-18.15.0-paid-cursor-fallback.patch
 ```
 
 Build and install both patched packages, `@oh-my-pi/pi-ai` and `@oh-my-pi/pi-coding-agent`, including the CLI bundle and SDK sources and declarations.
@@ -30,6 +30,7 @@ The main ones:
   `appendCustomMessageEntry` in `pi-coding-agent/src/session/session-manager.ts` gives a `custom_message` entry the timestamp of the message it records, which `#persistMessageEnd` in `agent-session.ts` passes.
   `setSessionName(title, "user")` there is how `renameSessionFile` in `src/omp/sessions.ts` retitles a saved session, opened with `SessionManager.open`: it writes the header's title slot in place and appends a `title_change` entry, and a `"user"` title outranks every later `"auto"` one.
   `listSessionsReadOnly` caches each file's header by modification time and size, so a renamed file reads with its new title.
+  `findSessionContinuation` there returns the copy `omp --resume` opens when a session went on in a sibling file whose header names it in `continuationOf`, which `continuationOf` in `src/omp/sessions.ts` reads for a resume, since RPC `switch_session` opens only the file it is given.
   Worktree protection uses `visitEntriesFromFileStream` through `readSessionCwd` instead: it reads only the first native record, capped at 1 MiB as omp's header reader is, without trusting a listing cache after a replacement that preserved size and modification time.
 - Interrupted turns: `pi-coding-agent/src/session/exit-diagnostics.ts` (`createInterruptedTurnAbortMessage`), which `endsMidTurn` in `src/omp/sessions.ts` uses to refuse forking a session that ended mid-turn.
   It checks the branch from the leaf that `resolveSessionLeafId` in `pi-coding-agent/src/session/session-entries.ts` returns, as omp's load does, since a late `model_usage` entry is written last but points back at the leaf with `activeLeafId`.

@@ -36,11 +36,15 @@ describe("parseRpcRequest", () => {
 		});
 		expect(parseRpcRequest(frame("input", { title: "Name", placeholder: "e.g. x" }), NOW)).toEqual({
 			kind: "add",
-			request: { id: "r1", title: "Name", deadline: null, kind: "text", multiline: false, placeholder: "e.g. x", prefill: "" },
+			request: { id: "r1", title: "Name", deadline: null, kind: "text", field: "line", placeholder: "e.g. x", prefill: "" },
+		});
+		expect(parseRpcRequest(frame("input", { title: "API key", placeholder: "sk-…", secret: true }), NOW)).toEqual({
+			kind: "add",
+			request: { id: "r1", title: "API key", deadline: null, kind: "text", field: "secret", placeholder: "sk-…", prefill: "" },
 		});
 		expect(parseRpcRequest(frame("editor", { title: "Notes", prefill: "draft" }), NOW)).toEqual({
 			kind: "add",
-			request: { id: "r1", title: "Notes", deadline: null, kind: "text", multiline: true, placeholder: null, prefill: "draft" },
+			request: { id: "r1", title: "Notes", deadline: null, kind: "text", field: "lines", placeholder: null, prefill: "draft" },
 		});
 		expect(parseRpcRequest(frame("cancel", { targetId: "r0" }), NOW)).toEqual({ kind: "cancel", id: "r0" });
 		expect(parseRpcRequest(frame("notify", { message: "hi" }), NOW)).toBeNull();
@@ -123,7 +127,7 @@ describe("parseCollabRequest", () => {
 			title: "Custom answer: Languages",
 			deadline: null,
 			kind: "text",
-			multiline: true,
+			field: "lines",
 			placeholder: null,
 			prefill: "",
 		});

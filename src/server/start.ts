@@ -5,6 +5,7 @@ import { checkoutDir, worktreeAt } from "../git";
 import { errorText } from "../json";
 import { endedTurn, skipRefused } from "../live-session";
 import { type AdmittedLaunch, keptSessions, type RpcLaunch } from "../omp/rpc";
+import { continuationOf } from "../omp/sessions";
 import { prepareReplay } from "../replay";
 import { directoryOf, displayPath } from "../paths";
 import { formatOf } from "../session-formats";
@@ -168,14 +169,25 @@ export function createStarter(env: StartEnv): Starter {
 			case "resume": {
 				const { sessionId } = request;
 				if (sessions.sessionIds().has(sessionId) || resuming.has(sessionId)) return { error: "This session is already running." };
-				const path = env.savedFile(sessionId);
-				if (!path) return { error: "Cannot resume: this session's file is not known." };
-				if (formatOf(path).source !== "omp") return { error: "Cannot resume: this session is read-only. Only omp sessions resume here." };
+				const asked = env.savedFile(sessionId);
+				if (!asked) return { error: "Cannot resume: this session's file is not known." };
+				if (formatOf(asked).source !== "omp") return { error: "Cannot resume: this session is read-only. Only omp sessions resume here." };
 				resuming.add(sessionId);
+				// The id of the copy this resume opens, held while it starts, as `sessionId` is.
+				let held: string | null = null;
 				try {
 					let identity: string | null;
+					let path: string;
 					let cwd: string;
 					try {
+						// Where omp went on in a new file, resume opens that copy, as `omp --resume` does; omp's `switch_session` opens only the file it is given.
+						const copy = await continuationOf(asked);
+						if (copy) {
+							if (sessions.sessionIds().has(copy.id) || resuming.has(copy.id)) return { error: "This session is already running." };
+							held = copy.id;
+							resuming.add(held);
+						}
+						path = copy?.path ?? asked;
 						const facts = env.factsFor(sessionId);
 						const ticket = facts.tickets[0];
 						const pr = facts.pullRequests[0];
@@ -187,6 +199,7 @@ export function createStarter(env: StartEnv): Starter {
 					return await claimed(identity, cwd, allocated => launch("Cannot resume", async (id, emit) => ({ session: await DashboardSession.resume(id, path, rpcLaunch, emit), prompt: null }), allocated));
 				} finally {
 					resuming.delete(sessionId);
+					if (held !== null) resuming.delete(held);
 				}
 			}
 		}

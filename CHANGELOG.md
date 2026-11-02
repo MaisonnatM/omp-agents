@@ -5,6 +5,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-02
 
+- Fixed: a question that asks for a secret, such as an API key, now shows dots for what you type, and the dashboard never saves it.
+- Fixed: Resume on a past session that omp went on with in a new file now opens that newer file, with the latest turns, instead of the older one.
+- The paid Cursor fallback patch now applies to omp 18.15.0. Subagents started with their own model keep it, and a model with no sign-in tries included plans before paying.
 - Behind the scenes: checked against omp 18.15.0, which keeps the daily compression log that Storage reads.
 - In a narrow window, such as a phone, an open sidebar now slides over the page instead of squeezing it to a sliver; picking a page or tapping outside closes it.
 - Behind the scenes: every test now ignores the session it runs from, so a test added later cannot stamp an agent's session on its commits and fail "Merge on main".
@@ -224,29 +227,3 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - What's new now explains each update in everyday words, and every update to omp-agents adds its own lines there.
 - You can approve a pull request in one click, from its menu in the list or from the top of its details, and the button goes away once you have approved it.
 - Clicking a pull request in the list now shows its details beside the list instead of replacing it, and Open as a page still gives them a page of their own.
-
-## 2026-10-27
-
-- New Bots tab: a Bot is a named helper with a job, a memory, and one ongoing conversation you come back to, like a chat app.
-- New Bot lets you name a Bot, pick its shape and color, and start from a ready-made job such as PR reviewer or Daily retro.
-- The Bots tab opens the Bot you spoke with last, and the grid button shows all your Bots as cards.
-- A Bot's conversation reads like a chat, with only your messages and its replies, and its job, memory, and routines sit in the right sidebar.
-- In a Bot's message box, typing @ lets you mention people, teams, files, todos, tickets, pull requests, emails, events, and sessions, and People now includes your Linear teammates.
-- Every routine now belongs to a Bot and either sends that Bot a message or runs a command, so the separate Routines tab is gone.
-- Routines can now start on their own when a Slack message waits on you, a pull request waits on you, a calendar event is about to start, or unread mail arrives.
-- A Bot's routines card lists each routine with Run now, a pause switch, a countdown to its next run, and its last 10 runs as colored ticks.
-- Settings › Preferences can now play a sound with notifications, and lets you choose whether a finished turn notifies you.
-- Settings › Decisions shows your project's recorded decisions as a timeline, with only the ones still in force by default.
-- The Inbox page is now called Email.
-- The desktop app's title bar has Back and Forward buttons, also on Cmd+[ and Cmd+], and moving between sessions is now Cmd+Alt with the arrow keys.
-- On the tickets page, the sessions working on an issue now sit in a dropdown in its details.
-- Sync now also carries your notes, todos, preferences, workspaces, and hidden calendars to your other computers, and every window shares the same preferences.
-- The changes card above the message box has a new Sources section listing the web pages a session opened, each with its site's icon.
-- Notes now leave space around headings, lists, quotes, and code blocks, so they are easier to read.
-- The What's new button at the top right lists recent features, with a blue dot when there are ones you haven't seen.
-- Starting a session on a ticket, pull request, or todo that another session already works on is now refused, with a link to that session.
-- When your GitHub hourly allowance runs low, the Pull requests page pauses its refreshes and says when they resume, so your agents can keep working.
-- Fixed: a session's details now show the pull request it opened before one its first message only linked to.
-- Behind the scenes: the Pull requests list now uses about a twenty-fifth of the GitHub allowance it used before.
-- Behind the scenes: quick actions on pull requests and tickets start in the branch's own folder, and agents can no longer wipe a pull request's description by mistake.
-- Behind the scenes: agents suggest more useful next prompts, and the agent starter kit gained upkeep scripts and a checklist for setting up a new computer.

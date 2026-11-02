@@ -1,6 +1,6 @@
 /** `QuestionCard`, a card that asks one question: rows to pick from or a text field to answer. */
 import { motion } from "framer-motion";
-import { type HTMLAttributes, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type HTMLAttributes, type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { fontWeights } from "@/lib/font-weight";
 import { useShape } from "@/lib/shape-context";
@@ -8,12 +8,13 @@ import { useSize } from "@/lib/size-context";
 import { spring } from "@/lib/springs";
 import { cn } from "@/lib/utils";
 import { IS_MAC, modHeld } from "../shortcuts";
+import type { TextField } from "../../src/shared/sessions";
 import { type OptionLayout, type QuestionOption, QuestionOptions } from "./question-options";
 
 /** What a card asks: rows to pick one or several of, or a free-text answer. */
 export type Question = { title: string; description?: string } & (
 	| { kind: "options"; options: QuestionOption[]; layout: OptionLayout; multi?: boolean }
-	| { kind: "text"; multiline: boolean; placeholder?: string; submitLabel: string }
+	| { kind: "text"; field: TextField; placeholder?: string; submitLabel: string }
 );
 
 /** A picked row's index, or the typed text, trimmed. */
@@ -38,7 +39,7 @@ const SUBMIT_CHORD = `${IS_MAC ? "⌘" : "⌃"}↵`;
 /**
  * One question, asked in Fluid's look. Option rows answer on a click, or on Enter or Space; number keys are the
  * owner's to bind. A text question focuses its field on mount and sends with the submit button, with ⌘↵ or ⌃↵, or with
- * Enter when it is single-line.
+ * Enter when it is one line. A secret field shows dots for what you type.
  */
 export function QuestionCard({ question, checked, defaultText = "", header, footer, onAnswer, className, onKeyDown, ...rest }: QuestionCardProps) {
 	const shape = useShape();
@@ -110,7 +111,7 @@ export function QuestionCard({ question, checked, defaultText = "", header, foot
 						) : (
 							<TextAnswer
 								value={text}
-								multiline={question.multiline}
+								field={question.field}
 								placeholder={question.placeholder ?? "Type your answer…"}
 								labelledBy={titleId}
 								onChange={setText}
@@ -147,7 +148,7 @@ export function QuestionCard({ question, checked, defaultText = "", header, foot
 
 interface TextAnswerProps {
 	value: string;
-	multiline: boolean;
+	field: TextField;
 	placeholder: string;
 	labelledBy: string;
 	onChange: (value: string) => void;
@@ -157,58 +158,76 @@ interface TextAnswerProps {
 /**
  * The free-text answer: a field that takes focus on mount and grows with its text. A multi-line field rests a few lines
  * tall and takes Enter as a newline; a single-line one rests one row tall and sends on Enter. Shift+Enter is always a
- * newline.
+ * newline. A secret field is a password input: one line of dots that the browser neither spell-checks nor offers to fill.
  */
-function TextAnswer({ value, multiline, placeholder, labelledBy, onChange, onSubmit }: TextAnswerProps) {
+function TextAnswer({ value, field, placeholder, labelledBy, onChange, onSubmit }: TextAnswerProps) {
 	const shape = useShape();
 	const size = useSize();
 	const compact = size.variant === "compact";
-	const fieldRef = useRef<HTMLTextAreaElement>(null);
+	const linesRef = useRef<HTMLTextAreaElement>(null);
+	const secretRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
-		fieldRef.current?.focus({ preventScroll: true });
+		(linesRef.current ?? secretRef.current)?.focus({ preventScroll: true });
 	}, []);
 
 	// A textarea does not fit its text: collapse it so it can shrink, then grow it to its content.
 	useEffect(() => {
-		const field = fieldRef.current;
-		if (!field) return;
-		field.style.height = "0px";
-		field.style.height = `${field.scrollHeight}px`;
+		const lines = linesRef.current;
+		if (!lines) return;
+		lines.style.height = "0px";
+		lines.style.height = `${lines.scrollHeight}px`;
 	}, [value]);
+
+	const sendOnEnter = (event: KeyboardEvent): void => {
+		// ⌘↵ and ⌃↵ reach the card, which sends from either kind of field.
+		if (event.key !== "Enter" || event.shiftKey || event.metaKey || event.ctrlKey || field === "lines") return;
+		event.preventDefault();
+		onSubmit();
+	};
+	const fieldClass = cn("block w-full bg-transparent border-0 p-0 m-0 outline-none leading-snug text-foreground placeholder:text-muted-foreground", size.text);
+	const fieldStyle = { fontVariationSettings: fontWeights.medium };
 
 	return (
 		// The resting height lives on the box, since the field's own height follows its text; a click anywhere in it focuses the field.
 		<div
-			onClick={() => fieldRef.current?.focus()}
+			onClick={() => (linesRef.current ?? secretRef.current)?.focus()}
 			className={cn(
 				"relative mt-1 cursor-text transition-colors",
 				compact ? "-mx-2.5 py-2" : "-mx-3 py-2.5",
 				size.px,
-				multiline ? "min-h-[76px]" : compact ? "min-h-8" : "min-h-10",
+				field === "lines" ? "min-h-[76px]" : compact ? "min-h-8" : "min-h-10",
 				shape.bg,
 				value.length > 0 ? "bg-active" : "hover:bg-hover focus-within:bg-card focus-within:ring-1 focus-within:ring-inset focus-within:ring-border",
 			)}
 		>
-			<textarea
-				ref={fieldRef}
-				rows={1}
-				value={value}
-				placeholder={placeholder}
-				aria-labelledby={labelledBy}
-				onChange={event => onChange(event.target.value)}
-				onKeyDown={event => {
-					// ⌘↵ and ⌃↵ reach the card, which sends from either kind of field.
-					if (event.key !== "Enter" || event.shiftKey || event.metaKey || event.ctrlKey || multiline) return;
-					event.preventDefault();
-					onSubmit();
-				}}
-				className={cn(
-					"block w-full bg-transparent border-0 p-0 m-0 outline-none resize-none overflow-hidden leading-snug text-foreground placeholder:text-muted-foreground",
-					size.text,
-				)}
-				style={{ fontVariationSettings: fontWeights.medium }}
-			/>
+			{field === "secret" ? (
+				<input
+					ref={secretRef}
+					type="password"
+					autoComplete="off"
+					spellCheck={false}
+					value={value}
+					placeholder={placeholder}
+					aria-labelledby={labelledBy}
+					onChange={event => onChange(event.target.value)}
+					onKeyDown={sendOnEnter}
+					className={fieldClass}
+					style={fieldStyle}
+				/>
+			) : (
+				<textarea
+					ref={linesRef}
+					rows={1}
+					value={value}
+					placeholder={placeholder}
+					aria-labelledby={labelledBy}
+					onChange={event => onChange(event.target.value)}
+					onKeyDown={sendOnEnter}
+					className={cn(fieldClass, "resize-none overflow-hidden")}
+					style={fieldStyle}
+				/>
+			)}
 		</div>
 	);
 }

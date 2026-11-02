@@ -266,7 +266,10 @@ export class DashboardSession implements LiveSession {
 		return { session, prompt };
 	}
 
-	/** Spawn omp with `launch` holding `sessionFile`, as `omp --resume` does. omp records an abort in a file that ended mid-turn. */
+	/**
+	 * Spawn omp with `launch` holding exactly `sessionFile`; the caller picks the copy `omp --resume` would open, with
+	 * `continuationOf`. omp records an abort in a file that ended mid-turn.
+	 */
 	static async resume(instanceId: string, sessionFile: string, launch: AdmittedLaunch, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
 		const replay = await launchForReplayResume(sessionFile, launch);
 		const session = await DashboardSession.#spawn(instanceId, await recordedCwd(sessionFile), replay.marker ? replay.launch : withSessionVisuals(replay.launch), emit, async client => {

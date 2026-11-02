@@ -64,12 +64,12 @@ export function parseRpcRequest(frame: Record<string, unknown>, now: number): Rp
 		case "input":
 			return {
 				kind: "add",
-				request: { ...base, kind: "text", multiline: false, placeholder: str(frame.placeholder) ?? null, prefill: "" },
+				request: { ...base, kind: "text", field: frame.secret === true ? "secret" : "line", placeholder: str(frame.placeholder) ?? null, prefill: "" },
 			};
 		case "editor":
 			return {
 				kind: "add",
-				request: { ...base, kind: "text", multiline: true, placeholder: null, prefill: str(frame.prefill) ?? "" },
+				request: { ...base, kind: "text", field: "lines", placeholder: null, prefill: str(frame.prefill) ?? "" },
 			};
 		default:
 			return null;
@@ -104,7 +104,7 @@ export function parseCollabRequest(value: unknown): UserRequest | null {
 	if (title === undefined) return null;
 	const base = { id: String(value.reqId), title, deadline: null };
 	if (value.kind === "editor") {
-		return { ...base, kind: "text", multiline: true, placeholder: null, prefill: str(value.prefill) ?? "" };
+		return { ...base, kind: "text", field: "lines", placeholder: null, prefill: str(value.prefill) ?? "" };
 	}
 	if (value.kind !== "select") return null;
 	const options = parseOptions(value.options, null);

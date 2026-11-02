@@ -252,6 +252,9 @@ export interface AskReply {
 	custom: string | null;
 }
 
+/** A text request's field: one line, several lines, or one line that hides what you type, such as an extension's API key prompt. */
+export type TextField = "line" | "lines" | "secret";
+
 /**
  * A question a live session waits on: omp's `ask` tool or an extension dialog. A dashboard session gets each `ask` call
  * whole, as one `ask` request. A terminal session gets it as a chain of the others: picking `Other (type your own)` brings
@@ -266,7 +269,7 @@ export type UserRequest = {
 	/** `checked`: rows a multi-select question has ticked so far. */
 	| { kind: "select"; options: RequestOption[]; checked: number[] }
 	| { kind: "confirm"; message: string }
-	| { kind: "text"; multiline: boolean; placeholder: string | null; prefill: string }
+	| { kind: "text"; field: TextField; placeholder: string | null; prefill: string }
 	| { kind: "ask"; questions: AskQuestion[] }
 );
 

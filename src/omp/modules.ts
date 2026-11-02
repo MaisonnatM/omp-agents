@@ -177,6 +177,7 @@ export const listing = await load<ListingModule>(join(srcDir, "session", "sessio
 	listAllSessions: "function",
 	listSessionsReadOnly: "function",
 	isEmptySession: "function",
+	findSessionContinuation: "function",
 });
 export const storage = await load<StorageModule>(join(srcDir, "session", "session-storage.ts"), { FileSessionStorage: "function" });
 export const loader = await load<LoaderModule>(join(srcDir, "session", "session-loader.ts"), {
