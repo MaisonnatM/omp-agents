@@ -60,19 +60,10 @@ describe("nextAfter", () => {
 		expect(nextAfter(items, "gone", 5)?.key).toBe("turn/b/2");
 		expect(nextAfter([], "gone", 0)).toBeNull();
 	});
-
-	test("a bare Inbox opens the first item", () => {
-		expect(nextAfter(items, null, 0)?.key).toBe("turn/a/1");
-		expect(nextAfter([], null, 0)).toBeNull();
-	});
 });
 
 describe("routeAfter", () => {
 	const [first, second] = inboxSections([host("a", "idle", { unread: turn(1) }), host("b", "idle", { unread: turn(2) })], [], 0, NO_PINS).flatMap(({ items }) => items);
-	test("the item a bare Inbox opens becomes the route, so an item that arrives later cannot take it over", () => {
-		expect(routeAfter(first ?? null, null, null)).toBe("turn/a/1");
-	});
-
 	test("an item that took a shown item's place becomes the route; a routed item that stays, or a link to one already gone, keeps it", () => {
 		expect(routeAfter(second ?? null, "turn/a/1", "turn/a/1")).toBe("turn/b/2");
 		expect(routeAfter(first ?? null, "turn/a/1", "turn/a/1")).toBeNull();

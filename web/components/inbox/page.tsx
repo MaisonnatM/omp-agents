@@ -16,13 +16,14 @@ import { PAGE_ICON } from "../../page-icons";
 import { useShowConversation } from "../../pane-store";
 import { type ModelList, UNREAD } from "../../reads";
 import { hashForInbox } from "../../routing";
+import { useOpenLatest } from "../../use-open-latest";
 import { shortcutKeys, useShortcuts } from "../../shortcuts";
 import { useAction } from "../../use-action";
 import { Age } from "../age";
 import type { ConversationHandle } from "../conversation";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { ShortcutChip } from "../kbd";
-import { PageFrame } from "../list-page";
+import { PageFrame, useReturnFocus } from "../list-page";
 import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, ListSplit } from "../list-split";
 import { NoticeAction } from "../notices";
 import { ViewConversation } from "../pane";
@@ -34,15 +35,17 @@ interface InboxPageProps {
 	notices: Notice[];
 	/** The ids of the pinned sessions, whose questions come first, as in the sidebar. */
 	pins: string[];
-	/** The item the route opens, `null` for the first, or for none once Close emptied the route. */
+	/** The item the route opens, `null` for none. */
 	openKey: string | null;
+	/** Whether the server has sent its session lists, so a bare route opens the first item once there is one to open. */
+	ready: boolean;
 	/** The model lists the server sent, by instance id, which the open session's composer offers. */
 	models: ReadonlyMap<string, ModelList>;
 	/** The workspaces, which the open session's composer offers as directories. */
 	workspaces: Workspace[];
 }
 
-export function InboxPage({ hosts, notices, pins, openKey, models, workspaces }: InboxPageProps) {
+export function InboxPage({ hosts, notices, pins, openKey, ready, models, workspaces }: InboxPageProps) {
 	const [filter, setFilter] = useState<(typeof INBOX_FILTERS)[number]>(INBOX_FILTERS[0]);
 	const reduceMotion = useReducedMotion() ?? false;
 	const pinned = useMemo<ReadonlySet<string>>(() => new Set(pins), [pins]);
@@ -57,25 +60,21 @@ export function InboxPage({ hosts, notices, pins, openKey, models, workspaces }:
 	const lastAt = useRef(0);
 	/** The routed item this list has shown, so its leaving, and not a link to an item already gone, hands the route on. */
 	const shownKey = useRef<string | null>(null);
-	/** Close emptied the route, so it opens no item until you open one, and the list shows where the page is too narrow for both. */
-	const [closed, setClosed] = useState(false);
-	useEffect(() => {
-		if (openKey !== null) setClosed(false);
-	}, [openKey]);
-	const open = openKey === null && closed ? null : nextAfter(shown, openKey, lastAt.current);
+	const open = nextAfter(shown, openKey, lastAt.current);
 	const at = open ? shown.indexOf(open) : -1;
 	if (at >= 0) lastAt.current = at;
 	if (open !== null && open.key === openKey) shownKey.current = openKey;
 	const handOn = routeAfter(open, openKey, shownKey.current);
-	// The item a bare route opens, or the one that took the routed one's place, becomes the route, so an item that arrives later cannot take it over.
+	// The item that took the routed one's place becomes the route, so an item that arrives later above it cannot take it over.
 	useEffect(() => {
 		if (handOn !== null) location.replace(hashForInbox(handOn));
 	}, [handOn]);
+	useOpenLatest(hashForInbox, openKey, shown[0]?.key ?? null, ready);
+	useReturnFocus(open?.key ?? null, key => key, key => document.getElementById(`inbox-${key}`)?.querySelector("a"), total);
 	const go = (item: InboxItem | null | undefined): void => {
 		if (item) location.hash = hashForInbox(item.key);
 	};
 	const close = (): void => {
-		setClosed(true);
 		location.hash = hashForInbox();
 	};
 	const previous = shown[at - 1];
@@ -108,7 +107,9 @@ export function InboxPage({ hosts, notices, pins, openKey, models, workspaces }:
 				empty={
 					total === 0
 						? { icon: PAGE_ICON.inbox, title: "Nothing waits on you", hint: "Questions, finished turns, your pull request moves, and messages land here." }
-						: { icon: PAGE_ICON.inbox, title: "No item open", hint: `Click one, or press ${shortcutKeys("inboxNext")} to open the first.` }
+						: shown.length === 0
+							? { icon: PAGE_ICON.inbox, title: "No item open", hint: null }
+							: { icon: PAGE_ICON.inbox, title: "No item open", hint: `Click one, or press ${shortcutKeys("inboxNext")} to open the first.` }
 				}
 				list={
 					<div className="mx-auto w-full max-w-3xl px-3 py-2">

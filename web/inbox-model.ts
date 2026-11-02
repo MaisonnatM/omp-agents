@@ -115,18 +115,17 @@ export const sectionsIn = (sections: readonly InboxSection[], filter: InboxFilte
 /** How many items `sections` hold. */
 export const itemCount = (sections: readonly InboxSection[]): number => sections.reduce((count, { items }) => count + items.length, 0);
 
-/** The item to open for route item `key`, at `index` before: the first for a bare route, itself while it stays, else the one now at its place, else the last. */
+/** The item to open for route item `key`, at `index` before: none for a bare route, itself while it stays, else the one now at its place, else the last. */
 export function nextAfter(items: readonly InboxItem[], key: string | null, index: number): InboxItem | null {
-	if (key === null) return items[0] ?? null;
+	if (key === null) return null;
 	return items.find(item => item.key === key) ?? items[Math.min(index, items.length - 1)] ?? null;
 }
 
 /**
  * The key the address should name once `open` shows for route item `key`, where `shownKey` is the routed item this list
- * has shown: the open item's when the route names none, or when the routed item left and another took its place; else
- * `null`, which keeps the route. A link to an item already gone keeps it too.
+ * has shown: the open item's when the routed item left and another took its place, else `null`, which keeps the route.
+ * A link to an item already gone keeps it too.
  */
 export function routeAfter(open: InboxItem | null, key: string | null, shownKey: string | null): string | null {
-	if (open === null || open.key === key) return null;
-	return key === null || shownKey === key ? open.key : null;
+	return open !== null && key !== null && open.key !== key && shownKey === key ? open.key : null;
 }
