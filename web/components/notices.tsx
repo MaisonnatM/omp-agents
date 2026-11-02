@@ -10,11 +10,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
-import { type NoticeAction as Action, type NoticeFace, type NoticeSource, presentNotice } from "../notice-model";
+import { type NoticeAction as Action, type NoticeFace, type NoticeSource, follow, presentNotice } from "../notice-model";
 import { readPinnedSkill } from "../pinned-skill";
 import { pendingOf, pullRequestStart, QUICK_ACTIONS } from "../quick-actions";
 import { providerLabel, providerOrg } from "../labels";
-import { hashForPullRequests } from "../routing";
 import { Age } from "./age";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { BrandMark, GOOGLE_CALENDAR_LOGO, SLACK_LOGO } from "./integrations/brand-logos";
@@ -180,7 +179,7 @@ function NoticeMerge({ pr, onMerged }: { pr: PullRequestSummary; onMerged: () =>
 	);
 }
 
-/** A notice's button: **Update**, the quick action that makes a pull request's move, **Merge**, or **Continue all**; the bell and the Inbox show it. */
+/** A notice's button: **Update**, the quick action that makes a pull request's move, **Merge**, or **Continue all**; the bell and the Inbox show it, and `onDone` runs once it acted. */
 export function NoticeAction({ id, action, send, onDone }: { id: string; action: Action; send: Send; onDone: () => void }) {
 	const { start } = useDashboardActions();
 	const { connected, starts } = useDashboardStatus();
@@ -223,7 +222,6 @@ export function NoticeAction({ id, action, send, onDone }: { id: string; action:
 						start(pullRequestStart(pr, action.action, cwd, readPinnedSkill()));
 						read();
 						onDone();
-						location.hash = hashForPullRequests(pr);
 					}}
 				>
 					{QUICK_ACTIONS[action.action].label}
@@ -292,7 +290,20 @@ function NoticeRow({ notice, send, onDone }: { notice: Notice; send: Send; onDon
 					{preview}
 				</p>
 				<div className="pointer-events-auto relative mt-1 flex empty:hidden">
-					<NoticeAction id={notice.id} action={action} send={send} onDone={onDone} />
+					{/* After its quick action, a pull request's notice opens the pull request, where the session it started shows. */}
+					<NoticeAction
+						id={notice.id}
+						action={action}
+						send={send}
+						onDone={
+							action.kind === "quick"
+								? () => {
+										onDone();
+										follow(link);
+									}
+								: onDone
+						}
+					/>
 				</div>
 			</div>
 			<Tooltip content="Clear">
