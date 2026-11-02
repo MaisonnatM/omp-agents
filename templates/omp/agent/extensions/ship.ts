@@ -68,7 +68,7 @@ const LABEL: Record<Stage | LiveWork, string> = {
 
 const NEXT: Record<Stage, string> = {
 	ticket: "Create or link the Linear issue, then record it with ship_stage({stage: 'plan', issue}).",
-	plan: "Write how to build the issue with the technical-writing skill. If the issue admits more than one sound approach, run the arena skill on up to three of them and keep the best. Post the chosen plan on the Linear issue, then record ship_stage({stage: 'implement'}).",
+	plan: "Choose how to build the issue as the ship skill's Plan step says, post the plan on the Linear issue, then record ship_stage({stage: 'implement'}).",
 	implement: "Implement the plan and commit on the issue's branch. Do not open a PR in this stage.",
 	draft_pr: "Create a draft with `gt submit --draft` for a Graphite repository, or push and run `gh pr create --draft` otherwise. Include the issue ID in the title and `Fixes <ID>` in the body.",
 	interface_review: `If the status says the ${REVIEWS.interface_review.label} is not needed because \`${REVIEWS.interface_review.pathsFile}\` lists no changed file, record ship_stage({stage: 'thermonuclear'}) and move on. Otherwise wait until the user approves the direction, then spawn \`task\` with \`agent: "interface-reviewer"\` on the PR, apply the findings in a fresh agent, push, then add \`${REVIEWS.interface_review.box}\` to the PR body.`,
@@ -170,9 +170,12 @@ export function renderLines(s: ShipState): string[] {
 	const at = STAGES.indexOf(s.stage);
 	const ref = [s.issue, s.pr ? `PR #${s.pr}${s.prStatus?.draft ? " (draft)" : ""}` : ""].filter(Boolean).join(" · ");
 	const lines = [`ship ${ref || "(no ticket yet)"}`];
+	const mark = (stage: Stage) => {
+		const i = STAGES.indexOf(stage);
+		return `${i < at || s.stage === "merged" ? "✓" : i === at ? "▶" : "○"} ${LABEL[stage]}`;
+	};
 	const reviews = STAGES.indexOf(REVIEW_STAGES[0]);
-	lines.push(STAGES.slice(0, reviews).map((stage, i) => `${i < at || s.stage === "merged" ? "✓" : i === at ? "▶" : "○"} ${LABEL[stage]}`).join("  "));
-	lines.push(STAGES.slice(reviews).map((stage, i) => `${i + reviews < at || s.stage === "merged" ? "✓" : i + reviews === at ? "▶" : "○"} ${LABEL[stage]}`).join("  "));
+	lines.push(STAGES.slice(0, reviews).map(mark).join("  "), STAGES.slice(reviews).map(mark).join("  "));
 	if (s.stage === "live" && s.prStatus) lines.push(`Live: ${liveSummary(s.prStatus)}`);
 	if (s.stage === "live" && s.work) lines.push(`Working on: ${LABEL[s.work]}`);
 	for (const stage of REVIEW_STAGES) {

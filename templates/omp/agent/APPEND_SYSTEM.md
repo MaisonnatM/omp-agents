@@ -103,7 +103,7 @@ preserve dirty, pinned, or in-use worktrees.
 When the checkout is on any other local branch, spawn editing subagents without
 `isolated` so they edit that branch in place, alongside its local changes. Run
 two at once only on disjoint files. Competing attempts at the same change, such
-as arena runners, still pass `isolated: true`.
+as arena runners that edit files, still pass `isolated: true`.
 
 # Asking the user
 

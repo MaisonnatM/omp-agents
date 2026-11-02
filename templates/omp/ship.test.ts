@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import { SHIP_STAGES, SHIP_WORK } from "../../src/shared/sessions";
 import { commands } from "./agent/extensions/shell/commands";
 
 type Review = { label: string; box: string; pathsFile: string; withoutPaths: boolean };
@@ -17,12 +18,19 @@ const extension: {
 	REVIEWS: Record<string, Review>;
 	PROOF_BOX: string;
 	renderLines(state: { stage: string; issue?: string; updatedAt: string }): string[];
+	STAGES: readonly string[];
+	LIVE_WORK: readonly string[];
 } = await import(join(import.meta.dir, "agent/extensions/ship.ts"));
 const { ghPr, prSelector, selectorOwner, otherOwner, publishBlocker, reviewsOf, reviewNeeded, authDiagnosis, REVIEWS, PROOF_BOX, renderLines } = extension;
 const THERMONUCLEAR = REVIEWS.thermonuclear.box;
 const INTERFACE = REVIEWS.interface_review.box;
 
 describe("the ship widget", () => {
+	test("the dashboard reads the same stages and live work the extension records", () => {
+		expect([...extension.STAGES]).toEqual([...SHIP_STAGES]);
+		expect([...extension.LIVE_WORK]).toEqual([...SHIP_WORK]);
+	});
+
 	test("plans after the ticket and before implementing, with the PR stages on the second row", () => {
 		expect(renderLines({ stage: "plan", issue: "ENG-1", updatedAt: "" })).toEqual([
 			"ship ENG-1",

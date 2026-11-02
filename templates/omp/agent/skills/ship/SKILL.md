@@ -25,12 +25,13 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before registering a PR o
    In a Graphite repo, register the branch under its parent.
 2. **Plan.** Choose how to build the issue before anyone writes code.
    If the issue already has a plan comment from an earlier run, use that plan and skip to the next step.
+   Read `skill://technical-writing` and `skill://arena`; the kit does not ship them, so if either read fails, name the missing skill, tell the user to install it, and stop.
    Read the issue and the code it touches, then list the approaches that would each solve it.
-   If only one approach is sound, such as for a typo or a fix the issue spells out, write that plan yourself and say in one line of the report why no arena ran.
+   If only one approach is sound, such as for a typo or a fix the issue spells out, write that plan yourself with the `technical-writing` skill and say in one line of the report why no arena ran.
    Otherwise run the `arena` skill with one runner for each approach, up to three.
-   Give every runner the same prompt: the issue, the checkout's path, the approach it plans, and the rule to write the plan with the `technical-writing` skill and edit nothing.
+   Give every runner the same prompt: the issue, the checkout's path, the approach it plans, its output path `local://plan-<n>.md`, and the rule to write the plan there with the `technical-writing` skill and edit nothing else.
    Each plan names the files it changes, the data shape, the steps in order, how to verify the result, and its risks.
-   The runners only read, so spawn them without `isolated`; alternate `poteto-agent` and `poteto-agent-codex`, and run the cross-judge on `poteto-agent-codex`.
+   The runners edit no files in the checkout, so spawn them without `isolated`; alternate `poteto-agent` and `poteto-agent-codex`, and run the cross-judge on `poteto-agent-codex` over the `local://plan-<n>.md` paths.
    Pick the base plan against the arena's rubric and graft what the other plans do better.
    Post the chosen plan on the issue with `save_comment`, with one line for each rejected approach that says why it lost.
    Call `ship_stage({stage:"implement"})`.

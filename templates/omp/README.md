@@ -50,7 +50,7 @@ Files, in `agent/`:
 - `APPEND_SYSTEM.md`: short final replies (Résumé, Action, What next) that end on up to three suggested next prompts, design variants named once and quoted by that name on every surface, a UI change handed off on a running dev server with checked screenshots, questions asked through the ask tool with the recommended option first, how Cursor models call omp's `ask`, `bash`, `grep`, and skills, and a code-quality review before any pull request, which a repository limits to the files its `.omp/review-paths` globs match.
 - `agents/thermonuclear-reviewer.md`: a read-only reviewer that checks the diff against the `CODING_STANDARDS.md` at the root of the checkout it reviews, then runs the thermo-nuclear code quality review on the `plan` role's model.
 - `agents/interface-reviewer.md`: a read-only reviewer that runs your `interface-review` skill in full mode on a PR, then applies the `app-consistency-review` skill to check the change reuses the app's shared components and follows its tokens and sibling screens, on the `plan` role's model; it stops naming the missing skill when `interface-review` or `better-interface` is not installed.
-- `skills/ship/SKILL.md`, `commands/ship.md`, and `extensions/ship.ts`: `/ship <Linear issue>` drives an issue from ticket to draft PR, interface review, thermonuclear review, and live review.
+- `skills/ship/SKILL.md`, `commands/ship.md`, and `extensions/ship.ts`: `/ship <Linear issue>` drives an issue from ticket to plan, draft PR, interface review, thermonuclear review, and live review.
   The skill holds the procedure and is tagged `workflow` in its `metadata.tags`, so the dashboard's Settings › Workflows lists and edits it; the command only tells the session to follow the skill for the issue it names.
   The extension adds the `ship_stage` tool and shows the stage and the PR's needs in the session.
   When the repository commits `.omp/review-paths`, the gate asks for the thermonuclear checkbox only when a changed file matches one of its globs; a repository without the file reviews every PR.
@@ -128,6 +128,8 @@ Files, in `agent/`:
   [Graphite](https://graphite.dev) is used when a repository is set up for it.
 - For `/ship`'s interface review: your own `interface-review` skill, plus the `better-interface` and `better-*` skills it hands off to, under `~/.agents/skills/` or `~/.omp/agent/skills/`.
   The kit does not ship them; a repository without `.omp/ui-paths` never runs the review.
+- For `/ship`'s plan: the `arena` and `technical-writing` skills from pstack, under `~/.agents/skills/` or `~/.omp/agent/skills/`.
+  The kit does not ship them; without them the plan step stops and names the missing skill.
 
 ## Maintainer git profile
 
