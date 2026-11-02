@@ -20,6 +20,8 @@ export interface SavedSession {
 	modifiedAt: number;
 	/** A 0-turn stub, which omp's own picker hides. */
 	empty: boolean;
+	/** omp's only: the id of the session whose conversation this file goes on with, in a new file (header `continuationOf`). */
+	continuationOf?: string;
 }
 
 /** The title a session's first prompt gives it: the user's as one line, a routine's name, none for the dashboard's. */
@@ -50,6 +52,7 @@ function saved(session: SessionInfo): SavedSession {
 		title: session.title || firstTitle(session.firstMessage),
 		modifiedAt: session.modified.getTime(),
 		empty: listing.isEmptySession(session),
+		continuationOf: session.continuationOf,
 	};
 }
 
@@ -111,13 +114,15 @@ export async function readSessionCwd(path: string): Promise<string | null> {
 	return cwd;
 }
 
-/** Give the saved session at `path`, which no omp runs, `title` as the user's own, as omp's `/rename` does. */
-export async function renameSessionFile(path: string, title: string): Promise<void> {
-	const session = await sessionManager.SessionManager.open(path, undefined, undefined, { suppressBreadcrumb: true, throwIfMissing: true });
-	try {
-		if (!(await session.setSessionName(title, "user"))) throw new Error("omp kept the old title: a title needs a character other than spaces.");
-	} finally {
-		await session.close();
+/**
+ * Give the saved session at `path` `title` as the user's own, as omp's session picker does: under omp's lease on the
+ * session, so it never writes beneath an omp process that holds the file, and refused while one does.
+ */
+export async function renameSessionFile(path: string, title: string, cwd: string): Promise<void> {
+	// omp reads control characters as spaces and answers a blank title as it answers a held session, so it is refused first.
+	if (!title.replace(/\p{Cc}/gu, "").trim()) throw new Error("omp kept the old title: a title needs a character other than spaces.");
+	if ((await sessionManager.SessionManager.renameSessionTitle(path, title, { cwd })) === null) {
+		throw new Error("This session is open in another omp window. Rename it there with /rename.");
 	}
 }
 

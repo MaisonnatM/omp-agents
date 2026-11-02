@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-02
 
+- Fixed: a session that omp went on with in a new file, because another omp window had it open, now shows once in Past sessions instead of twice.
+- Fixed: renaming a past session that another omp window is writing now says to rename it there, instead of risking a clash with that window.
 - Fixed: a question that asks for a secret, such as an API key, now shows dots for what you type, and the dashboard never saves it.
 - Fixed: Resume on a past session that omp went on with in a new file now opens that newer file, with the latest turns, instead of the older one.
 - The paid Cursor fallback patch now applies to omp 18.15.0. Subagents started with their own model keep it, and a model with no sign-in tries included plans before paying.

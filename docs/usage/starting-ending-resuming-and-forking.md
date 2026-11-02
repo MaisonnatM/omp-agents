@@ -61,6 +61,7 @@
   Enter, or clicking away, saves the title; Escape keeps the old one, and an empty or unchanged title changes nothing.
   omp keeps the title as one that you set, so its automatic title never replaces it.
   A session running in a terminal takes `/rename` there, and a Claude Code or Codex session keeps its own title.
+  A past session that another omp is writing to, such as one resumed in a terminal, keeps its title and says to rename it there with `/rename`.
 - A running session shows **End session** in its header, unless its room is read-only: a stop icon, whose tooltip names it and its Cmd+W shortcut.
   **End session** stops its omp process: one that the dashboard started stops with every process it started, its background jobs, kernels, and subagents included, and a terminal session gets `SIGTERM`, as when its terminal closes, so its terminal returns to the shell.
   A session the dashboard started that exits on its own takes those processes with it too.

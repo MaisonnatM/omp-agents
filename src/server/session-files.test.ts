@@ -39,6 +39,37 @@ function setup() {
 }
 
 const titles = (files: SessionFiles): (string | null)[] => files.past(new Set(), () => false).map(session => session.title);
+const pastIds = (files: SessionFiles): string[] => files.past(new Set(), () => false).map(session => session.sessionId);
+
+/** One message entry of an omp session file, written at `time`. */
+const message = (id: string, parentId: string | null, time: string, role: "user" | "assistant", text: string) => ({
+	type: "message",
+	id,
+	parentId,
+	timestamp: time,
+	message: role === "user" ? { role, content: text, timestamp: Date.parse(time) } : { role, ...model, content: [{ type: "text", text }], stopReason: "stop", timestamp: Date.parse(time) },
+});
+
+/**
+ * Session `orig`, and the copy omp went on with in a new file when it could not keep writing `orig`'s, as omp's move off a
+ * held file writes it: a new id whose header names `orig`, every turn of `orig`, and a newer one.
+ */
+function continuedSession(project: string) {
+	const original = join(project, "2026-11-01T10-00-00-000Z_orig.jsonl");
+	const copy = join(project, "2026-11-01T10-05-00-000Z_copy.jsonl");
+	const turn = [message("m1", null, "2026-11-01T10:00:01.000Z", "user", "Fix the login in https://github.com/acme/app/pull/7"), message("m2", "m1", "2026-11-01T10:00:02.000Z", "assistant", "On it")];
+	writeLines(original, [{ type: "session", version: 3, id: "orig", timestamp: "2026-11-01T10:00:00.000Z", cwd: "/tmp" }, ...turn]);
+	utimesSync(original, 1_000, 1_000);
+	const writeCopy = () => {
+		writeLines(copy, [
+			{ type: "session", version: 3, id: "copy", timestamp: "2026-11-01T10:05:00.000Z", cwd: "/tmp", parentSession: "orig", continuationOf: "orig" },
+			...turn,
+			message("m3", "m2", "2026-11-01T10:05:01.000Z", "user", "Carry on"),
+		]);
+		utimesSync(copy, 2_000, 2_000);
+	};
+	return { original, copy, writeCopy };
+}
 
 describe("SessionFiles", () => {
 	test("a refresh reads only the files the watcher reported", async () => {
@@ -162,5 +193,49 @@ describe("SessionFiles", () => {
 		expect(files.touch(claudeFile)).toBe(true);
 		expect(files.touch(codexFile)).toBe(true);
 		expect(files.touch(join(claude, "-tmp", "c1", "subagents", "agent-1.jsonl"))).toBe(false);
+	});
+
+	test("a session omp went on with in another file lists as that copy alone, which carries its links, and still resolves by its own id", async () => {
+		const { project, files } = setup();
+		const { original, writeCopy } = continuedSession(project);
+		writeCopy();
+		expect(await files.scan()).toBe(true);
+		expect(pastIds(files)).toEqual(["copy"]);
+		expect(files.pathOf("orig")).toBe(original);
+		await files.refreshFacts();
+		expect(files.past(new Set(), () => false).map(row => row.pullRequests.map(pr => `${pr.owner}/${pr.repo}#${pr.number}`))).toEqual([["acme/app#7"]]);
+		expect(await files.scan()).toBe(false);
+		expect(pastIds(files)).toEqual(["copy"]);
+	});
+
+	test("the copy replaces its session's row once the watcher reports it, and both list once that session goes on past the copy", async () => {
+		const { project, files } = setup();
+		const { original, copy, writeCopy } = continuedSession(project);
+		await files.scan();
+		expect(pastIds(files)).toEqual(["orig"]);
+
+		writeCopy();
+		files.touch(copy);
+		expect(await files.refresh()).toBe(true);
+		expect(pastIds(files)).toEqual(["copy"]);
+
+		// The process that held the original writes a turn the copy never got.
+		writeFileSync(original, `${JSON.stringify(message("m3b", "m2", "2026-11-01T10:06:00.000Z", "user", "Also the signup"))}\n`, { flag: "a" });
+		utimesSync(original, 3_000, 3_000);
+		files.touch(original);
+		expect(await files.refresh()).toBe(true);
+		expect(pastIds(files)).toEqual(["orig", "copy"]);
+	});
+
+	test("a session whose copy is an `omp -p` run lists again once the copy's facts show that", async () => {
+		const { project, files } = setup();
+		const { copy, writeCopy } = continuedSession(project);
+		writeCopy();
+		writeFileSync(copy, `${JSON.stringify({ type: "custom", customType: "omp-agents.headless", data: { headless: true }, id: "h1", parentId: "m3", timestamp: at })}\n`, { flag: "a" });
+		utimesSync(copy, 2_000, 2_000);
+		await files.scan();
+		expect(pastIds(files)).toEqual(["copy"]);
+		expect(await files.refreshFacts()).toBe(true);
+		expect(pastIds(files)).toEqual(["orig"]);
 	});
 });

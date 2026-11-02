@@ -1,7 +1,8 @@
+import { dirname } from "node:path";
 import { Conversations } from "../conversation-search";
 import { CachedCheckouts } from "../git";
 import { repoOf } from "../github";
-import type { SavedSession } from "../omp/sessions";
+import { continuationOf, type SavedSession } from "../omp/sessions";
 import { displayPath } from "../paths";
 import { branchPullRequest } from "../pull-requests";
 import { SessionFactsIndex } from "../session-facts";
@@ -9,7 +10,7 @@ import { formatOf, SESSION_FORMATS, type SessionFormat } from "../session-format
 import type { ConversationHit, PastSession, SessionFacts } from "../shared/sessions";
 
 const sameSession = (a: SavedSession, b: SavedSession): boolean =>
-	a.id === b.id && a.cwd === b.cwd && a.title === b.title && a.modifiedAt === b.modifiedAt && a.empty === b.empty;
+	a.id === b.id && a.cwd === b.cwd && a.title === b.title && a.modifiedAt === b.modifiedAt && a.empty === b.empty && a.continuationOf === b.continuationOf;
 
 /** The list's order: the file changed last first, then by path. */
 const newestFirst = (a: SavedSession, b: SavedSession): number => b.modifiedAt - a.modifiedAt || b.path.localeCompare(a.path);
@@ -41,6 +42,11 @@ export class SessionFiles {
 	readonly facts: SessionFactsIndex;
 	/** The last past-list row of each listed file, rebuilt only when what it shows changed. */
 	readonly #rows = new Map<string, PastRow>();
+	/**
+	 * The listed omp sessions whose conversation omp went on with in another file, which a resume opens instead: each one's
+	 * path to its copy's. The past list leaves them out, unless the copy is itself left out as an `omp -p` run.
+	 */
+	#continued: ReadonlyMap<string, string> = new Map();
 	readonly #formats: readonly SessionFormat[];
 
 	/** `formats`: the agents whose session files it lists, omp's first. */
@@ -96,9 +102,12 @@ export class SessionFiles {
 			this.#touched.clear();
 			const listed = (await Promise.all(this.#formats.map(format => format.list()))).flat();
 			const next = new Map(listed.map(session => [session.path, session]));
-			const changed = next.size !== this.#byPath.size || listed.some(session => !this.#same(session));
-			if (changed) this.#adopt(next);
-			return changed;
+			const changed = [...listed.filter(session => !this.#same(session)).map(session => session.path), ...[...this.#byPath.keys()].filter(path => !next.has(path))];
+			if (changed.length === 0) return false;
+			const continued = await this.#continuedAmong(listed, changed);
+			this.#adopt(next);
+			this.#continued = continued;
+			return true;
 		});
 	}
 
@@ -114,9 +123,30 @@ export class SessionFiles {
 				if (session ? !known || !sameSession(known, session) : known) changes.set(path, session);
 			}
 			if (changes.size === 0) return false;
+			const sessions = [...this.#files.filter(file => !changes.has(file.path)), ...[...changes.values()].filter(session => session !== null)];
+			const continued = await this.#continuedAmong(sessions, changes.keys());
 			this.#place(changes);
+			this.#continued = continued;
 			return true;
 		});
+	}
+
+	/**
+	 * Which of `sessions` omp went on with in another file: each one's path to its copy's. Only a session some file of
+	 * `sessions` names in `continuationOf` can be one; omp is asked again about those in a directory where `changed` names a
+	 * file, since a continuation sits beside the session it continues, and the rest keep their last answer.
+	 */
+	async #continuedAmong(sessions: readonly SavedSession[], changed: Iterable<string>): Promise<Map<string, string>> {
+		const named = new Set(sessions.flatMap(session => session.continuationOf ?? []));
+		const dirs = new Set(Array.from(changed, path => dirname(path)));
+		const continued = new Map<string, string>();
+		for (const session of sessions) {
+			if (session.source !== "omp" || !named.has(session.id)) continue;
+			// omp names no copy for a session that went on after the copy was made: it holds turns the copy lacks, so it keeps its row.
+			const copy = dirs.has(dirname(session.path)) ? (await continuationOf(session.path))?.path : this.#continued.get(session.path);
+			if (copy) continued.set(session.path, copy);
+		}
+		return continued;
 	}
 
 	#queue<T>(task: () => Promise<T>): Promise<T> {
@@ -173,12 +203,18 @@ export class SessionFiles {
 	}
 
 	/**
-	 * The saved sessions that no live session continues, newest first, without the `omp -p` runs that other sessions start. `interrupted` names the omp sessions that stopped without End session.
+	 * The saved sessions that no live session continues, newest first, without the `omp -p` runs that other sessions start, and without
+	 * the sessions omp went on with in another file, whose copy lists in their place unless it is such a run.
+	 * `interrupted` names the omp sessions that stopped without End session.
 	 * A row whose file, facts, and interruption did not change since the last call is the same object, so a caller can skip it by identity.
 	 */
 	past(liveSessionIds: ReadonlySet<string>, interrupted: (sessionId: string) => boolean): PastSession[] {
 		return this.#files
-			.filter(session => !session.empty && !liveSessionIds.has(session.id) && !this.facts.headless(session.path))
+			.filter(session => {
+				if (session.empty || liveSessionIds.has(session.id) || this.facts.headless(session.path)) return false;
+				const copy = this.#continued.get(session.path);
+				return copy === undefined || this.facts.headless(copy);
+			})
 			.map(session => {
 				const facts = this.facts.factsOf(session.path);
 				const stopped = session.source === "omp" && interrupted(session.id);
