@@ -611,17 +611,29 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	const model = useMemo(() => (modelRef.current = transcriptModel(items, working, modelRef.current)), [items, working]);
 	const { blocks, forks, replies, images } = model;
 	// Settled rows skip layout off screen only once every row has laid out, so each remembers its real height. The
-	// second frame comes after the browser laid out the first one; another view's rows lay out in full again first.
-	const viewKey = hashForView(view);
+	// second frame comes after the browser laid out the first one. Anything that changes rows' heights while off screen,
+	// another view, tools expanded or hidden, thinking hidden, or the lane's width, lays every row out in full again first.
+	const expanded = useContext(ToolsExpanded);
+	const { hideTools, hideThinking } = useContext(ActivityVisibility);
+	const [laneWidth, setLaneWidth] = useState(0);
+	const laneRef = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		const lane = laneRef.current;
+		if (!lane) return;
+		const observer = new ResizeObserver(([entry]) => setLaneWidth(Math.round(entry?.contentRect.width ?? 0)));
+		observer.observe(lane);
+		return () => observer.disconnect();
+	}, []);
+	const layoutKey = `${hashForView(view)}|${expanded}|${hideTools}|${hideThinking}|${laneWidth}`;
 	const hasRows = blocks.length > 0;
 	const [laidOut, setLaidOut] = useState<string | null>(null);
 	useEffect(() => {
-		if (!hasRows || laidOut === viewKey) return;
+		if (!hasRows || laidOut === layoutKey) return;
 		let frame = requestAnimationFrame(() => {
-			frame = requestAnimationFrame(() => setLaidOut(viewKey));
+			frame = requestAnimationFrame(() => setLaidOut(layoutKey));
 		});
 		return () => cancelAnimationFrame(frame);
-	}, [hasRows, laidOut, viewKey]);
+	}, [hasRows, laidOut, layoutKey]);
 	// The image the viewer shows, by its tool item and its place in that item's images, so new images do not move it.
 	const [image, setImage] = useState<{ id: string; at: number } | null>(null);
 	const openImage = useCallback((id: string, at: number) => setImage({ id, at }), []);
@@ -704,10 +716,11 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 				<MessageScroller className="@container min-h-0 flex-1">
 					<MessageScrollerViewport>
 						<MessageScrollerContent
+							ref={laneRef}
 							className="group/transcript conversation-lane gap-3 p-3"
 							aria-relevant="additions text"
 							data-transcript
-							data-laid-out={laidOut === viewKey || undefined}
+							data-laid-out={laidOut === layoutKey || undefined}
 						>
 							{visibleBlocks.map((block, index) => {
 								const settled = index < visibleBlocks.length - 1;
@@ -759,9 +772,9 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 							})}
 							{loaded && items.length === 0 && !working && !editing && empty}
 							{working && !streaming && (
-								<MessageScrollerItem messageId="thinking" className="flex flex-col">
+								<Row messageId="thinking" settled={false}>
 									<ThinkingIndicator className="self-start" />
-								</MessageScrollerItem>
+								</Row>
 							)}
 						</MessageScrollerContent>
 					</MessageScrollerViewport>
