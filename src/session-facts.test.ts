@@ -325,6 +325,23 @@ describe("SessionFactsIndex", () => {
 		expect(index.factsOf(session).ship).toBeNull();
 	});
 
+	test("the changes view's read of a session's own edits leaves what it folded for the next refresh to report", async () => {
+		const dir = sessionDir();
+		const session = join(dir, "2026-10-01T00-00-00-000Z_changes.jsonl");
+		const edited = (path: string) => JSON.stringify({ type: "message", message: { role: "toolResult", toolCallId: `c-${path}`, toolName: "edit", details: { path }, isError: false } });
+		const state = JSON.stringify({ type: "custom", customType: "omp-ship.state", data: { stage: "implement" } });
+		writeFileSync(session, `${JSON.stringify({ type: "session", cwd: "/repo" })}\n${edited("/repo/a.ts")}\n`);
+		const index = new SessionFactsIndex(async () => null, NO_GIT);
+		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
+
+		await index.refresh(listed(1));
+		expect(await index.changedPathsOf(session)).toEqual(["/repo/a.ts"]);
+		appendFileSync(session, `${edited("b.ts")}\n${state}\n${edited("/repo/a.ts")}\n`);
+		expect(await index.changedPathsOf(session)).toEqual(["/repo/a.ts", "/repo/b.ts"]);
+		expect(await index.refresh(listed(2))).toBe(true);
+		expect(index.factsOf(session).ship).toEqual({ stage: "implement" });
+	});
+
 	test("lists the Linear issues the session and its subagents worked on, the session's own first, each once, and reports a new one on append", async () => {
 		const dir = sessionDir();
 		const session = join(dir, "2026-10-01T00-00-00-000Z_tickets.jsonl");

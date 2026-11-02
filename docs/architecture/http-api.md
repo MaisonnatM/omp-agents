@@ -22,7 +22,7 @@ The four execution settings come from `agentSettings`, not a second catalog proj
 Without `cwd`, discovery runs from `/` and filters project definitions, avoiding the home directory's project agents and config; this is a user-only preview, not a running session's extension context.
 Model resolution reads the native registry's currently available models without refreshing providers or making model requests; a model-registry failure is separate from a discovery failure.
 Bundled seance never uses the stored user override in its effective preview.
-`GET /api/models` runs `omp models --json` for the pickers.
+`GET /api/models` runs `omp models --json` for the pickers; `listModels` in `src/omp/models.ts` keeps its list 30 seconds, so the draft's `/api/models/connected` and `/api/models/roles`, the settings page, and every window share one run, and a model added to omp's config shows within that time.
 
 **Get started** reads `GET /api/readiness/terminal-sessions` (omp's global `collab.autoStart`) and `GET /api/readiness/starter-kit` (a genuinely read-only installer plan).
 `PUT /api/readiness/terminal-sessions` takes `{ access }` of `view` or `control`, stages only `collab.autoStart` through omp's isolated locked writer unless it already holds that value, and returns the value it reads back; another body is a 400.

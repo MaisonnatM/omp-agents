@@ -18,13 +18,13 @@
  * The session's own bash calls and file changes tell which linked worktree it works in: a session started in a
  * repository's main checkout often adds a worktree, then edits its files and runs its commands there with bash's `cwd`.
  *
- * The read of a session's own file also feeds the `OwnFileFolds` the index is given, so another feature that folds
- * session files does not read them a second time.
+ * The read of a session's own file also feeds the `OwnFileFolds` the index is given, and folds the files its own `edit`
+ * and `write` calls changed for the changes view, so another feature that folds session files does not read them a second time.
  */
 import { access } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { branchAt, type CheckoutReads, type HeadHistory, type WorktreeAt } from "./git";
-import { isObject, oneOf } from "./json";
+import { isObject, oneOf, str } from "./json";
 import { FoldedFile, type LineFold } from "./line-reader";
 import { mapLimit, PROBE_PARALLEL } from "./map-limit";
 import { expandHome } from "./paths";
@@ -241,11 +241,22 @@ export class SessionFactsScan {
 	readonly fileDirs = new Set<string>();
 	/** A candidate line could not be parsed, so its working-directory evidence is incomplete. */
 	unreadableLines = false;
-	readonly replay = new ReplayFold();
+	/** The replay a session's own file records; `null` for a subagent's transcript, whose replay nothing reads. */
+	readonly replay: ReplayFold | null;
+	/** The transcript's working directory, from its `session` header. */
+	#cwd: string | null = null;
+	/** The paths its successful `edit` and `write` calls changed, as omp reported them, in first-touch order. */
+	readonly #changed = new Set<string>();
 
 	/** `prompts`: whether the transcript is the session's own, whose user prompts name the work the user asked for. */
 	constructor(prompts: boolean) {
 		this.#prompts = prompts;
+		this.replay = prompts ? new ReplayFold() : null;
+	}
+
+	/** Every changed file's absolute path, a relative one resolved against the transcript's cwd, in first-touch order. */
+	changedPaths(): string[] {
+		return [...this.#changed].map(path => resolve(this.#cwd ?? "/", path));
 	}
 
 	applyLine(line: string): void {
@@ -261,7 +272,11 @@ export class SessionFactsScan {
 			return;
 		}
 		if (!isObject(entry)) return;
-		this.replay.applyEntry(entry);
+		this.replay?.applyEntry(entry);
+		if (entry.type === "session") {
+			this.#cwd = str(entry.cwd) ?? null;
+			return;
+		}
 		if (entry.type === "custom") {
 			if (entry.customType === "omp-agents.headless") this.headless = isObject(entry.data) && entry.data.headless === true;
 			else if (entry.customType === "omp-ship.state") {
@@ -319,7 +334,12 @@ export class SessionFactsScan {
 		if (!result) return;
 		const { callId, details } = result;
 		if (callId !== undefined && this.#opening.delete(callId) && !result.isError) this.#opened(textOf(result.content));
-		if (!result.isError) for (const path of changedPaths(result.toolName, details)) this.#workedIn(dirname(path));
+		if (!result.isError) {
+			for (const path of changedPaths(result.toolName, details)) {
+				this.#changed.add(path);
+				this.#workedIn(dirname(path));
+			}
+		}
 		if (result.toolName === "bash") {
 			const expected = callId === undefined ? undefined : this.#take(callId);
 			const job = isObject(details.async) ? details.async.jobId : undefined;
@@ -512,6 +532,9 @@ interface SessionScan {
 	worktree: string | null;
 	/** The branch it works on in `worktree`, else in `cwd`, as `SessionFacts.branch` describes it; only `#resolve` writes it, whole, from git's answer, the default branch, and the pull request it heads. */
 	branch: SessionBranch | null;
+	/** The /ship stage and headless mark of its own file as the last refresh reported them: a read outside a refresh, by `changedPathsOf`, leaves them for the next one to report. */
+	ship: ShipProgress | null;
+	headless: boolean;
 }
 
 /** What git says of the branch a session works on. */
@@ -666,7 +689,7 @@ export class SessionFactsIndex {
 		const workspace = dir === undefined ? null : this.placement.at(dir);
 		if (!session || sessionPath === null) return workspace ? { ...NO_FACTS, workspace } : NO_FACTS;
 		const own = this.#own(sessionPath);
-		const replay = own?.replay.facts();
+		const replay = own?.replay?.facts();
 		return {
 			pullRequests: session.pullRequests, tickets: session.tickets, ship: own?.ship ?? null, worktree: session.worktree, branch: session.branch,
 			workspace, ...(replay ? { replay } : {}),
@@ -684,6 +707,16 @@ export class SessionFactsIndex {
 		const own = this.#own(sessionPath);
 		if (!session || !own) return [];
 		return [...new Set([...own.fileDirs].reverse().map(dir => absolute(session.cwd, dir)))];
+	}
+
+	/**
+	 * The absolute paths session file `sessionPath`'s own `edit` and `write` calls changed, in first-touch order, read up to the file's end now,
+	 * which feeds the index's folds of it; a file the index has not scanned yet is read whole and not kept.
+	 */
+	async changedPathsOf(sessionPath: string): Promise<string[]> {
+		const own = this.#sessions.get(sessionPath)?.transcripts.get(sessionPath) ?? new FoldedFile(sessionPath, () => new TranscriptFold(true, []));
+		await own.read();
+		return own.fold.scan.changedPaths();
 	}
 
 	/** The scan of session `path`'s own file, not its subagents'; `undefined` before its first scan. */
@@ -906,12 +939,10 @@ export class SessionFactsIndex {
 	 */
 	async #scan({ path, cwd, modifiedAt }: ListedSession): Promise<{ session: SessionScan; changed: boolean; submitted: boolean; moved: boolean; writtenAt: number }> {
 		let session = this.#sessions.get(path);
-		const before = this.#own(path);
-		const previousShip = before?.ship ?? null;
-		const wasHeadless = before?.headless ?? false;
 		session ??= {
 			modifiedAt: Number.NaN, cwd, transcripts: new Map([[path, new FoldedFile(path, () => new TranscriptFold(true, this.#ownFileFolds.map(folds => folds.start(path))))]]),
 			refs: [], submitted: new Map(), repo: null, named: new Set(), pullRequests: [], evidence: new Map(), tickets: [], submitsFinished: 0, workDirs: [], worktree: null, branch: null,
+			ship: null, headless: false,
 		};
 		this.#sessions.set(path, session);
 		for (const file of await subagentFiles(path)) {
@@ -920,12 +951,15 @@ export class SessionFactsIndex {
 		const reads = await Promise.all([...session.transcripts.values()].map(transcript => transcript.read()));
 		if (reads.every(read => read.readable)) session.modifiedAt = modifiedAt;
 		const own = session.transcripts.get(path)!.fold.scan;
-		const shipChanged = JSON.stringify(previousShip) !== JSON.stringify(own.ship ?? null);
+		const ship = own.ship ?? null;
+		const changed = JSON.stringify(session.ship) !== JSON.stringify(ship) || own.headless !== session.headless;
+		session.ship = ship;
+		session.headless = own.headless;
 		const workDirs = [...own.workDirs].reverse().map(dir => absolute(cwd, dir));
 		const dirsBefore = session.workDirs;
 		const same = workDirs.length === dirsBefore.length && workDirs.every((dir, i) => dir === dirsBefore[i]);
 		const moved = !same || (session.worktree !== null && !(await exists(session.worktree)));
 		session.workDirs = workDirs;
-		return { session, changed: shipChanged || own.headless !== wasHeadless, submitted: this.#gather(session, own), moved, writtenAt: modifiedAt };
+		return { session, changed, submitted: this.#gather(session, own), moved, writtenAt: modifiedAt };
 	}
 }

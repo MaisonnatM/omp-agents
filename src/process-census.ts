@@ -89,10 +89,24 @@ export function parseCwds(text: string): Map<number, string> {
 	return cwds;
 }
 
-/** Every process now; `null` when `ps` failed. */
+/** Every process now; `null` when `ps` failed. Only the keeper's {@link ProcessCensus.note} reads it this way, as it must note before omp exits. */
 function processTable(): ProcessTable | null {
 	const ps = Bun.spawnSync(PS_ARGV, { env: { ...process.env, ...PS_ENV } });
 	return ps.success ? parsePs(ps.stdout.toString()) : null;
+}
+
+/** How long a `ps` read without blocking may run before it counts as failed. */
+const PS_TIMEOUT_MS = 10_000;
+
+/** Every process now, read without blocking the event loop; `null` when `ps` failed or ran past {@link PS_TIMEOUT_MS}. */
+export async function readProcessTable(): Promise<ProcessTable | null> {
+	try {
+		const ps = Bun.spawn(PS_ARGV, { env: { ...process.env, ...PS_ENV }, stdout: "pipe", stderr: "ignore", timeout: PS_TIMEOUT_MS });
+		const [text, code] = await Promise.all([new Response(ps.stdout).text(), ps.exited]);
+		return code === 0 ? parsePs(text) : null;
+	} catch {
+		return null;
+	}
 }
 
 /** The processes under `root` in `table`, without `root`, and without omp's shared workers and what they started. */
@@ -150,9 +164,9 @@ function forgetGone(processes: Processes, table: ProcessTable | null): boolean {
 /**
  * Stops `processes`: SIGTERM, then SIGKILL after `graceMs` to those `ps` still lists under the start time they had, so
  * a pid that a later process reuses is never signalled. Settles once none runs, or at the grace's end. `read` lists the
- * processes; the server passes one that runs `ps` without blocking.
+ * processes, without blocking unless a caller passes a reader that does.
  */
-export async function terminate(processes: Processes, graceMs: number, read: () => ProcessTable | null | Promise<ProcessTable | null> = processTable): Promise<void> {
+export async function terminate(processes: Processes, graceMs: number, read: () => ProcessTable | null | Promise<ProcessTable | null> = readProcessTable): Promise<void> {
 	let listed = forgetGone(processes, await read());
 	for (const pid of processes.keys()) signal(pid, "SIGTERM");
 	const deadline = Date.now() + graceMs;
@@ -164,9 +178,9 @@ export async function terminate(processes: Processes, graceMs: number, read: () 
 	if (!listed) console.error(`omp-agents: ps failed, so these processes may still run: ${[...processes.keys()].join(" ")}`);
 }
 
-/** Stops `root` and every process under it now, as one `ps` finds them, by {@link terminate}. */
+/** Stops `root` and every process under it now, as one `ps` finds them, by {@link terminate}, without blocking the server. */
 export async function stopTree(root: number, graceMs: number): Promise<void> {
-	const table = processTable();
+	const table = await readProcessTable();
 	if (!table) return void console.error(`omp-agents: ps failed, so process ${root} and what it started may still run`);
 	const started = table.get(root)?.started;
 	const tree: Processes = new Map(started === undefined ? [] : [[root, started]]);

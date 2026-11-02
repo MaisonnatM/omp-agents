@@ -6,38 +6,22 @@
 import { join, relative } from "node:path";
 import { createCache } from "./cache";
 import { git } from "./git";
-import { FoldedFile } from "./line-reader";
 import { displayPath } from "./paths";
 import { run } from "./proc";
 import { type ChangedEntry, type ChangedFileText, type ChangeStatus, contextRows, fileText, MAX_CHANGED_FILE_BYTES, parseFullDiff, type SessionChanges } from "./shared/changes";
-import { Work } from "./work";
 
 /** Where a session works: its transcript, and the directory its checkout is read from (its worktree, else its cwd). */
 export interface SessionPlace {
 	file: string;
 	dir: string;
+	/** The absolute paths the session's own `edit` and `write` calls changed, in first-touch order, as its transcript holds them now. */
+	changedPaths: () => Promise<string[]>;
 }
 
 /** A file of the list with the absolute path it names. */
 type Located = ChangedEntry & { absolute: string };
 
 const STATUS: Record<string, ChangeStatus> = { A: "added", M: "modified", D: "deleted", T: "modified" };
-
-/** The most transcripts kept folded; the oldest is forgotten first. */
-const MAX_FOLDED = 32;
-const folded = new Map<string, FoldedFile<Work>>();
-
-/** The absolute paths transcript `file`'s `edit` and `write` calls changed, in first-touch order, parsing only the lines it gained since the last call. */
-async function sessionPaths(file: string): Promise<string[]> {
-	let transcript = folded.get(file);
-	if (!transcript) {
-		if (folded.size >= MAX_FOLDED) folded.delete(folded.keys().next().value!);
-		transcript = new FoldedFile(file, () => new Work());
-		folded.set(file, transcript);
-	}
-	await transcript.read();
-	return transcript.fold.paths();
-}
 
 /**
  * The checkout `dir` is in, with the commit its branch forked from the remote's default branch, else `HEAD`, else the
@@ -96,7 +80,7 @@ async function gitChanges(root: string, sha: string): Promise<Located[]> {
 
 /** The list with each entry's absolute path, which the file read checks a request against. */
 async function scan(place: SessionPlace): Promise<LocatedList> {
-	const [checkout, touched] = await Promise.all([checkoutOf(place.dir), sessionPaths(place.file)]);
+	const [checkout, touched] = await Promise.all([checkoutOf(place.dir), place.changedPaths()]);
 	const files = checkout ? await gitChanges(checkout.root, checkout.base.sha) : [];
 	const byPath = new Map(files.map(file => [file.absolute, file]));
 	for (const absolute of touched) {

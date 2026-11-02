@@ -69,7 +69,7 @@ import { hashForView, type OpenMode, sameView } from "../routing";
 import type { StartOf } from "../starts";
 import { usePaneLoaded, useTranscript } from "../pane-store";
 import { revealed, useReveal } from "../message-reveal";
-import { type ActivityItem, type Block, editablePrompt, type ForkPoint, forkPoints, replacingPrompt, type ToolItem, toBlocks, toolImages, turnReplies, withEditedPrompt } from "../transcript-view";
+import { type ActivityItem, EMPTY_TRANSCRIPT, type ForkPoint, replacingPrompt, type ToolItem, transcriptModel, withEditedPrompt } from "../transcript-view";
 import { useAction } from "../use-action";
 import { useCopy } from "../use-copy";
 import { type ToolChipLabels, ToolChipsContext } from "./tool-chips";
@@ -343,6 +343,44 @@ function ToolChips({ names, chips }: { names: string[]; chips: ToolChipLabels })
 	});
 }
 
+/**
+ * One row of the transcript. A settled row, any row but the last, skips its layout and paint while it is off screen,
+ * once the whole transcript has laid out, so a streamed token lays out what is on screen and not every row above it.
+ * Every row remembers its last laid-out size, so a skipped row keeps its height and the scroller, the minimap, and a
+ * jump to a message measure the row's own box as before. The inner box reaches 4px past the row, so a focus ring or the
+ * chat history's flash at its edge is not clipped by the skip's paint containment.
+ */
+function Row({ messageId, settled, className, children }: { messageId: string; settled: boolean; className?: string; children: ReactNode }) {
+	return (
+		<MessageScrollerItem messageId={messageId}>
+			<div
+				className={cn(
+					"-m-1 flex flex-col p-1 [contain-intrinsic-block-size:auto_6rem]",
+					settled && "group-data-[laid-out]/transcript:[content-visibility:auto]",
+					className,
+				)}
+			>
+				{children}
+			</div>
+		</MessageScrollerItem>
+	);
+}
+
+/** A group of tool calls and thinking, with a chip for each tool `chips` names that finished in it. Memoized on its block, so a token leaves a settled group as it is. */
+const ActivityRow = memo(function ActivityRow({ id, entries, settled, shown, chips }: { id: string; entries: ActivityItem[]; settled: boolean; shown: boolean; chips: ToolChipLabels }) {
+	const names = useMemo(
+		() => [...new Set(entries.flatMap(entry => (entry.kind === "tool" && entry.status === "ok" && Object.hasOwn(chips, entry.name) ? [entry.name] : [])))],
+		[entries, chips],
+	);
+	if (!shown && names.length === 0) return null;
+	return (
+		<Row messageId={id} settled={settled}>
+			{shown && <ActivityGroup entries={entries} />}
+			<ToolChips names={names} chips={chips} />
+		</Row>
+	);
+});
+
 function CopyButton({ text, label = "Copy message" }: { text: string; label?: string }) {
 	const { copied, copy } = useCopy();
 	const CopyIcon = useIcon("copy");
@@ -480,11 +518,11 @@ type RoutineItem = Extract<Item, { kind: "routine" }>;
 const copyText = (item: MessageItem): string => (item.kind === "user" && item.skill ? skillInvocation(item.skill, item.text) : item.text);
 
 /** A routine's message, as its card. Memoized on the item, so a streamed token leaves it as it is. */
-const RoutineRow = memo(function RoutineRow({ item }: { item: RoutineItem }) {
+const RoutineRow = memo(function RoutineRow({ item, settled }: { item: RoutineItem; settled: boolean }) {
 	return (
-		<MessageScrollerItem messageId={item.id} className="flex flex-col">
+		<Row messageId={item.id} settled={settled}>
 			<RoutineRunCard item={item} copy={<CopyButton text={taskText(item.message)} label={item.message.sent.kind === "command" ? "Copy command" : "Copy prompt"} />} />
-		</MessageScrollerItem>
+		</Row>
 	);
 });
 
@@ -504,13 +542,15 @@ interface MessageRowProps {
 	editor?: ReactNode;
 	/** It took the place of a pending prompt already on screen, so it shows at once without its entrance motion. */
 	replacing: boolean;
+	/** It is not the transcript's last row, so it may skip layout while off screen. */
+	settled: boolean;
 	onFork?: (itemId: string, point: ForkPoint) => void;
 	onEditing: (item: Extract<Item, { kind: "user" }>, entryId: string) => void;
 }
 
 /** One message with its actions. Every prop keeps its identity while the message is unchanged, so a streamed token renders only the row it extends. */
 const MessageRow = memo(function MessageRow({
-	item, copyable, forkAt, prefill, forking, forkDisabled, failed, editAt, editor, replacing, onFork, onEditing,
+	item, copyable, forkAt, prefill, forking, forkDisabled, failed, editAt, editor, replacing, settled, onFork, onEditing,
 }: MessageRowProps) {
 	const copied = copyText(item);
 	const point = forkAt === null || !onFork ? null : { entryId: forkAt, prefill };
@@ -518,7 +558,7 @@ const MessageRow = memo(function MessageRow({
 	const pending = item.kind === "user" && item.pending === true;
 	return (
 		// The dimming sits on the wrapper: the message's entrance motion sets its own inline opacity.
-		<MessageScrollerItem messageId={item.id} className={cn("flex flex-col", pending && "opacity-60")}>
+		<Row messageId={item.id} settled={settled} className={cn(pending && "opacity-60")}>
 			<ChatMessage
 				{...(replacing ? { initial: false } : {})}
 				from={item.kind}
@@ -552,25 +592,36 @@ const MessageRow = memo(function MessageRow({
 					{failed}
 				</p>
 			)}
-		</MessageScrollerItem>
+		</Row>
 	);
 });
 
 /**
  * The scrolling message list. It follows new output until the reader scrolls up; the button jumps back to the end.
- * It reads the view's items itself, so a streamed token renders it and the outline alone, and of its rows only the
- * ones whose message changed. It renders again for fork state or callbacks, not with the page around it.
+ * It reads the view's items itself and builds their model once, from the one before, for its rows, its minimap, its chat
+ * history, and its Todos card, so a streamed token redoes the last turn alone and renders only the rows whose message
+ * changed. It renders again for fork state or callbacks, not with the page around it.
  */
 export const Transcript = memo(function Transcript({ view, working, fork, onFork, onEdit, empty, changes }: TranscriptProps) {
 	const items = useTranscript(view);
 	const loaded = usePaneLoaded(view);
 	const last = items.at(-1);
 	const streaming = last?.kind === "assistant" && last.streaming;
-	const forks = useMemo(() => forkPoints(items), [items]);
-	const replies = useMemo(() => turnReplies(items, working), [items, working]);
-	const shown = useRef<Block[]>([]);
-	const blocks = useMemo(() => (shown.current = toBlocks(items, shown.current)), [items]);
-	const images = useMemo(() => toolImages(items), [items]);
+	const modelRef = useRef(EMPTY_TRANSCRIPT);
+	const model = useMemo(() => (modelRef.current = transcriptModel(items, working, modelRef.current)), [items, working]);
+	const { blocks, forks, replies, images } = model;
+	// Settled rows skip layout off screen only once every row has laid out, so each remembers its real height. The
+	// second frame comes after the browser laid out the first one; another view's rows lay out in full again first.
+	const viewKey = hashForView(view);
+	const hasRows = blocks.length > 0;
+	const [laidOut, setLaidOut] = useState<string | null>(null);
+	useEffect(() => {
+		if (!hasRows || laidOut === viewKey) return;
+		let frame = requestAnimationFrame(() => {
+			frame = requestAnimationFrame(() => setLaidOut(viewKey));
+		});
+		return () => cancelAnimationFrame(frame);
+	}, [hasRows, laidOut, viewKey]);
 	// The image the viewer shows, by its tool item and its place in that item's images, so new images do not move it.
 	const [image, setImage] = useState<{ id: string; at: number } | null>(null);
 	const openImage = useCallback((id: string, at: number) => setImage({ id, at }), []);
@@ -586,7 +637,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 		previousItems.current = items;
 		return id;
 	}, [items]);
-	const editable = useMemo(() => (onEdit ? editablePrompt(items) : null), [items, onEdit]);
+	const editable = onEdit ? model.editable : null;
 	const [editing, setEditing] = useState<{
 		item: Extract<Item, { kind: "user" }>;
 		position: number;
@@ -607,13 +658,13 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 			throw error;
 		}
 	}, "Could not resend the message");
-	// Reads the blocks through `shown`, so a streamed token keeps the callback, and the memoized rows, as they are.
+	// Reads the blocks through `modelRef`, so a streamed token keeps the callback, and the memoized rows, as they are.
 	const beginEditing = useCallback((item: Extract<Item, { kind: "user" }>, entryId: string) => {
 		const save = onEdit;
 		if (!save) return;
 		setEditing(current => current ?? {
 			item,
-			position: shown.current.findIndex(block => block.kind === "item" && block.item.id === item.id),
+			position: modelRef.current.blocks.findIndex(block => block.kind === "item" && block.item.id === item.id),
 			entryId,
 			text: item.text,
 			submitted: null,
@@ -644,7 +695,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 		<OpenToolImage.Provider value={openImage}>
 			<div className="@container/conversation relative flex min-h-0 flex-1 flex-col" data-conversation>
 				<SessionTodosCard
-					items={items}
+					phases={model.todos}
 					view={view}
 					working={working}
 					changes={activityShown ? changes : undefined}
@@ -652,29 +703,28 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 				/>
 				<MessageScroller className="@container min-h-0 flex-1">
 					<MessageScrollerViewport>
-						<MessageScrollerContent className="conversation-lane gap-3 p-3" aria-relevant="additions text" data-transcript>
-							{visibleBlocks.map(block => {
+						<MessageScrollerContent
+							className="group/transcript conversation-lane gap-3 p-3"
+							aria-relevant="additions text"
+							data-transcript
+							data-laid-out={laidOut === viewKey || undefined}
+						>
+							{visibleBlocks.map((block, index) => {
+								const settled = index < visibleBlocks.length - 1;
 								if (block.kind === "activity") {
-									const chips = [...new Set(block.entries.flatMap(entry => (entry.kind === "tool" && entry.status === "ok" && Object.hasOwn(toolChips, entry.name) ? [entry.name] : [])))];
-									if (!activityShown && chips.length === 0) return null;
-									return (
-										<MessageScrollerItem key={block.id} messageId={block.id} className="flex flex-col">
-											{activityShown && <ActivityGroup entries={block.entries} />}
-											<ToolChips names={chips} chips={toolChips} />
-										</MessageScrollerItem>
-									);
+									return <ActivityRow key={block.id} id={block.id} entries={block.entries} settled={settled} shown={activityShown} chips={toolChips} />;
 								}
 								const item = block.item;
 								if (item.kind === "notice") {
 									return (
-										<MessageScrollerItem key={item.id} messageId={item.id} className="flex flex-col">
+										<Row key={item.id} messageId={item.id} settled={settled}>
 											<p className={cn("self-center whitespace-pre-line text-center text-xs", NOTICE_TONE[item.level])} data-item="notice">
 												{item.text}
 											</p>
-										</MessageScrollerItem>
+										</Row>
 									);
 								}
-								if (item.kind === "routine") return <RoutineRow key={item.id} item={item} />;
+								if (item.kind === "routine") return <RoutineRow key={item.id} item={item} settled={settled} />;
 								const point = forks.get(item.id);
 								const edit = editing?.item.id === item.id ? editing : null;
 								return (
@@ -701,6 +751,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 											/>
 										) : undefined}
 										replacing={item.id === replacing}
+										settled={settled}
 										onFork={onFork}
 										onEditing={beginEditing}
 									/>
@@ -714,8 +765,8 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 							)}
 						</MessageScrollerContent>
 					</MessageScrollerViewport>
-					<TranscriptMinimap items={items} working={working} />
-					<PromptHistory view={view} items={items} working={working} />
+					<TranscriptMinimap turns={model.outline} />
+					<PromptHistory view={view} turns={model.outline} />
 					<MessageScrollerButton {...activityControl("transcript.scroll-to-bottom")} />
 				</MessageScroller>
 			</div>

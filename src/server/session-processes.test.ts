@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { DaemonReport } from "../omp/module-types/processes";
 import { parsePs } from "../process-census";
-import { SessionProcessWatch, type WatchedSession } from "./session-processes";
+import { LIST_REUSE_MS, SessionProcessWatch, type WatchedSession } from "./session-processes";
 
 const T0 = Date.parse("Fri Oct 3 09:00:00 2026");
 const minutes = (count: number): number => T0 + count * 60_000;
@@ -194,5 +194,20 @@ describe("SessionProcessWatch", () => {
 			["b", [BROWSER_ID]],
 		]);
 		expect(stopped).toEqual(["job 110,111"]);
+	});
+
+	test("lists within LIST_REUSE_MS of a sample share it, a stop and a later list read anew", async () => {
+		const { state, watch, processesOf } = computer();
+		state.sessions = [{ ...A, status: "working" }, B];
+		const ids = async () => (await processesOf("a"))?.map(item => item.id);
+		expect(await ids()).toEqual([DEV_ID, BROWSER_ID, API_ID]);
+		state.ps = PS.filter(line => line !== DEV && line !== VITE);
+		state.now += LIST_REUSE_MS - 1;
+		expect(await ids()).toEqual([DEV_ID, BROWSER_ID, API_ID]);
+		state.now += 1;
+		expect(await ids()).toEqual([BROWSER_ID, API_ID]);
+		state.ps = PS;
+		expect((await watch.stop("gone", DEV_ID)).find(each => each.instanceId === "a")?.processes.map(item => item.id)).toEqual([DEV_ID, BROWSER_ID, API_ID]);
+		expect(await ids()).toEqual([DEV_ID, BROWSER_ID, API_ID]);
 	});
 });

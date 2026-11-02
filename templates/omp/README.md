@@ -112,6 +112,7 @@ Files, in `agent/`:
   The changes of an `isolated: true` subagent apply to the checkout its spawn names only where an edit could go, so an apply into the main checkout on its default branch, or into another live session's checkout with uncommitted changes, is refused and its patch kept; the agent names a linked worktree as the spawn's `checkout` instead.
   Reads, files outside git, and the clones omp makes for `isolated: true` subagents pass, and a change in a directory that a variable names is blocked until the command writes the directory out.
   If a session's process dies and you know its work is done, delete the claim file it names; the guard also replaces a claim whose process has ended.
+  It reads HEAD and `origin/HEAD` from their files in the git dir and keeps each directory's checkout for a minute, so an edit or write in a checkout another session does not hold starts no `git`.
 - `extensions/todos.ts`: `user_todo` reads the dashboard list and queues add, check, edit, and delete changes; `add` and `edit` take the name of an existing section, and an `add` naming one that does not exist files the todo in none.
   On `add`, an omitted or empty `due` value means no due date, and on `edit` an empty one clears it; a nonempty value must use `YYYY-MM-DD`.
 - `extensions/notes.ts`: `user_note` lists and reads the dashboard's notes and queues add/append changes.

@@ -9,6 +9,10 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Behind the scenes: every test now ignores the session it runs from, so a test added later cannot stamp an agent's session on its commits and fail "Merge on main".
 - Settings, Workspaces: long folder paths now wrap onto a second line instead of being cut off, in both the workspace list and Trusted projects.
 - Agents working in a separate copy of a project can no longer read or edit the main copy by mistake through a short file path; they are told the full path to use instead.
+- Long conversations now scroll and update more smoothly while an agent writes, since the dashboard no longer redraws every earlier message for each new word.
+- Fixed: the dashboard no longer freezes for a few seconds while it stops a session that stopped answering.
+- Agents in a repository now start each file edit faster, since the check that keeps sessions out of each other's checkout no longer runs git for every edit.
+- Behind the scenes: the dashboard checks running processes, lists models, and reads a session's changed files less often, so several open windows cost less.
 - Fixed: a question an agent asks you, such as whether to mark its pull request ready, no longer disappears when the dashboard updates and restarts, which left the session waiting on an answer you could not give.
 - A /ship session now asks you once before marking its pull request ready for review, instead of twice.
 - A routine scheduled only on some weekdays now ignores its triggers on the other days, so a weekdays-only routine no longer wakes on weekend pull requests or Slack messages.

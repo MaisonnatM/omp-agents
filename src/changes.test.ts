@@ -3,7 +3,9 @@ import { appendFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFile
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { listChanges, readChangedFile, type SessionPlace } from "./changes";
+import type { CheckoutReads } from "./git";
 import { runChecked } from "./proc";
+import { SessionFactsIndex } from "./session-facts";
 import { type DiffRow, diffFence, parseFullDiff, patchRows } from "./shared/changes";
 
 const dirs: string[] = [];
@@ -14,6 +16,14 @@ afterEach(() => {
 const IDENTITY = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
 const git = (cwd: string, ...args: string[]): Promise<string> => runChecked(["git", ...args], { cwd, env: IDENTITY });
 const edit = (path: string) => ({ type: "message", message: { role: "toolResult", toolCallId: `c-${path}`, toolName: "edit", details: { path, diff: "+1|x" }, isError: false } });
+const NO_GIT: CheckoutReads = { worktreeAt: async () => null, headHistory: async () => null, defaultBranchOf: async () => null };
+
+/** Session file `file` working in `dir`, its own changed files read through a facts index that has scanned it once, as the server's. */
+async function placeOf(file: string, dir: string): Promise<SessionPlace> {
+	const index = new SessionFactsIndex(async () => null, NO_GIT);
+	await index.refresh([{ path: file, cwd: dir, modifiedAt: 1 }]);
+	return { file, dir, changedPaths: () => index.changedPathsOf(file) };
+}
 
 /**
  * A repository with `kept.ts` and `gone.ts` committed, then `kept.ts` edited by the session, `gone.ts` deleted, `new.ts`
@@ -36,7 +46,7 @@ async function place(): Promise<{ place: SessionPlace; root: string; outside: st
 	writeFileSync(outside, "note\n");
 	const file = join(parent, "session.jsonl");
 	writeFileSync(file, [{ type: "session", cwd: root }, edit(join(root, "kept.ts")), edit("notes.md"), edit(outside)].map(entry => `${JSON.stringify(entry)}\n`).join(""));
-	return { place: { file, dir: root }, root, outside };
+	return { place: await placeOf(file, root), root, outside };
 }
 
 describe("listChanges", () => {
@@ -74,7 +84,7 @@ describe("listChanges", () => {
 		writeFileSync(join(root, "staged.ts"), "s\n");
 		writeFileSync(join(root, "loose.ts"), "l\n");
 		await git(root, "add", "staged.ts");
-		const at = { file: join(root, "none.jsonl"), dir: root };
+		const at = await placeOf(join(root, "none.jsonl"), root);
 		expect((await listChanges(at)).files.map(file => [file.path, file.status])).toEqual([
 			["loose.ts", "untracked"],
 			["staged.ts", "added"],

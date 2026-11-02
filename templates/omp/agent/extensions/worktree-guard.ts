@@ -68,11 +68,13 @@ interface Family {
 	expected: Map<string, string>;
 	/** The checkouts each running bash call changes, as they were before it ran, by tool call id: a switch git refused leaves HEAD as it was. */
 	before: Map<string, Checkout[]>;
+	/** Where each directory's checkout is, by directory, as {@link placeOf} last read it. */
+	places: Map<string, { at: number; place: Place }>;
 }
 
 function family(): Family {
 	const store = globalThis as Record<symbol, Family | undefined>;
-	return (store[Symbol.for("omp-agents.worktree-guard")] ??= { pid: process.pid, started: startOf(process.pid), expected: new Map(), before: new Map() });
+	return (store[Symbol.for("omp-agents.worktree-guard")] ??= { pid: process.pid, started: startOf(process.pid), expected: new Map(), before: new Map(), places: new Map() });
 }
 
 function startOf(pid: number): string {
@@ -105,6 +107,31 @@ function git(dir: string, args: string[]): string {
 	}
 }
 
+/** Where a directory's checkout keeps its git data and files, which a change in it does not move. */
+interface Place {
+	gitDir: string;
+	commonDir: string;
+	top: string;
+}
+
+/** How long {@link placeOf} answers a directory from what it read, so a run of edits in one checkout starts no `git`. */
+const PLACE_TTL_MS = 60_000;
+
+/** The checkout `dir` is in, or `null` outside git; kept for {@link PLACE_TTL_MS} while its git dir exists. */
+function placeOf(dir: string): Place | null {
+	const places = family().places;
+	const kept = places.get(dir);
+	if (kept && Date.now() - kept.at < PLACE_TTL_MS && existsSync(kept.place.gitDir)) return kept.place;
+	const [gitDir, commonDir, top] = git(dir, ["rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir", "--show-toplevel"]).split("\n");
+	if (!gitDir || !commonDir || !top) {
+		places.delete(dir);
+		return null;
+	}
+	const place = { gitDir, commonDir, top };
+	places.set(dir, { at: Date.now(), place });
+	return place;
+}
+
 interface Checkout {
 	top: string;
 	gitDir: string;
@@ -113,6 +140,8 @@ interface Checkout {
 	graphite: boolean;
 	/** `refs/heads/<branch>`, or the commit a detached HEAD points at. */
 	head: string;
+	/** The default branch {@link defaultBranch} found when `main` has it checked out, else `null`. */
+	defaultBranch: string | null;
 }
 
 /** The checkout `path` is in, or `null` for a path outside git or in an isolated subagent's clone. */
@@ -120,27 +149,46 @@ function checkoutAt(path: string): Checkout | null {
 	let dir = path;
 	while (!existsSync(dir) && dirname(dir) !== dir) dir = dirname(dir);
 	if (!statSync(dir).isDirectory()) dir = dirname(dir);
-	const [gitDir, commonDir, top] = git(dir, ["rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir", "--show-toplevel"]).split("\n");
-	if (!gitDir || !commonDir || !top) return null;
+	const place = placeOf(dir);
+	if (!place) return null;
+	const { gitDir, commonDir, top } = place;
 	// omp clones the repository to `<base>/m` for an isolated subagent and marks `<base>` with its owner.
 	if (existsSync(join(dirname(top), ".omp-isolation-owner.json"))) return null;
+	const main = gitDir === commonDir;
+	const head = headOf(gitDir);
 	return {
 		top,
 		gitDir,
-		main: gitDir === commonDir,
+		main,
 		graphite: existsSync(join(commonDir, ".graphite_repo_config")),
-		head: headOf(top),
+		head,
+		defaultBranch: main ? defaultBranch(commonDir, head) : null,
 	};
 }
 
-/** `refs/heads/<branch>`, the commit a detached HEAD points at, or `""` when `top` is no longer a checkout. */
-const headOf = (top: string) => git(top, ["symbolic-ref", "--quiet", "HEAD"]) || git(top, ["rev-parse", "HEAD"]);
+/** A symbolic ref git keeps as a file in `gitDir`: `ref: <name>` gives `<name>`, a commit gives itself; `null` when the file is missing or a reftable placeholder. */
+function refFile(gitDir: string, name: string): string | null {
+	let text: string;
+	try {
+		text = readFileSync(join(gitDir, name), "utf8").trim();
+	} catch {
+		return null;
+	}
+	const ref = text.startsWith("ref: ") ? text.slice(5) : text;
+	// A repository on reftable keeps this placeholder in `HEAD` and its refs elsewhere, so only git reads them.
+	return ref === "refs/heads/.invalid" ? null : ref;
+}
 
-/** The default branch a main checkout has checked out, from `origin/HEAD`, else `main` or `master`, or `null` for any other checkout or branch. */
-function defaultBranch(c: Checkout): string | null {
-	if (!c.main) return null;
-	const branch = c.head.replace(/^refs\/heads\//, "");
-	const originHead = git(c.top, ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]).replace(/^origin\//, "");
+/** `refs/heads/<branch>`, the commit a detached HEAD points at, or `""` when `gitDir` is no longer a checkout's. Read from the file, as git would, without starting it. */
+const headOf = (gitDir: string) => refFile(gitDir, "HEAD") ?? (git(gitDir, ["symbolic-ref", "--quiet", "HEAD"]) || git(gitDir, ["rev-parse", "HEAD"]));
+
+/** `head` when it is the default branch, from `origin/HEAD`, else `main` or `master`, or `null` for any other branch. */
+function defaultBranch(commonDir: string, head: string): string | null {
+	const branch = head.replace(/^refs\/heads\//, "");
+	const remote = existsSync(join(commonDir, "reftable"))
+		? git(commonDir, ["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"])
+		: (refFile(commonDir, "refs/remotes/origin/HEAD") ?? "");
+	const originHead = remote.replace(/^refs\/remotes\/origin\//, "");
 	return (originHead ? [originHead] : ["main", "master"]).includes(branch) ? branch : null;
 }
 
@@ -187,7 +235,7 @@ function guard(c: Checkout, kind: Kind, what: string, ctx: ExtensionContext): st
 			"Changes to this checkout stay blocked until a switch succeeds, however often you retry.",
 		].join(" ");
 	}
-	const branch = kind === "edit" ? defaultBranch(c) : null;
+	const branch = kind === "edit" ? c.defaultBranch : null;
 	if (branch) {
 		return [
 			`${c.top} is the repository's main checkout, on its default branch \`${branch}\`.`,
@@ -282,7 +330,7 @@ export default function worktreeGuard(pi: ExtensionAPI) {
 				if (misplaced) return { block: true, reason: misplaced };
 				if (event.toolName === "read") continue;
 				// `git check-ignore` names an ignored path and stays silent for any other, including a tracked file an ignore rule matches.
-				if (c && defaultBranch(c) && git(c.top, ["check-ignore", "--", file]) !== "") ignored.push(file);
+				if (c?.defaultBranch && git(c.top, ["check-ignore", "--", file]) !== "") ignored.push(file);
 				else touch(c, "edit", `This ${event.toolName} of ${path}`);
 			}
 		} else if (event.toolName === "bash" && typeof input.command === "string") {
@@ -330,7 +378,7 @@ export default function worktreeGuard(pi: ExtensionAPI) {
 		const before = me.before.get(event.toolCallId);
 		me.before.delete(event.toolCallId);
 		for (const c of before ?? []) {
-			const head = headOf(c.top);
+			const head = headOf(c.gitDir);
 			// A process that took the checkout while the command ran owns what HEAD is now; this one's next change reports the switch.
 			if (head && (!event.isError || head !== c.head) && mine(readClaim(c.gitDir), me)) me.expected.set(c.gitDir, head);
 		}

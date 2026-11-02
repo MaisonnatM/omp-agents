@@ -7,7 +7,6 @@ import { motion, useReducedMotion } from "framer-motion";
 import { History, X } from "lucide-react";
 import { type KeyboardEvent, memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { View } from "../../src/shared/sessions";
-import type { Item } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useShape } from "@/lib/shape-context";
@@ -16,9 +15,9 @@ import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { keyedStore } from "../keyed-store";
 import { skillLabel } from "../labels";
-import { useTranscript } from "../pane-store";
+import { type PaneData, usePaneSelect } from "../pane-store";
 import { hashForView } from "../routing";
-import { outline } from "../transcript-view";
+import type { OutlineTurn } from "../transcript-view";
 import { messageIn, scrollToMessage, viewportOf } from "./transcript-minimap";
 
 /** Whether a view's chat history is open, by the view's hash. */
@@ -38,10 +37,12 @@ const close = (view: View, refocus: boolean): void => {
 	if (refocus) document.getElementById(triggerId(view))?.focus();
 };
 
+/** How many prompts the user sent in a view's transcript; a number, so a streamed token leaves its reader as it is. */
+const promptCount = ({ items }: PaneData): number => items.reduce((count, item) => count + (item.kind === "user" ? 1 : 0), 0);
+
 /** The composer's button that opens and closes the chat history; it shows from two prompts on. */
 export const PromptHistoryButton = memo(function PromptHistoryButton({ view }: { view: View }) {
-	const items = useTranscript(view);
-	const prompts = useMemo(() => items.reduce((count, item) => count + (item.kind === "user" ? 1 : 0), 0), [items]);
+	const prompts = usePaneSelect(view, promptCount);
 	const open = opened.use(hashForView(view));
 	if (prompts < MIN_PROMPTS) return null;
 	return (
@@ -75,25 +76,28 @@ function flash(message: HTMLElement): void {
 function startOffsets(viewport: HTMLElement, column: HTMLElement): Map<string, number> {
 	const offsets = new Map<string, number>();
 	const view = viewport.getBoundingClientRect();
+	const inView = (rect: DOMRect): boolean => rect.bottom >= view.top && rect.top <= view.bottom;
 	for (const slot of column.querySelectorAll<HTMLElement>("[data-prompt-id]")) {
 		const id = slot.dataset.promptId!;
-		const bubble = messageIn(viewport, id)?.querySelector<HTMLElement>('[data-item="user"]');
-		const from = bubble?.getBoundingClientRect();
-		if (!from || from.bottom < view.top || from.top > view.bottom) continue;
+		// The row comes first: a row off screen may skip its layout, which measuring the bubble in it would force.
+		const row = messageIn(viewport, id);
+		if (!row || !inView(row.getBoundingClientRect())) continue;
+		const from = row.querySelector<HTMLElement>('[data-item="user"]')?.getBoundingClientRect();
+		if (!from || !inView(from)) continue;
 		offsets.set(id, from.top - slot.getBoundingClientRect().top);
 	}
 	return offsets;
 }
 
 /** The blurred layer over the transcript with the session's prompts, newest at the bottom beside the composer. */
-export const PromptHistory = memo(function PromptHistory({ view, items, working }: { view: View; items: Item[]; working: boolean }) {
+export const PromptHistory = memo(function PromptHistory({ view, turns }: { view: View; turns: readonly OutlineTurn[] }) {
 	const open = opened.use(hashForView(view));
 	if (!open) return null;
-	return <Panel view={view} items={items} working={working} />;
+	return <Panel view={view} turns={turns} />;
 });
 
-function Panel({ view, items, working }: { view: View; items: Item[]; working: boolean }) {
-	const turns = useMemo(() => outline(items, working).filter(turn => !turn.routine), [items, working]);
+function Panel({ view, turns: outline }: { view: View; turns: readonly OutlineTurn[] }) {
+	const turns = useMemo(() => outline.filter(turn => !turn.routine), [outline]);
 	const reduceMotion = useReducedMotion() ?? false;
 	const shape = useShape();
 	const column = useRef<HTMLOListElement>(null);

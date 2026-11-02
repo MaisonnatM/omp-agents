@@ -30,7 +30,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Transcript: `web/components/transcript.tsx`, with message bubbles from `web/components/ui/chat-message.tsx` and tool calls and thinking as `ActivityGroup`, on shadcn's `Trace` from `web/components/ui/trace.tsx`.
   A message's code block is `CodeBlock` from `web/components/ui/code-block.tsx`, which `web/components/message-markdown.tsx` renders for each fence.
   In a session's conversation, a `mermaid` or `chart` fence is `SessionVisual` from `web/components/session-visual.tsx` instead, through the `SESSION_AGENT_PRESET` and `SESSION_PROMPT_PRESET` that `MessageRow` passes, and its chart is shadcn's `web/components/ui/chart.tsx`.
-  The turn minimap on its left edge is `TranscriptMinimap` in `web/components/transcript-minimap.tsx`, with its turns from `outline` in `web/transcript-view.ts`.
+  The turn minimap on its left edge is `TranscriptMinimap` in `web/components/transcript-minimap.tsx`, with its turns from the `outline` of the `transcriptModel` in `web/transcript-view.ts` that `Transcript` builds.
   The **Todos** card, the agent's own todo list followed by its changed files, images, and sources, is `SessionTodosCard` in `web/components/session-todos-card.tsx`.
   It floats at the transcript's top right when the transcript is wide enough to keep it beside the messages, and otherwise sits above them.
   Its **Files**, **Images**, and **Sources** sections are `ChangesSections` in `web/components/todos-card-changes.tsx`, from the `changes` that `conversation.tsx` and `past-conversation.tsx` pass `Transcript`.

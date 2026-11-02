@@ -1,3 +1,4 @@
+import { createCache } from "../cache";
 import { isObject } from "../json";
 import { runJson } from "../proc";
 import { type CatalogModel, type ConnectedModels, type DraftModel, type ModelEntry, type ModelRole, selectorOf, splitSelector } from "../shared/models";
@@ -8,6 +9,12 @@ import type { OmpSettingsInstance } from "./module-types/config";
 import type { ModelRegistryModule, ServiceTierModel } from "./module-types/models";
 
 const MODELS_TIMEOUT_MS = 30_000;
+
+/** How long one `omp models --json` run answers for; a model added to omp's config shows within it. */
+const CATALOG_TTL_MS = 30_000;
+
+/** `omp models --json`'s list, kept so a draft's two model reads and every open window share one `omp` run. */
+const catalogs = createCache<CatalogModel[]>(CATALOG_TTL_MS);
 
 /** The settings of a directory and omp's model registry, which reads the credential store until `close`. */
 export interface OpenRegistry {
@@ -30,8 +37,12 @@ export async function openRegistry(cwd: string): Promise<OpenRegistry> {
 	}
 }
 
-/** Every model `omp models` lists for this agent dir, in omp's order. */
-export async function listModels(): Promise<CatalogModel[]> {
+/** Every model `omp models` lists for this agent dir, in omp's order; one run answers every caller for {@link CATALOG_TTL_MS}. */
+export function listModels(): Promise<CatalogModel[]> {
+	return catalogs.get("", readCatalog);
+}
+
+async function readCatalog(): Promise<CatalogModel[]> {
 	const data = await runJson([...ompCommand, "models", "--json"], { timeoutMs: MODELS_TIMEOUT_MS });
 	if (!isObject(data) || !Array.isArray(data.models)) throw new Error("omp models --json printed no models");
 	return (data.models as unknown[]).flatMap((model): CatalogModel[] =>
