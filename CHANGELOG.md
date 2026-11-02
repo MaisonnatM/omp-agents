@@ -9,6 +9,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - A Router's task moves to Needs you when its session finishes, and the Router tells you in one line; Mark done and Stop in a task's menu close it.
 - A Router's task that gets stuck, repeats the same step, or whose session dies is restarted with what went wrong; after two restarts it is stopped and the Router tells you why.
 - A task the Router cannot restart is stopped at once, with the reason in the Tasks tab, and the Router tells you.
+- A Router's task in the middle of a long build or test run gets 30 minutes before it counts as stuck, instead of six.
 - A new Router comes with a Team events routine, so it hears about Slack messages waiting on you and pull requests that need your move.
 - A Router skips team messages that need nothing, such as "thanks!", and its next run tells you how many it skipped.
 - News on a pull request or Slack thread a Router's task follows goes straight to that task, without waking the Router.

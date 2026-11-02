@@ -119,6 +119,7 @@
 - When someone reports a bug nobody answered, the Router starts a quiet task that listens to the thread and posts there only once it has a result.
 - A supervisor checks the tasks in progress every two minutes while the dashboard runs.
   A task whose session works with no new step for six minutes, runs the same tool call four times in a row, or died, is stopped and told to continue, with the reason and its last error.
+  While one of its tool calls still runs, such as a long build or test run, it gets 30 minutes instead of six.
   The Router tells you it restarted a task unless the task is quiet, and the task's row in **Tasks** shows why.
   After two restarts, the next time the task is stuck the supervisor stops it and ends its session, and the Router hears why.
 - Deleting a Router deletes its tasks; their sessions stay in **Sessions**.

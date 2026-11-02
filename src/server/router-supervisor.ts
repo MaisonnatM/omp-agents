@@ -1,6 +1,7 @@
 /**
  * The supervisor of Router tasks: every {@link SUPERVISOR_TICK_MS}, on the server that holds the owner lock, it looks at
- * each working task's session. A session that works but writes nothing new for {@link STALL_CHECKS} looks, one that ran
+ * each working task's session. A session that works but writes nothing new for {@link STALL_CHECKS} looks, or for
+ * {@link LONG_CALL_CHECKS} while a tool call such as a long build still runs, one that ran
  * the same tool call {@link LOOP_REPEATS} times in a row, or one that died while its task worked, is stopped and told to
  * go on, with the reason and its last error; after {@link MAX_RESTARTS} restarts, or a restart that fails, the task is stopped and its Router told.
  */
@@ -9,7 +10,7 @@ import type { LiveSession } from "../live-session";
 import type { BotId } from "../shared/bots";
 import type { RouterTask } from "../shared/router";
 import type { WithdrawnMessage } from "../shared/sessions";
-import { oneLine, tailEntries, textOf, toolCallsOf, toolResultOf, toolSummary } from "../session-entries";
+import { oneLine, tailEntries, textOf, type ToolCall, toolCallsOf, toolResultOf, toolSummary } from "../session-entries";
 import { isUserPrompt } from "../transcript";
 import type { RouterTasks } from "./router-tasks";
 
@@ -17,6 +18,8 @@ import type { RouterTasks } from "./router-tasks";
 export const SUPERVISOR_TICK_MS = 2 * 60_000;
 /** How many looks in a row a working session writes nothing new before it counts as stuck, or a session gone before it counts as dead. */
 export const STALL_CHECKS = 3;
+/** How many looks a working session may write nothing while a tool call it made still runs, such as a long build or test run. */
+export const LONG_CALL_CHECKS = 15;
 /** How many times in a row the same tool call ends a session's file before it counts as looping. */
 export const LOOP_REPEATS = 4;
 /** How many times the supervisor restarts a task before it stops it. */
@@ -28,14 +31,22 @@ export interface TaskTail {
 	mark: string | null;
 	/** The tool call the file ends on and how many times in a row since the last prompt it ran, `null` without one. */
 	repeated: { call: string; times: number } | null;
+	/** The newest tool call that has no result yet, as it runs now, `null` without one. */
+	running: string | null;
 	/** The newest failed tool call's result, as one line, `null` without one. */
 	lastError: string | null;
 }
+
+/** A tool call as one line, such as `bash bun run build`. */
+const callLabel = (call: ToolCall): string => `${call.name} ${toolSummary(call.args, undefined)}`.trim();
 
 /** The end of session file `path`, as {@link TaskTail}, which names nothing for a file that is gone; `null` when it cannot be read. */
 export function readTaskTail(path: string): TaskTail | null {
 	let mark: string | null = null;
 	let lastError: string | null = null;
+	let running: string | null = null;
+	let newestCalls = true;
+	const answered = new Set<string>();
 	let repeated: { call: string; key: string; times: number; open: boolean } | null = null;
 	try {
 		for (const entry of tailEntries(path)) {
@@ -45,11 +56,19 @@ export function readTaskTail(path: string): TaskTail | null {
 			// A prompt, such as the supervisor's own restart, starts a new run: what came before it is answered.
 			if (isUserPrompt(message)) break;
 			const result = toolResultOf(message);
+			if (result?.callId) answered.add(result.callId);
 			if (result?.isError && lastError === null) lastError = oneLine(textOf(result.content)) || `${result.toolName} failed`;
+			const calls = toolCallsOf(message);
+			// Only the newest message's calls can still run: an older one's would have been answered before the session went on.
+			if (newestCalls && calls.length > 0) {
+				newestCalls = false;
+				const open = calls.find(call => !answered.has(call.id));
+				if (open) running = callLabel(open);
+			}
 			// Newest first: the last call of the newest message is the newest call.
-			for (const call of toolCallsOf(message).toReversed()) {
+			for (const call of calls.toReversed()) {
 				const key = `${call.name}\n${JSON.stringify(call.args)}`;
-				if (repeated === null) repeated = { call: `${call.name} ${toolSummary(call.args, undefined)}`.trim(), key, times: 1, open: true };
+				if (repeated === null) repeated = { call: callLabel(call), key, times: 1, open: true };
 				else if (repeated.open && repeated.key === key) repeated.times++;
 				else repeated.open = false;
 			}
@@ -57,7 +76,7 @@ export function readTaskTail(path: string): TaskTail | null {
 	} catch {
 		return null;
 	}
-	return { mark, repeated: repeated && { call: repeated.call, times: repeated.times }, lastError };
+	return { mark, repeated: repeated && { call: repeated.call, times: repeated.times }, running, lastError };
 }
 
 /** What the supervisor needs of a task's live session. */
@@ -133,9 +152,11 @@ export class RouterSupervisor {
 		const seen = this.#seen.get(task.id);
 		const still = seen?.mark === mark ? seen.still + 1 : 0;
 		this.#seen.set(task.id, { mark, still });
-		if (still < STALL_CHECKS) return;
-		const minutes = Math.round((STALL_CHECKS * SUPERVISOR_TICK_MS) / 60_000);
-		return this.#restart(task, sessionId, live, live ? `it made no progress for ${minutes} minutes` : "its session died", tail?.lastError ?? null);
+		const limit = live && tail?.running ? LONG_CALL_CHECKS : STALL_CHECKS;
+		if (still < limit) return;
+		const minutes = Math.round((limit * SUPERVISOR_TICK_MS) / 60_000);
+		const stalled = tail?.running && live ? `it made no progress for ${minutes} minutes while ${tail.running} ran` : `it made no progress for ${minutes} minutes`;
+		return this.#restart(task, sessionId, live, live ? stalled : "its session died", tail?.lastError ?? null);
 	}
 
 	async #restart(task: RouterTask, sessionId: string, live: SupervisedSession | null, reason: string, lastError: string | null): Promise<void> {

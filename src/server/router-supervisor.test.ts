@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { BotId } from "../shared/bots";
 import type { RouterTask } from "../shared/router";
 import type { WithdrawnMessage } from "../shared/sessions";
-import { LOOP_REPEATS, MAX_RESTARTS, readTaskTail, RouterSupervisor, STALL_CHECKS, type TaskTail } from "./router-supervisor";
+import { LONG_CALL_CHECKS, LOOP_REPEATS, MAX_RESTARTS, readTaskTail, RouterSupervisor, STALL_CHECKS, type TaskTail } from "./router-supervisor";
 import { RouterTasks } from "./router-tasks";
 
 const dirs: string[] = [];
@@ -48,7 +48,7 @@ function harness(fields: Partial<RouterTask> = {}) {
 	const prompts: string[] = [];
 	const resumed: string[] = [];
 	let interrupts = 0;
-	const state = { live: true, busy: true, resumes: null as string | null, activity: "", tail: { mark: "e1", repeated: null, lastError: null } as TaskTail, withdrawn: [] as WithdrawnMessage[] };
+	const state = { live: true, busy: true, resumes: null as string | null, activity: "", tail: { mark: "e1", repeated: null, running: null, lastError: null } as TaskTail, withdrawn: [] as WithdrawnMessage[] };
 	const tasks = new RouterTasks({ path: join(tempDir(), "router-tasks.json"), active: () => true, tell: async (_botId, text) => void told.push(text), end: async sessionId => void ended.push(sessionId), now: () => 10, onChange() {} });
 	tasks.apply({ op: "add", task: task(fields) });
 	tasks.bind("i1", "t1", "s1");
@@ -109,7 +109,7 @@ test("a session that waits on you is not stuck", async () => {
 
 test("a stalled task is restarted once, with the reason and its last error, and its Router hears of it", async () => {
 	const { file, tasks, state, tick, told, prompts, interrupts } = harness();
-	state.tail = { mark: "e1", repeated: null, lastError: "ECONNREFUSED 127.0.0.1:5432" };
+	state.tail = { mark: "e1", repeated: null, running: null, lastError: "ECONNREFUSED 127.0.0.1:5432" };
 	state.withdrawn = [{ text: "The CI run failed again.", images: [] }];
 	// The first look sees the mark, the next ones see it unchanged.
 	await tick(STALL_CHECKS);
@@ -138,12 +138,29 @@ test("a quiet task restarts without telling its Router", async () => {
 	expect(told).toEqual([]);
 });
 
+test("a task whose long tool call still runs gets more time before it counts as stuck", async () => {
+	const { file, state, tick } = harness();
+	state.tail = { mark: "e1", repeated: { call: "bash bun run build", times: 1 }, running: "bash bun run build", lastError: null };
+	await tick(LONG_CALL_CHECKS);
+	expect(file.get("t1")).toMatchObject({ status: "working", restarts: 0 });
+	await tick();
+	expect(file.get("t1")).toMatchObject({ restarts: 1, note: `it made no progress for ${LONG_CALL_CHECKS * 2} minutes while bash bun run build ran` });
+});
+
+test("a dead session gets no more time for the call it left running", async () => {
+	const { file, state, tick } = harness();
+	state.live = false;
+	state.tail = { mark: "e1", repeated: null, running: "bash bun run build", lastError: null };
+	await tick(STALL_CHECKS + 1);
+	expect(file.get("t1")).toMatchObject({ restarts: 1, note: "its session died" });
+});
+
 test("a task looping on the same tool call is restarted at once", async () => {
 	const { file, state, tick, prompts } = harness();
-	state.tail = { mark: "e9", repeated: { call: "bash bun run profile", times: LOOP_REPEATS - 1 }, lastError: null };
+	state.tail = { mark: "e9", repeated: { call: "bash bun run profile", times: LOOP_REPEATS - 1 }, running: null, lastError: null };
 	await tick();
 	expect(file.get("t1")).toMatchObject({ restarts: 0 });
-	state.tail = { mark: "e10", repeated: { call: "bash bun run profile", times: LOOP_REPEATS }, lastError: null };
+	state.tail = { mark: "e10", repeated: { call: "bash bun run profile", times: LOOP_REPEATS }, running: null, lastError: null };
 	await tick();
 	expect(file.get("t1")).toMatchObject({ restarts: 1, note: `it ran bash bun run profile ${LOOP_REPEATS} times in a row` });
 	expect(prompts).toEqual([`The supervisor restarted you: it ran bash bun run profile ${LOOP_REPEATS} times in a row. Last error: none. Continue the task.`]);
@@ -205,7 +222,7 @@ test("a server that does not hold the owner lock supervises nothing", async () =
 		tasks,
 		active: () => false,
 		live: () => null,
-		tail: () => ({ mark: "e1", repeated: null, lastError: null }),
+		tail: () => ({ mark: "e1", repeated: null, running: null, lastError: null }),
 		reach: () => Promise.reject(new Error("not reached")),
 		tell: () => Promise.reject(new Error("not told")),
 	});
@@ -217,7 +234,7 @@ const line = (id: string, message: Record<string, unknown>) => JSON.stringify({ 
 const call = (id: string, command: string) => ({ role: "assistant", content: [{ type: "toolCall", id, name: "bash", arguments: { command } }] });
 const result = (id: string, text: string, isError = false) => ({ role: "toolResult", toolCallId: id, toolName: "bash", isError, content: [{ type: "text", text }] });
 
-test("a session file's end names its newest entry, the call it repeats since the last prompt, and its last error", () => {
+test("a session file's end names its newest entry, the call it repeats since the last prompt, the call still running, and its last error", () => {
 	const path = join(tempDir(), "session.jsonl");
 	const lines = [
 		line("p0", { role: "user", content: "Profile the dialog." }),
@@ -229,6 +246,11 @@ test("a session file's end names its newest entry, the call it repeats since the
 		...[2, 3, 4].flatMap(n => [line(`a${n}`, call(`c${n}`, "bun run profile")), line(`r${n}`, result(`c${n}`, "same numbers"))]),
 	];
 	writeFileSync(path, `${lines.join("\n")}\n`);
-	expect(readTaskTail(path)).toEqual({ mark: "r4", repeated: { call: "bash bun run profile", times: 3 }, lastError: "error: Cannot find module 'x'" });
-	expect(readTaskTail(join(tempDir(), "gone.jsonl"))).toEqual({ mark: null, repeated: null, lastError: null });
+	expect(readTaskTail(path)).toEqual({ mark: "r4", repeated: { call: "bash bun run profile", times: 3 }, running: null, lastError: "error: Cannot find module 'x'" });
+	writeFileSync(path, `${[...lines, line("a5", call("c5", "bun run build"))].join("\n")}\n`);
+	expect(readTaskTail(path)).toMatchObject({ mark: "a5", running: "bash bun run build" });
+	const parallel = { role: "assistant", content: [call("c6", "bun run lint").content[0], call("c7", "bun test").content[0]] };
+	writeFileSync(path, `${[...lines, line("a6", parallel), line("r6", result("c6", "clean"))].join("\n")}\n`);
+	expect(readTaskTail(path)).toMatchObject({ mark: "r6", running: "bash bun test" });
+	expect(readTaskTail(join(tempDir(), "gone.jsonl"))).toEqual({ mark: null, repeated: null, running: null, lastError: null });
 });
