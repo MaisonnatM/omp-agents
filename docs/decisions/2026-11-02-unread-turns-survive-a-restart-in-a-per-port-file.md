@@ -8,7 +8,7 @@ decision-makers: agent
 
 In the context of the Inbox listing each session's unread turn, facing a dashboard that restarts itself after every update and dropped every unread turn kept only in memory, we chose to have `LiveSessions` save the unread turns in `unread/<port>.json` and bring back, at startup, those of the sessions that survived, and to read a turn that ended while no server listened from the end of its session file.
 We rejected one shared file, reading the gap turn through RPC `get_messages` or `get_last_assistant_text`, and restoring a saved turn on any `add`.
-We gain an Inbox that keeps what finished across restarts, ordered by when each turn really ended, at the cost of one more file per port and a second reader of the session file's end beside `lastMessage` in `src/server/bots.ts`.
+We gain an Inbox that keeps what finished across restarts, ordered by when each turn really ended, at the cost of one more file per port and a second reader of the session file's end, which shares `tailEntries` with `lastMessage`, a Bot's last words.
 
 ## Context
 

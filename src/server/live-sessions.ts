@@ -15,13 +15,16 @@ import { portFromEnv } from "./address";
 
 export type SessionUpdate = LiveUpdate | DashboardUpdate;
 
-/** The turns no page read yet, each with the instance id of the session that ended it, as the unread file holds them. */
+/** An unread turn with the instance id of the session that ended it, as the unread file holds it. */
+type SavedTurn = { instanceId: string } & UnreadTurn;
+
+/** The turns no page read yet. */
 interface SavedUnread {
-	turns: Array<{ instanceId: string } & UnreadTurn>;
+	turns: SavedTurn[];
 }
 
 const isSavedUnread = fields<SavedUnread>({
-	turns: arrayOf(fields<{ instanceId: string } & UnreadTurn>({ instanceId: isString, at: isNumber, reply: nullable(isString), body: nullable(isString), suggestions: isTexts })),
+	turns: arrayOf(fields<SavedTurn>({ instanceId: isString, at: isNumber, reply: nullable(isString), body: nullable(isString), suggestions: isTexts })),
 });
 
 /** `facts` with `subject` first among the session's links, unless its tool calls named it already. */
@@ -43,8 +46,6 @@ export class LiveSessions {
 	/** The turn each session ended since a page showed it in a focused window, by instance id; {@link #unreadFile} keeps them across restarts. */
 	readonly #unread = new Map<string, UnreadTurn>();
 	readonly #unreadFile: JsonFile<SavedUnread>;
-	/** The turns the file held when this server started, until {@link restoreUnread} brings back those of the sessions that survived the restart. */
-	readonly #restorable: Map<string, UnreadTurn>;
 	/**
 	 * The sessions by the session file they continue, the earliest added first. A session's id changes when omp moves it to
 	 * another file or the registry lists its host on another session, so the index is rebuilt where either can happen.
@@ -57,7 +58,6 @@ export class LiveSessions {
 		this.#onUpdate = onUpdate;
 		this.#taskClaims = taskClaims;
 		this.#unreadFile = new JsonFile(unreadPath, { parse: decoder(isSavedUnread), holds: "a list of unread turns", onInvalid: "ignore" });
-		this.#restorable = new Map(this.#unreadFile.load()?.turns.map(({ instanceId, ...turn }) => [instanceId, turn] as const));
 	}
 
 	get(instanceId: string): LiveSession | undefined {
@@ -146,14 +146,15 @@ export class LiveSessions {
 
 	/**
 	 * The turns sessions `instanceIds` ended unread under the previous server come back; the saved turns of every other
-	 * session, which did not survive it, are forgotten. Called once, by reattachAll, before any session is listed.
+	 * session, which did not survive it, are forgotten. Called once, by reattachAll, before any session is listed or any
+	 * turn is marked, so the file still holds the previous server's turns.
 	 */
 	restoreUnread(instanceIds: ReadonlySet<string>): void {
-		if (this.#restorable.size === 0) return;
-		for (const [instanceId, turn] of this.#restorable) {
-			if (instanceIds.has(instanceId) && !this.#unread.has(instanceId)) this.#unread.set(instanceId, turn);
+		const saved = this.#unreadFile.load()?.turns;
+		if (!saved?.length) return;
+		for (const { instanceId, ...turn } of saved) {
+			if (instanceIds.has(instanceId)) this.#unread.set(instanceId, turn);
 		}
-		this.#restorable.clear();
 		this.#saveUnread();
 	}
 
@@ -182,9 +183,7 @@ export class LiveSessions {
 	}
 
 	#saveUnread(): void {
-		// Until restoreUnread, the file keeps the previous server's turns too, so a turn marked meanwhile does not drop them.
-		const turns = new Map([...this.#restorable, ...this.#unread]);
-		this.#unreadFile.save({ turns: [...turns].map(([instanceId, turn]) => ({ instanceId, ...turn })) });
+		this.#unreadFile.save({ turns: [...this.#unread].map(([instanceId, turn]) => ({ instanceId, ...turn })) });
 	}
 
 	/** Each session's roster row, with its `cwdDisplay`, its unread turn, and what the session files' index knows of it, asked with the directory it runs in now. */

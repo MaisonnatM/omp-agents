@@ -17,7 +17,7 @@
   `src/line-reader.ts` holds `FoldedFile`, which keeps a fold of a file's lines up to date, applying only appended complete lines and starting a fresh fold when the file shrinks.
   `src/tail.ts`, `src/media.ts`, `src/changes.ts`, `src/session-facts.ts`, and `src/foreign/usage.ts` each fold transcripts through it.
   The first two queue their reads with its `ReadQueue`, which shares one read among a burst of pokes.
-  `src/read-tail.ts` holds `readTail`, which reads only the whole lines within a limit of a file's end, as the Bot extension and the server read a Bot's memory and `lastMessage` a Bot's last words.
+  `src/read-tail.ts` holds `readTail`, which reads only the whole lines within a limit of a file's end, as the Bot extension and the server read a Bot's memory, and `tailEntries` the entries at a session file's end.
 - `src/session-formats.ts`: the registry of agents whose session files the dashboard lists, `SESSION_FORMATS`, each a `SessionFormat` with its root, its `fileOf`, `list`, and `read`, its line `decode`, and the `messageLine` conversation search parses.
   Formats other than omp also name the usage-file patterns and per-file folds for Analytics.
   `ompFormat` wraps omp's own listing in `src/omp/sessions.ts`, which also holds `sessionFileOf` and `renameSessionFile`, which retitles a saved omp session through omp's `SessionManager`; `formatOf` names the format of a file by the root that holds it, else omp's.
@@ -30,6 +30,7 @@
 - `src/foreign/usage.ts`: `ForeignUsage`, the incremental request index for Analytics, and the request, per-file usage, fold, and pricing interfaces the readers share.
   `src/omp/stats.ts` provides its `listPrice` callback through the bundled `pi-catalog` exports loaded in `src/omp/modules.ts`.
 - `src/session-entries.ts`: the vocabulary of a session file's entries, `textOf`, `oneLine`, `entryTime`, `toolCallsOf`, `toolResultOf`, `toolSummary`, `imagesOf`, and `UNREAD_LINE` with `unreadLine`, which the folds below and `src/guest.ts` read instead of walking the entry shape themselves.
+  Its `tailEntries` walks the entries at a session file's end, newest first, for `lastMessage`, a Bot's last words, and `endedTurn`, the turn a session ended while no server listened.
 - `src/transcript.ts`: folds session-file lines and live events into display items, with a dashboard session's starting prompt last; an unread line shows as a warning notice with the line's start, and a prompt the dashboard sent in the user's place as a `dashboard` item the page hides.
   Its `promptItem` folds stamped routine messages into `routine` items with their saved message and restores a skill invocation on the saved prompt.
   The fold also retains a `!` prompt's `bashExecution` output and result as `shell` on its routine item.
