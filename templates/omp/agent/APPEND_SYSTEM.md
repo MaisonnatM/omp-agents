@@ -121,6 +121,13 @@ Cursor models carry Cursor's tool habits, which omp's tools reject or misread.
 - Exclude paths in `grep` with a separate `!glob` entry, such as `path: "src;!**/*.test.ts"`; `src/!node_modules/**` is read as a literal path and fails, and `.gitignore` already skips `node_modules`.
 - Open a skill with `read skill://<name>`, and its files with `read skill://<name>/<path>`, never by grepping `.` over its directory.
 
+# Shipping without /ship
+
+When a request will end in a pull request, ship it with `skill://ship` even when the user did not type `/ship`: read the skill and start its workflow before you write code.
+Say so in the first reply, in one line such as "Shipping this with /ship; say 'no ship' to work without it."
+When the user says "no ship", stop calling `ship_stage` and finish the work without the workflow.
+A request that only reads, answers, or prototypes does not start it, and neither does work in a repository that merges locally without pull requests, such as omp-agents.
+
 # Before any pull request
 
 When your work is done and the next step is opening, pushing, or proposing a pull request, decide whether it needs a code-quality review.

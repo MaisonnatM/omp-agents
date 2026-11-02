@@ -5,7 +5,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-02
 
-- /ship now plans before it builds: the agent compares up to three ways to do the work, keeps the best, and posts that plan on the Linear issue.
+- /ship now plans before it builds: the agent compares up to three ways to do the work, keeps the best, and posts that plan on the Linear issue, or in the pull request when there is no issue.
+- /ship no longer needs a Linear ticket: it uses the one you name or one that matches the work, and otherwise ships without one instead of creating a ticket.
+- Agents now start /ship on their own when your request will end in a pull request, and say so in their first reply; say "no ship" to work without it.
 - The Ship card shows the new Plan step between Ticket and Implement.
 - You can drag a Bot in the Bots tab onto Pinned, a section, or Other Bots.
 - Fixed: routines no longer start during the few seconds a sleeping Mac wakes on its own for Power Nap; they wait until you wake it, and news that came in overnight starts one run.

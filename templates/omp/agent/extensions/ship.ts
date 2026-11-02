@@ -1,4 +1,4 @@
-// Tracks the /ship workflow (Linear ticket -> draft PR -> reviews -> live for review) per session.
+// Tracks the /ship workflow (optional Linear ticket -> plan -> draft PR -> reviews -> live for review) per session.
 // The agent declares the stage it works on through the `ship_stage` tool. GitHub decides what a live PR
 // needs next (rebase, review comments, CI), so that part is polled, never declared.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -67,10 +67,10 @@ const LABEL: Record<Stage | LiveWork, string> = {
 };
 
 const NEXT: Record<Stage, string> = {
-	ticket: "Create or link the Linear issue, then record it with ship_stage({stage: 'plan', issue}).",
-	plan: "Choose how to build the issue as the ship skill's Plan step says, post the plan on the Linear issue, then record ship_stage({stage: 'implement'}).",
-	implement: "Implement the plan and commit on the issue's branch. Do not open a PR in this stage.",
-	draft_pr: "Create a draft with `gt submit --draft` for a Graphite repository, or push and run `gh pr create --draft` otherwise. Include the issue ID in the title and `Fixes <ID>` in the body.",
+	ticket: "Link the Linear issue the user named, or an open one that clearly matches the work, then record ship_stage({stage: 'plan', issue}); with no issue, record ship_stage({stage: 'plan'}).",
+	plan: "Choose how to build the change as the ship skill's Plan step says, then record ship_stage({stage: 'implement'}).",
+	implement: "Implement the plan and commit on the work's branch. Do not open a PR in this stage.",
+	draft_pr: "Create a draft with `gt submit --draft` for a Graphite repository, or push and run `gh pr create --draft` otherwise. With an issue, include its ID in the title and `Fixes <ID>` in the body; without one, put the plan under `## Plan` in the body.",
 	interface_review: `If the status says the ${REVIEWS.interface_review.label} is not needed because \`${REVIEWS.interface_review.pathsFile}\` lists no changed file, record ship_stage({stage: 'thermonuclear'}) and move on. Otherwise wait until the user approves the direction, then spawn \`task\` with \`agent: "interface-reviewer"\` on the PR, apply the findings in a fresh agent, push, then add \`${REVIEWS.interface_review.box}\` to the PR body.`,
 	thermonuclear: `If the status says the ${REVIEWS.thermonuclear.label} is not needed because \`${REVIEWS.thermonuclear.pathsFile}\` lists no changed file, skip the review. Otherwise wait until the user approves the direction, then run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${REVIEWS.thermonuclear.box}\` to the PR body. If the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
 	ready_gate: `Make sure the PR body has no unchecked \`${PROOF_BOX}\` box, ask the user to approve, then run \`gh pr ready <N>\`.`,
@@ -169,7 +169,7 @@ export function liveSummary(s: PrStatus): string {
 export function renderLines(s: ShipState): string[] {
 	const at = STAGES.indexOf(s.stage);
 	const ref = [s.issue, s.pr ? `PR #${s.pr}${s.prStatus?.draft ? " (draft)" : ""}` : ""].filter(Boolean).join(" · ");
-	const lines = [`ship ${ref || "(no ticket yet)"}`];
+	const lines = [`ship ${ref || (at > 0 ? "(no ticket)" : "(no ticket yet)")}`];
 	const mark = (stage: Stage) => {
 		const i = STAGES.indexOf(stage);
 		return `${i < at || s.stage === "merged" ? "✓" : i === at ? "▶" : "○"} ${LABEL[stage]}`;

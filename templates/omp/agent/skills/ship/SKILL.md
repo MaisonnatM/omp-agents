@@ -1,13 +1,13 @@
 ---
 name: ship
-description: Track a Linear ticket from draft PR through interface and thermonuclear reviews to live review and merge-ready
+description: Ship a change, with or without a Linear ticket, through a plan, a draft PR, interface and thermonuclear reviews, and live review to merge-ready
 metadata:
   tags: workflow
 ---
 
 # Ship
 
-Own the workflow for the issue the user named in this session.
+Own the workflow for the change this session ships: the Linear issue the user named, or the work they asked for when they named none.
 At every transition call `ship_stage`, including when you start a rebase, fix review comments, or fix CI.
 The session's ship widget and status show the stage and PR needs.
 `ship_stage` with no arguments refreshes the current state.
@@ -18,31 +18,32 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before registering a PR o
 
 1. **Ticket.** If no workflow exists, call `ship_stage({stage:"ticket"})`.
    If the user named a Linear issue ID or URL, fetch that issue with `get_issue`.
-   Otherwise create a concise issue with `save_issue`, using the Engineering team unless a different team is specified.
-   Record `ship_stage({stage:"plan", issue:"<identifier>"})`.
-   Read the issue's `gitBranchName` and use its issue ID in the branch.
+   Otherwise search Linear for an open issue that matches the work, and use it only if it clearly does.
+   Create an issue with `save_issue` only when the user asks for one, using the Engineering team unless a different team is specified.
+   With an issue, record `ship_stage({stage:"plan", issue:"<identifier>"})`, read its `gitBranchName`, and use its issue ID in the branch.
+   Without one, record `ship_stage({stage:"plan"})`, name the branch after the work, and say in one line of the report that the change has no ticket.
    If this is the main checkout on its default branch, create a dedicated worktree off the current parent branch per the Git safety rule in `AGENTS.md`; on any other branch, work in place.
    In a Graphite repo, register the branch under its parent.
-2. **Plan.** Choose how to build the issue before anyone writes code.
-   If the issue already has a plan comment from an earlier run, use that plan and skip to the next step.
+2. **Plan.** Choose how to build the change before anyone writes code.
+   If the issue, or the PR body when there is no issue, already has a plan from an earlier run, use that plan and skip to the next step.
    Read `skill://technical-writing` and `skill://arena`; the kit does not ship them, so if either read fails, name the missing skill, tell the user to install it, and stop.
-   Read the issue and the code it touches, then list the approaches that would each solve it.
-   If only one approach is sound, such as for a typo or a fix the issue spells out, write that plan yourself with the `technical-writing` skill and say in one line of the report why no arena ran.
+   Read the issue, or the user's request when there is none, and the code it touches, then list the approaches that would each solve it.
+   If only one approach is sound, such as for a typo or a fix the request spells out, write that plan yourself with the `technical-writing` skill and say in one line of the report why no arena ran.
    Otherwise run the `arena` skill with one runner for each approach, up to three.
-   Give every runner the same prompt: the issue, the checkout's path, the approach it plans, its output path `local://plan-<n>.md`, and the rule to write the plan there with the `technical-writing` skill and edit nothing else.
+   Give every runner the same prompt: the issue or the request, the checkout's path, the approach it plans, its output path `local://plan-<n>.md`, and the rule to write the plan there with the `technical-writing` skill and edit nothing else.
    Each plan names the files it changes, the data shape, the steps in order, how to verify the result, and its risks.
    The runners edit no files in the checkout, so spawn them without `isolated`; alternate `poteto-agent` and `poteto-agent-codex`, and run the cross-judge on `poteto-agent-codex` over the `local://plan-<n>.md` paths.
    Pick the base plan against the arena's rubric and graft what the other plans do better.
-   Post the chosen plan on the issue with `save_comment`, with one line for each rejected approach that says why it lost.
+   With an issue, post the chosen plan on it with `save_comment`, with one line for each rejected approach that says why it lost; without one, keep the same text for the PR body in step 4.
    Call `ship_stage({stage:"implement"})`.
 3. **Implement.** Delegate to `poteto-agent`, isolated or in place per the Git safety rule in `AGENTS.md`.
-   Give it the chosen plan, and tell it to implement the issue in this session's checkout but stop before opening a PR.
+   Give it the chosen plan, and tell it to implement the change in this session's checkout but stop before opening a PR.
    Integrate its changes.
    Run smoke checks and required tests once in the parent.
    Commit, then call `ship_stage({stage:"draft_pr"})`.
    If a PR already exists for the branch, reuse it.
 4. **Draft PR.** Push the branch, then open a DRAFT PR with `gh pr create --draft`.
-   Put `Fixes <issue ID>` in the body and the issue ID in the title.
+   With an issue, put `Fixes <issue ID>` in the body and the issue ID in the title; without one, put the chosen plan under `## Plan` in the body.
    Never request reviewers while draft.
    If Graphite is configured, run `gt track <branch> -p <parent> --no-interactive -q` and `gt submit --cwd <checkout> --no-edit --no-stack -q` so the PR is registered.
    Confirm its draft state with `gh pr view --json number,isDraft,url`, then call `ship_stage({stage:"interface_review", pr:<number>})`.
@@ -63,7 +64,7 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before registering a PR o
    Read the description with `pr_description({repo:"<owner>/<repo>", pr:<number>, change:{kind:"read"}})` and use `append` or `replace-text` for the checkbox; do not turn unchecked `gh` stdout into a replacement body.
    Add the checkbox only AFTER the fixes are pushed.
    Call `ship_stage({stage:"ready_gate"})`.
-7. **Put live for review.** Show the issue, PR URL, checks, findings and dispositions before promotion.
+7. **Put live for review.** Show the issue if there is one, the PR URL, checks, findings and dispositions before promotion.
    Run `gh pr ready <number>` only after the body has the checkbox of each review that steps 5 and 6 did not skip.
    If the body has an unchecked `- [ ] Browser proof` box from the repository's PR template, do what the box and the repository's instructions ask, then check it; the extension blocks on the unchecked box and does not look for a screenshot.
    The extension asks the user for approval and blocks the command if they decline or no UI is available.
