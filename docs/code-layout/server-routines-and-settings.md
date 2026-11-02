@@ -19,9 +19,11 @@
 - `src/usage.ts`: runs `omp usage --json` and parses it into plan windows, and names a provider as the page shows it (`providerName`).
   `src/server/usage-poll.ts` (`UsagePoll`) runs it for the dashboard: on the usage tick and a page's open, each followed by the plan notice check, and fresh for a continue, which skips that check.
 - `src/system-load.ts`: reads the machine's CPU percent, available memory, and free disk space for `GET /api/system`; `src/shared/system.ts` holds the shape the page shares.
-- `src/settings.ts`: builds the settings page's model routing, file list, and workflows, and checks and saves its edits.
+- `src/settings.ts`: builds the settings page's model routing, omp's own settings, file list, and workflows from one load of omp's settings (`loadSessionSettings` and `ompConfigOf` in `src/omp/config.ts`), and checks and saves its edits.
   An edit it refuses throws its `Rejected`, which `src/server/routes.ts` answers with the error's status.
+  `saveAgentSetting` refuses an edit whose `expected` is not the user value `config.yml` holds now (`userValue`) before it writes.
   `src/omp/workflows.ts` (`workflowsOf`) joins the skills and commands omp discovered: the skills whose frontmatter, as omp parsed it, names `workflow` in `metadata.tags`, each paired with the command omp names the same; `src/omp/workflows.test.ts` tests the tag, the pairing, and the order.
+  `src/omp/agent-settings.ts` reads omp's settings panel for Settings › omp settings from a loaded settings instance (`readAgentSettings`), building the tabs and groups once, finds the setting an id names unless it changes only how omp's terminal draws (`agentSetting`), reads the user value an edit is checked against (`userValue`), and writes one to `config.yml` (`writeAgentSetting`); `src/shared/agent-settings.ts` holds the rows, controls, change, and edit the page shares, and `src/omp/agent-settings.test.ts` tests the tabs, the controls, credentials, the workspace layer, and the user value.
 - `src/decisions.ts`: reads a repository's decision records for Settings › Decisions; `src/decisions.test.ts` tests a record with and without frontmatter, the directory it picks from a nested directory, and a repository with none.
 - `src/test-env.ts`: points `PI_CODING_AGENT_DIR` at a temporary directory, and `CLAUDE_CONFIG_DIR` and `CODEX_HOME` at directories inside it that do not exist.
   `bunfig.toml` preloads it for tests, so they never touch `~/.omp/agent`, `~/.claude`, or `~/.codex`.

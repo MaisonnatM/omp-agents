@@ -2,8 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { agentDir } from "./omp/config";
-import { loadOmpSettings, parseRoutingEdit, Rejected, routeRoles, saveOmpFile } from "./settings";
-import type { CatalogModel, RoutingEdit } from "./shared/models";
+import { loadOmpSettings, parseAgentSettingEdit, parseRoutingEdit, Rejected, routeRoles, saveAgentSetting, saveOmpFile } from "./settings";
+import type { AgentSettingRow } from "./shared/agent-settings";
+import type { CatalogModel, OmpSettings, RoutingEdit } from "./shared/models";
 
 describe("routeRoles", () => {
 	test("a chat role without its own chain walks the default chain; a model-kind role does not", () => {
@@ -145,6 +146,56 @@ describe("saveOmpFile", () => {
 		writeFileSync(path, "modelRoles: {}\n");
 		const refused = await saveOmpFile(null, { path, text: "modelRoles: [\n", baseHash: await loadedHash(path) }).catch((err: Rejected) => err);
 		expect(refused).toMatchObject({ status: 400 });
+		expect(await Bun.file(path).text()).toBe("modelRoles: {}\n");
+	});
+});
+
+describe("parseAgentSettingEdit", () => {
+	test("an edit is a value or a reset, with the user value the page showed", () => {
+		expect(parseAgentSettingEdit({ id: "compaction.enabled", value: false, expected: null })).toEqual({ id: "compaction.enabled", value: false, expected: null });
+		expect(parseAgentSettingEdit({ id: "compaction.enabled", reset: true, expected: false })).toEqual({ id: "compaction.enabled", reset: true, expected: false });
+		for (const raw of [{ id: "compaction.enabled", value: false }, { id: 3, value: false, expected: null }, { id: "compaction.enabled", reset: false, expected: null }, null]) {
+			expect(() => parseAgentSettingEdit(raw)).toThrow("Expected { id, value, expected } or { id, reset: true, expected }");
+		}
+	});
+});
+
+describe("saveAgentSetting", () => {
+	const path = join(agentDir, "config.yml");
+	const row = (settings: OmpSettings, id: string): AgentSettingRow | undefined =>
+		"error" in settings.agentSettings ? undefined : settings.agentSettings.tabs.flatMap(tab => tab.groups.flatMap(group => group.rows)).find(found => found.id === id);
+
+	test("a save writes only that setting to config.yml, and a reset removes it", async () => {
+		writeFileSync(path, "modelRoles: {}\n");
+		const saved = await saveAgentSetting(null, { id: "compaction.enabled", value: false, expected: null });
+		expect(row(saved, "compaction.enabled")).toMatchObject({ user: false });
+		expect(Bun.YAML.parse(await Bun.file(path).text())).toEqual({ modelRoles: {}, compaction: { enabled: false } });
+
+		const reset = await saveAgentSetting(null, { id: "compaction.enabled", reset: true, expected: false });
+		expect(row(reset, "compaction.enabled")).not.toHaveProperty("user");
+		expect(Bun.YAML.parse(await Bun.file(path).text())).toEqual({ modelRoles: {} });
+	});
+
+	test("a value changed in config.yml since the page read it is not overwritten", async () => {
+		writeFileSync(path, "compaction:\n  enabled: true\n");
+		const stale = await saveAgentSetting(null, { id: "compaction.enabled", value: false, expected: null }).catch((err: Rejected) => err);
+		expect(stale).toMatchObject({ status: 409, conflict: true });
+		expect(await Bun.file(path).text()).toBe("compaction:\n  enabled: true\n");
+	});
+
+	test("a credential is checked against whether it is set, never its text", async () => {
+		writeFileSync(path, "hindsight:\n  apiToken: old-token\n");
+		const saved = await saveAgentSetting(null, { id: "hindsight.apiToken", value: "new-token", expected: true });
+		expect(row(saved, "hindsight.apiToken")).toMatchObject({ user: true });
+		expect(Bun.YAML.parse(await Bun.file(path).text())).toEqual({ hindsight: { apiToken: "new-token" } });
+	});
+
+	test("only a setting a session reads can be written, with a value omp accepts", async () => {
+		writeFileSync(path, "modelRoles: {}\n");
+		for (const id of ["theme.dark", "no.such.setting"]) {
+			expect(await saveAgentSetting(null, { id, value: "x", expected: null }).catch((err: Rejected) => err)).toMatchObject({ status: 404 });
+		}
+		expect(await saveAgentSetting(null, { id: "compaction.enabled", value: "yes", expected: null }).catch((err: Rejected) => err)).toMatchObject({ status: 400 });
 		expect(await Bun.file(path).text()).toBe("modelRoles: {}\n");
 	});
 });

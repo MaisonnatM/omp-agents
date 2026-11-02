@@ -1,21 +1,22 @@
 import { FolderOpen } from "lucide-react";
-import { type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
+import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
 import type { TrustedProject } from "../../../src/shared/project-trust";
 import type { Workspace, WorkspaceList } from "../../../src/shared/workspaces";
 import { settingsUrl } from "../../api";
 import { useEditableRead } from "../../editable-read";
 import { type ReadState, useRead } from "../../reads";
-import { SETTINGS_SECTIONS, type SettingsSection } from "../../routing";
+import { hashForSettings, SETTINGS_SECTIONS, type SettingsSection } from "../../routing";
 import { CommandPicker } from "../command-picker";
 import { Header } from "../page-header";
 import { AnalyticsTab } from "./analytics-tab";
 import { ActivityTab } from "./activity-tab";
-import type { Catalog, Editing } from "./editor";
+import { type Catalog, type Editing, LINK } from "./editor";
 import { DecisionsTab } from "./decisions-tab";
 import { Files } from "./files-tab";
 import { IntegrationsTab } from "./integrations-tab";
 import { McpServersTab } from "./mcp-servers-tab";
+import { OmpSettingsTab } from "./omp-settings-tab";
 import { PreferencesTab } from "./preferences-tab";
 import { ProvidersTab } from "./providers-tab";
 import { ModelsTab } from "./routing-tab";
@@ -63,8 +64,20 @@ function WorkspacePicker({ cwd, workspaces, onPick }: { cwd: string | null; work
 
 const PANEL = "space-y-10 rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background";
 
+/** The file Settings › Files shows, which another section can open there. */
+interface FileSelection {
+	path: string | null;
+	open: (path: string) => void;
+}
+
+const loadAlert = (error: string): ReactNode => (
+	<p role="alert" className="text-sm text-red-600 dark:text-red-400">
+		omp cannot load its settings: {error}
+	</p>
+);
+
 /** The omp sections' content once settings are read, else why they are empty. */
-function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Editing): Record<"models" | "files" | "workflows", ReactNode> {
+function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Editing, selection: FileSelection): Record<"models" | "omp" | "files" | "workflows", ReactNode> {
 	if (read.data === null) {
 		const note =
 			read.error === null ? (
@@ -74,23 +87,39 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 					Cannot read omp's settings: {read.error}
 				</p>
 			);
-		return { models: note, files: note, workflows: note };
+		return { models: note, omp: note, files: note, workflows: note };
 	}
-	const { routing, files, workflows } = read.data;
+	const { routing, agentSettings, files, workflows } = read.data;
 	const key = cwd ?? "";
-	const filesPanel = <Files key={key} files={files} editing={editing} />;
+	const filesPanel = <Files key={key} files={files} editing={editing} selected={selection.path} onSelect={selection.open} />;
 	const workflowsPanel = <Workflows key={key} workflows={workflows} files={files} editing={editing} />;
-	if ("error" in routing) {
-		const alert = (
-			<p role="alert" className="text-sm text-red-600 dark:text-red-400">
-				omp cannot load its settings: {routing.error}
-			</p>
+	const configFile = files.find(file => file.kind === "settings" && file.scope === "user" && file.path.endsWith("/config.yml"));
+	const omp =
+		"error" in agentSettings ? (
+			<div className="space-y-2">
+				{loadAlert(agentSettings.error)}
+				{configFile && (
+					<p className="text-sm text-muted-foreground">
+						<a href={hashForSettings("files")} onClick={() => selection.open(configFile.path)} className={LINK}>
+							Fix config.yml in Files
+						</a>
+					</p>
+				)}
+			</div>
+		) : (
+			<OmpSettingsTab
+				key={key}
+				settings={agentSettings}
+				configFile={configFile}
+				projectFile={files.find(file => file.kind === "settings" && file.scope === "project" && file.body.state === "read")}
+				editing={editing}
+				onOpenFile={selection.open}
+			/>
 		);
-		return { models: alert, files: filesPanel, workflows: workflowsPanel };
-	}
-	const configPath = files.find(file => file.kind === "settings" && file.scope === "user" && file.path.endsWith("/config.yml"))?.pathDisplay;
+	if ("error" in routing) return { models: loadAlert(routing.error), omp, files: filesPanel, workflows: workflowsPanel };
 	return {
-		models: <ModelsTab routing={routing} configPath={configPath} editing={editing} />,
+		models: <ModelsTab routing={routing} configPath={configFile?.pathDisplay} editing={editing} />,
+		omp,
 		files: filesPanel,
 		workflows: workflowsPanel,
 	};
@@ -129,6 +158,7 @@ export function SettingsPage({
 	);
 	const settings = useEditableRead<OmpSettings>(settingsUrl("", cwd));
 	const editing: Editing = { cwd, catalog, write: settings.write, reload: settings.reload };
+	const [openFile, setOpenFile] = useState<string | null>(null);
 	// Every section shares one scroller, so a newly opened one would start at the last one's offset.
 	const scroller = useRef<HTMLDivElement>(null);
 	useLayoutEffect(() => {
@@ -136,7 +166,7 @@ export function SettingsPage({
 	}, [section]);
 
 	const panels: Record<SettingsSection, ReactNode> = {
-		...ompPanels(settings, cwd, editing),
+		...ompPanels(settings, cwd, editing, { path: openFile, open: setOpenFile }),
 		analytics: <AnalyticsTab active={section === "analytics"} />,
 		activity: <ActivityTab active={section === "activity"} />,
 		providers: <ProvidersTab active={section === "providers"} />,

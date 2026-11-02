@@ -55,9 +55,11 @@ export interface OmpConfig {
 	disabledExtensions: string[];
 }
 
-/** Read-only: omp's `loadReadOnly` never writes the config files back. */
-export async function loadOmpConfig(cwd: string): Promise<OmpConfig> {
-	const settings = await config.Settings.loadReadOnly({ cwd });
+/** omp's settings as a session in `cwd` loads them. Read-only: omp's `loadReadOnly` never writes the config files back. */
+export const loadSessionSettings = (cwd: string): Promise<OmpSettingsInstance> => config.Settings.loadReadOnly({ cwd });
+
+/** The {@link OmpConfig} `settings` holds. */
+export function ompConfigOf(settings: OmpSettingsInstance): OmpConfig {
 	return {
 		modelRoles: settings.getModelRoles(),
 		fallbackChains: sessionSettings.cfgRetryFallbackChains.get(settings),
@@ -69,6 +71,8 @@ export async function loadOmpConfig(cwd: string): Promise<OmpConfig> {
 		disabledExtensions: extensionSettings.cfgDisabledExtensions.get(settings),
 	};
 }
+
+export const loadOmpConfig = async (cwd: string): Promise<OmpConfig> => ompConfigOf(await loadSessionSettings(cwd));
 
 function setting(id: string): SettingHandle {
 	const handle = settingsRegistry.lookup(id);
@@ -83,7 +87,7 @@ export const retryChoices = (key: keyof RetrySettings): readonly string[] | unde
 export const assertRetryValue = (key: keyof RetrySettings, value: unknown): void => setting(`retry.${key}`).assertWritable(value);
 
 /** Loads the global config for a write; refuses while omp cannot parse it, since loading one to write moves it aside. */
-async function loadGlobalForWrite(cwd: string): Promise<OmpSettingsInstance> {
+export async function loadGlobalForWrite(cwd: string): Promise<OmpSettingsInstance> {
 	await config.Settings.loadReadOnly({ cwd });
 	return config.Settings.loadIsolated({ cwd });
 }

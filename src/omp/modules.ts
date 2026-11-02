@@ -10,11 +10,13 @@ import type { CollabAutoStart } from "../shared/readiness";
 import { ompVersion, packageDir } from "./install";
 import type { CryptoModule, ProtocolModule, RegistryModule, RelayModule } from "./module-types/collab";
 import type {
+	AllSettingsModule,
 	ConfigModule,
 	DirsModule,
 	ExtensionSettingsModule,
 	ModelSettingsModule,
 	SessionSettingsModule,
+	SettingsDefsModule,
 	SettingsRegistryModule,
 	UpdateCliModule,
 	UpdateSettingsModule,
@@ -209,6 +211,7 @@ export const config = await load<ConfigModule>(join(srcDir, "config", "settings.
 	"Settings.loadReadOnly": "function",
 	"Settings.loadIsolated": "function",
 	"Settings.prototype.getGlobalSettings": "function",
+	"Settings.prototype.getProjectSettings": "function",
 });
 export const extensionSettings = await load<ExtensionSettingsModule>(join(srcDir, "extensibility", "settings.ts"), {
 	"cfgSkills.get": "function",
@@ -254,6 +257,13 @@ export const modelResolver = await load<ModelResolverModule>(join(srcDir, "confi
 	resolveRoleSelection: "function",
 });
 export const settingsRegistry = await load<SettingsRegistryModule>(join(srcDir, "config", "registry.ts"), { lookup: "function", all: "function" });
+export const allSettings = await load<AllSettingsModule>(join(srcDir, "config", "all-settings.ts"), { orderedSettings: "function" });
+export const settingsDefs = await load<SettingsDefsModule>(join(dirname(packageDir), "pi-tui", "src", "overlays", "settings-defs.ts"), {
+	SETTING_TABS: "object",
+	TAB_METADATA: "object",
+	getSettingsForTab: "function",
+	numericOption: "function",
+});
 export const updateCli = await load<UpdateCliModule>(join(srcDir, "cli", "update-cli.ts"), { getLatestRelease: "function" });
 export const updateSettings = await load<UpdateSettingsModule>(join(srcDir, "modes", "settings.ts"), {
 	"cfgStartupCheckUpdate.get": "function",

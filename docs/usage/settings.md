@@ -3,9 +3,9 @@
 - The gear button at the right end of the header, after the notifications bell, opens **Settings**; G then , does the same.
   It stays pressed while Settings is open, including through a session's **Workspace settings** menu item or a direct link, and pressing it again, or G then ,, returns to the panes.
   While Settings is open the sidebar lists its sections below the tab bar, with no tab selected, in place of a tab's content; select a tab, such as **Sessions**, to leave.
-  The sidebar lists fourteen sections in four groups.
+  The sidebar lists fifteen sections in four groups.
   **Usage** holds **Analytics** and **Activity**, **General** holds **Preferences**, **Workspaces**, and **Sync**, and **Connections** holds **Providers**, **Integrations**, **MCP servers**, and **Source control**; these are the same whatever the workspace.
-  **This workspace** holds **Models**, **Files**, **Workflows**, **Decisions**, and **Worktrees**, which show omp's config and files, and the repository's records and worktrees, as a session in the sidebar's workspace sees them; only these sections show the workspace picker.
+  **This workspace** holds **Models**, **omp settings**, **Files**, **Workflows**, **Decisions**, and **Worktrees**, which show omp's config and files, and the repository's records and worktrees, as a session in the sidebar's workspace sees them; only these sections show the workspace picker.
   The command menu finds a section by its name or by what it holds, such as "theme" or "graphite", under **Settings**.
   The gear button and G then , reopen the section you last had open in this app, **Analytics** the first time, and the header names the open section.
   Switching sections keeps an unsaved edit and opens the new section at its top, and the selected section stays when you change workspace.
@@ -84,13 +84,28 @@
   Removing every fallback of a role removes its own chain, so it walks the `default` chain again.
   The retry settings and the provider order save the same way.
   A workspace's `.omp/config.yml` still overrides what you save there.
+- **omp settings** lists omp's own settings in the tabs and groups of omp's `/settings` panel, from **Appearance** to **Providers**, with how many settings in each tab differ from omp's default.
+  Settings that change only how omp's terminal draws, such as the theme, the status line, and the editor, are left out, since sessions the dashboard starts have no terminal.
+  The field above the tabs finds settings in every tab by name, config key, description, or current value; tabs with no match dim, and selecting a tab clears the search.
+  Each setting has the control omp's panel gives it: a switch, a menu of omp's choices, a text field saved on Enter or when you leave it, JSON text for a list or a map, an ordered list, or a request limit per provider.
+  When omp describes the choice picked in a menu, the description shows under the setting's own.
+  A change saves at once to your `~/.omp/agent/config.yml` and leaves every other key as it was; a dot after a setting's name marks a value other than omp's default, and hovering it names the default.
+  **Reset** removes your value from `config.yml`, so the setting goes back to the workspace's value or omp's default.
+  Clearing a text field resets it too; Escape puts the field back as it was.
+  A key, token, or password never reaches the page: its field says only whether it is set, and typing replaces it.
+  When the workspace's own settings set a value, the control is locked, and the row links to that file in **Files** and shows your value; your saved value applies in other workspaces.
+  When an environment variable sets a value, the row names the variable, which overrides what you save.
+  The settings **Models** edits, the model roles, the provider order, and its retry settings, show as a line that links to **Models**.
+  Settings omp gives no control to are counted under the tabs, with a link that opens `config.yml` in **Files**.
+  If `config.yml` changed on disk since the page read it, the save is refused and the page reloads the setting.
+  Running sessions pick up most changes; some apply only to sessions started after the change.
 - The **Files** section lists the files that omp reads: context files such as `AGENTS.md`, the `SYSTEM.md` and `APPEND_SYSTEM.md` prompt files, `config.yml`, agents, commands, rules, skills, and hooks.
   The field above the list narrows it to the files whose name holds every word typed; Escape clears it.
   Select a file to read its content, and choose **Edit** to change it in place (**Create** for a file marked `missing`).
   Save with the button or with Cmd+S. If the file changed on disk after the page read it, the save is refused and your edits stay in the editor, so you can copy them before you load the file from disk.
   A `.yml`, `.yaml`, or `.json` file must parse before it saves, and a settings file must hold a mapping.
   `~/.omp/agent/AGENTS.md` and `~/.omp/agent/config.yml` appear even before they exist, marked `missing`.
-  If omp cannot load `config.yml`, **Models** shows omp's error and **Files** still lists the files, so you can fix the broken file there.
+  If omp cannot load `config.yml`, **Models** and **omp settings** show omp's error and **Files** still lists the files, so you can fix the broken file there.
   Files from installed plugins and omp's bundled rules are left out.
 - The **Workflows** section lists your workflows: skills whose `SKILL.md` frontmatter tags them `workflow`, such as the starter kit's `ship` skill, which holds the steps `/ship` follows.
   Each shows its name, how to start it, `/<name>` when a command of the same name exists and `/skill:<name>` otherwise, and whether it is a user or a project skill.
@@ -143,7 +158,7 @@
   **Trusted projects** lists the projects whose own agent code you trusted, with **Stop trusting** to ask again; see [Per-project agent setup](per-project-agent-setup.md#stop-trusting).
 - **Sync** carries your omp settings and files to your other machines through a Git repository of yours; see [Settings sync](settings-sync.md).
 - Settings follows the workspace picked in the sidebar header, so it includes that workspace's project files and its `.omp/config.yml` overrides.
-  With **All workspaces**, **Models**, **Files**, **Workflows**, and the **New sessions** skill picker show your user files only, and **Worktrees** lists every repository.
+  With **All workspaces**, **Models**, **omp settings**, **Files**, **Workflows**, and the **New sessions** skill picker show your user files only, and **Worktrees** lists every repository.
   The picker in the header of a Workspace section is the same choice: picking a workspace there switches the sidebar to it too.
   Pressing the gear button while Settings is open closes it, so pick a section from the sidebar to change sections.
   A session's **Workspace settings** switches the sidebar to that session's workspace and opens **Models**; a session in `/tmp` or a hidden workspace does not offer it.
