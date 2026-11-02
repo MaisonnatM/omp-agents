@@ -16,10 +16,21 @@ const extension: {
 	authDiagnosis(credentials: { host: string; state: string; active: boolean; login: string; tokenSource: string }[], dotenvFiles: Record<string, string>): string | undefined;
 	REVIEWS: Record<string, Review>;
 	PROOF_BOX: string;
+	renderLines(state: { stage: string; issue?: string; updatedAt: string }): string[];
 } = await import(join(import.meta.dir, "agent/extensions/ship.ts"));
-const { ghPr, prSelector, selectorOwner, otherOwner, publishBlocker, reviewsOf, reviewNeeded, authDiagnosis, REVIEWS, PROOF_BOX } = extension;
+const { ghPr, prSelector, selectorOwner, otherOwner, publishBlocker, reviewsOf, reviewNeeded, authDiagnosis, REVIEWS, PROOF_BOX, renderLines } = extension;
 const THERMONUCLEAR = REVIEWS.thermonuclear.box;
 const INTERFACE = REVIEWS.interface_review.box;
+
+describe("the ship widget", () => {
+	test("plans after the ticket and before implementing, with the PR stages on the second row", () => {
+		expect(renderLines({ stage: "plan", issue: "ENG-1", updatedAt: "" })).toEqual([
+			"ship ENG-1",
+			"✓ Ticket  ▶ Plan  ○ Implement  ○ Draft PR",
+			"○ Interface review  ○ Thermonuclear  ○ Ready gate  ○ Live for review  ○ Merged",
+		]);
+	});
+});
 
 /** The `gh pr view` selector of each `gh pr ready` a bash line runs. */
 function readySelectors(line: string): string[][] {
