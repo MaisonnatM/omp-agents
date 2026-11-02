@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ModelOption } from "../../src/shared/models";
 import type { Delivery, LiveView, RosterHost } from "../../src/shared/sessions";
 import type { ChangedFile } from "../../src/shared/transcript";
@@ -69,6 +69,10 @@ interface ConversationProps {
 	header: boolean;
 	/** The composer's placeholder while the session waits on a message, in place of "Message this session…". */
 	placeholder?: string;
+	/** The focused composer takes the keyboard when the view opens and when it goes live; `false` leaves it, as the Inbox does so its keys keep working. Default `true`. */
+	autoFocus?: boolean;
+	/** Takes the composer's editor, for a page that focuses it from its own key. */
+	editorRef?: RefObject<PromptEditorHandle | null>;
 }
 
 /** One live session or subagent: header, live transcript, composer. Keyed by view: its draft is kept per view, in this browser, while queues and scroll reset per view. */
@@ -106,9 +110,12 @@ function LiveConversation({
 	workspaces,
 	header,
 	placeholder,
+	autoFocus = true,
+	editorRef: givenEditorRef,
 }: ConversationProps) {
 	const { scrollToEnd } = useMessageScroller();
-	const editorRef = useRef<PromptEditorHandle>(null);
+	const ownEditorRef = useRef<PromptEditorHandle>(null);
+	const editorRef = givenEditorRef ?? ownEditorRef;
 	const { completions, withdrawn } = useComposerData(view);
 	const changed = useChangedFiles(view) ?? NO_FILES;
 	const [draft, setDraft] = useComposerDraft(liveDraftKey(view), "");
@@ -156,8 +163,8 @@ function LiveConversation({
 		},
 	});
 	// The focused pane's composer takes the keyboard once it can be typed in: when the view opens, and when it goes live, not when focus moves.
-	const focusedNow = useRef(focused);
-	focusedNow.current = focused;
+	const focusedNow = useRef(focused && autoFocus);
+	focusedNow.current = focused && autoFocus;
 	useEffect(() => {
 		if (focusedNow.current && writable) editorRef.current?.focus();
 	}, [writable]);
