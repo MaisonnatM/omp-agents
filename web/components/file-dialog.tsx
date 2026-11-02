@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
 import { mediaSrc } from "../api";
-import { fileQuery, type FileTarget, linkedFile } from "../file-paths";
+import { type FileBase, type FileTarget, linkedFile, mediaFileUrl, textFileUrl } from "../file-paths";
 import { parseDelimited } from "../delimited";
 import { formatBytes } from "../labels";
 import { useRead } from "../reads";
@@ -34,7 +34,7 @@ function MediaDialog({ target, video, onClose }: { target: FileTarget; video: bo
 	const [failed, setFailed] = useState(false);
 	const { path } = target;
 	const name = path.slice(path.lastIndexOf("/") + 1);
-	const src = mediaSrc(`/api/media?${fileQuery(target)}`);
+	const src = mediaSrc(mediaFileUrl(target));
 	return (
 		<ViewerDialog
 			title={name}
@@ -65,7 +65,7 @@ function MediaDialog({ target, video, onClose }: { target: FileTarget; video: bo
 /** A text file rendered by its type; a path in the file opens in its place. */
 function TextFileDialog({ target, onClose }: { target: FileTarget; onClose: () => void }) {
 	const { path } = target;
-	const read = useRead<TextFile>(`/api/file?${fileQuery(target)}`);
+	const read = useRead<TextFile>(textFileUrl(target));
 	const look = LOOKS[path.slice(path.lastIndexOf(".") + 1).toLowerCase()] ?? "text";
 	const [source, setSource] = useState(false);
 	const { copied, copy } = useCopy();
@@ -104,9 +104,10 @@ function TextFileDialog({ target, onClose }: { target: FileTarget; onClose: () =
 }
 
 function FileBody({ file, look }: { file: TextFile; look: Look }) {
+	const base = useMemo((): FileBase => ({ dir: file.path.slice(0, file.path.lastIndexOf("/")), session: null }), [file.path]);
 	if (look === "markdown") {
 		return (
-			<FileBaseContext.Provider value={{ dir: file.path.slice(0, file.path.lastIndexOf("/")), session: null }}>
+			<FileBaseContext.Provider value={base}>
 				<article className="px-5 py-3 text-sm leading-relaxed">
 					<MessageMarkdown text={file.text} />
 				</article>

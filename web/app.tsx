@@ -19,7 +19,7 @@ import {
 import { DesktopLinkPreview } from "./components/desktop-link-preview";
 import { DiscussionPanel } from "./components/discussion-panel";
 import { FileDialog } from "./components/file-dialog";
-import { fileQuery } from "./file-paths";
+import { textFileUrl } from "./file-paths";
 import { PageSwitch } from "./components/page-switch";
 import { NO_PLANS, Plans } from "./components/plan-usage";
 import { useNoticeToasts } from "./components/use-notice-toasts";
@@ -351,7 +351,7 @@ export function App() {
 										rosterError={state.rosterError}
 										onClose={() => show(layout)}
 									/>
-									{overlays.openedFile !== null && <FileDialog key={fileQuery(overlays.openedFile)} target={overlays.openedFile} onClose={() => setOpenedFile(null)} />}
+									{overlays.openedFile !== null && <FileDialog key={textFileUrl(overlays.openedFile)} target={overlays.openedFile} onClose={() => setOpenedFile(null)} />}
 									{overlays.newTicket !== null && <NewTicketDialog title={overlays.newTicket} onClose={() => setNewTicket(null)} />}
 									{goalEditor && editedGoal && editedGoal.goal.kind !== "off" && (
 										<GoalDialog

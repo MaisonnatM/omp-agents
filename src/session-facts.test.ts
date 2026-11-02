@@ -479,12 +479,13 @@ describe("SessionFactsIndex", () => {
 			[
 				toolCall("a", "bash", { command: "cd ~/notes/memory && ls zen" }),
 				toolCall("b", "bash", { command: "pushd sub && cat a.md", cwd: "/data" }),
-				toolCall("c", "bash", { command: "cat $(cd elsewhere; pwd)/x.md", cwd: "rel" }),
+				toolCall("c", "bash", { command: "cd elsewhere; ls", cwd: "rel" }),
+				toolCall("d", "bash", { command: "cd packages/x && ls" }),
 			].join("\n") + "\n",
 		);
 		const index = new SessionFactsIndex(async () => null, new CachedCheckouts());
 		await index.refresh([{ path: session, cwd: "/code/app", modifiedAt: 1 }]);
-		expect(index.fileDirsOf(session)).toEqual(["/code/app/rel", "/data", "/data/sub", join(homedir(), "notes/memory")]);
+		expect(index.fileDirsOf(session)).toEqual(["/code/app/packages/x", "/code/app/rel", "/code/app/rel/elsewhere", "/data", "/data/sub", join(homedir(), "notes/memory")]);
 		expect(index.factsOf(session).worktree).toBeNull();
 	});
 

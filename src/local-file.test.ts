@@ -104,7 +104,7 @@ test("the first candidate that is a file wins, passing over a directory and a mi
 	await mkdir(join(dir, "first", "zen.md"), { recursive: true });
 	await mkdir(join(dir, "second"), { recursive: true });
 	await writeFile(join(dir, "second", "zen.md"), "");
-	const candidates = [join(dir, "missing", "zen.md"), join(dir, "first", "zen.md"), join(dir, "second", "zen.md")];
-	expect(await firstFile(candidates)).toBe(join(dir, "second", "zen.md"));
-	expect(await firstFile(candidates.slice(0, 2))).toBe(join(dir, "missing", "zen.md"));
+	const [missing, folder, file] = [join(dir, "missing", "zen.md"), join(dir, "first", "zen.md"), join(dir, "second", "zen.md")] as const;
+	expect(await firstFile([missing, folder, file])).toBe(file);
+	expect(await firstFile([missing, folder])).toBe(missing);
 });

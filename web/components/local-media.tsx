@@ -2,7 +2,7 @@
 import { Play } from "lucide-react";
 import { useContext, useState } from "react";
 import { mediaSrc } from "../api";
-import { fileQuery, type FileTarget, fileTarget, linkedFile } from "../file-paths";
+import { type FileTarget, fileTarget, linkedFile, mediaFileUrl } from "../file-paths";
 import { DashboardActionsContext } from "./dashboard-context";
 import { FileBaseContext } from "./file-link";
 
@@ -12,7 +12,7 @@ function useMedia(path: string): { target: FileTarget; src: string; video: boole
 	const file = linkedFile(path);
 	const target = fileTarget(path, base);
 	if (!file || file.kind === "text" || target === null) return null;
-	return { target, src: mediaSrc(`/api/media?${fileQuery(target)}`), video: file.kind === "video" };
+	return { target, src: mediaSrc(mediaFileUrl(target)), video: file.kind === "video" };
 }
 
 /** An image of agent text, `![alt](path)`, in place: an image, or a video that plays there. A path that loads nothing shows its `alt`. */

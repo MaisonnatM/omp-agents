@@ -22,7 +22,7 @@
  * session files does not read them a second time.
  */
 import { access } from "node:fs/promises";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { branchAt, type CheckoutReads, type HeadHistory, type WorktreeAt } from "./git";
 import { isObject, oneOf } from "./json";
 import { FoldedFile, type LineFold } from "./line-reader";
@@ -31,7 +31,7 @@ import { expandHome } from "./paths";
 import { textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { subagentFiles } from "./subagents";
 import { headKey, type LinkedPullRequest, parseRemote, type PullRequest, type PullRequestLink, prKey, pullRequestOfUrl, type Repo, repoKey } from "./shared/github";
-import { located } from "../templates/omp/agent/extensions/shell/commands";
+import { located, within } from "../templates/omp/agent/extensions/shell/commands";
 import { ReplayFold } from "./replay";
 import { taskText } from "./shared/routine-message";
 import { SHIP_STAGES, SHIP_WORK, type SessionBranch, type SessionFacts, type ShipProgress } from "./shared/sessions";
@@ -70,7 +70,12 @@ const PUSH_REMOTE = /^To (\S+)\s*$/;
 /** `   1a2b..3c4d  HEAD -> me/b`, ` * [new branch]  me/b -> me/b`, or ` + 1a2b...3c4d … (forced update)`; rejected and deleted refs do not match. */
 const PUSHED_REF = /^\s*[+*]?\s*(?:\[new branch\]|[0-9a-f]{4,}\.\.\.?[0-9a-f]{4,})\s+\S+\s+->\s+(\S+)/;
 /** Lines that can matter hold one of these; skipping the rest before `JSON.parse` is most of the startup scan. */
-const MARKERS = ["github", "gh pr", "push", "gt submit", "gt ss", "pr://", "omp-ship.state", "omp-agents.headless", "mcp__linear_", '"cwd"', '"toolName":"edit"', '"toolName":"write"', '"name":"bash"'];
+const MARKERS = ["github", "gh pr", "push", "gt submit", "gt ss", "pr://", "omp-ship.state", "omp-agents.headless", "mcp__linear_", '"cwd"', '"toolName":"edit"', '"toolName":"write"', "cd ", "-C "];
+/**
+ * Where `located` starts a bash call that names no absolute `cwd`, so a relative `cd` keeps its path relative to the
+ * session's directory, which the scan does not know: no real directory starts with a NUL.
+ */
+const SESSION_DIR = "/\0";
 /** A Linear MCP tool called directly (`mcp__linear_get_issue`, or `xd_mcp__linear_get_issue`), or written to as an omp device. */
 const LINEAR_TOOL = /^(?:xd_)?mcp__linear_(\w+)$/;
 const LINEAR_DEVICE = /^xd:\/\/mcp__linear_(\w+)$/;
@@ -295,8 +300,10 @@ export class SessionFactsScan {
 			const cwd = call.name === "bash" && typeof call.args.cwd === "string" && call.args.cwd ? call.args.cwd : null;
 			if (call.name === "bash" && typeof call.args.command === "string") {
 				this.#command(call.id, call.args.command, cwd, Date.parse(String(entry.timestamp)));
-				const from = cwd === null ? null : expandHome(cwd);
-				for (const { dir } of located(call.args.command, from !== null && isAbsolute(from) ? from : null)) if (dir) this.#movedTo(dir);
+				const from = cwd === null ? null : within(SESSION_DIR, cwd);
+				for (const { dir } of located(call.args.command, from ?? SESSION_DIR)) {
+					if (dir !== null && dir !== SESSION_DIR) this.#movedTo(dir.startsWith(`${SESSION_DIR}/`) ? dir.slice(SESSION_DIR.length + 1) : dir);
+				}
 			}
 			if (cwd) this.#workedIn(cwd);
 			if (call.name === "read" && typeof call.args.path === "string") this.#read(call.args.path);

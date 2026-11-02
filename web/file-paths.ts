@@ -69,8 +69,15 @@ export function fileTarget(path: string, base: FileBase | null): FileTarget | nu
 	return { path: absolute, lookup: base?.session && !isAbsolutePath(path) ? { session: base.session, relative: path } : null };
 }
 
-/** The query of `GET /api/file` and `GET /api/media` for `target`. */
-export const fileQuery = ({ path, lookup }: FileTarget): string => `${new URLSearchParams({ path, ...lookup })}`;
+/** The query `GET /api/file` and `GET /api/media` read for `target`. */
+const fileQuery = ({ path, lookup }: FileTarget): URLSearchParams =>
+	new URLSearchParams(lookup ? { path, session: lookup.session, relative: lookup.relative } : { path });
+
+/** The `GET /api/file` address of the text file `target` names. */
+export const textFileUrl = (target: FileTarget): string => `/api/file?${fileQuery(target)}`;
+
+/** The `GET /api/media` address of the image or video `target` names. */
+export const mediaFileUrl = (target: FileTarget): string => `/api/media?${fileQuery(target)}`;
 
 interface MdNode {
 	type: string;
