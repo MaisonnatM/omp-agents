@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-02
 
+- Behind the scenes: checked against omp 18.15.0, which keeps the daily compression log that Storage reads.
 - In a narrow window, such as a phone, an open sidebar now slides over the page instead of squeezing it to a sliver; picking a page or tapping outside closes it.
 - Behind the scenes: every test now ignores the session it runs from, so a test added later cannot stamp an agent's session on its commits and fail "Merge on main".
 - Settings, Workspaces: long folder paths now wrap onto a second line instead of being cut off, in both the workspace list and Trusted projects.
