@@ -33,6 +33,11 @@ describe("inboxSections", () => {
 		expect(keys(inboxSections([host("q", "needs-input")], [], 0))).toEqual([["Agents asking", ["ask/q/input"]]]);
 	});
 
+	test("questions keep the sidebar's order: pinned sessions first, then the roster's", () => {
+		const asking = ["a", "b", "c"].map(id => host(id, "needs-input", { requests: [ask] }));
+		expect(keys(inboxSections(asking, [], 0, new Set(["c"])))).toEqual([["Agents asking", ["ask/c/r1", "ask/a/r1", "ask/b/r1"]]]);
+	});
+
 	test("each item says its title, place, and line: a question's title, a turn's first suggestion or reply, a notice's headline", () => {
 		const [asking, finished, messages] = inboxSections([host("a", "needs-input", { requests: [ask] }), host("b", "idle", { unread: turn(1) }), host("c", "idle", { unread: turn(2, []) })], [slack("s1", 1)], 0);
 		const text = (section: InboxSection | undefined) => section?.items.map(({ title, place, line }) => ({ title, place, line }));
