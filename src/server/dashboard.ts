@@ -195,7 +195,8 @@ export class Dashboard {
 	#rosterError: string | null = null;
 	/**
 	 * Whether the registry was listed since the last poll tick found no listener. True until {@link start} lists it, so a
-	 * socket that opens earlier does not list it before the session files are, which the first listing reads.
+	 * page that connects earlier neither lists nor follows the registry before reattachAll and the restore of the unread
+	 * turns finish, nor before the session files are indexed, which the first listing reads.
 	 */
 	#registryFresh = true;
 	/** Whether the activity was checked since the last activity tick found no listener. */

@@ -5,7 +5,7 @@ import { JsonFile } from "../fs";
 import { SessionGuest } from "../guest";
 import { repositoryAt } from "../git";
 import { arrayOf, decoder, fields, isNumber, isString, isTexts, nullable, optional } from "../json";
-import { type EndedTurn, type LiveSession, type LiveUpdate, turnSince } from "../live-session";
+import { type EndedTurn, endedTurn, type LiveSession, type LiveUpdate } from "../live-session";
 import type { HostSnapshot } from "../omp/collab";
 import { displayPath, unreadFile } from "../paths";
 import { oneLine } from "../session-entries";
@@ -62,7 +62,7 @@ export class LiveSessions {
 	 * saved turns of the sessions that did not survive the restart as sessions this server started, which may be terminal
 	 * sessions', and the previous server's `heardUntil`. The file keeps both meanwhile.
 	 */
-	#pending: { turns: Map<string, UnreadTurn>; heardUntil: number | null } | null = null;
+	#pending: { turns: Map<string, UnreadTurn>; heardUntil: number | undefined } | null = null;
 	/**
 	 * The sessions by the session file they continue, the earliest added first. A session's id changes when omp moves it to
 	 * another file or the registry lists its host on another session, so the index is rebuilt where either can happen.
@@ -169,30 +169,27 @@ export class LiveSessions {
 		const saved = this.#unreadFile.load();
 		const pending = new Map<string, UnreadTurn>();
 		for (const { instanceId, ...turn } of saved?.turns ?? []) (instanceIds.has(instanceId) ? this.#unread : pending).set(instanceId, turn);
-		this.#pending = { turns: pending, heardUntil: saved?.heardUntil ?? null };
+		this.#pending = { turns: pending, heardUntil: saved?.heardUntil };
 	}
 
 	/**
 	 * At the first registry listing after {@link restoreUnread}, each terminal session of `hosts` gets back its unread turn:
 	 * none while a turn runs; else the last turn of its session file, which `savedFile` finds by session id, when it came
 	 * after the previous server's `heardUntil`, and none while the host cannot tell whether that turn still runs; else the
-	 * turn saved before the restart. The saved turns of the sessions it does not list are forgotten; later listings change nothing.
+	 * turn saved before the restart. A session this server started is left as reattachAll settled it. The saved turns of
+	 * the sessions it does not list are forgotten; later listings change nothing.
 	 */
 	restoreListedUnread(hosts: HostSnapshot[], savedFile: (sessionId: string) => string | null): void {
 		if (!this.#pending) return;
 		const { turns, heardUntil } = this.#pending;
 		this.#pending = null;
 		for (const host of hosts) {
-			// The running turn read the one before, as its `turn-started` would have.
-			if (host.busy === true) continue;
-			const file = heardUntil === null ? null : savedFile(host.sessionId);
-			const missed = file === null || heardUntil === null ? null : turnSince(file, heardUntil);
-			const saved = turns.get(host.instanceId);
-			if (missed) {
-				if (host.busy === false) this.#unread.set(host.instanceId, unreadTurn(missed));
-			} else if (saved) {
-				this.#unread.set(host.instanceId, saved);
-			}
+			if (!(this.#sessions.get(host.instanceId) instanceof SessionGuest)) continue;
+			const file = savedFile(host.sessionId);
+			const missed = file === null || heardUntil === undefined ? null : endedTurn(file, heardUntil);
+			// A running turn read the one before, as its `turn-started` would have, and a missed turn counts once the host says it ended.
+			const turn = host.busy === true ? undefined : missed === null ? turns.get(host.instanceId) : host.busy === false ? unreadTurn(missed) : undefined;
+			if (turn) this.#unread.set(host.instanceId, turn);
 		}
 		this.#saveUnread();
 	}
@@ -224,7 +221,7 @@ export class LiveSessions {
 	#saveUnread(): void {
 		const turns = new Map([...(this.#pending?.turns ?? []), ...this.#unread]);
 		// Until the first listing, this server has heard no terminal session, so it keeps the previous server's time.
-		const heardUntil = this.#pending ? (this.#pending.heardUntil ?? undefined) : Date.now();
+		const heardUntil = this.#pending ? this.#pending.heardUntil : Date.now();
 		this.#unreadFile.save({ turns: [...turns].map(([instanceId, turn]) => ({ instanceId, ...turn })), heardUntil });
 	}
 

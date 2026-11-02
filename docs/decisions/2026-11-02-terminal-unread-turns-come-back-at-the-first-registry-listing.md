@@ -32,6 +32,8 @@ A socket that opened during startup listed the registry before the session files
 
 A terminal session's unread turn survives a restart, and one that ended while no server listened shows unread with its real end time.
 A listed session with a turn running restores none, as its `turn-started` would have read it, and one whose omp cannot say whether it runs restores none for a newer turn.
+Only the sessions the listing joined as guests follow this rule, so a session this server started keeps what `reattachAll` settled.
+One `endedTurn` reads both gaps, and a turn stopped before anything followed its prompt now comes back unread with no reply for sessions the dashboard started too, as the live path marks an `agent_end` that carries none.
 A page that connects during startup sees terminal sessions only once startup lists the registry, after the session files are indexed.
 A turn that ends after that first listing and before the guest joins its room is still missed, as it was.
 

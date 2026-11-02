@@ -63,12 +63,15 @@ export interface EndedTurn {
 }
 
 /**
- * The last turn session file `sessionFile` holds: the messages after its prompt, oldest first, the time of the newest
- * of them, and when the prompt came, `null` when the file's end holds none. `null` when the file is gone or unreadable.
+ * The last turn session file `sessionFile` holds, as it ended, when it came after `since`, in ms since the epoch: the time
+ * of its last message, and the reply among the messages after its prompt, chosen as {@link turnUpdate} chooses an
+ * `agent_end`'s. For a turn that ended while no server listened. A turn stopped before any message followed its prompt
+ * counts too, at its prompt's time with no reply, as the live path marks an `agent_end` that carries none. `null` when
+ * the file is gone or unreadable, its end holds no prompt or message with a time, or that time is not after `since`.
  */
-function lastTurn(sessionFile: string): { messages: unknown[]; at: number | null; promptedAt: number | null } | null {
+export function endedTurn(sessionFile: string, since = Number.NEGATIVE_INFINITY): EndedTurn | null {
 	const newestFirst: unknown[] = [];
-	let at: number | null = null;
+	let lastAt: number | null = null;
 	let promptedAt: number | null = null;
 	try {
 		for (const entry of tailEntries(sessionFile)) {
@@ -78,33 +81,13 @@ function lastTurn(sessionFile: string): { messages: unknown[]; at: number | null
 			}
 			if (entry.type !== "message" || !isObject(entry.message)) continue;
 			newestFirst.push(entry.message);
-			at ??= entryTime(entry);
+			lastAt ??= entryTime(entry);
 		}
 	} catch {
 		return null;
 	}
-	return { messages: newestFirst.toReversed(), at, promptedAt };
-}
-
-/**
- * The last turn session file `sessionFile` holds, as it ended: the time of its last message, and the reply among the
- * messages after its prompt, chosen as {@link turnUpdate} chooses an `agent_end`'s. For a turn that ended while no server
- * listened. `null` when the file is gone or unreadable, or its end holds no message with a time.
- */
-export function endedTurn(sessionFile: string): EndedTurn | null {
-	const turn = lastTurn(sessionFile);
-	return !turn || turn.at === null ? null : { at: turn.at, reply: lastReply(turn.messages) };
-}
-
-/**
- * The last turn session file `sessionFile` holds, as {@link endedTurn} reads it, when its last message, or its prompt
- * when no message followed, came after `since`, in ms since the epoch. For a session whose turns no server heard
- * since then. `null` when it came no later, or the file is gone or unreadable.
- */
-export function turnSince(sessionFile: string, since: number): EndedTurn | null {
-	const turn = lastTurn(sessionFile);
-	const at = turn?.at ?? turn?.promptedAt ?? null;
-	return turn && at !== null && at > since ? { at, reply: lastReply(turn.messages) } : null;
+	const at = lastAt ?? promptedAt;
+	return at === null || at <= since ? null : { at, reply: lastReply(newestFirst.toReversed()) };
 }
 
 /** A message the session did not take; the session itself reports it, so a caller with someone to tell need not. */
