@@ -1,12 +1,16 @@
-/** The Bots tab: a search field, All Bots, and New Bot, then each Bot as a messaging app lists a conversation, under Pinned, its section, or Other Bots once any Bot is pinned or in one. */
+/**
+ * The Bots tab: a search field, All Bots, and New Bot, then each Bot as a messaging app lists a conversation, under Pinned, its section, or Other Bots once any Bot is pinned or in one.
+ * Dragging a Bot's row onto a group pins it or moves it there.
+ */
 import { Ellipsis, Folder, FolderMinus, LayoutGrid, type LucideIcon, Pencil, Pin, Plus, UsersRound } from "lucide-react";
-import { useState } from "react";
+import { type DragEvent, type HTMLAttributes, type LiHTMLAttributes, useState } from "react";
+import type { Bot } from "../../../src/shared/bots";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { SidebarContent, SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { botAsking, type BotGroup, botGroupKey, botGroupLabel, botGroupListName, botGroups, botSections, botsGrouped, botStatus, type BotRow } from "../../bots-model";
+import { botAsking, type BotGroup, botGroupKey, botGroupLabel, botGroupListName, botGroups, botMovesTo, type BotPlace, botSections, botsGrouped, botStatus, type BotRow } from "../../bots-model";
 import { mailTime } from "../../labels";
 import { hashForBots, hashForNewBot } from "../../routing";
 import { useStoredKeys } from "../../stored-state";
@@ -19,6 +23,16 @@ const COLLAPSED_GROUPS_KEY = "omp-agents.bots-collapsed-groups";
 
 const GROUP_ICONS: Record<BotGroup["kind"], LucideIcon> = { pinned: Pin, section: Folder, rest: UsersRound };
 
+const PINNED: BotPlace = { kind: "pinned" };
+
+const DROP_TARGET = "rounded-lg bg-accent/50 ring-2 ring-ring ring-inset";
+
+/** The Bot whose row is dragged, and the key of the group under it that would take it. */
+interface BotDrag {
+	bot: Bot;
+	over: string | null;
+}
+
 interface BotsNavProps {
 	/** `null` until the server sends the Bots. */
 	rows: readonly BotRow[] | null;
@@ -30,11 +44,48 @@ export function BotsNav({ rows, openId }: BotsNavProps) {
 	const [query, setQuery] = useState("");
 	const [naming, setNaming] = useState<SectionNaming | null>(null);
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
+	const [drag, setDrag] = useState<BotDrag | null>(null);
+	const { changeBot } = useDashboardActions();
+	const { connected } = useDashboardStatus();
 	const needle = query.trim().toLowerCase();
 	const shown = rows === null ? [] : needle ? rows.filter(({ bot, preview }) => [bot.name, bot.job, preview].some(text => text.toLowerCase().includes(needle))) : rows;
 	const bots = rows?.map(({ bot }) => bot) ?? [];
 	const sections = botSections(bots);
-	const links = (list: readonly BotRow[]) => list.map(row => <BotRowLink key={row.bot.id} row={row} active={openId === row.bot.id} sections={sections} onName={setNaming} />);
+	const groups = rows !== null && shown.length > 0 && botsGrouped(bots) ? botGroups(shown) : null;
+	const handle = (bot: Bot): RowHandle => ({
+		draggable: connected,
+		onDragStart: (event: DragEvent<HTMLLIElement>) => {
+			event.dataTransfer.effectAllowed = "move";
+			event.dataTransfer.setData("text/plain", bot.name);
+			setDrag({ bot, over: null });
+		},
+		onDragEnd: () => setDrag(null),
+	});
+	const target = (place: BotPlace): HTMLAttributes<HTMLDivElement> => {
+		const key = botGroupKey(place);
+		const moves = drag && connected ? botMovesTo(drag.bot, place) : [];
+		return {
+			className: cn(moves.length > 0 && drag?.over === key && DROP_TARGET),
+			onDragOver: event => {
+				if (moves.length === 0) return;
+				event.preventDefault();
+				setDrag(now => (now && now.over !== key ? { ...now, over: key } : now));
+			},
+			onDragLeave: event => {
+				// Crossing into one of the group's own rows is not leaving the group.
+				if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+				setDrag(now => (now?.over === key ? { ...now, over: null } : now));
+			},
+			onDrop: event => {
+				if (moves.length === 0) return;
+				event.preventDefault();
+				for (const change of moves) changeBot(change);
+				setDrag(null);
+			},
+		};
+	};
+	const links = (list: readonly BotRow[]) =>
+		list.map(row => <BotRowLink key={row.bot.id} row={row} active={openId === row.bot.id} sections={sections} onName={setNaming} handle={handle(row.bot)} dragging={drag?.bot.id === row.bot.id} />);
 	return (
 		<>
 			<SidebarGroup className="flex-row items-center gap-1">
@@ -57,7 +108,13 @@ export function BotsNav({ rows, openId }: BotsNavProps) {
 				</Tooltip>
 			</SidebarGroup>
 			<SidebarContent>
-				{rows === null || shown.length === 0 || !botsGrouped(bots) ? (
+				{drag && connected && !groups?.some(({ kind }) => kind === "pinned") && (
+					<SidebarGroup {...target(PINNED)}>
+						<SidebarGroupLabel icon={GROUP_ICONS.pinned}>{botGroupLabel(PINNED)}</SidebarGroupLabel>
+						<p className="rounded-md border border-dashed border-border px-2 py-3 text-center text-xs text-muted-foreground">Drop a Bot here to pin it</p>
+					</SidebarGroup>
+				)}
+				{groups === null ? (
 					<SidebarGroup>
 						{rows === null ? (
 							<p className="px-2 py-1 text-xs text-muted-foreground">Loading your Bots…</p>
@@ -70,7 +127,7 @@ export function BotsNav({ rows, openId }: BotsNavProps) {
 						)}
 					</SidebarGroup>
 				) : (
-					botGroups(shown).map(group => {
+					groups.map(group => {
 						const key = botGroupKey(group);
 						return (
 							<SidebarGroup
@@ -79,6 +136,7 @@ export function BotsNav({ rows, openId }: BotsNavProps) {
 								open={!collapsed.has(key)}
 								onOpenChange={() => toggleGroup(key)}
 								headerActions={group.kind === "section" ? <SectionMenu name={group.name} onName={setNaming} /> : undefined}
+								{...target(group)}
 							>
 								<SidebarGroupLabel icon={GROUP_ICONS[group.kind]}>{botGroupLabel(group)}</SidebarGroupLabel>
 								<SidebarMenu aria-label={botGroupListName(group)}>{links(group.rows)}</SidebarMenu>
@@ -120,20 +178,30 @@ function SectionMenu({ name, onName }: { name: string; onName: (naming: SectionN
 	);
 }
 
+/** What a row's `<li>` takes to be dragged onto a group. */
+type RowHandle = Pick<LiHTMLAttributes<HTMLLIElement>, "draggable" | "onDragStart" | "onDragEnd">;
+
 interface BotRowLinkProps {
 	row: BotRow;
 	active: boolean;
 	sections: readonly string[];
 	onName: (naming: SectionNaming) => void;
+	handle: RowHandle;
+	dragging: boolean;
 }
 
-function BotRowLink({ row: { bot, host, unread, preview, at }, active, sections, onName }: BotRowLinkProps) {
+function BotRowLink({ row: { bot, host, unread, preview, at }, active, sections, onName, handle, dragging }: BotRowLinkProps) {
 	const asking = botAsking(host);
 	const when = new Date(at);
 	return (
-		<BotMenu bot={bot} sections={sections} onName={onName} render={<SidebarMenuItem />}>
+		<BotMenu bot={bot} sections={sections} onName={onName} render={<SidebarMenuItem {...handle} className={cn(dragging && "opacity-50")} />}>
 			<SidebarMenuButton asChild size="lg" isActive={active} className="h-auto gap-2.5 py-1.5">
-				<a href={hashForBots(bot.id)} aria-label={`${bot.name}, ${botStatus(bot, host)}${unread ? ", unread" : ""}. ${preview}`}>
+				<a
+					href={hashForBots(bot.id)}
+					// The row drags, not the link's address.
+					draggable={false}
+					aria-label={`${bot.name}, ${botStatus(bot, host)}${unread ? ", unread" : ""}. ${preview}`}
+				>
 					<BotAvatar look={bot} size="row" working={host?.status === "working"} asking={asking !== null} />
 					<span className="flex min-w-0 flex-1 flex-col gap-0.5">
 						<span className="flex items-baseline gap-2">

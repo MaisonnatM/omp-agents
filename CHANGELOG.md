@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-02
+
+- You can drag a Bot in the Bots tab onto Pinned, a section, or Other Bots.
+
 ## 2026-11-01
 
 - Agents can now land work from a separate worktree while their session sits on main, and the landing report names the checks that passed.

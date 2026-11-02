@@ -8,6 +8,7 @@
   A blue dot marks a reply you have not read, and the most recent conversation comes first.
   The tab counts the Bots that wait on you: those asking you something, and those with a reply you have not read.
 - Right-click a Bot's row, or its card in the gallery, to **Pin** or **Unpin** it, to move it with **Move to section** into a section or a **New section…** you name, or to take it out with **Remove from section**.
+  You can also drag a Bot's row in the tab onto **Pinned**, a section, or **Other Bots**, and **Pinned** shows as a drop target while you drag, even before any Bot is pinned.
   Once any Bot is pinned or in a section, the tab and the gallery list **Pinned** first, then each section by name, then **Other Bots**, each most recent first.
   A pinned Bot shows only under **Pinned**, and unpinning it puts it back in its section.
   Click a group's name in the tab to fold it; the tab remembers which groups you folded.
