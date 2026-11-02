@@ -91,6 +91,8 @@ interface TooltipProps {
   children: React.ReactElement;
   /** The child is a disabled control: anchor hover to a non-focusable wrapper, without making the control operable. */
   disabled?: boolean;
+  /** Classes for the wrapper a `disabled` child gets, such as `min-w-0` so a shrinking child can still shrink. */
+  wrapperClassName?: string;
   side?: TooltipSide;
   sideOffset?: number;
   /** Hover delay before this tooltip opens, in ms. Defaults to 200, or to the
@@ -146,6 +148,7 @@ function Tooltip({
   shortcut,
   children,
   disabled = false,
+  wrapperClassName,
   side = "top",
   sideOffset = 8,
   delayDuration,
@@ -205,7 +208,7 @@ function Tooltip({
   const tooltip = (
     <TooltipPrimitive.Root delayDuration={delayDuration} open={open} onOpenChange={(v) => { setInternalOpen(v); onOpenChangeProp?.(v); }}>
       <TooltipPrimitive.Trigger asChild onPointerMove={followCursor ? handleFollowMove : undefined}>
-        {disabled ? <span className="inline-flex">{children}</span> : children}
+        {disabled ? <span className={cn("inline-flex", wrapperClassName)}>{children}</span> : children}
       </TooltipPrimitive.Trigger>
       {mounted && (
         <TooltipPrimitive.Portal forceMount container={portalContainer ?? undefined}>
