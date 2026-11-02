@@ -68,6 +68,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   A table row's or card's review cell, which asks for reviews, is `ReviewPicker` in `pr-row.tsx`, over `ReviewersField` in `pr-fields.tsx`, the **Summary**'s Reviewers picker.
   A row's or card's right-click menu is `RowContextMenu` in `pr-row.tsx`, which lists the `⋯` menu's `PullRequestMenuItems` from `pr-menu.tsx`, with its **Reviewers** submenu.
 - Bottom bar, with plan quota, the **Terminal** button, and CPU, memory, and disk: `StatusBar` in `web/components/status-bar.tsx`, whose CPU card lists every live session's processes with **Stop**; the terminal panel is `web/components/terminal/terminal-panel.tsx`.
+  The disk card's **Clean up…** link opens Settings › Storage.
 - The three things called Files:
   - The Todos card's **Files** section, a session's changed files: `ChangedFileList` in `web/components/changed-files-section.tsx`.
   - The session changes dialog that a file or **Review** opens: `web/components/changes/session-changes-dialog.tsx`, with its explorer in `changes-explorer.tsx` and tree in `file-tree.tsx` beside it.
@@ -105,6 +106,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
     Settings › Integrations' Google account lines, with **Add account**, **Remove**, and the workspace picker: `GoogleAccountsRow` in `web/components/integrations/google-accounts.tsx`.
     Settings › Worktrees, with its totals, filters, **Merged** and blocker badges, selection bar, and **Remove merged**: `WorktreesTab` in `web/components/settings/worktrees-tab.tsx`.
     Settings › Sync, with its remote, **Sync** button, last outcome, conflict choices, and item switches: `SyncTab` in `web/components/settings/sync-tab.tsx`.
+    Settings › Storage, with allocated usage, native cleanup previews, phase progress, and global cleanup rules: `StorageTab` in `web/components/settings/storage-tab.tsx`, with phase presentation and the sequential run driver in `web/storage.ts`.
 - List on the left with the open item on the right, split by a line you drag: `ListSplit` in `web/components/list-split.tsx`, over `web/components/drag-separator.tsx`.
 - Shared primitives (buttons, menus, dialogs, tooltips): `web/components/ui/`, from the Fluid registry and some from shadcn's, with the shadcn utilities they need in `web/shadcn.css`; change them only as `web/components/ui/PATCHES.md` describes.
 - Colors, the font, text sizes, and the `surface-glass` utility: the tokens in `web/globals.css`, which are T3 Code's light and dark values for every token the two apps share, with the system font stack and T3's `text-2xs` (11px) and `text-3xs` (10px); the `--surface-*`, `--shadow-*`, `--hover`, `--active`, `--selected`, `--tint`, and `--focus-ring` tokens stay Fluid's, since T3 has none of them.

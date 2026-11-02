@@ -139,6 +139,7 @@ import { signInGraphite } from "../source-control";
 import { activityRoutes, type ActivityRoutesEnv } from "./activity-routes";
 import { calendarRoutes, type CalendarRoutesEnv } from "./calendar-routes";
 import { readStarterKitStatus } from "../readiness";
+import { storageRoutes, type StorageRoutesEnv } from "./storage-routes";
 
 /** What the session routes read: the workspaces sessions count in, their files, and the workspaces Settings keeps. */
 export interface SessionRoutesEnv {
@@ -211,6 +212,7 @@ export interface RouteEnv {
 	/** The page's activity events, for Settings › Activity. */
 	activity: ActivityRoutesEnv;
 	processes: ProcessRoutesEnv;
+	storage: StorageRoutesEnv;
 }
 
 /** What the live sessions run besides omp, the start of a session's dev server, and when the idle stop ends them. */
@@ -240,7 +242,7 @@ export interface PullRequestRoutesEnv {
 }
 
 /** A route's handler; Bun passes its server, whose `timeout` lifts a slow request's idle timeout. */
-type Handler = (req: Request, server: Pick<Server<unknown>, "timeout">) => Promise<Response>;
+export type Handler = (req: Request, server: Pick<Server<unknown>, "timeout">) => Promise<Response>;
 /** HTTP handlers by path and method, as `Bun.serve` takes them. */
 export type Routes = Record<string, Partial<Record<"GET" | "PUT", Handler>>>;
 
@@ -1128,6 +1130,7 @@ export function createRoutes(env: RouteEnv): Routes {
 		...dashboardRoutes(kit, env.dashboard),
 		...syncRoutes(kit, env.sync),
 		...processRoutes(kit, env.processes),
+		...storageRoutes(kit, env.storage, env.sessions),
 	};
 	return { ...routes, ...activityRoutes(kit, env.activity, routes) };
 }

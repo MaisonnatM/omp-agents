@@ -40,6 +40,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Settings › Extensions manages plugins and registry skills and previews their files.
 - Packaged workflows open read-only, with a link to manage their package.
 - Settings › Agents previews new-session agents, with model overrides and execution defaults.
+- Clean up omp's disk use from the disk reading in the bottom bar: review files, confirm each cleanup run, and edit the rules in Settings, Storage.
 - A long folder name in the message box now ends in … instead of running past the box and under the model switch.
 - /ship now plans before it builds: the agent compares up to three ways to do the work, keeps the best, and posts that plan on the Linear issue, or in the pull request when there is no issue.
 - /ship no longer needs a Linear ticket: it uses the one you name or one that matches the work, and otherwise ships without one instead of creating a ticket.

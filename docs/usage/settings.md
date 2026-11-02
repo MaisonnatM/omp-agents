@@ -3,8 +3,8 @@
 - The gear button at the right end of the header, after the notifications bell, opens **Settings**; G then , does the same.
   It stays pressed while Settings is open, including through a session's **Workspace settings** menu item or a direct link, and pressing it again, or G then ,, returns to the panes.
   While Settings is open the sidebar lists its sections below the tab bar, with no tab selected, in place of a tab's content; select a tab, such as **Sessions**, to leave.
-  The sidebar lists seventeen sections in four groups.
-  **Usage** holds **Analytics** and **Activity**, **General** holds **Preferences**, **Workspaces**, and **Sync**, and **Connections** holds **Providers**, **Integrations**, **MCP servers**, and **Source control**; these are the same whatever the workspace.
+  The sidebar lists eighteen sections in four groups.
+  **Usage** holds **Analytics** and **Activity**, **General** holds **Preferences**, **Workspaces**, **Sync**, and **Storage**, and **Connections** holds **Providers**, **Integrations**, **MCP servers**, and **Source control**; these are the same whatever the workspace.
   **This workspace** holds **Models**, **Agents**, **omp settings**, **Files**, **Extensions**, **Workflows**, **Decisions**, and **Worktrees**, which show omp's config and files, package discovery, and the repository's records and worktrees, as a session in the sidebar's workspace sees them; only these sections show the workspace picker.
   The command menu finds a section by its name or by what it holds, such as "theme" or "graphite", under **Settings**.
   The gear button and G then , reopen the section you last had open in this app, **Analytics** the first time, and the header names the open section.
@@ -48,6 +48,29 @@
   **Navigation** lists the 15 most common moves from one view to another and the time spent on each view.
   **Active time** charts the minutes you used the dashboard each day, up to five minutes between two uses, with a table of each day's active time, visits, and changes sent.
   Only the server that runs the unattended work keeps activity, in `activity.db` in its data directory; a browser under automation records nothing.
+- **Storage** measures session files, attachments, and isolation sandboxes across all workspaces.
+  Open it from the disk reading's **Clean up…** link in the bottom bar, or at `#settings/storage`.
+  The checklist previews old reports and replicas, unused attachments, cold sessions to archive, idle files to compress, database logs, and sandboxes of ended tasks.
+  It starts with your saved cleanup switches, plus sandboxes; empty phases stay unchecked.
+  **Check again** refreshes the preview without deleting anything.
+  Sizes are approximate; cold sessions show a count, and compression shows the files' current disk use rather than promised savings.
+  Sandboxes fill in separately, and **Kept** lists the ones a live owner, changes, or another safety check protects.
+  **Clean up** asks for confirmation and names what cannot be undone.
+  Archived cold sessions leave the roster, History, and Resume, while their compressed archive stays on disk.
+  Cleanup follows omp's phase order, then rechecks and removes eligible sandboxes one at a time.
+  **Stop after this step** lets the current operation finish and starts no more.
+  Leaving Settings or reloading also prevents later steps, but does not kill the operation already running.
+  A failed step keeps its error on the row and stops the rest; **Check again** keeps the checklist's ticks for another attempt.
+  The result shows the native counts and the volume's free space before and after, not a promise that all selected bytes were freed.
+  **Cleanup rules** edits all twelve native cleanup settings through the same conflict-checked settings writer as **omp settings**.
+  Each rule saves separately; number fields save on Enter or when you leave the field, and Escape restores the value.
+  **Reset** removes your override and restores omp's default.
+  A conflict reloads the value changed on disk and asks you to review it before trying again.
+  The rules and dashboard cleanup are global; a selected workspace's overrides show a warning and apply only to terminal cleanup in that folder.
+  No new daily cleanup runs.
+  **Compress daily** runs only when you launch omp in a terminal, not for dashboard sessions, and shows the last background compression log when one exists.
+  The existing daily sandbox sweep stays in place.
+  Merged Git worktrees keep their separate review in **Worktrees**.
 - **Worktrees** lists every Git worktree in repositories where a session ran; **Show another repository**, below the list, lists one more.
   A session directory that is gone or outside Git is skipped; a path you enter that is not in a repository says so.
   Above the list, the tab counts the worktrees, their disk use measured so far, and the merged ones with their size; **All**, **Merged**, and **Removable** filter the rows.
@@ -112,7 +135,7 @@
   A key, token, or password never reaches the page: its field says only whether it is set, and typing replaces it.
   When the workspace's own settings set a value, the control is locked, and the row links to that file in **Files** and shows your value; your saved value applies in other workspaces.
   When an environment variable sets a value, the row names the variable, which overrides what you save.
-  The settings **Models** and **Agents** edit show as lines linking to those sections instead of a second editor.
+  The settings **Models**, **Agents**, and **Storage** edit show as lines linking to those sections instead of a second editor.
   Settings omp gives no control to are counted under the tabs, with a link that opens `config.yml` in **Files**.
   If `config.yml` changed on disk since the page read it, the save is refused and the page reloads the setting.
   Running sessions pick up most changes; some apply only to sessions started after the change.

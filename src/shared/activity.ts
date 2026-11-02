@@ -167,6 +167,8 @@ export const CONTROLS = [
 	{ id: "pr-details.checkout", label: "Check out menu", area: "Pull requests" },
 	{ id: "status-bar.terminal", label: "Terminal button", area: "Status bar" },
 	{ id: "status-bar.cpu", label: "CPU card", area: "Status bar" },
+	{ id: "status-bar.disk", label: "Disk card", area: "Status bar" },
+	{ id: "storage.stop", label: "Stop after this step", area: "Settings" },
 ] as const satisfies readonly { id: string; label: string; area: string }[];
 
 export type ControlId = (typeof CONTROLS)[number]["id"];

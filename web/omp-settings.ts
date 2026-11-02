@@ -5,6 +5,7 @@
 import type { AgentSettingRow, AgentSettingTab } from "../src/shared/agent-settings";
 import { AGENT_SETTINGS } from "../src/shared/agents";
 import { everyWord } from "../src/shared/every-word";
+import { GC_RULES } from "../src/shared/storage";
 import type { SettingsSection } from "./routing";
 
 /** The Settings section that edits a setting, and its name in the line that links there. */
@@ -15,6 +16,7 @@ export interface SettingOwner {
 
 const MODELS: SettingOwner = { section: "models", label: "Models" };
 const AGENTS: SettingOwner = { section: "agents", label: "Agents" };
+const STORAGE: SettingOwner = { section: "storage", label: "Storage" };
 
 /**
  * omp settings another Settings section edits, by id. Settings › omp settings counts them and links to that section
@@ -36,6 +38,7 @@ export const OWNED_SETTINGS: Readonly<Record<string, SettingOwner>> = {
 	"retry.usageReservePolicy": MODELS,
 	"retry.fallbackRevertPolicy": MODELS,
 	...Object.fromEntries(Object.values(AGENT_SETTINGS).map(id => [id, AGENTS])),
+	...Object.fromEntries(GC_RULES.map(rule => [rule.id, STORAGE])),
 };
 
 /** The section that edits `id`, from {@link OWNED_SETTINGS}; `undefined` when this section does. */
@@ -71,6 +74,7 @@ export function formatValue(row: AgentSettingRow, value: unknown): string {
 		}
 		case "json":
 			return value === undefined ? "Not set" : JSON.stringify(value);
+		case "number":
 		case "text":
 			return value === undefined || value === "" ? "Not set" : String(value);
 	}

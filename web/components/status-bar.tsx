@@ -11,6 +11,7 @@ import { activityControl } from "../activity";
 import type { DashboardState } from "../dashboard-state";
 import { commandLabel, formatBytes, hostLabel } from "../labels";
 import { sessionProcessesStore, useRead, writeProcessStop } from "../reads";
+import { hashForSettings } from "../routing";
 import { shortcutLabels } from "../shortcuts";
 import { useAction } from "../use-action";
 import { useHoverPopover } from "../use-hover-popover";
@@ -120,26 +121,31 @@ function ProcessItem({ instanceId, process, readAt }: { instanceId: string; proc
 	);
 }
 
-/** The disk fact's tooltip: how full the volume that holds the home directory is. */
-function DiskUsage({ available, total }: { available: number; total: number }) {
+/** Disk use and the entry to Storage, with the same hover-and-click behavior as the CPU card. */
+function DiskFact({ available, total }: { available: number; total: number }) {
+	const popover = useHoverPopover();
 	const used = total - available;
 	const percent = total > 0 ? Math.round((used / total) * 100) : 0;
 	return (
-		<div className="w-56 space-y-2">
-			<p>{`Disk ${percent}% used`}</p>
-			<div aria-hidden className="h-1 overflow-hidden rounded-full bg-background/25">
-				<div className="h-full rounded-full bg-background" style={{ width: `${percent}%` }} />
-			</div>
-			<dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 tabular-nums">
-				<dt className="text-background/70">Used</dt>
-				<dd className="text-right">{formatBytes(used)}</dd>
-				<dt className="text-background/70">Free</dt>
-				<dd className="text-right">{formatBytes(available)}</dd>
-				<dt className="text-background/70">Total</dt>
-				<dd className="text-right">{formatBytes(total)}</dd>
-			</dl>
-			<p className="text-background/70">The volume that holds your home folder.</p>
-		</div>
+		<Popover {...popover.root}>
+			<PopoverTrigger asChild>
+				<button {...activityControl("status-bar.disk")} {...popover.trigger} type="button" aria-label={`${formatBytes(available)} of ${formatBytes(total)} disk space available`} className={cn(FACT, "hover:text-foreground")}>
+					<HardDrive aria-hidden className="size-3 shrink-0" />
+					{formatBytes(available)}
+				</button>
+			</PopoverTrigger>
+			<PopoverContent {...popover.content} side="top" align="end" aria-label="Disk space" className="w-64 space-y-3 text-xs">
+				<p className="text-sm font-medium tabular-nums">{`Disk ${percent}% used`}</p>
+				<div aria-hidden className="h-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-muted-foreground" style={{ width: `${percent}%` }} /></div>
+				<dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 tabular-nums">
+					<dt className="text-muted-foreground">Used</dt><dd className="text-right">{formatBytes(used)}</dd>
+					<dt className="text-muted-foreground">Free</dt><dd className="text-right">{formatBytes(available)}</dd>
+					<dt className="text-muted-foreground">Total</dt><dd className="text-right">{formatBytes(total)}</dd>
+				</dl>
+				<p className="text-muted-foreground">The volume that holds your home folder.</p>
+				<div className="border-t border-border pt-2"><Button variant="ghost" size="compact" render={<a href={hashForSettings("storage")} />} onClick={() => popover.root.onOpenChange(false)}>Clean up…</Button></div>
+			</PopoverContent>
+		</Popover>
 	);
 }
 
@@ -156,7 +162,6 @@ function MachineLoad({ hosts }: { hosts: readonly RosterHost[] }) {
 	if (!load) return null;
 	const cpu = load.cpuPercent === null ? null : `${Math.round(load.cpuPercent)}%`;
 	const memory = `${formatBytes(load.memoryAvailable)} of ${formatBytes(load.memoryTotal)} memory available`;
-	const disk = `${formatBytes(load.diskAvailable)} of ${formatBytes(load.diskTotal)} disk space available`;
 	return (
 		<>
 			{cpu !== null && <CpuFact cpu={cpu} hosts={hosts} />}
@@ -166,12 +171,7 @@ function MachineLoad({ hosts }: { hosts: readonly RosterHost[] }) {
 					{formatBytes(load.memoryAvailable)}
 				</span>
 			</Tooltip>
-			<Tooltip content={<DiskUsage available={load.diskAvailable} total={load.diskTotal} />} side="top">
-				<span tabIndex={0} aria-label={disk} className={FACT}>
-					<HardDrive aria-hidden className="size-3 shrink-0" />
-					{formatBytes(load.diskAvailable)}
-				</span>
-			</Tooltip>
+			<DiskFact available={load.diskAvailable} total={load.diskTotal} />
 		</>
 	);
 }

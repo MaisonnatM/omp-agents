@@ -9,7 +9,7 @@ import { providerOrg } from "../../labels";
 import { CommandPicker } from "../command-picker";
 import { Model } from "../model-picker";
 import { OrgIcon } from "../org-icon";
-import { type Catalog, EditBar, type Editing, FIELD, LINK, OrderedList, SaveError, Section, useEditor, writeOrReload } from "./editor";
+import { type Catalog, EditBar, type Editing, FIELD, LINK, NumberField, OrderedList, SaveError, Section, useEditor, writeOrReload } from "./editor";
 import { SelectorPicker } from "./selector-picker";
 import { hashForSettings } from "../../routing";
 
@@ -160,25 +160,6 @@ function ModelChainRow({ chain, editing }: { chain: ModelChain; editing: Editing
 	);
 }
 
-/** A number typed as text, so the field can be cleared while typing; only a finite number reaches `onChange`. */
-function NumberField({ value, id, onChange }: { value: number; id: string; onChange: (value: number) => void }) {
-	const [text, setText] = useState(String(value));
-	return (
-		<input
-			type="number"
-			inputMode="numeric"
-			id={id}
-			className={cn(FIELD, "w-28 tabular-nums")}
-			value={text}
-			onChange={event => {
-				setText(event.target.value);
-				const next = Number(event.target.value);
-				if (event.target.value.trim() !== "" && Number.isFinite(next)) onChange(next);
-			}}
-			onBlur={() => setText(String(value))}
-		/>
-	);
-}
 
 function RetrySection({ routing, editing }: { routing: ModelRouting; editing: Editing }) {
 	const editor = useEditor(

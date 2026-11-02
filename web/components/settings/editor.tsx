@@ -1,6 +1,6 @@
 /** Shared Settings editors, native setting rows and controls, queued writes, save errors, and sections. */
 import { ArrowDown, ArrowUp, Lock, Pencil, X } from "lucide-react";
-import { type ReactNode, useId, useState } from "react";
+import { type ComponentProps, type ReactNode, useId, useState } from "react";
 import type { AgentSettingChange, AgentSettingEdit, AgentSettingOption, AgentSettingRow } from "../../../src/shared/agent-settings";
 import type { CatalogModel, OmpFile, OmpSettings } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,26 @@ export const RAIL_BUTTON = "flex w-full items-baseline gap-2 rounded-md px-2 py-
 
 /** A link in a settings note, to another section or a file. */
 export const LINK = "text-foreground underline-offset-2 hover:underline";
+
+/** Models changes its draft while typing; Save writes it. A blank field restores the draft's number on blur. */
+export function NumberField({ value, onChange, ...props }: Omit<ComponentProps<"input">, "value" | "onChange" | "onBlur"> & { value: number; onChange: (value: number) => void }) {
+	const [text, setText] = useState(String(value));
+	return (
+		<input
+			{...props}
+			type="number"
+			inputMode="numeric"
+			className={`${FIELD} w-28 tabular-nums`}
+			value={text}
+			onChange={event => {
+				setText(event.target.value);
+				const next = Number(event.target.value);
+				if (event.target.value.trim() !== "" && Number.isFinite(next)) onChange(next);
+			}}
+			onBlur={() => setText(String(value))}
+		/>
+	);
+}
 
 /** The models `omp models` lists, for the pickers; loaded once per page. */
 export type Catalog = ReadState<{ bySelector: ReadonlyMap<string, CatalogModel>; byProvider: ReadonlyMap<string, CatalogModel[]> }>;
@@ -47,7 +67,7 @@ export async function writeOrReload<T>(target: { write: Editable<T>["write"]; re
 	}
 }
 
-export const saveAgentSetting = (editing: Editing, edit: AgentSettingEdit): Promise<OmpSettings> =>
+export const saveAgentSetting = (editing: Pick<Editing, "cwd" | "write" | "reload">, edit: AgentSettingEdit): Promise<OmpSettings> =>
 	writeOrReload(editing, () => putJson<OmpSettings>(settingsUrl("/agent", editing.cwd), edit));
 
 /** A save-on-change control's pending value and error, kept beside that control. */
@@ -224,10 +244,10 @@ export function OrderedList({
 
 /** What a row needs from the section: its writer and the file that supplies a workspace value. */
 export interface RowContext {
-	editing: Editing;
+	editing: Pick<Editing, "cwd" | "write" | "reload">;
 	/** The workspace settings file Files lists, which a locked row links to. */
-	projectFile: OmpFile | undefined;
-	onOpenFile: (path: string) => void;
+	projectFile?: OmpFile;
+	onOpenFile?: (path: string) => void;
 }
 
 /** What every control gets from its row: the ids that name and describe it, its value, and its save. */
@@ -297,6 +317,44 @@ function TextControl({ row, controlId, value, disabled, onChange }: ControlProps
 			}}
 			className={cn(FIELD, "w-64 disabled:cursor-not-allowed disabled:opacity-50")}
 		/>
+	);
+}
+
+/** Unlike Models' draft field, this row saves on Enter or blur; Escape restores it, and clearing it removes your value. */
+function NumberControl({ controlId, value, disabled, onChange, min }: ControlProps & { min: number }) {
+	const initial = value === undefined ? "" : String(value);
+	const [draft, setDraft] = useState(initial);
+	const [invalid, setInvalid] = useState<string | null>(null);
+	const commit = (): void => {
+		if (draft === initial) return;
+		if (draft.trim() === "") return onChange({ reset: true });
+		const next = Number(draft);
+		if (!Number.isSafeInteger(next) || next < min) return setInvalid(`Use a whole number of ${min} or more.`);
+		setInvalid(null);
+		onChange({ value: next });
+	};
+	return (
+		<div className="space-y-1">
+			<input
+				id={controlId}
+				type="number"
+				inputMode="numeric"
+				min={min}
+				step={1}
+				disabled={disabled}
+				value={draft}
+				aria-invalid={invalid ? true : undefined}
+				aria-describedby={invalid ? `${controlId}-error` : undefined}
+				onChange={event => { setDraft(event.target.value); setInvalid(null); }}
+				onBlur={commit}
+				onKeyDown={event => {
+					if (event.key === "Enter") commit();
+					else if (event.key === "Escape") { setDraft(initial); setInvalid(null); }
+				}}
+				className={cn(FIELD, "w-28 tabular-nums disabled:cursor-not-allowed disabled:opacity-50")}
+			/>
+			{invalid && <div id={`${controlId}-error`}><ErrorText>{invalid}</ErrorText></div>}
+		</div>
 	);
 }
 
@@ -473,6 +531,8 @@ function rowControl(props: ControlProps, hintId: string | undefined): { element:
 			};
 		case "text":
 			return { element: <TextControl key={key} {...props} />, placement: "inline", native: true };
+		case "number":
+			return { element: <NumberControl key={key} {...props} min={control.min} />, placement: "inline", native: true };
 		case "json":
 			return { element: <JsonControl key={key} {...props} />, placement: "block", native: true };
 		case "list":
@@ -483,7 +543,7 @@ function rowControl(props: ControlProps, hintId: string | undefined): { element:
 }
 
 /** One setting: what it does, whether it differs from omp's default, its control, and the layer notes that apply. */
-export function SettingRow({ row, context: { editing, projectFile, onOpenFile }, mode = "immediate", hidden }: { row: AgentSettingRow; context: RowContext; mode?: "immediate" | "explicit"; hidden?: boolean }) {
+export function SettingRow({ row, context: { editing, projectFile, onOpenFile }, mode = "immediate", hidden, disabled: blocked = false }: { row: AgentSettingRow; context: RowContext; mode?: "immediate" | "explicit"; hidden?: boolean; disabled?: boolean }) {
 	const immediate = useSaving<{ shown: unknown }>();
 	const [status, setStatus] = useState("");
 	const editor = useEditor<{ change: AgentSettingChange; expected: unknown }>(
@@ -503,7 +563,7 @@ export function SettingRow({ row, context: { editing, projectFile, onOpenFile },
 	const value = mode === "explicit" && !viewing
 		? "value" in editor.draft.change ? editor.draft.change.value : row.default
 		: immediate.saving ? immediate.saving.shown : valueOf(row);
-	const disabled = saving || (locked && mode === "immediate");
+	const disabled = saving || blocked || (locked && mode === "immediate");
 	const change = (next: AgentSettingChange): void => {
 		setStatus("");
 		if (mode === "explicit") {
@@ -555,7 +615,7 @@ export function SettingRow({ row, context: { editing, projectFile, onOpenFile },
 				<div className="flex shrink-0 flex-wrap items-center gap-2">
 					{row.user !== undefined && !viewing && (
 						<Tooltip content={`Remove your value from config.yml${locked ? "" : `, back to ${row.credential ? "none" : formatValue(row, row.default)}`}`}>
-							<Button variant="ghost" size="compact" disabled={saving} onClick={() => change({ reset: true })}>
+							<Button variant="ghost" size="compact" disabled={saving || blocked} onClick={() => change({ reset: true })}>
 								Reset
 							</Button>
 						</Tooltip>
@@ -570,7 +630,7 @@ export function SettingRow({ row, context: { editing, projectFile, onOpenFile },
 			{locked && (
 				<p className="text-xs text-muted-foreground">
 					This workspace sets it.{" "}
-					{projectFile && (
+					{projectFile && onOpenFile && (
 						<FileLink file={projectFile} onOpenFile={onOpenFile}>
 							Open in Files
 						</FileLink>
