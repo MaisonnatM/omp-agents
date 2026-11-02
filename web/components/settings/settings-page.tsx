@@ -11,7 +11,7 @@ import { CommandPicker } from "../command-picker";
 import { Header } from "../page-header";
 import { AnalyticsTab } from "./analytics-tab";
 import { ActivityTab } from "./activity-tab";
-import type { Catalog, Editing } from "./editor";
+import { type Catalog, type Editing, LINK } from "./editor";
 import { DecisionsTab } from "./decisions-tab";
 import { Files } from "./files-tab";
 import { IntegrationsTab } from "./integrations-tab";
@@ -100,7 +100,7 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 				{loadAlert(agentSettings.error)}
 				{configFile && (
 					<p className="text-sm text-muted-foreground">
-						<a href={hashForSettings("files")} onClick={() => selection.open(configFile.path)} className="text-foreground underline-offset-2 hover:underline">
+						<a href={hashForSettings("files")} onClick={() => selection.open(configFile.path)} className={LINK}>
 							Fix config.yml in Files
 						</a>
 					</p>

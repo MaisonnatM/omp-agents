@@ -1,6 +1,6 @@
 /** Settings › omp settings: omp's own settings by its tabs, searched and edited one row at a time (`OmpSettingsTab`). */
 import { Lock, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import type { AgentSettingEdit, AgentSettingOption, AgentSettingRow, AgentSettings } from "../../../src/shared/agent-settings";
 import { searchWords } from "../../../src/shared/every-word";
 import type { OmpFile, OmpSettings } from "../../../src/shared/models";
@@ -14,7 +14,7 @@ import { formatValue, isChanged, ownerOf, type ShownGroup, type ShownTab, shownT
 import { hashForSettings } from "../../routing";
 import { SearchField } from "../search-field";
 import { ToggleSwitch } from "../toggle-switch";
-import { type Editing, ErrorText, FIELD, OrderedList } from "./editor";
+import { type Editing, ErrorText, FIELD, LINK, OrderedList, RAIL_BUTTON, Section } from "./editor";
 
 /** A row's change: a new value, or the removal of the user's, which leaves the workspace's, the variable's, or omp's default. */
 type Change = { value: unknown } | { reset: true };
@@ -27,8 +27,17 @@ interface RowContext {
 	onOpenFile: (path: string) => void;
 }
 
-const RAIL_BUTTON = "flex w-full items-baseline gap-2 rounded-md px-2 py-1 text-left text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring";
-const LINK = "text-foreground underline-offset-2 hover:underline";
+/** What every control gets from its row: the ids that name and describe it, its value, and its save. */
+interface ControlProps {
+	row: AgentSettingRow;
+	/** The id of the row's visible label, which names the control. */
+	labelId: string;
+	/** The id a native field takes, so the row's `<label>` focuses it. */
+	controlId: string;
+	value: unknown;
+	disabled: boolean;
+	onChange: (change: Change) => void;
+}
 
 /** A link to a file in Settings › Files, which opens it there. */
 function FileLink({ file, onOpenFile, children }: { file: OmpFile; onOpenFile: (path: string) => void; children: string }) {
@@ -39,19 +48,18 @@ function FileLink({ file, onOpenFile, children }: { file: OmpFile; onOpenFile: (
 	);
 }
 
-function OptionSelect({ label, value, options, disabled, onPick }: { label: string; value: unknown; options: AgentSettingOption[]; disabled: boolean; onPick: (value: string | number) => void }) {
+function OptionSelect({ labelId, hintId, value, options, disabled, onPick }: { labelId: string; hintId: string | undefined; value: unknown; options: AgentSettingOption[]; disabled: boolean; onPick: (value: string | number) => void }) {
 	// A value omp would not offer, written by hand, still shows as itself.
 	const listed = options.some(option => option.value === value) || (typeof value !== "string" && typeof value !== "number") ? options : [...options, { value, label: String(value) }];
 	return (
 		<Select value={value} disabled={disabled} onValueChange={next => (typeof next === "string" || typeof next === "number") && onPick(next)}>
-			<SelectTrigger aria-label={label} className="max-w-64">
+			<SelectTrigger aria-labelledby={labelId} aria-describedby={hintId} className="max-w-64">
 				<SelectValue>{(shown: unknown) => listed.find(option => option.value === shown)?.label ?? String(shown)}</SelectValue>
 			</SelectTrigger>
-			<SelectContent className="max-w-md">
+			<SelectContent>
 				{listed.map(option => (
 					<SelectItem key={String(option.value)} value={option.value}>
 						{option.label}
-						{"description" in option && option.description && <span className="block whitespace-normal text-xs text-muted-foreground">{option.description}</span>}
 					</SelectItem>
 				))}
 			</SelectContent>
@@ -60,7 +68,7 @@ function OptionSelect({ label, value, options, disabled, onPick }: { label: stri
 }
 
 /** A text field that saves on Enter or when it loses focus, and reverts on Escape. Clearing it removes your value. */
-function TextControl({ row, value, disabled, onChange }: { row: AgentSettingRow; value: unknown; disabled: boolean; onChange: (change: Change) => void }) {
+function TextControl({ row, controlId, value, disabled, onChange }: ControlProps) {
 	const initial = row.credential || value === undefined ? "" : String(value);
 	const [draft, setDraft] = useState(initial);
 	const commit = (): void => {
@@ -71,8 +79,8 @@ function TextControl({ row, value, disabled, onChange }: { row: AgentSettingRow;
 	const placeholder = row.credential ? (value === undefined ? "Not set" : "Set. Type to replace it") : typeof row.default === "string" && row.default ? row.default : "Not set";
 	return (
 		<input
+			id={controlId}
 			type={row.credential ? "password" : "text"}
-			aria-label={row.label}
 			autoComplete="off"
 			spellCheck={false}
 			disabled={disabled}
@@ -90,7 +98,7 @@ function TextControl({ row, value, disabled, onChange }: { row: AgentSettingRow;
 }
 
 /** JSON text for a list or a map, saved on ⌘Enter or when it loses focus; Escape reverts it, and clearing it removes your value. */
-function JsonControl({ row, value, disabled, onChange }: { row: AgentSettingRow; value: unknown; disabled: boolean; onChange: (change: Change) => void }) {
+function JsonControl({ controlId, value, disabled, onChange }: ControlProps) {
 	const initial = value === undefined ? "" : JSON.stringify(value, null, 2);
 	const [draft, setDraft] = useState(initial);
 	const [invalid, setInvalid] = useState<string | null>(null);
@@ -107,7 +115,7 @@ function JsonControl({ row, value, disabled, onChange }: { row: AgentSettingRow;
 	return (
 		<div className="space-y-1">
 			<textarea
-				aria-label={row.label}
+				id={controlId}
 				spellCheck={false}
 				disabled={disabled}
 				value={draft}
@@ -129,15 +137,15 @@ function JsonControl({ row, value, disabled, onChange }: { row: AgentSettingRow;
 }
 
 /** Some of omp's choices: in order, moved and removed in place, or each on or off. */
-function ListControl({ row, options, ordered, value, disabled, onChange }: { row: AgentSettingRow; options: AgentSettingOption[]; ordered: boolean; value: unknown; disabled: boolean; onChange: (change: Change) => void }) {
+function ListControl({ row, labelId, options, ordered, value, disabled, onChange }: ControlProps & { options: AgentSettingOption[]; ordered: boolean }) {
 	const items = Array.isArray(value) ? value.map(String) : [];
 	const labelOf = (item: string): string => options.find(option => option.value === item)?.label ?? item;
 	if (!ordered) {
 		return (
-			<ul className="grid gap-1.5 sm:grid-cols-2">
+			<ul aria-labelledby={labelId} className="grid gap-1.5 sm:grid-cols-2">
 				{options.map(option => (
 					<li key={String(option.value)}>
-						<label className="flex items-center gap-2 text-sm">
+						<label className="flex w-fit cursor-pointer items-center gap-2 text-[12px] has-[[data-disabled]]:cursor-not-allowed">
 							<ToggleSwitch
 								checked={items.includes(String(option.value))}
 								disabled={disabled}
@@ -152,13 +160,12 @@ function ListControl({ row, options, ordered, value, disabled, onChange }: { row
 	}
 	const rest = options.filter(option => !items.includes(String(option.value)));
 	return (
-		<fieldset disabled={disabled} className="disabled:opacity-50">
-			<legend className="sr-only">{row.label}</legend>
+		<fieldset aria-labelledby={labelId} disabled={disabled} className="disabled:opacity-50">
 			<OrderedList
 				items={items}
 				label={labelOf}
 				onChange={next => onChange({ value: next })}
-				render={item => <span className="text-sm">{labelOf(item)}</span>}
+				render={item => <span className="text-[12px]">{labelOf(item)}</span>}
 				add={
 					rest.length > 0 && (
 						<div className="pl-5">
@@ -183,7 +190,7 @@ function ListControl({ row, options, ordered, value, disabled, onChange }: { row
 }
 
 /** A request limit per provider: each one edited or removed in place, and a new one added below. */
-function ProviderLimitsControl({ row, value, disabled, onChange }: { row: AgentSettingRow; value: unknown; disabled: boolean; onChange: (change: Change) => void }) {
+function ProviderLimitsControl({ labelId, value, disabled, onChange }: ControlProps) {
 	const limits: Record<string, unknown> = typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 	const [provider, setProvider] = useState("");
 	const [limit, setLimit] = useState("");
@@ -196,13 +203,13 @@ function ProviderLimitsControl({ row, value, disabled, onChange }: { row: AgentS
 		setLimit("");
 	};
 	return (
-		<fieldset disabled={disabled} className="space-y-1.5 disabled:opacity-50">
-			<legend className="sr-only">{row.label}</legend>
+		<fieldset aria-labelledby={labelId} disabled={disabled} className="space-y-1.5 disabled:opacity-50">
 			{Object.entries(limits).map(([name, current]) => (
 				<div key={name} className="flex items-center gap-2 text-sm">
 					<span className="w-40 truncate font-mono text-xs">{name}</span>
 					<input
 						type="number"
+						inputMode="numeric"
 						min={1}
 						aria-label={`Request limit for ${name}`}
 						defaultValue={String(current)}
@@ -221,18 +228,23 @@ function ProviderLimitsControl({ row, value, disabled, onChange }: { row: AgentS
 					</Tooltip>
 				</div>
 			))}
-			<div className="flex items-center gap-2">
-				<input aria-label="Provider" placeholder="Provider" value={provider} onChange={event => setProvider(event.target.value)} className={cn(FIELD, "w-40")} />
-				<input
-					type="number"
-					min={1}
-					aria-label="Request limit"
-					placeholder="Limit"
-					value={limit}
-					onChange={event => setLimit(event.target.value)}
-					onKeyDown={event => event.key === "Enter" && add()}
-					className={cn(FIELD, "w-24 tabular-nums")}
-				/>
+			<div className="flex flex-wrap items-end gap-2">
+				<label className="space-y-1 text-xs text-muted-foreground">
+					Provider
+					<input value={provider} onChange={event => setProvider(event.target.value)} className={cn(FIELD, "block w-40 text-foreground")} />
+				</label>
+				<label className="space-y-1 text-xs text-muted-foreground">
+					Request limit
+					<input
+						type="number"
+						inputMode="numeric"
+						min={1}
+						value={limit}
+						onChange={event => setLimit(event.target.value)}
+						onKeyDown={event => event.key === "Enter" && add()}
+						className={cn(FIELD, "block w-24 tabular-nums text-foreground")}
+					/>
+				</label>
 				<Button variant="secondary" size="compact" disabled={!provider.trim() || !(Number(limit) > 0)} onClick={add}>
 					Add
 				</Button>
@@ -246,6 +258,9 @@ type RowState = { phase: "idle"; error: string | null } | { phase: "saving"; sho
 /** One setting: what it does, whether it differs from omp's default, its control, and the layer notes that apply. */
 function SettingRow({ row, context: { save, projectFile, onOpenFile } }: { row: AgentSettingRow; context: RowContext }) {
 	const [state, setState] = useState<RowState>({ phase: "idle", error: null });
+	const labelId = useId();
+	const controlId = useId();
+	const hintId = useId();
 	const saving = state.phase === "saving";
 	const locked = row.workspace !== undefined;
 	const value = saving ? state.shown : valueOf(row);
@@ -258,14 +273,17 @@ function SettingRow({ row, context: { save, projectFile, onOpenFile } }: { row: 
 		);
 	};
 	const { control } = row;
-	const props = { row, value, disabled, onChange: change };
+	const props: ControlProps = { row, labelId, controlId, value, disabled, onChange: change };
 	// Keyed by the value, so a field's draft starts over from each answer.
 	const key = JSON.stringify(value) ?? "";
+	// A choice's own description, which omp shows beside it, shows under the row for the one picked.
+	const picked = control.kind === "select" ? control.options.find(option => option.value === value) : undefined;
+	const hint = picked?.description ? `${picked.label}: ${picked.description}` : undefined;
 	const inline =
 		control.kind === "toggle" ? (
-			<ToggleSwitch aria-label={row.label} checked={value === true} disabled={disabled} onCheckedChange={checked => change({ value: checked })} />
+			<ToggleSwitch aria-labelledby={labelId} checked={value === true} disabled={disabled} onCheckedChange={checked => change({ value: checked })} />
 		) : control.kind === "select" ? (
-			<OptionSelect label={row.label} value={value} options={control.options} disabled={disabled} onPick={next => change({ value: next })} />
+			<OptionSelect labelId={labelId} hintId={hint ? hintId : undefined} value={value} options={control.options} disabled={disabled} onPick={next => change({ value: next })} />
 		) : control.kind === "text" ? (
 			<TextControl key={key} {...props} />
 		) : null;
@@ -278,12 +296,21 @@ function SettingRow({ row, context: { save, projectFile, onOpenFile } }: { row: 
 			<ProviderLimitsControl key={key} {...props} />
 		) : null;
 	const changed = isChanged(row);
+	// Only a native field takes a `<label>`; the switch, the select, and the lists are named by the label's id.
+	const label =
+		control.kind === "text" || control.kind === "json" ? (
+			<label id={labelId} htmlFor={controlId}>
+				{row.label}
+			</label>
+		) : (
+			<span id={labelId}>{row.label}</span>
+		);
 	return (
 		<li aria-busy={saving} className={cn("space-y-2 py-3 transition-opacity motion-reduce:transition-none", saving && "opacity-60")}>
 			<div className="flex items-start justify-between gap-6">
 				<div className="min-w-0 space-y-0.5">
 					<p className="flex items-center gap-1.5 text-sm font-medium">
-						{row.label}
+						{label}
 						{changed && (
 							<Tooltip content={row.credential ? "Set" : `Changed. omp's default is ${formatValue(row, row.default)}`}>
 								<span className="inline-flex size-4 items-center justify-center">
@@ -295,6 +322,11 @@ function SettingRow({ row, context: { save, projectFile, onOpenFile } }: { row: 
 					</p>
 					{row.warning && <p className="text-xs text-warning-foreground">{row.warning}</p>}
 					<p className="text-xs text-muted-foreground">{row.description}</p>
+					{hint && (
+						<p id={hintId} className="text-xs text-muted-foreground">
+							{hint}
+						</p>
+					)}
 				</div>
 				<div className="flex shrink-0 items-center gap-2">
 					{row.user !== undefined && (
@@ -355,14 +387,11 @@ function Group({ group, context }: { group: ShownGroup; context: RowContext }) {
 
 function TabBody({ shown, context }: { shown: ShownTab; context: RowContext }) {
 	return (
-		<section aria-labelledby={`omp-settings-${shown.tab.id}`} className="space-y-4">
-			<h3 id={`omp-settings-${shown.tab.id}`} className="text-sm font-semibold">
-				{shown.tab.label}
-			</h3>
+		<Section title={shown.tab.label} headingId={`omp-settings-${shown.tab.id}`}>
 			{shown.groups.map(group => (
 				<Group key={group.label ?? ""} group={group} context={context} />
 			))}
-		</section>
+		</Section>
 	);
 }
 
@@ -393,7 +422,7 @@ export function OmpSettingsTab({ settings, files, editing, onOpenFile }: { setti
 	const body = useRef<HTMLDivElement>(null);
 	return (
 		<div className="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
-			<nav ref={rail} aria-label="omp settings tabs" className="space-y-4 self-start md:sticky md:top-0">
+			<nav ref={rail} aria-label="omp settings tabs" className="space-y-4 self-start md:sticky md:top-6">
 				<SearchField label="Search omp settings" placeholder="Search" query={query} onQuery={setQuery} className="min-w-0 flex-1" />
 				<ul>
 					{tabs.map(shown => (
@@ -423,15 +452,15 @@ export function OmpSettingsTab({ settings, files, editing, onOpenFile }: { setti
 				</ul>
 				{unlisted > 0 && configFile && (
 					<p className="px-2 text-xs text-muted-foreground">
-						{unlisted} more settings have no control here.{" "}
+						{unlisted === 1 ? "1 more setting has" : `${unlisted} more settings have`} no control here.{" "}
 						<FileLink file={configFile} onOpenFile={onOpenFile}>
 							Edit them in config.yml
 						</FileLink>
 					</p>
 				)}
 			</nav>
-			<div ref={body} className="min-w-0 scroll-mt-4 space-y-6">
-				<p className="text-xs text-muted-foreground">Running sessions pick up most changes. Those that need a new session say so.</p>
+			<div ref={body} className="min-w-0 scroll-mt-6 space-y-6">
+				<p className="text-xs text-muted-foreground">Running sessions pick up most changes; some apply only to sessions started after the change.</p>
 				{searching ? (
 					matching.length === 0 ? (
 						<p className="text-sm text-muted-foreground">No setting matches.</p>

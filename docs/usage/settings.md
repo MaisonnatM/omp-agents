@@ -88,6 +88,7 @@
   Settings that change only how omp's terminal draws, such as the theme, the status line, and the editor, are left out, since sessions the dashboard starts have no terminal.
   The field above the tabs finds settings in every tab by name, config key, description, or current value; tabs with no match dim, and selecting a tab clears the search.
   Each setting has the control omp's panel gives it: a switch, a menu of omp's choices, a text field saved on Enter or when you leave it, JSON text for a list or a map, an ordered list, or a request limit per provider.
+  When omp describes the choice picked in a menu, the description shows under the setting's own.
   A change saves at once to your `~/.omp/agent/config.yml` and leaves every other key as it was; a dot after a setting's name marks a value other than omp's default, and hovering it names the default.
   **Reset** removes your value from `config.yml`, so the setting goes back to the workspace's value or omp's default.
   Clearing a text field resets it too; Escape puts the field back as it was.
@@ -97,7 +98,7 @@
   The settings **Models** edits, the model roles, the provider order, and its retry settings, show as a line that links to **Models**.
   Settings omp gives no control to are counted under the tabs, with a link that opens `config.yml` in **Files**.
   If `config.yml` changed on disk since the page read it, the save is refused and the page reloads the setting.
-  Running sessions pick up most changes; a setting that needs a new session says so in its description.
+  Running sessions pick up most changes; some apply only to sessions started after the change.
 - The **Files** section lists the files that omp reads: context files such as `AGENTS.md`, the `SYSTEM.md` and `APPEND_SYSTEM.md` prompt files, `config.yml`, agents, commands, rules, skills, and hooks.
   The field above the list narrows it to the files whose name holds every word typed; Escape clears it.
   Select a file to read its content, and choose **Edit** to change it in place (**Create** for a file marked `missing`).

@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { putJson, settingsUrl } from "../../api";
 import { FILE_KIND_LABELS, fileGroups, fileName, formatBytes } from "../../labels";
 import { SearchField } from "../search-field";
-import { EditBar, type Editing, SaveError, useEditor } from "./editor";
+import { EditBar, type Editing, RAIL_BUTTON, SaveError, useEditor } from "./editor";
 
 /** One omp file, viewed or edited in place; also the right pane of Settings › Workflows. */
 export function FileView({ file, editing }: { file: OmpFile; editing: Editing }) {
@@ -116,10 +116,7 @@ export function Files({ files, editing, selected, onSelect }: { files: OmpFile[]
 												type="button"
 												aria-current={file === open ? "true" : undefined}
 												onClick={() => onSelect(file.path)}
-												className={cn(
-													"flex w-full items-baseline gap-2 rounded-md px-2 py-1 text-left text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-													file === open && "bg-muted font-medium",
-												)}
+												className={cn(RAIL_BUTTON, file === open && "bg-muted font-medium")}
 											>
 												<span className={cn("truncate", file.body.state !== "read" && "text-muted-foreground")}>{name}</span>
 												<span className="ml-auto shrink-0 text-xs text-muted-foreground">
