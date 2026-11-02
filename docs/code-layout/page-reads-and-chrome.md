@@ -1,7 +1,8 @@
 # Page: status bar, terminal, HTTP reads, shortcuts, and theme
 
 - `web/components/status-bar.tsx`: the window's bottom strip, with `PlanUsageList` from `web/components/plan-usage.tsx` on the left, and on the right the **Terminal** button and the machine's CPU, available memory, and free disk space from `GET /api/system`.
-  The CPU fact is a popover, opened by hover or click through `useHoverPopover`, that lists every live session's processes, busiest session first, each session named by `hostLabel` over the roster `app.tsx` passes, and each row with its own `useAction` for **Stop**, which `writeProcessStop` sends; the disk fact's tooltip breaks down the volume that holds the home directory.
+  The CPU fact is a popover, opened by hover or click through `useHoverPopover`, that lists every live session's processes, busiest session first, each session named by `hostLabel` over the roster `app.tsx` passes, and each row with its own `useAction` for **Stop**, which `writeProcessStop` sends.
+  The disk fact uses the same popover behavior, breaks down the volume that holds the home directory, and links **Clean up…** to Settings › Storage.
 - `web/components/terminal/terminal-panel.tsx`: the terminal panel under the panes, its tabs, height, and open state, and `useTerminalPanel`, which saves the last two in localStorage.
   `terminal-tab.ts` holds the tab shape and its lifecycle, `TerminalTabState`, `starting`, `connected`, `closing`, or `disconnected`, which `nextTabState` moves through the socket's `opened` and close and the user's close; closing a starting or connected tab asks its shell to exit through the view and keeps the tab until its socket closes.
   `terminal-inventory.ts` holds `readTerminalTabs`, which turns `GET /api/terminals` into the panel's loading, failed, or ready tabs: a tab per running shell, or one new shell only when the read succeeds and lists none.

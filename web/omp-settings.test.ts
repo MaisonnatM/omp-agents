@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentSettingRow, AgentSettingTab } from "../src/shared/agent-settings";
+import { GC_RULES } from "../src/shared/storage";
 import { formatValue, isChanged, ownerOf, shownTabs, valueOf } from "./omp-settings";
 
 const toggle = (id: string, layers: Partial<AgentSettingRow> = {}): AgentSettingRow => ({
@@ -18,6 +19,10 @@ describe("ownerOf", () => {
 		expect(ownerOf("modelRoles")?.section).toBe("models");
 		expect(ownerOf("retry.fallbackOn")).toBeUndefined();
 		expect(ownerOf("constructor")).toBeUndefined();
+	});
+	test("Storage owns every cleanup rule, but not unknown future settings", () => {
+		for (const rule of GC_RULES) expect(ownerOf(rule.id)).toEqual({ section: "storage", label: "Storage" });
+		expect(ownerOf("gc.future")).toBeUndefined();
 	});
 });
 

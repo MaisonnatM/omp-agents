@@ -13,6 +13,11 @@ export interface DirsModule {
 	/** Where omp puts its task-isolation sandboxes and PR checkouts, `~/.omp/wt` unless `OMP_WORKTREE_DIR` moves it. */
 	getWorktreesDir(): string;
 }
+
+/** The native background compression log's filename, relative to the agent directory. */
+export interface GcAutoCompressModule {
+	GC_AUTO_COMPRESS_LOG: string;
+}
 /** omp settings descriptors (`register`/`combine` in src/config); `get` reads one from a loaded Settings. */
 export interface SettingsReader<T> {
 	get(settings: unknown): T;

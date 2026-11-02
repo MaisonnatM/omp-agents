@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { runChecked } from "../proc";
-import { IsolationSweep, type IsolationSweepDeps, SWEEP_EVERY_MS } from "./isolation-sweep";
+import { IsolationSweep, IsolationSweepBusy, type IsolationSweepDeps, SWEEP_EVERY_MS } from "./isolation-sweep";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -146,6 +146,49 @@ describe("isolation sweep", () => {
 
 	test("a missing root sweeps nothing", async () => {
 		expect(await sweepOf(join(scratch(), "wt")).sweep()).toEqual([]);
+	});
+
+	test("preview measures removable sandboxes without deleting them or interrupted removals", async () => {
+		const root = scratch();
+		const done = await sandbox(root, "tdone");
+		const live = await sandbox(root, "tlive");
+		const pending = join(root, "told.omp-agents-removing");
+		mkdirSync(pending);
+		const plans = await sweepOf(root, { live: ["tlive"] }).preview();
+		expect(plans.find(plan => plan.path === done)?.bytes).toBeGreaterThan(0);
+		expect(plans.find(plan => plan.path === live)).toMatchObject({ kept: "owner-live", bytes: null });
+		expect(plans).toHaveLength(2);
+		expect(existsSync(done) && existsSync(live) && existsSync(pending)).toBe(true);
+	});
+
+	test("manual removal rechecks changes and rejects outside paths and directory symlinks", async () => {
+		const root = scratch();
+		const changed = await sandbox(root, "tchanged");
+		const clean = await sandbox(root, "tclean");
+		const outside = await sandbox(scratch(), "toutside");
+		const linked = join(root, "tlinked");
+		symlinkSync(outside, linked, "dir");
+		const sweep = sweepOf(root);
+		await sweep.preview();
+		writeFileSync(join(changed, "m", "new.txt"), "keep me");
+		const results = await sweep.remove([changed, clean, outside, linked]);
+		expect(results.map(result => result.kept)).toEqual(["changed", null, "unreadable", "unreadable"]);
+		expect(existsSync(changed) && existsSync(outside) && existsSync(linked)).toBe(true);
+		expect(existsSync(clean)).toBe(false);
+	});
+
+	test("manual preview, removal, and the unattended sweep share one guard", async () => {
+		const root = scratch();
+		await sandbox(root, "tguard", false);
+		const barrier = Promise.withResolvers<string[]>();
+		const sweep = sweepOf(root, { inUse: () => barrier.promise });
+		const preview = sweep.preview();
+		await expect(sweep.remove([])).rejects.toBeInstanceOf(IsolationSweepBusy);
+		await expect(sweep.sweep()).rejects.toBeInstanceOf(IsolationSweepBusy);
+		expect(sweep.tick()).toBeNull();
+		barrier.resolve([]);
+		await preview;
+		expect(await sweep.remove([])).toEqual([]);
 	});
 
 	test("ticks sweep once a day, never two at once", async () => {

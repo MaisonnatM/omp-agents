@@ -10,7 +10,7 @@ import { providerOrg } from "../../labels";
 import { CommandPicker, fromList } from "../command-picker";
 import { MODEL_LIST, Model, modelDescription, modelGroups } from "../model-picker";
 import { OrgIcon } from "../org-icon";
-import { type Catalog, EditBar, type Editing, FIELD, OrderedList, SaveError, Section, useEditor } from "./editor";
+import { type Catalog, EditBar, type Editing, FIELD, NumberField, OrderedList, SaveError, Section, useEditor } from "./editor";
 
 /** Each save answers with the settings as they load afterwards. */
 const saveRouting = (cwd: string | null, edit: RoutingEdit): Promise<OmpSettings> => putJson<OmpSettings>(settingsUrl("/routing", cwd), edit);
@@ -204,25 +204,6 @@ function ModelChainRow({ chain, editing }: { chain: ModelChain; editing: Editing
 	);
 }
 
-/** A number typed as text, so the field can be cleared while typing; only a finite number reaches `onChange`. */
-function NumberField({ value, id, onChange }: { value: number; id: string; onChange: (value: number) => void }) {
-	const [text, setText] = useState(String(value));
-	return (
-		<input
-			type="number"
-			inputMode="numeric"
-			id={id}
-			className={cn(FIELD, "w-28 tabular-nums")}
-			value={text}
-			onChange={event => {
-				setText(event.target.value);
-				const next = Number(event.target.value);
-				if (event.target.value.trim() !== "" && Number.isFinite(next)) onChange(next);
-			}}
-			onBlur={() => setText(String(value))}
-		/>
-	);
-}
 
 function RetrySection({ routing, editing }: { routing: ModelRouting; editing: Editing }) {
 	const editor = useEditor(

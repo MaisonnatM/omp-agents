@@ -91,7 +91,8 @@
 - The strip's right side shows the machine's CPU, the percent of every core's time spent busy since the last read, the memory available, which macOS reads as `memory_pressure`'s free percentage of the physical memory, and the disk space free on the volume that holds your home directory.
   The strip reads them again every five seconds while the page is visible.
   Hover or focus the memory for its full reading.
-  Hover or focus the disk space for that volume's percent used, a bar of it, and the space used, free, and in total.
+  Hover or click the disk space for that volume's percent used, a bar of it, and the space used, free, and in total.
+  Click it or press Enter to move focus into the popover, then follow **Clean up…** to [Settings › Storage](settings.md).
 - Hover or click the CPU for a popover that lists what every live session runs besides omp, read again every 5 seconds while it is open.
   Clicking the CPU while hover opened it, or pressing Enter on it, moves focus into the popover, so Tab reaches each **Stop**.
   The busiest session comes first, by the CPU of omp and its processes together, each named by its session name or else its folder.

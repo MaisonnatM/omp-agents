@@ -77,10 +77,11 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Right sidebar (session details, a Bot's details, Images) | control | `sidebar.right.toggle`, `session-details.tab.pull-requests`, `session-details.tab.browser`, and `session-details.tab.tickets`, the last of which a Bot's details share; images use the `media-viewer.*` controls |
 | Browser, the right sidebar's tab | control | `browser.back`, `browser.forward`, `browser.reload`, `browser.server`, `browser.start-server`, `browser.stop-server`, `browser.select-element`, `browser.screenshot`, `browser.review-visuals`, `browser.pick.select`, `browser.pick.region`, `browser.pick.draw`, `browser.pick.erase`, `browser.annotation.attach`, `browser.open-in-browser`, `browser.tab`; an address loaded with Enter, a pick in the app, the marks drawn, and the comment typed beside them are not observed |
 | Pull request details (tabs, composer, header, checkout menu, checks, timeline) | view, control, action | views `pull-requests/item`, `pull-requests/files`; `pr-details.tab.summary`, `pr-details.tab.timeline`, `pr-details.tab.code`, `pr-details.tab.review`, `pr-details.checkout`; on the page the Code tab also sets the hash, so it shows as view `pull-requests/files`; edits, comments, merges, and checkouts are `PUT`s or action `review-draft` |
-| Bottom bar | control, command, action | `status-bar.terminal`, `status-bar.cpu`; command `terminal`; a process's Stop is a `PUT`; plan quota is display only |
+| Bottom bar | control, command, action | `status-bar.terminal`, `status-bar.cpu`, `status-bar.disk`; command `terminal`; a process's Stop is a `PUT`; plan quota is display only |
 | Files: the Todos card's Files section | control | `changes-card.file`, `changes-card.files.fold` |
 | Files: the session changes dialog | control | `changes-dialog.scope.all`, `changes-dialog.scope.session`, `changes-dialog.refresh` |
 | Files: Settings › Files | view | `settings/files` |
+| Settings › Storage | view, control, action | `settings/storage`; `storage.stop` stops between steps; previews and applies use `PUT /api/storage/cleanup`; rule changes use `PUT /api/settings/agent` |
 | File dialog | control | `file-dialog.open`, `file-dialog.source`, `file-dialog.copy-path` |
 | Ask about this and the discussion panel | control, action | `ask-about.open`, `discussion.close`; actions `discuss`, `discuss-stop`; Send to session is action `prompt` |
 | Command palette | command | the command each item runs |

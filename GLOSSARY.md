@@ -21,6 +21,10 @@ _Avoid_: Managed session, RPC session
 A session no omp process runs, read from its session file.
 _Avoid_: Closed session, archived session
 
+**Cold session**:
+A past session that omp's cleanup gzipped into its archive; the roster, History, and Resume no longer list it.
+_Avoid_: Past session when referring to an archived file, deleted session
+
 **Interrupted session**:
 A dashboard session whose omp stopped when the dashboard went down, without **End session**, waiting to be resumed.
 _Avoid_: Crashed session, orphan

@@ -1,6 +1,6 @@
 /** What the Settings editors share: the edit-then-save hook, the Edit/Save bar, save errors, and sections. */
 import { ArrowDown, ArrowUp, Pencil, X } from "lucide-react";
-import { type ReactNode, useId, useState } from "react";
+import { type ComponentProps, type ReactNode, useId, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -17,6 +17,26 @@ export const RAIL_BUTTON = "flex w-full items-baseline gap-2 rounded-md px-2 py-
 
 /** A link in a settings note, to another section or a file. */
 export const LINK = "text-foreground underline-offset-2 hover:underline";
+
+/** A number kept as text while typing; a blank field restores the saved number on blur. */
+export function NumberField({ value, onChange, ...props }: Omit<ComponentProps<"input">, "value" | "onChange" | "onBlur"> & { value: number; onChange: (value: number) => void }) {
+	const [text, setText] = useState(String(value));
+	return (
+		<input
+			{...props}
+			type="number"
+			inputMode="numeric"
+			className={`${FIELD} w-28 tabular-nums`}
+			value={text}
+			onChange={event => {
+				setText(event.target.value);
+				const next = Number(event.target.value);
+				if (event.target.value.trim() !== "" && Number.isFinite(next)) onChange(next);
+			}}
+			onBlur={() => setText(String(value))}
+		/>
+	);
+}
 
 /** The models `omp models` lists, for the pickers; loaded once per page. */
 export type Catalog = ReadState<{ bySelector: ReadonlyMap<string, CatalogModel>; byProvider: ReadonlyMap<string, CatalogModel[]> }>;
