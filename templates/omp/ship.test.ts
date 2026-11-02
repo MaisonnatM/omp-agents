@@ -38,6 +38,11 @@ describe("the ship widget", () => {
 			"○ Interface review  ○ Thermonuclear  ○ Ready gate  ○ Live for review  ○ Merged",
 		]);
 	});
+
+	test("a run past the ticket step without an issue says it has no ticket, not that one is still coming", () => {
+		expect(renderLines({ stage: "ticket", updatedAt: "" })[0]).toBe("ship (no ticket yet)");
+		expect(renderLines({ stage: "plan", updatedAt: "" })[0]).toBe("ship (no ticket)");
+	});
 });
 
 /** The `gh pr view` selector of each `gh pr ready` a bash line runs. */
