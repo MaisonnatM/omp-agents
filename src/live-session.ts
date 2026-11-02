@@ -63,25 +63,31 @@ export interface EndedTurn {
 }
 
 /**
- * The last turn session file `sessionFile` holds, as it ended: the time of its last message, and the reply among the
- * messages after its prompt, chosen as {@link turnUpdate} chooses an `agent_end`'s. For a turn that ended while no server
- * listened. `null` when the file is gone or unreadable, or its end holds no message with a time.
+ * The last turn session file `sessionFile` holds, as it ended, when it came after `since`, in ms since the epoch: the time
+ * of its last message, and the reply among the messages after its prompt, chosen as {@link turnUpdate} chooses an
+ * `agent_end`'s. For a turn that ended while no server listened. A turn stopped before any message followed its prompt
+ * counts too, at its prompt's time with no reply, as the live path marks an `agent_end` that carries none. `null` when
+ * the file is gone or unreadable, its end holds no prompt or message with a time, or that time is not after `since`.
  */
-export function endedTurn(sessionFile: string): EndedTurn | null {
+export function endedTurn(sessionFile: string, since = Number.NEGATIVE_INFINITY): EndedTurn | null {
 	const newestFirst: unknown[] = [];
-	let at: number | null = null;
+	let lastAt: number | null = null;
+	let promptedAt: number | null = null;
 	try {
 		for (const entry of tailEntries(sessionFile)) {
-			if (entry.type === "custom_message" && isUserPrompt(entry)) break;
+			if ((entry.type === "custom_message" && isUserPrompt(entry)) || (entry.type === "message" && isObject(entry.message) && isUserPrompt(entry.message))) {
+				promptedAt = entryTime(entry);
+				break;
+			}
 			if (entry.type !== "message" || !isObject(entry.message)) continue;
-			if (isUserPrompt(entry.message)) break;
 			newestFirst.push(entry.message);
-			at ??= entryTime(entry);
+			lastAt ??= entryTime(entry);
 		}
 	} catch {
 		return null;
 	}
-	return at === null ? null : { at, reply: lastReply(newestFirst.toReversed()) };
+	const at = lastAt ?? promptedAt;
+	return at === null || at <= since ? null : { at, reply: lastReply(newestFirst.toReversed()) };
 }
 
 /** A message the session did not take; the session itself reports it, so a caller with someone to tell need not. */
