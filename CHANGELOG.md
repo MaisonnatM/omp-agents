@@ -10,6 +10,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - /ship no longer needs a Linear ticket: it uses the one you name or one that matches the work, and otherwise ships without one instead of creating a ticket.
 - Agents now start /ship on their own when your request will end in a pull request, and say so in their first reply; say "no ship" to work without it.
 - The Ship card shows the new Plan step between Ticket and Implement.
+- New omp settings section in Settings lists omp's own settings in the same tabs as omp's settings panel, with a search across them, and saves each change to your config.yml as you make it.
+- In omp settings, a dot marks each setting you changed from omp's default, Reset puts it back, and a setting this workspace sets for itself shows locked, with a link to that file.
 - You can drag a Bot in the Bots tab onto Pinned, a section, or Other Bots.
 - Fixed: routines no longer start during the few seconds a sleeping Mac wakes on its own for Power Nap; they wait until you wake it, and news that came in overnight starts one run.
 - Fixed: a routine's command no longer counts time the Mac spent asleep toward its 10-minute limit, and when the Mac slept during a run, the routine's message to the Bot says for how long.
