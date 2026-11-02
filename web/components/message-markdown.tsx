@@ -1,11 +1,12 @@
 import type { Element, ElementContent } from "hast";
 import { Eye } from "lucide-react";
-import { type ComponentProps, memo, useContext, useState } from "react";
+import { type ComponentProps, createContext, memo, type ReactNode, useContext, useState } from "react";
 import ReactMarkdown, { type Components, defaultUrlTransform, type ExtraProps, type Options, type UrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { TICKET_MEDIA_PATH } from "../../src/shared/tickets";
 import { cn } from "@/lib/utils";
 import { CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockHeader, CodeBlockLine, CodeBlockTitle } from "@/components/ui/code-block";
+import { activityControl } from "../activity";
 import { mediaSrc } from "../api";
 import { highlightLines, useGrammars } from "../code-highlight";
 import { loadedOnce, useLoaded } from "../loaded-once";
@@ -55,6 +56,31 @@ const imageFrom =
 		);
 	};
 
+/** Opens an image of GitHub text large, given its opener; `null`, the default, leaves images as they are. */
+export const OpenMarkdownImage = createContext<((element: HTMLElement) => void) | null>(null);
+
+/** An image that opens large through `OpenMarkdownImage` when one is provided; `src` is before `mediaSrc`, which the viewer applies itself. */
+function Openable({ src, alt, children }: { src: string; alt: string | undefined; children: ReactNode }) {
+	const open = useContext(OpenMarkdownImage);
+	if (!open) return children;
+	return (
+		<button
+			{...activityControl("media-viewer.open")}
+			type="button"
+			data-markdown-image={src}
+			data-caption={alt || "Image"}
+			aria-label={`Open ${alt || "image"}`}
+			className="cursor-zoom-in"
+			onClick={event => {
+				event.preventDefault();
+				open(event.currentTarget);
+			}}
+		>
+			{children}
+		</button>
+	);
+}
+
 /** An image uploaded to GitHub, which its hosts serve only to a signed-in user; one that fails to load shows as a link to it. */
 function GitHubUpload({ url, path, alt, ...props }: ComponentProps<"img"> & { url: string; path: string }) {
 	const [failed, setFailed] = useState(false);
@@ -63,17 +89,28 @@ function GitHubUpload({ url, path, alt, ...props }: ComponentProps<"img"> & { ur
 			{alt || url}
 		</a>
 	) : (
-		<img {...props} src={mediaSrc(path)} alt={alt ?? ""} loading="lazy" onError={() => setFailed(true)} className={cn("max-w-full rounded-lg", props.className)} />
+		<Openable src={path} alt={alt}>
+			<img {...props} src={mediaSrc(path)} alt={alt ?? ""} loading="lazy" onError={() => setFailed(true)} className={cn("max-w-full rounded-lg", props.className)} />
+		</Openable>
 	);
 }
 
 const GitHubImage = imageFrom(githubImage);
 
-/** Text written on GitHub: its uploads load through this server, any other image as `githubImage` allows. */
+/** Text written on GitHub: its uploads load through this server, any other image as `githubImage` allows; either opens large in a provided viewer. */
 const githubImg: Components["img"] = ({ node: _node, ...props }) => {
-	const { src } = props;
-	const path = typeof src === "string" ? githubMediaPath(src) : null;
-	return path && typeof src === "string" ? <GitHubUpload {...props} url={src} path={path} /> : <GitHubImage {...props} />;
+	const { src, alt } = props;
+	if (typeof src === "string") {
+		const path = githubMediaPath(src);
+		if (path) return <GitHubUpload {...props} url={src} path={path} />;
+		if (githubImage(src))
+			return (
+				<Openable src={src} alt={alt}>
+					<GitHubImage {...props} />
+				</Openable>
+			);
+	}
+	return <GitHubImage {...props} />;
 };
 
 /** The `figure` that `remarkFilePaths` ends agent text with: the images and videos it names. Markdown makes no other figure. */
@@ -217,7 +254,7 @@ const textOf = (node: Element | ElementContent): string =>
 	node.type === "text" ? node.value : node.type === "element" ? node.children.map(textOf).join("") : "";
 
 /** A `<pre>`'s fence language, from its `<code>`'s `language-*` class, and its text. A `<pre>` in GitHub's raw HTML has no `<code>` and no language. */
-function fenceOf(node: Element | undefined): { language: string | null; text: string } {
+export function fenceOf(node: Element | undefined): { language: string | null; text: string } {
 	const code = node?.children.find((child): child is Element => child.type === "element" && child.tagName === "code");
 	const className = code?.properties.className;
 	const language = (Array.isArray(className) ? className : []).map(String).find(name => name.startsWith("language-"))?.slice("language-".length) ?? null;
@@ -234,7 +271,7 @@ function CodeLines({ text, language }: { text: string; language: string | null }
 }
 
 /** A code block, colored by its fence's language, which titles it, with a copy button. */
-function FencedCode({ language, text }: { language: string | null; text: string }) {
+export function FencedCode({ language, text }: { language: string | null; text: string }) {
 	const copy = <CodeBlockCopyButton value={text} />;
 	return (
 		<CodeBlock>

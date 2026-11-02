@@ -14,8 +14,8 @@ import {
 	FileText,
 	type LucideIcon,
 } from "lucide-react";
-import type { ReactNode } from "react";
-import { type ChangedFile, type FileChange, type FileChangeKind, type FileStatus, fileStatus, lineTotals } from "../../src/shared/transcript";
+import { type ReactNode, useMemo } from "react";
+import { type ChangedFile, editHunks, type FileChange, type FileChangeKind, type FileStatus, fileStatus, lineTotals } from "../../src/shared/transcript";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
 import { shortPaths } from "../changes-model";
@@ -49,6 +49,8 @@ const plural = (count: number, noun: string): string => `${count} ${noun}${count
 
 /** A change's kind and time, then what it recorded: an edit's line counts and diff, or how many lines a write wrote. */
 function Change({ path, change }: { path: string; change: FileChange }) {
+	const diff = change.tool === "edit" ? change.diff : null;
+	const hunks = useMemo(() => (diff ? editHunks(diff) : null), [diff]);
 	const caption = (counts: ReactNode) => (
 		<>
 			<span className="font-medium text-foreground">{CHANGE_LABEL[change.kind]}</span>
@@ -66,7 +68,7 @@ function Change({ path, change }: { path: string; change: FileChange }) {
 			const head = caption(<LineCounts added={change.added} removed={change.removed} />);
 			return (
 				<li className="space-y-1">
-					{change.diff ? <FileDiff path={path} diff={change.diff} caption={head} /> : <p className="flex items-baseline gap-1.5 text-xs text-muted-foreground">{head}</p>}
+					{hunks ? <FileDiff path={path} hunks={hunks} caption={head} /> : <p className="flex items-baseline gap-1.5 text-xs text-muted-foreground">{head}</p>}
 				</li>
 			);
 		}
