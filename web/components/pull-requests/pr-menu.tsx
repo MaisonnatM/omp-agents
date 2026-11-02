@@ -7,14 +7,16 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuL
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { graphiteUrl, rebaseApplies } from "../../pull-requests-model";
-import { type RebaseState, useRebaseState } from "../../pull-request-rebases";
+import { useRebaseState } from "../../pull-request-rebases";
 import { QUICK_ACTIONS } from "../../quick-actions";
 import { useAction } from "../../use-action";
 import { useCopy } from "../../use-copy";
 import { useInlineConfirm } from "../../use-inline-confirm";
 import { OrgIcon } from "../org-icon";
+import { Spinner } from "../spinner";
 import type { QuickActionsProps } from "../quick-actions";
 import { PersonPicture } from "./avatars";
+import { busyWords } from "./busy";
 import { type PullRequestOptionsRead, type ReviewerChange, requestedLogins, reviewerChoices } from "./pr-fields";
 
 export interface HeaderMergeMenu {
@@ -30,8 +32,6 @@ export interface MenuRebase {
 	facts: PullRequestSummary;
 	run: () => void;
 }
-
-const REBASE_LABELS: Record<RebaseState, string> = { queued: "Queued to rebase", running: "Rebasing…" };
 
 /** The **Reviewers** submenu's pull request, the people its repository offers, and how a pick asks one for a review or withdraws it. */
 export interface MenuReviewers {
@@ -115,7 +115,8 @@ export function PullRequestMenuItems({ pr, state, quick, onState, onApprove, mer
 			{quick.actions.map(id => <MenuItem key={id} title={QUICK_ACTIONS[id].description} disabled={quick.pending !== null} onClick={() => quick.onRun(id)}><Zap />{QUICK_ACTIONS[id].label}</MenuItem>)}
 			{offersRebase && (
 				<MenuItem title="Rebase the branch on its base, run the repository's pre-push checks, and push it with --force-with-lease" disabled={rebasing !== null} onClick={rebase.run}>
-					<RefreshCw />{rebasing ? REBASE_LABELS[rebasing] : `Rebase on ${rebase.facts.base}`}
+					{rebasing ? <Spinner /> : <RefreshCw />}
+					{rebasing ? busyWords({ kind: "rebase", state: rebasing }).label : `Rebase on ${rebase.facts.base}`}
 				</MenuItem>
 			)}
 			{(quick.actions.length > 0 || offersRebase) && <MenuSeparator />}

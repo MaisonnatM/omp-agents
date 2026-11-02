@@ -16,7 +16,9 @@ import { useHoverPopover } from "../../../use-hover-popover";
 import { CopyableCode } from "../../copyable-code";
 import { BranchLabel, releaseBranch } from "../../git";
 import type { QuickActionsProps } from "../../quick-actions";
+import { Spinner } from "../../spinner";
 import { Avatar, STATE_ICON } from "../avatars";
+import { type Busy, busyWords, useBusy } from "../busy";
 import { queuedMergeText } from "../merge-popover";
 import { type SavePullRequest, type SendPullRequest } from "../pr-fields";
 import { type MenuRebase, PullRequestMenu } from "../pr-menu";
@@ -120,6 +122,7 @@ export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPi
 	const approve = useAction(() => send({ field: "review", verdict: "approve", body: "" }), "GitHub did not take the approval");
 	const approvable = !!detail && canApprove(detail) && !detail.viewerApproved;
 	const [StateIcon, tone] = STATE_ICON[state];
+	const busy = useBusy(pr, quick.pending);
 	const badge = queued && <Tooltip content={queuedMergeText(queued)}><span role="status" className={cn("inline-flex h-6 shrink-0 items-center gap-1 rounded-md border px-[7px] text-xs font-medium", queued.state.kind === "failed" ? "border-destructive/32 bg-destructive/10 text-destructive-foreground" : "border-blue-500/32 bg-blue-500/10 text-blue-700 dark:border-blue-400/32 dark:bg-blue-400/15 dark:text-blue-300")}><GitMerge aria-hidden className="size-3.5" /><span className={ACTION_LABEL}>{queued.state.kind === "failed" ? "Merge stopped" : `Auto-merge (${MERGE_METHOD_LABELS[queued.method].toLowerCase()})`}</span></span></Tooltip>;
 	const mergeLabel = confirm.isArmed("merge") ? "Confirm merge?" : control.kind === "enable-auto-merge" ? `${method ? MERGE_METHOD_LABELS[method] : "Merge"} when ready` : method ? MERGE_METHOD_LABELS[method] : "Merge";
 	const stacked = !!detail && stack.length > 0 && stack.at(-1)?.number !== pr.number;
@@ -169,6 +172,7 @@ export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPi
 				)}
 				<LinkedSessions sessions={sessions} onOpen={onOpen} />
 				{queued && state !== "merged" && state !== "closed" && badge}
+				{busy && <BusyBadge busy={busy} />}
 				{(control.kind === "merged" || control.kind === "closed") && (
 					<span className={cn("inline-flex h-6 items-center gap-1 rounded-md border border-border px-[7px] text-xs", tone)}>
 						<StateIcon aria-hidden className="size-3.5" />{control.kind === "merged" ? "Merged" : "Closed"}
@@ -232,5 +236,18 @@ export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPi
 				</div>
 			</div>
 		</header>
+	);
+}
+
+/** What the pull request is busy with, beside its primary action, as the queued merge's badge; a narrow header shows only the spinner. */
+function BusyBadge({ busy }: { busy: Busy }) {
+	const { label } = busyWords(busy);
+	return (
+		<Tooltip content={label}>
+			<span role="status" aria-busy aria-label={label} className="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-border px-[7px] text-xs font-medium text-muted-foreground">
+				<Spinner className="size-3.5" />
+				<span className={ACTION_LABEL}>{label}</span>
+			</span>
+		</Tooltip>
 	);
 }

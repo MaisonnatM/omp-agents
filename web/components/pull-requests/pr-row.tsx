@@ -24,7 +24,9 @@ import { StatusDot, statusLabel } from "../status-dot";
 import { Avatar, IconTip, Reviewers } from "./avatars";
 import { MergePopover, useMergeTarget } from "./merge-popover";
 import { errorText } from "../../../src/json";
+import { Spinner } from "../spinner";
 import { toasts } from "../toaster";
+import { type Busy, busyWords, useBusy } from "./busy";
 import { type PullRequestOptionsRead, type ReviewerChange, ReviewersField, usePullRequestOptions } from "./pr-fields";
 import { PullRequestMenu, PullRequestMenuItems, type PullRequestMenuItemsProps } from "./pr-menu";
 
@@ -175,10 +177,30 @@ function RowMergeBadge(props: { pr: PullRequestSummary; move: "merge" | "checks-
 }
 
 /**
- * A row's move badge: for **Merge**, and **Checks running** on a pull request ready but for them, a button that merges;
- * else a button that starts the quick action handing the move to an agent, when one applies; else the plain badge.
+ * A pull request's move badge while it is busy: what it is busy with, spinning, at the move badge's size so the row
+ * holds still. Its padding, gap, and tracking are tighter than a move's, so **Rebasing** fits beside the spinner.
+ */
+function BusyBadge({ busy }: { busy: Busy }) {
+	const { label, short } = busyWords(busy);
+	return (
+		<Tooltip content={label}>
+			<span aria-busy className={cn(BADGE, MUTED, "gap-0.5 px-0.5 tracking-tight")} style={{ fontVariationSettings: fontWeights.semibold }}>
+				<Spinner className="size-3" strokeWidth={2} />
+				<span aria-hidden>{short}</span>
+				<span className="sr-only">{label}</span>
+			</span>
+		</Tooltip>
+	);
+}
+
+/**
+ * A row's move badge: while the pull request rebases or a session starts on it, what it is busy with; for **Merge**, and
+ * **Checks running** on a pull request ready but for them, a button that merges; else a button that starts the quick
+ * action handing the move to an agent, when one applies; else the plain badge.
  */
 function RowMoveBadge({ pr, move, pending, cwd, onQuickAction, merge }: { pr: PullRequestSummary; move: MoveId; merge?: MergeOpen } & Pick<RowProps, "pending" | "cwd" | "onQuickAction">) {
+	const busy = useBusy(pr, pending);
+	if (busy) return <BusyBadge busy={busy} />;
 	if (move === "merge" || (move === "checks-running" && readyOnceChecksPass(pr))) return merge ? <MergeBadge pr={pr} move={move} {...merge} /> : <RowMergeBadge pr={pr} move={move} />;
 	const action = moveAction(pr, move);
 	if (!action) return <MoveBadge move={move} />;
@@ -188,10 +210,8 @@ function RowMoveBadge({ pr, move, pending, cwd, onQuickAction, merge }: { pr: Pu
 			<button
 				type="button"
 				aria-label={label}
-				aria-busy={pending === action}
-				disabled={pending !== null}
 				onClick={() => onQuickAction(pr, cwd, action)}
-				className={cn(BADGE, MOVE_LOOK[move][0], BADGE_BUTTON, pending === action && "motion-safe:animate-pulse")}
+				className={cn(BADGE, MOVE_LOOK[move][0], BADGE_BUTTON)}
 				style={{ fontVariationSettings: fontWeights.semibold }}
 			>
 				<BadgeFace move={move} />

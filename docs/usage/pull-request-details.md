@@ -16,6 +16,7 @@
   A linked worktree that already has the branch is reused as it is, and one in the main checkout is refused.
   **In this repository** runs `gh pr checkout <number>` in that checkout, and refuses while tracked files have uncommitted changes.
   A toast follows the checkout, and warns when the branch is not at the pull request's latest commit, as a reused branch with local commits is not.
+  While its rebase is queued or runs, or while a quick action's session starts on it, a badge before **Check out** reads **Queued to rebase**, **Rebasing**, or **Starting** with the quick action, such as **Starting Fix CI**, beside a spinner; a narrow header shows only the spinner.
   On an open or draft pull request you did not open, **Approve** comes before the primary control and posts an approval with no summary at once.
   It goes away once your latest review approves the pull request, and comes back after a later review of yours that does not.
   GitHub refuses an approval from the pull request's author, so your own pull requests do not offer it.

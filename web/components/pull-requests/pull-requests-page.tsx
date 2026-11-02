@@ -23,6 +23,7 @@ import { FoldButton, useReveal } from "../fold";
 import { ListPage } from "../list-page";
 import { QuickStartNotice } from "../quick-actions";
 import { SegmentedTab, SegmentedTabs, SegmentedTabsList } from "../segmented-tabs";
+import { Spinner } from "../spinner";
 import {
 	type PullRequests,
 	type PullRequestsView,
@@ -196,7 +197,7 @@ function RebaseBehindButton({ pulls }: { pulls: PullRequests }) {
 	const label = rebasing ? "Rebasing…" : armed ? `Confirm rebase of ${count}?` : `Rebase ${count} behind`;
 	return (
 		<Tooltip content="Rebase each of your pull requests behind its base, and the ones stacked on them, bottom first: each runs the repository's pre-push checks and pushes with --force-with-lease" forceOpen={armed ? false : undefined}>
-			<Button size="compact" variant="outline" leadingIcon={RefreshCw} disabled={rebasing} aria-label={label} {...confirm.props("rebase", pulls.onRebaseBehind)}>
+			<Button size="compact" variant="outline" leadingIcon={rebasing ? Spinner : RefreshCw} disabled={rebasing} aria-busy={rebasing} aria-label={label} {...confirm.props("rebase", pulls.onRebaseBehind)}>
 				{label}
 			</Button>
 		</Tooltip>
