@@ -7,7 +7,7 @@ import type { LiveSession, LiveUpdate } from "../live-session";
 import type { HostSnapshot } from "../omp/collab";
 import { displayPath } from "../paths";
 import { oneLine } from "../session-entries";
-import { type RosterHost, type SessionFacts, type UnreadTurn, type WorkItem, worksOn } from "../shared/sessions";
+import { type RosterHost, type SessionFacts, UNREAD_BODY_MAX, type UnreadTurn, type WorkItem, worksOn } from "../shared/sessions";
 import { pullRequestTask, TaskClaims, ticketTask } from "../task-claims";
 import { portFromEnv } from "./address";
 
@@ -114,9 +114,10 @@ export class LiveSessions {
 		this.#taskClaims.release(instanceId);
 	}
 
-	/** Session `instanceId` ended a turn with `reply`, which stays unread until a look or its next turn reads it. */
-	markUnread(instanceId: string, reply: string | null): void {
-		this.#unread.set(instanceId, { at: Date.now(), reply: firstLine(reply) });
+	/** Session `instanceId` ended a turn with `reply` offering `suggestions`, which stays unread until a look or its next turn reads it. */
+	markUnread(instanceId: string, reply: string | null, suggestions: string[]): void {
+		const body = reply?.trim() ? reply.trim().slice(0, UNREAD_BODY_MAX) : null;
+		this.#unread.set(instanceId, { at: Date.now(), reply: firstLine(reply), body, suggestions });
 	}
 
 	/** A page showed session `instanceId` in a focused window, or its next turn started; whether it had a turn unread. */

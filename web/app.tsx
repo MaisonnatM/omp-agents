@@ -236,6 +236,7 @@ export function App() {
 											notesView={notesView}
 											hosts={state.hosts}
 											past={state.past}
+											notices={state.notices}
 											bots={state.bots}
 											botLasts={state.botLasts}
 											todoView={todoView}
@@ -274,6 +275,7 @@ export function App() {
 																	connected={state.connected}
 																	listed={state.listed}
 																	rosterError={state.rosterError}
+																	notices={state.notices}
 																	newStart={startOf(state.starts, "new")}
 																	scope={scope}
 																	defaultWorkspace={defaultWorkspace}

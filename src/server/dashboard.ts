@@ -831,7 +831,7 @@ export class Dashboard {
 				return;
 			}
 			case "turn-ended": {
-				this.#sessions.markUnread(instanceId, update.reply);
+				this.#sessions.markUnread(instanceId, update.reply, update.suggestions);
 				// A session started here that a usage limit or a transient fault stopped is held for its continue.
 				const sessionId = this.#sessions.started(instanceId)?.sessionId;
 				if (sessionId) this.#autoContinue.turnEnded(sessionId, update.failure);

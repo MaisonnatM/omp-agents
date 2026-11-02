@@ -96,7 +96,7 @@ test("Cmd+Enter steers now, Enter queues when running, and Cmd+Shift+Backspace s
 	expect(pressOn(true, "Enter", "Enter", { meta: true })).toEqual(["steer", "deliverSteer"]);
 	expect(pressOn(true, "Enter", "Enter", { ctrl: true })).toEqual([]);
 	for (const mac of [false, true]) {
-		expect(pressOn(mac, "Enter", "Enter")).toEqual([]);
+		expect(pressOn(mac, "Enter", "Enter")).toEqual(["inboxOpen"]);
 		expect(pressOn(mac, "Tab", "Tab", { shift: true })).toEqual(["thinking"]);
 		expect(pressOn(mac, "Backspace", "Backspace", { shift: true, ...(mac ? { meta: true } : { ctrl: true }) })).toEqual(["interrupt"]);
 	}
@@ -125,11 +125,11 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 	]);
 });
 
-test("↓ and ↑ step through sessions, pull requests, todos, notes, conversations, and changed files, ↑ also takes back a queued message, and J and K step through nothing", () => {
-	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "notesNext", "emailNext", "nextChangedFile"]);
-	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "notesPrevious", "emailPrevious", "previousChangedFile"]);
-	expect(press("j", "KeyJ")).toEqual([]);
-	expect(press("k", "KeyK")).toEqual([]);
+test("↓ and ↑ step through sessions, pull requests, todos, Inbox items, notes, conversations, and changed files, ↑ also takes back a queued message, and J and K step through Inbox items alone", () => {
+	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "inboxNext", "notesNext", "emailNext", "nextChangedFile"]);
+	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "inboxPrevious", "notesPrevious", "emailPrevious", "previousChangedFile"]);
+	expect(press("j", "KeyJ")).toEqual(["inboxNext"]);
+	expect(press("k", "KeyK")).toEqual(["inboxPrevious"]);
 });
 
 test("Cmd+[ and Cmd+] go back and forward, Cmd+Alt+arrows step through sessions, and Alt+Shift+arrows move a todo", () => {
@@ -148,13 +148,14 @@ test("the Browser's preload hands over exactly the keys of the pick mode shortcu
 	expect(keys.toSorted()).toEqual([...PICK_MODE_KEYS].toSorted());
 });
 
-test("G then N, W, M, or comma goes to a page only right after a plain G, and P picks a todo's priority", () => {
+test("G then N, W, M, I, or comma goes to a page only right after a plain G, and P picks a todo's priority", () => {
 	const after = (previous: string | null, key: string, mods: Mods = {}) => pressOn(false, key, `Key${key.toUpperCase()}`, mods, previous);
-	// R alone switches the Browser's pick mode or replies on an open conversation, and a G before it changes nothing.
-	expect(after("g", "r")).toEqual(["browserPickRegion", "emailReply"]);
+	// R alone switches the Browser's pick mode or replies on an open conversation or Inbox item, and a G before it changes nothing.
+	expect(after("g", "r")).toEqual(["browserPickRegion", "inboxReply", "emailReply"]);
 	expect(after("g", "w")).toEqual(["workspace"]);
 	expect(after("g", "m")).toEqual(["email"]);
-	expect(after("g", "i")).toEqual([]);
+	expect(after("g", "i")).toEqual(["inbox"]);
+	expect(after(null, "i")).toEqual([]);
 	expect(after("g", "n")).toEqual(["notes"]);
 	expect(pressOn(false, ",", "Comma", {}, "g")).toEqual(["settings"]);
 	expect(pressOn(false, ",", "Comma")).toEqual([]);
@@ -177,7 +178,7 @@ test("1 to 9 outside text fields answer the open question, and its handler learn
 			expect(pressOn(mac, key, `Digit${key}`, { shift: true })).toEqual([]);
 			expect(pressOn(mac, key, `Digit${key}`, { alt: true })).toEqual([]);
 		}
-		expect(pressOn(mac, "0", "Digit0")).toEqual([]);
+		expect(pressOn(mac, "0", "Digit0")).toEqual(["inboxSendAll"]);
 	}
 	const stack = createShortcutStack();
 	const picked: number[] = [];

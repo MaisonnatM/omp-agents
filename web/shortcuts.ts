@@ -60,6 +60,14 @@ export type ShortcutId =
 	| "giveToAgent"
 	| "copyPullRequestNumber"
 	| "copyPullRequestLink"
+	| "inbox"
+	| "inboxNext"
+	| "inboxPrevious"
+	| "inboxOpen"
+	| "inboxDone"
+	| "inboxEnd"
+	| "inboxReply"
+	| "inboxSendAll"
 	| "todoSearch"
 	| "todoNext"
 	| "todoPrevious"
@@ -125,6 +133,7 @@ export const SHORTCUT_CATEGORIES = [
 	{ id: "sessions", label: "Sessions" },
 	{ id: "pull-requests", label: "Pull requests" },
 	{ id: "todo", label: "Todo" },
+	{ id: "inbox", label: "Inbox" },
 	{ id: "notes", label: "Notes" },
 	{ id: "email", label: "Email" },
 	{ id: "calendar", label: "Calendar" },
@@ -259,6 +268,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "ticketsNew", category: "general", label: "Tickets page: create a Linear ticket, in place of a new session", keys: [{ chord: { key: "n", mod: true }, scope: "anywhere" }] },
 	{ id: "bots", category: "general", label: "Go to your Bots", command: "Go to Bots", keys: [] },
 	{ id: "sessions", category: "general", label: "Go to the sessions", command: "Go to sessions", keys: [] },
+	{ id: "inbox", category: "general", label: "Go to your Inbox", command: "Go to Inbox", keys: [{ goTo: "i" }] },
 	{ id: "todo", category: "general", label: "Go to your todo list", command: "Go to todo list", keys: [] },
 	{ id: "notes", category: "general", label: "Go to your notes", command: "Go to notes", keys: [{ goTo: "n" }] },
 	{ id: "calendar", category: "general", label: "Go to your calendar", command: "Go to calendar", keys: [] },
@@ -287,6 +297,29 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "todoDue", category: "todo", label: "Change the focused or open todo's due day", keys: [{ chord: { key: "d", shift: true }, scope: "outside-fields" }] },
 	{ id: "todoNew", category: "todo", label: "Add a todo to the Todo group", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "todoClose", category: "todo", label: "Close the open todo", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
+	{
+		id: "inboxNext",
+		category: "inbox",
+		label: "Inbox: open the next item",
+		keys: [
+			{ chord: { key: "j" }, scope: "outside-fields" },
+			{ chord: { key: "ArrowDown" }, scope: "outside-fields" },
+		],
+	},
+	{
+		id: "inboxPrevious",
+		category: "inbox",
+		label: "Inbox: open the previous item",
+		keys: [
+			{ chord: { key: "k" }, scope: "outside-fields" },
+			{ chord: { key: "ArrowUp" }, scope: "outside-fields" },
+		],
+	},
+	{ id: "inboxOpen", category: "inbox", label: "Inbox: open the item's session, pull request, or message", keys: [{ chord: { key: "Enter" }, scope: "outside-fields" }] },
+	{ id: "inboxDone", category: "inbox", label: "Inbox: mark the item done, and open the next", keys: [{ chord: { key: "d" }, scope: "outside-fields" }] },
+	{ id: "inboxEnd", category: "inbox", label: "Inbox: end the item's session", keys: [{ chord: { key: "e" }, scope: "outside-fields" }] },
+	{ id: "inboxReply", category: "inbox", label: "Inbox: write a reply to the item's session", keys: [{ chord: { key: "r" }, scope: "outside-fields" }] },
+	{ id: "inboxSendAll", category: "inbox", label: "Inbox: send every suggested prompt of the finished turn", keys: [{ chord: { key: "0" }, scope: "outside-fields" }] },
 	{ id: "notesSearch", category: "notes", label: "Search the Notes page's notes", keys: [{ chord: { key: "/" }, scope: "outside-fields" }] },
 	{ id: "notesNext", category: "notes", label: "Focus the next note, or open it while a note is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "notesPrevious", category: "notes", label: "Focus the previous note, or open it while a note is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },

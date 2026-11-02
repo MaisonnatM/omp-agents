@@ -200,6 +200,8 @@ export const VIEWS = [
 	{ key: "scheduled", label: "Scheduled sends" },
 	{ key: "scheduled/item", label: "A scheduled send" },
 	{ key: "new", label: "New session" },
+	{ key: "inbox", label: "Inbox" },
+	{ key: "inbox/item", label: "An Inbox item" },
 ] as const satisfies readonly { key: string; label: string; tab?: SidebarTab }[];
 
 /** A view's key: one of {@link VIEWS}, or a settings section. */
@@ -221,6 +223,8 @@ function pageView(page: Page): ViewKey {
 			return page.open === null ? "todo" : "todo/item";
 		case "notes":
 			return page.open === null ? "notes" : "notes/item";
+		case "inbox":
+			return page.open === null ? "inbox" : "inbox/item";
 		case "email":
 			return page.target === null ? "email" : page.target === "new" ? "email/new" : "email/item";
 		case "scheduled":

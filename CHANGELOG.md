@@ -3,6 +3,11 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-02
+
+- New Inbox page, at the top of the Sessions sidebar or G then I, lists everything that waits on you: sessions asking a question, finished turns with their suggested prompts, your pull request moves, Slack messages, and stopped sessions.
+- You can work the Inbox from the keyboard: J and K move, 1 to 9 answer or send a suggestion, 0 sends every suggestion, R replies, D marks done, E ends the session, and the next item opens on its own.
+
 ## 2026-11-01
 
 - Agents can now land work from a separate worktree while their session sits on main, and the landing report names the checks that passed.

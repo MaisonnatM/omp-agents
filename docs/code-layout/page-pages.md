@@ -37,6 +37,9 @@
   `web/components/notes/nav.tsx` draws its sidebar's **All** and **From agents** lists from `web/notes-views.ts`.
   A top-level todo's `detail.tsx` lists linked notes and creates a note with its todo id.
   `web/palette-records.ts` includes note titles and bodies in command-menu search.
+- `web/components/inbox/page.tsx`: the Inbox page's grouped two-line rows, filters, the open item's reply, question, or notice with its suggestions, the reply field, and its keys.
+  `web/inbox-model.ts` builds its items from the roster and the notices, groups and orders them, and picks the item that opens after one leaves.
+  The sidebar's **Inbox** row with its count is in `web/components/session-list.tsx`, counted in `web/components/app-sidebar.tsx`.
 - `web/components/routines/routines-card.tsx`: `RoutinesCard`, a Bot's routines as one card in place of its conversation, as Arc's Agent routines: a header with **New routine**, then a row per routine, one open at a time, the arrow keys moving between their names.
   `web/components/routines/routine-row.tsx` draws a row: its name, **Run now**, and the switch that pauses it; its schedules and its next run's countdown; its trigger logos, its task, and its last 10 runs as a strip of ticks, each with a tooltip, that opens the row on that run.
   `web/components/routines/routine-open.tsx` draws an open row: the picked run, with what triggered it, its command's output, and its errors; the task whole; the schedule as a cadence, a time, and a day that save as they change; and **Edit** and **Delete**.
