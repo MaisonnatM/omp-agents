@@ -23,18 +23,16 @@ import type {
 } from "../../../src/shared/omp-memory";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { ApiError, ompMemoryUrl, putJson, settingsUrl } from "../../api";
 import { type Editable, useEditableRead } from "../../editable-read";
-import { hashForSettings } from "../../routing";
 import { type InlineConfirm, useInlineConfirm } from "../../use-inline-confirm";
 import { Age } from "../age";
 import { SearchField } from "../search-field";
 import { ToggleSwitch } from "../toggle-switch";
-import { type Editing, ErrorText, LINK, RAIL_BUTTON, Section } from "./editor";
+import { type Editing, ErrorText, FileLink, LayerNotes, RAIL_BUTTON, Section } from "./editor";
 import { FileView } from "./files-tab";
 
 /** What the section's parts share: the page's settings to save through, the memory read, and the Files link. */
@@ -61,37 +59,16 @@ function useSaving() {
 	};
 }
 
-function FileLink({ file, onOpenFile, children }: { file: OmpFile; onOpenFile: (path: string) => void; children: string }) {
-	return (
-		<a href={hashForSettings("files")} onClick={() => onOpenFile(file.path)} className={LINK}>
-			{children}
-		</a>
-	);
-}
-
 /** Where a setting's value comes from, when it is not your own `config.yml`: the workspace, or an environment variable. */
 function SourceNote<T>({ setting, format, context }: { setting: OmpMemorySetting<T>; format: (value: T) => string; context: MemoryContext }) {
-	if (setting.source.layer === "env") {
-		return (
-			<p className="text-xs text-muted-foreground">
-				<code className="font-mono">{setting.source.variable}</code> is set, and it overrides this value.
-			</p>
-		);
-	}
-	if (setting.source.layer !== "workspace") return null;
 	return (
-		<p className="text-xs text-muted-foreground">
-			This workspace sets it.{" "}
-			{context.projectFile && (
-				<>
-					<FileLink file={context.projectFile} onOpenFile={context.onOpenFile}>
-						Open in Files
-					</FileLink>
-					.{" "}
-				</>
-			)}
-			{setting.user !== null && `Your value: ${format(setting.user)}`}
-		</p>
+		<LayerNotes
+			workspace={setting.source.layer === "workspace"}
+			env={setting.source.layer === "env" ? setting.source.variable : undefined}
+			yourValue={setting.user === null ? null : format(setting.user)}
+			projectFile={context.projectFile}
+			onOpenFile={context.onOpenFile}
+		/>
 	);
 }
 
@@ -118,7 +95,7 @@ function MemoryBar({ data, configPath, context }: { data: OmpMemory; configPath:
 	const labelOf = (value: unknown): string => backend.options.find(option => option.value === value)?.label ?? String(value);
 	const picked = backend.options.find(option => option.value === backend.value);
 	return (
-		<div aria-busy={saving.saving !== null} className="space-y-3 rounded-md border border-border px-4 py-3">
+		<div aria-busy={saving.saving !== null} className={cn("space-y-3 rounded-md border border-border px-4 py-3 transition-opacity motion-reduce:transition-none", saving.saving !== null && "opacity-60")}>
 			<div className="flex flex-wrap items-center gap-x-8 gap-y-3">
 				<div className="flex items-center gap-2">
 					<span id={backendLabel} className="text-sm font-medium">
@@ -130,7 +107,7 @@ function MemoryBar({ data, configPath, context }: { data: OmpMemory; configPath:
 						onValueChange={next => typeof next === "string" && next !== backend.value && save("backend", "memory.backend", backend, next)}
 					>
 						<SelectTrigger aria-labelledby={backendLabel} aria-describedby={picked?.description ? hintId : undefined} className="w-40">
-							<SelectValue>{(shown: unknown) => (saving.saving === "backend" ? "Saving…" : labelOf(shown))}</SelectValue>
+							<SelectValue>{(shown: unknown) => labelOf(shown)}</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
 							{backend.options.map(option => (
@@ -144,7 +121,7 @@ function MemoryBar({ data, configPath, context }: { data: OmpMemory; configPath:
 				</div>
 				<div className="flex items-center gap-2">
 					<span id={autolearnLabel} className="text-sm font-medium">
-						{saving.saving === "autolearn" ? "Saving…" : "Auto-learn"}
+						Auto-learn
 					</span>
 					<ToggleSwitch
 						aria-labelledby={autolearnLabel}
@@ -169,7 +146,7 @@ function MemoryBar({ data, configPath, context }: { data: OmpMemory; configPath:
 				<div className="space-y-1 border-l border-border pl-3">
 					<div className="flex items-center gap-2">
 						<span id={continueLabel} className="text-sm">
-							{saving.saving === "autoContinue" ? "Saving…" : "Capture on its own at stop"}
+							Capture on its own at stop
 						</span>
 						<ToggleSwitch
 							aria-labelledby={continueLabel}
@@ -200,7 +177,12 @@ function SessionPreview({ preview }: { preview: OmpMemoryWorkspace["preview"] })
 			</CollapsibleTrigger>
 			<CollapsibleContent className="space-y-2 px-3 pb-3">
 				{preview.partial && <p className="text-xs text-muted-foreground">A running session also gets memories recalled for each prompt, which only it can show.</p>}
-				<pre className="max-h-[50vh] overflow-auto rounded-md bg-muted px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap">{preview.text}</pre>
+				<pre
+					tabIndex={0}
+					className="max-h-[50vh] overflow-auto rounded-md bg-muted px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					{preview.text}
+				</pre>
 			</CollapsibleContent>
 		</Collapsible>
 	);
@@ -220,13 +202,7 @@ function MemoryFiles({ files, cwd, context, empty }: { files: OmpMemoryFile[]; c
 	const [query, setQuery] = useState("");
 	const open = files.find(file => file.path === selected) ?? files[0];
 	if (!open) {
-		return (
-			<Empty className="border border-dashed border-border">
-				<EmptyHeader>
-					<EmptyTitle>{empty}</EmptyTitle>
-				</EmptyHeader>
-			</Empty>
-		);
+		return <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">{empty}</p>;
 	}
 	const matches = everyWord(query);
 	const groups = Map.groupBy(
@@ -270,8 +246,9 @@ function MemoryFiles({ files, cwd, context, empty }: { files: OmpMemoryFile[]; c
 
 const KIND_LABELS: Record<OmpMemoryEntry["kind"], string> = { working: "Working", episodic: "Episodic", fact: "Fact", remote: "Hindsight" };
 
-/** One entry: its text, which Edit turns into a field that Enter saves and Escape reverts, and the actions omp allows on it. */
+/** One entry: its text, which Edit turns into a field that ⌘Enter saves and Escape reverts, and the actions omp allows on it. */
 function EntryRow({ entry, cwd, context, confirm }: { entry: OmpMemoryEntry; cwd: string; context: MemoryContext; confirm: InlineConfirm }) {
+	const contentId = useId();
 	const [draft, setDraft] = useState<string | null>(null);
 	const saving = useSaving();
 	const { memory } = context;
@@ -299,7 +276,9 @@ function EntryRow({ entry, cwd, context, confirm }: { entry: OmpMemoryEntry; cwd
 		<li aria-busy={busy} className={cn("flex items-start gap-4 py-2.5 transition-opacity motion-reduce:transition-none", busy && "opacity-60")}>
 			<div className="min-w-0 flex-1 space-y-1">
 				{draft === null ? (
-					<p className="text-sm break-words whitespace-pre-wrap">{entry.content}</p>
+					<p id={contentId} className="text-sm break-words whitespace-pre-wrap">
+						{entry.content}
+					</p>
 				) : (
 					<textarea
 						aria-label="Memory text"
@@ -312,7 +291,7 @@ function EntryRow({ entry, cwd, context, confirm }: { entry: OmpMemoryEntry; cwd
 							if (event.key === "Escape") {
 								event.preventDefault();
 								setDraft(null);
-							} else if (event.key === "Enter" && !event.shiftKey) {
+							} else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
 								event.preventDefault();
 								save();
 							}
@@ -332,14 +311,14 @@ function EntryRow({ entry, cwd, context, confirm }: { entry: OmpMemoryEntry; cwd
 						<Button variant="ghost" size="compact" disabled={busy} onClick={() => setDraft(null)}>
 							Cancel
 						</Button>
-						<Button variant="primary" size="compact" disabled={busy} onClick={save}>
-							{saving.saving === "update" ? "Saving…" : "Save"}
+						<Button variant="primary" size="compact" disabled={busy} loading={saving.saving === "update"} onClick={save}>
+							Save
 						</Button>
 					</>
 				) : (
 					<>
 						{entry.ops.includes("update") && (
-							<Button variant="ghost" size="compact" disabled={busy} onClick={() => setDraft(entry.content)}>
+							<Button variant="ghost" size="compact" disabled={busy} aria-describedby={contentId} onClick={() => setDraft(entry.content)}>
 								Edit
 							</Button>
 						)}
@@ -348,9 +327,11 @@ function EntryRow({ entry, cwd, context, confirm }: { entry: OmpMemoryEntry; cwd
 								variant="destructive-outline"
 								size="compact"
 								disabled={busy}
+								loading={saving.saving === "forget"}
+								aria-describedby={contentId}
 								{...confirm.props(`forget:${key}`, () => send("forget", { op: "forget", bank: entry.bank, id: entry.id, expected: entry.content }))}
 							>
-								{saving.saving === "forget" ? "Saving…" : confirm.isArmed(`forget:${key}`) ? "Confirm forget?" : "Forget"}
+								{confirm.isArmed(`forget:${key}`) ? "Confirm forget?" : "Forget"}
 							</Button>
 						)}
 						{entry.ops.includes("retire") && (
@@ -359,9 +340,11 @@ function EntryRow({ entry, cwd, context, confirm }: { entry: OmpMemoryEntry; cwd
 									variant="destructive-outline"
 									size="compact"
 									disabled={busy}
+									loading={saving.saving === "retire"}
+									aria-describedby={contentId}
 									{...confirm.props(`retire:${key}`, () => send("retire", { op: "retire", bank: entry.bank, id: entry.id, expected: entry.content }))}
 								>
-									{saving.saving === "retire" ? "Saving…" : confirm.isArmed(`retire:${key}`) ? "Confirm retire?" : "Retire"}
+									{confirm.isArmed(`retire:${key}`) ? "Confirm retire?" : "Retire"}
 								</Button>
 							</Tooltip>
 						)}
@@ -378,13 +361,7 @@ function MemoryEntries({ rows, cwd, context, confirm, empty }: { rows: OmpMemory
 	const [query, setQuery] = useState("");
 	if ("error" in rows) return <ErrorText>Cannot read the memories: {rows.error}</ErrorText>;
 	if (rows.entries.length === 0) {
-		return (
-			<Empty className="border border-dashed border-border">
-				<EmptyHeader>
-					<EmptyTitle>{empty}</EmptyTitle>
-				</EmptyHeader>
-			</Empty>
-		);
+		return <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">{empty}</p>;
 	}
 	const counts = Map.groupBy(rows.entries, entry => entry.kind);
 	const matches = everyWord(query);
@@ -392,7 +369,7 @@ function MemoryEntries({ rows, cwd, context, confirm, empty }: { rows: OmpMemory
 	return (
 		<div className="space-y-2">
 			<div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-				<SearchField label="Filter memories" placeholder="Filter" query={query} onQuery={setQuery} className="w-64" />
+				<SearchField label="Filter memories" placeholder="Filter" query={query} onQuery={setQuery} className="min-w-0 flex-1" />
 				<p className="text-xs text-muted-foreground tabular-nums">
 					{[...counts].map(([kind, entries]) => `${KIND_LABELS[kind]} ${entries.length.toLocaleString()}`).join(" · ")}
 				</p>
@@ -415,13 +392,13 @@ function MemoryEntries({ rows, cwd, context, confirm, empty }: { rows: OmpMemory
 function clearsOf(store: OmpMemoryStore): string | null {
 	switch (store.backend) {
 		case "local":
-			return "Lessons, the summary, skills, and session summaries for this folder.";
+			return "Forget everything removes the lessons, the summary, skills, and session summaries for this folder.";
 		case "sharpshooter":
-			return "The decision files for this folder.";
+			return "Forget everything removes the decision files for this folder.";
 		case "mnemopi": {
 			const own = store.banks.filter(bank => bank !== store.sharedBank);
 			if (own.length === 0) return null;
-			return `Every memory in ${own.join(", ")}.${store.sharedBank === null ? "" : ` ${store.sharedBank}, shared with other folders, stays.`}`;
+			return `Forget everything removes every memory in ${own.join(", ")}.${store.sharedBank === null ? "" : ` ${store.sharedBank}, shared with other folders, stays.`}`;
 		}
 		default:
 			return null;
@@ -429,36 +406,20 @@ function clearsOf(store: OmpMemoryStore): string | null {
 }
 
 /** Rebuild summary for Local, and Forget everything for the stores the page can clear, each armed before it runs. */
-function StoreActions({ store, cwd, context, confirm }: { store: OmpMemoryStore; cwd: string; context: MemoryContext; confirm: InlineConfirm }) {
-	const saving = useSaving();
-	const clears = clearsOf(store);
-	if (!clears) return null;
-	const run = (key: string, part: "/clear" | "/rebuild", body: object): void =>
-		saving.run(key, async () => {
-			try {
-				await context.memory.write(() => putJson<OmpMemory>(ompMemoryUrl(part, cwd), body));
-			} catch (err) {
-				if (err instanceof ApiError && err.conflict) context.memory.reload();
-				throw err;
-			}
-		});
-	const busy = saving.saving !== null;
+function StoreActions({ local, saving, confirm, run }: { local: boolean; saving: string | null; confirm: InlineConfirm; run: (key: "rebuild" | "clear") => void }) {
+	const busy = saving !== null;
 	return (
-		<div className="space-y-2 border-t border-border pt-3">
-			<div className="flex flex-wrap items-center justify-end gap-2">
-				{store.backend === "local" && (
-					<Tooltip content="It runs when the next session here starts">
-						<Button variant="secondary" size="compact" disabled={busy} onClick={() => run("rebuild", "/rebuild", {})}>
-							{saving.saving === "rebuild" ? "Saving…" : "Rebuild summary"}
-						</Button>
-					</Tooltip>
-				)}
-				<Button variant="destructive-outline" size="compact" disabled={busy} {...confirm.props("clear", () => run("clear", "/clear", { backend: store.backend }))}>
-					{saving.saving === "clear" ? "Forgetting…" : confirm.isArmed("clear") ? "Confirm forget everything?" : "Forget everything"}
-				</Button>
-			</div>
-			<p className="text-right text-xs text-muted-foreground">{clears}</p>
-			{saving.error && <ErrorText>{saving.error}</ErrorText>}
+		<div className="flex shrink-0 items-center gap-2">
+			{local && (
+				<Tooltip content="It runs when the next session here starts">
+					<Button variant="secondary" size="compact" disabled={busy} loading={saving === "rebuild"} onClick={() => run("rebuild")}>
+						Rebuild summary
+					</Button>
+				</Tooltip>
+			)}
+			<Button variant="destructive-outline" size="compact" disabled={busy} loading={saving === "clear"} {...confirm.props("clear", () => run("clear"))}>
+				{confirm.isArmed("clear") ? "Confirm forget everything?" : "Forget everything"}
+			</Button>
 		</div>
 	);
 }
@@ -466,17 +427,18 @@ function StoreActions({ store, cwd, context, confirm }: { store: OmpMemoryStore;
 /** The store of the backend in effect, in its own shape. */
 function Store({ store, options, cwd, context }: { store: OmpMemoryStore; options: OmpMemoryBackendOption[]; cwd: string; context: MemoryContext }) {
 	const confirm = useInlineConfirm(`omp-memory:${cwd}`);
+	const saving = useSaving();
 	let body: ReactNode;
 	let meta: ReactNode = null;
 	switch (store.backend) {
 		case "off":
 			return (
-				<Empty className="border border-dashed border-border">
-					<EmptyHeader>
-						<EmptyTitle>omp remembers nothing between sessions here.</EmptyTitle>
-						<EmptyDescription>Pick a backend above to start:</EmptyDescription>
-					</EmptyHeader>
-					<ul className="max-w-lg space-y-1 text-left text-sm text-muted-foreground">
+				<div className="space-y-3 rounded-md border border-dashed border-border px-3 py-6 text-sm">
+					<div className="space-y-1 text-center">
+						<p className="font-medium">omp remembers nothing between sessions here.</p>
+						<p className="text-muted-foreground">Pick a backend above to start:</p>
+					</div>
+					<ul className="mx-auto max-w-lg space-y-1 text-muted-foreground">
 						{options
 							.filter(option => option.value !== "off")
 							.map(option => (
@@ -486,7 +448,7 @@ function Store({ store, options, cwd, context }: { store: OmpMemoryStore; option
 								</li>
 							))}
 					</ul>
-				</Empty>
+				</div>
 			);
 		case "local":
 			body = <MemoryFiles files={store.files} cwd={cwd} context={context} empty="Nothing yet. omp summarizes a session here once it has been idle for a while." />;
@@ -504,9 +466,32 @@ function Store({ store, options, cwd, context }: { store: OmpMemoryStore; option
 			body = <MemoryEntries rows={store} cwd={cwd} context={context} confirm={confirm} empty="Nothing retained yet." />;
 			break;
 	}
+	const clears = clearsOf(store);
+	const run = (key: "rebuild" | "clear"): void =>
+		saving.run(key, async () => {
+			try {
+				await context.memory.write(() =>
+					key === "clear" ? putJson<OmpMemory>(ompMemoryUrl("/clear", cwd), { backend: store.backend }) : putJson<OmpMemory>(ompMemoryUrl("/rebuild", cwd), {}),
+				);
+			} catch (err) {
+				if (err instanceof ApiError && err.conflict) context.memory.reload();
+				throw err;
+			}
+		});
 	const shared = store.backend === "mnemopi" ? store.sharedBank !== null : store.backend === "hindsight" && store.shared;
 	return (
-		<Section title="Stored memory" meta={meta}>
+		<Section
+			title="Stored memory"
+			meta={
+				(meta || clears) && (
+					<>
+						{meta && <span className="block">{meta}</span>}
+						{clears && <span className="block">{clears}</span>}
+					</>
+				)
+			}
+			actions={clears && <StoreActions local={store.backend === "local"} saving={saving.saving} confirm={confirm} run={run} />}
+		>
 			{shared && (
 				<p className="text-xs text-warning-foreground">
 					{store.backend === "mnemopi"
@@ -515,7 +500,7 @@ function Store({ store, options, cwd, context }: { store: OmpMemoryStore; option
 				</p>
 			)}
 			{body}
-			<StoreActions store={store} cwd={cwd} context={context} confirm={confirm} />
+			{saving.error && <ErrorText>{saving.error}</ErrorText>}
 		</Section>
 	);
 }

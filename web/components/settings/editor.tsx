@@ -271,6 +271,42 @@ export function FileLink({ file, onOpenFile, children }: { file: OmpFile; onOpen
 	);
 }
 
+export function LayerNotes({
+	workspace,
+	env,
+	yourValue,
+	projectFile,
+	onOpenFile,
+}: {
+	workspace: boolean;
+	env: string | undefined;
+	yourValue: string | null;
+	projectFile: OmpFile | undefined;
+	onOpenFile: (path: string) => void;
+}) {
+	return (
+		<>
+			{workspace && (
+				<p className="text-xs text-muted-foreground">
+					This workspace sets it.{" "}
+					{projectFile && (
+						<FileLink file={projectFile} onOpenFile={onOpenFile}>
+							Open in Files
+						</FileLink>
+					)}
+					{projectFile && ". "}
+					{yourValue !== null && `Your value: ${yourValue}`}
+				</p>
+			)}
+			{env && (
+				<p className="text-xs text-muted-foreground">
+					<code className="font-mono">{env}</code> is set, and it overrides this value.
+				</p>
+			)}
+		</>
+	);
+}
+
 function OptionSelect({ labelId, hintId, value, options, disabled, onPick }: { labelId: string; hintId: string | undefined; value: unknown; options: AgentSettingOption[]; disabled: boolean; onPick: (value: string | number) => void }) {
 	// A value omp would not offer, written by hand, still shows as itself.
 	const listed = options.some(option => option.value === value) || (typeof value !== "string" && typeof value !== "number") ? options : [...options, { value, label: String(value) }];
