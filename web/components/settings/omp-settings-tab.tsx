@@ -37,11 +37,51 @@ interface ControlProps {
 }
 
 /** A link to a file in Settings › Files, which opens it there. */
-function FileLink({ file, onOpenFile, children }: { file: OmpFile; onOpenFile: (path: string) => void; children: string }) {
+export function FileLink({ file, onOpenFile, children }: { file: OmpFile; onOpenFile: (path: string) => void; children: string }) {
 	return (
 		<a href={hashForSettings("files")} onClick={() => onOpenFile(file.path)} className={LINK}>
 			{children}
 		</a>
+	);
+}
+
+/**
+ * Why a setting's control is locked or overridden: the workspace sets it, with a link to its file and your own value
+ * when there is one, or an environment variable does.
+ */
+export function LayerNotes({
+	workspace,
+	env,
+	yourValue,
+	projectFile,
+	onOpenFile,
+}: {
+	workspace: boolean;
+	env: string | undefined;
+	yourValue: string | null;
+	projectFile: OmpFile | undefined;
+	onOpenFile: (path: string) => void;
+}) {
+	return (
+		<>
+			{workspace && (
+				<p className="text-xs text-muted-foreground">
+					This workspace sets it.{" "}
+					{projectFile && (
+						<FileLink file={projectFile} onOpenFile={onOpenFile}>
+							Open in Files
+						</FileLink>
+					)}
+					{projectFile && ". "}
+					{yourValue !== null && `Your value: ${yourValue}`}
+				</p>
+			)}
+			{env && (
+				<p className="text-xs text-muted-foreground">
+					<code className="font-mono">{env}</code> is set, and it overrides this value.
+				</p>
+			)}
+		</>
 	);
 }
 
@@ -345,23 +385,13 @@ function SettingRow({ row, context: { save, projectFile, onOpenFile } }: { row: 
 				</div>
 			</div>
 			{placement === "block" && element}
-			{locked && (
-				<p className="text-xs text-muted-foreground">
-					This workspace sets it.{" "}
-					{projectFile && (
-						<FileLink file={projectFile} onOpenFile={onOpenFile}>
-							Open in Files
-						</FileLink>
-					)}
-					{projectFile && ". "}
-					Your value: {formatValue(row, row.user ?? (row.credential ? undefined : row.default))}
-				</p>
-			)}
-			{row.env && (
-				<p className="text-xs text-muted-foreground">
-					<code className="font-mono">{row.env}</code> is set, and it overrides this value.
-				</p>
-			)}
+			<LayerNotes
+				workspace={locked}
+				env={row.env}
+				yourValue={formatValue(row, row.user ?? (row.credential ? undefined : row.default))}
+				projectFile={projectFile}
+				onOpenFile={onOpenFile}
+			/>
 			{state.phase === "idle" && state.error && <ErrorText>Not saved: {state.error}</ErrorText>}
 		</li>
 	);
