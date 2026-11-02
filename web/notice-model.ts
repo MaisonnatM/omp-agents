@@ -23,13 +23,13 @@ export type NoticeFace =
 	| { kind: "slack"; person: { name: string; avatarUrl: string | null } };
 
 /**
- * A notice's button: **Update** (`ready` when it may run: before the update, and again after it failed), **Merge**,
+ * A notice's button: **Update** (`updating` while the update runs, and `ready` when it may run: before the update, and again after it failed), **Merge**,
  * which merges after a confirmation, the quick action that makes a pull request's move, or **Continue all**, which
  * resumes `sessionIds` and sends `continue` to each.
  */
 export type NoticeAction =
 	| { kind: "none" }
-	| { kind: "update"; label: "Update" | "Updating"; ready: boolean }
+	| { kind: "update"; updating: boolean; ready: boolean }
 	| { kind: "merge"; pr: PullRequestSummary }
 	| { kind: "quick"; pr: PullRequestSummary; action: PullRequestActionId; cwd: string }
 	| { kind: "continue-all"; sessionIds: string[] };
@@ -195,7 +195,7 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 				action:
 					status.state === "updated"
 						? { kind: "none" }
-						: { kind: "update", label: status.state === "updating" ? "Updating" : "Update", ready: status.state === "available" || status.state === "failed" },
+						: { kind: "update", updating: status.state === "updating", ready: status.state === "available" || status.state === "failed" },
 				toast: { kind: "update", dismissedElsewhere: notice.seen && status.state === "available" },
 			};
 		}

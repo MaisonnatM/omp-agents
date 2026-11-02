@@ -20,15 +20,15 @@ test("an event stays toasted and opens the Calendar page when kept on this compu
 
 test("an update's action, failure, and toast follow its status", () => {
 	const update = (status: Extract<Notice, { kind: "omp" }>["status"], seen = false): Notice => ({ id: "u", ...flags, seen, kind: "omp", current: "1", latest: "2", status });
-	expect(presentNotice(update({ state: "available" }, true), NOW)).toMatchObject({ source: "updates", headline: "omp 2 is out", link: null, action: { kind: "update", label: "Update", ready: true }, toast: { kind: "update", dismissedElsewhere: true } });
-	expect(presentNotice(update({ state: "updating" }), NOW)).toMatchObject({ busy: true, action: { label: "Updating", ready: false } });
+	expect(presentNotice(update({ state: "available" }, true), NOW)).toMatchObject({ source: "updates", headline: "omp 2 is out", link: null, action: { kind: "update", updating: false, ready: true }, toast: { kind: "update", dismissedElsewhere: true } });
+	expect(presentNotice(update({ state: "updating" }), NOW)).toMatchObject({ busy: true, action: { updating: true, ready: false } });
 	expect(presentNotice(update({ state: "failed", error: "boom" }), NOW)).toMatchObject({ failed: true, preview: "boom", action: { ready: true } });
 	expect(presentNotice(update({ state: "updated", note: "done" }), NOW).action).toEqual({ kind: "none" });
 });
 
 test("new omp-agents commits name their count and branch, and their Update pulls and restarts", () => {
 	const dashboard = (commits: number): Notice => ({ id: "d", ...flags, kind: "dashboard", branch: "main", commits, status: { state: "available" } });
-	expect(presentNotice(dashboard(1), NOW)).toMatchObject({ source: "updates", headline: "omp-agents update: 1 new commit on main", preview: "Update pulls them and restarts omp-agents.", action: { kind: "update", label: "Update", ready: true } });
+	expect(presentNotice(dashboard(1), NOW)).toMatchObject({ source: "updates", headline: "omp-agents update: 1 new commit on main", preview: "Update pulls them and restarts omp-agents.", action: { kind: "update", updating: false, ready: true } });
 	expect(presentNotice(dashboard(4), NOW).headline).toBe("omp-agents update: 4 new commits on main");
 });
 

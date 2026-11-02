@@ -194,11 +194,11 @@ export function NoticeAction({ id, action, send, onDone }: { id: string; action:
 					{...activityControl("notices.update")}
 					variant="secondary"
 					size="compact"
-					loading={action.label === "Updating"}
+					loading={action.updating}
 					disabled={!connected || !action.ready}
 					onClick={() => send({ t: "notice", ids: [id], op: "update" })}
 				>
-					{action.label}
+					{action.updating ? "Updating" : "Update"}
 				</Button>
 			);
 		case "merge":
