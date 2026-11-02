@@ -69,7 +69,6 @@ import { ActionPanel } from "./action-panel";
 import { PaletteFooter } from "./palette-footer";
 import { commandKey, record } from "../../activity";
 
-import { goalDialogs } from "../../session-goal";
 const COMMAND_ICON: Partial<Record<ShortcutId, LucideIcon>> = {
 	newSession: Plus,
 	previousSession: ArrowUp,
@@ -77,6 +76,7 @@ const COMMAND_ICON: Partial<Record<ShortcutId, LucideIcon>> = {
 	back: ArrowLeft,
 	forward: ArrowRight,
 	openPullRequest: GitPullRequestCreate,
+	setGoal: Target,
 	tools: Wrench,
 	sessionsSidebar: PanelLeft,
 	detailsSidebar: PanelRight,
@@ -99,7 +99,6 @@ interface CommandPaletteProps {
 	state: PaletteState | null;
 	dispatch: (event: PaletteEvent) => void;
 	hosts: RosterHost[];
-	goalHost?: RosterHost;
 	past: PastSession[];
 	/** The workspaces, as the sidebar's workspace picker lists them. */
 	workspaces: Workspace[];
@@ -151,7 +150,7 @@ const SETTINGS_ITEMS: readonly PaletteItem[] = SETTINGS_SECTIONS.map(({ value, l
 	actions: [[{ id: "open", title: "Open", icon, run: { kind: "link", href: hashForSettings(value) } }]],
 }));
 
-function OpenCommandPalette({ state, dispatch, hosts, goalHost, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, tabs, todoCategories, todos, notes, linearConnected, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
+function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, tabs, todoCategories, todos, notes, linearConnected, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
 	const { send, start, end, changeTodo, changeNote, workspaceSettings } = useDashboardActions();
 	const { starts, ending, pullRequestsScope, connected } = useDashboardStatus();
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
@@ -261,13 +260,6 @@ function OpenCommandPalette({ state, dispatch, hosts, goalHost, past, workspaces
 					} } }]],
 				}),
 			),
-			...(goalHost && !hosts.some(host => host.instanceId === goalHost.instanceId) ? [...hosts, goalHost] : hosts).flatMap((host): PaletteItem[] => host.source === "dashboard" && host.goal.kind !== "off" && host.control.phase === "live" ? [{
-				id: `command:goal:${host.instanceId}`, section: "commands", title: host.goal.kind === "set" ? "Edit goal" : "Set goal", subtitle: hostLabel(host), keywords: ["objective", "session"], icon: Target, accessories: [], kind: "Command",
-				actions: [[{ id: "set-goal", title: "Set goal", icon: Target, run: { kind: "do", fn: () => {
-					goalDialogs.set(host.instanceId, true);
-					onOpenSession({ kind: "live", instanceId: host.instanceId, agentId: null }, workspaceCwd(host), "replace");
-				} } }]],
-			}] : []),
 			pushItem("command:workspace", "Choose workspace…", Folder, "workspaces", ["switch workspace", "directory"], shortcutLabels("workspace")),
 			pushItem("command:create-todo", "Create todo", ListTodo, "createTodo", ["add todo", "task"], []),
 			...(connected && notes !== null ? [{
@@ -280,7 +272,7 @@ function OpenCommandPalette({ state, dispatch, hosts, goalHost, past, workspaces
 			} satisfies PaletteItem] : []),
 			...updateItem(selfUpdate),
 		];
-	}, [handlers, unavailable, tabs, selfUpdate, connected, notes, changeNote, hosts, goalHost, onOpenSession]);
+	}, [handlers, unavailable, tabs, selfUpdate, connected, notes, changeNote]);
 
 	const workspaceItems = useMemo((): PaletteItem[] => {
 		const pickWorkspace = (cwd: string | null): void => {

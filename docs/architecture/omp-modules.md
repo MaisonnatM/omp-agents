@@ -51,6 +51,7 @@ The main ones:
   `get_available_models` returns omp's whole `Model` objects, with `name`, `contextWindow`, `api`, `identity`, and `serviceTiers`; `get_state` adds `fastModeEnabled` and `fastModeActive`, and `setFastMode` sends `set_fast_mode`.
   `get_state` also exposes `autoCompactionEnabled` and `goal`; `RpcClient.setAutoCompaction` and `RpcClient.goal` drive their short controls.
   Goal events carry `goal_updated`; completion clears native mode state, so the dashboard retains the completed event until cleared.
+  `goals/state.ts` defines `GoalModeState` and `GoalRuntimeEvent` around pi-tui's `Goal`; `parseRpcGoal` validates the subset the dashboard reads before retaining a completion event.
   `goal.continuationModes` in `goals/settings.ts` defaults to interactive continuation only.
   `advisor/settings.ts` supplies the configured default and `advisor/config.ts` discovers the WATCHDOG roster; RPC still has no field for the session's actual advisor enabled state.
   `session/model-compaction-threshold.ts` applies per-model overrides before `pi-agent-core/src/compaction/compaction.ts` resolves the trigger token count, so the ring does not duplicate threshold math.

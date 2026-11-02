@@ -121,9 +121,13 @@ export type ClientMsg =
 	| { t: "set-thinking"; instanceId: string; level: string }
 	/** Turn omp's `/fast` on or off for a session this dashboard started. */
 	| { t: "set-fast"; instanceId: string; enabled: boolean }
+	/** Run an idle dashboard session's native context-maintenance slash command. */
 	| { t: "context"; instanceId: string; action: ContextAction }
+	/** Turn automatic compaction on or off for this dashboard session only. */
 	| { t: "set-auto-compaction"; instanceId: string; enabled: boolean }
+	/** Enable or disable this dashboard session's configured advisor through `/advisor`. */
 	| { t: "set-advisor"; instanceId: string; enabled: boolean }
+	/** Set, pause, resume, or clear a dashboard session's goal through native RPC. */
 	| { t: "goal"; instanceId: string; change: GoalChange }
 	/** Reply to one of a live session's pending `requests`. */
 	| { t: "answer"; instanceId: string; requestId: string; answer: UserAnswer }

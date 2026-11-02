@@ -17,6 +17,8 @@ import type { Socket } from "./server/views";
 import type { ServerMsg } from "./shared/protocol";
 import * as replayLaunch from "./omp/replay-launch";
 import type { PreparedReplay } from "./replay";
+import * as ompConfig from "./omp/config";
+import type { SessionControlsConfig } from "./omp/config";
 
 const STATE: RpcState = { sessionId: "session-1", fastModeEnabled: false, fastModeActive: false, autoCompactionEnabled: true, goal: null, isStreaming: false, isCompacting: false, hasPendingAsyncWork: false, queuedMessages: { steering: [], followUp: [] } };
 
@@ -106,9 +108,10 @@ function fakeOmp(client: FakeClient) {
 }
 
 /** Start a session on a fake omp, and collect what it reports. */
-async function startSession(model: { provider: string; id: string } | null = null) {
+async function startSession(model: { provider: string; id: string } | null = null, config: Partial<SessionControlsConfig> = {}) {
 	const client = new FakeClient();
 	fakeOmp(client);
+	spyOn(ompConfig, "loadSessionControlsConfig").mockResolvedValue({ advisorEnabled: false, advisorModels: [], goalEnabled: true, goalContinues: false, compactionThreshold: () => 180000, ...config });
 	const updates: DashboardUpdate[] = [];
 	const session = await DashboardSession.start("inst-1", "/tmp/project", model, null, LAUNCH, update => updates.push(update));
 	return { session, client, updates, rosters: () => updates.filter(update => update.kind === "roster").length };
@@ -974,7 +977,7 @@ describe("DashboardSession context and goal controls", () => {
 	test("manual compaction events update the ring and re-read its final tokens", async () => {
 		const { session, client } = await startSession();
 		client.fire({ type: "manual_compaction_start" });
-		expect(session.row().source === "dashboard" && session.compaction.running).toBe("manual");
+		expect(session.compaction.running).toBe("manual");
 		client.getState = async () => ({ ...STATE, contextUsage: { tokens: 40000, contextWindow: 200000 } });
 		client.fire({ type: "manual_compaction_end" });
 		await settle();
@@ -1003,12 +1006,11 @@ describe("DashboardSession context and goal controls", () => {
 	});
 
 	test("advisor slash toggles update the dashboard's tracked state", async () => {
-		const { session } = await startSession();
-		session.advisor = { enabled: false, model: "provider/model" };
+		const { session } = await startSession(null, { advisorModels: ["provider/model"] });
 		await session.setAdvisor(true);
-		expect(session.advisor.enabled).toBe(true);
+		expect(session.advisor?.enabled).toBe(true);
 		await session.prompt(null, "/advisor toggle", [], "steer");
-		expect(session.advisor.enabled).toBe(false);
+		expect(session.advisor?.enabled).toBe(false);
 	});
 
 	test("a completed goal remains visible after omp clears its mode, and Clear removes it", async () => {
@@ -1018,5 +1020,79 @@ describe("DashboardSession context and goal controls", () => {
 		expect(session.goal).toMatchObject({ kind: "set", goal: { status: "complete", objective: "ship" } });
 		await session.changeGoal({ op: "clear" });
 		expect(session.goal.kind).toBe("none");
+	});
+
+	test("auto compaction events and the state fallback show ongoing compaction", async () => {
+		const { session, client } = await startSession();
+		client.fire({ type: "auto_compaction_start" });
+		expect(session.compaction.running).toBe("auto");
+		client.fire({ type: "auto_compaction_end" });
+		await settle();
+		expect(session.compaction.running).toBeNull();
+		client.getState = async () => ({ ...STATE, isCompacting: true });
+		client.fire({ type: "turn_end" });
+		await settle();
+		expect(session.compaction.running).toBe("auto");
+	});
+
+	test("an unconfigured advisor refuses before sending a prompt", async () => {
+		const { session, client } = await startSession();
+		await expect(session.setAdvisor(true)).rejects.toThrow("Assign a model to the advisor role");
+		expect(client.calls).toEqual([]);
+	});
+
+	test("refused advisor commands do not change its tracked state", async () => {
+		const { session, client } = await startSession(null, { advisorModels: ["p/model"] });
+		client.prompt = async () => { throw new Error("refused"); };
+		await expect(session.setAdvisor(true)).rejects.toBeInstanceOf(PromptRefused);
+		expect(session.advisor?.enabled).toBe(false);
+	});
+
+	test("maintenance prompt admission does not hold the short-RPC model lane or read state", async () => {
+		const { session, client } = await startSession(null, { advisorModels: ["p/model"] });
+		for (const run of [() => session.contextAction({ kind: "handoff" }), () => session.setAdvisor(true)]) {
+			const admitted = Promise.withResolvers<string>();
+			client.prompt = () => admitted.promise;
+			const stateRead = spyOn(client, "getState");
+			const prompt = run();
+			await settle();
+			await session.setAutoCompaction(false);
+			expect(client.calls.at(-1)).toBe("auto false");
+			expect(stateRead).toHaveBeenCalledTimes(1);
+			admitted.resolve("local-command");
+			await prompt;
+			expect(stateRead).toHaveBeenCalledTimes(1);
+			stateRead.mockRestore();
+		}
+	});
+
+	test("a completed goal is invalidated by a new live goal or a different session", async () => {
+		const { session, client } = await startSession();
+		const complete = { objective: "done", status: "complete", tokensUsed: 42, timeUsedSeconds: 3 };
+		client.fire({ type: "goal_updated", goal: complete });
+		await settle();
+		const active = { ...complete, objective: "next", status: "active" as const };
+		client.getState = async () => ({ ...STATE, goal: { enabled: true, mode: "active", goal: active } });
+		client.fire({ type: "goal_updated", goal: active });
+		await settle();
+		expect(session.goal).toMatchObject({ kind: "set", goal: { objective: "next" } });
+		client.getState = async () => STATE;
+		client.fire({ type: "goal_updated", goal: null });
+		await settle();
+		expect(session.goal.kind).toBe("none");
+		client.fire({ type: "goal_updated", goal: complete });
+		await settle();
+		client.getState = async () => ({ ...STATE, sessionId: "session-2" });
+		client.fire({ type: "turn_end" });
+		await settle();
+		expect(session.goal.kind).toBe("none");
+	});
+
+	test("a failed typed goal command reports once and refuses the prompt", async () => {
+		const { session, client, updates } = await startSession();
+		client.goal = async () => { throw new Error("goal refused"); };
+		await expect(session.prompt(null, "/goal pause", [], "steer")).rejects.toBeInstanceOf(PromptRefused);
+		expect(updates.filter(update => update.kind === "note").map(update => update.text)).toEqual(["Goal change failed: goal refused"]);
+		expect(client.calls).toEqual([]);
 	});
 });

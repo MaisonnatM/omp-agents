@@ -25,6 +25,7 @@ import { useNoticeToasts } from "./components/use-notice-toasts";
 import { RenderBoundary } from "./components/render-boundary";
 import { ScheduledSends } from "./components/scheduled";
 import { SessionDetails } from "./components/session-details";
+import { GoalDialog } from "./components/session-goal";
 import { ProjectTrustDialog } from "./components/project-trust-dialog";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { GetStarted } from "./components/get-started";
@@ -77,6 +78,10 @@ export function App() {
 	useNoticeToasts(state.notices, state.connected, send, start);
 	useAttention(state, openBot?.view ?? null, send);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
+	const [goalEditor, setGoalEditor] = useState<{ instanceId: string; focus: "objective" | "budget" } | null>(null);
+	const editGoal = useCallback((instanceId: string, focus: "objective" | "budget") => setGoalEditor({ instanceId, focus }), []);
+	const goalHost = goalEditor ? state.hosts.find(host => host.instanceId === goalEditor.instanceId) : null;
+	const editedGoal = goalHost?.source === "dashboard" && goalHost.goal.kind !== "off" && goalHost.control.phase === "live" && !goalHost.control.readOnly ? goalHost : null;
 	const integrations = integrationsStore.usePolling().read?.data.integrations;
 	const linear = integrations?.linear ?? null;
 	const { signedOut: signedOutTabs, shown: tabs } = useSidebarTabs();
@@ -147,6 +152,7 @@ export function App() {
 	const { setShortcutsOpen, setFilePath, setNewTicket, dispatchPalette } = overlays;
 	// The command menu's **Open pull request** acts on the focused pane's session while the panes show, as its header's **Open PR** does.
 	const openPullRequest = useOpenPullRequest(page ? null : focused.view, focused.host, request);
+	const focusedGoal = page === null && focused.view?.kind === "live" && focused.view.agentId === null && focused.host?.source === "dashboard" && focused.host.goal.kind !== "off" && focused.host.control.phase === "live" && !focused.host.control.readOnly ? focused.host : null;
 	const { handlers, unavailable } = usePageShortcuts({
 		page,
 		layout,
@@ -160,6 +166,7 @@ export function App() {
 		linearCallable,
 		hasDetails: detailsView !== null || openBot !== null,
 		openPullRequest: openPullRequest.state.kind === "ready" ? openPullRequest.run : null,
+		setGoal: focusedGoal ? () => editGoal(focusedGoal.instanceId, "objective") : null,
 		palette: overlays.palette,
 		dispatchPalette,
 		setShortcutsOpen,
@@ -177,8 +184,8 @@ export function App() {
 	});
 
 	const actions = useMemo(
-		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, changeBot, end: endHost, openFile: setFilePath, openNewTicket: setNewTicket, workspaceSettings }),
-		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, changeBot, endHost, setFilePath, setNewTicket, workspaceSettings],
+		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, changeBot, end: endHost, openFile: setFilePath, openNewTicket: setNewTicket, editGoal, workspaceSettings }),
+		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, changeBot, endHost, setFilePath, setNewTicket, editGoal, workspaceSettings],
 	);
 	const fork = startOf(state.starts, "fork");
 	const replay = startOf(state.starts, "replay");
@@ -342,12 +349,21 @@ export function App() {
 									/>
 									{overlays.filePath !== null && <FileDialog key={overlays.filePath} path={overlays.filePath} onClose={() => setFilePath(null)} />}
 									{overlays.newTicket !== null && <NewTicketDialog title={overlays.newTicket} onClose={() => setNewTicket(null)} />}
+									{goalEditor && editedGoal && editedGoal.goal.kind !== "off" && (
+										<GoalDialog
+											key={goalEditor.instanceId}
+											goal={editedGoal.goal.kind === "set" && editedGoal.goal.goal.status !== "complete" ? editedGoal.goal.goal : null}
+											focus={goalEditor.focus}
+											continues={editedGoal.goal.continues}
+											onClose={() => setGoalEditor(null)}
+											onSave={async change => { await request({ t: "goal", instanceId: goalEditor.instanceId, change }); setGoalEditor(null); }}
+										/>
+									)}
 									<DiscussionPanel />
 									<CommandPalette
 										state={overlays.palette}
 										dispatch={dispatchPalette}
 										hosts={visible.hosts}
-										goalHost={page === null && focused.view?.kind === "live" && focused.view.agentId === null ? focused.host : undefined}
 										past={visible.past}
 										workspaces={workspaces}
 										workspace={workspace}

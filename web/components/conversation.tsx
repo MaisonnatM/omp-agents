@@ -161,10 +161,15 @@ function LiveConversation({
 	const contextAction = useAction((action: ContextAction) => request({ t: "context", instanceId, action }), "Could not change the context");
 	const autoCompaction = useAction((enabled: boolean) => request({ t: "set-auto-compaction", instanceId, enabled }), "Could not switch auto-compact");
 	const switching = (!!switchable && switchable.switching) || modelChange.pending || thinkingChange.pending || fastChange.pending || advisorChange.pending;
-	const restoreDraft = (text: string): void => {
-		setDraft(current => (current ? `${text}\n${current}` : text));
-		editorRef.current?.focus();
+	const prefixDraft = (text: string, { newline = true, selectEnd = false } = {}): void => {
+		setDraft(current => current ? `${text}${newline ? "\n" : ""}${current}` : text);
+		requestAnimationFrame(() => {
+			editorRef.current?.focus();
+			if (selectEnd) editorRef.current?.select(Number.POSITIVE_INFINITY);
+		});
 	};
+	const restoreDraft = (text: string): void => prefixDraft(text);
+	const focusContextCommand = (command: string): void => prefixDraft(command, { newline: false, selectEnd: true });
 	const { queued, take, interrupt } = useQueue({
 		waiting: subject.queue,
 		withdrawn,
@@ -376,7 +381,18 @@ function LiveConversation({
 										</Button>
 									</Tooltip>
 								)}
-								{session && shown?.context && (switchable ? <ContextRingMenu context={shown.context} compaction={switchable.compaction} working={working} pending={contextAction.pending} autoPending={autoCompaction.pending} onAction={contextAction.run} onAutoChange={autoCompaction.run} onFocus={command => { setDraft(current => `${command}${current}`); requestAnimationFrame(() => { editorRef.current?.focus(); editorRef.current?.select(Number.POSITIVE_INFINITY); }); }} /> : <ContextRing context={shown.context} />)}
+								{session && shown?.context && (switchable ? (
+									<ContextRingMenu
+										context={shown.context}
+										compaction={switchable.compaction}
+										working={working}
+										pending={contextAction.pending}
+										autoPending={autoCompaction.pending}
+										onAction={contextAction.run}
+										onAutoChange={autoCompaction.run}
+										onFocus={focusContextCommand}
+									/>
+								) : <ContextRing context={shown.context} />)}
 								{sessionId !== null && writable && (
 									<ScheduleButton draft={draft} files={attachments.files.length} disabled={!connected} pending={schedule.pending} onSchedule={schedule.run} />
 								)}

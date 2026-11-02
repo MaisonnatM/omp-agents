@@ -13,7 +13,7 @@ export interface CompactionState {
 
 export interface AdvisorState {
 	enabled: boolean;
-	model: string;
+	models: string[];
 }
 
 export interface SessionGoal {
@@ -50,6 +50,12 @@ export function parseGoalChange(value: unknown): GoalChange | null {
 }
 
 export const contextCommand = (action: ContextAction): string => action.kind === "compact" ? `/compact${action.mode ? ` ${action.mode}` : ""}` : action.kind === "shake" ? `/shake ${action.mode}` : "/handoff";
+
+/** The advisor commands whose successful admission changes the dashboard's tracked state. */
+export function advisorCommand(text: string): "on" | "off" | "toggle" | null {
+	const match = /^\/advisor(?:\s+(on|off|toggle))?\s*$/.exec(text.trim());
+	return match ? match[1] === "on" ? "on" : match[1] === "off" ? "off" : "toggle" : null;
+}
 
 /** A local /goal command, never a prompt for the model. Budget changes replace the goal over RPC. */
 export function goalCommand(text: string, current: SessionGoal | null): GoalChange | "show" | null {

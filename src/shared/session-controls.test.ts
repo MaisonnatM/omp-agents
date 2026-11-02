@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { contextCommand, goalCommand, parseContextAction, parseGoalChange } from "./session-controls";
+import { advisorCommand, contextCommand, goalCommand, parseContextAction, parseGoalChange } from "./session-controls";
 
 const goal = { objective: "ship", status: "paused" as const, tokensUsed: 42, tokenBudget: 100000, timeUsedSeconds: 4 };
 
@@ -12,6 +12,12 @@ describe("context actions", () => {
 		expect(parseContextAction({ kind: "shake", mode: "soft" })).toBeNull();
 		expect(parseContextAction({ kind: "handoff" })).toEqual({ kind: "handoff" });
 	});
+});
+
+test("advisor tracking accepts only native on, off, and toggle commands", () => {
+	expect(advisorCommand(" /advisor ")).toBe("toggle");
+	for (const op of ["on", "off", "toggle"] as const) expect(advisorCommand(`/advisor ${op}`)).toBe(op);
+	for (const text of ["hello", "/advisors", "/advisor model", "/advisor on extra", "/advisor ON"]) expect(advisorCommand(text)).toBeNull();
 });
 
 describe("goal changes", () => {

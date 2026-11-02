@@ -74,11 +74,13 @@ export interface AdvisorConfigModule {
 export interface AdvisorSettingsModule {
 	cfgAdvisorEnabled: SettingsReader<boolean>;
 }
+/** Opaque native settings passed straight from omp's model resolver to its threshold resolver. */
+export type ModelCompactionSettings = Record<string, unknown>;
 export interface ModelCompactionSettingsModule {
-	resolveModelCompactionSettings(scope: OmpSettingsInstance, model: { provider: string; id: string } | undefined): Record<string, unknown>;
+	resolveModelCompactionSettings(scope: OmpSettingsInstance, model: { provider: string; id: string } | undefined): ModelCompactionSettings;
 }
 export interface CompactionModule {
-	resolveThresholdTokens(window: number, settings: Record<string, unknown>): number;
+	resolveThresholdTokens(window: number, settings: ModelCompactionSettings): number;
 }
 /** omp's release lookup (src/cli/update-cli.ts), the one `omp update` makes. */
 export interface UpdateCliModule {

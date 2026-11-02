@@ -1,7 +1,7 @@
 ---
 status: accepted
 date: 2026-11-02
-decision-makers: agent
+decision-makers: Maxence Maisonnat
 ---
 
 # Respect the RPC continuation opt-in for goals

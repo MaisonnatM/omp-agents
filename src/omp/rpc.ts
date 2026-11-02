@@ -12,11 +12,23 @@ import { ompCommand } from "./install";
 import { rpc, rpcFrameFile, rpcFrames, utils } from "./modules";
 import type { ServiceTierModel } from "./module-types/models";
 import type { RpcHostTool } from "./module-types/rpc";
-import type { SessionGoal } from "../shared/session-controls";
 
-export interface RpcGoal extends Omit<SessionGoal, "tokenBudget" | "status"> {
+/** Fields read from omp's Goal (pi-tui/tools/goal, exposed by goals/state.ts). */
+export interface RpcGoal {
+	objective: string;
+	status: "active" | "paused" | "budget-limited" | "complete" | "dropped";
+	tokensUsed: number;
 	tokenBudget?: number;
-	status: SessionGoal["status"] | "dropped";
+	timeUsedSeconds: number;
+}
+
+export function parseRpcGoal(value: unknown): RpcGoal | null {
+	if (!isObject(value) || typeof value.objective !== "string") return null;
+	const { status, tokensUsed, tokenBudget, timeUsedSeconds } = value;
+	if (status !== "active" && status !== "paused" && status !== "budget-limited" && status !== "complete" && status !== "dropped") return null;
+	if (typeof tokensUsed !== "number" || !Number.isFinite(tokensUsed) || typeof timeUsedSeconds !== "number" || !Number.isFinite(timeUsedSeconds)) return null;
+	if (tokenBudget !== undefined && (typeof tokenBudget !== "number" || !Number.isFinite(tokenBudget))) return null;
+	return { objective: value.objective, status, tokensUsed, ...(tokenBudget === undefined ? {} : { tokenBudget }), timeUsedSeconds };
 }
 
 export interface RpcGoalState {

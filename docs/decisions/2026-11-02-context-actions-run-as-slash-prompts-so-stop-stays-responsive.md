@@ -1,7 +1,7 @@
 ---
 status: accepted
 date: 2026-11-02
-decision-makers: agent
+decision-makers: Maxence Maisonnat
 ---
 
 # Context actions run as slash prompts so Stop stays responsive

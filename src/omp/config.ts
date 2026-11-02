@@ -53,18 +53,36 @@ export interface OmpConfig {
 	retry: RetrySettings;
 	modelProviderOrder: string[];
 	disabledExtensions: string[];
+}
+
+/** Native settings and configured advisors used only by a live dashboard session. */
+export interface SessionControlsConfig {
 	advisorEnabled: boolean;
-	advisorModel: string | null;
+	advisorModels: string[];
 	goalEnabled: boolean;
 	goalContinues: boolean;
+	/** Resolve lazily so model switches use omp's per-model overrides with the current context window. */
 	compactionThreshold(model: { provider: string; id: string } | undefined, window: number): number;
+}
+
+/** Session-only discovery; routing and Settings readers do not need advisor files. */
+export async function loadSessionControlsConfig(cwd: string): Promise<SessionControlsConfig> {
+	const [settings, { advisors }] = await Promise.all([config.Settings.loadReadOnly({ cwd }), advisorConfig.discoverAdvisorConfigs(cwd)]);
+	const fallback = settings.getModelRoles().advisor;
+	const enabled = advisors.filter(advisor => advisor.enabled !== false);
+	const advisorModels = enabled.length ? enabled.flatMap(advisor => advisor.model ?? fallback ?? []) : fallback ? [fallback] : [];
+	return {
+		advisorEnabled: advisorSettings.cfgAdvisorEnabled.get(settings),
+		advisorModels,
+		goalEnabled: goalSettings.cfgGoalEnabled.get(settings),
+		goalContinues: goalSettings.cfgGoalContinuationModes.get(settings).includes("rpc"),
+		compactionThreshold: (model, window) => compaction.resolveThresholdTokens(window, modelCompactionSettings.resolveModelCompactionSettings(settings, model)),
+	};
 }
 
 /** Read-only: omp's `loadReadOnly` never writes the config files back. */
 export async function loadOmpConfig(cwd: string): Promise<OmpConfig> {
 	const settings = await config.Settings.loadReadOnly({ cwd });
-	const { advisors } = await advisorConfig.discoverAdvisorConfigs(cwd);
-	const enabledAdvisors = advisors.filter(advisor => advisor.enabled !== false);
 	return {
 		modelRoles: settings.getModelRoles(),
 		fallbackChains: sessionSettings.cfgRetryFallbackChains.get(settings),
@@ -74,14 +92,8 @@ export async function loadOmpConfig(cwd: string): Promise<OmpConfig> {
 		},
 		modelProviderOrder: modelSettings.cfgModelProviderOrder.get(settings),
 		disabledExtensions: extensionSettings.cfgDisabledExtensions.get(settings),
-		advisorEnabled: advisorSettings.cfgAdvisorEnabled.get(settings),
-		advisorModel: enabledAdvisors.length > 1 ? `${enabledAdvisors.length} advisors` : enabledAdvisors[0]?.model ?? settings.getModelRoles().advisor ?? null,
-		goalEnabled: goalSettings.cfgGoalEnabled.get(settings),
-		goalContinues: goalSettings.cfgGoalContinuationModes.get(settings).includes("rpc"),
-		compactionThreshold: (model, window) => compaction.resolveThresholdTokens(window, modelCompactionSettings.resolveModelCompactionSettings(settings, model)),
 	};
 }
-
 
 function setting(id: string): SettingHandle {
 	const handle = settingsRegistry.lookup(id);

@@ -2,7 +2,7 @@
 
 - Opening a live session or subagent puts the cursor in the focused pane's composer once it accepts messages, so you can type right away.
   A session that reconnects takes the cursor back the same way.
-- A dashboard session's title controls include **Set goal** (target icon); the command palette also offers **Set goal** or **Edit goal** for each live dashboard session.
+- A dashboard session's title controls include **Set goal** (target icon); the command palette's **Set or edit goal** opens the same editor for the focused live dashboard session.
   Enter an objective and an optional token budget: None, 100k, 500k, 1M, or Custom.
   Its header pill opens the full objective, token count, elapsed time, and Pause, Resume, Edit, or Clear.
   Clear asks you to click **Clear goal?** to confirm; clicking elsewhere or pressing Escape cancels it.

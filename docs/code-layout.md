@@ -21,7 +21,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Rows above the composer: queued prompts in `web/components/composer-queue.tsx`, suggested prompts in `web/components/composer-suggestions.tsx`, scheduled sends in `web/components/scheduled.tsx`, and the open question, `UserRequestCard` in `web/components/user-request.tsx`, drawn by `question-card.tsx`.
 - `/` and `@` menus: `CompletionPopup` in `web/components/completion-popup.tsx`, over `web/mentions.ts`.
 - Model and thinking switch: `ModelSlot` in `web/components/model-slot.tsx`, whose menu is `web/components/model-picker.tsx`.
-- Session goal: `SessionGoalControl` and its dialog in `web/components/session-goal.tsx`, mounted in the conversation header, with palette opening held by `web/session-goal.ts`.
+- Session goal: `SessionGoalControl` in `web/components/session-goal.tsx` mounts in the conversation header; `App` owns its `GoalDialog` and the shared `editGoal` action, which the focused-session palette command runs through `use-page-shortcuts.ts`.
 - Conversation pane: `web/components/pane.tsx`, laid out by `PaneGrid` in `web/components/pane-grid.tsx`, with the panes' divider in `web/components/split-resize-handle.tsx`.
   Its header is `ConversationHeader` in `web/components/conversation-header.tsx`, and a past session's view is `web/components/past-conversation.tsx`.
   The session title in either header, which a click turns into a field that renames the session, is `SessionTitle` in `web/components/session-title.tsx`.

@@ -241,7 +241,7 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 				{advisor && (
 					<MenuSwitchItem {...activityControl("composer.advisor")} checked={advisor.state?.enabled ?? false} onCheckedChange={advisor.onChange} disabled={pending || advisor.state === null} title={advisor.state === null ? "Set an advisor model in Settings → Models." : "Advisor for this session."}>
 						Advisor
-						{advisor.state && <span className="min-w-0 truncate text-xs text-muted-foreground">{advisor.state.model.endsWith(" advisors") ? advisor.state.model : modelLabel(advisor.state.model)}</span>}
+						{advisor.state && <span className="min-w-0 truncate text-xs text-muted-foreground">{advisor.state.models.length > 1 ? `${advisor.state.models.length} advisors` : modelLabel(advisor.state.models[0]!)}</span>}
 					</MenuSwitchItem>
 				)}
 				{contextWindow !== null && (

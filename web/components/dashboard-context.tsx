@@ -32,6 +32,8 @@ export interface DashboardActions {
 	openFile: (path: string) => void;
 	/** Open the new-ticket dialog with `title` as the issue's title. */
 	openNewTicket: (title: string) => void;
+	/** Open the session's goal editor, shared by its header and the focused-session palette command. */
+	editGoal: (instanceId: string, focus: "objective" | "budget") => void;
 	/** What opens `cwd`'s Models settings by picking it in the sidebar, or `null` when the sidebar cannot pick it, as for `/tmp` or a hidden workspace. */
 	workspaceSettings: (cwd: string) => (() => void) | null;
 }
