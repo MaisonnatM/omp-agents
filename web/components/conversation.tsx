@@ -28,6 +28,7 @@ import { ContextRing, ContextRingMenu } from "./context-ring";
 import { ConversationHeader } from "./conversation-header";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
+import { DictationButton, DictationRow, useDictation } from "./composer-dictation";
 import type { ModelMenuOpen } from "./model-picker";
 import { ModelSlot } from "./model-slot";
 import { ScheduleButton, ScheduledMessages, useScheduleSend } from "./scheduled";
@@ -142,6 +143,7 @@ function LiveConversation({
 	const instanceId = view.instanceId;
 	const { request } = useDashboardActions();
 	const { connected } = useDashboardStatus();
+	const dictation = useDictation({ composer: writable && shown ? { draftKey: liveDraftKey(view), cwd: shown.cwd } : null, text: draft, editorRef, send, connected });
 	const scheduleSend = useScheduleSend();
 	const editPrompt = useCallback((entryId: string, text: string) => request({ t: "edit-prompt", instanceId, entryId, text }), [instanceId, request]);
 	const completion = useCompletion({
@@ -202,7 +204,7 @@ function LiveConversation({
 	const sendToSession = useCallback((text: string) => request({ t: "prompt", view, text, images: [], delivery: deliveryOf(latestSubject.current) }), [request, view]);
 
 	const directCommand = blockedShortcut(draft, shell);
-	const steerable = writable && (draft.trim() !== "" || attachments.files.length > 0) && !directCommand;
+	const steerable = writable && !dictation.locked && (draft.trim() !== "" || attachments.files.length > 0) && !directCommand;
 	const steerDraft = (): void => submit(draft.trim(), "steer");
 	const sessionId = session ? (shown?.sessionId ?? null) : null;
 	const schedule = useAction(async (when: ScheduleWhen) => {
@@ -239,6 +241,7 @@ function LiveConversation({
 	const movable = switchable?.status === "idle";
 
 	const onComposerKey = useShortcuts({
+		dictate: dictation.toggle,
 		// The text field's own keys, so they need no focused pane.
 		steer: () => {
 			if (!steerable) return false;
@@ -284,6 +287,7 @@ function LiveConversation({
 	});
 	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
 		if (completion.onMenuKeyDown(event)) return;
+		dictation.onKeyDown(event);
 		onComposerKey(event);
 		if (!event.defaultPrevented) suggestions.onKeyDown(event);
 		if (!event.defaultPrevented && event.key === "Escape") {
@@ -398,10 +402,12 @@ function LiveConversation({
 								)}
 								{!trajectory && <PromptHistoryButton view={view} />}
 								{writable && <AttachButton onClick={() => openFilePicker()} />}
+								<DictationButton dictation={dictation} />
 							</>
 						)}
 						placeholder={placeholderOf(subject, placeholder)}
 						disabled={!writable}
+						locked={dictation.locked}
 						status={working ? "streaming" : "idle"}
 						onStop={session ? interrupt : undefined}
 						stopping={stop.pending}
@@ -409,6 +415,7 @@ function LiveConversation({
 						sendLabel={working && subject.followUps ? "Queue a follow-up" : `${working ? "Steer" : "Send to"} ${agent ? "subagent" : "session"}`}
 						beforeEditor={
 							<>
+								<DictationRow dictation={dictation} />
 								<ScheduledMessages sessionId={sessionId} onEdit={restoreDraft} />
 								<QueuedMessages
 									entries={queued}

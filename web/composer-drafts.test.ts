@@ -15,7 +15,7 @@ let now = 0;
 Date.now = () => now;
 // React DOM reads these globals as it loads, so it is imported after they are set.
 const { createRoot } = await import("react-dom/client");
-const { appendToComposer, clearDraft, liveDraftKey, newDraftKey, putDraft, useComposerDraft } = await import("./composer-drafts.ts");
+const { appendToComposer, clearDraft, liveDraftKey, newDraftKey, putDraft, replaceInComposer, useComposerDraft, useComposerReplacements } = await import("./composer-drafts.ts");
 
 const DAY = 24 * 60 * 60 * 1000;
 const STORAGE_KEY = "omp-agents.composer-drafts";
@@ -83,11 +83,28 @@ memory.set(STORAGE_KEY, "{not json");
 results.corrupt = await open(live("a"));
 memory.set(STORAGE_KEY, JSON.stringify({ "live/a": { text: 3, at: now }, "live/b": "bare", "live/c": { text: "kept", at: now } }));
 results.mistyped = [await open(live("a")), await open(live("b")), await open(live("c"))];
+
+memory.clear();
+const received = [];
+function Receiver({ draftKey }) {
+	useComposerReplacements(draftKey, replacement => received.push(replacement));
+	return null;
+}
+const replace = (draftKey, base, replacement) => act(async () => replaceInComposer(draftKey, base, replacement));
+await act(async () => root.render(createElement(Receiver, { draftKey: live("mic") })));
+await replace(live("mic"), "fix  bug", { start: 4, end: 4, text: "the" });
+results.replaced = { mounted: received, storedWhileMounted: stored() };
+await act(async () => root.render(null));
+putDraft(live("kept"), "fix it now");
+await replace(live("kept"), "ignored", { start: 4, end: 6, text: "the bug" });
+await replace(live("gone"), "say  then", { start: 4, end: 4, text: "hi" });
+await replace(live("short"), "ab", { start: 5, end: 9, text: "!" });
+results.replaced.unmounted = { kept: stored()["live/kept"].text, gone: stored()["live/gone"].text, short: stored()["live/short"].text };
 await act(async () => root.unmount());
 console.log(JSON.stringify(results));
 `;
 
-test("each composer keeps its own draft, forgets one equal to its seed or empty, drops drafts untouched for 30 days or unreadable, and takes appended text in place or in its draft", async () => {
+test("each composer keeps its own draft, forgets one equal to its seed or empty, drops drafts untouched for 30 days or unreadable, and takes appended or replacing text in place or in its draft", async () => {
 	const child = Bun.spawn([process.execPath, "--eval", scenario], { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" });
 	const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
 	expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" });
@@ -110,5 +127,10 @@ test("each composer keeps its own draft, forgets one equal to its seed or empty,
 		expiry: { "live/recent": { text: "recent", at: 2 * day }, new: { text: "new", at: 31 * day } },
 		corrupt: "",
 		mistyped: ["", "", "kept"],
+		replaced: {
+			mounted: [{ start: 4, end: 4, text: "the" }],
+			storedWhileMounted: null,
+			unmounted: { kept: "fix the bug now", gone: "say hi then", short: "ab!" },
+		},
 	});
 });

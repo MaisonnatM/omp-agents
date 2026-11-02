@@ -118,6 +118,8 @@ export interface ModelResolverModule {
 	resolveProviderModelReference<M extends { provider: string; id: string }>(provider: string, modelId: string, models: readonly M[]): M | undefined;
 	/** The model of the first of `roles` whose `modelRoles` selector names one of `models`, as omp's commit and title calls pick theirs. */
 	resolveRoleSelection<M extends OmpModel>(roles: readonly string[], settings: OmpSettingsInstance, models: M[]): { role: string; model: M } | undefined;
+	/** `role`'s model and its retry fallbacks among `pool`, in the order omp tries them. */
+	resolveRoleChain<M extends OmpModel>(role: string, settings: OmpSettingsInstance, pool: M[]): { model: M }[];
 }
 /** One event of a pi-ai answer stream (pi-ai src/types.ts `AssistantMessageEvent`), with the fields the dashboard reads. */
 export interface AnswerEvent {

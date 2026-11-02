@@ -17,6 +17,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Socket requests](architecture/socket-requests.md)
 - [Project trust](architecture/project-trust.md)
 - [Ask about this](architecture/ask-about-this.md)
+- [Dictation](architecture/dictation.md)
 - [Desktop shell](architecture/desktop-shell.md)
   - [Packaging and releases](architecture/desktop-shell.md#packaging-and-releases)
 - [Terminal panel](architecture/terminal-panel.md)

@@ -67,6 +67,9 @@ interface InputMessageProps
   rightSlot?: InputMessageSlot;
   /** Disables the text field, send button, drag-and-drop, and pasting files. */
   disabled?: boolean;
+  /** Makes the text field read-only and keeps the draft from sending, while
+   *  the slots stay usable: the draft waits on something else filling it. */
+  locked?: boolean;
   /** Minimum visible rows before the text field grows. */
   minRows?: number;
   /** Maximum visible rows before the text field starts to scroll. */
@@ -118,6 +121,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
       leftSlot,
       rightSlot,
       disabled,
+      locked = false,
       minRows = 1,
       maxRows = 8,
       sendLabel = "Send",
@@ -176,7 +180,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
     // Pixel height for the attachments' collapsible region (see useRegionHeight).
     const [filesRegionRef, filesRegionHeight] = useRegionHeight();
     const trimmed = value.trim();
-    const canSend = !disabled && (trimmed.length > 0 || filesArr.length > 0);
+    const canSend = !disabled && !locked && (trimmed.length > 0 || filesArr.length > 0);
 
     // Edge = the box-shadow's 1px ring, recoloured in place per state so the
     // stroke gains contrast without ever appearing to thicken (no second
@@ -203,7 +207,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
 
     // Send button morph: Stop (streaming + empty draft) ⇄ Send. Only the
     // Stop⇄arrow swap animates.
-    const buttonMode: "send" | "stop" = streaming && !canSend && onStop ? "stop" : "send";
+    const buttonMode: "send" | "stop" = streaming && !locked && !canSend && onStop ? "stop" : "send";
     const buttonLabel = buttonMode === "stop" ? "Stop" : sendLabel;
     const handleKeyDown = useCallback(
       (e: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -450,7 +454,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
               handle={setEditorHandle}
               value={value}
               onValueChange={onValueChange}
-              disabled={disabled}
+              disabled={disabled || locked}
               // Capture phase: these run before the editor's own key and
               // paste handling, which leaves alone what they prevent.
               onKeyDownCapture={handleKeyDown}

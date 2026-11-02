@@ -5,6 +5,7 @@ import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
 import type { ActivityEvent } from "./activity";
 import type { Bot, BotChange, BotId, BotLast } from "./bots";
 import type { DiscussionEvent, DiscussionRequest } from "./discussions";
+import type { DictationEvent } from "./dictation";
 import type { ModelEntry, ModelOption, PlanUsage } from "./models";
 import type { QueuedMerge } from "./merge-queue";
 import type { Notice, NoticeOp } from "./notices";
@@ -75,6 +76,8 @@ export type ServerMsg =
 	| { t: "review-drafts"; list: ReviewDraft[] }
 	/** One step of the answer to this socket's `discuss` with `id`, until its `end`. */
 	| { t: "discussion"; id: number; event: DiscussionEvent }
+	/** One step of this page's `dictation-start` with `captureId`, until its `end`. */
+	| { t: "dictation"; captureId: string; event: DictationEvent }
 	/** Answers the page's message tagged `ack` once its handler settled: `error` is why it threw, `null` when it did not. */
 	| { t: "done"; ack: number; error: string | null };
 
@@ -155,6 +158,12 @@ export type ClientMsg =
 	| { t: "discuss"; id: number; request: DiscussionRequest }
 	/** Stop the answer to this socket's `discuss` with `id`, which then ends with no error. */
 	| { t: "discuss-stop"; id: number }
+	/** Open this computer's microphone for a composer, with the settings of directory `cwd`; never replayed, so a reconnect opens none. */
+	| { t: "dictation-start"; captureId: string; cwd: string }
+	/** Stop this socket's capture `captureId`, which ends with what was said. */
+	| { t: "dictation-stop"; captureId: string }
+	/** Close the microphone of this socket's capture `captureId` at once, keeping nothing it heard. */
+	| { t: "dictation-discard"; captureId: string }
 	/** Page load `client`'s activity events, numbered from `first`; only the server holding `server.lock` stores them, and a batch sent again changes nothing. */
 	| { t: "activity"; client: string; first: number; events: ActivityEvent[] };
 

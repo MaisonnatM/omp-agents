@@ -103,6 +103,11 @@
   Steers and follow-ups carry their files too, and a queued row shows the files' names when you typed nothing.
   The new-session draft takes files for its first message.
   omp gives a subagent text only, so a subagent's composer takes text, documents included, but no image.
+- Dictate a prompt with the microphone before the send button, or Cmd+Shift+M in the composer.
+  The first time, a popover says dictation is off and offers **Enable dictation**, which turns on omp's dictation in your own config; press the microphone again to start.
+  A row above the text field says where your speech is transcribed, shows the words heard so far, and offers **Stop** and **Discard**; Escape or Cmd+Shift+M also stops.
+  The text field is read-only while dictation runs, and the text lands where your caret or selection was, so you review it before you send; nothing is sent for you.
+  One composer dictates at a time, and the microphone records on the computer that runs the dashboard.
 - Pasting more than 2,000 characters or 40 lines attaches the text as a file, `Pasted text.txt`, instead of filling the text field, as ChatGPT and Claude do; a second one is `Pasted text 2.txt`.
   Its tile shows the text's first lines, and it goes to the model as a text file does.
 - A prompt's images show above it in the transcript, in live and past sessions, including images sent from omp's terminal, and its files show by name in chips above the text.

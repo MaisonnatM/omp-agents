@@ -281,5 +281,8 @@ export const ACTION_MESSAGES: Record<ClientMsg["t"], boolean> = {
 	notice: false,
 	discuss: true,
 	"discuss-stop": true,
+	"dictation-start": true,
+	"dictation-stop": true,
+	"dictation-discard": true,
 	activity: false,
 };
