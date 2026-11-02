@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { HostStatus, RosterHost, UnreadTurn, UserRequest } from "../src/shared/sessions";
-import { type Attention, attend, needsYou, unreadShown } from "./attention";
+import { type Attention, attend, needsYou, unreadShown, waitOf } from "./attention";
 
 const host = (instanceId: string, status: HostStatus, { unread = null, requests = [], sessionName = `Session ${instanceId}` }: { unread?: UnreadTurn | null; requests?: UserRequest[]; sessionName?: string | null } = {}) =>
 	({ instanceId, sessionId: `s-${instanceId}`, sessionName, cwdDisplay: "~/code/webapp", status, unread, requests }) as RosterHost;
@@ -16,6 +16,17 @@ describe("needsYou", () => {
 			host("unknown", "unknown"),
 		];
 		expect(hosts.filter(needsYou).map(row => row.instanceId)).toEqual(["asks", "done"]);
+	});
+});
+
+describe("waitOf", () => {
+	test("takes the oldest question over a bare wait or an unread turn, and the bare wait over the turn", () => {
+		const unread = { at: 1, reply: "Done.", body: "Done.", suggestions: [] };
+		const first = ask("r1", "Which branch?");
+		expect(waitOf(host("a", "needs-input", { requests: [first, ask("r2", "Merge it?")], unread }))).toEqual({ kind: "ask", request: first });
+		expect(waitOf(host("b", "needs-input", { unread }))).toEqual({ kind: "input" });
+		expect(waitOf(host("c", "idle", { unread }))).toEqual({ kind: "turn", turn: unread });
+		expect(waitOf(host("d", "working"))).toBeNull();
 	});
 });
 

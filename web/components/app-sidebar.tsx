@@ -5,7 +5,7 @@ import type { Bot, BotId, BotLast } from "../../src/shared/bots";
 import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import { botRows } from "../bots-model";
-import { inboxItems } from "../inbox-model";
+import { inboxSections, itemCount } from "../inbox-model";
 import type { NotesListView, PullRequestsRoute, Page, SettingsRoute, SidebarPanel, SidebarTab, TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SessionLists } from "../use-session-lists";
@@ -92,7 +92,7 @@ export const AppSidebar = memo(function AppSidebar({
 	const todoSessions = useMemo(() => ({ hosts, past }), [hosts, past]);
 	const botList = useMemo(() => (bots === null ? null : botRows(bots, hosts, botLasts)), [bots, hosts, botLasts]);
 	const onShowShortcuts = useCallback(() => setShortcutsOpen(true), [setShortcutsOpen]);
-	const inboxCount = useMemo(() => inboxItems(hosts, notices).length, [hosts, notices]);
+	const inboxCount = useMemo(() => itemCount(inboxSections(hosts, notices, Date.now())), [hosts, notices]);
 	const inboxOpen = page?.kind === "inbox";
 	const inbox = useMemo(() => ({ count: inboxCount, open: inboxOpen }), [inboxCount, inboxOpen]);
 	return (

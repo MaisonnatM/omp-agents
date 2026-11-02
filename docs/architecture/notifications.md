@@ -62,7 +62,7 @@ A row's `status` of `needs-input` says that the session asks something, and its 
 Both transports report the main agent's turn as a `TurnUpdate` from `turnUpdate` in `src/live-session.ts`: `turn-started` at `agent_start`, and `turn-ended` with its last reply and its `failure`, a usage limit or a transient fault, at an `agent_end` that ends the run, not one that hands over to a queued follow-up.
 The same `turn-started` cancels a continue the session waits on, and only a `turn-ended` with a failure from a session this server started schedules one ([Scheduled sends](scheduled-sends.md)).
 `Dashboard` applies each in `#onLiveUpdate` through `LiveSessions`, which keeps the unread turns privately by instance id in memory, adds them to each row in `rows()`, and drops one when its session leaves.
-`turn-ended` carries the reply's suggestions, split by `splitSuggestions`, and sets the turn with `markUnread`, which always pushes the roster; `turn-started` clears it with `markRead` and pushes the roster only when a turn was unread.
+`turn-ended` carries the reply as `{ body, suggestions }`, split by `splitSuggestions`, or `null`, and sets the turn with `markUnread`, which always pushes the roster; `turn-started` clears it with `markRead` and pushes the roster only when a turn was unread.
 A page sends `{ t: "read", instanceId }` while a pane shows the session's main agent in a focused window, which `LiveSessions.markRead` clears for every page.
 
 `useAttention` in `web/use-attention.ts`, over the pure rules in `web/attention.ts`, counts the live sessions that need you for the desktop's badge.

@@ -58,13 +58,13 @@ describe("LiveSessions", () => {
 		sessions.add(live, null);
 		const unread = () => sessions.rows(() => facts)[0]?.unread;
 		expect(sessions.markRead("i1")).toBe(false);
-		sessions.markUnread("i1", "\n  Fixed the **flaky** test.  \nDetails follow.", ["Merge on main"]);
+		sessions.markUnread("i1", { body: "\n  Fixed the **flaky** test.  \nDetails follow.", suggestions: ["Merge on main"] });
 		expect(unread()).toEqual({ at: expect.any(Number), reply: "Fixed the **flaky** test.", body: "Fixed the **flaky** test.  \nDetails follow.", suggestions: ["Merge on main"] });
 		expect(sessions.markRead("i1")).toBe(true);
 		expect(sessions.markRead("i1")).toBe(false);
 		expect(unread()).toBeNull();
 
-		sessions.markUnread("i1", null, []);
+		sessions.markUnread("i1", null);
 		expect(unread()).toEqual({ at: expect.any(Number), reply: null, body: null, suggestions: [] });
 		sessions.remove("i1");
 		sessions.add(live, null);

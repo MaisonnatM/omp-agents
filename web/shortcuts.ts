@@ -315,6 +315,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
 			{ chord: { key: "ArrowUp" }, scope: "outside-fields" },
 		],
 	},
+	// Plain Enter, unlike any other page shortcut here, also presses a focused button or link, so its handler acts only
+	// while nothing has focus (`document.activeElement === document.body`); a page that binds plain Enter keeps that rule.
 	{ id: "inboxOpen", category: "inbox", label: "Inbox: open the item's session, pull request, or message", keys: [{ chord: { key: "Enter" }, scope: "outside-fields" }] },
 	{ id: "inboxDone", category: "inbox", label: "Inbox: mark the item done, and open the next", keys: [{ chord: { key: "d" }, scope: "outside-fields" }] },
 	{ id: "inboxEnd", category: "inbox", label: "Inbox: end the item's session", keys: [{ chord: { key: "e" }, scope: "outside-fields" }] },

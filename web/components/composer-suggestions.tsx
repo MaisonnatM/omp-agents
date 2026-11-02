@@ -21,6 +21,9 @@ export function chosenText(prompts: readonly string[], marked: ReadonlySet<strin
 	return chosen.length === 1 ? chosen[0] : chosen.map(text => `- ${text}`).join("\n");
 }
 
+/** Every one of `prompts`, as one message the way {@link chosenText} words several. */
+export const allPrompts = (prompts: readonly string[]): string => chosenText(prompts, new Set(prompts), null);
+
 /** What a key does to the list: send or fill the marks plus row `index`, send every row, move the highlight to `to`, or clear both. */
 export type SuggestionKey =
 	| { kind: "send"; index: number | null }
@@ -206,7 +209,7 @@ export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOpt
 	};
 	const sendAll = (): void => {
 		clear();
-		onSend(chosenText(prompts, new Set(prompts), null));
+		onSend(allPrompts(prompts));
 	};
 	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
 		const action = suggestionKey(event, { open, count: prompts.length, active: activeIndex, marked: prompts.some(text => marked.has(text)) });

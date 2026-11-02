@@ -7,12 +7,13 @@ Items come in groups, in this order: **Agents asking**, **Agents finished**, **P
 Within a group, the longest-waiting item comes first; questions keep the sidebar's order and show no age.
 A session that asks something appears once, under **Agents asking**, even when it also finished a turn you have not read.
 Each row shows a status mark, a title, the project, repository, or channel, and the wait, then a second line: the question, the first suggested prompt after ↳, or the notice's preview.
-**All**, **Agents**, **Pull requests**, and **Messages** at the top filter the list, each with its count.
+**All**, **Agents**, **Pull requests**, and **Messages** at the top filter the list, each with its count; a filter with no items says so.
 
 The open item shows on the right.
 A finished turn shows the agent's reply and its suggested prompts, numbered.
 A question shows the same card as the session's pane.
-A notice shows its preview; a stopped-sessions notice offers **Continue all**.
+A notice shows its preview and the same button as in the notices bell: a pull request's quick action or **Merge**, or a stopped-sessions notice's **Continue all**.
+Using that button clears the notice from the Inbox and opens the next item.
 Below a session's item, **Reply to this session…** sends what you type when you press Enter; Shift+Enter breaks the line.
 
 Outside text fields:

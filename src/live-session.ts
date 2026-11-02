@@ -21,13 +21,19 @@ export type LiveUpdate =
 	| TurnUpdate;
 
 /**
- * The main agent's turn started, or ran to its end; `reply` is its last text without suggested prompts, `null` when it ended on none,
- * `suggestions` the prompts that text offered in its `Suggestions:` block, and `failure` how a provider's error ended it, `null` when it ended any other way.
+ * The main agent's turn started, or ran to its end; `reply` is its last text, split from the prompts its `Suggestions:` block offered,
+ * `null` when it ended on none, and `failure` how a provider's error ended it, `null` when it ended any other way.
  */
-export type TurnUpdate = { kind: "turn-started" } | { kind: "turn-ended"; reply: string | null; suggestions: string[]; failure: TurnFailure | null };
+export type TurnUpdate = { kind: "turn-started" } | { kind: "turn-ended"; reply: TurnReply | null; failure: TurnFailure | null };
+
+/** A turn's last text without its suggested prompts, and those prompts. */
+export interface TurnReply {
+	body: string;
+	suggestions: string[];
+}
 
 /** The text of the last assistant message among `messages` that has any, split from its suggested prompts; `null` when none has text. */
-function lastReply(messages: unknown): { body: string; suggestions: string[] } | null {
+function lastReply(messages: unknown): TurnReply | null {
 	if (!Array.isArray(messages)) return null;
 	for (const message of messages.toReversed()) {
 		if (!isObject(message) || message.role !== "assistant" || !Array.isArray(message.content)) continue;
@@ -46,9 +52,7 @@ function lastReply(messages: unknown): { body: string; suggestions: string[] } |
 export function turnUpdate(event: unknown): TurnUpdate | null {
 	if (!isObject(event)) return null;
 	if (event.type === "agent_start") return { kind: "turn-started" };
-	if (event.type !== "agent_end" || event.isTerminal === false) return null;
-	const reply = lastReply(event.messages);
-	return { kind: "turn-ended", reply: reply?.body ?? null, suggestions: reply?.suggestions ?? [], failure: turnFailureOf(event.messages) };
+	return event.type === "agent_end" && event.isTerminal !== false ? { kind: "turn-ended", reply: lastReply(event.messages), failure: turnFailureOf(event.messages) } : null;
 }
 
 /** A message the session did not take; the session itself reports it, so a caller with someone to tell need not. */

@@ -3,7 +3,7 @@ import { forgetSession } from "../commands";
 import { DashboardSession, type DashboardUpdate, newInstanceId } from "../dashboard-session";
 import { SessionGuest } from "../guest";
 import { repositoryAt } from "../git";
-import type { LiveSession, LiveUpdate } from "../live-session";
+import type { LiveSession, LiveUpdate, TurnReply } from "../live-session";
 import type { HostSnapshot } from "../omp/collab";
 import { displayPath } from "../paths";
 import { oneLine } from "../session-entries";
@@ -114,10 +114,10 @@ export class LiveSessions {
 		this.#taskClaims.release(instanceId);
 	}
 
-	/** Session `instanceId` ended a turn with `reply` offering `suggestions`, which stays unread until a look or its next turn reads it. */
-	markUnread(instanceId: string, reply: string | null, suggestions: string[]): void {
-		const body = reply?.trim() ? reply.trim().slice(0, UNREAD_BODY_MAX) : null;
-		this.#unread.set(instanceId, { at: Date.now(), reply: firstLine(reply), body, suggestions });
+	/** Session `instanceId` ended a turn with `reply`, which stays unread until a look or its next turn reads it. */
+	markUnread(instanceId: string, reply: TurnReply | null): void {
+		const text = reply?.body.trim() || null;
+		this.#unread.set(instanceId, { at: Date.now(), reply: firstLine(text), body: text?.slice(0, UNREAD_BODY_MAX) ?? null, suggestions: reply?.suggestions ?? [] });
 	}
 
 	/** A page showed session `instanceId` in a focused window, or its next turn started; whether it had a turn unread. */
