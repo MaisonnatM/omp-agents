@@ -17,7 +17,7 @@ function WorkspaceRow({ workspace, note, action }: { workspace: Workspace; note:
 		<li className="flex items-center gap-3 px-4 py-2.5">
 			<div className="min-w-0 flex-1">
 				<p className="truncate text-[13px] font-medium">{folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay}</p>
-				<p className="truncate text-xs text-muted-foreground">
+				<p className="break-all text-xs text-muted-foreground">
 					{workspace.cwdDisplay}
 					{note && ` · ${note}`}
 				</p>
