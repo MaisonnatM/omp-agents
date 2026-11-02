@@ -115,7 +115,7 @@ async function nestedRepositories(root: string, ignoredTop: readonly string[]): 
 	return found;
 }
 
-async function allocatedUsage(path: string, signal?: AbortSignal): Promise<number> {
+export async function allocatedUsage(path: string, signal?: AbortSignal): Promise<number> {
 	const { stdout, stderr, code } = await run(["du", "-sk", path], { timeoutMs: 10000, signal });
 	if (code !== 0) throw new Error(stderr.trim() || "Disk measurement exceeded its time limit.");
 	const kilobytes = Number(stdout.split(/\s/, 1)[0]);

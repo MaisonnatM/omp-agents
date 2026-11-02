@@ -18,6 +18,7 @@ import type {
 	GoalSettingsModule,
 	ConfigModule,
 	DirsModule,
+	GcAutoCompressModule,
 	ExtensionSettingsModule,
 	ModelSettingsModule,
 	SessionSettingsModule,
@@ -212,6 +213,8 @@ export const dirs = await load<DirsModule>(join(utilsSrc, "dirs.ts"), {
 	getStatsDbPath: "function",
 	getWorktreesDir: "function",
 });
+
+export const gcAutoCompress = await load<GcAutoCompressModule>(join(srcDir, "cli", "gc-auto-compress.ts"), { GC_AUTO_COMPRESS_LOG: "string" });
 
 export const rpc = await load<RpcClientModule>(join(srcDir, "modes", "rpc", "rpc-client.ts"), {
 	RpcClient: "function",

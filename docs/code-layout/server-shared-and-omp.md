@@ -6,6 +6,7 @@
   `agent-settings.ts` holds omp's own settings by tab for Settings › omp settings, their controls, and one setting's change and edit.
   `session-controls.ts` holds the context actions, compaction and advisor state, goal slots and changes, their socket parsers, and the composer's `/goal` translation.
   `agents.ts` holds the discovered-agent new-session preview, model-resolution states, override selectors and their guard, and the one `AGENT_SETTINGS` table of Settings › Agents' owned ids.
+  `storage.ts` holds cleanup steps, parsed requests, the native report subset, sandbox plans and results, and all twelve editable rule ids; `storage.test.ts` checks the phase allowlist and sandbox request bounds.
   `accounts.ts` also holds `AccountId`, `GoogleAccount`, the `accounts` column of `MCP_SERVICES`, and `visibleAccounts`, the Google accounts a workspace shows: those linked to it and those linked to none.
   `transcript.ts` also holds `PromptAuthor` and `promptAuthor`, which distinguish the user's text, hidden dashboard prompts, and stamped routine messages, and `skillInvocation`, a `/skill:` prompt as typed, which every reader and writer of one joins with.
   The transcript, trajectory, queued rows, withdrawn messages, live title's `/rename`, and past title use that classification, so a routine is never presented as the user's own prompt.
@@ -38,6 +39,9 @@
   `dictation.ts` holds `dictationSettings`, omp's speech-to-text settings for a directory, and `startDictation`, one capture through omp's RPC dictation bridge, which answers the settings instead where dictation is off; `module-types/speech.ts` types the omp modules they load.
   `session-visuals-extension.ts` is the omp extension, loaded with `-e`, that appends the two visual fence formats, and the `review-pages` list that `web/review-pages.ts` reads, to the system prompt of a session the dashboard starts, resumes, or forks; `sessionVisualsExtension` in `src/server/resources.ts` names its file, a bundle beside `server.js` in the packaged app.
   `replay-fork.ts` owns native replay prompt reading, ancestry and request correlation, original evidence blobs, repairs, and fork writes; it returns plain replay data and narrow fork and close operations.
+  `gc.ts` runs native dry runs and single-phase applies, parses even a nonzero exit's JSON report, measures storage, and reads global rules and the background compression log.
+  `gc.test.ts` checks report validation, native preview and apply against an isolated fixture directory, and refusal of a live native cleanup lock.
+  `module-types/config.ts` also declares the background compression log export loaded by `modules.ts`.
 - `src/readiness.ts`: the read-only starter-kit snapshot, using native settings and marketplace registries plus the installer-owned non-forced plan; see [Get started](../architecture/get-started.md).
 - `src/activity.ts`: `foldActivity`, which folds the stored activity rows into Settings › Activity's uses, last uses, moves between views, time on each view, and days; `src/shared/activity.ts` holds the event kinds, the key pattern, `CONTROLS`, `ACTION_MESSAGES`, and the answer's decoder.
 - `src/analytics.ts`: merges Claude Code's and Codex's requests into omp-stats' `StatsRead` with `withForeignUsage`, then folds per-file rows into sessions and workspaces.

@@ -7,12 +7,13 @@
  */
 import type { Dirent } from "node:fs";
 import { lstat, readdir, readFile, rename, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { canonical, type Registration, worktreeAt, worktreesOf } from "../git";
 import { errorText, isObject } from "../json";
 import { mapLimit } from "../map-limit";
 import { run } from "../proc";
-import { beneath } from "../worktrees";
+import { allocatedUsage, beneath } from "../worktrees";
+import type { SandboxKeepReason, SandboxPlan, SandboxResult } from "../shared/storage";
 
 /** How long between two sweeps: a sandbox left behind costs disk, not correctness, and each sweep runs `git status` in every one. */
 export const SWEEP_EVERY_MS = 24 * 60 * 60_000;
@@ -39,22 +40,16 @@ export interface IsolationSweepDeps {
 	now(): number;
 }
 
-/** Why a sandbox stays. */
-export type KeepReason = "owner-live" | "occupied" | "changed" | "locked" | "unreadable" | "failed";
-
-/** What the sweep did with one sandbox: removed it, or kept it for `kept`, which `detail` explains. */
-export interface SandboxResult {
-	path: string;
-	kept: KeepReason | null;
-	detail: string | null;
+export class IsolationSweepBusy extends Error {
+	constructor() { super("Another cleanup is running. Try again when it ends."); }
 }
 
-const keep = (path: string, kept: KeepReason, detail: string): SandboxResult => ({ path, kept, detail });
+const keep = (path: string, kept: SandboxKeepReason, detail: string): SandboxResult => ({ path, kept, detail });
 
 export class IsolationSweep {
 	readonly #deps: IsolationSweepDeps;
 	#last = Number.NEGATIVE_INFINITY;
-	#running: Promise<void> | null = null;
+	#running = false;
 
 	constructor(deps: IsolationSweepDeps) {
 		this.#deps = deps;
@@ -68,37 +63,79 @@ export class IsolationSweep {
 		const now = this.#deps.now();
 		if (this.#running || now - this.#last < SWEEP_EVERY_MS) return null;
 		this.#last = now;
-		const running = (this.#running = this.sweep()
-			.then(logSweep, (error: unknown) => console.error(`omp-agents: cannot sweep omp's isolation sandboxes: ${errorText(error)}`))
-			.finally(() => {
-				this.#running = null;
-			}));
+		const running = this.sweep().then(logSweep, (error: unknown) => console.error(`omp-agents: cannot sweep omp's isolation sandboxes: ${errorText(error)}`));
 		return running;
 	}
 
-	/** Removes each sandbox under the root whose omp exited and whose checkout is clean, unlocked, and unused; one result per sandbox. */
-	async sweep(): Promise<SandboxResult[]> {
-		const { root } = this.#deps;
+	/** A dry run, including each kept reason, with measured sizes only for removable sandboxes. */
+	preview(): Promise<SandboxPlan[]> {
+		return this.#exclusive(() => this.#preview(true));
+	}
+
+	/** Rechecks each requested direct child before removal, never following a symlink out of the root. */
+	remove(paths: readonly string[]): Promise<SandboxResult[]> {
+		return this.#exclusive(async () => {
+			const results: SandboxResult[] = [];
+			for (const path of [...new Set(paths)]) {
+				try {
+					if (dirname(resolve(path)) !== resolve(this.#deps.root) || path.endsWith(REMOVING_SUFFIX) || !(await lstat(path)).isDirectory()) {
+						results.push(keep(path, "unreadable", "Not an isolation sandbox in omp's directory."));
+						continue;
+					}
+					const judged = await this.#judge(path, await this.#deps.inUse());
+					results.push(judged === undefined ? await this.#remove(path) : judged ?? keep(path, "unreadable", "Its owner marker is gone."));
+				} catch (error) { results.push(keep(path, "unreadable", errorText(error))); }
+			}
+			return results;
+		});
+	}
+
+	/** The unattended sweep keeps its existing recovery of interrupted removals. */
+	sweep(): Promise<SandboxResult[]> {
+		return this.#exclusive(async () => {
+			const dirs = await this.#directories();
+			await Promise.all(dirs.filter(dir => dir.endsWith(REMOVING_SUFFIX)).map(dir => rm(dir, { recursive: true, force: true }).catch((error: unknown) => console.error(`omp-agents: cannot finish removing ${dir}: ${errorText(error)}`))));
+			const plans = await this.#preview(false);
+			return mapLimit(plans, SANDBOX_READS, async plan => {
+				if (plan.kept !== null) return plan;
+				try {
+					const judged = await this.#judge(plan.path, await this.#deps.inUse());
+					return judged === undefined ? await this.#remove(plan.path) : judged ?? keep(plan.path, "unreadable", "Its owner marker is gone.");
+				} catch (error) { return keep(plan.path, "unreadable", errorText(error)); }
+			});
+		});
+	}
+
+	async #exclusive<T>(run: () => Promise<T>): Promise<T> {
+		if (this.#running) throw new IsolationSweepBusy();
+		this.#running = true;
+		try { return await run(); }
+		finally { this.#running = false; }
+	}
+
+	async #directories(): Promise<string[]> {
 		let entries: Dirent[];
-		try {
-			entries = await readdir(root, { withFileTypes: true });
-		} catch (error) {
+		try { entries = await readdir(this.#deps.root, { withFileTypes: true }); }
+		catch (error) {
 			if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
 			throw error;
 		}
-		const dirs = entries.filter(entry => entry.isDirectory()).map(entry => join(root, entry.name));
-		// A removal an earlier sweep began and did not finish: the directory was the sweep's own from its rename.
-		await Promise.all(dirs.filter(dir => dir.endsWith(REMOVING_SUFFIX)).map(dir => rm(dir, { recursive: true, force: true }).catch((error: unknown) => console.error(`omp-agents: cannot finish removing ${dir}: ${errorText(error)}`))));
+		return entries.filter(entry => entry.isDirectory()).map(entry => join(this.#deps.root, entry.name));
+	}
+
+	async #preview(measure: boolean): Promise<SandboxPlan[]> {
+		const dirs = (await this.#directories()).filter(dir => !dir.endsWith(REMOVING_SUFFIX));
 		const inUse = await this.#deps.inUse();
-		const results = await mapLimit(dirs.filter(dir => !dir.endsWith(REMOVING_SUFFIX)), SANDBOX_READS, async dir => {
+		const plans = await mapLimit(dirs, SANDBOX_READS, async (path): Promise<SandboxPlan | null> => {
 			try {
-				const kept = await this.#judge(dir, inUse);
-				return kept === undefined ? await this.#remove(dir) : kept;
-			} catch (error) {
-				return keep(dir, "unreadable", errorText(error));
-			}
+				const judged = await this.#judge(path, inUse);
+				if (judged === null) return null;
+				if (judged) return { ...judged, bytes: null };
+				const bytes = measure ? await allocatedUsage(path).catch(() => null) : null;
+				return { path, kept: null, detail: null, bytes };
+			} catch (error) { return { ...keep(path, "unreadable", errorText(error)), bytes: null }; }
 		});
-		return results.filter(result => result !== null);
+		return plans.filter(plan => plan !== null);
 	}
 
 	/** Why sandbox `dir` stays, `undefined` when it may go, `null` when it is no sandbox. */
@@ -168,7 +205,7 @@ async function checkoutOf(dir: string): Promise<string | null> {
 	return null;
 }
 
-const KEPT_WHY: Record<KeepReason, string> = {
+const KEPT_WHY: Record<SandboxKeepReason, string> = {
 	"owner-live": "whose omp still runs",
 	occupied: "in use",
 	changed: "with changes",

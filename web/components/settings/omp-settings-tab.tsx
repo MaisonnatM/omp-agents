@@ -65,6 +65,7 @@ export function OmpSettingsTab({
 	const current = tabs.find(shown => shown.tab.id === tabId) ?? tabs[0];
 	const matching = tabs.filter(shown => shown.groups.length > 0);
 	const unlisted = settings.unlisted.filter(id => !ownerOf(id)).length;
+	const unlistedOwners = [...new Set(settings.unlisted.map(ownerOf).filter(owner => owner !== undefined))];
 	const context: RowContext = { editing, projectFile, onOpenFile };
 	const rail = useRef<HTMLElement>(null);
 	const body = useRef<HTMLDivElement>(null);
@@ -106,6 +107,7 @@ export function OmpSettingsTab({
 						</FileLink>
 					</p>
 				)}
+				{unlistedOwners.map(owner => <p key={owner.section} className="px-2 text-xs text-muted-foreground">More settings are edited in <a href={hashForSettings(owner.section)} className={LINK}>{owner.label}</a>.</p>)}
 			</nav>
 			<div ref={body} className="min-w-0 scroll-mt-6 space-y-6">
 				<p className="text-xs text-muted-foreground">Running sessions pick up most changes; some apply only to sessions started after the change.</p>

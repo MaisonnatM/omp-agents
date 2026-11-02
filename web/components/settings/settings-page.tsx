@@ -24,6 +24,7 @@ import { ProvidersTab } from "./providers-tab";
 import { ModelsTab } from "./routing-tab";
 import { SourceControlTab } from "./source-control-tab";
 import { SyncTab } from "./sync-tab";
+import { StorageTab } from "./storage-tab";
 import { Workflows } from "./workflows-tab";
 import { WorkspacesTab } from "./workspaces-tab";
 import { WorktreesTab } from "./worktrees-tab";
@@ -181,6 +182,7 @@ export function SettingsPage({
 		"source-control": <SourceControlTab active={section === "source-control"} />,
 		workspaces: <WorkspacesTab workspaces={workspaces} list={workspaceList} trustedProjects={trustedProjects} />,
 		sync: <SyncTab active={section === "sync"} />,
+		storage: <StorageTab cwd={cwd} active={section === "storage"} onSaved={settings.reload} />,
 		worktrees: <WorktreesTab cwd={cwd} active={section === "worktrees"} pins={pins} />,
 		decisions: <DecisionsTab cwd={cwd} active={section === "decisions"} />,
 		extensions: <ExtensionsTab cwd={cwd} active={section === "extensions"} onSaved={settings.reload} />,

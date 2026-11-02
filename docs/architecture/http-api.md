@@ -40,6 +40,21 @@ It includes the requests, their input tokens and input cost, the sources by toke
 `GET /api/activity?range=<range>` answers `ActivityRead`, the page's activity over the range, defaulting to `30d`, with the same ranges as Analytics; an unknown range returns 400 `Unknown activity range`.
 It includes each feature's uses, every feature's last use over all stored rows, the moves between views, the time on each view, each local day's active time, visits, and actions, and `serverActions`, every route that takes a `PUT`, for the inventory; see [Activity](activity.md).
 
+**Storage** reads `GET /api/storage`, or `?cwd=<known-workspace>` only to report workspace overrides.
+`StorageUsage` in `src/shared/storage.ts` includes allocated folder sizes, global cleanup rules with their exact user values for conflict checks, and the last native background compression log.
+The three measured folders come from omp's directory exports; the archive-size card is absent because omp's archive-directory helper is private.
+`PUT /api/storage/cleanup` takes `{ action: "preview" }` for all five native phases, or `{ action: "preview", step: "sandboxes" }` for the independently measured sandbox plan.
+Apply takes `{ action: "apply", step }` for exactly one of `stale`, `blobs`, `archive`, `compress`, and `wal`.
+Sandbox apply takes `{ action: "apply", step: "sandboxes", sandboxes: string[] }`, at most 200 paths per request; the page sends one at a time.
+`src/omp/gc.ts` runs `omp gc --json` from the home directory, with all explicit phase flags for preview and one phase plus `--apply` for apply.
+Native gc owns its lock, thresholds, references, and keep rules.
+An exit with phase errors still returns its parsed report, while a held native lock or sandbox guard answers 409 with a busy error.
+Long storage requests disable the server's idle timeout and never kill a running cleanup when the page stops requesting steps.
+The page runs stale, blobs, archive, compress, and wal in that order, then sandboxes, and stops after a failed step or a request to stop.
+Rule changes reuse `PUT /api/settings/agent` with each rule's `expected` user value captured when editing starts; no separate settings writer exists.
+After a conflict, the draft keeps that snapshot rather than adopting a refreshed value it never showed; Cancel and Edit load the new value.
+No daily native cleanup or dashboard-triggered automatic compression is added.
+
 Edits go through three endpoints, each taking the same `?cwd=` and answering with the settings as they load after the write:
 
 - `PUT /api/settings/routing` takes one change: a role's model or fallbacks, a model-keyed chain, some `retry.*` values, or the provider order.

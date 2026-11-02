@@ -139,6 +139,9 @@ import { signInGraphite } from "../source-control";
 import { activityRoutes, type ActivityRoutesEnv } from "./activity-routes";
 import { calendarRoutes, type CalendarRoutesEnv } from "./calendar-routes";
 import { readStarterKitStatus } from "../readiness";
+import { CleanupBusy, gcApply, gcPreview, storageUsage } from "../omp/gc";
+import { parseCleanupRequest, type CleanupStepResult } from "../shared/storage";
+import { IsolationSweepBusy, type IsolationSweep } from "./isolation-sweep";
 
 /** What the session routes read: the workspaces sessions count in, their files, and the workspaces Settings keeps. */
 export interface SessionRoutesEnv {
@@ -211,6 +214,7 @@ export interface RouteEnv {
 	/** The page's activity events, for Settings › Activity. */
 	activity: ActivityRoutesEnv;
 	processes: ProcessRoutesEnv;
+	storage: IsolationSweep;
 }
 
 /** What the live sessions run besides omp, the start of a session's dev server, and when the idle stop ends them. */
@@ -1102,6 +1106,30 @@ function processRoutes({ get, write }: RouteKit, env: ProcessRoutesEnv): Routes 
 	};
 }
 
+function storageRoutes({ get, write }: RouteKit, sweep: IsolationSweep, sessions: SessionRoutesEnv): Routes {
+	const refuse = (error: unknown): Response | null => error instanceof CleanupBusy || error instanceof IsolationSweepBusy ? fail(409, error.message) : null;
+	const usage = get(params => {
+		const cwd = params.get("cwd");
+		if (cwd !== null && !sessions.knownWorkspaces().includes(cwd) && !sessions.addedCwds().includes(cwd)) return fail(404, "Choose a known workspace.");
+		return answer(() => storageUsage(cwd));
+	});
+	const cleanup = write(
+		body => checked(parseCleanupRequest(body), "Expected a cleanup preview or one cleanup step."),
+		async request => {
+			if (request.action === "preview") return request.step === "sandboxes" ? { sandboxes: await sweep.preview() } : { gc: await gcPreview() };
+			const result: CleanupStepResult = request.step === "sandboxes"
+				? { step: "sandboxes", sandboxes: await sweep.remove(request.sandboxes) }
+				: { step: request.step, gc: await gcApply(request.step) };
+			return result;
+		},
+		refuse,
+	);
+	return {
+		"/api/storage": { GET: async (req, server) => { server.timeout(req, 0); return usage(req, server); } },
+		"/api/storage/cleanup": { PUT: async (req, server) => { server.timeout(req, 0); return cleanup(req, server); } },
+	};
+}
+
 /** Every `/api/*` route, by path and method. */
 export function createRoutes(env: RouteEnv): Routes {
 	const kit = routeKit(env.guards);
@@ -1128,6 +1156,7 @@ export function createRoutes(env: RouteEnv): Routes {
 		...dashboardRoutes(kit, env.dashboard),
 		...syncRoutes(kit, env.sync),
 		...processRoutes(kit, env.processes),
+		...storageRoutes(kit, env.storage, env.sessions),
 	};
 	return { ...routes, ...activityRoutes(kit, env.activity, routes) };
 }

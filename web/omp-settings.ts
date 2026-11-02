@@ -15,6 +15,7 @@ export interface SettingOwner {
 
 const MODELS: SettingOwner = { section: "models", label: "Models" };
 const AGENTS: SettingOwner = { section: "agents", label: "Agents" };
+const STORAGE: SettingOwner = { section: "storage", label: "Storage" };
 
 /**
  * omp settings another Settings section edits, by id. Settings › omp settings counts them and links to that section
@@ -36,6 +37,18 @@ export const OWNED_SETTINGS: Readonly<Record<string, SettingOwner>> = {
 	"retry.usageReservePolicy": MODELS,
 	"retry.fallbackRevertPolicy": MODELS,
 	...Object.fromEntries(Object.values(AGENT_SETTINGS).map(id => [id, AGENTS])),
+	"gc.blobs": STORAGE,
+	"gc.archive": STORAGE,
+	"gc.wal": STORAGE,
+	"gc.stale": STORAGE,
+	"gc.compress": STORAGE,
+	"gc.coldArchiveAfterDays": STORAGE,
+	"gc.retainNewestGlobal": STORAGE,
+	"gc.retainNewestPerCwd": STORAGE,
+	"gc.staleRetainNewest": STORAGE,
+	"gc.staleRetainDays": STORAGE,
+	"gc.compressAfterDays": STORAGE,
+	"gc.autoCompress": STORAGE,
 };
 
 /** The section that edits `id`, from {@link OWNED_SETTINGS}; `undefined` when this section does. */
