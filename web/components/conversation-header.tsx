@@ -12,7 +12,7 @@ import { Header } from "./page-header";
 import { CRUMB_SEPARATOR, PARENT_CRUMB, SessionIdCopy, SessionMeta } from "./session-meta";
 import { SessionTitle } from "./session-title";
 import type { Subject } from "./subject";
-
+import { SessionGoalControl } from "./session-goal";
 /** A live session shows no status: the header speaks up only while the connection is not live. */
 const CONTROL_LABEL: Record<Exclude<ControlPhase["phase"], "live">, string> = {
 	connecting: "Connecting…",
@@ -39,7 +39,7 @@ interface ConversationHeaderProps {
  */
 export function ConversationHeader({ view, subject, onEnd, actions, titleAction }: ConversationHeaderProps) {
 	const { host, shown, agent, phase, live } = subject;
-	const { open } = useDashboardActions();
+	const { open, request } = useDashboardActions();
 	const ending = useDashboardStatus().ending.has(view.instanceId);
 	const status = ending
 		? "Ending…"
@@ -74,6 +74,7 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 		) : (
 			(shown ? hostLabel(shown) : view.instanceId)
 		);
+	const goal = subject.kind === "session" && subject.switchable ? <SessionGoalControl instanceId={view.instanceId} slot={subject.switchable.goal} onChange={change => request({ t: "goal", instanceId: view.instanceId, change })} /> : null;
 	return (
 		<Header
 			title={title}
@@ -81,11 +82,13 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 				<>
 					{subject.kind === "session" && shown && <SessionIdCopy id={shown.sessionId} />}
 					{titleAction}
+					{subject.kind === "session" && subject.switchable?.goal.kind !== "set" && goal}
 				</>
 			}
 			status={status}
 			alert={!ending && phase.phase === "ended"}
 		>
+			{subject.kind === "session" && subject.switchable?.goal.kind === "set" && goal}
 			{subject.kind === "session" && shown && <SessionMeta facts={shown} />}
 			{subject.kind === "session" && <OpenPullRequestButton view={view} host={host} />}
 			{subject.kind === "session" && endable && (

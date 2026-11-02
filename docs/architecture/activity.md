@@ -60,11 +60,12 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Part | Observed by | Key |
 | --- | --- | --- |
 | Composer | action | `prompt` (sent, steered, or queued), `edit-prompt` |
-| Composer's directory, branch, and context ring | control, command, action | `composer.directory`, `composer.branch`, `composer.context-ring`; command `directory`; a move sends action `prompt` (`/move`) |
+| Composer's directory, branch, and context ring | control, command, action | `composer.directory`, `composer.branch`, `composer.context-ring`; command `directory`; actions `context`, `set-auto-compaction`, or `prompt` (`/move`) |
 | Rows above the composer | control, action | `composer-queue.send-now`, `composer-queue.edit`, `composer-queue.remove`, `composer-suggestions.pick`, `composer-suggestions.send-all`; actions `dequeue`, `promote`, `prompt`, `schedule`, `answer` |
 | Todos card (Files, Images, and Sources sections, FileChangesDialog) | control, action | `changes-card.files.fold`, `changes-card.images.fold`, `changes-card.sources.fold`, `changes-card.review`, `changes-card.file`, `changes-card.image.select`, `changes-card.image.clear`, `changes-card.image.to-pull-request`, `changes-card.image.to-ticket`, `changes-card.source`, ids kept from the card the sections came from so recorded use stays counted; sending images is a `PUT` |
 | `/` and `@` menus | control | `completion.pick` (a click; picking by keyboard records nothing) |
-| Model and thinking switch | control, command, action | `composer.model`; command `model`; actions `set-model`, `set-thinking`, `set-fast` |
+| Model and thinking switch | control, command, action | `composer.model`, `composer.advisor`; command `model`; actions `set-model`, `set-thinking`, `set-fast`, `set-advisor` |
+| Session goal | control, action | `header.goal`; action `goal` from the pill, dialog, or composer |
 | Conversation pane, pane grid, and divider | view, control | views `session`, `past`, `split`, `home`; maximize and close change the hash, so they show as views; `trajectory.toggle`, `replay-compare.open`; dragging the divider is not observed |
 | Desktop link address | not observed | display only |
 | Transcript (code blocks, session visuals, minimap, Todos card, chat history, image viewer) | control | `transcript.activity-group`, `transcript.todos`, `transcript.ship`, `minimap.jump`, `minimap.step`, `prompt-history.toggle`, `prompt-history.jump`, `media-viewer.open`, `media-viewer.step`, `media-viewer.new-tab`; the viewer's arrow keys record nothing; code block copy and session visuals are not observed |

@@ -32,6 +32,7 @@ import {
 import { type CalendarShownInput, type EventRef, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar, parseEventWhen } from "../shared/calendar";
 import { MAX_MAIL_BODY, type MailDraft, type MailPerson, type MailReply, type MailSend, type MailTrash } from "../shared/gmail";
 import { parseImages, parseModel, parseNewSessionRequest, parseSkill, parseThinking } from "../shared/sessions";
+import { parseContextAction, parseGoalChange } from "../shared/session-controls";
 import { MAX_PROMPT_DOCUMENT_BYTES, type PromptDocument } from "../shared/prompt-files";
 import type { DevServerRequest, ProcessStop } from "../shared/processes";
 import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
@@ -365,6 +366,18 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 		typeof instanceId === "string" && typeof level === "string" ? { ok: { t: "set-thinking", instanceId, level } } : null,
 	"set-fast": ({ instanceId, enabled }) =>
 		typeof instanceId === "string" && typeof enabled === "boolean" ? { ok: { t: "set-fast", instanceId, enabled } } : null,
+	context({ instanceId, action }) {
+		const parsed = parseContextAction(action);
+		return typeof instanceId === "string" && parsed ? { ok: { t: "context", instanceId, action: parsed } } : null;
+	},
+	"set-auto-compaction": ({ instanceId, enabled }) =>
+		typeof instanceId === "string" && typeof enabled === "boolean" ? { ok: { t: "set-auto-compaction", instanceId, enabled } } : null,
+	"set-advisor": ({ instanceId, enabled }) =>
+		typeof instanceId === "string" && typeof enabled === "boolean" ? { ok: { t: "set-advisor", instanceId, enabled } } : null,
+	goal({ instanceId, change }) {
+		const parsed = parseGoalChange(change);
+		return typeof instanceId === "string" && parsed ? { ok: { t: "goal", instanceId, change: parsed } } : null;
+	},
 	answer(value) {
 		const { instanceId, requestId } = value;
 		const answer = parseAnswer(value.answer);

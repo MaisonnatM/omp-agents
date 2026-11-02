@@ -4,7 +4,7 @@ import { isObject } from "../json";
 import type { CollabAutoStart, TerminalAccess } from "../shared/readiness";
 import { type RetrySettings, type RoutingEdit, selectorOf } from "../shared/models";
 import { ompVersion } from "./install";
-import { collabSettings, config, dirs, extensionSettings, fallbackChains, modelSettings, sessionSettings, settingsRegistry } from "./modules";
+import { advisorConfig, advisorSettings, collabSettings, compaction, config, dirs, extensionSettings, fallbackChains, goalSettings, modelCompactionSettings, modelSettings, sessionSettings, settingsRegistry } from "./modules";
 import type { OmpSettingsInstance, SettingHandle } from "./module-types/config";
 
 /** omp's user config directory, `~/.omp/agent` unless `PI_CODING_AGENT_DIR` moves it. */
@@ -53,11 +53,18 @@ export interface OmpConfig {
 	retry: RetrySettings;
 	modelProviderOrder: string[];
 	disabledExtensions: string[];
+	advisorEnabled: boolean;
+	advisorModel: string | null;
+	goalEnabled: boolean;
+	goalContinues: boolean;
+	compactionThreshold(model: { provider: string; id: string } | undefined, window: number): number;
 }
 
 /** Read-only: omp's `loadReadOnly` never writes the config files back. */
 export async function loadOmpConfig(cwd: string): Promise<OmpConfig> {
 	const settings = await config.Settings.loadReadOnly({ cwd });
+	const { advisors } = await advisorConfig.discoverAdvisorConfigs(cwd);
+	const enabledAdvisors = advisors.filter(advisor => advisor.enabled !== false);
 	return {
 		modelRoles: settings.getModelRoles(),
 		fallbackChains: sessionSettings.cfgRetryFallbackChains.get(settings),
@@ -67,8 +74,14 @@ export async function loadOmpConfig(cwd: string): Promise<OmpConfig> {
 		},
 		modelProviderOrder: modelSettings.cfgModelProviderOrder.get(settings),
 		disabledExtensions: extensionSettings.cfgDisabledExtensions.get(settings),
+		advisorEnabled: advisorSettings.cfgAdvisorEnabled.get(settings),
+		advisorModel: enabledAdvisors.length > 1 ? `${enabledAdvisors.length} advisors` : enabledAdvisors[0]?.model ?? settings.getModelRoles().advisor ?? null,
+		goalEnabled: goalSettings.cfgGoalEnabled.get(settings),
+		goalContinues: goalSettings.cfgGoalContinuationModes.get(settings).includes("rpc"),
+		compactionThreshold: (model, window) => compaction.resolveThresholdTokens(window, modelCompactionSettings.resolveModelCompactionSettings(settings, model)),
 	};
 }
+
 
 function setting(id: string): SettingHandle {
 	const handle = settingsRegistry.lookup(id);

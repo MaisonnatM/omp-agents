@@ -1,6 +1,7 @@
 /** The model menu: a model's logo and name, the grouped searchable model list, and Fast, Context, and Effort controls. */
 import { type ModelEntry, type ModelOption, type PlanUsage, selectorOf } from "../../src/shared/models";
 import type { FastMode } from "../../src/shared/sessions";
+import type { AdvisorState } from "../../src/shared/session-controls";
 import type { ControlId } from "../../src/shared/activity";
 import { ChevronDown } from "lucide-react";
 import { useContext, useEffect, useRef, useState } from "react";
@@ -161,6 +162,7 @@ interface ModelPickerProps {
 	effort: EffortChoices;
 	/** omp's `/fast` for a live session, `state` `null` while its model has no fast tier; the draft has no row. */
 	fast?: { state: FastMode | null; onChange: (enabled: boolean) => void };
+	advisor?: { state: AdvisorState | null; onChange: (enabled: boolean) => void };
 	/** The Activity control a click on the button records; none when omitted. */
 	control?: ControlId;
 }
@@ -176,7 +178,7 @@ const BACK_TO_MENU: Record<string, true> = { "trigger-hover": true, "sibling-ope
 const tokens = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
 
 /** Cursor's model menu: Fast, Context, and Effort for the current model, then Model, which searches every connected model. */
-export function ModelPicker({ current, unset = "Choose model", list, open, onOpenChange, onPick, disabled, pending = false, effort, fast, control }: ModelPickerProps) {
+export function ModelPicker({ current, unset = "Choose model", list, open, onOpenChange, onPick, disabled, pending = false, effort, fast, advisor, control }: ModelPickerProps) {
 	const models = list.data?.models ?? [];
 	const variants = contextVariants(models, current);
 	const contextWindow = variants.find(model => selectorOf(model) === current)?.contextWindow ?? null;
@@ -234,6 +236,12 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 					>
 						Fast
 						{fast.state?.enabled && !fast.state.active && <span className="text-xs text-muted-foreground">not active</span>}
+					</MenuSwitchItem>
+				)}
+				{advisor && (
+					<MenuSwitchItem {...activityControl("composer.advisor")} checked={advisor.state?.enabled ?? false} onCheckedChange={advisor.onChange} disabled={pending || advisor.state === null} title={advisor.state === null ? "Assign a model to the advisor role in Settings > Models." : "Advisor for this session."}>
+						Advisor
+						{advisor.state && <span className="min-w-0 truncate text-xs text-muted-foreground">{advisor.state.model.endsWith(" advisors") ? advisor.state.model : modelLabel(advisor.state.model)}</span>}
 					</MenuSwitchItem>
 				)}
 				{contextWindow !== null && (

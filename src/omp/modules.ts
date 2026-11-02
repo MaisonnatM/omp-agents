@@ -10,6 +10,11 @@ import type { CollabAutoStart } from "../shared/readiness";
 import { ompVersion, packageDir } from "./install";
 import type { CryptoModule, ProtocolModule, RegistryModule, RelayModule } from "./module-types/collab";
 import type {
+	AdvisorConfigModule,
+	AdvisorSettingsModule,
+	CompactionModule,
+	ModelCompactionSettingsModule,
+	GoalSettingsModule,
 	ConfigModule,
 	DirsModule,
 	ExtensionSettingsModule,
@@ -183,6 +188,8 @@ export const rpc = await load<RpcClientModule>(join(srcDir, "modes", "rpc", "rpc
 	"RpcClient.prototype.cancelSubagent": "function",
 	"RpcClient.prototype.bash": "function",
 	"RpcClient.prototype.setFastMode": "function",
+	"RpcClient.prototype.goal": "function",
+	"RpcClient.prototype.setAutoCompaction": "function",
 	"RpcClient.prototype.onPromptResult": "function",
 	// Sends the constructor's `customTools`, and a reattached session's; the option itself cannot be checked.
 	"RpcClient.prototype.setCustomTools": "function",
@@ -222,6 +229,11 @@ export const sessionSettings = await load<SessionSettingsModule>(join(srcDir, "s
 export const modelSettings = await load<ModelSettingsModule>(join(srcDir, "config", "model-settings.ts"), {
 	"cfgModelProviderOrder.get": "function",
 });
+export const goalSettings = await load<GoalSettingsModule>(join(srcDir, "goals", "settings.ts"), { "cfgGoalEnabled.get": "function", "cfgGoalContinuationModes.get": "function" });
+export const advisorSettings = await load<AdvisorSettingsModule>(join(srcDir, "advisor", "settings.ts"), { "cfgAdvisorEnabled.get": "function" });
+export const advisorConfig = await load<AdvisorConfigModule>(join(srcDir, "advisor", "config.ts"), { discoverAdvisorConfigs: "function" });
+export const modelCompactionSettings = await load<ModelCompactionSettingsModule>(join(srcDir, "session", "model-compaction-threshold.ts"), { resolveModelCompactionSettings: "function" });
+export const compaction = await load<CompactionModule>(join(dirname(packageDir), "pi-agent-core", "src", "compaction", "compaction.ts"), { resolveThresholdTokens: "function" });
 export const auth = await load<AuthModule>(join(srcDir, "session", "auth-broker-config.ts"), { discoverAuthStorage: "function" });
 export const oauth = await load<OAuthModule>(join(dirname(packageDir), "pi-ai", "src", "registry", "oauth", "index.ts"), {
 	getOAuthProviders: "function",

@@ -1,6 +1,7 @@
 import { type KeyboardEvent, type ReactNode, type Ref, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import type { ModelOption } from "../../src/shared/models";
 import type { Delivery, LiveView, RosterHost } from "../../src/shared/sessions";
+import type { ContextAction } from "../../src/shared/session-controls";
 import type { ChangedFile } from "../../src/shared/transcript";
 import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ import { blockedShortcut, ComposerEditor, ComposerNote, DirectoryLabel, EmptyCon
 import { QueuedMessages, useQueue } from "./composer-queue";
 import { useSuggestions } from "./composer-suggestions";
 import type { PromptEditorHandle } from "./prompt-editor";
-import { ContextRing } from "./context-ring";
+import { ContextRing, ContextRingMenu } from "./context-ring";
 import { ConversationHeader } from "./conversation-header";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
@@ -156,7 +157,10 @@ function LiveConversation({
 	const modelChange = useAction((model: ModelOption, level: string | null) => request({ t: "set-model", instanceId, model, thinking: level }), "Could not switch the model");
 	const thinkingChange = useAction((level: string) => request({ t: "set-thinking", instanceId, level }), "Could not change the thinking level");
 	const fastChange = useAction((enabled: boolean) => request({ t: "set-fast", instanceId, enabled }), "Could not switch fast mode");
-	const switching = (!!switchable && switchable.switching) || modelChange.pending || thinkingChange.pending || fastChange.pending;
+	const advisorChange = useAction((enabled: boolean) => request({ t: "set-advisor", instanceId, enabled }), "Could not switch the advisor");
+	const contextAction = useAction((action: ContextAction) => request({ t: "context", instanceId, action }), "Could not change the context");
+	const autoCompaction = useAction((enabled: boolean) => request({ t: "set-auto-compaction", instanceId, enabled }), "Could not switch auto-compact");
+	const switching = (!!switchable && switchable.switching) || modelChange.pending || thinkingChange.pending || fastChange.pending || advisorChange.pending;
 	const restoreDraft = (text: string): void => {
 		setDraft(current => (current ? `${text}\n${current}` : text));
 		editorRef.current?.focus();
@@ -356,6 +360,7 @@ function LiveConversation({
 									onSetModel={modelChange.run}
 									onSetThinking={thinkingChange.run}
 									onSetFast={fastChange.run}
+									onSetAdvisor={advisorChange.run}
 								/>
 							</>
 						}
@@ -371,7 +376,7 @@ function LiveConversation({
 										</Button>
 									</Tooltip>
 								)}
-								{session && shown?.context && <ContextRing context={shown.context} />}
+								{session && shown?.context && (switchable ? <ContextRingMenu context={shown.context} compaction={switchable.compaction} working={working} pending={contextAction.pending} autoPending={autoCompaction.pending} onAction={contextAction.run} onAutoChange={autoCompaction.run} onFocus={command => { setDraft(current => `${command}${current}`); requestAnimationFrame(() => { editorRef.current?.focus(); editorRef.current?.select(Number.POSITIVE_INFINITY); }); }} /> : <ContextRing context={shown.context} />)}
 								{sessionId !== null && writable && (
 									<ScheduleButton draft={draft} files={attachments.files.length} disabled={!connected} pending={schedule.pending} onSchedule={schedule.run} />
 								)}

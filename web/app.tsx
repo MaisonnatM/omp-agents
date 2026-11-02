@@ -347,6 +347,7 @@ export function App() {
 										state={overlays.palette}
 										dispatch={dispatchPalette}
 										hosts={visible.hosts}
+										goalHost={page === null && focused.view?.kind === "live" && focused.view.agentId === null ? focused.host : undefined}
 										past={visible.past}
 										workspaces={workspaces}
 										workspace={workspace}

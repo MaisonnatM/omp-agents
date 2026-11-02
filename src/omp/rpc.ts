@@ -12,6 +12,18 @@ import { ompCommand } from "./install";
 import { rpc, rpcFrameFile, rpcFrames, utils } from "./modules";
 import type { ServiceTierModel } from "./module-types/models";
 import type { RpcHostTool } from "./module-types/rpc";
+import type { SessionGoal } from "../shared/session-controls";
+
+export interface RpcGoal extends Omit<SessionGoal, "tokenBudget" | "status"> {
+	tokenBudget?: number;
+	status: SessionGoal["status"] | "dropped";
+}
+
+export interface RpcGoalState {
+	enabled: boolean;
+	mode: "active" | "exiting";
+	goal: RpcGoal;
+}
 
 /** Subset of omp's `Model` (pi-ai src/types.ts) this app reads. */
 export interface RpcModel extends ServiceTierModel {
@@ -35,6 +47,8 @@ export interface RpcState {
 	fastModeEnabled: boolean;
 	/** Whether requests actually go out on the priority tier. */
 	fastModeActive: boolean;
+	autoCompactionEnabled: boolean;
+	goal: RpcGoalState | null;
 	/** Whether a turn runs. */
 	isStreaming: boolean;
 	/** Whether omp compacts the context, which a turn's own maintenance does before it goes on. */
@@ -87,6 +101,8 @@ export interface RpcClient {
 	setThinkingLevel(level: string): Promise<void>;
 	/** Turns `/fast` on or off; enabling rejects for a model without a priority tier. */
 	setFastMode(enabled: boolean): Promise<{ enabled: boolean; active: boolean }>;
+	setAutoCompaction(enabled: boolean): Promise<void>;
+	goal(op: "get" | "create" | "pause" | "resume" | "drop", options?: { objective?: string; tokenBudget?: number }): Promise<{ goal: RpcGoal | null; state: RpcGoalState | null }>;
 	setSubagentSubscription(level: "progress"): Promise<string>;
 	getSubagents(): Promise<RpcSubagent[]>;
 	switchSession(sessionPath: string): Promise<{ cancelled: boolean }>;

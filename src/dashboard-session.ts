@@ -7,7 +7,7 @@ import { randomBytes } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { errorText, isObject, isTexts } from "./json";
 import { type LiveRow, type LiveSession, type LiveUpdate, PromptRefused, turnUpdate } from "./live-session";
-import { loadOmpConfig } from "./omp/config";
+import { loadOmpConfig, type OmpConfig } from "./omp/config";
 import { connectedProviders, fastAvailable, modelEntries } from "./omp/models";
 import { type AdmittedLaunch, attachRpc, type RpcChild, type RpcClient, type RpcLaunch, type RpcState, startRpc } from "./omp/rpc";
 import { endsMidTurn } from "./omp/sessions";
@@ -15,6 +15,8 @@ import type { PreparedReplay } from "./replay";
 import { launchForReplayResume, readReplayMarker, replayLaunch, requireReplayReady } from "./omp/replay-launch";
 import { type ModelEntry, type ModelOption, selectorOf } from "./shared/models";
 import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type PromptImage, type UserAnswer, type UserRequest, type WithdrawnMessage } from "./shared/sessions";
+import { contextCommand, goalCommand, type AdvisorState, type CompactionState, type ContextAction, type GoalChange, type GoalSlot, type SessionGoal } from "./shared/session-controls";
+import type { RpcGoal } from "./omp/rpc";
 import { promptAuthor } from "./shared/transcript";
 import { PromptTurn } from "./prompt-turn";
 import { textOf } from "./session-entries";
@@ -80,7 +82,7 @@ export async function recordedCwd(sessionFile: string): Promise<string> {
 }
 
 /** Session events after which the model, thinking level, or context size can have changed. */
-const STATE_EVENTS = new Set(["turn_end", "model_changed", "thinking_level_changed", "auto_compaction_end"]);
+const STATE_EVENTS: Record<string, true> = { turn_end: true, model_changed: true, thinking_level_changed: true, auto_compaction_end: true, manual_compaction_end: true, goal_updated: true };
 
 /** A message taken back from omp's queue, holding only the image fields the composer restores. */
 function withdrawn({ text, images = [] }: { text: string; images?: readonly PromptImage[] }): WithdrawnMessage {
@@ -129,6 +131,11 @@ export class DashboardSession implements LiveSession {
 	/** `null` while the model has no priority tier for `/fast` to turn on. */
 	fast: FastMode | null = null;
 	context: ContextUsage | null = null;
+	compaction: CompactionState = { auto: false, running: null, thresholdTokens: null };
+	advisor: AdvisorState | null = null;
+	goal: GoalSlot = { kind: "none", continues: false };
+	#config: OmpConfig;
+	#finishedGoal: SessionGoal | null = null;
 	/** omp's own queues, from `get_state` and then each `queue_update`. */
 	queue: MessageQueue;
 	readonly #prompt = new PromptTurn();
@@ -159,6 +166,7 @@ export class DashboardSession implements LiveSession {
 		requests: PendingRequests,
 		state: RpcState,
 		emit: (update: DashboardUpdate) => void,
+		config: OmpConfig,
 	) {
 		this.instanceId = instanceId;
 		this.cwd = cwd;
@@ -167,6 +175,8 @@ export class DashboardSession implements LiveSession {
 		this.pid = child.pid;
 		this.startedAt = child.meta.startedAt;
 		this.#emit = emit;
+		this.#config = config;
+		this.advisor = config.advisorModel ? { enabled: config.advisorEnabled, model: config.advisorModel } : null;
 		this.sessionId = state.sessionId;
 		this.sessionFile = state.sessionFile ?? null;
 		this.#applyState(state);
@@ -333,7 +343,7 @@ export class DashboardSession implements LiveSession {
 			// An omp without the command answers it with an error and keeps asking in selects.
 			child.write(ASK_DIALOG_OPT_IN);
 			const cwd = await prepare(child);
-			session = new DashboardSession(instanceId, cwd, child, requests, await child.client.getState(), emit);
+			session = new DashboardSession(instanceId, cwd, child, requests, await child.client.getState(), emit, await loadOmpConfig(cwd));
 			session.thinkingLevels = await child.client.getAvailableThinkingLevels();
 			// omp's snapshot has the fields of a lifecycle frame.
 			for (const agent of await child.client.getSubagents()) session.#onSubagent(SUBAGENT_LIFECYCLE, agent);
@@ -358,6 +368,9 @@ export class DashboardSession implements LiveSession {
 			thinkingLevels: this.thinkingLevels,
 			switching: this.switching,
 			fast: this.fast,
+			compaction: this.compaction,
+			advisor: this.advisor,
+			goal: this.goal,
 			context: this.context,
 			startedAt: this.startedAt,
 			status: this.status,
@@ -447,6 +460,17 @@ export class DashboardSession implements LiveSession {
 			this.#replayExpected = null;
 		}
 		if (agentId !== null && images.length > 0) throw new Error("omp sends a subagent text only.");
+		if (agentId === null) {
+			const command = goalCommand(text, this.goal.kind === "set" ? this.goal.goal : null);
+			if (command !== null) {
+				if (images.length > 0) throw new PromptRefused("A goal command takes no images.");
+				if (command === "show") {
+					await this.#modelLane.run(() => this.#readModelState("Goal refresh failed"));
+					this.#emit({ kind: "note", agentId: null, level: "info", text: this.goal.kind === "set" ? `Goal ${this.goal.goal.status}: ${this.goal.goal.objective}` : "No goal is set." });
+				} else await this.changeGoal(command);
+				return;
+			}
+		}
 		if (agentId === null && text.startsWith("!")) {
 			if (images.length > 0) throw new Error("A ! command takes no images.");
 			return this.#shell(text);
@@ -477,6 +501,11 @@ export class DashboardSession implements LiveSession {
 		const id = await this.#child.client.prompt(text, content.length > 0 ? content : undefined, delivery).finally(() => pending.close());
 		const local = text.startsWith("/") && !text.startsWith("/skill:");
 		this.#change(() => pending.acked(id && !local ? { id, text, images } : null));
+		const advisor = /^\/advisor(?:\s+(on|off|toggle))?\s*$/.exec(text.trim());
+		if (advisor && this.advisor) {
+			this.advisor = { ...this.advisor, enabled: advisor[1] === "on" || (advisor[1] !== "off" && !this.advisor.enabled) };
+			this.#emit({ kind: "roster" });
+		}
 	}
 
 	/** A `!` command, which omp runs in the session's directory and records in its file for the agent to see. */
@@ -526,6 +555,8 @@ export class DashboardSession implements LiveSession {
 				const mark = this.#prompt.interrupt();
 				const { steering, followUp } = await this.#child.client.abortAndRestoreQueue();
 				this.#change(() => this.#prompt.release());
+				this.#refresh();
+				if (this.goal.kind === "set" && this.goal.goal.status === "active") this.#emit({ kind: "note", agentId: null, level: "info", text: "Goal paused. Resume it from the header." });
 				// omp's restore leaves out a prompt it admitted but never ran, so the composer gets it back from here.
 				// Only the user's own: a message the dashboard or a routine sent is not theirs to edit.
 				return [...mark.unsent(), ...steering, ...followUp].filter(({ text }) => promptAuthor(text).kind === "user").map(withdrawn);
@@ -631,6 +662,45 @@ export class DashboardSession implements LiveSession {
 		});
 	}
 
+	contextAction(action: ContextAction): Promise<void> {
+		return this.#modelLane.run(() => this.#noting("Context action failed", async () => {
+			if (this.#protectedReplay) throw new Error("Context actions are blocked in a replay.");
+			if (this.#prompt.busy || this.compaction.running) throw new Error("Wait for the turn to end, or stop it.");
+			await this.#send(contextCommand(action), [], "steer");
+		}).finally(() => this.#readModelState("Context refresh failed")));
+	}
+
+	setAutoCompaction(enabled: boolean): Promise<void> {
+		return this.#modelLane.run(() => this.#noting("Auto-compact switch failed", async () => {
+			if (this.#protectedReplay) throw new Error("Context changes are blocked in a replay.");
+			await this.#child.client.setAutoCompaction(enabled);
+		}).finally(() => this.#readModelState("Context refresh failed")));
+	}
+
+	setAdvisor(enabled: boolean): Promise<void> {
+		return this.#modelLane.run(() => this.#noting("Advisor switch failed", async () => {
+			if (this.#protectedReplay) throw new Error("Advisor changes are blocked in a replay.");
+			if (!this.advisor) throw new Error("Assign a model to the advisor role in Settings > Models.");
+			await this.#send(`/advisor ${enabled ? "on" : "off"}`, [], "steer");
+		}).finally(() => this.#readModelState("Advisor refresh failed")));
+	}
+
+	changeGoal(change: GoalChange): Promise<void> {
+		return this.#modelLane.run(() => this.#noting("Goal change failed", async () => {
+			if (this.#protectedReplay) throw new Error("Goal changes are blocked in a replay.");
+			const { client } = this.#child;
+			if (change.op === "set") {
+				if (this.goal.kind === "off") throw new Error(this.goal.reason);
+				if ((await client.goal("get")).state) await client.goal("drop");
+				this.#finishedGoal = null;
+				await client.goal("create", { objective: change.objective, ...(change.tokenBudget === null ? {} : { tokenBudget: change.tokenBudget }) });
+			} else {
+				await client.goal(change.op === "clear" ? "drop" : change.op);
+				if (change.op === "clear") this.#finishedGoal = null;
+			}
+		}).finally(() => this.#readModelState("Goal refresh failed")));
+	}
+
 	end(): Promise<void> {
 		this.#ended = true;
 		return this.#child.client.stop();
@@ -666,6 +736,13 @@ export class DashboardSession implements LiveSession {
 	#onEvent(event: unknown): void {
 		this.#emit({ kind: "event", event });
 		if (!isObject(event)) return;
+		if (event.type === "manual_compaction_start" || event.type === "auto_compaction_start") {
+			this.compaction = { ...this.compaction, running: event.type === "manual_compaction_start" ? "manual" : "auto" };
+			this.#emit({ kind: "roster" });
+		}
+		if (event.type === "goal_updated" && isObject(event.goal) && event.goal.status === "complete" && typeof event.goal.objective === "string" && typeof event.goal.tokensUsed === "number" && typeof event.goal.timeUsedSeconds === "number") {
+			this.#finishedGoal = { objective: event.goal.objective, status: "complete", tokensUsed: event.goal.tokensUsed, tokenBudget: typeof event.goal.tokenBudget === "number" ? event.goal.tokenBudget : null, timeUsedSeconds: event.goal.timeUsedSeconds };
+		}
 		if ((event.type === "message_start" || event.type === "message_end") && isObject(event.message) && isUserPrompt(event.message)) {
 			this.#change(() => this.#prompt.shown());
 		}
@@ -695,7 +772,7 @@ export class DashboardSession implements LiveSession {
 				.run(() => this.#child.client.prompt("/rename"))
 				.then(() => this.#refresh())
 				.catch((err: unknown) => this.#fail("Titling failed", err));
-		} else if (typeof event.type === "string" && STATE_EVENTS.has(event.type)) this.#refresh();
+		} else if (typeof event.type === "string" && Object.hasOwn(STATE_EVENTS, event.type)) this.#refresh();
 	}
 
 	#applyState(state: RpcState): void {
@@ -704,6 +781,17 @@ export class DashboardSession implements LiveSession {
 		this.thinkingLevel = state.thinkingLevel ?? null;
 		this.context = contextOf(state.contextUsage);
 		this.fast = state.model && fastAvailable(state.model) ? { enabled: state.fastModeEnabled, active: state.fastModeActive } : null;
+		this.compaction = { auto: state.autoCompactionEnabled, running: state.isCompacting ? this.compaction.running ?? "auto" : null, thresholdTokens: this.context ? this.#config.compactionThreshold(state.model, this.context.window) : null };
+		const goal = state.goal?.goal;
+		if (goal && goal.status !== "dropped") this.#finishedGoal = null;
+		const shown = goal && goal.status !== "dropped" ? this.#sessionGoal(goal) : this.#finishedGoal;
+		this.goal = shown ? { kind: "set", goal: shown, continues: this.#config.goalContinues }
+			: !this.#config.goalEnabled ? { kind: "off", reason: "Goal mode is off in this workspace's .omp/config.yml." }
+			: { kind: "none", continues: this.#config.goalContinues };
+	}
+
+	#sessionGoal(goal: RpcGoal): SessionGoal {
+		return { objective: goal.objective, status: goal.status === "dropped" ? "paused" : goal.status, tokensUsed: goal.tokensUsed, tokenBudget: goal.tokenBudget ?? null, timeUsedSeconds: goal.timeUsedSeconds };
 	}
 
 	/** Coalesce bursts while one read waits, without letting a read overtake a model setter. */
@@ -742,10 +830,12 @@ export class DashboardSession implements LiveSession {
 			if (file && !(await stat(file).catch(() => null))) return false;
 			cwd = file ? await recordedCwd(file) : this.cwd;
 		}
+		if (cwd !== this.cwd) this.#config = await loadOmpConfig(cwd);
 		this.sessionFile = file;
 		this.cwd = cwd;
 		if (state.sessionId !== this.sessionId) {
 			this.sessionId = state.sessionId;
+			this.#finishedGoal = null;
 			this.#titled = false;
 			this.#agents.clear();
 		}

@@ -18,7 +18,7 @@ import type { ServerMsg } from "./shared/protocol";
 import * as replayLaunch from "./omp/replay-launch";
 import type { PreparedReplay } from "./replay";
 
-const STATE: RpcState = { sessionId: "session-1", fastModeEnabled: false, fastModeActive: false, isStreaming: false, isCompacting: false, hasPendingAsyncWork: false, queuedMessages: { steering: [], followUp: [] } };
+const STATE: RpcState = { sessionId: "session-1", fastModeEnabled: false, fastModeActive: false, autoCompactionEnabled: true, goal: null, isStreaming: false, isCompacting: false, hasPendingAsyncWork: false, queuedMessages: { steering: [], followUp: [] } };
 
 /** Admits every directory: project trust has its own tests, and a spawn here only needs one. */
 const ADMIT_ALL = async (): Promise<void> => {};
@@ -56,6 +56,8 @@ class FakeClient implements RpcClient {
 		this.calls.push(`fast ${enabled}`);
 		return { enabled, active: enabled };
 	};
+	setAutoCompaction: RpcClient["setAutoCompaction"] = async enabled => { this.calls.push(`auto ${enabled}`); };
+	goal: RpcClient["goal"] = async op => { this.calls.push(`goal ${op}`); return { goal: null, state: null }; };
 	setSubagentSubscription = async () => "progress";
 	getSubagents: RpcClient["getSubagents"] = async () => [];
 	switchSession = async () => ({ cancelled: false });
@@ -948,5 +950,73 @@ describe("DashboardSession replay admission", () => {
 		const stopped = spyOn(client, "stop");
 		await expect(DashboardSession.replay("replay-instance", preparedReplay(), LAUNCH, () => {})).rejects.toThrow("cancelled");
 		expect(stopped).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("DashboardSession context and goal controls", () => {
+	test("context actions use slash prompts and auto-compact uses RPC", async () => {
+		const { session, client } = await startSession();
+		await session.contextAction({ kind: "compact", mode: "soft" });
+		await session.contextAction({ kind: "shake", mode: "images" });
+		await session.contextAction({ kind: "handoff" });
+		await session.setAutoCompaction(false);
+		expect(client.calls).toEqual(["prompt /compact soft", "prompt /shake images", "prompt /handoff", "auto false"]);
+	});
+
+	test("context changes refuse a running turn but the auto-compact switch stays live", async () => {
+		const { session, client } = await startSession();
+		client.fire({ type: "agent_start" });
+		await expect(session.contextAction({ kind: "handoff" })).rejects.toThrow("Wait for the turn to end");
+		await session.setAutoCompaction(false);
+		expect(client.calls).toEqual(["auto false"]);
+	});
+
+	test("manual compaction events update the ring and re-read its final tokens", async () => {
+		const { session, client } = await startSession();
+		client.fire({ type: "manual_compaction_start" });
+		expect(session.row().source === "dashboard" && session.compaction.running).toBe("manual");
+		client.getState = async () => ({ ...STATE, contextUsage: { tokens: 40000, contextWindow: 200000 } });
+		client.fire({ type: "manual_compaction_end" });
+		await settle();
+		expect(session.compaction.running).toBeNull();
+		expect(session.context).toEqual({ tokens: 40000, window: 200000 });
+	});
+
+	test("typed goals are local RPC operations rather than model prompts", async () => {
+		const { session, client } = await startSession();
+		await session.prompt(null, "/goal ship the editor", [], "steer");
+		await session.prompt(null, "/goal pause", [], "steer");
+		await session.prompt(null, "/goal resume", [], "steer");
+		await session.prompt(null, "/goal drop", [], "steer");
+		expect(client.calls).toEqual(["goal get", "goal create", "goal pause", "goal resume", "goal drop"]);
+	});
+
+	test("replacement drops an existing goal before creating one with fresh accounting", async () => {
+		const { session, client } = await startSession();
+		const goal = { objective: "old", status: "paused" as const, tokensUsed: 10, timeUsedSeconds: 2 };
+		client.goal = async (op, options) => {
+			client.calls.push(`${op} ${options?.objective ?? ""}`.trim());
+			return { goal, state: { enabled: false, mode: "active", goal } };
+		};
+		await session.changeGoal({ op: "set", objective: "new", tokenBudget: 100000 });
+		expect(client.calls).toEqual(["get", "drop", "create new"]);
+	});
+
+	test("advisor slash toggles update the dashboard's tracked state", async () => {
+		const { session } = await startSession();
+		session.advisor = { enabled: false, model: "provider/model" };
+		await session.setAdvisor(true);
+		expect(session.advisor.enabled).toBe(true);
+		await session.prompt(null, "/advisor toggle", [], "steer");
+		expect(session.advisor.enabled).toBe(false);
+	});
+
+	test("a completed goal remains visible after omp clears its mode, and Clear removes it", async () => {
+		const { session, client } = await startSession();
+		client.fire({ type: "goal_updated", goal: { objective: "ship", status: "complete", tokensUsed: 42, timeUsedSeconds: 3 } });
+		await settle();
+		expect(session.goal).toMatchObject({ kind: "set", goal: { status: "complete", objective: "ship" } });
+		await session.changeGoal({ op: "clear" });
+		expect(session.goal.kind).toBe("none");
 	});
 });

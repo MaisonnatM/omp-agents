@@ -64,6 +64,22 @@ export interface SessionSettingsModule {
 export interface ModelSettingsModule {
 	cfgModelProviderOrder: SettingsReader<string[]>;
 }
+export interface GoalSettingsModule {
+	cfgGoalEnabled: SettingsReader<boolean>;
+	cfgGoalContinuationModes: SettingsReader<string[]>;
+}
+export interface AdvisorConfigModule {
+	discoverAdvisorConfigs(cwd: string): Promise<{ advisors: { model?: string; enabled?: boolean }[] }>;
+}
+export interface AdvisorSettingsModule {
+	cfgAdvisorEnabled: SettingsReader<boolean>;
+}
+export interface ModelCompactionSettingsModule {
+	resolveModelCompactionSettings(scope: OmpSettingsInstance, model: { provider: string; id: string } | undefined): Record<string, unknown>;
+}
+export interface CompactionModule {
+	resolveThresholdTokens(window: number, settings: Record<string, unknown>): number;
+}
 /** omp's release lookup (src/cli/update-cli.ts), the one `omp update` makes. */
 export interface UpdateCliModule {
 	getLatestRelease(options: { timeoutMs: number; channel: string }): Promise<{ version: string }>;

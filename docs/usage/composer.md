@@ -45,6 +45,8 @@
   Esc in the host's terminal during a tool call looks to a guest like a turn that ended, so a follow-up that the dashboard holds still runs after it.
 - Sessions started from the dashboard have a model menu, as Cursor's does: the button reads the model and its effort, such as **Opus 5.5 High**.
   **Fast** turns omp's `/fast` on or off; it is greyed out for a model without a priority tier, and reads **not active** when omp has it on but the provider refused the fast tier.
+  **Advisor**, just under Fast, turns passive review on or off for this session and names its model, or the number of configured advisors.
+  Assign an advisor model in **Settings → Models** to enable the switch.
   **Context** shows the model's context window and switches to a variant of the same model with another window, such as Cursor's `claude-opus-5-5` (300K) and `claude-opus-5-5-1m` (1M); models without such a variant have no Context row.
   **Effort** chooses the thinking level among the ones the live model supports.
   **Model** opens the model search beside the menu, with the cursor in its field.
@@ -69,6 +71,11 @@
   The numbers are the ones that omp's status line shows.
   Dashboard sessions report them after each turn and after each model or thinking change.
   Terminal sessions report them through Collab `state` frames.
+  In a dashboard session, click the ring or press Enter, Space, or ↑ on it to open its context menu.
+  **Compact** offers Summarize, Locally, Remotely, As snapshot, and With focus; **Shake out** removes tool results, images, or thinking; **Hand off** starts a fresh context with a summary.
+  With focus fills the composer with `/compact ` or `/handoff ` for you to finish.
+  These actions wait until the running turn ends; **Auto-compact** remains available and changes this session only, not its config file.
+  While compaction runs, the ring reads **Compacting…** and pulses unless you prefer reduced motion.
 - Type `/` to complete discovered file commands and `/skill:<name>` skills; a skill whose name has a space is left out, since omp cannot invoke it.
   Type `@` to mention something: the list shows the last three files the session changed, then Files & Folders, Todos, Tickets, Pull requests, People, Email, Calendar, and Sessions.
   Picking a category narrows the list to it, which you can also type as a prefix: `@file:`, `@todo:`, `@ticket:`, `@pr:`, `@person:`, `@mail:`, `@event:`, or `@session:`.
