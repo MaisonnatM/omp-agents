@@ -17,6 +17,7 @@ import { Files } from "./files-tab";
 import { IntegrationsTab } from "./integrations-tab";
 import { McpServersTab } from "./mcp-servers-tab";
 import { OmpSettingsTab } from "./omp-settings-tab";
+import { ExtensionsTab } from "./extensions-tab";
 import { PreferencesTab } from "./preferences-tab";
 import { ProvidersTab } from "./providers-tab";
 import { ModelsTab } from "./routing-tab";
@@ -178,9 +179,10 @@ export function SettingsPage({
 		sync: <SyncTab active={section === "sync"} />,
 		worktrees: <WorktreesTab cwd={cwd} active={section === "worktrees"} pins={pins} />,
 		decisions: <DecisionsTab cwd={cwd} active={section === "decisions"} />,
+		extensions: <ExtensionsTab cwd={cwd} active={section === "extensions"} onSaved={settings.reload} />,
 	};
 	// Hidden panels stay mounted so an unsaved draft survives switching sections.
-	const body = SETTINGS_SECTIONS.map(({ value, label }) => (
+	const body = SETTINGS_SECTIONS.filter(({ value }) => value !== "extensions").map(({ value, label }) => (
 		<section key={value} aria-label={label} hidden={section !== value} tabIndex={0} className={PANEL}>
 			{panels[value]}
 		</section>
@@ -197,9 +199,10 @@ export function SettingsPage({
 				<Header title={shown.label} />
 			)}
 			{/* Relative, so an absolute child such as a table's `sr-only` caption stays in this scroll and never makes the document scroll. */}
-			<div ref={scroller} className="relative min-h-0 flex-1 overflow-y-auto">
+			<div ref={scroller} hidden={section === "extensions"} className="relative min-h-0 flex-1 overflow-y-auto">
 				<div className="mx-auto w-full max-w-5xl space-y-10 px-6 py-6">{body}</div>
 			</div>
+			<section aria-label="Extensions" hidden={section !== "extensions"} className="min-h-0 flex-1">{panels.extensions}</section>
 		</div>
 	);
 }

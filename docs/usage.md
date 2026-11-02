@@ -38,6 +38,7 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 - [Routines](usage/routines.md)
 - [Bots](usage/bots.md)
 - [Settings](usage/settings.md)
+  - [Extensions](usage/extensions.md)
 - [Settings sync](usage/settings-sync.md)
 - [Notifications](usage/notifications.md)
   - [Session notifications](usage/notifications.md#session-notifications)

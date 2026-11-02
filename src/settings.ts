@@ -320,7 +320,7 @@ function parseFileEdit(raw: unknown): FileEdit {
 export function saveOmpFile(cwd: string | null, raw: unknown): Promise<OmpSettings> {
 	return serialized(async () => {
 		const edit = parseFileEdit(raw);
-		const file = (await loadSession(cwd)).found.find(found => found.path === edit.path);
+		const file = (await loadSession(cwd)).found.find(found => found.path === edit.path && !found.packaged);
 		if (!file) throw new Rejected(404, `omp does not read ${displayPath(edit.path)} here`);
 		const { body, pathDisplay } = await readFile(file);
 		if (body.state === "unreadable") throw new Rejected(409, `Cannot read ${pathDisplay}: ${body.error}`);

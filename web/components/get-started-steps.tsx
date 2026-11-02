@@ -195,6 +195,7 @@ export function KitStep({ kit }: { kit: Observation<StarterKitStatus> }) {
 					}
 				>
 					{!run && !done && <p className="text-xs text-muted-foreground">Open omp agents in the desktop app to install it.</p>}
+					<Button size="compact" variant="outline" render={<a href="#settings/extensions" />}>Manage installed packages</Button>
 					<Unavailable fact={kit} />
 					{result && (
 						<Callout tone={result.ok ? "info" : "danger"} icon={result.ok ? Check : CircleAlert} role="alert">

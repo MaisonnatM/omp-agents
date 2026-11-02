@@ -196,6 +196,7 @@ export interface Workflow {
 	description: string;
 	skill: string;
 	command: string | null;
+	packageSource?: string;
 }
 
 /** `GET /api/settings`: omp's model routing and files, as a session in `cwd` would load them. */
@@ -207,6 +208,7 @@ export interface OmpSettings {
 	/** omp's own settings, as its settings panel lists them; `error` as for `routing`. */
 	agentSettings: AgentSettings | { error: string };
 	files: OmpFile[];
+	workflowFiles: OmpFile[];
 	/** The workflow skills among `files`, by name. */
 	workflows: Workflow[];
 }

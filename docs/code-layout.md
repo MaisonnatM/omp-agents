@@ -98,6 +98,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
     Dragging a Bot's row onto a group in the Bots tab is in `web/components/bots/bots-nav.tsx`, with the changes a drop sends from `botMovesTo` in `web/bots-model.ts`.
   - Settings: `web/components/settings/settings-page.tsx`, one `*-tab.tsx` per section listed in `SETTINGS_SECTIONS` in `web/routing.ts`.
     Settings › Analytics' context-source table: `ContextSources` in `web/components/settings/context-sources.tsx`.
+    Settings › Extensions, with Installed, Discover, Loaded items, and Sources: `ExtensionsTab` in `web/components/settings/extensions-tab.tsx`, a full-height split library over native package operations.
     Settings › Workflows, the skills tagged `workflow` with how each starts: `Workflows` in `web/components/settings/workflows-tab.tsx`, which opens the selected skill in `FileView` from `files-tab.tsx`, over `workflowsOf` in `src/omp/workflows.ts`.
     Settings › omp settings, omp's own settings by its tabs with search, a control per row, **Reset**, and the workspace lock: `OmpSettingsTab` in `web/components/settings/omp-settings-tab.tsx`, over `shownTabs` and `OWNED_SETTINGS`, the settings another section edits, in `web/omp-settings.ts`, and `readAgentSettings` in `src/omp/agent-settings.ts`.
     Settings › Activity, with its never-used, most-used, navigation, and active-time reports: `ActivityTab` in `web/components/settings/activity-tab.tsx`.

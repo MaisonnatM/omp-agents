@@ -6,6 +6,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { Editing } from "./editor";
 import { FileView } from "./files-tab";
+import { MessageMarkdown } from "../message-markdown";
 
 const TAG_SNIPPET = "metadata:\n  tags: workflow";
 
@@ -61,6 +62,7 @@ export function Workflows({ workflows, files, editing }: { workflows: Workflow[]
 									<span className="flex w-full items-baseline gap-2">
 										<span className="truncate">{workflow.name}</span>
 										<span className="ml-auto shrink-0 text-xs font-normal text-muted-foreground">{skill.scope}</span>
+										{workflow.packageSource && <span className="text-xs font-normal text-muted-foreground">{workflow.packageSource}</span>}
 									</span>
 									<span className="truncate font-mono text-xs font-normal text-muted-foreground">{invocation(workflow)}</span>
 								</button>
@@ -71,7 +73,12 @@ export function Workflows({ workflows, files, editing }: { workflows: Workflow[]
 			</nav>
 			<div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4">
 				<StepsChart key={open.skill.path} file={open.skill} />
-				<FileView key={open.skill.path} file={open.skill} editing={editing} />
+				{open.workflow.packageSource ? (
+					<>
+						<a href="#settings/extensions" className="text-xs text-primary underline">Manage package</a>
+						{open.skill.body.state === "read" ? <MessageMarkdown text={open.skill.body.text} /> : <p className="text-sm text-muted-foreground">Cannot read this packaged workflow.</p>}
+					</>
+				) : <FileView key={open.skill.path} file={open.skill} editing={editing} />}
 			</div>
 		</div>
 	);

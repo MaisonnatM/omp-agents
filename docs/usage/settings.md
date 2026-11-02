@@ -5,7 +5,7 @@
   While Settings is open the sidebar lists its sections below the tab bar, with no tab selected, in place of a tab's content; select a tab, such as **Sessions**, to leave.
   The sidebar lists fifteen sections in four groups.
   **Usage** holds **Analytics** and **Activity**, **General** holds **Preferences**, **Workspaces**, and **Sync**, and **Connections** holds **Providers**, **Integrations**, **MCP servers**, and **Source control**; these are the same whatever the workspace.
-  **This workspace** holds **Models**, **omp settings**, **Files**, **Workflows**, **Decisions**, and **Worktrees**, which show omp's config and files, and the repository's records and worktrees, as a session in the sidebar's workspace sees them; only these sections show the workspace picker.
+  **This workspace** holds **Models**, **omp settings**, **Files**, **Extensions**, **Workflows**, **Decisions**, and **Worktrees**, which show omp's config and files, package discovery, and the repository's records and worktrees, as a session in the sidebar's workspace sees them; only these sections show the workspace picker.
   The command menu finds a section by its name or by what it holds, such as "theme" or "graphite", under **Settings**.
   The gear button and G then , reopen the section you last had open in this app, **Analytics** the first time, and the header names the open section.
   Switching sections keeps an unsaved edit and opens the new section at its top, and the selected section stays when you change workspace.
@@ -107,9 +107,10 @@
   `~/.omp/agent/AGENTS.md` and `~/.omp/agent/config.yml` appear even before they exist, marked `missing`.
   If omp cannot load `config.yml`, **Models** and **omp settings** show omp's error and **Files** still lists the files, so you can fix the broken file there.
   Files from installed plugins and omp's bundled rules are left out.
+- **Extensions** manages packages, contribution previews, cached marketplace catalogs, the skill registry, and discovery sources; see [Extensions](extensions.md).
 - The **Workflows** section lists your workflows: skills whose `SKILL.md` frontmatter tags them `workflow`, such as the starter kit's `ship` skill, which holds the steps `/ship` follows.
   Each shows its name, how to start it, `/<name>` when a command of the same name exists and `/skill:<name>` otherwise, and whether it is a user or a project skill.
-  Select one to read its `SKILL.md`, and choose **Edit** to change it in place, with the same save and conflict rules as **Files**.
+  Select one to read its `SKILL.md`, and choose **Edit** to change an authored workflow in place, with the same save and conflict rules as **Files**; packaged workflows are read-only and link to Extensions.
   To make a skill a workflow, add `tags: workflow` under `metadata:` in its frontmatter; `tags` takes a comma-separated list, such as `review, workflow`, and a top-level `tags:` key does not count.
   With none tagged, the section shows those two lines to copy.
 - The **Decisions** section shows the decision records of the workspace's repository as a timeline, newest first, under a month header that stays at the top while you scroll: each record's date, status, title, and first paragraph, with **Read the record** to open the whole of it.
@@ -158,7 +159,7 @@
   **Trusted projects** lists the projects whose own agent code you trusted, with **Stop trusting** to ask again; see [Per-project agent setup](per-project-agent-setup.md#stop-trusting).
 - **Sync** carries your omp settings and files to your other machines through a Git repository of yours; see [Settings sync](settings-sync.md).
 - Settings follows the workspace picked in the sidebar header, so it includes that workspace's project files and its `.omp/config.yml` overrides.
-  With **All workspaces**, **Models**, **omp settings**, **Files**, **Workflows**, and the **New sessions** skill picker show your user files only, and **Worktrees** lists every repository.
+  With **All workspaces**, **Models**, **omp settings**, **Files**, **Extensions**, **Workflows**, and the **New sessions** skill picker show user files and packages only, and **Worktrees** lists every repository.
   The picker in the header of a Workspace section is the same choice: picking a workspace there switches the sidebar to it too.
   Pressing the gear button while Settings is open closes it, so pick a section from the sidebar to change sections.
   A session's **Workspace settings** switches the sidebar to that session's workspace and opens **Models**; a session in `/tmp` or a hidden workspace does not offer it.

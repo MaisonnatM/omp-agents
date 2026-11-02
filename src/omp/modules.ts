@@ -37,6 +37,7 @@ import type {
 	SkillsModule,
 	SlashCommandsModule,
 } from "./module-types/discovery";
+import type { MarketplaceModule, PluginManagerModule, PluginEntriesModule, SkillClientModule, SkillInstallerModule, SkillManifestModule } from "./module-types/extensions";
 import type {
 	DiscoveryHelpersModule,
 	McpClientModule,
@@ -119,18 +120,41 @@ export const collabSettings = await load<{ cfgCollabAutoStart: { readonly defaul
 export const marketplaceRegistry = await load<{
 	getMarketplacesRegistryPath(): string;
 	getInstalledPluginsRegistryPath(): string;
+	getMarketplacesCacheDir(): string;
+	getPluginsCacheDir(): string;
 	readMarketplacesRegistry(path: string): Promise<{ marketplaces: { name: string }[] }>;
 	readInstalledPluginsRegistry(path: string): Promise<{ plugins: Record<string, unknown> }>;
 }>(join(srcDir, "extensibility", "plugins", "marketplace", "registry.ts"), {
 	getMarketplacesRegistryPath: "function",
 	getInstalledPluginsRegistryPath: "function",
 	readMarketplacesRegistry: "function",
+	getMarketplacesCacheDir: "function",
+	getPluginsCacheDir: "function",
 	readInstalledPluginsRegistry: "function",
 });
 export const pluginRegistryDiscovery = await load<{
 	resolveOrDefaultProjectRegistryPath(cwd: string): Promise<string | undefined>;
+	clearClaudePluginRootsCache(): void;
 }>(join(srcDir, "discovery", "helpers.ts"), {
 	resolveOrDefaultProjectRegistryPath: "function",
+	clearClaudePluginRootsCache: "function",
+});
+
+export const marketplaceManager = await load<MarketplaceModule>(join(srcDir, "extensibility", "plugins", "marketplace", "manager.ts"), {
+	MarketplaceManager: "function",
+	...Object.fromEntries(["listMarketplaces", "listAvailablePlugins", "listInstalledPlugins", "checkForUpdates", "addMarketplace", "removeMarketplace", "updateMarketplace", "installPlugin", "uninstallPlugin", "setPluginEnabled", "upgradePlugin"].map(name => [`MarketplaceManager.prototype.${name}`, "function" as const])),
+});
+export const pluginManager = await load<PluginManagerModule>(join(srcDir, "extensibility", "plugins", "manager.ts"), {
+	PluginManager: "function",
+	...Object.fromEntries(["list", "install", "link", "uninstall", "upgrade", "validateUpgrade", "setEnabled"].map(name => [`PluginManager.prototype.${name}`, "function" as const])),
+});
+export const pluginEntries = await load<PluginEntriesModule>(join(srcDir, "extensibility", "plugins", "loader.ts"), { resolvePluginManifestEntries: "function" });
+export const skillClient = await load<SkillClientModule>(join(srcDir, "skillshare", "client.ts"), { "SkillshareClient.create": "function", "SkillshareClient.prototype.search": "function", "SkillshareClient.prototype.close": "function" });
+export const skillInstaller = await load<SkillInstallerModule>(join(srcDir, "skillshare", "installer.ts"), {
+	listInstalledSkills: "function", installSkillPackages: "function", updateSkillPackages: "function", uninstallSkillPackages: "function",
+});
+export const skillManifest = await load<SkillManifestModule>(join(srcDir, "skillshare", "manifest.ts"), {
+	parseSkillId: "function", getSkillStorePath: "function", getSkillsInstallPaths: "function",
 });
 
 export const registry = await load<RegistryModule>(join(srcDir, "collab", "registry.ts"), {
@@ -178,6 +202,7 @@ export const exitDiagnostics = await load<ExitDiagnosticsModule>(join(srcDir, "s
 export const dirs = await load<DirsModule>(join(utilsSrc, "dirs.ts"), {
 	getSessionsDir: "function",
 	getAgentDir: "function",
+	getPluginsDir: "function",
 	getProjectDir: "function",
 	getMCPConfigPath: "function",
 	getBlobsDir: "function",
@@ -217,6 +242,7 @@ export const slashCommands = await load<SlashCommandsModule>(join(srcDir, "exten
 
 export const config = await load<ConfigModule>(join(srcDir, "config", "settings.ts"), {
 	"Settings.loadReadOnly": "function",
+	"Settings.isolated": "function",
 	"Settings.loadIsolated": "function",
 	"Settings.prototype.getGlobalSettings": "function",
 	"Settings.prototype.getProjectSettings": "function",
@@ -305,7 +331,9 @@ export const catalog = await load<CatalogModule>(join(dirname(packageDir), "pi-c
 	calculateCost: "function",
 });
 
-export const discovery = await load<DiscoveryModule>(join(srcDir, "discovery", "index.ts"), { loadCapability: "function", reset: "function" });
+export const discovery = await load<DiscoveryModule>(join(srcDir, "discovery", "index.ts"), {
+	loadCapability: "function", reset: "function", initializeWithSettings: "function", getAllProvidersInfo: "function", isForeignUserProvider: "function", isUserSourceEnabled: "function",
+});
 export const customCommands = await load<CustomCommandsModule>(join(srcDir, "extensibility", "custom-commands", "loader.ts"), {
 	discoverCustomCommands: "function",
 });

@@ -5,6 +5,7 @@ import type { ProjectCodeKind } from "../shared/project-trust";
 import { agentDir } from "./config";
 import { agentDiscovery, configFiles, configSources, customCommands, discovery } from "./modules";
 import type { CapabilityItem, CapabilityLoadOptions } from "./module-types/discovery";
+import { withDiscovery } from "./scoped-discovery";
 
 /** omp capabilities that load files, and the kind of file each loads. */
 const FILE_CAPABILITIES: [string, OmpFileKind][] = [
@@ -22,6 +23,7 @@ const PACKAGED_PROVIDERS: Record<string, true> = {
 	"agent-plugins": true,
 	"claude-plugins": true,
 	"omp-plugins": true,
+	skillshare: true,
 };
 
 /** `name` is the name omp resolved for a skill or slash command; `frontmatter` is a skill's, as omp parsed it. */
@@ -31,18 +33,20 @@ export interface FoundFile {
 	path: string;
 	name?: string;
 	frontmatter?: Record<string, unknown>;
+	packaged?: string;
 }
 
-/** The user-written files a session in `cwd` loads, through omp's own discovery. */
+/** The authored and packaged files omp discovers; packaged files are read-only. */
 export async function discoverOmpFiles(cwd: string, disabledExtensions: string[]): Promise<FoundFile[]> {
+	return withDiscovery(cwd, async () => {
 	const [capabilityFiles, { agents }] = await Promise.all([
 		Promise.all(
 			FILE_CAPABILITIES.map(async ([id, kind]) => {
 				const { items } = await discovery.loadCapability(id, { cwd, disabledExtensions });
 				return items.flatMap(({ _source: source, name, frontmatter }): FoundFile[] =>
-					source.level === "native" || PACKAGED_PROVIDERS[source.provider]
+					source.level === "native" || source.provider === "builtin-defaults"
 						? []
-						: [{ kind, scope: source.level, path: source.path, name, frontmatter }],
+						: [{ kind, scope: source.level, path: source.path, name, frontmatter, ...(PACKAGED_PROVIDERS[source.provider] && { packaged: source.pluginName ?? source.provider }) }],
 				);
 			}),
 		),
@@ -60,7 +64,10 @@ export async function discoverOmpFiles(cwd: string, disabledExtensions: string[]
 		const path = configFiles.findConfigFile("APPEND_SYSTEM.md", scope === "user" ? { project: false } : { user: false, cwd });
 		return path ? [{ kind: "append-system", scope, path }] : [];
 	});
+	const overrides = configFiles.findConfigFile("plugin-overrides.json", { user: false, cwd });
+	if (overrides) capabilityFiles.push([{ kind: "settings", scope: "project", path: overrides }]);
 	return [...capabilityFiles.flat(), ...appendSystem, ...agentFiles];
+	}, true);
 }
 
 /** A file of a project's own agent code that a session would load, as omp names it. */
@@ -97,6 +104,7 @@ export function forgetReadFiles(): void {
  * loaders apply. It reads through omp's file cache; call {@link forgetReadFiles} first for files changed since.
  */
 export async function discoverProjectCode(cwd: string): Promise<{ files: ProjectFile[]; mcpServers: ProjectMcpServer[] }> {
+	return withDiscovery(cwd, async () => {
 	const projectItems = async (id: string, options: Pick<CapabilityLoadOptions, "providers" | "filter"> = {}) =>
 		(await discovery.loadCapability(id, { cwd, ...options })).items.filter(item => item._source.level === "project");
 	const [extensions, hooks, tools, mcps, settings, commands] = await Promise.all([
@@ -128,4 +136,5 @@ export async function discoverProjectCode(cwd: string): Promise<{ files: Project
 		return { name: config.name, config };
 	});
 	return { files, mcpServers };
+	});
 }

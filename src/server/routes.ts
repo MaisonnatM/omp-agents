@@ -32,6 +32,8 @@ import { attachToPullRequest, loadPullRequestOptions, markPullRequestFileViewed,
 import { InvalidPullRequestCommit, listPullRequestChanges, readPullRequestFile } from "../pull-request-files";
 import { loadPullRequestStack } from "../pull-request-stack";
 import { loadOmpSettings, Rejected, saveAgentSetting, saveOmpFile, saveRouting } from "../settings";
+import { answerExtensionApproval, readExtensionContribution, readExtensionOperation, startExtensionChange } from "../extensions";
+import { discoverExtensions, loadExtensions } from "../omp/extensions";
 import { attachToTicket, createTicket, loadLinearUsers, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
 import { ClientConfigError } from "../mcp-clients";
@@ -246,6 +248,11 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 			({ cwd, body }) => save(cwd, body),
 			err => (err instanceof Rejected ? fail(err.status, err.message, err.conflict) : null),
 		);
+	const extensionsRead = (read: (cwd: string | null, params: URLSearchParams) => Promise<unknown> | unknown): Handler => get(params => {
+		const cwd = workspaceCwd(params);
+		if (cwd instanceof Response) return cwd;
+		return answer(async () => read(cwd, params), err => err instanceof Rejected ? fail(err.status, err.message, err.conflict) : null);
+	});
 
 	/** `GET /api/decisions?cwd=<dir>`: the decision records of a workspace's repository. */
 	const decisions = get(params => {
@@ -410,6 +417,11 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/settings/routing": { PUT: settingsWrite(saveRouting) },
 		"/api/settings/agent": { PUT: settingsWrite(saveAgentSetting) },
 		"/api/settings/file": { PUT: settingsWrite(saveOmpFile) },
+		"/api/settings/extensions": { GET: extensionsRead(cwd => loadExtensions(cwd)), PUT: settingsWrite(async (cwd, body) => startExtensionChange(cwd, body)) },
+		"/api/settings/extensions/catalog": { GET: extensionsRead((cwd, params) => discoverExtensions(cwd, params.get("source") ?? "", params.get("q") ?? "", Math.max(1, Math.min(100, Number(params.get("page")) || 1)))) },
+		"/api/settings/extensions/operation": { GET: extensionsRead((cwd, params) => readExtensionOperation(cwd, params.get("id") ?? "")) },
+		"/api/settings/extensions/approval": { PUT: settingsWrite(async (cwd, body) => answerExtensionApproval(cwd, body)) },
+		"/api/settings/extensions/contribution": { GET: extensionsRead((cwd, params) => readExtensionContribution(cwd, params.get("key") ?? "")) },
 		"/api/decisions": { GET: decisions },
 		"/api/models": { GET: models },
 		"/api/models/connected": { GET: connected },

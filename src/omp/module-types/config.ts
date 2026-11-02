@@ -4,6 +4,7 @@ import type { RetrySettings } from "../../shared/models";
 export interface DirsModule {
 	getSessionsDir(): string;
 	getAgentDir(): string;
+	getPluginsDir(): string;
 	getProjectDir(): string;
 	/** omp's user-level MCP config, `mcp.json` in the agent directory. */
 	getMCPConfigPath(scope: "user"): string;
@@ -35,6 +36,7 @@ export interface OmpSettingsInstance {
 export interface ConfigModule {
 	Settings: {
 		loadReadOnly(options: { cwd: string }): Promise<OmpSettingsInstance>;
+		isolated(values: Record<string, unknown>): OmpSettingsInstance;
 		/** A private instance that persists what is set on it, unlike omp's process-wide `Settings.init`. */
 		loadIsolated(options: { cwd: string }): Promise<OmpSettingsInstance>;
 	};
@@ -53,6 +55,7 @@ export interface SettingHandle {
 	readonly isCredential: boolean;
 	/** The environment variable that can supply the value. */
 	readonly envName: string | undefined;
+	get(settings: OmpSettingsInstance): unknown;
 	pinDefault(settings: OmpSettingsInstance): void;
 	readonly enumValues: readonly string[] | undefined;
 	/** @throws Error when `value` does not fit the setting. */
