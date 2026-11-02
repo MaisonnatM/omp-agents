@@ -12,8 +12,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The Ship card shows the new Plan step between Ticket and Implement.
 - Settings has a new omp settings section: omp's own settings in omp's tabs, with search, saved to your config.yml as you change them.
 - In omp settings, a dot marks a setting changed from omp's default, Reset puts it back, and a setting this workspace sets shows locked, with a link to its file.
-- Settings has a new omp memory section: pick where omp keeps what it learns across sessions, switch Auto-learn, and see what a new session gets.
-- In omp memory, read and edit what omp remembers in this folder, forget one memory or all of them, and rebuild the summary.
+- New: omp memory in Settings.
 - You can drag a Bot in the Bots tab onto Pinned, a section, or Other Bots.
 - Fixed: routines no longer start during the few seconds a sleeping Mac wakes on its own for Power Nap; they wait until you wake it, and news that came in overnight starts one run.
 - Fixed: a routine's command no longer counts time the Mac spent asleep toward its 10-minute limit, and when the Mac slept during a run, the routine's message to the Bot says for how long.
@@ -94,7 +93,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-10-29
 
 - Fixed: a session's Changes dialog now shows line counts for files it edits in another checkout of the project from its first edit, rather than marking them S until it runs a command there.
-- New: Get started walks you through setup on first launch, one step per screen: sign in to a model provider, choose how terminal sessions show, install the starter kit, connect GitHub and your tools, and start a first session. Closed, it waits in a bubble at the bottom right; reopen it from there or Cmd+K.
+- New: Get started walks you through setup on first launch, one step per screen in a dialog. Sign in to a model provider right there, choose how terminal sessions show, install the starter kit, connect GitHub and your tools, then start your first session from a suggested task. Close it and it waits in a bubble at the bottom right until setup is done; reopen it any time from the bubble or Cmd+K.
 - When omp is not installed, the desktop app now shows the command to install it, with Copy and Retry, instead of a startup error.
 - Fixed: the desktop app's starter kit now includes its model settings.
 - A Bot's right sidebar now shows only Details, and Tickets once its conversation worked on a Linear issue; the PRs and Browser tabs are gone there.
@@ -115,7 +114,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - In the Browser, Select element now opens a field on the element you click, so you can type a note at once; sending it adds the note and the element to the composer, and you can go on to the next element.
 - Pasting a long text into the message box now attaches it as a file, Pasted text.txt, as ChatGPT and Claude do, so what you type stays readable. Its tile shows the first lines.
 - A routine's message in its Bot's conversation now shows as a run card instead of a message from you: the routine's name, what triggered it, whether it was sent or how its command ended, and its output a click away, with a link to the routine. The Bots sidebar shows the routine's name in place of "You:".
-- The Browser tab now picks as T3 Code does: the pointer button floats a Select, Region, Draw, and Erase switch over your app. What you select or draw goes in with your comment as one chip and one picture. The camera button attaches a picture of the whole app.
+- The Browser tab now picks as T3 Code does: the pointer button floats a Select, Region, Draw, and Erase switch over your app. Elements you select and boxes and lines you draw go in together with the comment you type beside them: one chip in the message box and one picture. The new camera button attaches a picture of the whole app.
 - The session details sidebar, and the Browser in it, now widens to 960 pixels, as far as the conversation keeps 480.
 - Behind the scenes: agents checking the desktop app now see a script's error instead of a confusing crash later, so they fix the right problem.
 - Behind the scenes: merging a branch into main without a line here now stops at the merge, and a fast-forward without one warns, so the line goes on the branch instead of a fix-up after it.
@@ -153,7 +152,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - A working session no longer shows a green dot, so the blue dot alone marks a session waiting on you.
 - While you are still trying out a design with an agent, it now also waits for your go on the direction before writing tests for it.
 - /ship now runs an interface review before the deep code review when a pull request changes files a project lists as interface files, and holds the pull request back from going live until its fixes are pushed.
-- That interface review also checks that new screens reuse the app's existing components, colors, and sizes, and flags a new way of showing something, such as cards in an app whose lists are all tables.
+- That interface review also checks that new screens reuse the app's existing components, colors, and sizes, and look like the screens next to them, and tells you when a pull request brings a new way of showing something, such as cards for a list in an app whose lists are all tables.
 - Behind the scenes: omp-agents lists its page's components and styles as interface files, so its own pull requests that change them get the interface review.
 - The todos card in a session now has a lighter shadow, and you can hide it with the checklist button after the session's title or with Show todos card in Settings → Preferences.
 - The todos card in a session now has a lighter shadow, never covers the conversation, sitting above it when the pane is too narrow to keep it at the side, and you can hide it with Show todos card in Settings → Preferences.

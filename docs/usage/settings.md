@@ -100,8 +100,8 @@
   If `config.yml` changed on disk since the page read it, the save is refused and the page reloads the setting.
   Running sessions pick up most changes; some apply only to sessions started after the change.
 - **omp memory** shows what omp itself remembers across sessions in the workspace, and the settings that decide it.
-  The bar at its top picks the backend, **Off**, **Local**, **Hindsight**, **Mnemopi**, or **Sharpshooter**, with omp's description of the one picked, and switches **Auto-learn**, which nudges the agent to capture lessons and skills when it stops; with **Auto-learn** on, **Capture on its own at stop** runs one capture turn then, which uses extra tokens.
-  These save to your `~/.omp/agent/config.yml` as in **omp settings**, which shows them as a line that links here; a value the workspace's settings set locks its control, and an environment variable that sets one is named under it.
+  The bar at its top holds omp's own rows for the memory backend, **Off**, **Local**, **Hindsight**, **Mnemopi**, or **Sharpshooter**, with omp's description of the one picked, and for Auto-learn, which nudges the agent to capture lessons and skills when it stops; with Auto-learn on, a second switch runs one capture turn then, which uses extra tokens.
+  They show omp's labels and save to your `~/.omp/agent/config.yml` as in **omp settings**, which shows them as a line that links here; a value the workspace's settings set locks its control, and an environment variable that sets one is named under it.
   **What a new session gets** unfolds the memory block a new session's prompt starts with, and its size in tokens; with Mnemopi and Hindsight a running session also gets memories recalled for each prompt, which the page cannot show.
   **Stored memory** shows the store of the backend picked.
   Local lists its files by group, **Lessons**, **Summary**, **Skills**, and **Session summaries**, and Sharpshooter its decision files and how many sessions wait to be folded in; select one to read it, and edit it as in **Files**.
@@ -170,7 +170,7 @@
   **Trusted projects** lists the projects whose own agent code you trusted, with **Stop trusting** to ask again; see [Per-project agent setup](per-project-agent-setup.md#stop-trusting).
 - **Sync** carries your omp settings and files to your other machines through a Git repository of yours; see [Settings sync](settings-sync.md).
 - Settings follows the workspace picked in the sidebar header, so it includes that workspace's project files and its `.omp/config.yml` overrides.
-  With **All workspaces**, **Models**, **omp settings**, **Files**, **Workflows**, and the **New sessions** skill picker show your user files only, **omp memory** shows only its settings, and **Worktrees** lists every repository.
+  With **All workspaces**, **Models**, **omp settings**, **Files**, **Workflows**, and the **New sessions** skill picker show your user files only, **omp memory** shows only its bar, and **Worktrees** lists every repository.
   The picker in the header of a Workspace section is the same choice: picking a workspace there switches the sidebar to it too.
   Pressing the gear button while Settings is open closes it, so pick a section from the sidebar to change sections.
   A session's **Workspace settings** switches the sidebar to that session's workspace and opens **Models**; a session in `/tmp` or a hidden workspace does not offer it.

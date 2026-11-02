@@ -234,11 +234,11 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	});
 
 	/**
-	 * A settings write: `PUT /api/settings/routing`, `/api/settings/agent`, or `/api/settings/file`, `?cwd=` as for reading;
-	 * and an omp memory edit, `PUT /api/omp-memory/file`, `/entry`, `/clear`, or `/rebuild`, which need `?cwd=`.
-	 * The answer is the settings or the memory as they load after the write, or the edit's refusal with its status.
+	 * A write whose refusals are `Rejected`: a settings write, `PUT /api/settings/routing`, `/api/settings/agent`, or
+	 * `/api/settings/file`, `?cwd=` as for reading; and an omp memory edit, `PUT /api/omp-memory/file`, `/entry`, `/clear`,
+	 * or `/rebuild`, which need `?cwd=`. The answer is what the write's section loads after it, or the refusal with its status.
 	 */
-	const settingsWrite = (save: (cwd: string | null, body: unknown) => Promise<unknown>): Handler =>
+	const rejectableWrite = (save: (cwd: string | null, body: unknown) => Promise<unknown>): Handler =>
 		write(
 			(body, params) => {
 				const cwd = workspaceCwd(params);
@@ -248,10 +248,11 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 			err => (err instanceof Rejected ? fail(err.status, err.message, err.conflict) : null),
 		);
 
-	/** `GET /api/omp-memory[?cwd=<dir>]`: omp's memory backend and Auto-learn, and with `cwd` the workspace's store and what a new session gets. */
+	/** `GET /api/omp-memory?cwd=<dir>`: what a new session in the workspace gets from omp memory, and the store it comes from. */
 	const ompMemory = get(params => {
 		const cwd = workspaceCwd(params);
-		return cwd instanceof Response ? cwd : answer(() => loadOmpMemory(cwd));
+		if (cwd instanceof Response) return cwd;
+		return cwd === null ? fail(400, "Expected ?cwd= naming a workspace") : answer(() => loadOmpMemory(cwd));
 	});
 
 	/** `GET /api/decisions?cwd=<dir>`: the decision records of a workspace's repository. */
@@ -405,14 +406,14 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 
 	return {
 		"/api/settings": { GET: settings },
-		"/api/settings/routing": { PUT: settingsWrite(saveRouting) },
-		"/api/settings/agent": { PUT: settingsWrite(saveAgentSetting) },
-		"/api/settings/file": { PUT: settingsWrite(saveOmpFile) },
+		"/api/settings/routing": { PUT: rejectableWrite(saveRouting) },
+		"/api/settings/agent": { PUT: rejectableWrite(saveAgentSetting) },
+		"/api/settings/file": { PUT: rejectableWrite(saveOmpFile) },
 		"/api/omp-memory": { GET: ompMemory },
-		"/api/omp-memory/file": { PUT: settingsWrite(saveMemoryFile) },
-		"/api/omp-memory/entry": { PUT: settingsWrite(editMemoryEntry) },
-		"/api/omp-memory/clear": { PUT: settingsWrite(clearMemory) },
-		"/api/omp-memory/rebuild": { PUT: settingsWrite(rebuildMemory) },
+		"/api/omp-memory/file": { PUT: rejectableWrite(saveMemoryFile) },
+		"/api/omp-memory/entry": { PUT: rejectableWrite(editMemoryEntry) },
+		"/api/omp-memory/clear": { PUT: rejectableWrite(clearMemory) },
+		"/api/omp-memory/rebuild": { PUT: rejectableWrite(rebuildMemory) },
 		"/api/decisions": { GET: decisions },
 		"/api/models": { GET: models },
 		"/api/models/connected": { GET: connected },

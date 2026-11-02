@@ -1,24 +1,23 @@
 /** Settings › omp settings: omp's own settings by its tabs, searched and edited one row at a time (`OmpSettingsTab`). */
 import { Lock, X } from "lucide-react";
 import { type ReactNode, useId, useRef, useState } from "react";
-import type { AgentSettingChange, AgentSettingEdit, AgentSettingOption, AgentSettingRow, AgentSettings } from "../../../src/shared/agent-settings";
+import type { AgentSettingChange, AgentSettingOption, AgentSettingRow, AgentSettings } from "../../../src/shared/agent-settings";
 import { searchWords } from "../../../src/shared/every-word";
-import type { OmpFile, OmpSettings } from "../../../src/shared/models";
+import type { OmpFile } from "../../../src/shared/models";
 import { errorText } from "../../../src/json";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { ApiError, putJson, settingsUrl } from "../../api";
 import { formatValue, isChanged, ownerOf, type ShownGroup, type ShownTab, shownTabs, valueOf } from "../../omp-settings";
 import { hashForSettings } from "../../routing";
 import { SearchField } from "../search-field";
 import { ToggleSwitch } from "../toggle-switch";
-import { type Editing, ErrorText, FIELD, LINK, OrderedList, RAIL_BUTTON, Section } from "./editor";
+import { type Editing, ErrorText, FIELD, FileLink, LayerNotes, LINK, OrderedList, RAIL_BUTTON, Section, saveAgentSetting, useSaving } from "./editor";
 
 /** What a row needs from the section: its save, and the Files link to a file that sets a value. */
 interface RowContext {
-	save: (row: AgentSettingRow, change: AgentSettingChange) => Promise<void>;
+	save: (row: AgentSettingRow, change: AgentSettingChange) => Promise<unknown>;
 	/** The workspace settings file Files lists, which a locked row links to. */
 	projectFile: OmpFile | undefined;
 	onOpenFile: (path: string) => void;
@@ -34,55 +33,6 @@ interface ControlProps {
 	value: unknown;
 	disabled: boolean;
 	onChange: (change: AgentSettingChange) => void;
-}
-
-/** A link to a file in Settings › Files, which opens it there. */
-export function FileLink({ file, onOpenFile, children }: { file: OmpFile; onOpenFile: (path: string) => void; children: string }) {
-	return (
-		<a href={hashForSettings("files")} onClick={() => onOpenFile(file.path)} className={LINK}>
-			{children}
-		</a>
-	);
-}
-
-/**
- * Why a setting's control is locked or overridden: the workspace sets it, with a link to its file and your own value
- * when there is one, or an environment variable does.
- */
-export function LayerNotes({
-	workspace,
-	env,
-	yourValue,
-	projectFile,
-	onOpenFile,
-}: {
-	workspace: boolean;
-	env: string | undefined;
-	yourValue: string | null;
-	projectFile: OmpFile | undefined;
-	onOpenFile: (path: string) => void;
-}) {
-	return (
-		<>
-			{workspace && (
-				<p className="text-xs text-muted-foreground">
-					This workspace sets it.{" "}
-					{projectFile && (
-						<FileLink file={projectFile} onOpenFile={onOpenFile}>
-							Open in Files
-						</FileLink>
-					)}
-					{projectFile && ". "}
-					{yourValue !== null && `Your value: ${yourValue}`}
-				</p>
-			)}
-			{env && (
-				<p className="text-xs text-muted-foreground">
-					<code className="font-mono">{env}</code> is set, and it overrides this value.
-				</p>
-			)}
-		</>
-	);
 }
 
 function OptionSelect({ labelId, hintId, value, options, disabled, onPick }: { labelId: string; hintId: string | undefined; value: unknown; options: AgentSettingOption[]; disabled: boolean; onPick: (value: string | number) => void }) {
@@ -316,25 +266,19 @@ function rowControl(props: ControlProps, hintId: string | undefined): { element:
 	}
 }
 
-type RowState = { phase: "idle"; error: string | null } | { phase: "saving"; shown: unknown };
-
 /** One setting: what it does, whether it differs from omp's default, its control, and the layer notes that apply. */
 function SettingRow({ row, context: { save, projectFile, onOpenFile } }: { row: AgentSettingRow; context: RowContext }) {
-	const [state, setState] = useState<RowState>({ phase: "idle", error: null });
+	// The value a save sends shows while it runs.
+	const saving = useSaving<{ shown: unknown }>();
 	const labelId = useId();
 	const controlId = useId();
 	const hintId = useId();
-	const saving = state.phase === "saving";
+	const busy = saving.saving !== null;
 	const locked = row.workspace !== undefined;
-	const value = saving ? state.shown : valueOf(row);
-	const disabled = saving || locked;
-	const change = (next: AgentSettingChange): void => {
-		setState({ phase: "saving", shown: "value" in next ? next.value : locked ? row.workspace : row.default });
-		save(row, next).then(
-			() => setState({ phase: "idle", error: null }),
-			(err: unknown) => setState({ phase: "idle", error: errorText(err) }),
-		);
-	};
+	const value = saving.saving ? saving.saving.shown : valueOf(row);
+	const disabled = busy || locked;
+	const change = (next: AgentSettingChange): void =>
+		saving.run({ shown: "value" in next ? next.value : locked ? row.workspace : row.default }, () => save(row, next));
 	const { control } = row;
 	// A choice's own description, which omp shows beside it, shows under the row for the one picked.
 	const picked = control.kind === "select" ? control.options.find(option => option.value === value) : undefined;
@@ -350,7 +294,7 @@ function SettingRow({ row, context: { save, projectFile, onOpenFile } }: { row: 
 		<span id={labelId}>{row.label}</span>
 	);
 	return (
-		<li aria-busy={saving} className={cn("space-y-2 py-3 transition-opacity motion-reduce:transition-none", saving && "opacity-60")}>
+		<li aria-busy={busy} className={cn("space-y-2 py-3 transition-opacity motion-reduce:transition-none", busy && "opacity-60")}>
 			<div className="flex items-start justify-between gap-6">
 				<div className="min-w-0 space-y-0.5">
 					<p className="flex items-center gap-1.5 text-sm font-medium">
@@ -375,7 +319,7 @@ function SettingRow({ row, context: { save, projectFile, onOpenFile } }: { row: 
 				<div className="flex shrink-0 items-center gap-2">
 					{row.user !== undefined && (
 						<Tooltip content={`Remove your value from config.yml${locked ? "" : `, back to ${row.credential ? "none" : formatValue(row, row.default)}`}`}>
-							<Button variant="ghost" size="compact" disabled={saving} onClick={() => change({ reset: true })}>
+							<Button variant="ghost" size="compact" disabled={busy} onClick={() => change({ reset: true })}>
 								Reset
 							</Button>
 						</Tooltip>
@@ -392,7 +336,7 @@ function SettingRow({ row, context: { save, projectFile, onOpenFile } }: { row: 
 				projectFile={projectFile}
 				onOpenFile={onOpenFile}
 			/>
-			{state.phase === "idle" && state.error && <ErrorText>Not saved: {state.error}</ErrorText>}
+			{saving.error && <ErrorText>Not saved: {saving.error}</ErrorText>}
 		</li>
 	);
 }
@@ -454,15 +398,7 @@ export function OmpSettingsTab({
 	const matching = tabs.filter(shown => shown.groups.length > 0);
 	const unlisted = settings.unlisted.filter(id => !ownerOf(id)).length;
 	const context: RowContext = {
-		save: async (row, change) => {
-			const edit: AgentSettingEdit = { id: row.id, ...change, expected: row.user ?? null };
-			try {
-				await editing.write(() => putJson<OmpSettings>(settingsUrl("/agent", editing.cwd), edit));
-			} catch (err) {
-				if (err instanceof ApiError && err.conflict) editing.reload();
-				throw err;
-			}
-		},
+		save: (row, change) => saveAgentSetting(editing, { id: row.id, ...change, expected: row.user ?? null }),
 		projectFile,
 		onOpenFile,
 	};
