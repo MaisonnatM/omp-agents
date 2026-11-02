@@ -193,8 +193,11 @@ export class Dashboard {
 	#publisher: Publisher | null = null;
 	/** Why the last registry listing failed, shown with the roster. */
 	#rosterError: string | null = null;
-	/** Whether the registry was listed since the last poll tick found no listener. */
-	#registryFresh = false;
+	/**
+	 * Whether the registry was listed since the last poll tick found no listener. True until {@link start} lists it, so a
+	 * socket that opens earlier does not list it before the session files are, which the first listing reads.
+	 */
+	#registryFresh = true;
 	/** Whether the activity was checked since the last activity tick found no listener. */
 	#activityFresh = false;
 	readonly #usage: UsagePoll;
@@ -965,6 +968,8 @@ export class Dashboard {
 		}
 		this.#registryFresh = true;
 		const joinedOrLeft = this.#sessions.follow(hosts);
+		// Only a listing that worked knows which terminal sessions still run.
+		if (this.#rosterError === null) this.#sessions.restoreListedUnread(hosts, this.#files.pathOf);
 		// A terminal session that asked to end before the registry listed it.
 		void this.#endInbox.drain();
 		// Every listing can change a host's row or the registry error; only a session that joins or leaves changes the past list.
