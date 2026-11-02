@@ -7,7 +7,7 @@
  */
 import { errorText } from "../json";
 import type { ShellResult } from "../proc";
-import { COMMAND_TIME_LIMIT, isDue, isTriggeredBy, MAX_TRIGGER_EVENTS, type CommandRun, type Routine, type RoutineRun, type TriggerEvent } from "../routines";
+import { COMMAND_TIME_LIMIT, isDue, isTriggeredBy, MAX_TRIGGER_EVENTS, triggersOn, type CommandRun, type Routine, type RoutineRun, type TriggerEvent } from "../routines";
 import { SerialLane } from "../serial-lane";
 import type { BotId } from "../shared/bots";
 import { type RoutineMessage, routineMessageText } from "../shared/routine-message";
@@ -109,7 +109,7 @@ export class RoutineRunner {
 			const { file } = this.#deps;
 			const now = this.#deps.now();
 			const watchedBy = new Map<BotId, TriggerEvent[]>();
-			for (const routine of file.value) {
+			for (const routine of file.value.filter(routine => triggersOn(routine, now))) {
 				const watched = watchedBy.get(routine.botId) ?? [];
 				watchedBy.set(routine.botId, [...new Set([...watched, ...events.filter(event => isTriggeredBy(routine, event.kind))])]);
 			}
@@ -117,7 +117,7 @@ export class RoutineRunner {
 				await Promise.all([...watchedBy].map(async ([botId, watched]) => [botId, new Set(watched.length === 0 ? [] : await this.#screen.events(botId, watched))] as const)),
 			);
 			// A routine saved while the screens ran has no screened events, and one deleted is gone.
-			for (const routine of file.value) {
+			for (const routine of file.value.filter(routine => triggersOn(routine, now))) {
 				const screened = kept.get(routine.botId);
 				const seen = events.filter(event => isTriggeredBy(routine, event.kind) && screened?.has(event)).slice(0, MAX_TRIGGER_EVENTS);
 				if (seen.length === 0) continue;

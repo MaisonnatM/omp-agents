@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-02
 
+- A routine scheduled only on some weekdays now ignores its triggers on the other days, so a weekdays-only routine no longer wakes on weekend pull requests or Slack messages.
 - A Router's task whose session crashes or is killed mid-step is now restarted right away instead of waiting for your review; ending its session yourself still moves it to Needs you.
 - A Router can now start a task on a pull request it read about or whose branch its own folder holds; its own conversation no longer counts as working on that pull request.
 - A /ship session that ticks a review box and moves on right away is no longer refused for a missing box: the check reads the pull request once more before it says no.
@@ -238,26 +239,3 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Behind the scenes: the Pull requests list now uses about a twenty-fifth of the GitHub allowance it used before.
 - Behind the scenes: quick actions on pull requests and tickets start in the branch's own folder, and agents can no longer wipe a pull request's description by mistake.
 - Behind the scenes: agents suggest more useful next prompts, and the agent starter kit gained upkeep scripts and a checklist for setting up a new computer.
-
-## 2026-10-26
-
-- A Dev and Ops switch in the header splits the sidebar tabs into two groups, and Settings moved to the gear button in the header.
-- Cmd+1 through Cmd+4 now count only the tabs of the group the switch shows.
-- The command menu and the bell moved to the desktop app's title bar and the page headers.
-- The dashboard now runs only in the desktop app, and a browser tab can no longer sign in.
-- Opening a ticket shows its details beside the list, laid out like a pull request, and Cmd+N creates a ticket on the tickets page.
-- Click a session's title in its header to rename it.
-- The folder and branch pickers and the context usage ring now sit inside the message box.
-- Session rows are simpler: the status dot comes before the title, and the workspace name sits beside the age.
-- In the Pull requests list you can change a pull request's reviewers from its row and right-click a row for its menu, and the reviewer pickers show people's pictures and names.
-- Right-click a todo, a note, or a mail conversation for a menu of actions.
-- Hover the CPU reading in the status bar to see what each session runs, with a Stop button for each, in place of the Processes tab.
-- Settings › Activity shows which pages, shortcuts, and commands you used over the last 30 days, and which features you never touch.
-- Settings › Worktrees shows totals and disk use, filters for All, Merged, and Removable, and lets you act on several rows at once.
-- The Calendar's Show routines checkbox hides routine runs from the month.
-- Agents can now edit, file, and delete your todos, not only add them.
-- A session's header now links only the pull requests and tickets it actually worked on.
-- The Projects page is gone.
-- Behind the scenes: two sessions sharing a folder can no longer overwrite each other's unsaved work.
-- Behind the scenes: a security, speed, and quality review made the dashboard safer and quicker to load.
-- Behind the scenes: checked against omp 18.12.6.
