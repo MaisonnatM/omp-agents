@@ -261,6 +261,14 @@ function NoticeRow({ notice, send, onDone }: { notice: Notice; send: Send; onDon
 		if (!notice.read) send({ t: "notice", ids: [notice.id], op: "read" });
 	};
 	const label = `${notice.read ? "" : "Unread: "}${headline}`;
+	// After its quick action, a pull request's notice opens the pull request, where the session it started shows.
+	const done =
+		action.kind === "quick"
+			? () => {
+					onDone();
+					follow(link);
+				}
+			: onDone;
 	return (
 		<li className="group relative flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/70 has-[>a:focus-visible]:bg-muted/70">
 			{link ? (
@@ -290,20 +298,7 @@ function NoticeRow({ notice, send, onDone }: { notice: Notice; send: Send; onDon
 					{preview}
 				</p>
 				<div className="pointer-events-auto relative mt-1 flex empty:hidden">
-					{/* After its quick action, a pull request's notice opens the pull request, where the session it started shows. */}
-					<NoticeAction
-						id={notice.id}
-						action={action}
-						send={send}
-						onDone={
-							action.kind === "quick"
-								? () => {
-										onDone();
-										follow(link);
-									}
-								: onDone
-						}
-					/>
+					<NoticeAction id={notice.id} action={action} send={send} onDone={done} />
 				</div>
 			</div>
 			<Tooltip content="Clear">

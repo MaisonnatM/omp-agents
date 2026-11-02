@@ -115,17 +115,30 @@ export const sectionsIn = (sections: readonly InboxSection[], filter: InboxFilte
 /** How many items `sections` hold. */
 export const itemCount = (sections: readonly InboxSection[]): number => sections.reduce((count, { items }) => count + items.length, 0);
 
-/** The item to open for route item `key`, at `index` before: none for a bare route, itself while it stays, else the one now at its place, else the last. */
-export function nextAfter(items: readonly InboxItem[], key: string | null, index: number): InboxItem | null {
-	if (key === null) return null;
-	return items.find(item => item.key === key) ?? items[Math.min(index, items.length - 1)] ?? null;
+/** The routed item the Inbox last showed: its key and its index in the list it showed. */
+export interface ShownItem {
+	key: string;
+	at: number;
+}
+
+/** The item the Inbox opens, and the key the address should name instead, `null` to keep it. */
+export interface InboxOpen {
+	open: InboxItem | null;
+	handOn: string | null;
 }
 
 /**
- * The key the address should name once `open` shows for route item `key`, where `shownKey` is the routed item this list
- * has shown: the open item's when the routed item left and another took its place, else `null`, which keeps the route.
- * A link to an item already gone keeps it too.
+ * What the Inbox opens for route item `key`, given `last`, the routed item it last showed.
+ * A bare route opens none, and a listed item opens itself.
+ * Once `last` leaves, the item now at its index, else the last item, opens and takes over the route, so an item that
+ * arrives later cannot take its place, and the item that took over hands on the same way when it leaves.
+ * A link to an item this list never showed opens a stand-in without writing it, since notices arrive after the
+ * session lists: `#inbox?open=notice/…` would otherwise lose its notice before it is listed.
  */
-export function routeAfter(open: InboxItem | null, key: string | null, shownKey: string | null): string | null {
-	return open !== null && key !== null && open.key !== key && shownKey === key ? open.key : null;
+export function openFor(items: readonly InboxItem[], key: string | null, last: ShownItem | null): InboxOpen {
+	if (key === null) return { open: null, handOn: null };
+	const kept = items.find(item => item.key === key);
+	if (kept) return { open: kept, handOn: null };
+	const open = items[Math.min(last?.at ?? 0, items.length - 1)] ?? null;
+	return { open, handOn: open !== null && last?.key === key ? open.key : null };
 }

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Notice } from "../src/shared/notices";
 import type { RosterHost, UserRequest } from "../src/shared/sessions";
-import { type InboxSection, inboxSections, itemCount, nextAfter, routeAfter, sectionsIn } from "./inbox-model";
+import { type InboxOpen, type InboxSection, inboxSections, itemCount, openFor, sectionsIn } from "./inbox-model";
 
 const host = (instanceId: string, status: RosterHost["status"], extra: Partial<RosterHost> = {}): RosterHost =>
 	({ instanceId, sessionId: instanceId, sessionName: instanceId, cwd: "/w", cwdDisplay: "~/w", status, requests: [], unread: null, ...extra }) as RosterHost;
@@ -52,22 +52,30 @@ describe("inboxSections", () => {
 	});
 });
 
-describe("nextAfter", () => {
-	const items = inboxSections([host("a", "idle", { unread: turn(1) }), host("b", "idle", { unread: turn(2) })], [], 0, NO_PINS).flatMap(({ items }) => items);
-	test("keeps an item still listed, else takes the one now at its place, else the last", () => {
-		expect(nextAfter(items, "turn/b/2", 0)?.key).toBe("turn/b/2");
-		expect(nextAfter(items, "gone", 1)?.key).toBe("turn/b/2");
-		expect(nextAfter(items, "gone", 5)?.key).toBe("turn/b/2");
-		expect(nextAfter([], "gone", 0)).toBeNull();
-	});
-});
+describe("openFor", () => {
+	const listOf = (...ids: ("a" | "b" | "c")[]) => inboxSections(ids.map(id => host(id, "idle", { unread: turn("abc".indexOf(id)) })), [], 0, NO_PINS).flatMap(({ items }) => items);
+	const opens = (result: InboxOpen) => [result.open?.key ?? null, result.handOn];
+	const [a, b, c] = ["turn/a/0", "turn/b/1", "turn/c/2"];
 
-describe("routeAfter", () => {
-	const [first, second] = inboxSections([host("a", "idle", { unread: turn(1) }), host("b", "idle", { unread: turn(2) })], [], 0, NO_PINS).flatMap(({ items }) => items);
-	test("an item that took a shown item's place becomes the route; a routed item that stays, or a link to one already gone, keeps it", () => {
-		expect(routeAfter(second ?? null, "turn/a/1", "turn/a/1")).toBe("turn/b/2");
-		expect(routeAfter(first ?? null, "turn/a/1", "turn/a/1")).toBeNull();
-		expect(routeAfter(second ?? null, "gone", null)).toBeNull();
-		expect(routeAfter(null, null, null)).toBeNull();
+	test("a bare route opens none, and a listed item opens itself and keeps the route", () => {
+		expect(opens(openFor(listOf("a", "b"), null, null))).toEqual([null, null]);
+		expect(opens(openFor(listOf("a", "b"), b, { key: a, at: 0 }))).toEqual([b, null]);
+	});
+
+	test("once the shown item leaves, the one now at its place, else the last, opens and takes over the route", () => {
+		expect(opens(openFor(listOf("a", "c"), b, { key: b, at: 1 }))).toEqual([c, c]);
+		expect(opens(openFor(listOf("a"), b, { key: b, at: 1 }))).toEqual([a, a]);
+		expect(opens(openFor([], b, { key: b, at: 1 }))).toEqual([null, null]);
+	});
+
+	test("a link to an item this list never showed opens a stand-in and keeps the route, so the item can still arrive", () => {
+		expect(opens(openFor(listOf("a", "b"), "notice/s1", null))).toEqual([a, null]);
+		expect(opens(openFor(listOf("a", "b"), "notice/s1", { key: a, at: 1 }))).toEqual([b, null]);
+	});
+
+	test("the item that took over hands the route on the same way when it leaves", () => {
+		expect(opens(openFor(listOf("b", "c"), a, { key: a, at: 0 }))).toEqual([b, b]);
+		expect(opens(openFor(listOf("b", "c"), b, { key: a, at: 0 }))).toEqual([b, null]);
+		expect(opens(openFor(listOf("c"), b, { key: b, at: 0 }))).toEqual([c, c]);
 	});
 });

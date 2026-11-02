@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { spring } from "@/lib/springs";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { INBOX_FILTERS, type InboxItem, type InboxNotice, inboxSections, itemCount, nextAfter, routeAfter, sectionsIn } from "../../inbox-model";
+import { INBOX_FILTERS, type InboxItem, type InboxNotice, inboxSections, itemCount, openFor, sectionsIn, type ShownItem } from "../../inbox-model";
 import { follow } from "../../notice-model";
 import { PAGE_ICON } from "../../page-icons";
 import { useShowConversation } from "../../pane-store";
@@ -33,8 +33,8 @@ import { subjectOf } from "../subject";
 interface InboxPageProps {
 	hosts: RosterHost[];
 	notices: Notice[];
-	/** The ids of the pinned sessions, whose questions come first, as in the sidebar. */
-	pins: string[];
+	/** The pinned sessions' ids, whose questions come first, as in the sidebar. */
+	pinned: ReadonlySet<string>;
 	/** The item the route opens, `null` for none. */
 	openKey: string | null;
 	/** Whether the server has sent its session lists, so a bare route opens the first item once there is one to open. */
@@ -45,26 +45,21 @@ interface InboxPageProps {
 	workspaces: Workspace[];
 }
 
-export function InboxPage({ hosts, notices, pins, openKey, ready, models, workspaces }: InboxPageProps) {
+export function InboxPage({ hosts, notices, pinned, openKey, ready, models, workspaces }: InboxPageProps) {
 	const [filter, setFilter] = useState<(typeof INBOX_FILTERS)[number]>(INBOX_FILTERS[0]);
 	const reduceMotion = useReducedMotion() ?? false;
-	const pinned = useMemo<ReadonlySet<string>>(() => new Set(pins), [pins]);
 	const sections = inboxSections(hosts, notices, Date.now(), pinned);
 	const listed = sectionsIn(sections, filter.id);
 	const shown = listed.flatMap(({ items }) => items);
 	const total = itemCount(sections);
 	/**
-	 * Where the open item was, so the one that takes its place opens once it leaves the list, whether you marked it read,
-	 * cleared it, or ended it here, or answered it in its session. Written during render, it only remembers what this render shows.
+	 * The routed item this list last showed, so the one that takes its place opens once it leaves the list, whether you
+	 * marked it read, cleared it, or ended it here, or answered it in its session. Written during render, it only remembers what this render shows.
 	 */
-	const lastAt = useRef(0);
-	/** The routed item this list has shown, so its leaving, and not a link to an item already gone, hands the route on. */
-	const shownKey = useRef<string | null>(null);
-	const open = nextAfter(shown, openKey, lastAt.current);
+	const last = useRef<ShownItem | null>(null);
+	const { open, handOn } = openFor(shown, openKey, last.current);
 	const at = open ? shown.indexOf(open) : -1;
-	if (at >= 0) lastAt.current = at;
-	if (open !== null && open.key === openKey) shownKey.current = openKey;
-	const handOn = routeAfter(open, openKey, shownKey.current);
+	if (open !== null && open.key === openKey) last.current = { key: openKey, at };
 	// The item that took the routed one's place becomes the route, so an item that arrives later above it cannot take it over.
 	useEffect(() => {
 		if (handOn !== null) location.replace(hashForInbox(handOn));
@@ -104,13 +99,11 @@ export function InboxPage({ hosts, notices, pins, openKey, ready, models, worksp
 				widthKey="omp-agents.inbox-list-width"
 				resizeLabel="Resize the Inbox list"
 				detailLabel="Open item"
-				empty={
-					total === 0
-						? { icon: PAGE_ICON.inbox, title: "Nothing waits on you", hint: "Questions, finished turns, your pull request moves, and messages land here." }
-						: shown.length === 0
-							? { icon: PAGE_ICON.inbox, title: "No item open", hint: null }
-							: { icon: PAGE_ICON.inbox, title: "No item open", hint: `Click one, or press ${shortcutKeys("inboxNext")} to open the first.` }
-				}
+				empty={{
+					icon: PAGE_ICON.inbox,
+					title: total === 0 ? "Nothing waits on you" : "No item open",
+					hint: total === 0 ? "Questions, finished turns, your pull request moves, and messages land here." : shown.length === 0 ? null : `Click one, or press ${shortcutKeys("inboxNext")} to open the first.`,
+				}}
 				list={
 					<div className="mx-auto w-full max-w-3xl px-3 py-2">
 						{listed.map(({ group, items }) => (

@@ -6,7 +6,7 @@ decision-makers: agent
 
 # The Inbox names the item it opens in the address
 
-In the context of the Inbox page, which opens an item beside its list, facing a bare `#inbox` whose open item a new question took over, an address that kept naming an item already gone while its neighbour showed, and a narrow window where the open item hid the list with no way back, we chose to open the first item on arrival with `useOpenLatest`, as Email, Notes, and Todo do, to write the item that takes a left item's place into the address with a history replace, and to add **Close** and Escape, which empty the address and return the focus to the item's row.
+In the context of the Inbox page, which opens an item beside its list, facing a bare `#inbox` whose open item a new question took over, an address that kept naming an item already gone while its neighbour showed, and a narrow window where the open item hid the list with no way back, we chose to open the first item on arrival with `useOpenLatest`, as Email, Notes, and Todo do, to write the item that takes a shown item's place into the address with a history replace, and to add **Close** and Escape, which empty the address and return the focus to the item's row.
 We rejected opening nothing on a bare `#inbox`, a page-local flag for the closed list, holding the auto-opened item in page state only, and a route that names the closed list.
 We gain an open item that only you or its leaving change, the same arrival and close behavior as the other list pages, at the cost of a first item picked once the session lists arrive, before the pins do.
 
@@ -20,7 +20,10 @@ At 700 pixels wide the list split shows only the open item, and the bar had no c
 
 ## Options considered
 
-- `useOpenLatest` for the bare route and the closed list, and `routeAfter` in `web/inbox-model.ts` for the item that takes a left item's place: the route then holds the item, as a click on a row does, and the Inbox behaves as the other list pages.
+- `useOpenLatest` for the bare route and the closed list, and `openFor` in `web/inbox-model.ts` for the item that takes a shown item's place: the route then holds the item, as a click on a row does, and the Inbox behaves as the other list pages.
+  `openFor` hands the route on only from an item the list showed, so a link to an item it never showed opens a stand-in without writing it.
+  Notices arrive after the session lists, and on a test server a link to a Slack notice showed the first turn for about 70 milliseconds before its notice listed and opened.
+  Handing on from any missing item would have written that turn into the address and lost the notice.
 - Open nothing on a bare `#inbox`: stable and simple, but it changes what users see, and the user has not approved that.
 - A page-local flag that keeps the list closed until you open an item: it works, but it reimplements what `useOpenLatest` settles.
 - Keep the auto-opened key in page state: stable, but the address and the open item disagree, and a reload opens another item.
@@ -34,7 +37,7 @@ Close empties the address and leaves the list as it is until you open an item, a
 
 ## Confirmation
 
-`web/use-open-latest.test.ts` covers the arrival with the Inbox's address, and `web/inbox-model.test.ts` covers `routeAfter`.
+`web/use-open-latest.test.ts` covers the arrival with the Inbox's address, and `web/inbox-model.test.ts` covers `openFor`: a kept item, a bare route, a shown item handed on, a link to an item never shown, and the chain of items that take over.
 
 ## Revisit when
 

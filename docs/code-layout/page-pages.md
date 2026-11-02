@@ -38,7 +38,7 @@
   A top-level todo's `detail.tsx` lists linked notes and creates a note with its todo id.
   `web/palette-records.ts` includes note titles and bodies in command-menu search.
 - `web/components/inbox/page.tsx`: the Inbox page's grouped two-line rows, which animate in and out, filters, and the open item, a `SessionDetail` or a `NoticeDetail` under the `InboxBar` they share, with its keys.
-  `web/inbox-model.ts` builds its items from the roster and the notices, with each item's title, place, and second line, groups and orders them into sections, pinned sessions' questions first, filters the sections, and picks the item that opens after one leaves with `nextAfter`, and the item the address then names with `routeAfter`.
+  `web/inbox-model.ts` builds its items from the roster and the notices, with each item's title, place, and second line, groups and orders them into sections, pinned sessions' questions first, filters the sections, and picks the open item and the item the address then names with `openFor`.
   `SessionDetail` is keyed by its session, so two items of one session share the conversation, a `ViewConversation` with no header and a composer that waits for R, which it streams through `useShowConversation` without marking it read.
   R, 1 to 9, and 0 go through the conversation's `ConversationHandle`, so a key sends a suggestion exactly as the composer's own list does.
   Each bar button runs through `useAction` from `web/use-action.ts`, which shows it pending and toasts a failure; the notice's button from `web/components/notices.tsx` clears the notice the same way.

@@ -283,6 +283,7 @@ export function App() {
 																	rosterError={state.rosterError}
 																	notices={state.notices}
 																	newStart={startOf(state.starts, "new")}
+																	pinned={sessions.pinned}
 																	scope={scope}
 																	defaultWorkspace={defaultWorkspace}
 																	sectionTarget={sectionTarget}
