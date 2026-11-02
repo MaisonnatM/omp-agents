@@ -36,7 +36,8 @@ const MAX_BYTES = 32 * 1024;
 describe("docs stay small enough to read whole", () => {
 	test.each(docs)("%s", file => {
 		const bytes = Bun.file(join(root, file)).size;
-		expect(bytes > MAX_BYTES ? `${bytes} bytes; split it into files under ${MAX_BYTES} bytes` : null).toBeNull();
+		const fix = file === "CHANGELOG.md" ? "run bun scripts/trim-changelog.ts to drop its oldest days" : `split it into files under ${MAX_BYTES} bytes`;
+		expect(bytes > MAX_BYTES ? `${bytes} bytes; ${fix}` : null).toBeNull();
 	});
 });
 

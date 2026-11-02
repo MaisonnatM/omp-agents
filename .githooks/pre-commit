@@ -1,0 +1,7 @@
+#!/bin/sh
+# When this commit changes CHANGELOG.md and the file has no unstaged edits, drops its oldest days past the doc size limit
+# and stages the result, so the commit carries the trimmed file; see scripts/trim-changelog.ts. A failed trim never
+# blocks the commit, and src/docs.test.ts still refuses a file over the limit.
+if ! git diff --cached --quiet HEAD -- CHANGELOG.md 2>/dev/null && git diff --quiet -- CHANGELOG.md && command -v bun >/dev/null; then
+	bun "$(dirname "$0")/../scripts/trim-changelog.ts" CHANGELOG.md && git add CHANGELOG.md || true
+fi
