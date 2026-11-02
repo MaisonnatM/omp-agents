@@ -31,7 +31,7 @@
 - `src/decisions.ts`: reads a repository's decision records for Settings › Decisions; `src/decisions.test.ts` tests a record with and without frontmatter, the directory it picks from a nested directory, and a repository with none.
 - `src/extensions.ts`: validates extension changes, queues native mutations, binds script approvals to an operation/workspace, and allowlists contribution previews.
   `src/extensions.test.ts` covers native local marketplace lifecycle, scope and packaged workflow ownership, malformed registry protection, script approval, shared config writes, discovery binding ordering, and invalid-settings fallback.
-- `src/test-env.ts`: points `PI_CODING_AGENT_DIR` at a temporary directory, and `CLAUDE_CONFIG_DIR` and `CODEX_HOME` at directories inside it that do not exist.
+- `src/test-env.ts`: points `PI_CODING_AGENT_DIR` at a temporary directory, and `CLAUDE_CONFIG_DIR` and `CODEX_HOME` at directories inside it that do not exist, and clears `PI_SESSION_ID`, so the session-trailer hook adds no `Omp-Session` trailer to a test's commits when the tests run from an omp session.
   `bunfig.toml` preloads it for tests, so they never touch `~/.omp/agent`, `~/.claude`, or `~/.codex`.
 - `.env.test`: `bun test` loads it before any test, so every child a test starts, even through Bun's default spawn environment, runs git without the developer's global and system config, with a test identity and no auto-maintenance.
   A test's commit never signs through the developer's gpg-agent, which stalls past Bun's 5-second test timeout or fails while other sessions sign; `src/git.test.ts` checks it.
