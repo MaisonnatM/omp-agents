@@ -48,6 +48,8 @@
   A session that runs without publishing itself to the registry also appears in this list, and its transcript keeps updating while it runs.
   A one-shot `omp -p` or `omp --mode json` run, such as one another session starts to check something, stays out of the list, as task subagents do; resumed in a terminal or from the dashboard, it lists again.
   It is marked by `~/.omp/agent/extensions/headless-mark.ts`, which `bun run omp-template` installs, so runs from before it was installed still show.
+  When omp went on with a session in a new file, as it does when you resume a session another omp still has open, the list shows only the new file, where the whole conversation continues, and **Resume** on either opens it.
+  If the first omp then goes on writing the old file too, the two have parted ways, and both list.
   Claude Code's sessions in `~/.claude/projects` and Codex's in `~/.codex/sessions` list here too, among omp's.
   `CLAUDE_CONFIG_DIR` and `CODEX_HOME` move those directories as they move them for their agents.
   Their rows name their source first among their details, **Claude Code** or **Codex**; omp's rows name no source.

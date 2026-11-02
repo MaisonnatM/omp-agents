@@ -189,8 +189,10 @@ export const sessionManager = await load<{
 	SessionManager: {
 		create(cwd: string, dir?: string): OmpSessionManager;
 		open(file: string, dir?: string, storage?: undefined, options?: { suppressBreadcrumb?: boolean; throwIfMissing?: boolean }): Promise<OmpSessionManager>;
+		/** Retitles a file no process here loads, under omp's lease on the session; `null` when it did not, as when another process holds it. */
+		renameSessionTitle(sessionPath: string, title: string, options?: { cwd?: string }): Promise<string | null>;
 	};
-}>(join(srcDir, "session", "session-manager.ts"), { SessionManager: "function" });
+}>(join(srcDir, "session", "session-manager.ts"), { SessionManager: "function", "SessionManager.renameSessionTitle": "function" });
 export const transcriptEntry = await load<{
 	userTurnDraft(entry: unknown): string | undefined;
 	imageContent(content: unknown): { type: "image"; data: string; mimeType: string }[];

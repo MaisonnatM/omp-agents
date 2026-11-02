@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { packageDir } from "./install";
 import { endsMidTurn, readSessionFile, renameSessionFile, sessionFileOf } from "./sessions";
 
 const dirs: string[] = [];
@@ -50,16 +51,41 @@ describe("readSessionFile", () => {
 describe("renameSessionFile", () => {
 	test("a saved session reads with the title it was given, again after a second rename", async () => {
 		const path = sessionFile([header, prompt]);
-		await renameSessionFile(path, "Billing migration");
+		await renameSessionFile(path, "Billing migration", "/tmp");
 		expect((await readSessionFile(path))?.title).toBe("Billing migration");
-		await renameSessionFile(path, "Billing cutover");
+		await renameSessionFile(path, "Billing cutover", "/tmp");
 		expect((await readSessionFile(path))?.title).toBe("Billing cutover");
 	});
 
 	test("a title of only spaces is refused, and the session keeps its title", async () => {
 		const path = sessionFile([header, prompt]);
-		await expect(renameSessionFile(path, "   ")).rejects.toThrow("omp kept the old title");
+		await expect(renameSessionFile(path, "   ", "/tmp")).rejects.toThrow("omp kept the old title");
+		await expect(renameSessionFile(path, "\u0001 \u0007", "/tmp")).rejects.toThrow("omp kept the old title");
 		expect((await readSessionFile(path))?.title).toBe("run it");
+	});
+
+	test("a session another omp process holds keeps its title until that process lets it go", async () => {
+		const id = `rename-lease-${process.pid}-${Date.now()}`;
+		const path = sessionFile([{ ...header, id }, prompt]);
+		// omp's own lease, taken by another process as a terminal omp writing the file takes it.
+		const script = `
+			import { FileSessionStorage } from ${JSON.stringify(join(packageDir, "src", "session", "session-storage.ts"))};
+			console.log(new FileSessionStorage().claimSession(${JSON.stringify(id)}, ${JSON.stringify(path)}) ? "held" : "refused");
+			for await (const _ of Bun.stdin.stream());
+		`;
+		// omp keeps a test run's leases apart from the user's and names that directory in the environment, which the child must share.
+		const holder = Bun.spawn([process.execPath, "--eval", script], { env: { ...process.env }, stdin: "pipe", stdout: "pipe", stderr: "inherit" });
+		try {
+			const { value } = await holder.stdout.getReader().read();
+			expect(new TextDecoder().decode(value)).toBe("held\n");
+			await expect(renameSessionFile(path, "Billing migration", "/tmp")).rejects.toThrow("This session is open in another omp window. Rename it there with /rename.");
+			expect((await readSessionFile(path))?.title).toBe("run it");
+		} finally {
+			holder.stdin.end();
+			await holder.exited;
+		}
+		await renameSessionFile(path, "Billing migration", "/tmp");
+		expect((await readSessionFile(path))?.title).toBe("Billing migration");
 	});
 });
 

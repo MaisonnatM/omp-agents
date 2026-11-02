@@ -589,7 +589,7 @@ export class Dashboard {
 				const saved = files.savedOf(sessionId);
 				if (!saved) throw new Error("This session's file is gone.");
 				if (saved.source !== "omp") throw new Error("Only omp sessions can be renamed here.");
-				await renameSessionFile(saved.path, title);
+				await renameSessionFile(saved.path, title, saved.cwd);
 				files.touch(saved.path);
 				if (await files.refresh()) this.#onFilesChanged();
 			},
