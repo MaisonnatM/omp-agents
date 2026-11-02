@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ShellResult } from "../proc";
-import { COMMAND_TIMEOUT_MS, type RoutineTask, type TriggerEvent } from "../routines";
+import { COMMAND_TIMEOUT_MS, type RoutineTask, type Schedule, type TriggerEvent } from "../routines";
 import type { BotId } from "../shared/bots";
 import { readRoutineMessage, type RoutineMessage, routineMessageText } from "../shared/routine-message";
 import { RoutineRunner } from "./routine-runner";
@@ -143,7 +143,7 @@ describe("RoutineRunner", () => {
 		const merged: TriggerEvent = { kind: "pull-request", title: "acme/app#4 was merged", detail: "Fix login, by ada", url: "https://github.com/acme/app/pull/4" };
 
 		/** Saves routine `id` of Bot Scout with `triggers` and `schedules`. */
-		function saveTriggered(file: RoutinesFile, id: string, triggers: TriggerEvent["kind"][], schedules = [everyHour], enabled = true): void {
+		function saveTriggered(file: RoutinesFile, id: string, triggers: TriggerEvent["kind"][], schedules: Schedule[] = [everyHour], enabled = true): void {
 			const task = { kind: "prompt", prompt: `Prompt ${id}` } as const;
 			file.apply({ op: "save", routine: { id, botId: SCOUT, name: id, schedules, triggers: triggers.map(kind => ({ kind })), task, enabled } }, T0);
 		}
@@ -191,6 +191,18 @@ describe("RoutineRunner", () => {
 			fake.execs[0]!.end({ exitCode: 0, output: "ok\n" });
 			await settled();
 			expect(readRoutineMessage(fake.messages[0]!.slice("scout: ".length))?.triggeredBy).toEqual([dm]);
+		});
+
+		test("a routine scheduled on weekdays only ignores its triggers on a weekend day, and hears them again on Monday", async () => {
+			const file = new RoutinesFile(routinesPath());
+			saveTriggered(file, "prs", ["pull-request"], [{ kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 10, minute: 0 } }]);
+			const { runner, fake } = harness(file);
+			const saturday = T0 + 5 * 24 * HOUR;
+			fake.now = saturday;
+			await runner.fire([merged]);
+			fake.now = saturday + 2 * 24 * HOUR;
+			await runner.fire([merged]);
+			expect(file.value[0]?.runs.map(({ at, triggeredBy }) => [at, triggeredBy])).toEqual([[saturday + 2 * 24 * HOUR, [merged]]]);
 		});
 	});
 

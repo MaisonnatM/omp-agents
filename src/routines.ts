@@ -147,6 +147,16 @@ export const isDue = (routine: Routine, now: number): boolean =>
 /** Whether `routine` runs when a trigger of `kind` sees something happen. */
 export const isTriggeredBy = (routine: Routine, kind: TriggerKind): boolean => routine.enabled && routine.triggers.some(trigger => trigger.kind === kind);
 
+/**
+ * Whether `routine`'s triggers fire on the local day of `now`: every day for a routine with no schedule or an interval
+ * one, else only on a weekday its weekly schedules name, so a weekdays-only routine stays quiet on weekends.
+ */
+export const triggersOn = (routine: Routine, now: number): boolean => {
+	if (routine.schedules.length === 0 || routine.schedules.some(schedule => schedule.kind === "every")) return true;
+	const day = new Date(now).getDay() as Weekday;
+	return routine.schedules.some(schedule => schedule.kind === "weekly" && schedule.days.includes(day));
+};
+
 /** The trigger kinds some enabled routine of `routines` runs on, so a check reads only what a routine watches. */
 export const watchedKinds = (routines: readonly Routine[]): TriggerKind[] => TRIGGER_KINDS.filter(kind => routines.some(routine => isTriggeredBy(routine, kind)));
 
