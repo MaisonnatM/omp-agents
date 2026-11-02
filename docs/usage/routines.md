@@ -6,6 +6,8 @@
   Click the **Routines** heading to open the Bot's routines card in place of the conversation, at `#bots/<Bot id>/routines`, or click one routine to open the card with its row open, at `#bots/<Bot id>/routines/<routine id>`.
 - Routines run only while the dashboard runs; a time missed while it was down, or while the Mac was off or asleep, starts one run once it is back.
   In the desktop app, **Open at Login** keeps it running from the moment you log in.
+- Routines also wait through the few seconds the Mac wakes on its own while asleep, for Power Nap or the network, since a run started then would stall when it sleeps again.
+  What came due starts once the Mac fully wakes, and the news a trigger saw meanwhile starts one run.
 - **New routine**, in the **Routines** tab of the Bot's details or at the top of its routines card, opens the editor in place of the conversation: a name, its task, its schedules, and its triggers.
   The task is **Send a message**, a message that goes into the Bot's conversation as a routine run card, or **Run a command**, a shell command.
   Each schedule repeats every so many minutes, hours, or days, counted from the last run a schedule or **Run now** started, or runs at a time of day on the days you pick.
@@ -37,8 +39,9 @@
   On a narrow conversation, the time and status label hide, but the status icon stays.
 - A command runs with `sh` in the Bot's workspace, without an omp session.
   The command runs with your user's full permissions, and nothing asks before it acts: a file it deletes is gone.
-  It stops after 10 minutes, and its run keeps the last 64 KB of what it printed, stdout and stderr together.
-  When it ends, the dashboard posts into the Bot's conversation which routine ran what, how it ended, and its output, which the Bot reads as data rather than as instructions.
+  It stops after 10 minutes, not counting the time the Mac sleeps, and its run keeps the last 64 KB of what it printed, stdout and stderr together.
+  When it ends, the dashboard posts into the Bot's conversation which routine ran what, how it ended, how long the Mac slept while it ran, if it did, and its output, which the Bot reads as data rather than as instructions.
+  A command that ends while the Mac sleeps posts once the Mac fully wakes.
   If the Bot cannot take that message, the run keeps the output anyway and lists why among its errors.
   A command routine whose last command still runs records an error instead of running a second one.
   Its runs read **Running…**, **Succeeded**, **Failed (exit n)**, **Stopped at the time limit**, **Stopped with the dashboard**, or **Could not start**, and anything but a success also counts as an error.

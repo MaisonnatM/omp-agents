@@ -6,6 +6,7 @@
  * A run starts no session of its own: a Bot keeps one conversation, so routines add no session beside it.
  */
 import { errorText } from "../json";
+import type { ShellResult } from "../proc";
 import { COMMAND_TIME_LIMIT, isDue, isTriggeredBy, MAX_TRIGGER_EVENTS, type CommandRun, type Routine, type RoutineRun, type TriggerEvent } from "../routines";
 import { SerialLane } from "../serial-lane";
 import type { BotId } from "../shared/bots";
@@ -18,7 +19,9 @@ export interface RoutineRunnerDeps {
 	/** Bot `botId`'s workspace, `null` once the Bot is gone. */
 	workspace(botId: BotId): string | null;
 	/** Runs `command` through `sh` in `cwd`, with `env` beside the server's environment, whatever its exit code; rejects only when it cannot start. */
-	exec(command: string, cwd: string, env: Record<string, string>): Promise<{ exitCode: number | null; output: string }>;
+	exec(command: string, cwd: string, env: Record<string, string>): Promise<ShellResult>;
+	/** Whether the Mac is fully awake: a dark wake lasts seconds, so a run started in one stalls until the next full wake. */
+	fullyAwake(): Promise<boolean>;
 	/** The routines changed; every socket should hear them. */
 	onChange(): void;
 	/** Sends `text` into Bot `botId`'s conversation, as the user's message would; the session it went to. Rejects with why it could not. */
@@ -31,6 +34,8 @@ export class RoutineRunner {
 	readonly #commands = new Set<string>();
 	/** Ticks and run-now claims, one at a time. */
 	readonly #lane = new SerialLane();
+	/** Command reports that ended outside a full wake, for the next tick at a full wake to send. */
+	readonly #reports: HeldReport[] = [];
 
 	constructor(deps: RoutineRunnerDeps) {
 		this.#deps = deps;
@@ -51,10 +56,15 @@ export class RoutineRunner {
 		}
 	}
 
-	/** Claims due slots, then starts the queued runs. A tick while one runs is skipped. */
+	/**
+	 * Once the Mac is fully awake, posts the command reports held since a dark wake, claims due slots, then starts the
+	 * queued runs; the first tick at a full wake claims what came due since as one run. A tick while one runs is skipped.
+	 */
 	tick(): Promise<void> {
 		if (this.#lane.busy) return this.#lane.idle();
 		return this.#lane.run(async () => {
+			if (!(await this.#deps.fullyAwake())) return;
+			for (const held of this.#reports.splice(0)) void this.#send(held);
 			const now = this.#deps.now();
 			for (const routine of this.#deps.file.value) if (isDue(routine, now)) this.#claim(routine, now, []);
 			await this.#drain();
@@ -73,17 +83,23 @@ export class RoutineRunner {
 
 	/**
 	 * Claims one run for each enabled routine with a trigger of the kinds in `events`, holding the first
-	 * {@link MAX_TRIGGER_EVENTS} of them it watches, then drains; waits for a tick under way rather than skip.
+	 * {@link MAX_TRIGGER_EVENTS} of them it watches, then drains once the Mac is fully awake, else leaves the runs for
+	 * the next tick at a full wake; waits for a tick under way rather than skip.
+	 * News for a routine whose triggered run is still queued joins that run, so a night of dark wakes starts one run.
 	 */
 	fire(events: readonly TriggerEvent[]): Promise<void> {
 		return this.#lane.run(async () => {
+			const { file } = this.#deps;
 			const now = this.#deps.now();
-			for (const routine of this.#deps.file.value) {
+			for (const routine of file.value) {
 				const seen = events.filter(event => isTriggeredBy(routine, event.kind)).slice(0, MAX_TRIGGER_EVENTS);
+				if (seen.length === 0) continue;
+				const waiting = routine.runs.find(run => run.outcome.kind === "pending" && run.outcome.queued && run.triggeredBy.length > 0);
+				if (waiting) file.addTriggerEvents(routine.id, waiting.at, seen);
 				// Runs are keyed by their time, so a second claim in the same millisecond takes the next one.
-				if (seen.length > 0) this.#claim(routine, Math.max(now, (routine.runs[0]?.at ?? 0) + 1), seen);
+				else this.#claim(routine, Math.max(now, (routine.runs[0]?.at ?? 0) + 1), seen);
 			}
-			await this.#drain();
+			if (await this.#deps.fullyAwake()) await this.#drain();
 		});
 	}
 
@@ -150,10 +166,10 @@ export class RoutineRunner {
 			void this.#post(routine, at, sentText(routine, { at, triggeredBy }, { kind: "command", command, run }));
 		};
 		void this.#deps.exec(command, cwd, { ROUTINE_TRIGGERS: JSON.stringify(triggeredBy) }).then(
-			({ exitCode, output }) => {
+			({ exitCode, output, slept }) => {
 				const endedAt = this.#deps.now();
-				if (exitCode === null) ended({ phase: "stopped", reason: "time-limit", output, startedAt, endedAt }, `Stopped after ${COMMAND_TIME_LIMIT}.`);
-				else ended({ phase: "exited", code: exitCode, output, startedAt, endedAt }, exitCode === 0 ? null : `Exited with code ${exitCode}.`);
+				if (exitCode === null) ended({ phase: "stopped", reason: "time-limit", output, startedAt, endedAt, slept }, `Stopped after ${COMMAND_TIME_LIMIT}.`);
+				else ended({ phase: "exited", code: exitCode, output, startedAt, endedAt, slept }, exitCode === 0 ? null : `Exited with code ${exitCode}.`);
 			},
 			(err: unknown) => {
 				const error = errorText(err);
@@ -162,15 +178,30 @@ export class RoutineRunner {
 		);
 	}
 
-	/** Posts how the command ended into the Bot's conversation; the run keeps the output either way, and records why the Bot could not take it. */
+	/** Sends how the command ended into the Bot's conversation, or holds it for the next tick at a full wake. */
 	async #post(routine: Routine, at: number, report: string): Promise<void> {
+		const held = { botId: routine.botId, id: routine.id, at, report };
+		if (await this.#deps.fullyAwake()) await this.#send(held);
+		else this.#reports.push(held);
+	}
+
+	/** Sends a command report; the run keeps the output either way, and records why the Bot could not take it. */
+	async #send({ botId, id, at, report }: HeldReport): Promise<void> {
 		try {
-			await this.#deps.messageBot(routine.botId, report);
+			await this.#deps.messageBot(botId, report);
 		} catch (error) {
-			this.#deps.file.failed(routine.id, at, `The output could not be posted to the Bot: ${errorText(error)}`);
+			this.#deps.file.failed(id, at, `The output could not be posted to the Bot: ${errorText(error)}`);
 			this.#deps.onChange();
 		}
 	}
+}
+
+/** A command report for Bot `botId` from the run at `at` of routine `id`. */
+interface HeldReport {
+	botId: BotId;
+	id: string;
+	at: number;
+	report: string;
 }
 
 /** What a run of `routine` sends into its Bot's conversation. */

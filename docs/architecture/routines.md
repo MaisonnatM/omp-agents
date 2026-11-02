@@ -40,20 +40,28 @@ The Routines Bot is created only when it is missing, through the lists so pages 
 
 `src/server/routine-runner.ts` runs on a 60 s tick in `src/server/loops.ts`, whether or not a page is connected, and only on the server that owns routines; see [One server runs the unattended work](#one-server-runs-the-unattended-work).
 Ticks and **Run now** claims share one `SerialLane`: a tick that finds the lane busy is skipped, and a **Run now** waits its turn.
-Each tick does two things, in order:
+A tick starts nothing unless the Mac is fully awake, by `fullyAwake` in `src/full-wake.ts`, which reads the system capabilities `pmset -g systemstate` prints: a dark wake, the few seconds of Power Nap or network maintenance the Mac wakes for while asleep, lacks Graphics.
+A run started in a dark wake stalled until the next full wake, and a command's time limit ran out meanwhile.
+Off macOS, or when `pmset` fails, the Mac counts as fully awake.
+**Run now** does not wait, since someone asked.
+Each tick at a full wake does three things, in order:
 
-1. It claims each due slot: it saves a new queued run before it starts anything.
-   Slots missed while the dashboard was closed or the Mac slept coalesce into one run at the next tick.
-2. It starts the queued runs, oldest first.
+1. It posts the command reports held since a command ended outside a full wake.
+2. It claims each due slot: it saves a new queued run before it starts anything.
+   Slots missed while the dashboard was closed or the Mac slept coalesce into one run at the next tick at a full wake.
+3. It starts the queued runs, oldest first.
    A prompt is serialized with `routineMessageText` from `src/shared/routine-message.ts` and goes through `Bots.message` in `src/server/bots.ts`, the path the Bot page's composer takes.
    It follows the Bot's live session, resumes its saved one, or starts its first session in its workspace.
    The run records `sent` with the session it went to; a refusal, such as a Bot that is gone, goes to the run's errors, and the next run tries again.
    A run starts no session of its own, so routines hold no slot cap; the Bot keeps its one conversation, which the runner neither tracks nor ends.
    A command starts through the runner's `exec`, `runShell` in `src/proc.ts`, in the Bot's workspace, and the drain does not wait for it, so a tick never blocks for minutes.
-   `runShell` runs `/bin/sh -c` with stderr merged into stdout, keeps the last 64 KB of output, and stops the command after 10 minutes.
+   `runShell` runs `/bin/sh -c` with stderr merged into stdout, keeps the last 64 KB of output, and stops the command after 10 minutes of awake time.
+   Timers and `Date.now()` count the time the Mac sleeps, so its timer re-arms for the awake time left by `performance.now()`, which stops while the Mac sleeps.
+   It returns `slept`, the wall time less the awake time, to the second, when a second or more.
    It spawns the shell in its own process group and stops the whole group with SIGTERM, since a command's own children would otherwise keep running and hold the output pipe open.
-   When the command ends, the runner writes its exit code, output, and times to the run; a non-zero exit, a stop, or a failed spawn also goes to the run's errors.
-   It then posts the command's completed `RoutineMessage` through `routineMessageText` and `Bots.message`, with the routine's name, command, result, and output fenced as data.
+   When the command ends, the runner writes its exit code, output, times, and `slept` to the run; a non-zero exit, a stop, or a failed spawn also goes to the run's errors.
+   It then posts the command's completed `RoutineMessage` through `routineMessageText` and `Bots.message`, with the routine's name, command, result, how long the Mac slept, and output fenced as data.
+   That post waits for a full wake, since the Bot's turn it starts would stall in a dark wake; it waits in memory, so a server that stops first never posts it, though the run keeps the output.
    The run keeps the output whether or not the post goes through, and a post the Bot refused adds why to the run's errors.
    The runner keeps the routines whose command runs in memory, since a run holds one outcome and later `run-now` claims can push a running command's run out of the saved 10; a command routine whose last command still runs records an error instead of running a second one.
 
@@ -94,7 +102,8 @@ A sighting has an id that names what it saw in the state it saw it, and a scope,
 A scope's first answer since the server started only sets what it knows, so a restart, or what happened while the dashboard was stopped, starts nothing; a scope whose check failed keeps what it knew.
 Every server learns its sightings, but only the server that owns routines fires them; another drops its news, and a server that takes over routines forgets what it learned before, so its next answers set a new baseline and a takeover fires nothing old.
 
-`RoutineRunner.fire` claims one run of each routine that watches a kind of the news, holding the first 10 of those events the check listed, then drains, in the same `SerialLane` as ticks and **Run now**.
+`RoutineRunner.fire` claims one run of each routine that watches a kind of the news, holding the first 10 of those events the check listed, then drains when the Mac is fully awake, in the same `SerialLane` as ticks and **Run now**.
+Otherwise the runs stay queued for the next tick at a full wake, and news for a routine whose triggered run is still queued joins that run, up to 10 events, through `RoutinesFile.addTriggerEvents`, so a night of dark wakes starts one run.
 A run is keyed by its time, so a claim lands at least a millisecond after the routine's newest run.
 A prompt run carries the events in the trailing JSON stamp rather than fenced trigger prose.
 A command gets the events as a JSON list in the `ROUTINE_TRIGGERS` environment variable, `[]` for a scheduled run or **Run now**, which `runShell` sets beside the server's environment.

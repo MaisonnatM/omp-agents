@@ -12,6 +12,10 @@ const exited: RoutineMessage = {
 };
 const failed: RoutineMessage = { ...head, sent: { kind: "command", command: "make", run: { phase: "failed", error: "no such directory", startedAt: 1, endedAt: 1 } } };
 const stopped: RoutineMessage = { ...head, sent: { kind: "command", command: "sleep 9999", run: { phase: "stopped", reason: "time-limit", output: "", startedAt: 1, endedAt: 9 } } };
+const sleptThrough: RoutineMessage = {
+	...head,
+	sent: { kind: "command", command: "git worktree prune", run: { phase: "stopped", reason: "time-limit", output: "", startedAt: 1, endedAt: 1_140_001, slept: 540_000 } },
+};
 
 describe("readRoutineMessage", () => {
 	test.each([
@@ -19,6 +23,7 @@ describe("readRoutineMessage", () => {
 		["exited command with backticks in its output", exited],
 		["command that could not start", failed],
 		["stopped command that printed nothing", stopped],
+		["command the Mac slept through", sleptThrough],
 	])("reads back the %s the runner sent", (_, message) => {
 		expect(readRoutineMessage(routineMessageText(message))).toEqual(message);
 	});
@@ -55,6 +60,14 @@ describe("readRoutineMessage", () => {
 
 	test("rejects a command stamp claiming a different exit than its report", () => {
 		expect(readRoutineMessage(routineMessageText(exited).replace('"code":2', '"code":0'))).toBeNull();
+	});
+
+	test("tells the Bot how long the Mac slept while the command ran", () => {
+		expect(routineMessageText(sleptThrough)).toContain("The Mac slept for 9 minutes while it ran");
+	});
+
+	test("rejects a command stamp that drops the sleep its report states", () => {
+		expect(readRoutineMessage(routineMessageText(sleptThrough).replace(',"slept":540000', ""))).toBeNull();
 	});
 
 	test.each([

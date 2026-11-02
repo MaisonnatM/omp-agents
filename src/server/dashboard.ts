@@ -10,6 +10,7 @@ import { rmSync } from "node:fs";
 import type { Server } from "bun";
 import { ForeignUsage } from "../foreign/usage";
 import { flushJsonFiles } from "../fs";
+import { fullyAwake } from "../full-wake";
 import { GmailAccounts, GmailClient } from "../gmail";
 import { accountClients, createGoogleAccounts } from "../google-accounts";
 import { GoogleCalendarClient, GoogleCalendars } from "../google-calendar";
@@ -437,6 +438,7 @@ export class Dashboard {
 				if (!dir) throw new Error(`${cwd.trim()} is not a directory.`);
 				return runShell(command, dir, { timeoutMs: COMMAND_TIMEOUT_MS, maxOutput: MAX_COMMAND_OUTPUT, signal: stopping, env });
 			},
+			fullyAwake,
 			onChange: () => broadcasts.pushList("routines"),
 			messageBot: (botId, text) => this.#bots.message(botId, text),
 		}));

@@ -11,6 +11,7 @@ import { expandHome, HOME } from "../paths";
 import {
 	applyRoutine,
 	MAX_ROUTINE_RUNS,
+	MAX_TRIGGER_EVENTS,
 	parseCommandRun,
 	parseRoutineSpec,
 	parseTriggerEvent,
@@ -200,6 +201,11 @@ export class RoutinesFile extends ReducerFile<Routine[], [change: Exclude<Routin
 			scheduledAt: triggeredBy.length === 0 ? at : routine.scheduledAt,
 			runs: [{ at, outcome: { kind: "pending", queued: true }, errors: [], triggeredBy } satisfies RoutineRun, ...routine.runs].slice(0, MAX_ROUTINE_RUNS),
 		}));
+	}
+
+	/** Adds `events` to what started the run at `at`, keeping the first {@link MAX_TRIGGER_EVENTS}. */
+	addTriggerEvents(id: string, at: number, events: TriggerEvent[]): void {
+		this.#updateRun(id, at, run => ({ ...run, triggeredBy: [...run.triggeredBy, ...events].slice(0, MAX_TRIGGER_EVENTS) }));
 	}
 
 	/** Takes routine `id`'s run at `at` off the queue, saved before its message or command starts. */
