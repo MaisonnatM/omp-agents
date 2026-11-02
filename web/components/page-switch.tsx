@@ -52,6 +52,8 @@ interface PageSwitchProps extends PageState {
 	openBot: OpenBot | null;
 	/** The new session under way or failed, if there is one. */
 	newStart: StartOf<"new"> | null;
+	/** The pinned sessions' ids, whose questions the Inbox lists first, as the sidebar does. */
+	pinned: ReadonlySet<string>;
 	scope: WorkspaceScope;
 	/** Where a new session starts when nothing picks a directory. */
 	defaultWorkspace: string;
@@ -95,6 +97,7 @@ export const PageSwitch = memo(function PageSwitch({
 	rosterError,
 	notices,
 	newStart,
+	pinned,
 	scope,
 	defaultWorkspace,
 	sectionTarget,
@@ -184,7 +187,7 @@ export const PageSwitch = memo(function PageSwitch({
 			return <NotesPage list={userNotes} todos={userTodos} view={page.list} openId={page.open} hosts={hosts} past={past} disabled={!connected} onChange={changeNote} />;
 		case "inbox":
 			// Every session that waits on you, whatever the sidebar's workspace.
-			return <InboxPage hosts={hosts} notices={notices} openKey={page.open} models={models} workspaces={workspaces} />;
+			return <InboxPage hosts={hosts} notices={notices} pinned={pinned} openKey={page.open} ready={listed} models={models} workspaces={workspaces} />;
 		case "bots": {
 			if (page.target === null) {
 				if (page.adding) return <NewBot workspaces={workspaces} defaultCwd={defaultWorkspace} connected={connected} />;

@@ -55,7 +55,7 @@ interface AppSidebarProps {
  */
 export const AppSidebar = memo(function AppSidebar({
 	scope: { visible, workspaces, workspace },
-	sessions: { lists, waiting, query, setQuery, togglePin },
+	sessions: { lists, waiting, query, setQuery, togglePin, pinned },
 	page,
 	panes,
 	tab,
@@ -92,7 +92,7 @@ export const AppSidebar = memo(function AppSidebar({
 	const todoSessions = useMemo(() => ({ hosts, past }), [hosts, past]);
 	const botList = useMemo(() => (bots === null ? null : botRows(bots, hosts, botLasts)), [bots, hosts, botLasts]);
 	const onShowShortcuts = useCallback(() => setShortcutsOpen(true), [setShortcutsOpen]);
-	const inboxCount = useMemo(() => itemCount(inboxSections(hosts, notices, Date.now())), [hosts, notices]);
+	const inboxCount = useMemo(() => itemCount(inboxSections(hosts, notices, Date.now(), pinned)), [hosts, notices, pinned]);
 	const inboxOpen = page?.kind === "inbox";
 	const inbox = useMemo(() => ({ count: inboxCount, open: inboxOpen }), [inboxCount, inboxOpen]);
 	return (

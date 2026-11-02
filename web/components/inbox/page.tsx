@@ -10,59 +10,75 @@ import { Button } from "@/components/ui/button";
 import { spring } from "@/lib/springs";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { INBOX_FILTERS, type InboxItem, type InboxNotice, inboxSections, itemCount, nextAfter, sectionsIn } from "../../inbox-model";
+import { INBOX_FILTERS, type InboxItem, type InboxNotice, inboxSections, itemCount, openFor, sectionsIn, type ShownItem } from "../../inbox-model";
 import { follow } from "../../notice-model";
 import { PAGE_ICON } from "../../page-icons";
 import { useShowConversation } from "../../pane-store";
 import { type ModelList, UNREAD } from "../../reads";
 import { hashForInbox } from "../../routing";
-import { useShortcuts } from "../../shortcuts";
+import { useOpenLatest } from "../../use-open-latest";
+import { shortcutKeys, useShortcuts } from "../../shortcuts";
 import { useAction } from "../../use-action";
 import { Age } from "../age";
 import type { ConversationHandle } from "../conversation";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { ShortcutChip } from "../kbd";
-import { PageFrame } from "../list-page";
-import { CH_NEXT, CH_PREVIOUS, DetailBar, ListSplit } from "../list-split";
+import { PageFrame, useReturnFocus } from "../list-page";
+import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, ListSplit } from "../list-split";
 import { NoticeAction } from "../notices";
 import { ViewConversation } from "../pane";
 import { StatusDot } from "../status-dot";
+import { subjectOf } from "../subject";
 
 interface InboxPageProps {
 	hosts: RosterHost[];
 	notices: Notice[];
-	/** The item the route opens, `null` for the first. */
+	/** The pinned sessions' ids, whose questions come first, as in the sidebar. */
+	pinned: ReadonlySet<string>;
+	/** The item the route opens, `null` for none. */
 	openKey: string | null;
+	/** Whether the server has sent its session lists, so a bare route opens the first item once there is one to open. */
+	ready: boolean;
 	/** The model lists the server sent, by instance id, which the open session's composer offers. */
 	models: ReadonlyMap<string, ModelList>;
 	/** The workspaces, which the open session's composer offers as directories. */
 	workspaces: Workspace[];
 }
 
-export function InboxPage({ hosts, notices, openKey, models, workspaces }: InboxPageProps) {
+export function InboxPage({ hosts, notices, pinned, openKey, ready, models, workspaces }: InboxPageProps) {
 	const [filter, setFilter] = useState<(typeof INBOX_FILTERS)[number]>(INBOX_FILTERS[0]);
 	const reduceMotion = useReducedMotion() ?? false;
-	const sections = inboxSections(hosts, notices, Date.now());
+	const sections = inboxSections(hosts, notices, Date.now(), pinned);
 	const listed = sectionsIn(sections, filter.id);
 	const shown = listed.flatMap(({ items }) => items);
 	const total = itemCount(sections);
 	/**
-	 * Where the open item was, so the one that takes its place opens once it leaves the list, whether you marked it read,
-	 * cleared it, or ended it here, or answered it in its session. Written during render, it only remembers what this render shows.
+	 * The routed item this list last showed, so the one that takes its place opens once it leaves the list, whether you
+	 * marked it read, cleared it, or ended it here, or answered it in its session. Written during render, it only remembers what this render shows.
 	 */
-	const lastAt = useRef(0);
-	const open = openKey === null ? (shown[0] ?? null) : nextAfter(shown, openKey, lastAt.current);
+	const last = useRef<ShownItem | null>(null);
+	const { open, handOn } = openFor(shown, openKey, last.current);
 	const at = open ? shown.indexOf(open) : -1;
-	if (at >= 0) lastAt.current = at;
+	if (open !== null && open.key === openKey) last.current = { key: openKey, at };
+	// The item that took the routed one's place becomes the route, so an item that arrives later above it cannot take it over.
+	useEffect(() => {
+		if (handOn !== null) location.replace(hashForInbox(handOn));
+	}, [handOn]);
+	useOpenLatest(hashForInbox, openKey, shown[0]?.key ?? null, ready);
+	useReturnFocus(open?.key ?? null, key => key, key => document.getElementById(`inbox-${key}`)?.querySelector("a"), total);
 	const go = (item: InboxItem | null | undefined): void => {
 		if (item) location.hash = hashForInbox(item.key);
 	};
+	const close = (): void => {
+		location.hash = hashForInbox();
+	};
 	const previous = shown[at - 1];
 	const next = shown[at + 1];
-	const nav: InboxNav = { at, of: shown.length, onPrevious: previous && (() => go(previous)), onNext: next && (() => go(next)) };
+	const nav: InboxNav = { at, of: shown.length, onPrevious: previous && (() => go(previous)), onNext: next && (() => go(next)), onClose: close };
 	useShortcuts({
 		inboxNext: () => go(next),
 		inboxPrevious: () => go(previous),
+		inboxClose: () => (open === null ? false : close()),
 	});
 	return (
 		<PageFrame
@@ -83,7 +99,11 @@ export function InboxPage({ hosts, notices, openKey, models, workspaces }: Inbox
 				widthKey="omp-agents.inbox-list-width"
 				resizeLabel="Resize the Inbox list"
 				detailLabel="Open item"
-				empty={{ icon: PAGE_ICON.inbox, title: "Nothing waits on you", hint: "Questions, finished turns, your pull request moves, and messages land here." }}
+				empty={{
+					icon: PAGE_ICON.inbox,
+					title: total === 0 ? "Nothing waits on you" : "No item open",
+					hint: total === 0 ? "Questions, finished turns, your pull request moves, and messages land here." : shown.length === 0 ? null : `Click one, or press ${shortcutKeys("inboxNext")} to open the first.`,
+				}}
 				list={
 					<div className="mx-auto w-full max-w-3xl px-3 py-2">
 						{listed.map(({ group, items }) => (
@@ -171,6 +191,8 @@ interface InboxNav {
 	onPrevious: (() => void) | undefined;
 	/** Opens the item below, `undefined` at the bottom. */
 	onNext: (() => void) | undefined;
+	/** Closes the open item, which shows the list again where the page is too narrow for both. */
+	onClose: () => void;
 }
 
 /** Hides a button's key chip where the open item is too narrow for the bar's labels and their keys. */
@@ -194,6 +216,7 @@ function InboxBar({ item, nav, children }: { item: InboxItem; nav: InboxNav; chi
 			}
 			previous={{ label: "Previous item", icon: CH_PREVIOUS, shortcut: "inboxPrevious", onClick: nav.onPrevious }}
 			next={{ label: "Next item", icon: CH_NEXT, shortcut: "inboxNext", onClick: nav.onNext }}
+			close={{ label: "Close", icon: CH_CLOSE, shortcut: "inboxClose", onClick: nav.onClose }}
 		>
 			<span className="shrink-0 px-1 text-xs text-muted-foreground tabular-nums">
 				{nav.at + 1} of {nav.of}
@@ -228,6 +251,8 @@ function SessionDetail({ item, nav, models, workspaces }: SessionDetailProps) {
 	const ending = useAction(async () => {
 		await end(instanceId);
 	}, "Could not end the session");
+	// As the session's pane header, End shows only for a session this page may write to, not a read-only or lost one.
+	const endable = subjectOf(view, item.host, null).live;
 	const busy = !connected || read.pending || ending.pending;
 	const openSession = (): void => {
 		location.hash = hashForSession(sessionId);
@@ -235,7 +260,7 @@ function SessionDetail({ item, nav, models, workspaces }: SessionDetailProps) {
 	useShortcuts({
 		inboxOpen: () => (document.activeElement === document.body ? openSession() : false),
 		inboxDone: () => (item.kind === "turn" && !busy ? read.run() : false),
-		inboxEnd: () => (busy ? false : ending.run()),
+		inboxEnd: () => (busy || !endable ? false : ending.run()),
 		inboxReply: () => conversation.current?.focus() ?? false,
 		inboxSendAll: () => conversation.current?.sendAllSuggestions() ?? false,
 		// A question's card in the conversation takes 1 to 9 itself, and the composer offers no suggestions meanwhile.
@@ -250,10 +275,12 @@ function SessionDetail({ item, nav, models, workspaces }: SessionDetailProps) {
 						<ShortcutChip id="inboxDone" className={BAR_CHIP} />
 					</Button>
 				)}
-				<Button variant="ghost" size="compact" loading={ending.pending} disabled={busy} onClick={() => ending.run()}>
-					{ending.pending ? "Ending…" : "End session"}
-					<ShortcutChip id="inboxEnd" className={BAR_CHIP} />
-				</Button>
+				{endable && (
+					<Button variant="ghost" size="compact" loading={ending.pending} disabled={busy} onClick={() => ending.run()}>
+						{ending.pending ? "Ending…" : "End session"}
+						<ShortcutChip id="inboxEnd" className={BAR_CHIP} />
+					</Button>
+				)}
 				<Button variant="ghost" size="compact" onClick={openSession}>
 					Open session
 					<ShortcutChip id="inboxOpen" className={BAR_CHIP} />

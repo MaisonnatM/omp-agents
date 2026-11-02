@@ -107,6 +107,7 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 		{ id: "restore", scope: "anywhere", key: 0 },
 		{ id: "browserRestore", scope: "anywhere", key: 0 },
 		{ id: "todoClose", scope: "outside-fields", key: 0 },
+		{ id: "inboxClose", scope: "outside-fields", key: 0 },
 		{ id: "notesClose", scope: "outside-fields", key: 0 },
 		{ id: "emailClose", scope: "outside-fields", key: 0 },
 	]);

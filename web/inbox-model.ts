@@ -92,13 +92,15 @@ function noticeItem(notice: InboxNotice, now: number): InboxItem {
 }
 
 /**
- * The groups that hold items, in {@link INBOX_GROUPS} order, as of `now`: questions in the roster's order, and every
- * other group the longest wait first. A session that asks shows its oldest question, not also its unread turn; a
- * cleared notice is gone.
+ * The groups that hold items, in {@link INBOX_GROUPS} order, as of `now`: questions in the sidebar's order, the sessions
+ * of `pinned` first and then the roster's, and every other group the longest wait first. A session that asks shows its
+ * oldest question, not also its unread turn; a cleared notice is gone.
  */
-export function inboxSections(hosts: readonly RosterHost[], notices: readonly Notice[], now: number): InboxSection[] {
+export function inboxSections(hosts: readonly RosterHost[], notices: readonly Notice[], now: number, pinned: ReadonlySet<string>): InboxSection[] {
 	const items = [...hosts.flatMap(host => hostItem(host) ?? []), ...notices.filter(isInboxNotice).map(notice => noticeItem(notice, now))];
-	const questions = items.filter(item => item.at === null);
+	const asking = items.filter((item): item is Extract<InboxItem, { kind: "ask" }> => item.kind === "ask");
+	const isPinned = (item: Extract<InboxItem, { kind: "ask" }>): boolean => pinned.has(item.host.sessionId);
+	const questions = [...asking.filter(isPinned), ...asking.filter(item => !isPinned(item))];
 	const waits = items.filter((item): item is Extract<InboxItem, { at: number }> => item.at !== null).toSorted((a, b) => a.at - b.at);
 	const byGroup = Map.groupBy([...questions, ...waits], item => item.group);
 	return INBOX_GROUPS.flatMap(group => {
@@ -113,7 +115,30 @@ export const sectionsIn = (sections: readonly InboxSection[], filter: InboxFilte
 /** How many items `sections` hold. */
 export const itemCount = (sections: readonly InboxSection[]): number => sections.reduce((count, { items }) => count + items.length, 0);
 
-/** The item to open once item `key`, at `index` before, may have left `items`: itself while it stays, else the one now at its place, else the last. */
-export function nextAfter(items: readonly InboxItem[], key: string, index: number): InboxItem | null {
-	return items.find(item => item.key === key) ?? items[Math.min(index, items.length - 1)] ?? null;
+/** The routed item the Inbox last showed: its key and its index in the list it showed. */
+export interface ShownItem {
+	key: string;
+	at: number;
+}
+
+/** The item the Inbox opens, and the key the address should name instead, `null` to keep it. */
+export interface InboxOpen {
+	open: InboxItem | null;
+	handOn: string | null;
+}
+
+/**
+ * What the Inbox opens for route item `key`, given `last`, the routed item it last showed.
+ * A bare route opens none, and a listed item opens itself.
+ * Once `last` leaves, the item now at its index, else the last item, opens and takes over the route, so an item that
+ * arrives later cannot take its place, and the item that took over hands on the same way when it leaves.
+ * A link to an item this list never showed opens a stand-in without writing it, since notices arrive after the
+ * session lists: `#inbox?open=notice/…` would otherwise lose its notice before it is listed.
+ */
+export function openFor(items: readonly InboxItem[], key: string | null, last: ShownItem | null): InboxOpen {
+	if (key === null) return { open: null, handOn: null };
+	const kept = items.find(item => item.key === key);
+	if (kept) return { open: kept, handOn: null };
+	const open = items[Math.min(last?.at ?? 0, items.length - 1)] ?? null;
+	return { open, handOn: open !== null && last?.key === key ? open.key : null };
 }

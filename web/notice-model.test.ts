@@ -32,7 +32,7 @@ test("new omp-agents commits name their count and branch, and their Update pulls
 	expect(presentNotice(dashboard(4), NOW).headline).toBe("omp-agents update: 4 new commits on main");
 });
 
-test("sessions that stopped mid-turn are counted, named as past sessions are, stay toasted, and Continue all carries their ids", () => {
+test("sessions that stopped mid-turn are counted, named as past sessions are, stay toasted, open the first of them, and Continue all carries their ids", () => {
 	const stopped = (sessions: StoppedSession[]): Notice => ({ id: "x", ...flags, kind: "stopped", sessions });
 	expect(presentNotice(stopped([{ sessionId: "s1", title: "Fix the login", cwdDisplay: "~/code/webapp" }]), NOW)).toMatchObject({ source: "sessions", headline: "1 session stopped mid-turn", preview: "Fix the login" });
 	expect(
@@ -47,7 +47,7 @@ test("sessions that stopped mid-turn are counted, named as past sessions are, st
 	).toMatchObject({
 		headline: "3 sessions stopped mid-turn",
 		preview: "Fix the login · api · Untitled session",
-		link: null,
+		link: { href: "#session/s1", external: false },
 		action: { kind: "continue-all", sessionIds: ["s1", "s2", "s3"] },
 		toast: { kind: "news", timeout: 0 },
 	});
