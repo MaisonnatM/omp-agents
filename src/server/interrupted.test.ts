@@ -49,6 +49,15 @@ describe("InterruptedSessions", () => {
 		expect(started(path, ["kept"]).has("kept")).toBe(false);
 	});
 
+	test("recover answers the survivors whose turn ran when the last server stopped, so a turn that ended while none listened is found", () => {
+		const path = fileIn();
+		started(path).setRunning(new Map([["busy", true], ["calm", false], ["gone", true], ["retried", true]]));
+		// The next server could not attach to "retried", which ran on unwatched, and died without another write.
+		started(path, ["busy", "calm", "gone"]);
+		flushJsonFiles();
+		expect(new InterruptedSessions(path).recover(new Set(["busy", "calm", "retried"]))).toEqual(new Set(["busy", "retried"]));
+	});
+
 	test("a session that stopped while the server ran stays interrupted across a restart, until it runs again", () => {
 		const path = fileIn();
 		const tracker = started(path);
