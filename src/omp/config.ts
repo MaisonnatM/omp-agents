@@ -134,3 +134,12 @@ export async function shareTerminalSessions(access: TerminalAccess): Promise<voi
 	setting("collab.autoStart").set(settings, access);
 	await settings.flush();
 }
+
+/** Stages only the global `stt.enabled` as on and flushes through omp's locked global config writer; already on writes nothing. */
+export async function enableDictation(): Promise<void> {
+	const settings = await loadGlobalForWrite(homedir());
+	const global = settings.getGlobalSettings();
+	if (isObject(global.stt) && global.stt.enabled === true) return;
+	setting("stt.enabled").set(settings, true);
+	await settings.flush();
+}

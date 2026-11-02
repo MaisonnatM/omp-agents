@@ -67,6 +67,7 @@ import type {
 	StorageModule,
 	TokenizerModule,
 } from "./module-types/session";
+import type { ModelRolesModule, RpcDictationModule, SttControllerModule, SttModelsModule, SttSettingsModule } from "./module-types/speech";
 import type {
 	ErrorFlagsModule,
 	FetchRetryModule,
@@ -252,6 +253,21 @@ export const fallbackChains = await load<FallbackChainsModule>(join(srcDir, "ses
 export const modelResolver = await load<ModelResolverModule>(join(srcDir, "config", "model-resolver.ts"), {
 	resolveProviderModelReference: "function",
 	resolveRoleSelection: "function",
+	resolveRoleChain: "function",
+});
+export const modelRoles = await load<ModelRolesModule>(join(srcDir, "config", "model-roles.ts"), { roleCandidatePool: "function" });
+export const sttSettings = await load<SttSettingsModule>(join(srcDir, "stt", "settings.ts"), {
+	"cfgSttEnabled.get": "function",
+	"cfgSttEnabled.provenance": "function",
+	"cfgSttLanguage.get": "function",
+});
+export const sttModels = await load<SttModelsModule>(join(srcDir, "stt", "models.ts"), { resolveSttModelSpec: "function" });
+export const sttController = await load<SttControllerModule>(join(srcDir, "stt", "stt-controller.ts"), { STTController: "function" });
+export const rpcDictation = await load<RpcDictationModule>(join(srcDir, "modes", "rpc", "rpc-dictation.ts"), {
+	RpcDictationBridge: "function",
+	"RpcDictationBridge.prototype.start": "function",
+	"RpcDictationBridge.prototype.stop": "function",
+	"RpcDictationBridge.prototype.dispose": "function",
 });
 export const settingsRegistry = await load<SettingsRegistryModule>(join(srcDir, "config", "registry.ts"), { lookup: "function", all: "function" });
 export const updateCli = await load<UpdateCliModule>(join(srcDir, "cli", "update-cli.ts"), { getLatestRelease: "function" });

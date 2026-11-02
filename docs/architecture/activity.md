@@ -83,6 +83,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Files: Settings › Files | view | `settings/files` |
 | File dialog | control | `file-dialog.open`, `file-dialog.source`, `file-dialog.copy-path` |
 | Ask about this and the discussion panel | control, action | `ask-about.open`, `discussion.close`; actions `discuss`, `discuss-stop`; Send to session is action `prompt` |
+| Dictation | action, command | actions `dictation-start`, `dictation-stop`, `dictation-discard`; command `dictate`; Enable dictation is `put /api/dictation/settings` |
 | Command palette | command | the command each item runs |
 | Keyboard shortcuts | command, control | each shortcut's command key; `shortcuts.open`, `shortcuts.tab` |
 | Notes, Calendar, and Email buttons, command menu button, What's new, notification bell, and Settings button | control, command | `header.tab`; `header.command-menu`, which opens the command palette as command `switcher` does; `header.whats-new`, which opens What's new; `notices.open`, `notices.filter`, `notices.read-all`, `notices.item`, `notices.update`, `notices.clear`; the `notice` message is not an action, so these need the tags; `header.settings`, which opens or closes Settings as command `settings` does; `header.back` and `header.forward`, the title bar's Back and Forward, which go back and forward as commands `back` and `forward` do |

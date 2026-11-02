@@ -55,6 +55,7 @@
   `web/use-skills.ts` reads a directory's skills, and `web/pinned-skill.ts` keeps the skill pinned for new sessions.
   `web/composer-drafts.ts` keeps each composer's unsent text in localStorage under one key, through `expiringStrings` in `web/expiring-strings.ts`, which also keeps each session's Preview address: `useComposerDraft` for each live session's and subagent's composer (`liveDraftKey`), each Bot's composer (`botDraftKey`), and the new-session draft (`newDraftKey`, one per todo), and `putDraft` and `clearDraft`, through which `web/use-dashboard.ts` puts a fork's prompt in its composer and forgets a started session's first message; `appendToComposer` adds text after a draft, through its composer when one is mounted, as the Browser's picks do; drafts unchanged for 30 days go on the next write.
   Its `attachToComposer` hands a mounted live composer a file, which `useComposerFiles` adds to its attachments, as the Browser's captures do.
+  Its `replaceInComposer` puts dictated text over a draft's saved selection, through its composer when one is mounted, else in the kept draft.
   `web/components/skill-picker.tsx` is the skill picker of the settings' pinned skill.
   `web/components/command-picker.tsx` holds `CommandPicker`, the searchable grouped list behind the branch, workspace, and skill pickers, with `CommandResults`, which the model menu's search shares.
   The checkout, the default model's role, and the skills are each one `useRead`.

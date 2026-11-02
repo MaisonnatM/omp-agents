@@ -5,6 +5,7 @@ import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest } from "../shared/sessions";
 import type { RoutineSpec, Schedule } from "../routines";
 import type { BotId } from "../shared/bots";
 import { MAX_DISCUSSION_QUOTE, MAX_DISCUSSION_SOURCE, MAX_DISCUSSION_TURNS } from "../shared/discussions";
+import { MAX_CAPTURE_ID } from "../shared/dictation";
 import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, type PullRequestChange } from "../shared/github";
@@ -409,6 +410,23 @@ describe("parseClientMsg", () => {
 	test("discuss-stop names the question it stops", () => {
 		expect(msg({ t: "discuss-stop", id: 2 })).toEqual({ t: "discuss-stop", id: 2 });
 		expect(msg({ t: "discuss-stop", id: "2" })).toBeNull();
+	});
+
+	test("dictation-start needs a capture id within omp's length and a directory", () => {
+		const start = { t: "dictation-start" as const, captureId: "c1", cwd: "~/code/app" };
+		expect(msg(start)).toEqual(start);
+		expect(msg({ ...start, captureId: "x".repeat(MAX_CAPTURE_ID) })).toEqual({ ...start, captureId: "x".repeat(MAX_CAPTURE_ID) });
+		expect(msg({ ...start, captureId: "x".repeat(MAX_CAPTURE_ID + 1) })).toBeNull();
+		expect(msg({ ...start, captureId: "  " })).toBeNull();
+		expect(msg({ ...start, captureId: 1 })).toBeNull();
+		expect(msg({ ...start, cwd: "" })).toBeNull();
+	});
+
+	test("dictation-stop and dictation-discard name the capture they end", () => {
+		expect(msg({ t: "dictation-stop", captureId: "c1" })).toEqual({ t: "dictation-stop", captureId: "c1" });
+		expect(msg({ t: "dictation-discard", captureId: "c1" })).toEqual({ t: "dictation-discard", captureId: "c1" });
+		expect(msg({ t: "dictation-stop", captureId: "" })).toBeNull();
+		expect(msg({ t: "dictation-discard" })).toBeNull();
 	});
 });
 

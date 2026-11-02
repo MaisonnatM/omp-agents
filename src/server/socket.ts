@@ -9,6 +9,7 @@ import type { ClientMsg, ServerMsg } from "../shared/protocol";
 import type { StartRequest, StartResult } from "../shared/sessions";
 import type { LiveSessions } from "./live-sessions";
 import type { Discussions } from "./discussions";
+import type { Dictation } from "./dictation";
 import type { ListRegistry } from "./list-registry";
 import type { Peer, Run } from "./request-ledger";
 import type { Views } from "./views";
@@ -49,6 +50,8 @@ export interface SocketEnv {
 	changeNotices(ids: string[], op: NoticeOp): Promise<void>;
 	/** The **Ask about this** answers under way. */
 	discussions: Discussions;
+	/** The one microphone capture under way. */
+	dictation: Dictation;
 	/** The activity store, written only while {@link owner} holds `server.lock`, so a smoke server on the user's state drops what it gets. */
 	activity: { owner(): boolean; store: Pick<ActivityStore, "append"> };
 }
@@ -176,6 +179,9 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 	notice: ({ changeNotices }, _peer, { ids, op }) => changeNotices(ids, op),
 	discuss: ({ discussions }, peer, { id, request }) => discussions.ask(peer, id, request),
 	"discuss-stop": ({ discussions }, peer, { id }) => discussions.stop(peer.socket, id),
+	"dictation-start": ({ dictation }, peer, { captureId, cwd }) => dictation.start(peer, captureId, cwd),
+	"dictation-stop": ({ dictation }, peer, { captureId }) => dictation.stop(peer.socket, captureId),
+	"dictation-discard": ({ dictation }, peer, { captureId }) => dictation.discard(peer.socket, captureId),
 	activity({ activity }, _peer, { client, first, events }) {
 		if (activity.owner()) activity.store.append(client, first, events);
 	},

@@ -22,6 +22,8 @@ import { useCompletion } from "./completion-popup";
 import { blockedShortcut, ComposerEditor, ComposerNote, EmptyConversation } from "./composer";
 import { BranchPicker, targetOf } from "./git";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
+import { DictationButton, DictationRow, useDictation } from "./composer-dictation";
+import { useDashboardActions } from "./dashboard-context";
 import type { PromptEditorHandle } from "./prompt-editor";
 import { ModelPicker } from "./model-picker";
 import { Header } from "./page-header";
@@ -109,7 +111,12 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			: pickedChoice;
 	const starting = launch?.phase === "starting" || (scheduled?.busy ?? false);
 	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] } });
+	const { send } = useDashboardActions();
+	const dictation = useDictation({ draftKey, cwd, text: draft, editorRef, send, connected });
+	// A composer that keeps no draft, as a scheduled start's, has nowhere to put text that lands after it closes.
+	const dictates = draftKey !== null && !starting;
 	const onComposerKey = useShortcuts({
+		dictate: () => dictates && dictation.toggle(),
 		model: () => {
 			if (starting || !connected) return false;
 			models.openModels("models");
@@ -130,6 +137,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	});
 	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
 		if (completion.onMenuKeyDown(event)) return;
+		dictation.onKeyDown(event);
 		onComposerKey(event);
 		if (!event.defaultPrevented && event.key === "Escape") {
 			event.currentTarget.blur();
@@ -217,9 +225,12 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 							<>
 								<ScheduleButton draft={draft} files={attachments.files.length} disabled={starting || !connected} pending={schedule.pending} onSchedule={schedule.run} />
 								{!scheduled && <AttachButton onClick={() => openFilePicker()} disabled={starting} />}
+								{dictates && <DictationButton dictation={dictation} />}
 							</>
 						)}
 						disabled={starting || !connected}
+						locked={dictation.locked}
+						beforeEditor={<DictationRow dictation={dictation} />}
 						sendLabel={scheduled ? "Save" : starting ? "Starting session" : "Start session"}
 						sending={starting || save.pending}
 						editorProps={{ ...completion.editorProps, onKeyDown, onPaste: scheduled ? undefined : attachments.onPaste, autoFocus: true }}

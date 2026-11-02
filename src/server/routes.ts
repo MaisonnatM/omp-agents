@@ -20,7 +20,8 @@ import { loadPullRequests, loadPullRequestDetail, loadPullRequestTitle } from ".
 import type { Integrations } from "../integrations";
 import { addMcpServerFrom, loadMcpServers, McpServerRejected, removeMcpServerNamed, setMcpServerEnabledFrom, signOutMcpServer, startMcpServerSignIn } from "../mcp-servers";
 import { answerProviderLogin, cancelProviderLogin, loadProviders, signOutProvider, startProviderLogin } from "../providers";
-import { blobsDir, readCollabAutoStart, shareTerminalSessions } from "../omp/config";
+import { blobsDir, enableDictation, readCollabAutoStart, shareTerminalSessions } from "../omp/config";
+import { dictationSettings } from "../omp/dictation";
 import { isTerminalAccess } from "../shared/readiness";
 import { connectedModels, connectedRoles, listModels } from "../omp/models";
 import { contextIndex } from "../omp/context-index";
@@ -268,6 +269,21 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		return cwd instanceof Response ? cwd : answer(async () => ({ roles: await connectedRoles(cwd) }));
 	});
 
+	/** `GET /api/dictation/settings?cwd=<dir>`: whether dictation is on in that directory, what decides it, and where its speech goes; opens no microphone. */
+	const dictation = get(async params => {
+		const cwd = await dirParam(params);
+		return cwd instanceof Response ? cwd : answer(() => dictationSettings(cwd));
+	});
+
+	/** `PUT /api/dictation/settings?cwd=<dir>` `{ enabled: true }`: turns dictation on in the user's omp config, then answers the directory's settings as they are after. */
+	const dictationEnable = write(
+		async (body, params) => (isObject(body) && body.enabled === true ? dirParam(params) : fail(400, "Expected { enabled: true }")),
+		async cwd => {
+			await enableDictation();
+			return dictationSettings(cwd);
+		},
+	);
+
 	/** `GET /api/analytics?range=`: omp-stats' request usage and live sync state, with Claude Code's and Codex's requests. */
 	const analytics = get(params => {
 		const value = params.get("range") ?? "24h";
@@ -402,6 +418,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/decisions": { GET: decisions },
 		"/api/models": { GET: models },
 		"/api/models/connected": { GET: connected },
+		"/api/dictation/settings": { GET: dictation, PUT: dictationEnable },
 		"/api/models/roles": { GET: roles },
 		"/api/replay/detail": { GET: replayRead(false) },
 		"/api/replay/compare": { GET: replayRead(true) },

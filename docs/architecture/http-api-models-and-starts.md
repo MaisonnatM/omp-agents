@@ -15,6 +15,9 @@ A `start` of kind `new` and a `set-model` each carry a `thinking`, `null` to kee
 A dashboard session's row carries `fast`, `{ enabled, active }` from omp's state, or `null` while its model has no priority tier.
 `set-fast` with `enabled` sends omp `set_fast_mode`, and the session then reads omp's state again; omp refuses to enable it for a model without the tier, which shows as a note.
 
+`GET /api/dictation/settings?cwd=<directory>` answers `DictationSettings` from `src/shared/dictation.ts`: whether omp's dictation is on for that directory and what turned it off, the language, and where speech is transcribed.
+`PUT` on the same path with `{ enabled: true }` turns the user's `stt.enabled` on and answers the settings again, which stay off while a project's config or an environment variable turns dictation off; see [Dictation](dictation.md).
+
 `GET /api/skills?cwd=<directory>` answers `{ skills }`, each `{ name, description }`: the skills that `/skill:<name>` invokes in a session started in that directory, from the same discovery as the composer's `/` completions (`listSkills` in `src/commands.ts`), and none when omp's `skills.enableSkillCommands` is off.
 Both leave out a skill whose frontmatter `name` holds whitespace, such as `Poteto Mode`: omp reads a `/skill:` name up to the first space, so no prompt can invoke it.
 The settings page lists them to pin one, and the new-session draft reads them to show whether the pinned skill exists there.

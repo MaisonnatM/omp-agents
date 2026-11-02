@@ -101,6 +101,8 @@ function builderConfig(): Record<string, unknown> {
 			entitlements: signed ? entitlements : undefined,
 			entitlementsInherit: signed ? entitlements : undefined,
 			notarize: signed,
+			// Dictation records in the bundled server, which macOS asks about in the app's name.
+			extendInfo: { NSMicrophoneUsageDescription: "omp-agents records your voice when you dictate a prompt, and turns it into text in the composer." },
 			identity: signed ? undefined : "-",
 		},
 		publish: mockPort ? { provider: "generic", url: `http://127.0.0.1:${mockPort}` } : { provider: "github", ...REPOSITORY },
