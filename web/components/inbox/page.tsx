@@ -19,6 +19,7 @@ import { type ModelList, UNREAD } from "../../reads";
 import { hashForInbox } from "../../routing";
 import { useShortcuts } from "../../shortcuts";
 import { Age } from "../age";
+import { blockedShortcut } from "../composer";
 import { allPrompts } from "../composer-suggestions";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { ShortcutChip } from "../kbd";
@@ -28,6 +29,7 @@ import { NoticeAction } from "../notices";
 import { ViewConversation } from "../pane";
 import type { PromptEditorHandle } from "../prompt-editor";
 import { StatusDot } from "../status-dot";
+import { deliveryOf, subjectOf } from "../subject";
 import { toasts } from "../toaster";
 
 interface InboxPageProps {
@@ -275,8 +277,9 @@ function InboxTriage({ item, view, editorRef, position, onPrevious, onNext, onDo
 			else setActing(null);
 		});
 	};
+	const subject = view && item.kind !== "notice" ? subjectOf(view, item.host, null) : null;
 	const prompt = (text: string): void => {
-		if (view) act("send", () => settle(request({ t: "prompt", view, text, images: [], delivery: "steer" }), "Could not send the prompt"));
+		if (view && subject) act("send", () => settle(request({ t: "prompt", view, text, images: [], delivery: deliveryOf(subject) }), "Could not send the prompt"));
 	};
 	const done = (): void => {
 		if (item.kind === "turn") act("done", () => settle(request({ t: "read", instanceId: item.host.instanceId }), "Could not mark the turn read"));
@@ -289,7 +292,8 @@ function InboxTriage({ item, view, editorRef, position, onPrevious, onNext, onDo
 		if (item.kind === "notice") follow(item.presentation.link);
 		else location.hash = hashForSession(item.host.sessionId);
 	};
-	const suggestions = item.kind === "turn" ? item.turn.suggestions : [];
+	// The same prompts, in the same order, as the composer's numbered list.
+	const suggestions = item.kind === "turn" && subject?.writable ? item.turn.suggestions.filter(text => blockedShortcut(text, subject.shell) === null) : [];
 	useShortcuts({
 		inboxOpen: () => (document.activeElement === document.body ? openItem() : false),
 		inboxDone: () => (item.kind !== "ask" ? done() : false),
