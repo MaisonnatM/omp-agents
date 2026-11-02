@@ -137,35 +137,61 @@ export const useSources = (view: View): AgentSource[] | null => usePaneSelect(vi
 /** `view`'s turns, in order; `null` until the server sends them. */
 export const useTurns = (view: View): Turn[] | null => usePaneSelect(view, turnsOf);
 
-/** The views whose Trajectory some mounted component shows, by {@link hashForView}, with how many components show each. */
-const shownTrajectories = new Map<string, { view: View; count: number }>();
-let shownList: View[] = [];
-const shownListeners = new Set<() => void>();
-
-function setShown(view: View, delta: 1 | -1): void {
-	const key = hashForView(view);
-	const count = (shownTrajectories.get(key)?.count ?? 0) + delta;
-	if (count > 0) shownTrajectories.set(key, { view, count });
-	else shownTrajectories.delete(key);
-	shownList = [...shownTrajectories.values()].map(entry => entry.view);
-	for (const listener of shownListeners) listener();
+/** Views some mounted components show, by {@link hashForView}, with how many components show each, as one list the page streams. */
+interface ShownViews {
+	change: (view: View, delta: 1 | -1) => void;
+	subscribe: (listener: () => void) => () => void;
+	snapshot: () => View[];
 }
+
+function shownViews(): ShownViews {
+	const counts = new Map<string, { view: View; count: number }>();
+	const listeners = new Set<() => void>();
+	let list: View[] = [];
+	return {
+		change: (view, delta) => {
+			const key = hashForView(view);
+			const count = (counts.get(key)?.count ?? 0) + delta;
+			if (count > 0) counts.set(key, { view, count });
+			else counts.delete(key);
+			list = [...counts.values()].map(entry => entry.view);
+			for (const listener of listeners) listener();
+		},
+		subscribe: listener => {
+			listeners.add(listener);
+			return () => listeners.delete(listener);
+		},
+		snapshot: () => list,
+	};
+}
+
+/** Counts `view` in `views` while the calling component is mounted. Keyed by the view's hash, so a caller may build a new `view` object each render. */
+function useShownIn(views: ShownViews, view: View | null): void {
+	const key = view && hashForView(view);
+	useEffect(() => {
+		if (!view) return;
+		views.change(view, 1);
+		return () => views.change(view, -1);
+	}, [views, key]);
+}
+
+const shownTrajectories = shownViews();
+const shownConversations = shownViews();
 
 /** Asks the server for `view`'s turns while the calling component is mounted. */
-export function useShowTrajectory(view: View): void {
-	useEffect(() => {
-		setShown(view, 1);
-		return () => setShown(view, -1);
-	}, [view]);
-}
-
-const subscribeShown = (listener: () => void): (() => void) => {
-	shownListeners.add(listener);
-	return () => shownListeners.delete(listener);
-};
+export const useShowTrajectory = (view: View): void => useShownIn(shownTrajectories, view);
 
 /** The views whose Trajectory the page shows, which it asks the server to stream. */
-export const useShownTrajectories = (): View[] => useSyncExternalStore(subscribeShown, () => shownList, () => shownList);
+export const useShownTrajectories = (): View[] => useSyncExternalStore(shownTrajectories.subscribe, shownTrajectories.snapshot, shownTrajectories.snapshot);
+
+/**
+ * Asks the server to stream `view`'s conversation while the calling component is mounted and a page covers the panes, as the
+ * Inbox does for its open session. `null` asks for nothing. Showing a conversation this way does not mark it read.
+ */
+export const useShowConversation = (view: View | null): void => useShownIn(shownConversations, view);
+
+/** The views whose conversation a page shows outside the panes, which the page asks the server to stream. */
+export const useShownConversations = (): View[] => useSyncExternalStore(shownConversations.subscribe, shownConversations.snapshot, shownConversations.snapshot);
 
 /** What the server answered `view`'s composer: its last `complete` and its last `dequeue`. */
 export const useComposerData = (view: View): ComposerData => usePaneSelect(view, composerOf, sameComposer);

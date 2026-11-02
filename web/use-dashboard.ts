@@ -12,7 +12,7 @@ import { type OpenBot, openBot as findOpenBot } from "./bots-model";
 import { clearDraft, liveDraftKey, newDraftKey, putDraft } from "./composer-drafts";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
 import { applyDiscussionMessage, discussionDisconnected } from "./discussions";
-import { applyPaneMessage, retainPanes, retainTrajectories, useShownTrajectories } from "./pane-store";
+import { applyPaneMessage, retainPanes, retainTrajectories, useShownConversations, useShownTrajectories } from "./pane-store";
 import { DEFAULT_SPLIT_RATIOS, type SplitAxis, type SplitRatios } from "./pane-navigation";
 import {
 	hashForView,
@@ -28,8 +28,6 @@ import {
 import { messageOf, pendingStart, type RefusedStart, type StartKind, type StartOp } from "./starts";
 import { adoptPreferences, sendPreferencesThrough, storedNumber, storedPreferences, storeOrRemove } from "./stored-state";
 import { flushActivity, installActivity, record, recordAction, viewOf } from "./activity";
-
-const NO_VIEWS: View[] = [];
 
 const SPLIT_STORAGE_KEYS: Record<SplitAxis, string> = { columns: "omp-agents.split-columns", rows: "omp-agents.split-rows" };
 
@@ -125,9 +123,14 @@ export function useDashboard(): Dashboard {
 	startsRef.current = state.starts;
 	const page = state.cover?.kind === "page" ? state.cover.page : null;
 	const openBot = useOpenBot(page, state);
-	// A page covering the panes shows none of them, so the server streams only a Bot page's conversation until the panes return.
+	// A page covering the panes shows none of them, so the server streams only a Bot page's conversation and the conversations
+	// a page shows through `useShowConversation`, such as the Inbox's open session, until the panes return.
 	const botConversation = openBot?.view ?? null;
-	const watched = useMemo<View[]>(() => (!page ? state.layout.panes : botConversation ? [botConversation] : NO_VIEWS), [page, botConversation, state.layout.panes]);
+	const shownConversations = useShownConversations();
+	const watched = useMemo<View[]>(
+		() => (!page ? state.layout.panes : botConversation ? [botConversation, ...shownConversations] : shownConversations),
+		[page, botConversation, shownConversations, state.layout.panes],
+	);
 	const watchedRef = useRef(watched);
 	watchedRef.current = watched;
 	const shownTrajectories = useShownTrajectories();
