@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-02
 
+- Behind the scenes: What's new now drops its oldest days on its own when the list grows too long, so new changes always fit.
 - The Inbox shows a session's whole conversation and message box, R puts the cursor there, and opening an item leaves it unread.
 - Inbox buttons show a spinner, the 1 to 9 and 0 keys send through the message box, and the next item opens once the item is done.
 - The starter kit's models match the current setup: Opus picks its own effort, Haiku 5.5 runs cheap roles, fallbacks use newer Codex models, and OpenRouter is gone.
