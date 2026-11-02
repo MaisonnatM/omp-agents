@@ -1,6 +1,7 @@
 /** Which live sessions need you, and the alerts they raise, for the desktop app's Dock badge and the session notifications. */
 import type { SessionAlert } from "../src/shared/desktop-bridge";
 import { hashForSession, type RosterHost, type UnreadTurn, type UserRequest, type View } from "../src/shared/sessions";
+import type { DashboardState } from "./dashboard-state";
 import { hostLabel } from "./labels";
 
 /**
@@ -105,6 +106,13 @@ export function attend(before: Attention, hosts: readonly RosterHost[]): { raise
 		else attention.set(host.instanceId, { wait: "told", heard: heard.has(moment.key) ? heard : new Set([...heard, moment.key]) });
 	}
 	return { raise, attention };
+}
+
+/** The views on screen: only the focused pane while it is maximized, and none under a page, but a Bot's page shows its conversation. */
+export function shownViews({ cover, layout }: Pick<DashboardState, "cover" | "layout">, botConversation: View | null): View[] {
+	if (botConversation) return [botConversation];
+	if (cover?.kind === "page") return [];
+	return layout.maximized ? layout.panes.slice(layout.focus, layout.focus + 1) : layout.panes;
 }
 
 /** The live sessions among `shown`, the views on screen, that ended a turn you had not seen: showing them in a focused window reads it. */

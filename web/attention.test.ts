@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { HostStatus, RosterHost, UnreadTurn, UserRequest } from "../src/shared/sessions";
-import { type Attention, attend, needsYou, unreadShown, waitOf } from "./attention";
+import { type Attention, attend, needsYou, shownViews, unreadShown, waitOf } from "./attention";
 
 const host = (instanceId: string, status: HostStatus, { unread = null, requests = [], sessionName = `Session ${instanceId}` }: { unread?: UnreadTurn | null; requests?: UserRequest[]; sessionName?: string | null } = {}) =>
 	({ instanceId, sessionId: `s-${instanceId}`, sessionName, cwdDisplay: "~/code/webapp", status, unread, requests }) as RosterHost;
@@ -100,5 +100,22 @@ describe("unreadShown", () => {
 			{ kind: "past", sessionId: "s-old" },
 		] as const;
 		expect(unreadShown(hosts, [...shown])).toEqual(["a"]);
+	});
+});
+
+describe("shownViews", () => {
+	const a = { kind: "live", instanceId: "a", agentId: null } as const;
+	const b = { kind: "live", instanceId: "b", agentId: null } as const;
+	const layout = { panes: [a, b], focus: 1, maximized: false };
+
+	test("shows every pane, or only the focused one while it is maximized", () => {
+		expect(shownViews({ cover: null, layout }, null)).toEqual([a, b]);
+		expect(shownViews({ cover: null, layout: { ...layout, maximized: true } }, null)).toEqual([b]);
+	});
+
+	test("shows no pane under a page or a session link, which opens another session over them, but a Bot's page shows its conversation", () => {
+		expect(shownViews({ cover: { kind: "page", page: { kind: "inbox", open: null } }, layout }, null)).toEqual([]);
+		expect(shownViews({ cover: { kind: "session", sessionId: "s-c" }, layout }, null)).toEqual([]);
+		expect(shownViews({ cover: { kind: "page", page: { kind: "bots", target: "bot", routine: null } }, layout }, a)).toEqual([a]);
 	});
 });
