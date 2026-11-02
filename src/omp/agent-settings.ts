@@ -2,7 +2,7 @@
  * omp's own settings as its terminal settings panel lays them out, read from the registry and the panel's definitions,
  * and one setting's write to the user's `config.yml` through omp's handle.
  */
-import type { AgentSettingChange, AgentSettingControl, AgentSettingOption, AgentSettingRow, AgentSettings, AgentSettingTab } from "../shared/agent-settings";
+import type { AgentSettingControl, AgentSettingEdit, AgentSettingOption, AgentSettingRow, AgentSettings, AgentSettingTab } from "../shared/agent-settings";
 import type { OmpSettingsInstance, SettingDef, SettingHandle, SettingOption, SettingsDisplayEntry } from "./module-types/config";
 import { allSettings, settingsDefs, settingsRegistry } from "./modules";
 
@@ -140,18 +140,18 @@ export function readAgentSettings(settings: OmpSettingsInstance, workspace: bool
 }
 
 /** The user value of `handle` the page shows, `null` when `config.yml` holds none: what an edit's `expected` must equal. */
-export function userValue(handle: SettingHandle, settings: OmpSettingsInstance, entry?: string): unknown {
+export function userValue(handle: SettingHandle, settings: OmpSettingsInstance, edit?: AgentSettingEdit): unknown {
 	const value = shown(handle, settings.getGlobalSettings());
-	return entry === undefined ? value ?? null : value && typeof value === "object" && Object.hasOwn(value, entry) ? (value as Record<string, unknown>)[entry] ?? null : null;
+	return edit?.entry === undefined ? value ?? null : value && typeof value === "object" && Object.hasOwn(value, edit.entry) ? (value as Record<string, unknown>)[edit.entry] ?? null : null;
 }
 
 /**
  * Writes `change` to the user's `config.yml` through omp's handle. `settings` is a load for a write, `handle` is
  * {@link agentSetting}'s, and the caller has checked the change against omp and against the value the page showed.
  */
-export async function writeAgentSetting(settings: OmpSettingsInstance, handle: SettingHandle, change: AgentSettingChange, entry?: string): Promise<void> {
-	if (entry !== undefined) handle.setEntry(settings, entry, "reset" in change ? undefined : change.value);
-	else if ("reset" in change) handle.unset(settings);
-	else handle.set(settings, change.value);
+export async function writeAgentSetting(settings: OmpSettingsInstance, handle: SettingHandle, edit: AgentSettingEdit): Promise<void> {
+	if (edit.entry !== undefined) handle.setEntry(settings, edit.entry, "reset" in edit ? undefined : edit.value);
+	else if ("reset" in edit) handle.unset(settings);
+	else handle.set(settings, edit.value);
 	await settings.flush();
 }

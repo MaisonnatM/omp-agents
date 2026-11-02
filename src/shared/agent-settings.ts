@@ -2,6 +2,7 @@
  * omp's own settings, as its terminal settings panel lists them: tabs, groups, and one row per setting with the control
  * omp edits it with. The page edits a row through `PUT /api/settings/agent`, which writes the user's `config.yml`.
  */
+import { AGENT_SETTINGS, type AgentModelOverride } from "./agents";
 
 /** One choice of a select or a list, as omp names it. */
 export interface AgentSettingOption {
@@ -68,6 +69,15 @@ export type AgentSettingChange = { value: unknown } | { reset: true };
 /**
  * `PUT /api/settings/agent`: one setting's change in the user's `config.yml`.
  * `expected` is the user value the page showed (`AgentSettingRow.user`, `null` when unset); another value refuses the edit.
- * Optional `entry` edits only one agent's model override; `expected` then compares that user entry, not the whole map.
+ * The override-entry variant compares only the named user entry, not the whole map.
  */
-export type AgentSettingEdit = { id: string; expected: unknown; entry?: string } & AgentSettingChange;
+export type AgentSettingEdit =
+	| ({ id: string; expected: unknown; entry?: never } & AgentSettingChange)
+	| AgentOverrideEntryEdit;
+
+/** A single named override is a selector or an ordered list, never an arbitrary setting value. */
+export type AgentOverrideEntryEdit = {
+	id: typeof AGENT_SETTINGS.overrides;
+	entry: string;
+	expected: AgentModelOverride | null;
+} & ({ value: AgentModelOverride } | { reset: true });

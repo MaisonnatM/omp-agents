@@ -86,7 +86,8 @@
   A workspace's `.omp/config.yml` still overrides what you save there.
 - **Agents** previews the agents a new session in this workspace discovers, alphabetically, with their descriptions, scopes, read-only classification, and effective models.
   With **All workspaces**, the preview includes user and bundled definitions and user plugins, not project or session-local agents.
-  Search by name, description, scope, source path, tools, or model; Escape clears the search and leaves the field. Expanding a row shows its source, declared tools, definition model choices, user override, and workspace override.
+  Search by name, description, scope, source path, tools, or model; Escape clears the search and leaves the field.
+  Expanding a row shows its source, declared tools, definition model choices, user override, and workspace override.
   **Edit** under **User model override** picks a model or model role, with an optional thinking level; **Use ordered model choices** lets omp try selectors in order.
   Save changes only that agent's entry in your `config.yml`; **Clear user override**, confirmed and then saved, removes the entry rather than writing the definition back.
   Unknown selectors and role aliases already saved stay unchanged unless you edit them.
@@ -94,7 +95,8 @@
   Bundled seance chooses its model from the source session or invocation, so only a stale saved override can be cleared.
   **Overrides for missing agents** lists saved entries with no discovered definition and lets you clear them.
   **Execution settings** uses omp's labels and descriptions for the concurrency limit, whether tasks may request a separate checkout, whether successful changes apply back, and the apply method; zero concurrency means unlimited.
-  Each value is marked as omp's default, your saved value, or a workspace value.
+  Each execution row uses **Edit**, **Save**, and **Cancel**, with the same control and layer notes as **omp settings**.
+  A dot marks a value different from omp's default, and a lock marks a workspace value; user edits still apply in other workspaces.
   The apply controls hide while isolation is off without deleting their saved values.
   Switching sections, folding a row, and searching keep unsaved edits; changing workspace starts a separate editor.
   **Refresh** reads discovery again, and a failed refresh keeps the last preview but prevents saving until another refresh succeeds.

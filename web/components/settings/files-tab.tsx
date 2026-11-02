@@ -7,16 +7,16 @@ import { cn } from "@/lib/utils";
 import { putJson, settingsUrl } from "../../api";
 import { FILE_KIND_LABELS, fileGroups, fileName, formatBytes } from "../../labels";
 import { SearchField } from "../search-field";
-import { EditBar, type Editing, RAIL_BUTTON, SaveError, useEditor } from "./editor";
+import { EditBar, type Editing, RAIL_BUTTON, SaveError, useEditor, writeOrReload } from "./editor";
 
 /** One omp file, viewed or edited in place; also the right pane of Settings › Workflows. */
 export function FileView({ file, editing }: { file: OmpFile; editing: Editing }) {
 	const { body } = file;
 	const editor = useEditor(
 		body.state === "read" ? body.text : "",
-		text =>
+		text => writeOrReload(editing, () =>
 			putJson<OmpSettings>(settingsUrl("/file", editing.cwd), { path: file.path, text, baseHash: body.state === "read" ? body.hash : null } satisfies FileEdit),
-		editing,
+		),
 	);
 	const viewing = editor.state.phase === "viewing";
 	const conflict = editor.state.phase === "editing" && editor.state.conflict;

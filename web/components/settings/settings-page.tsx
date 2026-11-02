@@ -95,7 +95,8 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 	const filesPanel = <Files key={key} files={files} editing={editing} selected={selection.path} onSelect={selection.open} />;
 	const workflowsPanel = <Workflows key={key} workflows={workflows} files={files} editing={editing} />;
 	const configFile = files.find(file => file.kind === "settings" && file.scope === "user" && file.path.endsWith("/config.yml"));
-	const agents = <AgentsTab key={key} catalog={catalog} editing={editing} stale={read.error} configPath={configFile?.path} projectPath={files.find(file => file.kind === "settings" && file.scope === "project" && file.body.state === "read")?.path} onOpenFile={selection.open} />;
+	const projectFile = files.find(file => file.kind === "settings" && file.scope === "project" && file.body.state === "read");
+	const agents = <AgentsTab key={key} catalog={catalog} settings={agentSettings} editing={editing} stale={read.error} configFile={configFile} projectFile={projectFile} onOpenFile={selection.open} />;
 	const omp =
 		"error" in agentSettings ? (
 			<div className="space-y-2">
@@ -113,7 +114,7 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 				key={key}
 				settings={agentSettings}
 				configFile={configFile}
-				projectFile={files.find(file => file.kind === "settings" && file.scope === "project" && file.body.state === "read")}
+				projectFile={projectFile}
 				editing={editing}
 				onOpenFile={selection.open}
 			/>

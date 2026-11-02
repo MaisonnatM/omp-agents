@@ -17,7 +17,8 @@ Each row carries omp's default and the values in your `config.yml` (`user`) and 
 A credential's value never leaves the server: its `user` and `workspace` are `true` when set, and it carries no default.
 `unlisted` names every other setting a session reads, those omp's panel gives no control to.
 `agents` is an `AgentCatalog` from `src/shared/agents.ts`, a new-session preview read by `src/omp/agents.ts` through native `discoverAgents`, read-only classification, and model selection and resolution.
-It carries the winning definitions, scope and package origin, declared tools, model layers, explicit resolved/inherited/unresolved/source-session model states, disabled markers, missing user overrides, and four execution-setting rows from omp's panel.
+It carries the winning definitions, scope and package origin, declared tools, model layers, explicit resolved/inherited/unresolved/source-session model states, disabled markers, missing user overrides, and an explicit bundled-seance marker.
+The four execution settings come from `agentSettings`, not a second catalog projection or settings load.
 Without `cwd`, discovery runs from `/` and filters project definitions, avoiding the home directory's project agents and config; this is a user-only preview, not a running session's extension context.
 Model resolution reads the native registry's currently available models without refreshing providers or making model requests; a model-registry failure is separate from a discovery failure.
 Bundled seance never uses the stored user override in its effective preview.
@@ -53,7 +54,7 @@ Edits go through three endpoints, each taking the same `?cwd=` and answering wit
   The server checks the value with the setting's `assertWritable`, then writes through the same path as routing: `Settings.loadIsolated`, the handle's `set`, or `unset` for a reset, and `flush`.
   It answers 404 for an id omp does not know and for one that changes only how omp's terminal draws, and 400 for a value omp refuses.
   An optional nonempty `entry` is accepted only for `task.agentModelOverrides` and names one agent's map entry, including a stale name discovery no longer finds.
-  In that form, `expected` compares only that user's entry, a value is a nonempty selector or ordered nonempty list of selectors, and native `setEntry` writes or removes only that entry.
+  In that typed entry form, `expected` must be a selector, ordered selectors, or `null` and compares only that user's entry; a new value is a nonempty selector or ordered nonempty list of selectors, and native `setEntry` writes or removes only that entry.
   Other entries changed elsewhere and workspace-only entries are never copied into the user's map.
 - `PUT /api/settings/file` takes `{ path, text, baseHash }`.
   The server runs discovery again for that `cwd` and writes only a path that it finds there, never one the page invents.

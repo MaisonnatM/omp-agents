@@ -5,7 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-02
 
-- Settings' new Agents section previews discovered agents, their tools and models; expand one to save or clear its model override. Execution settings uses omp's labels and marks defaults apart from saved values.
+- Settings' new Agents section previews discovered agents and lets you save model overrides and execution defaults with omp's own controls.
 - A long folder name in the message box now ends in … instead of running past the box and under the model switch.
 - /ship now plans before it builds: the agent compares up to three ways to do the work, keeps the best, and posts that plan on the Linear issue, or in the pull request when there is no issue.
 - /ship no longer needs a Linear ticket: it uses the one you name or one that matches the work, and otherwise ships without one instead of creating a ticket.

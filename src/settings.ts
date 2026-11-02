@@ -24,7 +24,8 @@ import { findModelUpdates, upgradeEdits } from "./omp/model-updates";
 import { connectedProviders, listModels } from "./omp/models";
 import { workflowsOf } from "./omp/workflows";
 import { displayPath, HOME } from "./paths";
-import type { AgentSettingEdit } from "./shared/agent-settings";
+import type { AgentOverrideEntryEdit, AgentSettingEdit } from "./shared/agent-settings";
+import { AGENT_SETTINGS, isAgentModelOverride } from "./shared/agents";
 import type { CatalogModel, FileEdit, ModelChain, OmpFile, OmpSettings, RetrySettings, RoleRoute, RoutingEdit } from "./shared/models";
 import type { ModelUpdate } from "./shared/notices";
 
@@ -97,7 +98,7 @@ async function loadSession(
 	let agents: OmpSettings["agents"];
 	let disabledExtensions: string[] = [];
 	try {
-		const settings = await loadSessionSettings(sessionCwd);
+		const settings = await loadSessionSettings(cwd ?? "/");
 		const config = ompConfigOf(settings);
 		disabledExtensions = config.disabledExtensions;
 		routing = {
@@ -232,22 +233,32 @@ export function saveRouting(cwd: string | null, raw: unknown): Promise<OmpSettin
 	});
 }
 
+function parseOverrideEntryEdit(raw: Record<string, unknown>): AgentOverrideEntryEdit {
+	if (raw.id !== AGENT_SETTINGS.overrides || typeof raw.entry !== "string" || !raw.entry.trim()) {
+		throw new Rejected(400, "An agent model override entry must name an agent");
+	}
+	if (raw.expected !== null && !isAgentModelOverride(raw.expected)) {
+		throw new Rejected(400, "Expected the saved model selector, ordered selectors, or null");
+	}
+	const base: Pick<AgentOverrideEntryEdit, "id" | "entry" | "expected"> = { id: AGENT_SETTINGS.overrides, entry: raw.entry, expected: raw.expected };
+	if (raw.reset === true) return { ...base, reset: true };
+	if (!isAgentModelOverride(raw.value) || !(typeof raw.value === "string" ? raw.value.trim() : raw.value.length > 0 && raw.value.every(value => value.trim()))) {
+		throw new Rejected(400, "Choose a model or a nonempty ordered list of model selectors");
+	}
+	return { ...base, value: raw.value };
+}
+
 export function parseAgentSettingEdit(raw: unknown): AgentSettingEdit {
 	if (!isObject(raw) || typeof raw.id !== "string" || !Object.hasOwn(raw, "expected") || (raw.reset !== true && !Object.hasOwn(raw, "value"))) {
 		throw new Rejected(400, "Expected { id, value, expected } or { id, reset: true, expected }");
 	}
-	if (raw.entry !== undefined && (raw.id !== "task.agentModelOverrides" || typeof raw.entry !== "string" || !raw.entry.trim())) {
-		throw new Rejected(400, "An agent model override entry must name an agent");
-	}
-	if (raw.entry !== undefined && raw.reset !== true && !(typeof raw.value === "string" && raw.value.trim() || Array.isArray(raw.value) && raw.value.length > 0 && raw.value.every(value => typeof value === "string" && value.trim()))) {
-		throw new Rejected(400, "Choose a model or a nonempty ordered list of model selectors");
-	}
-	return { ...(raw.reset === true ? { id: raw.id, reset: true as const, expected: raw.expected } : { id: raw.id, value: raw.value, expected: raw.expected }), ...(typeof raw.entry === "string" ? { entry: raw.entry } : {}) };
+	if (raw.entry !== undefined) return parseOverrideEntryEdit(raw);
+	return raw.reset === true ? { id: raw.id, reset: true, expected: raw.expected } : { id: raw.id, value: raw.value, expected: raw.expected };
 }
 
 /**
- * Sets or resets one of omp's settings in the user's `config.yml`, as omp's own settings panel would, and answers with the
- * settings as they now load. Any setting omp has is taken, except one that only changes how omp's terminal draws.
+ * Sets or resets one of omp's settings in the user's `config.yml`, as omp's own settings panel would, and answers with the settings as they now load.
+ * Any setting omp has is taken, except one that only changes how omp's terminal draws.
  */
 export function saveAgentSetting(cwd: string | null, raw: unknown): Promise<OmpSettings> {
 	return serialized(async () => {
@@ -264,10 +275,10 @@ export function saveAgentSetting(cwd: string | null, raw: unknown): Promise<OmpS
 		const settings = await loadGlobalForWrite(cwd ?? HOME).catch((err: unknown) => {
 			throw cannotLoad(err);
 		});
-		if (!Bun.deepEquals(userValue(handle, settings, edit.entry), edit.expected)) {
+		if (!Bun.deepEquals(userValue(handle, settings, edit), edit.expected)) {
 			throw new Rejected(409, `${edit.entry === undefined ? edit.id : `Model override for ${edit.entry}`} changed in config.yml since this page read it`, true);
 		}
-		await writeAgentSetting(settings, handle, edit, edit.entry);
+		await writeAgentSetting(settings, handle, edit);
 		return loadOmpSettings(cwd);
 	});
 }
