@@ -1,8 +1,7 @@
 /** The Inbox page: everything that waits on you, grouped in two-line rows, with the open item's session conversation or notice beside the list, worked from the keyboard. */
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { CircleAlert, GitPullRequest, MessageSquare } from "lucide-react";
-import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
-import { errorText } from "../../../src/json";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { Notice } from "../../../src/shared/notices";
 import type { LiveView, RosterHost } from "../../../src/shared/sessions";
 import { hashForSession } from "../../../src/shared/sessions";
@@ -18,6 +17,7 @@ import { useShowConversation } from "../../pane-store";
 import { type ModelList, UNREAD } from "../../reads";
 import { hashForInbox } from "../../routing";
 import { useShortcuts } from "../../shortcuts";
+import { useAction } from "../../use-action";
 import { Age } from "../age";
 import type { ConversationHandle } from "../conversation";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
@@ -27,7 +27,6 @@ import { CH_NEXT, CH_PREVIOUS, DetailBar, ListSplit } from "../list-split";
 import { NoticeAction } from "../notices";
 import { ViewConversation } from "../pane";
 import { StatusDot } from "../status-dot";
-import { toasts } from "../toaster";
 
 interface InboxPageProps {
 	hosts: RosterHost[];
@@ -48,8 +47,8 @@ export function InboxPage({ hosts, notices, openKey, models, workspaces }: Inbox
 	const shown = listed.flatMap(({ items }) => items);
 	const total = itemCount(sections);
 	/**
-	 * Where the open item was, so the one that takes its place opens once it leaves the list without you acting on it
-	 * here, such as a question answered in its session. Written during render, it only remembers what this render shows.
+	 * Where the open item was, so the one that takes its place opens once it leaves the list, whether you marked it read,
+	 * cleared it, or ended it here, or answered it in its session. Written during render, it only remembers what this render shows.
 	 */
 	const lastAt = useRef(0);
 	const open = openKey === null ? (shown[0] ?? null) : nextAfter(shown, openKey, lastAt.current);
@@ -58,12 +57,9 @@ export function InboxPage({ hosts, notices, openKey, models, workspaces }: Inbox
 	const go = (item: InboxItem | null | undefined): void => {
 		if (item) location.hash = hashForInbox(item.key);
 	};
-	/** After the server confirms what you did to the open item, the next one opens, though the item stays listed until the server's next push drops it. */
-	const advance = (): void => {
-		if (open) go(nextAfter(shown.filter(item => item !== open), open.key, at));
-	};
 	const previous = shown[at - 1];
 	const next = shown[at + 1];
+	const nav: InboxNav = { at, of: shown.length, onPrevious: previous && (() => go(previous)), onNext: next && (() => go(next)) };
 	useShortcuts({
 		inboxNext: () => go(next),
 		inboxPrevious: () => go(previous),
@@ -109,18 +105,11 @@ export function InboxPage({ hosts, notices, openKey, models, workspaces }: Inbox
 					</div>
 				}
 				detail={
-					open === null ? null : (
-						<InboxDetail
-							// Keyed by the session, so moving between two items of one session keeps its transcript instead of loading it again.
-							key={open.kind === "notice" ? open.key : `session/${open.host.instanceId}`}
-							item={open}
-							position={{ at, of: shown.length }}
-							onPrevious={previous && (() => go(previous))}
-							onNext={next && (() => go(next))}
-							models={models}
-							workspaces={workspaces}
-							onDone={advance}
-						/>
+					open === null ? null : open.kind === "notice" ? (
+						<NoticeDetail key={open.key} item={open} nav={nav} />
+					) : (
+						// Keyed by the session, so moving between two items of one session keeps its transcript instead of loading it again.
+						<SessionDetail key={`session/${open.host.instanceId}`} item={open} nav={nav} models={models} workspaces={workspaces} />
 					)
 				}
 			/>
@@ -172,179 +161,152 @@ function InboxRow({ item, open, reduceMotion }: { item: InboxItem; open: boolean
 	);
 }
 
-interface InboxDetailProps {
-	item: InboxItem;
-	/** The open item's index in the shown list, and the list's length. */
-	position: { at: number; of: number };
+/** Where the open item sits in the shown list, and what opens its neighbours. */
+interface InboxNav {
+	/** The open item's index in the shown list. */
+	at: number;
+	/** The shown list's length. */
+	of: number;
 	/** Opens the item above, `undefined` at the top. */
 	onPrevious: (() => void) | undefined;
 	/** Opens the item below, `undefined` at the bottom. */
 	onNext: (() => void) | undefined;
-	models: ReadonlyMap<string, ModelList>;
-	workspaces: Workspace[];
-	/** Opens the next item, once the server confirmed what you did to this one. */
-	onDone: () => void;
-}
-
-/**
- * The open item: its triage bar, then its session's own conversation, as its pane shows it, or a notice's text and action.
- * The conversation streams while it shows, and showing it never marks its turn read: D does.
- */
-function InboxDetail({ item, position, onPrevious, onNext, models, workspaces, onDone }: InboxDetailProps) {
-	const instanceId = item.kind === "notice" ? null : item.host.instanceId;
-	const view = useMemo<LiveView | null>(() => (instanceId === null ? null : { kind: "live", instanceId, agentId: null }), [instanceId]);
-	useShowConversation(view);
-	const conversation = useRef<ConversationHandle>(null);
-	return (
-		<section aria-label={item.title} className="@container/inbox flex h-full min-h-0 min-w-0 flex-col">
-			<InboxTriage key={item.key} item={item} view={view} conversation={conversation} position={position} onPrevious={onPrevious} onNext={onNext} onDone={onDone} />
-			{view && item.kind !== "notice" && (
-				<div className="relative flex min-h-0 flex-1 flex-col">
-					<ViewConversation
-						view={view}
-						focused
-						host={item.host}
-						lastHost={null}
-						session={null}
-						models={models.get(view.instanceId) ?? UNREAD}
-						workspaces={workspaces}
-						header={false}
-						autoFocus={false}
-						handle={conversation}
-					/>
-				</div>
-			)}
-		</section>
-	);
-}
-
-/** What you do to the open item; it has at most one in flight. */
-type InboxAction = "done" | "end";
-
-/** Resolves `true` once the server confirms `work`, or toasts `failureTitle` with why it failed and resolves `false`. */
-async function settle(work: Promise<void>, failureTitle: string): Promise<boolean> {
-	try {
-		await work;
-		return true;
-	} catch (error) {
-		toasts.add({ title: failureTitle, description: errorText(error) });
-		return false;
-	}
-}
-
-interface InboxTriageProps {
-	item: InboxItem;
-	/** The item's session, `null` for a notice. */
-	view: LiveView | null;
-	/** The session's conversation, whose composer R focuses and 1 to 9 and 0 send from. */
-	conversation: RefObject<ConversationHandle | null>;
-	position: InboxDetailProps["position"];
-	onPrevious: InboxDetailProps["onPrevious"];
-	onNext: InboxDetailProps["onNext"];
-	onDone: () => void;
 }
 
 /** Hides a button's key chip where the open item is too narrow for the bar's labels and their keys. */
 const BAR_CHIP = "hidden @lg/inbox:inline-flex";
 
+/** The open item's bar: its mark, title, place, and wait; previous and next with its place in the list; then its buttons. */
+function InboxBar({ item, nav, children }: { item: InboxItem; nav: InboxNav; children: ReactNode }) {
+	return (
+		<DetailBar
+			leading={
+				<span className="flex min-w-0 items-center gap-2">
+					<ItemMark item={item} />
+					<span className="truncate text-sm font-medium text-foreground">{item.title}</span>
+					{item.place && <span className="shrink-0 rounded bg-muted px-1.5 text-[11px]">{item.place}</span>}
+					{item.at !== null && (
+						<span className="shrink-0">
+							waiting <Age at={item.at} compact className="tabular-nums" />
+						</span>
+					)}
+				</span>
+			}
+			previous={{ label: "Previous item", icon: CH_PREVIOUS, shortcut: "inboxPrevious", onClick: nav.onPrevious }}
+			next={{ label: "Next item", icon: CH_NEXT, shortcut: "inboxNext", onClick: nav.onNext }}
+		>
+			<span className="shrink-0 px-1 text-xs text-muted-foreground tabular-nums">
+				{nav.at + 1} of {nav.of}
+			</span>
+			<div className="ml-2 flex shrink-0 items-center gap-1">{children}</div>
+		</DetailBar>
+	);
+}
+
+interface SessionDetailProps {
+	item: Extract<InboxItem, { kind: "ask" | "turn" }>;
+	nav: InboxNav;
+	/** The model lists the server sent, by instance id, which the session's composer offers. */
+	models: ReadonlyMap<string, ModelList>;
+	/** The workspaces, which the session's composer offers as directories. */
+	workspaces: Workspace[];
+}
+
 /**
- * The open item's bar and keys: its mark, title, place, and wait; previous and next; and Mark read or Clear, End session,
- * and Open, each pending until the server answers. A notice's text and action show under the bar.
+ * A question or a finished turn: its bar, then its session's own conversation, as its pane shows it. The conversation
+ * streams while it shows, and showing it never marks the turn read: Mark read does. R, 1 to 9, and 0 work its composer.
  */
-function InboxTriage({ item, view, conversation, position, onPrevious, onNext, onDone }: InboxTriageProps) {
-	const { send, request, end } = useDashboardActions();
+function SessionDetail({ item, nav, models, workspaces }: SessionDetailProps) {
+	const { instanceId, sessionId } = item.host;
+	const view = useMemo<LiveView>(() => ({ kind: "live", instanceId, agentId: null }), [instanceId]);
+	useShowConversation(view);
+	const conversation = useRef<ConversationHandle>(null);
+	const { request, end } = useDashboardActions();
 	const { connected } = useDashboardStatus();
-	const [acting, setActing] = useState<InboxAction | null>(null);
-	const latestDone = useRef(onDone);
-	latestDone.current = onDone;
-	const mounted = useRef(false);
-	useEffect(() => {
-		mounted.current = true;
-		return () => {
-			mounted.current = false;
-		};
-	}, []);
-	// A success keeps `acting` set: the next item replaces this one, or the server's push drops it when it was the last.
-	const act = (action: InboxAction, work: () => Promise<boolean>): void => {
-		if (acting !== null) return;
-		setActing(action);
-		void work().then(ok => {
-			if (!mounted.current) return;
-			if (ok) latestDone.current();
-			else setActing(null);
-		});
-	};
-	const done = (): void => {
-		if (item.kind === "turn") act("done", () => settle(request({ t: "read", instanceId: item.host.instanceId }), "Could not mark the turn read"));
-		else if (item.kind === "notice") act("done", () => settle(request({ t: "notice", ids: [item.notice.id], op: "clear" }), "Could not clear the notice"));
-	};
-	const endSession = (): void => {
-		if (view) act("end", () => end(view.instanceId));
-	};
-	const openItem = (): void => {
-		if (item.kind === "notice") follow(item.presentation.link);
-		else location.hash = hashForSession(item.host.sessionId);
+	const read = useAction(() => request({ t: "read", instanceId }), "Could not mark the turn read");
+	// `end` toasts its own failure and resolves `false`, so this never rejects and its title never shows.
+	const ending = useAction(async () => {
+		await end(instanceId);
+	}, "Could not end the session");
+	const busy = !connected || read.pending || ending.pending;
+	const openSession = (): void => {
+		location.hash = hashForSession(sessionId);
 	};
 	useShortcuts({
-		inboxOpen: () => (document.activeElement === document.body ? openItem() : false),
-		inboxDone: () => (item.kind !== "ask" ? done() : false),
-		inboxEnd: () => (view ? endSession() : false),
+		inboxOpen: () => (document.activeElement === document.body ? openSession() : false),
+		inboxDone: () => (item.kind === "turn" && !busy ? read.run() : false),
+		inboxEnd: () => (busy ? false : ending.run()),
 		inboxReply: () => conversation.current?.focus() ?? false,
 		inboxSendAll: () => conversation.current?.sendAllSuggestions() ?? false,
 		// A question's card in the conversation takes 1 to 9 itself, and the composer offers no suggestions meanwhile.
 		answer: key => conversation.current?.sendSuggestion(key) ?? false,
 	});
-	const busy = !connected || acting !== null;
 	return (
-		<>
-			<DetailBar
-				leading={
-					<span className="flex min-w-0 items-center gap-2">
-						<ItemMark item={item} />
-						<span className="truncate text-sm font-medium text-foreground">{item.title}</span>
-						{item.place && <span className="shrink-0 rounded bg-muted px-1.5 text-[11px]">{item.place}</span>}
-						{item.at !== null && (
-							<span className="shrink-0">
-								waiting <Age at={item.at} compact className="tabular-nums" />
-							</span>
-						)}
-					</span>
-				}
-				previous={{ label: "Previous item", icon: CH_PREVIOUS, shortcut: "inboxPrevious", onClick: onPrevious }}
-				next={{ label: "Next item", icon: CH_NEXT, shortcut: "inboxNext", onClick: onNext }}
-			>
-				<span className="shrink-0 px-1 text-xs text-muted-foreground tabular-nums">
-					{position.at + 1} of {position.of}
-				</span>
-				<div className="ml-2 flex shrink-0 items-center gap-1">
-					{item.kind !== "ask" && (
-						<Button variant="secondary" size="compact" loading={acting === "done"} disabled={busy} onClick={done}>
-							{item.kind === "turn" ? "Mark read" : "Clear"}
-							<ShortcutChip id="inboxDone" className={BAR_CHIP} />
-						</Button>
-					)}
-					{view && (
-						<Button variant="ghost" size="compact" loading={acting === "end"} disabled={busy} onClick={endSession}>
-							{acting === "end" ? "Ending…" : "End session"}
-							<ShortcutChip id="inboxEnd" className={BAR_CHIP} />
-						</Button>
-					)}
-					<Button variant="ghost" size="compact" disabled={item.kind === "notice" && item.presentation.link === null} onClick={openItem}>
-						{item.kind === "notice" ? "Open" : "Open session"}
-						<ShortcutChip id="inboxOpen" className={BAR_CHIP} />
+		<section aria-label={item.title} className="@container/inbox flex h-full min-h-0 min-w-0 flex-col">
+			<InboxBar item={item} nav={nav}>
+				{item.kind === "turn" && (
+					<Button variant="secondary" size="compact" loading={read.pending} disabled={busy} onClick={() => read.run()}>
+						Mark read
+						<ShortcutChip id="inboxDone" className={BAR_CHIP} />
 					</Button>
-				</div>
-			</DetailBar>
-			{item.kind === "notice" && (
-				<div className="px-6 py-5">
-					<div className="flex max-w-prose flex-col gap-3 rounded-lg border border-border px-4 py-3">
-						<p className="text-sm whitespace-pre-wrap">{item.line}</p>
-						<div className="flex self-start empty:hidden">
-							<NoticeAction id={item.notice.id} action={item.presentation.action} send={send} onDone={done} />
-						</div>
+				)}
+				<Button variant="ghost" size="compact" loading={ending.pending} disabled={busy} onClick={() => ending.run()}>
+					{ending.pending ? "Ending…" : "End session"}
+					<ShortcutChip id="inboxEnd" className={BAR_CHIP} />
+				</Button>
+				<Button variant="ghost" size="compact" onClick={openSession}>
+					Open session
+					<ShortcutChip id="inboxOpen" className={BAR_CHIP} />
+				</Button>
+			</InboxBar>
+			<div className="relative flex min-h-0 flex-1 flex-col">
+				<ViewConversation
+					view={view}
+					focused
+					host={item.host}
+					lastHost={null}
+					session={null}
+					models={models.get(instanceId) ?? UNREAD}
+					workspaces={workspaces}
+					header={false}
+					autoFocus={false}
+					handle={conversation}
+				/>
+			</div>
+		</section>
+	);
+}
+
+/** A notice: its bar, its text, and the same button as in the notices bell; using that button clears it, as Clear does. */
+function NoticeDetail({ item, nav }: { item: Extract<InboxItem, { kind: "notice" }>; nav: InboxNav }) {
+	const { send, request } = useDashboardActions();
+	const { connected } = useDashboardStatus();
+	const clear = useAction(() => request({ t: "notice", ids: [item.notice.id], op: "clear" }), "Could not clear the notice");
+	const { link, action } = item.presentation;
+	useShortcuts({
+		inboxOpen: () => (document.activeElement === document.body ? follow(link) : false),
+		inboxDone: () => (connected && !clear.pending ? clear.run() : false),
+	});
+	return (
+		<section aria-label={item.title} className="@container/inbox flex h-full min-h-0 min-w-0 flex-col">
+			<InboxBar item={item} nav={nav}>
+				<Button variant="secondary" size="compact" loading={clear.pending} disabled={!connected || clear.pending} onClick={() => clear.run()}>
+					Clear
+					<ShortcutChip id="inboxDone" className={BAR_CHIP} />
+				</Button>
+				<Button variant="ghost" size="compact" disabled={link === null} onClick={() => follow(link)}>
+					Open
+					<ShortcutChip id="inboxOpen" className={BAR_CHIP} />
+				</Button>
+			</InboxBar>
+			<div className="px-6 py-5">
+				<div className="flex max-w-prose flex-col gap-3 rounded-lg border border-border px-4 py-3">
+					<p className="text-sm whitespace-pre-wrap">{item.line}</p>
+					<div className="flex self-start empty:hidden">
+						<NoticeAction id={item.notice.id} action={action} send={send} onDone={() => clear.run()} />
 					</div>
 				</div>
-			)}
-		</>
+			</div>
+		</section>
 	);
 }
