@@ -250,7 +250,11 @@ test("resuming a saved ticket claims the same task and refuses another session's
 		spyOn(git, "repositoryAt").mockResolvedValue("/repo/.git");
 		expect(await sessions.reserveTask("ticket:ENG-2650", "already-working", dir, () => { throw new Error("no running sessions"); })).toBeNull();
 		const resume = spyOn(DashboardSession, "resume").mockImplementation(async (id) => sessionForStart(id, dir));
-		expect(await start({ kind: "resume", sessionId: "saved" })).toMatchObject({ ok: false, error: expect.stringContaining("ticket:ENG-2650 is already claimed by") });
+		expect(await start({ kind: "resume", sessionId: "saved" })).toMatchObject({
+			ok: false,
+			error: expect.stringContaining("ticket:ENG-2650 is already claimed by"),
+			owner: { instanceId: "already-working", sessionId: null, cwd: dir, port: expect.any(Number) },
+		});
 		expect(resume).not.toHaveBeenCalled();
 		sessions.releaseTask("already-working");
 		expect((await start({ kind: "resume", sessionId: "saved" })).ok).toBe(true);
