@@ -19,7 +19,7 @@ The bar turns memory on from the off state, and no store is shown as something i
 ## Consequences
 
 A user sees exactly what each backend keeps and can fix it where it lives.
-A new backend in omp needs its own store shape here, or the section refuses the unknown value.
+A new backend in omp needs its own store shape here; until then the bar can pick it and the store says the page cannot show it yet.
 The proposal is in `tmp/designs/omp-memory.md` on the branch that built it.
 
 ## Revisit when

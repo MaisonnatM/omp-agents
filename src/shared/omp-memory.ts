@@ -1,27 +1,13 @@
 /** Settings › omp memory: what omp itself recalls across sessions of a workspace, and the edits the section sends. */
 import type { OmpFile } from "./models";
 
-/** The stores omp's memory setting picks between; `off` keeps nothing. */
-export const OMP_MEMORY_BACKENDS = ["off", "local", "hindsight", "mnemopi", "sharpshooter"] as const;
-export type OmpMemoryBackendId = (typeof OMP_MEMORY_BACKENDS)[number];
+/** The omp settings Settings › omp memory edits; Settings › omp settings links here for them. */
+export const OMP_MEMORY_SETTINGS = { backend: "memory.backend", autolearn: "autolearn.enabled", autoContinue: "autolearn.autoContinue" } as const;
 
-/** The layer a session takes a setting from: an environment variable, the workspace's config, the user's `config.yml`, or omp's default. */
-export type OmpMemorySource = { layer: "env"; variable: string } | { layer: "workspace" | "user" | "default" };
-
-/** One setting this section edits, as a session in the workspace reads it. */
-export interface OmpMemorySetting<T> {
-	value: T;
-	source: OmpMemorySource;
-	/** The value in the user's `config.yml`, `null` when it holds none: what a save's `expected` must equal. */
-	user: T | null;
-}
-
-/** A backend the picker offers, in omp's own words. */
-export interface OmpMemoryBackendOption {
-	value: OmpMemoryBackendId;
-	label: string;
-	description: string;
-}
+/** The stores the page can forget at once; Hindsight's lives on its server. */
+export const OMP_MEMORY_CLEARABLE = ["local", "sharpshooter", "mnemopi"] as const;
+export type OmpMemoryClearable = (typeof OMP_MEMORY_CLEARABLE)[number];
+export const isOmpMemoryClearable = (value: unknown): value is OmpMemoryClearable => OMP_MEMORY_CLEARABLE.some(backend => backend === value);
 
 /** Which part of the Local store a file is: lessons the agent learned, the summary, a skill, or one session's summary. */
 export type OmpMemoryFileGroup = "lessons" | "summary" | "skills" | "rollouts" | "decisions";
@@ -62,19 +48,11 @@ export type OmpMemoryStore =
 	| ({ backend: "mnemopi"; banks: string[]; sharedBank: string | null } & OmpMemoryRows)
 	| ({ backend: "hindsight"; bank: string; shared: boolean } & OmpMemoryRows);
 
-/** One workspace's memory: what a new session gets, and the store it comes from. */
-export interface OmpMemoryWorkspace {
+/** `GET /api/omp-memory?cwd=<dir>`: what a new session in the workspace gets, and the store it comes from. */
+export interface OmpMemory {
 	/** The memory block a new session's system prompt gets; `partial` when the session adds more as it runs. `null`: none. */
 	preview: { text: string; partial: boolean } | null;
 	store: OmpMemoryStore;
-}
-
-/** `GET /api/omp-memory[?cwd=<dir>]`. */
-export interface OmpMemory {
-	backend: OmpMemorySetting<OmpMemoryBackendId> & { options: OmpMemoryBackendOption[] };
-	autolearn: { enabled: OmpMemorySetting<boolean>; autoContinue: OmpMemorySetting<boolean> };
-	/** `null` without a workspace: omp keeps memory per workspace. */
-	workspace: OmpMemoryWorkspace | null;
 }
 
 /** `PUT /api/omp-memory/entry`. `expected` is the content the page showed; a row that changed since is not touched. */
@@ -82,5 +60,5 @@ export type OmpMemoryEntryEdit = { bank: string; id: string; expected: string } 
 
 /** `PUT /api/omp-memory/clear`: forgets the store of `backend`, which must still be the one in effect. */
 export interface OmpMemoryClear {
-	backend: OmpMemoryBackendId;
+	backend: OmpMemoryClearable;
 }

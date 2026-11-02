@@ -53,17 +53,14 @@ import type {
 	McpRpcModule,
 } from "./module-types/mcp";
 import type {
-	AutolearnSettingsModule,
 	HindsightBankModule,
 	HindsightClientModule,
 	HindsightConfigModule,
 	LocalMemoryModule,
 	MemoryBackendModule,
-	MemoryBackendSettingsModule,
 	MemoryRedactModule,
 	MnemopiConfigModule,
 	MnemopiStateModule,
-	SharpshooterBackendModule,
 	SharpshooterPathsModule,
 	SharpshooterQueueModule,
 	SharpshooterTypesModule,
@@ -425,21 +422,11 @@ export const psTable = await load<PsTableModule>(join(dirname(packageDir), "pi-t
 export const launchPaths = await load<LaunchPathsModule>(join(srcDir, "launch", "paths.ts"), { canonicalProjectDir: "function" });
 export const launchClient = await load<LaunchClientModule>(join(srcDir, "launch", "client.ts"), { createDaemonBrokerClient: "function" });
 export const memoryBackend = await load<MemoryBackendModule>(join(srcDir, "memory-backend", "index.ts"), { resolveMemoryBackend: "function" });
-export const memoryBackendSettings = await load<MemoryBackendSettingsModule>(join(srcDir, "memory-backend", "settings.ts"), { cfgMemoryBackend: "object" });
 export const memoryRedact = await load<MemoryRedactModule>(join(srcDir, "memory-backend", "redact.ts"), { redactMemorySecrets: "function" });
-export const autolearnSettings = await load<AutolearnSettingsModule>(join(srcDir, "autolearn", "settings.ts"), {
-	cfgAutolearnEnabled: "object",
-	cfgAutolearnAutoContinue: "object",
-});
-export const localMemory = await load<LocalMemoryModule>(join(srcDir, "memories", "index.ts"), {
-	getMemoryRoot: "function",
-	clearMemoryData: "function",
-	enqueueMemoryConsolidation: "function",
-});
+export const localMemory = await load<LocalMemoryModule>(join(srcDir, "memories", "index.ts"), { getMemoryRoot: "function" });
 export const sharpshooterPaths = await load<SharpshooterPathsModule>(join(srcDir, "sharpshooter", "paths.ts"), { sharpshooterBankDir: "function" });
 export const sharpshooterTypes = await load<SharpshooterTypesModule>(join(srcDir, "sharpshooter", "types.ts"), { SHARPSHOOTER_MEMORY_FILES: "object" });
 export const sharpshooterQueue = await load<SharpshooterQueueModule>(join(srcDir, "sharpshooter", "queue.ts"), { sharpshooterQueueDepth: "function" });
-export const sharpshooterBackend = await load<SharpshooterBackendModule>(join(srcDir, "sharpshooter", "backend.ts"), { "sharpshooterBackend.clear": "function" });
 export const mnemopiConfig = await load<MnemopiConfigModule>(join(srcDir, "mnemopi", "config.ts"), { loadMnemopiConfig: "function" });
 export const mnemopiState = await load<MnemopiStateModule>(join(srcDir, "mnemopi", "state.ts"), {
 	getMnemopiScopedBanks: "function",

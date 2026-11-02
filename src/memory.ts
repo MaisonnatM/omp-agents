@@ -3,82 +3,83 @@
  * Each edit is checked against what the page showed and answered with the memory as it now loads.
  */
 import { isObject } from "./json";
-import { loadSessionSettings } from "./omp/config";
+import { agentDir, loadSessionSettings } from "./omp/config";
 import {
-	autolearnSetting,
-	backendSetting,
-	clearStore,
 	editMnemopiEntry,
 	forgetMnemopiBanks,
 	hindsightBankOf,
 	hindsightRows,
 	type MemoryFilePath,
+	memoryBackendOf,
 	memoryFiles,
 	mnemopiBanks,
 	mnemopiRows,
-	rebuildSummary,
 	sessionPreview,
 	sharpshooterQueued,
 } from "./omp/memory";
 import type { OmpSettingsInstance } from "./omp/module-types/config";
-import { displayPath, HOME } from "./paths";
+import type { MemoryBackend } from "./omp/module-types/memory";
+import { displayPath } from "./paths";
 import { parseFileEdit, readFileBody, Rejected, serialized, writeUnchanged } from "./settings";
-import type { OmpMemory, OmpMemoryBackendId, OmpMemoryEntryEdit, OmpMemoryFile, OmpMemoryStore } from "./shared/omp-memory";
+import { isOmpMemoryClearable, type OmpMemory, type OmpMemoryClear, type OmpMemoryEntryEdit, type OmpMemoryFile, type OmpMemoryStore } from "./shared/omp-memory";
 
 const readFiles = (files: MemoryFilePath[]): Promise<OmpMemoryFile[]> =>
 	Promise.all(files.map(async file => ({ ...file, pathDisplay: displayPath(file.path), body: await readFileBody(file.path) })));
 
-async function storeOf(cwd: string, settings: OmpSettingsInstance, backend: OmpMemoryBackendId): Promise<OmpMemoryStore> {
+async function storeOf(cwd: string, settings: OmpSettingsInstance, backend: MemoryBackend["id"]): Promise<OmpMemoryStore> {
 	switch (backend) {
 		case "off":
 			return { backend };
 		case "local":
 			return { backend, files: await readFiles(await memoryFiles(cwd, backend)) };
-		case "sharpshooter":
-			return { backend, files: await readFiles(await memoryFiles(cwd, backend)), queued: await sharpshooterQueued(cwd) };
+		case "sharpshooter": {
+			const [files, queued] = await Promise.all([memoryFiles(cwd, backend).then(readFiles), sharpshooterQueued(cwd)]);
+			return { backend, files, queued };
+		}
 		case "mnemopi": {
-			const { banks, sharedBank } = await mnemopiBanks(settings);
-			return { backend, banks: banks.map(({ bank }) => bank), sharedBank, ...mnemopiRows(banks) };
+			const { config, banks, sharedBank } = await mnemopiBanks(settings);
+			return { backend, banks: banks.map(({ bank }) => bank), sharedBank, ...(await mnemopiRows(config, banks)) };
 		}
 		case "hindsight": {
-			const { bank, shared } = hindsightBankOf(cwd, settings);
-			return { backend, bank, shared, ...(await hindsightRows(cwd, settings)) };
+			const { bank, shared, config } = hindsightBankOf(cwd, settings);
+			return { backend, bank, shared, ...(await hindsightRows(config, bank)) };
 		}
+		default:
+			// A backend omp added after this page: its store has no shape here yet.
+			throw new Error(`omp's ${String(backend satisfies never)} memory backend is not one this page can show yet`);
 	}
 }
 
-/** omp memory as a session in `cwd` uses it; without `cwd`, only the settings, since omp keeps memory per workspace. */
-export async function loadOmpMemory(cwd: string | null): Promise<OmpMemory> {
-	const settings = await loadSessionSettings(cwd ?? HOME);
-	const backend = backendSetting(settings);
-	return {
-		backend,
-		autolearn: autolearnSetting(settings),
-		workspace: cwd === null ? null : { preview: await sessionPreview(cwd, settings), store: await storeOf(cwd, settings, backend.value) },
-	};
-}
-
-/** The workspace an edit of the store names; omp has no store without one. */
+/** The workspace an edit of the store names; omp keeps memory per workspace. */
 function workspaceOf(cwd: string | null): string {
 	if (cwd === null) throw new Rejected(400, "Expected ?cwd= naming a workspace: omp keeps memory per workspace");
 	return cwd;
 }
 
-/** The backend in effect for `cwd`, refused unless it is one of `allowed`: the page showed another. */
-async function backendIn<T extends OmpMemoryBackendId>(cwd: string, allowed: readonly T[]): Promise<{ settings: OmpSettingsInstance; backend: T }> {
+/** The settings a session in `cwd` loads, and the memory backend it resolves from them. */
+async function inEffect(cwd: string): Promise<{ settings: OmpSettingsInstance; backend: MemoryBackend }> {
 	const settings = await loadSessionSettings(cwd);
-	const backend = backendSetting(settings).value;
-	if (!(allowed as readonly OmpMemoryBackendId[]).includes(backend)) throw new Rejected(409, "omp's memory backend changed since this page read it", true);
-	return { settings, backend: backend as T };
+	return { settings, backend: await memoryBackendOf(settings) };
 }
+
+/** `GET /api/omp-memory?cwd=`: what a new session in `cwd` gets, and the store of the backend it resolves. */
+export async function loadOmpMemory(cwd: string): Promise<OmpMemory> {
+	const { settings, backend } = await inEffect(cwd);
+	const [preview, store] = await Promise.all([sessionPreview(cwd, settings, backend), storeOf(cwd, settings, backend.id)]);
+	return { preview, store };
+}
+
+/** The page showed another backend than the one in effect now. */
+const backendChanged = (): Rejected => new Rejected(409, "omp's memory backend changed since this page read it", true);
 
 /** `PUT /api/omp-memory/file`: writes a file of the store in effect, when it still holds what the page showed. */
 export function saveMemoryFile(cwd: string | null, raw: unknown): Promise<OmpMemory> {
 	return serialized(async () => {
 		const dir = workspaceOf(cwd);
 		const edit = parseFileEdit(raw);
-		const { backend } = await backendIn(dir, ["local", "sharpshooter"] as const);
-		const file = (await memoryFiles(dir, backend)).find(found => found.path === edit.path);
+		const { backend } = await inEffect(dir);
+		if (backend.id !== "local" && backend.id !== "sharpshooter") throw backendChanged();
+		const file = (await memoryFiles(dir, backend.id)).find(found => found.path === edit.path);
 		if (!file) throw new Rejected(404, `omp memory has no ${displayPath(edit.path)} here`);
 		await writeUnchanged(file.path, edit);
 		return loadOmpMemory(dir);
@@ -103,7 +104,8 @@ export function editMemoryEntry(cwd: string | null, raw: unknown): Promise<OmpMe
 	return serialized(async () => {
 		const dir = workspaceOf(cwd);
 		const edit = parseEntryEdit(raw);
-		const { settings } = await backendIn(dir, ["mnemopi"] as const);
+		const { settings, backend } = await inEffect(dir);
+		if (backend.id !== "mnemopi") throw backendChanged();
 		const { config, banks } = await mnemopiBanks(settings);
 		const bank = banks.find(({ bank }) => bank === edit.bank);
 		if (!bank) throw new Rejected(404, `This workspace does not read the bank ${edit.bank}`);
@@ -120,25 +122,27 @@ export function editMemoryEntry(cwd: string | null, raw: unknown): Promise<OmpMe
 	});
 }
 
-/** The stores the page can forget; Hindsight's lives on its server. */
-const CLEARABLE = ["local", "sharpshooter", "mnemopi"] as const;
+export function parseClear(raw: unknown): OmpMemoryClear {
+	if (!isObject(raw) || !isOmpMemoryClearable(raw.backend)) throw new Rejected(400, "Expected { backend } naming local, sharpshooter, or mnemopi");
+	return { backend: raw.backend };
+}
 
 /**
- * `PUT /api/omp-memory/clear`: forgets the workspace's store of `backend`, which must still be the one in effect. For
- * Mnemopi, only the workspace's own banks: the shared one stays, unlike omp's `/memory clear`.
+ * `PUT /api/omp-memory/clear`: forgets the workspace's store of `backend`, which must still be the one in effect: Local
+ * and Sharpshooter as omp's `/memory clear` does, Mnemopi only the workspace's own banks, so the shared one stays.
  */
 export function clearMemory(cwd: string | null, raw: unknown): Promise<OmpMemory> {
 	return serialized(async () => {
 		const dir = workspaceOf(cwd);
-		if (!isObject(raw) || !CLEARABLE.includes(raw.backend as (typeof CLEARABLE)[number])) throw new Rejected(400, "Expected { backend } naming local, sharpshooter, or mnemopi");
-		const { settings, backend } = await backendIn(dir, CLEARABLE);
-		if (backend !== raw.backend) throw new Rejected(409, "omp's memory backend changed since this page read it", true);
-		if (backend === "mnemopi") {
+		const edit = parseClear(raw);
+		const { settings, backend } = await inEffect(dir);
+		if (backend.id !== edit.backend) throw backendChanged();
+		if (backend.id === "mnemopi") {
 			const { banks, sharedBank } = await mnemopiBanks(settings);
 			const own = banks.filter(({ bank }) => bank !== sharedBank);
 			if (own.length === 0) throw new Rejected(400, "Every bank this workspace reads is shared with other workspaces");
 			await forgetMnemopiBanks(own);
-		} else await clearStore(dir, backend);
+		} else await backend.clear(agentDir, dir);
 		return loadOmpMemory(dir);
 	});
 }
@@ -147,8 +151,9 @@ export function clearMemory(cwd: string | null, raw: unknown): Promise<OmpMemory
 export function rebuildMemory(cwd: string | null): Promise<OmpMemory> {
 	return serialized(async () => {
 		const dir = workspaceOf(cwd);
-		await backendIn(dir, ["local"] as const);
-		rebuildSummary(dir);
+		const { backend } = await inEffect(dir);
+		if (backend.id !== "local") throw backendChanged();
+		await backend.enqueue(agentDir, dir);
 		return loadOmpMemory(dir);
 	});
 }

@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite";
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -34,16 +35,6 @@ afterEach(() => {
 });
 
 describe("loadOmpMemory", () => {
-	test("without a workspace it reads the settings only, off by omp's default", async () => {
-		useBackend(null);
-		const memory = await loadOmpMemory(null);
-		expect(memory.backend).toMatchObject({ value: "off", source: { layer: "default" }, user: null });
-		expect(memory.backend.options.map(option => option.value)).toEqual(["off", "local", "hindsight", "mnemopi", "sharpshooter"]);
-		expect(memory.backend.options[1]?.label).toBe("Local");
-		expect(memory.autolearn.enabled).toEqual({ value: false, source: { layer: "default" }, user: null });
-		expect(memory.workspace).toBeNull();
-	});
-
 	test("Local lists the files of the workspace's store that exist, by group", async () => {
 		useBackend("local");
 		const cwd = tempDir();
@@ -55,9 +46,8 @@ describe("loadOmpMemory", () => {
 		writeFileSync(join(root, "skills", "deploy", "SKILL.md"), "# Deploy\n");
 		writeFileSync(join(root, "rollout_summaries", "one.md"), "A session\n");
 		const memory = await loadOmpMemory(cwd);
-		expect(memory.backend).toMatchObject({ value: "local", source: { layer: "user" }, user: "local" });
-		const store = memory.workspace?.store;
-		expect(store?.backend === "local" && store.files.map(file => [file.group, file.name, file.body.state])).toEqual([
+		const { store } = memory;
+		expect(store.backend === "local" && store.files.map(file => [file.group, file.name, file.body.state])).toEqual([
 			["lessons", "learned.md", "read"],
 			["summary", "memory_summary.md", "read"],
 			["skills", "deploy/SKILL.md", "read"],
@@ -65,9 +55,11 @@ describe("loadOmpMemory", () => {
 		]);
 	});
 
-	test("Off keeps no store", async () => {
+	test("Off keeps no store, and so does a backend omp does not know", async () => {
 		useBackend("off");
-		expect((await loadOmpMemory(tempDir())).workspace).toEqual({ preview: null, store: { backend: "off" } });
+		expect(await loadOmpMemory(tempDir())).toEqual({ preview: null, store: { backend: "off" } });
+		useBackend("notes");
+		expect((await loadOmpMemory(tempDir())).store).toEqual({ backend: "off" });
 	});
 });
 
@@ -81,7 +73,7 @@ describe("saveMemoryFile", () => {
 		writeFileSync(path, "- old\n");
 		const saved = await saveMemoryFile(cwd, { path, text: "- new\n", baseHash: sha("- old\n") });
 		expect(readFileSync(path, "utf8")).toBe("- new\n");
-		expect(saved.workspace?.store).toMatchObject({ backend: "local" });
+		expect(saved.store).toMatchObject({ backend: "local" });
 		const stale = await rejected(saveMemoryFile(cwd, { path, text: "- again\n", baseHash: sha("- old\n") }));
 		expect([stale.status, stale.conflict]).toEqual([409, true]);
 		expect((await rejected(saveMemoryFile(cwd, { path: join(root, "elsewhere.md"), text: "", baseHash: null }))).status).toBe(404);
@@ -149,25 +141,49 @@ describe("limitEntries", () => {
 });
 
 describe("Mnemopi rows", () => {
+	const config: MnemopiConfig = { scoping: "per-project", globalBank: "default", retainBank: "project", recallBanks: ["project"], providerOptions: { noEmbeddings: true } };
+	/** A bank database with `remember`'s rows, each written as `session`'s. */
+	const seed = async (dbPath: string, rows: { session: string; content: string }[]): Promise<string[]> => {
+		const { Mnemopi } = await mnemopiState.loadMnemopi();
+		return rows.map(({ session, content }) => {
+			const memory = new Mnemopi({ dbPath, bank: session, sessionId: session, noEmbeddings: true });
+			try {
+				return memory.remember(content);
+			} finally {
+				memory.close();
+			}
+		});
+	};
+
 	test("lists a bank's working rows, and updates, refuses, and forgets one against the text the page showed", async () => {
 		const dbPath = join(tempDir(), "mnemopi.db");
 		const bank = { bank: "project", dbPath };
-		const config: MnemopiConfig = { scoping: "per-project", globalBank: "default", retainBank: "project", recallBanks: ["project"], providerOptions: { noEmbeddings: true } };
-		const { Mnemopi } = await mnemopiState.loadMnemopi();
-		const seed = new Mnemopi({ dbPath, bank: "project", sessionId: "project", noEmbeddings: true }) as unknown as { remember(content: string): string; close(): void };
-		const id = seed.remember("Prefers pnpm over npm");
-		seed.close();
+		const [id = ""] = await seed(dbPath, [{ session: "project", content: "Prefers pnpm over npm" }]);
 
-		const listed = mnemopiRows([bank, { bank: "absent", dbPath: join(tempDir(), "none.db") }]);
+		const listed = await mnemopiRows(config, [bank, { bank: "absent", dbPath: join(tempDir(), "none.db") }]);
 		expect("entries" in listed && listed.entries.map(entry => [entry.id, entry.content, entry.kind, entry.ops])).toEqual([[id, "Prefers pnpm over npm", "working", ["update", "forget"]]]);
 
 		expect(await editMnemopiEntry(config, bank, { op: "update", bank: "project", id, expected: "something else", content: "x" })).toBe("changed");
 		expect(await editMnemopiEntry(config, bank, { op: "retire", bank: "project", id, expected: "Prefers pnpm over npm" })).toBe("refused");
 		expect(await editMnemopiEntry(config, bank, { op: "update", bank: "project", id, expected: "Prefers pnpm over npm", content: "Prefers bun" })).toBe("done");
-		const updated = mnemopiRows([bank]);
+		const updated = await mnemopiRows(config, [bank]);
 		expect("entries" in updated && updated.entries[0]?.content).toBe("Prefers bun");
 		expect(await editMnemopiEntry(config, bank, { op: "forget", bank: "project", id, expected: "Prefers bun" })).toBe("done");
 		expect(await editMnemopiEntry(config, bank, { op: "forget", bank: "project", id, expected: "Prefers bun" })).toBe("missing");
-		expect(mnemopiRows([bank])).toEqual({ entries: [], truncated: false });
+		expect(await mnemopiRows(config, [bank])).toEqual({ entries: [], truncated: false });
+	});
+
+	test("lists only the rows the bank's session recalls: its own, not another bank's, and none past their end", async () => {
+		const dbPath = join(tempDir(), "mnemopi.db");
+		const [, , expired] = await seed(dbPath, [
+			{ session: "project", content: "Ships on Fridays" },
+			{ session: "other", content: "Another workspace's" },
+			{ session: "project", content: "Was true once" },
+		]);
+		const db = new Database(dbPath);
+		db.query("UPDATE working_memory SET valid_until = ?1 WHERE id = ?2").run(new Date(0).toISOString(), expired ?? "");
+		db.close();
+		const listed = await mnemopiRows(config, [{ bank: "project", dbPath }]);
+		expect("entries" in listed && listed.entries.map(entry => entry.content)).toEqual(["Ships on Fridays"]);
 	});
 });

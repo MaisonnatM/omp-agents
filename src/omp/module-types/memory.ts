@@ -1,41 +1,36 @@
 /**
- * omp's memory (pi-coding-agent src/memory-backend, src/memories, src/sharpshooter, src/mnemopi, src/hindsight,
- * src/autolearn): the store `memory.backend` picks, read and changed with no session.
+ * omp's memory (pi-coding-agent src/memory-backend, src/memories, src/sharpshooter, src/mnemopi, src/hindsight): the
+ * store `memory.backend` picks, read and changed with no session.
  */
-import type { OmpSettingsInstance, SettingsReader } from "./config";
+import type { Database } from "bun:sqlite";
+import type { OmpSettingsInstance } from "./config";
 
 /** One of omp's memory backends (`MemoryBackend` in memory-backend/types.ts), as far as a sessionless read uses it. */
 export interface MemoryBackend {
-	id: string;
+	/** omp's `MemoryBackendId`; `resolveMemoryBackend` answers Off for a value it does not know. */
+	id: "off" | "local" | "hindsight" | "mnemopi" | "sharpshooter";
 	/** The memory block a new session in `cwd` gets in its system prompt, `undefined` when it gets none. */
 	buildDeveloperInstructions(agentDir: string, cwd: string, settings: OmpSettingsInstance): Promise<string | undefined>;
+	/** omp's `/memory clear`; Local and Sharpshooter need no session, Mnemopi and Hindsight do. */
+	clear(agentDir: string, cwd: string): Promise<void>;
+	/** omp's `/memory enqueue`; Local marks the summary for the rebuild the next session in `cwd` runs at its start. */
+	enqueue(agentDir: string, cwd: string): Promise<void>;
 }
 export interface MemoryBackendModule {
 	resolveMemoryBackend(settings: OmpSettingsInstance): Promise<MemoryBackend>;
 }
-export interface MemoryBackendSettingsModule {
-	cfgMemoryBackend: SettingsReader<string>;
-}
 export interface MemoryRedactModule {
 	/** What omp stores in place of `text`: secrets it recognizes replaced, as every memory write does. */
 	redactMemorySecrets(text: string): string;
-}
-export interface AutolearnSettingsModule {
-	cfgAutolearnEnabled: SettingsReader<boolean>;
-	cfgAutolearnAutoContinue: SettingsReader<boolean>;
 }
 
 /** The Local backend's files (memories/index.ts). */
 export interface LocalMemoryModule {
 	/** The directory a workspace's Local memory lives in, one per exact `cwd`. */
 	getMemoryRoot(agentDir: string, cwd: string): string;
-	/** Clears the workspace's rows in omp's memory database, then removes {@link getMemoryRoot}. */
-	clearMemoryData(agentDir: string, cwd: string): Promise<void>;
-	/** Marks the summary for a rebuild, which the next session in `cwd` runs at its start. */
-	enqueueMemoryConsolidation(agentDir: string, cwd: string): void;
 }
 
-/** The Sharpshooter backend's decision files (sharpshooter/paths.ts, types.ts, queue.ts, backend.ts). */
+/** The Sharpshooter backend's decision files (sharpshooter/paths.ts, types.ts, queue.ts). */
 export interface SharpshooterPathsModule {
 	sharpshooterBankDir(agentDir: string, cwd: string): string;
 }
@@ -46,10 +41,6 @@ export interface SharpshooterQueueModule {
 	/** How many sessions wait for the background consolidation into the decision files. */
 	sharpshooterQueueDepth(agentDir: string, cwd: string): Promise<number>;
 }
-export interface SharpshooterBackendModule {
-	sharpshooterBackend: { clear(agentDir: string, cwd: string): Promise<void> };
-}
-
 /** The Mnemopi backend's config (mnemopi/config.ts), its banks (mnemopi/state.ts) and its library (pi-mnemopi). */
 export interface MnemopiConfig {
 	scoping: "global" | "per-project" | "per-project-tagged";
@@ -72,13 +63,29 @@ export interface MnemopiStateModule {
 	loadMnemopiCore(): Promise<unknown>;
 	loadMnemopi(): Promise<{ Mnemopi: new (options: Record<string, unknown>) => MnemopiMemory }>;
 }
+/** A working or episodic row as `beam.exportToDict` lists it (pi-mnemopi src/core/beam/store.ts), as far as the page reads it. */
+export interface MnemopiExportRow {
+	id: string;
+	content: string;
+	timestamp: string | null;
+	session_id: string;
+	scope: string | null;
+	valid_until: string | null;
+	superseded_by: string | null;
+}
 /** One open bank (pi-mnemopi src/core/memory.ts `Mnemopi`). */
 export interface MnemopiMemory {
 	/** The row `id` names among the working and episodic rows and the facts this bank's session sees, `null` when none. */
-	get(id: string): { content?: unknown; memory_store?: unknown } | null;
+	get(id: string): { content: string; memory_store: "working" | "episodic" | "fact" } | null;
+	remember(content: string): string;
 	update(id: string, content: string | null): boolean;
 	forget(id: string): boolean;
-	beam: { invalidate(id: string, replacementId: string | null): boolean };
+	beam: {
+		invalidate(id: string, replacementId: string | null): boolean;
+		/** Every working and episodic row of the database, of every session, superseded and expired ones too. */
+		exportToDict(): { working_memory: MnemopiExportRow[]; episodic_memory: MnemopiExportRow[] };
+		db: Database;
+	};
 	/** Waits for the embedding an edit scheduled. */
 	flushExtractions(): Promise<void>;
 	close(): void;

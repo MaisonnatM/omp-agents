@@ -129,6 +129,35 @@ export function useEditor<T, R = OmpSettings>(original: T, save: (draft: T) => P
 	};
 }
 
+/** Sends `send` in turn through `target`, and on a conflict re-reads it, so the page shows what changed before the error. */
+export async function writeOrReload<T>(target: { write: Editable<T>["write"]; reload: () => void }, send: () => Promise<T>): Promise<T> {
+	try {
+		return await target.write(send);
+	} catch (err) {
+		if (err instanceof ApiError && err.conflict) target.reload();
+		throw err;
+	}
+}
+
+/** Saves one omp setting to your `config.yml` through `PUT /api/settings/agent`, re-reading the page's settings on a conflict. */
+export const saveAgentSetting = (editing: Editing, edit: AgentSettingEdit): Promise<OmpSettings> =>
+	writeOrReload(editing, () => putJson<OmpSettings>(settingsUrl("/agent", editing.cwd), edit));
+
+/** One control's save at a time: which one is saving, keyed by `K`, and why the last one failed. */
+export function useSaving<K>(): { saving: K | null; error: string | null; run: (key: K, send: () => Promise<unknown>) => void } {
+	const [state, setState] = useState<{ saving: K | null; error: string | null }>({ saving: null, error: null });
+	return {
+		...state,
+		run: (key, send) => {
+			setState({ saving: key, error: null });
+			send().then(
+				() => setState({ saving: null, error: null }),
+				(err: unknown) => setState({ saving: null, error: err instanceof ApiError && err.conflict ? "Changed since you opened it. This shows it as it is now." : errorText(err) }),
+			);
+		},
+	};
+}
+
 /** Edit while viewing; Cancel and Save while editing, Save only once something changed. */
 export function EditBar<T>({ editor, label, start = "Edit" }: { editor: Editor<T>; label: string; start?: string }) {
 	if (editor.state.phase === "viewing") {
@@ -271,6 +300,10 @@ export function FileLink({ file, onOpenFile, children }: { file: OmpFile; onOpen
 	);
 }
 
+/**
+ * Why a setting's control is locked or overridden: the workspace sets it, with a link to its file and your own value
+ * when there is one, or an environment variable does.
+ */
 export function LayerNotes({
 	workspace,
 	env,

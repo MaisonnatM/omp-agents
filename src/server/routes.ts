@@ -306,9 +306,9 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		);
 
 	/**
-	 * A settings write: `PUT /api/settings/routing`, `/api/settings/agent`, or `/api/settings/file`, `?cwd=` as for reading;
-	 * and an omp memory edit, `PUT /api/omp-memory/file`, `/entry`, `/clear`, or `/rebuild`, which need `?cwd=`.
-	 * The answer is the settings or the memory as they load after the write, or the edit's refusal with its status.
+	 * A write whose refusals are `Rejected`: a settings write, `PUT /api/settings/routing`, `/api/settings/agent`, or
+	 * `/api/settings/file`, `?cwd=` as for reading; and an omp memory edit, `PUT /api/omp-memory/file`, `/entry`, `/clear`,
+	 * or `/rebuild`, which need `?cwd=`. The answer is what the write's section loads after it, or the refusal with its status.
 	 */
 	const settingsWrite = (save: (cwd: string | null, body: unknown) => Promise<unknown>): Handler =>
 		write(
@@ -329,10 +329,11 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 			);
 		});
 
-	/** `GET /api/omp-memory[?cwd=<dir>]`: omp's memory backend and Auto-learn, and with `cwd` the workspace's store and what a new session gets. */
+	/** `GET /api/omp-memory?cwd=<dir>`: what a new session in the workspace gets from omp memory, and the store it comes from. */
 	const ompMemory = get(params => {
 		const cwd = workspaceCwd(params);
-		return cwd instanceof Response ? cwd : answer(() => loadOmpMemory(cwd));
+		if (cwd instanceof Response) return cwd;
+		return cwd === null ? fail(400, "Expected ?cwd= naming a workspace") : answer(() => loadOmpMemory(cwd));
 	});
 
 	/** `GET /api/decisions?cwd=<dir>`: the decision records of a workspace's repository. */

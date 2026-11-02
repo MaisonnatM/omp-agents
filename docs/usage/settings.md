@@ -140,8 +140,8 @@
   If `config.yml` changed on disk since the page read it, the save is refused and the page reloads the setting.
   Running sessions pick up most changes; some apply only to sessions started after the change.
 - **omp memory** shows what omp itself remembers across sessions in the workspace, and the settings that decide it.
-  The bar at its top picks the backend, **Off**, **Local**, **Hindsight**, **Mnemopi**, or **Sharpshooter**, with omp's description of the one picked, and switches **Auto-learn**, which nudges the agent to capture lessons and skills when it stops; with **Auto-learn** on, **Capture on its own at stop** runs one capture turn then, which uses extra tokens.
-  These save to your `~/.omp/agent/config.yml` as in **omp settings**, which shows them as a line that links here; a value the workspace's settings set locks its control, and an environment variable that sets one is named under it.
+  The bar at its top holds omp's own rows for the memory backend, **Off**, **Local**, **Hindsight**, **Mnemopi**, or **Sharpshooter**, with omp's description of the one picked, and for Auto-learn, which nudges the agent to capture lessons and skills when it stops; with Auto-learn on, a second switch runs one capture turn then, which uses extra tokens.
+  They show omp's labels and save to your `~/.omp/agent/config.yml` as in **omp settings**, which shows them as a line that links here; a value the workspace's settings set locks its control, and an environment variable that sets one is named under it.
   **What a new session gets** unfolds the memory block a new session's prompt starts with, and its size in tokens; with Mnemopi and Hindsight a running session also gets memories recalled for each prompt, which the page cannot show.
   **Stored memory** shows the store of the backend picked.
   Local lists its files by group, **Lessons**, **Summary**, **Skills**, and **Session summaries**, and Sharpshooter its decision files and how many sessions wait to be folded in; select one to read it, and edit it as in **Files**.

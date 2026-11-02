@@ -79,20 +79,18 @@ Edits go through three endpoints, each taking the same `?cwd=` and answering wit
   The server resolves symlinks, writes a temporary file beside the real file with its mode, and renames it over the real file, so a symlinked file stays a link and a crash cannot leave a truncated file.
   Saves run one at a time, so two saves of the same file cannot both pass the hash check.
 
-**omp memory** reads `GET /api/omp-memory?cwd=<directory>` and answers `{ backend, autolearn, workspace }`, built by `loadOmpMemory` in `src/memory.ts` from the settings a session in that workspace loads.
-`backend` is `memory.backend` as a session reads it, with its `source` (`env` with the variable, `workspace`, `user`, or `default`), the `user` value an edit is checked against, and the picker's `options` with omp's labels and descriptions; `autolearn` holds `autolearn.enabled` and `autolearn.autoContinue` the same way.
-Without `cwd`, `workspace` is `null`, since omp keeps memory per workspace.
-Otherwise it holds `preview`, the block a new session's system prompt gets from `buildDeveloperInstructions`, `partial` for Mnemopi and Hindsight, which add recalled memories as the session runs, and `store`, the store of the backend in effect: Local's and Sharpshooter's files that exist, with Sharpshooter's queued sessions, or Mnemopi's and Hindsight's rows, newest first and at most 500, each with the edits omp allows on it, or `{ error }`.
-Mnemopi's rows come from a read-only open of each bank's database with omp's visibility rules; Hindsight's from the server's `listMemories`.
-The backend and **Auto-learn** switches save through `PUT /api/settings/agent`.
+**omp memory** reads `GET /api/omp-memory?cwd=<directory>`, which answers 400 without `cwd`, since omp keeps memory per workspace, and answers `{ preview, store }`, built by `loadOmpMemory` in `src/memory.ts` from the settings a session in that workspace loads and the backend omp's `resolveMemoryBackend` picks from them, Off for a value omp does not know.
+`preview` is the block a new session's system prompt gets from `buildDeveloperInstructions`, `partial` for Mnemopi and Hindsight, which add recalled memories as the session runs, and `store`, the store of the backend in effect: Local's and Sharpshooter's files that exist, with Sharpshooter's queued sessions, or Mnemopi's and Hindsight's rows, newest first and at most 500, each with the edits omp allows on it, or `{ error }`.
+Mnemopi's working and episodic rows come from omp's `beam.exportToDict` on each bank, less those another bank wrote, superseded, or past their end, and its facts from the bank's `facts` table; Hindsight's from the server's `listMemories`.
+The backend and **Auto-learn** are rows of `agentSettings` in `GET /api/settings`, and save through `PUT /api/settings/agent`.
 Each write below takes `?cwd=`, runs one at a time, answers 400 without it, answers 409 with `conflict: true` when the backend in effect is no longer the one it edits, and answers the memory as it now loads.
 - `PUT /api/omp-memory/file` takes `{ path, text, baseHash }` for a file the store lists, with the hash check, symlink handling, and atomic write of `PUT /api/settings/file`, and answers 404 for a path the store does not list.
 - `PUT /api/omp-memory/entry` takes `{ op: "update", bank, id, expected, content }`, or `op` `forget` or `retire` without `content`, for a Mnemopi row of a bank the workspace reads.
   `expected` is the text the page showed; a row that is gone or holds other text answers 409 with `conflict: true`, and an edit omp does not allow on the row's kind answers 400.
   The server opens the bank through omp's `Mnemopi`, as a session does, redacts secrets from new text with `redactMemorySecrets`, and updates or forgets a working row or retires an episodic one, as omp's `/memory` edits do; facts are read-only.
 - `PUT /api/omp-memory/clear` takes `{ backend }`, one of `local`, `sharpshooter`, and `mnemopi`, which must be the backend in effect.
-  Local and Sharpshooter clear as omp's `/memory clear` does; Mnemopi removes the databases of the workspace's own banks and keeps the shared one, and answers 400 when every bank it reads is shared.
-- `PUT /api/omp-memory/rebuild`, for Local only, marks the summary for the rebuild the next session in the workspace runs as it starts.
+  Local and Sharpshooter clear through the backend's own `clear`, as omp's `/memory clear` does; Mnemopi removes the databases of the workspace's own banks and keeps the shared one, and answers 400 when every bank it reads is shared.
+- `PUT /api/omp-memory/rebuild`, for Local only, calls the backend's `enqueue`, which marks the summary for the rebuild the next session in the workspace runs as it starts.
 
 **Decisions** reads `GET /api/decisions?cwd=<directory>`, for a workspace only, and answers `{ dir, dirDisplay, records }`.
 `readDecisions` in `src/decisions.ts` finds the repository's top through git, else takes `cwd` itself, and reads the first of `docs/decisions`, docs/adr, and doc/adr that exists, or answers `dir: null`.

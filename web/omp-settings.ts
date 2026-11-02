@@ -6,6 +6,8 @@ import type { AgentSettingRow, AgentSettingTab } from "../src/shared/agent-setti
 import { AGENT_SETTINGS } from "../src/shared/agents";
 import { everyWord } from "../src/shared/every-word";
 import { GC_RULES } from "../src/shared/storage";
+import type { OmpFile } from "../src/shared/models";
+import { OMP_MEMORY_SETTINGS } from "../src/shared/omp-memory";
 import type { SettingsSection } from "./routing";
 
 /** The Settings section that edits a setting, and its name in the line that links there. */
@@ -40,13 +42,19 @@ export const OWNED_SETTINGS: Readonly<Record<string, SettingOwner>> = {
 	"retry.fallbackRevertPolicy": MODELS,
 	...Object.fromEntries(Object.values(AGENT_SETTINGS).map(id => [id, AGENTS])),
 	...Object.fromEntries(GC_RULES.map(rule => [rule.id, STORAGE])),
-	"memory.backend": MEMORY,
-	"autolearn.enabled": MEMORY,
-	"autolearn.autoContinue": MEMORY,
+	...Object.fromEntries(Object.values(OMP_MEMORY_SETTINGS).map(id => [id, MEMORY])),
 };
 
 /** The section that edits `id`, from {@link OWNED_SETTINGS}; `undefined` when this section does. */
 export const ownerOf = (id: string): SettingOwner | undefined => (Object.hasOwn(OWNED_SETTINGS, id) ? OWNED_SETTINGS[id] : undefined);
+
+/** The settings files the omp sections link to: your `config.yml`, and the workspace's own settings when it has one. */
+export function ompSettingsFiles(files: OmpFile[]): { configFile: OmpFile | undefined; projectFile: OmpFile | undefined } {
+	return {
+		configFile: files.find(file => file.kind === "settings" && file.scope === "user" && file.path.endsWith("/config.yml")),
+		projectFile: files.find(file => file.kind === "settings" && file.scope === "project" && file.body.state === "read"),
+	};
+}
 
 /** The value a session reads, the environment aside: the workspace's over the user's over omp's default. */
 export const valueOf = (row: AgentSettingRow): unknown => (row.workspace !== undefined ? row.workspace : row.user !== undefined ? row.user : row.default);
