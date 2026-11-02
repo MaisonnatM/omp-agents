@@ -433,12 +433,12 @@ export interface SkillOption {
 	name: string;
 	description: string | null;
 }
-/** The session that already works on the task a start asked for; `sessionId` is `null` while it still starts, `port` the dashboard that runs it. */
+/** The session that already works on the task a start asked for: `sessionId` is `null` while it still starts, `port` the dashboard that runs it, `cwdDisplay` its `~`-shortened directory. */
 export interface TaskOwner {
 	instanceId: string;
 	sessionId: string | null;
 	port: number;
-	cwd: string;
+	cwdDisplay: string;
 }
 /**
  * `workspace` is the absolute directory of the workspace the session counts in: its repository's main checkout when it

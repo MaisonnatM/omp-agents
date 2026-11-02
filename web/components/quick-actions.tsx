@@ -1,12 +1,13 @@
 /** Quick actions on a pull request, an issue, or a todo: the row menu, the details' buttons, and the note when a start fails. */
 import { CircleX, Eye, GitMerge, Hammer, ListChecks, type LucideIcon, MessageSquare, Radiation, Wrench, Zap } from "lucide-react";
-import { hashForSession, type RosterHost, type View } from "../../src/shared/sessions";
+import type { RosterHost, View } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 
 import { QUICK_ACTIONS, type QuickActionId, type QuickSubject } from "../quick-actions";
 import type { OpenMode } from "../routing";
+import { hostLabel } from "../labels";
 import type { StartOf } from "../starts";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { LiveSessionsMenu } from "./session-chip";
@@ -106,8 +107,8 @@ function subjectName(subject: QuickSubject): string {
 
 /**
  * Why the last quick action's session did not start, with a button that forgets it; nothing while it starts. When
- * another session already works on the task, it names that session instead, with **Open session**, and **End it and
- * start again** while this dashboard lists it.
+ * another session already works on the task, it names that session instead, with **Open session** and **End it and
+ * start again** while this dashboard lists it, else the dashboard port and directory it runs in.
  */
 export function QuickStartNotice({ quick, hosts, onDismiss }: NoticeProps) {
 	const { open, end, start } = useDashboardActions();
@@ -130,32 +131,26 @@ export function QuickStartNotice({ quick, hosts, onDismiss }: NoticeProps) {
 				{dismiss}
 			</p>
 		);
-	const host = hosts.find(listed => listed.instanceId === owner.instanceId || listed.sessionId === owner.sessionId);
-	const endAndStart = async (instanceId: string): Promise<void> => {
-		if (await end(instanceId)) start(op);
+	// The page's own roster may be scoped to the sidebar's workspace, so the port, not a listing, says this dashboard runs it.
+	const local = owner.port === Number(location.port);
+	const host = hosts.find(listed => listed.instanceId === owner.instanceId);
+	const endAndStart = async (): Promise<void> => {
+		if (await end(owner.instanceId)) start(op);
 	};
 	return (
 		<p role="alert" className="flex flex-wrap items-center gap-2 text-sm text-red-600 dark:text-red-400">
-			<span className="min-w-0">
-				Cannot start "{action}": {host ? `session "${host.sessionName ?? host.cwdDisplay}"` : `a session in ${owner.cwd}`} already works on {name}.
+			<span className="min-w-0 [overflow-wrap:anywhere]">
+				Cannot start "{action}": {host ? `session "${hostLabel(host)}"` : local ? `a session in ${owner.cwdDisplay}` : `a session on the dashboard at port ${owner.port}, in ${owner.cwdDisplay},`} already works on {name}.
 			</span>
-			{host ? (
+			{local && (
 				<>
-					<Button variant="secondary" size="compact" className="shrink-0" onClick={() => open({ kind: "live", instanceId: host.instanceId, agentId: null }, "replace")}>
+					<Button variant="secondary" size="compact" className="shrink-0" onClick={() => open({ kind: "live", instanceId: owner.instanceId, agentId: null }, "replace")}>
 						Open session
 					</Button>
-					<Button variant="destructive-outline" size="compact" className="shrink-0" loading={ending.has(host.instanceId)} onClick={() => void endAndStart(host.instanceId)}>
+					<Button variant="destructive-outline" size="compact" className="shrink-0" loading={ending.has(owner.instanceId)} onClick={() => void endAndStart()}>
 						End it and start again
 					</Button>
 				</>
-			) : (
-				owner.sessionId !== null && (
-					<Button variant="secondary" size="compact" className="shrink-0" asChild>
-						<a href={`http://localhost:${owner.port}/${hashForSession(owner.sessionId)}`} target="_blank" rel="noreferrer">
-							Open session
-						</a>
-					</Button>
-				)
 			)}
 			{dismiss}
 		</p>

@@ -177,5 +177,5 @@
   The button waits while the session starts.
   When the start fails, a note at the top of the Pull requests page, and in the details of that pull request, gives the reason until you dismiss it.
   When another session already works on the same task, the note says which instead, by its name, else its directory: `Cannot start "Fix CI": session "<session>" already works on owner/repo#123.`
-  For a session this dashboard lists, **Open session** opens it in the focused pane, and **End it and start again** ends it, waiting while it ends, then starts the quick action again.
-  For a session another dashboard runs, **Open session** opens it on that dashboard in a new browser tab; one still starting there offers only **Dismiss**.
+  For a session this dashboard runs, in any workspace, **Open session** opens it in the focused pane, and **End it and start again** ends it, waiting while it ends, then starts the quick action again.
+  For a session another dashboard runs, the note names that dashboard's port and the session's directory, and offers only **Dismiss**.

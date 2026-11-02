@@ -6,7 +6,7 @@ import { errorText } from "../json";
 import { skipRefused } from "../live-session";
 import { type AdmittedLaunch, keptSessions, type RpcLaunch } from "../omp/rpc";
 import { prepareReplay } from "../replay";
-import { directoryOf } from "../paths";
+import { directoryOf, displayPath } from "../paths";
 import { formatOf } from "../session-formats";
 import type { TrustAsk } from "../shared/project-trust";
 import { type PromptImage, type SessionFacts, type StartRequest, type StartResult, type TaskOwner, type View } from "../shared/sessions";
@@ -83,7 +83,7 @@ export function createStarter(env: StartEnv): Starter {
 		if (!identity) return body(allocated);
 		try {
 			const claim = await sessions.reserveTask(identity, allocated.instanceId, cwd, env.factsFor);
-			if (claim) return { error: taskConflict(claim), owner: { instanceId: claim.instanceId, sessionId: claim.sessionId, port: claim.port, cwd: claim.cwd } };
+			if (claim) return { error: taskConflict(claim), owner: { instanceId: claim.instanceId, sessionId: claim.sessionId, port: claim.port, cwdDisplay: displayPath(claim.cwd) } };
 		} catch (error) {
 			return { error: `Cannot claim the task: ${errorText(error)}` };
 		}
