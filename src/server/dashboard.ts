@@ -44,7 +44,8 @@ import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
 import { MCP_SERVICES } from "../shared/accounts";
 import { agentOn } from "../shared/moves";
-import type { StartRequest, StartResult, View } from "../shared/sessions";
+import { routerLinks } from "../shared/router";
+import type { SessionFacts, StartRequest, StartResult, View } from "../shared/sessions";
 import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
 import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
@@ -235,6 +236,8 @@ export class Dashboard {
 		this.#google = new GoogleCalendars(accountClients("google-calendar", (fetch, account) => new GoogleCalendarClient(fetch, account, () => calendars.value.get(account) ?? NO_HIDDEN)));
 		const sessions = (this.#sessions = new LiveSessions((instanceId, update) => this.#onLiveUpdate(instanceId, update)));
 		const { placement } = files.facts;
+		/** What each session links to, except that a Router's own conversation links no work item: see {@link routerLinks}. */
+		const factsOf = (sessionId: string, cwd?: string): SessionFacts => routerLinks(this.#botsFile.value, sessionId, files.factsOf(sessionId, cwd));
 		const pathFor = (view: View): string | null =>
 			view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
 		this.#pathFor = pathFor;
@@ -255,7 +258,7 @@ export class Dashboard {
 				updateDashboard: () => selfUpdate.update(),
 				pullRequests: async () => {
 					const list = await loadPullRequests(this.knownWorkspaces(), false);
-					const agent = agentOn(sessions.rows(files.factsOf));
+					const agent = agentOn(sessions.rows(factsOf));
 					this.#triggerWatch.learn(pullRequestSightings(list, agent));
 					return { list, agent };
 				},
@@ -344,7 +347,7 @@ export class Dashboard {
 			"router-tasks": { msg: () => this.#router.tasks.msg(), apply: change => this.#router.tasks.change(change) },
 		}, kind => this.#broadcasts.pushList(kind)));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
-			roster: () => ({ hosts: sessions.rows(files.factsOf), error: this.#rosterError }),
+			roster: () => ({ hosts: sessions.rows(factsOf), error: this.#rosterError }),
 			past: () => files.past(sessions.sessionIds(), id => interrupted.has(id)),
 			lists,
 			publish: (topic, json) => void this.#publisher?.publish(topic, json),
@@ -371,7 +374,7 @@ export class Dashboard {
 			sessions,
 			pathFor,
 			savedFile: files.pathOf,
-			factsFor: files.factsOf,
+			factsFor: factsOf,
 			mayDiscardReplay: async cwd => {
 				const at = await worktreeAt(cwd);
 				if (!at?.linked) return "This is not a registered linked worktree.";
@@ -392,7 +395,7 @@ export class Dashboard {
 			activity: () => files.activity(),
 			serverCwd: process.cwd(),
 			mergedPullRequests,
-			live: () => occupants.snapshot(sessions.rows(files.factsOf), (host, agentId) => sessions.get(host.instanceId)?.transcriptPath(agentId, files.pathOf) ?? null),
+			live: () => occupants.snapshot(sessions.rows(factsOf), (host, agentId) => sessions.get(host.instanceId)?.transcriptPath(agentId, files.pathOf) ?? null),
 		}));
 		this.#isolationSweep = new IsolationSweep({ ...ompSandboxes(), inUse: () => worktrees.inUse(), now: Date.now });
 		this.#processWatch = new SessionProcessWatch({
@@ -402,7 +405,7 @@ export class Dashboard {
 			readCwds,
 			appOf: readAppOf,
 			stopProcesses,
-			sessions: () => sessions.rows(files.factsOf),
+			sessions: () => sessions.rows(factsOf),
 			now: Date.now,
 			owner: () => ownerLock.held,
 			stopIdleAfterMinutes: () => {
@@ -480,7 +483,7 @@ export class Dashboard {
 		// Only the server that holds the owner lock steps the queue and takes the minute tick's look, so only it ends sessions after a merge, and only the ones it started.
 		const mergeCleanup = (this.#mergeCleanup = new MergeCleanup({
 			sessions: () =>
-				sessions.rows(files.factsOf).flatMap(host =>
+				sessions.rows(factsOf).flatMap(host =>
 					sessions.started(host.instanceId) !== undefined && this.#sourceControl.cleanUp
 						? [{ sessionId: host.sessionId, idle: host.status === "idle", occupied: occupiedBy(host.status, autoContinue.held(host.sessionId)), pullRequests: host.pullRequests, workDir: host.worktree ?? host.cwd, branch: host.branch?.linked ? host.branch.name : null }]
 						: [],
@@ -511,7 +514,7 @@ export class Dashboard {
 			{
 				bots: () => this.#botsFile.value,
 				pullRequests: () => loadPullRequests(this.knownWorkspaces(), true),
-				agent: () => agentOn(sessions.rows(files.factsOf)),
+				agent: () => agentOn(sessions.rows(factsOf)),
 				start: startSession,
 				queueMerge: change => this.#mergeQueue.apply(change),
 				unapprovedChange,
@@ -820,14 +823,16 @@ export class Dashboard {
 			case "exited": {
 				// Only a session this dashboard started reports its exit.
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
-				if (sessionId && !update.ended) this.#interrupted.interrupt(sessionId);
 				this.#reviewDrafts.exited(instanceId);
 				this.#moves.exited(instanceId);
-				this.#router.exited(instanceId);
 				// Its last turn may have remembered something.
 				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
 				this.#bots.exited(instanceId);
 				this.#sessions.remove(instanceId);
+				// Once the registry no longer holds it, so the supervisor's restart of a task's session resumes it rather than
+				// reaching the one that exited; that session is the supervisor's to continue, not one stopped mid-turn.
+				const restarting = this.#router.exited(instanceId, update.ended);
+				if (sessionId && !update.ended && !restarting) this.#interrupted.interrupt(sessionId);
 				this.#broadcasts.syncRoster();
 				void this.#loops.listNow();
 				return;

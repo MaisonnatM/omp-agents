@@ -60,21 +60,30 @@ test("a task whose session ends its turn waits for review and tells its Router t
 	expect(file.get("t1")).toMatchObject({ status: "review" });
 	expect(told).toEqual([[atlas, 'Task "Fix the flaky test" finished: It is fixed in `retry.ts`, and the test passes.']]);
 	await tasks.turnEnded("i1", "Still done.");
-	await tasks.exited("i1");
+	expect(tasks.exited("i1", false)).toBeNull();
 	expect(told).toHaveLength(1);
 	expect(changes()).toBe(3);
 });
 
-test("a quiet task moves to review without a word, and a session that exits mid-turn moves its task too", async () => {
+test("a quiet task moves to review without a word, and a session End session ends mid-turn moves its task too", async () => {
 	const { file, tasks, told } = harness();
 	tasks.apply({ op: "add", task: task({ quiet: true }) });
 	tasks.apply({ op: "add", task: task({ id: "t2", title: "Review the docs" }) });
 	tasks.bind("i1", "t1", "s1");
 	tasks.bind("i2", "t2", "s2");
 	await tasks.turnEnded("i1", "Done.");
-	await tasks.exited("i2");
+	expect(tasks.exited("i2", true)).toBeNull();
 	expect(file.value.map(({ status }) => status)).toEqual(["review", "review"]);
 	expect(told).toEqual([[atlas, 'Task "Review the docs" finished: its session ended without a reply.']]);
+});
+
+test("a session that goes down on its own mid-turn hands its task back for the supervisor rather than to review", () => {
+	const { file, tasks, told } = harness();
+	tasks.apply({ op: "add", task: task() });
+	tasks.bind("i1", "t1", "s1");
+	expect(tasks.exited("i1", false)).toMatchObject({ id: "t1", status: "working" });
+	expect(file.get("t1")).toMatchObject({ status: "working" });
+	expect(told).toEqual([]);
 });
 
 test("a task's session resumed, as after a restart, moves its task too, and a prompt to a task waiting for review sets it working", async () => {
@@ -101,7 +110,7 @@ test("a server without the owner lock changes no task and tells nobody", async (
 	expect(told).toEqual([]);
 });
 
-test("the page marks a task done, or stops it, which ends its session; a stopped task's exit tells nobody", async () => {
+test("the page marks a task done, or stops it, which ends its session; a stopped task's exit tells nobody", () => {
 	const { file, tasks, told, ended, changes } = harness();
 	tasks.apply({ op: "add", task: task({ sessionId: "s1" }) });
 	tasks.apply({ op: "add", task: task({ id: "t2", sessionId: "s2" }) });
@@ -113,7 +122,7 @@ test("the page marks a task done, or stops it, which ends its session; a stopped
 	expect(changes()).toBe(before + 2);
 	expect(file.value.map(({ status }) => status)).toEqual(["done", "stopped"]);
 	expect(ended).toEqual(["s2"]);
-	await tasks.exited("i2");
+	expect(tasks.exited("i2", true)).toBeNull();
 	expect(told).toEqual([]);
 });
 

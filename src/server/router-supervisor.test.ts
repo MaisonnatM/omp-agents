@@ -78,7 +78,12 @@ function harness(fields: Partial<RouterTask> = {}) {
 	const tick = async (times = 1) => {
 		for (let i = 0; i < times; i++) await supervisor.check();
 	};
-	return { file: tasks, tasks, state, tick, told, ended, prompts, resumed, interrupts: () => interrupts };
+	/** Instance `instanceId` of the task's session goes down on its own, and its task goes to the supervisor, as `Router.exited` hands it. */
+	const crash = async (instanceId: string) => {
+		const died = tasks.exited(instanceId, false);
+		if (died) await supervisor.died(died);
+	};
+	return { file: tasks, tasks, state, tick, crash, told, ended, prompts, resumed, interrupts: () => interrupts };
 }
 
 test("a task whose session keeps writing is left alone", async () => {
@@ -174,6 +179,26 @@ test("a task whose session died is resumed with the follow-up", async () => {
 	expect(resumed).toEqual(["s1"]);
 	expect(interrupts()).toBe(0);
 	expect(prompts).toEqual(["The supervisor restarted you: its session died. Last error: none. Continue the task."]);
+});
+
+test("a session that goes down on its own mid-turn is resumed at once, and after the last restart its task stops", async () => {
+	const { file, tasks, state, crash, told, ended, prompts, resumed } = harness();
+	state.live = false;
+	state.tail = { ...state.tail, lastError: "Killed" };
+	for (let restart = 1; restart <= MAX_RESTARTS; restart++) {
+		await crash(`i${restart}`);
+		expect(file.get("t1")).toMatchObject({ status: "working", restarts: restart, note: "its session died" });
+		// The resumed session runs as a new instance, whose follow-up starts a turn.
+		tasks.bind(`i${restart + 1}`, "t1", "s1");
+		tasks.turnStarted(`i${restart + 1}`);
+	}
+	expect(resumed).toEqual(Array(MAX_RESTARTS).fill("s1"));
+	expect(prompts.at(-1)).toBe("The supervisor restarted you: its session died. Last error: Killed. Continue the task.");
+	expect(told).toEqual(Array(MAX_RESTARTS).fill('FYI: the supervisor restarted task "Fix the flaky test": its session died.'));
+	await crash(`i${MAX_RESTARTS + 1}`);
+	expect(file.get("t1")).toMatchObject({ status: "stopped", restarts: MAX_RESTARTS, note: "its session died" });
+	expect(ended).toEqual(["s1"]);
+	expect(told.at(-1)).toBe(`The supervisor stopped task "Fix the flaky test" after ${MAX_RESTARTS} restarts: its session died.`);
 });
 
 test("a session gone from this server that still writes is not dead", async () => {

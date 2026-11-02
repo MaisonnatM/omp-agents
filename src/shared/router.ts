@@ -4,8 +4,9 @@
  */
 import { isNonEmpty, isObject, isSafeInteger, parseAll, type Parsed } from "../json";
 import type { RoutineSpec } from "../routines";
-import { type BotId, parseBotId } from "./bots";
+import { type Bot, type BotId, parseBotId } from "./bots";
 import { parsePullRequest } from "./github";
+import type { SessionFacts } from "./sessions";
 
 export const ROUTER_NAME = "Atlas";
 
@@ -73,6 +74,18 @@ export interface RouterTask {
 
 /** A task's open statuses: the ones the Router still tracks. */
 export const isOpenTask = ({ status }: RouterTask): boolean => status === "working" || status === "review";
+
+const NO_LINKS: Pick<SessionFacts, "pullRequests" | "tickets"> = { pullRequests: [], tickets: [] };
+
+/**
+ * `facts` of session `sessionId`, without its pull requests and Linear issues when it is the conversation of one of `bots`
+ * that is a Router. The events it reads name them, and its workspace's branch may head one, but it hands their work to
+ * tasks: it never claims one, so its tasks can start on it, and never counts as the agent on one, so its events still fire.
+ */
+export function routerLinks(bots: readonly Pick<Bot, "kind" | "sessionId">[], sessionId: string, facts: SessionFacts): SessionFacts {
+	if (!bots.some(bot => bot.kind === "router" && bot.sessionId === sessionId)) return facts;
+	return facts.pullRequests.length === 0 && facts.tickets.length === 0 ? facts : { ...facts, ...NO_LINKS };
+}
 
 /** The longest title, prompt, or note a task keeps. */
 export const MAX_TASK_TITLE = 120;

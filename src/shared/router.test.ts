@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import type { BotId } from "./bots";
-import { followKey, parseRouterRequest, parseRouterTask, parseRouterTaskChange, parseRouterTasks, parseTaskFollow, type RouterTask, taskGroups, uniqueFollows } from "./router";
+import { followKey, parseRouterRequest, parseRouterTask, parseRouterTaskChange, parseRouterTasks, parseTaskFollow, type RouterTask, routerLinks, taskGroups, uniqueFollows } from "./router";
+import type { SessionFacts } from "./sessions";
 
 const atlas = "atlas" as BotId;
 
@@ -74,4 +75,15 @@ test("the Tasks tab puts the tasks waiting on you first, then the ones at work, 
 		working: ["working"],
 		done: ["stopped", "done"],
 	});
+});
+
+test("a Router's own conversation links no pull request or issue, so it neither claims one nor counts as the agent on it", () => {
+	const facts: SessionFacts = { pullRequests: [{ owner: "acme", repo: "webapp", number: 7, link: "worked" }], tickets: ["ENG-1"], ship: null, worktree: "/work/webapp-wt", branch: null, workspace: null };
+	const bots = [
+		{ kind: "router" as const, sessionId: "router-s" },
+		{ kind: "pr-shepherd" as const, sessionId: "bot-s" },
+	];
+	expect(routerLinks(bots, "router-s", facts)).toEqual({ ...facts, pullRequests: [], tickets: [] });
+	expect(routerLinks(bots, "bot-s", facts)).toBe(facts);
+	expect(routerLinks(bots, "task-s", facts)).toBe(facts);
 });

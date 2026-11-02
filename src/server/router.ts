@@ -3,6 +3,7 @@
  * requests in, the screen their routines' events pass first, and the supervisor that restarts a stuck task. The
  * Dashboard builds one and forwards the lifecycle of every live session to it.
  */
+import { errorText } from "../json";
 import type { LiveSession } from "../live-session";
 import type { Bot, BotId } from "../shared/bots";
 import type { StartRequest, StartResult } from "../shared/sessions";
@@ -107,8 +108,16 @@ export class Router {
 		return this.tasks.join(request);
 	}
 
-	exited(instanceId: string): void {
-		void this.tasks.exited(instanceId);
+	/**
+	 * Live session `instanceId` exited, `ended` when End session ended it; call it once the registry no longer holds it,
+	 * so a restart resumes the session rather than reaching the one that exited. Returns whether the supervisor restarts
+	 * the task whose session went down on its own mid-turn, which makes that session the supervisor's to continue.
+	 */
+	exited(instanceId: string, ended: boolean): boolean {
+		const died = this.tasks.exited(instanceId, ended);
+		if (!died) return false;
+		this.#supervisor.died(died).catch((error: unknown) => console.error(`omp-agents: cannot restart task ${died.id}, whose session died: ${errorText(error)}`));
+		return true;
 	}
 
 	switched(instanceId: string, sessionId: string): void {
