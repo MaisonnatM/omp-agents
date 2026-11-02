@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { spring } from "@/lib/springs";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { INBOX_FILTERS, type InboxItem, type InboxNotice, inboxSections, itemCount, nextAfter, sectionsIn } from "../../inbox-model";
+import { INBOX_FILTERS, type InboxItem, type InboxNotice, inboxSections, itemCount, nextAfter, routeAfter, sectionsIn } from "../../inbox-model";
 import { follow } from "../../notice-model";
 import { PAGE_ICON } from "../../page-icons";
 import { useShowConversation } from "../../pane-store";
@@ -60,7 +60,7 @@ export function InboxPage({ hosts, notices, pins, openKey, models, workspaces }:
 	const at = open ? shown.indexOf(open) : -1;
 	if (at >= 0) lastAt.current = at;
 	if (open !== null && open.key === openKey) shownKey.current = openKey;
-	const handOn = open !== null && openKey !== null && open.key !== openKey && shownKey.current === openKey ? open.key : null;
+	const handOn = routeAfter(open, openKey, shownKey.current);
 	// The item that took the routed one's place becomes the route, so an item that arrives later above it cannot take it over.
 	useEffect(() => {
 		if (handOn !== null) location.replace(hashForInbox(handOn));

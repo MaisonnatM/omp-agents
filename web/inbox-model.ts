@@ -120,3 +120,11 @@ export function nextAfter(items: readonly InboxItem[], key: string | null, index
 	if (key === null) return null;
 	return items.find(item => item.key === key) ?? items[Math.min(index, items.length - 1)] ?? null;
 }
+
+/**
+ * The key the address should name once `open` shows for route item `key`, where `shownKey` is the routed item this list
+ * has shown: the open item's when the routed item left and another took its place, else `null`, which keeps the route.
+ */
+export function routeAfter(open: InboxItem | null, key: string | null, shownKey: string | null): string | null {
+	return open !== null && key !== null && open.key !== key && shownKey === key ? open.key : null;
+}
