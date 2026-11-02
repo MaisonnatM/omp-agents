@@ -34,6 +34,8 @@ export class RoutineRunner {
 	readonly #commands = new Set<string>();
 	/** Ticks and run-now claims, one at a time. */
 	readonly #lane = new SerialLane();
+	/** Command reports that ended outside a full wake, for the next tick at a full wake to post. */
+	readonly #reports: { routine: Routine; at: number; report: string }[] = [];
 
 	constructor(deps: RoutineRunnerDeps) {
 		this.#deps = deps;
@@ -54,10 +56,15 @@ export class RoutineRunner {
 		}
 	}
 
-	/** Claims due slots, then starts the queued runs. A tick while one runs is skipped. */
+	/**
+	 * Once the Mac is fully awake, posts the command reports held since a dark wake, claims due slots, then starts the
+	 * queued runs; the first tick at a full wake claims what came due since as one run. A tick while one runs is skipped.
+	 */
 	tick(): Promise<void> {
 		if (this.#lane.busy) return this.#lane.idle();
 		return this.#lane.run(async () => {
+			if (!(await this.#deps.fullyAwake())) return;
+			for (const { routine, at, report } of this.#reports.splice(0)) void this.#post(routine, at, report);
 			const now = this.#deps.now();
 			for (const routine of this.#deps.file.value) if (isDue(routine, now)) this.#claim(routine, now, []);
 			await this.#drain();
@@ -76,7 +83,8 @@ export class RoutineRunner {
 
 	/**
 	 * Claims one run for each enabled routine with a trigger of the kinds in `events`, holding the first
-	 * {@link MAX_TRIGGER_EVENTS} of them it watches, then drains; waits for a tick under way rather than skip.
+	 * {@link MAX_TRIGGER_EVENTS} of them it watches, then drains once the Mac is fully awake, else leaves the runs for
+	 * the next tick at a full wake; waits for a tick under way rather than skip.
 	 */
 	fire(events: readonly TriggerEvent[]): Promise<void> {
 		return this.#lane.run(async () => {
@@ -86,7 +94,7 @@ export class RoutineRunner {
 				// Runs are keyed by their time, so a second claim in the same millisecond takes the next one.
 				if (seen.length > 0) this.#claim(routine, Math.max(now, (routine.runs[0]?.at ?? 0) + 1), seen);
 			}
-			await this.#drain();
+			if (await this.#deps.fullyAwake()) await this.#drain();
 		});
 	}
 
@@ -153,10 +161,11 @@ export class RoutineRunner {
 			void this.#post(routine, at, sentText(routine, { at, triggeredBy }, { kind: "command", command, run }));
 		};
 		void this.#deps.exec(command, cwd, { ROUTINE_TRIGGERS: JSON.stringify(triggeredBy) }).then(
-			({ exitCode, output }) => {
+			({ exitCode, output, slept }) => {
 				const endedAt = this.#deps.now();
-				if (exitCode === null) ended({ phase: "stopped", reason: "time-limit", output, startedAt, endedAt }, `Stopped after ${COMMAND_TIME_LIMIT}.`);
-				else ended({ phase: "exited", code: exitCode, output, startedAt, endedAt }, exitCode === 0 ? null : `Exited with code ${exitCode}.`);
+				const asleep = slept === undefined ? {} : { slept };
+				if (exitCode === null) ended({ phase: "stopped", reason: "time-limit", output, startedAt, endedAt, ...asleep }, `Stopped after ${COMMAND_TIME_LIMIT}.`);
+				else ended({ phase: "exited", code: exitCode, output, startedAt, endedAt, ...asleep }, exitCode === 0 ? null : `Exited with code ${exitCode}.`);
 			},
 			(err: unknown) => {
 				const error = errorText(err);
@@ -165,8 +174,15 @@ export class RoutineRunner {
 		);
 	}
 
-	/** Posts how the command ended into the Bot's conversation; the run keeps the output either way, and records why the Bot could not take it. */
+	/**
+	 * Posts how the command ended into the Bot's conversation, or holds it for the next tick at a full wake; the run keeps
+	 * the output either way, and records why the Bot could not take it.
+	 */
 	async #post(routine: Routine, at: number, report: string): Promise<void> {
+		if (!(await this.#deps.fullyAwake())) {
+			this.#reports.push({ routine, at, report });
+			return;
+		}
 		try {
 			await this.#deps.messageBot(routine.botId, report);
 		} catch (error) {

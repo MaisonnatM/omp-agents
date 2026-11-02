@@ -59,7 +59,7 @@ export async function run(argv: string[], opts: RunOptions = {}): Promise<RunRes
 }
 
 export interface ShellOptions {
-	/** Stops the command after this long. */
+	/** Stops the command after this long while the Mac is awake. */
 	timeoutMs: number;
 	/** The output characters kept, the last ones. */
 	maxOutput: number;
@@ -69,10 +69,11 @@ export interface ShellOptions {
 	env?: Record<string, string>;
 }
 
-/** What a shell command ended with: `exitCode` is null once it was stopped; `slept` is how long the Mac slept while it ran, when a second or more. */
+/** What a shell command ended with: `exitCode` is null once it was stopped. */
 export interface ShellResult {
 	exitCode: number | null;
 	output: string;
+	/** How long the Mac slept while the command ran, in milliseconds, when a second or more. */
 	slept?: number;
 }
 
@@ -91,7 +92,16 @@ export async function runShell(command: string, cwd: string, opts: ShellOptions)
 			// Every process in the group already exited.
 		}
 	};
-	const timer = setTimeout(stop, opts.timeoutMs);
+	// Timers and `Date.now()` count the time the Mac sleeps, while `performance.now()` stops, so the limit re-arms for the awake time left.
+	const wallAt = Date.now();
+	const awakeAt = performance.now();
+	let timer: Timer;
+	const limit = (): void => {
+		const left = opts.timeoutMs - (performance.now() - awakeAt);
+		if (left <= 0) stop();
+		else timer = setTimeout(limit, left);
+	};
+	timer = setTimeout(limit, opts.timeoutMs);
 	opts.signal?.addEventListener("abort", stop, { once: true });
 	try {
 		if (opts.signal?.aborted) stop();
@@ -107,7 +117,8 @@ export async function runShell(command: string, cwd: string, opts: ShellOptions)
 		for await (const chunk of child.stdout) keep(decoder.decode(chunk, { stream: true }));
 		keep(decoder.decode());
 		await child.exited;
-		return { exitCode: child.signalCode ? null : child.exitCode, output: cut ? `…${output}` : output };
+		const slept = Math.floor((Date.now() - wallAt - (performance.now() - awakeAt)) / 1000) * 1000;
+		return { exitCode: child.signalCode ? null : child.exitCode, output: cut ? `…${output}` : output, ...(slept > 0 ? { slept } : {}) };
 	} finally {
 		clearTimeout(timer);
 		opts.signal?.removeEventListener("abort", stop);

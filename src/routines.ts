@@ -42,7 +42,7 @@ export type RoutineTask =
 
 /**
  * A run's command: `running` from its launch, saved before it can end, then how it ended. `slept` is how long the Mac
- * slept between `startedAt` and `endedAt`, when a second or more; the time limit does not count it.
+ * slept between `startedAt` and `endedAt`, when a second or more.
  */
 export type CommandRun =
 	| { phase: "running"; startedAt: number }
@@ -104,7 +104,7 @@ export interface BotRoutineRequest {
 	change: BotRoutineChange;
 }
 
-/** A command routine's command: the longest one a routine saves, how long it may run, and how much of its output a run keeps. */
+/** A command routine's command: the longest one a routine saves, how long it may run while the Mac is awake, and how much of its output a run keeps. */
 export const MAX_COMMAND_LENGTH = 10_000;
 export const COMMAND_TIMEOUT_MS = 600_000;
 export const MAX_COMMAND_OUTPUT = 64 * 1024;
@@ -228,14 +228,15 @@ export function parseTriggerEvent(value: unknown): TriggerEvent | null {
 /** A run's command as `routines.json` keeps it, or `null`. */
 export function parseCommandRun(value: unknown): CommandRun | null {
 	if (!isObject(value) || !isSafeInteger(value.startedAt)) return null;
-	const { phase, startedAt, endedAt, output } = value;
+	const { phase, startedAt, endedAt, output, slept } = value;
 	if (phase === "running") return { phase, startedAt };
-	if (!isSafeInteger(endedAt)) return null;
+	const asleep = slept === undefined ? {} : isSafeInteger(slept) && slept > 0 ? { slept } : null;
+	if (!isSafeInteger(endedAt) || !asleep) return null;
 	switch (phase) {
 		case "exited":
-			return typeof value.code === "number" && Number.isSafeInteger(value.code) && typeof output === "string" ? { phase, code: value.code, output, startedAt, endedAt } : null;
+			return typeof value.code === "number" && Number.isSafeInteger(value.code) && typeof output === "string" ? { phase, code: value.code, output, startedAt, endedAt, ...asleep } : null;
 		case "stopped":
-			return (value.reason === "time-limit" || value.reason === "dashboard") && typeof output === "string" ? { phase, reason: value.reason, output, startedAt, endedAt } : null;
+			return (value.reason === "time-limit" || value.reason === "dashboard") && typeof output === "string" ? { phase, reason: value.reason, output, startedAt, endedAt, ...asleep } : null;
 		case "failed":
 			return typeof value.error === "string" ? { phase, error: value.error, startedAt, endedAt } : null;
 		default:

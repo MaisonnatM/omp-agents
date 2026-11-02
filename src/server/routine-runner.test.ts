@@ -246,6 +246,23 @@ describe("RoutineRunner", () => {
 			expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + HOUR, [], { kind: "command", command: "git worktree prune", run })]);
 		});
 
+		test("a command that ends in a dark wake posts its report at the first tick at a full wake", async () => {
+			const file = fileWith(routinesPath(), command);
+			const { runner, fake } = harness(file);
+			await runner.tick();
+			fake.awake = false;
+			fake.execs[0]!.end({ exitCode: 0, output: "ok\n" });
+			await settled();
+			const run = { phase: "exited", code: 0, output: "ok\n", startedAt: T0 + HOUR, endedAt: T0 + HOUR } as const;
+			expect([file.value[0]?.runs[0]?.outcome, fake.messages]).toEqual([{ kind: "command", run }, []]);
+
+			await runner.tick();
+			fake.awake = true;
+			await runner.tick();
+			await settled();
+			expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + HOUR, [], { kind: "command", command: "git worktree prune", run })]);
+		});
+
 		test("a command that cannot start saves why as its failure and its error", async () => {
 			const file = fileWith(routinesPath(), command);
 			const { runner, fake } = harness(file);
@@ -299,6 +316,7 @@ describe("RoutineRunner", () => {
 
 	describe("a Mac in a dark wake", () => {
 		const mention: TriggerEvent = { kind: "slack", title: "Ana mentioned you in #eng", detail: "Can you look at the deploy?", url: "https://acme.slack.com/archives/C1/p1" };
+		const reply: TriggerEvent = { kind: "slack", title: "Ana replied in #eng", detail: "Never mind, it is fixed.", url: "https://acme.slack.com/archives/C1/p2" };
 
 		test("a tick starts nothing, and the first tick at a full wake runs what came due once", async () => {
 			const file = fileWith(routinesPath());
@@ -314,18 +332,20 @@ describe("RoutineRunner", () => {
 			expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + 3 * HOUR, [], summary)]);
 		});
 
-		test("a trigger claims its run, which starts at the first tick at a full wake", async () => {
+		test("trigger news joins one waiting run, which starts at the first tick at a full wake", async () => {
 			const file = new RoutinesFile(routinesPath());
 			file.apply({ op: "save", routine: { id: "r1", botId: SCOUT, name: "Notes", schedules: [], triggers: [{ kind: "slack" }], task: summary, enabled: true } }, T0);
 			const { runner, fake } = harness(file);
 			fake.awake = false;
 			await runner.fire([mention]);
-			expect([fake.messages, file.value[0]?.runs.map(({ at, triggeredBy }) => [at, triggeredBy])]).toEqual([[], [[T0 + HOUR, [mention]]]]);
+			fake.now += 16 * 60_000;
+			await runner.fire([reply]);
+			expect([fake.messages, file.value[0]?.runs.map(({ at, triggeredBy }) => [at, triggeredBy])]).toEqual([[], [[T0 + HOUR, [mention, reply]]]]);
 
 			fake.awake = true;
 			fake.now += 60_000;
 			await runner.tick();
-			expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + HOUR, [mention], summary)]);
+			expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + HOUR, [mention, reply], summary)]);
 		});
 
 		test("Run now starts at once, since the user asked", async () => {
