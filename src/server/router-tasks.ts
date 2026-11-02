@@ -1,6 +1,7 @@
 /**
  * The tasks Router Bots hand to background sessions, kept in `router-tasks.json` beside `bots.json`, and how each moves
- * as its session works: a turn that ends, or a session that exits, while it works moves it to review and tells its Router.
+ * as its session works: a turn that ends, or a session that End session ends, while it works moves it to review and
+ * tells its Router; a session that goes down on its own mid-turn is handed back for the supervisor to restart.
  * Only the server that holds the owner lock changes the file, so two servers never tell a Router twice; nothing else reads or writes it.
  */
 import { errorText } from "../json";
@@ -185,11 +186,16 @@ export class RouterTasks {
 		return this.#finished(this.#taskOf(instanceId), lastLine(reply));
 	}
 
-	/** The task's session exited; one still working moves to review. */
-	exited(instanceId: string): Promise<void> {
+	/**
+	 * The task's session exited, `ended` when End session ended it. A working task moves to review, unless its session went
+	 * down on its own mid-turn, as on a crash or a kill: that task is returned, for the supervisor to restart.
+	 */
+	exited(instanceId: string, ended: boolean): RouterTask | null {
 		const task = this.#taskOf(instanceId);
 		this.#instances.delete(instanceId);
-		return this.#finished(task, null);
+		if (!ended && task?.status === "working" && !this.#restarting.has(task.id) && this.#deps.active()) return task;
+		void this.#finished(task, null);
+		return null;
 	}
 
 	async #finished(task: RouterTask | undefined, line: string | null): Promise<void> {

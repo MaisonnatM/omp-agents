@@ -105,6 +105,11 @@ Each tool writes one `RouterRequest` into `router-inbox/`, as the shepherd's too
 On every main-agent turn, `before_agent_start` appends the tools' rules and the Router's open tasks, read from the tasks file, one JSON line each with its id, title, status, and follow keys.
 
 `Router` in `src/server/router.ts` wires the Router parts once, for `Dashboard`: it builds `RouterTasks`, `RouterInbox`, `RouterEvents`, and `RouterSupervisor` over one set of dependencies, starts and stops the inbox and the supervisor's loop, reloads the tasks and drains the inbox when the server takes over the owner lock, adds `RouterTasks.join` to each session's join, and takes the live sessions' exits, switches, and turns.
+`Dashboard` hands it an exit only once the registry no longer holds the session, so a restart resumes the session rather than reaching the one that exited.
+`Router.exited` answers whether the supervisor restarts that session's task; `Dashboard` lists a session among those stopped mid-turn, for **Continue all**, only when it does not, since the supervisor continues the others.
+
+`Dashboard` reads every live session's facts through `routerLinks` in `src/shared/router.ts`, which drops the pull requests and Linear issues of a Router's own conversation: the events it reads name them and its workspace's branch may head one, but it hands their work to tasks.
+So its live row links none, `agentOn` never counts it as the agent on one, which would hide the event from the Router or fire it again once the conversation idles, merge cleanup never ends it, and `reserveTask` never refuses a task's start on one for its claim.
 
 `RouterInbox` in `src/server/router-inbox.ts` drains the inbox on the server that owns the lock, and sets aside a file that is no request, or one from a Bot that is gone or is not a Router.
 A start adds the task as `working`, then starts `newSessionRequest` in its directory with its prompt, and the first pull request or Linear issue it follows as its subject, through the same `startSession` the shepherd uses; it then binds the task to the session and renames the session after the task, so the Sessions tab shows it by name.
@@ -113,7 +118,8 @@ That failure, and a `follow` or `finish_task` for a task that is not the Router'
 
 `RouterTasks` in `src/server/router-tasks.ts` keeps the tasks in `router-tasks.json` through its own private `RouterTasksFile`, a `ReducerFile` over `applyRouterTask`, so its collaborators read and change tasks through it alone, and moves each as its session reports to `Dashboard`'s live updates.
 It finds a session's task by the instance it was bound to: the inbox binds a task's new session at start, and `join`, like `Bots.join`, binds the resume of a task's session, whether the supervisor's, a passed-through event's, or `reattachAll`'s after a restart; it follows an edited prompt's new session file (`switched`).
-A turn that ends, or a session that exits, while its task is `working` moves the task to `review`, which the Tasks tab shows as **Needs you**, and, unless the task is `quiet`, posts `Task "<title>" finished: <last line of the reply>` into the Router's conversation; a turn that starts on a task in `review` moves it back to `working`.
+A turn that ends, or a session that End session ends, while its task is `working` moves the task to `review`, which the Tasks tab shows as **Needs you**, and, unless the task is `quiet`, posts `Task "<title>" finished: <last line of the reply>` into the Router's conversation; a turn that starts on a task in `review` moves it back to `working`.
+A session that exits mid-turn on its own, the `exited` update without `ended`, such as a crash or a kill, instead leaves its task `working`: `RouterTasks.exited` returns the task, and `Router.exited` hands it to `RouterSupervisor.died`.
 Only the server holding the owner lock moves tasks, so two servers never tell a Router twice.
 The pages hear every task through the list registry's `router-tasks` entry, a `router-tasks` ServerMsg, and send a `router-task` ClientMsg, **Mark done** or **Stop**.
 That message and a Router's `finish_task` carry the same `RouterTaskChange`, which `RouterTasks.change` applies; `stopped` ends the task's session.
@@ -135,9 +141,10 @@ As the run sends, the screen's `prompt` adds to a triggered run's prompt each ev
 It reads the end of the task's session file through `readTaskTail`: the newest entry's id, the tool call the file ends on and how many times in a row it ran since the last prompt, the newest message's tool call that has no result yet, and the newest failed tool result.
 A live session whose turn runs is stuck when that call repeated `LOOP_REPEATS`, four, times, or when neither its newest entry nor its running subagents' activity changed for `STALL_CHECKS`, three, looks in a row, or `LONG_CALL_CHECKS`, fifteen, while a tool call it made still has no result, such as a long build; a session waiting on you, or idle, is not.
 A session that no longer runs here counts as died only once its file stays still for those looks too, so a session another server still runs is left alone.
+A session this server sees exit on its own mid-turn needs no looks: `died` restarts its task at once, with `its session died` as the reason.
 A restart, through `RouterTasks.restart`, marks the task so the turn it stops ends without moving it to review, stops the turn with `interrupt`, and sends `The supervisor restarted you: <reason>. Last error: <error>. Continue the task.` as a follow-up, with the messages the stop took back, to the session, resumed through `reach` when it died.
 Only once that follow-up is sent does the restart count in the task's `restarts` and set its `note` to the reason through the `restart` edit.
 A restart that fails, such as a session that does not resume, counts nothing: it stops the task with `The supervisor could not restart it: <error>` as its note, which ends its session, and posts `The supervisor stopped task "<title>": it could not restart it: <error>.` into its Router's conversation.
 A task that is not `quiet` posts `FYI: the supervisor restarted task "<title>": <reason>.` into its Router's conversation.
-After `MAX_RESTARTS`, two, restarts, the next stuck look stops the task with the reason as its note, which ends its session, and posts `The supervisor stopped task "<title>" after 2 restarts: <reason>.` whether the task is quiet or not.
+After `MAX_RESTARTS`, two, restarts, the next stuck look or death stops the task with the reason as its note, which ends its session, and posts `The supervisor stopped task "<title>" after 2 restarts: <reason>.` whether the task is quiet or not.
 

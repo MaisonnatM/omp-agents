@@ -2,8 +2,9 @@
  * The supervisor of Router tasks: every {@link SUPERVISOR_TICK_MS}, on the server that holds the owner lock, it looks at
  * each working task's session. A session that works but writes nothing new for {@link STALL_CHECKS} looks, or for
  * {@link LONG_CALL_CHECKS} while a tool call such as a long build still runs, one that ran
- * the same tool call {@link LOOP_REPEATS} times in a row, or one that died while its task worked, is stopped and told to
- * go on, with the reason and its last error; after {@link MAX_RESTARTS} restarts, or a restart that fails, the task is stopped and its Router told.
+ * the same tool call {@link LOOP_REPEATS} times in a row, or one gone whose file stays still, is stopped and told to
+ * go on, with the reason and its last error. A session this server sees go down on its own mid-turn restarts at once.
+ * After {@link MAX_RESTARTS} restarts, or a restart that fails, the task is stopped and its Router told.
  */
 import { errorText, isObject } from "../json";
 import type { LiveSession } from "../live-session";
@@ -24,6 +25,8 @@ export const LONG_CALL_CHECKS = 15;
 export const LOOP_REPEATS = 4;
 /** How many times the supervisor restarts a task before it stops it. */
 export const MAX_RESTARTS = 2;
+/** The reason a task whose session died restarts with. */
+const DIED = "its session died";
 
 /** What the end of a session's file says of its progress. */
 export interface TaskTail {
@@ -156,7 +159,13 @@ export class RouterSupervisor {
 		if (still < limit) return;
 		const minutes = Math.round((limit * SUPERVISOR_TICK_MS) / 60_000);
 		const stalled = tail?.running && live ? `it made no progress for ${minutes} minutes while ${tail.running} ran` : `it made no progress for ${minutes} minutes`;
-		return this.#restart(task, sessionId, live, live ? stalled : "its session died", tail?.lastError ?? null);
+		return this.#restart(task, sessionId, live, live ? stalled : DIED, tail?.lastError ?? null);
+	}
+
+	/** Working task `task`'s session went down on its own mid-turn, as on a crash or a kill: it restarts at once, without waiting for a look. */
+	async died(task: RouterTask): Promise<void> {
+		if (task.sessionId === null) return;
+		await this.#restart(task, task.sessionId, null, DIED, this.#deps.tail(task.sessionId)?.lastError ?? null);
 	}
 
 	async #restart(task: RouterTask, sessionId: string, live: SupervisedSession | null, reason: string, lastError: string | null): Promise<void> {

@@ -103,10 +103,11 @@
   It answers at once and never does real work in its own turn: it asks the dashboard to start a task, a background session with its own prompt, and tells you it did.
 - Each task's session shows in **Sessions**, named after the task, and runs in the Router's workspace unless the Router names another directory.
   A task about a pull request or a Linear issue also shows it on its session row.
+  The Router's own conversation links no pull request or issue, even one it read about or one its workspace's branch heads, so it never counts as the agent on one and never keeps a task from starting on it.
 - The Router's **Tasks** tab groups its tasks into **Needs you**, **In progress**, and **Done**, newest first.
   Each row shows the task's title, the dot of its session while it runs, what it is **Listening to**, such as a pull request, a Slack thread, or a Linear issue, and how long ago it last changed.
   Click a row to open its session, or Cmd-click to open it in a new pane; its menu offers **Mark done** and **Stop**, which ends its session.
-- When a task's session ends its turn, the task moves to **Needs you**, and the Router hears one line in its conversation, `Task "<title>" finished:` and the last line of the reply, unless it started the task quiet.
+- When a task's session ends its turn, or you end the session with **End session** while it works, the task moves to **Needs you**, and the Router hears one line in its conversation, `Task "<title>" finished:` and the last line of the reply, unless it started the task quiet.
   Prompting the task's session again moves it back to **In progress**.
 - The Router sees its open tasks on every turn, so it can mark one done or stopped, or add what one listens to, when you ask.
 - A task the dashboard cannot start, such as one in a directory you have not trusted, shows under **Done** as stopped, with why, and the Router hears why in its conversation.
@@ -120,7 +121,8 @@
 - A supervisor checks the tasks in progress every two minutes while the dashboard runs.
   A task whose session works with no new step for six minutes, runs the same tool call four times in a row, or died, is stopped and told to continue, with the reason and its last error.
   While one of its tool calls still runs, such as a long build or test run, it gets 30 minutes instead of six.
+  A session that goes down on its own mid-turn, as when its process crashes or is killed, counts as died at once: the supervisor resumes it and tells it to continue without waiting for its next check.
   The Router tells you it restarted a task unless the task is quiet, and the task's row in **Tasks** shows why.
-  After two restarts, the next time the task is stuck the supervisor stops it and ends its session, and the Router hears why.
+  After two restarts, the next time the task is stuck or its session dies the supervisor stops it and ends its session, and the Router hears why.
 - Deleting a Router deletes its tasks; their sessions stay in **Sessions**.
 - The server keeps the tasks in `router-tasks.json` beside `bots.json`.
