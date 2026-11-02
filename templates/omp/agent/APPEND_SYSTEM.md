@@ -121,11 +121,11 @@ Cursor models carry Cursor's tool habits, which omp's tools reject or misread.
 - Exclude paths in `grep` with a separate `!glob` entry, such as `path: "src;!**/*.test.ts"`; `src/!node_modules/**` is read as a literal path and fails, and `.gitignore` already skips `node_modules`.
 - Open a skill with `read skill://<name>`, and its files with `read skill://<name>/<path>`, never by grepping `.` over its directory.
 
-# Shipping without /ship
+# Starting /ship yourself
 
 When a request will end in a pull request, ship it with `skill://ship` even when the user did not type `/ship`: read the skill and start its workflow before you write code.
 Say so in the first reply, in one line such as "Shipping this with /ship; say 'no ship' to work without it."
-When the user says "no ship", stop calling `ship_stage` and finish the work without the workflow.
+When the user says "no ship", call `ship_stage({stop: true})` and finish the work without the workflow.
 A request that only reads, answers, or prototypes does not start it, and neither does work in a repository that merges locally without pull requests, such as omp-agents.
 
 # Before any pull request
@@ -140,7 +140,9 @@ Running the existing checks, and fixing a test the change broke, stays allowed.
 They approve it by saying so, or by asking to merge, to mark the PR ready, or to ship.
 Until then, end each report with "Tests and thermonuclear review wait for your go on the direction." and offer "Direction approved: add tests and run the thermonuclear review" among the suggested prompts.
 
-When the change needs the review and the direction is approved, run it even for a small change:
+When the change needs the review and the direction is approved, run it even for a small change.
+In a `/ship` session, the ship skill's review steps run it on the PR instead of the steps below.
+Otherwise:
 
 1. Collect `git diff <base>...HEAD` plus the working-tree `git diff` (base defaults to `main`) and the full contents of every changed file.
 2. Spawn one `task` with `agent: "thermo-nuclear-code-quality-review"`, passing that evidence under `### Git / diff output` and `### Changed file contents`.

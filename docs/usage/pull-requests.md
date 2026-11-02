@@ -28,7 +28,7 @@
   Weaker evidence counts once two kinds of it agree: a read with omp's Linear tools (`get_issue`, `list_comments`), its identifier in the session's own prompt, and the session's branch, such as `eng-2716-agent-templates` or `me/eng-2712`.
   So an issue a subagent only read for context does not count, and neither does one that a `list_issues` search only listed.
 - Sessions that use `/ship` show a Ship card at the top of their transcript, with the Linear issue if the work has one, the PR, the current step, and how many of the nine steps are done, such as `1 of 9` during the plan.
-  Agents start `/ship` on their own when a request will end in a pull request, and say so in their first reply; answer "no ship" to work without it.
+  Agents start `/ship` on their own when a request will end in a pull request, and say so in their first reply; answer "no ship" to work without it, and the Ship card goes away.
   Click the card to see every step.
   The steps are ticket, plan, implementation, draft PR, interface review, thermonuclear review, ready gate, live review, and merged.
   The ticket step links the issue you named or one that matches the work, and passes without one rather than creating a ticket.

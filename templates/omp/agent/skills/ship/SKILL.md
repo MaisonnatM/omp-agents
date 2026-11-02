@@ -43,7 +43,7 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before registering a PR o
    Commit, then call `ship_stage({stage:"draft_pr"})`.
    If a PR already exists for the branch, reuse it.
 4. **Draft PR.** Push the branch, then open a DRAFT PR with `gh pr create --draft`.
-   With an issue, put `Fixes <issue ID>` in the body and the issue ID in the title; without one, put the chosen plan under `## Plan` in the body.
+   With an issue the user named, put `Fixes <issue ID>` in the body and the issue ID in the title; with one you found by search, put `Refs <issue ID>` instead, so merging does not close a ticket the user never confirmed; without one, put the chosen plan under `## Plan` in the body.
    Never request reviewers while draft.
    If Graphite is configured, run `gt track <branch> -p <parent> --no-interactive -q` and `gt submit --cwd <checkout> --no-edit --no-stack -q` so the PR is registered.
    Confirm its draft state with `gh pr view --json number,isDraft,url`, then call `ship_stage({stage:"interface_review", pr:<number>})`.

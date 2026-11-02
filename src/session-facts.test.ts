@@ -320,6 +320,9 @@ describe("SessionFactsIndex", () => {
 		appendFileSync(session, `${state("unknown")}\n`);
 		expect(await index.refresh(listed(3))).toBe(false);
 		expect(index.factsOf(session).ship?.work).toBe("rebase");
+		appendFileSync(session, `${JSON.stringify({ type: "custom", customType: "omp-ship.state", data: { stopped: true } })}\n`);
+		expect(await index.refresh(listed(4))).toBe(true);
+		expect(index.factsOf(session).ship).toBeNull();
 	});
 
 	test("lists the Linear issues the session and its subagents worked on, the session's own first, each once, and reports a new one on append", async () => {

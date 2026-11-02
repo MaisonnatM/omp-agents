@@ -257,6 +257,8 @@ export class SessionFactsScan {
 		if (entry.type === "custom") {
 			if (entry.customType === "omp-agents.headless") this.headless = isObject(entry.data) && entry.data.headless === true;
 			else if (entry.customType === "omp-ship.state") {
+				// `ship_stage({stop: true})` writes `{stopped: true}` when the user says "no ship", which ends the run.
+				if (isObject(entry.data) && entry.data.stopped === true) this.ship = null;
 				const ship = parseShipProgress(entry.data);
 				if (ship) {
 					this.ship = ship;

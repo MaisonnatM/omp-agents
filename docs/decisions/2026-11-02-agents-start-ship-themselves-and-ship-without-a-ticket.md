@@ -27,12 +27,15 @@ The user chose both options below.
 
 Without an issue, the plan goes under `## Plan` in the PR body instead of a Linear comment, and the PR's title and body carry no `Fixes <ID>`.
 The ticket step still shows as done on the Ship card and widget; the widget's title line says "(no ticket)" once past it.
+An issue the agent found by search, not one the user named, gets `Refs <ID>` rather than `Fixes <ID>`, so merging does not close a ticket the user never confirmed.
+"No ship" calls `ship_stage({stop: true})`, which writes `{stopped: true}` to the session; the extension's widget and gates and the dashboard's Ship card drop the run, since the workflow has already recorded its first stage by the time the user answers.
+In a `/ship` session, the ship skill's review steps replace the numbered steps of `# Before any pull request`, so the review runs once.
 A repository that merges locally without pull requests, such as omp-agents, never starts `/ship` on its own, because the stages after Implement assume a PR.
 The rule lives in the kit's `APPEND_SYSTEM.md`, so installed copies change only after `bun run omp-template`.
 
 ## Confirmation
 
-`templates/omp/agent/APPEND_SYSTEM.md` has the `# Shipping without /ship` section, and step 1 of `templates/omp/agent/skills/ship/SKILL.md` creates an issue only when the user asks for one.
+`templates/omp/agent/APPEND_SYSTEM.md` has the `# Starting /ship yourself` section, step 1 of `templates/omp/agent/skills/ship/SKILL.md` creates an issue only when the user asks for one, and `src/session-facts.test.ts` drops the Ship card on a stop entry.
 
 ## Revisit when
 

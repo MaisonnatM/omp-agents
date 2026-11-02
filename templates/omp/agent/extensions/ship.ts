@@ -70,7 +70,7 @@ const NEXT: Record<Stage, string> = {
 	ticket: "Link the Linear issue the user named, or an open one that clearly matches the work, then record ship_stage({stage: 'plan', issue}); with no issue, record ship_stage({stage: 'plan'}).",
 	plan: "Choose how to build the change as the ship skill's Plan step says, then record ship_stage({stage: 'implement'}).",
 	implement: "Implement the plan and commit on the work's branch. Do not open a PR in this stage.",
-	draft_pr: "Create a draft with `gt submit --draft` for a Graphite repository, or push and run `gh pr create --draft` otherwise. With an issue, include its ID in the title and `Fixes <ID>` in the body; without one, put the plan under `## Plan` in the body.",
+	draft_pr: "Create a draft with `gt submit --draft` for a Graphite repository, or push and run `gh pr create --draft` otherwise. Reference the issue, or put the plan in the body without one, as the ship skill's Draft PR step says.",
 	interface_review: `If the status says the ${REVIEWS.interface_review.label} is not needed because \`${REVIEWS.interface_review.pathsFile}\` lists no changed file, record ship_stage({stage: 'thermonuclear'}) and move on. Otherwise wait until the user approves the direction, then spawn \`task\` with \`agent: "interface-reviewer"\` on the PR, apply the findings in a fresh agent, push, then add \`${REVIEWS.interface_review.box}\` to the PR body.`,
 	thermonuclear: `If the status says the ${REVIEWS.thermonuclear.label} is not needed because \`${REVIEWS.thermonuclear.pathsFile}\` lists no changed file, skip the review. Otherwise wait until the user approves the direction, then run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${REVIEWS.thermonuclear.box}\` to the PR body. If the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
 	ready_gate: `Make sure the PR body has no unchecked \`${PROOF_BOX}\` box, ask the user to approve, then run \`gh pr ready <N>\`.`,
@@ -409,6 +409,7 @@ export default function ship(pi: ExtensionAPI) {
 			if (entry.type === "custom" && entry.customType === ENTRY) {
 				const parsed = stateSchema.safeParse(entry.data);
 				if (parsed.success) state = parsed.data;
+				else if ((entry.data as { stopped?: unknown } | undefined)?.stopped === true) state = undefined;
 			}
 		}
 		lastSummary = state?.prStatus ? liveSummary(state.prStatus) : "";
@@ -575,6 +576,7 @@ export default function ship(pi: ExtensionAPI) {
 		pr: z.number().int().optional().describe("Pull request number"),
 		repo: z.string().optional().describe("owner/name; resolved from the cwd when omitted"),
 		note: z.string().optional().describe("One-line status note; empty string clears it"),
+		stop: z.boolean().optional().describe("End the workflow in this session, as when the user says 'no ship'"),
 	});
 	pi.registerTool({
 		loadMode: "essential",
@@ -584,12 +586,19 @@ export default function ship(pi: ExtensionAPI) {
 			`Read or record the /ship workflow stage of this session: ${STAGES.join(", ")}.`,
 			"While live, record the work you start: rebase, fix_comments, or fix_ci; record `live` again after you push.",
 			"Call with no stage to read the current stage, the PR's live needs from GitHub, and the next action.",
+			"Call with stop: true when the user says 'no ship'; the widget, the gates, and the dashboard's Ship card then drop the run.",
 		].join(" "),
 		parameters: toolParamsSchema,
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			const parsed = toolParamsSchema.safeParse(params);
 			if (!parsed.success) return { content: [{ type: "text", text: "Invalid ship stage input." }], isError: true };
-			const { stage, issue, pr, repo, note } = parsed.data;
+			const { stage, issue, pr, repo, note, stop } = parsed.data;
+			if (stop) {
+				state = undefined;
+				pi.appendEntry(ENTRY, { stopped: true });
+				render(ctx);
+				return { content: [{ type: "text", text: "Stopped the /ship workflow in this session." }] };
+			}
 			const base: ShipState = state ?? { stage: "ticket", updatedAt: "" };
 			const newPr = pr !== undefined && pr !== base.pr;
 			if (newPr || (repo !== undefined && repo !== base.repo)) {
