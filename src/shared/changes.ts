@@ -47,6 +47,12 @@ export const fileText = (path: string, rows: ChangedFileText["rows"], note: stri
 /** The most bytes of a side that the changes view reads. */
 export const MAX_CHANGED_FILE_BYTES = 1024 * 1024;
 
+/** A hunk header's first line number on each side, `null` for an `@@` line without numbers. An empty side starts at 0 and has no lines, so it counts from 1. */
+const hunkStart = (line: string): { old: number; new: number } | null => {
+	const match = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+	return match ? { old: Math.max(1, Number(match[1])), new: Math.max(1, Number(match[2])) } : null;
+};
+
 /**
  * The rows of `git diff --unified=<every line>`: the header lines before the first `@@` are skipped, and so is the
  * `\ No newline at end of file` marker. A diff with no hunk, an unchanged file, has no rows.
@@ -56,17 +62,11 @@ export function parseFullDiff(diff: string): DiffRow[] {
 	let oldLine = 0;
 	let newLine = 0;
 	let inHunk = false;
-	const lines = diff.split("\n");
-	if (lines.at(-1) === "") lines.pop();
-	for (const line of lines) {
+	for (const line of linesOf(diff)) {
 		if (line.startsWith("@@")) {
-			const match = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
-			if (!match) continue;
-			oldLine = Number(match[1]);
-			newLine = Number(match[2]);
-			// An empty side starts at 0 and has no lines.
-			if (oldLine === 0) oldLine = 1;
-			if (newLine === 0) newLine = 1;
+			const start = hunkStart(line);
+			if (!start) continue;
+			({ old: oldLine, new: newLine } = start);
 			inHunk = true;
 			continue;
 		}
@@ -78,6 +78,77 @@ export function parseFullDiff(diff: string): DiffRow[] {
 		else rows.push({ sign: " ", old: oldLine++, new: newLine++, text });
 	}
 	return rows;
+}
+
+/** One file of a Markdown `diff` fence: the path its header names, and its hunks. */
+export interface FenceFile {
+	path: string | null;
+	/** `false` when no hunk header numbers its rows, which then count from 1 only so that they highlight. */
+	numbered: boolean;
+	hunks: DiffRow[][];
+}
+
+/** The lines git writes between `diff --git` and a file's first hunk, other than `---` and `+++`. */
+const GIT_HEADER = /^(?:index |old mode |new mode |new file mode |deleted file mode |similarity index |dissimilarity index |rename (?:from|to) |copy (?:from|to) |Binary files )/;
+
+/** The path of a `---` or `+++` line, without git's `a/` or `b/` and `diff -u`'s tab and time. */
+const headerPath = (line: string): string => line.slice(4).split("\t")[0]!.replace(/^[ab]\//, "");
+
+/**
+ * A Markdown `diff` or `patch` fence, one entry per file: `diff --git` or a `---` line followed by `+++` starts one.
+ * Authors often write a fence with no `@@` header, so the lines before a file's first `@@` are a hunk of their own.
+ * Inside a hunk a line without a sign, or an empty one, is unchanged. Files with no rows drop out.
+ */
+export function diffFence(text: string): FenceFile[] {
+	const files: FenceFile[] = [];
+	const newFile = (path: string | null): FenceFile => {
+		const file: FenceFile = { path, numbered: true, hunks: [] };
+		files.push(file);
+		return file;
+	};
+	let oldLine = 1;
+	let newLine = 1;
+	const lines = linesOf(text);
+	for (let at = 0; at < lines.length; at++) {
+		const line = lines[at]!;
+		if (line.startsWith("diff --git ")) {
+			newFile(/ b\/(.+)$/.exec(line)?.[1] ?? null);
+			continue;
+		}
+		const last = files.at(-1);
+		if (line.startsWith("--- ") && lines[at + 1]?.startsWith("+++ ")) {
+			const target = headerPath(lines[++at]!);
+			const path = target === "/dev/null" ? headerPath(line) : target;
+			if (last?.hunks.length === 0) last.path = path;
+			else newFile(path);
+			continue;
+		}
+		if (last?.hunks.length === 0 && GIT_HEADER.test(line)) continue;
+		const file = last ?? newFile(null);
+		if (line.startsWith("@@")) {
+			const start = hunkStart(line);
+			if (start) ({ old: oldLine, new: newLine } = start);
+			else file.numbered = false;
+			file.hunks.push([]);
+			continue;
+		}
+		if (line.startsWith("\\")) continue;
+		if (file.hunks.length === 0) {
+			file.numbered = false;
+			oldLine = 1;
+			newLine = 1;
+			file.hunks.push([]);
+		}
+		const hunk = file.hunks.at(-1)!;
+		const sign = line[0];
+		if (sign === "+") hunk.push({ sign: "+", old: null, new: newLine++, text: line.slice(1) });
+		else if (sign === "-") hunk.push({ sign: "-", old: oldLine++, new: null, text: line.slice(1) });
+		else hunk.push({ sign: " ", old: oldLine++, new: newLine++, text: sign === " " ? line.slice(1) : line });
+	}
+	return files.flatMap(file => {
+		const hunks = file.hunks.filter(hunk => hunk.length > 0);
+		return hunks.length > 0 ? [{ ...file, hunks }] : [];
+	});
 }
 
 const linesOf = (text: string): string[] => {

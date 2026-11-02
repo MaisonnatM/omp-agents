@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { listChanges, readChangedFile, type SessionPlace } from "./changes";
 import { runChecked } from "./proc";
-import { type DiffRow, parseFullDiff, patchRows } from "./shared/changes";
+import { type DiffRow, diffFence, parseFullDiff, patchRows } from "./shared/changes";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -141,6 +141,78 @@ describe("parseFullDiff", () => {
 	test("a header line that looks like a change is not a row, and no hunk means no rows", () => {
 		expect(parseFullDiff("--- a/x\n+++ b/x\n")).toEqual([]);
 		expect(parseFullDiff("")).toEqual([]);
+	});
+});
+
+describe("diffFence", () => {
+	test("a fence without headers is one hunk numbered from 1, its numbers not the diff's own", () => {
+		expect(diffFence("- old\n+ new\n\nkept as is\n\\ No newline at end of file")).toEqual([
+			{
+				path: null,
+				numbered: false,
+				hunks: [
+					[
+						{ sign: "-", old: 1, new: null, text: " old" },
+						{ sign: "+", old: null, new: 1, text: " new" },
+						{ sign: " ", old: 2, new: 2, text: "" },
+						{ sign: " ", old: 3, new: 3, text: "kept as is" },
+					],
+				],
+			},
+		]);
+	});
+
+	test("a git diff of two files keeps each file's path and its hunks' numbers", () => {
+		const fence = [
+			"diff --git a/src/a.ts b/src/a.ts",
+			"index 1234567..89abcde 100644",
+			"--- a/src/a.ts",
+			"+++ b/src/a.ts",
+			"@@ -3,2 +3,2 @@ function a() {",
+			" same",
+			"-old",
+			"+new",
+			"@@ -20 +20,2 @@",
+			" end",
+			"+more",
+			"diff --git a/gone.md b/gone.md",
+			"deleted file mode 100644",
+			"--- a/gone.md",
+			"+++ /dev/null",
+			"@@ -1 +0,0 @@",
+			"-bye",
+		].join("\n");
+		expect(diffFence(fence)).toEqual([
+			{
+				path: "src/a.ts",
+				numbered: true,
+				hunks: [
+					[
+						{ sign: " ", old: 3, new: 3, text: "same" },
+						{ sign: "-", old: 4, new: null, text: "old" },
+						{ sign: "+", old: null, new: 4, text: "new" },
+					],
+					[
+						{ sign: " ", old: 20, new: 20, text: "end" },
+						{ sign: "+", old: null, new: 21, text: "more" },
+					],
+				],
+			},
+			{ path: "gone.md", numbered: true, hunks: [[{ sign: "-", old: 1, new: null, text: "bye" }]] },
+		]);
+	});
+
+	test("a --- line followed by +++ is a file's header, not rows, and starts another file after one with rows", () => {
+		const fence = ["--- a/x.py", "+++ b/x.py", "@@", "-a", "+b", "--- old/y.py\t2026-01-01", "+++ new/y.py\t2026-01-02", "@@ -5 +5 @@", "-c", "+d"].join("\n");
+		expect(diffFence(fence)).toEqual([
+			{ path: "x.py", numbered: false, hunks: [[{ sign: "-", old: 1, new: null, text: "a" }, { sign: "+", old: null, new: 1, text: "b" }]] },
+			{ path: "new/y.py", numbered: true, hunks: [[{ sign: "-", old: 5, new: null, text: "c" }, { sign: "+", old: null, new: 5, text: "d" }]] },
+		]);
+	});
+
+	test("a fence with no rows has no files", () => {
+		expect(diffFence("diff --git a/x b/x\nindex 1..2 100644\n--- a/x\n+++ b/x\n")).toEqual([]);
+		expect(diffFence("")).toEqual([]);
 	});
 });
 
