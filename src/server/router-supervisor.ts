@@ -10,7 +10,7 @@ import type { LiveSession } from "../live-session";
 import type { BotId } from "../shared/bots";
 import type { RouterTask } from "../shared/router";
 import type { WithdrawnMessage } from "../shared/sessions";
-import { oneLine, tailEntries, textOf, toolCallsOf, toolResultOf, toolSummary } from "../session-entries";
+import { oneLine, tailEntries, textOf, type ToolCall, toolCallsOf, toolResultOf, toolSummary } from "../session-entries";
 import { isUserPrompt } from "../transcript";
 import type { RouterTasks } from "./router-tasks";
 
@@ -37,6 +37,9 @@ export interface TaskTail {
 	lastError: string | null;
 }
 
+/** A tool call as one line, such as `bash bun run build`. */
+const callLabel = (call: ToolCall): string => `${call.name} ${toolSummary(call.args, undefined)}`.trim();
+
 /** The end of session file `path`, as {@link TaskTail}, which names nothing for a file that is gone; `null` when it cannot be read. */
 export function readTaskTail(path: string): TaskTail | null {
 	let mark: string | null = null;
@@ -60,12 +63,12 @@ export function readTaskTail(path: string): TaskTail | null {
 			if (newestCalls && calls.length > 0) {
 				newestCalls = false;
 				const open = calls.find(call => !answered.has(call.id));
-				if (open) running = `${open.name} ${toolSummary(open.args, undefined)}`.trim();
+				if (open) running = callLabel(open);
 			}
 			// Newest first: the last call of the newest message is the newest call.
 			for (const call of calls.toReversed()) {
 				const key = `${call.name}\n${JSON.stringify(call.args)}`;
-				if (repeated === null) repeated = { call: `${call.name} ${toolSummary(call.args, undefined)}`.trim(), key, times: 1, open: true };
+				if (repeated === null) repeated = { call: callLabel(call), key, times: 1, open: true };
 				else if (repeated.open && repeated.key === key) repeated.times++;
 				else repeated.open = false;
 			}
@@ -152,7 +155,8 @@ export class RouterSupervisor {
 		const limit = live && tail?.running ? LONG_CALL_CHECKS : STALL_CHECKS;
 		if (still < limit) return;
 		const minutes = Math.round((limit * SUPERVISOR_TICK_MS) / 60_000);
-		return this.#restart(task, sessionId, live, live ? `it made no progress for ${minutes} minutes` : "its session died", tail?.lastError ?? null);
+		const stalled = tail?.running && live ? `it made no progress for ${minutes} minutes while ${tail.running} ran` : `it made no progress for ${minutes} minutes`;
+		return this.#restart(task, sessionId, live, live ? stalled : "its session died", tail?.lastError ?? null);
 	}
 
 	async #restart(task: RouterTask, sessionId: string, live: SupervisedSession | null, reason: string, lastError: string | null): Promise<void> {
