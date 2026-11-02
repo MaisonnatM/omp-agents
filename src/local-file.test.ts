@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, sep } from "node:path";
 import { agentDir } from "./omp/config";
 import { HOME, tokenFile } from "./paths";
-import { DENIED_DIRS, findMediaFile, readTextFile } from "./local-file";
+import { DENIED_DIRS, findMediaFile, firstFile, readTextFile } from "./local-file";
 import { MAX_TEXT_FILE_BYTES, MEDIA_FILE_EXTENSIONS } from "./shared/transcript";
 
 const dir = await mkdtemp(join(tmpdir(), "omp-agents-local-file-"));
@@ -98,4 +98,13 @@ test("a media file in a denied directory is refused unless that directory opens 
 	await writeFile(join(secrets, "a.webm"), "");
 	expect(await findMediaFile(join(secrets, "a.webm"), [{ dir: secrets, opens: [] }])).toMatchObject({ ok: false, status: 403 });
 	expect(await findMediaFile(join(secrets, "a.webm"), [{ dir: secrets, opens: ["webm"] }])).toMatchObject({ ok: true, extension: "webm" });
+});
+
+test("the first candidate that is a file wins, passing over a directory and a missing path; with none, the first names the refusal", async () => {
+	await mkdir(join(dir, "first", "zen.md"), { recursive: true });
+	await mkdir(join(dir, "second"), { recursive: true });
+	await writeFile(join(dir, "second", "zen.md"), "");
+	const candidates = [join(dir, "missing", "zen.md"), join(dir, "first", "zen.md"), join(dir, "second", "zen.md")];
+	expect(await firstFile(candidates)).toBe(join(dir, "second", "zen.md"));
+	expect(await firstFile(candidates.slice(0, 2))).toBe(join(dir, "missing", "zen.md"));
 });
