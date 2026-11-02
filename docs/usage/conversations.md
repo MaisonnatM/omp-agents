@@ -5,6 +5,7 @@
 - A dashboard session's title controls include **Set goal** (target icon); the command palette also offers **Set goal** or **Edit goal** for each live dashboard session.
   Enter an objective and an optional token budget: None, 100k, 500k, 1M, or Custom.
   Its header pill opens the full objective, token count, elapsed time, and Pause, Resume, Edit, or Clear.
+  Clear asks you to click **Clear goal?** to confirm; clicking elsewhere or pressing Escape cancels it.
   A finished goal stays marked **Done** until cleared; a goal at its budget offers **Raise budget**.
   Editing or raising the budget replaces the goal and resets its token and time counts.
   By default the goal advances when you send a prompt, not on its own; automatic continuation requires `"rpc"` in omp's `goal.continuationModes`.

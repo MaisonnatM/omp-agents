@@ -2,6 +2,7 @@ import { useContext, useState } from "react";
 import type { ContextUsage } from "../../src/shared/sessions";
 import type { CompactionState, ContextAction } from "../../src/shared/session-controls";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuSeparator, MenuSubmenu, MenuSubmenuContent, MenuSubmenuTrigger, MenuSwitchItem } from "@/components/ui/menu";
+import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
@@ -49,15 +50,15 @@ export function ContextRingMenu({ context, compaction, working, pending, autoPen
 	const reason = busy ? "Compacting…" : working ? "Wait for the turn to end, or stop it." : undefined;
 	return <DropdownMenu open={open} onOpenChange={setOpen}>
 		<Tooltip content={busy ? "Compacting…" : usageLabel(context)} forceOpen={open ? false : undefined}>
-			<DropdownMenuTrigger {...activityControl("composer.context-ring")} className={cn(ringClass(used), "hover:bg-accent")} aria-label={busy ? "Compacting…" : `${usageLabel(context)}. Context actions`}><Ring used={used} running={busy} /></DropdownMenuTrigger>
+			<DropdownMenuTrigger {...activityControl("composer.context-ring")} render={<Button variant="ghost" size="compact" active={open} className={ringClass(used)} />} aria-label={busy ? "Compacting…" : `${usageLabel(context)}. Context actions`}><span className="inline-flex items-center gap-1.5"><Ring used={used} running={busy} /></span></DropdownMenuTrigger>
 		</Tooltip>
 		<DropdownMenuContent side="top" align="end" className="w-64" finalFocus={() => { composer?.current?.focus(); return composer ? false : true; }}>
-			<div className="px-2 py-1.5 text-xs text-muted-foreground">{tokens.format(context.tokens)} of {tokens.format(context.window)}{compaction.thresholdTokens !== null && ` · auto at ${Math.round(compaction.thresholdTokens / context.window * 100)}%`}</div>
+			<div className="px-2 py-1.5 text-xs tabular-nums text-muted-foreground">{tokens.format(context.tokens)} of {tokens.format(context.window)}{compaction.thresholdTokens !== null && ` · auto at ${Math.round(compaction.thresholdTokens / context.window * 100)}%`}</div>
 			<MenuSeparator />
 			<MenuSubmenu><MenuSubmenuTrigger disabled={disabled} title={reason}>Compact</MenuSubmenuTrigger><MenuSubmenuContent>
 				<MenuItem onClick={() => onAction({ kind: "compact", mode: null })}>Summarize</MenuItem>
-				<MenuItem onClick={() => onAction({ kind: "compact", mode: "soft" })}>Summarize locally (soft)</MenuItem>
-				<MenuItem onClick={() => onAction({ kind: "compact", mode: "remote" })}>Server compaction (remote)</MenuItem>
+				<MenuItem onClick={() => onAction({ kind: "compact", mode: "soft" })}>Summarize locally</MenuItem>
+				<MenuItem onClick={() => onAction({ kind: "compact", mode: "remote" })}>Server compaction</MenuItem>
 				<MenuItem onClick={() => onAction({ kind: "compact", mode: "snapcompact" })}>Snapshot to images</MenuItem>
 				<MenuSeparator /><MenuItem onClick={() => onFocus("/compact ")}>With focus…</MenuItem>
 			</MenuSubmenuContent></MenuSubmenu>
@@ -66,9 +67,12 @@ export function ContextRingMenu({ context, compaction, working, pending, autoPen
 				<MenuItem onClick={() => onAction({ kind: "shake", mode: "images" })}>Images</MenuItem>
 				<MenuItem onClick={() => onAction({ kind: "shake", mode: "thinking" })}>Thinking</MenuItem>
 			</MenuSubmenuContent></MenuSubmenu>
-			<div className="flex items-center"><MenuItem className="flex-1" disabled={disabled} title={reason} onClick={() => onAction({ kind: "handoff" })}>Hand off</MenuItem><MenuItem className="text-xs text-muted-foreground" disabled={disabled} title={reason} onClick={() => onFocus("/handoff ")}>With focus…</MenuItem></div>
+			<MenuSubmenu><MenuSubmenuTrigger disabled={disabled} title={reason}>Hand off</MenuSubmenuTrigger><MenuSubmenuContent>
+				<MenuItem onClick={() => onAction({ kind: "handoff" })}>Hand off</MenuItem>
+				<MenuItem onClick={() => onFocus("/handoff ")}>With focus…</MenuItem>
+			</MenuSubmenuContent></MenuSubmenu>
 			<MenuSeparator />
-			<MenuSwitchItem checked={compaction.auto} disabled={autoPending} onCheckedChange={onAutoChange} title="This session. New sessions follow compaction.enabled.">Auto-compact</MenuSwitchItem>
+			<MenuSwitchItem checked={compaction.auto} disabled={autoPending} onCheckedChange={onAutoChange} title="Applies to this session only. New sessions use your omp compaction settings.">Auto-compact</MenuSwitchItem>
 		</DropdownMenuContent>
 	</DropdownMenu>;
 }

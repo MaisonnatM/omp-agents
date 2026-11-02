@@ -72,7 +72,8 @@
   Dashboard sessions report them after each turn and after each model or thinking change.
   Terminal sessions report them through Collab `state` frames.
   In a dashboard session, click the ring or press Enter, Space, or ↑ on it to open its context menu.
-  **Compact** offers Summarize, Locally, Remotely, As snapshot, and With focus; **Shake out** removes tool results, images, or thinking; **Hand off** starts a fresh context with a summary.
+  **Compact** offers Summarize, Summarize locally, Server compaction, Snapshot to images, and With focus; **Shake out** removes tool results, images, or thinking.
+  **Hand off** opens a submenu to start a fresh context with a summary or add focus in the composer.
   With focus fills the composer with `/compact ` or `/handoff ` for you to finish.
   These actions wait until the running turn ends; **Auto-compact** remains available and changes this session only, not its config file.
   While compaction runs, the ring reads **Compacting…** and pulses unless you prefer reduced motion.
