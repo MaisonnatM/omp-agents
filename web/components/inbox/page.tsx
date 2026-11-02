@@ -34,8 +34,9 @@ interface InboxPageProps {
 	notices: Notice[];
 	/** The ids of the pinned sessions, whose questions come first, as in the sidebar. */
 	pins: string[];
-	/** The item the route opens, `null` for none. */
+	/** The item the route opens, `null` for the first, or for none once Close emptied the route. */
 	openKey: string | null;
+	/** The model lists the server sent, by instance id, which the open session's composer offers. */
 	models: ReadonlyMap<string, ModelList>;
 	/** The workspaces, which the open session's composer offers as directories. */
 	workspaces: Workspace[];
@@ -56,12 +57,17 @@ export function InboxPage({ hosts, notices, pins, openKey, models, workspaces }:
 	const lastAt = useRef(0);
 	/** The routed item this list has shown, so its leaving, and not a link to an item already gone, hands the route on. */
 	const shownKey = useRef<string | null>(null);
-	const open = nextAfter(shown, openKey, lastAt.current);
+	/** Close emptied the route, so it opens no item until you open one, and the list shows where the page is too narrow for both. */
+	const [closed, setClosed] = useState(false);
+	useEffect(() => {
+		if (openKey !== null) setClosed(false);
+	}, [openKey]);
+	const open = openKey === null && closed ? null : nextAfter(shown, openKey, lastAt.current);
 	const at = open ? shown.indexOf(open) : -1;
 	if (at >= 0) lastAt.current = at;
 	if (open !== null && open.key === openKey) shownKey.current = openKey;
 	const handOn = routeAfter(open, openKey, shownKey.current);
-	// The item that took the routed one's place becomes the route, so an item that arrives later above it cannot take it over.
+	// The item a bare route opens, or the one that took the routed one's place, becomes the route, so an item that arrives later cannot take it over.
 	useEffect(() => {
 		if (handOn !== null) location.replace(hashForInbox(handOn));
 	}, [handOn]);
@@ -69,6 +75,7 @@ export function InboxPage({ hosts, notices, pins, openKey, models, workspaces }:
 		if (item) location.hash = hashForInbox(item.key);
 	};
 	const close = (): void => {
+		setClosed(true);
 		location.hash = hashForInbox();
 	};
 	const previous = shown[at - 1];
