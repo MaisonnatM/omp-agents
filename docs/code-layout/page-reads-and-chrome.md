@@ -10,7 +10,7 @@
 - `web/quick-actions.ts`: the quick actions of the Pull requests page, the tickets page, and the open todo, which pull requests, issues, and todos each applies to, and the start, with its prompt, that runs it; the pull request actions themselves come from `src/pull-request-actions.ts`.
   Tickets and todos share the **Work on it** and **Plan it** labels and descriptions in `WORK_ACTIONS`, and each keeps its own rules, which of its items an action applies to and the prompt it sends.
   `startTarget` turns what a quick start works on into the `subject` or `todoId` its `start` message carries, and `reviewDraft`, true for **Review** alone, and `quickOn` picks the quick start that works on an item, whose failure that item's details show.
-  `web/components/quick-actions.tsx` holds the tickets' row menu, the buttons on a pull request's, an issue's, or a todo's details, and the note that says why a start failed.
+  `web/components/quick-actions.tsx` holds the tickets' row menu, the buttons on a pull request's, an issue's, or a todo's details, and the note that says why a start failed, or names the session that already works on its task with **Open session** and **End it and start again**.
   `web/components/session-chip.tsx` holds the chip that names a session on a row or in the details, with the status dot of a running one.
   `web/components/status-dot.tsx` draws that dot for each session status.
 - `web/activity.ts`: the activity recorder, its outbox, `VIEWS` and `viewOf`, `commandKey`, `recordAction`, `activityControl`, and `controlOf` with the one click listener for tagged controls; see [Activity](../architecture/activity.md).

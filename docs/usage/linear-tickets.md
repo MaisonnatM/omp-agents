@@ -65,6 +65,7 @@
   The button waits while the session starts.
   When the start fails, a note above the issue's details or at the top of the list gives the reason, even when the issue itself cannot load, until you dismiss it.
   The Pull requests page and the tickets page share that note: either page shows the last failed quick action, whether it ran on a pull request, an issue, or a todo, and names a todo by its title.
+  When another session already works on the issue, the note names it and offers **Open session** and **End it and start again**, as on [the Pull requests page](pull-requests.md).
 - The list of tickets is not tied to the sidebar's workspace.
   The page reads Linear when it opens and every minute after, and shows the last read at once on a reopen, even after a reload.
   A saved tickets list without each issue's opening date is discarded, and the page reads Linear again.

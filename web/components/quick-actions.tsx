@@ -1,6 +1,6 @@
 /** Quick actions on a pull request, an issue, or a todo: the row menu, the details' buttons, and the note when a start fails. */
 import { CircleX, Eye, GitMerge, Hammer, ListChecks, type LucideIcon, MessageSquare, Radiation, Wrench, Zap } from "lucide-react";
-import type { RosterHost, View } from "../../src/shared/sessions";
+import { hashForSession, type RosterHost, type View } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -8,6 +8,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { QUICK_ACTIONS, type QuickActionId, type QuickSubject } from "../quick-actions";
 import type { OpenMode } from "../routing";
 import type { StartOf } from "../starts";
+import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { LiveSessionsMenu } from "./session-chip";
 
 const ICON: Record<QuickActionId, LucideIcon> = {
@@ -82,6 +83,8 @@ export function QuickActionButtons({ actions, pending, onRun }: QuickActionsProp
 
 interface NoticeProps {
 	quick: StartOf<"quick">;
+	/** The live sessions the page lists, among which the notice finds the one that already works on the task. */
+	hosts: readonly RosterHost[];
 	onDismiss: () => void;
 }
 
@@ -101,19 +104,60 @@ function subjectName(subject: QuickSubject): string {
 	}
 }
 
-/** Why the last quick action's session did not start, with a button that forgets it; nothing while it starts. */
-export function QuickStartNotice({ quick, onDismiss }: NoticeProps) {
+/**
+ * Why the last quick action's session did not start, with a button that forgets it; nothing while it starts. When
+ * another session already works on the task, it names that session instead, with **Open session**, and **End it and
+ * start again** while this dashboard lists it.
+ */
+export function QuickStartNotice({ quick, hosts, onDismiss }: NoticeProps) {
+	const { open, end, start } = useDashboardActions();
+	const { ending } = useDashboardStatus();
 	if (quick.phase !== "failed") return null;
-	const { subject } = quick.op;
-	const name = subjectName(subject);
+	const { op, owner } = quick;
+	const action = QUICK_ACTIONS[op.subject.action].label;
+	const name = subjectName(op.subject);
+	const dismiss = (
+		<Button variant="ghost" size="compact" className="shrink-0" onClick={onDismiss}>
+			Dismiss
+		</Button>
+	);
+	if (!owner)
+		return (
+			<p role="alert" className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+				<span className="min-w-0">
+					Cannot start "{action}" on {name}: {quick.error}
+				</span>
+				{dismiss}
+			</p>
+		);
+	const host = hosts.find(listed => listed.instanceId === owner.instanceId || listed.sessionId === owner.sessionId);
+	const endAndStart = async (instanceId: string): Promise<void> => {
+		if (await end(instanceId)) start(op);
+	};
 	return (
-		<p role="alert" className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+		<p role="alert" className="flex flex-wrap items-center gap-2 text-sm text-red-600 dark:text-red-400">
 			<span className="min-w-0">
-				Cannot start "{QUICK_ACTIONS[subject.action].label}" on {name}: {quick.error}
+				Cannot start "{action}": {host ? `session "${host.sessionName ?? host.cwdDisplay}"` : `a session in ${owner.cwd}`} already works on {name}.
 			</span>
-			<Button variant="ghost" size="compact" className="shrink-0" onClick={onDismiss}>
-				Dismiss
-			</Button>
+			{host ? (
+				<>
+					<Button variant="secondary" size="compact" className="shrink-0" onClick={() => open({ kind: "live", instanceId: host.instanceId, agentId: null }, "replace")}>
+						Open session
+					</Button>
+					<Button variant="destructive-outline" size="compact" className="shrink-0" loading={ending.has(host.instanceId)} onClick={() => void endAndStart(host.instanceId)}>
+						End it and start again
+					</Button>
+				</>
+			) : (
+				owner.sessionId !== null && (
+					<Button variant="secondary" size="compact" className="shrink-0" asChild>
+						<a href={`http://localhost:${owner.port}/${hashForSession(owner.sessionId)}`} target="_blank" rel="noreferrer">
+							Open session
+						</a>
+					</Button>
+				)
+			)}
+			{dismiss}
 		</p>
 	);
 }

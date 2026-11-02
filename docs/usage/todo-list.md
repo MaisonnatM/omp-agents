@@ -88,6 +88,7 @@
   **Work on it** does what the todo asks from its title, notes, and open sub-todos, in a git worktree on a new branch when it changes code, then commits and reports without pushing.
   **Plan it**, on a todo not **In Progress** yet, reads what the todo concerns and reports a plan without changing anything.
   The button waits while the session starts, and a start that fails says why in the card, naming the todo by its title.
+  When another session already works on the todo, the card names it and offers **Open session** and **End it and start again**, as on [the Pull requests page](pull-requests.md).
 - An open top-level todo's **Start session** opens the new-session draft with its title and notes as the first message, in the todo's workspace, else the sidebar's, to edit the prompt or pick another directory first; `#new/<cwd>?todo=<id>` addresses it, and its directory wins over the todo's.
   A session started from a todo links to it once omp starts, which moves a **Backlog** or **Todo** todo to **In Progress**, and its agent marks the todo **Done** once it finishes the work; see [Todos from agents](#todos-from-agents).
 - With Linear connected, an open top-level todo's **Create Linear ticket** asks for a team, starting with the last one an issue was created in, then opens an issue from the title and notes, assigned to you, and links it to the todo.

@@ -23,8 +23,11 @@ export interface DashboardActions {
 	changeTodo: Dashboard["changeTodo"];
 	changeNote: Dashboard["changeNote"];
 	changeBot: Dashboard["changeBot"];
-	/** End running session `instanceId`, then move its panes along once the server ended it; a failure shows as a toast. */
-	end: (instanceId: string) => void;
+	/**
+	 * End running session `instanceId`, then move its panes along once the server ended it; a failure shows as a toast.
+	 * Resolves `true` once the server ended it, `false` when it was already ending or could not end.
+	 */
+	end: (instanceId: string) => Promise<boolean>;
 	/** Open the text, image, or video file at an absolute or `~/` path in the file dialog. */
 	openFile: (path: string) => void;
 	/** Open the new-ticket dialog with `title` as the issue's title. */

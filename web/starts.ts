@@ -2,7 +2,7 @@ import type { BranchChoice } from "../src/shared/git";
 import type { ModelOption } from "../src/shared/models";
 import type { TrustAsk } from "../src/shared/project-trust";
 import type { ClientMsg } from "../src/shared/protocol";
-import type { PromptImage, StartResult, View } from "../src/shared/sessions";
+import type { PromptImage, StartResult, TaskOwner, View } from "../src/shared/sessions";
 import { type QuickSubject, startTarget } from "./quick-actions";
 import type { ForkPoint } from "./transcript-view";
 
@@ -41,9 +41,10 @@ export type StartKind = StartOp["kind"];
 
 /**
  * A start waiting for the server's answer, or failed with the reason. A start that succeeded leaves {@link Starts}. A
- * failure has `trust` while the server refused it for untrusted project code and the trust dialog still asks.
+ * failure has `trust` while the server refused it for untrusted project code and the trust dialog still asks, and `owner`
+ * when another session already works on its task.
  */
-export type Start<Op extends StartOp = StartOp> = { op: Op } & ({ phase: "starting" } | { phase: "failed"; error: string; trust?: TrustAsk });
+export type Start<Op extends StartOp = StartOp> = { op: Op } & ({ phase: "starting" } | { phase: "failed"; error: string; trust?: TrustAsk; owner?: TaskOwner });
 
 /** The starts of this page, by the `reqId` the server answers with. At most one per kind: a new start replaces the last of its kind. */
 export type Starts = ReadonlyMap<number, Start>;

@@ -176,3 +176,6 @@
   On your own pull request, the session then applies the valid findings on its branch, pushes them, and only after the push adds `- [x] Thermo-nuclear code quality review` to its description; on a pull request you review, it reports the findings in the session and changes nothing on GitHub.
   The button waits while the session starts.
   When the start fails, a note at the top of the Pull requests page, and in the details of that pull request, gives the reason until you dismiss it.
+  When another session already works on the same task, the note says which instead, by its name, else its directory: `Cannot start "Fix CI": session "<session>" already works on owner/repo#123.`
+  For a session this dashboard lists, **Open session** opens it in the focused pane, and **End it and start again** ends it, waiting while it ends, then starts the quick action again.
+  For a session another dashboard runs, **Open session** opens it on that dashboard in a new browser tab; one still starting there offers only **Dismiss**.

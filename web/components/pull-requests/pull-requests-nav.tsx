@@ -144,7 +144,7 @@ export function PullRequestsNav({ workspace, hosts, past, route }: PullRequestsN
 			)}
 			{quick && (
 				<div className="px-2">
-					<QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />
+					<QuickStartNotice quick={quick} hosts={hosts} onDismiss={() => dismissStart("quick")} />
 				</div>
 			)}
 			{read && board.repos.length === 0 && note("No session ran in a GitHub repository.")}

@@ -98,9 +98,15 @@ export function App() {
 	latest.current = { layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, shownWorkspace: focused.workspace };
 
 	const endHost = useCallback(
-		(instanceId: string): void => {
-			if (latest.current.ending.has(instanceId)) return;
-			end(instanceId, latest.current.listedHosts).catch((error: unknown) => toasts.add({ title: "Could not end the session", description: errorText(error) }));
+		async (instanceId: string): Promise<boolean> => {
+			if (latest.current.ending.has(instanceId)) return false;
+			try {
+				await end(instanceId, latest.current.listedHosts);
+				return true;
+			} catch (error) {
+				toasts.add({ title: "Could not end the session", description: errorText(error) });
+				return false;
+			}
 		},
 		[end],
 	);
