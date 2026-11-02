@@ -22,7 +22,7 @@ const message = (timestamp: string, role: string, content: object[]) => ({ type:
 const text = (value: string) => ({ type: "text", text: value });
 
 describe("endedTurn", () => {
-	test("a turn that ended answers its last reply, split from its suggestions, and the time of its last message, until its file is gone", () => {
+	test("a turn that ended answers its last reply, without its suggestions, and the time of its last message, until its file is gone", () => {
 		const path = sessionFile([
 			message("2026-11-02T10:00:00.000Z", "user", [text("Fix the flaky test")]),
 			message("2026-11-02T10:00:05.000Z", "assistant", [text("Earlier reply.")]),
@@ -32,7 +32,7 @@ describe("endedTurn", () => {
 			message("2026-11-02T10:01:20.000Z", "assistant", [text("All green.\n\nSuggestions:\n1. Merge on main")]),
 			{ type: "model_change", timestamp: "2026-11-02T10:02:00.000Z", provider: "anthropic", modelId: "claude" },
 		]);
-		expect(endedTurn(path)).toEqual({ at: Date.parse("2026-11-02T10:01:20.000Z"), reply: { body: "All green.", suggestions: ["Merge on main"] } });
+		expect(endedTurn(path)).toEqual({ at: Date.parse("2026-11-02T10:01:20.000Z"), reply: "All green." });
 		rmSync(path);
 		expect(endedTurn(path)).toBeNull();
 	});

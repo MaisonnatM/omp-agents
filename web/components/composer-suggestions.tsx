@@ -21,9 +21,6 @@ export function chosenText(prompts: readonly string[], marked: ReadonlySet<strin
 	return chosen.length === 1 ? chosen[0] : chosen.map(text => `- ${text}`).join("\n");
 }
 
-/** Every one of `prompts`, as one message the way {@link chosenText} words several. */
-export const allPrompts = (prompts: readonly string[]): string => chosenText(prompts, new Set(prompts), null);
-
 /** What a key does to the list: send or fill the marks plus row `index`, send every row, move the highlight to `to`, or clear both. */
 export type SuggestionKey =
 	| { kind: "send"; index: number | null }
@@ -167,10 +164,6 @@ interface Suggestions {
 	onBlur: FocusEventHandler<HTMLDivElement>;
 	/** The composer's keys for the list; call it for a key no shortcut took. */
 	onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
-	/** Sends the marks plus row `index`, as its number key does; `false` while the list is closed or has no such row. */
-	send: (index: number) => boolean;
-	/** Sends every row, as 0 does; `false` while the list is closed or holds fewer than two. */
-	sendAll: () => boolean;
 }
 
 /**
@@ -213,7 +206,7 @@ export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOpt
 	};
 	const sendAll = (): void => {
 		clear();
-		onSend(allPrompts(prompts));
+		onSend(chosenText(prompts, new Set(prompts), null));
 	};
 	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
 		const action = suggestionKey(event, { open, count: prompts.length, active: activeIndex, marked: prompts.some(text => marked.has(text)) });
@@ -302,15 +295,5 @@ export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOpt
 		activeId: activeIndex === null ? undefined : `${listId}-${activeIndex}`,
 		onBlur: () => setActiveIndex(null),
 		onKeyDown,
-		send: index => {
-			if (!open || index >= prompts.length) return false;
-			take(index, onSend);
-			return true;
-		},
-		sendAll: () => {
-			if (!open || prompts.length < 2) return false;
-			sendAll();
-			return true;
-		},
 	};
 }

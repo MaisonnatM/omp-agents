@@ -9,7 +9,7 @@ import { hostLabel } from "./labels";
  * session's own dialog, or the placeholder a terminal session shows until its host replays the question), else its
  * unread turn; `null` while it does not need you.
  */
-export type Wait = { kind: "ask"; request: UserRequest } | { kind: "input" } | { kind: "turn"; turn: UnreadTurn };
+type Wait = { kind: "ask"; request: UserRequest } | { kind: "input" } | { kind: "turn"; turn: UnreadTurn };
 
 export function waitOf(host: RosterHost): Wait | null {
 	const [request] = host.requests;
@@ -18,11 +18,6 @@ export function waitOf(host: RosterHost): Wait | null {
 	if (host.unread) return { kind: "turn", turn: host.unread };
 	return null;
 }
-
-/** What a wait with no question relayed says. */
-export const WAITS_FOR_INPUT = "Waits for your input.";
-/** What an unread turn that ended on no reply says. */
-export const FINISHED_TURN = "Finished its turn.";
 
 /** Whether live session `host` needs you: it asks you something, or it ended a turn you have not looked at since. */
 export const needsYou = (host: RosterHost): boolean => waitOf(host) !== null;
@@ -39,9 +34,9 @@ function momentOf(host: RosterHost): Moment | null {
 			return { kind: "ask", key: `ask/${request.id}`, body: request.kind === "confirm" ? `${request.title}\n${request.message}` : request.title };
 		}
 		case "input":
-			return { kind: "input", body: WAITS_FOR_INPUT };
+			return { kind: "input", body: "Waits for your input." };
 		case "turn":
-			return { kind: "turn", key: `turn/${wait.turn.at}`, body: wait.turn.reply ?? FINISHED_TURN };
+			return { kind: "turn", key: `turn/${wait.turn.at}`, body: wait.turn.reply ?? "Finished its turn." };
 		default: {
 			const unhandled: never = wait;
 			return unhandled;

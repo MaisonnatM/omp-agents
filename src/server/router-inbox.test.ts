@@ -68,8 +68,8 @@ test("two start_task calls start two sessions named after their tasks, and both 
 		{ id: "t2", botId: atlas.id, sessionId: "s-i2", status: "working" },
 	]);
 	expect(readdirSync(inboxDir)).toEqual([]);
-	await tasks.turnEnded("i1", { body: "Opened acme/webapp#8.", suggestions: [] });
-	await tasks.turnEnded("i2", { body: "Docs fixed.", suggestions: [] });
+	await tasks.turnEnded("i1", "Opened acme/webapp#8.");
+	await tasks.turnEnded("i2", "Docs fixed.");
 	expect(file.value.map(({ status }) => status)).toEqual(["review", "review"]);
 	expect(told).toEqual(['Task "Task t1" finished: Opened acme/webapp#8.']);
 });

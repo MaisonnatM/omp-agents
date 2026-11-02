@@ -186,7 +186,7 @@ export const useShownTrajectories = (): View[] => useSyncExternalStore(shownTraj
 
 /**
  * Asks the server to stream `view`'s conversation while the calling component is mounted and a page covers the panes, as a
- * Bot's page and the Inbox do for their open session. `null` asks for nothing. It marks nothing read: `useAttention` does that.
+ * Bot's page does for its open session. `null` asks for nothing. It marks nothing read: `useAttention` does that.
  */
 export const useShowConversation = (view: View | null): void => useShownIn(shownConversations, view);
 

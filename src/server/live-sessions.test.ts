@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { flushJsonFiles } from "../fs";
 import type { LiveSession } from "../live-session";
 import * as collab from "../omp/collab";
@@ -122,18 +122,18 @@ describe("LiveSessions", () => {
 		expect(sessions.bySessionId("s1")).toBeUndefined();
 	});
 
-	test("a row carries the turn its session ended unseen, with its reply's first line, body, and suggestions, until a look, the next turn, or the session leaving reads it", () => {
+	test("a row carries the turn its session ended unseen, with its reply's first line, until a look, the next turn, or the session leaving reads it", () => {
 		const sessions = registry(unreadIn(), "i1");
 		const unread = () => sessions.rows(() => facts)[0]?.unread;
 		expect(sessions.markRead("i1")).toBe(false);
-		sessions.markUnread("i1", { at: 1_000, reply: { body: "\n  Fixed the **flaky** test.  \nDetails follow.", suggestions: ["Merge on main"] } });
-		expect(unread()).toEqual({ at: 1_000, reply: "Fixed the **flaky** test.", body: "Fixed the **flaky** test.  \nDetails follow.", suggestions: ["Merge on main"] });
+		sessions.markUnread("i1", { at: 1_000, reply: "\n  Fixed the **flaky** test.  \nDetails follow." });
+		expect(unread()).toEqual({ at: 1_000, reply: "Fixed the **flaky** test." });
 		expect(sessions.markRead("i1")).toBe(true);
 		expect(sessions.markRead("i1")).toBe(false);
 		expect(unread()).toBeNull();
 
 		sessions.markUnread("i1", { at: 2_000, reply: null });
-		expect(unread()).toEqual({ at: 2_000, reply: null, body: null, suggestions: [] });
+		expect(unread()).toEqual({ at: 2_000, reply: null });
 		sessions.remove("i1");
 		sessions.add(liveSession("i1"), null);
 		expect(unread()).toBeNull();
@@ -142,14 +142,14 @@ describe("LiveSessions", () => {
 	test("an unread turn comes back after a restart for a session that survived it, and only when the next server restores it", () => {
 		const path = unreadIn();
 		const first = registry(path, "i-kept", "i-gone");
-		first.markUnread("i-kept", { at: 1_000, reply: { body: "Fixed the test.\nDetails follow.", suggestions: ["Merge on main"] } });
+		first.markUnread("i-kept", { at: 1_000, reply: "Fixed the test.\nDetails follow." });
 		first.markUnread("i-gone", { at: 2_000, reply: null });
 		flushJsonFiles();
 
 		const second = registry(path, "i-kept", "i-gone");
 		expect(unreadOf(second)).toEqual([["i-kept", null], ["i-gone", null]]);
 		second.restoreUnread(new Set(["i-kept"]));
-		const kept = { at: 1_000, reply: "Fixed the test.", body: "Fixed the test.\nDetails follow.", suggestions: ["Merge on main"] };
+		const kept = { at: 1_000, reply: "Fixed the test." };
 		expect(unreadOf(second)).toEqual([["i-kept", kept], ["i-gone", null]]);
 		// The first registry listing does not list it as a terminal session either.
 		list(second, []);
@@ -165,7 +165,7 @@ describe("LiveSessions", () => {
 		const path = unreadIn();
 		const first = registry(path);
 		list(first, [host("t-kept"), host("t-gone")]);
-		first.markUnread("t-kept", { at: 1_000, reply: { body: "Fixed the test.", suggestions: [] } });
+		first.markUnread("t-kept", { at: 1_000, reply: "Fixed the test." });
 		first.markUnread("t-gone", { at: 2_000, reply: null });
 		flushJsonFiles();
 
@@ -176,7 +176,7 @@ describe("LiveSessions", () => {
 		const next = registry(path);
 		next.restoreUnread(new Set());
 		list(next, [host("t-kept")]);
-		const kept = { at: 1_000, reply: "Fixed the test.", body: "Fixed the test.", suggestions: [] };
+		const kept = { at: 1_000, reply: "Fixed the test." };
 		expect(unreadOf(next)).toEqual([["t-kept", kept]]);
 		// Only the first listing restores.
 		next.markRead("t-kept");
@@ -188,7 +188,7 @@ describe("LiveSessions", () => {
 		const last = registry(path);
 		last.restoreUnread(new Set());
 		list(last, [host("t-kept"), host("t-gone")]);
-		expect(unreadOf(last)).toEqual([["t-kept", { at: 3_000, reply: null, body: null, suggestions: [] }], ["t-gone", null]]);
+		expect(unreadOf(last)).toEqual([["t-kept", { at: 3_000, reply: null }], ["t-gone", null]]);
 	});
 
 	test("a terminal session's turn that ended while no server listened comes back unread from its session file, in place of the turn saved before it", () => {
@@ -197,7 +197,7 @@ describe("LiveSessions", () => {
 		spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-02T10:00:00.000Z"));
 		const first = registry(path, "i-dash");
 		list(first, hosts);
-		for (const instanceId of ["t-ended", "t-quiet", "t-working", "t-unknown"]) first.markUnread(instanceId, { at: 1_000, reply: { body: "Saved reply.", suggestions: [] } });
+		for (const instanceId of ["t-ended", "t-quiet", "t-working", "t-unknown"]) first.markUnread(instanceId, { at: 1_000, reply: "Saved reply." });
 		flushJsonFiles();
 
 		// The next server marks a turn of a session it started, then stops before it lists the registry, so it heard no terminal session.
@@ -221,27 +221,27 @@ describe("LiveSessions", () => {
 		// A session this server started keeps the turn its reattach settled, even if the registry lists it too.
 		list(next, [...hosts, host("i-dash")], sessionId => files[sessionId] ?? null);
 		expect(unreadOf(next)).toEqual([
-			["i-dash", { at: 4_000, reply: null, body: null, suggestions: [] }],
-			["t-ended", { at: Date.parse("2026-11-02T10:06:00.000Z"), reply: "Merged.", body: "Merged.", suggestions: [] }],
-			["t-quiet", { at: 1_000, reply: "Saved reply.", body: "Saved reply.", suggestions: [] }],
+			["i-dash", { at: 4_000, reply: null }],
+			["t-ended", { at: Date.parse("2026-11-02T10:06:00.000Z"), reply: "Merged." }],
+			["t-quiet", { at: 1_000, reply: "Saved reply." }],
 			["t-working", null],
 			["t-unknown", null],
 			// Stopped before it replied, as a turn the server hears end with no reply.
-			["t-stopped", { at: Date.parse("2026-11-02T10:07:00.000Z"), reply: null, body: null, suggestions: [] }],
+			["t-stopped", { at: Date.parse("2026-11-02T10:07:00.000Z"), reply: null }],
 		]);
 	});
 
 	test("a turn read or a session removed before a restart stays read after it", () => {
 		const path = unreadIn();
 		const first = registry(path, "i-read", "i-removed", "i-unread");
-		for (const instanceId of ["i-read", "i-removed", "i-unread"]) first.markUnread(instanceId, { at: 1_000, reply: { body: "Done.", suggestions: [] } });
+		for (const instanceId of ["i-read", "i-removed", "i-unread"]) first.markUnread(instanceId, { at: 1_000, reply: "Done." });
 		first.markRead("i-read");
 		first.remove("i-removed");
 		flushJsonFiles();
 
 		const next = registry(path, "i-read", "i-removed", "i-unread");
 		next.restoreUnread(new Set(["i-read", "i-removed", "i-unread"]));
-		expect(unreadOf(next)).toEqual([["i-read", null], ["i-removed", null], ["i-unread", { at: 1_000, reply: "Done.", body: "Done.", suggestions: [] }]]);
+		expect(unreadOf(next)).toEqual([["i-read", null], ["i-removed", null], ["i-unread", { at: 1_000, reply: "Done." }]]);
 	});
 
 	test("a file that is not a list of unread turns restores none, and the next turn read unseen replaces it", () => {
@@ -259,6 +259,15 @@ describe("LiveSessions", () => {
 
 		const after = registry(path, "i1");
 		after.restoreUnread(new Set(["i1"]));
-		expect(unreadOf(after)).toEqual([["i1", { at: 2_000, reply: null, body: null, suggestions: [] }]]);
+		expect(unreadOf(after)).toEqual([["i1", { at: 2_000, reply: null }]]);
+	});
+
+	test("a turn an older server saved with more fields comes back with only its time and first line", () => {
+		const path = unreadIn();
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, '{"turns": [{"instanceId": "i1", "at": 1000, "reply": "Done.", "body": "Done.\\nDetails.", "suggestions": ["Ship it"]}]}');
+		const next = registry(path, "i1");
+		next.restoreUnread(new Set(["i1"]));
+		expect(unreadOf(next)).toEqual([["i1", { at: 1_000, reply: "Done." }]]);
 	});
 });

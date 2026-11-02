@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type ReactNode, type Ref, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ModelOption } from "../../src/shared/models";
 import type { Delivery, LiveView, RosterHost } from "../../src/shared/sessions";
 import type { ContextAction } from "../../src/shared/session-controls";
@@ -63,7 +63,7 @@ interface ConversationProps {
 	titleAction?: ReactNode;
 	/** Show its turns in place of its transcript; the composer stays. */
 	trajectory: boolean;
-	/** Whether this is the focused pane, the one session shortcuts act on. With `autoFocus` off, it no longer means the composer takes the keyboard. */
+	/** Whether this is the focused pane, the one session shortcuts act on. */
 	focused: boolean;
 	/** The workspaces, as {@link listWorkspaces} lists them, which the directory picker offers. */
 	workspaces: Workspace[];
@@ -71,20 +71,6 @@ interface ConversationProps {
 	header: boolean;
 	/** The composer's placeholder while the session waits on a message, in place of "Message this session…". */
 	placeholder?: string;
-	/** The focused composer takes the keyboard when the view opens and when it goes live; `false` leaves it where it is. Default `true`. */
-	autoFocus?: boolean;
-	/** Takes the conversation's {@link ConversationHandle}, for a page that works the composer from its own keys. */
-	handle?: Ref<ConversationHandle>;
-}
-
-/** What a page does to a conversation from its own keys; each returns `false` when it does not apply now. */
-export interface ConversationHandle {
-	/** Puts the cursor in the composer. */
-	focus: () => boolean;
-	/** Sends the composer's suggested prompt `index`, as its number key does. */
-	sendSuggestion: (index: number) => boolean;
-	/** Sends every suggested prompt as one message, as 0 does. */
-	sendAllSuggestions: () => boolean;
 }
 
 /** One live session or subagent: header, live transcript, composer. Keyed by view: its draft is kept per view, in this browser, while queues and scroll reset per view. */
@@ -122,8 +108,6 @@ function LiveConversation({
 	workspaces,
 	header,
 	placeholder,
-	autoFocus = true,
-	handle,
 }: ConversationProps) {
 	const { scrollToEnd } = useMessageScroller();
 	const editorRef = useRef<PromptEditorHandle>(null);
@@ -183,8 +167,8 @@ function LiveConversation({
 		},
 	});
 	// The focused pane's composer takes the keyboard once it can be typed in: when the view opens, and when it goes live, not when focus moves.
-	const focusedNow = useRef(focused && autoFocus);
-	focusedNow.current = focused && autoFocus;
+	const focusedNow = useRef(focused);
+	focusedNow.current = focused;
 	useEffect(() => {
 		if (focusedNow.current && writable) editorRef.current?.focus();
 	}, [writable]);
@@ -230,7 +214,6 @@ function LiveConversation({
 		editor.focus();
 		return true;
 	};
-	useImperativeHandle(handle, () => ({ focus: focusComposer, sendSuggestion: suggestions.send, sendAllSuggestions: suggestions.sendAll }));
 
 	// The list refreshes on every open, whether a click or the model shortcut opened the menu.
 	const openModels = (open: ModelMenuOpen | null): void => {

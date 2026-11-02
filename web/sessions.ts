@@ -126,7 +126,7 @@ export function searchSessions(lists: SidebarSessions, query: string): SidebarSe
 	};
 }
 
-/** How many live sessions in `lists` need you: each that asks you something, or finished a turn you have not looked at since, as the Inbox and the Dock badge count them. */
+/** How many live sessions in `lists` need you: each that asks you something, or finished a turn you have not looked at since, as the Dock badge counts them. */
 export const waitingCount = ({ pinned, running, idle }: SidebarSessions): number => [...pinned.hosts, ...running, ...idle].filter(needsYou).length;
 
 /** The session the Sessions tab opens when no pane shows one: of the rows `lists` holds, the live one started last, else the past one saved last. */

@@ -4,12 +4,12 @@ import { DashboardSession, type DashboardUpdate, newInstanceId } from "../dashbo
 import { JsonFile } from "../fs";
 import { SessionGuest } from "../guest";
 import { repositoryAt } from "../git";
-import { arrayOf, decoder, fields, isNumber, isString, isTexts, nullable, optional } from "../json";
+import { arrayOf, decoder, fields, isNumber, isString, nullable, optional } from "../json";
 import { type EndedTurn, endedTurn, type LiveSession, type LiveUpdate } from "../live-session";
 import type { HostSnapshot } from "../omp/collab";
 import { displayPath, unreadFile } from "../paths";
 import { oneLine } from "../session-entries";
-import { type RosterHost, type SessionFacts, UNREAD_BODY_MAX, type UnreadTurn, type WorkItem, worksOn } from "../shared/sessions";
+import { type RosterHost, type SessionFacts, type UnreadTurn, type WorkItem, worksOn } from "../shared/sessions";
 import { pullRequestTask, TaskClaims, ticketTask } from "../task-claims";
 import { portFromEnv } from "./address";
 
@@ -28,15 +28,12 @@ interface SavedUnread {
 }
 
 const isSavedUnread = fields<SavedUnread>({
-	turns: arrayOf(fields<SavedTurn>({ instanceId: isString, at: isNumber, reply: nullable(isString), body: nullable(isString), suggestions: isTexts })),
+	turns: arrayOf(fields<SavedTurn>({ instanceId: isString, at: isNumber, reply: nullable(isString) })),
 	heardUntil: optional(isNumber),
 });
 
 /** An ended turn as a row shows it unread. */
-function unreadTurn({ at, reply }: EndedTurn): UnreadTurn {
-	const text = reply?.body.trim() || null;
-	return { at, reply: firstLine(text), body: text?.slice(0, UNREAD_BODY_MAX) ?? null, suggestions: reply?.suggestions ?? [] };
-}
+const unreadTurn = ({ at, reply }: EndedTurn): UnreadTurn => ({ at, reply: firstLine(reply) });
 
 /** `facts` with `subject` first among the session's links, unless its tool calls named it already. */
 export function withSubject(facts: SessionFacts, subject: WorkItem | undefined): SessionFacts {
@@ -168,7 +165,8 @@ export class LiveSessions {
 	restoreUnread(instanceIds: ReadonlySet<string>): void {
 		const saved = this.#unreadFile.load();
 		const pending = new Map<string, UnreadTurn>();
-		for (const { instanceId, ...turn } of saved?.turns ?? []) (instanceIds.has(instanceId) ? this.#unread : pending).set(instanceId, turn);
+		// A file an older server saved may hold more of each turn; only `at` and `reply` come back.
+		for (const { instanceId, at, reply } of saved?.turns ?? []) (instanceIds.has(instanceId) ? this.#unread : pending).set(instanceId, { at, reply });
 		this.#pending = { turns: pending, heardUntil: saved?.heardUntil };
 	}
 

@@ -4,7 +4,6 @@
  * Only the server that holds the owner lock changes the file, so two servers never tell a Router twice; nothing else reads or writes it.
  */
 import { errorText } from "../json";
-import type { TurnReply } from "../live-session";
 import type { BotId } from "../shared/bots";
 import { followKey, isOpenTask, parseRouterTasks, type RouterTask, type RouterTaskChange, type TaskFollow, type TaskStatus, uniqueFollows } from "../shared/router";
 import type { ServerMsg } from "../shared/protocol";
@@ -75,8 +74,8 @@ export interface RouterTasksDeps {
 }
 
 /** `reply`'s last line as one short line, as a finished task tells its Router what it said. */
-function lastLine(reply: TurnReply | null): string | null {
-	const line = reply?.body.split("\n").findLast(text => text.trim() !== "");
+function lastLine(reply: string | null): string | null {
+	const line = reply?.split("\n").findLast(text => text.trim() !== "");
 	return line ? oneLine(line) : null;
 }
 
@@ -182,7 +181,7 @@ export class RouterTasks {
 	}
 
 	/** The task's session ended its turn with `reply`: a working task moves to review, and tells its Router unless it is quiet. */
-	turnEnded(instanceId: string, reply: TurnReply | null): Promise<void> {
+	turnEnded(instanceId: string, reply: string | null): Promise<void> {
 		return this.#finished(this.#taskOf(instanceId), lastLine(reply));
 	}
 
