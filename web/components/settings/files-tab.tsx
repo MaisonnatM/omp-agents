@@ -88,10 +88,12 @@ export function FileView({ file, editing }: { file: OmpFile; editing: Editing })
 	);
 }
 
-/** omp's files by group, a filter that narrows them by name, and the one picked, the first by default, viewed in place. */
-export function Files({ files, editing }: { files: OmpFile[]; editing: Editing }) {
+/**
+ * omp's files by group, a filter that narrows them by name, and the one picked, the first by default, viewed in place.
+ * The page holds `selected`, so another section can open a file here.
+ */
+export function Files({ files, editing, selected, onSelect }: { files: OmpFile[]; editing: Editing; selected: string | null; onSelect: (path: string) => void }) {
 	const [query, setQuery] = useState("");
-	const [selected, setSelected] = useState<string | null>(null);
 	const all = fileGroups(files, "");
 	const open = files.find(file => file.path === selected) ?? all[0]?.[1][0];
 	if (!open) return <p className="text-sm text-muted-foreground">omp found no files.</p>;
@@ -113,7 +115,7 @@ export function Files({ files, editing }: { files: OmpFile[]; editing: Editing }
 											<button
 												type="button"
 												aria-current={file === open ? "true" : undefined}
-												onClick={() => setSelected(file.path)}
+												onClick={() => onSelect(file.path)}
 												className={cn(
 													"flex w-full items-baseline gap-2 rounded-md px-2 py-1 text-left text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
 													file === open && "bg-muted font-medium",
