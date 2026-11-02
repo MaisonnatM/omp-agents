@@ -192,7 +192,7 @@ export const plainMarkdown = (text: string): string =>
 		.replace(/\s+/g, " ")
 		.trim();
 
-export const hostLabel = (host: RosterHost): string => host.sessionName ?? folderName(host.cwdDisplay) ?? host.cwdDisplay;
+export const hostLabel = (host: Pick<RosterHost, "sessionName" | "cwdDisplay">): string => host.sessionName ?? folderName(host.cwdDisplay) ?? host.cwdDisplay;
 
 export const pastLabel = (session: PastSession): string => session.title ?? folderName(session.cwdDisplay) ?? "Untitled session";
 

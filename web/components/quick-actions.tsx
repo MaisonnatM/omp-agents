@@ -84,8 +84,6 @@ export function QuickActionButtons({ actions, pending, onRun }: QuickActionsProp
 
 interface NoticeProps {
 	quick: StartOf<"quick">;
-	/** The live sessions the page lists, among which the notice finds the one that already works on the task. */
-	hosts: readonly RosterHost[];
 	onDismiss: () => void;
 }
 
@@ -108,9 +106,9 @@ function subjectName(subject: QuickSubject): string {
 /**
  * Why the last quick action's session did not start, with a button that forgets it; nothing while it starts. When
  * another session already works on the task, it names that session instead, with **Open session** and **End it and
- * start again** while this dashboard lists it, else the dashboard port and directory it runs in.
+ * start again** while this dashboard runs it, else the dashboard port and directory it runs in.
  */
-export function QuickStartNotice({ quick, hosts, onDismiss }: NoticeProps) {
+export function QuickStartNotice({ quick, onDismiss }: NoticeProps) {
 	const { open, end, start } = useDashboardActions();
 	const { ending } = useDashboardStatus();
 	if (quick.phase !== "failed") return null;
@@ -131,23 +129,20 @@ export function QuickStartNotice({ quick, hosts, onDismiss }: NoticeProps) {
 				{dismiss}
 			</p>
 		);
-	// The page's own roster may be scoped to the sidebar's workspace, so the port, not a listing, says this dashboard runs it.
-	const local = owner.port === Number(location.port);
-	const host = hosts.find(listed => listed.instanceId === owner.instanceId);
-	const endAndStart = async (): Promise<void> => {
-		if (await end(owner.instanceId)) start(op);
+	const endAndStart = async (instanceId: string): Promise<void> => {
+		if (await end(instanceId)) start(op);
 	};
 	return (
 		<p role="alert" className="flex flex-wrap items-center gap-2 text-sm text-red-600 dark:text-red-400">
 			<span className="min-w-0 [overflow-wrap:anywhere]">
-				Cannot start "{action}": {host ? `session "${hostLabel(host)}"` : local ? `a session in ${owner.cwdDisplay}` : `a session on the dashboard at port ${owner.port}, in ${owner.cwdDisplay},`} already works on {name}.
+				Cannot start "{action}": {owner.here ? `session "${hostLabel(owner)}"` : `a session on the dashboard at port ${owner.port}, in ${owner.cwdDisplay},`} already works on {name}.
 			</span>
-			{local && (
+			{owner.here && (
 				<>
 					<Button variant="secondary" size="compact" className="shrink-0" onClick={() => open({ kind: "live", instanceId: owner.instanceId, agentId: null }, "replace")}>
 						Open session
 					</Button>
-					<Button variant="destructive-outline" size="compact" className="shrink-0" loading={ending.has(owner.instanceId)} onClick={() => void endAndStart()}>
+					<Button variant="destructive-outline" size="compact" className="shrink-0" loading={ending.has(owner.instanceId)} onClick={() => void endAndStart(owner.instanceId)}>
 						End it and start again
 					</Button>
 				</>

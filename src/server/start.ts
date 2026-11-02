@@ -8,9 +8,9 @@ import { type AdmittedLaunch, keptSessions, type RpcLaunch } from "../omp/rpc";
 import { prepareReplay } from "../replay";
 import { directoryOf, displayPath } from "../paths";
 import { formatOf } from "../session-formats";
-import type { TrustAsk } from "../shared/project-trust";
-import { type PromptImage, type SessionFacts, type StartRequest, type StartResult, type TaskOwner, type View } from "../shared/sessions";
+import { type PromptImage, type SessionFacts, type StartFailure, type StartRequest, type StartResult, type TaskOwner, type View } from "../shared/sessions";
 import { pullRequestTask, taskConflict, taskIdentity, ticketTask } from "../task-claims";
+import { portFromEnv } from "./address";
 import type { LiveSessions } from "./live-sessions";
 import { UntrustedProjectError } from "./project-trust-file";
 
@@ -29,9 +29,7 @@ interface Started {
 	discard?: () => Promise<void>;
 }
 
-/** A start that failed; `trust` when it refused because the project's agent code is not trusted yet, `owner` when another session already works on its task. */
-type Failure = { error: string; trust?: TrustAsk; owner?: TaskOwner };
-type Outcome = { started: Started } | Failure;
+type Outcome = { started: Started } | StartFailure;
 
 type Spawn = (instanceId: string, emit: (update: DashboardUpdate) => void) => Promise<Started>;
 
@@ -83,7 +81,7 @@ export function createStarter(env: StartEnv): Starter {
 		if (!identity) return body(allocated);
 		try {
 			const claim = await sessions.reserveTask(identity, allocated.instanceId, cwd, env.factsFor);
-			if (claim) return { error: taskConflict(claim), owner: { instanceId: claim.instanceId, sessionId: claim.sessionId, port: claim.port, cwdDisplay: displayPath(claim.cwd) } };
+			if (claim) return { error: taskConflict(claim), owner: ownerOf(claim) };
 		} catch (error) {
 			return { error: `Cannot claim the task: ${errorText(error)}` };
 		}
@@ -106,6 +104,13 @@ export function createStarter(env: StartEnv): Starter {
 			await discard?.();
 			return { error: `Cannot register the session's task ownership: ${errorText(error)}` };
 		}
+	}
+
+	/** The session that holds `claim`, named when this dashboard runs it. */
+	function ownerOf(claim: { instanceId: string; cwd: string; port: number }): TaskOwner {
+		const cwdDisplay = displayPath(claim.cwd);
+		if (claim.port !== portFromEnv()) return { here: false, port: claim.port, cwdDisplay };
+		return { here: true, instanceId: claim.instanceId, sessionName: sessions.started(claim.instanceId)?.sessionName ?? null, cwdDisplay };
 	}
 
 	/** Prepares a new, forked, or resumed session; `rpcLaunch` supplies its extensions and host tools, and admits its directory before omp spawns. */

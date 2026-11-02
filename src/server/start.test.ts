@@ -253,7 +253,7 @@ test("resuming a saved ticket claims the same task and refuses another session's
 		expect(await start({ kind: "resume", sessionId: "saved" })).toMatchObject({
 			ok: false,
 			error: expect.stringContaining("ticket:ENG-2650 is already claimed by"),
-			owner: { instanceId: "already-working", sessionId: null, cwdDisplay: dir, port: expect.any(Number) },
+			owner: { here: true, instanceId: "already-working", sessionName: null, cwdDisplay: dir },
 		});
 		expect(resume).not.toHaveBeenCalled();
 		sessions.releaseTask("already-working");

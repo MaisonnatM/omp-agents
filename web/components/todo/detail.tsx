@@ -266,7 +266,7 @@ function AgentCard({ todo, readOnly, sessions, newSessionCwd }: { todo: UserTodo
 					</Button>
 				</Tooltip>
 			</div>
-			{failed && <QuickStartNotice quick={failed} hosts={sessions.hosts} onDismiss={() => dismissStart("quick")} />}
+			{failed && <QuickStartNotice quick={failed} onDismiss={() => dismissStart("quick")} />}
 		</div>
 	);
 	if (sessionId === null) return controls || null;

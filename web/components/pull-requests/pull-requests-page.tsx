@@ -258,7 +258,7 @@ function PullRequestsOverview({ workspace, hosts, past, section, route, view, on
 							<SortMenu order={pulls.order} onSort={pulls.onSort} onReset={pulls.onReset} />
 						</>
 					}
-					notice={quick && <QuickStartNotice quick={quick} hosts={hosts} onDismiss={() => dismissStart("quick")} />}
+					notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
 					className={view === "board" ? "max-w-none space-y-4" : "max-w-7xl space-y-8"}
 				>
 					{() => {

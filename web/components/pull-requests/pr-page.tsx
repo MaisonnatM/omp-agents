@@ -74,7 +74,7 @@ export function PullRequestDetails({ workspace, hosts, target, placement, versio
 							{whyMissing(target, read.data, workspace === null)}
 						</p>
 					)}
-					{started && <QuickStartNotice quick={started} hosts={hosts} onDismiss={() => dismissStart("quick")} />}
+					{started && <QuickStartNotice quick={started} onDismiss={() => dismissStart("quick")} />}
 				</div>
 			)}
 			<PullRequestDetailContent

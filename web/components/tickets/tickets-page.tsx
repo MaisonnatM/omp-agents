@@ -130,7 +130,7 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 					empty={{ icon: ListTodo, title: "No issue open", hint: "Click one to see its details here." }}
 					list={
 						<div className="space-y-1 px-2 pt-2 pb-6">
-							{quick && <QuickStartNotice quick={quick} hosts={hosts} onDismiss={() => dismissStart("quick")} />}
+							{quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
 							<PolledContent noun="the tickets" loading="Asking Linear for your issues…" poll={poll}>
 								{() => (
 									<div ref={listRef} tabIndex={-1} className="space-y-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
