@@ -20,14 +20,15 @@ Outside text fields:
 
 - J and K, or ↓ and ↑, open the next or previous item.
 - 1 to 9 answer the question, or send that suggested prompt.
-- 0 sends every suggested prompt as one list.
+- 0 sends every suggested prompt as one list, when there are two or more.
 - R focuses the composer.
 - D marks a finished turn read or clears a notice.
 - E ends the session.
 - Enter, with nothing focused, opens the session or the notice's link.
 
-While the server works on **Mark read**, **Clear**, or **End session**, that button shows a spinner, and while it sends a suggested prompt, the bar shows **Sending…**; meanwhile the item takes no other action.
-Once the server confirms, the next item opens, so you can work down the list without picking.
+While the server works on **Mark read**, **Clear**, or **End session**, that button shows a spinner and the item takes no other button.
+A suggested prompt sent by key goes through the composer, as if you picked it there, and shows in the transcript.
+Once the server drops the item from the list, the next item opens, so you can work down the list without picking.
 If it fails, a toast says why and the item stays open.
 `#inbox?open=<key>` addresses one item.
 The divider resizes the list, and the app remembers its width.

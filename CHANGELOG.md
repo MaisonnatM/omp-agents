@@ -6,7 +6,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-11-02
 
 - The Inbox shows a session's whole conversation and message box, R puts the cursor there, and opening an item leaves it unread.
-- Inbox buttons and the 1 to 9 and 0 keys show a spinner, open the next item once done, and keep the item if it fails.
+- Inbox buttons show a spinner, the 1 to 9 and 0 keys send through the message box, and the next item opens once the item is done.
 - A long folder name in the message box now ends in … instead of running past the box and under the model switch.
 - /ship now plans before it builds: the agent compares up to three ways to do the work, keeps the best, and posts that plan on the Linear issue, or in the pull request when there is no issue.
 - /ship no longer needs a Linear ticket: it uses the one you name or one that matches the work, and otherwise ships without one instead of creating a ticket.
