@@ -3,9 +3,9 @@
  * The server rebases the branch, runs the repository's checks, and pushes it; a conflict hands it to **Resolve conflicts**.
  */
 import { useSyncExternalStore } from "react";
-import { type PullRequest, type PullRequestRebase, type PullRequestSummary, prKey, type RebasedPullRequest, repoKey } from "../src/shared/github";
+import { type PullRequest, type PullRequestRebase, type PullRequestSummary, prKey, type RebasedPullRequest, type RebaseStep, repoKey } from "../src/shared/github";
 import { errorText } from "../src/json";
-import { putJson } from "./api";
+import { putSteps } from "./api";
 import { loadingToast, settleToast, type ToastText, toasts } from "./components/toaster";
 
 /** A pull request to rebase, from `cwd`, the workspace a session on it starts in. */
@@ -53,9 +53,14 @@ interface Entry {
 	run: Run;
 }
 
+interface Running extends Entry {
+	/** The step the server last said the rebase started, `null` until it says one. */
+	step: RebaseStep | null;
+}
+
 const queue: Entry[] = [];
 /** The job rebasing now, off the queue. */
-let running: Entry | null = null;
+let running: Running | null = null;
 let states: ReadonlyMap<string, RebaseState> = new Map();
 let draining = false;
 /** A branch of the pull request's repository, as one key: the queue spans repositories, and a stack links its pull requests by branch within one. */
@@ -92,12 +97,17 @@ interface Ended {
 	text: ToastText;
 }
 
-/** Rebases `job`, unless a pull request below it stopped earlier, and hands a conflict to **Resolve conflicts**. */
-async function rebaseOne({ pr, cwd }: RebaseJob, run: Run): Promise<Ended> {
+/** Rebases the running job, unless a pull request below it stopped earlier, and hands a conflict to **Resolve conflicts**. */
+async function rebaseOne(current: Running): Promise<Ended> {
+	const { job: { pr, cwd }, run } = current;
 	if (pr.stackedOn !== null && stopped.has(branchKey(pr, pr.stackedOn))) return { outcome: "skipped", text: { title: `Did not rebase ${pr.head}`, description: `It is stacked on ${pr.stackedOn}, whose rebase stopped.` } };
+	showProgress();
 	try {
 		const request: PullRequestRebase = { owner: pr.owner, repo: pr.repo, number: pr.number, cwd };
-		const done = await putJson<RebasedPullRequest>("/api/pull-request/rebase", request);
+		const done = await putSteps<RebaseStep, RebasedPullRequest>("/api/pull-request/rebase", request, step => {
+			current.step = step;
+			showProgress();
+		});
 		if (done.kind === "rebased") return { outcome: done.kind, text: { title: `Rebased ${done.branch} on ${done.onto}` } };
 		if (done.kind === "current") return { outcome: done.kind, text: { title: `${done.branch} already has ${done.onto}` } };
 		run.hooks.resolve({ pr, cwd });
@@ -125,12 +135,22 @@ function summary({ total, outcomes }: Run): ToastText {
 	return others.length > 0 ? { title, description: `${AND.format(others)}.` } : { title };
 }
 
-/** What a run's loading toast says while its next pull request waits behind `ahead` rebases, or while `job` runs. */
-function progress(run: RunFacts, place: { job: RebaseJob } | { ahead: number }): ToastText {
+/** What the running rebase is doing, by the step the server last said it started. */
+const STEP_WORDS: Record<RebaseStep, (pr: PullRequestSummary) => string> = {
+	waiting: () => "Waiting for another rebase in this repository",
+	fetching: pr => `Fetching ${pr.base} and ${pr.head}`,
+	rebasing: pr => `Rebasing onto ${pr.base}`,
+	pushing: () => "Pushing through the pre-push checks",
+};
+
+/** What a run's loading toast says while its next pull request waits behind `ahead` rebases, or while `job` runs at `step`. */
+function progress(run: RunFacts, place: { job: RebaseJob; step: RebaseStep | null } | { ahead: number }): ToastText {
 	const { pr } = run.first;
 	const title = run.bulk ? `Rebasing ${ofTotal(run.total - run.left + 1, run.total)}` : `Rebasing ${pr.head} on ${pr.base}`;
 	if ("ahead" in place) return { title, description: `Queued behind ${place.ahead} ${place.ahead === 1 ? "rebase" : "rebases"}` };
-	return { title, description: run.bulk ? `${place.job.pr.head} on ${place.job.pr.base}` : "Fetching, rebasing, and pushing through the pre-push checks" };
+	// Before its first step, the server reads the pull request's branches from GitHub.
+	const words = place.step === null ? "Reading the pull request" : STEP_WORDS[place.step](place.job.pr);
+	return { title, description: run.bulk ? `${place.job.pr.head}: ${words}` : words };
 }
 
 /** Brings each run's loading toast up to where the queue stands: the running job's, then each waiting run's place in line. */
@@ -140,7 +160,7 @@ function showProgress(): void {
 	lined.forEach(({ job, run }, at) => {
 		if (shown.has(run)) return;
 		shown.add(run);
-		toasts.update(run.toast, progress(run, running && at === 0 ? { job } : { ahead: at }));
+		toasts.update(run.toast, progress(run, running && at === 0 ? { job, step: running.step } : { ahead: at }));
 	});
 }
 
@@ -148,12 +168,11 @@ async function drain(): Promise<void> {
 	if (draining) return;
 	draining = true;
 	for (let next = queue.shift(); next; next = queue.shift()) {
-		running = next;
+		running = { ...next, step: null };
 		const { job, run } = next;
 		const key = prKey(job.pr);
 		setState(key, "running");
-		showProgress();
-		const { outcome, text } = await rebaseOne(job, run);
+		const { outcome, text } = await rebaseOne(running);
 		running = null;
 		setState(key, null);
 		run.outcomes[outcome] += 1;
@@ -177,7 +196,7 @@ function enqueue(jobs: readonly RebaseJob[], hooks: RebaseHooks, bulk: boolean):
 	const ahead = queue.length + (running ? 1 : 0);
 	const facts: RunFacts = { bulk, first, total: fresh.length, left: fresh.length };
 	// With nothing ahead, `drain` starts it at once.
-	const toast = loadingToast(progress(facts, ahead > 0 ? { ahead } : { job: first }));
+	const toast = loadingToast(progress(facts, ahead > 0 ? { ahead } : { job: first, step: null }));
 	const run: Run = { ...facts, hooks, outcomes: { rebased: 0, current: 0, conflict: 0, failed: 0, skipped: 0 }, toast };
 	for (const job of fresh) {
 		queue.push({ job, run });

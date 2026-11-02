@@ -8,13 +8,45 @@ import { bearerToken, fetchSiteAllowed, helloProof, mediaKey, tokenMatches } fro
 export const fail = (status: number, error: string, conflict = false): Response =>
 	Response.json({ error, ...(conflict && { conflict: true }) } satisfies SettingsError, { status });
 
-/** The JSON of `run`'s result; when it throws, `refuse`'s response for the error, else a 500 with its text. */
+/** The JSON of `run`'s result, or the result itself when it is a `Response`; when it throws, `refuse`'s response for the error, else a 500 with its text. */
 export async function answer(run: () => Promise<unknown>, refuse?: (err: unknown) => Response | null): Promise<Response> {
 	try {
-		return Response.json(await run());
+		const result = await run();
+		return result instanceof Response ? result : Response.json(result);
 	} catch (err) {
 		return refuse?.(err) ?? fail(500, errorText(err));
 	}
+}
+
+/**
+ * Runs `run`, which calls `step` as each of its steps starts. Until the first, it answers as {@link answer} does, so a
+ * refusal keeps its status; from then on the answer is NDJSON: a `{ step }` line for each, then one `{ done }` line with
+ * `run`'s result or `{ error }` with why it failed, so the outcome never arrives before its last step.
+ */
+export async function answerSteps<S, T>(run: (step: (step: S) => void) => Promise<T>, refuse: (err: unknown) => Response): Promise<Response> {
+	const encoder = new TextEncoder();
+	let lines!: ReadableStreamDefaultController<Uint8Array>;
+	// A page that went away cancels the stream; the work goes on without it.
+	let open = true;
+	const body = new ReadableStream<Uint8Array>({ start: controller => void (lines = controller), cancel: () => void (open = false) });
+	const send = (line: { step: S } | { done: T } | { error: string }): void => {
+		if (open) lines.enqueue(encoder.encode(`${JSON.stringify(line)}\n`));
+	};
+	const stepped = Promise.withResolvers<"stepped">();
+	const ended = run(step => {
+		send({ step });
+		stepped.resolve("stepped");
+	}).then(
+		done => ({ done }),
+		(err: unknown) => ({ err }),
+	);
+	const first = await Promise.race([stepped.promise, ended]);
+	if (first !== "stepped" && "err" in first) return refuse(first.err);
+	void ended.then(end => {
+		send("done" in end ? { done: end.done } : { error: errorText(end.err) });
+		if (open) lines.close();
+	});
+	return new Response(body, { headers: { "content-type": "application/x-ndjson" } });
 }
 
 /** The value `parsed` holds, or a 400 with the parser's own reason, else with `badRequest`. */

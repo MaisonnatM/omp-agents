@@ -45,7 +45,7 @@
   It also lists picker choices for `GET /api/pull-request/options`, the reviewers with their profile names through `parseAssigneesAnswer`, and appends images with `attachToPullRequest`.
   Description changes use the shared checked transaction in `templates/omp/agent/extensions/github/description.ts`, preserving a private original and refusing observed concurrent changes before the REST write.
   `src/pull-request-checkout.ts` checks out a pull request for `PUT /api/pull-request/checkout`: with `gh pr checkout` in a checkout, or on its head branch in a worktree with a new session that the route's starter opens there.
-  `src/pull-request-rebase.ts` rebases a pull request's branch onto its base for `PUT /api/pull-request/rebase`, in the worktree that has the branch or a temporary one, and force-pushes it with a lease through the repository's pre-push hook, one repository at a time.
+  `src/pull-request-rebase.ts` rebases a pull request's branch onto its base for `PUT /api/pull-request/rebase`, in the worktree that has the branch or a temporary one, and force-pushes it with a lease through the repository's pre-push hook, one repository at a time, calling back each step as it starts.
   Both read the pull request's head and base branches through `headOf` in `src/pull-request-head.ts`, and refuse a workspace of another repository through `assertWorkspaceOf` there.
   `src/pull-request-merge.ts` holds `GITHUB_MERGES`, the merge and its steps, including merge or rebase branch updates, and the status reads.
   `src/pull-requests.ts` adds `behindBy` with one REST base-to-head comparison per detail read.

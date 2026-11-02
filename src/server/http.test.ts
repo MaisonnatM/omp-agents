@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
+import { errorText } from "../json";
 import type { Guards } from "./http";
-import { guardsFor, refuseUntil } from "./http";
+import { answerSteps, fail, guardsFor, refuseUntil } from "./http";
 
 // The DOM constructor type hides Bun's documented client header/protocol options.
 declare const WebSocket: { new(url: string, options?: Bun.WebSocketOptions): globalThis.WebSocket };
@@ -60,4 +61,38 @@ test("a local program opens the dashboard socket with the Bearer header as with 
 	expect(await connect({ headers: { origin, authorization: `Bearer ${TOKEN}` } })).toBe("open");
 	expect(await connect({ headers: { origin }, protocols: ["omp-agents", `bearer.${TOKEN}`] })).toBe("open");
 	expect(await connect({ headers: { origin } })).toBe("refused");
+});
+
+test("answerSteps streams each step as it starts, then the result, over HTTP", async () => {
+	const gate = Promise.withResolvers<void>();
+	using server = Bun.serve({
+		port: 0,
+		fetch: () =>
+			answerSteps<string, { kind: string }>(async step => {
+				step("fetching");
+				await gate.promise;
+				step("pushing");
+				return { kind: "rebased" };
+			}, err => fail(409, errorText(err))),
+	});
+	const response = await fetch(server.url);
+	const reader = response.body!.pipeThrough(new TextDecoderStream()).getReader();
+	expect([response.status, response.headers.get("content-type"), (await reader.read()).value]).toEqual([200, "application/x-ndjson", '{"step":"fetching"}\n']);
+	gate.resolve();
+	let rest = "";
+	for (let read = await reader.read(); !read.done; read = await reader.read()) rest += read.value;
+	expect(rest).toBe('{"step":"pushing"}\n{"done":{"kind":"rebased"}}\n');
+});
+
+test("answerSteps refuses a failure before the first step, and ends the stream with one after it", async () => {
+	const refuse = (err: unknown) => fail(409, errorText(err));
+	const refused = await answerSteps(async () => {
+		throw new Error("The branch is in a fork.");
+	}, refuse);
+	expect([refused.status, await refused.json()]).toEqual([409, { error: "The branch is in a fork." }]);
+	const failed = await answerSteps<string, never>(async step => {
+		step("pushing");
+		throw new Error("2 tests failed");
+	}, refuse);
+	expect([failed.status, await failed.text()]).toEqual([200, '{"step":"pushing"}\n{"error":"2 tests failed"}\n']);
 });
