@@ -173,7 +173,7 @@ export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, toolti
 	return (
 		<Popover open={shown} onOpenChange={change}>
 			{tooltip ? (
-				<Tooltip content={tooltip} shortcut={shortcut && shortcutLabels(shortcut)} side={side ?? "bottom"} forceOpen={shown ? false : undefined} disabled={disabled}>
+				<Tooltip content={tooltip} shortcut={shortcut && shortcutLabels(shortcut)} side={side ?? "bottom"} forceOpen={shown ? false : undefined} disabled={disabled} wrapperClassName="min-w-0">
 					{button}
 				</Tooltip>
 			) : (

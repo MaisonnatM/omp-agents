@@ -55,7 +55,7 @@ function SidebarWorkspacePicker({ workspaces, current, onPick }: SidebarWorkspac
 	};
 	return (
 		<CommandPicker
-			trigger={<span className="truncate">{label}</span>}
+			trigger={label}
 			icon={Folder}
 			control="sidebar.workspace"
 			tooltip={selected?.cwdDisplay ?? "All workspaces"}

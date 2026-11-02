@@ -230,7 +230,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             bgClass
           )}
         />
-        <span className="relative inline-flex items-center justify-center gap-[inherit]">
+        <span className="relative inline-flex min-w-0 items-center justify-center gap-[inherit]">
           {loading ? (
             <>
               <span className="flex items-center justify-center gap-[inherit] opacity-0">
@@ -272,19 +272,22 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
                 <LeadingIcon
                   size={iconSize}
                   strokeWidth={1.5}
-                  className="transition-[stroke-width] duration-80 group-hover:stroke-[2]"
+                  className="shrink-0 transition-[stroke-width] duration-80 group-hover:stroke-[2]"
                 />
               )}
               {/* text-box only applies to block containers, so the trim lives
                   on the label span (a blockified flex item), not the flex root.
                   The button's height is fixed (h-*), so this doesn't change
-                  layout — it just centers the cap-to-baseline box optically. */}
-              <span className="[text-box:trim-both_cap_alphabetic]">{label}</span>
+                  layout — it just centers the cap-to-baseline box optically.
+                  Every label stays on one line; only a button allowed to shrink
+                  (min-w-0) ever ellipsizes it. Clip only the x axis so the
+                  trimmed box keeps its descenders. */}
+              <span className="min-w-0 overflow-x-clip text-ellipsis whitespace-nowrap [text-box:trim-both_cap_alphabetic]">{label}</span>
               {TrailingIcon && (
                 <TrailingIcon
                   size={iconSize}
                   strokeWidth={1.5}
-                  className="transition-[stroke-width] duration-80 group-hover:stroke-[2]"
+                  className="shrink-0 transition-[stroke-width] duration-80 group-hover:stroke-[2]"
                 />
               )}
             </>

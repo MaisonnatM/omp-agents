@@ -50,7 +50,7 @@ export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shor
 	};
 	return (
 		<CommandPicker
-			trigger={<span className="truncate">{folderName(cwd) ?? cwd}</span>}
+			trigger={folderName(cwd) ?? cwd}
 			icon={Folder}
 			control={control}
 			ariaLabel={`Working directory: ${cwd}`}
