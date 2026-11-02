@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { BOT_KIND_START, botAsking, jobLine, NEW_BOT_DRAFT, type NewBotDraft, type OpenBot, pickKind, pickTemplate, starterPrompts } from "../../bots-model";
 import { botDraftKey, useComposerDraft } from "../../composer-drafts";
-import type { Completions } from "../../pane-store";
+import { type Completions, useShowConversation } from "../../pane-store";
 import { type ModelList, UNREAD } from "../../reads";
 import { hashForBotRoutine, hashForBots } from "../../routing";
 import { draftOf, newDraft, type RoutineDraft } from "../../routines-model";
@@ -157,6 +157,7 @@ export function BotPage({ open, past, lastHosts, models, workspaces, connected, 
 	const instanceId = host?.instanceId ?? null;
 	const toolChips = useMemo<ToolChipLabels>(() => ({ [REMEMBER_TOOL]: { label: `Updated memory for ${bot.name}`, icon: BookmarkCheck } }), [bot.name]);
 	const starters = useMemo(() => (bot.sessionId === null ? starterPrompts(bot.job) : NO_STARTERS), [bot.sessionId, bot.job]);
+	useShowConversation(view);
 	switch (routine.kind) {
 		case "new":
 			return <NewBotRoutine bot={bot} connected={connected} />;
