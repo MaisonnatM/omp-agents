@@ -26,8 +26,8 @@
   The last card, and **New Bot** in the header, open the New Bot form.
   Deleting a Bot returns to the gallery.
 - New Bot follows Grok's: name the Bot, pick a shape and a color, pick its **Type**, and choose **Create**; the form starts on a random shape and color, and on **Bot designer**, named **Dr Eggbot** with its job filled.
-  The type stays what you picked: **Bot designer** asks what Bot you want and creates it, as [Bot designers](#bot-designers) says, **Routines** works through its conversation and its routines, and **PR shepherd** also drives your approved pull requests to merged, as [PR shepherds](#pr-shepherds) says.
-  Picking **Bot designer** or **PR shepherd** fills its **Job** with its rules, and its name with **Dr Eggbot** or **Shepherd**, and hides the job templates.
+  The type stays what you picked: **Bot designer** asks what Bot you want and creates it, as [Bot designers](#bot-designers) says, **Routines** works through its conversation and its routines, **PR shepherd** also drives your approved pull requests to merged, as [PR shepherds](#pr-shepherds) says, and **Router** hands real work to background sessions it tracks as tasks, as [Routers](#routers) says.
+  Picking **Bot designer**, **PR shepherd**, or **Router** fills its **Job** with its rules, and its name with **Dr Eggbot**, **Shepherd**, or **Atlas**, and hides the job templates.
   Switching type swaps a name or job the last type or a template filled, and keeps one you typed; picking **Routines** after a type that filled them empties them.
   For a **Routines** Bot, the optional **Job** field starts empty, and a template above it, **PR reviewer**, **Daily retro**, **Worktree janitor**, or **Release watcher**, fills it and the name, keeping either one you typed.
   It also asks for the workspace its conversation runs in, the sidebar's workspace by default.
@@ -48,7 +48,7 @@
   Open the card to read its prompt or command, any output, what started it, and the **Open routine** link.
 - The right sidebar shows the Bot's details, as it shows a session's on the panes.
   Click the Bot's name in the header, the button at the header's end, or press Cmd+Alt+B to show or hide it; it keeps the width and open state of the session details sidebar.
-  Its tabs are **Details**, **Routines**, which counts the Bot's routines, and, once the Bot's conversation worked on a Linear issue, **Tickets**, which shows those issues as a session's does; it remembers the one you last picked, apart from a session's.
+  Its tabs are **Details**, **Routines**, which counts the Bot's routines, a Router's **Tasks**, which counts the tasks waiting on you, and, once the Bot's conversation worked on a Linear issue, **Tickets**, which shows those issues as a session's does; it remembers the one you last picked, apart from a session's.
   **Details** starts with the avatar, the name, the Bot's type and whether its session runs, and its workspace.
   Click the avatar to change its shape and color; the avatar follows each pick, and closing the popover saves the last one.
   Click the name to rename it: Enter or leaving the field saves, and Escape puts the name back.
@@ -96,3 +96,19 @@
   It queues a merge only when the head has the same changes as a commit a reviewer approved, so a rebase keeps the approval and new code waits for a fresh review.
   A refused request tells the shepherd why in its conversation, so it can tell you.
 - Its job is its rules, which you can edit like any Bot's: what it touches, what it asks you first, and how it merges.
+
+## Routers
+
+- A Router, **Atlas** unless you rename it, is the one conversation you hand work to, inspired by DeepSeek's Super-agent.
+  It answers at once and never does real work in its own turn: it asks the dashboard to start a task, a background session with its own prompt, and tells you it did.
+- Each task's session shows in **Sessions**, named after the task, and runs in the Router's workspace unless the Router names another directory.
+  A task about a pull request or a Linear issue also shows it on its session row.
+- The Router's **Tasks** tab groups its tasks into **Needs you**, **In progress**, and **Done**, newest first.
+  Each row shows the task's title, the dot of its session while it runs, what it is **Listening to**, such as a pull request, a Slack thread, or a Linear issue, and how long ago it last changed.
+  Click a row to open its session, or Cmd-click to open it in a new pane; its menu offers **Mark done** and **Stop**, which ends its session.
+- When a task's session ends its turn, the task moves to **Needs you**, and the Router hears one line in its conversation, `Task "<title>" finished:` and the last line of the reply, unless it started the task quiet.
+  Prompting the task's session again moves it back to **In progress**.
+- The Router sees its open tasks on every turn, so it can mark one done or stopped, or add what one listens to, when you ask.
+- A task the dashboard cannot start, such as one in a directory you have not trusted, shows under **Done** as stopped, with why, and the Router hears why in its conversation.
+- Deleting a Router deletes its tasks; their sessions stay in **Sessions**.
+- The server keeps the tasks in `router-tasks.json` beside `bots.json`.

@@ -32,10 +32,11 @@ export function defaultLook(id: BotId): BotLook {
 
 /**
  * What a Bot is for, picked when it is made and kept after: `bot-designer` asks what Bot you want and creates it,
- * `routines` works through its routines and conversation alone, and `pr-shepherd` also drives your approved pull
- * requests to merged; each but `routines` through the tools only its session loads.
+ * `routines` works through its routines and conversation alone, `pr-shepherd` also drives your approved pull
+ * requests to merged, and `router` hands real work to background sessions it tracks as tasks; each but `routines`
+ * through the tools only its session loads.
  */
-export const BOT_KINDS = ["bot-designer", "routines", "pr-shepherd"] as const;
+export const BOT_KINDS = ["bot-designer", "routines", "pr-shepherd", "router"] as const;
 
 export type BotKind = (typeof BOT_KINDS)[number];
 
@@ -47,6 +48,7 @@ export const BOT_KIND_INFO: Record<BotKind, { label: string; description: string
 		label: "PR shepherd",
 		description: "Watches your approved pull requests and fixes conflicts, failing checks, and review comments until they merge.",
 	},
+	router: { label: "Router", description: "Answers at once and hands real work to background sessions, which it tracks as tasks." },
 };
 
 export interface Bot extends BotLook {

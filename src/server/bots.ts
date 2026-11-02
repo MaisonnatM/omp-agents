@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { isObject, str } from "../json";
 import type { LiveSession } from "../live-session";
 import { BOT_FLAGS } from "../omp/bot-extension";
+import { ROUTER_FLAGS } from "../omp/router-extension";
 import { SHEPHERD_FLAGS } from "../omp/shepherd-extension";
 import { PLAIN_LAUNCH } from "../omp/rpc";
 import { type Bot, type BotEdit, type BotId, type BotKind, type BotLast, MAX_MEMORY_BYTES } from "../shared/bots";
@@ -98,9 +99,23 @@ export interface BotsDeps {
 	/**
 	 * The extension a Bot's session loads, the `bots.json` it reads and the inbox its `set_job` tool writes, the directory of
 	 * the Bots' memories, the `routines.json` and routine inbox its routine tools read and write, the extension a PR
-	 * shepherd's session loads beside it, with the inbox its tools write, and the one a Bot designer's session loads.
+	 * shepherd's session loads beside it, with the inbox its tools write, the one a Router's session loads, with the inbox
+	 * its tools write and the tasks file it reads, and the one a Bot designer's session loads.
 	 */
-	paths: { extension: string; botsFile: string; botInboxDir: string; botsDir: string; routinesFile: string; routineInboxDir: string; shepherdExtension: string; shepherdInboxDir: string; designerExtension: string };
+	paths: {
+		extension: string;
+		botsFile: string;
+		botInboxDir: string;
+		botsDir: string;
+		routinesFile: string;
+		routineInboxDir: string;
+		shepherdExtension: string;
+		shepherdInboxDir: string;
+		routerExtension: string;
+		routerInboxDir: string;
+		routerTasksFile: string;
+		designerExtension: string;
+	};
 	now(): string;
 	/** A Bot's conversation moved to another session, which the list registry did not publish. */
 	onChange(): void;
@@ -108,13 +123,15 @@ export interface BotsDeps {
 
 /**
  * The extension each kind's session loads beside the Bot extension, with the flags it reads beyond the Bot extension's:
- * a PR shepherd's its own inbox, and a Bot designer's none, since it reads the Bot's id and inbox from the Bot extension's flags.
+ * a PR shepherd's its own inbox, a Router's its own inbox and tasks file, and a Bot designer's none, since it reads the
+ * Bot's id and inbox from the Bot extension's flags.
  */
-function kindExtensions({ shepherdExtension, shepherdInboxDir, designerExtension }: BotsDeps["paths"], id: BotId): Record<BotKind, { extension: string; flags: Record<string, string> } | null> {
+function kindExtensions(paths: BotsDeps["paths"], id: BotId): Record<BotKind, { extension: string; flags: Record<string, string> } | null> {
 	return {
 		routines: null,
-		"pr-shepherd": { extension: shepherdExtension, flags: { [SHEPHERD_FLAGS.bot]: id, [SHEPHERD_FLAGS.inbox]: shepherdInboxDir } },
-		"bot-designer": { extension: designerExtension, flags: {} },
+		"pr-shepherd": { extension: paths.shepherdExtension, flags: { [SHEPHERD_FLAGS.bot]: id, [SHEPHERD_FLAGS.inbox]: paths.shepherdInboxDir } },
+		router: { extension: paths.routerExtension, flags: { [ROUTER_FLAGS.bot]: id, [ROUTER_FLAGS.inbox]: paths.routerInboxDir, [ROUTER_FLAGS.tasks]: paths.routerTasksFile } },
+		"bot-designer": { extension: paths.designerExtension, flags: {} },
 	};
 }
 

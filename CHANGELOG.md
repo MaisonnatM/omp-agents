@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-02
 
+- New Bot type, Router: a Bot named Atlas that answers at once and hands real work to background sessions, which its new Tasks tab groups into Needs you, In progress, and Done.
+- A Router's task moves to Needs you when its session finishes, and the Router tells you in one line; Mark done and Stop in a task's menu close it.
 - You can click an image in a pull request's description or comments to open it large.
 - Diff code blocks in a pull request's description and comments now show as colored diffs, one card per file, with line numbers when the block has them.
 - Fixed: the Inbox no longer jumps to a new question while you work on another item.
