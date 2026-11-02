@@ -6,6 +6,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-11-02
 
 - Fixed: a question an agent asks you, such as whether to mark its pull request ready, no longer disappears when the dashboard updates and restarts, which left the session waiting on an answer you could not give.
+- A /ship session now asks you once before marking its pull request ready for review, instead of twice.
 - A routine scheduled only on some weekdays now ignores its triggers on the other days, so a weekdays-only routine no longer wakes on weekend pull requests or Slack messages.
 - A Router's task whose session crashes or is killed mid-step is now restarted right away instead of waiting for your review; ending its session yourself still moves it to Needs you.
 - A Router can now start a task on a pull request it read about or whose branch its own folder holds; its own conversation no longer counts as working on that pull request.

@@ -39,7 +39,7 @@ Follow `~/.omp/agent/docs/review-workflow.md` for when the review applies and fo
 The extension also blocks while the body has an unchecked `- [ ] Browser proof` box, which yampa's PR template declares.
 For a change under `front/components/` or `front/app/`, run the verify-yampa skill, attach a screenshot of the changed UI with `gh pr edit <N> --attach`, then check the box; otherwise delete the line.
 The extension checks the box, not the screenshot.
-Only then request ready-gate approval and run `gt submit --publish` or `gh pr ready <N>`.
+Only then run `gt submit --publish` or `gh pr ready <N>`; the extension asks the user to approve before the command runs.
 A new branch has no PR body to check: create its draft first rather than retrying publication.
 Authentication or network errors still require fixing the reported access failure, not creating another PR.
 
