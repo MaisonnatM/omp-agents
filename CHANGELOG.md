@@ -5,6 +5,14 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-02
 
+- New Bot type, Router: a Bot named Atlas that answers at once and hands real work to background sessions, which its new Tasks tab groups into Needs you, In progress, and Done.
+- A Router's task moves to Needs you when its session finishes, and the Router tells you in one line; Mark done and Stop in a task's menu close it.
+- A Router's task that gets stuck, repeats the same step, or whose session dies is restarted with what went wrong; after two restarts it is stopped and the Router tells you why.
+- A task the Router cannot restart is stopped at once, with the reason in the Tasks tab, and the Router tells you.
+- A new Router comes with a Team events routine, so it hears about Slack messages waiting on you and pull requests that need your move.
+- A Router skips team messages that need nothing, such as "thanks!", and its next run tells you how many it skipped.
+- News on a pull request or Slack thread a Router's task follows goes straight to that task, without waking the Router.
+- A Router starts a quiet task for a bug report nobody answered, which posts in the thread only once it has a result.
 - You can click an image in a pull request's description or comments to open it large.
 - Diff code blocks in a pull request's description and comments now show as colored diffs, one card per file, with line numbers when the block has them.
 - Fixed: the Inbox no longer jumps to a new question while you work on another item.
@@ -245,29 +253,3 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Behind the scenes: two sessions sharing a folder can no longer overwrite each other's unsaved work.
 - Behind the scenes: a security, speed, and quality review made the dashboard safer and quicker to load.
 - Behind the scenes: checked against omp 18.12.6.
-
-## 2026-10-23
-
-- Conversations can now show diagrams and charts.
-- An agent's file edits now show as cards with the lines it removed and added.
-- A changes card above the message box gathers the files and images a session touched.
-- New Notes page, G then N, for your own notes, which agents can add to as well.
-- The new session screen lists your todos, recent sessions, and pull requests waiting on you, so you can pick one up in one click.
-- The clock button in the message box opens Chat history, which gathers every prompt you sent in a session.
-- Conversations are narrower and easier to read, the buttons by a session's title appear on hover, and pointing at a link shows its address at the bottom of the window.
-- When sessions stop in the middle of their work, the bell offers Continue all to pick them all back up.
-- A session that stops on a dropped connection or a brief provider error now tries again on its own, waiting longer each time.
-- Rebase on main, in a pull request's menu, brings it up to date with no agent involved, and Rebase N behind does it for every pull request that is behind.
-- A session's details list the programs it runs, each with Stop, and the dashboard stops them for you once the session has sat idle for a while.
-- Fixed: ending one session no longer stops the browser and helpers that other sessions share.
-- Behind the scenes: the usage guides are now one page per feature, so agents find the right one faster.
-
-## 2026-10-22
-
-- Pull request details have a new look, with a cleaner header, Summary, Timeline, and Code tabs, and a popover for checks.
-- In the Code tab you can mark files as Viewed and comment on a line or a range of lines.
-- A round button at the bottom right of a pull request's details opens a box to comment, or to submit a review that comments, approves, or requests changes.
-- The Check out menu opens a pull request in a separate folder with a new session, or checks it out in your repository.
-- The Board view shows pull requests in columns by whose move it is, and dragging a card to another column does the step that moves it there.
-- Todo, session, ticket, and pull request chips in your sent messages now open inside the dashboard.
-- Behind the scenes: agents check more carefully before they publish a pull request, such as a ticked browser proof box when the pull request asks for one.

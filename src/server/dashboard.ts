@@ -28,7 +28,7 @@ import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, processesFile, projectTrustFile, reviewDraftsFile, routerInboxDir, routerTasksFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -51,7 +51,7 @@ import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
 import { Worktrees } from "../worktrees";
 import { WorktreeOccupants } from "./worktree-occupants";
 import { BotInbox } from "./bot-inbox";
-import { Bots } from "./bots";
+import { Bots, startingRoutine } from "./bots";
 import { BotsFile } from "./bots-file";
 import { Broadcasts } from "./broadcasts";
 import { CalendarsFile } from "./calendars-file";
@@ -78,8 +78,8 @@ import { ReviewDraftsFile } from "./review-drafts-file";
 import { RoutineRunner } from "./routine-runner";
 import { eventSightings, gmailSightings, pullRequestSightings, SLACK_SCOPE, slackSightings, TriggerWatch } from "./routine-triggers";
 import { RoutineInbox } from "./routine-inbox";
+import { Router } from "./router";
 import { ShepherdInbox } from "./shepherd-inbox";
-import { shepherdRoutine } from "../shared/shepherd";
 import { unapprovedChange } from "../pull-request-approval";
 import { configAt } from "../../templates/omp/agent/extensions/land/gate";
 import { RoutinesFile } from "./routines-file";
@@ -98,7 +98,7 @@ import { DAY_MS } from "../shared/days";
 import { Discussions } from "./discussions";
 import { Dictation } from "./dictation";
 import { createClientHandler } from "./socket";
-import { botExtension, designerExtension, shepherdExtension } from "./resources";
+import { botExtension, designerExtension, routerExtension, shepherdExtension } from "./resources";
 import { createStarter, reattachAll, type SessionJoin } from "./start";
 import { NoteInbox } from "./note-inbox";
 import { TodoInbox } from "./todo-inbox";
@@ -169,6 +169,8 @@ export class Dashboard {
 	readonly #routineInbox: RoutineInbox;
 	readonly #botInbox: BotInbox;
 	readonly #shepherdInbox: ShepherdInbox;
+	/** Router Bots' tasks, inbox, screen, and supervisor. */
+	readonly #router: Router;
 	readonly #worktrees: Worktrees;
 	/** omp's isolation sandboxes whose omp exited, removed once a day by the owner. */
 	readonly #isolationSweep: IsolationSweep;
@@ -328,15 +330,18 @@ export class Dashboard {
 			bots: {
 				msg: () => this.#bots.msg(),
 				apply: change => {
-					// Deleting a Bot deletes its routines, first, so a crash between the two saves leaves no routine without its Bot.
+					// Deleting a Bot deletes its routines and its tasks, first, so a crash between the saves leaves none without its Bot.
 					if (change.op === "remove" && routines.removeBot(change.id)) this.#broadcasts.pushList("routines");
+					if (change.op === "remove") this.#router.tasks.apply({ op: "remove-bot", botId: change.id });
 					const created = change.op === "save" && !this.#botsFile.value.some(({ id }) => id === change.bot.id);
 					if (!this.#botsFile.apply(change, new Date().toISOString())) return false;
-					// A new PR shepherd starts with the routine that wakes it as your pull requests change, after the Bot it belongs to is saved.
-					if (created && change.bot.kind === "pr-shepherd" && routines.apply({ op: "save", routine: shepherdRoutine(change.bot.id) }, Date.now())) this.#broadcasts.pushList("routines");
+					// A new PR shepherd or Router starts with the routine that wakes it as what it watches changes, after the Bot it belongs to is saved.
+					const routine = created ? startingRoutine[change.bot.kind]?.(change.bot.id) : null;
+					if (routine && routines.apply({ op: "save", routine }, Date.now())) this.#broadcasts.pushList("routines");
 					return true;
 				},
 			},
+			"router-tasks": { msg: () => this.#router.tasks.msg(), apply: change => this.#router.tasks.change(change) },
 		}, kind => this.#broadcasts.pushList(kind)));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(files.factsOf), error: this.#rosterError }),
@@ -416,13 +421,17 @@ export class Dashboard {
 			if (!resumed) throw new Error("The session exited as it resumed.");
 			return resumed;
 		};
+		const router = (this.#router = new Router({
+			tasksFile: routerTasksFile, inboxDir: routerInboxDir, bots: () => this.#botsFile.value, sessions, pathOf: files.pathOf, start: startSession, reach, now: Date.now,
+			end: session => this.#endLive(session), tell: (botId, text) => this.#bots.message(botId, text), active: () => ownerLock.held, onChange: () => this.#broadcasts.pushList("router-tasks"),
+		}));
 		this.#bots = new Bots({
 			file: this.#botsFile,
 			start: startSession,
 			live: sessionId => sessions.bySessionId(sessionId),
 			session: instanceId => sessions.get(instanceId),
 			savedFile: files.pathOf,
-			paths: { extension: botExtension, botsFile, botInboxDir, botsDir, routinesFile, routineInboxDir, shepherdExtension, shepherdInboxDir, designerExtension },
+			paths: { extension: botExtension, botsFile, botInboxDir, botsDir, routinesFile, routineInboxDir, shepherdExtension, shepherdInboxDir, routerExtension, routerInboxDir, routerTasksFile, designerExtension },
 			now: () => new Date().toISOString(),
 			onChange: () => broadcasts.pushList("bots"),
 		});
@@ -448,6 +457,8 @@ export class Dashboard {
 			fullyAwake,
 			onChange: () => broadcasts.pushList("routines"),
 			messageBot: (botId, text) => this.#bots.message(botId, text),
+			// A Router's rules and tasks see its events first.
+			screen: router.screen,
 		}));
 		const scheduledRunner = (this.#scheduledRunner = new ScheduledRunner({
 			file: scheduled,
@@ -709,6 +720,7 @@ export class Dashboard {
 		this.#routineInbox.watch();
 		this.#botInbox.watch();
 		this.#shepherdInbox.watch();
+		this.#router.watch();
 		this.#endInbox.watch();
 		await this.#rescanFiles();
 		// Once the files are listed, so the notice names the sessions that stopped mid-turn with the last server.
@@ -737,6 +749,7 @@ export class Dashboard {
 		this.#routineInbox.stop();
 		this.#botInbox.stop();
 		this.#shepherdInbox.stop();
+		this.#router.stop();
 		this.#endInbox.stop();
 		await this.#sessions.dispose();
 		this.terminals.dispose();
@@ -810,6 +823,7 @@ export class Dashboard {
 				if (sessionId && !update.ended) this.#interrupted.interrupt(sessionId);
 				this.#reviewDrafts.exited(instanceId);
 				this.#moves.exited(instanceId);
+				this.#router.exited(instanceId);
 				// Its last turn may have remembered something.
 				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
 				this.#bots.exited(instanceId);
@@ -829,6 +843,7 @@ export class Dashboard {
 				if (sessionId) {
 					this.#reviewDrafts.switched(instanceId, sessionId);
 					this.#bots.switched(instanceId, sessionId);
+					this.#router.switched(instanceId, sessionId);
 				}
 				return;
 			}
@@ -837,6 +852,7 @@ export class Dashboard {
 				// Whoever prompted, the session works again; its own continue, already claimed, stays.
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
 				if (sessionId) this.#autoContinue.turnStarted(sessionId);
+				this.#router.turnStarted(instanceId);
 				// Its row moves up with the prompt that started the turn.
 				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
 				return;
@@ -846,6 +862,7 @@ export class Dashboard {
 				// A session started here that a usage limit or a transient fault stopped is held for its continue.
 				const sessionId = this.#sessions.started(instanceId)?.sessionId;
 				if (sessionId) this.#autoContinue.turnEnded(sessionId, update.failure);
+				this.#router.turnEnded(instanceId, update.reply);
 				this.#broadcasts.rosterChanged();
 				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
 				return;
@@ -869,7 +886,7 @@ export class Dashboard {
 
 	/** How `request` joins the server: as a Review session, as a Bot's conversation, both, or plain; any but a Bot's can move itself. */
 	#joinFor(request: StartRequest): SessionJoin {
-		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#moves.join(request)];
+		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#router.join(request), this.#moves.join(request)];
 		return {
 			rpc: { args: joins.flatMap(join => join.rpc.args), tools: joins.flatMap(join => join.rpc.tools) },
 			attach: session => {
@@ -897,6 +914,7 @@ export class Dashboard {
 			// What the server that ran them saved since this one started.
 			this.#routines.reload();
 			this.#bots.reload();
+			this.#router.takeOver();
 			this.#migrateRoutines();
 			this.#todos.reload();
 			this.#notes.reload();

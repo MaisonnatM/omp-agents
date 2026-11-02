@@ -333,6 +333,8 @@ export function App() {
 														open={openBot}
 														session={openBot.host ?? state.past.find(({ sessionId }) => sessionId === openBot.bot.sessionId) ?? null}
 														memory={state.botMemories[openBot.bot.id] ?? ""}
+														tasks={state.routerTasks.filter(({ botId }) => botId === openBot.bot.id)}
+														hosts={state.hosts}
 														connected={state.connected}
 													/>
 												)

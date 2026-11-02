@@ -9,6 +9,7 @@ import { errorText, isObject, parseJson } from "../json";
 import { readTail } from "../read-tail";
 import { type BotRoutineRequest, MAX_COMMAND_LENGTH, parseRoutineSpec, type RoutineSpec, TRIGGER_KINDS } from "../routines";
 import { type BotCreateRequest, type BotId, type BotJobRequest, MAX_FACT_LENGTH, MAX_JOB_LENGTH, MAX_MEMORY_BYTES, parseBots, parseBotId, REMEMBER_TOOL } from "../shared/bots";
+import type { RouterRequest } from "../shared/router";
 import type { ShepherdRequest } from "../shared/shepherd";
 
 /**
@@ -78,7 +79,8 @@ export function flagValue(pi: BotExtensionApi, name: string): string | null {
 	return typeof value === "string" && value !== "" ? value : null;
 }
 
-function readText(path: string): string {
+/** The text of the file at `path`, empty when it cannot be read. */
+export function readText(path: string): string {
 	try {
 		return readFileSync(path, "utf8");
 	} catch {
@@ -97,7 +99,7 @@ function routineLine({ id, name, enabled, schedules, triggers, task }: RoutineSp
 }
 
 /** Leaves `request` in `dir` for the dashboard: written under a name it skips, then renamed, so it never reads half a file. */
-export function leave(dir: string, request: BotRoutineRequest | BotJobRequest | BotCreateRequest | ShepherdRequest): void {
+export function leave(dir: string, request: BotRoutineRequest | BotJobRequest | BotCreateRequest | ShepherdRequest | RouterRequest): void {
 	try {
 		mkdirSync(dir, { recursive: true });
 		const name = `${Date.now()}-${randomUUID()}`;

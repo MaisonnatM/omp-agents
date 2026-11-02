@@ -176,6 +176,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 	"user-note": ({ lists }, peer, { change }) => void lists.apply("user-notes", change, peer),
 	routine: ({ lists, runRoutine }, peer, { change }) => (change.op === "run-now" ? runRoutine(change.id) : void lists.apply("routines", change, peer)),
 	bot: ({ lists, messageBot }, peer, { change }) => (change.op === "message" ? messageBot(change.id, change.text) : void lists.apply("bots", change, peer)),
+	"router-task": ({ lists }, peer, { change }) => void lists.apply("router-tasks", change, peer),
 	schedule: ({ lists, sendScheduledNow }, peer, { change }) => (change.op === "send-now" ? sendScheduledNow(change.id) : void lists.apply("scheduled", change, peer)),
 	pin: ({ lists }, peer, { change }) => void lists.apply("pins", change, peer),
 	preference: ({ lists }, peer, { change }) => void lists.apply("preferences", change, peer),

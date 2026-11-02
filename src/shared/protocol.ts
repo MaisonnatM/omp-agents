@@ -13,6 +13,7 @@ import type { PinChange } from "./pins";
 import type { PagePreferences, PreferenceChange } from "./preferences";
 import type { TrustAsk, TrustedProject } from "./project-trust";
 import type { ReviewDraft, ReviewDraftEdit } from "./review-drafts";
+import type { RouterTask, RouterTaskChange } from "./router";
 import type { ScheduledChange, ScheduledSend } from "./scheduled";
 import type { ContextAction, GoalChange } from "./session-controls";
 import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View, WithdrawnMessage } from "./sessions";
@@ -58,6 +59,8 @@ export type ServerMsg =
 	| { t: "routines"; routines: Routine[] }
 	/** Every Bot, whole, the newest of what each remembers, within `MAX_MEMORY_BYTES`, and the last words of its conversation, sent when a socket opens, after every change, and as each turn of a Bot's conversation starts and ends. */
 	| { t: "bots"; bots: Bot[]; memories: Record<BotId, string>; lasts: Record<BotId, BotLast | null> }
+	/** Every Router's tasks, whole, sent when a socket opens and after every change. */
+	| { t: "router-tasks"; tasks: RouterTask[] }
 	/** Every scheduled send, whole, soonest first, sent when a socket opens and after every change. */
 	| { t: "scheduled"; sends: ScheduledSend[] }
 	/** The directories Settings → Workspaces added and hid, whole, sent when a socket opens and after every change. */
@@ -144,6 +147,8 @@ export type ClientMsg =
 	| { t: "routine"; change: RoutineChange }
 	/** Create, edit, or remove a Bot, or send one a message; every socket then gets the Bots as they are after. */
 	| { t: "bot"; change: BotChange }
+	/** Mark a Router's task done, or stop it, which ends its session; every socket then gets the tasks as they are after. */
+	| { t: "router-task"; change: RouterTaskChange }
 	/** Schedule a message or a session start, cancel one, take one back to edit, or send one now; every socket then gets the scheduled sends as they are after. */
 	| { t: "schedule"; change: ScheduledChange }
 	/** Pin or unpin sessions; every socket then gets the pins as they are after. */

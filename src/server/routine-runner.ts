@@ -26,10 +26,24 @@ export interface RoutineRunnerDeps {
 	onChange(): void;
 	/** Sends `text` into Bot `botId`'s conversation, as the user's message would; the session it went to. Rejects with why it could not. */
 	messageBot(botId: BotId, text: string): Promise<string>;
+	/** Screens each Bot's trigger events before its routines claim runs, as a Router's rules and tasks do; {@link EVERY_EVENT} by default. */
+	screen?: RoutineScreen;
 }
+
+/** What a Bot does with its routines' trigger events before they run on them. */
+export interface RoutineScreen {
+	/** The events of `events` that Bot `botId`'s routines should still run on, in their order; it handled or dropped the rest. Called once per Bot for each {@link RoutineRunner.fire}. */
+	events(botId: BotId, events: TriggerEvent[]): Promise<TriggerEvent[]>;
+	/** The prompt `run` of a routine of Bot `botId` sends, with what the screen adds to it. */
+	prompt(botId: BotId, run: RoutineRun, prompt: string): string;
+}
+
+/** The screen that lets every event through and adds nothing to a prompt. */
+export const EVERY_EVENT: RoutineScreen = { events: async (_botId, events) => events, prompt: (_botId, _run, prompt) => prompt };
 
 export class RoutineRunner {
 	readonly #deps: RoutineRunnerDeps;
+	readonly #screen: RoutineScreen;
 	/** Routines with a command running. A run holds one outcome and ten run-now claims push it out of the history, so the file cannot say whether a command still runs. */
 	readonly #commands = new Set<string>();
 	/** Ticks and run-now claims, one at a time. */
@@ -39,6 +53,7 @@ export class RoutineRunner {
 
 	constructor(deps: RoutineRunnerDeps) {
 		this.#deps = deps;
+		this.#screen = deps.screen ?? EVERY_EVENT;
 	}
 
 	/**
@@ -83,16 +98,28 @@ export class RoutineRunner {
 
 	/**
 	 * Claims one run for each enabled routine with a trigger of the kinds in `events`, holding the first
-	 * {@link MAX_TRIGGER_EVENTS} of them it watches, then drains once the Mac is fully awake, else leaves the runs for
-	 * the next tick at a full wake; waits for a tick under way rather than skip.
-	 * News for a routine whose triggered run is still queued joins that run, so a night of dark wakes starts one run.
+	 * {@link MAX_TRIGGER_EVENTS} of them it watches that its Bot's screen leaves, then drains once the Mac is fully awake,
+	 * else leaves the runs for the next tick at a full wake; waits for a tick under way rather than skip.
+	 * Each Bot's screen sees, once and all at a time, the events any of its routines watches, so an event reaches a task
+	 * once however many routines watch it. A routine whose screen leaves none claims nothing. News for a routine whose
+	 * triggered run is still queued joins that run, so a night of dark wakes starts one run.
 	 */
 	fire(events: readonly TriggerEvent[]): Promise<void> {
 		return this.#lane.run(async () => {
 			const { file } = this.#deps;
 			const now = this.#deps.now();
+			const watchedBy = new Map<BotId, TriggerEvent[]>();
 			for (const routine of file.value) {
-				const seen = events.filter(event => isTriggeredBy(routine, event.kind)).slice(0, MAX_TRIGGER_EVENTS);
+				const watched = watchedBy.get(routine.botId) ?? [];
+				watchedBy.set(routine.botId, [...new Set([...watched, ...events.filter(event => isTriggeredBy(routine, event.kind))])]);
+			}
+			const kept = new Map(
+				await Promise.all([...watchedBy].map(async ([botId, watched]) => [botId, new Set(watched.length === 0 ? [] : await this.#screen.events(botId, watched))] as const)),
+			);
+			// A routine saved while the screens ran has no screened events, and one deleted is gone.
+			for (const routine of file.value) {
+				const screened = kept.get(routine.botId);
+				const seen = events.filter(event => isTriggeredBy(routine, event.kind) && screened?.has(event)).slice(0, MAX_TRIGGER_EVENTS);
 				if (seen.length === 0) continue;
 				const waiting = routine.runs.find(run => run.outcome.kind === "pending" && run.outcome.queued && run.triggeredBy.length > 0);
 				if (waiting) file.addTriggerEvents(routine.id, waiting.at, seen);
@@ -120,7 +147,7 @@ export class RoutineRunner {
 			file.dequeue(routine.id, run.at);
 			switch (task.kind) {
 				case "prompt":
-					await this.#message(routine, run.at, sentText(routine, run, { kind: "prompt", prompt: task.prompt }));
+					await this.#message(routine, run.at, sentText(routine, run, { kind: "prompt", prompt: this.#screen.prompt(routine.botId, run, task.prompt) }));
 					break;
 				case "command":
 					this.#launch(routine, run, task.command);
