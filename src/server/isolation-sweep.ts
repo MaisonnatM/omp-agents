@@ -13,7 +13,7 @@ import { errorText, isObject } from "../json";
 import { mapLimit } from "../map-limit";
 import { run } from "../proc";
 import { allocatedUsage, beneath } from "../worktrees";
-import type { SandboxKeepReason, SandboxPlan, SandboxResult } from "../shared/storage";
+import { CleanupBusy, type SandboxKeepReason, type SandboxPlan, type SandboxResult } from "../shared/storage";
 
 /** How long between two sweeps: a sandbox left behind costs disk, not correctness, and each sweep runs `git status` in every one. */
 export const SWEEP_EVERY_MS = 24 * 60 * 60_000;
@@ -38,10 +38,6 @@ export interface IsolationSweepDeps {
 	/** The canonical directories live sessions and the server run in, and the paths live sessions' tool calls named, `Worktrees.inUse`. */
 	inUse(): Promise<string[]>;
 	now(): number;
-}
-
-export class IsolationSweepBusy extends Error {
-	constructor() { super("Another cleanup is running. Try again when it ends."); }
 }
 
 const keep = (path: string, kept: SandboxKeepReason, detail: string): SandboxResult => ({ path, kept, detail });
@@ -69,12 +65,13 @@ export class IsolationSweep {
 
 	/** A dry run, including each kept reason, with measured sizes only for removable sandboxes. */
 	preview(): Promise<SandboxPlan[]> {
-		return this.#exclusive(() => this.#preview(true));
+		return this.#exclusive(() => this.#preview());
 	}
 
 	/** Rechecks each requested direct child before removal, never following a symlink out of the root. */
 	remove(paths: readonly string[]): Promise<SandboxResult[]> {
 		return this.#exclusive(async () => {
+			const inUse = await this.#deps.inUse();
 			const results: SandboxResult[] = [];
 			for (const path of [...new Set(paths)]) {
 				try {
@@ -82,8 +79,8 @@ export class IsolationSweep {
 						results.push(keep(path, "unreadable", "Not an isolation sandbox in omp's directory."));
 						continue;
 					}
-					const judged = await this.#judge(path, await this.#deps.inUse());
-					results.push(judged === undefined ? await this.#remove(path) : judged ?? keep(path, "unreadable", "Its owner marker is gone."));
+					const result = await this.#removeIfEligible(path, inUse);
+					results.push(result ?? keep(path, "unreadable", "Its owner marker is gone."));
 				} catch (error) { results.push(keep(path, "unreadable", errorText(error))); }
 			}
 			return results;
@@ -95,19 +92,17 @@ export class IsolationSweep {
 		return this.#exclusive(async () => {
 			const dirs = await this.#directories();
 			await Promise.all(dirs.filter(dir => dir.endsWith(REMOVING_SUFFIX)).map(dir => rm(dir, { recursive: true, force: true }).catch((error: unknown) => console.error(`omp-agents: cannot finish removing ${dir}: ${errorText(error)}`))));
-			const plans = await this.#preview(false);
-			return mapLimit(plans, SANDBOX_READS, async plan => {
-				if (plan.kept !== null) return plan;
-				try {
-					const judged = await this.#judge(plan.path, await this.#deps.inUse());
-					return judged === undefined ? await this.#remove(plan.path) : judged ?? keep(plan.path, "unreadable", "Its owner marker is gone.");
-				} catch (error) { return keep(plan.path, "unreadable", errorText(error)); }
+			const inUse = await this.#deps.inUse();
+			const results = await mapLimit(dirs.filter(dir => !dir.endsWith(REMOVING_SUFFIX)), SANDBOX_READS, async path => {
+				try { return await this.#removeIfEligible(path, inUse); }
+				catch (error) { return keep(path, "unreadable", errorText(error)); }
 			});
+			return results.filter(result => result !== null);
 		});
 	}
 
 	async #exclusive<T>(run: () => Promise<T>): Promise<T> {
-		if (this.#running) throw new IsolationSweepBusy();
+		if (this.#running) throw new CleanupBusy();
 		this.#running = true;
 		try { return await run(); }
 		finally { this.#running = false; }
@@ -123,7 +118,7 @@ export class IsolationSweep {
 		return entries.filter(entry => entry.isDirectory()).map(entry => join(this.#deps.root, entry.name));
 	}
 
-	async #preview(measure: boolean): Promise<SandboxPlan[]> {
+	async #preview(): Promise<SandboxPlan[]> {
 		const dirs = (await this.#directories()).filter(dir => !dir.endsWith(REMOVING_SUFFIX));
 		const inUse = await this.#deps.inUse();
 		const plans = await mapLimit(dirs, SANDBOX_READS, async (path): Promise<SandboxPlan | null> => {
@@ -131,7 +126,7 @@ export class IsolationSweep {
 				const judged = await this.#judge(path, inUse);
 				if (judged === null) return null;
 				if (judged) return { ...judged, bytes: null };
-				const bytes = measure ? await allocatedUsage(path).catch(() => null) : null;
+				const bytes = await allocatedUsage(path).catch(() => null);
 				return { path, kept: null, detail: null, bytes };
 			} catch (error) { return { ...keep(path, "unreadable", errorText(error)), bytes: null }; }
 		});
@@ -173,6 +168,11 @@ export class IsolationSweep {
 			if (own.locked !== null) return keep(dir, "locked", `Git locked its checkout${own.locked ? `: ${own.locked}` : "."}`);
 		}
 		return undefined;
+	}
+
+	async #removeIfEligible(path: string, inUse: readonly string[]): Promise<SandboxResult | null> {
+		const judged = await this.#judge(path, inUse);
+		return judged === undefined ? this.#remove(path) : judged;
 	}
 
 	/** Removes sandbox `dir`, which {@link #judge} let go, unless a new task claimed it meanwhile. */

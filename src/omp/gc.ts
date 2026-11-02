@@ -5,10 +5,10 @@ import { join } from "node:path";
 import { parsedAnswer } from "../../templates/omp/agent/extensions/github/command";
 import { arrayOf, fields, isBoolean, isNumber, isString, isTexts, optional, errorText } from "../json";
 import { run } from "../proc";
-import { GC_PHASES, GC_RULES, type GcAnswer, type GcPhase, type GcRule, type StorageUsage } from "../shared/storage";
+import { CleanupBusy, GC_PHASES, GC_RULES, type GcAnswer, type GcPhase, type StorageUsage } from "../shared/storage";
 import { allocatedUsage } from "../worktrees";
 import { loadSessionSettings } from "./config";
-import { userValue } from "./agent-settings";
+import { rowOf } from "./agent-settings";
 import { ompCommand } from "./install";
 import { dirs, gcAutoCompress, settingsRegistry } from "./modules";
 
@@ -17,10 +17,6 @@ const archive = fields<NonNullable<GcAnswer["archive"]>>({ wouldArchive: isNumbe
 const compress = fields<NonNullable<GcAnswer["compress"]>>({ supported: isBoolean, probeFailure: optional(isString), wouldCompress: isNumber, compressed: isNumber, leftoverScratchDirs: isNumber, allocatedBefore: isNumber, allocatedAfter: isNumber, errors: isTexts });
 const wal = fields<NonNullable<GcAnswer["wal"]>>({ databases: arrayOf(fields({ dbPath: isString, walBytes: isNumber, checkpointed: isBoolean, busy: isNumber })), walBytes: isNumber, checkpointed: isBoolean });
 const isAnswer = fields<GcAnswer>({ apply: isBoolean, stale: optional(deletion), blobs: optional(deletion), archive: optional(archive), compress: optional(compress), wal: optional(wal) });
-
-export class CleanupBusy extends Error {
-	constructor() { super("Another cleanup is running. Try again when it ends."); }
-}
 
 export function parseGcAnswer(raw: unknown, phases: readonly GcPhase[], apply: boolean): GcAnswer {
 	if (!isAnswer(raw) || raw.apply !== apply || phases.some(phase => raw[phase] === undefined)) throw new Error("omp returned an incomplete cleanup report.");
@@ -55,20 +51,25 @@ export async function storageUsage(cwd: string | null): Promise<StorageUsage> {
 		measure("Attachments", dirs.getBlobsDir()),
 		measure("Isolation sandboxes", dirs.getWorktreesDir()),
 	]);
-	let rules: GcRule[] = [];
+	let rules: StorageUsage["rules"] = [];
+	const overrides: string[] = [];
 	let settingsError: string | null = null;
 	try {
-		const settings = await loadSessionSettings(homedir());
-		const project = cwd === null ? null : (await loadSessionSettings(cwd)).getProjectSettings();
-		const projectGc = project && typeof project.gc === "object" && project.gc !== null ? project.gc : {};
-		rules = GC_RULES.map(({ id, kind }) => {
+		const settings = await loadSessionSettings(cwd ?? homedir());
+		const global = settings.getGlobalSettings();
+		const project = cwd === null ? null : settings.getProjectSettings();
+		rules = GC_RULES.map(({ id, label, hint, kind }) => {
 			const handle = settingsRegistry.lookup(id);
 			if (!handle) throw new Error(`omp has no storage rule ${id}.`);
-			const user = userValue(handle, settings);
-			const value = user ?? handle.default;
-			if (kind === "toggle" ? typeof value !== "boolean" : typeof value !== "number" || !Number.isFinite(value)) throw new Error(`The saved value for ${id} is invalid.`);
-			const workspace = Reflect.get(projectGc, id.slice(3));
-			return { id, user, value: value as boolean | number, default: handle.default, ...(workspace != null ? { workspace } : {}) };
+			const { workspace, ...row } = rowOf({
+				handle,
+				fixed: {
+					id, label, description: hint, default: handle.default, credential: false,
+					control: kind === "toggle" ? { kind: "toggle" } : { kind: "number", min: 0 },
+				},
+			}, settings, global, project);
+			if (workspace !== undefined) overrides.push(id);
+			return row;
 		});
 	} catch (error) { settingsError = errorText(error); }
 	let autoCompress: StorageUsage["autoCompress"] = null;
@@ -79,5 +80,5 @@ export async function storageUsage(cwd: string | null): Promise<StorageUsage> {
 	} catch (error) {
 		if ((error as NodeJS.ErrnoException).code !== "ENOENT") autoCompress = { at: 0, text: errorText(error) };
 	}
-	return { folders: await folders, rules, settingsError, autoCompress };
+	return { folders: await folders, rules, overrides, settingsError, autoCompress };
 }

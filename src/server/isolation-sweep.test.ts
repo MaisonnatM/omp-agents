@@ -3,7 +3,8 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, 
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { runChecked } from "../proc";
-import { IsolationSweep, IsolationSweepBusy, type IsolationSweepDeps, SWEEP_EVERY_MS } from "./isolation-sweep";
+import { CleanupBusy } from "../shared/storage";
+import { IsolationSweep, type IsolationSweepDeps, SWEEP_EVERY_MS } from "./isolation-sweep";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -168,10 +169,12 @@ describe("isolation sweep", () => {
 		const outside = await sandbox(scratch(), "toutside");
 		const linked = join(root, "tlinked");
 		symlinkSync(outside, linked, "dir");
-		const sweep = sweepOf(root);
+		let inUseReads = 0;
+		const sweep = sweepOf(root, { inUse: async () => { inUseReads++; return []; } });
 		await sweep.preview();
 		writeFileSync(join(changed, "m", "new.txt"), "keep me");
 		const results = await sweep.remove([changed, clean, outside, linked]);
+		expect(inUseReads).toBe(2);
 		expect(results.map(result => result.kept)).toEqual(["changed", null, "unreadable", "unreadable"]);
 		expect(existsSync(changed) && existsSync(outside) && existsSync(linked)).toBe(true);
 		expect(existsSync(clean)).toBe(false);
@@ -183,12 +186,27 @@ describe("isolation sweep", () => {
 		const barrier = Promise.withResolvers<string[]>();
 		const sweep = sweepOf(root, { inUse: () => barrier.promise });
 		const preview = sweep.preview();
-		await expect(sweep.remove([])).rejects.toBeInstanceOf(IsolationSweepBusy);
-		await expect(sweep.sweep()).rejects.toBeInstanceOf(IsolationSweepBusy);
+		await expect(sweep.remove([])).rejects.toBeInstanceOf(CleanupBusy);
+		await expect(sweep.sweep()).rejects.toBeInstanceOf(CleanupBusy);
 		expect(sweep.tick()).toBeNull();
 		barrier.resolve([]);
 		await preview;
 		expect(await sweep.remove([])).toEqual([]);
+	});
+
+	test("the unattended sweep reads occupied paths once and judges each sandbox only once", async () => {
+		const root = scratch();
+		await sandbox(root, "tone");
+		await sandbox(root, "ttwo");
+		let inUseReads = 0;
+		const ownerReads = new Map<string, number>();
+		const sweep = sweepOf(root, {
+			inUse: async () => { inUseReads++; return []; },
+			ownerLive: async path => { ownerReads.set(path, (ownerReads.get(path) ?? 0) + 1); return false; },
+		});
+		expect((await sweep.sweep()).map(result => result.kept)).toEqual([null, null]);
+		expect(inUseReads).toBe(1);
+		expect([...ownerReads.values()]).toEqual([2, 2]);
 	});
 
 	test("ticks sweep once a day, never two at once", async () => {

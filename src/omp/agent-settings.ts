@@ -117,7 +117,7 @@ function panel(): Panel {
 }
 
 /** One row with its values; `global` and `workspace` are the layers, read once per request since omp clones them on every read. */
-function rowOf({ handle, fixed }: PanelRow, settings: OmpSettingsInstance, global: Record<string, unknown>, workspace: Record<string, unknown> | null): AgentSettingRow {
+export function rowOf({ handle, fixed }: PanelRow, settings: OmpSettingsInstance, global: Record<string, unknown>, workspace: Record<string, unknown> | null): AgentSettingRow {
 	const user = shown(handle, global);
 	const project = workspace === null ? undefined : shown(handle, workspace);
 	return {

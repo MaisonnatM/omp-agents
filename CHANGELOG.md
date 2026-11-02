@@ -42,9 +42,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Settings › Agents previews new-session agents, with model overrides and execution defaults.
 - Clean up omp's disk use from the disk reading in the bottom bar: review files, confirm each cleanup run, and edit the rules in Settings, Storage.
 - A long folder name in the message box now ends in … instead of running past the box and under the model switch.
-- /ship now compares up to three plans before building and posts the chosen plan on the issue or pull request.
-- /ship uses a matching Linear ticket when one exists, otherwise ships without creating one.
-- Agents start /ship for work ending in a pull request; say "no ship" to opt out.
+- /ship now plans before it builds: the agent compares up to three ways to do the work, keeps the best, and posts that plan on the Linear issue, or in the pull request when there is no issue.
+- /ship no longer needs a Linear ticket: it uses the one you name or one that matches the work, and otherwise ships without one instead of creating a ticket.
+- Agents now start /ship on their own when your request will end in a pull request, and say so in their first reply; say "no ship" to work without it.
 - The Ship card shows the new Plan step between Ticket and Implement.
 - Settings has a new omp settings section: omp's own settings in omp's tabs, with search, saved to your config.yml as you change them.
 - In omp settings, a dot marks a setting changed from omp's default, Reset puts it back, and a setting this workspace sets shows locked, with a link to its file.
