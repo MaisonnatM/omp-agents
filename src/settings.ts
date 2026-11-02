@@ -3,8 +3,21 @@ import { mkdir, realpath, stat } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
 import { atomicWriteText } from "./fs";
 import { errorText, isObject } from "./json";
-import { agentSetting, readAgentSettings, writeAgentSetting } from "./omp/agent-settings";
-import { agentDir, assertRetryValue, expandDefaultRetryFallbackChains, loadOmpConfig, type OmpConfig, resolveSelector, retryChoices, routedSelectors, writeRouting } from "./omp/config";
+import { agentSetting, readAgentSettings, userValue, writeAgentSetting } from "./omp/agent-settings";
+import {
+	agentDir,
+	assertRetryValue,
+	expandDefaultRetryFallbackChains,
+	loadGlobalForWrite,
+	loadOmpConfig,
+	loadSessionSettings,
+	type OmpConfig,
+	ompConfigOf,
+	resolveSelector,
+	retryChoices,
+	routedSelectors,
+	writeRouting,
+} from "./omp/config";
 import { discoverOmpFiles, type FoundFile } from "./omp/discovery";
 import { findModelUpdates, upgradeEdits } from "./omp/model-updates";
 import { connectedProviders, listModels } from "./omp/models";
@@ -71,15 +84,19 @@ const USER_FILES: FoundFile[] = [
 ];
 
 /**
- * omp's routing and the files a session in `cwd` loads, user-level only when `cwd` is `null`.
- * A config omp cannot load still lists the files, so the page can show the broken `config.yml`.
+ * omp's routing and settings and the files a session in `cwd` loads, user-level only when `cwd` is `null`, from one
+ * load of omp's settings. A config omp cannot load still lists the files, so the page can show the broken `config.yml`.
  */
-async function loadSession(cwd: string | null): Promise<{ routing: OmpSettings["routing"]; found: FoundFile[] }> {
+async function loadSession(
+	cwd: string | null,
+): Promise<{ routing: OmpSettings["routing"]; agentSettings: OmpSettings["agentSettings"]; found: FoundFile[] }> {
 	const sessionCwd = cwd ?? HOME;
 	let routing: OmpSettings["routing"];
+	let agentSettings: OmpSettings["agentSettings"];
 	let disabledExtensions: string[] = [];
 	try {
-		const config = await loadOmpConfig(sessionCwd);
+		const settings = await loadSessionSettings(sessionCwd);
+		const config = ompConfigOf(settings);
 		disabledExtensions = config.disabledExtensions;
 		routing = {
 			...routeRoles(config.modelRoles, config.fallbackChains),
@@ -92,17 +109,19 @@ async function loadSession(cwd: string | null): Promise<{ routing: OmpSettings["
 			),
 			modelProviderOrder: config.modelProviderOrder,
 		};
+		agentSettings = readAgentSettings(settings, cwd !== null);
 	} catch (err) {
 		routing = { error: errorText(err) };
+		agentSettings = routing;
 	}
 	// From the home directory omp reads other tools' dot-directories as project files; without a workspace there is no project.
 	const found = (await discoverOmpFiles(sessionCwd, disabledExtensions)).filter(file => cwd !== null || file.scope === "user");
 	const placeholders = USER_FILES.filter(file => !found.some(other => other.kind === file.kind && other.scope === "user"));
-	return { routing, found: [...found, ...placeholders] };
+	return { routing, agentSettings, found: [...found, ...placeholders] };
 }
 
 export async function loadOmpSettings(cwd: string | null): Promise<OmpSettings> {
-	const [{ routing, found }, agentSettings] = await Promise.all([loadSession(cwd), readAgentSettings(cwd).catch((err: unknown) => ({ error: errorText(err) }))]);
+	const { routing, agentSettings, found } = await loadSession(cwd);
 	return { cwd, routing, agentSettings, files: await Promise.all(found.map(readFile)), workflows: workflowsOf(found) };
 }
 
@@ -232,15 +251,13 @@ export function saveAgentSetting(cwd: string | null, raw: unknown): Promise<OmpS
 				throw new Rejected(400, errorText(err));
 			}
 		}
-		const sessionCwd = cwd ?? HOME;
-		try {
-			await loadOmpConfig(sessionCwd);
-		} catch (err) {
+		const settings = await loadGlobalForWrite(cwd ?? HOME).catch((err: unknown) => {
 			throw cannotLoad(err);
-		}
-		if (!(await writeAgentSetting(sessionCwd, handle, edit))) {
+		});
+		if (!Bun.deepEquals(userValue(handle, settings), edit.expected)) {
 			throw new Rejected(409, `${edit.id} changed in config.yml since this page read it`, true);
 		}
+		await writeAgentSetting(settings, handle, edit);
 		return loadOmpSettings(cwd);
 	});
 }

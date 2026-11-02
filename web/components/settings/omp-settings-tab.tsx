@@ -1,7 +1,7 @@
 /** Settings › omp settings: omp's own settings by its tabs, searched and edited one row at a time (`OmpSettingsTab`). */
 import { Lock, X } from "lucide-react";
-import { useId, useRef, useState } from "react";
-import type { AgentSettingEdit, AgentSettingOption, AgentSettingRow, AgentSettings } from "../../../src/shared/agent-settings";
+import { type ReactNode, useId, useRef, useState } from "react";
+import type { AgentSettingChange, AgentSettingEdit, AgentSettingOption, AgentSettingRow, AgentSettings } from "../../../src/shared/agent-settings";
 import { searchWords } from "../../../src/shared/every-word";
 import type { OmpFile, OmpSettings } from "../../../src/shared/models";
 import { errorText } from "../../../src/json";
@@ -16,12 +16,9 @@ import { SearchField } from "../search-field";
 import { ToggleSwitch } from "../toggle-switch";
 import { type Editing, ErrorText, FIELD, LINK, OrderedList, RAIL_BUTTON, Section } from "./editor";
 
-/** A row's change: a new value, or the removal of the user's, which leaves the workspace's, the variable's, or omp's default. */
-type Change = { value: unknown } | { reset: true };
-
 /** What a row needs from the section: its save, and the Files link to a file that sets a value. */
 interface RowContext {
-	save: (row: AgentSettingRow, change: Change) => Promise<void>;
+	save: (row: AgentSettingRow, change: AgentSettingChange) => Promise<void>;
 	/** The workspace settings file Files lists, which a locked row links to. */
 	projectFile: OmpFile | undefined;
 	onOpenFile: (path: string) => void;
@@ -36,7 +33,7 @@ interface ControlProps {
 	controlId: string;
 	value: unknown;
 	disabled: boolean;
-	onChange: (change: Change) => void;
+	onChange: (change: AgentSettingChange) => void;
 }
 
 /** A link to a file in Settings › Files, which opens it there. */
@@ -253,6 +250,32 @@ function ProviderLimitsControl({ labelId, value, disabled, onChange }: ControlPr
 	);
 }
 
+/** The control a row's kind takes, whether it sits beside the label or below it, and whether it is a native field a `<label>` focuses. */
+function rowControl(props: ControlProps, hintId: string | undefined): { element: ReactNode; placement: "inline" | "block"; native: boolean } {
+	const { row, labelId, value, disabled, onChange } = props;
+	// Keyed by the value, so a field's draft starts over from each answer.
+	const key = JSON.stringify(value) ?? "";
+	const { control } = row;
+	switch (control.kind) {
+		case "toggle":
+			return { element: <ToggleSwitch aria-labelledby={labelId} checked={value === true} disabled={disabled} onCheckedChange={checked => onChange({ value: checked })} />, placement: "inline", native: false };
+		case "select":
+			return {
+				element: <OptionSelect labelId={labelId} hintId={hintId} value={value} options={control.options} disabled={disabled} onPick={next => onChange({ value: next })} />,
+				placement: "inline",
+				native: false,
+			};
+		case "text":
+			return { element: <TextControl key={key} {...props} />, placement: "inline", native: true };
+		case "json":
+			return { element: <JsonControl key={key} {...props} />, placement: "block", native: true };
+		case "list":
+			return { element: <ListControl {...props} options={control.options} ordered={control.ordered} />, placement: "block", native: false };
+		case "provider-limits":
+			return { element: <ProviderLimitsControl key={key} {...props} />, placement: "block", native: false };
+	}
+}
+
 type RowState = { phase: "idle"; error: string | null } | { phase: "saving"; shown: unknown };
 
 /** One setting: what it does, whether it differs from omp's default, its control, and the layer notes that apply. */
@@ -265,7 +288,7 @@ function SettingRow({ row, context: { save, projectFile, onOpenFile } }: { row: 
 	const locked = row.workspace !== undefined;
 	const value = saving ? state.shown : valueOf(row);
 	const disabled = saving || locked;
-	const change = (next: Change): void => {
+	const change = (next: AgentSettingChange): void => {
 		setState({ phase: "saving", shown: "value" in next ? next.value : locked ? row.workspace : row.default });
 		save(row, next).then(
 			() => setState({ phase: "idle", error: null }),
@@ -273,38 +296,19 @@ function SettingRow({ row, context: { save, projectFile, onOpenFile } }: { row: 
 		);
 	};
 	const { control } = row;
-	const props: ControlProps = { row, labelId, controlId, value, disabled, onChange: change };
-	// Keyed by the value, so a field's draft starts over from each answer.
-	const key = JSON.stringify(value) ?? "";
 	// A choice's own description, which omp shows beside it, shows under the row for the one picked.
 	const picked = control.kind === "select" ? control.options.find(option => option.value === value) : undefined;
 	const hint = picked?.description ? `${picked.label}: ${picked.description}` : undefined;
-	const inline =
-		control.kind === "toggle" ? (
-			<ToggleSwitch aria-labelledby={labelId} checked={value === true} disabled={disabled} onCheckedChange={checked => change({ value: checked })} />
-		) : control.kind === "select" ? (
-			<OptionSelect labelId={labelId} hintId={hint ? hintId : undefined} value={value} options={control.options} disabled={disabled} onPick={next => change({ value: next })} />
-		) : control.kind === "text" ? (
-			<TextControl key={key} {...props} />
-		) : null;
-	const block =
-		control.kind === "json" ? (
-			<JsonControl key={key} {...props} />
-		) : control.kind === "list" ? (
-			<ListControl {...props} options={control.options} ordered={control.ordered} />
-		) : control.kind === "provider-limits" ? (
-			<ProviderLimitsControl key={key} {...props} />
-		) : null;
+	const { element, placement, native } = rowControl({ row, labelId, controlId, value, disabled, onChange: change }, hint ? hintId : undefined);
 	const changed = isChanged(row);
 	// Only a native field takes a `<label>`; the switch, the select, and the lists are named by the label's id.
-	const label =
-		control.kind === "text" || control.kind === "json" ? (
-			<label id={labelId} htmlFor={controlId}>
-				{row.label}
-			</label>
-		) : (
-			<span id={labelId}>{row.label}</span>
-		);
+	const label = native ? (
+		<label id={labelId} htmlFor={controlId}>
+			{row.label}
+		</label>
+	) : (
+		<span id={labelId}>{row.label}</span>
+	);
 	return (
 		<li aria-busy={saving} className={cn("space-y-2 py-3 transition-opacity motion-reduce:transition-none", saving && "opacity-60")}>
 			<div className="flex items-start justify-between gap-6">
@@ -337,10 +341,10 @@ function SettingRow({ row, context: { save, projectFile, onOpenFile } }: { row: 
 						</Tooltip>
 					)}
 					{locked && <Lock aria-hidden className="size-3.5 text-muted-foreground" />}
-					{inline}
+					{placement === "inline" && element}
 				</div>
 			</div>
-			{block}
+			{placement === "block" && element}
 			{locked && (
 				<p className="text-xs text-muted-foreground">
 					This workspace sets it.{" "}
@@ -387,7 +391,7 @@ function Group({ group, context }: { group: ShownGroup; context: RowContext }) {
 
 function TabBody({ shown, context }: { shown: ShownTab; context: RowContext }) {
 	return (
-		<Section title={shown.tab.label} headingId={`omp-settings-${shown.tab.id}`}>
+		<Section title={shown.tab.label}>
 			{shown.groups.map(group => (
 				<Group key={group.label ?? ""} group={group} context={context} />
 			))}
@@ -395,15 +399,29 @@ function TabBody({ shown, context }: { shown: ShownTab; context: RowContext }) {
 	);
 }
 
-/** omp's settings in its own tabs and groups, a search across them, and each row saved to your `config.yml` as you change it. */
-export function OmpSettingsTab({ settings, files, editing, onOpenFile }: { settings: AgentSettings; files: OmpFile[]; editing: Editing; onOpenFile: (path: string) => void }) {
+/**
+ * omp's settings in its own tabs and groups, a search across them, and each row saved to your `config.yml` as you change it.
+ * `configFile` and `projectFile` are the user's and the workspace's settings files Files lists, which the section links to.
+ */
+export function OmpSettingsTab({
+	settings,
+	configFile,
+	projectFile,
+	editing,
+	onOpenFile,
+}: {
+	settings: AgentSettings;
+	configFile: OmpFile | undefined;
+	projectFile: OmpFile | undefined;
+	editing: Editing;
+	onOpenFile: (path: string) => void;
+}) {
 	const [tabId, setTabId] = useState(settings.tabs[0]?.id ?? "");
 	const [query, setQuery] = useState("");
 	const searching = searchWords(query).length > 0;
 	const tabs = shownTabs(settings.tabs, query);
 	const current = tabs.find(shown => shown.tab.id === tabId) ?? tabs[0];
 	const matching = tabs.filter(shown => shown.groups.length > 0);
-	const configFile = files.find(file => file.kind === "settings" && file.scope === "user" && file.path.endsWith("/config.yml"));
 	const unlisted = settings.unlisted.filter(id => !ownerOf(id)).length;
 	const context: RowContext = {
 		save: async (row, change) => {
@@ -415,7 +433,7 @@ export function OmpSettingsTab({ settings, files, editing, onOpenFile }: { setti
 				throw err;
 			}
 		},
-		projectFile: files.find(file => file.kind === "settings" && file.scope === "project" && file.body.state === "read"),
+		projectFile,
 		onOpenFile,
 	};
 	const rail = useRef<HTMLElement>(null);

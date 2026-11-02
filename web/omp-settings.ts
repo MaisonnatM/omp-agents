@@ -15,9 +15,8 @@ export interface SettingOwner {
 const MODELS: SettingOwner = { section: "models", label: "Models" };
 
 /**
- * omp settings another Settings section edits, by id, or every id under a prefix that ends in `.`. Settings › omp
- * settings counts them and links to that section rather than listing them twice. A section that starts editing a
- * setting adds it here.
+ * omp settings another Settings section edits, by id. Settings › omp settings counts them and links to that section
+ * rather than listing them twice. A section that starts editing a setting adds it here.
  */
 export const OWNED_SETTINGS: Readonly<Record<string, SettingOwner>> = {
 	modelRoles: MODELS,
@@ -37,18 +36,15 @@ export const OWNED_SETTINGS: Readonly<Record<string, SettingOwner>> = {
 };
 
 /** The section that edits `id`, from {@link OWNED_SETTINGS}; `undefined` when this section does. */
-export function ownerOf(id: string): SettingOwner | undefined {
-	if (Object.hasOwn(OWNED_SETTINGS, id)) return OWNED_SETTINGS[id];
-	for (const [key, owner] of Object.entries(OWNED_SETTINGS)) {
-		if (key.endsWith(".") && id.startsWith(key)) return owner;
-	}
-	return undefined;
-}
+export const ownerOf = (id: string): SettingOwner | undefined => (Object.hasOwn(OWNED_SETTINGS, id) ? OWNED_SETTINGS[id] : undefined);
 
 /** The value a session reads, the environment aside: the workspace's over the user's over omp's default. */
 export const valueOf = (row: AgentSettingRow): unknown => (row.workspace !== undefined ? row.workspace : row.user !== undefined ? row.user : row.default);
 
-/** Whether a session reads something other than omp's default; for a credential, whether any layer sets one. */
+/**
+ * Whether a session reads something other than omp's default; for a credential, whether any layer sets one. JSON text
+ * compares lists and maps by content; a map's key order counts, which holds since the server writes back what the page sent.
+ */
 export const isChanged = (row: AgentSettingRow): boolean =>
 	row.credential ? row.workspace !== undefined || row.user !== undefined : JSON.stringify(valueOf(row)) !== JSON.stringify(row.default);
 
@@ -95,13 +91,13 @@ export interface ShownTab {
 export function shownTabs(tabs: AgentSettingTab[], query: string): ShownTab[] {
 	const matches = everyWord(query);
 	return tabs.map(tab => {
-		let changed = 0;
+		// Counted over the whole tab, whatever the search, so the rail's counts stay put while you type.
+		const changed = tab.groups.flatMap(group => group.rows).filter(row => !ownerOf(row.id) && isChanged(row)).length;
 		const groups = tab.groups.flatMap(({ label, rows }): ShownGroup[] => {
 			const shown: AgentSettingRow[] = [];
 			const owned = new Map<SettingsSection, { owner: SettingOwner; count: number }>();
 			for (const row of rows) {
 				const owner = ownerOf(row.id);
-				if (!owner && isChanged(row)) changed++;
 				if (!matches(`${row.label} ${row.id} ${row.description} ${formatValue(row, valueOf(row))}`)) continue;
 				if (!owner) shown.push(row);
 				else owned.set(owner.section, { owner, count: (owned.get(owner.section)?.count ?? 0) + 1 });

@@ -1,6 +1,6 @@
 /** What the Settings editors share: the edit-then-save hook, the Edit/Save bar, save errors, and sections. */
 import { ArrowDown, ArrowUp, Pencil, X } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -109,10 +109,11 @@ export function SaveError<T>({ editor }: { editor: Editor<T> }) {
 	return <ErrorText>Not saved: {editor.state.error}</ErrorText>;
 }
 
-/** A settings block; leave out `title` when the page header already names it, so only `meta` and `actions` head it. `headingId` names the block by its title. */
-export function Section({ title, headingId, meta, actions, children }: { title?: string; headingId?: string; meta?: ReactNode; actions?: ReactNode; children: ReactNode }) {
+/** A settings block, named by its `title`; leave out `title` when the page header already names it, so only `meta` and `actions` head it. */
+export function Section({ title, meta, actions, children }: { title?: string; meta?: ReactNode; actions?: ReactNode; children: ReactNode }) {
+	const headingId = useId();
 	return (
-		<section aria-labelledby={headingId} className="space-y-3">
+		<section aria-labelledby={title ? headingId : undefined} className="space-y-3">
 			<div className="flex min-h-7 items-center justify-between gap-4">
 				<div className="min-w-0">
 					{title && (

@@ -107,7 +107,14 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 				)}
 			</div>
 		) : (
-			<OmpSettingsTab key={key} settings={agentSettings} files={files} editing={editing} onOpenFile={selection.open} />
+			<OmpSettingsTab
+				key={key}
+				settings={agentSettings}
+				configFile={configFile}
+				projectFile={files.find(file => file.kind === "settings" && file.scope === "project" && file.body.state === "read")}
+				editing={editing}
+				onOpenFile={selection.open}
+			/>
 		);
 	if ("error" in routing) return { models: loadAlert(routing.error), omp, files: filesPanel, workflows: workflowsPanel };
 	return {

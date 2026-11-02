@@ -62,8 +62,11 @@ export interface AgentSettings {
 	unlisted: string[];
 }
 
+/** One setting's change: a new value, or the removal of the user's, which leaves the workspace's, the variable's, or omp's default. */
+export type AgentSettingChange = { value: unknown } | { reset: true };
+
 /**
- * `PUT /api/settings/agent`: one setting's new value in the user's `config.yml`, or its removal with `reset`.
+ * `PUT /api/settings/agent`: one setting's change in the user's `config.yml`.
  * `expected` is the user value the page showed (`AgentSettingRow.user`, `null` when unset); another value refuses the edit.
  */
-export type AgentSettingEdit = { id: string; value: unknown; expected: unknown } | { id: string; reset: true; expected: unknown };
+export type AgentSettingEdit = { id: string; expected: unknown } & AgentSettingChange;
