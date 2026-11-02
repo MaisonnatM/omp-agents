@@ -5,6 +5,13 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-02
 
+- Fixed: the Inbox no longer jumps to a new question while you work on another item.
+- Fixed: on a narrow window, Close or Escape in the Inbox brings the list back.
+- Fixed: the Inbox lists questions from pinned sessions first, as the sidebar does.
+- Fixed: the Inbox no longer offers End session for a session you can only watch.
+- Fixed: a pull request's quick action in the Inbox keeps you in the Inbox.
+- Fixed: Open on a stopped-sessions notice now opens the first session it names.
+- Fixed: the Sessions tab's count now matches the Inbox, leaving out turns you already read.
 - Behind the scenes: What's new now drops its oldest days on its own when the list grows too long, so new changes always fit.
 - Fixed: a turn a terminal session finished stays in the Inbox when the dashboard restarts, and one it finished while the dashboard was stopped shows up once it starts again.
 - The Inbox shows a session's whole conversation and message box, R puts the cursor there, and opening an item leaves it unread.

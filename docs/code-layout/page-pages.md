@@ -38,11 +38,12 @@
   A top-level todo's `detail.tsx` lists linked notes and creates a note with its todo id.
   `web/palette-records.ts` includes note titles and bodies in command-menu search.
 - `web/components/inbox/page.tsx`: the Inbox page's grouped two-line rows, which animate in and out, filters, and the open item, a `SessionDetail` or a `NoticeDetail` under the `InboxBar` they share, with its keys.
-  `web/inbox-model.ts` builds its items from the roster and the notices, with each item's title, place, and second line, groups and orders them into sections, filters the sections, and picks the item that opens after one leaves.
+  `web/inbox-model.ts` builds its items from the roster and the notices, with each item's title, place, and second line, groups and orders them into sections, pinned sessions' questions first, filters the sections, and picks the item that opens, the first for a bare `#inbox` or the one that takes a left item's place, with `nextAfter`, and the item the address then names with `routeAfter`.
   `SessionDetail` is keyed by its session, so two items of one session share the conversation, a `ViewConversation` with no header and a composer that waits for R, which it streams through `useShowConversation` without marking it read.
   R, 1 to 9, and 0 go through the conversation's `ConversationHandle`, so a key sends a suggestion exactly as the composer's own list does.
   Each bar button runs through `useAction` from `web/use-action.ts`, which shows it pending and toasts a failure; the notice's button from `web/components/notices.tsx` clears the notice the same way.
-  Once the server's push drops the open item, the page opens the one that takes its place.
+  The page writes that item into the address with a history replace, so an item that arrives later cannot take it over; **Close** and Escape empty the address and open nothing until you open an item.
+  **End session** and E show only for a session the page can write to, as the session pane's header decides with `subjectOf` from `web/components/subject.ts`.
   The sidebar's **Inbox** row with its count is in `web/components/session-list.tsx`, counted in `web/components/app-sidebar.tsx`.
 - `web/components/routines/routines-card.tsx`: `RoutinesCard`, a Bot's routines as one card in place of its conversation, as Arc's Agent routines: a header with **New routine**, then a row per routine, one open at a time, the arrow keys moving between their names.
   `web/components/routines/routine-row.tsx` draws a row: its name, **Run now**, and the switch that pauses it; its schedules and its next run's countdown; its trigger logos, its task, and its last 10 runs as a strip of ticks, each with a tooltip, that opens the row on that run.
