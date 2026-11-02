@@ -1,6 +1,6 @@
 /** The Inbox page: everything that waits on you, grouped in two-line rows, with the open item's session conversation or notice beside the list, worked from the keyboard. */
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { CircleAlert, GitPullRequest, LoaderCircle, MessageSquare } from "lucide-react";
+import { CircleAlert, GitPullRequest, MessageSquare } from "lucide-react";
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { errorText } from "../../../src/json";
 import type { Notice } from "../../../src/shared/notices";
@@ -19,17 +19,14 @@ import { type ModelList, UNREAD } from "../../reads";
 import { hashForInbox } from "../../routing";
 import { useShortcuts } from "../../shortcuts";
 import { Age } from "../age";
-import { blockedShortcut } from "../composer";
-import { allPrompts } from "../composer-suggestions";
+import type { ConversationHandle } from "../conversation";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { ShortcutChip } from "../kbd";
 import { PageFrame } from "../list-page";
 import { CH_NEXT, CH_PREVIOUS, DetailBar, ListSplit } from "../list-split";
 import { NoticeAction } from "../notices";
 import { ViewConversation } from "../pane";
-import type { PromptEditorHandle } from "../prompt-editor";
 import { StatusDot } from "../status-dot";
-import { deliveryOf, subjectOf } from "../subject";
 import { toasts } from "../toaster";
 
 interface InboxPageProps {
@@ -197,10 +194,10 @@ function InboxDetail({ item, position, onPrevious, onNext, models, workspaces, o
 	const instanceId = item.kind === "notice" ? null : item.host.instanceId;
 	const view = useMemo<LiveView | null>(() => (instanceId === null ? null : { kind: "live", instanceId, agentId: null }), [instanceId]);
 	useShowConversation(view);
-	const editorRef = useRef<PromptEditorHandle>(null);
+	const conversation = useRef<ConversationHandle>(null);
 	return (
 		<section aria-label={item.title} className="@container/inbox flex h-full min-h-0 min-w-0 flex-col">
-			<InboxTriage key={item.key} item={item} view={view} editorRef={editorRef} position={position} onPrevious={onPrevious} onNext={onNext} onDone={onDone} />
+			<InboxTriage key={item.key} item={item} view={view} conversation={conversation} position={position} onPrevious={onPrevious} onNext={onNext} onDone={onDone} />
 			{view && item.kind !== "notice" && (
 				<div className="relative flex min-h-0 flex-1 flex-col">
 					<ViewConversation
@@ -213,7 +210,7 @@ function InboxDetail({ item, position, onPrevious, onNext, models, workspaces, o
 						workspaces={workspaces}
 						header={false}
 						autoFocus={false}
-						editorRef={editorRef}
+						handle={conversation}
 					/>
 				</div>
 			)}
@@ -222,7 +219,7 @@ function InboxDetail({ item, position, onPrevious, onNext, models, workspaces, o
 }
 
 /** What you do to the open item; it has at most one in flight. */
-type InboxAction = "send" | "done" | "end";
+type InboxAction = "done" | "end";
 
 /** Resolves `true` once the server confirms `work`, or toasts `failureTitle` with why it failed and resolves `false`. */
 async function settle(work: Promise<void>, failureTitle: string): Promise<boolean> {
@@ -239,8 +236,8 @@ interface InboxTriageProps {
 	item: InboxItem;
 	/** The item's session, `null` for a notice. */
 	view: LiveView | null;
-	/** The session composer's editor, which R focuses. */
-	editorRef: RefObject<PromptEditorHandle | null>;
+	/** The session's conversation, whose composer R focuses and 1 to 9 and 0 send from. */
+	conversation: RefObject<ConversationHandle | null>;
 	position: InboxDetailProps["position"];
 	onPrevious: InboxDetailProps["onPrevious"];
 	onNext: InboxDetailProps["onNext"];
@@ -254,7 +251,7 @@ const BAR_CHIP = "hidden @lg/inbox:inline-flex";
  * The open item's bar and keys: its mark, title, place, and wait; previous and next; and Mark read or Clear, End session,
  * and Open, each pending until the server answers. A notice's text and action show under the bar.
  */
-function InboxTriage({ item, view, editorRef, position, onPrevious, onNext, onDone }: InboxTriageProps) {
+function InboxTriage({ item, view, conversation, position, onPrevious, onNext, onDone }: InboxTriageProps) {
 	const { send, request, end } = useDashboardActions();
 	const { connected } = useDashboardStatus();
 	const [acting, setActing] = useState<InboxAction | null>(null);
@@ -277,10 +274,6 @@ function InboxTriage({ item, view, editorRef, position, onPrevious, onNext, onDo
 			else setActing(null);
 		});
 	};
-	const subject = view && item.kind !== "notice" ? subjectOf(view, item.host, null) : null;
-	const prompt = (text: string): void => {
-		if (view && subject) act("send", () => settle(request({ t: "prompt", view, text, images: [], delivery: deliveryOf(subject) }), "Could not send the prompt"));
-	};
 	const done = (): void => {
 		if (item.kind === "turn") act("done", () => settle(request({ t: "read", instanceId: item.host.instanceId }), "Could not mark the turn read"));
 		else if (item.kind === "notice") act("done", () => settle(request({ t: "notice", ids: [item.notice.id], op: "clear" }), "Could not clear the notice"));
@@ -292,20 +285,14 @@ function InboxTriage({ item, view, editorRef, position, onPrevious, onNext, onDo
 		if (item.kind === "notice") follow(item.presentation.link);
 		else location.hash = hashForSession(item.host.sessionId);
 	};
-	// The same prompts, in the same order, as the composer's numbered list.
-	const suggestions = item.kind === "turn" && subject?.writable ? item.turn.suggestions.filter(text => blockedShortcut(text, subject.shell) === null) : [];
 	useShortcuts({
 		inboxOpen: () => (document.activeElement === document.body ? openItem() : false),
 		inboxDone: () => (item.kind !== "ask" ? done() : false),
 		inboxEnd: () => (view ? endSession() : false),
-		inboxReply: () => {
-			const editor = editorRef.current;
-			if (!editor?.editable()) return false;
-			editor.focus();
-		},
-		inboxSendAll: () => (suggestions.length > 0 ? prompt(allPrompts(suggestions)) : false),
-		// A question's card in the conversation takes 1 to 9 itself; a finished turn's keys send its suggestions.
-		answer: key => (key < suggestions.length ? prompt(suggestions[key]!) : false),
+		inboxReply: () => conversation.current?.focus() ?? false,
+		inboxSendAll: () => conversation.current?.sendAllSuggestions() ?? false,
+		// A question's card in the conversation takes 1 to 9 itself, and the composer offers no suggestions meanwhile.
+		answer: key => conversation.current?.sendSuggestion(key) ?? false,
 	});
 	const busy = !connected || acting !== null;
 	return (
@@ -330,12 +317,6 @@ function InboxTriage({ item, view, editorRef, position, onPrevious, onNext, onDo
 					{position.at + 1} of {position.of}
 				</span>
 				<div className="ml-2 flex shrink-0 items-center gap-1">
-					{acting === "send" && (
-						<span role="status" aria-busy className="mr-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-							<LoaderCircle aria-hidden className="size-3.5 animate-spin" />
-							Sending…
-						</span>
-					)}
 					{item.kind !== "ask" && (
 						<Button variant="secondary" size="compact" loading={acting === "done"} disabled={busy} onClick={done}>
 							{item.kind === "turn" ? "Mark read" : "Clear"}

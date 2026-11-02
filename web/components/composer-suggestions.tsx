@@ -167,6 +167,10 @@ interface Suggestions {
 	onBlur: FocusEventHandler<HTMLDivElement>;
 	/** The composer's keys for the list; call it for a key no shortcut took. */
 	onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
+	/** Sends the marks plus row `index`, as its number key does; `false` while the list is closed or has no such row. */
+	send: (index: number) => boolean;
+	/** Sends every row, as 0 does; `false` while the list is closed or holds fewer than two. */
+	sendAll: () => boolean;
 }
 
 /**
@@ -293,5 +297,20 @@ export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOpt
 			)}
 		</AnimatePresence>
 	);
-	return { list, activeId: activeIndex === null ? undefined : `${listId}-${activeIndex}`, onBlur: () => setActiveIndex(null), onKeyDown };
+	return {
+		list,
+		activeId: activeIndex === null ? undefined : `${listId}-${activeIndex}`,
+		onBlur: () => setActiveIndex(null),
+		onKeyDown,
+		send: index => {
+			if (!open || index >= prompts.length) return false;
+			take(index, onSend);
+			return true;
+		},
+		sendAll: () => {
+			if (!open || prompts.length < 2) return false;
+			sendAll();
+			return true;
+		},
+	};
 }

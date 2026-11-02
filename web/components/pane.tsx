@@ -1,5 +1,5 @@
 import { Maximize2, Minimize2, Route, X } from "lucide-react";
-import { memo, type ReactNode, type RefObject, useCallback, useMemo, useState } from "react";
+import { memo, type ReactNode, type Ref, useCallback, useMemo, useState } from "react";
 import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
@@ -10,12 +10,11 @@ import type { ModelList } from "../reads";
 import { hashForView } from "../routing";
 import { shortcutLabels } from "../shortcuts";
 import type { ForkPoint } from "../transcript-view";
-import { Conversation } from "./conversation";
+import { Conversation, type ConversationHandle } from "./conversation";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { FileBaseContext } from "./file-link";
 import { HeaderControlsContext, useHeaderControls } from "./header-controls";
 import { PastConversation } from "./past-conversation";
-import type { PromptEditorHandle } from "./prompt-editor";
 import { RenderBoundary } from "./render-boundary";
 import { ReplayCompareDialog } from "./replay-compare";
 import { SidebarToggle } from "./sidebar-panel";
@@ -63,8 +62,8 @@ interface ViewConversationProps {
 	placeholder?: string;
 	/** A live session's composer takes the keyboard when it opens; `false` leaves it. Default `true`. */
 	autoFocus?: boolean;
-	/** Takes a live session's composer editor, for a page that focuses it from its own key. */
-	editorRef?: RefObject<PromptEditorHandle | null>;
+	/** Takes a live session's {@link ConversationHandle}, for a page that works its composer from its own keys. */
+	handle?: Ref<ConversationHandle>;
 }
 
 /**
@@ -72,7 +71,7 @@ interface ViewConversationProps {
  * from around it. It reads none of its view's data, which `Conversation` and `Transcript` read by field, so a streamed
  * token never asks it to render.
  */
-export const ViewConversation = memo(function ViewConversation({ view, focused, host, lastHost, session, models, workspaces, actions, header, placeholder, autoFocus, editorRef }: ViewConversationProps) {
+export const ViewConversation = memo(function ViewConversation({ view, focused, host, lastHost, session, models, workspaces, actions, header, placeholder, autoFocus, handle }: ViewConversationProps) {
 	const { send, request, start, open, end } = useDashboardActions();
 	const { fork, resume } = useDashboardStatus().starts;
 	const instanceId = view.kind === "live" ? view.instanceId : null;
@@ -145,7 +144,7 @@ export const ViewConversation = memo(function ViewConversation({ view, focused, 
 			header={header}
 			placeholder={placeholder}
 			autoFocus={autoFocus}
-			editorRef={editorRef}
+			handle={handle}
 		/>
 	);
 
