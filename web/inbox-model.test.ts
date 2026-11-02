@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Notice } from "../src/shared/notices";
 import type { RosterHost, UserRequest } from "../src/shared/sessions";
-import { type InboxSection, inboxSections, itemCount, nextAfter, sectionsIn } from "./inbox-model";
+import { type InboxSection, inboxSections, itemCount, nextAfter, routeAfter, sectionsIn } from "./inbox-model";
 
 const host = (instanceId: string, status: RosterHost["status"], extra: Partial<RosterHost> = {}): RosterHost =>
 	({ instanceId, sessionId: instanceId, sessionName: instanceId, cwd: "/w", cwdDisplay: "~/w", status, requests: [], unread: null, ...extra }) as RosterHost;
@@ -61,7 +61,22 @@ describe("nextAfter", () => {
 		expect(nextAfter([], "gone", 0)).toBeNull();
 	});
 
-	test("a bare Inbox opens nothing, so an item that arrives never takes over the page", () => {
-		expect(nextAfter(items, null, 0)).toBeNull();
+	test("a bare Inbox opens the first item", () => {
+		expect(nextAfter(items, null, 0)?.key).toBe("turn/a/1");
+		expect(nextAfter([], null, 0)).toBeNull();
+	});
+});
+
+describe("routeAfter", () => {
+	const [first, second] = inboxSections([host("a", "idle", { unread: turn(1) }), host("b", "idle", { unread: turn(2) })], [], 0, NO_PINS).flatMap(({ items }) => items);
+	test("the item a bare Inbox opens becomes the route, so an item that arrives later cannot take it over", () => {
+		expect(routeAfter(first ?? null, null, null)).toBe("turn/a/1");
+	});
+
+	test("an item that took a shown item's place becomes the route; a routed item that stays, or a link to one already gone, keeps it", () => {
+		expect(routeAfter(second ?? null, "turn/a/1", "turn/a/1")).toBe("turn/b/2");
+		expect(routeAfter(first ?? null, "turn/a/1", "turn/a/1")).toBeNull();
+		expect(routeAfter(second ?? null, "gone", null)).toBeNull();
+		expect(routeAfter(null, null, null)).toBeNull();
 	});
 });
