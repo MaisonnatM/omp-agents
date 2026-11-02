@@ -3,6 +3,7 @@
  * reads, whether it differs from omp's default, and the tabs and groups a search leaves.
  */
 import type { AgentSettingRow, AgentSettingTab } from "../src/shared/agent-settings";
+import { AGENT_SETTINGS } from "../src/shared/agents";
 import { everyWord } from "../src/shared/every-word";
 import type { SettingsSection } from "./routing";
 
@@ -13,6 +14,7 @@ export interface SettingOwner {
 }
 
 const MODELS: SettingOwner = { section: "models", label: "Models" };
+const AGENTS: SettingOwner = { section: "agents", label: "Agents" };
 
 /**
  * omp settings another Settings section edits, by id. Settings › omp settings counts them and links to that section
@@ -33,6 +35,7 @@ export const OWNED_SETTINGS: Readonly<Record<string, SettingOwner>> = {
 	"retry.usageReservePct": MODELS,
 	"retry.usageReservePolicy": MODELS,
 	"retry.fallbackRevertPolicy": MODELS,
+	...Object.fromEntries(Object.values(AGENT_SETTINGS).map(id => [id, AGENTS])),
 };
 
 /** The section that edits `id`, from {@link OWNED_SETTINGS}; `undefined` when this section does. */

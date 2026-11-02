@@ -120,6 +120,8 @@ export interface ModelResolverModule {
 	resolveRoleSelection<M extends OmpModel>(roles: readonly string[], settings: OmpSettingsInstance, models: M[]): { role: string; model: M } | undefined;
 	/** `role`'s model and its retry fallbacks among `pool`, in the order omp tries them. */
 	resolveRoleChain<M extends OmpModel>(role: string, settings: OmpSettingsInstance, pool: M[]): { model: M }[];
+	resolveAgentModelSelection(options: { settingsOverride?: string | string[]; agentModel?: string[]; settings: OmpSettingsInstance; activeModelPattern?: string }): { patterns: string[]; role: string | undefined };
+	resolveModelOverride(patterns: string[], registry: { getAvailable(): OmpModel[] }, settings: OmpSettingsInstance): { model?: OmpModel; thinkingLevel?: string; warning?: string };
 }
 /** One event of a pi-ai answer stream (pi-ai src/types.ts `AssistantMessageEvent`), with the fields the dashboard reads. */
 export interface AnswerEvent {

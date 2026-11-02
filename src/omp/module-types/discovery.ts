@@ -49,8 +49,25 @@ export interface DiscoveryModule {
 export interface CustomCommandsModule {
 	discoverCustomCommands(options: { cwd: string }): Promise<{ paths: { path: string; source: "bundled" | "user" | "project" }[] }>;
 }
+export interface AgentDefinition {
+	name: string;
+	description: string;
+	source: "user" | "project" | "bundled";
+	filePath?: string;
+	tools?: string[];
+	model?: string[];
+}
 export interface AgentDiscoveryModule {
-	discoverAgents(cwd: string): Promise<{ agents: { source: string; name?: string; filePath?: string }[] }>;
+	discoverAgents(cwd: string): Promise<{ agents: AgentDefinition[] }>;
+}
+export interface AgentReadOnlyModule {
+	isReadOnlyAgent(agent: AgentDefinition): boolean;
+}
+export interface AgentRootsModule {
+	listOmpExtensionRoots(context: { cwd: string; home: string; repoRoot: null }): Promise<{ path: string; name: string; level: "user" | "project" }[]>;
+}
+export interface AgentPluginRootsModule {
+	listClaudePluginRoots(home: string, cwd: string): Promise<{ roots: { path: string; plugin: string; scope: "user" | "project" }[] }>;
 }
 export interface ConfigFilesModule {
 	findConfigFile(subpath: string, options: { user?: boolean; project?: boolean; cwd?: string }): string | undefined;

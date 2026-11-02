@@ -12,6 +12,7 @@ import { Header } from "../page-header";
 import { AnalyticsTab } from "./analytics-tab";
 import { ActivityTab } from "./activity-tab";
 import { type Catalog, type Editing, LINK } from "./editor";
+import { AgentsTab } from "./agents-tab";
 import { DecisionsTab } from "./decisions-tab";
 import { Files } from "./files-tab";
 import { IntegrationsTab } from "./integrations-tab";
@@ -78,7 +79,7 @@ const loadAlert = (error: string): ReactNode => (
 );
 
 /** The omp sections' content once settings are read, else why they are empty. */
-function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Editing, selection: FileSelection): Record<"models" | "omp" | "files" | "workflows", ReactNode> {
+function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Editing, selection: FileSelection): Record<"models" | "agents" | "omp" | "files" | "workflows", ReactNode> {
 	if (read.data === null) {
 		const note =
 			read.error === null ? (
@@ -88,13 +89,15 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 					Cannot read omp's settings: {read.error}
 				</p>
 			);
-		return { models: note, omp: note, files: note, workflows: note };
+		return { models: note, agents: note, omp: note, files: note, workflows: note };
 	}
-	const { routing, agentSettings, files, workflows } = read.data;
+	const { routing, agentSettings, agents: catalog, files, workflows } = read.data;
 	const key = cwd ?? "";
 	const filesPanel = <Files key={key} files={files} editing={editing} selected={selection.path} onSelect={selection.open} />;
 	const workflowsPanel = <Workflows key={key} workflows={workflows} files={files} editing={editing} />;
 	const configFile = files.find(file => file.kind === "settings" && file.scope === "user" && file.path.endsWith("/config.yml"));
+	const projectFile = files.find(file => file.kind === "settings" && file.scope === "project" && file.body.state === "read");
+	const agents = <AgentsTab key={key} catalog={catalog} settings={agentSettings} editing={editing} stale={read.error} configFile={configFile} projectFile={projectFile} onOpenFile={selection.open} />;
 	const omp =
 		"error" in agentSettings ? (
 			<div className="space-y-2">
@@ -112,15 +115,16 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 				key={key}
 				settings={agentSettings}
 				configFile={configFile}
-				projectFile={files.find(file => file.kind === "settings" && file.scope === "project" && file.body.state === "read")}
+				projectFile={projectFile}
 				editing={editing}
 				onOpenFile={selection.open}
 			/>
 		);
-	if ("error" in routing) return { models: loadAlert(routing.error), omp, files: filesPanel, workflows: workflowsPanel };
+	if ("error" in routing) return { models: loadAlert(routing.error), agents, omp, files: filesPanel, workflows: workflowsPanel };
 	return {
 		models: <ModelsTab routing={routing} configPath={configFile?.pathDisplay} editing={editing} />,
 		omp,
+		agents,
 		files: filesPanel,
 		workflows: workflowsPanel,
 	};

@@ -28,6 +28,9 @@ import type {
 } from "./module-types/config";
 import type {
 	AgentDiscoveryModule,
+	AgentReadOnlyModule,
+	AgentRootsModule,
+	AgentPluginRootsModule,
 	AutocompleteModule,
 	ConfigFilesModule,
 	ConfigFileSourcesModule,
@@ -294,6 +297,8 @@ export const fallbackChains = await load<FallbackChainsModule>(join(srcDir, "ses
 export const modelResolver = await load<ModelResolverModule>(join(srcDir, "config", "model-resolver.ts"), {
 	resolveProviderModelReference: "function",
 	resolveRoleSelection: "function",
+	resolveAgentModelSelection: "function",
+	resolveModelOverride: "function",
 	resolveRoleChain: "function",
 });
 export const modelRoles = await load<ModelRolesModule>(join(srcDir, "config", "model-roles.ts"), { roleCandidatePool: "function" });
@@ -338,6 +343,9 @@ export const customCommands = await load<CustomCommandsModule>(join(srcDir, "ext
 	discoverCustomCommands: "function",
 });
 export const agentDiscovery = await load<AgentDiscoveryModule>(join(srcDir, "task", "discovery.ts"), { discoverAgents: "function" });
+export const agentReadOnly = await load<AgentReadOnlyModule>(join(srcDir, "task", "read-only-policy.ts"), { isReadOnlyAgent: "function" });
+export const agentRoots = await load<AgentRootsModule>(join(srcDir, "discovery", "omp-extension-roots.ts"), { listOmpExtensionRoots: "function" });
+export const agentPluginRoots = await load<AgentPluginRootsModule>(join(srcDir, "discovery", "helpers.ts"), { listClaudePluginRoots: "function" });
 export const configFiles = await load<ConfigFilesModule>(join(srcDir, "config.ts"), { findConfigFile: "function", getConfigDirPaths: "function" });
 export const configSources = await load<ConfigFileSourcesModule>(join(srcDir, "utils", "config-file-sources.ts"), { configFileSources: "function" });
 export const markit = await load<MarkitModule>(join(srcDir, "utils", "markit.ts"), { convertBufferWithMarkit: "function" });
