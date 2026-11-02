@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-02-terminal-unread-turns-come-back-at-the-first-registry-listing
 date: 2026-11-02
 decision-makers: agent
 ---

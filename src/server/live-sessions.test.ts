@@ -4,13 +4,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { flushJsonFiles } from "../fs";
 import type { LiveSession } from "../live-session";
+import * as collab from "../omp/collab";
+import type { HostSnapshot } from "../omp/collab";
 import type { SessionFacts } from "../shared/sessions";
 import { LiveSessions, withSubject } from "./live-sessions";
 
 const facts: SessionFacts = { pullRequests: [{ owner: "acme", repo: "webapp", number: 7, link: "submitted" }], tickets: ["ENG-1"], ship: null, worktree: null, branch: null, workspace: null };
 
 const dirs: string[] = [];
-afterEach(() => {
+/** The servers whose guests joined terminal sessions, which a test leaves. */
+const following: LiveSessions[] = [];
+afterEach(async () => {
+	await Promise.all(following.splice(0).map(sessions => sessions.dispose()));
 	mock.restore();
 	for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
@@ -23,7 +28,7 @@ function unreadIn(): string {
 }
 
 const liveSession = (instanceId: string) =>
-	({ instanceId, sessionId: `s-${instanceId}`, cwd: "/work", row: () => ({ instanceId }), follow() {}, finished: () => false }) as unknown as LiveSession;
+	({ instanceId, sessionId: `s-${instanceId}`, cwd: "/work", row: () => ({ instanceId }), follow() {}, finished: () => false, dispose: async () => {} }) as unknown as LiveSession;
 
 /** A server starting over `path`, listing the sessions `instanceIds` names. */
 function registry(path: string, ...instanceIds: string[]): LiveSessions {
@@ -34,6 +39,41 @@ function registry(path: string, ...instanceIds: string[]): LiveSessions {
 
 /** Each listed session's instance id with its unread turn. */
 const unreadOf = (sessions: LiveSessions) => sessions.rows(() => facts).map(row => [row.instanceId, row.unread]);
+
+/** Terminal session `instanceId` as the registry lists it, running a turn when `busy`, and `null` when its omp does not say. */
+const host = (instanceId: string, busy: boolean | null = false): HostSnapshot => ({
+	instanceId,
+	generation: 1,
+	pid: 4242,
+	sessionId: `s-${instanceId}`,
+	sessionName: null,
+	cwd: "/work",
+	model: null,
+	startedAt: 1,
+	participants: 1,
+	relayConnected: true,
+	inputRequired: false,
+	busy,
+	access: "control",
+});
+
+/** The registry listing `hosts`, as the dashboard follows it: a guest joins each new one, whose room never opens, and the listing restores the unread turns. */
+function list(sessions: LiveSessions, hosts: HostSnapshot[], savedFile: (sessionId: string) => string | null = () => null): void {
+	spyOn(collab, "openRoom").mockReturnValue(new Promise(() => {}));
+	following.push(sessions);
+	sessions.follow(hosts);
+	sessions.restoreListedUnread(hosts, savedFile);
+}
+
+/** A session file holding one message per `[ISO time, role, text]`, in a directory the test removes. */
+function sessionFile(entries: Array<[string, string, string]>): string {
+	const dir = mkdtempSync(join(tmpdir(), "omp-agents-terminal-"));
+	dirs.push(dir);
+	const path = join(dir, "session.jsonl");
+	const lines = [{ type: "session", id: "s", cwd: dir }, ...entries.map(([timestamp, role, text]) => ({ type: "message", timestamp, message: { role, content: [{ type: "text", text }] } }))];
+	writeFileSync(path, lines.map(line => `${JSON.stringify(line)}\n`).join(""));
+	return path;
+}
 
 describe("withSubject", () => {
 	test("puts a quick action's pull request or issue first among the session's links", () => {
@@ -111,12 +151,84 @@ describe("LiveSessions", () => {
 		second.restoreUnread(new Set(["i-kept"]));
 		const kept = { at: 1_000, reply: "Fixed the test.", body: "Fixed the test.\nDetails follow.", suggestions: ["Merge on main"] };
 		expect(unreadOf(second)).toEqual([["i-kept", kept], ["i-gone", null]]);
+		// The first registry listing does not list it as a terminal session either.
+		list(second, []);
 		flushJsonFiles();
 
 		// The turn of a session that did not survive the restart is forgotten, so it never comes back.
 		const third = registry(path, "i-kept", "i-gone");
 		third.restoreUnread(new Set(["i-kept", "i-gone"]));
 		expect(unreadOf(third)).toEqual([["i-kept", kept], ["i-gone", null]]);
+	});
+
+	test("a terminal session's unread turn comes back at the first registry listing after a restart, which forgets only the turns of the sessions it does not list", () => {
+		const path = unreadIn();
+		const first = registry(path);
+		list(first, [host("t-kept"), host("t-gone")]);
+		first.markUnread("t-kept", { at: 1_000, reply: { body: "Fixed the test.", suggestions: [] } });
+		first.markUnread("t-gone", { at: 2_000, reply: null });
+		flushJsonFiles();
+
+		// No session the dashboard started survived, and this server stops before it lists the registry.
+		registry(path).restoreUnread(new Set());
+		flushJsonFiles();
+
+		const next = registry(path);
+		next.restoreUnread(new Set());
+		list(next, [host("t-kept")]);
+		const kept = { at: 1_000, reply: "Fixed the test.", body: "Fixed the test.", suggestions: [] };
+		expect(unreadOf(next)).toEqual([["t-kept", kept]]);
+		// Only the first listing restores.
+		next.markRead("t-kept");
+		list(next, [host("t-kept"), host("t-gone")]);
+		expect(unreadOf(next)).toEqual([["t-kept", null], ["t-gone", null]]);
+		next.markUnread("t-kept", { at: 3_000, reply: null });
+		flushJsonFiles();
+
+		const last = registry(path);
+		last.restoreUnread(new Set());
+		list(last, [host("t-kept"), host("t-gone")]);
+		expect(unreadOf(last)).toEqual([["t-kept", { at: 3_000, reply: null, body: null, suggestions: [] }], ["t-gone", null]]);
+	});
+
+	test("a terminal session's turn that ended while no server listened comes back unread from its session file, in place of the turn saved before it", () => {
+		const path = unreadIn();
+		const hosts = [host("t-ended"), host("t-quiet"), host("t-working", true), host("t-unknown", null), host("t-stopped")];
+		spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-02T10:00:00.000Z"));
+		const first = registry(path, "i-dash");
+		list(first, hosts);
+		for (const instanceId of ["t-ended", "t-quiet", "t-working", "t-unknown"]) first.markUnread(instanceId, { at: 1_000, reply: { body: "Saved reply.", suggestions: [] } });
+		flushJsonFiles();
+
+		// The next server marks a turn of a session it started, then stops before it lists the registry, so it heard no terminal session.
+		spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-02T10:30:00.000Z"));
+		const crashed = registry(path, "i-dash");
+		crashed.restoreUnread(new Set(["i-dash"]));
+		crashed.markUnread("i-dash", { at: 4_000, reply: null });
+		flushJsonFiles();
+
+		const later = sessionFile([["2026-11-02T10:05:00.000Z", "user", "Merge it"], ["2026-11-02T10:06:00.000Z", "assistant", "Merged."]]);
+		const files: Record<string, string> = {
+			"s-t-ended": later,
+			"s-t-quiet": sessionFile([["2026-11-02T09:58:00.000Z", "user", "Merge it"], ["2026-11-02T09:59:00.000Z", "assistant", "Merged."]]),
+			"s-t-working": later,
+			"s-t-unknown": later,
+			"s-t-stopped": sessionFile([["2026-11-02T09:58:00.000Z", "assistant", "Done."], ["2026-11-02T10:07:00.000Z", "user", "Run the tests"]]),
+			"s-i-dash": later,
+		};
+		const next = registry(path, "i-dash");
+		next.restoreUnread(new Set(["i-dash"]));
+		// A session this server started keeps the turn its reattach settled, even if the registry lists it too.
+		list(next, [...hosts, host("i-dash")], sessionId => files[sessionId] ?? null);
+		expect(unreadOf(next)).toEqual([
+			["i-dash", { at: 4_000, reply: null, body: null, suggestions: [] }],
+			["t-ended", { at: Date.parse("2026-11-02T10:06:00.000Z"), reply: "Merged.", body: "Merged.", suggestions: [] }],
+			["t-quiet", { at: 1_000, reply: "Saved reply.", body: "Saved reply.", suggestions: [] }],
+			["t-working", null],
+			["t-unknown", null],
+			// Stopped before it replied, as a turn the server hears end with no reply.
+			["t-stopped", { at: Date.parse("2026-11-02T10:07:00.000Z"), reply: null, body: null, suggestions: [] }],
+		]);
 	});
 
 	test("a turn read or a session removed before a restart stays read after it", () => {

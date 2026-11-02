@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { CHANGELOG_MAX_BYTES } from "../scripts/trim-changelog";
 import { run, runChecked } from "./proc";
 
 const HOOKS = join(import.meta.dir, "..", ".githooks");
@@ -76,5 +77,25 @@ describe("post-merge", () => {
 		await git(dir, "switch", "-q", "-c", "other", "main");
 		const merge = await run(["git", "merge", "--ff-only", "feature"], { cwd: dir });
 		expect(merge.stderr).not.toContain(WARNING);
+	});
+});
+
+/** A CHANGELOG.md past the doc size limit: sixty days of ten long lines each, newest first, from 2026-12-31 back. */
+function oversizedChangelog(): string {
+	const days = Array.from({ length: 60 }, (_, i) => `## 2026-12-${String(31 - (i % 31)).padStart(2, "0")}\n\n${`- ${"A change worth a whole line of words. ".repeat(2)}\n`.repeat(10)}`);
+	return `# Changelog\n\n${days.join("\n")}`;
+}
+
+describe("CHANGELOG.md trimming", () => {
+	test("a commit that grows CHANGELOG.md past the limit commits it without its oldest days", async () => {
+		const { dir } = await setup({ "feature.txt": "feature\n" });
+		const text = oversizedChangelog();
+		expect(Buffer.byteLength(text)).toBeGreaterThan(CHANGELOG_MAX_BYTES);
+		writeFileSync(join(dir, "CHANGELOG.md"), text);
+		await git(dir, "commit", "-q", "-am", "grow");
+		const committed = await git(dir, "show", "HEAD:CHANGELOG.md");
+		expect(Buffer.byteLength(committed)).toBeLessThanOrEqual(CHANGELOG_MAX_BYTES);
+		expect(text.startsWith(committed)).toBe(true);
+		expect(await git(dir, "status", "--porcelain")).toBe("");
 	});
 });

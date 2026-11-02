@@ -75,22 +75,25 @@ test("the server learns which sessions survived before it lists or hears any, an
 	}
 });
 
-test("a reattached session whose turn ended while no server listened is listed with that turn unread, and a turn left unread before the restart comes back", async () => {
+test("a reattached session whose turn ended while no server listened is listed with that turn unread, even one stopped before any reply, and a turn left unread before the restart comes back", async () => {
 	const dir = mkdtempSync(join("/tmp", "ost-"));
 	try {
 		const file = join(dir, "session.jsonl");
 		const line = (timestamp: string, role: string, text: string) => `${JSON.stringify({ type: "message", timestamp, message: { role, content: [{ type: "text", text }] } })}\n`;
 		writeFileSync(file, `${JSON.stringify({ type: "session", id: "s", cwd: dir })}\n${line("2026-11-02T10:00:00.000Z", "user", "Sleep 12 seconds")}${line("2026-11-02T10:00:12.000Z", "assistant", "done")}`);
+		// Stopped while its prompt waited on the model, so the file ends on the prompt, as a turn the server hears end with no reply.
+		const prompted = join(dir, "prompted.jsonl");
+		writeFileSync(prompted, `${JSON.stringify({ type: "session", id: "s", cwd: dir })}\n${line("2026-11-02T10:00:20.000Z", "user", "Run the tests")}`);
 		const unreadPath = join(dir, "unread.json");
 		new LiveSessions(() => {}, undefined, unreadPath).markUnread("i-saved", { at: 5_000, reply: { body: "Saved reply.", suggestions: [] } });
 		flushJsonFiles();
 
-		spyOn(rpc, "keptSessions").mockReturnValue(["i-ended", "i-working", "i-idle", "i-saved"]);
+		spyOn(rpc, "keptSessions").mockReturnValue(["i-ended", "i-prompted", "i-working", "i-idle", "i-saved"]);
 		spyOn(DashboardSession, "reattach").mockImplementation(async instanceId => {
 			const fields = {
 				instanceId: { value: instanceId },
 				sessionId: { value: `s-${instanceId}` },
-				sessionFile: { value: file },
+				sessionFile: { value: instanceId === "i-prompted" ? prompted : file },
 				cwd: { value: dir },
 				status: { value: instanceId === "i-working" ? "working" : "idle" },
 				finished: { value: () => false },
@@ -99,10 +102,11 @@ test("a reattached session whose turn ended while no server listened is listed w
 			return fromPartial(Object.create(DashboardSession.prototype, fields));
 		});
 		const sessions = new LiveSessions(() => {}, new TaskClaims(join(dir, "claims.json")), unreadPath);
-		await reattachAll(sessions, () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }), () => new Set(["s-i-ended", "s-i-working"]));
+		await reattachAll(sessions, () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }), () => new Set(["s-i-ended", "s-i-prompted", "s-i-working"]));
 		const facts: SessionFacts = { tickets: [], pullRequests: [], worktree: null, branch: null, ship: null, workspace: null };
 		expect(sessions.rows(() => facts).map(row => [row.instanceId, row.unread])).toEqual([
 			["i-ended", { at: Date.parse("2026-11-02T10:00:12.000Z"), reply: "done", body: "done", suggestions: [] }],
+			["i-prompted", { at: Date.parse("2026-11-02T10:00:20.000Z"), reply: null, body: null, suggestions: [] }],
 			["i-working", null],
 			["i-idle", null],
 			["i-saved", { at: 5_000, reply: "Saved reply.", body: "Saved reply.", suggestions: [] }],
