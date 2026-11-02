@@ -3,12 +3,14 @@ import { mkdir, realpath, stat } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
 import { atomicWriteText } from "./fs";
 import { errorText, isObject } from "./json";
+import { agentSetting, readAgentSettings, writeAgentSetting } from "./omp/agent-settings";
 import { agentDir, assertRetryValue, expandDefaultRetryFallbackChains, loadOmpConfig, type OmpConfig, resolveSelector, retryChoices, routedSelectors, writeRouting } from "./omp/config";
 import { discoverOmpFiles, type FoundFile } from "./omp/discovery";
 import { findModelUpdates, upgradeEdits } from "./omp/model-updates";
 import { connectedProviders, listModels } from "./omp/models";
 import { workflowsOf } from "./omp/workflows";
 import { displayPath, HOME } from "./paths";
+import type { AgentSettingEdit } from "./shared/agent-settings";
 import type { CatalogModel, FileEdit, ModelChain, OmpFile, OmpSettings, RetrySettings, RoleRoute, RoutingEdit } from "./shared/models";
 import type { ModelUpdate } from "./shared/notices";
 
@@ -100,8 +102,8 @@ async function loadSession(cwd: string | null): Promise<{ routing: OmpSettings["
 }
 
 export async function loadOmpSettings(cwd: string | null): Promise<OmpSettings> {
-	const { routing, found } = await loadSession(cwd);
-	return { cwd, routing, files: await Promise.all(found.map(readFile)), workflows: workflowsOf(found) };
+	const [{ routing, found }, agentSettings] = await Promise.all([loadSession(cwd), readAgentSettings(cwd).catch((err: unknown) => ({ error: errorText(err) }))]);
+	return { cwd, routing, agentSettings, files: await Promise.all(found.map(readFile)), workflows: workflowsOf(found) };
 }
 
 /** What a routing edit is checked against: the models omp lists, and what the config names today. */
@@ -188,6 +190,9 @@ function serialized<T>(save: () => Promise<T>): Promise<T> {
 	return next;
 }
 
+/** A config omp cannot load is one it would move aside to write, so a write waits until the user fixes it. */
+const cannotLoad = (err: unknown): Rejected => new Rejected(409, `omp cannot load its settings, so it cannot write them: ${errorText(err)}`);
+
 /** Applies a routing edit to the user's `config.yml` and answers with the settings as they now load. */
 export function saveRouting(cwd: string | null, raw: unknown): Promise<OmpSettings> {
 	return serialized(async () => {
@@ -196,10 +201,46 @@ export function saveRouting(cwd: string | null, raw: unknown): Promise<OmpSettin
 		try {
 			config = await loadOmpConfig(sessionCwd);
 		} catch (err) {
-			throw new Rejected(409, `omp cannot load its settings, so it cannot write them: ${errorText(err)}`);
+			throw cannotLoad(err);
 		}
 		const edit = parseRoutingEdit(raw, { catalog: await listModels(), config });
 		await writeRouting(sessionCwd, edit);
+		return loadOmpSettings(cwd);
+	});
+}
+
+export function parseAgentSettingEdit(raw: unknown): AgentSettingEdit {
+	if (!isObject(raw) || typeof raw.id !== "string" || !Object.hasOwn(raw, "expected") || (raw.reset !== true && !Object.hasOwn(raw, "value"))) {
+		throw new Rejected(400, "Expected { id, value, expected } or { id, reset: true, expected }");
+	}
+	return raw.reset === true ? { id: raw.id, reset: true, expected: raw.expected } : { id: raw.id, value: raw.value, expected: raw.expected };
+}
+
+/**
+ * Sets or resets one of omp's settings in the user's `config.yml`, as omp's own settings panel would, and answers with the
+ * settings as they now load. Any setting omp has is taken, except one that only changes how omp's terminal draws.
+ */
+export function saveAgentSetting(cwd: string | null, raw: unknown): Promise<OmpSettings> {
+	return serialized(async () => {
+		const edit = parseAgentSettingEdit(raw);
+		const handle = agentSetting(edit.id);
+		if (!handle) throw new Rejected(404, `omp has no setting ${edit.id} a session reads`);
+		if (!("reset" in edit)) {
+			try {
+				handle.assertWritable(edit.value);
+			} catch (err) {
+				throw new Rejected(400, errorText(err));
+			}
+		}
+		const sessionCwd = cwd ?? HOME;
+		try {
+			await loadOmpConfig(sessionCwd);
+		} catch (err) {
+			throw cannotLoad(err);
+		}
+		if (!(await writeAgentSetting(sessionCwd, handle, edit))) {
+			throw new Rejected(409, `${edit.id} changed in config.yml since this page read it`, true);
+		}
 		return loadOmpSettings(cwd);
 	});
 }

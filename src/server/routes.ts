@@ -30,7 +30,7 @@ import { directoryOf } from "../paths";
 import { attachToPullRequest, loadPullRequestOptions, markPullRequestFileViewed, savePullRequest } from "../pull-request-edit";
 import { InvalidPullRequestCommit, listPullRequestChanges, readPullRequestFile } from "../pull-request-files";
 import { loadPullRequestStack } from "../pull-request-stack";
-import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings";
+import { loadOmpSettings, Rejected, saveAgentSetting, saveOmpFile, saveRouting } from "../settings";
 import { attachToTicket, createTicket, loadLinearUsers, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
 import { ClientConfigError } from "../mcp-clients";
@@ -226,14 +226,14 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		return env.replayDetail(parsed.ok, turnId);
 	}));
 
-	/** `GET /api/settings[?cwd=<dir>]`: omp's model routing and files, user-level only without `cwd`. */
+	/** `GET /api/settings[?cwd=<dir>]`: omp's model routing, its own settings, and its files, user-level only without `cwd`. */
 	const settings = get(params => {
 		const cwd = workspaceCwd(params);
 		return cwd instanceof Response ? cwd : answer(() => loadOmpSettings(cwd));
 	});
 
 	/**
-	 * A settings write: `PUT /api/settings/routing` or `/api/settings/file`, `?cwd=` as for reading.
+	 * A settings write: `PUT /api/settings/routing`, `/api/settings/agent`, or `/api/settings/file`, `?cwd=` as for reading.
 	 * The answer is the settings as they load after the write, or the edit's refusal with its status.
 	 */
 	const settingsWrite = (save: (cwd: string | null, body: unknown) => Promise<unknown>): Handler =>
@@ -398,6 +398,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	return {
 		"/api/settings": { GET: settings },
 		"/api/settings/routing": { PUT: settingsWrite(saveRouting) },
+		"/api/settings/agent": { PUT: settingsWrite(saveAgentSetting) },
 		"/api/settings/file": { PUT: settingsWrite(saveOmpFile) },
 		"/api/decisions": { GET: decisions },
 		"/api/models": { GET: models },

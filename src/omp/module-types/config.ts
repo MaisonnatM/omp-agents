@@ -23,6 +23,8 @@ export interface OmpSettingsInstance {
 	getModelRoles(): Record<string, string>;
 	/** The native global layer, without project/runtime overlays. */
 	getGlobalSettings(): Record<string, unknown>;
+	/** The workspace's layer: `.omp/settings.json` and the other project files omp merges, without the global one. */
+	getProjectSettings(): Record<string, unknown>;
 	/** Stages one role in the global `config.yml`; `flush` writes it, leaving every other role as it is on disk. */
 	setModelRole(role: string, selector: string | undefined): void;
 	/** Writes staged changes into the re-read global `config.yml` under omp's lock. */
@@ -40,17 +42,81 @@ export interface ConfigModule {
 /** Subset of omp's `Setting` handle (src/config/registry.ts). `set`/`setEntry` stage a global write; `undefined` removes. */
 export interface SettingHandle {
 	readonly id: string;
+	/** {@link id} split at its dots, the path it sits at within a settings layer. */
+	readonly segments: readonly string[];
 	readonly definition: { protocolDefault?: readonly string[] };
+	readonly type: "boolean" | "string" | "number" | "enum" | "array" | "record";
+	readonly default: unknown;
+	/** Settings-panel metadata; `undefined` for a setting only `config.yml` edits. */
+	readonly ui: SettingUi | undefined;
+	/** A credential, which omp never prints. */
+	readonly isCredential: boolean;
+	/** The environment variable that can supply the value. */
+	readonly envName: string | undefined;
 	pinDefault(settings: OmpSettingsInstance): void;
 	readonly enumValues: readonly string[] | undefined;
 	/** @throws Error when `value` does not fit the setting. */
 	assertWritable(value: unknown): void;
 	set(settings: OmpSettingsInstance, value: unknown): void;
 	setEntry(settings: OmpSettingsInstance, key: string, value: unknown): void;
+	/** Stages the removal of the key from the global `config.yml`, so the workspace's value, the variable's, or the default applies. */
+	unset(settings: OmpSettingsInstance): void;
+	/** The layer the value in effect comes from; `"env"` when {@link envName} overrides the settings. */
+	provenance(settings: OmpSettingsInstance): "env" | "runtime" | "overlay" | "project" | "global" | "default";
 }
 export interface SettingsRegistryModule {
 	all(): readonly SettingHandle[];
 	lookup(id: string): SettingHandle | undefined;
+}
+/** omp's settings-panel metadata for one setting (pi-tui src/overlays/settings-defs.ts `AnyUiMetadata`). */
+export interface SettingUi {
+	tab: string;
+	group?: string;
+	label: string;
+	description: string;
+	warning?: string;
+	/** The name of a check, private to omp's terminal, that hides the row when false. */
+	condition?: string;
+	options?: readonly SettingOption[] | "runtime";
+	secret?: boolean;
+	ordered?: boolean;
+	editor?: "json";
+}
+export interface SettingOption {
+	value: string;
+	label: string;
+	description?: string;
+}
+/** omp's registry in the order its settings panel walks it (src/config/all-settings.ts). */
+export interface AllSettingsModule {
+	orderedSettings(): readonly SettingHandle[];
+}
+/** What omp's settings panel shows a setting as (pi-tui src/overlays/settings-defs.ts `SettingsDisplayEntry`). */
+export interface SettingsDisplayEntry {
+	path: string;
+	type: string;
+	defaultValue: unknown;
+	ui?: SettingUi;
+	enumValues?: readonly string[];
+	credential?: boolean;
+}
+/** The control omp's settings panel edits a setting with (`SettingDef`). */
+export type SettingDef = { path: string; schemaType: string; label: string; description: string; warning?: string; tab: string; group?: string } & (
+	| { type: "boolean" }
+	| { type: "enum"; values: readonly string[] }
+	| { type: "submenu"; options: readonly SettingOption[] }
+	| { type: "text"; secret: boolean }
+	| { type: "providerLimits" }
+	| { type: "multiselect"; options: readonly SettingOption[]; ordered: boolean }
+);
+/** omp's settings-panel layout: its tabs in order, each one's label and group order, and each setting's control. */
+export interface SettingsDefsModule {
+	SETTING_TABS: readonly string[];
+	TAB_METADATA: Record<string, { label: string }>;
+	/** Each tab's settings in its group order, the rows omp leaves without a control left out. */
+	getSettingsForTab(entries: readonly SettingsDisplayEntry[], tab: string): SettingDef[];
+	/** The number a numeric choice stands for, `-1` for `default`; `undefined` when it is not numeric. */
+	numericOption(value: string): number | undefined;
 }
 export interface ExtensionSettingsModule {
 	cfgSkills: SettingsReader<Record<string, unknown> & { enableSkillCommands?: boolean }>;

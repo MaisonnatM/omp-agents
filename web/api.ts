@@ -104,7 +104,7 @@ export async function putJson<T>(url: string, body: unknown, signal?: AbortSigna
 }
 
 /** The settings route `part` for `cwd`, or for the user's own files when `cwd` is `null`. */
-export const settingsUrl = (part: "" | "/routing" | "/file", cwd: string | null): string => `/api/settings${part}${cwd === null ? "" : `?cwd=${encodeURIComponent(cwd)}`}`;
+export const settingsUrl = (part: "" | "/routing" | "/agent" | "/file", cwd: string | null): string => `/api/settings${part}${cwd === null ? "" : `?cwd=${encodeURIComponent(cwd)}`}`;
 
 export const readWorktrees = (cwd: string | null, signal?: AbortSignal): Promise<WorktreeInventory> => getJson(`/api/worktrees${cwd === null ? "" : `?cwd=${encodeURIComponent(cwd)}`}`, signal);
 

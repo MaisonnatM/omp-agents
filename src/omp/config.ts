@@ -83,7 +83,7 @@ export const retryChoices = (key: keyof RetrySettings): readonly string[] | unde
 export const assertRetryValue = (key: keyof RetrySettings, value: unknown): void => setting(`retry.${key}`).assertWritable(value);
 
 /** Loads the global config for a write; refuses while omp cannot parse it, since loading one to write moves it aside. */
-async function loadGlobalForWrite(cwd: string): Promise<OmpSettingsInstance> {
+export async function loadGlobalForWrite(cwd: string): Promise<OmpSettingsInstance> {
 	await config.Settings.loadReadOnly({ cwd });
 	return config.Settings.loadIsolated({ cwd });
 }
