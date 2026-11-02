@@ -1,24 +1,51 @@
 /** Which live sessions need you, and the alerts they raise, for the desktop app's Dock badge and the session notifications. */
 import type { SessionAlert } from "../src/shared/desktop-bridge";
-import { hashForSession, type RosterHost, type View } from "../src/shared/sessions";
+import { hashForSession, type RosterHost, type UnreadTurn, type UserRequest, type View } from "../src/shared/sessions";
 import { hostLabel } from "./labels";
-
-/** Whether live session `host` needs you: it asks you something, or it ended a turn you have not looked at since. */
-export const needsYou = (host: RosterHost): boolean => host.status === "needs-input" || host.unread !== null;
 
 /**
  * What a session waits on you for now: its oldest open question, else a wait with no question relayed (a terminal
  * session's own dialog, or the placeholder a terminal session shows until its host replays the question), else its
- * unread turn. A question and a turn carry a key that names them across roster pushes; the bare wait has none.
+ * unread turn; `null` while it does not need you.
  */
+export type Wait = { kind: "ask"; request: UserRequest } | { kind: "input" } | { kind: "turn"; turn: UnreadTurn };
+
+export function waitOf(host: RosterHost): Wait | null {
+	const [request] = host.requests;
+	if (request) return { kind: "ask", request };
+	if (host.status === "needs-input") return { kind: "input" };
+	if (host.unread) return { kind: "turn", turn: host.unread };
+	return null;
+}
+
+/** What a wait with no question relayed says. */
+export const WAITS_FOR_INPUT = "Waits for your input.";
+/** What an unread turn that ended on no reply says. */
+export const FINISHED_TURN = "Finished its turn.";
+
+/** Whether live session `host` needs you: it asks you something, or it ended a turn you have not looked at since. */
+export const needsYou = (host: RosterHost): boolean => waitOf(host) !== null;
+
+/** A session's {@link Wait} as an alert tells it. A question and a turn carry a key that names them across roster pushes; the bare wait has none. */
 type Moment = { kind: "ask" | "turn"; key: string; body: string } | { kind: "input"; body: string };
 
 function momentOf(host: RosterHost): Moment | null {
-	const [request] = host.requests;
-	if (request) return { kind: "ask", key: `ask/${request.id}`, body: request.kind === "confirm" ? `${request.title}\n${request.message}` : request.title };
-	if (host.status === "needs-input") return { kind: "input", body: "Waits for your input." };
-	if (host.unread) return { kind: "turn", key: `turn/${host.unread.at}`, body: host.unread.reply ?? "Finished its turn." };
-	return null;
+	const wait = waitOf(host);
+	if (!wait) return null;
+	switch (wait.kind) {
+		case "ask": {
+			const { request } = wait;
+			return { kind: "ask", key: `ask/${request.id}`, body: request.kind === "confirm" ? `${request.title}\n${request.message}` : request.title };
+		}
+		case "input":
+			return { kind: "input", body: WAITS_FOR_INPUT };
+		case "turn":
+			return { kind: "turn", key: `turn/${wait.turn.at}`, body: wait.turn.reply ?? FINISHED_TURN };
+		default: {
+			const unhandled: never = wait;
+			return unhandled;
+		}
+	}
 }
 
 /**

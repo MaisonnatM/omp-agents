@@ -1,9 +1,9 @@
-import { Activity, CircleAlert, CirclePause, History, ListRestart, Loader, Pin, Plus } from "lucide-react";
+import { Activity, CircleAlert, CirclePause, History, Inbox, ListRestart, Loader, Pin, Plus } from "lucide-react";
 import { useState } from "react";
 import type { View } from "../../src/shared/sessions";
 import { SidebarContent, SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
-import { sameView } from "../routing";
+import { hashForInbox, sameView } from "../routing";
 import type { SidebarSessions } from "../sessions";
 import { shortcutLabels } from "../shortcuts";
 import { useStoredKeys } from "../stored-state";
@@ -35,10 +35,12 @@ interface SessionListProps {
 	scheduledOpen: string | null;
 	/** The New session button's label, naming the selected workspace. */
 	newSessionLabel: string;
+	/** How many items wait in the Inbox, and whether its page is open. */
+	inbox: { count: number; open: boolean };
 }
 
 /** The Sessions tab: New session, the search field, then the scheduled sends, and the pinned, idle, running, interrupted, and past groups. */
-export function SessionList({ lists, query, onQuery, onTogglePin, open, showWorkspace, newSessionOpen, scheduledOpen, newSessionLabel }: SessionListProps) {
+export function SessionList({ lists, query, onQuery, onTogglePin, open, showWorkspace, newSessionOpen, scheduledOpen, newSessionLabel, inbox }: SessionListProps) {
 	const { start, dismissStart, openNewSession } = useDashboardActions();
 	const { connected, starts: { resumeAll } } = useDashboardStatus();
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
@@ -60,6 +62,14 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 		<>
 			<SidebarGroup className="gap-1">
 				<SidebarMenu aria-label="Start a session">
+					<SidebarMenuItem>
+						<Tooltip content="Everything that waits on you" shortcut={shortcutLabels("inbox")} side="right">
+							<SidebarMenuButton icon={Inbox} isActive={inbox.open} aria-current={inbox.open ? "page" : undefined} aria-label={`Inbox, ${inbox.count} waiting on you`} render={<a href={hashForInbox()} />}>
+								Inbox
+								{inbox.count > 0 && <span className="ml-auto text-xs tabular-nums text-muted-foreground">{inbox.count}</span>}
+							</SidebarMenuButton>
+						</Tooltip>
+					</SidebarMenuItem>
 					<SidebarMenuItem>
 						<Tooltip content={newSessionLabel} shortcut={shortcutLabels("newSession")} side="right">
 							<SidebarMenuButton icon={Plus} isActive={newSessionOpen} aria-current={newSessionOpen ? "page" : undefined} aria-label={newSessionLabel} onClick={openNewSession}>

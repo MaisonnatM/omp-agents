@@ -8,6 +8,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - You can drag a Bot in the Bots tab onto Pinned, a section, or Other Bots.
 - Fixed: routines no longer start during the few seconds a sleeping Mac wakes on its own for Power Nap; they wait until you wake it, and news that came in overnight starts one run.
 - Fixed: a routine's command no longer counts time the Mac spent asleep toward its 10-minute limit, and when the Mac slept during a run, the routine's message to the Bot says for how long.
+- New Inbox page, at the top of the Sessions sidebar or G then I, lists everything that waits on you: sessions asking a question, finished turns with their suggested prompts, your pull request moves, Slack messages, and stopped sessions.
+- You can work the Inbox from the keyboard: J and K move, 1 to 9 answer or send a suggestion, 0 sends every suggestion, R replies, D marks done, E ends the session, and the next item opens on its own.
+- An Inbox notice offers the same button as the notices bell: a pull request's quick action, Merge, or Continue all.
 
 ## 2026-11-01
 

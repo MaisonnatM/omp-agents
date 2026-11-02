@@ -52,20 +52,20 @@ describe("LiveSessions", () => {
 		expect(sessions.bySessionId("s1")).toBeUndefined();
 	});
 
-	test("a row carries the turn its session ended unseen, with its reply's first line, until a look, the next turn, or the session leaving reads it", () => {
+	test("a row carries the turn its session ended unseen, with its reply's first line, body, and suggestions, until a look, the next turn, or the session leaving reads it", () => {
 		const sessions = new LiveSessions(() => {});
 		const live = { instanceId: "i1", sessionId: "s1", cwd: "/work", row: () => ({ instanceId: "i1" }), follow() {}, finished: () => false } as unknown as LiveSession;
 		sessions.add(live, null);
 		const unread = () => sessions.rows(() => facts)[0]?.unread;
 		expect(sessions.markRead("i1")).toBe(false);
-		sessions.markUnread("i1", "\n  Fixed the **flaky** test.  \nDetails follow.");
-		expect(unread()).toEqual({ at: expect.any(Number), reply: "Fixed the **flaky** test." });
+		sessions.markUnread("i1", { body: "\n  Fixed the **flaky** test.  \nDetails follow.", suggestions: ["Merge on main"] });
+		expect(unread()).toEqual({ at: expect.any(Number), reply: "Fixed the **flaky** test.", body: "Fixed the **flaky** test.  \nDetails follow.", suggestions: ["Merge on main"] });
 		expect(sessions.markRead("i1")).toBe(true);
 		expect(sessions.markRead("i1")).toBe(false);
 		expect(unread()).toBeNull();
 
 		sessions.markUnread("i1", null);
-		expect(unread()).toEqual({ at: expect.any(Number), reply: null });
+		expect(unread()).toEqual({ at: expect.any(Number), reply: null, body: null, suggestions: [] });
 		sessions.remove("i1");
 		sessions.add(live, null);
 		expect(unread()).toBeNull();

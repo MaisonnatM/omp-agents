@@ -3,11 +3,11 @@ import { forgetSession } from "../commands";
 import { DashboardSession, type DashboardUpdate, newInstanceId } from "../dashboard-session";
 import { SessionGuest } from "../guest";
 import { repositoryAt } from "../git";
-import type { LiveSession, LiveUpdate } from "../live-session";
+import type { LiveSession, LiveUpdate, TurnReply } from "../live-session";
 import type { HostSnapshot } from "../omp/collab";
 import { displayPath } from "../paths";
 import { oneLine } from "../session-entries";
-import { type RosterHost, type SessionFacts, type UnreadTurn, type WorkItem, worksOn } from "../shared/sessions";
+import { type RosterHost, type SessionFacts, UNREAD_BODY_MAX, type UnreadTurn, type WorkItem, worksOn } from "../shared/sessions";
 import { pullRequestTask, TaskClaims, ticketTask } from "../task-claims";
 import { portFromEnv } from "./address";
 
@@ -115,8 +115,9 @@ export class LiveSessions {
 	}
 
 	/** Session `instanceId` ended a turn with `reply`, which stays unread until a look or its next turn reads it. */
-	markUnread(instanceId: string, reply: string | null): void {
-		this.#unread.set(instanceId, { at: Date.now(), reply: firstLine(reply) });
+	markUnread(instanceId: string, reply: TurnReply | null): void {
+		const text = reply?.body.trim() || null;
+		this.#unread.set(instanceId, { at: Date.now(), reply: firstLine(text), body: text?.slice(0, UNREAD_BODY_MAX) ?? null, suggestions: reply?.suggestions ?? [] });
 	}
 
 	/** A page showed session `instanceId` in a focused window, or its next turn started; whether it had a turn unread. */

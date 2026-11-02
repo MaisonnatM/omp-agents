@@ -180,8 +180,8 @@ function NoticeMerge({ pr, onMerged }: { pr: PullRequestSummary; onMerged: () =>
 	);
 }
 
-/** A notice's button: **Update**, the quick action that makes a pull request's move, **Merge**, or **Continue all**. */
-function NoticeAction({ id, action, send, onDone }: { id: string; action: Action; send: Send; onDone: () => void }) {
+/** A notice's button: **Update**, the quick action that makes a pull request's move, **Merge**, or **Continue all**; the bell and the Inbox show it. */
+export function NoticeAction({ id, action, send, onDone }: { id: string; action: Action; send: Send; onDone: () => void }) {
 	const { start } = useDashboardActions();
 	const { connected, starts } = useDashboardStatus();
 	const read = () => send({ t: "notice", ids: [id], op: "read" });

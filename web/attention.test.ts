@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { HostStatus, RosterHost, UnreadTurn, UserRequest } from "../src/shared/sessions";
-import { type Attention, attend, needsYou, unreadShown } from "./attention";
+import { type Attention, attend, needsYou, unreadShown, waitOf } from "./attention";
 
 const host = (instanceId: string, status: HostStatus, { unread = null, requests = [], sessionName = `Session ${instanceId}` }: { unread?: UnreadTurn | null; requests?: UserRequest[]; sessionName?: string | null } = {}) =>
 	({ instanceId, sessionId: `s-${instanceId}`, sessionName, cwdDisplay: "~/code/webapp", status, unread, requests }) as RosterHost;
@@ -10,12 +10,23 @@ describe("needsYou", () => {
 	test("counts a session that asks or ended a turn unseen, not one that works or idles after you read it", () => {
 		const hosts = [
 			host("asks", "needs-input", { requests: [ask("r1", "Which branch?")] }),
-			host("done", "idle", { unread: { at: 1, reply: "Done." } }),
+			host("done", "idle", { unread: { at: 1, reply: "Done.", body: "Done.", suggestions: [] } }),
 			host("read", "idle"),
 			host("works", "working"),
 			host("unknown", "unknown"),
 		];
 		expect(hosts.filter(needsYou).map(row => row.instanceId)).toEqual(["asks", "done"]);
+	});
+});
+
+describe("waitOf", () => {
+	test("takes the oldest question over a bare wait or an unread turn, and the bare wait over the turn", () => {
+		const unread = { at: 1, reply: "Done.", body: "Done.", suggestions: [] };
+		const first = ask("r1", "Which branch?");
+		expect(waitOf(host("a", "needs-input", { requests: [first, ask("r2", "Merge it?")], unread }))).toEqual({ kind: "ask", request: first });
+		expect(waitOf(host("b", "needs-input", { unread }))).toEqual({ kind: "input" });
+		expect(waitOf(host("c", "idle", { unread }))).toEqual({ kind: "turn", turn: unread });
+		expect(waitOf(host("d", "working"))).toBeNull();
 	});
 });
 
@@ -34,15 +45,15 @@ describe("attend", () => {
 	const working = [host("q", "working")];
 	const placeholder = [host("q", "needs-input")];
 	const asks = (id = "r1", title = "Which branch?") => [host("q", "needs-input", { requests: [ask(id, title)] })];
-	const turn = (at: number) => [host("q", "idle", { unread: { at, reply: `Turn ${at}.` } })];
+	const turn = (at: number) => [host("q", "idle", { unread: { at, reply: `Turn ${at}.`, body: `Turn ${at}.`, suggestions: [] } })];
 
 	test("raises one alert per session, titled by the session and opening it: its oldest question over an unread turn", () => {
 		const confirm: UserRequest = { id: "r2", title: "Delete the branch?", deadline: null, kind: "confirm", message: "feat/x has unpushed work." };
 		const seen = attend(new Map(), [host("a", "idle"), host("b", "idle"), host("c", "idle")]).attention;
 		const { raise } = attend(seen, [
-			host("a", "needs-input", { requests: [ask("r1", "Which branch?"), confirm], unread: { at: 7, reply: "Merged." } }),
+			host("a", "needs-input", { requests: [ask("r1", "Which branch?"), confirm], unread: { at: 7, reply: "Merged.", body: "Merged.", suggestions: [] } }),
 			host("b", "needs-input", { requests: [confirm] }),
-			host("c", "idle", { sessionName: null, unread: { at: 3, reply: null } }),
+			host("c", "idle", { sessionName: null, unread: { at: 3, reply: null, body: null, suggestions: [] } }),
 		]);
 		expect(raise).toEqual([
 			{ alert: { hash: "#session/s-a", title: "Session a", body: "Which branch?" }, turn: false },
@@ -81,7 +92,7 @@ describe("attend", () => {
 
 describe("unreadShown", () => {
 	test("reads only the unread sessions a pane shows as the session itself, not as one of its subagents", () => {
-		const hosts = [host("a", "idle", { unread: { at: 1, reply: null } }), host("b", "idle", { unread: { at: 1, reply: null } }), host("c", "idle")];
+		const hosts = [host("a", "idle", { unread: { at: 1, reply: null, body: null, suggestions: [] } }), host("b", "idle", { unread: { at: 1, reply: null, body: null, suggestions: [] } }), host("c", "idle")];
 		const shown = [
 			{ kind: "live", instanceId: "a", agentId: null },
 			{ kind: "live", instanceId: "b", agentId: "explore-1" },

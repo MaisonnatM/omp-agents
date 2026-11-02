@@ -180,6 +180,8 @@ interface RosterProps {
 	workspace: string | null;
 	onPickWorkspace: (cwd: string | null) => void;
 	onShowShortcuts: () => void;
+	/** How many items wait in the Inbox, and whether its page is open. */
+	inbox: { count: number; open: boolean };
 }
 
 export function Roster({
@@ -211,6 +213,7 @@ export function Roster({
 	workspace,
 	onPickWorkspace,
 	onShowShortcuts,
+	inbox,
 }: RosterProps) {
 	const { changeTodo: onTodoChange } = useDashboardActions();
 	const { connected } = useDashboardStatus();
@@ -276,6 +279,7 @@ export function Roster({
 					newSessionOpen={newSessionOpen}
 					scheduledOpen={scheduledOpen}
 					newSessionLabel={newSessionLabel}
+					inbox={inbox}
 				/>
 			</TabPanel>
 			<TabPanel value="bots" className="flex min-h-0 flex-1 flex-col">
