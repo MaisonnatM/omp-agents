@@ -13,6 +13,7 @@ import { appendToComposer, newDraftKey } from "../composer-drafts";
 import type { Observation } from "../get-started-model";
 import type { PolledEntry } from "../polled-store";
 import { setTerminalAccess, starterKitStore } from "../reads";
+import { hashForSettings } from "../routing";
 import { useAction } from "../use-action";
 import { CopyableCode } from "./copyable-code";
 import { useDashboardActions } from "./dashboard-context";
@@ -195,7 +196,7 @@ export function KitStep({ kit }: { kit: Observation<StarterKitStatus> }) {
 					}
 				>
 					{!run && !done && <p className="text-xs text-muted-foreground">Open omp agents in the desktop app to install it.</p>}
-					<Button size="compact" variant="outline" render={<a href="#settings/extensions" />}>Manage installed packages</Button>
+					<Button size="compact" variant="outline" render={<a href={hashForSettings("extensions")} />}>Manage installed packages</Button>
 					<Unavailable fact={kit} />
 					{result && (
 						<Callout tone={result.ok ? "info" : "danger"} icon={result.ok ? Check : CircleAlert} role="alert">

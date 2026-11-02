@@ -4,9 +4,9 @@ import { SessionVisual } from "../session-visual";
 import type { OmpFile, Workflow } from "../../../src/shared/models";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { hashForSettings } from "../../routing";
 import type { Editing } from "./editor";
 import { FileView } from "./files-tab";
-import { MessageMarkdown } from "../message-markdown";
 
 const TAG_SNIPPET = "metadata:\n  tags: workflow";
 
@@ -62,7 +62,7 @@ export function Workflows({ workflows, files, editing }: { workflows: Workflow[]
 									<span className="flex w-full items-baseline gap-2">
 										<span className="truncate">{workflow.name}</span>
 										<span className="ml-auto shrink-0 text-xs font-normal text-muted-foreground">{skill.scope}</span>
-										{workflow.packageSource && <span className="text-xs font-normal text-muted-foreground">{workflow.packageSource}</span>}
+										{workflow.packageSource && <span className="max-w-24 shrink-0 truncate text-xs font-normal text-muted-foreground" title={workflow.packageSource}>{workflow.packageSource}</span>}
 									</span>
 									<span className="truncate font-mono text-xs font-normal text-muted-foreground">{invocation(workflow)}</span>
 								</button>
@@ -75,8 +75,12 @@ export function Workflows({ workflows, files, editing }: { workflows: Workflow[]
 				<StepsChart key={open.skill.path} file={open.skill} />
 				{open.workflow.packageSource ? (
 					<>
-						<a href="#settings/extensions" className="text-xs text-primary underline">Manage package</a>
-						{open.skill.body.state === "read" ? <MessageMarkdown text={open.skill.body.text} /> : <p className="text-sm text-muted-foreground">Cannot read this packaged workflow.</p>}
+						<a href={hashForSettings("extensions")} className="text-xs text-foreground underline-offset-2 hover:underline">Manage package</a>
+						{open.skill.body.state === "read" ? (
+							<pre tabIndex={0} aria-label={`Contents of ${open.skill.pathDisplay}`} className="max-h-[70vh] overflow-auto rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring">
+								{open.skill.body.text}
+							</pre>
+						) : <p className="text-sm text-muted-foreground">Cannot read this packaged workflow.</p>}
 					</>
 				) : <FileView key={open.skill.path} file={open.skill} editing={editing} />}
 			</div>

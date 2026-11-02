@@ -26,6 +26,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The first time you dictate, the message box offers to turn dictation on, and says where your speech is turned into text.
 - Settings now has an Extensions library for installed packages, marketplace catalogs, registry skills, and their contributions, with native install, update, enable, disable, and uninstall actions.
 - Packaged workflows now show their source and open read-only; Files no longer lets you edit a package's installed files.
+- Extensions now calls its workspace discovery view Preview, uses familiar Settings controls, and confirms removal once.
 - A long folder name in the message box now ends in … instead of running past the box and under the model switch.
 - /ship now plans before it builds: the agent compares up to three ways to do the work, keeps the best, and posts that plan on the Linear issue, or in the pull request when there is no issue.
 - /ship no longer needs a Linear ticket: it uses the one you name or one that matches the work, and otherwise ships without one instead of creating a ticket.
