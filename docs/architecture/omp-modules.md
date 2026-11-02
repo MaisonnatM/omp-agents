@@ -73,6 +73,12 @@ The main ones:
 - Starter-kit plugins: `pi-coding-agent/src/extensibility/plugins/marketplace/registry.ts` exports `getMarketplacesRegistryPath`, `getInstalledPluginsRegistryPath`, `readMarketplacesRegistry`, and `readInstalledPluginsRegistry`.
   Get started reads these registries and the current project's registry, located by the read-only `resolveOrDefaultProjectRegistryPath` in `discovery/helpers.ts` with native `getProjectDir`.
   It never initializes CLI config, migrates plugin data, or installs anything while checking readiness.
+- Extensions library: `pi-coding-agent/src/extensibility/plugins/marketplace/manager.ts` supplies source catalogs and scoped marketplace lifecycle; `registry.ts` supplies its cache and registry paths.
+  `pi-coding-agent/src/extensibility/plugins/marketplace/registry.ts` catches parse errors and returns an empty registry, so `assertRegistryReadable` validates its top-level version and collection before passing a mutation to the manager.
+  `extensibility/plugins/manager.ts` supplies npm/git/link lifecycle, and `loader.ts`'s `resolvePluginManifestEntries` reads declarations without executing entrypoints.
+  `skillshare/client.ts` supplies explicit-registry search, `installer.ts` installs/updates/uninstalls with native script consent callbacks, and `manifest.ts` supplies native IDs, store paths, and scoped manifest locations.
+  `discovery/index.ts` supplies provider state, foreign-user-source opt-ins, and read-only settings binding; `src/omp/scoped-discovery.ts` serializes that process-wide binding.
+  `src/omp/extensions.ts` keeps installed scope copies separate and discovery preview distinct from session runtime; see [Extensions library](extensions.md).
 - Credentials: `pi-coding-agent/src/session/auth-broker-config.ts` (`discoverAuthStorage`) and `pi-ai/src/registry/oauth/index.ts` (`getOAuthProviders`).
   `connectedProviders` in `src/omp/models.ts` keeps the `/login` providers that have a credential, as omp's RPC `get_login_providers` marks them `authenticated`.
   It opens the credential store on each call and closes it, so a login in a terminal counts at the next call.

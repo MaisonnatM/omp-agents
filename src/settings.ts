@@ -7,6 +7,7 @@ import { agentSetting, readAgentSettings, userValue, writeAgentSetting } from ".
 import {
 	agentDir,
 	assertRetryValue,
+	configWrites,
 	expandDefaultRetryFallbackChains,
 	loadGlobalForWrite,
 	loadOmpConfig,
@@ -46,35 +47,31 @@ export class Rejected extends Error {
  * Every role omp knows a model or a chain for, in config order, with the fallbacks omp walks for it.
  * Chain keys with a `/` name a model or provider wildcard rather than a role (omp's `isRetryFallbackModelKey`).
  */
-export function routeRoles(
-	modelRoles: Record<string, string>,
-	configuredChains: Record<string, string[]>,
-): { roles: RoleRoute[]; modelChains: ModelChain[] } {
+export function routeRoles(modelRoles: Record<string, string>, configuredChains: Record<string, string[]>): { roles: RoleRoute[]; modelChains: ModelChain[] } {
 	const chainKeys = Object.keys(configuredChains);
-	const roleNames = [...new Set([...Object.keys(modelRoles), ...chainKeys.filter(key => !key.includes("/"))])];
+	const roleNames = [...new Set([...Object.keys(modelRoles), ...chainKeys.filter((key) => !key.includes("/"))])];
 	const effective = expandDefaultRetryFallbackChains(configuredChains, roleNames);
 	return {
-		roles: roleNames.map(role => ({
+		roles: roleNames.map((role) => ({
 			role,
 			primary: modelRoles[role] ?? null,
 			fallbacks: effective[role] ?? [],
 			inheritsDefault: configuredChains[role] === undefined && effective[role] !== undefined,
 		})),
-		modelChains: chainKeys.filter(key => key.includes("/")).map(key => ({ key, fallbacks: configuredChains[key] ?? [] })),
+		modelChains: chainKeys.filter((key) => key.includes("/")).map((key) => ({ key, fallbacks: configuredChains[key] ?? [] })),
 	};
 }
 
 /** Reading a file never throws: a file that is not there or cannot be read says so. */
-async function readFile({ kind, scope, path }: FoundFile): Promise<OmpFile> {
+async function readFile({ kind, scope, path, packaged }: FoundFile): Promise<OmpFile> {
 	let body: OmpFile["body"];
 	try {
 		const [info, text] = await Promise.all([stat(path), Bun.file(path).text()]);
 		body = { state: "read", size: info.size, modifiedAt: info.mtimeMs, text, hash: new Bun.CryptoHasher("sha256").update(text).digest("hex") };
 	} catch (err) {
-		body =
-			(err as NodeJS.ErrnoException).code === "ENOENT" ? { state: "missing" } : { state: "unreadable", error: errorText(err) };
+		body = (err as NodeJS.ErrnoException).code === "ENOENT" ? { state: "missing" } : { state: "unreadable", error: errorText(err) };
 	}
-	return { kind, scope, path, pathDisplay: displayPath(path), body };
+	return { kind, scope, path, pathDisplay: displayPath(path), body, ...(packaged && { packaged }) };
 }
 
 /** Files omp reads from its own directory, listed even before they exist so the page shows where they go. */
@@ -102,7 +99,7 @@ async function loadSession(
 			...routeRoles(config.modelRoles, config.fallbackChains),
 			retry: config.retry,
 			retryChoices: Object.fromEntries(
-				(Object.keys(config.retry) as (keyof RetrySettings)[]).flatMap(key => {
+				(Object.keys(config.retry) as (keyof RetrySettings)[]).flatMap((key) => {
 					const choices = retryChoices(key);
 					return choices ? [[key, choices]] : [];
 				}),
@@ -132,7 +129,7 @@ export interface RoutingContext {
 }
 
 function stringList(value: unknown, field: string): string[] {
-	if (!Array.isArray(value) || !value.every(entry => typeof entry === "string")) {
+	if (!Array.isArray(value) || !value.every((entry) => typeof entry === "string")) {
 		throw new Rejected(400, `${field} must be a list of strings`);
 	}
 	return value;
@@ -144,14 +141,14 @@ function stringList(value: unknown, field: string): string[] {
  */
 export function parseRoutingEdit(raw: unknown, { catalog, config }: RoutingContext): RoutingEdit {
 	if (!isObject(raw) || Array.isArray(raw)) throw new Rejected(400, "Expected a JSON object");
-	const known = new Set(catalog.map(model => model.selector));
+	const known = new Set(catalog.map((model) => model.selector));
 	const configured = new Set(routedSelectors(config));
 	const selector = (value: unknown, field: string): string => {
 		if (typeof value !== "string") throw new Rejected(400, `${field} must be a model selector`);
 		if (!configured.has(value) && !resolveSelector(value, known)) throw new Rejected(400, `omp lists no model ${value}`);
 		return value;
 	};
-	const chain = (value: unknown): string[] => stringList(value, "fallbacks").map(entry => selector(entry, "A fallback"));
+	const chain = (value: unknown): string[] => stringList(value, "fallbacks").map((entry) => selector(entry, "A fallback"));
 	switch (raw.kind) {
 		case "role": {
 			const { role } = raw;
@@ -190,8 +187,8 @@ export function parseRoutingEdit(raw: unknown, { catalog, config }: RoutingConte
 		}
 		case "provider-order": {
 			const providers = stringList(raw.providers, "providers");
-			const knownProviders = new Set([...catalog.map(model => model.provider), ...config.modelProviderOrder]);
-			const unknown = providers.find(provider => !knownProviders.has(provider));
+			const knownProviders = new Set([...catalog.map((model) => model.provider), ...config.modelProviderOrder]);
+			const unknown = providers.find((provider) => !knownProviders.has(provider));
 			if (unknown !== undefined) throw new Rejected(400, `omp lists no provider ${unknown}`);
 			if (new Set(providers).size !== providers.length) throw new Rejected(400, "A provider is listed twice");
 			return { kind: "provider-order", providers };
@@ -201,20 +198,12 @@ export function parseRoutingEdit(raw: unknown, { catalog, config }: RoutingConte
 	}
 }
 
-/** One save at a time, so two saves of the same file cannot both pass the check that it is unchanged. */
-let saving: Promise<unknown> = Promise.resolve();
-function serialized<T>(save: () => Promise<T>): Promise<T> {
-	const next = saving.then(save, save);
-	saving = next.catch(() => {});
-	return next;
-}
-
 /** A config omp cannot load is one it would move aside to write, so a write waits until the user fixes it. */
 const cannotLoad = (err: unknown): Rejected => new Rejected(409, `omp cannot load its settings, so it cannot write them: ${errorText(err)}`);
 
 /** Applies a routing edit to the user's `config.yml` and answers with the settings as they now load. */
 export function saveRouting(cwd: string | null, raw: unknown): Promise<OmpSettings> {
-	return serialized(async () => {
+	return configWrites.run(async () => {
 		const sessionCwd = cwd ?? HOME;
 		let config: OmpConfig;
 		try {
@@ -240,7 +229,7 @@ export function parseAgentSettingEdit(raw: unknown): AgentSettingEdit {
  * settings as they now load. Any setting omp has is taken, except one that only changes how omp's terminal draws.
  */
 export function saveAgentSetting(cwd: string | null, raw: unknown): Promise<OmpSettings> {
-	return serialized(async () => {
+	return configWrites.run(async () => {
 		const edit = parseAgentSettingEdit(raw);
 		const handle = agentSetting(edit.id);
 		if (!handle) throw new Rejected(404, `omp has no setting ${edit.id} a session reads`);
@@ -270,7 +259,7 @@ export async function modelUpdates(): Promise<ModelUpdate[]> {
 
 /** Names `update.to` in the user's `config.yml` wherever it names `update.from`, each role and fallback keeping its level. */
 export function upgradeModel({ provider, from, to }: ModelUpdate): Promise<void> {
-	return serialized(async () => {
+	return configWrites.run(async () => {
 		const [catalog, config] = await Promise.all([listModels(), loadOmpConfig(HOME)]);
 		const edits = upgradeEdits(config, catalog, provider, from.id, to.id);
 		if (edits.length === 0) throw new Error(`The routing no longer names ${provider}/${from.id}`);
@@ -280,9 +269,9 @@ export function upgradeModel({ provider, from, to }: ModelUpdate): Promise<void>
 
 /** Syntax checks by file extension, so a save cannot leave a file omp fails to parse. */
 const PARSERS: Record<string, [string, (text: string) => unknown]> = {
-	".yml": ["YAML", text => Bun.YAML.parse(text)],
-	".yaml": ["YAML", text => Bun.YAML.parse(text)],
-	".json": ["JSON", text => JSON.parse(text)],
+	".yml": ["YAML", (text) => Bun.YAML.parse(text)],
+	".yaml": ["YAML", (text) => Bun.YAML.parse(text)],
+	".json": ["JSON", (text) => JSON.parse(text)],
 };
 
 function checkSyntax(file: FoundFile, text: string): void {
@@ -302,12 +291,7 @@ function checkSyntax(file: FoundFile, text: string): void {
 }
 
 function parseFileEdit(raw: unknown): FileEdit {
-	if (
-		!isObject(raw) ||
-		typeof raw.path !== "string" ||
-		typeof raw.text !== "string" ||
-		(raw.baseHash !== null && typeof raw.baseHash !== "string")
-	) {
+	if (!isObject(raw) || typeof raw.path !== "string" || typeof raw.text !== "string" || (raw.baseHash !== null && typeof raw.baseHash !== "string")) {
 		throw new Rejected(400, "Expected { path, text, baseHash }");
 	}
 	return { path: raw.path, text: raw.text, baseHash: raw.baseHash };
@@ -318,9 +302,9 @@ function parseFileEdit(raw: unknown): FileEdit {
  * and the file must still hash to `baseHash`; the answer is the settings as they now load.
  */
 export function saveOmpFile(cwd: string | null, raw: unknown): Promise<OmpSettings> {
-	return serialized(async () => {
+	return configWrites.run(async () => {
 		const edit = parseFileEdit(raw);
-		const file = (await loadSession(cwd)).found.find(found => found.path === edit.path);
+		const file = (await loadSession(cwd)).found.find((found) => found.path === edit.path && !found.packaged);
 		if (!file) throw new Rejected(404, `omp does not read ${displayPath(edit.path)} here`);
 		const { body, pathDisplay } = await readFile(file);
 		if (body.state === "unreadable") throw new Rejected(409, `Cannot read ${pathDisplay}: ${body.error}`);

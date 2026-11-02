@@ -154,6 +154,14 @@ The optional omp setup in `templates/omp/` that one command installs into omp's 
 _Avoid_: Template, preset, config pack
 
 **Workflow**:
-An omp skill whose `SKILL.md` frontmatter names `workflow` in `metadata.tags`, such as the starter kit's `ship`, which Settings › Workflows lists and edits; a command of the same name starts it.
+An omp skill whose `SKILL.md` frontmatter names `workflow` in `metadata.tags`, such as the starter kit's `ship`, which Settings › Workflows lists; authored workflows are editable and packaged workflows are read-only.
 It is not a GitHub Actions workflow under `.github/workflows/`.
 _Avoid_: Playbook, procedure, pipeline
+
+**Extension package**:
+An installed marketplace plugin, npm/git/linked plugin, or registry skill, identified separately for its user or project scope.
+_Avoid_: Loaded extension, workflow
+
+**Contribution**:
+A skill, command, agent, hook, tool, MCP server, rule, prompt, or executable extension supplied by a package or discovery source; being discovered for a workspace does not mean it is loaded in a running session.
+_Avoid_: Plugin, package

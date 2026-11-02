@@ -22,20 +22,26 @@ export interface SlashCommandsModule {
  * skill's parsed frontmatter. `path` is the module an extension, hook, or tool loads, or a settings file.
  */
 export interface CapabilityItem {
-	_source: { provider: string; path: string; level: "user" | "project" | "native" };
+	_source: { provider: string; path: string; level: "user" | "project" | "native"; pluginName?: string; origin?: string };
 	name?: string;
 	frontmatter?: Record<string, unknown>;
 	path?: string;
+	_shadowed?: boolean;
 }
 /** `providers` loads only those providers' items (src/capability/types.ts LoadOptions); `filter` drops items before omp dedupes them by name. */
 export interface CapabilityLoadOptions {
 	cwd: string;
 	disabledExtensions?: string[];
+	includeDisabled?: boolean;
 	providers?: string[];
 	filter?: (item: CapabilityItem) => boolean;
 }
 export interface DiscoveryModule {
-	loadCapability(id: string, options: CapabilityLoadOptions): Promise<{ items: CapabilityItem[] }>;
+	loadCapability(id: string, options: CapabilityLoadOptions): Promise<{ items: CapabilityItem[]; all: CapabilityItem[]; warnings: string[] }>;
+	initializeWithSettings(settings: unknown): () => void;
+	getAllProvidersInfo(): { id: string; displayName: string; description: string; enabled: boolean }[];
+	isForeignUserProvider(id: string): boolean;
+	isUserSourceEnabled(id: string): boolean;
 	/** Empties the file cache capability loads read through (src/capability/fs.ts), which otherwise keeps every file it read for the process's life. */
 	reset(): void;
 }
@@ -44,7 +50,7 @@ export interface CustomCommandsModule {
 	discoverCustomCommands(options: { cwd: string }): Promise<{ paths: { path: string; source: "bundled" | "user" | "project" }[] }>;
 }
 export interface AgentDiscoveryModule {
-	discoverAgents(cwd: string): Promise<{ agents: { source: string; filePath?: string }[] }>;
+	discoverAgents(cwd: string): Promise<{ agents: { source: string; name?: string; filePath?: string }[] }>;
 }
 export interface ConfigFilesModule {
 	findConfigFile(subpath: string, options: { user?: boolean; project?: boolean; cwd?: string }): string | undefined;
