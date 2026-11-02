@@ -135,7 +135,7 @@ function DiskFact({ available, total }: { available: number; total: number }) {
 				</button>
 			</PopoverTrigger>
 			<PopoverContent {...popover.content} side="top" align="end" aria-label="Disk space" className="w-64 space-y-3 text-xs">
-				<p className="font-medium tabular-nums">{`Disk ${percent}% used`}</p>
+				<p className="text-sm font-medium tabular-nums">{`Disk ${percent}% used`}</p>
 				<div aria-hidden className="h-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-muted-foreground" style={{ width: `${percent}%` }} /></div>
 				<dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 tabular-nums">
 					<dt className="text-muted-foreground">Used</dt><dd className="text-right">{formatBytes(used)}</dd>

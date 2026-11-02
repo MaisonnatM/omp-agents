@@ -22,7 +22,7 @@ The disk fact already shows volume use, while cleanup also needs kept reasons, r
 ## Consequences
 
 The disk reading stays neutral and opens a hover-and-click popover with a Clean up link.
-Settings reuses its editor kit, and switching sections preserves the mounted run.
+Settings reuses its sections and native setting rows, and switching sections preserves the mounted run.
 
 ## Confirmation
 

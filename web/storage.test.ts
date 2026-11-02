@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { GcAnswer } from "../src/shared/storage";
-import { cleanupRows, gcResultText } from "./storage";
+import { cleanupRows, cleanupSettingRows, gcResultText } from "./storage";
 
 const report: GcAnswer = {
 	apply: false,
@@ -14,7 +14,7 @@ const report: GcAnswer = {
 test("cleanup preserves native phase order and does not invent archive or compression savings", () => {
 	const rows = cleanupRows(report, [{ path: "/tmp/sandbox", kept: null, detail: null, bytes: 2048 }]);
 	expect(rows.map(row => row.step)).toEqual(["stale", "blobs", "archive", "compress", "wal", "sandboxes"]);
-	expect(rows[2]).toMatchObject({ count: 5, bytes: 256 });
+	expect(rows[2]).toMatchObject({ label: "Archive cold sessions", count: 5, bytes: 256 });
 	expect(rows[2]?.size).toContain("4 sessions");
 	expect(rows[3]).toMatchObject({ count: 5, bytes: null });
 	expect(rows[3]?.size).toContain("on disk");
@@ -40,4 +40,17 @@ test("partial failures keep their error and never claim all selected bytes were 
 	const compressed = gcResultText("compress", { ...report, apply: true, compress: { ...report.compress!, compressed: 2, allocatedAfter: 4096 } });
 	expect(compressed.text).toContain("less on disk");
 	expect(gcResultText("wal", { ...report, apply: true }).text).toContain("1 busy");
+});
+
+test("cleanup rules reuse native setting rows with real defaults and global user values", () => {
+	const rows = cleanupSettingRows([
+		{ id: "gc.blobs", value: false, default: true, user: false, workspace: true },
+		{ id: "gc.coldArchiveAfterDays", value: 7, default: 30, user: 7 },
+		{ id: "gc.compressAfterDays", value: 14, default: 14, user: null },
+	]);
+	expect(rows[0]).toMatchObject({ control: { kind: "toggle" }, default: true, user: false, credential: false });
+	expect(rows[0]).not.toHaveProperty("workspace");
+	expect(rows[1]).toMatchObject({ control: { kind: "number", min: 0 }, default: 30, user: 7 });
+	expect(rows[2]).not.toHaveProperty("user");
+	expect(rows[2]?.default).toBe(14);
 });

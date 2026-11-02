@@ -11,10 +11,11 @@ export interface AgentSettingOption {
 	description?: string;
 }
 
-/** How a row is edited, from omp's own control for it. */
+/** How a native setting is edited in omp settings or its owning dashboard section. */
 export type AgentSettingControl =
 	| { kind: "toggle" }
 	| { kind: "select"; options: AgentSettingOption[] }
+	| { kind: "number"; min: number }
 	/** `secret`: a credential, whose value the page never receives. */
 	| { kind: "text"; secret: boolean }
 	/** A list or a map that omp edits as JSON text. */

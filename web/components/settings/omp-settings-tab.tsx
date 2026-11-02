@@ -20,8 +20,8 @@ import { type Editing, ErrorText, FIELD, LINK, OrderedList, RAIL_BUTTON, Section
 interface RowContext {
 	save: (row: AgentSettingRow, change: AgentSettingChange) => Promise<void>;
 	/** The workspace settings file Files lists, which a locked row links to. */
-	projectFile: OmpFile | undefined;
-	onOpenFile: (path: string) => void;
+	projectFile?: OmpFile;
+	onOpenFile?: (path: string) => void;
 }
 
 /** What every control gets from its row: the ids that name and describe it, its value, and its save. */
@@ -91,6 +91,30 @@ function TextControl({ row, controlId, value, disabled, onChange }: ControlProps
 			}}
 			className={cn(FIELD, "w-64 disabled:cursor-not-allowed disabled:opacity-50")}
 		/>
+	);
+}
+
+/** A whole number saved on Enter or blur; Escape restores it, and clearing it removes the user's value. */
+function NumberControl({ controlId, value, disabled, onChange, min }: ControlProps & { min: number }) {
+	const initial = value === undefined ? "" : String(value);
+	const [draft, setDraft] = useState(initial);
+	const [invalid, setInvalid] = useState<string | null>(null);
+	const commit = (): void => {
+		if (draft === initial) return;
+		if (draft.trim() === "") return onChange({ reset: true });
+		const next = Number(draft);
+		if (!Number.isSafeInteger(next) || next < min) return setInvalid(`Use a whole number of ${min} or more.`);
+		setInvalid(null);
+		onChange({ value: next });
+	};
+	return (
+		<div className="space-y-1">
+			<input id={controlId} type="number" inputMode="numeric" min={min} step={1} disabled={disabled} value={draft} aria-invalid={invalid ? true : undefined} aria-describedby={invalid ? `${controlId}-error` : undefined}
+				onChange={event => { setDraft(event.target.value); setInvalid(null); }} onBlur={commit}
+				onKeyDown={event => { if (event.key === "Enter") commit(); else if (event.key === "Escape") { setDraft(initial); setInvalid(null); } }}
+				className={cn(FIELD, "w-28 tabular-nums disabled:cursor-not-allowed disabled:opacity-50")} />
+			{invalid && <div id={`${controlId}-error`}><ErrorText>{invalid}</ErrorText></div>}
+		</div>
 	);
 }
 
@@ -267,6 +291,8 @@ function rowControl(props: ControlProps, hintId: string | undefined): { element:
 			};
 		case "text":
 			return { element: <TextControl key={key} {...props} />, placement: "inline", native: true };
+		case "number":
+			return { element: <NumberControl key={key} {...props} min={control.min} />, placement: "inline", native: true };
 		case "json":
 			return { element: <JsonControl key={key} {...props} />, placement: "block", native: true };
 		case "list":
@@ -279,7 +305,7 @@ function rowControl(props: ControlProps, hintId: string | undefined): { element:
 type RowState = { phase: "idle"; error: string | null } | { phase: "saving"; shown: unknown };
 
 /** One setting: what it does, whether it differs from omp's default, its control, and the layer notes that apply. */
-function SettingRow({ row, context: { save, projectFile, onOpenFile } }: { row: AgentSettingRow; context: RowContext }) {
+export function SettingRow({ row, context: { save, projectFile, onOpenFile }, disabled: blocked = false }: { row: AgentSettingRow; context: RowContext; disabled?: boolean }) {
 	const [state, setState] = useState<RowState>({ phase: "idle", error: null });
 	const labelId = useId();
 	const controlId = useId();
@@ -287,7 +313,7 @@ function SettingRow({ row, context: { save, projectFile, onOpenFile } }: { row: 
 	const saving = state.phase === "saving";
 	const locked = row.workspace !== undefined;
 	const value = saving ? state.shown : valueOf(row);
-	const disabled = saving || locked;
+	const disabled = saving || locked || blocked;
 	const change = (next: AgentSettingChange): void => {
 		setState({ phase: "saving", shown: "value" in next ? next.value : locked ? row.workspace : row.default });
 		save(row, next).then(
@@ -335,7 +361,7 @@ function SettingRow({ row, context: { save, projectFile, onOpenFile } }: { row: 
 				<div className="flex shrink-0 items-center gap-2">
 					{row.user !== undefined && (
 						<Tooltip content={`Remove your value from config.yml${locked ? "" : `, back to ${row.credential ? "none" : formatValue(row, row.default)}`}`}>
-							<Button variant="ghost" size="compact" disabled={saving} onClick={() => change({ reset: true })}>
+							<Button variant="ghost" size="compact" disabled={saving || blocked} onClick={() => change({ reset: true })}>
 								Reset
 							</Button>
 						</Tooltip>
@@ -348,7 +374,7 @@ function SettingRow({ row, context: { save, projectFile, onOpenFile } }: { row: 
 			{locked && (
 				<p className="text-xs text-muted-foreground">
 					This workspace sets it.{" "}
-					{projectFile && (
+					{projectFile && onOpenFile && (
 						<FileLink file={projectFile} onOpenFile={onOpenFile}>
 							Open in Files
 						</FileLink>

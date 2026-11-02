@@ -50,6 +50,9 @@ describe("formatValue", () => {
 		expect(formatValue(select, -1)).toBe("Default");
 		expect(formatValue(select, 42)).toBe("42");
 		expect(formatValue(toggle("on"), false)).toBe("Off");
+		const number: AgentSettingRow = { ...toggle("days"), control: { kind: "number", min: 0 }, default: 30 };
+		expect(formatValue(number, 0)).toBe("0");
+		expect(formatValue(number, 30)).toBe("30");
 		const ordered: AgentSettingRow = { ...toggle("order"), control: { kind: "list", ordered: true, options: [{ value: "remote", label: "Server" }, { value: "local", label: "Local" }] }, default: [] };
 		expect(formatValue(ordered, ["local", "remote"])).toBe("Local → Server");
 		expect(formatValue(ordered, [])).toBe("None");

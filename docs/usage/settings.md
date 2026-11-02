@@ -51,7 +51,7 @@
 - **Storage** measures session files, attachments, and isolation sandboxes across all workspaces.
   Open it from the disk reading's **Clean up…** link in the bottom bar, or at `#settings/storage`.
   The checklist previews old reports and replicas, unused attachments, cold sessions to archive, idle files to compress, database logs, and sandboxes of ended tasks.
-  It starts with your saved cleanup switches, plus sandboxes.
+  It starts with your saved cleanup switches, plus sandboxes; empty phases stay unchecked.
   **Check again** refreshes the preview without deleting anything.
   Sizes are approximate; cold sessions show a count, and compression shows the files' current disk use rather than promised savings.
   Sandboxes fill in separately, and **Kept** lists the ones a live owner, changes, or another safety check protects.
@@ -63,6 +63,9 @@
   A failed step keeps its error on the row and stops the rest; **Check again** keeps the checklist's ticks for another attempt.
   The result shows the native counts and the volume's free space before and after, not a promise that all selected bytes were freed.
   **Cleanup rules** edits all twelve native cleanup settings through the same conflict-checked settings writer as **omp settings**.
+  Each rule saves separately; number fields save on Enter or when you leave the field, and Escape restores the value.
+  **Reset** removes your override and restores omp's default.
+  A conflict reloads the value changed on disk and asks you to review it before trying again.
   The rules and dashboard cleanup are global; a selected workspace's overrides show a warning and apply only to terminal cleanup in that folder.
   No new daily cleanup runs.
   **Compress daily** runs only when you launch omp in a terminal, not for dashboard sessions, and shows the last background compression log when one exists.
