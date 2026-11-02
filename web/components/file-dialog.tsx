@@ -1,11 +1,11 @@
 import { Check, Copy } from "lucide-react";
 import { useMemo, useState } from "react";
-import { MAX_TEXT_FILE_BYTES, mediaUrl, type TextFile } from "../../src/shared/transcript";
+import { MAX_TEXT_FILE_BYTES, type TextFile } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
 import { mediaSrc } from "../api";
-import { linkedFile } from "../file-paths";
+import { type FileBase, type FileTarget, linkedFile, mediaFileUrl, textFileUrl } from "../file-paths";
 import { parseDelimited } from "../delimited";
 import { formatBytes } from "../labels";
 import { useRead } from "../reads";
@@ -23,17 +23,18 @@ type Look = "markdown" | "tsv" | "csv" | "text";
 const LOOKS: Record<string, Look> = { md: "markdown", markdown: "markdown", tsv: "tsv", csv: "csv" };
 
 /** A file that a path in agent text opened: an image or video large, else a text file rendered by its type. */
-export function FileDialog({ path, onClose }: { path: string; onClose: () => void }) {
-	const kind = linkedFile(path)?.kind;
-	return kind === "image" || kind === "video" ? <MediaDialog path={path} video={kind === "video"} onClose={onClose} /> : <TextFileDialog path={path} onClose={onClose} />;
+export function FileDialog({ target, onClose }: { target: FileTarget; onClose: () => void }) {
+	const kind = linkedFile(target.path)?.kind;
+	return kind === "image" || kind === "video" ? <MediaDialog target={target} video={kind === "video"} onClose={onClose} /> : <TextFileDialog target={target} onClose={onClose} />;
 }
 
 /** An image or video on this computer, as large as the dialog allows; a video plays at once. */
-function MediaDialog({ path, video, onClose }: { path: string; video: boolean; onClose: () => void }) {
+function MediaDialog({ target, video, onClose }: { target: FileTarget; video: boolean; onClose: () => void }) {
 	const { copied, copy } = useCopy();
 	const [failed, setFailed] = useState(false);
+	const { path } = target;
 	const name = path.slice(path.lastIndexOf("/") + 1);
-	const src = mediaSrc(mediaUrl(path));
+	const src = mediaSrc(mediaFileUrl(target));
 	return (
 		<ViewerDialog
 			title={name}
@@ -62,8 +63,9 @@ function MediaDialog({ path, video, onClose }: { path: string; video: boolean; o
 }
 
 /** A text file rendered by its type; a path in the file opens in its place. */
-function TextFileDialog({ path, onClose }: { path: string; onClose: () => void }) {
-	const read = useRead<TextFile>(`/api/file?${new URLSearchParams({ path })}`);
+function TextFileDialog({ target, onClose }: { target: FileTarget; onClose: () => void }) {
+	const { path } = target;
+	const read = useRead<TextFile>(textFileUrl(target));
 	const look = LOOKS[path.slice(path.lastIndexOf(".") + 1).toLowerCase()] ?? "text";
 	const [source, setSource] = useState(false);
 	const { copied, copy } = useCopy();
@@ -102,9 +104,10 @@ function TextFileDialog({ path, onClose }: { path: string; onClose: () => void }
 }
 
 function FileBody({ file, look }: { file: TextFile; look: Look }) {
+	const base = useMemo((): FileBase => ({ dir: file.path.slice(0, file.path.lastIndexOf("/")), session: null }), [file.path]);
 	if (look === "markdown") {
 		return (
-			<FileBaseContext.Provider value={file.path.slice(0, file.path.lastIndexOf("/"))}>
+			<FileBaseContext.Provider value={base}>
 				<article className="px-5 py-3 text-sm leading-relaxed">
 					<MessageMarkdown text={file.text} />
 				</article>

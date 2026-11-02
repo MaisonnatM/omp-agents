@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { appendFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { CachedCheckouts, type CheckoutReads } from "./git";
 import { runChecked } from "./proc";
@@ -469,6 +469,24 @@ describe("SessionFactsIndex", () => {
 		appendFileSync(session, `${changed("e2", "edit", { perFileResults: [{ path: join(parent, "app-done", "docs", "a.md"), op: "update" }] })}\n`);
 		expect(await index.refresh(listed(3))).toBe(true);
 		expect(index.factsOf(session).worktree).toBe(join(parent, "app-done"));
+	});
+
+	test("starts a session's relative file paths in the directories its bash calls cd into, the latest first, without picking its worktree", async () => {
+		const parent = realpathSync(sessionDir());
+		const session = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
+		writeFileSync(
+			session,
+			[
+				toolCall("a", "bash", { command: "cd ~/notes/memory && ls zen" }),
+				toolCall("b", "bash", { command: "pushd sub && cat a.md", cwd: "/data" }),
+				toolCall("c", "bash", { command: "cd elsewhere; ls", cwd: "rel" }),
+				toolCall("d", "bash", { command: "cd packages/x && ls" }),
+			].join("\n") + "\n",
+		);
+		const index = new SessionFactsIndex(async () => null, new CachedCheckouts());
+		await index.refresh([{ path: session, cwd: "/code/app", modifiedAt: 1 }]);
+		expect(index.fileDirsOf(session)).toEqual(["/code/app/packages/x", "/code/app/rel", "/code/app/rel/elsewhere", "/data", "/data/sub", join(homedir(), "notes/memory")]);
+		expect(index.factsOf(session).worktree).toBeNull();
 	});
 
 	test("names the branch of the linked worktree a session works in, follows a branch switch, and links the PR that heads it, not the main checkout's", async () => {

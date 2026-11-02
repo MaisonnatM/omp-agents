@@ -19,6 +19,7 @@ import {
 import { DesktopLinkPreview } from "./components/desktop-link-preview";
 import { DiscussionPanel } from "./components/discussion-panel";
 import { FileDialog } from "./components/file-dialog";
+import { textFileUrl } from "./file-paths";
 import { PageSwitch } from "./components/page-switch";
 import { NO_PLANS, Plans } from "./components/plan-usage";
 import { useNoticeToasts } from "./components/use-notice-toasts";
@@ -149,7 +150,7 @@ export function App() {
 		[workspaces, pickWorkspace, navigate],
 	);
 
-	const { setShortcutsOpen, setFilePath, setNewTicket, dispatchPalette } = overlays;
+	const { setShortcutsOpen, setOpenedFile, setNewTicket, dispatchPalette } = overlays;
 	// The command menu's **Open pull request** acts on the focused pane's session while the panes show, as its header's **Open PR** does.
 	const openPullRequest = useOpenPullRequest(page ? null : focused.view, focused.host, request);
 	const focusedGoal = page === null && focused.view?.kind === "live" && focused.view.agentId === null && focused.host?.source === "dashboard" && focused.host.goal.kind !== "off" && focused.host.control.phase === "live" && !focused.host.control.readOnly ? focused.host : null;
@@ -184,8 +185,8 @@ export function App() {
 	});
 
 	const actions = useMemo(
-		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, changeBot, end: endHost, openFile: setFilePath, openNewTicket: setNewTicket, editGoal, workspaceSettings }),
-		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, changeBot, endHost, setFilePath, setNewTicket, editGoal, workspaceSettings],
+		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, changeBot, end: endHost, openFile: setOpenedFile, openNewTicket: setNewTicket, editGoal, workspaceSettings }),
+		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, changeBot, endHost, setOpenedFile, setNewTicket, editGoal, workspaceSettings],
 	);
 	const fork = startOf(state.starts, "fork");
 	const replay = startOf(state.starts, "replay");
@@ -347,7 +348,7 @@ export function App() {
 										rosterError={state.rosterError}
 										onClose={() => show(layout)}
 									/>
-									{overlays.filePath !== null && <FileDialog key={overlays.filePath} path={overlays.filePath} onClose={() => setFilePath(null)} />}
+									{overlays.openedFile !== null && <FileDialog key={textFileUrl(overlays.openedFile)} target={overlays.openedFile} onClose={() => setOpenedFile(null)} />}
 									{overlays.newTicket !== null && <NewTicketDialog title={overlays.newTicket} onClose={() => setNewTicket(null)} />}
 									{goalEditor && editedGoal && editedGoal.goal.kind !== "off" && (
 										<GoalDialog

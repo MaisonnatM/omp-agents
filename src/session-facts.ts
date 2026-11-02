@@ -31,6 +31,7 @@ import { expandHome } from "./paths";
 import { textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { subagentFiles } from "./subagents";
 import { headKey, type LinkedPullRequest, parseRemote, type PullRequest, type PullRequestLink, prKey, pullRequestOfUrl, type Repo, repoKey } from "./shared/github";
+import { located, within } from "../templates/omp/agent/extensions/shell/commands";
 import { ReplayFold } from "./replay";
 import { taskText } from "./shared/routine-message";
 import { SHIP_STAGES, SHIP_WORK, type SessionBranch, type SessionFacts, type ShipProgress } from "./shared/sessions";
@@ -69,7 +70,12 @@ const PUSH_REMOTE = /^To (\S+)\s*$/;
 /** `   1a2b..3c4d  HEAD -> me/b`, ` * [new branch]  me/b -> me/b`, or ` + 1a2b...3c4d … (forced update)`; rejected and deleted refs do not match. */
 const PUSHED_REF = /^\s*[+*]?\s*(?:\[new branch\]|[0-9a-f]{4,}\.\.\.?[0-9a-f]{4,})\s+\S+\s+->\s+(\S+)/;
 /** Lines that can matter hold one of these; skipping the rest before `JSON.parse` is most of the startup scan. */
-const MARKERS = ["github", "gh pr", "push", "gt submit", "gt ss", "pr://", "omp-ship.state", "omp-agents.headless", "mcp__linear_", '"cwd"', '"toolName":"edit"', '"toolName":"write"'];
+const MARKERS = ["github", "gh pr", "push", "gt submit", "gt ss", "pr://", "omp-ship.state", "omp-agents.headless", "mcp__linear_", '"cwd"', '"toolName":"edit"', '"toolName":"write"', "cd ", "-C "];
+/**
+ * Where `located` starts a bash call that names no absolute `cwd`, so a relative `cd` keeps its path relative to the
+ * session's directory, which the scan does not know: no real directory starts with a NUL.
+ */
+const SESSION_DIR = "/\0";
 /** A Linear MCP tool called directly (`mcp__linear_get_issue`, or `xd_mcp__linear_get_issue`), or written to as an omp device. */
 const LINEAR_TOOL = /^(?:xd_)?mcp__linear_(\w+)$/;
 const LINEAR_DEVICE = /^xd:\/\/mcp__linear_(\w+)$/;
@@ -231,6 +237,8 @@ export class SessionFactsScan {
 	headless = false;
 	/** The `cwd` arguments of bash calls as written, and the directories of the files `edit` and `write` changed, each once, the most recently used last. */
 	readonly workDirs = new Set<string>();
+	/** `workDirs`, plus the absolute directories its bash commands `cd` into: where a relative path in its text may start. Each once, the most recently used last. */
+	readonly fileDirs = new Set<string>();
 	/** A candidate line could not be parsed, so its working-directory evidence is incomplete. */
 	unreadableLines = false;
 	readonly replay = new ReplayFold();
@@ -290,7 +298,13 @@ export class SessionFactsScan {
 		if (entry.type !== "message" || !isObject(entry.message)) return;
 		for (const call of toolCallsOf(entry.message)) {
 			const cwd = call.name === "bash" && typeof call.args.cwd === "string" && call.args.cwd ? call.args.cwd : null;
-			if (call.name === "bash" && typeof call.args.command === "string") this.#command(call.id, call.args.command, cwd, Date.parse(String(entry.timestamp)));
+			if (call.name === "bash" && typeof call.args.command === "string") {
+				this.#command(call.id, call.args.command, cwd, Date.parse(String(entry.timestamp)));
+				const from = cwd === null ? null : within(SESSION_DIR, cwd);
+				for (const { dir } of located(call.args.command, from ?? SESSION_DIR)) {
+					if (dir !== null && dir !== SESSION_DIR) this.#movedTo(dir.startsWith(`${SESSION_DIR}/`) ? dir.slice(SESSION_DIR.length + 1) : dir);
+				}
+			}
 			if (cwd) this.#workedIn(cwd);
 			if (call.name === "read" && typeof call.args.path === "string") this.#read(call.args.path);
 			const linear = linearCall(call.name, call.args);
@@ -325,6 +339,12 @@ export class SessionFactsScan {
 	#workedIn(dir: string): void {
 		this.workDirs.delete(dir);
 		this.workDirs.add(dir);
+		this.#movedTo(dir);
+	}
+
+	#movedTo(dir: string): void {
+		this.fileDirs.delete(dir);
+		this.fileDirs.add(dir);
 	}
 
 	#take(id: string): Expected | undefined {
@@ -656,6 +676,14 @@ export class SessionFactsIndex {
 	/** Whether omp last started session `sessionPath` as `omp -p` or `--mode json`; `false` before its first scan. */
 	headless(sessionPath: string): boolean {
 		return this.#own(sessionPath)?.headless ?? false;
+	}
+
+	/** Where a relative path in session `sessionPath`'s text may start: the directories its own bash calls ran in or `cd` into, and those of the files it changed, absolute, the most recently used first; none before its first scan. */
+	fileDirsOf(sessionPath: string): string[] {
+		const session = this.#sessions.get(sessionPath);
+		const own = this.#own(sessionPath);
+		if (!session || !own) return [];
+		return [...new Set([...own.fileDirs].reverse().map(dir => absolute(session.cwd, dir)))];
 	}
 
 	/** The scan of session `path`'s own file, not its subagents'; `undefined` before its first scan. */

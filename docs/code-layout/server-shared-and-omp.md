@@ -10,7 +10,7 @@
   `transcript.ts` also holds `PromptAuthor` and `promptAuthor`, which distinguish the user's text, hidden dashboard prompts, and stamped routine messages, and `skillInvocation`, a `/skill:` prompt as typed, which every reader and writer of one joins with.
   The transcript, trajectory, queued rows, withdrawn messages, live title's `/rename`, and past title use that classification, so a routine is never presented as the user's own prompt.
   `routine-message.ts` holds `RoutineMessage`, the snapshot of what one routine run sent, `routineMessageText`, its body and trailing JSON stamp, `readRoutineMessage`, its checked decoder, `taskOf`, its prompt or command task, and `taskText`, that task's prompt or command as text.
-  `transcript.ts` also holds `MEDIA_FILE_TYPES` and `mediaUrl`, the `GET /api/media` address of an image or video on this computer, which the media tree and the page both build.
+  `transcript.ts` also holds `MEDIA_FILE_TYPES` and `mediaUrl`, the `GET /api/media` address of an image or video on this computer, which the media tree and the media section build; a path in agent text builds it with its session lookup through `mediaFileUrl` in `web/file-paths.ts`.
   `mcp-servers.ts` holds the rows and bodies of Settings › MCP servers, and `mcp-catalog.ts` the catalog of remote servers it offers.
   `mcp-status.ts` holds `McpRemoteStatus` and `McpTool`, where omp stands with a remote MCP server, which an integration's `McpConnection` in `accounts.ts` and a server's `McpServerStatus` in `mcp-servers.ts` both build on.
   `gmail.ts` holds `MailThread` and `EmailAnswer`, the Email page's conversations, and `ThreadAnswer` with its `MailMessage`, `MailPerson`, `MailBody`, and `MailAttachment`, one conversation in full.
