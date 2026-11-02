@@ -135,7 +135,6 @@ export const CONTROLS = [
 	{ id: "notices.update", label: "Notification Update button", area: "Notifications" },
 	{ id: "notices.clear", label: "Notification cleared", area: "Notifications" },
 	{ id: "inbox.filter", label: "Inbox filter", area: "Inbox" },
-	{ id: "inbox.suggestion", label: "Inbox suggested prompt", area: "Inbox" },
 	{ id: "session-details.tab.pull-requests", label: "Session details PRs tab", area: "Right sidebar" },
 	{ id: "session-details.tab.browser", label: "Session details Browser tab", area: "Right sidebar" },
 	{ id: "session-details.tab.tickets", label: "Session details Tickets tab", area: "Right sidebar" },

@@ -184,7 +184,7 @@ export const PageSwitch = memo(function PageSwitch({
 			return <NotesPage list={userNotes} todos={userTodos} view={page.list} openId={page.open} hosts={hosts} past={past} disabled={!connected} onChange={changeNote} />;
 		case "inbox":
 			// Every session that waits on you, whatever the sidebar's workspace.
-			return <InboxPage hosts={hosts} notices={notices} openKey={page.open} />;
+			return <InboxPage hosts={hosts} notices={notices} openKey={page.open} models={models} workspaces={workspaces} />;
 		case "bots": {
 			if (page.target === null) {
 				if (page.adding) return <NewBot workspaces={workspaces} defaultCwd={defaultWorkspace} connected={connected} />;
