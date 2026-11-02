@@ -2,6 +2,7 @@
 import type { PullRequestSummary } from "../src/shared/github";
 import type { YourMove } from "../src/shared/moves";
 import { type Notice, type UpdateSubject, usesClause } from "../src/shared/notices";
+import { hashForSession } from "../src/shared/sessions";
 import { folderName, providerLabel } from "./labels";
 import { moveAction } from "./pull-requests-model";
 import type { PullRequestActionId } from "../src/pull-request-actions";
@@ -151,13 +152,15 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 			};
 		case "stopped": {
 			const count = notice.sessions.length;
+			const [first] = notice.sessions;
 			return {
 				...NEWS,
 				source: "sessions",
 				headline: count === 1 ? "1 session stopped mid-turn" : `${count} sessions stopped mid-turn`,
 				// Named as the sidebar names a past session.
 				preview: notice.sessions.map(({ title, cwdDisplay }) => title ?? (cwdDisplay === null ? undefined : folderName(cwdDisplay)) ?? "Untitled session").join(" · "),
-				link: null,
+				// The first session it names, where you see how far its turn got before you continue it.
+				link: first ? { href: hashForSession(first.sessionId), external: false } : null,
 				face: { kind: "stopped" },
 				action: { kind: "continue-all", sessionIds: notice.sessions.map(({ sessionId }) => sessionId) },
 				// It comes at the server's start, which you may not watch.
