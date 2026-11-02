@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { existsSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,6 +6,8 @@ import { CommandError } from "../templates/omp/agent/extensions/github/command";
 import { run, runJson, runShell } from "./proc";
 
 const limits = { timeoutMs: 10_000, maxOutput: 1024 };
+
+afterEach(() => mock.restore());
 
 describe("runShell", () => {
 	test("gives the exit code and stdout and stderr in the order the command wrote them", async () => {
@@ -26,6 +28,12 @@ describe("runShell", () => {
 		const startedAt = Date.now();
 		expect(await runShell("echo started; sleep 5; echo done", tmpdir(), { ...limits, timeoutMs: 200 })).toEqual({ exitCode: null, output: "started\n" });
 		expect(Date.now() - startedAt).toBeLessThan(2000);
+	});
+
+	test("counts its time limit in awake time, so a Mac asleep past the limit lets the command finish, and says how long it slept", async () => {
+		// Asleep for the whole run: `performance.now()` stands still while real time passes.
+		spyOn(performance, "now").mockReturnValue(performance.now());
+		expect(await runShell("sleep 1.2; echo done", tmpdir(), { ...limits, timeoutMs: 200 })).toEqual({ exitCode: 0, output: "done\n", slept: 1000 });
 	});
 
 	test("stops when its signal aborts", async () => {

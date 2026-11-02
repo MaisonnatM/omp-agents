@@ -69,10 +69,11 @@ export interface ShellOptions {
 	env?: Record<string, string>;
 }
 
-/** What a shell command ended with: `exitCode` is null once it was stopped. */
+/** What a shell command ended with: `exitCode` is null once it was stopped; `slept` is how long the Mac slept while it ran, when a second or more. */
 export interface ShellResult {
 	exitCode: number | null;
 	output: string;
+	slept?: number;
 }
 
 /**

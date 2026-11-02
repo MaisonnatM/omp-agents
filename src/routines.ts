@@ -40,12 +40,15 @@ export type RoutineTask =
 	/** `command` through `sh -c` in the Bot's workspace, with no omp session; what it printed is then posted into the Bot's conversation. */
 	| { kind: "command"; command: string };
 
-/** A run's command: `running` from its launch, saved before it can end, then how it ended. */
+/**
+ * A run's command: `running` from its launch, saved before it can end, then how it ended. `slept` is how long the Mac
+ * slept between `startedAt` and `endedAt`, when a second or more; the time limit does not count it.
+ */
 export type CommandRun =
 	| { phase: "running"; startedAt: number }
-	| { phase: "exited"; code: number; output: string; startedAt: number; endedAt: number }
+	| { phase: "exited"; code: number; output: string; startedAt: number; endedAt: number; slept?: number }
 	/** Killed at the time limit, or by a dashboard stop, which the next server records. */
-	| { phase: "stopped"; reason: "time-limit" | "dashboard"; output: string; startedAt: number; endedAt: number }
+	| { phase: "stopped"; reason: "time-limit" | "dashboard"; output: string; startedAt: number; endedAt: number; slept?: number }
 	/** `sh` could not start, as when the workspace is gone. */
 	| { phase: "failed"; error: string; startedAt: number; endedAt: number };
 

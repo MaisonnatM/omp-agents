@@ -6,6 +6,7 @@
  * A run starts no session of its own: a Bot keeps one conversation, so routines add no session beside it.
  */
 import { errorText } from "../json";
+import type { ShellResult } from "../proc";
 import { COMMAND_TIME_LIMIT, isDue, isTriggeredBy, MAX_TRIGGER_EVENTS, type CommandRun, type Routine, type RoutineRun, type TriggerEvent } from "../routines";
 import { SerialLane } from "../serial-lane";
 import type { BotId } from "../shared/bots";
@@ -18,7 +19,9 @@ export interface RoutineRunnerDeps {
 	/** Bot `botId`'s workspace, `null` once the Bot is gone. */
 	workspace(botId: BotId): string | null;
 	/** Runs `command` through `sh` in `cwd`, with `env` beside the server's environment, whatever its exit code; rejects only when it cannot start. */
-	exec(command: string, cwd: string, env: Record<string, string>): Promise<{ exitCode: number | null; output: string }>;
+	exec(command: string, cwd: string, env: Record<string, string>): Promise<ShellResult>;
+	/** Whether the Mac is fully awake: a dark wake lasts seconds, so a run started in one stalls until the next full wake. */
+	fullyAwake(): Promise<boolean>;
 	/** The routines changed; every socket should hear them. */
 	onChange(): void;
 	/** Sends `text` into Bot `botId`'s conversation, as the user's message would; the session it went to. Rejects with why it could not. */
