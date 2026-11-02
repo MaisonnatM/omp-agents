@@ -1,8 +1,10 @@
 /** Settings › Agents compares omp's discovered definitions and edits user defaults for later spawns. */
-import { ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
+import { ChevronRight, RefreshCw } from "lucide-react";
 import { type ReactNode, useId, useRef, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import type { AgentSettingEdit, AgentSettingRow } from "../../../src/shared/agent-settings";
 import type { AgentCatalog, AgentDefinitionPreview, AgentModelOverride } from "../../../src/shared/agents";
 import { everyWord } from "../../../src/shared/every-word";
@@ -11,17 +13,19 @@ import { putJson, settingsUrl } from "../../api";
 import { formatValue, valueOf } from "../../omp-settings";
 import { hashForSettings } from "../../routing";
 import { useInlineConfirm } from "../../use-inline-confirm";
+import { FoldButton } from "../fold";
 import { Model } from "../model-picker";
-import { EditBar, type Editing, ErrorText, FIELD, LINK, OrderedList, RAIL_BUTTON, SaveError, Section, useEditor } from "./editor";
+import { SearchField } from "../search-field";
+import { EditBar, type Editing, ErrorText, LINK, OrderedList, RAIL_BUTTON, SaveError, Section, useEditor } from "./editor";
 import { SelectorPicker } from "./selector-picker";
 
 const selectors = (value: AgentModelOverride | undefined): string => value === undefined ? "Use agent definition" : Array.isArray(value) ? value.join(", ") : value;
-const scopeName = { user: "User", project: "Project", bundled: "Bundled" };
+const scopeName = { user: "user", project: "project", bundled: "bundled" };
 
 function Fold({ title, children, initial = false }: { title: string; children: ReactNode; initial?: boolean }) {
 	const [open, setOpen] = useState(initial);
 	const id = useId();
-	return <div className="space-y-3"><button type="button" className={RAIL_BUTTON} aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>{open ? <ChevronDown className="size-4 shrink-0" /> : <ChevronRight className="size-4 shrink-0" />}<span className="font-medium">{title}</span></button><div id={id} hidden={!open} className="pl-6">{children}</div></div>;
+	return <div className="space-y-3"><FoldButton open={open} controls={id} onToggle={() => setOpen(!open)} className="ml-0 min-h-7 px-2 text-sm [&>svg]:size-4"><span className="font-medium">{title}</span></FoldButton><div id={id} hidden={!open} className="pl-8">{children}</div></div>;
 }
 
 function FileLink({ path, onOpenFile, children }: { path: string | undefined; onOpenFile: (path: string) => void; children: string }) {
@@ -72,10 +76,13 @@ function AgentRow({ agent, catalog, editing, projectPath, onOpenFile, isolation 
 	const [open, setOpen] = useState(false);
 	const id = useId();
 	return <article className="border-b border-border py-3 last:border-b-0">
-		<button type="button" aria-expanded={open} aria-controls={id} className={`${RAIL_BUTTON} flex-wrap items-start gap-y-1`} onClick={() => setOpen(!open)}>
-			{open ? <ChevronDown className="mt-0.5 size-4 shrink-0" /> : <ChevronRight className="mt-0.5 size-4 shrink-0" />}
-			<span className="min-w-0 flex-1 space-y-1"><span className="flex flex-wrap items-baseline gap-x-3 gap-y-1"><span className="font-medium">{agent.name}</span><span className="text-xs text-muted-foreground">{agent.origin === "plugin" ? "Plugin · " : ""}{scopeName[agent.scope]}</span><span className="text-xs text-muted-foreground">{agent.readOnly ? "Read-only" : "Not classified read-only"}</span>{agent.disabled && <span className="text-xs text-muted-foreground">Disabled in settings</span>}</span><span className="block text-xs text-muted-foreground">{agent.description}</span></span>
-			<span className="min-w-0 break-words text-xs sm:max-w-80"><EffectiveModel agent={agent} compact /></span>
+		<button type="button" aria-expanded={open} aria-controls={id} className={cn(RAIL_BUTTON, "items-start")} onClick={() => setOpen(!open)}>
+			<ChevronRight aria-hidden className={cn("mt-0.5 size-4 shrink-0 transition-transform", open && "rotate-90")} />
+			<span className="grid min-w-0 flex-1 gap-x-5 gap-y-1 sm:grid-cols-3">
+				<span className="flex flex-wrap items-baseline gap-x-3 gap-y-1 sm:col-span-2"><span className="font-medium">{agent.name}</span><span className="text-xs text-muted-foreground">{agent.origin === "plugin" ? "plugin · " : ""}{scopeName[agent.scope]}</span><span className="text-xs text-muted-foreground">{agent.readOnly ? "Read-only" : "Not classified read-only"}</span>{agent.disabled && <Badge variant="dot" size="compact" color="gray">Disabled</Badge>}</span>
+				<span className="text-xs text-muted-foreground sm:col-span-2 sm:col-start-1 sm:row-start-2">{agent.description}</span>
+				<span className="min-w-0 break-words text-xs sm:col-start-3 sm:row-span-2 sm:row-start-1"><EffectiveModel agent={agent} compact /></span>
+			</span>
 		</button>
 		<div id={id} hidden={!open} className="space-y-5 px-2 pt-5 pl-8">
 			<dl className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-5 gap-y-2 text-xs">
@@ -92,13 +99,12 @@ function AgentRow({ agent, catalog, editing, projectPath, onOpenFile, isolation 
 	</article>;
 }
 
-const EXECUTION_LABELS: Record<string, string> = { "task.maxConcurrency": "Max concurrent subagents", "task.isolation.enabled": "Allow isolated tasks", "task.isolation.apply": "Apply successful changes", "task.isolation.merge": "Apply method" };
 function ExecutionRow({ row, editing, projectPath, onOpenFile }: { row: AgentSettingRow; editing: Editing; projectPath?: string; onOpenFile: (path: string) => void }) {
 	const id = useId();
 	const [status, setStatus] = useState("");
 	const editor = useEditor({ value: row.user ?? null, expected: row.user ?? null }, async draft => {
 		const result = await putJson<OmpSettings>(settingsUrl("/agent", editing.cwd), { id: row.id, expected: draft.expected, ...(draft.value === null ? { reset: true } : { value: draft.value }) } satisfies AgentSettingEdit);
-		setStatus(`Saved ${EXECUTION_LABELS[row.id]!.toLowerCase()}.`);
+		setStatus(`Saved ${row.label.toLowerCase()}.`);
 		return result;
 	}, editing);
 	const options = row.control.kind === "select" ? row.control.options : [{ value: "true", label: "On" }, { value: "false", label: "Off" }];
@@ -106,11 +112,11 @@ function ExecutionRow({ row, editing, projectPath, onOpenFile }: { row: AgentSet
 	const listed = options.some(option => String(option.value) === String(current));
 	const viewing = editor.state.phase === "viewing";
 	return <div className="space-y-2 py-3">
-		<div className="flex flex-wrap items-center justify-between gap-3"><span id={id} className="text-sm font-medium">{EXECUTION_LABELS[row.id]}</span><EditBar editor={editor} label={EXECUTION_LABELS[row.id]!} /></div>
-		{viewing ? <p className="text-sm tabular-nums">{formatValue(row, valueOf(row))}</p> : <Select disabled={editor.state.phase === "saving"} value={current === null ? "inherit" : String(current)} onValueChange={value => editor.change({ ...editor.draft, value: value === "inherit" ? null : row.control.kind === "toggle" ? value === "true" : typeof row.default === "number" ? Number(value) : value })}><SelectTrigger aria-labelledby={id} className="tabular-nums"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="inherit">Use omp default ({formatValue(row, row.default)})</SelectItem>{current !== null && !listed && <SelectItem value={String(current)}>{String(current)}</SelectItem>}{options.map(option => <SelectItem key={String(option.value)} value={String(option.value)}>{option.label}</SelectItem>)}</SelectContent></Select>}
+		<div className="flex flex-wrap items-center justify-between gap-3"><span id={id} className="text-sm font-medium">{row.label}</span><EditBar editor={editor} label={row.label} /></div>
+		{row.warning && <p className="text-xs text-warning-foreground">{row.warning}</p>}
+		<p className="text-xs text-muted-foreground">{row.id === "task.isolation.enabled" ? "Allows individual tasks to request a separate checkout. Other tasks still share the parent checkout." : row.description}</p>
+		{viewing ? <p className="text-sm tabular-nums">{formatValue(row, valueOf(row))}<span className="ml-2 text-xs text-muted-foreground">{row.workspace !== undefined ? "Workspace value" : row.user === undefined ? "omp default" : "Your value"}</span></p> : <Select disabled={editor.state.phase === "saving"} value={current === null ? "inherit" : String(current)} onValueChange={value => editor.change({ ...editor.draft, value: value === "inherit" ? null : row.control.kind === "toggle" ? value === "true" : typeof row.default === "number" ? Number(value) : value })}><SelectTrigger aria-labelledby={id} className="tabular-nums"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="inherit">Use omp default ({formatValue(row, row.default)})</SelectItem>{current !== null && !listed && <SelectItem value={String(current)}>{String(current)}</SelectItem>}{options.map(option => <SelectItem key={String(option.value)} value={String(option.value)}>{option.label}</SelectItem>)}</SelectContent></Select>}
 		{row.id === "task.maxConcurrency" && <p className="text-xs text-muted-foreground">Zero means unlimited.</p>}
-		{row.id === "task.isolation.enabled" && <p className="text-xs text-muted-foreground">Allows individual tasks to request a separate checkout. Other tasks still share the parent checkout.</p>}
-		{row.id === "task.isolation.apply" && <p className="text-xs text-muted-foreground">Applies successful changes to the parent checkout, subject to its worktree guard.</p>}
 		{row.workspace !== undefined && <p className="text-xs text-muted-foreground">Your default is {formatValue(row, row.user ?? row.default)}. This workspace still uses {formatValue(row, row.workspace)}. <FileLink path={projectPath} onOpenFile={onOpenFile}>Open workspace config in Files</FileLink></p>}
 		{row.env && <p className="text-xs text-muted-foreground">An environment variable overrides this setting.</p>}
 		<SaveError editor={editor} /><p role="status" className="text-xs text-muted-foreground">{status}</p>
@@ -123,20 +129,19 @@ export function AgentsTab({ catalog, editing, stale, configPath, projectPath, on
 	const data = "error" in catalog ? previous.current : catalog;
 	const error = "error" in catalog ? catalog.error : stale;
 	const [query, setQuery] = useState("");
-	const search = useId();
 	const isolation = data?.execution.find(row => row.id === "task.isolation.enabled");
 	const allowIsolation = isolation ? Boolean(valueOf(isolation)) : false;
 	const matchText = everyWord(query);
 	const matches = (agent: AgentDefinitionPreview): boolean => matchText([agent.name, agent.description, scopeName[agent.scope], agent.origin, agent.package ?? "", agent.path ?? "", ...(agent.tools ?? []), ...agent.definition, ...agent.effective, selectors(agent.user), selectors(agent.workspace), agent.model.kind === "resolved" ? agent.model.selector : ""].join(" "));
 	const missing = data && Object.keys(data.userOverrides).filter(name => !data.agents.some(agent => agent.name === name)).sort();
-	return <Section title="Agent definitions and model overrides" meta={data?.context === "user-preview" ? "Preview of a new session with user defaults only. Project and session-local agents are excluded." : "Preview of a new session in this workspace. Running sessions can have different agents and model choices."} actions={<Button variant="ghost" size="compact" leadingIcon={RefreshCw} onClick={editing.reload}>Refresh</Button>}>
+	return <Section meta={data?.context === "user-preview" ? "Project and session-local agents are excluded." : "Running sessions can have different agents and model choices."} actions={<Button variant="ghost" size="compact" leadingIcon={RefreshCw} onClick={editing.reload}>Refresh</Button>}>
 		<p className="text-xs text-muted-foreground">User defaults affect later spawns, not already running subagents. Invocation choices, sign-in fallback, and hooks can still change the model.</p>
-		{error && <div className="space-y-2"><ErrorText>Cannot refresh agents. {error}{data && " The previous preview is stale. Refresh before saving."}</ErrorText><FileLink path={configPath} onOpenFile={onOpenFile}>Open config file in Files</FileLink></div>}
-		{data?.modelError && <ErrorText>Cannot preview matching models. {data.modelError} Saved model choices are still shown.</ErrorText>}
-		<div className="space-y-1"><label htmlFor={search} className="text-xs font-medium">Search agents</label><input id={search} type="search" value={query} onChange={event => setQuery(event.target.value)} className={`${FIELD} w-full`} placeholder="Name, description, tools, or model" /></div>
+		{error && <div className="space-y-2"><ErrorText>Cannot refresh agents.{data && " The previous preview is stale; refresh before saving."} {error}</ErrorText><p className="text-xs text-muted-foreground"><FileLink path={configPath} onOpenFile={onOpenFile}>Open config file in Files</FileLink></p></div>}
+		{data?.modelError && <ErrorText>Cannot preview matching models. Saved model choices are still shown. {data.modelError}</ErrorText>}
+		<SearchField label="Search agents" placeholder="Search" query={query} onQuery={setQuery} className="min-w-0 w-full" />
 		{data && <fieldset disabled={Boolean(error)} className="min-w-0 space-y-6">
 			<div>{data.agents.map(agent => <div key={agent.name} hidden={!matches(agent)}><AgentRow agent={agent} catalog={data} editing={editing} projectPath={projectPath} onOpenFile={onOpenFile} isolation={allowIsolation} /></div>)}</div>
-			{!data.agents.some(matches) && <div className="space-y-2"><p className="text-sm">{query ? "No agents match your search." : "No agents available in this context."}</p>{query && <Button variant="ghost" size="compact" onClick={() => setQuery("")}>Clear search</Button>}</div>}
+			{!data.agents.some(matches) && <div className="space-y-2"><p className="text-sm text-muted-foreground">{query ? "No agent matches." : "No agents available in this context."}</p>{query && <Button variant="ghost" size="compact" onClick={() => setQuery("")}>Clear search</Button>}</div>}
 			{data.agents.length > 0 && data.agents.every(agent => agent.disabled) && <p className="text-sm text-muted-foreground">No agents available in this context. Every discovered agent is disabled.</p>}
 			{missing && missing.length > 0 && <Fold title="Overrides for missing agents"><div className="space-y-6">{missing.map(name => <div key={name} className="space-y-2"><h4 className="text-sm font-medium">{name}</h4><p className="text-xs text-muted-foreground">No definition was discovered in this preview.</p><OverrideEditor name={name} value={data.userOverrides[name]} clearOnly roles={data.roles} editing={editing} onOpenFile={onOpenFile} /></div>)}</div></Fold>}
 			<Fold title="Execution settings"><div className="divide-y divide-border">{data.execution.map(row => <div key={row.id} hidden={!allowIsolation && (row.id === "task.isolation.apply" || row.id === "task.isolation.merge")}><ExecutionRow row={row} editing={editing} projectPath={projectPath} onOpenFile={onOpenFile} /></div>)}</div></Fold>

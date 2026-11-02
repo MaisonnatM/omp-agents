@@ -1,4 +1,5 @@
 /** A Settings model selector and its thinking level, with optional role aliases for agent defaults. */
+import { useId } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip } from "@/components/ui/tooltip";
 import { splitSelector, type CatalogModel } from "../../../src/shared/models";
@@ -9,6 +10,8 @@ import type { Catalog } from "./editor";
 export function SelectorPicker({ value, catalog, label, labelId, roles = [], disabled, onPick }: { value: string | null; catalog: Catalog; label: string; labelId?: string; roles?: string[]; disabled?: boolean; onPick: (selector: string) => void }) {
 	const models = catalog.data?.bySelector ?? null;
 	const { model, level } = value && models ? splitSelector(value, models) : { model: value, level: null };
+	const valueId = useId();
+	const valueName = `${label}: ${model ? model.startsWith("@") ? `${model} model role` : modelDescription(model) : "none"}`;
 	const levels = (model && models?.get(model)?.thinking) || [];
 	const pickModel = (next: CatalogModel): void => onPick(level && next.thinking.includes(level) ? `${next.selector}:${level}` : next.selector);
 	const list = fromList(catalog, MODEL_LIST.loading, ({ byProvider }) => modelGroups(byProvider, option => ({ selector: option.selector, id: option.selector.slice(option.provider.length + 1), keywords: [option.name] }), model, pickModel));
@@ -17,10 +20,11 @@ export function SelectorPicker({ value, catalog, label, labelId, roles = [], dis
 	const choices = list.kind === "ready" ? { kind: "ready" as const, groups: [...groups, ...list.groups] } : groups.length ? { kind: "ready" as const, groups } : list;
 	return (
 		<div className="flex min-w-0 flex-wrap items-center gap-1">
+			{labelId && <span id={valueId} className="sr-only">{valueName}</span>}
 			<CommandPicker
 				trigger={<span className="max-w-56 truncate" title={labelId ? model ?? undefined : undefined}>{model ? <Model selector={model} titled={false} /> : "Choose a model"}</span>}
-				ariaLabel={labelId ? undefined : `${label}: ${model ? modelDescription(model) : "none"}`}
-				ariaLabelledby={labelId}
+				ariaLabel={labelId ? undefined : valueName}
+				ariaLabelledby={labelId ? `${labelId} ${valueId}` : undefined}
 				tooltip={labelId ? undefined : model ? `Model for ${label}: ${modelDescription(model)}` : `Choose a model for ${label}`}
 				className="min-w-0" disabled={disabled} search={MODEL_LIST.search} width="lg" list={choices} empty={MODEL_LIST.empty}
 			/>
