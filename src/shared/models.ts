@@ -1,5 +1,6 @@
 /** omp's models, model routing, plan usage, and the files and settings it reads. */
 import type { AgentSettings } from "./agent-settings";
+import type { AgentCatalog } from "./agents";
 
 /** One quota window of a provider plan. */
 export interface PlanWindow {
@@ -206,6 +207,8 @@ export interface OmpSettings {
 	routing: ModelRouting | { error: string };
 	/** omp's own settings, as its settings panel lists them; `error` as for `routing`. */
 	agentSettings: AgentSettings | { error: string };
+	/** omp's discovered definitions and defaults for a new session, or a distinct discovery failure. */
+	agents: AgentCatalog | { error: string };
 	files: OmpFile[];
 	/** The workflow skills among `files`, by name. */
 	workflows: Workflow[];

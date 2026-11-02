@@ -57,6 +57,7 @@ export interface SettingHandle {
 	readonly enumValues: readonly string[] | undefined;
 	/** @throws Error when `value` does not fit the setting. */
 	assertWritable(value: unknown): void;
+	get(settings: OmpSettingsInstance): unknown;
 	set(settings: OmpSettingsInstance, value: unknown): void;
 	setEntry(settings: OmpSettingsInstance, key: string, value: unknown): void;
 	/** Stages the removal of the key from the global `config.yml`, so the workspace's value, the variable's, or the default applies. */

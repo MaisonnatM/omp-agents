@@ -68,5 +68,6 @@ export type AgentSettingChange = { value: unknown } | { reset: true };
 /**
  * `PUT /api/settings/agent`: one setting's change in the user's `config.yml`.
  * `expected` is the user value the page showed (`AgentSettingRow.user`, `null` when unset); another value refuses the edit.
+ * Optional `entry` edits only one agent's model override; `expected` then compares that user entry, not the whole map.
  */
-export type AgentSettingEdit = { id: string; expected: unknown } & AgentSettingChange;
+export type AgentSettingEdit = { id: string; expected: unknown; entry?: string } & AgentSettingChange;

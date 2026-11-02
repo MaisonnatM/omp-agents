@@ -29,6 +29,11 @@ _Avoid_: Crashed session, orphan
 A session that another session's `task` call spawned.
 _Avoid_: Child agent, worker
 
+**Agent definition**:
+The named prompt, declared tools, and model choices omp discovers for a kind of subagent, which Settings › Agents previews before a new session starts.
+It is not a running subagent or a Bot.
+_Avoid_: Worker, Bot type
+
 **Isolation sandbox**:
 The directory under `~/.omp/wt` where omp runs a subagent's isolated task, with a marker naming the omp process that owns it.
 _Avoid_: Workspace (see **Workspace**), worktree

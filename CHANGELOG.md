@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-02
 
+- New Agents section in Settings previews the agents a new session discovers, with their tools and models; expand one to save or clear its model override, or open Execution settings to change concurrency and isolation defaults.
 - A long folder name in the message box now ends in … instead of running past the box and under the model switch.
 - /ship now plans before it builds: the agent compares up to three ways to do the work, keeps the best, and posts that plan on the Linear issue, or in the pull request when there is no issue.
 - /ship no longer needs a Linear ticket: it uses the one you name or one that matches the work, and otherwise ships without one instead of creating a ticket.
@@ -280,6 +281,3 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Cmd+N starts a new session, Cmd+F searches sessions, and the sidebar shows these keys.
 - Clicking the branch in a session's header copies its name and frees it to be checked out elsewhere.
 - Tool calls have a new compact look, and code blocks show their language with a copy button.
-- In the desktop app, right-click an image to copy it.
-- Fixed: the pull request tabs in the sidebar no longer scroll sideways.
-- Behind the scenes: agents no longer inherit the dashboard's own settings, and several guides were corrected.

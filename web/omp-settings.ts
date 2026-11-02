@@ -13,6 +13,7 @@ export interface SettingOwner {
 }
 
 const MODELS: SettingOwner = { section: "models", label: "Models" };
+const AGENTS: SettingOwner = { section: "agents", label: "Agents" };
 
 /**
  * omp settings another Settings section edits, by id. Settings › omp settings counts them and links to that section
@@ -33,6 +34,11 @@ export const OWNED_SETTINGS: Readonly<Record<string, SettingOwner>> = {
 	"retry.usageReservePct": MODELS,
 	"retry.usageReservePolicy": MODELS,
 	"retry.fallbackRevertPolicy": MODELS,
+	"task.agentModelOverrides": AGENTS,
+	"task.maxConcurrency": AGENTS,
+	"task.isolation.enabled": AGENTS,
+	"task.isolation.apply": AGENTS,
+	"task.isolation.merge": AGENTS,
 };
 
 /** The section that edits `id`, from {@link OWNED_SETTINGS}; `undefined` when this section does. */
