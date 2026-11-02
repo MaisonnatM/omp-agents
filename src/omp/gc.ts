@@ -68,7 +68,7 @@ export async function storageUsage(cwd: string | null): Promise<StorageUsage> {
 			const value = user ?? handle.default;
 			if (kind === "toggle" ? typeof value !== "boolean" : typeof value !== "number" || !Number.isFinite(value)) throw new Error(`The saved value for ${id} is invalid.`);
 			const workspace = Reflect.get(projectGc, id.slice(3));
-			return { id, user, value: value as boolean | number, ...(workspace != null ? { workspace } : {}) };
+			return { id, user, value: value as boolean | number, default: handle.default, ...(workspace != null ? { workspace } : {}) };
 		});
 	} catch (error) { settingsError = errorText(error); }
 	let autoCompress: StorageUsage["autoCompress"] = null;

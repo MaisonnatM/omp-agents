@@ -41,7 +41,7 @@ It includes the requests, their input tokens and input cost, the sources by toke
 It includes each feature's uses, every feature's last use over all stored rows, the moves between views, the time on each view, each local day's active time, visits, and actions, and `serverActions`, every route that takes a `PUT`, for the inventory; see [Activity](activity.md).
 
 **Storage** reads `GET /api/storage`, or `?cwd=<known-workspace>` only to report workspace overrides.
-`StorageUsage` in `src/shared/storage.ts` includes allocated folder sizes, global cleanup rules with their exact user values for conflict checks, and the last native background compression log.
+`StorageUsage` in `src/shared/storage.ts` includes allocated folder sizes, global cleanup rules with their native defaults and exact user values for conflict checks, and the last native background compression log.
 The three measured folders come from omp's directory exports; the archive-size card is absent because omp's archive-directory helper is private.
 `PUT /api/storage/cleanup` takes `{ action: "preview" }` for all five native phases, or `{ action: "preview", step: "sandboxes" }` for the independently measured sandbox plan.
 Apply takes `{ action: "apply", step }` for exactly one of `stale`, `blobs`, `archive`, `compress`, and `wal`.
@@ -51,8 +51,9 @@ Native gc owns its lock, thresholds, references, and keep rules.
 An exit with phase errors still returns its parsed report, while a held native lock or sandbox guard answers 409 with a busy error.
 Long storage requests disable the server's idle timeout and never kill a running cleanup when the page stops requesting steps.
 The page runs stale, blobs, archive, compress, and wal in that order, then sandboxes, and stops after a failed step or a request to stop.
-Rule changes reuse `PUT /api/settings/agent` with each rule's `expected` user value captured when editing starts; no separate settings writer exists.
-After a conflict, the draft keeps that snapshot rather than adopting a refreshed value it never showed; Cancel and Edit load the new value.
+Rule changes reuse `PUT /api/settings/agent` with the user value the row showed as `expected`; no separate settings writer exists.
+Storage uses omp settings' `SettingRow`: toggles save on change, whole-number fields on Enter or blur, and Reset removes the user's override.
+After a conflict, the row reloads the current value and asks the user to review it before another change.
 No daily native cleanup or dashboard-triggered automatic compression is added.
 
 Edits go through three endpoints, each taking the same `?cwd=` and answering with the settings as they load after the write:

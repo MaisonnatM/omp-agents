@@ -84,6 +84,7 @@ export function formatValue(row: AgentSettingRow, value: unknown): string {
 		}
 		case "json":
 			return value === undefined ? "Not set" : JSON.stringify(value);
+		case "number":
 		case "text":
 			return value === undefined || value === "" ? "Not set" : String(value);
 	}

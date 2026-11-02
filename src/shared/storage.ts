@@ -33,7 +33,7 @@ export const GC_RULES = [
 	{ id: "gc.autoCompress", label: "Compress daily", hint: "Runs at most once a day when you start omp in a terminal, not when you start a dashboard session.", kind: "toggle" },
 ] as const;
 export type GcRuleId = (typeof GC_RULES)[number]["id"];
-export interface GcRule { id: GcRuleId; value: boolean | number; user: unknown; workspace?: unknown }
+export interface GcRule { id: GcRuleId; value: boolean | number; default: unknown; user: unknown; workspace?: unknown }
 export interface StorageUsage {
 	folders: { label: string; path: string; bytes: number | null; error: string | null }[];
 	rules: GcRule[];
