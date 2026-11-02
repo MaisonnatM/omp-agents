@@ -6,8 +6,8 @@ disable-model-invocation: true
 
 # poteto-mode
 
-The mode lives in pstack's own skill file, `~/.omp/agent/vendor/cursor-plugins/pstack/skills/poteto-mode/SKILL.md`; this wrapper shares its directory name, so `skill://` cannot reach it. Before working, `read` that file in full, including its inline Principles index, and then work in that style for the rest of the session.
-Its material sits in the same directory, `~/.omp/agent/vendor/cursor-plugins/pstack/skills/poteto-mode/`: `playbooks/<name>.md`, `references/<name>.md`, and `scripts/<file>`. Each principle or routed skill is at `skill://<name>`.
+The mode lives in pstack's own skill file, `skills/poteto-mode/SKILL.md` in the newest `~/.omp/plugins/cache/plugins/cursor-plugins___pstack___<version>/` directory. omp refuses that skill, whose name `Poteto Mode` is not lowercase, so `skill://` cannot reach it. Before working, `read` that file in full, including its inline Principles index, and then work in that style for the rest of the session.
+Its material sits in the same directory: `playbooks/<name>.md`, `references/<name>.md`, and `scripts/<file>`. Each principle or routed skill is at `skill://<name>`.
 
 pstack is written for Cursor. On omp, the routes below replace every Cursor tool, path, and model name in the mode, its playbooks, and its routed skills. Translate as you read, and open each skill through its exact `skill://` URI, not a plugin cache path.
 
@@ -59,4 +59,4 @@ omp's `task` call has no per-spawn `model`, `readonly`, `environment`, or `run_i
 ## Scripts
 
 Script dependencies live in `scripts/node_modules`. After a pstack upgrade, run `bun install --frozen-lockfile` in the `scripts` directory of the resolved skill.
-Resolve `scripts/worktree-audit.sh` against `~/.omp/agent/vendor/cursor-plugins/pstack/skills/poteto-mode/`, and run it from the repository you are auditing.
+Resolve `scripts/worktree-audit.sh` against that pstack `skills/poteto-mode/` directory, and run it from the repository you are auditing.
