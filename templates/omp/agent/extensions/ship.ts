@@ -74,8 +74,8 @@ const NEXT: Record<Stage, string> = {
 	implement: "Implement the plan and commit on the work's branch. Do not open a PR in this stage.",
 	draft_pr: "Create a draft with `gt submit --draft` for a Graphite repository, or push and run `gh pr create --draft` otherwise. Reference the issue, or put the plan in the body without one, as the ship skill's Draft PR step says.",
 	interface_review: `If the status says the ${REVIEWS.interface_review.label} is not needed because \`${REVIEWS.interface_review.pathsFile}\` lists no changed file, record ship_stage({stage: 'thermonuclear'}) and move on. Otherwise wait until the user approves the direction, then spawn \`task\` with \`agent: "interface-reviewer"\` on the PR, apply the findings in a fresh agent, push, then add \`${REVIEWS.interface_review.box}\` to the PR body.`,
-	thermonuclear: `If the status says the ${REVIEWS.thermonuclear.label} is not needed because \`${REVIEWS.thermonuclear.pathsFile}\` lists no changed file, skip the review. Otherwise wait until the user approves the direction, then run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${REVIEWS.thermonuclear.box}\` to the PR body. If the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
-	ready_gate: `Make sure the PR body has no unchecked \`${PROOF_BOX}\` box, then run \`gt submit --publish\` for a Graphite repository or \`gh pr ready <N>\` otherwise, without asking first: the command itself asks the user to approve.`,
+	thermonuclear: `If the status says the ${REVIEWS.thermonuclear.label} is not needed because \`${REVIEWS.thermonuclear.pathsFile}\` lists no changed file, skip the review. Otherwise wait until the user approves the direction, then run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${REVIEWS.thermonuclear.box}\` to the PR body. If the ${REVIEWS.interface_review.label} was needed and the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
+	ready_gate: `When the ${REVIEWS.interface_review.label} was needed, make sure the PR body has no unchecked \`${PROOF_BOX}\` box. Then run \`gt submit --publish\` for a Graphite repository or \`gh pr ready <N>\` otherwise, without asking first: the command itself asks the user to approve.`,
 	live: "Work the first need below. Stop when the forge reports merge-ready or while waiting for review. Never merge without an explicit request.",
 	merged: "Done.",
 };
@@ -308,15 +308,18 @@ function checkoutReader(dir: string): (pathsFile: string) => string | undefined 
 	};
 }
 
-/** Why a PR with this body may not go live, or `undefined` when it may: it needs the box of every review `reviews` calls for, and no unchecked proof box. */
+/**
+ * Why a PR with this body may not go live, or `undefined` when it may: it needs the box of every review `reviews` calls for,
+ * and no unchecked proof box while the interface review is needed, since only an interface change has a page to prove.
+ */
 export function publishBlocker(body: string, reviews: Reviews): string | undefined {
 	const missing = missingReview(reviews, "live");
 	if (missing) {
 		const { label, box } = REVIEWS[missing];
 		return `Blocked: the PR is not live until the ${label} stage is done. Run it, apply and push its fixes, then add \`${box}\` to the PR body.`;
 	}
-	if (body.split("\n").some(line => line.trimStart().startsWith(PROOF_BOX))) {
-		return `Blocked: the PR body has an unchecked \`${PROOF_BOX}\` box from the repository's PR template. Do what the box and the repository's instructions ask, then check it; delete the line only when it does not apply to this PR.`;
+	if (reviews.interface_review.needed && body.split("\n").some(line => line.trimStart().startsWith(PROOF_BOX))) {
+		return `Blocked: the PR body has an unchecked \`${PROOF_BOX}\` box from the repository's PR template, and a changed file matches \`${REVIEWS.interface_review.pathsFile}\`. Do what the box and the repository's instructions ask, then check it.`;
 	}
 	return undefined;
 }

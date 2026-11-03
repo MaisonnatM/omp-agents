@@ -215,10 +215,17 @@ describe("ship publication gate", () => {
 		expect(confirmations).toBe(1);
 	});
 
-	test.each([["- [ ] Browser proof (UI changes: run verify-yampa, attach screenshot)", true], ["- [x] Browser proof (UI changes: run verify-yampa, attach screenshot)", false]])("a reviewed PR with %j is blocked: %s", (box, blocked) => {
+	const UNCHECKED = "- [ ] Browser proof (UI changes: run verify-yampa, attach screenshot)";
+	const CHECKED = "- [x] Browser proof (UI changes: run verify-yampa, attach screenshot)";
+	test.each<[string, string | undefined, boolean]>([
+		[UNCHECKED, "web/**/*.tsx\n", true],
+		[CHECKED, "web/**/*.tsx\n", false],
+		[UNCHECKED, "front/**\n", false],
+		[UNCHECKED, undefined, false],
+	])("a reviewed PR changing web/app.tsx with %j and ui paths %j is blocked: %s", (box, uiPaths, blocked) => {
 		const { result, confirmations } = exercise("ship", {
-			command: "gh pr ready 7", approve: true, cwd: checkout(),
-			responses: answers(prView(`## Checks\n${box}\n- [x] Thermo-nuclear code quality review`)),
+			command: "gh pr ready 7", approve: true, cwd: checkout(undefined, uiPaths),
+			responses: answers(prView(`## Checks\n${box}\n- [x] Interface review\n- [x] Thermo-nuclear code quality review`, ["web/app.tsx"])),
 		});
 		expect(result?.block ?? false).toBe(blocked);
 		expect(confirmations).toBe(blocked ? 0 : 1);

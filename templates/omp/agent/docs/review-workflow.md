@@ -46,9 +46,9 @@ Append it under an existing checklist; otherwise add a `## Checks` section befor
 ## Proof boxes
 
 A repository's PR template can declare `- [ ] Browser proof`.
-The ship extension blocks `gh pr ready` and `gt submit --publish` while the PR body has that box unchecked.
+The ship extension blocks `gh pr ready` and `gt submit --publish` while the PR body has that box unchecked and the interface review applies, that is, the repository commits `.omp/ui-paths` and a changed file matches it.
 It checks the box, not a screenshot: do what the box and the repository's instructions ask, such as attaching a screenshot as [PR screenshots](#pr-screenshots) describes, then change it to `- [x] Browser proof`.
-Delete the line only when it does not apply to the PR, such as a template box for UI changes on a PR without one.
+When the interface review does not apply, the box does not block, and you may delete the line.
 Edit the box with `pr_description`'s `replace-text` change, using the exact unchecked line as `oldText` and its checked line as `newText`, keeping the rest of the description.
 
 ## PR description layout

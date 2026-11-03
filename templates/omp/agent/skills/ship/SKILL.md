@@ -70,7 +70,7 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before registering a PR o
    Call `ship_stage({stage:"ready_gate"})`.
 7. **Put live for review.** Show the issue if there is one, the PR URL, checks, findings and dispositions before promotion.
    Run `gh pr ready <number>` only after the body has the checkbox of each review that steps 5 and 6 did not skip.
-   If the body has an unchecked `- [ ] Browser proof` box from the repository's PR template, do what the box and the repository's instructions ask, then check it; the extension blocks on the unchecked box and does not look for a screenshot.
+   When the interface review applied and the body has an unchecked `- [ ] Browser proof` box from the repository's PR template, do what the box and the repository's instructions ask, then check it; the extension blocks on the unchecked box and does not look for a screenshot.
    The extension asks the user for approval and blocks the command if they decline or no UI is available.
    Request the named reviewer, if any, only after promotion succeeds.
    Call `ship_stage({stage:"live"})`.
