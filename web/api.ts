@@ -110,6 +110,10 @@ export function settingsUrl(part: "" | "/routing" | "/agent" | "/file" | "/exten
 	return `/api/settings${part}${query.size ? `?${query}` : ""}`;
 }
 
+/** The omp memory route `part` for `cwd`; without `cwd` it reads the settings only, since omp keeps memory per workspace. */
+export const ompMemoryUrl = (part: "" | "/file" | "/entry" | "/clear" | "/rebuild", cwd: string | null): string =>
+	`/api/omp-memory${part}${cwd === null ? "" : `?cwd=${encodeURIComponent(cwd)}`}`;
+
 export const readWorktrees = (cwd: string | null, signal?: AbortSignal): Promise<WorktreeInventory> => getJson(`/api/worktrees${cwd === null ? "" : `?cwd=${encodeURIComponent(cwd)}`}`, signal);
 
 export const readWorktreeMetrics = (target: WorktreeTarget, signal?: AbortSignal): Promise<WorktreeMetrics> =>

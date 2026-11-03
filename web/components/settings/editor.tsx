@@ -104,8 +104,8 @@ interface Editor<T> {
 	submit: () => Promise<void>;
 }
 
-/** Edit, then save or cancel. A failed save keeps the draft and shows why, for another try. */
-export function useEditor<T>(original: T, save: (draft: T) => Promise<OmpSettings>): Editor<T> {
+/** Edit, then save or cancel. A failed save keeps the draft and shows why, for another try. `R` is what the save answers, the page's settings unless another read. */
+export function useEditor<T, R = OmpSettings>(original: T, save: (draft: T) => Promise<R>): Editor<T> {
 	const [state, setState] = useState<EditorState<T>>({ phase: "viewing" });
 	const draft = state.phase === "viewing" ? original : state.draft;
 	return {
@@ -268,6 +268,46 @@ export function FileLink({ file, onOpenFile, children }: { file: OmpFile; onOpen
 		<a href={hashForSettings("files")} onClick={() => onOpenFile(file.path)} className={LINK}>
 			{children}
 		</a>
+	);
+}
+
+/**
+ * Why a setting's control is locked or overridden: the workspace sets it, with a link to its file and your own value
+ * when there is one, or an environment variable does.
+ */
+export function LayerNotes({
+	workspace,
+	env,
+	yourValue,
+	projectFile,
+	onOpenFile,
+}: {
+	workspace: boolean;
+	env: string | undefined;
+	yourValue: string | null;
+	projectFile: OmpFile | undefined;
+	onOpenFile: (path: string) => void;
+}) {
+	return (
+		<>
+			{workspace && (
+				<p className="text-xs text-muted-foreground">
+					This workspace sets it.{" "}
+					{projectFile && (
+						<FileLink file={projectFile} onOpenFile={onOpenFile}>
+							Open in Files
+						</FileLink>
+					)}
+					{projectFile && ". "}
+					{yourValue !== null && `Your value: ${yourValue}`}
+				</p>
+			)}
+			{env && (
+				<p className="text-xs text-muted-foreground">
+					<code className="font-mono">{env}</code> is set, and it overrides this value.
+				</p>
+			)}
+		</>
 	);
 }
 

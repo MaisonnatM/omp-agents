@@ -3,9 +3,9 @@
 - The gear button at the right end of the header, after the notifications bell, opens **Settings**; G then , does the same.
   It stays pressed while Settings is open, including through a session's **Workspace settings** menu item or a direct link, and pressing it again, or G then ,, returns to the panes.
   While Settings is open the sidebar lists its sections below the tab bar, with no tab selected, in place of a tab's content; select a tab, such as **Sessions**, to leave.
-  The sidebar lists eighteen sections in four groups.
+  The sidebar lists nineteen sections in four groups.
   **Usage** holds **Analytics** and **Activity**, **General** holds **Preferences**, **Workspaces**, **Sync**, and **Storage**, and **Connections** holds **Providers**, **Integrations**, **MCP servers**, and **Source control**; these are the same whatever the workspace.
-  **This workspace** holds **Models**, **Agents**, **omp settings**, **Files**, **Extensions**, **Workflows**, **Decisions**, and **Worktrees**, which show omp's config and files, package discovery, and the repository's records and worktrees, as a session in the sidebar's workspace sees them; only these sections show the workspace picker.
+  **This workspace** holds **Models**, **Agents**, **omp settings**, **omp memory**, **Files**, **Extensions**, **Workflows**, **Decisions**, and **Worktrees**, which show omp's config and files, package discovery, and the repository's records and worktrees, as a session in the sidebar's workspace sees them; only these sections show the workspace picker.
   The command menu finds a section by its name or by what it holds, such as "theme" or "graphite", under **Settings**.
   The gear button and G then , reopen the section you last had open in this app, **Analytics** the first time, and the header names the open section.
   Switching sections keeps an unsaved edit and opens the new section at its top, and the selected section stays when you change workspace.
@@ -139,6 +139,18 @@
   Settings omp gives no control to are counted under the tabs, with a link that opens `config.yml` in **Files**.
   If `config.yml` changed on disk since the page read it, the save is refused and the page reloads the setting.
   Running sessions pick up most changes; some apply only to sessions started after the change.
+- **omp memory** shows what omp itself remembers across sessions in the workspace, and the settings that decide it.
+  The bar at its top holds omp's own rows for the memory backend, **Off**, **Local**, **Hindsight**, **Mnemopi**, or **Sharpshooter**, with omp's description of the one picked, and for Auto-learn, which nudges the agent to capture lessons and skills when it stops; with Auto-learn on, a second switch runs one capture turn then, which uses extra tokens.
+  They show omp's labels and save to your `~/.omp/agent/config.yml` as in **omp settings**, which shows them as a line that links here; a value the workspace's settings set locks its control, and an environment variable that sets one is named under it.
+  **What a new session gets** unfolds the memory block a new session's prompt starts with, and its size in tokens; with Mnemopi and Hindsight a running session also gets memories recalled for each prompt, which the page cannot show.
+  **Stored memory** shows the store of the backend picked.
+  Local lists its files by group, **Lessons**, **Summary**, **Skills**, and **Session summaries**, and Sharpshooter its decision files and how many sessions wait to be folded in; select one to read it, and edit it as in **Files**.
+  Mnemopi lists its memories newest first, up to 500, with a filter and a count of each kind: **Edit** changes a working memory's text, saved with **Save** or Cmd+Enter, where Enter starts a new line, and put back with Escape, **Forget** deletes it, **Retire** stops recall from using an episodic one, and facts are read-only.
+  Hindsight lists the memories its server keeps for the workspace's bank, read-only.
+  **Forget everything**, beside the **Stored memory** heading, deletes the workspace's Local, Sharpshooter, or Mnemopi store, and the line under the heading says what it removes; with Mnemopi it keeps the bank every workspace shares, and a memory of that bank changes everywhere when you edit or forget it.
+  **Rebuild summary**, with Local, rebuilds the summary when the next session in the workspace starts.
+  **Forget**, **Retire**, and **Forget everything** each ask you to click again to confirm, and an edit made elsewhere since the page read it is refused and the page shows the memory as it is now.
+  Running sessions keep the memory they started with; new sessions see your changes.
 - The **Files** section lists the files that omp reads: context files such as `AGENTS.md`, the `SYSTEM.md` and `APPEND_SYSTEM.md` prompt files, `config.yml`, agents, commands, rules, skills, and hooks.
   The field above the list narrows it to the files whose name holds every word typed; Escape clears it.
   Select a file to read its content, and choose **Edit** to change it in place (**Create** for a file marked `missing`).
@@ -199,7 +211,7 @@
   **Trusted projects** lists the projects whose own agent code you trusted, with **Stop trusting** to ask again; see [Per-project agent setup](per-project-agent-setup.md#stop-trusting).
 - **Sync** carries your omp settings and files to your other machines through a Git repository of yours; see [Settings sync](settings-sync.md).
 - Settings follows the workspace picked in the sidebar header, so it includes that workspace's project files and its `.omp/config.yml` overrides.
-  With **All workspaces**, **Models**, **Agents**, **omp settings**, **Files**, **Extensions**, **Workflows**, and the **New sessions** skill picker show user files and packages only, and **Worktrees** lists every repository.
+  With **All workspaces**, **Models**, **Agents**, **omp settings**, **Files**, **Extensions**, **Workflows**, and the **New sessions** skill picker show user files and packages only, **omp memory** shows only its settings, and **Worktrees** lists every repository.
   The picker in the header of a Workspace section is the same choice: picking a workspace there switches the sidebar to it too.
   Pressing the gear button while Settings is open closes it, so pick a section from the sidebar to change sections.
   A session's **Workspace settings** switches the sidebar to that session's workspace and opens **Models**; a session in `/tmp` or a hidden workspace does not offer it.

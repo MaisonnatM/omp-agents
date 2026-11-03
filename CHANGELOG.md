@@ -80,6 +80,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - In omp settings, a dot marks a setting changed from omp's default, Reset puts it back, and a setting this workspace sets shows locked, with a link to its file.
 - The context ring now opens Compact, Shake out, Hand off, and a session-only Auto-compact switch.
 - The model menu has an Advisor switch, and the session header lets you set, edit, pause, resume, or clear a goal with an optional token budget.
+- Settings has a new omp memory section: pick where omp keeps what it learns across sessions, switch Auto-learn, and see what a new session gets.
+- In omp memory, read and edit what omp remembers in this folder, forget one memory or all of them, and rebuild the summary.
+- New: omp memory in Settings.
 - You can drag a Bot in the Bots tab onto Pinned, a section, or Other Bots.
 - Fixed: routines no longer start during the few seconds a sleeping Mac wakes on its own for Power Nap; they wait until you wake it, and news that came in overnight starts one run.
 - Fixed: a routine's command no longer counts time the Mac spent asleep toward its 10-minute limit, and when the Mac slept during a run, the routine's message to the Bot says for how long.

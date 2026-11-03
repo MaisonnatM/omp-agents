@@ -90,7 +90,7 @@ Besides a live session's own hash, the routes are:
 - `#calendar`, `#bots`, `#bots/<id>`, `#bots/<id>/routines`, `#bots/<id>/routines/<routine id>`, `#bots/<id>/routines/<routine id>/edit`, `#bots/<id>/routines/new`;
 - `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`, `#scheduled/<send id>`;
 - `#get-started`, which always opens Get started's setup dialog over the home, even after local dismissal;
-- `#settings`, `#settings/<section>`, where `<section>` is `analytics`, `activity`, `preferences`, `providers`, `integrations`, `mcp-servers`, `source-control`, `workspaces`, `sync`, `storage`, `models`, `agents`, `omp`, `files`, `extensions`, `workflows`, `decisions`, or `worktrees`.
+- `#settings`, `#settings/<section>`, where `<section>` is `analytics`, `activity`, `preferences`, `providers`, `integrations`, `mcp-servers`, `source-control`, `workspaces`, `sync`, `storage`, `models`, `agents`, `omp`, `omp-memory`, `files`, `extensions`, `workflows`, `decisions`, or `worktrees`.
 
 For Storage cleanup, a real agent directory is safe only for the dry-run preview.
 Exercise every apply with `PI_CODING_AGENT_DIR` and `OMP_WORKTREE_DIR` pointed at fixture directories, along with isolated XDG config and data.
