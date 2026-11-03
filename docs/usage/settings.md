@@ -39,7 +39,7 @@
   Choose a workspace to narrow the report to its sessions and their subagents, and a session to see that session's top sources.
   A main session's transcript records neither its system prompt nor its tool definitions, so their tokens show together as **System prompt and tool definitions**, under **Not in transcript**; a subagent's transcript records its system prompt, so its files, skills, rules, and MCP servers show by name, and only **Tool definitions** stay unrecorded.
   Tokens come from omp's tokenizer for each model, or from OpenAI's o200k encoding for a model omp has none for.
-  The report reads every session file once, then only the files that changed, and shows how far it has read while it catches up.
+  The report reads every session file once, then only the files that changed, and shows how far it has read while it catches up; after omp updates, it reads them all once more, since omp's new tokenizer may count differently.
 - **Activity** shows how you use the dashboard over the last 30 days; choose **Today**, **24h**, **7d**, **30d**, **90d**, or **All** to change the range.
   It counts the pages and settings sections you open, the shortcuts and command palette commands you run, the changes you send, and clicks on a few controls that change nothing else, by name only, never what they show or what you typed.
   **Not used** lists every feature with no use in the range and when you last used it, or **Never**; features used once or twice follow.

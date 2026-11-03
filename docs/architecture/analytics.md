@@ -42,6 +42,7 @@ An unknown model costs zero but still counts requests and tokens.
 ## Context sources
 
 `src/omp/context-index.ts` keeps its own index, `context-sources.db` beside `stats.db`, and never writes omp-stats' database.
+Its `meta` table keys the index by `INDEX_VERSION` and omp's version, so an attribution change or an omp update drops the index and the next sync reads every file again.
 A sync walks omp's sessions directory and re-reads only the files whose size or modification time changed; a file it cannot read is recorded with no requests until it changes.
 For each request, the assistant entry or `model_usage` entry whose usage carries input, `attributeTurns` in `src/context-sources.ts` splits the input, cache reads and writes included, by source.
 It rebuilds the request's context with omp's `buildSessionContext` from the entry's parent, counts each message with omp's `Tokenizer` for the request's model, and credits it by role: a tool result to its tool, a `skill-prompt` custom message to its skill, a rule reminder to its rule, other custom messages and reminders to injections, and the rest to the conversation.
