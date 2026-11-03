@@ -238,8 +238,8 @@ describe("a prompt the dashboard sent", () => {
 	});
 });
 
-describe("tool images", () => {
-	test("lists every tool call's images in reading order across calls, each captioned by its tool and summary, and no prompt's", () => {
+describe("viewer images", () => {
+	test("lists every prompt's and tool call's images in reading order, each captioned by its sender", () => {
 		const items: Item[] = [
 			{ id: "u", kind: "user", text: "look", skill: null, from: null, entryId: "u", images: ["/p.png"] },
 			{ id: "tool:a", kind: "tool", name: "browser", summary: "screenshot", status: "ok", agents: [], images: ["/a1.png", "/a2.png"] },
@@ -247,6 +247,7 @@ describe("tool images", () => {
 			{ id: "tool:c", kind: "tool", name: "read", summary: "", status: "ok", agents: [], images: ["/c.png"] },
 		];
 		expect(transcriptModel(items, false).images).toEqual([
+			{ id: "u", at: 0, src: "/p.png", caption: "Your message" },
 			{ id: "tool:a", at: 0, src: "/a1.png", caption: "browser · screenshot" },
 			{ id: "tool:a", at: 1, src: "/a2.png", caption: "browser · screenshot" },
 			{ id: "tool:c", at: 0, src: "/c.png", caption: "read" },
