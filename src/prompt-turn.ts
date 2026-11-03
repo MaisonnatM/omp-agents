@@ -18,7 +18,7 @@ export interface StopMark {
  * omp acks a prompt before its turn starts, and its `agent_start`, user message, or `prompt_result` may each come before the ack.
  */
 export class PromptTurn {
-	/** Whether a turn runs, from its `agent_start` to its terminal `agent_end`. */
+	/** Whether a turn runs, from its `agent_start` to the `agent_end` that gives the turn back, as `turnUpdate` reads it. */
 	#running = false;
 	#starting: StartingPrompt | null = null;
 	/** The `agent_start`s seen, so a prompt whose turn started before its ack came back is not held as starting. */

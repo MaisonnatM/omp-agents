@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { endedTurn } from "./live-session";
+import { endedTurn, type TurnUpdate, turnUpdate } from "./live-session";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -54,5 +54,17 @@ describe("endedTurn", () => {
 			message("2026-11-02T10:01:40.000Z", "assistant", [{ type: "toolCall", id: "t1", name: "read", arguments: { path: "a" } }]),
 		]);
 		expect(endedTurn(skill)).toEqual({ at: Date.parse("2026-11-02T10:01:40.000Z"), reply: null });
+	});
+});
+
+describe("turnUpdate", () => {
+	test("an agent_end ends the turn when it gives the turn back, terminal or waiting only on a background job, and not when more of the run follows", () => {
+		const messages = [{ role: "assistant", content: [text("Started.")] }];
+		const ended: TurnUpdate = { kind: "turn-ended", reply: "Started.", failure: null };
+		expect(turnUpdate({ type: "agent_end", messages })).toEqual(ended);
+		expect(turnUpdate({ type: "agent_end", isTerminal: false, yielded: true, awaitingAsyncWork: true, messages })).toEqual(ended);
+		// omp keeps `yielded` on a terminal end it re-tags non-terminal for a queued follow-up.
+		expect(turnUpdate({ type: "agent_end", isTerminal: false, yielded: true, messages })).toBeNull();
+		expect(turnUpdate({ type: "agent_end", isTerminal: false, messages })).toBeNull();
 	});
 });

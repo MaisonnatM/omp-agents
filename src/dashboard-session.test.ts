@@ -839,7 +839,8 @@ describe("DashboardSession reattach", () => {
 	test("a session attached while it only waits on a background job reads idle until the job's result starts its next turn", async () => {
 		const client = new FakeClient();
 		keptOmp(client);
-		const waiting = { ...STATE, hasPendingAsyncWork: true };
+		// omp's `get_state` still reports the job, which the dashboard ignores.
+		const waiting: RpcState & { hasPendingAsyncWork: boolean } = { ...STATE, hasPendingAsyncWork: true };
 		client.getState = async () => waiting;
 		const session = await DashboardSession.reattach("inst-kept", () => [], () => {});
 		session.answer("q1", { kind: "confirm", confirmed: true });

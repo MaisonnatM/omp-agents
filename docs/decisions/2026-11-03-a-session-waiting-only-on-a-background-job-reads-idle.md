@@ -17,9 +17,9 @@ omp's own terminal sets its title idle at that `agent_end` and keeps a row namin
 
 ## Options considered
 
-- Keep it working until the job delivers. It matches omp's run, which is not over, but the session looks stuck, sends no reply notice, and keeps Router tasks and usage-limit continues waiting on a turn the agent already ended.
-- A third status, such as waiting on a background job. It is the most precise, but every reader of `HostStatus` would need to place it, and the user can do nothing with it that idle does not allow.
-- End the turn at the reply, chosen. The session reads idle, the reply notice and unread mark come at once, and the job's result starts a new turn the dashboard shows working.
+- Keep it working until the job delivers: it matches omp's run, which is not over, but the session looks stuck, sends no reply notice, and keeps Router tasks and usage-limit continues waiting on a turn the agent already ended.
+- A third status, such as waiting on a background job: the most precise, but every reader of `HostStatus` would need to place it, and the user can do nothing with it that idle does not allow.
+- End the turn at the reply: the session reads idle, the reply notice and unread mark come at once, and the job's result starts a new turn the dashboard shows working; chosen.
 
 ## Consequences
 
