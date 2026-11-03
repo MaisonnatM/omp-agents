@@ -12,7 +12,8 @@ export interface BusyWords {
 	short: string;
 }
 
-const REBASE_WORDS: Record<RebaseState, BusyWords> = {
+/** How a pull request in the rebase queue reads, by where it stands there. */
+export const REBASE_WORDS: Record<RebaseState, BusyWords> = {
 	queued: { label: "Queued to rebase", short: "Queued" },
 	running: { label: "Rebasing", short: "Rebasing" },
 };

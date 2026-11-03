@@ -16,7 +16,7 @@ import { OrgIcon } from "../org-icon";
 import { Spinner } from "../spinner";
 import type { QuickActionsProps } from "../quick-actions";
 import { PersonPicture } from "./avatars";
-import { busyWords } from "./busy";
+import { REBASE_WORDS } from "./busy";
 import { type PullRequestOptionsRead, type ReviewerChange, requestedLogins, reviewerChoices } from "./pr-fields";
 
 export interface HeaderMergeMenu {
@@ -116,7 +116,7 @@ export function PullRequestMenuItems({ pr, state, quick, onState, onApprove, mer
 			{offersRebase && (
 				<MenuItem title="Rebase the branch on its base, run the repository's pre-push checks, and push it with --force-with-lease" disabled={rebasing !== null} onClick={rebase.run}>
 					{rebasing ? <Spinner /> : <RefreshCw />}
-					{rebasing ? busyWords({ kind: "rebase", state: rebasing }).label : `Rebase on ${rebase.facts.base}`}
+					{rebasing ? REBASE_WORDS[rebasing].label : `Rebase on ${rebase.facts.base}`}
 				</MenuItem>
 			)}
 			{(quick.actions.length > 0 || offersRebase) && <MenuSeparator />}

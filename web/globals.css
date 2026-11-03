@@ -284,7 +284,7 @@
   }
 }
 
-/* Outside @theme: Tailwind keeps a theme keyframe only when an --animate-* token names it, and the Button spinner names these in an inline style, `Spinner` in an arbitrary `animate-[…]` class. */
+/* Outside @theme: Tailwind keeps a theme keyframe only when an --animate-* token names it, and `Spinner` names these in an arbitrary `animate-[…]` class. */
 @keyframes spinner-move {
   to {
     stroke-dashoffset: -100;

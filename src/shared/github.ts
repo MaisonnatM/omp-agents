@@ -490,6 +490,9 @@ export type RebasedPullRequest = { branch: string; onto: string } & ({ kind: "re
  */
 export type RebaseStep = "waiting" | "fetching" | "rebasing" | "pushing";
 
+/** What a rebase calls as it starts each {@link RebaseStep}. */
+export type OnRebaseStep = (step: RebaseStep) => void;
+
 /** Someone GitHub lets a repository assign, and so ask for a review; `name` is their profile name, `null` when they set none. */
 export interface Assignee extends Person {
 	name: string | null;

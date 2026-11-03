@@ -180,7 +180,7 @@ function RowMergeBadge(props: { pr: PullRequestSummary; move: "merge" | "checks-
  * A pull request's move badge while it is busy: what it is busy with, spinning, at the move badge's size so the row
  * holds still. Its padding, gap, and tracking are tighter than a move's, so **Rebasing** fits beside the spinner.
  */
-function BusyBadge({ busy }: { busy: Busy }) {
+function RowBusyBadge({ busy }: { busy: Busy }) {
 	const { label, short } = busyWords(busy);
 	return (
 		<Tooltip content={label}>
@@ -200,7 +200,7 @@ function BusyBadge({ busy }: { busy: Busy }) {
  */
 function RowMoveBadge({ pr, move, pending, cwd, onQuickAction, merge }: { pr: PullRequestSummary; move: MoveId; merge?: MergeOpen } & Pick<RowProps, "pending" | "cwd" | "onQuickAction">) {
 	const busy = useBusy(pr, pending);
-	if (busy) return <BusyBadge busy={busy} />;
+	if (busy) return <RowBusyBadge busy={busy} />;
 	if (move === "merge" || (move === "checks-running" && readyOnceChecksPass(pr))) return merge ? <MergeBadge pr={pr} move={move} {...merge} /> : <RowMergeBadge pr={pr} move={move} />;
 	const action = moveAction(pr, move);
 	if (!action) return <MoveBadge move={move} />;

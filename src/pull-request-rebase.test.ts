@@ -5,7 +5,7 @@ import { join } from "node:path";
 import * as github from "./github";
 import * as proc from "./proc";
 import { rebasePullRequest } from "./pull-request-rebase";
-import type { RebaseStep } from "./shared/github";
+import type { OnRebaseStep, RebaseStep } from "./shared/github";
 
 // A git call here took 300 to 450 ms under full-suite load on a busy machine, and the longest test makes about 28 of them.
 setDefaultTimeout(30_000);
@@ -74,7 +74,7 @@ function setup() {
 	});
 	/** The steps the rebases reported, in order, unless a call takes its own `onStep`. */
 	const steps: RebaseStep[] = [];
-	const rebase = (number = 7, onStep = (step: RebaseStep) => void steps.push(step)) => rebasePullRequest({ owner: "acme", repo: "app", number, cwd: main }, onStep);
+	const rebase = (number = 7, onStep: OnRebaseStep = step => void steps.push(step)) => rebasePullRequest({ owner: "acme", repo: "app", number, cwd: main }, onStep);
 	const subjects = (dir: string, ref: string) => git(dir, "log", "--format=%s", ref);
 	/** A linked worktree `review` on `feature`. */
 	const review = async () => {

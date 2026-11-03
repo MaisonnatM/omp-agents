@@ -1,8 +1,9 @@
-/** The infinity glyph a Button draws while `loading`, cropped to its width so it sits beside a label as an icon would. */
+/** The infinity spinner, which a Button also draws while `loading`, cropped to its width so it sits beside a label as an icon would. */
 import type { IconComponentProps } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 
-const GLYPH = "M 12 12 C 14 8.5 19 8.5 19 12 C 19 15.5 14 15.5 12 12 C 10 8.5 5 8.5 5 12 C 5 15.5 10 15.5 12 12 Z";
+/** The infinity glyph on a 24-unit box, which `ThinkingIndicator` also morphs into. */
+export const GLYPH = "M 12 12 C 14 8.5 19 8.5 19 12 C 19 15.5 14 15.5 12 12 C 10 8.5 5 8.5 5 12 C 5 15.5 10 15.5 12 12 Z";
 
 /**
  * Work in progress, sized by `className` or `size` as a Lucide icon is, so a Button takes it as its `leadingIcon`.

@@ -32,7 +32,8 @@ export const loadingToast = (text: ToastText): string => toasts.add({ ...text, t
 
 /**
  * Turns the loading toast `id` into `text`, which then closes after the page's usual five seconds. Adding by id updates
- * the toast in place, and shows it again when it was swiped away meanwhile, so how the work ended always shows.
+ * the toast in place, and shows it again when it was swiped away meanwhile, so how the work ended always shows. The
+ * update merges into what the toast said, so it names `description` even when `text` has none, to clear the old one.
  */
 export function settleToast(id: string, text: ToastText): void {
 	toasts.add({ id, type: undefined, title: text.title, description: text.description });
@@ -78,7 +79,7 @@ export function Toaster() {
 }
 
 /** `0:42`, `12:05`: minutes, then seconds. */
-const clockWords = (ms: number): string => {
+export const clockWords = (ms: number): string => {
 	const seconds = Math.max(0, Math.floor(ms / 1000));
 	return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 };
@@ -91,14 +92,15 @@ function Elapsed({ since }: { since: number }) {
 
 function ToastList() {
 	return Toast.useToastManager<ToastData>().toasts.map(toast => {
-		const startedAt = toast.type === "loading" ? toast.data?.startedAt : undefined;
+		const loading = toast.type === "loading";
+		const startedAt = loading ? toast.data?.startedAt : undefined;
 		return (
 			<Toast.Root key={toast.id} toast={toast} className="rounded-lg border border-border bg-popover px-4 py-2 text-sm shadow-lg data-limited:hidden">
 				<Toast.Content className="flex items-center gap-3">
 					<div className="flex min-w-0 flex-1 flex-col">
 						{toast.data?.source && <div className="mb-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">{toast.data.source}</div>}
 						<div className="flex min-w-0 items-center gap-2">
-							{toast.type === "loading" && <Spinner className="size-4" />}
+							{loading && <Spinner className="size-4" />}
 							<Toast.Title className="min-w-0 flex-1 truncate" />
 							{startedAt !== undefined && <Elapsed since={startedAt} />}
 						</div>

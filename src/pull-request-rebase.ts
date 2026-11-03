@@ -10,7 +10,7 @@ import { commonDir, git, holderOf } from "./git";
 import { run, type RunResult } from "./proc";
 import { assertWorkspaceOf, headOf, type PullRequestHead } from "./pull-request-head";
 import { SerialLane } from "./serial-lane";
-import type { PullRequestRebase, RebasedPullRequest, RebaseStep } from "./shared/github";
+import type { OnRebaseStep, PullRequestRebase, RebasedPullRequest } from "./shared/github";
 
 const GIT_TIMEOUT_MS = 120_000;
 /** The push runs the pre-push hook, which may run a repository's whole test suite. */
@@ -37,7 +37,7 @@ function lastLines({ stderr, code }: RunResult): string {
 }
 
 /** Rebases the commit checked out in `dir` onto `origin/<base>` and pushes it to `head`, unless `origin`'s `head` moved past `old`. */
-async function rebaseAndPush(dir: string, { ref: head, base }: PullRequestHead, old: string, onStep: (step: RebaseStep) => void): Promise<RebasedPullRequest> {
+async function rebaseAndPush(dir: string, { ref: head, base }: PullRequestHead, old: string, onStep: OnRebaseStep): Promise<RebasedPullRequest> {
 	// `--fork-point` reads `origin/<base>`'s reflog, so a branch stacked on one that was just rebased replays only its own commits.
 	const rebase = await gitRun(dir, GIT_TIMEOUT_MS, "rebase", "--fork-point", "--no-update-refs", "--no-autostash", `refs/remotes/origin/${base}`);
 	if (rebase.code !== 0) {
@@ -56,7 +56,7 @@ async function rebaseAndPush(dir: string, { ref: head, base }: PullRequestHead, 
  * Rebases the pull request's branch onto its base as `origin` has them, in the worktree that has the branch checked out,
  * else in a detached worktree of its own, which it removes after. A local branch moves only when the push succeeds.
  */
-async function rebaseBranch(cwd: string, branches: PullRequestHead, number: number, onStep: (step: RebaseStep) => void): Promise<RebasedPullRequest> {
+async function rebaseBranch(cwd: string, branches: PullRequestHead, number: number, onStep: OnRebaseStep): Promise<RebasedPullRequest> {
 	const { ref: head, base } = branches;
 	const origin = (branch: string) => `refs/remotes/origin/${branch}`;
 	onStep("fetching");
@@ -105,7 +105,7 @@ const lanes = new Map<string, SerialLane>();
  * Rebases `request`'s pull request onto its base and pushes it, calling `onStep` as each step starts; refuses a `cwd`
  * whose `origin` is another repository, or a fork's branch, before the first.
  */
-export async function rebasePullRequest(request: PullRequestRebase, onStep: (step: RebaseStep) => void): Promise<RebasedPullRequest> {
+export async function rebasePullRequest(request: PullRequestRebase, onStep: OnRebaseStep): Promise<RebasedPullRequest> {
 	const [, branches] = await Promise.all([assertWorkspaceOf(request.cwd, request), headOf(request)]);
 	if (branches.fork) throw new Error(`Pull request #${request.number}'s branch is in a fork, which this dashboard does not push to.`);
 	const key = await commonDir(request.cwd);

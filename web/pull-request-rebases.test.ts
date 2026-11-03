@@ -30,7 +30,6 @@ const pr = (number: number, stackedOn: number | null = null): PullRequestSummary
 
 const job = (number: number, stackedOn: number | null = null): RebaseJob => ({ pr: pr(number, stackedOn), cwd: "/work/webapp" });
 
-
 const reply = (status: number, body: unknown): Response => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
 /** The server's streamed answer, a line for each step and then the last one, cut every 7 bytes as a network may cut it. */

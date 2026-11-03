@@ -61,6 +61,7 @@ import {
 	type CheckedOutPullRequest,
 	MAX_PULL_REQUEST_ATTACHMENTS,
 	MAX_PULL_REQUEST_IMAGE_BYTES,
+	type OnRebaseStep,
 	type PullRequest,
 	type PullRequestCheckout,
 	type PullRequestRebase,
@@ -239,7 +240,7 @@ export interface PullRequestRoutesEnv {
 	/** Checks out the pull request at its place, a worktree with a new session on it or the checkout itself; rejects with why it refused. */
 	checkOutPullRequest(checkout: PullRequestCheckout): Promise<CheckedOutPullRequest>;
 	/** Rebases the pull request's branch onto its base and pushes it through the repository's pre-push hook, calling `onStep` as each step starts; rejects with why it refused or failed. */
-	rebasePullRequest(rebase: PullRequestRebase, onStep: (step: RebaseStep) => void): Promise<RebasedPullRequest>;
+	rebasePullRequest(rebase: PullRequestRebase, onStep: OnRebaseStep): Promise<RebasedPullRequest>;
 }
 
 /** A route's handler; Bun passes its server, whose `timeout` lifts a slow request's idle timeout. */

@@ -24,29 +24,25 @@ export async function answer(run: () => Promise<unknown>, refuse?: (err: unknown
  * `run`'s result or `{ error }` with why it failed, so the outcome never arrives before its last step.
  */
 export async function answerSteps<S, T>(run: (step: (step: S) => void) => Promise<T>, refuse: (err: unknown) => Response): Promise<Response> {
-	const encoder = new TextEncoder();
-	let lines!: ReadableStreamDefaultController<Uint8Array>;
-	// A page that went away cancels the stream; the work goes on without it.
-	let open = true;
-	const body = new ReadableStream<Uint8Array>({ start: controller => void (lines = controller), cancel: () => void (open = false) });
-	const send = (line: { step: S } | { done: T } | { error: string }): void => {
-		if (open) lines.enqueue(encoder.encode(`${JSON.stringify(line)}\n`));
-	};
-	const stepped = Promise.withResolvers<"stepped">();
+	const { readable, writable } = new TextEncoderStream();
+	const writer = writable.getWriter();
+	// A page that went away cancels the stream, which rejects each write after; the work goes on without it.
+	const send = (line: { step: S } | { done: T } | { error: string }): void => void writer.write(`${JSON.stringify(line)}\n`).catch(() => {});
+	const stepped = Promise.withResolvers<null>();
 	const ended = run(step => {
 		send({ step });
-		stepped.resolve("stepped");
+		stepped.resolve(null);
 	}).then(
 		done => ({ done }),
 		(err: unknown) => ({ err }),
 	);
 	const first = await Promise.race([stepped.promise, ended]);
-	if (first !== "stepped" && "err" in first) return refuse(first.err);
+	if (first && "err" in first) return refuse(first.err);
 	void ended.then(end => {
 		send("done" in end ? { done: end.done } : { error: errorText(end.err) });
-		if (open) lines.close();
+		writer.close().catch(() => {});
 	});
-	return new Response(body, { headers: { "content-type": "application/x-ndjson" } });
+	return new Response(readable, { headers: { "content-type": "application/x-ndjson" } });
 }
 
 /** The value `parsed` holds, or a 400 with the parser's own reason, else with `badRequest`. */
