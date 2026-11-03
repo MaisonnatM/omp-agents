@@ -30,15 +30,15 @@ export function SubagentsSection({ links, nodes }: { links: SubagentLinksValue; 
 			onToggle={() => setClosed(shut => !shut)}
 			fold="transcript.subagents"
 		>
-			<ul aria-label="Subagents" className="max-h-[min(30vh,11.5rem)] overflow-y-auto px-1 py-1">
+			<ul aria-label="Subagents" className="max-h-[min(30vh,12.5rem)] overflow-y-auto px-1 py-1">
 				{nodes.map(({ agent, depth }) => {
 					const view = { kind: "live", instanceId: links.instanceId, agentId: agent.id } as const;
 					return (
 						<li key={agent.id} className="flex min-w-0 items-center gap-0.5" style={{ paddingLeft: depth * INDENT_PX }}>
-							<Tooltip content={`${agent.id} · ${agent.kind} · ${statusLabel(agent.status)}. ${SPLIT_CLICK} to open in a split`} side="left">
+							<Tooltip content={`${[agent.id, agent.kind, statusLabel(agent.status), agent.activity].filter(Boolean).join(" · ")}. ${SPLIT_CLICK} to open in a split`} side="left">
 								<a
 									href={hashForView(view)}
-									className="flex min-w-0 flex-1 flex-col rounded-md px-2 py-1 text-[13px] outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+									className="grid min-w-0 flex-1 grid-cols-[0.375rem_minmax(0,1fr)] items-center gap-x-2 rounded-md px-2 py-1 text-[13px] outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
 									onClick={event => {
 										// Shift- and middle-clicks keep the link's own new-window behavior.
 										if (event.button !== 0 || event.shiftKey || event.altKey) return;
@@ -46,16 +46,16 @@ export function SubagentsSection({ links, nodes }: { links: SubagentLinksValue; 
 										links.onOpen(view, modeOf(event));
 									}}
 								>
-									<span className="flex min-w-0 items-center gap-2">
+									{/* A running subagent draws no dot, so the column keeps names aligned with the rows that do. */}
+									<span className="flex">
 										<StatusDot status={agent.status} />
+									</span>
+									<span className="flex min-w-0 items-center gap-2">
 										<span className="truncate text-foreground">{agent.id}</span>
+										{depth > 0 && <span className="sr-only">, started by {agent.parentId}</span>}
 										<span className="shrink-0 text-xs text-muted-foreground">{agent.kind}</span>
 									</span>
-									{agent.activity && (
-										<span className="truncate text-xs text-muted-foreground" title={agent.activity}>
-											{agent.activity}
-										</span>
-									)}
+									{agent.activity && <span className="col-start-2 truncate text-xs text-muted-foreground">{agent.activity}</span>}
 								</a>
 							</Tooltip>
 							{links.onCancel && <CancelAgentButton view={view} onCancel={links.onCancel} running={agent.status === "running"} />}

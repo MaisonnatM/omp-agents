@@ -27,7 +27,7 @@ A subagent can spawn subagents, so the list is a tree.
 Users see a session's subagents, nested under the subagent that started each, with their status, and open or stop one from the card.
 A subagent's view lists only the subagents under it, and a past session or a Bot's page shows no section.
 The section's fold has its own key, `omp-agents.todos-card-subagents-closed`, and its own Activity control, `transcript.subagents`.
-A session with many subagents makes the card taller; the list scrolls inside the section past about six rows.
+A session with many subagents makes the card taller; the list scrolls inside the section past about four rows, and the fifth shows cut to say there is more.
 
 ## Revisit when
 
