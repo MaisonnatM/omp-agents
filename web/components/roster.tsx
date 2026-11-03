@@ -1,6 +1,6 @@
 /** The left sidebar's tabbed roster: sessions, pull requests, tickets, todos, notes, and more, under the workspace picker. */
 import { Folder, Keyboard } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useContext, useState } from "react";
 import type { RosterHost, View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import type { UserNoteList } from "../../src/user-notes-shared";
@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { agentOn } from "../../src/shared/moves";
 import { activityControl } from "../activity";
 import { yourMoveCount } from "../pull-requests-model";
-import { folderName } from "../labels";
+import { workspaceName } from "../labels";
 import { pullRequestsStore, ticketsStore } from "../reads";
 import { hashForTickets, type NotesListView, type SettingsRoute, type SidebarPanel, type SidebarTab, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
@@ -26,7 +26,7 @@ import { CommandPicker } from "./command-picker";
 import { SectionLink } from "./section-link";
 import { BotsNav } from "./bots/bots-nav";
 import { type BotRow, botsNeedingYou } from "../bots-model";
-import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
+import { PersonalContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { CalendarNav } from "./calendar/calendar-nav";
 import { EmailNav } from "./email/email-nav";
 import { NotesNav } from "./notes/nav";
@@ -47,9 +47,10 @@ interface SidebarWorkspacePickerProps {
 /** Scopes the roster to one directory's running and past sessions. */
 function SidebarWorkspacePicker({ workspaces, current, onPick }: SidebarWorkspacePickerProps) {
 	const [open, setOpen] = useState(false);
+	const personal = useContext(PersonalContext);
 	useShortcuts({ workspace: () => setOpen(shown => !shown) });
 	const selected = workspaces.find(workspace => workspace.cwd === current);
-	const label = selected ? (folderName(selected.cwdDisplay) ?? selected.cwdDisplay) : "All workspaces";
+	const label = selected ? (workspaceName(selected.cwdDisplay, personal) ?? selected.cwdDisplay) : "All workspaces";
 	const pick = (cwd: string | null) => (): void => {
 		if (cwd !== current) onPick(cwd);
 	};
@@ -73,7 +74,7 @@ function SidebarWorkspacePicker({ workspaces, current, onPick }: SidebarWorkspac
 					{
 						key: "workspaces",
 						heading: "Workspaces",
-						items: workspaceItems(workspaces, current, workspace => pick(workspace.cwd)()),
+						items: workspaceItems(workspaces, current, personal, workspace => pick(workspace.cwd)()),
 					},
 				],
 			}}
@@ -214,6 +215,7 @@ export function Roster({
 }: RosterProps) {
 	const { changeTodo: onTodoChange } = useDashboardActions();
 	const { connected } = useDashboardStatus();
+	const personal = useContext(PersonalContext);
 	const pullRequestRead = pullRequestsStore.use(workspace).read;
 	/** The count after a tab's label, and what it counts, for its accessible name. */
 	const tabCounts: Partial<Record<SidebarTab, { count: number; meaning: string }>> = {
@@ -222,7 +224,7 @@ export function Roster({
 		"pull-requests": { count: pullRequestRead ? yourMoveCount(pullRequestRead.data, agentOn(hosts)) : 0, meaning: "your move" },
 	};
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
-	const newSessionLabel = selectedWorkspace ? `New session in ${folderName(selectedWorkspace.cwdDisplay) ?? selectedWorkspace.cwdDisplay}` : "New session";
+	const newSessionLabel = selectedWorkspace ? `New session in ${workspaceName(selectedWorkspace.cwdDisplay, personal) ?? selectedWorkspace.cwdDisplay}` : "New session";
 	return (
 		<Tabs value={tab} onValueChange={value => onTab(value as SidebarTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="h-(--page-header-height) flex-row items-center justify-between gap-2 border-b border-border px-2 py-0">

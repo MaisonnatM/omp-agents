@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { botAsking, memoryEntries, type OpenBot, type OpenRoutine } from "../../bots-model";
+import { botAsking, type OpenBot, type OpenRoutine } from "../../bots-model";
 import { PAGE_ICON } from "../../page-icons";
 import { hashForBotRoutine, hashForBots, viewForSession } from "../../routing";
 import { age, modeOf } from "../../labels";
@@ -19,6 +19,7 @@ import { runWords, startsWords } from "../../routines-model";
 import { useDashboardActions } from "../dashboard-context";
 import { DetailsEmpty, DetailsSidebarFrame } from "../details-sidebar-frame";
 import { MoreActionsMenu } from "../more-actions-menu";
+import { MemoryList } from "../memory-list";
 import { StatusDot } from "../status-dot";
 import { LoadNote } from "../sheet-details";
 import { ticketsTabs } from "../session-details";
@@ -156,32 +157,6 @@ function JobEditor({ bot, connected }: { bot: Bot; connected: boolean }) {
 						Revert
 					</Button>
 				</div>
-			)}
-		</section>
-	);
-}
-
-/** The facts the Bot keeps, which only its `remember` tool writes. */
-function MemoryList({ bot, memory }: { bot: Bot; memory: string }) {
-	const id = useId();
-	const entries = memoryEntries(memory);
-	return (
-		<section aria-labelledby={id} className="space-y-2">
-			<h3 id={id} className="flex items-baseline gap-2 text-xs font-medium text-muted-foreground">
-				Memory
-				<span className="truncate font-mono font-normal">bots/{bot.id}/memory.md</span>
-			</h3>
-			{entries.length === 0 ? (
-				<p className="text-xs text-muted-foreground">Nothing yet. Tell {bot.name} something worth keeping, and it remembers it.</p>
-			) : (
-				<ul className="space-y-1.5">
-					{entries.map((entry, index) => (
-						<li key={index} className="rounded-md border border-border bg-card px-3 py-2 text-sm">
-							<p className="break-words">{entry.fact}</p>
-							{entry.date && <p className="text-xs tabular-nums text-muted-foreground">{entry.date}</p>}
-						</li>
-					))}
-				</ul>
 			)}
 		</section>
 	);
@@ -419,7 +394,7 @@ export function BotDetails({ open: { bot, host, routines, routine, status }, ses
 								</div>
 							</div>
 							<JobEditor key={bot.job} bot={bot} connected={connected} />
-							<MemoryList bot={bot} memory={memory} />
+							<MemoryList path={`bots/${bot.id}/memory.md`} memory={memory} empty={`Nothing yet. Tell ${bot.name} something worth keeping, and it remembers it.`} />
 							<BotUsage bot={bot} host={host} />
 							<div className="border-t border-border pt-4">
 								<DeleteBot bot={bot} connected={connected} />

@@ -13,6 +13,7 @@ import { type PromptImage, type SessionFacts, type StartFailure, type StartReque
 import { pullRequestTask, taskConflict, taskIdentity, ticketTask } from "../task-claims";
 import { portFromEnv } from "./address";
 import type { LiveSessions } from "./live-sessions";
+import type { PrivateSessions } from "./private-sessions";
 import { UntrustedProjectError } from "./project-trust-file";
 
 /** How a start joins the server: what omp launches with, and what links the session once it is in the registry, before its first prompt. */
@@ -53,6 +54,7 @@ export interface StartEnv {
 	mayDiscardReplay(cwd: string): Promise<string | null>;
 	/** Lets omp spawn in `cwd`, or throws {@link UntrustedProjectError} while its project's agent code is not trusted as it is now. */
 	admit(cwd: string): Promise<void>;
+	privateSessions: Pick<PrivateSessions, "launch" | "purge" | "holds">;
 }
 
 export type Starter = (request: StartRequest) => Promise<StartResult>;
@@ -139,23 +141,31 @@ export function createStarter(env: StartEnv): Starter {
 					} catch (err) {
 						return { error: `Cannot read the skills in ${cwd}: ${errorText(err)}` };
 					}
-					return launch("Cannot start omp", async (id, emit) => ({
-						session: await DashboardSession.start(id, cwd, model, thinking, rpcLaunch, emit),
-						prompt: null,
-						first: { text, images },
-					}), allocated);
+					return launch("Cannot start omp", async (id, emit) => {
+						// A private start that fails deletes its directory, here or, once omp runs, through `discard`.
+						const discard = request.private ? () => env.privateSessions.purge(id) : undefined;
+						try {
+							const own = request.private ? await env.privateSessions.launch(id, cwd, rpcLaunch) : rpcLaunch;
+							return { session: await DashboardSession.start(id, cwd, model, thinking, own, emit), prompt: null, first: { text, images }, discard };
+						} catch (error) {
+							await discard?.();
+							throw error;
+						}
+					}, allocated);
 				});
 			}
 			case "fork": {
 				const source = env.pathFor(request.view);
 				if (!source) return { error: "Cannot fork: this session's file is not known yet." };
 				if (formatOf(source).source !== "omp") return { error: "Cannot fork: this session is read-only. Only omp sessions fork here." };
+				if (env.privateSessions.holds(source)) return { error: "Cannot fork: a private session is deleted when it ends, so nothing copies it." };
 				return launch("Cannot fork", async (id, emit) => DashboardSession.fork(id, source, request.entryId, rpcLaunch, emit));
 			}
 			case "replay": {
 				const source = env.pathFor(request.view);
 				if (!source || request.view.kind === "live" && request.view.agentId !== null) return { error: "Cannot replay: the main session's file is unavailable." };
 				if (formatOf(source).source !== "omp") return { error: "Cannot replay: this session is read-only. Only omp sessions replay here." };
+				if (env.privateSessions.holds(source)) return { error: "Cannot replay: a private session is deleted when it ends, so nothing copies it." };
 				return launch("Cannot replay", async (id, emit) => {
 					const prepared = await prepareReplay(request, source, env.mayDiscardReplay);
 					try {

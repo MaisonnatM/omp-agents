@@ -59,6 +59,10 @@ export interface DashboardState extends PaneNavigation {
 	botMemories: Record<BotId, string>;
 	/** The last words of each Bot's conversation, as the server last read them. */
 	botLasts: Record<BotId, BotLast | null>;
+	/** Where personal sessions run, `null` until the server first says; kept as one object while it stays, so its readers render only once. */
+	personal: Workspace | null;
+	/** What personal sessions remember, as the server last read it. */
+	personalMemory: string;
 	/** Every Router's tasks, empty until the server first sends them. */
 	routerTasks: RouterTask[];
 	/** The messages and session starts that wait for a time, soonest first, empty until the server first sends them. */
@@ -80,7 +84,7 @@ export interface DashboardState extends PaneNavigation {
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "user-notes" | "routines" | "bots" | "router-tasks" | "scheduled" | "workspaces" | "project-trust" | "pins" | "notices" | "merges" | "review-drafts" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "user-notes" | "routines" | "bots" | "personal" | "router-tasks" | "scheduled" | "workspaces" | "project-trust" | "pins" | "notices" | "merges" | "review-drafts" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -231,6 +235,8 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, routines: action.routines };
 		case "bots":
 			return { ...state, bots: action.bots, botMemories: action.memories, botLasts: action.lasts };
+		case "personal":
+			return { ...state, personal: state.personal?.cwd === action.cwd && state.personal.cwdDisplay === action.cwdDisplay ? state.personal : { cwd: action.cwd, cwdDisplay: action.cwdDisplay }, personalMemory: action.memory };
 		case "bot":
 			return state.bots ? { ...state, bots: applyBot(state.bots, action.change, action.now) } : state;
 		case "router-tasks":
@@ -292,6 +298,8 @@ export function initialState(route: Route, ratios: SplitRatios = DEFAULT_SPLIT_R
 		bots: null,
 		botMemories: {},
 		botLasts: {},
+		personal: null,
+		personalMemory: "",
 		routerTasks: [],
 		scheduled: [],
 		workspaceList: { added: [], hidden: [] },

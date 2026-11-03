@@ -27,8 +27,8 @@ interface ListChanges {
 	"router-tasks": RouterTaskChange;
 }
 
-/** The lists only the server changes, through actions of their own: the bell's notices, and the queued merges. */
-type ReadOnlyKind = "notices" | "merges";
+/** The lists only the server changes, through actions of their own: the bell's notices, the queued merges, and the personal memory. */
+type ReadOnlyKind = "notices" | "merges" | "personal";
 export type ListKind = keyof ListChanges | ReadOnlyKind;
 export type ListMessage<T extends ListKind = ListKind> = Extract<ServerMsg, { t: T }>;
 type EditableEntries = {

@@ -82,7 +82,7 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 					</p>
 				)}
 				{trajectory && !foreign ? (
-					<Trajectory view={view} />
+					<Trajectory view={view} replayable />
 				) : (
 					<AskAboutSelection origin={{ source: session ? `past session “${title}”` : "a past session", sendToSession: null }}>
 						<Transcript view={view} working={false} fork={foreign ? null : fork} onFork={foreign ? undefined : onFork} changes={changes} />

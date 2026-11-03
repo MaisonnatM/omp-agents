@@ -143,6 +143,7 @@ export const CONTROLS = [
 	{ id: "session-details.tab.pull-requests", label: "Session details PRs tab", area: "Right sidebar" },
 	{ id: "session-details.tab.browser", label: "Session details Browser tab", area: "Right sidebar" },
 	{ id: "session-details.tab.tickets", label: "Session details Tickets tab", area: "Right sidebar" },
+	{ id: "session-details.tab.memory", label: "Session details Memory tab", area: "Right sidebar" },
 	{ id: "browser.back", label: "Browser back", area: "Browser" },
 	{ id: "browser.forward", label: "Browser forward", area: "Browser" },
 	{ id: "browser.reload", label: "Browser reload", area: "Browser" },

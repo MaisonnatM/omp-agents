@@ -263,6 +263,7 @@ export function useDashboard(): Dashboard {
 					case "user-notes":
 					case "routines":
 					case "bots":
+					case "personal":
 					case "router-tasks":
 					case "scheduled":
 					case "workspaces":

@@ -89,6 +89,7 @@ import type {
 	OmpSessionManager,
 	SessionContextModule,
 	SessionEntriesModule,
+	SessionPathsModule,
 	StorageModule,
 	TokenizerModule,
 } from "./module-types/session";
@@ -198,6 +199,7 @@ export const loader = await load<LoaderModule>(join(srcDir, "session", "session-
 	visitEntriesFromFileStream: "function",
 });
 export const sessionEntries = await load<SessionEntriesModule>(join(srcDir, "session", "session-entries.ts"), { resolveSessionLeafId: "function" });
+export const sessionPaths = await load<SessionPathsModule>(join(srcDir, "session", "session-paths.ts"), { sessionDirForCwd: "function" });
 export const sessionManager = await load<{
 	SessionManager: {
 		create(cwd: string, dir?: string): OmpSessionManager;
@@ -228,6 +230,9 @@ export const dirs = await load<DirsModule>(join(utilsSrc, "dirs.ts"), {
 	getBlobsDir: "function",
 	getStatsDbPath: "function",
 	getWorktreesDir: "function",
+	getHistoryDbPath: "function",
+	getCustomSessionFilesDir: "function",
+	hashPath: "function",
 });
 
 export const gcAutoCompress = await load<GcAutoCompressModule>(join(srcDir, "cli", "gc-auto-compress.ts"), { GC_AUTO_COMPRESS_LOG: "string" });

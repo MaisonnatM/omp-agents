@@ -1,20 +1,21 @@
 /** The workspace picker: the searchable directory list for the roster and the new session's directory. */
 import { Folder } from "lucide-react";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import type { Workspace } from "../../src/shared/workspaces";
-import { folderName } from "../labels";
+import { workspaceName } from "../labels";
 import type { ShortcutId } from "../shortcuts";
 import { CommandPicker, type PickerItem } from "./command-picker";
+import { PersonalContext } from "./dashboard-context";
 
-/** The same visible directory row and search words for the roster and the new-session picker. */
-export function workspaceItems(workspaces: Workspace[], current: string | null, onPick: (workspace: Workspace) => void): PickerItem[] {
+/** The same visible directory row and search words for the roster and the new-session picker; `personal` reads as **Personal**. */
+export function workspaceItems(workspaces: Workspace[], current: string | null, personal: Workspace | null, onPick: (workspace: Workspace) => void): PickerItem[] {
 	return workspaces.map(workspace => ({
 		value: workspace.cwd,
 		keywords: [workspace.cwdDisplay],
 		label: (
 			<span className="flex min-w-0 flex-col">
-				<span className="truncate">{folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay}</span>
+				<span className="truncate">{workspaceName(workspace.cwdDisplay, personal) ?? workspace.cwdDisplay}</span>
 				<span className="truncate text-xs text-muted-foreground">{workspace.cwdDisplay}</span>
 			</span>
 		),
@@ -41,16 +42,18 @@ interface DirectoryPickerProps {
 	control?: ControlId;
 }
 
-/** A working directory: a workspace the dashboard lists, or any directory typed into the search field. */
+/** A working directory: **Personal** first, then a workspace the dashboard lists, or any directory typed into the search field. */
 export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shortcut, side = "top", open, onOpenChange, onPick, control }: DirectoryPickerProps) {
+	const personal = useContext(PersonalContext);
 	const [query, setQuery] = useState("");
 	const typed = query.trim();
+	const listed = personal ? [personal, ...workspaces.filter(workspace => workspace.cwd !== personal.cwd)] : workspaces;
 	const pick = (next: string): void => {
 		if (next !== cwd) onPick(next);
 	};
 	return (
 		<CommandPicker
-			trigger={folderName(cwd) ?? cwd}
+			trigger={workspaceName(cwd, personal) ?? cwd}
 			icon={Folder}
 			control={control}
 			ariaLabel={`Working directory: ${cwd}`}
@@ -72,9 +75,9 @@ export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shor
 					{
 						key: "workspaces",
 						heading: "Workspaces",
-						items: workspaceItems(workspaces, cwd, workspace => pick(workspace.cwdDisplay)),
+						items: workspaceItems(listed, cwd, personal, workspace => pick(workspace.cwdDisplay)),
 					},
-					...(typed && !workspaces.some(w => w.cwd === typed || w.cwdDisplay === typed)
+					...(typed && !listed.some(w => w.cwd === typed || w.cwdDisplay === typed)
 						? [
 								{
 									key: "typed",

@@ -142,8 +142,8 @@ export interface UnreadTurn {
 export type RosterHost = RosterHostBase &
 	(
 		| { source: "terminal"; participants: number; relayConnected: boolean }
-		/** Started by this dashboard, which can end it. */
-		| { source: "dashboard"; thinkingLevels: string[]; switching: boolean; fast: FastMode | null; compaction: CompactionState; advisor: AdvisorState | null; goal: GoalSlot }
+		/** Started by this dashboard, which can end it. `private` when ending it deletes it with everything it wrote. */
+		| { source: "dashboard"; thinkingLevels: string[]; switching: boolean; fast: FastMode | null; compaction: CompactionState; advisor: AdvisorState | null; goal: GoalSlot; private: boolean }
 	);
 
 /** omp's `/fast` for the session's model: whether you turned it on, and whether requests go out on the priority tier. */
@@ -324,6 +324,8 @@ export type StartRequest =
 			reviewDraft: boolean;
 			/** The Bot whose conversation the session starts, which launches it with the Bot extension; only the server's `Bots` sets it, since {@link parseNewSessionRequest} never reads one. */
 			bot: BotId | null;
+			/** The session is deleted, with everything it wrote, when it ends, and omp remembers nothing of it; it works on no todo, task, or review draft. */
+			private: boolean;
 	  }
 	| { kind: "fork"; view: View; entryId: string }
 	| { kind: "replay"; view: View; token: string; model: ModelOption | null; thinking: string | null; prompt: string | null }
@@ -345,6 +347,7 @@ export const newSessionRequest = (cwd: string, prompt: string, options: Partial<
 	taskId: null,
 	reviewDraft: false,
 	bot: null,
+	private: false,
 	...options,
 });
 
@@ -406,7 +409,7 @@ function parseWorkItem(value: unknown): Parsed<WorkItem | null> {
  */
 export function parseNewSessionRequest(value: unknown): Parsed<NewSessionRequest> {
 	if (!isObject(value) || value.kind !== "new") return null;
-	const { cwd, prompt, todoId = null, taskId = null, reviewDraft = false } = value;
+	const { cwd, prompt, todoId = null, taskId = null, reviewDraft = false, private: isPrivate = false } = value;
 	const images = parseImages(value.images);
 	const branch = parseBranchChoice(value.branch);
 	// `null` starts on omp's default model.
@@ -419,8 +422,10 @@ export function parseNewSessionRequest(value: unknown): Parsed<NewSessionRequest
 	if (taskId !== null && !isNonEmpty(taskId)) return null;
 	// Only a pull request has a review draft.
 	if (typeof reviewDraft !== "boolean" || (reviewDraft && subject.ok?.kind !== "pull-request")) return null;
+	// A private session leaves nothing behind, so nothing may link to it.
+	if (typeof isPrivate !== "boolean" || (isPrivate && (todoId !== null || taskId !== null || reviewDraft))) return null;
 	return prompt.trim() || images.ok.length > 0
-		? { ok: newSessionRequest(cwd, prompt, { images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, todoId, taskId, reviewDraft }) }
+		? { ok: newSessionRequest(cwd, prompt, { images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, todoId, taskId, reviewDraft, private: isPrivate }) }
 		: null;
 }
 

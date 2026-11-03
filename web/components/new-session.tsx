@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react";
+import { Lock, Sparkles } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
 import type { BranchChoice } from "../../src/shared/git";
 import type { NewSessionRequest } from "../../src/shared/sessions";
@@ -94,6 +94,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	// A scheduled start keeps the skill it was saved with; with its skill turned off, the toggle offers the pinned one.
 	const draftSkill = initial?.skill ?? pinnedSkill;
 	const [skipSkill, setSkipSkill] = useState(initial !== null && initial.skill === null);
+	const [isPrivate, setPrivate] = useState(initial?.private ?? false);
 	const skills = useSkills(cwd);
 	// The server decides whether the skill applies; the toggle only shows what it will decide.
 	const listedSkills = skills.error === null ? skills.data?.skills : [];
@@ -144,7 +145,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		}
 	};
 	const directCommand = blockedShortcut(draft, "new");
-	const opOf = (prompt: string): ScheduledOp => ({ prompt, branch: choice, model: models.model, thinking: models.thinking, skill: skipSkill ? null : draftSkill });
+	const opOf = (prompt: string): ScheduledOp => ({ prompt, branch: choice, model: models.model, thinking: models.thinking, skill: skipSkill ? null : draftSkill, private: !todo && isPrivate });
 	const schedule = useAction(async (when: ScheduleWhen) => {
 		const prompt = draft.trim();
 		await onSchedule(opOf(prompt), when);
@@ -218,6 +219,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 								{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
 								<ModelPicker {...models.picker} disabled={starting || !connected} control="composer.model" />
 								{draftSkill !== null && !ownCommand && <SkillToggle name={draftSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
+								{!todo && <PrivateToggle on={isPrivate} onToggle={() => setPrivate(on => !on)} disabled={starting} />}
 							</>
 						}
 						rightSlot={({ openFilePicker }) => (
@@ -274,6 +276,19 @@ function SkillToggle({ name, state, onToggle, disabled }: { name: string; state:
 				disabled={off}
 			>
 				<span className={cn("max-w-40 truncate", state !== "on" && "text-muted-foreground line-through")}>{name}</span>
+			</Button>
+		</Tooltip>
+	);
+}
+
+/** The tooltip of a private session's mark, which every place showing one repeats. */
+export const PRIVATE_NOTE = "Private: deleted with everything it wrote when it ends.";
+
+function PrivateToggle({ on, onToggle, disabled }: { on: boolean; onToggle: () => void; disabled: boolean }) {
+	return (
+		<Tooltip content={PRIVATE_NOTE} disabled={disabled}>
+			<Button variant="ghost" size="compact" leadingIcon={Lock} aria-pressed={on} onClick={onToggle} disabled={disabled}>
+				<span className={cn(!on && "text-muted-foreground")}>Private</span>
 			</Button>
 		</Tooltip>
 	);

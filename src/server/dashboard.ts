@@ -6,7 +6,7 @@
  * No constructor calls either; nothing follows the registry, watches a directory, or publishes before {@link Dashboard.start}.
  */
 import { randomUUID } from "node:crypto";
-import { rmSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
 import type { Server } from "bun";
 import { ForeignUsage } from "../foreign/usage";
 import { flushJsonFiles } from "../fs";
@@ -26,9 +26,11 @@ import { findMcpServers } from "../omp/mcp";
 import { ompDaemons, startOwnedService } from "../omp/daemons";
 import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
+import { forgetSessions, readSessionId } from "../omp/forget-sessions";
+import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, processesFile, projectTrustFile, reviewDraftsFile, routerInboxDir, routerTasksFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, personalDir, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routerInboxDir, routerTasksFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -45,7 +47,7 @@ import { modelUpdates, upgradeModel } from "../settings";
 import { MCP_SERVICES } from "../shared/accounts";
 import { agentOn } from "../shared/moves";
 import { routerLinks } from "../shared/router";
-import type { SessionFacts, StartRequest, StartResult, View } from "../shared/sessions";
+import type { RosterHost, SessionFacts, StartRequest, StartResult, View } from "../shared/sessions";
 import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
 import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
@@ -69,7 +71,9 @@ import { MergeCleanup } from "./merge-cleanup";
 import { MergeQueue } from "./merge-queue";
 import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, Notices, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
 import { OwnerLock } from "../../templates/omp/agent/extensions/github/owner-lock";
+import { isPersonalDir, personalJoin, personalMessage } from "./personal";
 import { PinsFile } from "./pins-file";
+import { PrivateSessions } from "./private-sessions";
 import { PreferencesFile } from "./preferences-file";
 import { ProcessSettingsFile } from "./process-settings-file";
 import { startDevServer } from "./dev-server";
@@ -130,6 +134,12 @@ export class Dashboard {
 	readonly #scheduled = new ScheduledFile(scheduledFile);
 	readonly #workspaces: WorkspacesFile;
 	readonly #pins = new PinsFile(pinsFile);
+	readonly #privateSessions = new PrivateSessions({
+		root: privateSessionsDir,
+		unpin: sessionIds => void this.#lists.apply("pins", { op: "unpin", sessionIds }),
+		forgetInOmp: forgetSessions,
+		readSessionId,
+	});
 	readonly #processSettings = new ProcessSettingsFile(processesFile);
 	readonly #preferences = new PreferencesFile(preferencesFile);
 	readonly #reviewDrafts = new ReviewDrafts({
@@ -144,7 +154,7 @@ export class Dashboard {
 	readonly #admit = (dir: string): Promise<void> => this.#projectTrust.admit(dir);
 	readonly #moves = new SessionMoves({
 		session: instanceId => this.#sessions.started(instanceId),
-		isBot: request => this.#bots.botOf(request) !== null,
+		staysPut: request => this.#bots.botOf(request) !== null || isPersonalDir(this.#cwdOf(request)),
 		admit: this.#admit,
 	});
 	readonly #sourceControl = new SourceControl(sourceControlFile);
@@ -239,6 +249,8 @@ export class Dashboard {
 		const { placement } = files.facts;
 		/** What each session links to, except that a Router's own conversation links no work item: see {@link routerLinks}. */
 		const factsOf = (sessionId: string, cwd?: string): SessionFacts => routerLinks(this.#botsFile.value, sessionId, files.factsOf(sessionId, cwd));
+		const privateSessions = this.#privateSessions;
+		const rows = (): RosterHost[] => sessions.rows(factsOf, instanceId => privateSessions.has(instanceId));
 		const pathFor = (view: View): string | null =>
 			view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
 		this.#pathFor = pathFor;
@@ -259,7 +271,7 @@ export class Dashboard {
 				updateDashboard: () => selfUpdate.update(),
 				pullRequests: async () => {
 					const list = await loadPullRequests(this.knownWorkspaces(), false);
-					const agent = agentOn(sessions.rows(factsOf));
+					const agent = agentOn(rows());
 					this.#triggerWatch.learn(pullRequestSightings(list, agent));
 					return { list, agent };
 				},
@@ -330,6 +342,7 @@ export class Dashboard {
 			preferences: { msg: () => ({ t: "preferences", values: this.#preferences.value }), apply: change => this.#preferences.apply(change) },
 			notices: { msg: () => ({ t: "notices", list: notices.list }) },
 			merges: { msg: () => ({ t: "merges", list: [...this.#mergeQueue.list] }) },
+			personal: { msg: personalMessage },
 			"review-drafts": { msg: () => ({ t: "review-drafts", list: this.#reviewDrafts.list }), apply: edit => this.#reviewDrafts.edit(edit) },
 			bots: {
 				msg: () => this.#bots.msg(),
@@ -348,7 +361,7 @@ export class Dashboard {
 			"router-tasks": { msg: () => this.#router.tasks.msg(), apply: change => this.#router.tasks.change(change) },
 		}, kind => this.#broadcasts.pushList(kind)));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
-			roster: () => ({ hosts: sessions.rows(factsOf), error: this.#rosterError }),
+			roster: () => ({ hosts: rows(), error: this.#rosterError }),
 			past: () => files.past(sessions.sessionIds(), id => interrupted.has(id)),
 			lists,
 			publish: (topic, json) => void this.#publisher?.publish(topic, json),
@@ -359,7 +372,7 @@ export class Dashboard {
 					if (placed) broadcasts.pushAll();
 				});
 			},
-			saveRunning: () => interrupted.setRunning(sessions.startedHere()),
+			saveRunning: () => interrupted.setRunning(sessions.startedHere(instanceId => privateSessions.has(instanceId))),
 		}));
 		this.#usage = new UsagePoll({ refresh: () => broadcasts.refreshUsage(), checkNotices: () => notices.check(PROVIDER_KINDS) });
 		/** The workspace directory `cwd` counts in, asking git when it was not asked about yet. */
@@ -389,6 +402,7 @@ export class Dashboard {
 			},
 			joinFor: request => this.#joinFor(request),
 			admit: this.#admit,
+			privateSessions,
 		});
 		const occupants = new WorktreeOccupants();
 		const worktrees = (this.#worktrees = new Worktrees({
@@ -396,7 +410,7 @@ export class Dashboard {
 			activity: () => files.activity(),
 			serverCwd: process.cwd(),
 			mergedPullRequests,
-			live: () => occupants.snapshot(sessions.rows(factsOf), (host, agentId) => sessions.get(host.instanceId)?.transcriptPath(agentId, files.pathOf) ?? null),
+			live: () => occupants.snapshot(rows(), (host, agentId) => sessions.get(host.instanceId)?.transcriptPath(agentId, files.pathOf) ?? null),
 		}));
 		this.#isolationSweep = new IsolationSweep({ ...ompSandboxes(), inUse: () => worktrees.inUse(), now: Date.now });
 		this.#processWatch = new SessionProcessWatch({
@@ -406,7 +420,7 @@ export class Dashboard {
 			readCwds,
 			appOf: readAppOf,
 			stopProcesses,
-			sessions: () => sessions.rows(factsOf),
+			sessions: () => rows(),
 			now: Date.now,
 			owner: () => ownerLock.held,
 			stopIdleAfterMinutes: () => {
@@ -484,7 +498,7 @@ export class Dashboard {
 		// Only the server that holds the owner lock steps the queue and takes the minute tick's look, so only it ends sessions after a merge, and only the ones it started.
 		const mergeCleanup = (this.#mergeCleanup = new MergeCleanup({
 			sessions: () =>
-				sessions.rows(factsOf).flatMap(host =>
+				rows().flatMap(host =>
 					sessions.started(host.instanceId) !== undefined && this.#sourceControl.cleanUp
 						? [{ sessionId: host.sessionId, idle: host.status === "idle", occupied: occupiedBy(host.status, autoContinue.held(host.sessionId)), pullRequests: host.pullRequests, workDir: host.worktree ?? host.cwd, branch: host.branch?.linked ? host.branch.name : null }]
 						: [],
@@ -515,7 +529,7 @@ export class Dashboard {
 			{
 				bots: () => this.#botsFile.value,
 				pullRequests: () => loadPullRequests(this.knownWorkspaces(), true),
-				agent: () => agentOn(sessions.rows(factsOf)),
+				agent: () => agentOn(rows()),
 				start: startSession,
 				queueMerge: change => this.#mergeQueue.apply(change),
 				unapprovedChange,
@@ -524,7 +538,8 @@ export class Dashboard {
 			},
 			{ active: () => ownerLock.held },
 		);
-		this.#loops = new Loops(SESSION_FORMATS, {
+		// Private sessions' files poke the views that follow them, but no format lists them, so they never show as past sessions.
+		this.#loops = new Loops([...SESSION_FORMATS, { root: privateSessionsDir, createRoot: true }], {
 			onRegistryTick: async () => {
 				if (broadcasts.listening()) await this.#listRegistry();
 				else this.#registryFresh = false;
@@ -707,8 +722,12 @@ export class Dashboard {
 	 */
 	async start(publisher: Publisher): Promise<void> {
 		this.#publisher = publisher;
+		mkdirSync(personalDir, { recursive: true });
 		// Before the runners recover, so a session that survived counts as neither interrupted nor stopped with the server.
 		await reattachAll(this.#sessions, request => this.#joinFor(request), survived => this.#interrupted.recover(survived));
+		// A private session whose omp exited while no server ran is deleted, as its exit would have; one this server could not attach to runs on.
+		const kept = new Set(keptSessions());
+		await this.#privateSessions.sweep(instanceId => kept.has(instanceId) || this.#sessions.get(instanceId) !== undefined);
 		this.#reattached.resolve();
 		this.#broadcasts.syncRoster();
 		this.#loops.watch();
@@ -830,11 +849,16 @@ export class Dashboard {
 				// Its last turn may have remembered something.
 				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
 				this.#bots.exited(instanceId);
+				// Its turn may have remembered something about the user.
+				if (isPersonalDir(this.#sessions.get(instanceId)?.cwd)) this.#broadcasts.pushList("personal");
 				this.#sessions.remove(instanceId);
 				// Once the registry no longer holds it, so the supervisor's restart of a task's session resumes it rather than
 				// reaching the one that exited; that session is the supervisor's to continue, not one stopped mid-turn.
 				const restarting = this.#router.exited(instanceId, update.ended);
-				if (sessionId && !update.ended && !restarting) this.#interrupted.interrupt(sessionId);
+				// A private session lives exactly as long as its omp, so it is deleted rather than interrupted; the next server's sweep finishes a purge cut short.
+				if (this.#privateSessions.has(instanceId))
+					void this.#privateSessions.purge(instanceId).catch((err: unknown) => console.error(`omp-agents: deleting private session ${instanceId} failed: ${errorText(err)}`));
+				else if (sessionId && !update.ended && !restarting) this.#interrupted.interrupt(sessionId);
 				this.#broadcasts.syncRoster();
 				void this.#loops.listNow();
 				return;
@@ -872,6 +896,8 @@ export class Dashboard {
 				this.#router.turnEnded(instanceId, update.reply);
 				this.#broadcasts.rosterChanged();
 				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
+				// Its turn may have remembered something about the user.
+				if (isPersonalDir(this.#sessions.get(instanceId)?.cwd)) this.#broadcasts.pushList("personal");
 				return;
 			}
 			default: {
@@ -891,15 +917,22 @@ export class Dashboard {
 		this.#activity.prune(Date.now() - ACTIVITY_KEPT_DAYS * DAY_MS);
 	}
 
-	/** How `request` joins the server: as a Review session, as a Bot's conversation, both, or plain; any but a Bot's can move itself. */
+	/** How `request` joins the server: as a Review session, as a Bot's conversation, both, or plain; any but a Bot's loads the personal extension, and any but a Bot's or a personal session can move itself. */
 	#joinFor(request: StartRequest): SessionJoin {
-		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#router.join(request), this.#moves.join(request)];
+		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#router.join(request), this.#moves.join(request), personalJoin(this.#bots.botOf(request) !== null)];
 		return {
 			rpc: { args: joins.flatMap(join => join.rpc.args), tools: joins.flatMap(join => join.rpc.tools) },
 			attach: session => {
 				for (const join of joins) join.attach(session);
 			},
 		};
+	}
+
+	/** The directory `request`'s session starts in, `undefined` when the session it continues is gone. */
+	#cwdOf(request: StartRequest): string | undefined {
+		if (request.kind === "new") return request.cwd;
+		if (request.kind === "resume") return this.#files.savedOf(request.sessionId)?.cwd;
+		return request.view.kind === "live" ? this.#sessions.get(request.view.instanceId)?.cwd : this.#files.savedOf(request.view.sessionId)?.cwd;
 	}
 
 	/**

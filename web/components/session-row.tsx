@@ -1,6 +1,6 @@
 /** `HostRow` and `PastRow`, a running or past session's row in the sidebar, with its status, age, and actions menu. */
-import { Loader } from "lucide-react";
-import { Fragment, memo, type ReactElement, type ReactNode } from "react";
+import { Loader, Lock } from "lucide-react";
+import { Fragment, memo, type ReactElement, type ReactNode, useContext } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem, MenuLinkItem, MenuSeparator, MenuShortcut } from "@/components/ui/menu";
@@ -8,12 +8,14 @@ import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { PaletteAction } from "../command-palette";
-import { folderName, hostLabel, modeOf, pastLabel, SOURCE_LABELS, SPLIT_CLICK } from "../labels";
+import { hostLabel, modeOf, pastLabel, SOURCE_LABELS, SPLIT_CLICK, workspaceName } from "../labels";
 import type { OpenMode } from "../routing";
 import { sessionActions, type SessionEntry, type SessionRun } from "../session-actions";
 import { workspaceCwd, workspaceOf } from "../sessions";
+import { type InlineConfirm, useInlineConfirm } from "../use-inline-confirm";
 import { Age } from "./age";
-import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
+import { PersonalContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
+import { PRIVATE_NOTE } from "./new-session";
 import { StatusDot, statusLabel } from "./status-dot";
 
 /** The muted facts after a session's name: the parts that apply. */
@@ -81,7 +83,7 @@ function SessionButton({ view, label, title, badge, facts, when, dot, open, onOp
  * whose label is its directory's name, when that directory is not its workspace's, as a linked worktree's is not.
  */
 export function WorkspaceBadge({ cwdDisplay }: { cwdDisplay: string }) {
-	const name = folderName(cwdDisplay);
+	const name = workspaceName(cwdDisplay, useContext(PersonalContext));
 	return name ? <Badge size="compact" className="shrink-0 self-center">{name}</Badge> : null;
 }
 
@@ -102,6 +104,8 @@ interface RowMenuProps {
 function RowMenuItems({ entry, onScreen, pinned, onTogglePin }: Omit<RowMenuProps, "children">) {
 	const { open, send, start, end, workspaceSettings } = useDashboardActions();
 	const { starts: { resume }, ending } = useDashboardStatus();
+	const confirm = useInlineConfirm(entry.kind === "live" ? `end:${entry.host.instanceId}` : "end");
+	const isPrivate = entry.kind === "live" && entry.host.source === "dashboard" && entry.host.private;
 	const actions = sessionActions(entry, {
 		onScreen,
 		pinned,
@@ -120,7 +124,7 @@ function RowMenuItems({ entry, onScreen, pinned, onTogglePin }: Omit<RowMenuProp
 				<Fragment key={group[0].id}>
 					{index > 0 && <MenuSeparator />}
 					{group.map(action => (
-						<ActionItem key={action.id} action={action} />
+						<ActionItem key={action.id} action={action} confirm={isPrivate && action.id === "end" ? confirm : null} />
 					))}
 				</Fragment>
 			))}
@@ -140,8 +144,11 @@ function RowMenu({ entry, onScreen, pinned, onTogglePin, children }: RowMenuProp
 	);
 }
 
-/** One session action as a menu item. Open in split names the click that also runs it from the row. */
-function ActionItem({ action }: { action: PaletteAction<SessionRun> }) {
+/**
+ * One session action as a menu item. Open in split names the click that also runs it from the row. With `confirm`,
+ * the first click arms it and keeps the menu open, and the second runs it, as End does for a private session.
+ */
+function ActionItem({ action, confirm }: { action: PaletteAction<SessionRun>; confirm: InlineConfirm | null }) {
 	const { icon: Icon, title, run } = action;
 	if (run.kind === "link") {
 		return (
@@ -151,10 +158,16 @@ function ActionItem({ action }: { action: PaletteAction<SessionRun> }) {
 			</MenuLinkItem>
 		);
 	}
+	const armed = confirm?.isArmed(action.id) ?? false;
 	return (
-		<MenuItem variant={action.tone} disabled={action.disabled} aria-busy={(action.id === "end" && action.disabled) || undefined} onClick={run.fn}>
+		<MenuItem
+			variant={action.tone}
+			disabled={action.disabled}
+			aria-busy={(action.id === "end" && action.disabled) || undefined}
+			{...(confirm ? { closeOnClick: armed, ...confirm.props(action.id, run.fn) } : { onClick: run.fn })}
+		>
 			<Icon />
-			{title}
+			{armed ? "Confirm end and delete?" : title}
 			{action.id === "split" && <MenuShortcut>{SPLIT_CLICK}</MenuShortcut>}
 		</MenuItem>
 	);
@@ -208,13 +221,24 @@ export const HostRow = memo(function HostRow({ session: host, pinned, open, show
 	const { open: onOpen } = useDashboardActions();
 	const view: View = { kind: "live", instanceId: host.instanceId, agentId: null };
 	const label = hostLabel(host);
+	const isPrivate = host.source === "dashboard" && host.private;
+	const workspace = showWorkspace && (host.sessionName !== null || workspaceCwd(host) !== host.cwd) ? <WorkspaceBadge cwdDisplay={workspaceOf(host).cwdDisplay} /> : null;
 	return (
 		<RowMenu entry={{ kind: "live", host }} onScreen={open} pinned={pinned} onTogglePin={onTogglePin}>
 			<SessionButton
 				view={view}
 				label={label}
-				title={`${statusLabel(host.status)}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
-				badge={showWorkspace && (host.sessionName !== null || workspaceCwd(host) !== host.cwd) ? <WorkspaceBadge cwdDisplay={workspaceOf(host).cwdDisplay} /> : null}
+				title={`${statusLabel(host.status)}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}${isPrivate ? `\n${PRIVATE_NOTE}` : ""}`}
+				badge={
+					isPrivate ? (
+						<span className="flex items-center gap-1.5">
+							<Lock role="img" aria-label="Private" className="size-3 shrink-0 text-muted-foreground" />
+							{workspace}
+						</span>
+					) : (
+						workspace
+					)
+				}
 				facts={sessionFacts([host.source === "terminal" && !host.relayConnected && "relay offline"])}
 				when={host.startedAt}
 				dot={<HostStatus host={host} />}

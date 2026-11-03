@@ -290,15 +290,17 @@ function LiveConversation({
 		[session, writable, cwdDisplay],
 	);
 	const changes = useMemo(() => ({ sessionId, cwd: shown?.cwd ?? null, facts: shown }), [sessionId, shown]);
+	// A private session leaves nothing behind, so nothing may fork or replay it.
+	const isPrivate = shown?.source === "dashboard" && shown.private;
 
 	return (
 		<div className="@container/conversation flex h-full min-h-0 flex-1 flex-col" data-conversation>
 			{header && <ConversationHeader view={view} subject={subject} onEnd={onEnd} actions={actions} titleAction={titleAction} />}
 			{trajectory ? (
-				<Trajectory view={view} />
+				<Trajectory view={view} replayable={!isPrivate} />
 			) : (
 				<AskAboutSelection origin={{ source: shown ? `session “${hostLabel(shown)}”` : "a session", sendToSession: writable ? sendToSession : null }}>
-					<Transcript view={view} working={working} fork={fork} onFork={onFork} onEdit={switchable ? editPrompt : undefined} empty={empty} changes={changes} />
+					<Transcript view={view} working={working} fork={fork} onFork={isPrivate ? undefined : onFork} onEdit={switchable ? editPrompt : undefined} empty={empty} changes={changes} />
 				</AskAboutSelection>
 			)}
 			<div className="conversation-lane relative px-3 pb-3">

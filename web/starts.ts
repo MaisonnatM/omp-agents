@@ -25,6 +25,8 @@ export type StartOp =
 			skill: string | null;
 			/** The todo the session works on, `null` for none. */
 			todoId: string | null;
+			/** The session is deleted with everything it wrote when it ends. */
+			private: boolean;
 	  }
 	| { kind: "fork"; view: View; itemId: string; point: ForkPoint }
 	| { kind: "replay"; view: View; turnId: string; token: string; model: ModelOption | null; thinking: string | null; prompt: string | null }
@@ -55,9 +57,9 @@ export type StartOf<K extends StartKind> = Start<Extract<StartOp, { kind: K }>>;
 export const messageOf = (op: StartOp, reqId: number): ClientMsg => {
 	switch (op.kind) {
 		case "new":
-			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: op.thinking, skill: op.skill, subject: null, todoId: op.todoId, taskId: null, reviewDraft: false, bot: null };
+			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: op.thinking, skill: op.skill, subject: null, todoId: op.todoId, taskId: null, reviewDraft: false, bot: null, private: op.private };
 		case "quick":
-			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: op.branch, model: null, thinking: null, skill: op.skill, taskId: null, bot: null, ...startTarget(op.subject) };
+			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: op.branch, model: null, thinking: null, skill: op.skill, taskId: null, bot: null, private: false, ...startTarget(op.subject) };
 		case "fork":
 			return { t: "start", reqId, kind: "fork", view: op.view, entryId: op.point.entryId };
 		case "replay":

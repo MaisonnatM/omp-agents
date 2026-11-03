@@ -17,6 +17,7 @@ import * as rpc from "../omp/rpc";
 import { refuseUntil } from "./http";
 import { InterruptedSessions } from "./interrupted";
 import { LiveSessions } from "./live-sessions";
+import type { PrivateSessions } from "./private-sessions";
 import { UntrustedProjectError, untrustedText } from "./project-trust-file";
 import { createStarter, reattachAll, type SessionJoin } from "./start";
 
@@ -41,6 +42,7 @@ test("a Claude Code or Codex session neither resumes, forks, nor replays, before
 		mayDiscardReplay: async () => null,
 		admit: async () => { throw new Error("A read-only start must not take a census."); },
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
+		privateSessions: fromPartial<PrivateSessions>({ holds: () => false }),
 	});
 	expect(await start({ kind: "resume", sessionId: "c1" })).toMatchObject({ ok: false, error: expect.stringContaining("read-only") });
 	expect(await start({ kind: "fork", view: { kind: "past", sessionId: "x1" }, entryId: "e1" })).toMatchObject({ ok: false, error: expect.stringContaining("read-only") });
@@ -104,7 +106,7 @@ test("a reattached session whose turn ended while no server listened is listed w
 		const sessions = new LiveSessions(() => {}, new TaskClaims(join(dir, "claims.json")), unreadPath);
 		await reattachAll(sessions, () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }), () => new Set(["s-i-ended", "s-i-prompted", "s-i-working"]));
 		const facts: SessionFacts = { tickets: [], pullRequests: [], worktree: null, branch: null, ship: null, workspace: null };
-		expect(sessions.rows(() => facts).map(row => [row.instanceId, row.unread])).toEqual([
+		expect(sessions.rows(() => facts, () => false).map(row => [row.instanceId, row.unread])).toEqual([
 			["i-ended", { at: Date.parse("2026-11-02T10:00:12.000Z"), reply: "done" }],
 			["i-prompted", { at: Date.parse("2026-11-02T10:00:20.000Z"), reply: null }],
 			["i-working", null],
@@ -192,6 +194,7 @@ function claimedStarter(
 		mayDiscardReplay: async () => null,
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
 		admit,
+		privateSessions: fromPartial<PrivateSessions>({ holds: () => false }),
 	});
 }
 

@@ -35,8 +35,8 @@ const TOKEN_COLUMNS = [
 
 const GRID = "grid grid-cols-[1.5rem_minmax(0,1fr)_3.5rem_3.5rem_3.5rem_4rem_4rem_4rem_4rem] items-center gap-x-3";
 
-/** A view's turns as a ledger: one row each with its requests, tool calls, tokens, and cost, which opens on its steps. */
-export function Trajectory({ view }: { view: View }) {
+/** A view's turns as a ledger: one row each with its requests, tool calls, tokens, and cost, which opens on its steps; `replayable` offers Replay from here. */
+export function Trajectory({ view, replayable }: { view: View; replayable: boolean }) {
 	useShowTrajectory(view);
 	const turns = useTurns(view);
 	const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
@@ -79,7 +79,7 @@ export function Trajectory({ view }: { view: View }) {
 								<span className="absolute right-0 -bottom-1 h-0.5 rounded-full bg-foreground/70" style={{ width: `${(turn.usage.cost / Math.max(total.cost, 1e-9)) * 100}%` }} />
 							</span>
 						</button>
-						{turn.id !== "start" && turn.steps.some(step => step.kind === "prompt") && (view.kind === "past" || view.agentId === null) && (
+						{replayable && turn.id !== "start" && turn.steps.some(step => step.kind === "prompt") && (view.kind === "past" || view.agentId === null) && (
 							<div className="flex justify-end px-2 pb-1">
 								<Button {...activityControl("replay.open")} size="compact" variant="ghost" onClick={() => setReplayTurn(turn.id)}>Replay from here</Button>
 							</div>

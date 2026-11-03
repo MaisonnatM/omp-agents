@@ -44,6 +44,11 @@
   Click it to start this one session without the skill.
   It is greyed out when the directory has no skill of that name, and the session then starts without it.
   A first message that starts with `/` keeps its own skill or command and skips the pinned skill, so the toggle hides while the message starts that way.
+- **Private**, the lock toggle after the model picker, starts a session that is deleted with everything it wrote when it ends: its transcript, its subagents, its prompts in omp's history, its title, and its pins.
+  It never shows under the past sessions, never resumes, and cannot be forked or replayed, and omp's memory and autolearn stay off for it.
+  A private session shows a lock in its sidebar row and its header.
+  It ends when its omp process stops, whether through **End session**, `end_session`, or a crash; a dashboard that was not running then deletes it at its next start.
+  The toggle hides on a draft that starts from a todo, since nothing may link to a private session.
 - When the directory is in a git checkout, a branch picker sits after the directory picker in the composer.
   The picker lists the local branches, the checked-out one first, then the most recently committed to, each with where it would run: `here`, the worktree that has it checked out, or `new worktree`.
   Picking the checked-out branch keeps the directory as it is.
@@ -71,6 +76,7 @@
   The header shows **Ending…** until the process stops and the worktree check finishes.
   Each pane that showed the session, or one of its subagents, moves to the next running session the sidebar lists, else the previous one, skipping sessions already open in a pane.
   With none left, the pane closes and the dashboard shows its empty state.
+  On a private session, **End session** in the header and in the row's menu asks again in place, since ending deletes it; Cmd+W ends it without asking.
 - An agent ends its own session through the `end_session` tool, when you ask it to, for example "Merge on main, then end the session".
   It comes from `~/.omp/agent/extensions/end-session.ts`, which `bun run omp-template` installs.
   The session ends once the agent's turn is over, so its last reply stays in the transcript, and it moves to the past sessions as with **End session**, not as interrupted, its worktree removed the same way.

@@ -223,14 +223,20 @@ export class LiveSessions {
 		this.#unreadFile.save({ turns: [...turns].map(([instanceId, turn]) => ({ instanceId, ...turn })), heardUntil });
 	}
 
-	/** Each session's roster row, with its `cwdDisplay`, its unread turn, and what the session files' index knows of it, asked with the directory it runs in now. */
-	rows(factsOf: (sessionId: string, cwd: string) => SessionFacts): RosterHost[] {
-		return [...this.#sessions.values()].map(session => ({
-			...session.row(),
-			cwdDisplay: displayPath(session.cwd),
-			unread: this.#unread.get(session.instanceId) ?? null,
-			...withSubject(factsOf(session.sessionId, session.cwd), this.#subjects.get(session.instanceId)),
-		}));
+	/**
+	 * Each session's roster row, with its `cwdDisplay`, its unread turn, what the session files' index knows of it, asked
+	 * with the directory it runs in now, and, for one this dashboard started, whether `isPrivate` holds of it.
+	 */
+	rows(factsOf: (sessionId: string, cwd: string) => SessionFacts, isPrivate: (instanceId: string) => boolean): RosterHost[] {
+		return [...this.#sessions.values()].map(session => {
+			const row = session.row();
+			const added = {
+				cwdDisplay: displayPath(session.cwd),
+				unread: this.#unread.get(session.instanceId) ?? null,
+				...withSubject(factsOf(session.sessionId, session.cwd), this.#subjects.get(session.instanceId)),
+			};
+			return row.source === "dashboard" ? { ...row, ...added, private: isPrivate(session.instanceId) } : { ...row, ...added };
+		});
 	}
 
 	/** The ids of the sessions that run now, which are not past sessions. */
@@ -238,9 +244,11 @@ export class LiveSessions {
 		return new Set([...this.#sessions.values()].map(session => session.sessionId));
 	}
 
-	/** The running sessions that this dashboard started, each with whether its turn runs (or waits on a question). */
-	startedHere(): Map<string, boolean> {
-		return new Map([...this.#sessions.values()].flatMap(session => (session instanceof DashboardSession ? [[session.sessionId, session.status !== "idle"] as const] : [])));
+	/** The running sessions that this dashboard started, each with whether its turn runs (or waits on a question), leaving out those `isPrivate` holds of. */
+	startedHere(isPrivate: (instanceId: string) => boolean): Map<string, boolean> {
+		return new Map(
+			[...this.#sessions.values()].flatMap(session => (session instanceof DashboardSession && !isPrivate(session.instanceId) ? [[session.sessionId, session.status !== "idle"] as const] : [])),
+		);
 	}
 
 	/** The directories running sessions work in. */

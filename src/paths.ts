@@ -55,6 +55,15 @@ export const routerInboxDir = join(configDir, "router-inbox");
 export const routerTasksFile = join(configDir, "router-tasks.json");
 /** Each Bot's `<id>/memory.md`, which its own session writes, in the dashboard's data directory. */
 export const botsDir = join(dataDir, "bots");
+/** Where personal sessions run: the user's own directory, tied to no project, in the dashboard's data directory so the file dialog opens what they write there. */
+export const personalDir = join(dataDir, "personal");
+/** The facts every personal session shares, which their `remember` tool appends, beside {@link personalDir} so omp never reads it as a file of that directory. */
+export const personalMemoryFile = join(dataDir, "personal-memory.md");
+/**
+ * Where this port's private sessions keep everything omp writes for them, one `<instance id>` directory each, as {@link keepersDir} is per port.
+ * A directory's presence is the only record that its session is private; deleting it, last, is what deletes the session.
+ */
+export const privateSessionsDir = join(dataDir, "private-sessions", String(portFromEnv()));
 /** The messages and session starts that wait for their time, beside {@link tokenFile}. */
 export const scheduledFile = join(configDir, "scheduled.json");
 /** The directories Settings → Workspaces added and hid, beside {@link tokenFile}. */

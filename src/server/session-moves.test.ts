@@ -24,7 +24,7 @@ function setup(untrusted: (dir: string) => TrustAsk | null = () => null) {
 	const moved: string[] = [];
 	const moves = new SessionMoves({
 		session: instanceId => (instanceId === "i1" ? { moveAfterTurn: dir => void moved.push(dir) } : undefined),
-		isBot: request => request.kind === "new" && request.bot !== null,
+		staysPut: request => request.kind === "new" && request.bot !== null,
 		admit: async dir => {
 			const ask = untrusted(dir);
 			if (ask) throw new UntrustedProjectError(ask);

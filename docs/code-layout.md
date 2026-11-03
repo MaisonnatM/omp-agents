@@ -16,14 +16,14 @@ Each part of the screen, by the name you would call it, with the component that 
 Start a UI change here, then read that file's entry under [Page](#page).
 
 - Composer, the box you type a prompt in: `InputMessage` in `web/components/ui/input-message.tsx`, with its text field, `PromptEditor`, in `web/components/prompt-editor.tsx`.
-  A live session mounts it in `web/components/conversation.tsx`, and the new-session page in `web/components/new-session.tsx`.
-- The composer's directory, branch, and context ring: the directory is `DirectoryPicker` in `web/components/workspace-picker.tsx`, or `DirectoryLabel` in `web/components/composer.tsx` where the session cannot move, in the composer's `leftSlot`, followed in the new-session draft by `BranchPicker` in `web/components/git.tsx`; the ring is `ContextRingMenu` for dashboard sessions and read-only `ContextRing` for terminal sessions in `web/components/context-ring.tsx`, in its `rightSlot`.
+  A live session mounts it in `web/components/conversation.tsx`, and the new-session page in `web/components/new-session.tsx`, whose `PrivateToggle` draws the **Private** toggle.
+- The composer's directory, branch, and context ring: the directory is `DirectoryPicker` in `web/components/workspace-picker.tsx`, with the **Personal** item first, or `DirectoryLabel` in `web/components/composer.tsx` where the session cannot move, in the composer's `leftSlot`, followed in the new-session draft by `BranchPicker` in `web/components/git.tsx`; the ring is `ContextRingMenu` for dashboard sessions and read-only `ContextRing` for terminal sessions in `web/components/context-ring.tsx`, in its `rightSlot`.
 - Rows above the composer: queued prompts in `web/components/composer-queue.tsx`, suggested prompts in `web/components/composer-suggestions.tsx`, scheduled sends in `web/components/scheduled.tsx`, and the open question, `UserRequestCard` in `web/components/user-request.tsx`, drawn by `question-card.tsx`.
 - `/` and `@` menus: `CompletionPopup` in `web/components/completion-popup.tsx`, over `web/mentions.ts`.
 - Model and thinking switch: `ModelSlot` in `web/components/model-slot.tsx`, whose menu is `web/components/model-picker.tsx`.
 - Session goal: `SessionGoalControl` in `web/components/session-goal.tsx` mounts in the conversation header; `App` owns its `GoalDialog` and the shared `editGoal` action, which the focused-session palette command runs through `use-page-shortcuts.ts`.
 - Conversation pane: `web/components/pane.tsx`, laid out by `PaneGrid` in `web/components/pane-grid.tsx`, with the panes' divider in `web/components/split-resize-handle.tsx`.
-  Its header is `ConversationHeader` in `web/components/conversation-header.tsx`, and a past session's view is `web/components/past-conversation.tsx`.
+  Its header is `ConversationHeader` in `web/components/conversation-header.tsx`, which draws a private session's lock, and a past session's view is `web/components/past-conversation.tsx`.
   The session title in either header, which a click turns into a field that renames the session, is `SessionTitle` in `web/components/session-title.tsx`.
   Which split a plain click brings back, and each split's sizes, live in `web/pane-navigation.ts`, which `web/dashboard-state.ts` runs for every pane change.
 - Desktop link address at the bottom left: `DesktopLinkPreview` in `web/components/desktop-link-preview.tsx`, mounted by `web/app.tsx`.
@@ -55,7 +55,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Scroll-to-bottom arrow: `MessageScrollerButton` in `web/components/ui/message-scroller.tsx`, placed by `web/components/transcript.tsx`; button variants live in `web/components/ui/button.tsx`.
 - Left sidebar: `Roster` in `web/components/roster.tsx`, wired by `web/components/app-sidebar.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which slides it open and shut and draws its toggle over the header's corner; the Sessions tab is `web/components/session-list.tsx` and a row is `web/components/session-row.tsx`.
 - Right sidebar, the session details: `SessionDetails` in `web/components/session-details.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which `web/app.tsx` mounts.
-  Its tabs are **PRs** in `session-pull-requests-tab.tsx`, **Browser** in `browser-panel.tsx`, and **Tickets** in `session-tickets-tab.tsx`, all in `web/components/`.
+  Its tabs are **PRs** in `session-pull-requests-tab.tsx`, **Browser** in `browser-panel.tsx`, **Tickets** in `session-tickets-tab.tsx`, and a personal session's **Memory**, drawn by `MemoryList` in `memory-list.tsx`, all in `web/components/`.
   The **Images** section, the transcript, and a pull request's Markdown share `ImageViewer` from `web/components/media-viewer.tsx`, with the image, its caption, `N of M`, previous and next buttons and arrow keys, open in the default browser, and Close.
 - Pull request details, with the **Summary**, **Timeline**, **Code**, and **Review draft** tabs: `PullRequestDetailContent` in `web/components/pull-requests/pr-details/index.tsx`, with **Summary** in `summary.tsx` and **Review draft** in `review-draft.tsx` beside it.
   The floating comment and review composer at its bottom right, on the Pull requests page only, is `PullRequestComposer` in `pr-details/composer.tsx`.

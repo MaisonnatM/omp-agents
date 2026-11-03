@@ -13,6 +13,7 @@ import {
 	type DashboardStatus,
 	DashboardStatusContext,
 	MentionListsContext,
+	PersonalContext,
 	UserNotesContext,
 	UserTodosContext,
 } from "./components/dashboard-context";
@@ -233,159 +234,162 @@ export function App() {
 				<ScheduledSends.Provider value={state.scheduled}>
 					<UserTodosContext.Provider value={state.userTodos}>
 						<UserNotesContext.Provider value={state.userNotes}>
-							<div className="flex h-svh flex-col">
-								{DESKTOP_TITLE_BAR && <DesktopTitleBar title={focused.title} controls={headerControls} />}
-								<SidebarProvider className="min-h-0 flex-1">
-									<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")} address={address}>
-										<AppSidebar
-											scope={scope}
-											sessions={sessions}
-											page={page}
-											panes={layout.panes}
-											tab={tab}
-											onTab={showTab}
-											tabs={barTabs}
-											listed={state.listed}
-											userTodos={state.userTodos}
-											userNotes={state.userNotes}
-											notesView={notesView}
-											hosts={state.hosts}
-											past={state.past}
-											bots={state.bots}
-											botLasts={state.botLasts}
-											todoView={todoView}
-											settings={settings}
-											sectionTarget={sectionTarget}
-											onSectionTarget={setSectionTarget}
-											onPickWorkspace={switchWorkspace}
-											setShortcutsOpen={setShortcutsOpen}
-										/>
-									</DashboardSidebar>
-									<SidebarInset>
-										<HeaderControlsContext.Provider value={DESKTOP_TITLE_BAR ? null : headerControls}>
-											<Plans value={state.usage?.plans ?? NO_PLANS}>
-												<ActivityVisibility.Provider value={display.activityVisibility}>
-													<ToolsExpanded value={display.toolsExpanded}>
-														<MentionListsContext.Provider value={mentionLists}>
-															<RenderBoundary resetKey={hashForRoute(routeOf(state))}>
-																<PageSwitch
-																	page={page}
-																	hosts={state.hosts}
-																	past={state.past}
-																	lastHosts={state.lastHosts}
-																	layout={layout}
-																	splits={state.splits}
-																	models={state.models}
-																	userTodos={state.userTodos}
-																	userNotes={state.userNotes}
-																	routines={state.routines}
-																	bots={state.bots}
-																	botLasts={state.botLasts}
-																	openBot={openBot}
-																	workspaceList={state.workspaceList}
-																	trustedProjects={state.trustedProjects}
-																	pins={state.pins}
-																	newSessionCompletions={state.newSessionCompletions}
-																	connected={state.connected}
-																	listed={state.listed}
-																	rosterError={state.rosterError}
-																	newStart={startOf(state.starts, "new")}
-																	scope={scope}
-																	defaultWorkspace={defaultWorkspace}
-																	sectionTarget={sectionTarget}
-																	todoView={todoView}
-																	linear={linear}
-																	linearCallable={linearCallable}
-																	maximized={maximized}
-																	hasDetails={detailsView !== null}
-																	rightOpen={sidebars.panels.right.open}
-																	show={show}
-																	close={close}
-																	resize={resize}
-																	toggleSidebar={toggleSidebar}
-																/>
-															</RenderBoundary>
-														</MentionListsContext.Provider>
-													</ToolsExpanded>
-												</ActivityVisibility.Provider>
-											</Plans>
-										</HeaderControlsContext.Provider>
-										<TerminalPanel panel={terminal} cwd={focused.workDir ?? workspace ?? "~"} />
-									</SidebarInset>
-									{(detailsView || openBot) && (
-										<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")} address={address}>
-											{detailsView ? (
-												<SessionDetails
-													key={hashForView(detailsView)}
-													view={detailsView}
-													working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
-													cwd={focused.cwd ?? null}
-													pullRequests={focused.row?.pullRequests ?? []}
-													tickets={focused.row?.tickets ?? []}
-													workspace={workspace}
-													hosts={visible.hosts}
-												/>
-											) : (
-												openBot && (
-													<BotDetails
-														key={openBot.bot.id}
-														open={openBot}
-														session={openBot.host ?? state.past.find(({ sessionId }) => sessionId === openBot.bot.sessionId) ?? null}
-														memory={state.botMemories[openBot.bot.id] ?? ""}
-														tasks={state.routerTasks.filter(({ botId }) => botId === openBot.bot.id)}
-														hosts={state.hosts}
-														connected={state.connected}
-													/>
-												)
-											)}
+							<PersonalContext.Provider value={state.personal}>
+								<div className="flex h-svh flex-col">
+									{DESKTOP_TITLE_BAR && <DesktopTitleBar title={focused.title} controls={headerControls} />}
+									<SidebarProvider className="min-h-0 flex-1">
+										<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")} address={address}>
+											<AppSidebar
+												scope={scope}
+												sessions={sessions}
+												page={page}
+												panes={layout.panes}
+												tab={tab}
+												onTab={showTab}
+												tabs={barTabs}
+												listed={state.listed}
+												userTodos={state.userTodos}
+												userNotes={state.userNotes}
+												notesView={notesView}
+												hosts={state.hosts}
+												past={state.past}
+												bots={state.bots}
+												botLasts={state.botLasts}
+												todoView={todoView}
+												settings={settings}
+												sectionTarget={sectionTarget}
+												onSectionTarget={setSectionTarget}
+												onPickWorkspace={switchWorkspace}
+												setShortcutsOpen={setShortcutsOpen}
+											/>
 										</DashboardSidebar>
-									)}
-									<ShortcutsDialog open={overlays.shortcutsOpen} onOpenChange={setShortcutsOpen} tabs={barTabs} />
-									{refused && <ProjectTrustDialog key={refused.reqId} ask={refused.trust} connected={state.connected} onTrust={() => trustAndStart(refused)} onCancel={() => dismissTrust(refused.reqId)} />}
-									<GetStarted
-										route={page?.kind === "get-started"}
-										vacantHome={!page && layout.panes.length === 0}
-										firstSession={firstSessionFact({ hosts: state.hosts.length, past: state.past.length, listed: state.listed, connected: state.connected, rosterError: state.rosterError })}
-										rosterError={state.rosterError}
-										onClose={() => show(layout)}
-									/>
-									{overlays.openedFile !== null && <FileDialog key={textFileUrl(overlays.openedFile)} target={overlays.openedFile} onClose={() => setOpenedFile(null)} />}
-									{overlays.newTicket !== null && <NewTicketDialog title={overlays.newTicket} onClose={() => setNewTicket(null)} />}
-									{goalEditor && editedGoal && editedGoal.goal.kind !== "off" && (
-										<GoalDialog
-											key={goalEditor.instanceId}
-											goal={editedGoal.goal.kind === "set" && editedGoal.goal.goal.status !== "complete" ? editedGoal.goal.goal : null}
-											focus={goalEditor.focus}
-											continues={editedGoal.goal.continues}
-											onClose={() => setGoalEditor(null)}
-											onSave={async change => { await request({ t: "goal", instanceId: goalEditor.instanceId, change }); setGoalEditor(null); }}
+										<SidebarInset>
+											<HeaderControlsContext.Provider value={DESKTOP_TITLE_BAR ? null : headerControls}>
+												<Plans value={state.usage?.plans ?? NO_PLANS}>
+													<ActivityVisibility.Provider value={display.activityVisibility}>
+														<ToolsExpanded value={display.toolsExpanded}>
+															<MentionListsContext.Provider value={mentionLists}>
+																<RenderBoundary resetKey={hashForRoute(routeOf(state))}>
+																	<PageSwitch
+																		page={page}
+																		hosts={state.hosts}
+																		past={state.past}
+																		lastHosts={state.lastHosts}
+																		layout={layout}
+																		splits={state.splits}
+																		models={state.models}
+																		userTodos={state.userTodos}
+																		userNotes={state.userNotes}
+																		routines={state.routines}
+																		bots={state.bots}
+																		botLasts={state.botLasts}
+																		openBot={openBot}
+																		workspaceList={state.workspaceList}
+																		trustedProjects={state.trustedProjects}
+																		pins={state.pins}
+																		newSessionCompletions={state.newSessionCompletions}
+																		connected={state.connected}
+																		listed={state.listed}
+																		rosterError={state.rosterError}
+																		newStart={startOf(state.starts, "new")}
+																		scope={scope}
+																		defaultWorkspace={defaultWorkspace}
+																		sectionTarget={sectionTarget}
+																		todoView={todoView}
+																		linear={linear}
+																		linearCallable={linearCallable}
+																		maximized={maximized}
+																		hasDetails={detailsView !== null}
+																		rightOpen={sidebars.panels.right.open}
+																		show={show}
+																		close={close}
+																		resize={resize}
+																		toggleSidebar={toggleSidebar}
+																	/>
+																</RenderBoundary>
+															</MentionListsContext.Provider>
+														</ToolsExpanded>
+													</ActivityVisibility.Provider>
+												</Plans>
+											</HeaderControlsContext.Provider>
+											<TerminalPanel panel={terminal} cwd={focused.workDir ?? workspace ?? "~"} />
+										</SidebarInset>
+										{(detailsView || openBot) && (
+											<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")} address={address}>
+												{detailsView ? (
+													<SessionDetails
+														key={hashForView(detailsView)}
+														view={detailsView}
+														working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
+														cwd={focused.cwd ?? null}
+														personalMemory={focused.cwd !== undefined && focused.cwd === state.personal?.cwd ? state.personalMemory : null}
+														pullRequests={focused.row?.pullRequests ?? []}
+														tickets={focused.row?.tickets ?? []}
+														workspace={workspace}
+														hosts={visible.hosts}
+													/>
+												) : (
+													openBot && (
+														<BotDetails
+															key={openBot.bot.id}
+															open={openBot}
+															session={openBot.host ?? state.past.find(({ sessionId }) => sessionId === openBot.bot.sessionId) ?? null}
+															memory={state.botMemories[openBot.bot.id] ?? ""}
+															tasks={state.routerTasks.filter(({ botId }) => botId === openBot.bot.id)}
+															hosts={state.hosts}
+															connected={state.connected}
+														/>
+													)
+												)}
+											</DashboardSidebar>
+										)}
+										<ShortcutsDialog open={overlays.shortcutsOpen} onOpenChange={setShortcutsOpen} tabs={barTabs} />
+										{refused && <ProjectTrustDialog key={refused.reqId} ask={refused.trust} connected={state.connected} onTrust={() => trustAndStart(refused)} onCancel={() => dismissTrust(refused.reqId)} />}
+										<GetStarted
+											route={page?.kind === "get-started"}
+											vacantHome={!page && layout.panes.length === 0}
+											firstSession={firstSessionFact({ hosts: state.hosts.length, past: state.past.length, listed: state.listed, connected: state.connected, rosterError: state.rosterError })}
+											rosterError={state.rosterError}
+											onClose={() => show(layout)}
 										/>
-									)}
-									<DiscussionPanel />
-									<CommandPalette
-										state={overlays.palette}
-										dispatch={dispatchPalette}
-										hosts={visible.hosts}
-										past={visible.past}
-										workspaces={workspaces}
-										workspace={workspace}
-										onOpenSession={openFromPalette}
-										onPickWorkspace={switchWorkspace}
-										pinned={sessions.pinned}
-										onTogglePin={sessions.togglePin}
-										handlers={handlers}
-										unavailable={unavailable}
-										tabs={barTabs}
-										todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
-										todos={mentionLists.todos}
-										notes={state.userNotes?.notes ?? null}
-										linearConnected={linearCallable}
-										onCreateTicket={setNewTicket}
-									/>
-								</SidebarProvider>
-								<StatusBar usage={state.usage} hosts={state.hosts} terminalOpen={terminal.open} onToggleTerminal={terminal.toggle} />
-								<DesktopLinkPreview />
-							</div>
+										{overlays.openedFile !== null && <FileDialog key={textFileUrl(overlays.openedFile)} target={overlays.openedFile} onClose={() => setOpenedFile(null)} />}
+										{overlays.newTicket !== null && <NewTicketDialog title={overlays.newTicket} onClose={() => setNewTicket(null)} />}
+										{goalEditor && editedGoal && editedGoal.goal.kind !== "off" && (
+											<GoalDialog
+												key={goalEditor.instanceId}
+												goal={editedGoal.goal.kind === "set" && editedGoal.goal.goal.status !== "complete" ? editedGoal.goal.goal : null}
+												focus={goalEditor.focus}
+												continues={editedGoal.goal.continues}
+												onClose={() => setGoalEditor(null)}
+												onSave={async change => { await request({ t: "goal", instanceId: goalEditor.instanceId, change }); setGoalEditor(null); }}
+											/>
+										)}
+										<DiscussionPanel />
+										<CommandPalette
+											state={overlays.palette}
+											dispatch={dispatchPalette}
+											hosts={visible.hosts}
+											past={visible.past}
+											workspaces={workspaces}
+											workspace={workspace}
+											onOpenSession={openFromPalette}
+											onPickWorkspace={switchWorkspace}
+											pinned={sessions.pinned}
+											onTogglePin={sessions.togglePin}
+											handlers={handlers}
+											unavailable={unavailable}
+											tabs={barTabs}
+											todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
+											todos={mentionLists.todos}
+											notes={state.userNotes?.notes ?? null}
+											linearConnected={linearCallable}
+											onCreateTicket={setNewTicket}
+										/>
+									</SidebarProvider>
+									<StatusBar usage={state.usage} hosts={state.hosts} terminalOpen={terminal.open} onToggleTerminal={terminal.toggle} />
+									<DesktopLinkPreview />
+								</div>
+							</PersonalContext.Provider>
 						</UserNotesContext.Provider>
 					</UserTodosContext.Provider>
 				</ScheduledSends.Provider>

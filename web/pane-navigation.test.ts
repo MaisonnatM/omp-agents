@@ -11,7 +11,7 @@ function host(instanceId: string, sessionId = `session-${instanceId}`, agents: A
 		control: { phase: "live", readOnly: false }, requests: [], queue: { steering: [], followUp: [] },
 		unread: null, thinkingLevels: [], switching: false, fast: null, pullRequests: [], tickets: [], ship: null,
 		compaction: { auto: true, running: null, thresholdTokens: null }, advisor: null, goal: { kind: "none", continues: false },
-		worktree: null, branch: null, workspace: null,
+		worktree: null, branch: null, workspace: null, private: false,
 	};
 }
 
@@ -229,7 +229,7 @@ describe("explicit history and startup", () => {
 	test("a start's unidentified live pane retires the old overlapping group and is remembered once the roster names it", () => {
 		let state = select(select(setup(), live("c")), live("b"));
 		expect(hashForLayout(state.layout)).toBe("#a,b@1");
-		const next = layoutAfterStart(state.layout, { kind: "new", cwd: "/work", prompt: "hi", images: [], model: null, thinking: null, skill: null, branch: null, todoId: null }, "fresh");
+		const next = layoutAfterStart(state.layout, { kind: "new", cwd: "/work", prompt: "hi", images: [], model: null, thinking: null, skill: null, branch: null, todoId: null, private: false }, "fresh");
 		if (!next) throw new Error("A new session must open a pane");
 		state = command(state, { kind: "edit", layout: next });
 		expect(hashForLayout(state.layout)).toBe("#a,fresh@1");
