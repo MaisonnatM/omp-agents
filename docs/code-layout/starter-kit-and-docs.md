@@ -3,6 +3,8 @@
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`).
 Its `agent/` files are the default kit.
 The installer's `planStarterKit` reads the same file, setting, marketplace, and plugin requirements for installation and Get started; customized `keep` entries count as present.
+Its `planKitFiles` replaces a file you have only when you never edited it: its git blob id matches the one `starter-kit-installed.json` in the agent directory recorded at the last install, or one the kit's files had in its git history; that record also remembers `--maintainer`.
+`--files` runs only that file plan, never adding back a recorded file you deleted, and `SelfUpdate` in `src/server/self-update.ts` runs it after a fast-forward; `templates/omp/install.test.ts` covers an outdated unedited file, an edited one, the git history, and `--files` on a scratch agent directory.
 The dashboard supplies read-only native snapshots instead of running CLI config initialization, and installation uses the exact resolved omp command, including `OMP_PACKAGE_DIR`.
 Packaged resources include `agent/`, `config.yml`, and `install.js`.
 `templates/omp/README.md` lists what each of its extensions does.

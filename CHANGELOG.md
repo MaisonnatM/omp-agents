@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-03
 
+- Update dashboard now also updates the omp starter kit files you never changed, so new omp sessions get the kit's latest fixes. Files you edited keep your version, and installing the starter kit again works the same way.
 - The starter kit tells agents to present a plan as a short decision card: what you asked, their answer, and what you decide, then at most three bullets, with a flow diagram when the plan changes a workflow. The card is the whole reply, with no summary or evidence list around it.
 - /ship plans now list the existing code they reuse, and a large change gets a pass that swaps rebuilt pieces for the ones the project already has before the draft PR opens.
 - New session can start a private session: turn on Private, the lock beside the skill toggle, and the session is deleted with everything it wrote when it ends. It never shows in Past sessions or History, and omp memory does not learn from it.

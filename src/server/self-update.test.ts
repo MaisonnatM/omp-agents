@@ -139,18 +139,20 @@ describe("fastForward", () => {
 });
 
 describe("SelfUpdate", () => {
-	/** A self-update of `checkout` that records its installs and restarts. */
+	/** A self-update of `checkout` that records its installs, its starter kit updates, and restarts. */
 	function recorded(checkout: Checkout) {
 		const installs: string[] = [];
+		const kitInstalls: string[] = [];
 		const { promise: restarted, resolve: restart } = Promise.withResolvers<void>();
-		const update = new SelfUpdate(checkout, restart, async dir => void installs.push(dir));
-		return { update, installs, restarted };
+		const update = new SelfUpdate(checkout, restart, { install: async dir => void installs.push(dir), installKit: async dir => void kitInstalls.push(dir) });
+		return { update, installs, kitInstalls, restarted };
 	}
+	const noKit = { installKit: async () => {} };
 
 	test("lists CHANGELOG.md's lines newest day first, marking those only origin holds as not installed", async () => {
 		const { build, pusher } = await checkout();
 		const entriesOf = async (running: RunningBuild) => {
-			const update = new SelfUpdate({ kind: "checkout", build: running }, () => {});
+			const update = new SelfUpdate({ kind: "checkout", build: running }, () => {}, noKit);
 			await update.newCommits();
 			const changelog = await update.changelog();
 			if (changelog.kind !== "checkout") throw new Error(changelog.reason);
@@ -207,13 +209,14 @@ describe("SelfUpdate", () => {
 		expect(await update.status()).toEqual({ kind: "checkout", branch: "main", running: build.commit, behind: 2 });
 	});
 
-	test("restarts once the checkout moved, installing only when bun.lock changed", async () => {
+	test("restarts once the checkout moved, installing only when bun.lock changed and updating the starter kit's files", async () => {
 		const { build, pusher } = await checkout();
 		const tip = await push(pusher, "a");
-		const { update, installs, restarted } = recorded({ kind: "checkout", build });
+		const { update, installs, kitInstalls, restarted } = recorded({ kind: "checkout", build });
 		expect(await update.update()).toEqual({ kind: "restarting", from: build.commit, to: tip, installed: false });
 		await restarted;
 		expect(installs).toEqual([]);
+		expect(kitInstalls).toEqual([build.dir]);
 	});
 
 	test("installs before restarting when bun.lock changed, and answers a second update with the first", async () => {
@@ -231,7 +234,7 @@ describe("SelfUpdate", () => {
 	test("a check queued behind an update that restarts fetches nothing", async () => {
 		const { build, pusher } = await checkout();
 		const tip = await push(pusher, "bun.lock", "v2");
-		const update = new SelfUpdate({ kind: "checkout", build }, () => {}, async () => void (await push(pusher, "later")));
+		const update = new SelfUpdate({ kind: "checkout", build }, () => {}, { install: async () => void (await push(pusher, "later")), installKit: async () => {} });
 		const updated = update.update();
 		const queued = update.newCommits();
 		expect(await updated).toEqual({ kind: "restarting", from: build.commit, to: tip, installed: true });
@@ -241,9 +244,10 @@ describe("SelfUpdate", () => {
 
 	test("answers current without restarting when origin holds nothing new", async () => {
 		const { build } = await checkout();
-		const { update, installs } = recorded({ kind: "checkout", build });
+		const { update, installs, kitInstalls } = recorded({ kind: "checkout", build });
 		expect(await update.update()).toEqual({ kind: "current" });
 		expect(installs).toEqual([]);
+		expect(kitInstalls).toEqual([]);
 	});
 
 	test("refuses where the server cannot update itself", async () => {

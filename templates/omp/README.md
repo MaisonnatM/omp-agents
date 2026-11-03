@@ -19,12 +19,17 @@ The installer:
 - applies each setting in [`config.yml`](config.yml) with `omp config set`, so omp writes it and every other key in your `config.yml` stays as it is;
 - adds the [`cursor/plugins`](https://github.com/cursor/plugins) marketplace and installs its `pstack` plugin, unless they are already there.
 
-A file or a setting that you already have keeps your version, and the installer lists it as `keep yours`.
-Pass `--force` to overwrite those with the kit's version.
+A setting that you already have keeps your value, and the installer lists it as `keep yours`.
+A file that you already have is replaced, listed as `overwrite`, only when you never edited it: it matches what the last install wrote, which the installer records in `starter-kit-installed.json` in the agent directory, or a version the kit shipped before, which the kit's git history holds.
+A file you edited keeps your version and is listed as `keep yours`; merge the kit's changes into it by hand, or pass `--force` to overwrite it and every other `keep yours` with the kit's version.
 Running the installer again changes nothing that already matches.
+After one install with `--maintainer`, later installs copy `maintainer/` too.
+
+`bun run omp-template --files` brings only the files up to date, as the last recorded install chose them, and never adds back a file you deleted; it needs no omp and does nothing before an install has been recorded.
+**Update dashboard** runs it in the updated checkout before the server restarts, so a landed kit change reaches the files you never edited.
 
 The desktop app's **Get started** starter kit step and **Install omp Starter Kit…** menu run this same non-forced installer.
-That step's read-only status includes files, settings, marketplace, and plugins; `keep yours` is complete rather than an invitation to overwrite it.
+That step's read-only status includes files, settings, marketplace, and plugins; `keep yours` is complete rather than an invitation to overwrite it, and an outdated file you never edited is pending.
 CLI calls use the resolved omp package, including `OMP_PACKAGE_DIR` when set.
 
 Restart running omp sessions to pick up the new files and settings.
