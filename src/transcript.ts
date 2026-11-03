@@ -355,7 +355,7 @@ export class Transcript {
 					const skill = str(details.name);
 					// Subagents get skills as hidden context the user never typed.
 					if (message.attribution !== "user" || !skill) return [];
-					return this.#upsert(promptItem(key, { text: skillArgs(message), skill }, { from: null, entryId: null }));
+					return this.#upsert(promptItem(key, { text: skillArgs(message), skill }, { from: null, entryId: null, ...imagesOf(message.content) }));
 				}
 				if (message.customType !== COLLAB_PROMPT) return [];
 				return this.#upsert(promptItem(key, unwrapSkill(textOf(message.content)), { from: str(details.from) ?? null, entryId: null, ...imagesOf(message.content) }));

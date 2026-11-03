@@ -3,6 +3,11 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-03
+
+- Fixed: images you send with a skill, such as the first message of a new session with a pinned skill, now stay in the conversation instead of disappearing once the agent starts. Past sessions show them again too.
+- Images you send now show as smaller thumbnails in the conversation, the same size as the agent's screenshots.
+
 ## 2026-11-02
 
 - Fixed: a session that omp went on with in a new file, because another omp window had it open, now shows once in Past sessions instead of twice.
