@@ -13,6 +13,7 @@ import { CRUMB_SEPARATOR, PARENT_CRUMB, SessionIdCopy, SessionMeta } from "./ses
 import { SessionTitle } from "./session-title";
 import type { Subject } from "./subject";
 import { SessionGoalControl } from "./session-goal";
+import { TodosCardToggle } from "./session-todos-card";
 
 /** A live session shows no status: the header speaks up only while the connection is not live. */
 const CONTROL_LABEL: Record<Exclude<ControlPhase["phase"], "live">, string> = {
@@ -93,6 +94,7 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 			{goalSet && goal}
 			{subject.kind === "session" && shown && <SessionMeta facts={shown} />}
 			{subject.kind === "session" && <OpenPullRequestButton view={view} host={host} />}
+			{subject.kind === "session" && <TodosCardToggle />}
 			{subject.kind === "session" && endable && (
 				<Tooltip
 					content={`End session. Stops the omp process ${endable.source === "dashboard" ? "this dashboard started" : `running in its terminal (pid ${endable.pid})`}. Its transcript moves to Past sessions, where Resume continues it.`}

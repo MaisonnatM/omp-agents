@@ -24,7 +24,7 @@ The trajectory toggle beside the title keeps its state per pane and per view, an
 
 ## Consequences
 
-Users hide or show the whole card from the checklist button after a session's title or from **Show todos card**, and the choice holds in every pane and after a reload.
+Users hide or show the whole card from the checklist button in a session's header or from **Show todos card**, and the choice holds in every pane and after a reload.
 Someone who hid the todo list with **Show todos card** before this change now sees no card at all, its files, images, and sources included, until they turn it back on.
 This record replaces only the **Show todos card** consequence of `2026-10-28-files-images-and-sources-live-in-the-todos-card`; its choice of one card with sections still stands, so that record stays accepted.
 The stored key stays `omp-agents.todos-card-shown`, so an existing choice carries over with its wider meaning.

@@ -1,3 +1,4 @@
+import { TodosCardToggle } from "./session-todos-card";
 import { type ReactNode, useMemo } from "react";
 import type { PastSession } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,7 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 						{session && (
 							<>
 								<SessionMeta facts={session} />
+								<TodosCardToggle />
 								{!foreign && (
 									<Tooltip content="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here.">
 										<Button
