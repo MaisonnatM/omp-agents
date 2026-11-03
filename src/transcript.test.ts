@@ -83,6 +83,19 @@ describe("Transcript", () => {
 		expect(t.items()).toMatchObject([{ id: "m700", images: [`/api/image?hash=${hash}&type=image%2Fpng`] }]);
 	});
 
+	test("a /skill: prompt keeps its images, live and from its file entry, as omp sends them after the skill's text", () => {
+		const t = new Transcript();
+		const hash = "b".repeat(64);
+		const details = { name: "mma-mode", path: "/s/SKILL.md", args: "match this", prompt: "/skill:mma-mode match this" };
+		const prompt = (data: string) => ({ role: "custom", customType: "skill-prompt", content: [text("[IMPORTANT: …]"), { type: "image", data, mimeType: "image/png" }], display: true, details, attribution: "user", timestamp: 800 });
+		expect(t.applyEvent({ type: "message_end", message: prompt("aGVsbG8=") })).toEqual([
+			{ id: "m800", kind: "user", text: "match this", skill: "mma-mode", from: null, entryId: null, images: ["data:image/png;base64,aGVsbG8="] },
+		]);
+		const { role: _, timestamp: __, ...fields } = prompt(`blob:sha256:${hash}`);
+		t.applyEntry({ type: "custom_message", id: "e1", ...fields, timestamp: new Date(800).toISOString() });
+		expect(t.items()).toMatchObject([{ id: "m800", images: [`/api/image?hash=${hash}&type=image%2Fpng`] }]);
+	});
+
 	test("a prompt's attached files show by name, apart from its text, a skill prompt's arguments included", () => {
 		const t = new Transcript();
 		const files = withFiles("sum these up", [{ name: "notes.md", text: "# Notes" }, { name: "spec.pdf", text: "Spec" }]);
