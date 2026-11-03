@@ -42,12 +42,15 @@ function lastReply(messages: unknown): string | null {
 
 /**
  * What a main-agent live event does to its turn, which both transports report: `agent_start` starts one, and an
- * `agent_end` ends it, unless it hands over to a queued follow-up (`isTerminal: false`); `null` for any other event.
+ * `agent_end` ends it, unless it hands over to more of the run, such as a queued follow-up (`isTerminal: false`).
+ * An end that only waits on a background job (`awaitingAsyncWork`) ends it too: the agent gave the turn back, and the
+ * job's result starts the next one with its own `agent_start`. `null` for any other event.
  */
 export function turnUpdate(event: unknown): TurnUpdate | null {
 	if (!isObject(event)) return null;
 	if (event.type === "agent_start") return { kind: "turn-started" };
-	return event.type === "agent_end" && event.isTerminal !== false ? { kind: "turn-ended", reply: lastReply(event.messages), failure: turnFailureOf(event.messages) } : null;
+	if (event.type !== "agent_end" || (event.isTerminal === false && event.awaitingAsyncWork !== true)) return null;
+	return { kind: "turn-ended", reply: lastReply(event.messages), failure: turnFailureOf(event.messages) };
 }
 
 /** A turn that ended: when, in ms since the epoch, and its last reply, `null` when it ended on none. */

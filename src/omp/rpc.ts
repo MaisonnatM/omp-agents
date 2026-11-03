@@ -65,8 +65,6 @@ export interface RpcState {
 	isStreaming: boolean;
 	/** Whether omp compacts the context, which a turn's own maintenance does before it goes on. */
 	isCompacting: boolean;
-	/** Whether a background job's result will start the agent again once it arrives. */
-	hasPendingAsyncWork: boolean;
 	/** omp's displayable steering and follow-up queues, as its `queue_update` event reports them. */
 	queuedMessages: { steering: string[]; followUp: string[] };
 }

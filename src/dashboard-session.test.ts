@@ -20,7 +20,7 @@ import type { PreparedReplay } from "./replay";
 import * as ompConfig from "./omp/config";
 import type { SessionControlsConfig } from "./omp/config";
 
-const STATE: RpcState = { sessionId: "session-1", fastModeEnabled: false, fastModeActive: false, autoCompactionEnabled: true, goal: null, isStreaming: false, isCompacting: false, hasPendingAsyncWork: false, queuedMessages: { steering: [], followUp: [] } };
+const STATE: RpcState = { sessionId: "session-1", fastModeEnabled: false, fastModeActive: false, autoCompactionEnabled: true, goal: null, isStreaming: false, isCompacting: false, queuedMessages: { steering: [], followUp: [] } };
 
 /** Admits every directory: project trust has its own tests, and a spawn here only needs one. */
 const ADMIT_ALL = async (): Promise<void> => {};
