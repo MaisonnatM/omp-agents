@@ -125,8 +125,8 @@ export function replacingPrompt(previous: readonly Item[], items: readonly Item[
 	return prompt && !previous.some(item => item.id === prompt.id) ? prompt.id : null;
 }
 
-/** One image a tool's result returned: its tool item, its place among that item's images, and the line that captions it. */
-export interface ToolImage {
+/** One image the viewer steps through: its prompt or tool item, its place among that item's images, and the line that captions it. */
+export interface TranscriptImage {
 	id: string;
 	at: number;
 	src: string;
@@ -151,7 +151,7 @@ interface Segment {
 	forks: [string, ForkPoint][];
 	tools: number;
 	failed: number;
-	images: ToolImage[];
+	images: TranscriptImage[];
 	/** The agent's todo list as its latest successful `todo` call up to and including this segment left it. */
 	todos: readonly TodoPhase[];
 }
@@ -189,8 +189,8 @@ export interface TranscriptModel {
 	replies: ReadonlySet<string>;
 	/** Each turn in transcript order. A turn still running has no reply until it ends. */
 	outline: readonly OutlineTurn[];
-	/** Every image the tool calls returned, in reading order, each captioned with its tool and what the call said it did. */
-	images: readonly ToolImage[];
+	/** Every image the prompts carried and the tool calls returned, in reading order, each captioned with what sent it. */
+	images: readonly TranscriptImage[];
 	/** The agent's todo list as its latest successful `todo` call left it; empty before its first one. */
 	todos: readonly TodoPhase[];
 	/**
@@ -232,7 +232,7 @@ const TURN_EQUAL: FieldEqual<OutlineTurn> = {
 	running: same,
 };
 
-const IMAGE_EQUAL: FieldEqual<ToolImage> = { id: same, at: same, src: same, caption: same };
+const IMAGE_EQUAL: FieldEqual<TranscriptImage> = { id: same, at: same, src: same, caption: same };
 
 const FORK_EQUAL: FieldEqual<ForkPoint> = { entryId: same, prefill: same };
 
@@ -270,7 +270,7 @@ function segmentOf(items: readonly Item[], start: number, end: number, next: Ite
 	let lastAssistant: AssistantItem | null = null;
 	let tools = 0;
 	let failed = 0;
-	const images: ToolImage[] = [];
+	const images: TranscriptImage[] = [];
 	for (let at = start; at < end; at++) {
 		const item = items[at]!;
 		if (item.kind === "assistant") {
@@ -284,6 +284,8 @@ function segmentOf(items: readonly Item[], start: number, end: number, next: Ite
 				const caption = [item.name, item.summary].filter(Boolean).join(" · ");
 				item.images.forEach((src, index) => images.push({ id: item.id, at: index, src, caption }));
 			}
+		} else if (item.kind === "user" && item.images) {
+			item.images.forEach((src, index) => images.push({ id: item.id, at: index, src, caption: "Your message" }));
 		}
 	}
 	const forks: [string, ForkPoint][] = [];

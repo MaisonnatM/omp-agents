@@ -172,8 +172,8 @@ export const SubagentLinks = createContext<{
 /** How long a resize of the transcript's lane rests before its rows lay out again at the new width. */
 const RESIZE_REST_MS = 150;
 
-/** Opens the transcript's image viewer at image `at` of tool item `id`; outside a `Transcript` it does nothing. */
-const OpenToolImage = createContext<(id: string, at: number) => void>(() => {});
+/** Opens the transcript's image viewer at image `at` of prompt or tool item `id`; outside a `Transcript` it does nothing. */
+const OpenImage = createContext<(id: string, at: number) => void>(() => {});
 
 function CancelAgentButton({ view, onCancel, running }: { view: LiveView & { agentId: string }; onCancel: (view: LiveView & { agentId: string }) => Promise<void>; running: boolean }) {
 	const LoaderIcon = useIcon("loader");
@@ -240,7 +240,7 @@ function SpawnedAgents({ ids }: { ids: string[] }) {
 
 /** The images a tool's result returned, as thumbnails under its line; one opens large in the transcript's viewer. */
 function ToolImages({ id, srcs, tool }: { id: string; srcs: string[]; tool: string }) {
-	const openImage = useContext(OpenToolImage);
+	const openImage = useContext(OpenImage);
 	const label = (index: number): string => `Image ${index + 1} from ${tool}`;
 	return (
 		<span className="-mt-1 ml-6 flex flex-wrap gap-1.5" data-tool-images>
@@ -565,6 +565,7 @@ const MessageRow = memo(function MessageRow({
 	item, copyable, forkAt, prefill, forking, forkDisabled, failed, editAt, editor, replacing, settled, onFork, onEditing,
 }: MessageRowProps) {
 	const copied = copyText(item);
+	const openImage = useContext(OpenImage);
 	const point = forkAt === null || !onFork ? null : { entryId: forkAt, prefill };
 	const edit = editAt !== null && item.kind === "user" ? () => onEditing(item, editAt) : undefined;
 	const pending = item.kind === "user" && item.pending === true;
@@ -577,6 +578,7 @@ const MessageRow = memo(function MessageRow({
 				time={item.kind === "user" ? (item.from ?? undefined) : undefined}
 				files={item.kind === "user" ? item.files : undefined}
 				images={item.kind === "user" ? item.images?.map(mediaSrc) : undefined}
+				onOpenImage={index => openImage(item.id, index)}
 				actions={
 					editor ? undefined : copyable || point || edit ? (
 						<>
@@ -727,7 +729,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	}, [revealId, loaded, items, view, scrollToMessage]);
 
 	return (
-		<OpenToolImage.Provider value={openImage}>
+		<OpenImage.Provider value={openImage}>
 			<div className="@container/conversation relative flex min-h-0 flex-1 flex-col" data-conversation>
 				<SessionTodosCard
 					phases={model.todos}
@@ -818,6 +820,6 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 					onClose={() => setImage(null)}
 				/>
 			)}
-		</OpenToolImage.Provider>
+		</OpenImage.Provider>
 	);
 });

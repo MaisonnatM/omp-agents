@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, type ReactNode } from "react";
+import { forwardRef, Fragment, type ReactNode } from "react";
 import { motion, type HTMLMotionProps } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { spring } from "@/lib/springs";
@@ -18,6 +18,8 @@ interface ChatMessageProps
   files?: string[];
   /** Addresses of images the message carried, shown above the bubble. */
   images?: string[];
+  /** Opens image `index` of `images` large; omitted, the images are not buttons. */
+  onOpenImage?: (index: number) => void;
   /** Timestamp shown in the hover-revealed meta row, before the actions.
    *  User-message only — ignored on assistant replies. Caller pre-formats it
    *  (e.g. `"Wednesday 6:08 PM"`). */
@@ -39,7 +41,7 @@ interface ChatMessageProps
 // lets earlier messages slide up smoothly when a new one is appended.
 const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
   (
-    { from, files, images, time, actions, children, size, className, ...props },
+    { from, files, images, onOpenImage, time, actions, children, size, className, ...props },
     ref
   ) => {
     const shape = useShape();
@@ -96,19 +98,33 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
               isUser ? "justify-end" : "justify-start"
             )}
           >
-            {images.map((src, i) => (
+            {images.map((src, i) => {
+              const image = (
+                <img
+                  src={src}
+                  alt={`Attached image ${i + 1}`}
+                  loading="lazy"
+                  className={cn(
+                    "min-w-0 max-h-32 max-w-60 object-contain outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10",
+                    shape.bg
+                  )}
+                />
+              );
               // A message's images never change, so their order names them.
-              <img
-                key={i}
-                src={src}
-                alt={`Attached image ${i + 1}`}
-                loading="lazy"
-                className={cn(
-                  "min-w-0 max-h-32 max-w-60 object-contain outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10",
-                  shape.bg
-                )}
-              />
-            ))}
+              return onOpenImage ? (
+                <button
+                  key={i}
+                  type="button"
+                  aria-label={`Open attached image ${i + 1}`}
+                  onClick={() => onOpenImage(i)}
+                  className="min-w-0 cursor-zoom-in"
+                >
+                  {image}
+                </button>
+              ) : (
+                <Fragment key={i}>{image}</Fragment>
+              );
+            })}
           </div>
         )}
         {children != null && children !== "" && (

@@ -6,7 +6,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-11-03
 
 - Fixed: images you send with a skill, such as the first message of a new session with a pinned skill, now stay in the conversation instead of disappearing once the agent starts. Past sessions show them again too.
-- Images you send now show as smaller thumbnails in the conversation, the same size as the agent's screenshots.
+- Images you send now show as smaller thumbnails in the conversation, the same size as the agent's screenshots. Click one to open it full size, as with screenshots.
 
 ## 2026-11-02
 
