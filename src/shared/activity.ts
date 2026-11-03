@@ -61,6 +61,7 @@ export const CONTROLS = [
 	{ id: "get-started.close", label: "Get started closed into its bubble", area: "Get started" },
 	{ id: "get-started.bubble", label: "Get started reopened from its bubble", area: "Get started" },
 	{ id: "trajectory.toggle", label: "Trajectory toggle", area: "Panes" },
+	{ id: "todos-card.toggle", label: "Todos card shown or hidden", area: "Panes" },
 	{ id: "trajectory.turn", label: "Trajectory turn, folded or unfolded", area: "Panes" },
 	{ id: "trajectory.step", label: "Trajectory step, folded or unfolded", area: "Panes" },
 	{ id: "replay.open", label: "Replay from here", area: "Panes" },

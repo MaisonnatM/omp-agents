@@ -208,7 +208,7 @@ export function PreferencesTab({ cwd, workspace }: { cwd: string | null; workspa
 					})}
 				</RadioGroup>
 			</Section>
-			<Section title="Transcript" meta="What each activity group shows under its heading, and whether the agent's todo list floats at the top right, in every pane. Saved in this app.">
+			<Section title="Transcript" meta="What each activity group shows under its heading, and whether the Todos card shows beside or above the messages, in every pane. Saved in this app.">
 				<div className="space-y-2">
 					<ActivitySwitch label="Show tool calls" shortcut="hideTools" checked={!hideTools} onToggle={toggleTools} />
 					<ActivitySwitch label="Show thinking" shortcut="hideThinking" checked={!hideThinking} onToggle={toggleThinking} />

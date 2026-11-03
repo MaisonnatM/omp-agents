@@ -5,6 +5,8 @@ import remarkGfm from "remark-gfm";
 import { SHIP_STAGES, type ShipProgress, type View } from "../../src/shared/sessions";
 import type { TodoPhase, TodoTask } from "../../src/shared/transcript";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { activityControl } from "../activity";
 import { useStoredState } from "../stored-state";
@@ -34,8 +36,28 @@ const WORK_LABEL: Record<NonNullable<ShipProgress["work"]>, string> = {
 	fix_ci: "Fixing CI",
 };
 
-/** Whether transcripts show the card's todo list, which Settings → Preferences toggles. */
+/** Whether transcripts show the whole Todos card, which the checklist button in the session header and Settings → Preferences both toggle. */
 export const useTodosCardShown = () => useStoredState(SHOWN_KEY, raw => raw !== "false");
+
+/** The session header's checklist button, which hides or shows the whole Todos card in every pane. */
+export function TodosCardToggle() {
+	const [shown, setShown] = useTodosCardShown();
+	return (
+		<Tooltip content={shown ? "Hide the todos card: todos, ship steps, files, images, and sources" : "Show the todos card"} side="bottom">
+			<Button
+				{...activityControl("todos-card.toggle")}
+				variant="ghost"
+				size="icon-compact"
+				aria-label="Hide todos card"
+				aria-pressed={!shown}
+				className={cn(!shown && "bg-muted text-foreground")}
+				onClick={() => setShown(value => !value)}
+			>
+				<ListChecks />
+			</Button>
+		</Tooltip>
+	);
+}
 
 const STATUS_LABEL: Record<TodoTask["status"], string> = {
 	pending: "To do",
@@ -307,10 +329,10 @@ interface SessionTodosCardProps {
  * Memoized: `phases` keeps its identity until a `todo` call changes it, so a streamed token leaves the card as it is.
  */
 export const SessionTodosCard = memo(function SessionTodosCard({ phases, view, working, changes, ship }: SessionTodosCardProps) {
-	const [todosShown] = useTodosCardShown();
-	const todos = todosShown && phases.length > 0;
+	const [shown] = useTodosCardShown();
 	const found = useChanges(view, changes);
-	if (!ship && !todos && !found) return null;
+	const todos = phases.length > 0;
+	if (!shown || (!ship && !todos && !found)) return null;
 	return (
 		<section
 			aria-label="Todos"
