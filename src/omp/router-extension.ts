@@ -9,7 +9,8 @@ import { isAbsolute } from "node:path";
 import { parseJson } from "../json";
 import { type BotId, parseBotId } from "../shared/bots";
 import { followKey, isOpenTask, MAX_TASK_NOTE, MAX_TASK_PROMPT, MAX_TASK_TITLE, parseRouterTasks, parseTaskFollow, type RouterChange, type RouterTaskChange, type TaskFollow } from "../shared/router";
-import { type BotExtensionApi, flagValue, leave, readText, reply } from "./bot-extension";
+import { leave } from "./bot-extension";
+import { type ExtensionApi, flagValue, readText, reply } from "./extension-kit";
 
 /** The flags a Router's session starts with: its Bot's id, the directory its tools leave their requests in, and the tasks file it reads. */
 export const ROUTER_FLAGS = {
@@ -66,7 +67,7 @@ function follows(values: readonly TaskFollow[]): TaskFollow[] {
 	});
 }
 
-export default function routerExtension(pi: BotExtensionApi): void {
+export default function routerExtension(pi: ExtensionApi): void {
 	pi.registerFlag(ROUTER_FLAGS.bot, { type: "string", description: "The omp-agents Router Bot this session is." });
 	pi.registerFlag(ROUTER_FLAGS.inbox, { type: "string", description: "The directory its tools leave their requests in." });
 	pi.registerFlag(ROUTER_FLAGS.tasks, { type: "string", description: "The file the dashboard keeps every Router's tasks in." });

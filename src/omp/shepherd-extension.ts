@@ -6,7 +6,8 @@ import { parseBotId } from "../shared/bots";
 import { parsePullRequest } from "../shared/github";
 import { MAX_FIXES_PER_PULL_REQUEST, SHEPHERD_FIXES, type ShepherdChange } from "../shared/shepherd";
 import { MERGE_METHODS } from "../shared/source-control";
-import { type BotExtensionApi, flagValue, leave, reply } from "./bot-extension";
+import { leave } from "./bot-extension";
+import { type ExtensionApi, flagValue, reply } from "./extension-kit";
 
 /** The flags a shepherd's session starts with: its Bot's id, and the directory its tools leave their requests in. */
 export const SHEPHERD_FLAGS = {
@@ -34,7 +35,7 @@ const RULES = [
 	"Both tools only leave a request; when the dashboard refuses one, it tells you why in this conversation. Then tell the user, and do not ask again for that pull request until a routine run names it again.",
 ].join("\n");
 
-export default function shepherdExtension(pi: BotExtensionApi): void {
+export default function shepherdExtension(pi: ExtensionApi): void {
 	pi.registerFlag(SHEPHERD_FLAGS.bot, { type: "string", description: "The omp-agents PR shepherd Bot this session is." });
 	pi.registerFlag(SHEPHERD_FLAGS.inbox, { type: "string", description: "The directory its tools leave their requests in." });
 
