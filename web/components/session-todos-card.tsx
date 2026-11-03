@@ -1,5 +1,5 @@
 import { ChevronRight, ListChecks, Ship } from "lucide-react";
-import { memo, type ReactNode, useState } from "react";
+import { memo, type ReactNode, useLayoutEffect, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { SHIP_STAGES, type ShipProgress, type View } from "../../src/shared/sessions";
@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { activityControl } from "../activity";
+import { keyedStore } from "../keyed-store";
+import { hashForView } from "../routing";
 import { useStoredState } from "../stored-state";
 import { subagentTree } from "../todos-card-subagents-model";
 import type { SubagentLinksValue } from "./subagent-links";
@@ -39,21 +41,26 @@ const WORK_LABEL: Record<NonNullable<ShipProgress["work"]>, string> = {
 	fix_ci: "Fixing CI",
 };
 
-/** Whether transcripts show the whole Todos card, which the checklist button in the session header and Settings → Preferences both toggle. */
+/** Whether transcripts show the whole Todos card, which the checklist toggle in the session header and Settings → Preferences both toggle. */
 export const useTodosCardShown = () => useStoredState(SHOWN_KEY, raw => raw !== "false");
 
-/** The session header's checklist button, which hides or shows the whole Todos card in every pane. */
-export function TodosCardToggle() {
+/** Per view hash, how many mounted Todos cards have a section to show, so the header toggle shows only while one could appear. */
+const filledCards = keyedStore(0);
+
+/** The session header's checklist toggle, pressed while the Todos card shows in every pane, and absent while the view's card has nothing to show. */
+export function TodosCardToggle({ view }: { view: View }) {
 	const [shown, setShown] = useTodosCardShown();
+	const filled = filledCards.use(hashForView(view)) > 0;
+	if (!filled) return null;
 	return (
-		<Tooltip content={shown ? "Hide the todos card: todos, ship steps, files, images, and sources" : "Show the todos card"} side="bottom">
+		<Tooltip content={shown ? "Hide the todos card" : "Show the todos card: todos, ship steps, subagents, files, images, and sources"} side="bottom">
 			<Button
 				{...activityControl("todos-card.toggle")}
 				variant="ghost"
 				size="icon-compact"
-				aria-label="Hide todos card"
-				aria-pressed={!shown}
-				className={cn(!shown && "bg-muted text-foreground")}
+				aria-label="Todos card"
+				aria-pressed={shown}
+				active={shown}
 				onClick={() => setShown(value => !value)}
 			>
 				<ListChecks />
@@ -339,7 +346,14 @@ export const SessionTodosCard = memo(function SessionTodosCard({ phases, view, w
 	const found = useChanges(view, changes);
 	const todos = phases.length > 0;
 	const nodes = subagents ? subagentTree(subagents.agents, view.kind === "live" ? view.agentId : null) : [];
-	if (!shown || (!ship && !todos && nodes.length === 0 && !found)) return null;
+	const filled = ship !== null || todos || nodes.length > 0 || found !== null;
+	const key = hashForView(view);
+	useLayoutEffect(() => {
+		if (!filled) return;
+		filledCards.set(key, filledCards.get(key) + 1);
+		return () => filledCards.set(key, filledCards.get(key) - 1);
+	}, [key, filled]);
+	if (!shown || !filled) return null;
 	return (
 		<section
 			aria-label="Todos"

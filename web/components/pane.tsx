@@ -97,7 +97,7 @@ export const ViewConversation = memo(function ViewConversation({ view, focused, 
 				size="icon-compact"
 				aria-label="Trajectory"
 				aria-pressed={trajectory}
-				className={cn(trajectory && "bg-muted text-foreground")}
+				active={trajectory}
 				onClick={() => setTrajectoryOf(trajectory ? null : hashForView(view))}
 			>
 				<Route />

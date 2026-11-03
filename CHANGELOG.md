@@ -7,7 +7,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - The Todos card now lists a session's subagents with their status, so you can open or stop one without scrolling back to where it started.
 - Fixed: a session that replied while a background job it started was still running no longer shows as working until the job ends. It shows idle and tells you it replied, and shows working again when the job's result wakes it.
-- You can hide the todos card with the checklist button in a session's header, between Open PR and End session; it hides the whole card, its files, images, and sources too, as Show todos card in Settings → Preferences now does.
+- You can hide or show the todos card with the checklist toggle in a session's header, between Open PR and End session; it hides the whole card, its files, images, and sources too, as Show todos card in Settings → Preferences now does.
+- The checklist toggle looks pressed while the todos card shows, and appears only while the card has something to show, such as todos, ship steps, subagents, files, images, or sources.
 - Agents can now run git in a throwaway folder they just made with `mktemp`, such as `d=$(mktemp -d); cd $d`, without being told to spell out its path.
 - Fixed: images you send with a skill, such as the first message of a new session with a pinned skill, now stay in the conversation instead of disappearing once the agent starts. Past sessions show them again too.
 - Images you send now show as smaller thumbnails in the conversation, the same size as the agent's screenshots. Click one to open it full size, as with screenshots.

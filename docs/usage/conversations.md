@@ -18,8 +18,9 @@
   A turn's tokens add up its requests and its side calls, each from the usage omp recorded for it.
   A subagent's turns show in the subagent's own pane, not its parent's.
   The pane goes back to the transcript when it opens another conversation.
-- The checklist button in a session's header, between **Open PR** and End session, or before **Resume** in a past session, hides or shows the **Todos** card in every pane, the same choice as **Show todos card** in Settings › Preferences.
-  It stays highlighted while the card is hidden.
+- The checklist toggle in a session's header, between **Open PR** and End session, or before **Resume** in a past session, hides or shows the **Todos** card in every pane, the same choice as **Show todos card** in Settings › Preferences.
+  It looks pressed while the card shows.
+  It appears only while the card has something to show, a todo list, /ship steps, subagents, files, images, or sources, and leaves with the card while the trajectory takes the transcript's place.
 - The transcript fades at its top or bottom edge only while more of it lies past that edge, so a conversation that fits the pane shows no fade.
 - Each tool call in a tool group is a line with an icon for its tool, such as a terminal for `bash`, a page for `read`, and a plug for an MCP tool; a tool without its own icon shows a wrench.
   A call that is running shimmers, a call that failed is red, and the group's heading counts the failures.
@@ -68,7 +69,7 @@
   Once the view's agent made a todo list, the card shows the list as its latest `todo` call left it: how many tasks are done of all, a thin progress line, and the task in progress.
   It floats at the conversation's top right, narrowing to fit the space beside the messages, and sits above them when that space is too narrow, so it never covers a message; it scrolls as a whole when its sections outgrow it.
   Click the todo summary to unfold every phase, and click it again to fold it; it starts folded, and the app remembers your choice for every conversation.
-  **Show todos card** in Settings › Preferences, or the checklist button in the session's header, before End session or Resume, hides the whole card, its **Subagents**, **Files**, **Images**, and **Sources** sections too.
+  **Show todos card** in Settings › Preferences, or the checklist toggle in the session's header, before End session or Resume, hides the whole card, its **Subagents**, **Files**, **Images**, and **Sources** sections too.
   Unfolded, each phase shows its done count and its open tasks first, a blocked task's reason under it; its done and dropped tasks fold into an **N done** row.
   Each status has its own mark: an empty ring for to do, a spinning arc beside a shimmering title for in progress, a green disc with a check for done, an amber disc with an exclamation mark for blocked, and a dashed ring for dropped.
   A phase with every task done folds to one line; click it to open it.
