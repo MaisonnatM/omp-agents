@@ -8,11 +8,13 @@ import { stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { attributeTurns, type ContextFileRow, type ContextSourceRow, type SessionReading, type TokenCounter, type Turn } from "../context-sources";
 import { errorText, isObject, str } from "../json";
+import { ompVersion } from "./install";
 import { dirs, loader, modelTokenizer, sessionContext, tokenizer } from "./modules";
 import type { FileEntry } from "./module-types/session";
 
-/** Raise when attribution changes: an index of another version is read again from the session files. */
-const INDEX_VERSION = 2;
+/** Raise when attribution changes. With omp's version, whose tokenizer and catalog make every count, it keys the index: an index of another key is read again from the session files. */
+const INDEX_VERSION = 1;
+const INDEX_KEY = `${INDEX_VERSION}/${ompVersion}`;
 
 /** The least time between syncs that a report starts. */
 const SYNC_GAP_MS = 15_000;
@@ -86,10 +88,11 @@ export class ContextIndex {
 		this.#db = new Database(dbPath, { create: true });
 		this.#root = root;
 		this.#db.run("PRAGMA journal_mode = WAL");
-		const { user_version: version } = this.#db.query<{ user_version: number }, []>("PRAGMA user_version").get()!;
-		if (version !== INDEX_VERSION) {
+		this.#db.run("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+		const stored = this.#db.query<{ value: string }, []>("SELECT value FROM meta WHERE key = 'index'").get()?.value;
+		if (stored !== INDEX_KEY) {
 			this.#db.run("DROP TABLE IF EXISTS turn_sources; DROP TABLE IF EXISTS turns; DROP TABLE IF EXISTS sources; DROP TABLE IF EXISTS files");
-			this.#db.run(`PRAGMA user_version = ${INDEX_VERSION}`);
+			this.#db.run("INSERT OR REPLACE INTO meta (key, value) VALUES ('index', ?)", [INDEX_KEY]);
 		}
 		this.#db.run(SCHEMA);
 	}

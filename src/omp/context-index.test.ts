@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite";
 import { afterEach, describe, expect, test } from "bun:test";
 import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -56,6 +57,22 @@ describe("ContextIndex", () => {
 		({ files, sources } = index.read(null));
 		expect(files[0]).toMatchObject({ turns: 2, input: 12_000 });
 		expect(sources.reduce((sum, row) => sum + row.tokens, 0)).toBeCloseTo(12_000);
+	});
+
+	test("an index kept under another omp version or attribution is read again from the session files", async () => {
+		const { index, file } = setUp();
+		await index.sync();
+		index.close();
+		indexes.length = 0;
+		const dbPath = join(file, "..", "..", "context-sources.db");
+		const db = new Database(dbPath);
+		db.run("UPDATE meta SET value = 'old' WHERE key = 'index'");
+		db.close();
+		const reopened = new ContextIndex(dbPath, join(file, "..", ".."));
+		indexes.push(reopened);
+		expect(reopened.read(null).files).toEqual([]);
+		await reopened.sync();
+		expect(reopened.read(null).files).toMatchObject([{ sessionFile: file, turns: 1 }]);
 	});
 
 	test("a cutoff keeps the requests made at it or later", async () => {
