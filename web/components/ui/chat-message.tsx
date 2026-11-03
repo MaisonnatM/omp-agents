@@ -104,7 +104,7 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
                 alt={`Attached image ${i + 1}`}
                 loading="lazy"
                 className={cn(
-                  "max-h-32 max-w-60 object-contain outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10",
+                  "min-w-0 max-h-32 max-w-60 object-contain outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10",
                   shape.bg
                 )}
               />
