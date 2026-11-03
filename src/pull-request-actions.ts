@@ -35,7 +35,7 @@ const checkLogs = (pr: PullRequestSummary): string => `(\`gh pr checks ${pr.numb
 /** Where every prompt of an action that changes the PR's branch says the session runs: the dashboard starts it there. */
 const ON_BRANCH = "This session runs in a git worktree on the PR's branch, which the dashboard checked out for it; work there.";
 
-/** How a session that repairs the PR's branch ends: by itself once the repair is done, open while something waits on the user. */
+/** How a session that repairs the PR's branch ends: by itself once the repair is pushed, open while something waits on the user. */
 const END_WHEN_DONE = "Once that is done, end this session with the `end_session` tool, then give your final reply. If anything is left for the user, such as a failure you could not fix or a push that failed, leave the session open and say what.";
 
 /** How a session runs the thermo-nuclear review of `pr`: on the `plan` role, through the kit's reviewer agent. */
@@ -76,7 +76,7 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 			const threads = pr.unresolved.count > 0 ? `${pr.unresolved.exact ? "" : "at least "}${pr.unresolved.count} unresolved review ${pr.unresolved.count === 1 ? "thread" : "threads"}` : null;
 			const requested = pr.review === "changes-requested" ? "a reviewer requested changes" : null;
 			const has = [threads, requested].filter(clause => clause !== null).join(" and ");
-			return `${pullRequestContext(pr)} It has ${has}. ${ON_BRANCH} Read the threads and reviews, fix what is right, commit and push, then reply to each thread with what you changed or why you did not change it, and resolve the threads you fixed.`;
+			return `${pullRequestContext(pr)} It has ${has}. ${ON_BRANCH} Read the threads and reviews, fix what is right, commit and push, then reply to each thread with what you changed or why you did not change it, and resolve the threads you fixed. ${END_WHEN_DONE}`;
 		},
 		branch: pr => pr.head,
 	},
