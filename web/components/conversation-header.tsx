@@ -94,7 +94,7 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 			{goalSet && goal}
 			{subject.kind === "session" && shown && <SessionMeta facts={shown} />}
 			{subject.kind === "session" && <OpenPullRequestButton view={view} host={host} />}
-			{subject.kind === "session" && <TodosCardToggle />}
+			{subject.kind === "session" && <TodosCardToggle view={view} />}
 			{subject.kind === "session" && endable && (
 				<Tooltip
 					content={`End session. Stops the omp process ${endable.source === "dashboard" ? "this dashboard started" : `running in its terminal (pid ${endable.pid})`}. Its transcript moves to Past sessions, where Resume continues it.`}
