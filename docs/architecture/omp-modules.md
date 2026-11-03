@@ -7,13 +7,13 @@ Those files hold only types, so the app imports a type from them directly and ev
 It finds the package through `omp` on `PATH`, or `OMP_PACKAGE_DIR` when set; with a Bun global install that is `~/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent`.
 `bun run omp-release` checks a new omp release against these modules and the files listed below; the [omp release skill](../../.agents/skills/omp-release/SKILL.md) says how to read its report.
 
-Paid Cursor fallback is an external OMP runtime change, preserved in [`patches/omp-18.15.0-paid-cursor-fallback.patch`](../../patches/omp-18.15.0-paid-cursor-fallback.patch) with its regression tests.
-Its base is upstream tag `v18.15.0`, commit `3fedf8d53267e32a6d7521ce725fdcc4a36fdc67`; do not apply it to another release without porting and verifying it.
+Paid Cursor fallback is an external OMP runtime change, preserved in [`patches/omp-18.16.0-paid-cursor-fallback.patch`](../../patches/omp-18.16.0-paid-cursor-fallback.patch) with its regression tests.
+Its base is upstream tag `v18.16.0`, commit `650f3a108229ee11bf68ba3377f4e8c3391cd424`; do not apply it to another release without porting and verifying it.
 From a clean checkout of that release, check and apply the patch:
 
 ```sh
-git apply --check /absolute/path/to/omp-agents/patches/omp-18.15.0-paid-cursor-fallback.patch
-git apply /absolute/path/to/omp-agents/patches/omp-18.15.0-paid-cursor-fallback.patch
+git apply --check /absolute/path/to/omp-agents/patches/omp-18.16.0-paid-cursor-fallback.patch
+git apply /absolute/path/to/omp-agents/patches/omp-18.16.0-paid-cursor-fallback.patch
 ```
 
 Build and install both patched packages, `@oh-my-pi/pi-ai` and `@oh-my-pi/pi-coding-agent`, including the CLI bundle and SDK sources and declarations.

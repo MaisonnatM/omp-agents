@@ -47,7 +47,7 @@ index 1ead7f6..9b8070d 100644
 +
 +Cursor uses the same completion transport for included and on-demand requests. This policy controls deliberate local routing using reported quota. It does not disable Cursor's server-side automatic billing or guarantee zero incidental overage when reports are stale or unknown.
 diff --git a/docs/settings.md b/docs/settings.md
-index 3c62ce7..0ddb769 100644
+index 60c5e2c..601d705 100644
 --- a/docs/settings.md
 +++ b/docs/settings.md
 @@ -601,6 +601,7 @@ providers:
@@ -59,7 +59,7 @@ index 3c62ce7..0ddb769 100644
  | `retry.usageReservePolicy`               | enum    | `confirm`         | `confirm`, `auto`, `fail-closed`. At reserve, `confirm` asks when an interactive confirmer is available and otherwise auto-falls back; exhausted quota can fall back without confirmation. `fail-closed` blocks known reserve/depleted quota rather than spending it.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
  | `providers.anthropic.serverSideFallback` | boolean | `false`           | Opt in to Anthropic's `server-side-fallback-2026-06-01` beta for eligible direct Claude Fable/Mythos requests. The catalog-owned server-side chain currently targets `claude-opus-5`, not `claude-opus-5-5`; unsupported models and hosts have no chain.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 diff --git a/packages/ai/CHANGELOG.md b/packages/ai/CHANGELOG.md
-index 22c442a..e0f5b11 100644
+index 20790ec..feaae60 100644
 --- a/packages/ai/CHANGELOG.md
 +++ b/packages/ai/CHANGELOG.md
 @@ -2,6 +2,14 @@
@@ -74,9 +74,9 @@ index 22c442a..e0f5b11 100644
 +
 +- Treat numerically exhausted included-plan windows as depleted even when the provider labels them `ok`, preserving their reset time instead of routing through zero reserve.
 +
- ## [18.15.0] - 2026-11-01
+ ## [18.16.0] - 2026-11-02
  
- ### Fixed
+ ### Added
 diff --git a/packages/ai/src/auth/cascade.ts b/packages/ai/src/auth/cascade.ts
 index cf4e827..7b08cc2 100644
 --- a/packages/ai/src/auth/cascade.ts
@@ -1039,7 +1039,7 @@ index 6b1cc07..3902514 100644
  		it("does not let an exhausted Other Models pool block Grok or Composer", () => {
  			const report = parseCursorIndividualUsage({
 diff --git a/packages/coding-agent/CHANGELOG.md b/packages/coding-agent/CHANGELOG.md
-index f3412e4..3556d2f 100644
+index a13d487..422343f 100644
 --- a/packages/coding-agent/CHANGELOG.md
 +++ b/packages/coding-agent/CHANGELOG.md
 @@ -2,6 +2,10 @@
@@ -1050,7 +1050,7 @@ index f3412e4..3556d2f 100644
 +
 +- Added opt-in `retry.paidFallback` for session routing after all eligible configured included plans are depleted or unavailable, with automatic included-plan recovery on later prompts. Usage preflight preserves automatic thinking and defers interactive reserve confirmation until the first prompt.
 +
- ## [18.15.0] - 2026-11-01
+ ## [18.16.0] - 2026-11-02
  
  ### Added
 diff --git a/packages/coding-agent/src/config/account-pools.ts b/packages/coding-agent/src/config/account-pools.ts
@@ -1144,10 +1144,10 @@ index 56b2e98..116d465 100644
  	}
  
 diff --git a/packages/coding-agent/src/sdk.ts b/packages/coding-agent/src/sdk.ts
-index 0f4cea6..2273014 100644
+index ef6a078..42d0357 100644
 --- a/packages/coding-agent/src/sdk.ts
 +++ b/packages/coding-agent/src/sdk.ts
-@@ -222,6 +222,15 @@ import {
+@@ -226,6 +226,15 @@ import {
  	type RetryFallbackResolutionContext,
  	resolveRetryFallbackChainKey,
  } from "./session/retry-fallback-chains";
@@ -1163,7 +1163,7 @@ index 0f4cea6..2273014 100644
  import { describeUsageFallback } from "./session/retry-fallback-reason";
  import { loadRuntimeIdentity } from "./session/runtime-identity";
  import { getRestorableSessionModels } from "./session/session-context";
-@@ -257,6 +266,7 @@ import {
+@@ -261,6 +270,7 @@ import {
  	AUTO_THINKING,
  	type ConfiguredThinkingLevel,
  	concreteThinkingLevel,
@@ -1171,7 +1171,7 @@ index 0f4cea6..2273014 100644
  	parseConfiguredThinkingLevel,
  	parseThinkingLevel,
  	resolveProvisionalAutoLevel,
-@@ -364,6 +374,7 @@ import {
+@@ -368,6 +378,7 @@ import {
  	cfgProvidersKimiApiFormat,
  	cfgRetryFallbackChains,
  	cfgRetryModelFallback,
@@ -1179,7 +1179,7 @@ index 0f4cea6..2273014 100644
  	cfgRetryUsageAwareFallback,
  	cfgRetryUsageReservePct,
  	cfgRetryUsageReservePolicy,
-@@ -2452,9 +2463,16 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
+@@ -2456,9 +2467,16 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
  	let contextFiles = initialContextFiles;
  
  	let agent: Agent;
@@ -1198,7 +1198,7 @@ index 0f4cea6..2273014 100644
  	let hasSession = false;
  	let hasRegistered = false;
  	const restrictToolNames = options.restrictToolNames === true;
-@@ -3311,7 +3329,8 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
+@@ -3315,7 +3333,8 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
  				if (
  					((modelFallbackEnabled && (hasUsageFallbackCandidate || usageFallbackTriggered)) ||
  						usageReservePolicy === "fail-closed") &&
@@ -1208,7 +1208,7 @@ index 0f4cea6..2273014 100644
  				) {
  					let usageHealth: ModelUsageHealth | undefined;
  					try {
-@@ -3670,6 +3689,69 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
+@@ -3674,6 +3693,69 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
  				adoptThinkingForModel(refreshedModel);
  			}
  		}
@@ -1278,7 +1278,7 @@ index 0f4cea6..2273014 100644
  
  		// A first-turn user tail has no assistant metadata to copy. Once startup
  		// has selected its final model, use that model to terminate the
-@@ -5048,6 +5130,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
+@@ -5055,6 +5137,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
  			thinkingLevelCeiling: options.thinkingLevelCeiling,
  			disableModelFallback: options.disableModelFallback,
  			initialRetryFallback,
@@ -1316,10 +1316,10 @@ index 4580d8c..5e7a6c8 100644
  	deferRetryFallbackValidation?: boolean;
  	/**
 diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/coding-agent/src/session/agent-session.ts
-index 47ba57b..a834b1a 100644
+index eecfac3..9f32fc3 100644
 --- a/packages/coding-agent/src/session/agent-session.ts
 +++ b/packages/coding-agent/src/session/agent-session.ts
-@@ -2192,6 +2192,7 @@ export class AgentSession implements SettingsScope {
+@@ -2195,6 +2195,7 @@ export class AgentSession implements SettingsScope {
  		this.#fallbackChainValidationDeferred = config.deferRetryFallbackValidation === true;
  		this.#recovery = new TurnRecovery(recoveryHost, {
  			initialRetryFallback: config.initialRetryFallback,
@@ -1327,7 +1327,7 @@ index 47ba57b..a834b1a 100644
  			deferFallbackChainValidation: this.#fallbackChainValidationDeferred,
  			unexpectedStopJudgeTimeoutMs: config.unexpectedStopJudgeTimeoutMs,
  		});
-@@ -6799,6 +6800,10 @@ export class AgentSession implements SettingsScope {
+@@ -6802,6 +6803,10 @@ export class AgentSession implements SettingsScope {
  		return allowed;
  	}
  
@@ -1338,7 +1338,7 @@ index 47ba57b..a834b1a 100644
  	async #runUsageAwarePreflight(signal?: AbortSignal): Promise<boolean> {
  		if (signal?.aborted) return false;
  		const generation = this.#promptGeneration;
-@@ -8865,7 +8870,9 @@ export class AgentSession implements SettingsScope {
+@@ -8876,7 +8881,9 @@ export class AgentSession implements SettingsScope {
  			}
  
  			// Validate API key; a provider without one walks the retry fallback chain first.
@@ -1348,7 +1348,7 @@ index 47ba57b..a834b1a 100644
 +			);
  			if (!apiKey && !(await this.#recovery.applyMissingCredentialFallback(setupAbort.signal))) {
  				if (setupAbort.signal.aborted) return false;
- 				throw new Error(
+ 				throw new PromptPreflightError(
 diff --git a/packages/coding-agent/src/session/retry-fallback-chains.ts b/packages/coding-agent/src/session/retry-fallback-chains.ts
 index 084b5db..979628f 100644
 --- a/packages/coding-agent/src/session/retry-fallback-chains.ts
@@ -1389,10 +1389,10 @@ index 084b5db..979628f 100644
  	entry: string,
  	current: RetryFallbackSelector | undefined,
 diff --git a/packages/coding-agent/src/session/settings.ts b/packages/coding-agent/src/session/settings.ts
-index aa60885..5ba168b 100644
+index 04acbc2..62c0441 100644
 --- a/packages/coding-agent/src/session/settings.ts
 +++ b/packages/coding-agent/src/session/settings.ts
-@@ -888,6 +888,12 @@ export const cfgRetryUsageReservePolicy = register({
+@@ -885,6 +885,12 @@ export const cfgRetryUsageReservePolicy = register({
  	},
  });
  
