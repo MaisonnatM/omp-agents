@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-03
 
+- /ship plans now list the existing code they reuse, and a large change gets a pass that swaps rebuilt pieces for the ones the project already has before the draft PR opens.
 - New session can start a private session: turn on Private, the lock beside the skill toggle, and the session is deleted with everything it wrote when it ends. It never shows in Past sessions or History, and omp memory does not learn from it.
 - Pick Personal in a new session's directory menu for help with your own life, such as meals or plans. Personal sessions share a memory: tell one something about yourself and every later personal session knows it. The session's details show what it remembers.
 - The paid Cursor fallback patch for omp now applies to omp 18.16.0.

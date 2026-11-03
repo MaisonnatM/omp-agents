@@ -32,13 +32,17 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before registering a PR o
    Otherwise run the `arena` skill with one runner for each approach, up to three.
    Give every runner the same prompt: the issue or the request, the checkout's path, the approach it plans, its output path `local://plan-<n>.md`, and the rule to write the plan there with the `technical-writing` skill and edit nothing else.
    Each plan names the files it changes, the data shape, the steps in order, how to verify the result, and its risks.
+   Each plan also lists what it reuses: the existing helpers, components, models, and patterns, by path, that already do part of the job, so the change extends them instead of rebuilding them.
    The runners edit no files in the checkout, so spawn them without `isolated`; alternate `poteto-agent` and `poteto-agent-codex`, and run the cross-judge on `poteto-agent-codex` over the `local://plan-<n>.md` paths.
-   Pick the base plan against the arena's rubric and graft what the other plans do better.
+   Pick the base plan against the arena's rubric, which scores that reuse list, and graft what the other plans do better.
    With an issue, post the chosen plan on it with `save_comment`, with one line for each rejected approach that says why it lost; without one, keep the same text for the PR body in step 4.
    Call `ship_stage({stage:"implement"})`.
 3. **Implement.** Delegate to `poteto-agent`, isolated or in place per the Git safety rule in `AGENTS.md`.
    Give it the chosen plan, and tell it to implement the change in this session's checkout but stop before opening a PR.
    Integrate its changes.
+   When the change adds more than about 500 hand-written lines, not counting tests and generated files, run a duplication pass before the checks.
+   Give a fresh `poteto-agent-codex` the plan, the diff, and one job: find what the diff rebuilds that the repository already has, such as a copied model, a second enum for one concept, a repeated component, or a fetch a parent already makes, and replace it with the existing one without changing behavior.
+   Keep its edits only when the same tests pass and the diff gets smaller or loses a concept; otherwise discard them, and say in one line of the report which you did.
    Run smoke checks and required tests once in the parent.
    Commit, then call `ship_stage({stage:"draft_pr"})`.
    If a PR already exists for the branch, reuse it.
