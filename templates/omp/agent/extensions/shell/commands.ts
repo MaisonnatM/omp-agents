@@ -1,4 +1,5 @@
-import { isAbsolute, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { isAbsolute, join, resolve } from "node:path";
 
 /**
  * The commands of a bash line, each as its words: split on `&&`, `||`, `;`, `|`, `&`, parentheses, and newlines outside quotes,
@@ -47,11 +48,25 @@ export interface Located {
 	dir: string | null;
 }
 
-/** The commands of a bash line run from `cwd`, past wrappers such as `nohup`, each with its directory, following `cd`, `pushd`, `popd`, `env -C`, and into `bash -c` scripts. */
+/** Where a variable that `NAME=$(mktemp ...)` alone assigns points: a fresh directory outside every checkout. */
+const SCRATCH = join(tmpdir(), "mktemp");
+
+/** The variables of a bash line that only `NAME=$(mktemp ...)` assigns, which name a fresh directory outside every checkout. */
+function scratchNames(line: string): Set<string> {
+	const names = new Set<string>();
+	for (const [, name] of line.matchAll(/(?:^|[\s;&|(])([A-Za-z_]\w*)=\$\(mktemp\b[^)]*\)/g)) if (name) names.add(name);
+	for (const name of names) if ((line.match(new RegExp(`(?:^|[\\s;&|(])${name}=`, "g")) ?? []).length !== 1) names.delete(name);
+	return names;
+}
+
+/** The commands of a bash line run from `cwd`, past wrappers such as `nohup`, each with its directory, following `cd`, `pushd`, `popd`, `env -C`, and into `bash -c` scripts; a variable only `$(mktemp)` assigns reads as a directory outside every checkout. */
 export function located(line: string, cwd: string | null): Located[] {
 	const out: Located[] = [];
 	let dir = cwd;
+	const scratch = scratchNames(line);
+	const unscratch = (word: string) => word.replace(/\$(?:\{([A-Za-z_]\w*)\}|([A-Za-z_]\w*))/g, (whole, braced, bare) => (scratch.has(braced ?? bare) ? SCRATCH : whole));
 	for (let words of split(line)) {
+		if (scratch.size > 0) words = words.map(unscratch);
 		// The directory this command alone runs in, after any `env -C`.
 		let here = dir;
 		for (;;) {
