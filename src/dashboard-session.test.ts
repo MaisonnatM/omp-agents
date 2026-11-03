@@ -20,7 +20,7 @@ import type { PreparedReplay } from "./replay";
 import * as ompConfig from "./omp/config";
 import type { SessionControlsConfig } from "./omp/config";
 
-const STATE: RpcState = { sessionId: "session-1", fastModeEnabled: false, fastModeActive: false, autoCompactionEnabled: true, goal: null, isStreaming: false, isCompacting: false, hasPendingAsyncWork: false, queuedMessages: { steering: [], followUp: [] } };
+const STATE: RpcState = { sessionId: "session-1", fastModeEnabled: false, fastModeActive: false, autoCompactionEnabled: true, goal: null, isStreaming: false, isCompacting: false, queuedMessages: { steering: [], followUp: [] } };
 
 /** Admits every directory: project trust has its own tests, and a spawn here only needs one. */
 const ADMIT_ALL = async (): Promise<void> => {};
@@ -258,11 +258,27 @@ describe("DashboardSession turns", () => {
 		client.fire({ type: "agent_start" });
 		expect(session.status).toBe("working");
 
-		client.fire({ type: "agent_end", isTerminal: false });
+		client.fire({ type: "agent_end", isTerminal: false, yielded: true });
 		expect(session.status).toBe("working");
 
 		client.fire({ type: "agent_end", isTerminal: true });
 		expect(session.status).toBe("idle");
+	});
+
+	test("an agent_end that only waits on a background job gives the turn back, and the job's result starts the next turn", async () => {
+		const { session, client, updates } = await startSession();
+		const ended = () => updates.filter(update => update.kind === "turn-ended");
+		const assistant = (text: string) => ({ role: "assistant", content: [{ type: "text", text }] });
+		client.fire({ type: "agent_start" });
+		client.fire({ type: "agent_end", isTerminal: false, yielded: true, awaitingAsyncWork: true, messages: [assistant("started")] });
+		expect(session.status).toBe("idle");
+		expect(ended()).toEqual([{ kind: "turn-ended", reply: "started", failure: null }]);
+
+		client.fire({ type: "agent_start" });
+		expect(session.status).toBe("working");
+		client.fire({ type: "agent_end", isTerminal: true, yielded: true, messages: [assistant("finished")] });
+		expect(session.status).toBe("idle");
+		expect(ended().at(-1)).toEqual({ kind: "turn-ended", reply: "finished", failure: null });
 	});
 
 	test("a terminal agent_end reports the turn's last reply once, without its suggested prompts", async () => {
@@ -820,16 +836,16 @@ describe("DashboardSession reattach", () => {
 		expect(updates.filter(update => update.kind === "exited")).toEqual([{ kind: "exited", ended: true }]);
 	});
 
-	test("a session attached while it waits on a background job works until the job's result ends its turn", async () => {
+	test("a session attached while it only waits on a background job reads idle until the job's result starts its next turn", async () => {
 		const client = new FakeClient();
 		keptOmp(client);
-		client.getState = async () => ({ ...STATE, hasPendingAsyncWork: true });
+		// omp's `get_state` still reports the job, which the dashboard ignores.
+		const waiting: RpcState & { hasPendingAsyncWork: boolean } = { ...STATE, hasPendingAsyncWork: true };
+		client.getState = async () => waiting;
 		const session = await DashboardSession.reattach("inst-kept", () => [], () => {});
 		session.answer("q1", { kind: "confirm", confirmed: true });
-		expect(session.status).toBe("working");
+		expect(session.status).toBe("idle");
 		client.fire({ type: "agent_start" });
-		client.fire({ type: "agent_end", messages: [], isTerminal: false });
-		await settle();
 		expect(session.status).toBe("working");
 		client.fire({ type: "agent_end", messages: [] });
 		await settle();

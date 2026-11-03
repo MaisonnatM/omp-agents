@@ -180,9 +180,9 @@ export class DashboardSession implements LiveSession {
 		this.sessionFile = state.sessionFile ?? null;
 		this.#applyState(state);
 		this.queue = state.queuedMessages;
-		// A session this server attached to may be in a turn an earlier server started: streaming, compacting, or waiting
-		// on a background job, whose result goes on with the turn and ends it with the terminal `agent_end`.
-		if (state.isStreaming || state.isCompacting || state.hasPendingAsyncWork) this.#prompt.turnStarted();
+		// A session this server attached to may be in a turn an earlier server started, streaming or compacting.
+		// One that only waits on a background job gave its turn back; the job's result starts the next with its `agent_start`.
+		if (state.isStreaming || state.isCompacting) this.#prompt.turnStarted();
 
 		const { client } = child;
 		client.onSessionEvent(event => this.#onEvent(event));
