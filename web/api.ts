@@ -106,6 +106,10 @@ export async function putJson<T>(url: string, body: unknown, signal?: AbortSigna
 /** The settings route `part` for `cwd`, or for the user's own files when `cwd` is `null`. */
 export const settingsUrl = (part: "" | "/routing" | "/agent" | "/file", cwd: string | null): string => `/api/settings${part}${cwd === null ? "" : `?cwd=${encodeURIComponent(cwd)}`}`;
 
+/** The omp memory route `part` for `cwd`; without `cwd` it reads the settings only, since omp keeps memory per workspace. */
+export const ompMemoryUrl = (part: "" | "/file" | "/entry" | "/clear" | "/rebuild", cwd: string | null): string =>
+	`/api/omp-memory${part}${cwd === null ? "" : `?cwd=${encodeURIComponent(cwd)}`}`;
+
 export const readWorktrees = (cwd: string | null, signal?: AbortSignal): Promise<WorktreeInventory> => getJson(`/api/worktrees${cwd === null ? "" : `?cwd=${encodeURIComponent(cwd)}`}`, signal);
 
 export const readWorktreeMetrics = (target: WorktreeTarget, signal?: AbortSignal): Promise<WorktreeMetrics> =>

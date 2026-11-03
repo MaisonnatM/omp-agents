@@ -30,6 +30,7 @@ import { directoryOf } from "../paths";
 import { attachToPullRequest, loadPullRequestOptions, markPullRequestFileViewed, savePullRequest } from "../pull-request-edit";
 import { InvalidPullRequestCommit, listPullRequestChanges, readPullRequestFile } from "../pull-request-files";
 import { loadPullRequestStack } from "../pull-request-stack";
+import { clearMemory, editMemoryEntry, loadOmpMemory, rebuildMemory, saveMemoryFile } from "../memory";
 import { loadOmpSettings, Rejected, saveAgentSetting, saveOmpFile, saveRouting } from "../settings";
 import { attachToTicket, createTicket, loadLinearUsers, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
@@ -233,10 +234,11 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	});
 
 	/**
-	 * A settings write: `PUT /api/settings/routing`, `/api/settings/agent`, or `/api/settings/file`, `?cwd=` as for reading.
-	 * The answer is the settings as they load after the write, or the edit's refusal with its status.
+	 * A write whose refusals are `Rejected`: a settings write, `PUT /api/settings/routing`, `/api/settings/agent`, or
+	 * `/api/settings/file`, `?cwd=` as for reading; and an omp memory edit, `PUT /api/omp-memory/file`, `/entry`, `/clear`,
+	 * or `/rebuild`, which need `?cwd=`. The answer is what the write's section loads after it, or the refusal with its status.
 	 */
-	const settingsWrite = (save: (cwd: string | null, body: unknown) => Promise<unknown>): Handler =>
+	const rejectableWrite = (save: (cwd: string | null, body: unknown) => Promise<unknown>): Handler =>
 		write(
 			(body, params) => {
 				const cwd = workspaceCwd(params);
@@ -245,6 +247,13 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 			({ cwd, body }) => save(cwd, body),
 			err => (err instanceof Rejected ? fail(err.status, err.message, err.conflict) : null),
 		);
+
+	/** `GET /api/omp-memory?cwd=<dir>`: what a new session in the workspace gets from omp memory, and the store it comes from. */
+	const ompMemory = get(params => {
+		const cwd = workspaceCwd(params);
+		if (cwd instanceof Response) return cwd;
+		return cwd === null ? fail(400, "Expected ?cwd= naming a workspace") : answer(() => loadOmpMemory(cwd));
+	});
 
 	/** `GET /api/decisions?cwd=<dir>`: the decision records of a workspace's repository. */
 	const decisions = get(params => {
@@ -397,9 +406,14 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 
 	return {
 		"/api/settings": { GET: settings },
-		"/api/settings/routing": { PUT: settingsWrite(saveRouting) },
-		"/api/settings/agent": { PUT: settingsWrite(saveAgentSetting) },
-		"/api/settings/file": { PUT: settingsWrite(saveOmpFile) },
+		"/api/settings/routing": { PUT: rejectableWrite(saveRouting) },
+		"/api/settings/agent": { PUT: rejectableWrite(saveAgentSetting) },
+		"/api/settings/file": { PUT: rejectableWrite(saveOmpFile) },
+		"/api/omp-memory": { GET: ompMemory },
+		"/api/omp-memory/file": { PUT: rejectableWrite(saveMemoryFile) },
+		"/api/omp-memory/entry": { PUT: rejectableWrite(editMemoryEntry) },
+		"/api/omp-memory/clear": { PUT: rejectableWrite(clearMemory) },
+		"/api/omp-memory/rebuild": { PUT: rejectableWrite(rebuildMemory) },
 		"/api/decisions": { GET: decisions },
 		"/api/models": { GET: models },
 		"/api/models/connected": { GET: connected },

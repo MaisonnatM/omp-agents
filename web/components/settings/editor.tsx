@@ -1,13 +1,15 @@
-/** What the Settings editors share: the edit-then-save hook, the Edit/Save bar, save errors, and sections. */
+/** What the Settings editors share: the edit-then-save hook, one-control saves, the Edit/Save bar, save errors, sections, and the layer notes. */
 import { ArrowDown, ArrowUp, Pencil, X } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
-import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
+import type { AgentSettingEdit } from "../../../src/shared/agent-settings";
+import type { CatalogModel, OmpFile, OmpSettings } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { errorText } from "../../../src/json";
-import { ApiError } from "../../api";
+import { ApiError, putJson, settingsUrl } from "../../api";
 import type { Editable } from "../../editable-read";
 import type { ReadState } from "../../reads";
+import { hashForSettings } from "../../routing";
 
 /** A settings text field or select. */
 export const FIELD = "h-7 rounded-md border border-border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -47,8 +49,8 @@ interface Editor<T> {
 	submit: () => Promise<void>;
 }
 
-/** Edit, then save or cancel. A failed save keeps the draft and shows why, for another try. */
-export function useEditor<T>(original: T, save: (draft: T) => Promise<OmpSettings>, editing: Pick<Editing, "write">): Editor<T> {
+/** Edit, then save or cancel. A failed save keeps the draft and shows why, for another try. `R` is what the save answers, the page's settings unless another read. */
+export function useEditor<T, R = OmpSettings>(original: T, save: (draft: T) => Promise<R>, editing: { write: Editable<R>["write"] }): Editor<T> {
 	const [state, setState] = useState<EditorState<T>>({ phase: "viewing" });
 	const draft = state.phase === "viewing" ? original : state.draft;
 	return {
@@ -68,6 +70,35 @@ export function useEditor<T>(original: T, save: (draft: T) => Promise<OmpSetting
 				const conflict = err instanceof ApiError && err.conflict;
 				setState({ phase: "editing", draft: state.draft, error: errorText(err), conflict });
 			}
+		},
+	};
+}
+
+/** Sends `send` in turn through `target`, and on a conflict re-reads it, so the page shows what changed before the error. */
+export async function writeOrReload<T>(target: { write: Editable<T>["write"]; reload: () => void }, send: () => Promise<T>): Promise<T> {
+	try {
+		return await target.write(send);
+	} catch (err) {
+		if (err instanceof ApiError && err.conflict) target.reload();
+		throw err;
+	}
+}
+
+/** Saves one omp setting to your `config.yml` through `PUT /api/settings/agent`, re-reading the page's settings on a conflict. */
+export const saveAgentSetting = (editing: Editing, edit: AgentSettingEdit): Promise<OmpSettings> =>
+	writeOrReload(editing, () => putJson<OmpSettings>(settingsUrl("/agent", editing.cwd), edit));
+
+/** One control's save at a time: which one is saving, keyed by `K`, and why the last one failed. */
+export function useSaving<K>(): { saving: K | null; error: string | null; run: (key: K, send: () => Promise<unknown>) => void } {
+	const [state, setState] = useState<{ saving: K | null; error: string | null }>({ saving: null, error: null });
+	return {
+		...state,
+		run: (key, send) => {
+			setState({ saving: key, error: null });
+			send().then(
+				() => setState({ saving: null, error: null }),
+				(err: unknown) => setState({ saving: null, error: err instanceof ApiError && err.conflict ? "Changed since you opened it. This shows it as it is now." : errorText(err) }),
+			);
 		},
 	};
 }
@@ -182,5 +213,54 @@ export function OrderedList({
 			</ol>
 			{add}
 		</div>
+	);
+}
+
+/** A link to a file in Settings › Files, which opens it there. */
+export function FileLink({ file, onOpenFile, children }: { file: OmpFile; onOpenFile: (path: string) => void; children: string }) {
+	return (
+		<a href={hashForSettings("files")} onClick={() => onOpenFile(file.path)} className={LINK}>
+			{children}
+		</a>
+	);
+}
+
+/**
+ * Why a setting's control is locked or overridden: the workspace sets it, with a link to its file and your own value
+ * when there is one, or an environment variable does.
+ */
+export function LayerNotes({
+	workspace,
+	env,
+	yourValue,
+	projectFile,
+	onOpenFile,
+}: {
+	workspace: boolean;
+	env: string | undefined;
+	yourValue: string | null;
+	projectFile: OmpFile | undefined;
+	onOpenFile: (path: string) => void;
+}) {
+	return (
+		<>
+			{workspace && (
+				<p className="text-xs text-muted-foreground">
+					This workspace sets it.{" "}
+					{projectFile && (
+						<FileLink file={projectFile} onOpenFile={onOpenFile}>
+							Open in Files
+						</FileLink>
+					)}
+					{projectFile && ". "}
+					{yourValue !== null && `Your value: ${yourValue}`}
+				</p>
+			)}
+			{env && (
+				<p className="text-xs text-muted-foreground">
+					<code className="font-mono">{env}</code> is set, and it overrides this value.
+				</p>
+			)}
+		</>
 	);
 }

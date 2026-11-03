@@ -64,18 +64,17 @@ export function routeRoles(
 	};
 }
 
-/** Reading a file never throws: a file that is not there or cannot be read says so. */
-async function readFile({ kind, scope, path }: FoundFile): Promise<OmpFile> {
-	let body: OmpFile["body"];
+/** A file's body as the page shows it. Reading never throws: a file that is not there or cannot be read says so. */
+export async function readFileBody(path: string): Promise<OmpFile["body"]> {
 	try {
 		const [info, text] = await Promise.all([stat(path), Bun.file(path).text()]);
-		body = { state: "read", size: info.size, modifiedAt: info.mtimeMs, text, hash: new Bun.CryptoHasher("sha256").update(text).digest("hex") };
+		return { state: "read", size: info.size, modifiedAt: info.mtimeMs, text, hash: new Bun.CryptoHasher("sha256").update(text).digest("hex") };
 	} catch (err) {
-		body =
-			(err as NodeJS.ErrnoException).code === "ENOENT" ? { state: "missing" } : { state: "unreadable", error: errorText(err) };
+		return (err as NodeJS.ErrnoException).code === "ENOENT" ? { state: "missing" } : { state: "unreadable", error: errorText(err) };
 	}
-	return { kind, scope, path, pathDisplay: displayPath(path), body };
 }
+
+const readFile = async ({ kind, scope, path }: FoundFile): Promise<OmpFile> => ({ kind, scope, path, pathDisplay: displayPath(path), body: await readFileBody(path) });
 
 /** Files omp reads from its own directory, listed even before they exist so the page shows where they go. */
 const USER_FILES: FoundFile[] = [
@@ -203,7 +202,7 @@ export function parseRoutingEdit(raw: unknown, { catalog, config }: RoutingConte
 
 /** One save at a time, so two saves of the same file cannot both pass the check that it is unchanged. */
 let saving: Promise<unknown> = Promise.resolve();
-function serialized<T>(save: () => Promise<T>): Promise<T> {
+export function serialized<T>(save: () => Promise<T>): Promise<T> {
 	const next = saving.then(save, save);
 	saving = next.catch(() => {});
 	return next;
@@ -301,7 +300,7 @@ function checkSyntax(file: FoundFile, text: string): void {
 	}
 }
 
-function parseFileEdit(raw: unknown): FileEdit {
+export function parseFileEdit(raw: unknown): FileEdit {
 	if (
 		!isObject(raw) ||
 		typeof raw.path !== "string" ||
@@ -313,6 +312,21 @@ function parseFileEdit(raw: unknown): FileEdit {
 	return { path: raw.path, text: raw.text, baseHash: raw.baseHash };
 }
 
+/** Writes `text` to `path` when it still hashes to `baseHash`, `null` for a file not there yet; `check` vets the text first. */
+export async function writeUnchanged(path: string, { text, baseHash }: FileEdit, check: (text: string) => void = () => {}): Promise<void> {
+	const pathDisplay = displayPath(path);
+	const body = await readFileBody(path);
+	if (body.state === "unreadable") throw new Rejected(409, `Cannot read ${pathDisplay}: ${body.error}`);
+	if ((body.state === "read" ? body.hash : null) !== baseHash) {
+		throw new Rejected(409, `${pathDisplay} changed on disk since this page read it`, true);
+	}
+	check(text);
+	// Write next to the target, not the symlink: replacing the symlink would strand omp's config elsewhere.
+	const target = body.state === "read" ? await realpath(path) : path;
+	await mkdir(dirname(target), { recursive: true });
+	await atomicWriteText(target, text, body.state === "read" ? (await stat(target)).mode & 0o777 : undefined);
+}
+
 /**
  * Writes a file the page listed for `cwd`. `path` must be one omp's discovery finds for `cwd` right now,
  * and the file must still hash to `baseHash`; the answer is the settings as they now load.
@@ -322,16 +336,7 @@ export function saveOmpFile(cwd: string | null, raw: unknown): Promise<OmpSettin
 		const edit = parseFileEdit(raw);
 		const file = (await loadSession(cwd)).found.find(found => found.path === edit.path);
 		if (!file) throw new Rejected(404, `omp does not read ${displayPath(edit.path)} here`);
-		const { body, pathDisplay } = await readFile(file);
-		if (body.state === "unreadable") throw new Rejected(409, `Cannot read ${pathDisplay}: ${body.error}`);
-		if ((body.state === "read" ? body.hash : null) !== edit.baseHash) {
-			throw new Rejected(409, `${pathDisplay} changed on disk since this page read it`, true);
-		}
-		checkSyntax(file, edit.text);
-		// Write next to the target, not the symlink: replacing the symlink would strand omp's config elsewhere.
-		const target = body.state === "read" ? await realpath(file.path) : file.path;
-		await mkdir(dirname(target), { recursive: true });
-		await atomicWriteText(target, edit.text, body.state === "read" ? (await stat(target)).mode & 0o777 : undefined);
+		await writeUnchanged(file.path, edit, text => checkSyntax(file, text));
 		return loadOmpSettings(cwd);
 	});
 }

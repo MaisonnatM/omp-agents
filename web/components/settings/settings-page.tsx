@@ -6,6 +6,7 @@ import type { Workspace, WorkspaceList } from "../../../src/shared/workspaces";
 import { settingsUrl } from "../../api";
 import { useEditableRead } from "../../editable-read";
 import { type ReadState, useRead } from "../../reads";
+import { ompSettingsFiles } from "../../omp-settings";
 import { hashForSettings, SETTINGS_SECTIONS, type SettingsSection } from "../../routing";
 import { CommandPicker } from "../command-picker";
 import { Header } from "../page-header";
@@ -16,6 +17,7 @@ import { DecisionsTab } from "./decisions-tab";
 import { Files } from "./files-tab";
 import { IntegrationsTab } from "./integrations-tab";
 import { McpServersTab } from "./mcp-servers-tab";
+import { OmpMemoryTab } from "./omp-memory-tab";
 import { OmpSettingsTab } from "./omp-settings-tab";
 import { PreferencesTab } from "./preferences-tab";
 import { ProvidersTab } from "./providers-tab";
@@ -76,24 +78,27 @@ const loadAlert = (error: string): ReactNode => (
 	</p>
 );
 
+/** Why the omp sections are empty while omp's settings are not read: still reading, or the read failed. */
+const readNote = (read: ReadState<OmpSettings>): ReactNode =>
+	read.error === null ? (
+		<p className="text-sm text-muted-foreground">Reading omp's settings…</p>
+	) : (
+		<p role="alert" className="text-sm text-red-600 dark:text-red-400">
+			Cannot read omp's settings: {read.error}
+		</p>
+	);
+
 /** The omp sections' content once settings are read, else why they are empty. */
 function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Editing, selection: FileSelection): Record<"models" | "omp" | "files" | "workflows", ReactNode> {
 	if (read.data === null) {
-		const note =
-			read.error === null ? (
-				<p className="text-sm text-muted-foreground">Reading omp's settings…</p>
-			) : (
-				<p role="alert" className="text-sm text-red-600 dark:text-red-400">
-					Cannot read omp's settings: {read.error}
-				</p>
-			);
+		const note = readNote(read);
 		return { models: note, omp: note, files: note, workflows: note };
 	}
 	const { routing, agentSettings, files, workflows } = read.data;
 	const key = cwd ?? "";
 	const filesPanel = <Files key={key} files={files} editing={editing} selected={selection.path} onSelect={selection.open} />;
 	const workflowsPanel = <Workflows key={key} workflows={workflows} files={files} editing={editing} />;
-	const configFile = files.find(file => file.kind === "settings" && file.scope === "user" && file.path.endsWith("/config.yml"));
+	const { configFile, projectFile } = ompSettingsFiles(files);
 	const omp =
 		"error" in agentSettings ? (
 			<div className="space-y-2">
@@ -111,7 +116,7 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 				key={key}
 				settings={agentSettings}
 				configFile={configFile}
-				projectFile={files.find(file => file.kind === "settings" && file.scope === "project" && file.body.state === "read")}
+				projectFile={projectFile}
 				editing={editing}
 				onOpenFile={selection.open}
 			/>
@@ -167,6 +172,12 @@ export function SettingsPage({
 
 	const panels: Record<SettingsSection, ReactNode> = {
 		...ompPanels(settings, cwd, editing, { path: openFile, open: setOpenFile }),
+		"omp-memory":
+			settings.data === null ? (
+				readNote(settings)
+			) : (
+				<OmpMemoryTab key={cwd ?? ""} active={section === "omp-memory"} settings={settings.data} editing={editing} onOpenFile={setOpenFile} />
+			),
 		analytics: <AnalyticsTab active={section === "analytics"} />,
 		activity: <ActivityTab active={section === "activity"} />,
 		providers: <ProvidersTab active={section === "providers"} />,
