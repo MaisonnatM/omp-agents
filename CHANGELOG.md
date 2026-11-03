@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-03
+
+- Agents can now run git in a throwaway folder they just made with `mktemp`, such as `d=$(mktemp -d); cd $d`, without being told to spell out its path.
+
 ## 2026-11-02
 
 - Fixed: a session that omp went on with in a new file, because another omp window had it open, now shows once in Past sessions instead of twice.

@@ -705,7 +705,7 @@ describe("checkout ownership", () => {
 		expect(existsSync(claimFile(dir))).toBe(kept);
 	});
 
-	test("a command changes the checkout its cd, -C, or --cwd names, and one named through a variable waits", () => {
+	test("a command changes the checkout its cd, -C, or --cwd names, one named through a variable waits, and one in a fresh mktemp directory passes", () => {
 		const dir = repo();
 		writeFileSync(join(dir, "file.txt"), "theirs\n");
 		claimByAnother(dir);
@@ -725,6 +725,9 @@ describe("checkout ownership", () => {
 			[`env -C "$REPO" git commit -qam x`]: "unlocated",
 			[`git -C "$REPO" commit -qam x`]: "unlocated",
 			[`cd "$(mktemp -d)" && git commit`]: "unlocated",
+			[`d=$(mktemp -d); cd $d && git init -q && git add f`]: null,
+			[`d=$(mktemp -d) && git -C "\${d}/omp" apply x`]: null,
+			[`d=$(mktemp -d); d=${name}; cd $d && git commit -qam x`]: "unlocated",
 			[`pushd && git commit`]: "unlocated",
 			[`git -C "$REPO" status`]: null,
 		};
