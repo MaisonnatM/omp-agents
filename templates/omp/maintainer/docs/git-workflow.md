@@ -29,6 +29,18 @@ When the parent is itself untracked, track it first, from the bottom of the stac
 A warning that branches "diverged from Graphite's tracking" concerns the branches it names; ignore it unless it names your stack.
 Read the stack with `gt log short --stack`; `gt log` and `gt state` print every tracked branch in the repository.
 
+## Resolve conflicts in a rebase or restack
+
+A rebase stops once per conflicting commit; repeat these steps until no commit stops:
+
+1. List the conflicted files with `git diff --name-only --diff-filter=U`.
+2. `read` a file's `:conflicts` before writing `conflict://`; each stop needs a fresh read.
+3. To take a whole side, run `git -c core.hooksPath=/dev/null checkout --theirs -- <file>`.
+   During a rebase `--ours` is the base and `--theirs` is the branch's commit.
+   A post-checkout hook, such as yampa's pre-commit one, fails the plain command with `Unmerged files` after it took that side.
+4. Format a resolved file, then `git add` it.
+5. Continue with `GIT_EDITOR=true gt continue`, or `GIT_EDITOR=true git rebase --continue` without Graphite.
+
 ## Create drafts before publishing
 
 Create the PR as a draft with `gt submit --draft` when Graphite is configured, or `gh pr create --draft` otherwise.

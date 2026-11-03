@@ -97,11 +97,21 @@ async function rebaseOne({ job, run }: Entry): Promise<Ended> {
 		if (done.kind === "rebased") return { outcome: done.kind, text: { title: `Rebased ${done.branch} on ${done.onto}` } };
 		if (done.kind === "current") return { outcome: done.kind, text: { title: `${done.branch} already has ${done.onto}` } };
 		run.hooks.resolve({ pr, cwd });
-		const count = done.files.length;
-		return { outcome: done.kind, text: { title: `${done.branch} conflicts with ${done.onto}`, description: `${count} ${count === 1 ? "file conflicts" : "files conflict"}. A Resolve conflicts session takes over.` } };
+		return { outcome: done.kind, text: { title: `${done.branch} conflicts with ${done.onto}`, description: `${conflictingFiles(done.files)}. A Resolve conflicts session takes over.` } };
 	} catch (error) {
 		return { outcome: "failed", text: { title: `Could not rebase ${pr.head}`, description: errorText(error) } };
 	}
+}
+
+/** How many files listed in a toast before the rest become a count. */
+const NAMED_FILES = 3;
+
+/** `2 files conflict: a.ts and b.ts`, naming the first few and counting the rest. */
+function conflictingFiles(files: readonly string[]): string {
+	const named = files.slice(0, NAMED_FILES);
+	const rest = files.length - named.length;
+	const names = AND.format(rest > 0 ? [...named, `${rest} more`] : named);
+	return `${files.length} ${files.length === 1 ? "file conflicts" : "files conflict"}: ${names}`;
 }
 
 const AND = new Intl.ListFormat("en", { type: "conjunction" });
