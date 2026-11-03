@@ -10,7 +10,10 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { activityControl } from "../activity";
 import { useStoredState } from "../stored-state";
+import { subagentTree } from "../todos-card-subagents-model";
+import type { SubagentLinksValue } from "./subagent-links";
 import { type ChangesSession, ChangesSections, useChanges } from "./todos-card-changes";
+import { SubagentsSection } from "./todos-card-subagents";
 import { Stepper } from "./arc/stepper";
 
 /** Whether the card shows the whole todo list, kept for every transcript; it starts folded to its summary. */
@@ -317,22 +320,26 @@ interface SessionTodosCardProps {
 	working: boolean;
 	/** The session whose files, images, and sources the card lists; omitted, it lists none. */
 	changes?: ChangesSession;
+	/** The live session's subagents, listed in their own section; `null` in a past session or where activity is hidden. */
+	subagents: SubagentLinksValue | null;
 	/** The session's /ship run, shown as its own section; `null` without one. */
 	ship: ShipProgress | null;
 }
 
 /**
- * The agent's own todo list, as its latest `todo` call left it, and the files, images, and pages the view's agents
- * changed, took, and opened, each a section shown once it has something to list. The todo list is a summary of progress
- * and the task in progress, which unfolds into every phase, open tasks first. The card floats at the top right of its
- * transcript when the transcript is wide enough to keep it beside the messages, and otherwise sits above them.
+ * The agent's own todo list, as its latest `todo` call left it, the subagents under the view's agent, and the files,
+ * images, and pages the view's agents changed, took, and opened, each a section shown once it has something to list.
+ * The todo list is a summary of progress and the task in progress, which unfolds into every phase, open tasks first.
+ * The card floats at the top right of its transcript when the transcript is wide enough to keep it beside the messages,
+ * and otherwise sits above them.
  * Memoized: `phases` keeps its identity until a `todo` call changes it, so a streamed token leaves the card as it is.
  */
-export const SessionTodosCard = memo(function SessionTodosCard({ phases, view, working, changes, ship }: SessionTodosCardProps) {
+export const SessionTodosCard = memo(function SessionTodosCard({ phases, view, working, changes, subagents, ship }: SessionTodosCardProps) {
 	const [shown] = useTodosCardShown();
 	const found = useChanges(view, changes);
 	const todos = phases.length > 0;
-	if (!shown || (!ship && !todos && !found)) return null;
+	const nodes = subagents ? subagentTree(subagents.agents, view.kind === "live" ? view.agentId : null) : [];
+	if (!shown || (!ship && !todos && nodes.length === 0 && !found)) return null;
 	return (
 		<section
 			aria-label="Todos"
@@ -341,6 +348,7 @@ export const SessionTodosCard = memo(function SessionTodosCard({ phases, view, w
 		>
 			{ship && <ShipSection ship={ship} />}
 			{todos && <TodosSection phases={phases} />}
+			{subagents && nodes.length > 0 && <SubagentsSection links={subagents} nodes={nodes} />}
 			{found && changes && <ChangesSections view={view} session={changes} changes={found} working={working} />}
 		</section>
 	);

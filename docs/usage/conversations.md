@@ -64,17 +64,25 @@
   Hovering a line grows it and, less, its neighbours, and opens a card with the turn's prompt and the first words of its reply, or **Working…** while it runs; a bold label that opens a reply, such as **Résumé**, is left out.
   Click a line to scroll the conversation to that prompt; the arrows above and below the lines, shown on hover, step to the previous and next turn.
   The line of the turn you are reading stays lit as you scroll; after a click it stays on that turn until you scroll yourself, since the last turns may never reach the top.
-- The **Todos** card holds the agent's todo list and the **Files**, **Images**, and **Sources** sections of [Changed files and images](changed-files-and-images.md), each shown once it has something to list; a past session's conversation shows it too.
+- The **Todos** card holds the agent's todo list, its **Subagents**, and the **Files**, **Images**, and **Sources** sections of [Changed files and images](changed-files-and-images.md), each shown once it has something to list; a past session's conversation shows it too.
   Once the view's agent made a todo list, the card shows the list as its latest `todo` call left it: how many tasks are done of all, a thin progress line, and the task in progress.
   It floats at the conversation's top right, narrowing to fit the space beside the messages, and sits above them when that space is too narrow, so it never covers a message; it scrolls as a whole when its sections outgrow it.
   Click the todo summary to unfold every phase, and click it again to fold it; it starts folded, and the app remembers your choice for every conversation.
-  **Show todos card** in Settings › Preferences, or the checklist button in the session's header, before End session or Resume, hides the whole card, its **Files**, **Images**, and **Sources** sections too.
+  **Show todos card** in Settings › Preferences, or the checklist button in the session's header, before End session or Resume, hides the whole card, its **Subagents**, **Files**, **Images**, and **Sources** sections too.
   Unfolded, each phase shows its done count and its open tasks first, a blocked task's reason under it; its done and dropped tasks fold into an **N done** row.
   Each status has its own mark: an empty ring for to do, a spinning arc beside a shimmering title for in progress, a green disc with a check for done, an amber disc with an exclamation mark for blocked, and a dashed ring for dropped.
   A phase with every task done folds to one line; click it to open it.
   Task text shows its Markdown, such as code and bold.
   It follows the agent's calls while the turn runs, and a subagent's view shows that subagent's own list.
   This list is the agent's own and is separate from your Todo page.
+- In a live session, the Todos card's **Subagents** section, after the todo list, lists the session's subagents, so you can reach one without scrolling back to the `task` call that started it.
+  A subagent that another subagent started sits indented under it.
+  Each row shows the subagent's status dot, the same as on its link in the conversation, its id, its type, and, on one line under them, what it is doing now; hover that line for all of it.
+  The section's title counts the subagents, and how many are running.
+  Click a row to open the subagent, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split, or middle-click to open it in the app window in place of what it shows.
+  The stop button after a running subagent cancels it, as the one after its link in the conversation does, in every room the dashboard can write to.
+  A subagent's own view lists only the subagents it started, and theirs; a past session shows no section, because the dashboard opens subagents only of a running session.
+  The section starts open, and the app remembers whether you folded it.
 - The clock button in the composer, shown once a session has two prompts, opens **Chat history**: it blurs the conversation and gathers every prompt you sent into one column over it, newest at the bottom.
   Prompts that were in view slide from their place into the column.
   Click a prompt to close the history, scroll the conversation to it, and briefly outline its bubble; the X in the button's place, Escape, or a click on the blur closes it where you were.

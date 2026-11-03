@@ -1,6 +1,6 @@
 import { Maximize2, Minimize2, Route, X } from "lucide-react";
 import { memo, type ReactNode, useCallback, useMemo, useState } from "react";
-import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
+import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -19,7 +19,7 @@ import { PastConversation } from "./past-conversation";
 import { RenderBoundary } from "./render-boundary";
 import { ReplayCompareDialog } from "./replay-compare";
 import { SidebarToggle } from "./sidebar-panel";
-import { SubagentLinks } from "./transcript";
+import { SubagentLinks, type SubagentLinksValue } from "./subagent-links";
 
 interface PaneProps {
 	view: View;
@@ -74,10 +74,10 @@ export const ViewConversation = memo(function ViewConversation({ view, focused, 
 	const instanceId = view.kind === "live" ? view.instanceId : null;
 	const agents = host?.agents;
 	const writable = host?.control.phase === "live" && !host.control.readOnly;
-	const links = useMemo(
+	const links = useMemo<SubagentLinksValue | null>(
 		() =>
 			instanceId
-				? { instanceId, agents: agents ?? [], onOpen: open, onCancel: writable ? (agent: LiveView & { agentId: string }) => request({ t: "cancel-agent", view: agent }) : null }
+				? { instanceId, agents: agents ?? [], onOpen: open, onCancel: writable ? agent => request({ t: "cancel-agent", view: agent }) : null }
 				: null,
 		[instanceId, agents, open, writable, request],
 	);

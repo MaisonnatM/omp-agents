@@ -77,7 +77,8 @@ interface ChangesSectionProps {
 	children: ReactNode;
 }
 
-function ChangesSection({ title, open, onToggle, fold, action, children }: ChangesSectionProps) {
+/** A section of the Todos card under its todo list: a folding header with an optional action at its right. */
+export function ChangesSection({ title, open, onToggle, fold, action, children }: ChangesSectionProps) {
 	return (
 		<Collapsible open={open} onOpenChange={onToggle}>
 			<div className="flex items-center gap-2">

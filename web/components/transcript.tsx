@@ -6,7 +6,6 @@ import {
 	Brain,
 	Bug,
 	CircleCheck,
-	CircleStop,
 	Code,
 	CornerDownLeft,
 	Cpu,
@@ -43,7 +42,7 @@ import {
 	Wrench,
 } from "lucide-react";
 import { createContext, Fragment, type KeyboardEvent, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { AgentRow, LiveView, View } from "../../src/shared/sessions";
+import type { View } from "../../src/shared/sessions";
 import { taskText } from "../../src/shared/routine-message";
 import { type Item, skillInvocation } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
@@ -65,7 +64,7 @@ import { errorText } from "../../src/json";
 import { activityControl } from "../activity";
 import { mediaSrc } from "../api";
 import { modeOf, SPLIT_CLICK } from "../labels";
-import { hashForView, type OpenMode, sameView } from "../routing";
+import { hashForView, sameView } from "../routing";
 import type { StartOf } from "../starts";
 import { usePaneLoaded, useTranscript } from "../pane-store";
 import { revealed, useReveal } from "../message-reveal";
@@ -79,6 +78,7 @@ import { StatusDot, statusLabel } from "./status-dot";
 import { RoutineRunCard } from "./routines/routine-run-card";
 import { PromptHistory } from "./prompt-history";
 import { SessionTodosCard } from "./session-todos-card";
+import { CancelAgentButton, SubagentLinks } from "./subagent-links";
 import type { ChangesSession } from "./todos-card-changes";
 import { TranscriptMinimap } from "./transcript-minimap";
 
@@ -151,50 +151,17 @@ export const ActivityVisibility = createContext<ActivityVisibility>({
 	toggleThinking: () => {},
 });
 
-/** Whether the transcript draws its tool and thinking groups and the Todos card's files, images, and sources; a Bot's page turns it off, so its conversation reads as a chat, keeping only the chips of {@link ToolChipsContext}. */
+/** Whether the transcript draws its tool and thinking groups and the Todos card's subagents, files, images, and sources; a Bot's page turns it off, so its conversation reads as a chat, keeping only the chips of {@link ToolChipsContext}. */
 export const ActivityShown = createContext(true);
 
 export const HIDE_TOOL_CALLS_KEY = "omp-agents.hide-tool-calls";
 export const HIDE_THINKING_KEY = "omp-agents.hide-thinking";
-
-/**
- * Where a `task` row's subagents open: the live session the transcript belongs to, its registered subagents for their
- * status, and the page's open. `onCancel` cancels a running subagent, as omp's Agent Hub kill does, settling once the server has asked omp to;
- * `null` in a room the dashboard cannot write to. The context is `null` in a past session, whose subagents have no view of their own.
- */
-export const SubagentLinks = createContext<{
-	instanceId: string;
-	agents: AgentRow[];
-	onOpen: (view: View, mode: OpenMode) => void;
-	onCancel: ((view: LiveView & { agentId: string }) => Promise<void>) | null;
-} | null>(null);
 
 /** How long a resize of the transcript's lane rests before its rows lay out again at the new width. */
 const RESIZE_REST_MS = 150;
 
 /** Opens the transcript's image viewer at image `at` of prompt or tool item `id`; outside a `Transcript` it does nothing. */
 const OpenImage = createContext<(id: string, at: number) => void>(() => {});
-
-function CancelAgentButton({ view, onCancel, running }: { view: LiveView & { agentId: string }; onCancel: (view: LiveView & { agentId: string }) => Promise<void>; running: boolean }) {
-	const LoaderIcon = useIcon("loader");
-	const cancel = useAction(() => onCancel(view), "Could not cancel the subagent");
-	if (!running && !cancel.pending) return null;
-	return (
-		<Tooltip content={cancel.pending ? "Cancelling…" : "Cancel subagent, leaving the session's turn running"}>
-			<Button
-				variant="ghost"
-				size="icon"
-				className="size-6 text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
-				aria-label={cancel.pending ? `Cancelling subagent ${view.agentId}` : `Cancel subagent ${view.agentId}`}
-				aria-busy={cancel.pending || undefined}
-				disabled={cancel.pending}
-				onClick={() => cancel.run()}
-			>
-				{cancel.pending ? <LoaderIcon className="size-3.5 animate-spin" /> : <CircleStop className="size-3.5" />}
-			</Button>
-		</Tooltip>
-	);
-}
 
 /** The subagents a `task` call spawned, each a link to its own view with its status. */
 function SpawnedAgents({ ids }: { ids: string[] }) {
@@ -715,6 +682,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	const revealId = useReveal(view);
 	const toolChips = useContext(ToolChipsContext);
 	const activityShown = useContext(ActivityShown);
+	const subagents = useContext(SubagentLinks);
 	const { scrollToMessage } = useMessageScroller();
 	// The command palette opened this view at a match. Scroll once the whole transcript has loaded, a frame after the
 	// scroller places it at its end, so that placement does not undo the scroll. The reveal ends when the scroll lands,
@@ -736,6 +704,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 					view={view}
 					working={working}
 					changes={activityShown ? changes : undefined}
+					subagents={activityShown ? subagents : null}
 					ship={changes?.sessionId ? (changes.facts?.ship ?? null) : null}
 				/>
 				<MessageScroller className="@container min-h-0 flex-1">
