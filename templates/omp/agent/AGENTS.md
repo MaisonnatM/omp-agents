@@ -36,6 +36,18 @@ Then update with the same command plus `-X PUT -H "Origin: http://127.0.0.1:4317
 A `current` answer means origin had nothing new and the dashboard did not restart; when it still needs a restart, ask the user rather than kill its processes.
 A 409 answer says why the checkout stayed as it was, such as uncommitted changes or local commits; report it rather than stash, reset, or retry.
 
+## Presenting a plan
+
+Present every plan, proposal, or recommendation as a decision card, in plain words with no jargon.
+Open with exactly three lines:
+- **You asked:** the request in one sentence.
+- **My answer:** the recommendation in one or two sentences.
+- **You decide:** the choice waiting on the user, or "nothing" when none is.
+
+Under them, at most three short bullets, **Why**, **Cost**, and **Risk**, each one or two sentences; mark a guessed number as a guess.
+When the plan adds, removes, or reorders steps in a workflow, put a mermaid flowchart of the new flow between the three lines and the bullets, with the changed step highlighted.
+Leave out file paths, line numbers, principle names, and rejected alternatives unless the user asks; a table only when the user must compare three or more options.
+
 ## Conditional references
 
 - Models: before configuring model roles, reasoning levels, fallback chains, or responding to quota exhaustion, read `~/.omp/agent/docs/model-routing.md`.
