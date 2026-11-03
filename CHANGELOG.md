@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-03
 
+- The paid Cursor fallback patch for omp now applies to omp 18.16.0.
+- Context sources in Analytics recount their tokens from the session files once, since omp 18.16.0 counts models without their own tokenizer more exactly.
 - The Todos card now lists a session's subagents with their status, so you can open or stop one without scrolling back to where it started.
 - Fixed: a session that replied while a background job it started was still running no longer shows as working until the job ends. It shows idle and tells you it replied, and shows working again when the job's result wakes it.
 - You can hide or show the todos card with the checklist toggle in a session's header, between Open PR and End session; it hides the whole card, its files, images, and sources too, as Show todos card in Settings → Preferences now does.

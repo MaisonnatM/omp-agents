@@ -12,7 +12,7 @@ import { dirs, loader, modelTokenizer, sessionContext, tokenizer } from "./modul
 import type { FileEntry } from "./module-types/session";
 
 /** Raise when attribution changes: an index of another version is read again from the session files. */
-const INDEX_VERSION = 1;
+const INDEX_VERSION = 2;
 
 /** The least time between syncs that a report starts. */
 const SYNC_GAP_MS = 15_000;

@@ -44,7 +44,7 @@ export interface SessionEntriesModule {
 export interface SessionContextModule {
 	buildSessionContext(entries: FileEntry[], leafId: string | null, byId: Map<string, FileEntry>): { messages: object[] };
 }
-/** omp's tokenizer (pi-agent-core src/tokenizer.ts): exact counts for the catalog's tokenizer families, else about 4 bytes a token. */
+/** omp's tokenizer (pi-agent-core src/tokenizer.ts): exact counts for the catalog's tokenizer families, else o200k_base counts. */
 export interface TokenizerModule {
 	Tokenizer: new (model: { tokenizer?: string; api: string; provider: string; id: string }) => {
 		countMessage(message: object): number;
