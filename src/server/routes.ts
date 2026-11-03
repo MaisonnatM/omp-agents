@@ -62,11 +62,13 @@ import {
 	type CheckedOutPullRequest,
 	MAX_PULL_REQUEST_ATTACHMENTS,
 	MAX_PULL_REQUEST_IMAGE_BYTES,
+	type OnRebaseStep,
 	type PullRequest,
 	type PullRequestCheckout,
 	type PullRequestRebase,
 	prKey,
 	type RebasedPullRequest,
+	type RebaseStep,
 	type Repo,
 } from "../shared/github";
 import type { ReviewDraft, ReviewPreview, ReviewSubmit } from "../shared/review-drafts";
@@ -84,7 +86,7 @@ import { findMediaFile, firstFile, readTextFile } from "../local-file";
 import type { Terminals } from "../terminals";
 import type { Worktrees } from "../worktrees";
 import { MAX_WORKTREE_BATCH } from "../worktrees-shared";
-import { answer, checked, fail, type Guards } from "./http";
+import { answer, answerSteps, checked, fail, type Guards } from "./http";
 import { mailDocument } from "./mail-document";
 import { createTicketForTodo, type TodoTicketEnv, TodoTicketRefused } from "./todo-ticket";
 import {
@@ -238,8 +240,8 @@ export interface PullRequestRoutesEnv {
 	postReviewDraft(pr: PullRequest, submit?: ReviewSubmit): Promise<ReviewDraft>;
 	/** Checks out the pull request at its place, a worktree with a new session on it or the checkout itself; rejects with why it refused. */
 	checkOutPullRequest(checkout: PullRequestCheckout): Promise<CheckedOutPullRequest>;
-	/** Rebases the pull request's branch onto its base and pushes it through the repository's pre-push hook; rejects with why it refused or failed. */
-	rebasePullRequest(rebase: PullRequestRebase): Promise<RebasedPullRequest>;
+	/** Rebases the pull request's branch onto its base and pushes it through the repository's pre-push hook, calling `onStep` as each step starts; rejects with why it refused or failed. */
+	rebasePullRequest(rebase: PullRequestRebase, onStep: OnRebaseStep): Promise<RebasedPullRequest>;
 }
 
 /** A route's handler; Bun passes its server, whose `timeout` lifts a slow request's idle timeout. */
@@ -255,7 +257,8 @@ export interface RouteKit {
 	media(handle: (params: URLSearchParams, req: Request) => Response | Promise<Response>): Handler;
 	/**
 	 * A write: admitted with its JSON body (origin, content type, size), `parse`d with the request's query into an input or the
-	 * response refusing it, then `run`; `refuse` answers an error `run` throws, and any other is a 500 with its text.
+	 * response refusing it, then `run`, whose result is the answer's JSON, unless it is a `Response`; `refuse` answers an error
+	 * `run` throws, and any other is a 500 with its text.
 	 */
 	write<T>(
 		parse: (body: unknown, params: URLSearchParams) => T | Response | Promise<T | Response>,
@@ -872,11 +875,11 @@ function pullRequestRoutes({ get, media, write }: RouteKit, env: PullRequestRout
 			const cwd = await directoryOf(rebase.cwd);
 			return cwd ? { ...rebase, cwd } : fail(404, `${rebase.cwd.trim()} is not a directory.`);
 		},
-		env.rebasePullRequest,
-		(err) => fail(409, errorText(err)),
+		(rebase) => answerSteps<RebaseStep, RebasedPullRequest>(step => env.rebasePullRequest(rebase, step), (err) => fail(409, errorText(err))),
 	);
 	/**
-	 * `PUT /api/pull-request/rebase`: `PullRequestRebase`; answers a `RebasedPullRequest`, or 409 with why it refused or failed.
+	 * `PUT /api/pull-request/rebase`: `PullRequestRebase`; streams `answerSteps`' NDJSON, each `RebaseStep` as it starts and
+	 * then the `RebasedPullRequest` or why it failed, or answers 409 with why it refused before its first step.
 	 * Its push runs the repository's pre-push hook, which can take minutes, past Bun's idle timeout, so the request has none.
 	 */
 	const pullRequestRebase: Handler = (req, server) => {

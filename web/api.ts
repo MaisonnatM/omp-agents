@@ -103,6 +103,29 @@ export async function putJson<T>(url: string, body: unknown, signal?: AbortSigna
 	);
 }
 
+/**
+ * A `PUT` to a route that streams its steps, as the server's `answerSteps` does: calls `onStep` with each as it arrives,
+ * then answers the last line's result or throws its error; a refusal before the first step throws as `putJson` would.
+ */
+export async function putSteps<S, T>(url: string, body: unknown, onStep: (step: S) => void): Promise<T> {
+	record("action", `put ${url.split("?", 1)[0]}`);
+	const response = await apiFetch(url, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+	if (!response.ok || !response.body) return readJson<T>(response);
+	const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+	let partial = "";
+	for (let read = await reader.read(); !read.done; read = await reader.read()) {
+		const lines = (partial + read.value).split("\n");
+		partial = lines.pop() ?? "";
+		for (const line of lines) {
+			const parsed = JSON.parse(line) as { step: S } | { done: T } | { error: string };
+			if ("step" in parsed) onStep(parsed.step);
+			else if ("done" in parsed) return parsed.done;
+			else throw new ApiError(parsed.error);
+		}
+	}
+	throw new ApiError("The server stopped answering before the work ended.");
+}
+
 /** The settings route `part` for `cwd`, or for the user's own files when `cwd` is `null`. */
 export function settingsUrl(part: "" | "/routing" | "/agent" | "/file" | "/extensions" | "/extensions/catalog" | "/extensions/contribution" | "/extensions/operation" | "/extensions/approval", cwd: string | null, extra: Record<string, string> = {}): string {
 	const query = new URLSearchParams(extra);

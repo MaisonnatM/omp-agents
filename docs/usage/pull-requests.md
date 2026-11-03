@@ -102,12 +102,14 @@
   Right-click a row or a card, or focus its title and press the context-menu key or Shift+F10, for the same menu.
   On your own open pull request without merge conflicts whose base has commits its branch lacks, **Rebase on main**, named after its base, follows the quick actions.
   It rebases the branch on its base from the repository's most recently used workspace, runs the repository's pre-push checks, and pushes the branch with `--force-with-lease`.
-  One rebase runs at a time, so the item reads **Queued to rebase** behind another one, then **Rebasing…** until the push ends, which can take minutes.
-  A toast says what came of it: the rebase, a branch that already had its base, or the server's reason for refusing, such as uncommitted changes in the workspace, local commits the pull request lacks, or failed checks.
-  When the rebase stops at a conflict, a toast counts the conflicting files and a **Resolve conflicts** session starts on the pull request, as its quick action does.
+  One rebase runs at a time, so the item reads **Queued to rebase** behind another one, then **Rebasing** beside a spinner until the push ends, which can take minutes.
+  A toast with a spinner and a running clock follows it at once: `Rebasing me/fix on main`, with how many rebases it waits behind, then the step the server is on: `Reading the pull request`, `Waiting for another rebase in this repository` while another rebase of the same repository runs, `Fetching main and me/fix`, `Rebasing onto main`, and `Pushing through the pre-push checks`, the long one.
+  When it ends, the same toast says what came of it: the rebase, a branch that already had its base, or the server's reason for refusing, such as uncommitted changes in the workspace, local commits the pull request lacks, or failed checks.
+  When the rebase stops at a conflict, the toast counts the conflicting files and a **Resolve conflicts** session starts on the pull request, as its quick action does.
   The list reads GitHub again once the rebases end.
   A state change, a review request, or a merge from a row shows in the list as soon as GitHub takes it, and the list then reads GitHub again; a closed pull request leaves the list, and when GitHub refuses a change, a toast says why.
   Click a **Review**, **Fix CI**, **Rebase**, or **Reply** badge to start its quick action when available, such as **Resolve conflicts** for **Rebase**.
+  While a quick action's session starts on a pull request, from its badge or its `⋯` menu, or while its rebase is queued or runs, the badge reads **Starting**, **Queued**, or **Rebasing** beside a spinner, and its tooltip says what, such as **Starting Fix CI**.
   Click a **Merge** badge for a popover that reads the pull request from GitHub and confirms the merge; a **CI running** badge on your own pull request that is ready but for its checks opens it too, and queues the merge until they pass.
   Click a repository or a section heading to fold it; the app keeps your choice across reloads.
   A folded section's heading shows its count, and its tooltip sums up its moves, such as `2 in review · 1 CI running`.
@@ -129,8 +131,9 @@
 - **Rebase N behind** at the top of the Pull requests page shows while N of your pull requests can rebase on their base, counting the ones stacked on them.
   The first click arms **Confirm rebase of N?**, and a second click within three seconds rebases them one at a time, as **Rebase on main** does, the bottom of each stack first.
   A pull request stacked on one whose rebase stopped at a conflict or failed is skipped, even when a **Rebase on main** click queued that one before.
-  Each rebase, conflict, and failure toasts as it happens, and a last toast sums up the run, such as `Rebased 3 of 5 pull requests`, with how many already had their base, stopped at a conflict, failed, or were skipped.
-  The button reads **Rebasing…** and waits while any rebase is queued or running.
+  One toast with a spinner and a running clock counts the run, such as `Rebasing 2 of 5 pull requests`, and names the branch rebasing now with its step, such as `me/fix: Pushing through the pre-push checks`; when the last one ends, it sums up the run, such as `Rebased 3 of 5 pull requests`, with how many already had their base, stopped at a conflict, failed, or were skipped.
+  A conflict or a failure also toasts on its own as it happens.
+  The button reads **Rebasing…** beside a spinner and waits while any rebase is queued or running.
 - The sort button at the top of the Pull requests page orders the pull requests within each section: **Recently updated**, the default, **Newest first** and **Oldest first** by number, or **Manual**.
   Any sort but **Manual** keeps your moves in their order and sorts within each move.
   Drag a pull request within its section to place it by hand, which switches the sort to **Manual** and keeps the order the section showed until then.

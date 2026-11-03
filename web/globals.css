@@ -284,7 +284,7 @@
   }
 }
 
-/* Outside @theme: Tailwind keeps a theme keyframe only when an --animate-* token names it, and the Button spinner names these in an inline style. */
+/* Outside @theme: Tailwind keeps a theme keyframe only when an --animate-* token names it, and `Spinner` names these in an arbitrary `animate-[…]` class. */
 @keyframes spinner-move {
   to {
     stroke-dashoffset: -100;
@@ -298,7 +298,7 @@
     stroke-dasharray: 40 60;
   }
 }
-/* A working Bot's avatar: it bobs, its eyes glance aside and back, and with reduced motion its eyes only pulse. Outside @theme, as the spinner's, since an arbitrary `animate-[…]` class names them. */
+/* A working Bot's avatar: it bobs, its eyes glance aside and back, and with reduced motion its eyes only pulse, as `Spinner`'s glyph does. Outside @theme, as the spinner's, since an arbitrary `animate-[…]` class names them. */
 @keyframes bot-bob {
   0%, 100% {
     transform: translateY(0);

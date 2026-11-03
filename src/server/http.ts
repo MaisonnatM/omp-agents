@@ -8,13 +8,41 @@ import { bearerToken, fetchSiteAllowed, helloProof, mediaKey, tokenMatches } fro
 export const fail = (status: number, error: string, conflict = false): Response =>
 	Response.json({ error, ...(conflict && { conflict: true }) } satisfies SettingsError, { status });
 
-/** The JSON of `run`'s result; when it throws, `refuse`'s response for the error, else a 500 with its text. */
+/** The JSON of `run`'s result, or the result itself when it is a `Response`; when it throws, `refuse`'s response for the error, else a 500 with its text. */
 export async function answer(run: () => Promise<unknown>, refuse?: (err: unknown) => Response | null): Promise<Response> {
 	try {
-		return Response.json(await run());
+		const result = await run();
+		return result instanceof Response ? result : Response.json(result);
 	} catch (err) {
 		return refuse?.(err) ?? fail(500, errorText(err));
 	}
+}
+
+/**
+ * Runs `run`, which calls `step` as each of its steps starts. Until the first, it answers as {@link answer} does, so a
+ * refusal keeps its status; from then on the answer is NDJSON: a `{ step }` line for each, then one `{ done }` line with
+ * `run`'s result or `{ error }` with why it failed, so the outcome never arrives before its last step.
+ */
+export async function answerSteps<S, T>(run: (step: (step: S) => void) => Promise<T>, refuse: (err: unknown) => Response): Promise<Response> {
+	const { readable, writable } = new TextEncoderStream();
+	const writer = writable.getWriter();
+	// A page that went away cancels the stream, which rejects each write after; the work goes on without it.
+	const send = (line: { step: S } | { done: T } | { error: string }): void => void writer.write(`${JSON.stringify(line)}\n`).catch(() => {});
+	const stepped = Promise.withResolvers<null>();
+	const ended = run(step => {
+		send({ step });
+		stepped.resolve(null);
+	}).then(
+		done => ({ done }),
+		(err: unknown) => ({ err }),
+	);
+	const first = await Promise.race([stepped.promise, ended]);
+	if (first && "err" in first) return refuse(first.err);
+	void ended.then(end => {
+		send("done" in end ? { done: end.done } : { error: errorText(end.err) });
+		writer.close().catch(() => {});
+	});
+	return new Response(readable, { headers: { "content-type": "application/x-ndjson" } });
 }
 
 /** The value `parsed` holds, or a 400 with the parser's own reason, else with `badRequest`. */

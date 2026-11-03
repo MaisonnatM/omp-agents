@@ -5,6 +5,7 @@ import { join } from "node:path";
 import * as github from "./github";
 import * as proc from "./proc";
 import { rebasePullRequest } from "./pull-request-rebase";
+import type { OnRebaseStep, RebaseStep } from "./shared/github";
 
 // A git call here took 300 to 450 ms under full-suite load on a busy machine, and the longest test makes about 28 of them.
 setDefaultTimeout(30_000);
@@ -71,7 +72,9 @@ function setup() {
 		const [head, base] = prs.get(Number(argv.at(-1)!.split("/").at(-1)))!;
 		return { title: "Add the change", head: { ref: head, sha: "unused", repo: { full_name: "acme/app" } }, base: { ref: base, repo: { full_name: "acme/app" } } };
 	});
-	const rebase = (number = 7) => rebasePullRequest({ owner: "acme", repo: "app", number, cwd: main });
+	/** The steps the rebases reported, in order, unless a call takes its own `onStep`. */
+	const steps: RebaseStep[] = [];
+	const rebase = (number = 7, onStep: OnRebaseStep = step => void steps.push(step)) => rebasePullRequest({ owner: "acme", repo: "app", number, cwd: main }, onStep);
 	const subjects = (dir: string, ref: string) => git(dir, "log", "--format=%s", ref);
 	/** A linked worktree `review` on `feature`. */
 	const review = async () => {
@@ -79,23 +82,25 @@ function setup() {
 		await git(main, "worktree", "add", "-q", path, "feature");
 		return path;
 	};
-	return { parent, origin, main, hooks, before: template.before, prs, rebase, subjects, review };
+	return { parent, origin, main, hooks, before: template.before, prs, steps, rebase, subjects, review };
 }
 
 test("answers current when the branch already has its base, and pushes nothing", async () => {
-	const { origin, main, rebase } = setup();
+	const { origin, main, steps, rebase } = setup();
 	await git(main, "switch", "-q", "feature");
 	await git(main, "merge", "-q", "--no-edit", "main");
 	await git(main, "push", "-q", "origin", "feature");
 	const merged = await git(main, "rev-parse", "HEAD");
 	expect(await rebase()).toEqual({ kind: "current", branch: "feature", onto: "main" });
 	expect(await git(origin, "rev-parse", "feature")).toBe(merged);
+	expect(steps).toEqual(["fetching"]);
 });
 
 describe("a branch behind its base", () => {
 	test("rebases it onto origin's base, pushes it, and moves the local branch, without leaving a worktree", async () => {
-		const { origin, main, before, rebase, subjects } = setup();
+		const { origin, main, before, steps, rebase, subjects } = setup();
 		expect(await rebase()).toEqual({ kind: "rebased", branch: "feature", onto: "main" });
+		expect(steps).toEqual(["fetching", "rebasing", "pushing"]);
 		expect(await subjects(origin, "feature")).toBe("the change\ntwo\none");
 		const pushed = await git(origin, "rev-parse", "feature");
 		expect(pushed).not.toBe(before);
@@ -126,13 +131,37 @@ describe("a branch behind its base", () => {
 	});
 
 	test("answers a conflict in a worktree of its own, which it removes, leaving the local branch where it was", async () => {
-		const { origin, main, before, rebase } = setup();
+		const { origin, main, before, steps, rebase } = setup();
 		await commit(main, "feature.txt", "theirs\n", "three");
 		await git(main, "push", "-q", "origin", "main");
 		expect(await rebase()).toEqual({ kind: "conflict", files: ["feature.txt"], branch: "feature", onto: "main" });
+		expect(steps).toEqual(["fetching", "rebasing"]);
 		expect(await git(origin, "rev-parse", "feature")).toBe(before);
 		expect(await git(main, "rev-parse", "feature")).toBe(before);
 		expect((await git(main, "worktree", "list")).split("\n")).toHaveLength(1);
+	});
+
+	test("waits behind a rebase of the same repository, then finds the branch already has its base", async () => {
+		const { parent, hooks, steps, rebase } = setup();
+		const go = join(parent, "go");
+		writeFileSync(join(hooks, "pre-push"), `#!/bin/sh\nwhile [ ! -e "${go}" ]; do sleep 0.05; done\n`, { mode: 0o755 });
+		const pushing = Promise.withResolvers<void>();
+		const first = rebase(7, step => {
+			steps.push(step);
+			if (step === "pushing") pushing.resolve();
+		});
+		await pushing.promise;
+		const waiting = Promise.withResolvers<void>();
+		const behind: RebaseStep[] = [];
+		const second = rebase(7, step => {
+			behind.push(step);
+			if (step === "waiting") waiting.resolve();
+		});
+		await waiting.promise;
+		writeFileSync(go, "");
+		expect(await first).toEqual({ kind: "rebased", branch: "feature", onto: "main" });
+		expect(await second).toEqual({ kind: "current", branch: "feature", onto: "main" });
+		expect([steps, behind]).toEqual([["fetching", "rebasing", "pushing"], ["waiting", "fetching"]]);
 	});
 });
 

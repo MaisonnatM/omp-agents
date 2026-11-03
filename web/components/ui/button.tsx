@@ -10,6 +10,7 @@ import {
 } from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
+import { Spinner } from "@/components/spinner";
 import type { IconComponent } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import { useShape } from "@/lib/shape-context";
@@ -215,8 +216,9 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       resolvedSize === "compact" || resolvedSize === "icon-compact" || resolvedSize === "xs" || resolvedSize === "icon-xs";
     const iconSize = isCompact ? 14 : 16;
     // Spinner box tracks the button height so the loading glyph stays
-    // proportionate across sizes.
-    const spinnerSizeClass = resolvedSize === "xs" || resolvedSize === "icon-xs" ? "h-6 w-6" : isCompact ? "h-7 w-7" : "h-9 w-9";
+    // proportionate across sizes. `Spinner` crops the glyph to 16 of a 24-unit
+    // box, so its box is two thirds of the 24px, 28px, and 36px the full box was.
+    const spinnerSizeClass = resolvedSize === "xs" || resolvedSize === "icon-xs" ? "size-4" : isCompact ? "size-[18.67px]" : "size-6";
     const shape = useShape();
     const variantKey = variant ?? "primary";
     const bgClass = (active && activeBgVariants[variantKey]) || bgVariants[variantKey];
@@ -243,23 +245,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
                 )}
               </span>
               <span className="absolute inset-0 flex items-center justify-center">
-                <svg
-                  className={spinnerSizeClass}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                >
-                  <path
-                    d="M 12 12 C 14 8.5 19 8.5 19 12 C 19 15.5 14 15.5 12 12 C 10 8.5 5 8.5 5 12 C 5 15.5 10 15.5 12 12 Z"
-                    stroke="currentColor"
-                    strokeWidth="1.125"
-                    strokeLinecap="round"
-                    pathLength="100"
-                    style={{
-                      strokeDasharray: "15 85",
-                      animation: "spinner-move 2s linear infinite, spinner-dash 4s ease-in-out infinite",
-                    }}
-                  />
-                </svg>
+                <Spinner className={spinnerSizeClass} strokeWidth={1.125} />
               </span>
             </>
           ) : isIconOnly ? (

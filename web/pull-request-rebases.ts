@@ -3,10 +3,10 @@
  * The server rebases the branch, runs the repository's checks, and pushes it; a conflict hands it to **Resolve conflicts**.
  */
 import { useSyncExternalStore } from "react";
-import { type PullRequest, type PullRequestRebase, type PullRequestSummary, prKey, type RebasedPullRequest, repoKey } from "../src/shared/github";
+import { type PullRequest, type PullRequestRebase, type PullRequestSummary, prKey, type RebasedPullRequest, type RebaseStep, repoKey } from "../src/shared/github";
 import { errorText } from "../src/json";
-import { putJson } from "./api";
-import { toasts } from "./components/toaster";
+import { putSteps } from "./api";
+import { loadingToast, settleToast, type ToastText, toasts } from "./components/toaster";
 
 /** A pull request to rebase, from `cwd`, the workspace a session on it starts in. */
 export interface RebaseJob {
@@ -32,15 +32,23 @@ type Outcome = RebasedPullRequest["kind"] | "failed" | "skipped";
 const STOPS: Record<Outcome, boolean> = { rebased: false, current: false, conflict: true, failed: true, skipped: true };
 
 interface Run {
-	/** A bulk run counts the pull requests that already had their base into the toast at its end, instead of a toast each. */
+	/** A bulk run counts its pull requests in one toast that sums them up at its end, instead of a toast each. */
 	bulk: boolean;
 	hooks: RebaseHooks;
 	total: number;
 	left: number;
 	outcomes: Record<Outcome, number>;
+	/** The id of its loading toast, which tells where it stands, then what came of it. */
+	toast: string;
 }
 
-const queue: { job: RebaseJob; run: Run }[] = [];
+interface Entry {
+	job: RebaseJob;
+	run: Run;
+}
+
+/** The jobs to rebase, in order; the one rebasing stays first until it ends. */
+const queue: Entry[] = [];
 let states: ReadonlyMap<string, RebaseState> = new Map();
 let draining = false;
 /** A branch of the pull request's repository, as one key: the queue spans repositories, and a stack links its pull requests by branch within one. */
@@ -71,32 +79,39 @@ export function useRebaseState(pr: PullRequest): RebaseState | null {
 /** Whether a rebase is queued or running. */
 export const useRebasing = (): boolean => useSyncExternalStore(subscribe, () => states.size > 0);
 
-/** Rebases `job`, toasting what came of it, unless a pull request below it stopped earlier. */
-async function rebaseOne({ pr, cwd }: RebaseJob, run: Run): Promise<Outcome> {
-	if (pr.stackedOn !== null && stopped.has(branchKey(pr, pr.stackedOn))) return "skipped";
+/** How a rebase ended, and the toast that says so. */
+interface Ended {
+	outcome: Outcome;
+	text: ToastText;
+}
+
+/** Rebases the running job, at `queue[0]`, unless a pull request below it stopped earlier, and hands a conflict to **Resolve conflicts**. */
+async function rebaseOne({ job, run }: Entry): Promise<Ended> {
+	const { pr, cwd } = job;
+	if (pr.stackedOn !== null && stopped.has(branchKey(pr, pr.stackedOn))) return { outcome: "skipped", text: { title: `Did not rebase ${pr.head}`, description: `It is stacked on ${pr.stackedOn}, whose rebase stopped.` } };
+	toasts.update(run.toast, progress(run, job, { step: null }));
+	showQueue();
 	try {
 		const request: PullRequestRebase = { owner: pr.owner, repo: pr.repo, number: pr.number, cwd };
-		const done = await putJson<RebasedPullRequest>("/api/pull-request/rebase", request);
-		if (done.kind === "rebased") toasts.add({ title: `Rebased ${done.branch} on ${done.onto}` });
-		else if (done.kind === "current") {
-			if (!run.bulk) toasts.add({ title: `${done.branch} already has ${done.onto}` });
-		} else {
-			const count = done.files.length;
-			toasts.add({ title: `${done.branch} conflicts with ${done.onto}`, description: `${count} ${count === 1 ? "file conflicts" : "files conflict"}. A Resolve conflicts session takes over.` });
-			run.hooks.resolve({ pr, cwd });
-		}
-		return done.kind;
+		const done = await putSteps<RebaseStep, RebasedPullRequest>("/api/pull-request/rebase", request, step => toasts.update(run.toast, progress(run, job, { step })));
+		if (done.kind === "rebased") return { outcome: done.kind, text: { title: `Rebased ${done.branch} on ${done.onto}` } };
+		if (done.kind === "current") return { outcome: done.kind, text: { title: `${done.branch} already has ${done.onto}` } };
+		run.hooks.resolve({ pr, cwd });
+		const count = done.files.length;
+		return { outcome: done.kind, text: { title: `${done.branch} conflicts with ${done.onto}`, description: `${count} ${count === 1 ? "file conflicts" : "files conflict"}. A Resolve conflicts session takes over.` } };
 	} catch (error) {
-		toasts.add({ title: `Could not rebase ${pr.head}`, description: errorText(error) });
-		return "failed";
+		return { outcome: "failed", text: { title: `Could not rebase ${pr.head}`, description: errorText(error) } };
 	}
 }
 
 const AND = new Intl.ListFormat("en", { type: "conjunction" });
 
-/** The toast that ends a bulk run: how many it rebased, then what became of the others. */
-function summary({ total, outcomes }: Run): { title: string; description?: string } {
-	const title = `Rebased ${outcomes.rebased} of ${total} ${total === 1 ? "pull request" : "pull requests"}`;
+/** `1 of 1 pull request`, `2 of 5 pull requests`. */
+const ofTotal = (count: number, total: number): string => `${count} of ${total} ${total === 1 ? "pull request" : "pull requests"}`;
+
+/** How a bulk run ends: how many it rebased, then what became of the others. */
+function summary({ total, outcomes }: Run): ToastText {
+	const title = `Rebased ${ofTotal(outcomes.rebased, total)}`;
 	const others = [
 		outcomes.current > 0 && `${outcomes.current} already had ${outcomes.current === 1 ? "its" : "their"} base`,
 		outcomes.conflict > 0 && `${outcomes.conflict} stopped at a conflict`,
@@ -106,21 +121,52 @@ function summary({ total, outcomes }: Run): { title: string; description?: strin
 	return others.length > 0 ? { title, description: `${AND.format(others)}.` } : { title };
 }
 
+/** What the running rebase is doing, by the step the server last said it started. */
+const STEP_WORDS: Record<RebaseStep, (pr: PullRequestSummary) => string> = {
+	waiting: () => "Waiting for another rebase in this repository",
+	fetching: pr => `Fetching ${pr.base} and ${pr.head}`,
+	rebasing: pr => `Rebasing onto ${pr.base}`,
+	pushing: () => "Pushing through the pre-push checks",
+};
+
+/** What a run's loading toast says while `job` waits behind `ahead` rebases, or runs at `step`. */
+function progress(run: Pick<Run, "bulk" | "total" | "left">, { pr }: RebaseJob, place: { ahead: number } | { step: RebaseStep | null }): ToastText {
+	const title = run.bulk ? `Rebasing ${ofTotal(run.total - run.left + 1, run.total)}` : `Rebasing ${pr.head} on ${pr.base}`;
+	if ("ahead" in place) return { title, description: `Queued behind ${place.ahead} ${place.ahead === 1 ? "rebase" : "rebases"}` };
+	// Before its first step, the server reads the pull request's branches from GitHub.
+	const words = place.step === null ? "Reading the pull request" : STEP_WORDS[place.step](pr);
+	return { title, description: run.bulk ? `${pr.head}: ${words}` : words };
+}
+
+/** Tells each run waiting behind the running job, at `queue[0]`, how many rebases are ahead of its next one. */
+function showQueue(): void {
+	const seen = new Set<Run>();
+	queue.forEach(({ job, run }, ahead) => {
+		if (seen.has(run)) return;
+		seen.add(run);
+		if (ahead > 0) toasts.update(run.toast, progress(run, job, { ahead }));
+	});
+}
+
 async function drain(): Promise<void> {
 	if (draining) return;
 	draining = true;
-	for (let next = queue.shift(); next; next = queue.shift()) {
+	for (let next = queue[0]; next; next = queue[0]) {
 		const { job, run } = next;
 		const key = prKey(job.pr);
 		setState(key, "running");
-		const outcome = await rebaseOne(job, run);
+		const { outcome, text } = await rebaseOne(next);
+		queue.shift();
 		setState(key, null);
 		run.outcomes[outcome] += 1;
 		if (STOPS[outcome]) stopped.add(branchKey(job.pr, job.pr.head));
 		run.left -= 1;
+		if (!run.bulk) settleToast(run.toast, text);
+		// A bulk run's toast counts the rebased ones and those that had their base; what stopped one gets a toast of its own.
+		else if (outcome === "conflict" || outcome === "failed") toasts.add(text);
 		if (run.left > 0) continue;
 		run.hooks.refresh();
-		if (run.bulk) toasts.add(summary(run));
+		if (run.bulk) settleToast(run.toast, summary(run));
 	}
 	stopped.clear();
 	draining = false;
@@ -128,8 +174,13 @@ async function drain(): Promise<void> {
 
 function enqueue(jobs: readonly RebaseJob[], hooks: RebaseHooks, bulk: boolean): void {
 	const fresh = jobs.filter(({ pr }) => !states.has(prKey(pr)));
-	if (fresh.length === 0) return;
-	const run: Run = { bulk, hooks, total: fresh.length, left: fresh.length, outcomes: { rebased: 0, current: 0, conflict: 0, failed: 0, skipped: 0 } };
+	const first = fresh[0];
+	if (!first) return;
+	const ahead = queue.length;
+	const counts = { bulk, total: fresh.length, left: fresh.length };
+	// With nothing ahead, `drain` starts it at once.
+	const toast = loadingToast(progress(counts, first, ahead > 0 ? { ahead } : { step: null }));
+	const run: Run = { ...counts, hooks, outcomes: { rebased: 0, current: 0, conflict: 0, failed: 0, skipped: 0 }, toast };
 	for (const job of fresh) {
 		queue.push({ job, run });
 		setState(prKey(job.pr), "queued");
@@ -137,12 +188,12 @@ function enqueue(jobs: readonly RebaseJob[], hooks: RebaseHooks, bulk: boolean):
 	void drain();
 }
 
-/** Queues the rebase of `job`; once it ends, a toast says what came of it and the list is read again. */
+/** Queues the rebase of `job`, under a toast that tells where it stands until it says what came of it; the list is then read again. */
 export const rebasePullRequest = (job: RebaseJob, hooks: RebaseHooks): void => enqueue([job], hooks, false);
 
 /**
  * Queues the rebase of each of `jobs` in order, bottom of a stack first, skipping those stacked on one that conflicted,
- * failed, or was skipped. Once the last ends, one toast sums them up and the list is read again. A pull request already
- * queued keeps its place.
+ * failed, or was skipped. One toast counts them as they run and sums them up once the last ends, and the list is read
+ * again; a conflict or a failure also toasts on its own. A pull request already queued keeps its place.
  */
 export const rebasePullRequests = (jobs: readonly RebaseJob[], hooks: RebaseHooks): void => enqueue(jobs, hooks, true);

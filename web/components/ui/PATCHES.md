@@ -49,6 +49,10 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
   `glass` is always a pill and uses the `surface-glass` utility from `web/globals.css`.
 - `ui/button.tsx`: an `xs` size (24px tall, 12px text, 14px icons, 8px sides) and an `icon-xs` size (24px square), T3 Code's header sizes; the SizeProvider never resolves to them, so a caller asks for them by name.
 - `ui/button.tsx`: the primary surface and label use `--primary` and `--primary-foreground`, including hover and pressed fills, so the shared token controls the primary action throughout the app.
+- `ui/button.tsx`: `loading` draws the dashboard's `Spinner` (`web/components/spinner.tsx`) in place of the registry's inline infinity `<svg>` and its inline-style animation, so the page has one spinner.
+  `Spinner` crops the glyph to 16 of the registry's 24 units, so its box is two thirds of the registry's, 16px, 18.67px, and 24px, and the glyph keeps its size and its 1.125 stroke.
+  It also lays a faint copy of the glyph under the running stroke, and with reduced motion it pulses instead of running.
+- `ui/thinking-indicator.tsx`: the infinity path is `GLYPH` from `web/components/spinner.tsx`, in place of its own copy.
 - `ui/tooltip.tsx`: `shortcut`, the keys that run the trigger's action, drawn as chips after `content`.
   Long labels wrap at 16rem.
 - `ui/tabs.tsx`: `tooltip` names compact tabs without needing a shortcut; `shortcut` adds keys and keeps the tab's `data-state`, since the tooltip trigger stamps its own.

@@ -478,9 +478,20 @@ export interface PullRequestRebase extends PullRequest {
 
 /**
  * What `PUT /api/pull-request/rebase` did to branch `branch` on base `onto`: pushed it rebased, found its base already in
- * it, or stopped at a conflict in `files` and left it as it was, for **Resolve conflicts** to take over.
+ * it, or stopped at a conflict in `files` and left it as it was, for **Resolve conflicts** to take over. It is the last
+ * line the route streams, `{ done }`, after a `{ step }` line for each {@link RebaseStep}.
  */
 export type RebasedPullRequest = { branch: string; onto: string } & ({ kind: "rebased" } | { kind: "current" } | { kind: "conflict"; files: string[] });
+
+/**
+ * Where a rebase stands, as it starts each step: `waiting` for another rebase of the same repository, `fetching` both
+ * branches, `rebasing`, which sets up its worktree first, and `pushing`, which runs the pre-push hook and takes longest.
+ * A branch that already has its base ends after `fetching`.
+ */
+export type RebaseStep = "waiting" | "fetching" | "rebasing" | "pushing";
+
+/** What a rebase calls as it starts each {@link RebaseStep}. */
+export type OnRebaseStep = (step: RebaseStep) => void;
 
 /** Someone GitHub lets a repository assign, and so ask for a review; `name` is their profile name, `null` when they set none. */
 export interface Assignee extends Person {

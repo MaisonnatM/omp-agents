@@ -1,16 +1,43 @@
-/** The page's toasts: the `toasts` manager that shows one from anywhere, and `Toaster`, which stacks them bottom right. */
+/** The page's toasts: the `toasts` manager that shows one from anywhere, `loadingToast` for work that takes a while, and `Toaster`, which stacks them bottom right. */
 import { Toast } from "@base-ui/react/toast";
 import { type ReactNode, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { useSecond } from "../use-minute";
+import { Spinner } from "./spinner";
 
-/** What a toast carries beyond its text: `source`, the line over its title that says where it came from, such as Slack's logo and name. */
+/**
+ * What a toast carries beyond its text: `source`, the line over its title that says where it came from, such as Slack's
+ * logo and name, and `startedAt`, when a loading toast opened, in ms since the epoch.
+ */
 export interface ToastData {
 	source?: ReactNode;
+	startedAt?: number;
 }
 
 /** The page's toasts: `toasts.add` shows one from anywhere, without rendering its caller again as the toasts change. */
 export const toasts = Toast.createToastManager<ToastData>();
+
+/** What a toast says. */
+export interface ToastText {
+	title: string;
+	description?: string;
+}
+
+/**
+ * Shows `text` with a spinner and the time since it opened, and returns its id. It never times out and has no
+ * **Dismiss**: `toasts.update` changes its text as the work goes on, and {@link settleToast} turns it into how it ended.
+ */
+export const loadingToast = (text: ToastText): string => toasts.add({ ...text, type: "loading", data: { startedAt: Date.now() } });
+
+/**
+ * Turns the loading toast `id` into `text`, which then closes after the page's usual five seconds. Adding by id updates
+ * the toast in place, and shows it again when it was swiped away meanwhile, so how the work ended always shows. The
+ * update merges into what the toast said, so it names `description` even when `text` has none, to clear the old one.
+ */
+export function settleToast(id: string, text: ToastText): void {
+	toasts.add({ id, type: undefined, title: text.title, description: text.description });
+}
 
 /** The element under the toasts that {@link UnderToasts} draws into, once `Toaster` has mounted it. */
 let corner: HTMLElement | null = null;
@@ -51,18 +78,38 @@ export function Toaster() {
 	);
 }
 
+/** `0:42`, `12:05`: minutes, then seconds. */
+export const clockWords = (ms: number): string => {
+	const seconds = Math.max(0, Math.floor(ms / 1000));
+	return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+};
+
+/** The time since `since`, renewed each second; hidden from screen readers, which would otherwise read the toast again each second. */
+function Elapsed({ since }: { since: number }) {
+	const now = useSecond();
+	return <span aria-hidden className="shrink-0 text-xs tabular-nums text-muted-foreground">{clockWords(now - since)}</span>;
+}
+
 function ToastList() {
-	return Toast.useToastManager<ToastData>().toasts.map(toast => (
-		<Toast.Root key={toast.id} toast={toast} className="rounded-lg border border-border bg-popover px-4 py-2 text-sm shadow-lg data-limited:hidden">
-			<Toast.Content className="flex items-center gap-3">
-				<div className="flex min-w-0 flex-1 flex-col">
-					{toast.data?.source && <div className="mb-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">{toast.data.source}</div>}
-					<Toast.Title className="truncate" />
-					<Toast.Description className="text-muted-foreground" />
-				</div>
-				<Toast.Action render={<Button variant="secondary" size="compact" />} />
-				{toast.timeout === 0 && <Toast.Close render={<Button variant="ghost" size="compact" />}>Dismiss</Toast.Close>}
-			</Toast.Content>
-		</Toast.Root>
-	));
+	return Toast.useToastManager<ToastData>().toasts.map(toast => {
+		const loading = toast.type === "loading";
+		const startedAt = loading ? toast.data?.startedAt : undefined;
+		return (
+			<Toast.Root key={toast.id} toast={toast} className="rounded-lg border border-border bg-popover px-4 py-2 text-sm shadow-lg data-limited:hidden">
+				<Toast.Content className="flex items-center gap-3">
+					<div className="flex min-w-0 flex-1 flex-col">
+						{toast.data?.source && <div className="mb-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">{toast.data.source}</div>}
+						<div className="flex min-w-0 items-center gap-2">
+							{loading && <Spinner className="size-4" />}
+							<Toast.Title className="min-w-0 flex-1 truncate" />
+							{startedAt !== undefined && <Elapsed since={startedAt} />}
+						</div>
+						<Toast.Description className="text-muted-foreground" />
+					</div>
+					<Toast.Action render={<Button variant="secondary" size="compact" />} />
+					{toast.timeout === 0 && <Toast.Close render={<Button variant="ghost" size="compact" />}>Dismiss</Toast.Close>}
+				</Toast.Content>
+			</Toast.Root>
+		);
+	});
 }
