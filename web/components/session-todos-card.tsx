@@ -34,7 +34,7 @@ const WORK_LABEL: Record<NonNullable<ShipProgress["work"]>, string> = {
 	fix_ci: "Fixing CI",
 };
 
-/** Whether transcripts show the card's todo list, which Settings → Preferences toggles. */
+/** Whether transcripts show the whole Todos card, which the checklist button after a pane's title and Settings → Preferences both toggle. */
 export const useTodosCardShown = () => useStoredState(SHOWN_KEY, raw => raw !== "false");
 
 const STATUS_LABEL: Record<TodoTask["status"], string> = {
@@ -307,10 +307,10 @@ interface SessionTodosCardProps {
  * Memoized: `phases` keeps its identity until a `todo` call changes it, so a streamed token leaves the card as it is.
  */
 export const SessionTodosCard = memo(function SessionTodosCard({ phases, view, working, changes, ship }: SessionTodosCardProps) {
-	const [todosShown] = useTodosCardShown();
-	const todos = todosShown && phases.length > 0;
+	const [shown] = useTodosCardShown();
 	const found = useChanges(view, changes);
-	if (!ship && !todos && !found) return null;
+	const todos = phases.length > 0;
+	if (!shown || (!ship && !todos && !found)) return null;
 	return (
 		<section
 			aria-label="Todos"

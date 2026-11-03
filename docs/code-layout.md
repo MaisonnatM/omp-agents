@@ -33,6 +33,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   The turn minimap on its left edge is `TranscriptMinimap` in `web/components/transcript-minimap.tsx`, with its turns from the `outline` of the `transcriptModel` in `web/transcript-view.ts` that `Transcript` builds.
   The **Todos** card, the agent's own todo list followed by its changed files, images, and sources, is `SessionTodosCard` in `web/components/session-todos-card.tsx`.
   It floats at the transcript's top right when the transcript is wide enough to keep it beside the messages, and otherwise sits above them.
+  The checklist button after the session's title, in `ViewConversation` in `web/components/pane.tsx`, hides it, as **Show todos card** in Settings › Preferences does.
   Its **Files**, **Images**, and **Sources** sections are `ChangesSections` in `web/components/todos-card-changes.tsx`, from the `changes` that `conversation.tsx` and `past-conversation.tsx` pass `Transcript`.
   Its **Files** section is `ChangedFileList` in `changed-files-section.tsx`; its **Images** section is `MediaStrip` in `media-section.tsx`, with the selection bar that sends images to a pull request or Linear issue; its **Sources** section is `SourceList` in `sources-section.tsx`.
   The sections fold independently, with closed sections kept by `useStoredKeys`.
