@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useComposerDraft } from "../composer-drafts";
-import { folderName } from "../labels";
+import { folderName, PRIVATE_NOTE } from "../labels";
 import type { Completions } from "../pane-store";
 import { usePinnedSkill } from "../pinned-skill";
 import { useDraftModelSelection } from "../use-draft-model";
@@ -280,9 +280,6 @@ function SkillToggle({ name, state, onToggle, disabled }: { name: string; state:
 		</Tooltip>
 	);
 }
-
-/** The tooltip of a private session's mark, which every place showing one repeats. */
-export const PRIVATE_NOTE = "Private: deleted with everything it wrote when it ends.";
 
 function PrivateToggle({ on, onToggle, disabled }: { on: boolean; onToggle: () => void; disabled: boolean }) {
 	return (

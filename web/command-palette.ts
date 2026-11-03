@@ -37,6 +37,8 @@ export interface PaletteAction<Run extends ActionRun = ActionRun> {
 	chord?: Chord;
 	tone?: "destructive";
 	disabled?: boolean;
+	/** What a session row's menu reads once a first click armed the action, which runs on a second one; the palette and the chord run it at once. */
+	confirm?: string;
 	run: Run;
 }
 

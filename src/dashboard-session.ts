@@ -118,6 +118,8 @@ export class DashboardSession implements LiveSession {
 	/** Where omp works; a `/move` changes it. */
 	cwd: string;
 	readonly pid: number;
+	/** Ending the session deletes it with everything it wrote, as a private session's end does. */
+	readonly private: boolean;
 	sessionId: string;
 	sessionFile: string | null;
 	sessionName: string | null = null;
@@ -166,12 +168,14 @@ export class DashboardSession implements LiveSession {
 		state: RpcState,
 		emit: (update: DashboardUpdate) => void,
 		config: SessionControlsConfig,
+		isPrivate: boolean,
 	) {
 		this.instanceId = instanceId;
 		this.cwd = cwd;
 		this.#child = child;
 		this.#requests = requests;
 		this.pid = child.pid;
+		this.private = isPrivate;
 		this.startedAt = child.meta.startedAt;
 		this.#emit = emit;
 		this.#config = config;
@@ -206,7 +210,10 @@ export class DashboardSession implements LiveSession {
 	#replayExpected: PreparedReplay["first"] | null = null;
 	#protectedReplay = false;
 
-	/** Spawn omp in `cwd` with `launch`, on `model` and at `thinking` when they name one, and wait until it accepts commands. `emit` hears `instanceId` from spawn on, before this resolves. */
+	/**
+	 * Spawn omp in `cwd` with `launch`, on `model` and at `thinking` when they name one, and wait until it accepts commands.
+	 * `emit` hears `instanceId` from spawn on, before this resolves. `isPrivate` when `launch` is a private session's.
+	 */
 	static start(
 		instanceId: string,
 		cwd: string,
@@ -214,8 +221,9 @@ export class DashboardSession implements LiveSession {
 		thinking: string | null,
 		launch: AdmittedLaunch,
 		emit: (update: DashboardUpdate) => void,
+		isPrivate: boolean,
 	): Promise<DashboardSession> {
-		return DashboardSession.#spawn(instanceId, cwd, withSessionVisuals(launch), emit, async client => {
+		return DashboardSession.#spawn(instanceId, cwd, withSessionVisuals(launch), emit, isPrivate, async client => {
 			if (model) await client.setModel(model.provider, model.id);
 			if (thinking) {
 				const levels = await client.getAvailableThinkingLevels();
@@ -227,7 +235,7 @@ export class DashboardSession implements LiveSession {
 
 	static async replay(instanceId: string, prepared: PreparedReplay, launch: AdmittedLaunch, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
 		const launchWithGuard = replayLaunch(prepared.config, launch);
-		const session = await DashboardSession.#spawn(instanceId, prepared.cwd, launchWithGuard, emit, async client => {
+		const session = await DashboardSession.#spawn(instanceId, prepared.cwd, launchWithGuard, emit, false, async client => {
 			if ((await client.switchSession(prepared.forkFile)).cancelled) throw new Error("An omp extension cancelled opening the replay.");
 			await client.setModel(prepared.marker.model.provider, prepared.marker.model.id);
 			if (prepared.marker.thinking) {
@@ -251,7 +259,7 @@ export class DashboardSession implements LiveSession {
 		// omp would repair such a file in place on open.
 		if (await endsMidTurn(sourceFile)) throw new Error("this session ended mid-turn. Resume it in omp once, then fork.");
 		let prompt = "";
-		const session = await DashboardSession.#spawn(instanceId, await recordedCwd(sourceFile), withSessionVisuals(launch), emit, async client => {
+		const session = await DashboardSession.#spawn(instanceId, await recordedCwd(sourceFile), withSessionVisuals(launch), emit, false, async client => {
 			if ((await client.switchSession(sourceFile)).cancelled) throw new Error("an omp extension cancelled opening the session");
 			try {
 				const branched = await client.branch(entryId);
@@ -272,7 +280,7 @@ export class DashboardSession implements LiveSession {
 	 */
 	static async resume(instanceId: string, sessionFile: string, launch: AdmittedLaunch, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
 		const replay = await launchForReplayResume(sessionFile, launch);
-		const session = await DashboardSession.#spawn(instanceId, await recordedCwd(sessionFile), replay.marker ? replay.launch : withSessionVisuals(replay.launch), emit, async client => {
+		const session = await DashboardSession.#spawn(instanceId, await recordedCwd(sessionFile), replay.marker ? replay.launch : withSessionVisuals(replay.launch), emit, false, async client => {
 			if ((await client.switchSession(sessionFile)).cancelled) throw new Error("an omp extension cancelled opening the session");
 			if (replay.marker) await requireReplayReady(sessionFile, replay.marker.id, replay.launch.readyToken);
 		});
@@ -282,11 +290,12 @@ export class DashboardSession implements LiveSession {
 
 	/**
 	 * Attach to session `instanceId`, whose omp a previous server started and left running, as it stands now: in the
-	 * middle of a turn, with its questions and its subagents. `toolsFor` names the tools this server serves the session.
+	 * middle of a turn, with its questions and its subagents. `toolsFor` names the tools this server serves the session;
+	 * `isPrivate` when it is a private session.
 	 */
-	static async reattach(instanceId: string, toolsFor: (sessionId: string) => RpcLaunch["tools"], emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
+	static async reattach(instanceId: string, toolsFor: (sessionId: string) => RpcLaunch["tools"], emit: (update: DashboardUpdate) => void, isPrivate: boolean): Promise<DashboardSession> {
 		let protectedReplay = false;
-		const session = await DashboardSession.#open(instanceId, emit, { kind: "attach" }, async child => {
+		const session = await DashboardSession.#open(instanceId, emit, { kind: "attach" }, isPrivate, async child => {
 			const { sessionId, sessionFile } = await child.client.getState();
 			const tools = toolsFor(sessionId);
 			if (tools.length > 0) await child.client.setCustomTools(tools);
@@ -308,9 +317,10 @@ export class DashboardSession implements LiveSession {
 		cwd: string,
 		launch: AdmittedLaunch,
 		emit: (update: DashboardUpdate) => void,
+		isPrivate: boolean,
 		prepare: (client: RpcClient) => Promise<void>,
 	): Promise<DashboardSession> {
-		return DashboardSession.#open(instanceId, emit, { kind: "spawn", cwd, launch }, async child => {
+		return DashboardSession.#open(instanceId, emit, { kind: "spawn", cwd, launch }, isPrivate, async child => {
 			await prepare(child.client);
 			return cwd;
 		});
@@ -321,6 +331,7 @@ export class DashboardSession implements LiveSession {
 		instanceId: string,
 		emit: (update: DashboardUpdate) => void,
 		opening: Opening,
+		isPrivate: boolean,
 		prepare: (child: RpcChild) => Promise<string>,
 	): Promise<DashboardSession> {
 		const requests = new PendingRequests(() => emit({ kind: "roster" }));
@@ -345,7 +356,7 @@ export class DashboardSession implements LiveSession {
 			// An omp without the command answers it with an error and keeps asking in selects.
 			child.write(ASK_DIALOG_OPT_IN);
 			const cwd = await prepare(child);
-			session = new DashboardSession(instanceId, cwd, child, requests, await child.client.getState(), emit, await loadSessionControlsConfig(cwd));
+			session = new DashboardSession(instanceId, cwd, child, requests, await child.client.getState(), emit, await loadSessionControlsConfig(cwd), isPrivate);
 			session.thinkingLevels = await child.client.getAvailableThinkingLevels();
 			// omp's snapshot has the fields of a lifecycle frame.
 			for (const agent of await child.client.getSubagents()) session.#onSubagent(SUBAGENT_LIFECYCLE, agent);
@@ -373,6 +384,7 @@ export class DashboardSession implements LiveSession {
 			compaction: this.compaction,
 			advisor: this.advisor,
 			goal: this.goal,
+			private: this.private,
 			context: this.context,
 			startedAt: this.startedAt,
 			status: this.status,

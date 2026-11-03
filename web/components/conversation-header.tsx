@@ -4,12 +4,12 @@ import type { ControlPhase, LiveView } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
-import { hostLabel } from "../labels";
+import { CONFIRM_PRIVATE_END, hostLabel, PRIVATE_NOTE } from "../labels";
 import { OpenPullRequestButton } from "../open-pull-request";
+import { isPrivateHost } from "../sessions";
 import { shortcutLabels } from "../shortcuts";
 import { useInlineConfirm } from "../use-inline-confirm";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
-import { PRIVATE_NOTE } from "./new-session";
 import { Header } from "./page-header";
 import { CRUMB_SEPARATOR, PARENT_CRUMB, SessionIdCopy, SessionMeta } from "./session-meta";
 import { SessionTitle } from "./session-title";
@@ -54,7 +54,7 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 				? CONTROL_LABEL.connecting
 				: `${CONTROL_LABEL[phase.phase]} · ${phase.reason}`;
 	const endable = live && host ? host : ending ? shown : null;
-	const isPrivate = shown?.source === "dashboard" && shown.private;
+	const isPrivate = isPrivateHost(shown);
 	const confirm = useInlineConfirm(`end:${view.instanceId}`);
 	const confirming = confirm.isArmed("end");
 	const endNow = (): void => onEnd(view.instanceId);
@@ -123,11 +123,11 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 						variant={confirming ? "destructive-outline" : "primary"}
 						size={confirming ? "compact" : "icon-compact"}
 						loading={ending}
-						aria-label={ending ? "Ending…" : confirming ? "Confirm end and delete" : "End session"}
+						aria-label={ending ? "Ending…" : confirming ? CONFIRM_PRIVATE_END : "End session"}
 						{...(isPrivate ? confirm.props("end", endNow) : { onClick: endNow })}
 					>
 						<CircleStop />
-						{confirming && "Confirm end and delete?"}
+						{confirming && CONFIRM_PRIVATE_END}
 					</Button>
 				</Tooltip>
 			)}

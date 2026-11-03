@@ -113,7 +113,7 @@ async function startSession(model: { provider: string; id: string } | null = nul
 	fakeOmp(client);
 	spyOn(ompConfig, "loadSessionControlsConfig").mockResolvedValue({ advisorEnabled: false, advisorModels: [], goalEnabled: true, goalContinues: false, compactionThreshold: () => 180000, ...config });
 	const updates: DashboardUpdate[] = [];
-	const session = await DashboardSession.start("inst-1", "/tmp/project", model, null, LAUNCH, update => updates.push(update));
+	const session = await DashboardSession.start("inst-1", "/tmp/project", model, null, LAUNCH, update => updates.push(update), false);
 	return { session, client, updates, rosters: () => updates.filter(update => update.kind === "roster").length };
 }
 
@@ -201,7 +201,7 @@ describe("DashboardSession state refresh", () => {
 			const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, LAUNCH, update => {
 				if (update.kind === "switched") switched.resolve();
 				if (update.kind === "roster") refreshed.resolve();
-			});
+			}, false);
 			const file = join(dir, "moved.jsonl");
 			client.getState = async () => ({ ...STATE, sessionFile: file, sessionName: "moved" });
 
@@ -580,7 +580,7 @@ describe("DashboardSession prompts", () => {
 		const order: string[] = [];
 		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, LAUNCH, update => {
 			if (update.kind === "switched") order.push(`switched ${session.sessionId}`);
-		});
+		}, false);
 		client.abort = async () => {
 			order.push("abort");
 		};
@@ -643,7 +643,7 @@ describe("DashboardSession action failures", () => {
 		const client = new FakeClient();
 		fakeOmp(client);
 		const updates: DashboardUpdate[] = [];
-		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, LAUNCH, update => updates.push(update));
+		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, LAUNCH, update => updates.push(update), false);
 		client.abortAndRestoreQueue = async () => { throw new Error("abort unavailable"); };
 		client.stop = async () => { throw new Error("stop unavailable"); };
 		const sessions = new LiveSessions(() => {});
@@ -679,7 +679,7 @@ describe("DashboardSession action failures", () => {
 		const client = new FakeClient();
 		fakeOmp(client);
 		const updates: DashboardUpdate[] = [];
-		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, LAUNCH, update => updates.push(update));
+		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, LAUNCH, update => updates.push(update), false);
 		client.setThinkingLevel = async () => { throw new Error("thinking unavailable"); };
 		client.setFastMode = async () => { throw new Error("fast unavailable"); };
 		await expect(session.setThinking("low")).rejects.toThrow("thinking unavailable");
@@ -699,7 +699,7 @@ describe("DashboardSession action failures", () => {
 		};
 		fakeOmp(client);
 		const updates: DashboardUpdate[] = [];
-		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, LAUNCH, update => updates.push(update));
+		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, LAUNCH, update => updates.push(update), false);
 		lifecycle({ id: "a1", status: "started" });
 		const response = Promise.withResolvers<boolean>();
 		client.cancelSubagent = () => response.promise;
@@ -766,7 +766,7 @@ describe("DashboardSession start", () => {
 		};
 
 		await expect(
-			DashboardSession.start("inst-1", "/tmp/project", { provider: "p", id: "m" }, null, LAUNCH, update => order.push(update.kind)),
+			DashboardSession.start("inst-1", "/tmp/project", { provider: "p", id: "m" }, null, LAUNCH, update => order.push(update.kind), false),
 		).rejects.toThrow("no such model");
 
 		// The question arrived (a roster change), the process stopped, and only then was the question dropped (another).
@@ -795,7 +795,7 @@ describe("DashboardSession reattach", () => {
 		client.getSubagents = async () => [{ id: "a1", agent: "explore", status: "running", description: "Read the docs" }];
 		const tool = { name: "project_status", label: "Status", description: "", parameters: {}, loadMode: "essential" as const, execute: async () => "" };
 		const asked: string[] = [];
-		const session = await DashboardSession.reattach("inst-kept", sessionId => (asked.push(sessionId), [tool]), () => {});
+		const session = await DashboardSession.reattach("inst-kept", sessionId => (asked.push(sessionId), [tool]), () => {}, false);
 
 		expect(asked).toEqual(["kept-1"]);
 		expect(client.calls).toContain("tools project_status");
@@ -815,7 +815,7 @@ describe("DashboardSession reattach", () => {
 		const client = new FakeClient();
 		const { hungUp } = keptOmp(client);
 		const updates: DashboardUpdate[] = [];
-		const session = await DashboardSession.reattach("inst-kept", () => [], update => updates.push(update));
+		const session = await DashboardSession.reattach("inst-kept", () => [], update => updates.push(update), false);
 		const stops: string[] = [];
 		client.stop = async () => {
 			stops.push("stop");
@@ -829,7 +829,7 @@ describe("DashboardSession reattach", () => {
 		const client = new FakeClient();
 		const { exit } = keptOmp(client);
 		const updates: DashboardUpdate[] = [];
-		const session = await DashboardSession.reattach("inst-kept", () => [], update => updates.push(update));
+		const session = await DashboardSession.reattach("inst-kept", () => [], update => updates.push(update), false);
 		client.stop = async () => exit.resolve("exit");
 		await session.end();
 		await settle();
@@ -842,7 +842,7 @@ describe("DashboardSession reattach", () => {
 		// omp's `get_state` still reports the job, which the dashboard ignores.
 		const waiting: RpcState & { hasPendingAsyncWork: boolean } = { ...STATE, hasPendingAsyncWork: true };
 		client.getState = async () => waiting;
-		const session = await DashboardSession.reattach("inst-kept", () => [], () => {});
+		const session = await DashboardSession.reattach("inst-kept", () => [], () => {}, false);
 		session.answer("q1", { kind: "confirm", confirmed: true });
 		expect(session.status).toBe("idle");
 		client.fire({ type: "agent_start" });
@@ -857,7 +857,7 @@ describe("DashboardSession reattach", () => {
 		keptOmp(client);
 		client.getState = async () => ({ ...STATE, isStreaming: true });
 		const updates: DashboardUpdate[] = [];
-		const session = await DashboardSession.reattach("inst-kept", () => [], update => updates.push(update));
+		const session = await DashboardSession.reattach("inst-kept", () => [], update => updates.push(update), false);
 		session.answer("q1", { kind: "confirm", confirmed: true });
 		const from = updates.length;
 		const limited = {
@@ -882,7 +882,7 @@ describe("DashboardSession reattach", () => {
 			const client = new FakeClient();
 			keptOmp(client);
 			client.getState = async () => ({ ...STATE, sessionFile: file });
-			const session = await DashboardSession.reattach("inst-kept", () => [], () => {});
+			const session = await DashboardSession.reattach("inst-kept", () => [], () => {}, false);
 			expect(session.row().cwd).toBe("/tmp/kept");
 			await expect(session.prompt("a1", "hi", [], "steer")).rejects.toThrow("Subagent prompts are blocked in a replay.");
 		} finally {
@@ -900,7 +900,7 @@ describe("DashboardSession reattach", () => {
 		client.getSubagents = async () => {
 			throw new Error("omp did not answer");
 		};
-		await expect(DashboardSession.reattach("inst-kept", () => [], () => {})).rejects.toThrow("omp did not answer");
+		await expect(DashboardSession.reattach("inst-kept", () => [], () => {}, false)).rejects.toThrow("omp did not answer");
 		expect([hungUp, stops]).toEqual([["detach"], []]);
 	});
 });

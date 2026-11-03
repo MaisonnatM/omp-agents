@@ -6,7 +6,7 @@ For what the user sees, see [Personal sessions](../usage/personal-sessions.md).
 
 ## The extension
 
-`personalJoin` in `src/server/personal.ts` is a `SessionJoin` in the dashboard's `#joinFor`, so every session the dashboard launches that is not a Bot's loads it with `-e` and the flags in `PERSONAL_FLAGS`, the personal directory and the memory file.
+`personalJoin` in `src/server/personal.ts` makes a `SessionJoin` for the dashboard's `#joinFor` from how to tell a Bot's start, so every session the dashboard launches that is not a Bot's loads it with `-e` and the flags in `PERSONAL_FLAGS`, the personal directory and the memory file.
 A Bot's session launches without it, so a Bot whose workspace is the personal directory keeps only its own memory.
 A private session loads it as any other, so a private personal session reads and writes the shared memory.
 
@@ -30,7 +30,7 @@ The Bot, designer, shepherd, router, and personal extensions import from it; `le
 
 The dashboard creates `personalDir` in `start()`.
 It is outside git and holds no agent code, so `ProjectTrustFile.admit` passes for it without a trust; see [Project trust](project-trust.md).
-`isPersonalDir` in `src/server/personal.ts` resolves a `~` path before comparing, since the page sends directories as shown.
+`isPersonalDir` in `src/server/personal.ts` resolves a `~` path through `absoluteDir` in `src/paths.ts` before comparing, since the page sends directories as shown.
 `SessionMoves` takes `staysPut`, true for a Bot's conversation or a session started in the personal directory, and gives neither the `move_session` tool; the join is decided at launch, so a session that moves into the directory keeps the tool.
 
 The page learns the directory and the memory from the read-only list message `personal`, `{ cwd, cwdDisplay, memory }`, which `personalMessage` builds and every socket gets on open.
@@ -39,6 +39,6 @@ The dashboard pushes it again after a personal session's turn ends and when one 
 ## The page
 
 `web/dashboard-state.ts` keeps the directory as `personal`, one object while it stays the same, and the memory text as `personalMemory`.
-`PersonalContext` in `web/components/dashboard-context.tsx` provides the directory, and `workspaceName` in `web/labels.ts` names it **Personal** for the workspace pickers, the roster's new-session button, a row's workspace badge, and the command palette.
+`PersonalContext` in `web/components/dashboard-context.tsx` provides the directory, and `workspaceName` in `web/labels.ts` names it **Personal**, from the directory as shown, for the workspace pickers, the roster's new-session button, a row's workspace badge, and the command palette.
 `DirectoryPicker` lists it first.
 `SessionDetails` adds a **Memory** tab for a session whose `cwd` is the personal directory, with `MemoryList` from `web/components/memory-list.tsx`, which a Bot's details also use.

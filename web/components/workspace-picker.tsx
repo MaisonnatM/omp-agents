@@ -53,7 +53,7 @@ export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shor
 	};
 	return (
 		<CommandPicker
-			trigger={workspaceName(cwd, personal) ?? cwd}
+			trigger={workspaceName(listed.find(workspace => workspace.cwd === cwd)?.cwdDisplay ?? cwd, personal) ?? cwd}
 			icon={Folder}
 			control={control}
 			ariaLabel={`Working directory: ${cwd}`}

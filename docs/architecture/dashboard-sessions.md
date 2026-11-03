@@ -126,12 +126,13 @@ A `start` with `new` and `private: true` starts a private session, one that live
 `PrivateSessions` in `src/server/private-sessions.ts` makes `private-sessions/<port>/<instance id>` before omp starts, and its existence is what marks the session private, so a restart loses nothing.
 omp runs with `--session-dir` set to omp's own name for the cwd inside that directory (`sessionDirForCwd`), so its transcript, subagents, `/move`, and `/wt` all stay inside, and with `--config private.yml` from the same directory, which turns omp's memory and autolearn off and outranks the user's and the project's settings.
 A private session's file sits one directory deeper than past sessions' files are read, so the private root's watch only pokes live views, and no past list, search, or index lists it.
-The roster marks the row `private`, and `saveRunning` leaves the session out of `interrupted.json`.
+The session holds whether it is private, set at its start and, at a reattach, from its directory's existence; the roster marks the row `private` from it, and `saveRunning` leaves the session out of `interrupted.json`.
 When the `exited` update comes, the server purges the session instead of counting it interrupted.
-`purge` reads the session id of every `*.jsonl` under the directory, unpins those ids, deletes their `history`, `session_titles`, and `session_recaps` rows from omp's `history.db` and rebuilds its full-text index, removes omp's custom-session-file markers that name those files, and only then removes the directory (`forgetSessions` in `src/omp/forget-sessions.ts`, which mirrors `deleteHistoryRowsForSessions` in omp's `gc-cli.ts`).
+`purge` reads the session id of every `*.jsonl` under the directory through `readSessionHeader`, unpins those ids, deletes their `history`, `session_titles`, and `session_recaps` rows from omp's `history.db` and rebuilds its full-text index, removes omp's custom-session-file markers that name those files, and only then removes the directory (`forgetSessions` in `src/omp/forget-sessions.ts`, which mirrors `deleteHistoryRowsForSessions` in omp's `gc-cli.ts`).
 Each step changes nothing when repeated, and the directory goes last, so a purge cut short anywhere is finished by the next one.
+A purge asked while one of the same session runs joins it, so a failed start and its omp's exit purge once.
 After `reattachAll`, before the page's socket is let in, the server sweeps the private root and purges every directory whose session neither the registry nor a keeper holds, as one whose omp exited while no server ran.
-A private start that fails purges its directory, before omp runs or through the `discard` that a start which ran omp returns.
+A private start that fails purges its directory through `launch`, before omp runs, or through the `discard` that `launch` returns, after.
 `createStarter` refuses to fork or replay a private session, since omp writes a fork beside its source, and the page hides **Fork from here** and **Replay from here** for it.
 What stays: pasted images in omp's blob store until `omp gc --blobs`, omp-stats' token counts and file path with no text, and any terminal breadcrumb of omp's, which holds only a path.
 

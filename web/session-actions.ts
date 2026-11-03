@@ -2,8 +2,10 @@ import { AppWindow, Archive, CircleStop, Columns2, Copy, Folder, GitPullRequest,
 import { pullRequestUrl } from "../src/shared/github";
 import type { PastSession, RosterHost, View } from "../src/shared/sessions";
 import type { ActionGroup, ActionRun } from "./command-palette";
+import { CONFIRM_PRIVATE_END } from "./labels";
 import { PAGE_ICON } from "./page-icons";
 import { hashForTickets, type OpenMode } from "./routing";
+import { isPrivateHost } from "./sessions";
 import { END_SESSION } from "./shortcuts";
 
 /** A session as a row lists it: running, or past. */
@@ -96,6 +98,17 @@ export function sessionActions(entry: SessionEntry, context: SessionActionContex
 		opening,
 		links,
 		copies,
-		[{ id: "end", title: context.ending ? "Ending…" : "End session", icon: CircleStop, disabled: context.ending, tone: "destructive", chord: END_SESSION, run: { kind: "do", fn: () => context.end(instanceId) } }],
+		[
+			{
+				id: "end",
+				title: context.ending ? "Ending…" : "End session",
+				icon: CircleStop,
+				disabled: context.ending,
+				tone: "destructive",
+				chord: END_SESSION,
+				...(isPrivateHost(entry.host) ? { confirm: CONFIRM_PRIVATE_END } : {}),
+				run: { kind: "do", fn: () => context.end(instanceId) },
+			},
+		],
 	];
 }

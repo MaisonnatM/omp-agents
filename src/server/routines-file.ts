@@ -4,10 +4,9 @@
  * A routine whose task was pull requests or a project's prompt is dropped on load. The rest of the file stays.
  * A file from before `schedules`, before a run's `outcome`, before every routine had a Bot, or before triggers migrates here, so everything else sees the current shape.
  */
-import { resolve } from "node:path";
 import { ReducerFile } from "../fs";
 import { isNonEmpty, isObject, isSafeInteger, isTexts, parseAll } from "../json";
-import { expandHome, HOME } from "../paths";
+import { absoluteDir, HOME } from "../paths";
 import {
 	applyRoutine,
 	MAX_ROUTINE_RUNS,
@@ -95,7 +94,7 @@ function adoptLegacy(value: Record<string, unknown>, workspace: string): { field
 	if (!isObject(task)) return { fields: value, toRoutinesBot: false };
 	switch (task.kind) {
 		case "command": {
-			const command = elsewhere !== null && typeof task.command === "string" ? `cd ${shellWord(resolve(HOME, expandHome(elsewhere.trim())))} && ${task.command}` : task.command;
+			const command = elsewhere !== null && typeof task.command === "string" ? `cd ${shellWord(absoluteDir(elsewhere))} && ${task.command}` : task.command;
 			return { fields: { ...value, botId: ROUTINES_BOT_ID, task: { kind: "command", command } }, toRoutinesBot: true };
 		}
 		case "prompt": {

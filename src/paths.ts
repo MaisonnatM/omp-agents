@@ -113,9 +113,12 @@ export const displayPath = (path: string): string =>
 /** Directory `cwd` as the page shows a workspace, with its {@link displayPath}. */
 export const workspaceFor = (cwd: string): Workspace => ({ cwd, cwdDisplay: displayPath(cwd) });
 
-/** The directory `input` names (absolute, `~`-relative, or relative to the home directory), or `null` when it is not one; stats without blocking the event loop. */
+/** The absolute path `input` names (absolute, `~`-relative, or relative to the home directory), without checking that it exists. */
+export const absoluteDir = (input: string): string => resolve(HOME, expandHome(input.trim()));
+
+/** The directory `input` names, as {@link absoluteDir} reads it, or `null` when it is not one; stats without blocking the event loop. */
 export async function directoryOf(input: string): Promise<string | null> {
-	const cwd = resolve(HOME, expandHome(input.trim()));
+	const cwd = absoluteDir(input);
 	const found = await stat(cwd).catch(() => null);
 	return found?.isDirectory() ? cwd : null;
 }

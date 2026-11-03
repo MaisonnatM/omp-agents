@@ -6,17 +6,7 @@ import { Database } from "bun:sqlite";
 import { existsSync } from "node:fs";
 import { readFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { dirs, loader } from "./modules";
-
-/** The id in the header of the session file at `path`; `null` when it has no header yet. */
-export async function readSessionId(path: string): Promise<string | null> {
-	let id: string | null = null;
-	await loader.visitEntriesFromFileStream(path, entry => {
-		if (entry.type === "session" && typeof entry.id === "string") id = entry.id;
-		return false;
-	}, { maxRecords: 1, maxBytes: 1024 * 1024 });
-	return id;
-}
+import { dirs } from "./modules";
 
 /** Remove omp's history rows of `sessionIds` and its markers of `sessionFiles`; what is already gone stays gone. */
 export async function forgetSessions(sessionIds: string[], sessionFiles: string[]): Promise<void> {

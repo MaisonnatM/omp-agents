@@ -76,19 +76,24 @@ interface SessionDetailsProps extends Omit<SessionWork, "scope" | "live"> {
 /** The right sidebar's content for the focused view: its session's pull requests, its running app, its Linear issues when it has any, and a personal session's **Memory**. */
 export function SessionDetails({ view, working, cwd, personalMemory, pullRequests, tickets, workspace, hosts }: SessionDetailsProps) {
 	const scope = view.kind === "past" ? view.sessionId : (hosts.find(host => host.instanceId === view.instanceId)?.sessionId ?? view.instanceId);
-	const tabs: DetailsTab<"pull-requests" | "browser" | "tickets" | "memory">[] = sessionWorkTabs({ scope, working, pullRequests, tickets, workspace, hosts, live: view.kind === "live" ? view : null });
-	if (personalMemory !== null)
-		tabs.push({
-			value: "memory",
-			icon: Brain,
-			name: "Memory",
-			control: "session-details.tab.memory",
-			count: 0,
-			content: (
-				<div className="px-4 pt-2 pb-4">
-					<MemoryList path="personal-memory.md" memory={personalMemory} empty="Nothing yet. Tell it something worth keeping, and it remembers it." />
-				</div>
-			),
-		});
+	const tabs = [
+		...sessionWorkTabs({ scope, working, pullRequests, tickets, workspace, hosts, live: view.kind === "live" ? view : null }),
+		...(personalMemory !== null
+			? [
+					{
+						value: "memory",
+						icon: Brain,
+						name: "Memory",
+						control: "session-details.tab.memory",
+						count: 0,
+						content: (
+							<div className="px-4 pt-2 pb-4">
+								<MemoryList path="personal-memory.md" memory={personalMemory} empty="Nothing yet. Tell it something worth keeping, and it remembers it." />
+							</div>
+						),
+					} as const,
+				]
+			: []),
+	];
 	return <DetailsSidebarFrame label="Session details" storageKey={TAB_KEY} defaultTab="pull-requests" cwd={cwd} tabs={tabs} />;
 }

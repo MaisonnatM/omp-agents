@@ -12,6 +12,7 @@ import { liveDraftKey, useComposerDraft, useComposerFiles } from "../composer-dr
 import { folderName, hostLabel } from "../labels";
 import { useChangedFiles, useComposerData, useNextSuggestions } from "../pane-store";
 import type { ModelList } from "../reads";
+import { isPrivateHost } from "../sessions";
 import { shortcutKeys, shortcutLabels, useShortcuts } from "../shortcuts";
 import type { StartOf } from "../starts";
 import type { ForkPoint } from "../transcript-view";
@@ -291,7 +292,7 @@ function LiveConversation({
 	);
 	const changes = useMemo(() => ({ sessionId, cwd: shown?.cwd ?? null, facts: shown }), [sessionId, shown]);
 	// A private session leaves nothing behind, so nothing may fork or replay it.
-	const isPrivate = shown?.source === "dashboard" && shown.private;
+	const isPrivate = isPrivateHost(shown);
 
 	return (
 		<div className="@container/conversation flex h-full min-h-0 flex-1 flex-col" data-conversation>

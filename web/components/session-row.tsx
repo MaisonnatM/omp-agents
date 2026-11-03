@@ -8,14 +8,13 @@ import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { PaletteAction } from "../command-palette";
-import { hostLabel, modeOf, pastLabel, SOURCE_LABELS, SPLIT_CLICK, workspaceName } from "../labels";
+import { hostLabel, modeOf, pastLabel, PRIVATE_NOTE, SOURCE_LABELS, SPLIT_CLICK, workspaceName } from "../labels";
 import type { OpenMode } from "../routing";
 import { sessionActions, type SessionEntry, type SessionRun } from "../session-actions";
-import { workspaceCwd, workspaceOf } from "../sessions";
+import { isPrivateHost, workspaceCwd, workspaceOf } from "../sessions";
 import { type InlineConfirm, useInlineConfirm } from "../use-inline-confirm";
 import { Age } from "./age";
 import { PersonalContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
-import { PRIVATE_NOTE } from "./new-session";
 import { StatusDot, statusLabel } from "./status-dot";
 
 /** The muted facts after a session's name: the parts that apply. */
@@ -83,7 +82,8 @@ function SessionButton({ view, label, title, badge, facts, when, dot, open, onOp
  * whose label is its directory's name, when that directory is not its workspace's, as a linked worktree's is not.
  */
 export function WorkspaceBadge({ cwdDisplay }: { cwdDisplay: string }) {
-	const name = workspaceName(cwdDisplay, useContext(PersonalContext));
+	const personal = useContext(PersonalContext);
+	const name = workspaceName(cwdDisplay, personal);
 	return name ? <Badge size="compact" className="shrink-0 self-center">{name}</Badge> : null;
 }
 
@@ -105,7 +105,6 @@ function RowMenuItems({ entry, onScreen, pinned, onTogglePin }: Omit<RowMenuProp
 	const { open, send, start, end, workspaceSettings } = useDashboardActions();
 	const { starts: { resume }, ending } = useDashboardStatus();
 	const confirm = useInlineConfirm(entry.kind === "live" ? `end:${entry.host.instanceId}` : "end");
-	const isPrivate = entry.kind === "live" && entry.host.source === "dashboard" && entry.host.private;
 	const actions = sessionActions(entry, {
 		onScreen,
 		pinned,
@@ -124,7 +123,7 @@ function RowMenuItems({ entry, onScreen, pinned, onTogglePin }: Omit<RowMenuProp
 				<Fragment key={group[0].id}>
 					{index > 0 && <MenuSeparator />}
 					{group.map(action => (
-						<ActionItem key={action.id} action={action} confirm={isPrivate && action.id === "end" ? confirm : null} />
+						<ActionItem key={action.id} action={action} confirm={confirm} />
 					))}
 				</Fragment>
 			))}
@@ -145,10 +144,10 @@ function RowMenu({ entry, onScreen, pinned, onTogglePin, children }: RowMenuProp
 }
 
 /**
- * One session action as a menu item. Open in split names the click that also runs it from the row. With `confirm`,
- * the first click arms it and keeps the menu open, and the second runs it, as End does for a private session.
+ * One session action as a menu item. Open in split names the click that also runs it from the row. An action with a
+ * `confirm` arms on the first click, which keeps the menu open and shows `confirm`, and runs on the second.
  */
-function ActionItem({ action, confirm }: { action: PaletteAction<SessionRun>; confirm: InlineConfirm | null }) {
+function ActionItem({ action, confirm }: { action: PaletteAction<SessionRun>; confirm: InlineConfirm }) {
 	const { icon: Icon, title, run } = action;
 	if (run.kind === "link") {
 		return (
@@ -158,16 +157,16 @@ function ActionItem({ action, confirm }: { action: PaletteAction<SessionRun>; co
 			</MenuLinkItem>
 		);
 	}
-	const armed = confirm?.isArmed(action.id) ?? false;
+	const armed = action.confirm !== undefined && confirm.isArmed(action.id);
 	return (
 		<MenuItem
 			variant={action.tone}
 			disabled={action.disabled}
 			aria-busy={(action.id === "end" && action.disabled) || undefined}
-			{...(confirm ? { closeOnClick: armed, ...confirm.props(action.id, run.fn) } : { onClick: run.fn })}
+			{...(action.confirm !== undefined ? { closeOnClick: armed, ...confirm.props(action.id, run.fn) } : { onClick: run.fn })}
 		>
 			<Icon />
-			{armed ? "Confirm end and delete?" : title}
+			{armed ? action.confirm : title}
 			{action.id === "split" && <MenuShortcut>{SPLIT_CLICK}</MenuShortcut>}
 		</MenuItem>
 	);
@@ -221,7 +220,7 @@ export const HostRow = memo(function HostRow({ session: host, pinned, open, show
 	const { open: onOpen } = useDashboardActions();
 	const view: View = { kind: "live", instanceId: host.instanceId, agentId: null };
 	const label = hostLabel(host);
-	const isPrivate = host.source === "dashboard" && host.private;
+	const isPrivate = isPrivateHost(host);
 	const workspace = showWorkspace && (host.sessionName !== null || workspaceCwd(host) !== host.cwd) ? <WorkspaceBadge cwdDisplay={workspaceOf(host).cwdDisplay} /> : null;
 	return (
 		<RowMenu entry={{ kind: "live", host }} onScreen={open} pinned={pinned} onTogglePin={onTogglePin}>

@@ -68,7 +68,7 @@ test("a private session neither forks nor replays, before any omp starts, since 
 		mayDiscardReplay: async () => null,
 		admit: async () => {},
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
-		privateSessions: new PrivateSessions({ root, unpin: () => {}, forgetInOmp: async () => {}, readSessionId: async () => null }),
+		privateSessions: new PrivateSessions({ root, unpin: () => {} }),
 	});
 	const view = { kind: "live", instanceId: "i1", agentId: null } as const;
 	expect(await start({ kind: "fork", view, entryId: "e1" })).toMatchObject({ ok: false, error: expect.stringContaining("private session") });
@@ -90,7 +90,7 @@ test("the server learns which sessions survived before it lists or hears any, an
 		const heard: string[] = [];
 		const sessions: LiveSessions = new LiveSessions((instanceId, update) => heard.push(`${update.kind} ${instanceId}, listed: ${sessions.get(instanceId) !== undefined}`), undefined, join(dir, "unread.json"));
 		const joinFor = (): SessionJoin => ({ rpc: rpc.PLAIN_LAUNCH, attach: session => { heard.push(`attach ${session.instanceId}`); } });
-		await reattachAll(sessions, joinFor, survived => {
+		await reattachAll(sessions, joinFor, () => false, survived => {
 			heard.push(`recover ${[...survived].join(" ")}`);
 			return new Set();
 		});
@@ -130,9 +130,9 @@ test("a reattached session whose turn ended while no server listened is listed w
 			return fromPartial(Object.create(DashboardSession.prototype, fields));
 		});
 		const sessions = new LiveSessions(() => {}, new TaskClaims(join(dir, "claims.json")), unreadPath);
-		await reattachAll(sessions, () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }), () => new Set(["s-i-ended", "s-i-prompted", "s-i-working"]));
+		await reattachAll(sessions, () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }), () => false, () => new Set(["s-i-ended", "s-i-prompted", "s-i-working"]));
 		const facts: SessionFacts = { tickets: [], pullRequests: [], worktree: null, branch: null, ship: null, workspace: null };
-		expect(sessions.rows(() => facts, () => false).map(row => [row.instanceId, row.unread])).toEqual([
+		expect(sessions.rows(() => facts).map(row => [row.instanceId, row.unread])).toEqual([
 			["i-ended", { at: Date.parse("2026-11-02T10:00:12.000Z"), reply: "done" }],
 			["i-prompted", { at: Date.parse("2026-11-02T10:00:20.000Z"), reply: null }],
 			["i-working", null],
@@ -184,7 +184,7 @@ test("a keeper that never greets is stopped with its job within the bound, then 
 		const interrupted = new InterruptedSessions(saved);
 
 		const began = Date.now();
-		const reattached = reattachAll(new LiveSessions(() => {}, undefined, join(dir, "unread.json")), () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }), survived => interrupted.recover(survived));
+		const reattached = reattachAll(new LiveSessions(() => {}, undefined, join(dir, "unread.json")), () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }), () => false, survived => interrupted.recover(survived));
 		const notReattached = refuseUntil(reattached, "Still attaching.");
 		expect(notReattached()?.status).toBe(503);
 		await reattached;

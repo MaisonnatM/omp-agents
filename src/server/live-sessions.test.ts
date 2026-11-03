@@ -38,7 +38,7 @@ function registry(path: string, ...instanceIds: string[]): LiveSessions {
 }
 
 /** Each listed session's instance id with its unread turn. */
-const unreadOf = (sessions: LiveSessions) => sessions.rows(() => facts, () => false).map(row => [row.instanceId, row.unread]);
+const unreadOf = (sessions: LiveSessions) => sessions.rows(() => facts).map(row => [row.instanceId, row.unread]);
 
 /** Terminal session `instanceId` as the registry lists it, running a turn when `busy`, and `null` when its omp does not say. */
 const host = (instanceId: string, busy: boolean | null = false): HostSnapshot => ({
@@ -124,7 +124,7 @@ describe("LiveSessions", () => {
 
 	test("a row carries the turn its session ended unseen, with its reply's first line, until a look, the next turn, or the session leaving reads it", () => {
 		const sessions = registry(unreadIn(), "i1");
-		const unread = () => sessions.rows(() => facts, () => false)[0]?.unread;
+		const unread = () => sessions.rows(() => facts)[0]?.unread;
 		expect(sessions.markRead("i1")).toBe(false);
 		sessions.markUnread("i1", { at: 1_000, reply: "\n  Fixed the **flaky** test.  \nDetails follow." });
 		expect(unread()).toEqual({ at: 1_000, reply: "Fixed the **flaky** test." });

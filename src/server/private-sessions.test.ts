@@ -3,7 +3,6 @@ import { afterEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { forgetSessions, readSessionId } from "../omp/forget-sessions";
 import { dirs } from "../omp/modules";
 import { PLAIN_LAUNCH } from "../omp/rpc";
 import { PrivateSessions } from "./private-sessions";
@@ -62,15 +61,15 @@ function historyOf(word: string) {
 	}
 }
 
-/** Private sessions under a fresh root, which forget through `forget`, and the session ids each purge unpinned. */
-function setup(forget: typeof forgetSessions = forgetSessions) {
+/** Private sessions under a fresh root, and the session ids each purge unpinned. */
+function setup() {
 	const root = mkdtempSync(join(tmpdir(), "omp-agents-private-"));
 	roots.push(root);
 	const unpinned: string[][] = [];
-	const sessions = new PrivateSessions({ root, unpin: ids => void unpinned.push(ids), forgetInOmp: forget, readSessionId });
+	const sessions = new PrivateSessions({ root, unpin: ids => void unpinned.push(ids) });
 	/** Launches private session `instanceId` in `/work` and writes its file and its subagent's where omp's `--session-dir` puts them. */
 	const launched = async (instanceId: string, sessionId: string) => {
-		const { args } = await sessions.launch(instanceId, "/work", PLAIN_LAUNCH);
+		const { rpc: { args } } = await sessions.launch(instanceId, "/work", PLAIN_LAUNCH);
 		const sessionDir = args[args.indexOf("--session-dir") + 1]!;
 		const main = join(sessionDir, `2026-11-03T10-00-00-000Z_${sessionId}.jsonl`);
 		writeSession(main, sessionId);
@@ -101,18 +100,16 @@ test("purging a private session deletes its files, its subagents', and omp's his
 });
 
 test("a purge cut short leaves the session private with its files, the next one finishes it, and one after that changes nothing", async () => {
-	let failures = 1;
-	const { sessions, launched } = setup(async (ids, files) => {
-		if (failures-- > 0) throw new Error("database is locked");
-		await forgetSessions(ids, files);
-	});
+	const { sessions, launched } = setup();
 	const main = await launched("i1", "s-private");
-	seedHistory({ "s-private": "book the clinic appointment", "s-other": "fix the flaky build" });
+	writeFileSync(dirs.getHistoryDbPath(), "not a database\n".repeat(100));
 
-	await expect(sessions.purge("i1")).rejects.toThrow("database is locked");
+	await expect(sessions.purge("i1")).rejects.toThrow("file is not a database");
 	expect(sessions.has("i1")).toBe(true);
 	expect(existsSync(main)).toBe(true);
 
+	rmSync(dirs.getHistoryDbPath());
+	seedHistory({ "s-private": "book the clinic appointment", "s-other": "fix the flaky build" });
 	await sessions.purge("i1");
 	expect(sessions.has("i1")).toBe(false);
 	expect(existsSync(main)).toBe(false);
@@ -120,6 +117,19 @@ test("a purge cut short leaves the session private with its files, the next one 
 
 	await sessions.purge("i1");
 	expect(historyOf("build")).toEqual({ history: ["s-other"], titles: ["s-other"], recaps: ["s-other"], matches: 1 });
+});
+
+test("two purges of one session at once, as a failed start's and its omp's exit, both finish and leave nothing", async () => {
+	const { sessions, unpinned, launched } = setup();
+	const main = await launched("i1", "s-private");
+	seedHistory({ "s-private": "book the clinic appointment", "s-other": "fix the flaky build" });
+
+	await Promise.all([sessions.purge("i1"), sessions.purge("i1")]);
+
+	expect(sessions.has("i1")).toBe(false);
+	expect(existsSync(main)).toBe(false);
+	expect(historyOf("clinic")).toEqual({ history: ["s-other"], titles: ["s-other"], recaps: ["s-other"], matches: 0 });
+	expect(unpinned).toHaveLength(1);
 });
 
 test("the sweep purges the private sessions whose omp no longer runs and keeps the running ones", async () => {
