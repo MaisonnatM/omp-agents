@@ -238,9 +238,11 @@ export class LiveSessions {
 		return new Set([...this.#sessions.values()].map(session => session.sessionId));
 	}
 
-	/** The running sessions that this dashboard started, each with whether its turn runs (or waits on a question). */
+	/** The running sessions that this dashboard started, each with whether its turn runs (or waits on a question), leaving out private ones. */
 	startedHere(): Map<string, boolean> {
-		return new Map([...this.#sessions.values()].flatMap(session => (session instanceof DashboardSession ? [[session.sessionId, session.status !== "idle"] as const] : [])));
+		return new Map(
+			[...this.#sessions.values()].flatMap(session => (session instanceof DashboardSession && !session.private ? [[session.sessionId, session.status !== "idle"] as const] : [])),
+		);
 	}
 
 	/** The directories running sessions work in. */

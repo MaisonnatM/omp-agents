@@ -55,6 +55,15 @@ export const routerInboxDir = join(configDir, "router-inbox");
 export const routerTasksFile = join(configDir, "router-tasks.json");
 /** Each Bot's `<id>/memory.md`, which its own session writes, in the dashboard's data directory. */
 export const botsDir = join(dataDir, "bots");
+/** Where personal sessions run: the user's own directory, tied to no project, in the dashboard's data directory so the file dialog opens what they write there. */
+export const personalDir = join(dataDir, "personal");
+/** The facts every personal session shares, which their `remember` tool appends, beside {@link personalDir} so omp never reads it as a file of that directory. */
+export const personalMemoryFile = join(dataDir, "personal-memory.md");
+/**
+ * Where this port's private sessions keep everything omp writes for them, one `<instance id>` directory each, as {@link keepersDir} is per port.
+ * A directory's presence is the only record that its session is private; deleting it, last, is what deletes the session.
+ */
+export const privateSessionsDir = join(dataDir, "private-sessions", String(portFromEnv()));
 /** The messages and session starts that wait for their time, beside {@link tokenFile}. */
 export const scheduledFile = join(configDir, "scheduled.json");
 /** The directories Settings → Workspaces added and hid, beside {@link tokenFile}. */
@@ -104,9 +113,12 @@ export const displayPath = (path: string): string =>
 /** Directory `cwd` as the page shows a workspace, with its {@link displayPath}. */
 export const workspaceFor = (cwd: string): Workspace => ({ cwd, cwdDisplay: displayPath(cwd) });
 
-/** The directory `input` names (absolute, `~`-relative, or relative to the home directory), or `null` when it is not one; stats without blocking the event loop. */
+/** The absolute path `input` names (absolute, `~`-relative, or relative to the home directory), without checking that it exists. */
+export const absoluteDir = (input: string): string => resolve(HOME, expandHome(input.trim()));
+
+/** The directory `input` names, as {@link absoluteDir} reads it, or `null` when it is not one; stats without blocking the event loop. */
 export async function directoryOf(input: string): Promise<string | null> {
-	const cwd = resolve(HOME, expandHome(input.trim()));
+	const cwd = absoluteDir(input);
 	const found = await stat(cwd).catch(() => null);
 	return found?.isDirectory() ? cwd : null;
 }

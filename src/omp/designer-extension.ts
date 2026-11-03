@@ -8,7 +8,8 @@ import { statSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { CREATE_TOOL } from "../shared/bot-designer";
 import { BOT_KIND_INFO, BOT_KINDS, type BotId, MAX_JOB_LENGTH, parseBotId } from "../shared/bots";
-import { BOT_FLAGS, type BotExtensionApi, flagValue, leave, reply } from "./bot-extension";
+import { BOT_FLAGS, leave } from "./bot-extension";
+import { type ExtensionApi, flagValue, reply } from "./extension-kit";
 
 export interface CreateBotParams {
 	name: string;
@@ -32,7 +33,7 @@ const isDirectory = (path: string): boolean => {
 	}
 };
 
-export default function designerExtension(pi: BotExtensionApi): void {
+export default function designerExtension(pi: ExtensionApi): void {
 	pi.registerFlag(BOT_FLAGS.bot, { type: "string", description: "The omp-agents Bot this session is." });
 	pi.registerFlag(BOT_FLAGS.botInbox, { type: "string", description: "The directory create_bot leaves its requests in." });
 

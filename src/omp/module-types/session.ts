@@ -40,6 +40,10 @@ export interface LoaderModule {
 export interface SessionEntriesModule {
 	resolveSessionLeafId(entries: readonly FileEntry[]): string | null;
 }
+/** omp's session paths (src/session/session-paths.ts): the directory omp keeps `cwd`'s sessions in under `sessionsRoot`, named as under its own root. */
+export interface SessionPathsModule {
+	sessionDirForCwd(cwd: string, sessionsRoot: string): string;
+}
 /** omp's session context (src/session/session-context.ts): the messages a request on the branch ending at `leafId` sends. */
 export interface SessionContextModule {
 	buildSessionContext(entries: FileEntry[], leafId: string | null, byId: Map<string, FileEntry>): { messages: object[] };

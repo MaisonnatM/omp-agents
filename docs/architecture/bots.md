@@ -17,8 +17,8 @@ Only `Bots` sets `bot`, since `parseNewSessionRequest` never reads one, so a pag
 A Bot of another kind than `routines` also loads its kind's extension with a second `-e`, with any flags it reads beyond the Bot extension's, from the per-kind table `kindExtensions` in `src/server/bots.ts`.
 A PR shepherd's session loads `src/omp/shepherd-extension.ts` with the flags in `SHEPHERD_FLAGS`, the Bot's id and the `shepherd-inbox/` directory beside `bots.json`.
 A Router's loads `src/omp/router-extension.ts` with the flags in `ROUTER_FLAGS`, the Bot's id, the `router-inbox/` directory, and `router-tasks.json`, all beside `bots.json`.
-A Bot designer's loads `src/omp/designer-extension.ts` with no flags of its own: it registers the Bot extension's `BOT_FLAGS.bot` and `BOT_FLAGS.botInbox` too, and omp keeps one value per flag name for every extension that registers it, which `flagValue` in `src/omp/bot-extension.ts` reads.
-Any other start launches plain, so no other session loads the extension.
+A Bot designer's loads `src/omp/designer-extension.ts` with no flags of its own: it registers the Bot extension's `BOT_FLAGS.bot` and `BOT_FLAGS.botInbox` too, and omp keeps one value per flag name for every extension that registers it, which `flagValue` in `src/omp/extension-kit.ts` reads.
+Any other start launches without the Bot extension; a session that is not a Bot's loads the personal extension instead, as [Personal sessions](personal-sessions.md) says.
 Once the session is live, `Bots` saves its session id on the Bot, and follows it after a `/move` or an edited prompt (`switched`).
 
 The extension adds to the main agent's system prompt on every turn the Bot's name, its job, its memory, and its routines, read again each turn, so a saved job or routine reaches the next turn.

@@ -18,6 +18,9 @@ export const workspaceOf = (row: { cwd: string; cwdDisplay: string; workspace: W
 /** The directory of the workspace a session counts in, {@link workspaceOf}'s `cwd`. */
 export const workspaceCwd = (row: { cwd: string; workspace: Workspace | null }): string => row.workspace?.cwd ?? row.cwd;
 
+/** Ending session `host` deletes it with everything it wrote, as for a private session this dashboard started. */
+export const isPrivateHost = (host: RosterHost | null | undefined): boolean => host?.source === "dashboard" && host.private;
+
 /**
  * The sessions the sidebar, the palette, and the pages list: none in a temporary directory, none counting in a hidden workspace,
  * and none that is a Bot's conversation, which only its Bot's page shows.

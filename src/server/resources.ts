@@ -36,3 +36,6 @@ export const routerExtension: string = packagedResources ? join(packagedResource
 
 /** The omp extension a Bot designer's session loads beside {@link botExtension} (`src/omp/designer-extension.ts`): its bundle in a packaged app. */
 export const designerExtension: string = packagedResources ? join(packagedResources, "designer-extension.js") : join(import.meta.dir, "..", "omp", "designer-extension.ts");
+
+/** The omp extension every session but a Bot's loads, which acts only in the personal directory (`src/omp/personal-extension.ts`): its bundle in a packaged app. */
+export const personalExtension: string = packagedResources ? join(packagedResources, "personal-extension.js") : join(import.meta.dir, "..", "omp", "personal-extension.ts");

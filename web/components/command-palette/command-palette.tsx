@@ -22,7 +22,7 @@ import {
 	Wrench,
 	Target,
 } from "lucide-react";
-import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { DashboardUpdateStatus } from "../../../src/shared/dashboard-update";
 import type { PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -49,7 +49,7 @@ import {
 	topFrame,
 } from "../../command-palette";
 import { localDay } from "../../../src/shared/days";
-import { age, folderName, hostLabel, pastLabel } from "../../labels";
+import { age, hostLabel, pastLabel, workspaceName } from "../../labels";
 import { PAGE_ICON } from "../../page-icons";
 import { conversationItems, recordItems } from "../../palette-records";
 import { useConversationHits, useRead, useSearchSources } from "../../reads";
@@ -62,7 +62,7 @@ import { pressesChord, type ShortcutHandlers, type ShortcutId, shortcutLabels } 
 import { tabShortcutLabels } from "../../sidebar-tabs";
 import { useStoredState } from "../../stored-state";
 import { quickAddTodo } from "../../todo-quick-add";
-import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
+import { PersonalContext, useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { Kbd } from "../kbd";
 import { StatusDot } from "../status-dot";
 import { ActionPanel } from "./action-panel";
@@ -153,6 +153,7 @@ const SETTINGS_ITEMS: readonly PaletteItem[] = SETTINGS_SECTIONS.map(({ value, l
 function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, tabs, todoCategories, todos, notes, linearConnected, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
 	const { send, start, end, changeTodo, changeNote, workspaceSettings } = useDashboardActions();
 	const { starts, ending, pullRequestsScope, connected } = useDashboardStatus();
+	const personal = useContext(PersonalContext);
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const focusInput = useCallback(() => inputRef.current?.focus(), []);
@@ -291,9 +292,9 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 		});
 		return [
 			workspaceItem("workspace:all", "All workspaces", undefined, Layers, null),
-			...workspaces.map(({ cwd, cwdDisplay }) => workspaceItem(`workspace:${cwd}`, folderName(cwdDisplay) ?? cwdDisplay, cwdDisplay, Folder, cwd)),
+			...workspaces.map(({ cwd, cwdDisplay }) => workspaceItem(`workspace:${cwd}`, workspaceName(cwdDisplay, personal) ?? cwdDisplay, cwdDisplay, Folder, cwd)),
 		];
-	}, [workspaces, workspace, onPickWorkspace]);
+	}, [workspaces, workspace, personal, onPickWorkspace]);
 
 	const records = useMemo((): PaletteItem[] => recordItems({ todos, notes: notes ?? [], tickets, pullRequestRepos }), [todos, notes, tickets, pullRequestRepos]);
 	const conversations = useMemo(

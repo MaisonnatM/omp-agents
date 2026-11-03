@@ -3,14 +3,14 @@
 // `delete_routine` tools, which ask it to change the Bot's own routines. The dashboard loads it with `omp -e` and the
 // flags in `BOT_FLAGS` for a Bot's session only (`Bots.join` in src/server/bots.ts), so no other session reads it.
 import { randomUUID } from "node:crypto";
-import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { mkdirSync, renameSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { errorText, isObject, parseJson } from "../json";
-import { readTail } from "../read-tail";
 import { type BotRoutineRequest, MAX_COMMAND_LENGTH, parseRoutineSpec, type RoutineSpec, TRIGGER_KINDS } from "../routines";
-import { type BotCreateRequest, type BotId, type BotJobRequest, MAX_FACT_LENGTH, MAX_JOB_LENGTH, MAX_MEMORY_BYTES, parseBots, parseBotId, REMEMBER_TOOL } from "../shared/bots";
+import { type BotCreateRequest, type BotId, type BotJobRequest, MAX_FACT_LENGTH, MAX_JOB_LENGTH, parseBots, parseBotId } from "../shared/bots";
 import type { RouterRequest } from "../shared/router";
 import type { ShepherdRequest } from "../shared/shepherd";
+import { type ExtensionApi, flagValue, memoryLines, readText, rememberTool, reply } from "./extension-kit";
 
 /**
  * The flags a Bot's session starts with: its id, the `bots.json` it reads its name and job from, the directory its
@@ -28,65 +28,6 @@ export const BOT_FLAGS = {
 
 /** What `save_routine` takes: `id` names one of the Bot's routines to change, and every field left out keeps its value; without `id` it creates one. */
 export type SaveRoutineParams = Partial<Omit<RoutineSpec, "botId">>;
-
-interface ToolResult {
-	content: { type: "text"; text: string }[];
-	details: undefined;
-}
-
-export interface BotTool<Params> {
-	name: string;
-	label: string;
-	description: string;
-	parameters: unknown;
-	loadMode: "essential";
-	approval: "write";
-	/** omp passes every tool the session's context; this reads only its `cwd`, the session's workspace. */
-	execute(toolCallId: string, params: Params, signal: AbortSignal | undefined, onUpdate: unknown, ctx: { cwd: string }): Promise<ToolResult>;
-}
-
-interface SchemaOptions {
-	description?: string;
-}
-
-/** The part of omp's `ExtensionAPI` this uses, by hand: `tsc` cannot resolve omp's own package here. */
-export interface BotExtensionApi {
-	registerFlag(name: string, options: { type: "string"; description: string }): void;
-	getFlag(name: string): boolean | string | undefined;
-	on(event: "before_agent_start", handler: (event: { systemPrompt: string[] }, ctx: { agent: { kind: "main" | "sub" } }) => { systemPrompt: string[] } | undefined): void;
-	registerTool<Params>(tool: BotTool<Params>): void;
-	/** omptype's TypeBox shim, `@oh-my-pi/omptype/typebox`. */
-	typebox: {
-		Type: {
-			Object(properties: Record<string, unknown>, options?: SchemaOptions): unknown;
-			String(options: SchemaOptions & { minLength?: number; maxLength?: number }): unknown;
-			Integer(options: SchemaOptions & { minimum?: number; maximum?: number }): unknown;
-			Boolean(options: SchemaOptions): unknown;
-			Literal(value: string): unknown;
-			Union(schemas: unknown[], options?: SchemaOptions): unknown;
-			Array(items: unknown, options: SchemaOptions & { minItems?: number; uniqueItems?: boolean }): unknown;
-			Optional(schema: unknown): unknown;
-		};
-	};
-}
-
-/**
- * Flag `name`'s value, or `null` when the dashboard passed none. omp sets an extension's flags once every extension has
- * loaded, so each is read when it is used, and it gives one only to an extension that registered it.
- */
-export function flagValue(pi: BotExtensionApi, name: string): string | null {
-	const value = pi.getFlag(name);
-	return typeof value === "string" && value !== "" ? value : null;
-}
-
-/** The text of the file at `path`, empty when it cannot be read. */
-export function readText(path: string): string {
-	try {
-		return readFileSync(path, "utf8");
-	} catch {
-		return "";
-	}
-}
 
 /** How much of a routine's prompt or command its line in the system prompt shows. */
 const TASK_PREVIEW_LENGTH = 80;
@@ -111,8 +52,6 @@ export function leave(dir: string, request: BotRoutineRequest | BotJobRequest | 
 	}
 }
 
-export const reply = (text: string): ToolResult => ({ content: [{ type: "text", text }], details: undefined });
-
 const APPLIES = "The dashboard applies it, and while the dashboard is stopped the change waits for it.";
 const NO_ROUTINES = "This session is not an omp-agents Bot, so it has no routines.";
 
@@ -126,7 +65,7 @@ interface ThisBot {
 	routineInbox: string | null;
 }
 
-export default function botExtension(pi: BotExtensionApi): void {
+export default function botExtension(pi: ExtensionApi): void {
 	pi.registerFlag(BOT_FLAGS.bot, { type: "string", description: "The omp-agents Bot this session is." });
 	pi.registerFlag(BOT_FLAGS.bots, { type: "string", description: "The omp-agents bots.json that holds its name and job." });
 	pi.registerFlag(BOT_FLAGS.botInbox, { type: "string", description: "The directory its set_job tool leaves its job in." });
@@ -156,20 +95,13 @@ export default function botExtension(pi: BotExtensionApi): void {
 		if (ctx.agent.kind === "sub" || !me) return undefined;
 		const bot = parseBots(parseJson(readText(me.botsPath)))?.find(bot => bot.id === me.botId);
 		if (!bot) return undefined;
-		let memory: { text: string; cut: boolean } | null = null;
-		try {
-			memory = readTail(me.memoryPath, MAX_MEMORY_BYTES);
-		} catch {
-			// An unreadable memory leaves this turn without it rather than stopping it.
-		}
 		const routines = ownRoutines(me);
 		const prompt = [
 			`You are ${bot.name}, an omp-agents Bot: a teammate the user keeps, with this one conversation they come back to.`,
 			"Your job, and what you ask before doing:",
 			bot.job.trim() || "No job yet. Ask the user what it is, and what you should ask before doing, then call `set_job` with what they say.",
 			"What you remember from earlier turns:",
-			...(memory?.cut ? ["(Older memory was cut to keep this prompt short; only the newest facts follow.)"] : []),
-			memory?.text.trim() || "Nothing yet.",
+			...memoryLines(me.memoryPath),
 			"When the user tells you something worth keeping across turns, such as a preference, a decision, or a fact about the work, call `remember` with it as one short sentence.",
 			`Your routines, one per line: its fields as \`save_routine\` takes them, then its task's kind and its prompt or command, cut at ${TASK_PREVIEW_LENGTH} characters:`,
 			...(routines.length > 0 ? routines.map(routineLine) : ["None yet."]),
@@ -178,28 +110,13 @@ export default function botExtension(pi: BotExtensionApi): void {
 		return { systemPrompt: [...event.systemPrompt, prompt] };
 	});
 
-	pi.registerTool<{ fact: string }>({
-		name: REMEMBER_TOOL,
-		label: "Remember",
-		description: `Adds one fact to this Bot's memory, which every later turn's system prompt carries. Use one short sentence that stays true, at most ${MAX_FACT_LENGTH} characters.`,
-		parameters: pi.typebox.Type.Object({ fact: pi.typebox.Type.String({ description: "The fact, as one short sentence.", maxLength: MAX_FACT_LENGTH }) }),
-		loadMode: "essential",
-		approval: "write",
-		async execute(_toolCallId, { fact }) {
+	pi.registerTool(
+		rememberTool(pi, `Adds one fact to this Bot's memory, which every later turn's system prompt carries. Use one short sentence that stays true, at most ${MAX_FACT_LENGTH} characters.`, () => {
 			const memoryPath = thisBot()?.memoryPath;
-			const line = fact.replace(/\s+/g, " ").trim();
 			if (!memoryPath) throw new Error("This session is not an omp-agents Bot, so it has no memory.");
-			if (!line) throw new Error("fact is empty.");
-			if (line.length > MAX_FACT_LENGTH) throw new Error(`fact is ${line.length} characters; keep it to one short sentence of at most ${MAX_FACT_LENGTH}.`);
-			try {
-				mkdirSync(dirname(memoryPath), { recursive: true });
-				appendFileSync(memoryPath, `- ${new Date().toISOString().slice(0, 10)} ${line}\n`);
-			} catch (error) {
-				throw new Error(`Cannot write the memory: ${errorText(error)}`);
-			}
-			return reply(`Remembered: ${line}`);
-		},
-	});
+			return memoryPath;
+		}),
+	);
 
 	pi.registerTool<{ job: string }>({
 		name: "set_job",

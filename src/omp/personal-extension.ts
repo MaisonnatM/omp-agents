@@ -1,0 +1,51 @@
+// omp-agents personal sessions: a session whose directory is the dashboard's personal directory turns from a coding
+// agent into the user's personal assistant, with what it remembers about them on every turn and the `remember` tool, the
+// one writer of that memory. The dashboard loads it with `omp -e` and the flags in `PERSONAL_FLAGS` into every session it
+// starts that is not a Bot's (`personalJoin` in src/server/personal.ts); it reads the directory each turn, so a session
+// that moves in or out follows.
+import { MAX_FACT_LENGTH } from "../shared/bots";
+import { type ExtensionApi, flagValue, memoryLines, rememberTool } from "./extension-kit";
+
+/** The flags a dashboard session starts with: the personal directory, and the Markdown memory every personal session shares. */
+export const PERSONAL_FLAGS = {
+	dir: "omp-agents-personal-dir",
+	memory: "omp-agents-personal-memory",
+} as const;
+
+const FRAMING =
+	"You are the user's personal assistant, not a coding agent on a project. You help with everyday life such as meals and recipes, shopping, plans, habits and family logistics. Keep any file you make in this directory. What you know about the user follows; a later fact overrides an earlier one. When the user tells you something about themselves worth keeping, such as a preference, an allergy, or a household fact, call `remember` with one short sentence. Never remember secrets such as passwords or card numbers.";
+
+export default function personalExtension(pi: ExtensionApi): void {
+	pi.registerFlag(PERSONAL_FLAGS.dir, { type: "string", description: "The omp-agents personal directory." });
+	pi.registerFlag(PERSONAL_FLAGS.memory, { type: "string", description: "The Markdown memory personal sessions remember in." });
+
+	/** The memory for a session in `cwd`, or `null` when `cwd` is not the personal directory or the dashboard named none. */
+	const memoryIn = (cwd: string): string | null => {
+		const dir = flagValue(pi, PERSONAL_FLAGS.dir);
+		return dir !== null && cwd === dir ? flagValue(pi, PERSONAL_FLAGS.memory) : null;
+	};
+
+	// Registered only once the session is personal, so every other session's tool list stays as it was. Either hook may
+	// be the first to see it: `session_start` can fire before omp sets the flags, and a session can move in later.
+	let mounted = false;
+	const mount = (cwd: string): void => {
+		if (mounted || memoryIn(cwd) === null) return;
+		mounted = true;
+		pi.registerTool(
+			rememberTool(pi, `Adds one fact about the user to their personal memory, which every later personal turn's system prompt carries. Use one short sentence that stays true, at most ${MAX_FACT_LENGTH} characters.`, ({ cwd }) => {
+				const memory = memoryIn(cwd);
+				if (memory === null) throw new Error("This session is not in the personal directory, so it has no personal memory.");
+				return memory;
+			}),
+		);
+	};
+
+	pi.on("session_start", (_event, ctx) => mount(ctx.cwd));
+
+	pi.on("before_agent_start", (event, ctx) => {
+		const memory = memoryIn(ctx.cwd);
+		if (ctx.agent.kind === "sub" || memory === null) return undefined;
+		mount(ctx.cwd);
+		return { systemPrompt: [...event.systemPrompt, [FRAMING, ...memoryLines(memory)].join("\n")] };
+	});
+}

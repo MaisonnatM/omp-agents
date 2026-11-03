@@ -1,6 +1,7 @@
 import { afterEach, expect, mock, spyOn, test } from "bun:test";
 import { fromPartial } from "@total-typescript/shoehorn";
 import { appendFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DashboardSession } from "../dashboard-session";
 import * as commands from "../commands";
@@ -17,6 +18,7 @@ import * as rpc from "../omp/rpc";
 import { refuseUntil } from "./http";
 import { InterruptedSessions } from "./interrupted";
 import { LiveSessions } from "./live-sessions";
+import { PrivateSessions } from "./private-sessions";
 import { UntrustedProjectError, untrustedText } from "./project-trust-file";
 import { createStarter, reattachAll, type SessionJoin } from "./start";
 
@@ -41,10 +43,36 @@ test("a Claude Code or Codex session neither resumes, forks, nor replays, before
 		mayDiscardReplay: async () => null,
 		admit: async () => { throw new Error("A read-only start must not take a census."); },
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
+		privateSessions: fromPartial<PrivateSessions>({ holds: () => false }),
 	});
 	expect(await start({ kind: "resume", sessionId: "c1" })).toMatchObject({ ok: false, error: expect.stringContaining("read-only") });
 	expect(await start({ kind: "fork", view: { kind: "past", sessionId: "x1" }, entryId: "e1" })).toMatchObject({ ok: false, error: expect.stringContaining("read-only") });
 	expect(await start({ kind: "replay", view: { kind: "past", sessionId: "x1" }, token: "t", model: null, thinking: null, prompt: null })).toMatchObject({ ok: false, error: expect.stringContaining("read-only") });
+});
+
+test("a private session neither forks nor replays, before any omp starts, since its copy would outlive it", async () => {
+	const root = join(tmpdir(), "omp-agents-private-start");
+	const start = createStarter({
+		sessions: fromPartial<LiveSessions>({
+			sessionIds: () => new Set<string>(),
+			allocate: () => {
+				throw new Error("no omp should start");
+			},
+		}),
+		pathFor: () => join(root, "i1", "--work--", "2026-11-03T10-00-00-000Z_s1.jsonl"),
+		savedFile: () => null,
+		factsFor: () => ({ tickets: [], pullRequests: [], worktree: null, branch: null, ship: null, workspace: null }),
+		onStarted: () => {},
+		workspaceOf: async cwd => cwd,
+		linkTodo: () => {},
+		mayDiscardReplay: async () => null,
+		admit: async () => {},
+		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
+		privateSessions: new PrivateSessions({ root, unpin: () => {} }),
+	});
+	const view = { kind: "live", instanceId: "i1", agentId: null } as const;
+	expect(await start({ kind: "fork", view, entryId: "e1" })).toMatchObject({ ok: false, error: expect.stringContaining("private session") });
+	expect(await start({ kind: "replay", view, token: "t", model: null, thinking: null, prompt: null })).toMatchObject({ ok: false, error: expect.stringContaining("private session") });
 });
 
 test("the server learns which sessions survived before it lists or hears any, and lists none that exited as it attached", async () => {
@@ -62,7 +90,7 @@ test("the server learns which sessions survived before it lists or hears any, an
 		const heard: string[] = [];
 		const sessions: LiveSessions = new LiveSessions((instanceId, update) => heard.push(`${update.kind} ${instanceId}, listed: ${sessions.get(instanceId) !== undefined}`), undefined, join(dir, "unread.json"));
 		const joinFor = (): SessionJoin => ({ rpc: rpc.PLAIN_LAUNCH, attach: session => { heard.push(`attach ${session.instanceId}`); } });
-		await reattachAll(sessions, joinFor, survived => {
+		await reattachAll(sessions, joinFor, () => false, survived => {
 			heard.push(`recover ${[...survived].join(" ")}`);
 			return new Set();
 		});
@@ -102,7 +130,7 @@ test("a reattached session whose turn ended while no server listened is listed w
 			return fromPartial(Object.create(DashboardSession.prototype, fields));
 		});
 		const sessions = new LiveSessions(() => {}, new TaskClaims(join(dir, "claims.json")), unreadPath);
-		await reattachAll(sessions, () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }), () => new Set(["s-i-ended", "s-i-prompted", "s-i-working"]));
+		await reattachAll(sessions, () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }), () => false, () => new Set(["s-i-ended", "s-i-prompted", "s-i-working"]));
 		const facts: SessionFacts = { tickets: [], pullRequests: [], worktree: null, branch: null, ship: null, workspace: null };
 		expect(sessions.rows(() => facts).map(row => [row.instanceId, row.unread])).toEqual([
 			["i-ended", { at: Date.parse("2026-11-02T10:00:12.000Z"), reply: "done" }],
@@ -156,7 +184,7 @@ test("a keeper that never greets is stopped with its job within the bound, then 
 		const interrupted = new InterruptedSessions(saved);
 
 		const began = Date.now();
-		const reattached = reattachAll(new LiveSessions(() => {}, undefined, join(dir, "unread.json")), () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }), survived => interrupted.recover(survived));
+		const reattached = reattachAll(new LiveSessions(() => {}, undefined, join(dir, "unread.json")), () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }), () => false, survived => interrupted.recover(survived));
 		const notReattached = refuseUntil(reattached, "Still attaching.");
 		expect(notReattached()?.status).toBe(503);
 		await reattached;
@@ -192,6 +220,7 @@ function claimedStarter(
 		mayDiscardReplay: async () => null,
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
 		admit,
+		privateSessions: fromPartial<PrivateSessions>({ holds: () => false }),
 	});
 }
 

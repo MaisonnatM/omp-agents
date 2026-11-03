@@ -38,6 +38,14 @@ _Avoid_: Past session when referring to an archived file, deleted session
 A dashboard session whose omp stopped when the dashboard went down, without **End session**, waiting to be resumed.
 _Avoid_: Crashed session, orphan
 
+**Private session**:
+A dashboard session deleted with everything omp wrote for it once its omp stops, whether by **End session**, omp's `end_session` tool, or a crash; it never becomes a past or interrupted session.
+_Avoid_: Incognito session, temporary session, ephemeral session
+
+**Personal session**:
+A session that runs in the dashboard's personal directory instead of a workspace, for the user's own life, such as meals or plans, and reads and writes the **Personal memory**.
+_Avoid_: User session, assistant session, private session (see **Private session**)
+
 **Subagent**:
 A session that another session's `task` call spawned.
 _Avoid_: Child agent, worker
@@ -64,6 +72,11 @@ _Avoid_: Shared memory, team memory, knowledge base
 What omp itself recalls across sessions of a workspace, through the store its `memory.backend` setting picks, which Settings › omp memory shows and edits.
 It is separate from project memory and from a Bot's memory.
 _Avoid_: Memory (bare), Agent memory, Long-term memory
+
+**Personal memory**:
+The facts about the user that every personal session reads at each turn and that only their `remember` tool appends, kept in `personal-memory.md`.
+It is separate from project memory, omp memory, and a Bot's memory.
+_Avoid_: User memory, profile
 
 ## Collab
 

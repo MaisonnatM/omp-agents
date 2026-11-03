@@ -15,8 +15,8 @@ export const MOVE_SESSION_TOOL = "move_session";
 export interface SessionMovesDeps {
 	/** Dashboard session `instanceId`, while it runs. */
 	session(instanceId: string): Pick<DashboardSession, "moveAfterTurn"> | undefined;
-	/** Whether `request` starts or resumes a Bot's conversation, which stays in its Bot's directory. */
-	isBot(request: StartRequest): boolean;
+	/** Whether `request`'s session stays in its directory: a Bot's conversation stays in its Bot's, and a personal session in the personal directory. */
+	staysPut(request: StartRequest): boolean;
 	/** Lets a session run in `dir`, or throws while the project code there is not trusted as it is now. */
 	admit(dir: string): Promise<void>;
 }
@@ -60,9 +60,9 @@ export class SessionMoves {
 		this.#deps = deps;
 	}
 
-	/** How `request` joins the server: with the move tool, unless it is a Bot's conversation. */
+	/** How `request` joins the server: with the move tool, unless its session stays put. */
 	join(request: StartRequest): SessionJoin {
-		return { rpc: this.#deps.isBot(request) ? PLAIN_LAUNCH : { ...PLAIN_LAUNCH, tools: [this.#tool] }, attach() {} };
+		return { rpc: this.#deps.staysPut(request) ? PLAIN_LAUNCH : { ...PLAIN_LAUNCH, tools: [this.#tool] }, attach() {} };
 	}
 
 	/**

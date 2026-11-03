@@ -4,6 +4,7 @@ import { everyWord } from "../src/shared/every-word";
 import type { PullRequestLink } from "../src/shared/github";
 import type { OmpFile, OmpFileKind } from "../src/shared/models";
 import type { PastSession, RosterHost, SessionSource } from "../src/shared/sessions";
+import type { Workspace } from "../src/shared/workspaces";
 import { IS_MAC, modHeld } from "./shortcuts";
 import type { OpenMode } from "./routing";
 
@@ -178,6 +179,16 @@ export const commandLabel = (command: string): string => command.replace(/(^|\s)
 
 /** A directory's last segment: `~/code/webapp` reads `webapp`. */
 export const folderName = (dir: string): string | undefined => dir.split("/").filter(Boolean).pop();
+
+/** What the page calls the workspace shown as `cwdDisplay`: **Personal** for where personal sessions run, else its last segment. */
+export const workspaceName = (cwdDisplay: string, personal: Workspace | null): string | undefined =>
+	cwdDisplay === personal?.cwdDisplay ? "Personal" : folderName(cwdDisplay);
+
+/** The tooltip of a private session's mark, which every place showing one repeats. */
+export const PRIVATE_NOTE = "Private: deleted with everything it wrote when it ends.";
+
+/** What a private session's **End** reads once armed, since its second click deletes the session. */
+export const CONFIRM_PRIVATE_END = "Confirm end and delete?";
 
 /** A leading bold label such as `**Résumé**` or `**Summary:**`, which every reply of a format repeats. */
 const LEAD_LABEL = /^\s*\*\*[^*\n]{1,24}\*\*\s*[:.—–-]?\s*/;

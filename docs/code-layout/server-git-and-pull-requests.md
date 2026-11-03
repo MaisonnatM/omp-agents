@@ -31,7 +31,7 @@
   A merged pull request counts only when the branch's last commit is no newer than the merge, read with one `git log --no-walk` call.
   `previewAll(targets, true)`, for **Remove merged**, runs the same check and adds the `unmerged` blocker to each target it cannot show merged; removal needs no second check, since the confirmation pins the branch and commit.
 - `src/server/worktree-occupants.ts`: `WorktreeOccupants`, the live sessions and resident subagents whose directories and named paths protect checkouts from removal.
-  It reads each live child's native default directory through the uncached `readSessionCwd`, and, from each live session's and each live child's transcript through an incremental `CheckoutScan`, the declared Bash directories `SessionFactsScan` finds and every path a tool call names.
+  It reads each live child's native default directory through the uncached `readSessionHeader`, and, from each live session's and each live child's transcript through an incremental `CheckoutScan`, the declared Bash directories `SessionFactsScan` finds and every path a tool call names.
   Changed transcripts are streamed through a prefix fingerprint before an append is trusted; unchanged files reuse their folded records and fingerprint.
   It retains known paths during transcript failures, roster reconnects, and a surviving child's parent session switch, and supplies unresolved repository scopes until complete evidence returns.
   `Worktrees` owns canonical paths, Git identity, and containment. The collector owns residency and its per-live-transcript cache.

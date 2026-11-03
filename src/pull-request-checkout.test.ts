@@ -107,6 +107,7 @@ describe("in a separate worktree", () => {
 				taskId: null,
 				reviewDraft: false,
 				bot: null,
+				private: false,
 			},
 		]);
 	});

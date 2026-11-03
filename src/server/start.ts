@@ -13,6 +13,7 @@ import { type PromptImage, type SessionFacts, type StartFailure, type StartReque
 import { pullRequestTask, taskConflict, taskIdentity, ticketTask } from "../task-claims";
 import { portFromEnv } from "./address";
 import type { LiveSessions } from "./live-sessions";
+import type { PrivateSessions } from "./private-sessions";
 import { UntrustedProjectError } from "./project-trust-file";
 
 /** How a start joins the server: what omp launches with, and what links the session once it is in the registry, before its first prompt. */
@@ -53,6 +54,7 @@ export interface StartEnv {
 	mayDiscardReplay(cwd: string): Promise<string | null>;
 	/** Lets omp spawn in `cwd`, or throws {@link UntrustedProjectError} while its project's agent code is not trusted as it is now. */
 	admit(cwd: string): Promise<void>;
+	privateSessions: Pick<PrivateSessions, "launch" | "holds">;
 }
 
 export type Starter = (request: StartRequest) => Promise<StartResult>;
@@ -139,23 +141,29 @@ export function createStarter(env: StartEnv): Starter {
 					} catch (err) {
 						return { error: `Cannot read the skills in ${cwd}: ${errorText(err)}` };
 					}
-					return launch("Cannot start omp", async (id, emit) => ({
-						session: await DashboardSession.start(id, cwd, model, thinking, rpcLaunch, emit),
-						prompt: null,
-						first: { text, images },
-					}), allocated);
+					return launch("Cannot start omp", async (id, emit) => {
+						const { rpc, discard } = request.private ? await env.privateSessions.launch(id, cwd, rpcLaunch) : { rpc: rpcLaunch, discard: undefined };
+						try {
+							return { session: await DashboardSession.start(id, cwd, model, thinking, rpc, emit, request.private), prompt: null, first: { text, images }, discard };
+						} catch (error) {
+							await discard?.();
+							throw error;
+						}
+					}, allocated);
 				});
 			}
 			case "fork": {
 				const source = env.pathFor(request.view);
 				if (!source) return { error: "Cannot fork: this session's file is not known yet." };
 				if (formatOf(source).source !== "omp") return { error: "Cannot fork: this session is read-only. Only omp sessions fork here." };
+				if (env.privateSessions.holds(source)) return { error: "Cannot fork: a private session is deleted when it ends, so nothing copies it." };
 				return launch("Cannot fork", async (id, emit) => DashboardSession.fork(id, source, request.entryId, rpcLaunch, emit));
 			}
 			case "replay": {
 				const source = env.pathFor(request.view);
 				if (!source || request.view.kind === "live" && request.view.agentId !== null) return { error: "Cannot replay: the main session's file is unavailable." };
 				if (formatOf(source).source !== "omp") return { error: "Cannot replay: this session is read-only. Only omp sessions replay here." };
+				if (env.privateSessions.holds(source)) return { error: "Cannot replay: a private session is deleted when it ends, so nothing copies it." };
 				return launch("Cannot replay", async (id, emit) => {
 					const prepared = await prepareReplay(request, source, env.mayDiscardReplay);
 					try {
@@ -235,13 +243,13 @@ interface Attached {
 	publish(): void;
 }
 
-/** Attaches to session `instanceId`; `null` when it cannot, which leaves its omp running for the next server. */
-async function attach(sessions: LiveSessions, joinFor: StartEnv["joinFor"], instanceId: string): Promise<Attached | null> {
+/** Attaches to session `instanceId`, private when `isPrivate`; `null` when it cannot, which leaves its omp running for the next server. */
+async function attach(sessions: LiveSessions, joinFor: StartEnv["joinFor"], instanceId: string, isPrivate: boolean): Promise<Attached | null> {
 	const { emit } = sessions.allocate(instanceId);
 	const held: DashboardUpdate[] = [];
 	let report = (update: DashboardUpdate): void => void held.push(update);
 	try {
-		const session = await DashboardSession.reattach(instanceId, sessionId => joinFor({ kind: "resume", sessionId }).rpc.tools, update => report(update));
+		const session = await DashboardSession.reattach(instanceId, sessionId => joinFor({ kind: "resume", sessionId }).rpc.tools, update => report(update), isPrivate);
 		return {
 			session,
 			publish: () => {
@@ -260,10 +268,15 @@ async function attach(sessions: LiveSessions, joinFor: StartEnv["joinFor"], inst
  * those that survived; it answers those whose turn ran when the last server stopped. Only then does it list each again,
  * under the instance id it had, with the turn it left unread, or the one it ended while no server listened, and pass
  * on what it reported, so no report reaches the server before it knows which sessions survived. One it reaches but
- * cannot attach to runs on unlisted, and the next server tries again.
+ * cannot attach to runs on unlisted, and the next server tries again. `isPrivate` tells the private ones.
  */
-export async function reattachAll(sessions: LiveSessions, joinFor: StartEnv["joinFor"], recover: (survived: ReadonlySet<string>) => ReadonlySet<string>): Promise<void> {
-	const attached = (await Promise.all(keptSessions().map(instanceId => attach(sessions, joinFor, instanceId)))).filter(
+export async function reattachAll(
+	sessions: LiveSessions,
+	joinFor: StartEnv["joinFor"],
+	isPrivate: (instanceId: string) => boolean,
+	recover: (survived: ReadonlySet<string>) => ReadonlySet<string>,
+): Promise<void> {
+	const attached = (await Promise.all(keptSessions().map(instanceId => attach(sessions, joinFor, instanceId, isPrivate(instanceId))))).filter(
 		(kept): kept is Attached => kept !== null && !kept.session.finished(),
 	);
 	const midTurn = recover(new Set(attached.map(({ session }) => session.sessionId)));

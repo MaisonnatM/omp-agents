@@ -13,6 +13,12 @@ export interface DirsModule {
 	getStatsDbPath(): string;
 	/** Where omp puts its task-isolation sandboxes and PR checkouts, `~/.omp/wt` unless `OMP_WORKTREE_DIR` moves it. */
 	getWorktreesDir(): string;
+	/** omp's prompt history, with each session's recap and title, `history.db` in omp's data root. */
+	getHistoryDbPath(): string;
+	/** Where omp marks each session file it wrote outside its sessions root, one file named {@link hashPath} of it holding its path. */
+	getCustomSessionFilesDir(): string;
+	/** A short hash of `absPath`, resolved; two paths can share one. */
+	hashPath(absPath: string): string;
 }
 
 /** The native background compression log's filename, relative to the agent directory. */

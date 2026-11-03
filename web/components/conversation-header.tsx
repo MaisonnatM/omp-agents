@@ -1,12 +1,14 @@
-import { CircleStop } from "lucide-react";
+import { CircleStop, Lock } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ControlPhase, LiveView } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
-import { hostLabel } from "../labels";
+import { CONFIRM_PRIVATE_END, hostLabel, PRIVATE_NOTE } from "../labels";
 import { OpenPullRequestButton } from "../open-pull-request";
+import { isPrivateHost } from "../sessions";
 import { shortcutLabels } from "../shortcuts";
+import { useInlineConfirm } from "../use-inline-confirm";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Header } from "./page-header";
 import { CRUMB_SEPARATOR, PARENT_CRUMB, SessionIdCopy, SessionMeta } from "./session-meta";
@@ -38,6 +40,7 @@ interface ConversationHeaderProps {
  * the connection status; a session's Linear issues, pull requests, and the branch it works on, which copies a `cd` into its
  * linked worktree when clicked; **Open PR** while its branch can take one; its directory in Cursor;
  * and End session, which shows it is ending until the server answers, though the session may leave the roster before then.
+ * A private session shows a lock, and its End, which deletes it, asks for a second click.
  */
 export function ConversationHeader({ view, subject, onEnd, actions, titleAction }: ConversationHeaderProps) {
 	const { host, shown, agent, phase, live } = subject;
@@ -51,6 +54,10 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 				? CONTROL_LABEL.connecting
 				: `${CONTROL_LABEL[phase.phase]} · ${phase.reason}`;
 	const endable = live && host ? host : ending ? shown : null;
+	const isPrivate = isPrivateHost(shown);
+	const confirm = useInlineConfirm(`end:${view.instanceId}`);
+	const confirming = confirm.isArmed("end");
+	const endNow = (): void => onEnd(view.instanceId);
 	const title =
 		subject.kind === "subagent" ? (
 			<span className="inline-flex min-w-0 items-center">
@@ -91,24 +98,36 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 			status={status}
 			alert={!ending && phase.phase === "ended"}
 		>
+			{isPrivate && (
+				<Tooltip content={PRIVATE_NOTE} side="bottom">
+					<span role="img" aria-label="Private" tabIndex={0} className="flex shrink-0 items-center text-muted-foreground">
+						<Lock className="size-3.5" />
+					</span>
+				</Tooltip>
+			)}
 			{goalSet && goal}
 			{subject.kind === "session" && shown && <SessionMeta facts={shown} />}
 			{subject.kind === "session" && <OpenPullRequestButton view={view} host={host} />}
 			{subject.kind === "session" && <TodosCardToggle view={view} />}
 			{subject.kind === "session" && endable && (
 				<Tooltip
-					content={`End session. Stops the omp process ${endable.source === "dashboard" ? "this dashboard started" : `running in its terminal (pid ${endable.pid})`}. Its transcript moves to Past sessions, where Resume continues it.`}
+					content={
+						isPrivate
+							? "Deletes this conversation and everything it wrote. Nothing moves to Past sessions."
+							: `End session. Stops the omp process ${endable.source === "dashboard" ? "this dashboard started" : `running in its terminal (pid ${endable.pid})`}. Its transcript moves to Past sessions, where Resume continues it.`
+					}
 					shortcut={shortcutLabels("endSession")}
 					side="bottom"
 				>
 					<Button
-						variant="primary"
-						size="icon-compact"
+						variant={confirming ? "destructive-outline" : "primary"}
+						size={confirming ? "compact" : "icon-compact"}
 						loading={ending}
-						aria-label={ending ? "Ending…" : "End session"}
-						onClick={() => onEnd(view.instanceId)}
+						aria-label={ending ? "Ending…" : confirming ? CONFIRM_PRIVATE_END : "End session"}
+						{...(isPrivate ? confirm.props("end", endNow) : { onClick: endNow })}
 					>
 						<CircleStop />
+						{confirming && CONFIRM_PRIVATE_END}
 					</Button>
 				</Tooltip>
 			)}

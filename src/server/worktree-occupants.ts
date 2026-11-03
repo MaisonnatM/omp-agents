@@ -6,7 +6,7 @@ import { isAbsolute, resolve } from "node:path";
 import { isObject } from "../json";
 import { FoldedFile, type LineFold } from "../line-reader";
 import { mapLimit, PROBE_PARALLEL } from "../map-limit";
-import { readSessionCwd } from "../omp/sessions";
+import { readSessionHeader } from "../omp/sessions";
 import { expandHome } from "../paths";
 import { SessionFactsScan } from "../session-facts";
 import { toolCallsOf } from "../session-entries";
@@ -212,7 +212,7 @@ export class WorktreeOccupants {
 		const read = await transcript.file.read().catch(() => null);
 		if (read?.restarted) transcript.cwd = null;
 		if (transcript.cwd === null) {
-			transcript.cwd = await readSessionCwd(path).catch(() => null);
+			transcript.cwd = (await readSessionHeader(path).catch(() => null))?.cwd ?? null;
 		}
 		if (transcript.cwd) transcript.dirs.add(transcript.cwd);
 		for (const raw of transcript.file.fold.paths) {
