@@ -6,7 +6,8 @@ import type { Handler, RouteKit, Routes, SessionRoutesEnv } from "./routes";
 
 export interface StorageRoutesEnv {
 	preview(): Promise<SandboxPlan[]>;
-	remove(paths: readonly string[]): Promise<SandboxResult[]>;
+	/** Removes each sandbox that still qualifies; `discardChanges` lets one go whose checkout holds changes. */
+	remove(paths: readonly string[], options: { discardChanges?: boolean }): Promise<SandboxResult[]>;
 }
 
 function untimed(handler: Handler): Handler {
@@ -26,8 +27,8 @@ export function storageRoutes({ get, write }: RouteKit, sweep: StorageRoutesEnv,
 		body => checked(parseCleanupRequest(body), "Expected a cleanup preview or one cleanup step."),
 		async request => {
 			if (request.action === "preview") return request.step === "sandboxes" ? { sandboxes: await sweep.preview() } : { gc: await gcPreview() };
-			const result: CleanupStepResult = request.step === "sandboxes"
-				? { step: "sandboxes", sandboxes: await sweep.remove(request.sandboxes) }
+			const result: CleanupStepResult = "sandboxes" in request
+				? { step: request.step, sandboxes: await sweep.remove(request.sandboxes, { discardChanges: request.step === "changedSandboxes" }) }
 				: { step: request.step, gc: await gcApply(request.step) };
 			return result;
 		},

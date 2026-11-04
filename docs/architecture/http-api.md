@@ -45,7 +45,8 @@ It includes each feature's uses, every feature's last use over all stored rows, 
 The three measured folders come from omp's directory exports; the archive-size card is absent because omp's archive-directory helper is private.
 `PUT /api/storage/cleanup` takes `{ action: "preview" }` for all five native phases, or `{ action: "preview", step: "sandboxes" }` for the independently measured sandbox plan.
 Apply takes `{ action: "apply", step }` for exactly one of `stale`, `blobs`, `archive`, `compress`, and `wal`.
-Sandbox apply takes `{ action: "apply", step: "sandboxes", sandboxes: string[] }`, at most 200 paths per request; the page sends one at a time.
+Sandbox apply takes `{ action: "apply", step: "sandboxes" | "changedSandboxes", sandboxes: string[] }`, at most 200 paths per request; the page sends one at a time.
+`changedSandboxes` also removes a sandbox kept only because its checkout holds changes; a live owner, a lock, or a checkout in use still keeps it.
 `src/omp/gc.ts` runs `omp gc --json` from the home directory, with all explicit phase flags for preview and one phase plus `--apply` for apply.
 Native gc owns its lock, thresholds, references, and keep rules.
 An exit with phase errors still returns its parsed report, while a held native lock or sandbox guard answers 409 with a busy error.

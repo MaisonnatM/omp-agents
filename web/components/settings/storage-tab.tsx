@@ -2,14 +2,14 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Check, Circle, LoaderCircle, RefreshCw, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorText } from "../../../src/json";
-import { CLEANUP_STEPS, type CleanupStep, type GcAnswer, type SandboxPlan, type StorageUsage } from "../../../src/shared/storage";
+import { CLEANUP_STEPS, isSandboxStep, type CleanupStep, type GcAnswer, type SandboxPlan, type StorageUsage } from "../../../src/shared/storage";
 import { Button } from "@/components/ui/button";
 import { getJson, putJson } from "../../api";
 import { activityControl } from "../../activity";
 import { age, formatBytes } from "../../labels";
 import { valueOf } from "../../omp-settings";
 import { hashForSettings } from "../../routing";
-import { cleanupRows, runCleanup, type CleanupRow, type CleanupRun, type StepProgress } from "../../storage";
+import { cleanupRows, keptSandboxes, runCleanup, sandboxTargets, type CleanupRow, type CleanupRun, type StepProgress } from "../../storage";
 import { ErrorText, LINK, type RowContext, Section, SettingRow } from "./editor";
 
 function UsageSection({ usage, error }: { usage: StorageUsage | null; error: string | null }) {
@@ -157,24 +157,27 @@ function ConfirmDialog({ open, onOpenChange, chosen, sandboxes, label, onConfirm
 						<p className="mt-2 text-sm">Cold sessions leave the roster, History, and Resume. Their compressed archive stays on disk.</p>
 					)}
 					{chosen.some(row => row.step === "stale") && <p className="mt-2 text-sm">Old debug reports and replicas are permanently deleted.</p>}
-					{chosen.some(row => row.step === "sandboxes") && (
-						<>
-							<p className="mt-2 text-sm">
-								Sandbox files, ignored files, and commits omp did not bring back are permanently deleted. Close other shells and editors using these folders first.
-							</p>
-							<details className="mt-3 text-xs text-muted-foreground">
-								<summary className="cursor-pointer">Review sandboxes to remove</summary>
-								<ul className="mt-2 space-y-2">
-									{sandboxes.filter(plan => plan.kept === null).map(plan => (
-										<li key={plan.path} className="flex items-baseline justify-between gap-4">
-											<span className="break-all">{plan.path}</span>
-											<span className="shrink-0 tabular-nums">{plan.bytes === null ? "Size unavailable" : formatBytes(plan.bytes)}</span>
-										</li>
-									))}
-								</ul>
-							</details>
-						</>
+					{chosen.some(row => isSandboxStep(row.step)) && (
+						<p className="mt-2 text-sm">
+							Sandbox files, ignored files, and commits omp did not bring back are permanently deleted. Close other shells and editors using these folders first.
+						</p>
 					)}
+					{chosen.some(row => row.step === "changedSandboxes") && (
+						<p className="mt-2 text-sm">Sandboxes with leftover changes lose those edits too, unless omp already brought them back to your checkout.</p>
+					)}
+					{chosen.flatMap(row => isSandboxStep(row.step) ? [{ step: row.step, label: row.label }] : []).map(({ step, label }) => (
+						<details key={step} className="mt-3 text-xs text-muted-foreground">
+							<summary className="cursor-pointer">Review: {label}</summary>
+							<ul className="mt-2 space-y-2">
+								{sandboxTargets(step, sandboxes).map(plan => (
+									<li key={plan.path} className="flex items-baseline justify-between gap-4">
+										<span className="break-all">{plan.path}</span>
+										<span className="shrink-0 tabular-nums">{plan.bytes === null ? "Size unavailable" : formatBytes(plan.bytes)}</span>
+									</li>
+								))}
+							</ul>
+						</details>
+					))}
 					<div className="mt-5 flex justify-end gap-2">
 						<Button variant="secondary" size="compact" onClick={() => onOpenChange(false)}>Cancel</Button>
 						<Button variant="destructive-outline" size="compact" className="tabular-nums" leadingIcon={Trash2} onClick={onConfirm}>{label}</Button>
@@ -271,13 +274,13 @@ export function StorageTab({ active, cwd, onSaved }: { active: boolean; cwd: str
 	} else if (!checking && gc && sandboxes && rows.every(row => row.count === 0)) {
 		summary = "Nothing to clean up. omp's files are already tidy.";
 	}
-	const kept = sandboxes?.filter(plan => plan.kept !== null) ?? [];
+	const kept = keptSandboxes(sandboxes ?? []);
 	return (
 		<div className="space-y-10">
 			<UsageSection usage={usage} error={usageError} />
 			<Section
 				title="Clean up"
-				meta="Nothing changes until you confirm. Archive sizes and compression savings are not included in the estimate."
+				meta="Nothing changes until you confirm. Sandbox sizes are upper bounds; they, archive sizes, and compression savings are not included in the estimate."
 				actions={<Button variant="ghost" size="compact" leadingIcon={RefreshCw} loading={checking} disabled={busy} onClick={checkAgain}>Check again</Button>}
 			>
 				{gcError && <ErrorText>{gcError} Check again to retry.</ErrorText>}
@@ -288,7 +291,7 @@ export function StorageTab({ active, cwd, onSaved }: { active: boolean; cwd: str
 							key={row.step}
 							row={row}
 							status={run?.progress[row.step]}
-							loading={row.step === "sandboxes" ? sandboxes === null && !sandboxError : gc === null && !gcError}
+							loading={isSandboxStep(row.step) ? sandboxes === null && !sandboxError : gc === null && !gcError}
 							finished={run?.phase === "done"}
 							disabled={busy || checking || run !== null}
 							checked={selected.has(row.step)}

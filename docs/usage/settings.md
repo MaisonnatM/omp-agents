@@ -50,14 +50,17 @@
   Only the server that runs the unattended work keeps activity, in `activity.db` in its data directory; a browser under automation records nothing.
 - **Storage** measures session files, attachments, and isolation sandboxes across all workspaces.
   Open it from the disk reading's **Clean up…** link in the bottom bar, or at `#settings/storage`.
-  The checklist previews old reports and replicas, unused attachments, cold sessions to archive, idle files to compress, database logs, and sandboxes of ended tasks.
-  It starts with your saved cleanup switches, plus sandboxes; empty phases stay unchecked.
+  The checklist previews old reports and replicas, unused attachments, cold sessions to archive, idle files to compress, database logs, sandboxes of ended tasks, and sandboxes of ended tasks with leftover changes.
+  It starts with your saved cleanup switches, plus sandboxes of ended tasks; empty phases and sandboxes with leftover changes stay unchecked.
   **Check again** refreshes the preview without deleting anything.
   Sizes are approximate; cold sessions show a count, and compression shows the files' current disk use rather than promised savings.
-  Sandboxes fill in separately, and **Kept** lists the ones a live owner, changes, or another safety check protects.
+  Sandboxes fill in separately, and can take a few minutes when many are left over.
+  Their sizes read **Up to**, since a sandbox shares some files with your checkout and the package cache, so they stay out of the **Clean up about** estimate.
+  **Sandboxes of ended tasks with leftover changes** are ones whose task ended with edits still in them; removing them deletes edits omp did not bring back to your checkout.
+  **Kept** lists the ones a live owner, a Git lock, or another safety check protects.
   **Clean up** asks for confirmation and names what cannot be undone.
   Archived cold sessions leave the roster, History, and Resume, while their compressed archive stays on disk.
-  Cleanup follows omp's phase order, then rechecks and removes eligible sandboxes one at a time.
+  Cleanup follows omp's phase order, then rechecks and removes the chosen sandboxes one at a time.
   **Stop after this step** lets the current operation finish and starts no more.
   Leaving Settings or reloading also prevents later steps, but does not kill the operation already running.
   A failed step keeps its error on the row and stops the rest; **Check again** keeps the checklist's ticks for another attempt.
@@ -69,7 +72,7 @@
   The rules and dashboard cleanup are global; a selected workspace's overrides show a warning and apply only to terminal cleanup in that folder.
   No new daily cleanup runs.
   **Compress daily** runs only when you launch omp in a terminal, not for dashboard sessions, and shows the last background compression log when one exists.
-  The existing daily sandbox sweep stays in place.
+  The existing daily sandbox sweep stays in place, and never removes a sandbox with leftover changes.
   Merged Git worktrees keep their separate review in **Worktrees**.
 - **Worktrees** lists every Git worktree in repositories where a session ran; **Show another repository**, below the list, lists one more.
   A session directory that is gone or outside Git is skipped; a path you enter that is not in a repository says so.

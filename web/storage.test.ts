@@ -14,25 +14,33 @@ const sandboxes: SandboxPlan[] = [
 	{ path: "/tmp/one", kept: null, detail: null, bytes: 1024 },
 	{ path: "/tmp/two", kept: null, detail: null, bytes: 1024 },
 	{ path: "/tmp/live", kept: "owner-live", detail: "Running", bytes: null },
+	{ path: "/tmp/edited", kept: "changed", detail: "Its checkout has tracked modifications or untracked files.", bytes: 4096 },
 ];
-const applyReply: CleanupIo["apply"] = async request => request.step === "sandboxes"
-	? { step: "sandboxes", sandboxes: request.sandboxes.map(path => ({ path, kept: null, detail: null })) }
+const applyReply: CleanupIo["apply"] = async request => "sandboxes" in request
+	? { step: request.step, sandboxes: request.sandboxes.map(path => ({ path, kept: null, detail: null })) }
 	: { step: request.step, gc: { apply: true, [request.step]: report[request.step] } };
 
 test("cleanup preserves native phase order and does not invent archive or compression savings", () => {
 	const rows = cleanupRows(report, [{ path: "/tmp/sandbox", kept: null, detail: null, bytes: 2048 }]);
-	expect(rows.map(row => row.step)).toEqual(["stale", "blobs", "archive", "compress", "wal", "sandboxes"]);
+	expect(rows.map(row => row.step)).toEqual(["stale", "blobs", "archive", "compress", "wal", "sandboxes", "changedSandboxes"]);
 	expect(rows[2]).toMatchObject({ label: "Archive cold sessions", count: 5, bytes: 256 });
 	expect(rows[2]?.size).toContain("4 sessions");
 	expect(rows[3]).toMatchObject({ count: 5, bytes: null });
 	expect(rows[3]?.size).toContain("on disk");
-	expect(rows[5]).toMatchObject({ bytes: 2048, count: 1, available: true, unit: ["sandbox", "sandboxes"] });
+	expect(rows[5]).toMatchObject({ bytes: null, size: "Up to 2.0 KB", count: 1, available: true, unit: ["sandbox", "sandboxes"] });
 });
 
 test("unknown sandbox sizes stay unknown and kept sandboxes are excluded", () => {
 	const rows = cleanupRows(report, [{ path: "/tmp/one", kept: null, detail: null, bytes: null }, { path: "/tmp/live", kept: "owner-live", detail: "Running", bytes: null }]);
 	expect(rows[5]).toMatchObject({ bytes: null, count: 1, size: "Size unavailable" });
-	expect(cleanupRows(report, null)[5]).toMatchObject({ available: false, size: "Checking…" });
+	expect(cleanupRows(report, null)[5]).toMatchObject({ available: false, size: "Checking… can take a few minutes" });
+	expect(cleanupRows(report, [])[5]).toMatchObject({ count: 0, size: "0 B" });
+});
+
+test("sandbox sizes are upper bounds kept out of the estimate, and leftover changes get their own row", () => {
+	const rows = cleanupRows(report, sandboxes);
+	expect(rows[5]).toMatchObject({ count: 2, bytes: null, size: "Up to 2.0 KB" });
+	expect(rows[6]).toMatchObject({ step: "changedSandboxes", count: 1, bytes: null, size: "Up to 4.0 KB", available: true });
 });
 
 test("unsupported compression and a failed volume probe are not actionable", () => {
@@ -58,15 +66,16 @@ test("the driver runs native phases in order, then eligible sandboxes individual
 	const io: CleanupIo = {
 		availableBytes: async () => readings.shift() ?? null,
 		apply: async request => {
-			applied.push(request.step === "sandboxes" ? request.sandboxes.join(",") : request.step);
+			applied.push("sandboxes" in request ? `${request.step}:${request.sandboxes.join(",")}` : request.step);
 			return applyReply(request);
 		},
 	};
 	const result = await runCleanup(cleanupRows(report, sandboxes), sandboxes, { stopped: () => false, onProgress: run => progress.push(run) }, io);
-	expect(applied).toEqual(["stale", "blobs", "archive", "compress", "wal", "/tmp/one", "/tmp/two"]);
+	expect(applied).toEqual(["stale", "blobs", "archive", "compress", "wal", "sandboxes:/tmp/one", "sandboxes:/tmp/two", "changedSandboxes:/tmp/edited"]);
 	expect(result).toMatchObject({ phase: "done", before: 1000, after: 2000, stopping: false });
 	expect(Object.values(result.progress).every(step => step.state === "done")).toBe(true);
 	expect(result.progress.sandboxes?.text).toBe("2 of 2 sandboxes removed");
+	expect(result.progress.changedSandboxes?.text).toBe("1 of 1 sandbox removed");
 	expect(Object.values(progress[0]?.progress ?? {}).every(step => step.state === "waiting")).toBe(true);
 	expect(progress.some(run => run.progress.sandboxes?.text === "Checking and removing 2 of 2…")).toBe(true);
 });
