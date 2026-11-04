@@ -108,7 +108,7 @@ if (input.command) {
 }
 `;
 
-function exercise(name: "ship" | "todos" | "notes" | "worktree-guard" | "google-accounts" | "pr-description" | "headless-mark", input: object, env: Record<string, string> = {}): {
+function exercise(name: "ship" | "todos" | "notes" | "events" | "worktree-guard" | "google-accounts" | "pr-description" | "headless-mark", input: object, env: Record<string, string> = {}): {
 	result: { block: boolean; reason: string } | null;
 	confirmations: number;
 	valid: boolean;
@@ -884,6 +884,51 @@ describe("user_note", () => {
 		expect(call({ action: "read", id: "n1" }).text).toBe("Deploy checklist\n\nRun the staging smoke first.");
 		expect(call({ action: "read", id: "n2" }).text).toBe("Reading list\n\nDesigning Data-Intensive Applications\n\nThinking in Systems");
 		expect(call({ action: "list", query: "thinking systems" }).text).toContain("Reading list (id n2");
+	});
+});
+
+describe("user_event", () => {
+	const root = mkdtempSync(join(tmpdir(), "events-extension-"));
+	afterAll(() => rmSync(root, { recursive: true, force: true }));
+	const env = { XDG_CONFIG_HOME: join(root, "config"), TZ: "America/New_York" };
+	const config = join(root, "config", "omp-agents");
+	const inbox = join(config, "event-inbox");
+	const dentist = { id: "e1", title: "Dentist", when: { allDay: false, start: Date.parse("2030-01-02T08:00:00Z"), end: Date.parse("2030-01-02T09:00:00Z") } };
+	mkdirSync(config, { recursive: true });
+	writeFileSync(join(config, "events.json"), JSON.stringify({ events: [dentist] }));
+	const call = (params: object, sessionId = "s1") => exercise("events", { run: true, params, sessionId }, env);
+	const left = () => readdirSync(inbox).sort().map(name => JSON.parse(readFileSync(join(inbox, name), "utf8")));
+
+	test("add leaves a reminder in local time for the dashboard, which lists before it applies it, and adding it again gives its id back", () => {
+		const first = call({ action: "add", title: "Check the build time", start: "2030-01-03T14:30", minutes: "" });
+		const [added] = left();
+		expect(first.run.isError).toBe(false);
+		expect(added).toEqual({
+			op: "add",
+			event: { id: added.event.id, title: "Check the build time", when: { allDay: false, start: Date.parse("2030-01-03T14:30-05:00"), end: Date.parse("2030-01-03T15:00-05:00") }, sessionId: "s1" },
+		});
+		expect(call({ action: "add", title: " Check the build time ", start: "2030-01-03T14:30" }).text).toContain(`already added it (id ${added.event.id})`);
+		expect(left()).toHaveLength(1);
+		const lines = call({ action: "list" }).text?.split("\n");
+		expect(lines?.map(line => line.split(" (")[0])).toEqual(["- Dentist", "- Check the build time"]);
+		expect(lines?.[1]).toContain(`id ${added.event.id}`);
+		expect(lines?.[1]).toEndWith(", added by this session)");
+	});
+
+	test("add refuses a start in the past or without a time of day", () => {
+		expect(call({ action: "add", title: "Too late", start: "2020-01-01T09:00:00Z" }).run.isError).toBe(true);
+		expect(call({ action: "add", title: "No time", start: "2030-01-03" }).run.isError).toBe(true);
+	});
+
+	test("remove takes only an event this session added", () => {
+		const before = left().length;
+		expect(call({ action: "remove", id: "e1" }).run.isError).toBe(true);
+		const [added] = left();
+		expect(call({ action: "remove", id: added.event.id }, "s2").run.isError).toBe(true);
+		expect(left()).toHaveLength(before);
+		expect(call({ action: "remove", id: added.event.id }).run.isError).toBe(false);
+		expect(left().at(-1)).toEqual({ op: "remove", id: added.event.id, sessionId: "s1" });
+		expect(call({ action: "list" }).text).not.toContain("Check the build time");
 	});
 });
 
