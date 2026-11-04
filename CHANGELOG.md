@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-04
 
+- Fixed: ending a session whose folder holds many installed packages no longer leaves a half-deleted folder behind, which made Resolve conflicts and other starts on that branch fail with "already exists".
 - Behind the scenes: agents checking the dashboard page now use Chrome DevTools' tools, which also show page errors, failed requests, and load times.
 - Settings › Storage can now prune the uv, pnpm, and bun package caches. Packages no project needs are deleted and download again when a project installs them, while the files running tools such as MCP servers use are kept.
 - Behind the scenes: agents now run the interface review alongside the thermonuclear one when a pull request changes UI files, attach PR screenshots without the body edit the guard refuses, and open the test browser with the right call shape.
