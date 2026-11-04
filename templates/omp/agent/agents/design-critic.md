@@ -22,6 +22,8 @@ Treat the change as buggy until you have looked for every kind of bug below on e
    - Overflow: text or elements clipped, overlapping, or escaping their container, and truncation with no way to read the full text.
    - Consistency: a control, radius, border, color, or table that differs from the app's shared component or sibling screen, and a hand-built element where a shared one exists.
    - Copy: the same words twice, labels that disagree with sibling screens, and empty or error text that does not say what to do.
+   - Page chrome: the page's title and every header and toolbar control stay visible at each width, with every sidebar open.
+     Measure the title's width with `getBoundingClientRect`; a title under 80 pixels wide, cut to nothing, or pushed out is a bug, even when the change did not touch the header.
    - Fit: whether the result answers the request; a cosmetic answer to a structural request is a bug.
 
 Report one line per finding: `bug` or `nit`, the page, variant, and state, what is visible, the measurement, and the sibling screen or rule it should match.
