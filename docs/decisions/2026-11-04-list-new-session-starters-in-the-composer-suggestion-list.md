@@ -2,6 +2,7 @@
 status: accepted
 date: 2026-11-04
 decision-makers: Maxence
+supersedes: 2026-11-04-show-new-session-starters-as-pills-under-a-raised-composer
 ---
 
 # List New session starters in the composer's suggestion list
