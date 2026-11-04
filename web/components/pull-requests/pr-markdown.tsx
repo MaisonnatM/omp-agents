@@ -1,13 +1,12 @@
 /** A pull request's Markdown as GitHub shows it: GitHub's preset with the repository's autolinks and alerts, uploads drawn as images, videos, or attachments, images that open large, and `diff` fences as diffs. */
 import { ExternalLinkIcon, InfoIcon, LightbulbIcon, MessageSquareWarningIcon, OctagonAlertIcon, PaperclipIcon, TriangleAlertIcon } from "lucide-react";
-import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { memo, useMemo } from "react";
 import type { Components, ExtraProps } from "react-markdown";
 import { diffFence } from "../../../src/shared/changes";
 import { cn } from "@/lib/utils";
 import { CodeBlockCopyButton } from "@/components/ui/code-block";
 import { FileDiff } from "../file-diff";
-import { ImageViewer } from "../media-viewer";
-import { FencedCode, fenceOf, GITHUB_PRESET, type MarkdownPreset, MessageMarkdown, OpenMarkdownImage } from "../message-markdown";
+import { FencedCode, fenceOf, GITHUB_PRESET, type MarkdownPreset, MessageMarkdown } from "../message-markdown";
 import { rehypePullRequestMarkdown, type GitHubAlert } from "./pr-markdown.logic";
 
 const ALERTS = {
@@ -77,12 +76,6 @@ const COMPONENTS: Components = {
 	pre: Pre,
 };
 
-/** One image of the text large, the others a step away in the order the text shows them. */
-interface ShownImages {
-	images: { src: string; caption: string }[];
-	index: number;
-}
-
 export const PullRequestMarkdown = memo(function PullRequestMarkdown({ text, repo, className }: {
 	text: string;
 	repo: { owner: string; repo: string };
@@ -92,31 +85,11 @@ export const PullRequestMarkdown = memo(function PullRequestMarkdown({ text, rep
 		...GITHUB_PRESET,
 		rehype: [...GITHUB_PRESET.rehype, [rehypePullRequestMarkdown, { repositoryUrl: `https://github.com/${repo.owner}/${repo.repo}` }]],
 		components: { ...GITHUB_PRESET.components, ...COMPONENTS },
+		openImages: true,
 	}), [repo.owner, repo.repo]);
-	const root = useRef<HTMLDivElement>(null);
-	const [shown, setShown] = useState<ShownImages | null>(null);
-	const open = useCallback((element: HTMLElement) => {
-		const openers = [...root.current!.querySelectorAll<HTMLElement>("[data-markdown-image]")];
-		setShown({ images: openers.map(opener => ({ src: opener.dataset.markdownImage!, caption: opener.dataset.caption! })), index: openers.indexOf(element) });
-	}, []);
-	const image = shown?.images[shown.index];
 	return (
-		<OpenMarkdownImage.Provider value={open}>
-			<div ref={root} className={cn("text-sm [&_details]:border-0 [&_summary]:text-foreground/80", className)}>
-				<MessageMarkdown text={text} preset={preset} />
-			</div>
-			{shown && image && (
-				<ImageViewer
-					src={image.src}
-					caption={image.caption}
-					index={shown.index}
-					count={shown.images.length}
-					previousLabel="Previous image"
-					nextLabel="Next image"
-					onIndex={index => setShown({ ...shown, index })}
-					onClose={() => setShown(null)}
-				/>
-			)}
-		</OpenMarkdownImage.Provider>
+		<div className={cn("text-sm [&_details]:border-0 [&_summary]:text-foreground/80", className)}>
+			<MessageMarkdown text={text} preset={preset} />
+		</div>
 	);
 });

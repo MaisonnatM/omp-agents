@@ -8,7 +8,7 @@ import { CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, Cod
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { ViewerDialog } from "./viewer-dialog";
-import { useZoom, ZoomControls, ZoomPane, zoomKey } from "./zoom-pane";
+import { useZoom } from "./zoom-pane";
 
 // `recharts` is a chunk of its own, loaded when the first chart draws.
 const ChartView = lazy(() => import("./session-chart").then(module => ({ default: module.ChartView })));
@@ -129,26 +129,10 @@ function VisualFrame({ language, title, description = null, source, code, body }
 
 /** A visual over the page, zoomed as a browser zooms a page. */
 function ExpandedVisual({ title, description, actions, onClose, children }: { title: string; description: ReactNode; actions: ReactNode; onClose: () => void; children: ReactNode }) {
-	const zoom = useZoom(null);
+	const zoom = useZoom();
 	return (
-		<ViewerDialog
-			title={title}
-			description={description}
-			actions={
-				<>
-					<ZoomControls zoom={zoom} />
-					{actions}
-				</>
-			}
-			bodyLabel={title}
-			onKeyDown={event => zoomKey(zoom, event)}
-			onClose={onClose}
-		>
-			<div className="flex h-full min-h-0 flex-col">
-				<ZoomPane zoom={zoom}>
-					<div className="flex h-full w-full items-center justify-center p-4">{children}</div>
-				</ZoomPane>
-			</div>
+		<ViewerDialog title={title} description={description} actions={actions} bodyLabel={title} zoom={zoom} onClose={onClose}>
+			<div className="flex h-full w-full items-center justify-center p-4">{children}</div>
 		</ViewerDialog>
 	);
 }

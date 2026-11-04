@@ -7,7 +7,7 @@ test("stepped moves to the next listed level, from a pinch's in-between level to
 });
 
 const press = (key: string, modifiers: Partial<Pick<KeyboardEvent, "metaKey" | "ctrlKey" | "altKey">> = {}) => {
-	const zoom: Zoom = { level: 1, set: mock(), step: mock() };
+	const zoom: Zoom = { level: 1, set: mock(), scale: mock(), step: mock() };
 	const preventDefault = mock();
 	const event = { key, metaKey: false, ctrlKey: false, altKey: false, ...modifiers, preventDefault } as unknown as KeyboardEvent;
 	return { took: zoomKey(zoom, event), zoom, prevented: preventDefault.mock.calls.length > 0 };

@@ -1,5 +1,5 @@
 import { Check, Copy } from "lucide-react";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { MAX_TEXT_FILE_BYTES, type TextFile } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -14,7 +14,7 @@ import { FileBaseContext } from "./file-link";
 import { MessageMarkdown } from "./message-markdown";
 import { LoadNote } from "./sheet-details";
 import { ViewerDialog } from "./viewer-dialog";
-import { useZoom, ZoomControls, ZoomPane, zoomKey } from "./zoom-pane";
+import { useZoom, type Zoom } from "./zoom-pane";
 
 /** The rows a table shows; a longer file shows the rest as its source. */
 const MAX_TABLE_ROWS = 1000;
@@ -26,51 +26,62 @@ const LOOKS: Record<string, Look> = { md: "markdown", markdown: "markdown", tsv:
 /** A file that a path in agent text opened: an image or video large, else a text file rendered by its type. */
 export function FileDialog({ target, onClose }: { target: FileTarget; onClose: () => void }) {
 	const kind = linkedFile(target.path)?.kind;
-	return kind === "image" || kind === "video" ? <MediaDialog target={target} video={kind === "video"} onClose={onClose} /> : <TextFileDialog target={target} onClose={onClose} />;
+	if (kind === "image") return <ImageFileDialog target={target} onClose={onClose} />;
+	if (kind === "video") return <VideoFileDialog target={target} onClose={onClose} />;
+	return <TextFileDialog target={target} onClose={onClose} />;
 }
 
-/** An image or video on this computer, as large as the dialog allows; a video plays at once, and an image zooms. */
-function MediaDialog({ target, video, onClose }: { target: FileTarget; video: boolean; onClose: () => void }) {
-	const { copied, copy } = useCopy();
+const LOAD_FAILED = <p className="text-sm text-muted-foreground">This file could not be loaded: it is missing, or lies in a directory that does not open here.</p>;
+
+/** An image on this computer, fitted to the dialog, that zooms; one that loads nothing says so. */
+function ImageFileDialog({ target, onClose }: { target: FileTarget; onClose: () => void }) {
 	const [failed, setFailed] = useState(false);
 	const zoom = useZoom(target.path);
+	const name = target.path.slice(target.path.lastIndexOf("/") + 1);
+	return (
+		<MediaFileDialog target={target} zoom={failed ? undefined : zoom} onClose={onClose}>
+			{failed ? (
+				<div className="flex min-h-full items-center justify-center p-4">{LOAD_FAILED}</div>
+			) : (
+				<img src={mediaSrc(mediaFileUrl(target))} alt={name} draggable={false} onError={() => setFailed(true)} className="max-h-full max-w-full object-contain p-4" />
+			)}
+		</MediaFileDialog>
+	);
+}
+
+/** A video on this computer, which plays at once; one that loads nothing says so. */
+function VideoFileDialog({ target, onClose }: { target: FileTarget; onClose: () => void }) {
+	const [failed, setFailed] = useState(false);
+	return (
+		<MediaFileDialog target={target} onClose={onClose}>
+			<div className="flex min-h-full items-center justify-center p-4">
+				{failed ? LOAD_FAILED : <video controls autoPlay src={mediaSrc(mediaFileUrl(target))} onError={() => setFailed(true)} className="max-h-[75vh] max-w-full bg-black" />}
+			</div>
+		</MediaFileDialog>
+	);
+}
+
+/** The dialog an image or video file shows in: its name, its path, and a button that copies the path. */
+function MediaFileDialog({ target, zoom, onClose, children }: { target: FileTarget; zoom?: Zoom; onClose: () => void; children: ReactNode }) {
+	const { copied, copy } = useCopy();
 	const { path } = target;
 	const name = path.slice(path.lastIndexOf("/") + 1);
-	const src = mediaSrc(mediaFileUrl(target));
-	const image = !video && !failed;
 	return (
 		<ViewerDialog
 			title={name}
 			description={path}
 			bodyLabel={name}
-			onKeyDown={image ? event => zoomKey(zoom, event) : undefined}
+			zoom={zoom}
 			onClose={onClose}
 			actions={
-				<>
-					{image && <ZoomControls zoom={zoom} />}
-					<Tooltip content={copied ? "Copied" : "Copy the path"}>
-						<Button {...activityControl("file-dialog.copy-path")} variant="ghost" size="icon-compact" aria-label="Copy the path" onClick={() => copy(path)}>
-							{copied ? <Check /> : <Copy />}
-						</Button>
-					</Tooltip>
-				</>
+				<Tooltip content={copied ? "Copied" : "Copy the path"}>
+					<Button {...activityControl("file-dialog.copy-path")} variant="ghost" size="icon-compact" aria-label="Copy the path" onClick={() => copy(path)}>
+						{copied ? <Check /> : <Copy />}
+					</Button>
+				</Tooltip>
 			}
 		>
-			{image ? (
-				<div className="flex h-full min-h-0 flex-col">
-					<ZoomPane zoom={zoom}>
-						<img src={src} alt={name} draggable={false} onError={() => setFailed(true)} className="max-h-full max-w-full object-contain p-4" />
-					</ZoomPane>
-				</div>
-			) : (
-				<div className="flex min-h-full items-center justify-center p-4">
-					{failed ? (
-						<p className="text-sm text-muted-foreground">This file could not be loaded: it is missing, or lies in a directory that does not open here.</p>
-					) : (
-						<video controls autoPlay src={src} onError={() => setFailed(true)} className="max-h-[75vh] max-w-full bg-black" />
-					)}
-				</div>
-			)}
+			{children}
 		</ViewerDialog>
 	);
 }

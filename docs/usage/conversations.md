@@ -113,11 +113,11 @@
 - An image or video on this computer that a prompt or the agent's text names shows in the message: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, `.svg`, `.mp4`, `.m4v`, `.webm`, or `.mov`.
   Its path is found as a text file's is, and opens the file dialog with the image large or the video playing.
   Written as an image, `![alt](path)`, it shows in place and opens large on click, and a video there plays in place.
-  Otherwise each one the text names shows once as a thumbnail under the text, a video by its first frame: a video opens the dialog, and an image opens large, where the arrows, or the Left and Right keys, step to the thumbnails' other images.
+  Otherwise each one the text names shows once as a thumbnail under the text, a video by its first frame: a video opens the dialog, and an image opens large, where the arrows, or the Left and Right keys, step through the message's images, those in place and the thumbnails alike.
   A remote image, `![](https://…)`, stays a link, so a prompt-injected address never loads.
   A path to a missing file, or to one in a directory that does not open, shows no thumbnail.
 - An image opened large, a chart or diagram expanded, and the dialog's image zoom as a browser page does: the header's − and + buttons or the − and + keys zoom out and in, the level between them or the 0 key fits it to the window again, a pinch or Cmd/Ctrl with the scroll wheel zooms around the pointer, and dragging moves a zoomed image.
-  Zoomed in, Tab reaches the image so the arrow keys move it, and the Left and Right keys no longer step to other images; Cmd+ and Cmd− still zoom the whole desktop window.
+  Zoomed in, the arrow keys move the image once it has focus, which Tab gives it in the image viewer, where the Left and Right keys then no longer step to other images; Cmd+ and Cmd− still zoom the whole desktop window.
 - Every prompt has a copy button.
   Among the agent's messages, only the reply that ends each turn has one, not the messages it writes between tool calls.
   A turn still running shows none until it ends.

@@ -1,6 +1,6 @@
 /** `ZoomPane`, what a viewer dialog shows zoomed in or out as a browser zooms a page, and `ZoomControls`, its −, level, and + buttons. */
 import { Minus, Plus } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -20,18 +20,28 @@ export function stepped(zoom: number, by: 1 | -1): number {
 export interface Zoom {
 	level: number;
 	set: (level: number) => void;
+	/** Multiplies the level by `factor`, as a pinch does. */
+	scale: (factor: number) => void;
 	step: (by: 1 | -1) => void;
 }
 
+const clamp = (level: number): number => Math.min(MAX, Math.max(MIN, level));
+
 /** A zoom level that starts fitted and goes back to it when `resetKey` changes, such as when the viewer shows another image. */
-export function useZoom(resetKey: unknown): Zoom {
+export function useZoom(resetKey?: string): Zoom {
 	const [level, setLevel] = useState(1);
 	const [key, setKey] = useState(resetKey);
 	if (key !== resetKey) {
 		setKey(resetKey);
 		setLevel(1);
 	}
-	return { level, set: next => setLevel(Math.min(MAX, Math.max(MIN, next))), step: by => setLevel(current => stepped(current, by)) };
+	// Every update is a function of the current level, so a listener bound once may keep the first render's `Zoom`.
+	return {
+		level,
+		set: next => setLevel(clamp(next)),
+		scale: factor => setLevel(current => clamp(current * factor)),
+		step: by => setLevel(current => stepped(current, by)),
+	};
 }
 
 /** Zooms on +, −, and 0 like a browser's ⌘+, ⌘−, and ⌘0, which the desktop menu keeps for the whole window; `true` when it took the key. */
@@ -74,9 +84,11 @@ export function ZoomControls({ zoom }: { zoom: Zoom }) {
 /**
  * `children` laid out in the pane's box and scaled from there, as a browser zooms a page, scrolling when larger. A pinch
  * or ⌘/Ctrl+wheel zooms around the pointer, and a drag pans. `children` sizes itself to that box, such as `max-h-full max-w-full`.
+ * With a `label`, the pane is a region that always takes focus, as a dialog's body; without, it takes focus only zoomed in.
  */
-export function ZoomPane({ zoom, children, className }: { zoom: Zoom; children: ReactNode; className?: string }) {
-	const pane = useRef<HTMLDivElement>(null);
+export function ZoomPane({ zoom, label, paneRef, children, className }: { zoom: Zoom; label?: string; paneRef?: RefObject<HTMLDivElement | null>; children: ReactNode; className?: string }) {
+	const ownPane = useRef<HTMLDivElement>(null);
+	const pane = paneRef ?? ownPane;
 	const [box, setBox] = useState<{ width: number; height: number } | null>(null);
 	// Where the pointer was, in the content's fraction and the pane's pixels, for the zoom it asked for to keep it there.
 	const anchor = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
@@ -98,7 +110,7 @@ export function ZoomPane({ zoom, children, className }: { zoom: Zoom; children: 
 			const py = event.clientY - rect.top;
 			anchor.current = { x: (element.scrollLeft + px) / element.scrollWidth, y: (element.scrollTop + py) / element.scrollHeight, px, py };
 			// A trackpad pinch sends small steps; a mouse wheel notch, about 100, zooms by at most a quarter.
-			zoomRef.current.set(zoomRef.current.level * Math.exp(-Math.max(-25, Math.min(25, event.deltaY)) / 100));
+			zoom.scale(Math.exp(-Math.max(-25, Math.min(25, event.deltaY)) / 100));
 		};
 		element.addEventListener("wheel", wheel, { passive: false });
 		return () => {
@@ -106,8 +118,6 @@ export function ZoomPane({ zoom, children, className }: { zoom: Zoom; children: 
 			element.removeEventListener("wheel", wheel);
 		};
 	}, []);
-	const zoomRef = useRef(zoom);
-	zoomRef.current = zoom;
 
 	useEffect(() => {
 		const element = pane.current!;
@@ -126,8 +136,10 @@ export function ZoomPane({ zoom, children, className }: { zoom: Zoom; children: 
 	return (
 		<div
 			ref={pane}
+			role={label && "region"}
+			aria-label={label}
 			// Focusable while zoomed in, so the arrow keys and Page keys pan it as the drag does.
-			tabIndex={pannable ? 0 : undefined}
+			tabIndex={label || pannable ? 0 : undefined}
 			className={cn(
 				"min-h-0 min-w-0 flex-1 overflow-auto outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
 				pannable && (dragging ? "cursor-grabbing" : "cursor-grab"),
@@ -156,8 +168,9 @@ export function ZoomPane({ zoom, children, className }: { zoom: Zoom; children: 
 				setDragging(false);
 			}}
 		>
+			{/* The box is unknown until the first resize report, a frame after the pane mounts. */}
 			{box && (
-				<div className="flex items-center justify-center" style={{ width: Math.max(box.width, box.width * zoom.level), height: Math.max(box.height, box.height * zoom.level) }}>
+				<div className="flex min-h-full w-max min-w-full items-center justify-center">
 					<div className="shrink-0" style={{ width: box.width * zoom.level, height: box.height * zoom.level }}>
 						<div className="flex origin-top-left items-center justify-center" style={{ width: box.width, height: box.height, transform: `scale(${zoom.level})` }}>
 							{children}

@@ -1,8 +1,9 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { type LucideIcon, X } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useRef } from "react";
+import { type ReactNode, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
+import { type Zoom, ZoomControls, zoomKey, ZoomPane } from "./zoom-pane";
 
 interface ViewerDialogProps {
 	title: string;
@@ -12,14 +13,16 @@ interface ViewerDialogProps {
 	actions?: ReactNode;
 	/** What screen readers call the scrolling body. */
 	bodyLabel: string;
-	onKeyDown?: (event: KeyboardEvent) => void;
+	/** Given, the body zooms as a browser zooms a page, with the zoom buttons before `actions` and +, −, and 0 on the keyboard. */
+	zoom?: Zoom;
 	onClose: () => void;
 	children: ReactNode;
 }
 
-/** A large dialog over the page that shows one thing to read: a header with its title and actions, and a body that scrolls. */
-export function ViewerDialog({ title, description, icon: Icon, actions, bodyLabel, onKeyDown, onClose, children }: ViewerDialogProps) {
+/** A large dialog over the page that shows one thing to read: a header with its title and actions, and a body that scrolls, or zooms. */
+export function ViewerDialog({ title, description, icon: Icon, actions, bodyLabel, zoom, onClose, children }: ViewerDialogProps) {
 	const body = useRef<HTMLDivElement>(null);
+	const frame = "rounded-md border border-border";
 	return (
 		<DialogPrimitive.Root open onOpenChange={next => !next && onClose()}>
 			<DialogPrimitive.Portal>
@@ -31,7 +34,7 @@ export function ViewerDialog({ title, description, icon: Icon, actions, bodyLabe
 						body.current?.focus();
 					}}
 					className="fixed top-1/2 left-1/2 z-50 flex h-[calc(100vh-4rem)] w-[min(64rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-3 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-hidden"
-					onKeyDown={onKeyDown}
+					onKeyDown={zoom && (event => zoomKey(zoom, event))}
 				>
 					<div className="flex items-start gap-4">
 						{Icon && <Icon aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />}
@@ -40,6 +43,7 @@ export function ViewerDialog({ title, description, icon: Icon, actions, bodyLabe
 							<DialogPrimitive.Description className="truncate text-xs text-muted-foreground">{description}</DialogPrimitive.Description>
 						</div>
 						<div className="flex shrink-0 items-center gap-1">
+							{zoom && <ZoomControls zoom={zoom} />}
 							{actions}
 							<Tooltip content="Close" shortcut={["Esc"]}>
 								<DialogPrimitive.Close asChild>
@@ -50,9 +54,15 @@ export function ViewerDialog({ title, description, icon: Icon, actions, bodyLabe
 							</Tooltip>
 						</div>
 					</div>
-					<div ref={body} role="region" tabIndex={0} aria-label={bodyLabel} className="min-h-0 flex-1 overflow-auto rounded-md border border-border outline-hidden focus-visible:ring-2 focus-visible:ring-ring">
-						{children}
-					</div>
+					{zoom ? (
+						<ZoomPane zoom={zoom} label={bodyLabel} paneRef={body} className={frame}>
+							{children}
+						</ZoomPane>
+					) : (
+						<div ref={body} role="region" tabIndex={0} aria-label={bodyLabel} className={`min-h-0 flex-1 overflow-auto outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${frame}`}>
+							{children}
+						</div>
+					)}
 				</DialogPrimitive.Content>
 			</DialogPrimitive.Portal>
 		</DialogPrimitive.Root>

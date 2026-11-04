@@ -1,12 +1,11 @@
 import type { Element, ElementContent } from "hast";
 import { Eye } from "lucide-react";
-import { type ComponentProps, createContext, memo, type ReactNode, useContext, useState } from "react";
+import { type ComponentProps, memo, useContext, useRef, useState } from "react";
 import ReactMarkdown, { type Components, defaultUrlTransform, type ExtraProps, type Options, type UrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { TICKET_MEDIA_PATH } from "../../src/shared/tickets";
 import { cn } from "@/lib/utils";
 import { CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockHeader, CodeBlockLine, CodeBlockTitle } from "@/components/ui/code-block";
-import { activityControl } from "../activity";
 import { mediaSrc } from "../api";
 import { highlightLines, useGrammars } from "../code-highlight";
 import { loadedOnce, useLoaded } from "../loaded-once";
@@ -20,7 +19,8 @@ import { parseReviewPages, type ReviewPage } from "../review-pages";
 import { hashForPullRequests, hashForTickets, hashForTodoId } from "../routing";
 import { UserTodosContext } from "./dashboard-context";
 import { FileLink } from "./file-link";
-import { LocalMedia, MediaStrip, OpenableImage } from "./local-media";
+import { LocalMedia, MediaStrip } from "./local-media";
+import { Openable, OpenMarkdownImage, useMarkdownImages } from "./markdown-images";
 import { BrandMark, LINEAR_LOGO, SLACK_LOGO } from "./integrations/brand-logos";
 import { OrgIcon } from "./org-icon";
 import { type ChipProps, isChipKind, PromptChip } from "./prompt-chip";
@@ -46,7 +46,14 @@ const imageFrom =
 	({ node: _node, ...props }: ComponentProps<"img"> & { node?: unknown }) => {
 		const { src, alt } = props;
 		if (typeof src !== "string" || src === "") return <>{alt}</>;
-		if (allowed(src)) return local ? <OpenableImage {...props} src={src} /> : <img {...props} src={mediaSrc(src)} />;
+		if (allowed(src))
+			return local ? (
+				<Openable src={src} alt={alt}>
+					<img {...props} src={mediaSrc(src)} />
+				</Openable>
+			) : (
+				<img {...props} src={mediaSrc(src)} />
+			);
 		const file = local ? linkedFile(src) : null;
 		if (file && file.kind !== "text") return <LocalMedia path={file.path} alt={alt ?? ""} />;
 		return (
@@ -55,31 +62,6 @@ const imageFrom =
 			</a>
 		);
 	};
-
-/** Opens an image of GitHub text large, given its opener; `null`, the default, leaves images as they are. */
-export const OpenMarkdownImage = createContext<((element: HTMLElement) => void) | null>(null);
-
-/** An image that opens large through `OpenMarkdownImage` when one is provided; `src` is before `mediaSrc`, which the viewer applies itself. */
-function Openable({ src, alt, children }: { src: string; alt: string | undefined; children: ReactNode }) {
-	const open = useContext(OpenMarkdownImage);
-	if (!open) return children;
-	return (
-		<button
-			{...activityControl("media-viewer.open")}
-			type="button"
-			data-markdown-image={src}
-			data-caption={alt || "Image"}
-			aria-label={`Open ${alt || "image"}`}
-			className="cursor-zoom-in"
-			onClick={event => {
-				event.preventDefault();
-				open(event.currentTarget);
-			}}
-		>
-			{children}
-		</button>
-	);
-}
 
 /** An image uploaded to GitHub, which its hosts serve only to a signed-in user; one that fails to load shows as a link to it. */
 function GitHubUpload({ url, path, alt, ...props }: ComponentProps<"img"> & { url: string; path: string }) {
@@ -355,6 +337,8 @@ export interface MarkdownPreset {
 	rehype: Plugins;
 	components: Components;
 	urlTransform: UrlTransform;
+	/** Whether a click on one of the text's images opens it large, with ←/→ to the text's other images. */
+	openImages: boolean;
 }
 
 /** `RAW_HTML`, or, should its chunk fail to load, no plugins, which leaves the raw HTML as escaped text. */
@@ -371,7 +355,7 @@ export const loadRawHtml = (): Promise<unknown> => rawHtmlPlugins.load();
  * Agent text: the path of a file opens it in the file dialog, a relative one against `FileBaseContext`; an image or
  * video on this computer shows in place when the text writes it as an image, and under the text when it only names it.
  */
-export const AGENT_PRESET: MarkdownPreset = { remark: [remarkGfm, remarkFilePaths], rawHtml: false, rehype: [], components: AGENT_COMPONENTS, urlTransform: agentUrlTransform };
+export const AGENT_PRESET: MarkdownPreset = { remark: [remarkGfm, remarkFilePaths], rawHtml: false, rehype: [], components: AGENT_COMPONENTS, urlTransform: agentUrlTransform, openImages: true };
 
 /** A user's prompt, read as agent text with its skill, command, file, ticket, pull request, todo, and session references as chips. */
 export const PROMPT_PRESET: MarkdownPreset = { ...AGENT_PRESET, remark: [remarkGfm, remarkPromptChips, remarkFilePaths], components: PROMPT_COMPONENTS };
@@ -387,7 +371,7 @@ export const SESSION_PROMPT_PRESET: MarkdownPreset = { ...PROMPT_PRESET, compone
  * follows GitHub's; HTML comments drop out, as GitHub hides them. Images load from GitHub's hosts and from this
  * server's route for a Linear issue's files, which also plays its videos.
  */
-export const GITHUB_PRESET: MarkdownPreset = { remark: [remarkGfm], rawHtml: true, rehype: [], components: GITHUB_COMPONENTS, urlTransform };
+export const GITHUB_PRESET: MarkdownPreset = { remark: [remarkGfm], rawHtml: true, rehype: [], components: GITHUB_COMPONENTS, urlTransform, openImages: false };
 
 /**
  * Markdown text is untrusted. react-markdown escapes raw HTML and filters unsafe link schemes, and images load only
@@ -398,12 +382,21 @@ export const GITHUB_PRESET: MarkdownPreset = { remark: [remarkGfm], rawHtml: tru
  */
 export const MessageMarkdown = memo(function MessageMarkdown({ text, preset = AGENT_PRESET }: { text: string; preset?: MarkdownPreset }) {
 	const rawHtml = useLoaded(rawHtmlPlugins, preset.rawHtml);
+	const root = useRef<HTMLDivElement>(null);
+	const images = useMarkdownImages(root);
 	if (preset.rawHtml && !rawHtml) return null;
-	return (
-		<div className="message-markdown max-w-full whitespace-normal break-words">
+	const body = (
+		<div ref={root} className="message-markdown max-w-full whitespace-normal break-words">
 			<ReactMarkdown remarkPlugins={preset.remark} rehypePlugins={rawHtml && preset.rawHtml ? [...rawHtml, ...preset.rehype] : preset.rehype} components={preset.components} urlTransform={preset.urlTransform}>
 				{text}
 			</ReactMarkdown>
 		</div>
+	);
+	if (!preset.openImages) return body;
+	return (
+		<OpenMarkdownImage.Provider value={images.open}>
+			{body}
+			{images.viewer}
+		</OpenMarkdownImage.Provider>
 	);
 });
