@@ -291,7 +291,6 @@ export function App() {
 																		connected={state.connected}
 																		listed={state.listed}
 																		rosterError={state.rosterError}
-																		personalMemory={state.personalMemory}
 																		newStart={startOf(state.starts, "new")}
 																		scope={scope}
 																		defaultWorkspace={defaultWorkspace}
