@@ -138,13 +138,15 @@ While they are still shaping it, through a prototype, a live preview, or rounds 
 Running the existing checks, and fixing a test the change broke, stays allowed.
 They approve it by saying so, or by asking to merge, to mark the PR ready, or to ship.
 Until then, end each report with "Tests and thermonuclear review wait for your go on the direction." and offer "Direction approved: add tests and run the thermonuclear review" among the suggested prompts.
+When a changed file also matches the repository's `.omp/ui-paths`, the interface review runs too, before the thermonuclear one: say "Tests, interface and thermonuclear reviews wait for your go on the direction." and offer "Direction approved: add tests and run the interface and thermonuclear reviews" instead.
 
 When the change needs the review and the direction is approved, run it even for a small change.
 In a `/ship` session, the ship skill's review steps run it on the PR instead of the steps below.
 Otherwise:
 
 1. Collect `git diff <base>...HEAD` plus the working-tree `git diff` (base defaults to `main`) and the full contents of every changed file.
-2. Spawn one `task` with `agent: "thermo-nuclear-code-quality-review"`, passing that evidence under `### Git / diff output` and `### Changed file contents`.
+2. When a changed file matches `.omp/ui-paths`, first spawn `task` with `agent: "interface-reviewer"` on the PR, apply its findings, and add `- [x] Interface review` as `~/.omp/agent/docs/review-workflow.md` says.
+   Then spawn one `task` with `agent: "thermo-nuclear-code-quality-review"`, passing that evidence under `### Git / diff output` and `### Changed file contents`.
    Do not run the rubric yourself or override its model.
 3. Apply every finding that keeps behavior the same and stays inside the change's scope.
    Skip a finding only with a one-line reason.

@@ -49,7 +49,7 @@ When the review applies, run the thermonuclear stage once the user approves the 
 When the repository commits `.omp/ui-paths` and a changed file matches it, the interface review runs first the same way and earns `- [x] Interface review`.
 Follow `~/.omp/agent/docs/review-workflow.md` for when the review applies and for the review and checkbox rules.
 When the interface review applies, the extension also blocks while the body has an unchecked `- [ ] Browser proof` box, which yampa's PR template declares.
-Then run the verify-yampa skill, attach a screenshot of the changed UI with `gh pr edit <N> --attach`, and check the box; when the interface review does not apply, delete the line.
+Then run the verify-yampa skill, attach a screenshot of the changed UI with `gh pr edit <N> --attach` and no body flag, and check the box with `pr_description`; when the interface review does not apply, delete the line with `pr_description`.
 The extension checks the box, not the screenshot.
 Only then run `gt submit --publish` or `gh pr ready <N>`; the extension asks the user to approve before the command runs.
 A new branch has no PR body to check: create its draft first rather than retrying publication.

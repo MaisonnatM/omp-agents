@@ -3,6 +3,7 @@
 ## Pitfalls
 
 Read [LEARNINGS.md](LEARNINGS.md) before you retry a failed check; it lists the mistakes agents already made here.
+Every land on `main` needs new lines in `CHANGELOG.md`, as [Changelog](CODING_STANDARDS.md#changelog) says: write them before you call `land`, whatever the global "none by default" rule says.
 
 ## Read before you act
 
