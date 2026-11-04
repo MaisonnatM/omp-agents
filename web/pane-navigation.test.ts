@@ -77,14 +77,11 @@ describe("session selection and split memory", () => {
 		expect(state.layout).toEqual({ panes: [live("a"), live("e"), live("c"), live("d")], focus: 1, maximized: false });
 	});
 
-	test("fork and replay keep explicit pane-edit behavior instead of ordinary session selection", () => {
+	test("a fork keeps explicit pane-edit behavior instead of ordinary session selection", () => {
 		const state = setup("#a,b@1;max");
 		const fork = layoutAfterStart(state.layout, { kind: "fork", view: live("a"), itemId: "prompt", point: { entryId: "entry", prefill: true } }, "fork");
 		if (!fork) throw new Error("A fork must open a pane");
 		expect(hashForLayout(command(state, { kind: "edit", layout: fork }).layout)).toBe("#a,fork@1;max");
-		const replay = layoutAfterStart(state.layout, { kind: "replay", view: live("a"), turnId: "turn", token: "token", model: null, thinking: null, prompt: null }, "replay");
-		if (!replay) throw new Error("A replay must open beside its source");
-		expect(hashForLayout(command(state, { kind: "edit", layout: replay }).layout)).toBe("#a,b,replay@2");
 	});
 
 	test("closing B from AB prevents a later selection of A from reviving B", () => {

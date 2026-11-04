@@ -6,7 +6,6 @@ import { isNonEmpty, isObject, num, str } from "./json";
 import { FoldedFile, ReadQueue } from "./line-reader";
 import { entryTime, textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { addUsage, type Clipped, NO_USAGE, type TokenUsage, type Turn, type TurnStep } from "./shared/trajectory";
-import { REPLAY_BLOCK } from "./shared/replay";
 import { botMessageText } from "./shared/bot-message";
 import { routineMessageText } from "./shared/routine-message";
 import { isPrompt, promptAuthor } from "./shared/transcript";
@@ -44,7 +43,6 @@ export class Trajectory {
 	/** When omp started each tool call, in ms, from its `tool_execution_start` marker. */
 	#started = new Map<string, number>();
 	#changed = new Set<Turn>();
-	constructor(readonly detail = false) {}
 
 	turns(): Turn[] {
 		return this.#turns;
@@ -67,13 +65,6 @@ export class Trajectory {
 				this.#customMessage(entry);
 				return;
 			case "custom":
-				if (entry.customType === REPLAY_BLOCK && isObject(entry.data)) {
-					const call = this.#tools.get(String(entry.data.toolCallId));
-					if (call) {
-						call.step.blocked = true;
-						this.#changed.add(call.turn);
-					}
-				}
 				if (entry.customType === "tool_execution_start" && isObject(entry.data)) {
 					const callId = str(entry.data.toolCallId);
 					const at = Date.parse(str(entry.data.startedAt) ?? "");
@@ -149,7 +140,7 @@ export class Trajectory {
 		this.#flush(turn);
 		const { body, skill } =
 			prompt.kind === "routine" ? { body: routineMessageText(prompt.message), skill: null } : prompt.kind === "bot-message" ? { body: botMessageText(prompt.message), skill: null } : { body: prompt.text, skill: prompt.skill };
-		this.#push(turn, { kind: "prompt", body: clip(body, this.detail ? Infinity : TEXT_MAX), skill });
+		this.#push(turn, { kind: "prompt", body: clip(body), skill });
 		return turn;
 	}
 
@@ -188,8 +179,8 @@ export class Trajectory {
 		if (!Array.isArray(message.content)) return;
 		for (const block of message.content) {
 			if (!isObject(block)) continue;
-			if (block.type === "thinking" && isNonEmpty(block.thinking)) this.#push(turn, { kind: "thinking", body: clip(block.thinking, this.detail ? Infinity : TEXT_MAX) });
-			else if (block.type === "text" && isNonEmpty(block.text)) this.#push(turn, { kind: "reply", body: clip(block.text, this.detail ? Infinity : TEXT_MAX) });
+			if (block.type === "thinking" && isNonEmpty(block.thinking)) this.#push(turn, { kind: "thinking", body: clip(block.thinking) });
+			else if (block.type === "text" && isNonEmpty(block.text)) this.#push(turn, { kind: "reply", body: clip(block.text) });
 			else if (block.type === "toolCall") {
 				const call = calls.get(str(block.id) ?? "");
 				if (!call) continue;
@@ -197,7 +188,7 @@ export class Trajectory {
 					kind: "tool",
 					callId: call.id,
 					name: call.name,
-					args: clip(JSON.stringify(call.args ?? {}, null, 2), this.detail ? Infinity : ARGS_MAX),
+					args: clip(JSON.stringify(call.args ?? {}, null, 2), ARGS_MAX),
 					status: "running",
 					resultBytes: null,
 					resultImages: 0,
@@ -217,7 +208,6 @@ export class Trajectory {
 		const ended = entryTime(entry);
 		call.step.status = result.isError ? "error" : "ok";
 		call.step.resultBytes = Buffer.byteLength(textOf(result.content));
-		if (this.detail) call.step.result = clip(textOf(result.content), Infinity);
 		call.step.resultImages = Array.isArray(result.content) ? result.content.filter(block => isObject(block) && block.type === "image").length : 0;
 		call.step.durationMs = started !== undefined && ended !== null ? Math.max(0, ended - started) : null;
 		this.#changed.add(call.turn);

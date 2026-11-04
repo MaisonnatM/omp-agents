@@ -24,7 +24,6 @@ import {
 	parseBots,
 	parseBotId,
 } from "../shared/bots";
-import type { RouterRequest } from "../shared/router";
 import type { ShepherdRequest } from "../shared/shepherd";
 import { type ExtensionApi, flagValue, memoryLines, readText, rememberTool, reply } from "./extension-kit";
 
@@ -56,7 +55,7 @@ function routineLine({ id, name, enabled, schedules, triggers, task }: RoutineSp
 }
 
 /** Leaves `request` in `dir` for the dashboard: written under a name it skips, then renamed, so it never reads half a file. */
-export function leave(dir: string, request: BotRoutineRequest | BotJobRequest | BotCreateRequest | BotMessageRequest | ShepherdRequest | RouterRequest): void {
+export function leave(dir: string, request: BotRoutineRequest | BotJobRequest | BotCreateRequest | BotMessageRequest | ShepherdRequest): void {
 	try {
 		mkdirSync(dir, { recursive: true });
 		const name = `${Date.now()}-${randomUUID()}`;

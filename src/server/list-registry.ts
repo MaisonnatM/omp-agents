@@ -5,7 +5,6 @@ import type { PinChange } from "../shared/pins";
 import type { PreferenceChange } from "../shared/preferences";
 import type { ServerMsg } from "../shared/protocol";
 import type { ReviewDraftEdit } from "../shared/review-drafts";
-import type { RouterTaskChange } from "../shared/router";
 import type { TrustChange } from "../shared/project-trust";
 import type { ScheduledChange } from "../shared/scheduled";
 import type { WorkspaceChange } from "../shared/workspaces";
@@ -24,7 +23,6 @@ interface ListChanges {
 	"review-drafts": ReviewDraftEdit;
 	preferences: PreferenceChange;
 	bots: Exclude<BotChange, { op: "message" }>;
-	"router-tasks": RouterTaskChange;
 }
 
 /** The lists only the server changes, through actions of their own: the bell's notices, the queued merges, and the personal memory. */

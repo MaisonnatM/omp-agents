@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { lineCommentsBlocked } from "../../../pull-requests-model";
 import { useRead } from "../../../reads";
 import { hashForPullRequestFiles } from "../../../routing";
-import { AskAboutSelection } from "../../ask-about-selection";
 import { type DiffReview, DiffReviewContext } from "../../changes/diff-review";
 import { useCollapsedFiles } from "../../changes/diff-stack";
 import { useDashboardActions, useDashboardStatus } from "../../dashboard-context";
@@ -81,25 +80,23 @@ export function Code({ pr, detail, placement, path, version }: CodeProps) {
 			) : files.length === 0 ? (
 				<p className="m-auto p-6 text-sm text-muted-foreground">This {commit ? "commit" : "pull request"} has no file changes.</p>
 			) : (
-				<AskAboutSelection origin={{ source: `pull request ${pr.owner}/${pr.repo}#${pr.number} “${detail.title}”`, sendToSession: null }}>
-					<DiffReviewContext.Provider value={review}>
-						<CodeControlsContext.Provider value={controls}>
-							<ViewedFilesContext.Provider value={viewedFiles}>
-								<CodeFiles
-									key={commit ?? "all"}
-									files={files}
-									path={placement === "page" ? path : sidebarPath}
-									{...(placement === "page" ? { hrefFor: (file: string) => hashForPullRequestFiles(pr, file) } : { onPick: setSidebarPath })}
-									fileUrl={file => `/api/pull-request/file?${query}&path=${encodeURIComponent(file)}`}
-									version={String(version ?? 0)}
-									treeOpen={preferences.treeOpen}
-									collapsed={collapsed}
-									onCollapse={onCollapse}
-								/>
-							</ViewedFilesContext.Provider>
-						</CodeControlsContext.Provider>
-					</DiffReviewContext.Provider>
-				</AskAboutSelection>
+				<DiffReviewContext.Provider value={review}>
+					<CodeControlsContext.Provider value={controls}>
+						<ViewedFilesContext.Provider value={viewedFiles}>
+							<CodeFiles
+								key={commit ?? "all"}
+								files={files}
+								path={placement === "page" ? path : sidebarPath}
+								{...(placement === "page" ? { hrefFor: (file: string) => hashForPullRequestFiles(pr, file) } : { onPick: setSidebarPath })}
+								fileUrl={file => `/api/pull-request/file?${query}&path=${encodeURIComponent(file)}`}
+								version={String(version ?? 0)}
+								treeOpen={preferences.treeOpen}
+								collapsed={collapsed}
+								onCollapse={onCollapse}
+							/>
+						</ViewedFilesContext.Provider>
+					</CodeControlsContext.Provider>
+				</DiffReviewContext.Provider>
 			)}
 		</>
 	);

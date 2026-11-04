@@ -6,6 +6,10 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-11-04
 
 - Bots can now message each other: one Bot hands work to another, which wakes up, does it, and can answer back. The message shows as a card with the sender's face in the other Bot's conversation, and as Messaged and the other Bot's name in the sender's. One Bot can send another at most 20 messages an hour, so two Bots cannot keep answering each other forever.
+- Replay from here and Compare replay are gone from the trajectory and the pane header.
+- Behind the scenes: the starter kit no longer includes the request log, which saved every request sent to a model so a turn could be replayed.
+- Ask about this is gone. Selecting text in a conversation, a past session, or a pull request's code no longer offers a side discussion.
+- Bots no longer offer the Router type or its Tasks tab. A Router you saved before this update no longer shows, and your other Bots load as before.
 - The starter kit's project memory tool can now read and write another repository's memory, so one session, such as a Bot that reviews every project's sessions, keeps each repository's memory up to date.
 - When updating omp from its notice installs omp's standalone app but leaves behind the copy your sessions run, the notice now says so and names the command that updates that copy, instead of omp's own success message.
 - Personal no longer shows up among your workspaces, in the directory picker or in the sidebar's workspace picker. Open a personal session from **Personal** in the sidebar or with Cmd+Shift+P.

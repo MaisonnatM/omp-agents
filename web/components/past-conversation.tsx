@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import type { StartOf } from "../starts";
 import type { ForkPoint } from "../transcript-view";
 import { pastLabel, SOURCE_LABELS } from "../labels";
-import { AskAboutSelection } from "./ask-about-selection";
 import { Header } from "./page-header";
 import { SessionIdCopy, SessionMeta } from "./session-meta";
 import { SessionTitle } from "./session-title";
@@ -82,11 +81,9 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 					</p>
 				)}
 				{trajectory && !foreign ? (
-					<Trajectory view={view} replayable />
+					<Trajectory view={view} />
 				) : (
-					<AskAboutSelection origin={{ source: session ? `past session “${title}”` : "a past session", sendToSession: null }}>
-						<Transcript view={view} working={false} fork={foreign ? null : fork} onFork={foreign ? undefined : onFork} changes={changes} />
-					</AskAboutSelection>
+					<Transcript view={view} working={false} fork={foreign ? null : fork} onFork={foreign ? undefined : onFork} changes={changes} />
 				)}
 			</div>
 		</MessageScrollerProvider>

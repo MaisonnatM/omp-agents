@@ -46,7 +46,7 @@
   It is greyed out when the directory has no skill of that name, and the session then starts without it.
   A first message that starts with `/` keeps its own skill or command and skips the pinned skill, so the toggle hides while the message starts that way.
 - **Private**, the pill at the right of the page header, starts a session that is deleted with everything it wrote when it ends: its transcript, its subagents, its prompts in omp's history, its title, and its pins.
-  It never shows under the past sessions, never resumes, and cannot be forked or replayed, and omp's memory and autolearn stay off for it.
+  It never shows under the past sessions, never resumes, and cannot be forked, and omp's memory and autolearn stay off for it.
   While it is on, the pill fills dark, the composer gets a dark outline, and the starters give way to what ending deletes and what stays: files it changes and commits it makes stay in the project, and a personal one keeps its memory.
   A private session shows a dark **Private** chip in its sidebar row and its header.
   It ends when its omp process stops, whether through **End session**, `end_session`, or a crash; a dashboard that was not running then deletes it at its next start.
@@ -88,7 +88,7 @@
   A session whose omp process exited mid-turn, for example because the computer restarted, resumes too: omp records the interrupted turn first, as it does in a terminal.
   If another omp process still writes the file, omp writes the resumed session's entries to a new file instead of mixing the two.
   The past sessions then list both files, and **Resume** on the older one opens the newer one, which holds its whole conversation and what came after, as `omp --resume` does; it says the session is already running while the newer one runs.
-  **Fork from here** and **Replay from here** read the file the pane shows.
+  **Fork from here** reads the file the pane shows.
 - Every commit an omp session makes carries an `Omp-Session: <session id>` trailer, from `~/.omp/agent/extensions/session-trailer.ts`, which `bun run omp-template` installs.
   `git log --format='%h %(trailers:key=Omp-Session,valueonly)'` lists each commit's session, and `omp -r <session id>` or **Resume** on that session reopens it.
 - Click **Fork from here** under a prompt or a turn's last reply to start a dashboard session that holds the conversation up to that point, as omp's `/branch` does.

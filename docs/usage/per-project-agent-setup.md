@@ -14,7 +14,7 @@ TypeScript slash commands are the exception: yours wins, and omp logs the clash.
 
 Extensions, hooks, tools, TypeScript slash commands, MCP servers, settings, and language server settings are code, or start code, with your permissions.
 Before the dashboard starts a session in a project with any of these, it checks that you trusted each piece.
-A new session, a fork, a replay, a resume, a pull request checkout, and a Bot's, routine's, or scheduled send's start all check.
+A new session, a fork, a resume, a pull request checkout, and a Bot's, routine's, or scheduled send's start all check.
 Skills, agents, rules, markdown commands, and context files are prompt text, so a project with only those never asks.
 
 When a piece is untrusted, the start does not happen and the **Trust this project's agent code?** dialog opens.

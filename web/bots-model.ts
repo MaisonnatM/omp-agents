@@ -2,7 +2,6 @@
 import type { Routine } from "../src/routines";
 import { DESIGNER_JOB, DESIGNER_NAME } from "../src/shared/bot-designer";
 import { type Bot, type BotChange, type BotId, type BotKind, type BotLast, jobLine } from "../src/shared/bots";
-import { ROUTER_JOB, ROUTER_NAME } from "../src/shared/router";
 import { SHEPHERD_JOB, SHEPHERD_NAME } from "../src/shared/shepherd";
 import type { HostStatus, RosterHost, View } from "../src/shared/sessions";
 import { needsYou } from "./attention";
@@ -250,7 +249,6 @@ export const BOT_KIND_START: Record<BotKind, BotKindStart> = {
 	"bot-designer": { name: DESIGNER_NAME, job: DESIGNER_JOB, hint: "How it designs your Bots. Edit it to fit how you like them.", templates: [] },
 	routines: { name: "", job: "", hint: "Optional. Leave it empty and tell it in your first message.", templates: JOB_TEMPLATES },
 	"pr-shepherd": { name: SHEPHERD_NAME, job: SHEPHERD_JOB, hint: "Its rules. Edit them to fit how you merge.", templates: [] },
-	router: { name: ROUTER_NAME, job: ROUTER_JOB, hint: "Its rules. Edit them to fit how you hand off work.", templates: [] },
 };
 
 /** What the New Bot form holds of the Bot's type, name, and job. */

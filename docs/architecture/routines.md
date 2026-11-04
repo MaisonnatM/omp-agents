@@ -106,10 +106,6 @@ Every server learns its sightings, but only the server that owns routines fires 
 Otherwise the runs stay queued for the next tick at a full wake, and news for a routine whose triggered run is still queued joins that run, up to 10 events, through `RoutinesFile.addTriggerEvents`, so a night of dark wakes starts one run.
 A run is keyed by its time, so a claim lands at least a millisecond after the routine's newest run.
 A routine whose schedules are all weekly hears its triggers only on the weekdays they name, by `triggersOn`, so a weekdays-only routine ignores weekend news; one with no schedule or an interval hears them every day.
-Before any routine claims, the runner's `screen`, a `RoutineScreen`, takes for each Bot, once and all Bots at a time, the events any of its routines watches, and returns the ones they should still run on; each routine then claims with the ones it watches, and one left with none claims nothing.
-Without a screen the runner uses `EVERY_EVENT`, which passes every event and adds nothing to a prompt.
-The `Dashboard`'s screen is `RouterEvents`, which drops a Router's chatter and hands an event a Router's task follows to that task's session at once, even in a dark wake, where that session's turn may stall until the next full wake; every other Bot's events pass unchanged; see [Bots](bots.md#routers).
-The screen also adds to a prompt run's prompt as the drain sends it, so a Router's message names each event's follow and how many messages its rules dropped.
 A prompt run carries the events in the trailing JSON stamp rather than fenced trigger prose.
 A command gets the events as a JSON list in the `ROUTINE_TRIGGERS` environment variable, `[]` for a scheduled run or **Run now**, which `runShell` sets beside the server's environment.
 Each event carries its kind, a title, a detail of at most 2,000 characters, and a link when it has one.

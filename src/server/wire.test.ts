@@ -4,7 +4,6 @@ import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest } from "../shared/sessions";
 import type { RoutineSpec, Schedule } from "../routines";
 import type { BotId } from "../shared/bots";
-import { MAX_DISCUSSION_QUOTE, MAX_DISCUSSION_SOURCE, MAX_DISCUSSION_TURNS } from "../shared/discussions";
 import { MAX_CAPTURE_ID } from "../shared/dictation";
 import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
@@ -408,26 +407,6 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "rename-session", sessionId: "s1", title: "  Billing migration \n" })).toEqual({ t: "rename-session", sessionId: "s1", title: "Billing migration" });
 		expect(msg({ t: "rename-session", sessionId: "s1", title: " \n " })).toBeNull();
 		expect(msg({ t: "rename-session", sessionId: "", title: "Billing" })).toBeNull();
-	});
-
-	test("discuss needs a counter id and a passage, its source, and a question within their lengths", () => {
-		const request = { source: "session “Fix login”", quote: "ttl: 0", turns: [{ question: "What is ttl?", answer: "How long a token stays cached." }], question: "Why zero?" };
-		const ask = { t: "discuss" as const, id: 2, request };
-		expect(msg(ask)).toEqual(ask);
-		expect(msg({ ...ask, request: { ...request, extra: true } })).toEqual(ask);
-		expect(msg({ ...ask, id: -1 })).toBeNull();
-		expect(msg({ ...ask, id: 1.5 })).toBeNull();
-		expect(msg({ ...ask, request: { ...request, question: "  " } })).toBeNull();
-		expect(msg({ ...ask, request: { ...request, quote: "x".repeat(MAX_DISCUSSION_QUOTE + 1) } })).toBeNull();
-		expect(msg({ ...ask, request: { ...request, source: "x".repeat(MAX_DISCUSSION_SOURCE + 1) } })).toBeNull();
-		expect(msg({ ...ask, request: { ...request, turns: [{ question: "What is ttl?", answer: "" }] } })).toBeNull();
-		expect(msg({ ...ask, request: { ...request, turns: Array.from({ length: MAX_DISCUSSION_TURNS + 1 }, () => request.turns[0]) } })).toBeNull();
-		expect(msg({ ...ask, request: { ...request, turns: undefined } })).toBeNull();
-	});
-
-	test("discuss-stop names the question it stops", () => {
-		expect(msg({ t: "discuss-stop", id: 2 })).toEqual({ t: "discuss-stop", id: 2 });
-		expect(msg({ t: "discuss-stop", id: "2" })).toBeNull();
 	});
 
 	test("dictation-start needs a capture id within omp's length and a directory", () => {
@@ -954,17 +933,6 @@ describe("parseMcpServerAdd", () => {
 		expect(parseMcpServerAdd({ ...server, header: { name: "Authorization", value: " Bearer k " } })).toMatchObject({ ok: { header: { name: "Authorization", value: "Bearer k" } } });
 		expect(parseMcpServerAdd({ ...server, header: { name: "Bad Name", value: "k" } })).toEqual({ error: "Enter the header's name, such as Authorization." });
 		expect(parseMcpServerAdd({ ...server, header: { name: "X-Api-Key", value: " " } })).toEqual({ error: "Enter the header's value." });
-	});
-});
-
-describe("replay start requests", () => {
-	const start = { t: "start", reqId: 7, kind: "replay", view: { kind: "past", sessionId: "source" }, token: "pinned-source", model: { provider: "openai-codex", id: "gpt-5.6-sol" }, thinking: "low", prompt: null } as const;
-	test("keeps explicit choices and the server-owned source token", () => {
-		expect(msg(start)).toEqual(start);
-		expect(msg({ ...start, prompt: "edited" })).toEqual({ ...start, prompt: "edited" });
-	});
-	test("rejects malformed tokens, settings, and views instead of accepting a raw source path", () => {
-		for (const change of [{ token: null }, { token: "" }, { thinking: 3 }, { prompt: {} }, { model: { provider: "openai-codex" } }, { view: { file: "/arbitrary/source.jsonl" } }]) expect(msg({ ...start, ...change })).toBeNull();
 	});
 });
 

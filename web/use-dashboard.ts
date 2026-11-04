@@ -11,7 +11,6 @@ import { openSocket, putJson } from "./api";
 import { type OpenBot, openBot as findOpenBot } from "./bots-model";
 import { clearDraft, liveDraftKey, newDraftKey, putDraft } from "./composer-drafts";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
-import { applyDiscussionMessage, discussionDisconnected } from "./discussions";
 import { applyDictationMessage, dictationDisconnected } from "./dictation";
 import { applyPaneMessage, retainPanes, retainTrajectories, useShownConversations, useShownTrajectories } from "./pane-store";
 import { DEFAULT_SPLIT_RATIOS, type SplitAxis, type SplitRatios } from "./pane-navigation";
@@ -264,7 +263,6 @@ export function useDashboard(): Dashboard {
 					case "routines":
 					case "bots":
 					case "personal":
-					case "router-tasks":
 					case "scheduled":
 					case "workspaces":
 					case "project-trust":
@@ -280,9 +278,6 @@ export function useDashboard(): Dashboard {
 						else waiting?.reject(new Error(msg.error));
 						return;
 					}
-					case "discussion":
-						applyDiscussionMessage(msg);
-						return;
 					case "dictation":
 						applyDictationMessage(msg);
 						return;
@@ -303,7 +298,6 @@ export function useDashboard(): Dashboard {
 			};
 			ws.onclose = () => {
 				if (disposed) return;
-				discussionDisconnected();
 				dictationDisconnected();
 				dispatch({ t: "connected", connected: false });
 				timer = window.setTimeout(connect, retryMs);
