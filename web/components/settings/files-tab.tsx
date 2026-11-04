@@ -1,14 +1,17 @@
-/** The Settings Files section: omp's config files by group, each viewed and edited in place (`Files`). */
+/** The Settings Files section: omp's config files as folders, each viewed and edited in place (`Files`). */
 import { useState, type ReactNode } from "react";
+import { everyWord } from "../../../src/shared/every-word";
 import type { FileEdit, OmpFile, OmpSettings, ReadOnlyFile } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { putJson, settingsUrl } from "../../api";
+import { fileTree, foldersAbove } from "../../changes-model";
 import type { Editable } from "../../editable-read";
-import { FILE_KIND_LABELS, fileGroups, fileName, formatBytes } from "../../labels";
+import { formatBytes } from "../../labels";
+import { FolderRows, indentOf } from "../folder-rows";
 import { SearchField } from "../search-field";
-import { EditBar, type Editing, RAIL_BUTTON, SaveError, useEditor, writeOrReload } from "./editor";
+import { EditBar, type Editing, SaveError, useEditor, writeOrReload } from "./editor";
 
 function FileContents({ file }: { file: ReadOnlyFile }) {
 	const { body } = file;
@@ -131,11 +134,18 @@ function EditableFileView<R>({ file, saver }: { file: Pick<OmpFile, "path" | "pa
 	);
 }
 
-/** A rail of files by group, narrowed by a filter, with the open one marked; Settings › Files and a file store of omp memory. */
+/** A file's place in a {@link FileRail}: a skill's file is always SKILL.md, so its directory names it. */
+const railPath = (path: string): string => path.replace(/\/SKILL\.md$/, "");
+
+/**
+ * A rail of files as folders, narrowed by a filter on their names, with the open one marked; Settings › Files and a file store of omp memory.
+ * Folders start closed except those above the open file, which open again when another file opens; a filter opens every folder.
+ */
 export function FileRail<F extends Pick<OmpFile, "path" | "pathDisplay">>({
 	label,
 	filtered,
-	groupsOf,
+	files,
+	pathOf,
 	open,
 	onSelect,
 	children,
@@ -144,69 +154,87 @@ export function FileRail<F extends Pick<OmpFile, "path" | "pathDisplay">>({
 	label: string;
 	/** Whether the rail shows its filter. */
 	filtered: boolean;
-	/** The files a filter leaves, by group heading. */
-	groupsOf: (query: string) => [string, F[]][];
+	files: F[];
+	/** Where a file sits in the rail, its folders joined by `/`. */
+	pathOf: (file: F) => string;
 	open: F;
 	onSelect: (path: string) => void;
-	/** A file's entry in the rail. */
-	children: (file: F) => ReactNode;
+	/** A file's entry in the rail, given the name the rail lists it by. */
+	children: (file: F, name: string) => ReactNode;
 }) {
 	const [query, setQuery] = useState("");
-	const groups = groupsOf(query);
+	const entries = files.map(file => {
+		const path = railPath(pathOf(file));
+		return { path, name: path.slice(path.lastIndexOf("/") + 1), file };
+	});
+	const all = fileTree(entries);
+	const openPath = railPath(pathOf(open));
+	const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set(foldersAbove(all, openPath)));
+	const [revealed, setRevealed] = useState(openPath);
+	if (revealed !== openPath) {
+		setRevealed(openPath);
+		setExpanded(new Set([...expanded, ...(foldersAbove(all, openPath) ?? [])]));
+	}
+	const matches = everyWord(query);
+	const tree = query ? fileTree(entries.filter(entry => matches(entry.name))) : all;
+	const toggle = (path: string): void =>
+		setExpanded(prev => {
+			const next = new Set(prev);
+			if (!next.delete(path)) next.add(path);
+			return next;
+		});
 	return (
-		<nav aria-label={label} className="space-y-4">
+		<nav aria-label={label} className="space-y-2">
 			{filtered && <SearchField label={`Filter ${label}`} placeholder="Filter" query={query} onQuery={setQuery} className="min-w-0 flex-1" />}
-			{groups.length === 0 && <p className="px-2 text-sm text-muted-foreground">No file matches.</p>}
-			{groups.map(([heading, group]) => (
-				<div key={heading} className="space-y-1">
-					<h4 className="flex items-baseline gap-2 px-2 text-xs font-medium text-muted-foreground">
-						{heading}
-						{group.length > 1 && <span className="tabular-nums">{group.length}</span>}
-					</h4>
-					<ul>
-						{group.map(file => (
+			{tree.dirs.length + tree.files.length === 0 ? (
+				<p className="px-2 text-sm text-muted-foreground">No file matches.</p>
+			) : (
+				<ul className="text-sm">
+					<FolderRows
+						dir={tree}
+						depth={0}
+						isShut={path => !query && !expanded.has(path)}
+						onToggle={toggle}
+						file={({ name, file }, depth) => (
 							<li key={file.path}>
 								<Tooltip content={file.pathDisplay}>
 									<button
 										type="button"
 										aria-current={file === open ? "true" : undefined}
 										onClick={() => onSelect(file.path)}
-										className={cn(RAIL_BUTTON, file === open && "bg-muted font-medium")}
+										className={cn(
+											"flex w-full items-baseline gap-2 rounded-md py-0.5 pr-2 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+											file === open && "bg-muted font-medium",
+										)}
+										style={{ paddingLeft: indentOf(depth, true) }}
 									>
-										{children(file)}
+										{children(file, name)}
 									</button>
 								</Tooltip>
 							</li>
-						))}
-					</ul>
-				</div>
-			))}
+						)}
+					/>
+				</ul>
+			)}
 		</nav>
 	);
 }
 
 /**
  * Authored files only: package-owned files are previewed through their owning library.
- * The page holds `selected`, so another section can open a file here.
+ * The page holds `selected`, so another section can open a file here; the user's context file opens first.
  */
 export function Files({ files: allFiles, editing, selected, onSelect }: { files: OmpFile[]; editing: Editing; selected: string | null; onSelect: (path: string) => void }) {
 	const files = allFiles.filter(file => !file.packaged);
-	const all = fileGroups(files, "");
-	const open = files.find((file) => file.path === selected) ?? all[0]?.[1][0];
+	const open = files.find(file => file.path === selected) ?? files.find(file => file.kind === "context") ?? files[0];
 	if (!open) return <p className="text-sm text-muted-foreground">omp found no files.</p>;
 	return (
 		<div className="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
-			<FileRail
-				label="omp files"
-				filtered
-				groupsOf={query => fileGroups(files, query).map(([kind, group]) => [FILE_KIND_LABELS[kind], group])}
-				open={open}
-				onSelect={onSelect}
-			>
-				{file => (
+			<FileRail label="omp files" filtered files={files} pathOf={file => file.pathDisplay} open={open} onSelect={onSelect}>
+				{(file, name) => (
 					<>
-						<span className={cn("truncate", file.body.state !== "read" && "text-muted-foreground")}>{fileName(file)}</span>
-						<span className="ml-auto shrink-0 text-xs text-muted-foreground">{file.body.state === "missing" ? "missing" : file.scope === "project" ? "project" : ""}</span>
+						<span className={cn("truncate", file.body.state !== "read" && "text-muted-foreground")}>{name}</span>
+						{file.body.state === "missing" && <span className="ml-auto shrink-0 text-xs text-muted-foreground">missing</span>}
 					</>
 				)}
 			</FileRail>

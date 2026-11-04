@@ -42,9 +42,9 @@ export function folderTree<T extends { path: string }>(files: readonly T[]): Tre
 	return settle(root);
 }
 
-/** The changes explorer's tree: {@link folderTree}, where a folder holding one folder and no file joins it. */
-export function fileTree(files: readonly ChangedEntry[]): TreeDir {
-	const joined = (dir: TreeDir): TreeDir => {
+/** {@link folderTree}, where a folder holding one folder and no file joins it; the changes explorer's tree and the settings file rails'. */
+export function fileTree<T extends { path: string } = ChangedEntry>(files: readonly T[]): TreeDir<T> {
+	const joined = (dir: TreeDir<T>): TreeDir<T> => {
 		const dirs = dir.dirs.map(joined).sort((a, b) => a.name.localeCompare(b.name));
 		const only = dirs[0];
 		if (dir.name && dir.files.length === 0 && dirs.length === 1 && only) return { ...only, name: `${dir.name === "/" ? "" : dir.name}/${only.name}` };
@@ -57,7 +57,7 @@ export function fileTree(files: readonly ChangedEntry[]): TreeDir {
 export const treeOrder = (dir: TreeDir): ChangedEntry[] => [...dir.dirs.flatMap(treeOrder), ...dir.files];
 
 /** The paths of the folders that hold `path`, outermost first, which must be open for its row to show; `null` when no folder holds it. */
-export function foldersAbove(dir: TreeDir, path: string): string[] | null {
+export function foldersAbove<T extends { path: string }>(dir: TreeDir<T>, path: string): string[] | null {
 	if (dir.files.some(file => file.path === path)) return [];
 	for (const child of dir.dirs) {
 		const above = foldersAbove(child, path);
