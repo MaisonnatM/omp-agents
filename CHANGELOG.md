@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-04
+
+- The starter kit now sends agents to the review steps before they mark a pull request ready or merge it, so they stop running into the review check first.
+
 ## 2026-11-03
 
 - Sessions started by Fix CI, Fix CI and conflicts, Resolve conflicts, and Address comments now end themselves once the fix is pushed. A session that could not finish stays open and says what is left.
