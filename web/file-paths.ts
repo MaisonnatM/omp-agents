@@ -34,7 +34,7 @@ export function isAbsolutePath(path: string): boolean {
 
 /**
  * The path the server reads for `path`: as it is when absolute or `~/`, else resolved against `base`, the session's
- * directory or the open file's; `null` without one.
+ * directory or the open file's, and still `~/` when `base` is; `null` without one.
  */
 export function absoluteFilePath(path: string, base: string | null): string | null {
 	if (isAbsolutePath(path)) return path;
@@ -44,7 +44,7 @@ export function absoluteFilePath(path: string, base: string | null): string | nu
 		if (segment === "..") segments.pop();
 		else if (segment !== "" && segment !== ".") segments.push(segment);
 	}
-	return `/${segments.join("/")}`;
+	return base.startsWith("~/") ? segments.join("/") : `/${segments.join("/")}`;
 }
 
 /** Where a relative path in a text starts: `dir`, and the session whose text it is, `null` for a file's text. */

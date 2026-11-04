@@ -158,7 +158,8 @@
   A skill shows as its directory's name in its `skills` folder, and a folder holding only one folder joins it, such as `.omp/agent`.
   Folders start closed except those holding the open file, and opening a file from another section opens its folders.
   The field above the list narrows it to the files whose name holds every word typed and opens every folder; Escape clears it.
-  Select a file to read its content, and choose **Edit** to change it in place (**Create** for a file marked `missing`).
+  Select a file to read it: Markdown renders as the agent's messages do, under its frontmatter's keys and values, and **Source** next to **Preview** shows its text; any other file shows as numbered lines that wrap, colored by its type.
+  Choose **Edit** to change the file in place (**Create** for a file marked `missing`).
   Save with the button or with Cmd+S. If the file changed on disk after the page read it, the save is refused and your edits stay in the editor, so you can copy them before you load the file from disk.
   A `.yml`, `.yaml`, or `.json` file must parse before it saves, and a settings file must hold a mapping.
   `~/.omp/agent/AGENTS.md` and `~/.omp/agent/config.yml` appear even before they exist, marked `missing`.

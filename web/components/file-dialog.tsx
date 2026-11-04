@@ -5,13 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
 import { mediaSrc } from "../api";
-import { type FileBase, type FileTarget, linkedFile, mediaFileUrl, textFileUrl } from "../file-paths";
+import { type FileTarget, linkedFile, mediaFileUrl, textFileUrl } from "../file-paths";
 import { parseDelimited } from "../delimited";
 import { formatBytes } from "../labels";
 import { useRead } from "../reads";
 import { useCopy } from "../use-copy";
-import { FileBaseContext } from "./file-link";
-import { MessageMarkdown } from "./message-markdown";
+import { MarkdownDocument } from "./file-text";
 import { LoadNote } from "./sheet-details";
 import { ViewerDialog } from "./viewer-dialog";
 import { useZoom, type Zoom } from "./zoom-pane";
@@ -128,16 +127,7 @@ function TextFileDialog({ target, onClose }: { target: FileTarget; onClose: () =
 }
 
 function FileBody({ file, look }: { file: TextFile; look: Look }) {
-	const base = useMemo((): FileBase => ({ dir: file.path.slice(0, file.path.lastIndexOf("/")), session: null }), [file.path]);
-	if (look === "markdown") {
-		return (
-			<FileBaseContext.Provider value={base}>
-				<article className="px-5 py-3 text-sm leading-relaxed">
-					<MessageMarkdown text={file.text} />
-				</article>
-			</FileBaseContext.Provider>
-		);
-	}
+	if (look === "markdown") return <MarkdownDocument text={file.text} dir={file.path.slice(0, file.path.lastIndexOf("/"))} className="px-5 py-3" />;
 	if (look === "tsv" || look === "csv") return <Table text={file.text} separator={look === "tsv" ? "\t" : ","} />;
 	return <pre className="p-4 font-mono text-xs leading-relaxed whitespace-pre">{file.text}</pre>;
 }

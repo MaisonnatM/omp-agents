@@ -7,7 +7,8 @@
   `web/loaded-once.ts` holds `loadedOnce` and `useLoaded`, a value a dynamic import makes, loaded once on first need, which the grammars and `web/components/raw-html.ts`'s raw HTML plugins use.
 - `web/todos-card-subagents-model.ts`: `subagentTree`, the subagents the Todos card's **Subagents** section lists for a view, the descendants of the session's main agent or of one subagent, depth first with each one's depth, siblings in the order the host lists them.
 - `web/file-paths.ts`: which paths in agent text name a text file, an image, or a video (`linkedFile`), the absolute path each resolves to, and the `figure` that `remarkFilePaths` ends the text with, listing the images and videos it names.
-  `web/delimited.ts` parses a TSV or CSV file into rows.
+  `web/delimited.ts` parses a TSV or CSV file into rows, and `web/frontmatter.ts` (`splitFrontmatter`) a Markdown file's frontmatter into the keys and values shown above its text.
+  `web/components/file-text.tsx` shows a text file for reading: `MarkdownDocument` renders Markdown under its frontmatter, which the file dialog and Settings › Files share, and `CodeText` shows any other file as numbered, wrapping, colored lines.
   `web/components/file-link.tsx` holds the link that opens such a path, `web/components/local-media.tsx` the image or video shown in place and the thumbnails under the text, and `web/components/file-dialog.tsx` the dialog that shows the file, an image or video large.
   `MessageMarkdown` opens the images of agent text, and of a pull request's Markdown, through `Openable` and `useMarkdownImages` in `web/components/markdown-images.tsx`: a click shows one in `ImageViewer` with the text's other images, in place or under it, a step away.
   That dialog and `FileChangesDialog` in `changed-files-section.tsx` share `ViewerDialog` from `web/components/viewer-dialog.tsx`: the header with its actions and close button, and the body that takes focus and scrolls, or, given a `Zoom`, zooms.

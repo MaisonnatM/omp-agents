@@ -9,30 +9,61 @@ import { putJson, settingsUrl } from "../../api";
 import { fileTree, foldersAbove } from "../../changes-model";
 import type { Editable } from "../../editable-read";
 import { formatBytes } from "../../labels";
+import { CodeText, isMarkdownPath, MarkdownDocument } from "../file-text";
 import { FolderRows, indentOf } from "../folder-rows";
 import { SearchField } from "../search-field";
 import { EditBar, type Editing, SaveError, useEditor, writeOrReload } from "./editor";
 
-function FileContents({ file }: { file: ReadOnlyFile }) {
+/** Where the file's relative links resolve: its directory. */
+const dirOf = (path: string): string => path.slice(0, path.lastIndexOf("/"));
+
+function FileContents({ file, source }: { file: ReadOnlyFile; source: boolean }) {
 	const { body } = file;
-	return body.state === "read" ? (
-		<pre
-			tabIndex={0}
-			aria-label={`Contents of ${file.pathDisplay}`}
-			className="max-h-[70vh] overflow-auto rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring"
-		>
-			{body.text || <span className="text-muted-foreground">The file is empty.</span>}
-		</pre>
-	) : (
+	if (body.state === "read" && body.text !== "") {
+		return isMarkdownPath(file.pathDisplay) && !source ? (
+			<div
+				tabIndex={0}
+				aria-label={`Contents of ${file.pathDisplay}`}
+				className="max-h-[70vh] overflow-auto rounded-lg border border-border px-6 py-5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			>
+				<MarkdownDocument text={body.text} dir={dirOf(file.pathDisplay)} className="max-w-[75ch]" />
+			</div>
+		) : (
+			<CodeText text={body.text} path={file.pathDisplay} className="max-h-[70vh]" />
+		);
+	}
+	return (
 		<p
 			className={cn(
 				"rounded-md border border-dashed border-border px-3 py-6 text-center text-sm",
 				body.state === "unreadable" ? "text-red-600 dark:text-red-400" : "text-muted-foreground",
 			)}
 		>
-			{body.state === "missing" ? "This file does not exist yet. omp reads it from this path once you create it." : `Cannot read this file: ${body.error}`}
+			{body.state === "read"
+				? "The file is empty."
+				: body.state === "missing"
+					? "This file does not exist yet. omp reads it from this path once you create it."
+					: `Cannot read this file: ${body.error}`}
 		</p>
 	);
+}
+
+/** Whether a Markdown file shows its source rather than rendered, and the Preview and Source buttons that switch it; other files show only their source. */
+function useSourceView(file: ReadOnlyFile): { source: boolean; toggle: ReactNode } {
+	const [source, setSource] = useState(false);
+	if (file.body.state !== "read" || file.body.text === "" || !isMarkdownPath(file.pathDisplay)) return { source: false, toggle: null };
+	return {
+		source,
+		toggle: (
+			<div role="group" aria-label="Show the file as" className="flex items-center gap-0.5">
+				{[false, true].map(option => (
+					<Button key={String(option)} variant="ghost" size="xs" active={source === option} aria-pressed={source === option} onClick={() => setSource(option)}>
+						{option ? "Source" : "Preview"}
+					</Button>
+				))}
+			</div>
+		),
+	};
 }
 
 /** Where a {@link FileView} saves: `save` sends the edit, `write` sends it in turn with the section's other saves, `reload` re-reads after a conflict. */
@@ -62,7 +93,7 @@ function FileFrame({ file, controls, children }: { file: ReadOnlyFile; controls?
 						</>
 					)}
 				</p>
-				{controls}
+				<div className="flex shrink-0 items-center gap-2">{controls}</div>
 			</div>
 			{children}
 		</div>
@@ -73,12 +104,15 @@ function FileFrame({ file, controls, children }: { file: ReadOnlyFile; controls?
 export function FileView<R>(
 	props: { file: ReadOnlyFile; readOnly: true } | { file: Pick<OmpFile, "path" | "pathDisplay" | "body">; saver: FileSaver<R>; readOnly?: false },
 ) {
-	return props.readOnly ? (
-		<FileFrame file={props.file}>
-			<FileContents file={props.file} />
+	return props.readOnly ? <ReadOnlyFileView file={props.file} /> : <EditableFileView file={props.file} saver={props.saver} />;
+}
+
+function ReadOnlyFileView({ file }: { file: ReadOnlyFile }) {
+	const view = useSourceView(file);
+	return (
+		<FileFrame file={file} controls={view.toggle}>
+			<FileContents file={file} source={view.source} />
 		</FileFrame>
-	) : (
-		<EditableFileView file={props.file} saver={props.saver} />
 	);
 }
 
@@ -88,14 +122,20 @@ function EditableFileView<R>({ file, saver }: { file: Pick<OmpFile, "path" | "pa
 		writeOrReload(saver, () => saver.save({ path: file.path, text, baseHash: body.state === "read" ? body.hash : null })),
 	);
 	const viewing = editor.state.phase === "viewing";
+	const view = useSourceView(file);
 	const conflict = editor.state.phase === "editing" && editor.state.conflict;
 	return (
 		<FileFrame
 			file={file}
-			controls={body.state !== "unreadable" && <EditBar editor={editor} label={file.pathDisplay} start={body.state === "missing" ? "Create" : "Edit"} />}
+			controls={
+				<>
+					{viewing && view.toggle}
+					{body.state !== "unreadable" && <EditBar editor={editor} label={file.pathDisplay} start={body.state === "missing" ? "Create" : "Edit"} />}
+				</>
+			}
 		>
 			{viewing ? (
-				<FileContents file={file} />
+				<FileContents file={file} source={view.source} />
 			) : (
 				<>
 					<textarea

@@ -13,7 +13,7 @@ const editing: Editing = {
 	},
 };
 
-test("packaged workflows show raw source without an editor or a false metadata heading, while authored workflows stay editable", () => {
+test("packaged workflows render read-only with the frontmatter as properties rather than a heading, while authored workflows stay editable", () => {
 	const text = "---\nname: review\ndescription: Review changes\nmetadata:\n  tags: workflow\n---\n\n# Review changes\n\nRead the diff.\n";
 	const file: OmpFile = {
 		kind: "skill",
@@ -26,9 +26,10 @@ test("packaged workflows show raw source without an editor or a false metadata h
 	const packaged = renderToStaticMarkup(<Workflows workflows={[workflow]} files={[{ ...file, packaged: "review-kit" }]} editing={editing} />);
 	expect(packaged).toContain('href="#settings/extensions"');
 	expect(packaged).toContain('aria-label="Contents of plugins/review/SKILL.md"');
-	expect(packaged).toContain(text);
+	expect(packaged).toMatch(/>description<\/dt><dd[^>]*>Review changes<\/dd>/);
+	expect(packaged).not.toMatch(/<h\d[^>]*>[^<]*(?:description|tags):/);
+	expect(packaged).toContain("<h1>Review changes</h1>");
 	expect(packaged).toContain("Manage package");
-	expect(packaged).not.toContain("<h1>");
 	expect(packaged).not.toContain(">Edit<");
 	const authored = renderToStaticMarkup(<Workflows workflows={[workflow]} files={[file]} editing={editing} />);
 	expect(authored).toContain(">Edit<");
