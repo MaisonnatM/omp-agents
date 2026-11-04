@@ -55,5 +55,5 @@ When a reply presents a plan, the card replaces the **Résumé** of the final-an
 
 - Models: before configuring model roles, reasoning levels, fallback chains, or responding to quota exhaustion, read `~/.omp/agent/docs/model-routing.md`.
   Check `omp usage` at the start of a long session.
-- Reviews: before a thermonuclear or interface review or writing or editing a PR description, read `~/.omp/agent/docs/review-workflow.md`.
+- Reviews: before marking a PR ready, merging one, a thermonuclear or interface review, or writing or editing a PR description, read `~/.omp/agent/docs/review-workflow.md`.
 - Decisions: when you choose between options that would each work, when the user settles a choice, or before you change code a decision record may cover, read `~/.omp/agent/skills/decision-records/SKILL.md`.

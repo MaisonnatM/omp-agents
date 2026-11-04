@@ -41,6 +41,8 @@ const ON_BRANCH = "This session runs in a git worktree on the PR's branch, which
  */
 const CONFLICT_STEPS =
 	"At each stop, list the conflicted files with `git diff --name-only --diff-filter=U`, `read` a file's `:conflicts` before writing `conflict://`, and `git add` each file once it is resolved and formatted. During a rebase `--ours` is the base and `--theirs` is the branch's commit; take a whole side with `git -c core.hooksPath=/dev/null checkout --theirs -- <file>`, since a post-checkout hook can fail the plain command after it took that side. Then continue with `GIT_EDITOR=true gt continue` (or `GIT_EDITOR=true git rebase --continue`) until no commit stops.";
+/** How a session that repairs the PR's branch ends: by itself once the repair is pushed, open while something waits on the user. */
+const END_WHEN_DONE = "Once that is done, end this session with the `end_session` tool, then give your final reply. If anything is left for the user, such as a failure you could not fix or a push that failed, leave the session open and say what.";
 
 /** How a session runs the thermo-nuclear review of `pr`: on the `plan` role, through the kit's reviewer agent. */
 const thermonuclear = (pr: PullRequestSummary): string =>
@@ -53,7 +55,7 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 		description: "Start a session that rebases the branch, resolves its merge conflicts, then fixes the failing checks",
 		applies: pr => ownOpen(pr) && pr.conflicts && pr.checks === "failing",
 		prompt: pr =>
-			`${pullRequestContext(pr)} It has merge conflicts with its base branch (${baseOf(pr)}) and the checks on its latest commit fail. ${ON_BRANCH} First rebase it onto the latest base (restack with \`gt\` when the repository uses Graphite) and resolve every conflict keeping the intent of both sides. ${CONFLICT_STEPS} Then find the failing checks and read their logs ${checkLogs(pr)}. Fix the root cause of each failure that still applies after the rebase, and rerun a failure that is flaky or unrelated to this pull request instead of changing code, saying so. Run the project's checks, then push the branch with \`--force-with-lease\` (or \`gt submit\`).`,
+			`${pullRequestContext(pr)} It has merge conflicts with its base branch (${baseOf(pr)}) and the checks on its latest commit fail. ${ON_BRANCH} First rebase it onto the latest base (restack with \`gt\` when the repository uses Graphite) and resolve every conflict keeping the intent of both sides. ${CONFLICT_STEPS} Then find the failing checks and read their logs ${checkLogs(pr)}. Fix the root cause of each failure that still applies after the rebase, and rerun a failure that is flaky or unrelated to this pull request instead of changing code, saying so. Run the project's checks, then push the branch with \`--force-with-lease\` (or \`gt submit\`). ${END_WHEN_DONE}`,
 		branch: pr => pr.head,
 	},
 	"fix-ci": {
@@ -61,7 +63,7 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 		description: "Start a session that fixes the failing checks",
 		applies: pr => ownOpen(pr) && pr.checks === "failing",
 		prompt: pr =>
-			`${pullRequestContext(pr)} The checks on its latest commit fail. ${ON_BRANCH} Find the failing checks and read their logs ${checkLogs(pr)}. Fix the root cause, run the failing checks locally when you can, then commit and push to the PR's branch. If a failure is flaky or unrelated to this pull request, rerun it instead of changing code, and say so.`,
+			`${pullRequestContext(pr)} The checks on its latest commit fail. ${ON_BRANCH} Find the failing checks and read their logs ${checkLogs(pr)}. Fix the root cause, run the failing checks locally when you can, then commit and push to the PR's branch. If a failure is flaky or unrelated to this pull request, rerun it instead of changing code, and say so. ${END_WHEN_DONE}`,
 		branch: pr => pr.head,
 	},
 	"resolve-conflicts": {
@@ -69,7 +71,7 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 		description: "Start a session that rebases the branch and resolves its merge conflicts",
 		applies: pr => ownOpen(pr) && pr.conflicts,
 		prompt: pr =>
-			`${pullRequestContext(pr)} It has merge conflicts with its base branch (${baseOf(pr)}). ${ON_BRANCH} Rebase it onto the latest base (restack with \`gt\` when the repository uses Graphite) and resolve every conflict keeping the intent of both sides. ${CONFLICT_STEPS} Run the project's checks, and push the branch with \`--force-with-lease\` (or \`gt submit\`).`,
+			`${pullRequestContext(pr)} It has merge conflicts with its base branch (${baseOf(pr)}). ${ON_BRANCH} Rebase it onto the latest base (restack with \`gt\` when the repository uses Graphite) and resolve every conflict keeping the intent of both sides. ${CONFLICT_STEPS} Run the project's checks, and push the branch with \`--force-with-lease\` (or \`gt submit\`). ${END_WHEN_DONE}`,
 		branch: pr => pr.head,
 	},
 	"address-comments": {
@@ -80,7 +82,7 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 			const threads = pr.unresolved.count > 0 ? `${pr.unresolved.exact ? "" : "at least "}${pr.unresolved.count} unresolved review ${pr.unresolved.count === 1 ? "thread" : "threads"}` : null;
 			const requested = pr.review === "changes-requested" ? "a reviewer requested changes" : null;
 			const has = [threads, requested].filter(clause => clause !== null).join(" and ");
-			return `${pullRequestContext(pr)} It has ${has}. ${ON_BRANCH} Read the threads and reviews, fix what is right, commit and push, then reply to each thread with what you changed or why you did not change it, and resolve the threads you fixed.`;
+			return `${pullRequestContext(pr)} It has ${has}. ${ON_BRANCH} Read the threads and reviews, fix what is right, commit and push, then reply to each thread with what you changed or why you did not change it, and resolve the threads you fixed. ${END_WHEN_DONE}`;
 		},
 		branch: pr => pr.head,
 	},
