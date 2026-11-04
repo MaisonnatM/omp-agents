@@ -3,7 +3,7 @@ import { useContext, useState } from "react";
 import type { View } from "../../src/shared/sessions";
 import { SidebarContent, SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
-import { hashForNewSession, sameView } from "../routing";
+import { sameView } from "../routing";
 import type { SidebarSessions } from "../sessions";
 import { isPersonalDir } from "../labels";
 import { shortcutLabels } from "../shortcuts";
@@ -65,7 +65,7 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 				<SidebarMenu aria-label="Start a session">
 					<SidebarMenuItem>
 						<Tooltip content={newSessionLabel} shortcut={shortcutLabels("newSession")} side="right">
-							<SidebarMenuButton icon={Plus} isActive={newSessionOpen !== null && !personalOpen} aria-current={newSessionOpen !== null && !personalOpen ? "page" : undefined} aria-label={newSessionLabel} onClick={openNewSession}>
+							<SidebarMenuButton icon={Plus} isActive={newSessionOpen !== null && !personalOpen} aria-current={newSessionOpen !== null && !personalOpen ? "page" : undefined} aria-label={newSessionLabel} onClick={() => openNewSession()}>
 								{newSessionLabel}
 								<ShortcutChip id="newSession" className="ml-auto" />
 							</SidebarMenuButton>
@@ -73,17 +73,15 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 					</SidebarMenuItem>
 					{personal && (
 						<SidebarMenuItem>
-							<Tooltip content="Start a personal session, for life outside code" side="right">
+							<Tooltip content="Start a personal session, for life outside code" shortcut={shortcutLabels("personalSession")} side="right">
 								<SidebarMenuButton
 									icon={UserRound}
 									isActive={personalOpen}
 									aria-current={personalOpen ? "page" : undefined}
-									onClick={() => {
-										dismissStart("new");
-										location.hash = hashForNewSession(personal.cwdDisplay);
-									}}
+									onClick={() => openNewSession(personal.cwdDisplay)}
 								>
 									Personal
+									<ShortcutChip id="personalSession" className="ml-auto" />
 								</SidebarMenuButton>
 							</Tooltip>
 						</SidebarMenuItem>

@@ -210,7 +210,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 							if (scheduled) save.run(text.trim());
 							else void attachments.read(text, async (prompt, images) => onStart({ ...opOf(prompt), images }));
 						}}
-						placeholder="Message this session…"
+						placeholder={isPersonalDir(cwd, personal) ? "Ask about meals, plans, errands…" : "Message this session…"}
 						files={attachments.files}
 						onFilesChange={attachments.onFilesChange}
 						accept={ATTACH_ACCEPT}

@@ -175,6 +175,7 @@ export function App() {
 		setShortcutsOpen,
 		setNewTicket,
 		openNewSession,
+		personal: state.personal,
 		open,
 		show,
 		navigate,
