@@ -52,6 +52,15 @@ describe("EventInbox", () => {
 		expect(readdirSync(kit.inbox).sort()).toEqual(["1-x.json.invalid", "2-x.json.invalid"]);
 	});
 
+	test("sets aside the removal of another session's event added in the same drain", async () => {
+		const kit = config();
+		writeFileSync(join(kit.inbox, "1-x.json"), JSON.stringify({ op: "add", event: reminder("theirs", "s2") }));
+		writeFileSync(join(kit.inbox, "2-x.json"), JSON.stringify({ op: "remove", id: "theirs", sessionId: "s1" }));
+		await drain(kit);
+		expect(kit.events.value).toEqual([reminder("theirs", "s2")]);
+		expect(readdirSync(kit.inbox)).toEqual(["2-x.json.invalid"]);
+	});
+
 	test("an event the dashboard already keeps is not added twice", async () => {
 		const kit = config();
 		writeFileSync(join(kit.inbox, "1-x.json"), JSON.stringify({ op: "add", event: reminder("a", "s1") }));
