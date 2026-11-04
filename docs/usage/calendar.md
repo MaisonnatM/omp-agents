@@ -18,7 +18,8 @@
   Hover a day, or focus its number, to see all of its entries in a card beside it, each a link like in the day's list.
   Click anywhere in a day's cell to list all of its entries beside the month; today is listed when the page opens.
 - Click an entry to open its routine under its Bot, its todo beside its list, or its ticket; a Google event opens in Google Calendar in your default browser.
-  An event on this computer has no page of its own, so clicking it in a day cell lists its day.
+  A reminder an agent added opens the session that added it.
+  An event you added on this computer has no page of its own, so clicking it in a day cell lists its day.
 - The arrows move a month at a time, the month and year menus jump to any month, and **Today** goes back to the current month.
   Choosing the selected month or year keeps it selected; neither menu clears the calendar's date.
 - **New event**, beside **Today**, or C outside a text field, adds an event on the day listed beside the month, or today when none is.
@@ -28,6 +29,10 @@
   The dialog starts on the calendar you picked last, while it is still offered.
   Enter in the title or Cmd+Enter creates it, and Esc closes the dialog; the month then shows the event and lists its first day.
 - An event on **This computer** stays in `events.json` beside the server's access token, so every window of the app shows it, and nothing leaves this computer.
+- An agent can add a reminder on **This computer** with its `user_event` tool, such as when you ask for one or when its work can only be checked later, like a performance change or a deploy.
+  The reminder shows on this page like an event you added, and its notice comes 10 minutes before it starts.
+  Clicking the reminder, here or in its notice, opens the session that added it.
+  An agent can remove only the reminders its own session added; you can delete any of them here.
 - In the day's list beside the month, an event's trash button deletes it: an event on **This computer**, or a Google event of a calendar you own or may edit.
   It deletes at once, with no confirmation; for a repeating Google event it deletes only that day's repeat.
   An event of a calendar you may only read has no trash button; it opens in Google Calendar.

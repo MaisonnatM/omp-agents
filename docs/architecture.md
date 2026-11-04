@@ -54,6 +54,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
   - [Providers](architecture/http-api-providers.md)
   - [Google Calendar](architecture/http-api-google-calendar.md)
     - [New and local events](architecture/http-api-google-calendar.md#new-and-local-events)
+    - [Agent reminders](architecture/http-api-google-calendar.md#agent-reminders)
   - [Gmail](architecture/http-api-gmail.md)
 - [Front-end components](architecture/front-end-components.md)
   - [Session visuals](architecture/front-end-components.md#session-visuals)
