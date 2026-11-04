@@ -5,7 +5,7 @@ import { SidebarContent, SidebarGroup, SidebarGroupAction, SidebarGroupActions, 
 import { Tooltip } from "@/components/ui/tooltip";
 import { sameView } from "../routing";
 import type { SidebarSessions } from "../sessions";
-import { isPersonalDir } from "../labels";
+import { sameDir } from "../labels";
 import { shortcutLabels } from "../shortcuts";
 import { useStoredKeys } from "../stored-state";
 import { ShortcutChip } from "./kbd";
@@ -30,7 +30,7 @@ interface SessionListProps {
 	open: View[];
 	/** All workspaces are listed, so a titled row names its workspace. */
 	showWorkspace: boolean;
-	/** The open New session draft's directory, "" for the default one; `null` while none is open. */
+	/** The open New session draft's directory; `null` while none is open. */
 	newSessionOpen: string | null;
 	/** The scheduled send whose page is open, highlighted in its group; `null` for none. */
 	scheduledOpen: string | null;
@@ -42,7 +42,7 @@ interface SessionListProps {
 export function SessionList({ lists, query, onQuery, onTogglePin, open, showWorkspace, newSessionOpen, scheduledOpen, newSessionLabel }: SessionListProps) {
 	const { start, dismissStart, openNewSession } = useDashboardActions();
 	const personal = useContext(PersonalContext);
-	const personalOpen = newSessionOpen !== null && isPersonalDir(newSessionOpen, personal);
+	const personalOpen = newSessionOpen !== null && sameDir(newSessionOpen, personal);
 	const { connected, starts: { resumeAll } } = useDashboardStatus();
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
 	const [pastShown, setPastShown] = useState(PAST_PAGE);

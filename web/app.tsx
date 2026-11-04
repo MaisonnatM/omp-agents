@@ -21,7 +21,7 @@ import { DesktopLinkPreview } from "./components/desktop-link-preview";
 import { DiscussionPanel } from "./components/discussion-panel";
 import { FileDialog } from "./components/file-dialog";
 import { textFileUrl } from "./file-paths";
-import { PageSwitch } from "./components/page-switch";
+import { newDraftCwd, PageSwitch } from "./components/page-switch";
 import { NO_PLANS, Plans } from "./components/plan-usage";
 import { useNoticeToasts } from "./components/use-notice-toasts";
 import { RenderBoundary } from "./components/render-boundary";
@@ -244,6 +244,7 @@ export function App() {
 												scope={scope}
 												sessions={sessions}
 												page={page}
+												newDraftDir={page?.kind === "new" ? newDraftCwd(page, state.userTodos, defaultWorkspace) : null}
 												panes={layout.panes}
 												tab={tab}
 												onTab={showTab}

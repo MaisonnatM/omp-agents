@@ -123,15 +123,17 @@ export function PersonalBoard({ cwd, past, memory }: PersonalBoardProps) {
 
 /** A private draft's hero: what ending it deletes, and what stays. */
 export function PrivateHero({ personal }: { personal: boolean }) {
-	const facts: [LucideIcon, string, string][] = [
-		[History, "Not in Past sessions", "It never shows there, and you cannot resume it."],
-		[Trash2, "Deleted when it ends", "Its conversation, its subagents, and its prompts in history go with it."],
-		personal ? [Brain, "Memory stays on", "It still reads what it knows about you and can add to it."] : [FileCode, "Your files stay", "Files it changes and commits it makes stay in the project."],
+	const facts: { icon: LucideIcon; title: string; text: string }[] = [
+		{ icon: History, title: "Not in Past sessions", text: "It never shows there, and you cannot resume it." },
+		{ icon: Trash2, title: "Deleted when it ends", text: "Its conversation, its subagents, and its prompts in history go with it." },
+		personal
+			? { icon: Brain, title: "Memory stays on", text: "It still reads what it knows about you and can add to it." }
+			: { icon: FileCode, title: "Your files stay", text: "Files it changes and commits it makes stay in the project." },
 	];
 	return (
 		<BoardShell title={personal ? "Private, personal" : "Private session"} icon={<HeroIcon icon={Lock} className="bg-foreground text-background" />}>
 			<ul aria-label="What a private session keeps" className="mx-auto grid w-full max-w-[680px] grid-cols-1 gap-3 sm:grid-cols-3">
-				{facts.map(([Icon, title, text]) => (
+				{facts.map(({ icon: Icon, title, text }) => (
 					<li key={title} className="rounded-xl bg-card/80 p-3 shadow-surface-2">
 						<p className="mb-1 flex items-center gap-1.5 text-[13px] font-semibold">
 							<Icon aria-hidden className="size-3.5 text-muted-foreground" />

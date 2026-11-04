@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useComposerDraft } from "../composer-drafts";
-import { folderName, isPersonalDir, PRIVATE_NOTE } from "../labels";
+import { folderName, sameDir, PRIVATE_NOTE } from "../labels";
 import type { Completions } from "../pane-store";
 import { usePinnedSkill } from "../pinned-skill";
 import { useDraftModelSelection } from "../use-draft-model";
@@ -57,8 +57,8 @@ interface NewSessionProps {
 	scheduled?: ScheduledDraft;
 	/** Where this browser keeps the unsent text; `null` keeps none. */
 	draftKey: string | null;
-	/** The hero and board above the composer, given the line under its heading; a scheduled start shows none. */
-	board?: (note: string) => ReactNode;
+	/** The hero and board above the composer, given the line under its heading and whether the draft is personal; a scheduled start shows none. */
+	board?: (note: string, personal: boolean) => ReactNode;
 }
 
 /** What a scheduled start keeps of the draft: text only, in the draft's directory. */
@@ -95,8 +95,10 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	// A scheduled start keeps the skill it was saved with; with its skill turned off, the toggle offers the pinned one.
 	const draftSkill = initial?.skill ?? pinnedSkill;
 	const [skipSkill, setSkipSkill] = useState(initial !== null && initial.skill === null);
-	const [isPrivate, setPrivate] = useState(initial?.private ?? false);
-	const personal = useContext(PersonalContext);
+	const [privateOn, setPrivate] = useState(initial?.private ?? false);
+	// A draft that starts from a todo is never private, since nothing may link to a private session.
+	const isPrivate = todo === null && privateOn;
+	const personalDraft = todo === null && sameDir(cwd, useContext(PersonalContext));
 	const skills = useSkills(cwd);
 	// The server decides whether the skill applies; the toggle only shows what it will decide.
 	const listedSkills = skills.error === null ? skills.data?.skills : [];
@@ -113,7 +115,6 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			? { kind: "existing", name: pickedChoice.name }
 			: pickedChoice;
 	const starting = launch?.phase === "starting" || (scheduled?.busy ?? false);
-	// A draft that starts from a todo cannot be private, since nothing may link to a private session.
 	const privacy = todo ? null : <PrivatePill on={isPrivate} onToggle={() => setPrivate(on => !on)} disabled={starting} />;
 	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] } });
 	const { send } = useDashboardActions();
@@ -149,7 +150,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		}
 	};
 	const directCommand = blockedShortcut(draft, "new");
-	const opOf = (prompt: string): ScheduledOp => ({ prompt, branch: choice, model: models.model, thinking: models.thinking, skill: skipSkill ? null : draftSkill, private: !todo && isPrivate });
+	const opOf = (prompt: string): ScheduledOp => ({ prompt, branch: choice, model: models.model, thinking: models.thinking, skill: skipSkill ? null : draftSkill, private: isPrivate });
 	const schedule = useAction(async (when: ScheduleWhen) => {
 		const prompt = draft.trim();
 		await onSchedule(opOf(prompt), when);
@@ -186,21 +187,22 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					It starts at its time as Start session would start it. Edit the message, model, skill, directory, or branch, then save; the clock moves its time.
 					{todo && ` Your todo “${todo.text}” links to the session once it starts.`}
 				</EmptyConversation>
-			) : !todo && isPrivate ? (
-				<PrivateHero personal={isPersonalDir(cwd, personal)} />
+			) : isPrivate ? (
+				<PrivateHero personal={personalDraft} />
 			) : (
 				board?.(
 					(target.creates
 						? "It starts when you send the first message, which adds the worktree, so leaving this draft leaves nothing running."
 						: "Describe new work, or pick up something below. It starts when you send the first message, so leaving this draft leaves nothing running.") +
 						(todo ? ` Your todo “${todo.text}” links to the session once it starts.` : ""),
+					personalDraft,
 				)
 			)}
 			<div className="relative mx-auto w-full max-w-conversation px-3 pb-3">
 				{completion.popup}
 				<ComposerEditor value={editorRef}>
 					<InputMessage
-						className={cn(!todo && isPrivate && "outline-2 outline-foreground")}
+						className={cn(isPrivate && "outline-2 outline-foreground")}
 						editorRef={editorRef}
 						value={draft}
 						onValueChange={completion.onValueChange}
@@ -210,7 +212,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 							if (scheduled) save.run(text.trim());
 							else void attachments.read(text, async (prompt, images) => onStart({ ...opOf(prompt), images }));
 						}}
-						placeholder={isPersonalDir(cwd, personal) ? "Ask about meals, plans, errands…" : "Message this session…"}
+						placeholder={personalDraft ? "Ask about meals, plans, errands…" : "Message this session…"}
 						files={attachments.files}
 						onFilesChange={attachments.onFilesChange}
 						accept={ATTACH_ACCEPT}
@@ -294,18 +296,20 @@ function SkillToggle({ name, state, onToggle, disabled }: { name: string; state:
 function PrivatePill({ on, onToggle, disabled }: { on: boolean; onToggle: () => void; disabled: boolean }) {
 	return (
 		<Tooltip content={PRIVATE_NOTE} disabled={disabled}>
-			<Button
-				variant={on ? "secondary" : "outline"}
-				size="compact"
-				leadingIcon={on ? Lock : LockOpen}
+			<button
+				type="button"
 				aria-pressed={on}
 				onClick={onToggle}
 				disabled={disabled}
-				className={cn("rounded-full", on && "bg-foreground text-background hover:bg-foreground/90")}
+				className={cn(
+					"inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium ring-1 ring-border ring-inset transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:outline-none disabled:opacity-50",
+					on ? "bg-foreground text-background ring-foreground" : "text-muted-foreground hover:bg-hover hover:text-foreground",
+				)}
 			>
+				{on ? <Lock aria-hidden className="size-3.5" /> : <LockOpen aria-hidden className="size-3.5" />}
 				Private
 				{on && <X aria-hidden className="size-3" />}
-			</Button>
+			</button>
 		</Tooltip>
 	);
 }

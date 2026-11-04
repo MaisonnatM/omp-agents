@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { OmpFile } from "../src/shared/models";
-import { age, commandLabel, dayLabel, fileGroups, isPersonalDir, mailTime, modelLabel, modelOrg, providerLabel, skillLabel } from "./labels";
+import { age, commandLabel, dayLabel, fileGroups, sameDir, mailTime, modelLabel, modelOrg, providerLabel, skillLabel } from "./labels";
 
 describe("model labels", () => {
 	test("a direct provider's model reads as its family and dotted version", () => {
@@ -115,15 +115,15 @@ describe("file groups", () => {
 	});
 });
 
-describe("isPersonalDir", () => {
+describe("sameDir", () => {
 	const personal = { cwd: "/Users/me/.local/share/omp-agents/personal", cwdDisplay: "~/.local/share/omp-agents/personal" };
 	test("the personal directory matches as resolved or as displayed", () => {
-		expect(isPersonalDir(personal.cwd, personal)).toBe(true);
-		expect(isPersonalDir(personal.cwdDisplay, personal)).toBe(true);
+		expect(sameDir(personal.cwd, personal)).toBe(true);
+		expect(sameDir(personal.cwdDisplay, personal)).toBe(true);
 	});
 	test("another directory, or no personal directory yet, does not match", () => {
-		expect(isPersonalDir("~/code/omp-agents", personal)).toBe(false);
-		expect(isPersonalDir("", personal)).toBe(false);
-		expect(isPersonalDir(personal.cwd, null)).toBe(false);
+		expect(sameDir("~/code/omp-agents", personal)).toBe(false);
+		expect(sameDir("", personal)).toBe(false);
+		expect(sameDir(personal.cwd, null)).toBe(false);
 	});
 });

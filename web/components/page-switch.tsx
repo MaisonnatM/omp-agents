@@ -11,7 +11,6 @@ import { hashForNewSession } from "../routing";
 import type { SectionTarget } from "../section";
 import type { StartOf } from "../starts";
 import { todoCwd } from "../todo-views";
-import { isPersonalDir } from "../labels";
 import type { WorkspaceScope } from "../use-workspace-scope";
 import { CalendarPage } from "./calendar/calendar-page";
 import { PersonalContext, useDashboardActions } from "./dashboard-context";
@@ -32,6 +31,14 @@ import { TICKETS_META, TICKETS_TITLE, TicketsPage } from "./tickets/tickets-page
 import { TodoPage } from "./todo/page";
 
 /** What a new session for top-level todo `todoId` starts with: its title, then its notes, and its Workspace. `null` while the list names no such todo. */
+/** The directory a New session draft on `page` starts in: the route's, else its todo's Workspace, else `defaultWorkspace`. */
+export function newDraftCwd(page: Extract<Page, { kind: "new" }>, list: UserTodoList | null, defaultWorkspace: string): string {
+	// A directory the route names wins over the todo's Workspace, so picking another one in the draft sticks.
+	if (page.cwd !== null) return page.cwd;
+	const seed = todoSeed(list, page.todoId);
+	return seed ? todoCwd(seed, defaultWorkspace) : defaultWorkspace;
+}
+
 function todoSeed(list: UserTodoList | null, todoId: string | null): { text: string; prompt: string; workspace: string | null } | null {
 	const todo = todoId === null ? undefined : list?.todos.find(({ id }) => id === todoId);
 	if (!todo) return null;
@@ -116,8 +123,7 @@ export const PageSwitch = memo(function PageSwitch({
 	switch (page?.kind) {
 		case "new": {
 			const seed = todoSeed(userTodos, page.todoId);
-			// A directory the route names wins over the todo's Workspace, so picking another one in the draft sticks.
-			const cwd = page.cwd ?? (seed ? todoCwd(seed, defaultWorkspace) : defaultWorkspace);
+			const cwd = newDraftCwd(page, userTodos, defaultWorkspace);
 			// Until the todo list arrives, a todo's draft is neither the plain draft nor kept, so it cannot overwrite either.
 			const pending = page.todoId !== null && userTodos === null;
 			return (
@@ -139,8 +145,8 @@ export const PageSwitch = memo(function PageSwitch({
 					onSchedule={(op, when) => scheduleSend({ kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, todoId: seed && page.todoId }) }, when)}
 					todo={seed}
 					draftKey={pending ? null : newDraftKey(seed ? page.todoId : null)}
-					board={note =>
-						!seed && personal && isPersonalDir(cwd, personal) ? (
+					board={(note, personalDraft) =>
+						personal && personalDraft ? (
 							<PersonalBoard cwd={personal.cwd} past={visible.past} memory={personalMemory} />
 						) : (
 							<NewSessionBoard cwd={cwd} hosts={visible.hosts} past={visible.past} workspace={workspace} note={note} />

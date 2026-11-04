@@ -19,6 +19,8 @@ interface AppSidebarProps {
 	scope: WorkspaceScope;
 	sessions: SessionLists;
 	page: Page | null;
+	/** The open New session draft's directory; `null` while none is open. */
+	newDraftDir: string | null;
 	/** The panes on screen. */
 	panes: View[];
 	tab: SidebarPanel;
@@ -53,6 +55,7 @@ export const AppSidebar = memo(function AppSidebar({
 	scope: { visible, workspaces, workspace },
 	sessions: { lists, waiting, query, setQuery, togglePin },
 	page,
+	newDraftDir,
 	panes,
 	tab,
 	onTab,
@@ -96,7 +99,7 @@ export const AppSidebar = memo(function AppSidebar({
 			onQuery={setQuery}
 			onTogglePin={togglePin}
 			open={page ? NO_VIEWS : panes}
-			newSessionOpen={page?.kind === "new" ? (page.cwd ?? "") : null}
+			newSessionOpen={newDraftDir}
 			scheduledOpen={page?.kind === "scheduled" ? page.id : null}
 			bots={botList}
 			botsOpen={page?.kind !== "bots" ? undefined : page.target === null ? (page.adding ? null : undefined) : page.target}

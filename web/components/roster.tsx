@@ -143,7 +143,7 @@ interface RosterProps {
 	onTogglePin: (sessionId: string) => void;
 	/** Views on screen, highlighted in the list. */
 	open: View[];
-	/** The open New session draft's directory, "" for the default one; `null` while none is open. */
+	/** The open New session draft's directory; `null` while none is open. */
 	newSessionOpen: string | null;
 	/** The scheduled send whose page is open, `null` for none. */
 	scheduledOpen: string | null;

@@ -184,8 +184,8 @@ export const folderName = (dir: string): string | undefined => dir.split("/").fi
 export const workspaceName = (cwdDisplay: string, personal: Workspace | null): string | undefined =>
 	cwdDisplay === personal?.cwdDisplay ? "Personal" : folderName(cwdDisplay);
 
-/** Directory `dir`, as typed or displayed, is where personal sessions run. */
-export const isPersonalDir = (dir: string, personal: Workspace | null): boolean => personal !== null && (dir === personal.cwd || dir === personal.cwdDisplay);
+/** Directory `dir`, as typed or displayed, is `workspace`, such as the personal directory; never when there is none. */
+export const sameDir = (dir: string, workspace: Workspace | null): boolean => workspace !== null && (dir === workspace.cwd || dir === workspace.cwdDisplay);
 
 /** The tooltip of a private session's mark, which every place showing one repeats. */
 export const PRIVATE_NOTE = "Private: deleted with everything it wrote when it ends.";
