@@ -31,7 +31,7 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before registering a PR o
    If only one approach is sound, such as for a typo or a fix the request spells out, write that plan yourself with the `technical-writing` skill and say in one line of the report why no arena ran.
    Otherwise run the `arena` skill with one runner for each approach, up to three.
    Give every runner the same prompt: the issue or the request, the checkout's path, the approach it plans, its output path `local://plan-<n>.md`, and the rule to write the plan there with the `technical-writing` skill and edit nothing else.
-   Each plan names the files it changes, the data shape, the steps in order, how to verify the result, and its risks.
+   Each plan opens with how it works today, the current code path in plain words with paths and one concrete example, then names the files it changes, the data shape, the steps in order, how to verify the result, its risks, and what is out of scope.
    Each plan also lists what it reuses: the existing helpers, components, models, and patterns, by path, that already do part of the job, so the change extends them instead of rebuilding them.
    The runners edit no files in the checkout, so spawn them without `isolated`; alternate `poteto-agent` and `poteto-agent-codex`, and run the cross-judge on `poteto-agent-codex` over the `local://plan-<n>.md` paths.
    Pick the base plan against the arena's rubric, which scores that reuse list, and graft what the other plans do better.
