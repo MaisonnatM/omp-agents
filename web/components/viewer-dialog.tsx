@@ -3,6 +3,7 @@ import { type LucideIcon, X } from "lucide-react";
 import { type ReactNode, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useReturnFocus } from "../use-return-focus";
 import { type Zoom, ZoomControls, zoomKey, ZoomPane } from "./zoom-pane";
 
 interface ViewerDialogProps {
@@ -22,6 +23,7 @@ interface ViewerDialogProps {
 /** A large dialog over the page that shows one thing to read: a header with its title and actions, and a body that scrolls, or zooms. */
 export function ViewerDialog({ title, description, icon: Icon, actions, bodyLabel, zoom, onClose, children }: ViewerDialogProps) {
 	const body = useRef<HTMLDivElement>(null);
+	const returnFocus = useReturnFocus();
 	const frame = "rounded-md border border-border";
 	return (
 		<DialogPrimitive.Root open onOpenChange={next => !next && onClose()}>
@@ -33,6 +35,7 @@ export function ViewerDialog({ title, description, icon: Icon, actions, bodyLabe
 						event.preventDefault();
 						body.current?.focus();
 					}}
+					onCloseAutoFocus={returnFocus}
 					className="fixed top-1/2 left-1/2 z-50 flex h-[calc(100vh-4rem)] w-[min(64rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-3 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-hidden"
 					onKeyDown={zoom && (event => zoomKey(zoom, event))}
 				>

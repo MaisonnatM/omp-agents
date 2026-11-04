@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
 import { mediaSrc } from "../api";
+import { useReturnFocus } from "../use-return-focus";
 import { useZoom, ZoomControls, ZoomPane, zoomKey } from "./zoom-pane";
 
 interface ImageViewerProps {
@@ -30,6 +31,7 @@ interface ImageViewerProps {
 /** One image large, with its caption, its place in a list, buttons and ←/→ to the images before and after it, and zoom. */
 export function ImageViewer({ src, caption, index, count, detail, actions, previousLabel, nextLabel, onIndex, onClose }: ImageViewerProps) {
 	const zoom = useZoom(src);
+	const returnFocus = useReturnFocus();
 	const step = (by: 1 | -1): void => {
 		const next = index + by;
 		if (next >= 0 && next < count) onIndex(next);
@@ -44,6 +46,7 @@ export function ImageViewer({ src, caption, index, count, detail, actions, previ
 						event.preventDefault();
 						(event.currentTarget as HTMLElement).focus();
 					}}
+					onCloseAutoFocus={returnFocus}
 					className="fixed top-1/2 left-1/2 z-50 flex h-[calc(100vh-2rem)] w-[min(72rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-3 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-hidden"
 					onKeyDown={event => {
 						// Zoomed in, the arrow keys pan the image instead of stepping to the next one.

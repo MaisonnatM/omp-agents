@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { spring, exitFallbackMs } from "@/lib/springs";
 import { fontWeights } from "@/lib/font-weight";
 import { useShape } from "@/lib/shape-context";
+import { isReturnedFocus } from "@/use-return-focus";
 
 // ---------------------------------------------------------------------------
 // Portal container context
@@ -207,7 +208,12 @@ function Tooltip({
   // undefined, the Root inherits it from the nearest provider.
   const tooltip = (
     <TooltipPrimitive.Root delayDuration={delayDuration} open={open} onOpenChange={(v) => { setInternalOpen(v); onOpenChangeProp?.(v); }}>
-      <TooltipPrimitive.Trigger asChild onPointerMove={followCursor ? handleFollowMove : undefined}>
+      <TooltipPrimitive.Trigger
+        asChild
+        onPointerMove={followCursor ? handleFollowMove : undefined}
+        // A closing dialog handing the focus back: the trigger was already read, and a tooltip here would take the next Escape.
+        onFocus={(event) => { if (isReturnedFocus(event.currentTarget)) event.preventDefault(); }}
+      >
         {disabled ? <span className={cn("inline-flex", wrapperClassName)}>{children}</span> : children}
       </TooltipPrimitive.Trigger>
       {mounted && (

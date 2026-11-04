@@ -68,7 +68,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Session goal | control, action | `header.goal`; action `goal` from the pill, dialog, or composer |
 | Conversation pane, pane grid, and divider | view, control | views `session`, `past`, `split`, `home`; maximize and close change the hash, so they show as views; `trajectory.toggle`, `todos-card.toggle`; dragging the divider is not observed |
 | Desktop link address | not observed | display only |
-| Transcript (code blocks, session visuals, minimap, Todos card, chat history, image viewer) | control | `transcript.activity-group`, `transcript.todos`, `transcript.ship`, `transcript.subagents`, `minimap.jump`, `minimap.step`, `prompt-history.toggle`, `prompt-history.jump`, `media-viewer.open`, `media-viewer.step`, `media-viewer.new-tab`, `viewer.zoom` for the zoom buttons of the image viewer, an expanded visual, and the file dialog's image; the viewer's arrow and zoom keys, a pinch, and a drag record nothing; code block copy and session visuals are not observed |
+| Transcript (code blocks, session visuals, minimap, Todos card, chat history, image viewer) | control | `transcript.activity-group`, `todos-card.open` for the Todos card's line, `transcript.todos`, `transcript.ship`, `transcript.subagents`, `minimap.jump`, `minimap.step`, `prompt-history.toggle`, `prompt-history.jump`, `media-viewer.open`, `media-viewer.step`, `media-viewer.new-tab`, `viewer.zoom` for the zoom buttons of the image viewer, an expanded visual, and the file dialog's image; the viewer's arrow and zoom keys, a pinch, and a drag record nothing; code block copy and session visuals are not observed |
 | Routine run card in a conversation | control, view | `transcript.routine-card` folds or unfolds the card; **Open routine** records the `bots/routine` view; copy and the output disclosure are not observed |
 | Trajectory | control | `trajectory.toggle`, `trajectory.turn`, `trajectory.step` |
 | Scroll-to-bottom arrow | control | `transcript.scroll-to-bottom` |
@@ -100,7 +100,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Settings › Analytics' context-source table | view | `settings/analytics` |
 | Settings › Integrations' Google account lines | view, action | `settings/integrations`; Add account, Remove, and the workspace picker are `PUT`s |
 | Settings › Workflows | view, action | `settings/workflows`; saving a workflow's skill is the `PUT` that Settings › Files saves with |
-| Settings › Worktrees | view, action | `settings/worktrees`; Remove merged is a `PUT` |
+| Settings › Worktrees | view, action | `settings/worktrees`; each queued removal's preview and removal are `PUT`s |
 | Settings › Preferences | view, action | `settings/preferences`; each change to a preference that follows you, the theme, transcript, sidebar tabs, notifications, pinned skill, default merge method, diff, and calendar routine choices, is action `preference`, wherever you change it; Stop idle processes is a `PUT` |
 | Settings › Sync | view, action | `settings/sync`; Sync and its switches are `PUT`s |
 | ListSplit | not observed | dragging the line is not a click |

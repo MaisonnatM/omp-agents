@@ -22,6 +22,9 @@ export interface WorktreeTarget {
 	path: string;
 }
 
+/** One worktree as one key, since a path alone may repeat across repositories. */
+export const worktreeKey = (target: WorktreeTarget): string => `${target.repository}\0${target.path}`;
+
 /** The most worktrees one removal request previews or removes. */
 export const MAX_WORKTREE_BATCH = 100;
 
