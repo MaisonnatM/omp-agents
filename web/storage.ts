@@ -1,6 +1,6 @@
 /** Native-order cleanup presentation and the sequential run that can stop only between operations. */
 import { errorText } from "../src/json";
-import { CACHE_STEP, CLEANUP_STEPS, isSandboxStep, type CachePlan, type CacheResult, type CleanupRequest, type CleanupStep, type CleanupStepResult, type GcAnswer, type GcPhase, type SandboxKeepReason, type SandboxPlan, type SandboxResult, type SandboxStep } from "../src/shared/storage";
+import { CACHE_STEP, CLEANUP_STEPS, isSandboxStep, PACKAGE_TOOLS, type CachePlan, type CacheResult, type CleanupRequest, type CleanupStep, type CleanupStepResult, type GcAnswer, type GcPhase, type PreviewSource, type Previews, type SandboxKeepReason, type SandboxPlan, type SandboxResult, type SandboxStep } from "../src/shared/storage";
 import type { SystemLoad } from "../src/shared/system";
 import { getJson, putJson } from "./api";
 import { formatBytes } from "./labels";
@@ -50,6 +50,13 @@ function deletionResult(report: GcReports["blobs"]): CleanupResult {
 		errors: report.errors,
 	};
 }
+/** The size of plans whose bytes each count files shared elsewhere: the most removing them all can free. */
+function upperBound(plans: readonly { bytes: number | null }[] | undefined): Pick<Preview, "bytes" | "size"> {
+	if (plans === undefined) return { bytes: null, size: "" };
+	if (!plans.every(plan => plan.bytes !== null)) return { bytes: null, size: "Size unavailable" };
+	const total = plans.reduce((sum, plan) => sum + (plan.bytes ?? 0), 0);
+	return { bytes: null, size: total === 0 ? formatBytes(0) : `Up to ${formatBytes(total)}` };
+}
 
 /** The kept reason of the sandboxes each sandbox step removes: none for clean ones, `changed` for ones you choose to discard.
  * Their sizes are upper bounds: `du` counts again the files a sandbox shares with its source checkout or a package cache through APFS clones. */
@@ -68,13 +75,7 @@ function sandboxPhase(step: SandboxStep, label: string, detail: string): Phase<S
 		label, unit: ["sandbox", "sandboxes"],
 		preview: plans => {
 			const targets = plans && sandboxTargets(step, plans);
-			const upTo = targets && targets.every(plan => plan.bytes !== null)
-				? targets.reduce((sum, plan) => sum + (plan.bytes ?? 0), 0) : null;
-			return {
-				count: targets?.length ?? 0, bytes: null,
-				size: plans === undefined ? "" : upTo === null ? "Size unavailable" : upTo === 0 ? formatBytes(0) : `Up to ${formatBytes(upTo)}`,
-				detail, errors: [], available: plans !== undefined,
-			};
+			return { count: targets?.length ?? 0, ...upperBound(targets), detail, errors: [], available: plans !== undefined };
 		},
 		result: ({ results, total }) => ({
 			text: `${results.filter(result => result.kept === null).length} of ${total} ${total === 1 ? "sandbox" : "sandboxes"} removed`,
@@ -83,26 +84,20 @@ function sandboxPhase(step: SandboxStep, label: string, detail: string): Phase<S
 	};
 }
 
-function toolNames(plans: readonly CachePlan[]): string {
-	const names = plans.map(plan => plan.tool);
-	return names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`;
-}
+const and = new Intl.ListFormat("en", { type: "conjunction" });
+const or = new Intl.ListFormat("en", { type: "disjunction" });
 /** A cache's size is the most its prune can free: projects' environments share some of its files through clones or hard links. */
 const cachePhase: Phase<typeof CACHE_STEP> = {
 	label: "Package caches", unit: ["cache", "caches"],
-	preview: plans => {
-		const total = plans?.every(plan => plan.bytes !== null) ? plans.reduce((sum, plan) => sum + (plan.bytes ?? 0), 0) : null;
-		return {
-			count: plans?.length ?? 0, bytes: null,
-			size: plans === undefined ? "" : total === null ? "Size unavailable" : total === 0 ? formatBytes(0) : `Up to ${formatBytes(total)}`,
-			detail: plans?.length === 0 ? "No uv, pnpm, or bun found."
-				: `${plans ? `Caches of ${toolNames(plans)}. ` : ""}Removes packages no project needs, and keeps what running tools use.`,
-			errors: [], available: plans !== undefined,
-		};
-	},
+	preview: plans => ({
+		count: plans?.length ?? 0, ...upperBound(plans),
+		detail: plans?.length === 0 ? `No ${or.format(PACKAGE_TOOLS)} found.`
+			: `${plans ? `Caches of ${and.format(plans.map(plan => plan.tool))}. ` : ""}Removes packages no project needs, and keeps what running tools use.`,
+		errors: [], available: plans !== undefined,
+	}),
 	result: results => {
 		const pruned = results.filter(result => result.error === null);
-		const freed = pruned.reduce((sum, result) => sum + Math.max(0, (result.bytes ?? 0) - (result.after ?? result.bytes ?? 0)), 0);
+		const freed = pruned.reduce((sum, result) => sum + (result.bytes !== null && result.after !== null ? Math.max(0, result.bytes - result.after) : 0), 0);
 		return {
 			text: `${pruned.length} of ${results.length} ${results.length === 1 ? "cache" : "caches"} pruned · ${formatBytes(freed)} smaller`,
 			errors: results.flatMap(result => result.error === null ? [] : [`${result.tool}: ${result.error}`]),
@@ -173,13 +168,22 @@ function previewRow<P extends CleanupStep>(step: P, report: PreviewReports[P] | 
 	const phase = PHASES[step];
 	return { step, label: phase.label, unit: phase.unit, ...phase.preview(report) };
 }
-export function cleanupRows(gc: GcAnswer, sandboxes: SandboxPlan[] | null, caches: CachePlan[] | null): CleanupRow[] {
-	return CLEANUP_STEPS.map(step => isSandboxStep(step) ? previewRow(step, sandboxes ?? undefined)
-		: step === CACHE_STEP ? previewRow(step, caches ?? undefined)
-		: previewRow(step, gc[step]));
+/** Each preview as it stands: null until it answers, and still null when it failed. */
+export type Loaded = { [S in PreviewSource]: Previews[S] | null };
+export function cleanupRows(previews: Loaded): CleanupRow[] {
+	return CLEANUP_STEPS.map(step => isSandboxStep(step) ? previewRow(step, previews.sandboxes ?? undefined)
+		: step === CACHE_STEP ? previewRow(step, previews.caches ?? undefined)
+		: previewRow(step, previews.gc?.[step]));
 }
-export function stepResultText<P extends GcPhase | typeof CACHE_STEP>(step: P, report: ResultReports[P]): CleanupResult {
+export function stepResultText<P extends CleanupStep>(step: P, report: ResultReports[P]): CleanupResult {
 	return PHASES[step].result(report);
+}
+/** The report a single gc phase's or the package caches' apply answered for `step`. */
+function reportOf<P extends GcPhase | typeof CACHE_STEP>(step: P, answer: CleanupStepResult): ResultReports[P] {
+	if (answer.step === step && "caches" in answer) return answer.caches as ResultReports[P];
+	const report = answer.step === step && "gc" in answer ? answer.gc[step as GcPhase] : undefined;
+	if (report === undefined) throw new Error("Unexpected cleanup response.");
+	return report as ResultReports[P];
 }
 
 type Apply = Extract<CleanupRequest, { action: "apply" }>;
@@ -201,12 +205,12 @@ async function runSandboxes(step: SandboxStep, plans: readonly SandboxPlan[], io
 	const results: SandboxResult[] = [];
 	for (const [index, target] of targets.entries()) {
 		if (stopped()) break;
-		onProgress({ ...PHASES[step].result({ results, total: targets.length }), text: `Checking and removing ${index + 1} of ${targets.length}…` });
+		onProgress({ ...stepResultText(step, { results, total: targets.length }), text: `Checking and removing ${index + 1} of ${targets.length}…` });
 		const answer = await io.apply({ action: "apply", step, sandboxes: [target.path] });
 		if (answer.step !== step || !("sandboxes" in answer)) throw new Error("Unexpected cleanup response.");
 		results.push(...answer.sandboxes);
 	}
-	return PHASES[step].result({ results, total: targets.length });
+	return stepResultText(step, { results, total: targets.length });
 }
 
 export async function runCleanup(chosen: readonly CleanupRow[], sandboxes: readonly SandboxPlan[], { stopped, onProgress }: RunHooks, io: CleanupIo = cleanupIo): Promise<CleanupRun> {
@@ -229,16 +233,9 @@ export async function runCleanup(chosen: readonly CleanupRow[], sandboxes: reado
 					progress[step] = { state: "running", ...result };
 					publish();
 				});
-			} else if (row.step === CACHE_STEP) {
-				const answer = await io.apply({ action: "apply", step: CACHE_STEP });
-				if (answer.step !== CACHE_STEP || !("caches" in answer)) throw new Error("Unexpected cleanup response.");
-				result = stepResultText(CACHE_STEP, answer.caches);
 			} else {
-				const answer = await io.apply({ action: "apply", step: row.step });
-				if (answer.step !== row.step || !("gc" in answer)) throw new Error("Unexpected cleanup response.");
-				const report = answer.gc[row.step];
-				if (report === undefined) throw new Error("Unexpected cleanup response.");
-				result = stepResultText(row.step, report);
+				const step = row.step;
+				result = stepResultText(step, reportOf(step, await io.apply({ action: "apply", step })));
 			}
 			failed = result.errors.length > 0;
 			progress[row.step] = { state: failed ? "failed" : "done", ...result };

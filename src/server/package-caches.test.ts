@@ -34,12 +34,10 @@ test("an entry a running process uses survives a prune that removes it whole or 
 
 test("a failed prune still puts back what it removed, then reports its error", async () => {
 	const { used, keep } = await cache();
-	const prune = pruneKeeping([used], keep, async () => {
+	await expect(pruneKeeping([used], keep, async () => {
 		await rm(used, { recursive: true });
 		throw new Error("Permission denied");
-	});
-	expect(prune).rejects.toThrow("Permission denied");
-	await prune.catch(() => {});
+	})).rejects.toThrow("Permission denied");
 	expect(await readFile(join(used, "lib.py"), "utf8")).toBe("lib");
 	expect(await readdir(root)).toEqual(["uv"]);
 });

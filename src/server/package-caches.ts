@@ -39,15 +39,20 @@ export async function previewCaches(): Promise<CachePlan[]> {
 	return plans.filter(plan => plan !== null);
 }
 
-/** The cache's second-level entries, such as `archive-v0/<id>`, that a running process has open; `uvx` runs tools straight from them. */
+/**
+ * The cache's second-level entries, such as `archive-v0/<id>`, that a running process has open; `uvx` runs tools straight from them.
+ * `lsof` exits 1 whenever some process was unreadable, so only empty output or another exit, such as the timeout's kill, means it could not tell.
+ */
 async function openEntries(cache: string): Promise<string[]> {
-	const prefix = `n${await realpath(cache)}/`;
-	const { stdout } = await run(["lsof", "-nP", "-Fn"], { timeoutMs: 60_000 });
+	const root = await realpath(cache);
+	const prefix = `n${root}/`;
+	const { code, stdout } = await run(["lsof", "-nP", "-w", "-Fn"], { timeoutMs: 60_000 });
+	if (code > 1 || !stdout) throw new Error("Cannot list the files running tools have open, so uv's cache was not pruned.");
 	const entries = new Set<string>();
 	for (const line of stdout.split("\n")) {
 		if (!line.startsWith(prefix)) continue;
 		const [bucket, entry] = line.slice(prefix.length).split("/");
-		if (bucket && entry) entries.add(join(prefix.slice(1), bucket, entry));
+		if (bucket && entry) entries.add(join(root, bucket, entry));
 	}
 	return [...entries];
 }
@@ -104,7 +109,7 @@ export async function pruneKeeping(entries: readonly string[], keep: string, pru
 function pruneError(plan: CachePlan, stderr: string): string {
 	const text = stderr.trim().split("\n").filter(Boolean).at(-1) ?? `${plan.tool} stopped with an error.`;
 	return /permission denied/i.test(stderr)
-		? `${text} Some files belong to another user, often after a sudo install. Run sudo chown -R "$USER" ${plan.path}, then clean up again.`
+		? `${text} Some files belong to another user, often after a sudo install. Run sudo chown -R "$USER" "${plan.path}", then clean up again.`
 		: text;
 }
 
@@ -114,7 +119,7 @@ async function cleanCache(plan: CachePlan): Promise<CacheResult> {
 		if (code !== 0) throw new Error(pruneError(plan, stderr));
 	};
 	try {
-		if (plan.tool === "uv") await pruneKeeping(await openEntries(plan.path), join(dirname(plan.path), `.uv-cache-keep-${process.pid}`), prune);
+		if (plan.tool === "uv") await pruneKeeping(await openEntries(plan.path), join(dirname(plan.path), ".uv-cache-keep"), prune);
 		else await prune();
 		return { ...plan, after: await measured(plan.path), error: null };
 	} catch (error) {

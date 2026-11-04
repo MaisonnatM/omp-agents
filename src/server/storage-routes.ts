@@ -1,6 +1,6 @@
 /** Storage usage and explicit native, sandbox, or package cache cleanup, with no request idle deadline. */
 import { gcApply, gcPreview, storageUsage } from "../omp/gc";
-import { CACHE_STEP, CleanupBusy, parseCleanupRequest, type CleanupStepResult, type SandboxPlan, type SandboxResult } from "../shared/storage";
+import { CACHE_STEP, CleanupBusy, parseCleanupRequest, type CleanupStepResult, type PreviewSource, type Previews, type SandboxPlan, type SandboxResult } from "../shared/storage";
 import { cleanCaches, previewCaches } from "./package-caches";
 import { answer, checked, fail } from "./http";
 import type { Handler, RouteKit, Routes, SessionRoutesEnv } from "./routes";
@@ -24,13 +24,15 @@ export function storageRoutes({ get, write }: RouteKit, sweep: StorageRoutesEnv,
 		if (cwd !== null && !sessions.knownWorkspaces().includes(cwd) && !sessions.addedCwds().includes(cwd)) return fail(404, "Choose a known workspace.");
 		return answer(() => storageUsage(cwd));
 	});
+	const previews: { [S in PreviewSource]: () => Promise<Pick<Previews, S>> } = {
+		gc: async () => ({ gc: await gcPreview() }),
+		sandboxes: async () => ({ sandboxes: await sweep.preview() }),
+		caches: async () => ({ caches: await previewCaches() }),
+	};
 	const cleanup = write(
 		body => checked(parseCleanupRequest(body), "Expected a cleanup preview or one cleanup step."),
 		async request => {
-			if (request.action === "preview") {
-				if (request.step === "sandboxes") return { sandboxes: await sweep.preview() };
-				return request.step === CACHE_STEP ? { caches: await previewCaches() } : { gc: await gcPreview() };
-			}
+			if (request.action === "preview") return previews[request.source]();
 			const result: CleanupStepResult = "sandboxes" in request
 				? { step: request.step, sandboxes: await sweep.remove(request.sandboxes, { discardChanges: request.step === "changedSandboxes" }) }
 				: request.step === CACHE_STEP ? { step: CACHE_STEP, caches: await cleanCaches() }
