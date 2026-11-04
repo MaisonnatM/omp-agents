@@ -13,17 +13,18 @@ import type { PromptEditorHandle } from "./prompt-editor";
 
 const NO_USERS: TicketChoice[] = [];
 
-export function CompletionPopup({ id, sections, active, onPick, error }: {
+export function CompletionPopup({ id, sections, active, onPick, error, below }: {
 	id: string;
 	sections: MenuSection[];
 	/** Among the options of every section, in order. */
 	active: number;
 	onPick: (option: MenuOption) => void;
 	error: string | null;
+	below: boolean;
 }) {
 	let index = 0;
 	return (
-		<div className="absolute inset-x-6 bottom-full z-30 mb-2 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-xl" aria-label="Completions">
+		<div className={cn("absolute inset-x-6 z-30 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-xl", below ? "top-full mt-2" : "bottom-full mb-2")} aria-label="Completions">
 			<div id={id} role="listbox" aria-label="Suggestions" className="max-h-64 overflow-y-auto p-1">
 				{sections.map((section, at) => (
 					<div
@@ -76,10 +77,12 @@ interface CompletionOptions {
 	completions: Completions | null;
 	onComplete: (reqId: number, text: string, cursor: number) => void;
 	composer: Composer;
+	/** Opens the list under the composer, for a composer high on its page with no room above; it opens above by default. */
+	below?: boolean;
 }
 
 interface Completion {
-	/** The open list, placed just before the composer. */
+	/** The open list, placed just before the composer; it sits above it, or under it with `below`. */
 	popup: ReactNode;
 	onValueChange: (text: string) => void;
 	editorProps: HTMLAttributes<HTMLDivElement>;
@@ -96,7 +99,7 @@ interface Completion {
  * arrows, Tab, and Enter. Live sessions, the new-session draft, and a Bot's composer share it, so all offer the same commands and skills.
  * The `@` menu adds todos, tickets, pull requests, people, email, events, and sessions to omp's files; it asks the server only for files.
  */
-export function useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer }: CompletionOptions): Completion {
+export function useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer, below = false }: CompletionOptions): Completion {
 	/** The `@` token the open list answers, `null` for `/`, and the `complete` request whose answer it shows, if it sent one. */
 	const [menu, setMenu] = useState<{ token: MentionToken | null; reqId: number | null } | null>(null);
 	const [active, setActive] = useState(0);
@@ -144,7 +147,7 @@ export function useCompletion({ editorRef, draft, setDraft, completions, onCompl
 
 	const caret = (): number => editorRef.current?.selection().start ?? draft.length;
 	return {
-		popup: menu !== null && <CompletionPopup id={popupId} sections={sections} active={shown} error={answer?.error ?? null} onPick={pick} />,
+		popup: menu !== null && <CompletionPopup id={popupId} sections={sections} active={shown} error={answer?.error ?? null} onPick={pick} below={below} />,
 		onValueChange: text => {
 			setDraft(text);
 			suggest(text, editorRef.current?.selection().start ?? text.length);

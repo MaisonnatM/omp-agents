@@ -1,4 +1,4 @@
-import { memo, useContext } from "react";
+import { memo } from "react";
 import type { McpIntegration } from "../../src/shared/accounts";
 import { newSessionRequest } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
@@ -13,13 +13,13 @@ import type { StartOf } from "../starts";
 import { todoCwd } from "../todo-views";
 import type { WorkspaceScope } from "../use-workspace-scope";
 import { CalendarPage } from "./calendar/calendar-page";
-import { PersonalContext, useDashboardActions } from "./dashboard-context";
+import { useDashboardActions } from "./dashboard-context";
 import { EmailPage } from "./email/email-page";
 import { EmptyHome } from "./empty-home";
 import { DisconnectedPage } from "./integrations/disconnected-page";
 import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { NewSession } from "./new-session";
-import { NewSessionBoard, PersonalBoard } from "./new-session-board";
+
 import { PaneGrid } from "./pane-grid";
 import { NotesPage } from "./notes/page";
 import { BotPage, NewBot } from "./bots/bot-page";
@@ -117,7 +117,6 @@ export const PageSwitch = memo(function PageSwitch({
 	toggleSidebar,
 }: PageSwitchProps) {
 	const { send, start, dismissStart, changeTodo, changeNote } = useDashboardActions();
-	const personal = useContext(PersonalContext);
 	const scheduleSend = useScheduleSend();
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
 	switch (page?.kind) {
@@ -145,13 +144,8 @@ export const PageSwitch = memo(function PageSwitch({
 					onSchedule={(op, when) => scheduleSend({ kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, todoId: seed && page.todoId }) }, when)}
 					todo={seed}
 					draftKey={pending ? null : newDraftKey(seed ? page.todoId : null)}
-					board={(note, personalDraft) =>
-						personal && personalDraft ? (
-							<PersonalBoard cwd={personal.cwd} past={visible.past} memory={personalMemory} />
-						) : (
-							<NewSessionBoard cwd={cwd} hosts={visible.hosts} past={visible.past} workspace={workspace} note={note} />
-						)
-					}
+					starters={{ hosts, linear: linearCallable }}
+					assistant={{ past: visible.past, memory: personalMemory }}
 				/>
 			);
 		}

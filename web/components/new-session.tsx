@@ -1,20 +1,27 @@
 import { Lock, LockOpen, Sparkles, X } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useContext, useRef, useState } from "react";
+import { type KeyboardEvent, useContext, useEffect, useMemo, useRef, useState } from "react";
+import type { PullRequestSummary } from "../../src/shared/github";
+import { agentOn } from "../../src/shared/moves";
 import type { BranchChoice } from "../../src/shared/git";
-import type { NewSessionRequest } from "../../src/shared/sessions";
+import type { NewSessionRequest, PastSession, RosterHost } from "../../src/shared/sessions";
+import type { Ticket } from "../../src/shared/tickets";
 import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
 import { Tooltip } from "@/components/ui/tooltip";
+import { activityControl } from "../activity";
 import { useComposerDraft } from "../composer-drafts";
 import { folderName, sameDir, PRIVATE_NOTE } from "../labels";
 import type { Completions } from "../pane-store";
+import { listedPullRequests, yourMoveCount } from "../pull-requests-model";
+import { pullRequestsStore, ticketsStore } from "../reads";
 import { usePinnedSkill } from "../pinned-skill";
 import { useDraftModelSelection } from "../use-draft-model";
 import { useShortcuts } from "../shortcuts";
 import type { ScheduleWhen } from "../scheduled-model";
 import type { NewOp, StartOf } from "../starts";
+import { rankedStarters, type Starter } from "../starters";
 import { useGitCheckout } from "../use-git-checkout";
 import { useAction } from "../use-action";
 import { useSkills } from "../use-skills";
@@ -23,8 +30,8 @@ import { blockedShortcut, ComposerEditor, ComposerNote, EmptyConversation } from
 import { BranchPicker, targetOf } from "./git";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
 import { DictationButton, DictationRow, useDictation } from "./composer-dictation";
-import { PersonalContext, useDashboardActions } from "./dashboard-context";
-import { PrivateHero } from "./new-session-board";
+import { PersonalContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
+import { PersonalPanel, PrivateFacts } from "./new-session-modes";
 import type { PromptEditorHandle } from "./prompt-editor";
 import { ModelPicker } from "./model-picker";
 import { Header } from "./page-header";
@@ -57,8 +64,10 @@ interface NewSessionProps {
 	scheduled?: ScheduledDraft;
 	/** Where this browser keeps the unsent text; `null` keeps none. */
 	draftKey: string | null;
-	/** The hero and board above the composer, given the line under its heading and whether the draft is personal; a scheduled start shows none. */
-	board?: (note: string, personal: boolean) => ReactNode;
+	/** Where the starters listed under the composer come from; a scheduled start passes none and lists none. */
+	starters?: StarterSources;
+	/** What a personal draft lists under the composer instead of starters; a scheduled start passes none. */
+	assistant?: AssistantSources;
 }
 
 /** What a scheduled start keeps of the draft: text only, in the draft's directory. */
@@ -84,10 +93,17 @@ export interface ScheduledDraft {
  * The composer picks the directory, the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
  * A skill pinned in the settings shows as a toggle, on until you turn it off for this session.
  */
-export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, scheduled, draftKey, board }: NewSessionProps) {
+export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, scheduled, draftKey, starters, assistant }: NewSessionProps) {
 	const initial = scheduled?.request ?? null;
 	const editorRef = useRef<PromptEditorHandle>(null);
 	const [draft, setDraft] = useComposerDraft(draftKey, initial?.prompt ?? todo?.prompt ?? "");
+	// Set by a starter's pick until the editor holds it as the draft, so the caret lands after the prompt.
+	const prefilled = useRef(false);
+	useEffect(() => {
+		if (!prefilled.current) return;
+		prefilled.current = false;
+		editorRef.current?.select(draft.length);
+	}, [draft]);
 	const attachments = usePromptAttachments(true);
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null } | null>(initial && { cwd: initial.cwd, choice: initial.branch });
 	const models = useDraftModelSelection(cwd, initial ?? undefined);
@@ -98,7 +114,8 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const [privateOn, setPrivate] = useState(initial?.private ?? false);
 	// A draft that starts from a todo is never private, since nothing may link to a private session.
 	const isPrivate = todo === null && privateOn;
-	const personalDraft = todo === null && sameDir(cwd, useContext(PersonalContext));
+	const personal = useContext(PersonalContext);
+	const personalDraft = todo === null && sameDir(cwd, personal);
 	const skills = useSkills(cwd);
 	// The server decides whether the skill applies; the toggle only shows what it will decide.
 	const listedSkills = skills.error === null ? skills.data?.skills : [];
@@ -116,7 +133,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			: pickedChoice;
 	const starting = launch?.phase === "starting" || (scheduled?.busy ?? false);
 	const privacy = todo ? null : <PrivatePill on={isPrivate} onToggle={() => setPrivate(on => !on)} disabled={starting} />;
-	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] } });
+	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] }, below: !scheduled });
 	const { send } = useDashboardActions();
 	// A composer that keeps no draft, as a scheduled start's, has nowhere to put text that lands after it closes.
 	const dictation = useDictation({ composer: draftKey !== null && !starting ? { draftKey, cwd } : null, text: draft, editorRef, send, connected });
@@ -160,6 +177,22 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const target = checkout ? targetOf(checkout, cwd, choice) : { dir: cwd, creates: false };
 	const name = folderName(target.dir) ?? target.dir;
 	const error = scheduled ? scheduled.error : launch?.phase === "failed" ? launch.error : null;
+	const starterList = useStarters(starters, name, choice?.name ?? checkout?.branch ?? null);
+	const pickers = (
+		<>
+			<DirectoryPicker
+				cwd={cwd}
+				workspaces={workspaces}
+				disabled={starting}
+				shortcut="directory"
+				open={directoriesOpen}
+				onOpenChange={setDirectoriesOpen}
+				onPick={onPickCwd}
+				control="composer.directory"
+			/>
+			{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
+		</>
+	);
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			{scheduled ? (
@@ -182,77 +215,128 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					{scheduled ? `Not sent: ${error}` : error}
 				</p>
 			)}
-			{scheduled ? (
+			{scheduled && (
 				<EmptyConversation title={`Scheduled in ${name}`}>
 					It starts at its time as Start session would start it. Edit the message, model, skill, directory, or branch, then save; the clock moves its time.
 					{todo && ` Your todo “${todo.text}” links to the session once it starts.`}
 				</EmptyConversation>
-			) : isPrivate ? (
-				<PrivateHero personal={personalDraft} />
-			) : (
-				board?.(
-					(target.creates
-						? "It starts when you send the first message, which adds the worktree, so leaving this draft leaves nothing running."
-						: "Describe new work, or pick up something below. It starts when you send the first message, so leaving this draft leaves nothing running.") +
-						(todo ? ` Your todo “${todo.text}” links to the session once it starts.` : ""),
-					personalDraft,
-				)
 			)}
-			<div className="relative mx-auto w-full max-w-conversation px-3 pb-3">
-				{completion.popup}
-				<ComposerEditor value={editorRef}>
-					<InputMessage
-						className={cn(isPrivate && "outline-2 outline-foreground")}
-						editorRef={editorRef}
-						value={draft}
-						onValueChange={completion.onValueChange}
-						onSend={text => {
-							if (directCommand) return;
-							completion.close();
-							if (scheduled) save.run(text.trim());
-							else void attachments.read(text, async (prompt, images) => onStart({ ...opOf(prompt), images }));
-						}}
-						placeholder={personalDraft ? "Ask about meals, plans, errands…" : "Message this session…"}
-						files={attachments.files}
-						onFilesChange={attachments.onFilesChange}
-						accept={ATTACH_ACCEPT}
-						leftSlot={
-							<>
-								<DirectoryPicker
-									cwd={cwd}
-									workspaces={workspaces}
-									disabled={starting}
-									shortcut="directory"
-									open={directoriesOpen}
-									onOpenChange={setDirectoriesOpen}
-									onPick={onPickCwd}
-									control="composer.directory"
-								/>
-								{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
-								<ModelPicker {...models.picker} disabled={starting || !connected} control="composer.model" />
-								{draftSkill !== null && !ownCommand && <SkillToggle name={draftSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
-							</>
-						}
-						rightSlot={({ openFilePicker }) => (
-							<>
-								<ScheduleButton draft={draft} files={attachments.files.length} disabled={starting || !connected} pending={schedule.pending} onSchedule={schedule.run} />
-								{!scheduled && <AttachButton onClick={() => openFilePicker()} disabled={starting} />}
-								<DictationButton dictation={dictation} />
-							</>
-						)}
-						disabled={starting || !connected}
-						locked={dictation.locked}
-						beforeEditor={<DictationRow dictation={dictation} />}
-						sendLabel={scheduled ? "Save" : starting ? "Starting session" : "Start session"}
-						sending={starting || save.pending}
-						editorProps={{ ...completion.editorProps, onKeyDown, onPaste: scheduled ? undefined : attachments.onPaste, autoFocus: true }}
-					/>
-				</ComposerEditor>
+			{/* A new session puts the composer in the page's upper middle, its directory and branch above it and its starters under it; a scheduled start docks it at the bottom. */}
+			<div className={cn("mx-auto w-full max-w-conversation px-3", scheduled ? "pb-3" : "pt-[18vh] pb-6")}>
+				{!scheduled && <div className="flex flex-wrap items-center gap-1 pb-1.5">{pickers}</div>}
+				<div className="relative">
+					{completion.popup}
+					<ComposerEditor value={editorRef}>
+						<InputMessage
+							className={cn(isPrivate && "outline-2 outline-foreground")}
+							editorRef={editorRef}
+							value={draft}
+							onValueChange={completion.onValueChange}
+							onSend={text => {
+								if (directCommand) return;
+								completion.close();
+								if (scheduled) save.run(text.trim());
+								else void attachments.read(text, async (prompt, images) => onStart({ ...opOf(prompt), images }));
+							}}
+							placeholder={personalDraft ? "Ask about meals, plans, errands…" : scheduled ? "Message this session…" : "Describe the work; omp starts when you send it"}
+							files={attachments.files}
+							onFilesChange={attachments.onFilesChange}
+							accept={ATTACH_ACCEPT}
+							leftSlot={
+								<>
+									{scheduled && pickers}
+									<ModelPicker {...models.picker} disabled={starting || !connected} control="composer.model" />
+									{draftSkill !== null && !ownCommand && <SkillToggle name={draftSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
+								</>
+							}
+							rightSlot={({ openFilePicker }) => (
+								<>
+									<ScheduleButton draft={draft} files={attachments.files.length} disabled={starting || !connected} pending={schedule.pending} onSchedule={schedule.run} />
+									{!scheduled && <AttachButton onClick={() => openFilePicker()} disabled={starting} />}
+									<DictationButton dictation={dictation} />
+								</>
+							)}
+							disabled={starting || !connected}
+							locked={dictation.locked}
+							beforeEditor={<DictationRow dictation={dictation} />}
+							sendLabel={scheduled ? "Save" : starting ? "Starting session" : "Start session"}
+							sending={starting || save.pending}
+							editorProps={{
+								...completion.editorProps,
+								onKeyDown,
+								onPaste: scheduled ? undefined : attachments.onPaste,
+								autoFocus: true,
+							}}
+						/>
+					</ComposerEditor>
+				</div>
 				{directCommand && <ComposerNote text={directCommand} />}
 				{attachments.note && <ComposerNote text={attachments.note} />}
+				{!scheduled && todo && <p className="mt-2 px-1 text-xs text-muted-foreground">Your todo “{todo.text}” links to the session once it starts.</p>}
+				{/* A private draft says what ending it deletes, and a personal one what it remembers, in place of the starters, which suit project work. */}
+				{!scheduled && isPrivate ? (
+					<PrivateFacts personal={personalDraft} />
+				) : personal && personalDraft && assistant ? (
+					<PersonalPanel cwd={personal.cwd} past={assistant.past} memory={assistant.memory} />
+				) : (
+					connected &&
+					!starting &&
+					!draft.trim() &&
+					starterList.length > 0 && (
+						<div role="group" aria-label="Starters" className="mt-3 flex flex-wrap gap-2">
+							{starterList.map(starter => (
+								<Tooltip key={starter.label} content={starter.prompt}>
+									<Button
+										variant="tertiary"
+										size="compact"
+										className="rounded-full px-3 font-normal text-muted-foreground hover:text-foreground"
+										onClick={() => {
+											prefilled.current = true;
+											setDraft(starter.prompt);
+										}}
+										{...activityControl("composer.starter")}
+									>
+										{starter.label}
+									</Button>
+								</Tooltip>
+							))}
+						</div>
+					)
+				)}
 			</div>
 		</div>
 	);
+}
+
+/** Where the starters' blanks and ranking come from beyond the draft: the live sessions, which tell whose move a pull request waits on, and whether Linear answers. */
+export interface StarterSources {
+	hosts: RosterHost[];
+	linear: boolean;
+}
+
+/** What a personal draft's panel lists: the past sessions, of which it shows the personal directory's, and what personal sessions remember. */
+export interface AssistantSources {
+	past: PastSession[];
+	/** `personal-memory.md`'s text. */
+	memory: string;
+}
+
+const NO_STARTERS: Starter[] = [];
+const NO_TICKETS: Ticket[] = [];
+const NO_PULL_REQUESTS: PullRequestSummary[] = [];
+
+/** The starters for a draft in `folder` on `branch`, the best fit now first; none without `sources`. */
+function useStarters(sources: StarterSources | undefined, folder: string, branch: string | null): Starter[] {
+	const { pullRequestsScope } = useDashboardStatus();
+	const tickets = ticketsStore.usePolling(null, sources?.linear ?? false).read?.data.tickets ?? NO_TICKETS;
+	const list = pullRequestsStore.use(pullRequestsScope).read?.data ?? null;
+	const hosts = sources?.hosts;
+	return useMemo(() => {
+		if (!hosts) return NO_STARTERS;
+		const pullRequests = list ? listedPullRequests(list.repos) : NO_PULL_REQUESTS;
+		const waiting = list ? yourMoveCount(list, agentOn(hosts)) : 0;
+		return rankedStarters({ folder, branch, tickets, pullRequests, waiting, now: new Date() });
+	}, [hosts, list, tickets, folder, branch]);
 }
 
 /** Whether the pinned skill applies: `missing` when the directory has no such skill. */
