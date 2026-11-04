@@ -1,11 +1,12 @@
 /** `HostRow` and `PastRow`, a running or past session's row in the sidebar, with its status, age, and actions menu. */
-import { Loader, Lock } from "lucide-react";
+import { Loader } from "lucide-react";
 import { Fragment, memo, type ReactElement, type ReactNode, useContext } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem, MenuLinkItem, MenuSeparator, MenuShortcut } from "@/components/ui/menu";
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
+import { PrivateChip } from "./private-chip";
 import { cn } from "@/lib/utils";
 import type { PaletteAction } from "../command-palette";
 import { hostLabel, modeOf, pastLabel, PRIVATE_NOTE, SOURCE_LABELS, SPLIT_CLICK, workspaceName } from "../labels";
@@ -231,7 +232,7 @@ export const HostRow = memo(function HostRow({ session: host, pinned, open, show
 				badge={
 					isPrivate ? (
 						<span className="flex items-center gap-1.5">
-							<Lock role="img" aria-label="Private" className="size-3 shrink-0 text-muted-foreground" />
+							<PrivateChip />
 							{workspace}
 						</span>
 					) : (

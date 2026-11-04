@@ -1,11 +1,15 @@
-/** The New session page's hero and board above the composer: open todos, sessions to resume, and pull requests waiting on your move, each one click from an agent. */
-import { CircleDashed, GitPullRequest, History, type LucideIcon } from "lucide-react";
+/**
+ * The New session page's hero and board above the composer: open todos, sessions to resume, and pull requests waiting on your move,
+ * each one click from an agent; a personal draft's board of what it remembers; and a private draft's hero of what it deletes.
+ */
+import { Brain, CircleDashed, FileCode, GitPullRequest, History, Lock, type LucideIcon, Trash2, UserRound } from "lucide-react";
 import { useContext, useMemo, type ReactNode } from "react";
 import { prKey } from "../../src/shared/github";
 import { agentOn } from "../../src/shared/moves";
 import type { PastSession, RosterHost } from "../../src/shared/sessions";
 import { cn } from "@/lib/utils";
 import { localDay } from "../../src/shared/days";
+import { memoryEntries } from "../bots-model";
 import { pastLabel } from "../labels";
 import { boardPullRequests, boardSessions, boardTodos, BOARD_ROWS } from "../new-session-board-model";
 import { readPinnedSkill } from "../pinned-skill";
@@ -41,13 +45,7 @@ export function NewSessionBoard({ cwd, hosts, past, workspace, note }: Props) {
 	const resuming = starts.resume?.phase === "starting" ? starts.resume.op.sessionId : null;
 	const day = localDay();
 	return (
-		<div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto px-3">
-			<div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 mx-auto h-80 max-w-3xl rounded-full bg-[radial-gradient(closest-side,color-mix(in_oklch,var(--primary)_9%,transparent),transparent)] blur-[24px]" />
-			<div className="relative m-auto flex w-full flex-col items-center gap-7 py-8">
-				<div className="space-y-1.5 text-center">
-					<h2 className="text-[30px] leading-tight font-semibold tracking-[-0.022em] text-balance">Start a session</h2>
-					<p className="text-sm text-pretty text-muted-foreground">{note}</p>
-				</div>
+		<BoardShell title="Start a session" note={note}>
 				<section aria-label="Pick up work" className="mx-auto grid w-full max-w-[1040px] grid-cols-1 rounded-[18px] bg-card/80 shadow-surface-3 backdrop-blur md:grid-cols-3 [&>*+*]:border-t [&>*+*]:border-border md:[&>*+*]:border-t-0 md:[&>*+*]:border-s">
 					<Column icon={CircleDashed} title="Todos for agents" count={todos.length} all={hashForTodo({ kind: "all" })} empty="No open todos.">
 						{todos.slice(0, BOARD_ROWS).map(todo => (
@@ -58,17 +56,7 @@ export function NewSessionBoard({ cwd, hosts, past, workspace, note }: Props) {
 					</Column>
 					<Column icon={History} title="Pick up where you left off" count={sessions.length} empty="No sessions to resume.">
 						{sessions.slice(0, BOARD_ROWS).map(session => (
-							<Row
-								key={session.sessionId}
-								title={pastLabel(session)}
-								action={resuming === session.sessionId ? "Resuming…" : "Resume"}
-								busy={resuming === session.sessionId}
-								disabled={resuming !== null}
-								onPick={() => start({ kind: "resume", sessionId: session.sessionId })}
-								icon={<span aria-hidden className={cn("size-2 rounded-full", session.interrupted ? "bg-amber-500" : "bg-muted-foreground/40")} />}
-							>
-								{session.interrupted ? "Interrupted" : "Ended"} · <Age at={session.modifiedAt} compact className="tabular-nums" />
-							</Row>
+							<ResumeRow key={session.sessionId} session={session} resuming={resuming} />
 						))}
 					</Column>
 					<Column icon={GitPullRequest} title="Pull requests waiting" count={pullRequests.length} all={hashForPullRequests(null)} empty="Nothing waits on you.">
@@ -94,8 +82,106 @@ export function NewSessionBoard({ cwd, hosts, past, workspace, note }: Props) {
 						})}
 					</Column>
 				</section>
+		</BoardShell>
+	);
+}
+
+interface PersonalBoardProps {
+	/** The personal directory. */
+	cwd: string;
+	past: PastSession[];
+	/** `personal-memory.md`'s text. */
+	memory: string;
+}
+
+/** A personal draft's board: the facts every personal session shares, newest first, and the personal sessions to resume. */
+export function PersonalBoard({ cwd, past, memory }: PersonalBoardProps) {
+	const { starts } = useDashboardStatus();
+	const facts = useMemo(() => memoryEntries(memory).toReversed(), [memory]);
+	const sessions = useMemo(() => boardSessions(past, cwd), [past, cwd]);
+	const resuming = starts.resume?.phase === "starting" ? starts.resume.op.sessionId : null;
+	return (
+		<BoardShell title="Your assistant" note="For meals, shopping, plans, and everything outside code. It remembers what you tell it about yourself." icon={<HeroIcon icon={UserRound} className="bg-violet-500/12 text-violet-700 dark:text-violet-300" />}>
+			<section aria-label="Your assistant" className="mx-auto grid w-full max-w-[760px] grid-cols-1 rounded-[18px] bg-card/80 shadow-surface-3 backdrop-blur md:grid-cols-[1.3fr_1fr] [&>*+*]:border-t [&>*+*]:border-border md:[&>*+*]:border-t-0 md:[&>*+*]:border-s">
+				<Column icon={Brain} title="What it remembers" count={facts.length} empty="Nothing yet. Tell it something worth keeping, and it remembers it.">
+					{facts.slice(0, BOARD_ROWS).map((entry, index) => (
+						<li key={index} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 px-2.5 py-[9px]">
+							<span className="truncate text-[13.5px]">{entry.fact}</span>
+							{entry.date && <span className="text-[11.5px] tabular-nums text-muted-foreground">{entry.date}</span>}
+						</li>
+					))}
+				</Column>
+				<Column icon={History} title="Recent" count={sessions.length} empty="No personal sessions yet.">
+					{sessions.slice(0, BOARD_ROWS).map(session => (
+						<ResumeRow key={session.sessionId} session={session} resuming={resuming} />
+					))}
+				</Column>
+			</section>
+		</BoardShell>
+	);
+}
+
+/** A private draft's hero: what ending it deletes, and what stays. */
+export function PrivateHero({ personal }: { personal: boolean }) {
+	const facts: [LucideIcon, string, string][] = [
+		[History, "Not in Past sessions", "It never shows there, and you cannot resume it."],
+		[Trash2, "Deleted when it ends", "Its conversation, its subagents, and its prompts in history go with it."],
+		personal ? [Brain, "Memory stays on", "It still reads what it knows about you and can add to it."] : [FileCode, "Your files stay", "Files it changes and commits it makes stay in the project."],
+	];
+	return (
+		<BoardShell title={personal ? "Private, personal" : "Private session"} icon={<HeroIcon icon={Lock} className="bg-foreground text-background" />}>
+			<ul aria-label="What a private session keeps" className="mx-auto grid w-full max-w-[680px] grid-cols-1 gap-3 sm:grid-cols-3">
+				{facts.map(([Icon, title, text]) => (
+					<li key={title} className="rounded-xl bg-card/80 p-3 shadow-surface-2">
+						<p className="mb-1 flex items-center gap-1.5 text-[13px] font-semibold">
+							<Icon aria-hidden className="size-3.5 text-muted-foreground" />
+							{title}
+						</p>
+						<p className="text-xs text-pretty text-muted-foreground">{text}</p>
+					</li>
+				))}
+			</ul>
+		</BoardShell>
+	);
+}
+
+function BoardShell({ title, note, icon, children }: { title: string; note?: string; icon?: ReactNode; children: ReactNode }) {
+	return (
+		<div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto px-3">
+			<div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 mx-auto h-80 max-w-3xl rounded-full bg-[radial-gradient(closest-side,color-mix(in_oklch,var(--primary)_9%,transparent),transparent)] blur-[24px]" />
+			<div className="relative m-auto flex w-full flex-col items-center gap-7 py-8">
+				<div className="flex flex-col items-center gap-1.5 text-center">
+					{icon}
+					<h2 className="text-[30px] leading-tight font-semibold tracking-[-0.022em] text-balance">{title}</h2>
+					{note && <p className="text-sm text-pretty text-muted-foreground">{note}</p>}
+				</div>
+				{children}
 			</div>
 		</div>
+	);
+}
+
+function HeroIcon({ icon: Icon, className }: { icon: LucideIcon; className: string }) {
+	return (
+		<span aria-hidden className={cn("mb-2.5 flex size-10 items-center justify-center rounded-full", className)}>
+			<Icon className="size-[18px]" />
+		</span>
+	);
+}
+
+function ResumeRow({ session, resuming }: { session: PastSession; resuming: string | null }) {
+	const { start } = useDashboardActions();
+	return (
+		<Row
+			title={pastLabel(session)}
+			action={resuming === session.sessionId ? "Resuming…" : "Resume"}
+			busy={resuming === session.sessionId}
+			disabled={resuming !== null}
+			onPick={() => start({ kind: "resume", sessionId: session.sessionId })}
+			icon={<span aria-hidden className={cn("size-2 rounded-full", session.interrupted ? "bg-amber-500" : "bg-muted-foreground/40")} />}
+		>
+			{session.interrupted ? "Interrupted" : "Ended"} · <Age at={session.modifiedAt} compact className="tabular-nums" />
+		</Row>
 	);
 }
 

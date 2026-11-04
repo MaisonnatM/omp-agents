@@ -143,8 +143,8 @@ interface RosterProps {
 	onTogglePin: (sessionId: string) => void;
 	/** Views on screen, highlighted in the list. */
 	open: View[];
-	/** The new-session draft is open. */
-	newSessionOpen: boolean;
+	/** The open New session draft's directory, "" for the default one; `null` while none is open. */
+	newSessionOpen: string | null;
 	/** The scheduled send whose page is open, `null` for none. */
 	scheduledOpen: string | null;
 	/** Every Bot's row, whatever the workspace, the most recent conversation first; `null` until the server sends the Bots. */

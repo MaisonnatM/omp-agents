@@ -96,7 +96,7 @@ export const AppSidebar = memo(function AppSidebar({
 			onQuery={setQuery}
 			onTogglePin={togglePin}
 			open={page ? NO_VIEWS : panes}
-			newSessionOpen={page?.kind === "new"}
+			newSessionOpen={page?.kind === "new" ? (page.cwd ?? "") : null}
 			scheduledOpen={page?.kind === "scheduled" ? page.id : null}
 			bots={botList}
 			botsOpen={page?.kind !== "bots" ? undefined : page.target === null ? (page.adding ? null : undefined) : page.target}

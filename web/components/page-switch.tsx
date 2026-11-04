@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useContext } from "react";
 import type { McpIntegration } from "../../src/shared/accounts";
 import { newSessionRequest } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
@@ -11,15 +11,16 @@ import { hashForNewSession } from "../routing";
 import type { SectionTarget } from "../section";
 import type { StartOf } from "../starts";
 import { todoCwd } from "../todo-views";
+import { isPersonalDir } from "../labels";
 import type { WorkspaceScope } from "../use-workspace-scope";
 import { CalendarPage } from "./calendar/calendar-page";
-import { useDashboardActions } from "./dashboard-context";
+import { PersonalContext, useDashboardActions } from "./dashboard-context";
 import { EmailPage } from "./email/email-page";
 import { EmptyHome } from "./empty-home";
 import { DisconnectedPage } from "./integrations/disconnected-page";
 import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { NewSession } from "./new-session";
-import { NewSessionBoard } from "./new-session-board";
+import { NewSessionBoard, PersonalBoard } from "./new-session-board";
 import { PaneGrid } from "./pane-grid";
 import { NotesPage } from "./notes/page";
 import { BotPage, NewBot } from "./bots/bot-page";
@@ -41,7 +42,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError" | "personalMemory"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -92,6 +93,7 @@ export const PageSwitch = memo(function PageSwitch({
 	connected,
 	listed,
 	rosterError,
+	personalMemory,
 	newStart,
 	scope,
 	defaultWorkspace,
@@ -108,6 +110,7 @@ export const PageSwitch = memo(function PageSwitch({
 	toggleSidebar,
 }: PageSwitchProps) {
 	const { send, start, dismissStart, changeTodo, changeNote } = useDashboardActions();
+	const personal = useContext(PersonalContext);
 	const scheduleSend = useScheduleSend();
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
 	switch (page?.kind) {
@@ -136,7 +139,13 @@ export const PageSwitch = memo(function PageSwitch({
 					onSchedule={(op, when) => scheduleSend({ kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, todoId: seed && page.todoId }) }, when)}
 					todo={seed}
 					draftKey={pending ? null : newDraftKey(seed ? page.todoId : null)}
-					board={note => <NewSessionBoard cwd={cwd} hosts={visible.hosts} past={visible.past} workspace={workspace} note={note} />}
+					board={note =>
+						!seed && personal && isPersonalDir(cwd, personal) ? (
+							<PersonalBoard cwd={personal.cwd} past={visible.past} memory={personalMemory} />
+						) : (
+							<NewSessionBoard cwd={cwd} hosts={visible.hosts} past={visible.past} workspace={workspace} note={note} />
+						)
+					}
 				/>
 			);
 		}

@@ -7,6 +7,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - You can zoom an image opened large, an expanded chart or diagram, and an image opened from a file path, as you zoom a web page: the − and + buttons or keys, a pinch, or Cmd or Ctrl with the scroll wheel. Click the zoom level or press 0 to fit it again, and drag to move around.
 - The images in a message, in place or as thumbnails under it, now open large, and the arrows or the Left and Right keys step through the message's other images.
+- Private is now a pill at the top right of the New session page. Turned on, it fills dark and the page says what ending the session deletes and what stays.
+- A private session's sidebar row and header now show a dark Private chip, easier to spot than the old lock.
+- The sidebar has a Personal item under New session. It opens a page that shows what your assistant remembers and your recent personal sessions.
 - The starter kit now sends agents to the review steps before they mark a pull request ready or merge it, so they stop running into the review check first.
 - The starter kit now tells agents to write out the full address of any server they start for you, ready to click, instead of only its port number.
 

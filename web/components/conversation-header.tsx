@@ -1,9 +1,10 @@
-import { CircleStop, Lock } from "lucide-react";
+import { CircleStop } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ControlPhase, LiveView } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
+import { PrivateChip } from "./private-chip";
 import { CONFIRM_PRIVATE_END, hostLabel, PRIVATE_NOTE } from "../labels";
 import { OpenPullRequestButton } from "../open-pull-request";
 import { isPrivateHost } from "../sessions";
@@ -100,8 +101,8 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 		>
 			{isPrivate && (
 				<Tooltip content={PRIVATE_NOTE} side="bottom">
-					<span role="img" aria-label="Private" tabIndex={0} className="flex shrink-0 items-center text-muted-foreground">
-						<Lock className="size-3.5" />
+					<span tabIndex={0} className="flex shrink-0 items-center rounded-full">
+						<PrivateChip />
 					</span>
 				</Tooltip>
 			)}

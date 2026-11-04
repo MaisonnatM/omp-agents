@@ -1,5 +1,5 @@
-import { Lock, Sparkles } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
+import { Lock, LockOpen, Sparkles, X } from "lucide-react";
+import { type KeyboardEvent, type ReactNode, useContext, useRef, useState } from "react";
 import type { BranchChoice } from "../../src/shared/git";
 import type { NewSessionRequest } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useComposerDraft } from "../composer-drafts";
-import { folderName, PRIVATE_NOTE } from "../labels";
+import { folderName, isPersonalDir, PRIVATE_NOTE } from "../labels";
 import type { Completions } from "../pane-store";
 import { usePinnedSkill } from "../pinned-skill";
 import { useDraftModelSelection } from "../use-draft-model";
@@ -23,7 +23,8 @@ import { blockedShortcut, ComposerEditor, ComposerNote, EmptyConversation } from
 import { BranchPicker, targetOf } from "./git";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
 import { DictationButton, DictationRow, useDictation } from "./composer-dictation";
-import { useDashboardActions } from "./dashboard-context";
+import { PersonalContext, useDashboardActions } from "./dashboard-context";
+import { PrivateHero } from "./new-session-board";
 import type { PromptEditorHandle } from "./prompt-editor";
 import { ModelPicker } from "./model-picker";
 import { Header } from "./page-header";
@@ -95,6 +96,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const draftSkill = initial?.skill ?? pinnedSkill;
 	const [skipSkill, setSkipSkill] = useState(initial !== null && initial.skill === null);
 	const [isPrivate, setPrivate] = useState(initial?.private ?? false);
+	const personal = useContext(PersonalContext);
 	const skills = useSkills(cwd);
 	// The server decides whether the skill applies; the toggle only shows what it will decide.
 	const listedSkills = skills.error === null ? skills.data?.skills : [];
@@ -111,6 +113,8 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			? { kind: "existing", name: pickedChoice.name }
 			: pickedChoice;
 	const starting = launch?.phase === "starting" || (scheduled?.busy ?? false);
+	// A draft that starts from a todo cannot be private, since nothing may link to a private session.
+	const privacy = todo ? null : <PrivatePill on={isPrivate} onToggle={() => setPrivate(on => !on)} disabled={starting} />;
 	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] } });
 	const { send } = useDashboardActions();
 	// A composer that keeps no draft, as a scheduled start's, has nowhere to put text that lands after it closes.
@@ -159,6 +163,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			{scheduled ? (
 				<Header title="Scheduled session" meta={scheduled.when}>
+					{privacy}
 					<Button variant="ghost" size="compact" disabled={starting || !connected || !draft.trim() || directCommand !== null} onClick={() => onStart({ ...opOf(draft.trim()), images: [] })}>
 						{scheduled.error ? "Try again now" : "Start now"}
 					</Button>
@@ -167,7 +172,9 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					</Button>
 				</Header>
 			) : (
-				<Header title="New session" status={starting ? "Starting omp…" : undefined} />
+				<Header title="New session" status={starting ? "Starting omp…" : undefined}>
+					{privacy}
+				</Header>
 			)}
 			{error !== null && (
 				<p role="alert" className="border-b border-border px-6 py-2 text-xs text-red-600 dark:text-red-400">
@@ -179,6 +186,8 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					It starts at its time as Start session would start it. Edit the message, model, skill, directory, or branch, then save; the clock moves its time.
 					{todo && ` Your todo “${todo.text}” links to the session once it starts.`}
 				</EmptyConversation>
+			) : !todo && isPrivate ? (
+				<PrivateHero personal={isPersonalDir(cwd, personal)} />
 			) : (
 				board?.(
 					(target.creates
@@ -191,6 +200,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 				{completion.popup}
 				<ComposerEditor value={editorRef}>
 					<InputMessage
+						className={cn(!todo && isPrivate && "outline-2 outline-foreground")}
 						editorRef={editorRef}
 						value={draft}
 						onValueChange={completion.onValueChange}
@@ -219,7 +229,6 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 								{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
 								<ModelPicker {...models.picker} disabled={starting || !connected} control="composer.model" />
 								{draftSkill !== null && !ownCommand && <SkillToggle name={draftSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
-								{!todo && <PrivateToggle on={isPrivate} onToggle={() => setPrivate(on => !on)} disabled={starting} />}
 							</>
 						}
 						rightSlot={({ openFilePicker }) => (
@@ -281,11 +290,21 @@ function SkillToggle({ name, state, onToggle, disabled }: { name: string; state:
 	);
 }
 
-function PrivateToggle({ on, onToggle, disabled }: { on: boolean; onToggle: () => void; disabled: boolean }) {
+/** The header's Private switch: an outlined pill while off, a filled one with a close mark while on. */
+function PrivatePill({ on, onToggle, disabled }: { on: boolean; onToggle: () => void; disabled: boolean }) {
 	return (
 		<Tooltip content={PRIVATE_NOTE} disabled={disabled}>
-			<Button variant="ghost" size="compact" leadingIcon={Lock} aria-pressed={on} onClick={onToggle} disabled={disabled}>
-				<span className={cn(!on && "text-muted-foreground")}>Private</span>
+			<Button
+				variant={on ? "secondary" : "outline"}
+				size="compact"
+				leadingIcon={on ? Lock : LockOpen}
+				aria-pressed={on}
+				onClick={onToggle}
+				disabled={disabled}
+				className={cn("rounded-full", on && "bg-foreground text-background hover:bg-foreground/90")}
+			>
+				Private
+				{on && <X aria-hidden className="size-3" />}
 			</Button>
 		</Tooltip>
 	);
