@@ -9,7 +9,7 @@ decision-makers: Maxence, agent
 In the context of Private and Personal sessions, which Maxence found hard to tell apart from a normal draft, facing a lock toggle lost among the composer's chips and a Personal directory found only inside the directory picker, we chose the Private pill design: a **Private** pill in the New session header that, while on, fills dark, outlines the composer, and swaps the board for what ending deletes and what stays, a dark **Private** chip on running private rows and headers, and a **Personal** item under **New session** that opens a personal draft with its own board.
 We chose it over mode chips in the composer, a mode switch, and a dark private canvas, accepting one more sidebar item.
 We kept the sidebar's status groups rather than splitting it into Personal and Projects sections, since a split would repeat the pinned, idle, running, interrupted, and past groups twice; the existing Personal badge marks personal rows.
-We kept **Personal** in the directory picker too, since moving a draft there and the move and Bot pickers rely on it.
+We first kept **Personal** in the directory picker; later the same day Maxence had it removed, so the sidebar's **Personal** item and Cmd+Shift+P are the only ways into a personal session, and a project session can no longer move there.
 
 ## Options considered
 

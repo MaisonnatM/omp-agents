@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-04
 
+- Personal no longer shows up among your workspaces, in the directory picker or in the sidebar's workspace picker. Open a personal session from **Personal** in the sidebar or with Cmd+Shift+P.
 - New session now keeps the composer at the bottom of the page, as in a running session, under the omp logo and a question naming the folder you work in. Starters for work you start often, such as Run the dev server, Ship ENG-2722, or Shepherd my PRs, show inside the composer as the same numbered list a session suggests after a reply. Press a starter's number or click it to put its prompt in the composer, where you can edit it before you send.
 - Agents can now add reminders to the Calendar page, such as a time to check how a change performed, and you get a notice 10 minutes before each one. Clicking a reminder, on the Calendar page or in its notice, opens the session that added it.
 - New session now puts the composer near the top of the page, with the directory and branch just above it, and a row of starters under it for work you start often, such as **Run the dev server**, **Ship ENG-2722**, or **Shepherd my PRs**, the best fit for now first. Hover a starter to see its full prompt, and click it to put that prompt in the composer, where you can edit it before you send.
