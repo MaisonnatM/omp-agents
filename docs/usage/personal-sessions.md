@@ -5,8 +5,8 @@
   The dashboard creates that directory when it starts; it is not a git repository and holds no agent code, so starting there never asks you to [trust project code](per-project-agent-setup.md#trusting-a-projects-code).
 - To start one, click **Personal** under **New session** in the sidebar, or press Cmd+Shift+P (Ctrl+Shift+P elsewhere).
   A personal draft's page asks "What can I help with?" and shows **Your assistant** under the composer, in place of the starters, with the newest facts it remembers and the personal sessions you can resume; its composer asks about meals, plans, and errands.
-  The directory pickers, on a new session, a conversation's move, and a Bot's workspace, do not list it.
-- The page calls that directory **Personal** wherever it names a workspace: the sidebar's workspace picker and its **New session in Personal** button, the badge on a row under all workspaces, a directory picker's button on a personal session, and the command palette.
+  Neither the directory pickers, on a new session, a conversation's move, and a Bot's workspace, nor the sidebar's workspace picker list it.
+- The page calls that directory **Personal** wherever it names a workspace: the badge on a row under all workspaces, a directory picker's button on a personal session, and the command palette.
   An untitled session's row still reads as its directory's name, `personal`, until omp titles it.
 - Every turn of a personal session's main agent starts with the assistant's framing and what it remembers about you; its subagents get neither.
   It keeps any file it makes in the personal directory, which the [file dialog](changed-files-and-images.md) can open.

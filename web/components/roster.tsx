@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { agentOn } from "../../src/shared/moves";
 import { activityControl } from "../activity";
 import { yourMoveCount } from "../pull-requests-model";
-import { workspaceName } from "../labels";
+import { sameDir, workspaceName } from "../labels";
 import { pullRequestsStore, ticketsStore } from "../reads";
 import { hashForTickets, type NotesListView, type SettingsRoute, type SidebarPanel, type SidebarTab, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
@@ -74,7 +74,7 @@ function SidebarWorkspacePicker({ workspaces, current, onPick }: SidebarWorkspac
 					{
 						key: "workspaces",
 						heading: "Workspaces",
-						items: workspaceItems(workspaces, current, personal, workspace => pick(workspace.cwd)()),
+						items: workspaceItems(workspaces.filter(workspace => !sameDir(workspace.cwd, personal)), current, personal, workspace => pick(workspace.cwd)()),
 					},
 				],
 			}}
