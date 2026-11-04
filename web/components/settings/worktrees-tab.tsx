@@ -1,6 +1,6 @@
 import { Copy, GitMerge, RefreshCw, Trash2 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-import type { WorktreeBlockerCode, WorktreeEntry, WorktreeInventory, WorktreeMerge, WorktreeMetrics } from "../../../src/worktrees-shared";
+import { type WorktreeBlockerCode, type WorktreeEntry, type WorktreeInventory, type WorktreeMerge, type WorktreeMetrics, worktreeKey as keyOf } from "../../../src/worktrees-shared";
 import { Badge, type BadgeColor } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,7 +9,7 @@ import { readWorktreeMetrics, readWorktrees } from "../../api";
 import { errorText } from "../../../src/json";
 import { age, formatBytes } from "../../labels";
 import { useInlineConfirm } from "../../use-inline-confirm";
-import { removalKey as keyOf, removeWorktrees, useRemovalState, useRemovalStates, useRemovedAt } from "../../worktree-removals";
+import { REMOVAL_KEEPS, removeWorktrees, useRemovalState, useRemovalStates, useRemovedAt, useRemoving } from "../../worktree-removals";
 import { Spinner } from "../spinner";
 
 type SortKey = "name" | "activity" | "size";
@@ -42,7 +42,7 @@ const BLOCKER_BADGES: Record<WorktreeBlockerCode, { label: string; color: BadgeC
 const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? "" : "s"}`;
 
 /** What every removal deletes and keeps, said beside each button that queues one. */
-const REMOVAL_TERMS = "Ignored files such as dependencies and .env go with each checkout; branches and session transcripts stay.";
+const REMOVAL_TERMS = `Ignored files such as dependencies and .env go with each checkout. ${REMOVAL_KEEPS}`;
 
 const mergedLabel = (merge: WorktreeMerge): string => (merge.by === "pull-request" ? `Merged #${merge.number}` : "Merged");
 
@@ -395,7 +395,7 @@ function Pending() {
 
 /** **Remove N merged**: once you confirm, removes each merged worktree nothing blocks, one at a time; it waits while any removal is queued or running. */
 function RemoveMergedButton({ entries }: { entries: WorktreeEntry[] }) {
-	const removing = useRemovalStates().size > 0;
+	const removing = useRemoving();
 	const confirm = useInlineConfirm("remove-merged");
 	const count = entries.length;
 	if (count === 0 && !removing) return null;

@@ -13,6 +13,8 @@ let previews: Record<string, { blockers?: WorktreeBlocker[]; detachedCommitLoss?
 /** What the server answers when asked to remove each branch; a branch missing here is removed. */
 let removals: Record<string, Partial<WorktreeRemovalResult> | Error>;
 let requested: WorktreeRemovalRequest[];
+/** How many previews still drop their last plan, as a server that answers for fewer worktrees than asked. */
+let shortPreviews: number;
 
 const branchOf = (path: string): string => path.slice(path.lastIndexOf("/") + 1);
 
@@ -40,6 +42,7 @@ beforeEach(() => {
 	previews = {};
 	removals = {};
 	requested = [];
+	shortPreviews = 0;
 	shown = new Map();
 	said = new Map();
 	let ids = 0;
@@ -47,9 +50,12 @@ beforeEach(() => {
 		const body = JSON.parse(String(init.body)) as WorktreeRemovalRequest;
 		requested.push(body);
 		if (body.action === "preview") {
-			return reply({
-				plans: body.targets.map(({ repository, path }) => ({ repository, path, blockers: [], kind: "remove", branch: branchOf(path), head: "abc", ignored: ["node_modules"], detachedCommitLoss: false, savedSessionIds: [], confirmation: `ok-${branchOf(path)}`, ...previews[branchOf(path)] })),
-			});
+			const plans = body.targets.map(({ repository, path }) => ({ repository, path, blockers: [], kind: "remove", branch: branchOf(path), head: "abc", ignored: ["node_modules"], detachedCommitLoss: false, savedSessionIds: [], confirmation: `ok-${branchOf(path)}`, ...previews[branchOf(path)] }));
+			if (shortPreviews > 0) {
+				shortPreviews -= 1;
+				plans.pop();
+			}
+			return reply({ plans });
 		}
 		const results = body.plans.map(({ repository, path }) => {
 			const answer = removals[branchOf(path)];
@@ -118,5 +124,14 @@ describe("removeWorktrees", () => {
 			["Removing 2 worktrees: Checking whether they can be removed", "Removing 1 of 2 worktrees: a", "Removing 2 of 2 worktrees: b", "Removed 2 of 2 worktrees: Branches and session transcripts stay."],
 			["Removing c: Waiting for another removal", "Removing c: Checking whether it can be removed", "Removing c", "Removed c: Its branch and session transcripts stay."],
 		]);
+	});
+
+	test("removes nothing when the preview answers for fewer worktrees than asked, and frees them to queue again", async () => {
+		shortPreviews = 1;
+		await removeWorktrees([target("a"), target("b")], false);
+		expect(removed()).toEqual([]);
+		expect([...said.values()]).toEqual([["Removing 2 worktrees: Checking whether they can be removed", "Could not check 2 worktrees: The server answered for 1 of 2 worktrees."]]);
+		await removeWorktrees([target("a")], false);
+		expect(removed()).toEqual(["a"]);
 	});
 });

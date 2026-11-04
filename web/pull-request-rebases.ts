@@ -2,9 +2,9 @@
  * **Rebase on** a pull request's base: a queue the page keeps while you move around it, which runs one rebase at a time.
  * The server rebases the branch, runs the repository's checks, and pushes it; a conflict hands it to **Resolve conflicts**.
  */
-import { useSyncExternalStore } from "react";
 import { type PullRequest, type PullRequestRebase, type PullRequestSummary, prKey, type RebasedPullRequest, type RebaseStep, repoKey } from "../src/shared/github";
 import { errorText } from "../src/json";
+import { queueStates } from "./queue-states";
 import { putSteps } from "./api";
 import { loadingToast, settleToast, type ToastText, toasts } from "./components/toaster";
 
@@ -49,35 +49,21 @@ interface Entry {
 
 /** The jobs to rebase, in order; the one rebasing stays first until it ends. */
 const queue: Entry[] = [];
-let states: ReadonlyMap<string, RebaseState> = new Map();
+const states = queueStates<RebaseState>();
 let draining = false;
 /** A branch of the pull request's repository, as one key: the queue spans repositories, and a stack links its pull requests by branch within one. */
 const branchKey = (pr: PullRequest, branch: string): string => `${repoKey(pr)}:${branch}`;
 /** The head branches, by {@link branchKey}, of the pull requests that stopped since the queue was last empty, whatever run queued them. */
 const stopped = new Set<string>();
-const listeners = new Set<() => void>();
-
-function setState(key: string, state: RebaseState | null): void {
-	const next = new Map(states);
-	if (state) next.set(key, state);
-	else next.delete(key);
-	states = next;
-	for (const listener of listeners) listener();
-}
-
-const subscribe = (listener: () => void): (() => void) => {
-	listeners.add(listener);
-	return () => listeners.delete(listener);
-};
 
 /** Where `pr` stands in the queue; `null` while it is not in it. */
 export function useRebaseState(pr: PullRequest): RebaseState | null {
 	const key = prKey(pr);
-	return useSyncExternalStore(subscribe, () => states.get(key) ?? null);
+	return states.useState(key);
 }
 
 /** Whether a rebase is queued or running. */
-export const useRebasing = (): boolean => useSyncExternalStore(subscribe, () => states.size > 0);
+export const useRebasing = (): boolean => states.useBusy();
 
 /** How a rebase ended, and the toast that says so. */
 interface Ended {
@@ -164,10 +150,10 @@ async function drain(): Promise<void> {
 	for (let next = queue[0]; next; next = queue[0]) {
 		const { job, run } = next;
 		const key = prKey(job.pr);
-		setState(key, "running");
+		states.set([key], "running");
 		const { outcome, text } = await rebaseOne(next);
 		queue.shift();
-		setState(key, null);
+		states.set([key], null);
 		run.outcomes[outcome] += 1;
 		if (STOPS[outcome]) stopped.add(branchKey(job.pr, job.pr.head));
 		run.left -= 1;
@@ -183,7 +169,7 @@ async function drain(): Promise<void> {
 }
 
 function enqueue(jobs: readonly RebaseJob[], hooks: RebaseHooks, bulk: boolean): void {
-	const fresh = jobs.filter(({ pr }) => !states.has(prKey(pr)));
+	const fresh = jobs.filter(({ pr }) => !states.current().has(prKey(pr)));
 	const first = fresh[0];
 	if (!first) return;
 	const ahead = queue.length;
@@ -193,7 +179,7 @@ function enqueue(jobs: readonly RebaseJob[], hooks: RebaseHooks, bulk: boolean):
 	const run: Run = { ...counts, hooks, outcomes: { rebased: 0, current: 0, conflict: 0, failed: 0, skipped: 0 }, toast };
 	for (const job of fresh) {
 		queue.push({ job, run });
-		setState(prKey(job.pr), "queued");
+		states.set([prKey(job.pr)], "queued");
 	}
 	void drain();
 }
