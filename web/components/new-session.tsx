@@ -29,6 +29,7 @@ import { ModelPicker } from "./model-picker";
 import { Header } from "./page-header";
 import { ScheduleButton } from "./scheduled";
 import { DirectoryPicker } from "./workspace-picker";
+import { useGhost } from "./starter-variants";
 
 interface NewSessionProps {
 	/** Where omp starts, as typed or displayed (`~/code/webapp`). */
@@ -60,7 +61,7 @@ interface NewSessionProps {
 	 * The hero and board above the composer, given the line under its heading and `prefill`, which adds a prompt to the
 	 * draft, unsent, with the caret after it; a scheduled start shows none.
 	 */
-	board?: (note: string, prefill: (prompt: string) => void) => ReactNode;
+	board?: (note: string, prefill: (prompt: string) => void, draft: string) => ReactNode;
 }
 
 /** What a scheduled start keeps of the draft: text only, in the draft's directory. */
@@ -145,7 +146,21 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			editor.focus();
 		},
 	});
+	const ghost = useGhost();
 	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+		if (ghost && draft === "" && !event.metaKey && !event.altKey && !event.ctrlKey) {
+			if (event.key === "Tab" && !event.shiftKey) {
+				event.preventDefault();
+				prefilled.current = true;
+				setDraft(ghost.text);
+				return;
+			}
+			if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+				event.preventDefault();
+				ghost.step(event.key === "ArrowDown" ? 1 : -1);
+				return;
+			}
+		}
 		if (completion.onMenuKeyDown(event)) return;
 		dictation.onKeyDown(event);
 		onComposerKey(event);
@@ -199,6 +214,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 						prefilled.current = true;
 						setDraft(current => withAppended(current, prompt));
 					},
+					draft,
 				)
 			)}
 			<div className="relative mx-auto w-full max-w-conversation px-3 pb-3">
@@ -214,7 +230,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 							if (scheduled) save.run(text.trim());
 							else void attachments.read(text, async (prompt, images) => onStart({ ...opOf(prompt), images }));
 						}}
-						placeholder="Message this session…"
+						placeholder={ghost && draft === "" ? ghost.text : "Message this session…"}
 						files={attachments.files}
 						onFilesChange={attachments.onFilesChange}
 						accept={ATTACH_ACCEPT}
@@ -251,6 +267,12 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 						editorProps={{ ...completion.editorProps, onKeyDown, onPaste: scheduled ? undefined : attachments.onPaste, autoFocus: true }}
 					/>
 				</ComposerEditor>
+				{ghost && draft === "" && (
+					<p className="flex items-center gap-1.5 px-1 pt-1.5 text-[11.5px] text-muted-foreground">
+						<span className="font-medium text-foreground/80">{ghost.reason ?? ghost.label}</span>
+						<span>· Tab drafts it · ↑↓ another ({ghost.position})</span>
+					</p>
+				)}
 				{directCommand && <ComposerNote text={directCommand} />}
 				{attachments.note && <ComposerNote text={attachments.note} />}
 			</div>
