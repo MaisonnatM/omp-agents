@@ -21,6 +21,7 @@ Force-pushes and rewriting `main` still require explicit approval.
 A server, dev server, or other listener you start to test or verify never takes a default port, such as 3000, 3001, 4200, 4317, 5000, 5173, 8000, or 8080: the user's own servers and other sessions run there.
 Use the port range the repository's docs name; otherwise pick a random port between 20000 and 39999 and check it is free with `lsof -nP -iTCP:<port> -sTCP:LISTEN || echo free` first: `lsof` exits 1 when nothing listens, and `free` marks that as the expected answer.
 Pass the port through the tool's port flag or `PORT`, and point every browser, curl, and proxy call at it.
+When you tell the user about a server you started, write its full URL, such as `http://localhost:24816/settings`, never only the port.
 
 A test or check runs headless and never opens a window on the user's screen.
 Open pages with eval's `browser.open` in managed Chromium, `app: { relay: false, tern: false }` with `headed: false`; without them, it drives the user's own Chrome through the relay or a visible Tern pane.
