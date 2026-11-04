@@ -44,6 +44,8 @@
   `src/server/note-inbox.ts` drains agent adds and appends from `note-inbox/` through `JsonInboxDir` while its server owns the lock.
   `templates/omp/agent/extensions/notes.ts` registers `user_note`, reads persisted notes and pending adds, and leaves requests without writing `notes.json`.
   See [User notes](../architecture/user-notes.md).
+- `templates/omp/agent/extensions/inbox/client.ts`: what `notes.ts`, `todos.ts`, and `events.ts` share to reach their inboxes: `CONFIG_DIR`, `readJson`, `waiting`, the changes an inbox holds that the dashboard has not applied yet, oldest first, `leave`, which writes one change under a `.tmp` name then renames it, and the tool `reply`.
+  `withoutEmpty` drops the empty strings a model sends for a parameter it means to leave out, before `user_note` and `user_event` check their parameters; `user_todo` keeps them, since an empty `due`, `section`, or `workspace` clears that field.
 - `src/shared/workspaces.ts`: the Settings › Workspaces list, `WorkspaceList` of added and hidden directories, its `WorkspaceChange`, and `applyWorkspace`, which the server applies to its file.
   `src/server/workspaces-file.ts` keeps the list in `workspaces.json` beside the access token and moves a file it cannot read, or one that holds a relative path, to `workspaces.json.invalid`.
   At startup, before either file loads, the `Dashboard` constructor calls its `adoptOldWorkspaces`, which moves `projects.json`, where an older version kept the list, to `workspaces.json` when it holds a workspace list and `workspaces.json` does not exist; a `projects.json` in any other shape stays where it is.

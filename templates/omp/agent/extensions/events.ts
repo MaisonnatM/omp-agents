@@ -3,12 +3,10 @@
 // which the dashboard server applies and deletes, so it stays the only writer of events.json and a reminder added while
 // it is down waits for it.
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import { CONFIG_DIR, leave, readJson, reply, waiting, withoutEmpty } from "./inbox/client";
 
-const CONFIG_DIR = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "omp-agents");
 const EVENTS_FILE = join(CONFIG_DIR, "events.json");
 const INBOX_DIR = join(CONFIG_DIR, "event-inbox");
 
@@ -26,30 +24,10 @@ type Change = { op: "add"; event: LocalEvent } | { op: "remove"; id: string; ses
 const DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?$/;
 const MINUTE_MS = 60_000;
 
-function readJson(path: string): unknown {
-	try {
-		return JSON.parse(readFileSync(path, "utf8"));
-	} catch {
-		return null;
-	}
-}
-
-/** The changes the inbox holds that the dashboard has not applied yet, oldest first. */
-function waiting(): Change[] {
-	let names: string[] = [];
-	try {
-		names = readdirSync(INBOX_DIR).filter(name => name.endsWith(".json")).sort();
-	} catch {}
-	return names.flatMap(name => {
-		const change = readJson(join(INBOX_DIR, name)) as Change | null;
-		return change ? [change] : [];
-	});
-}
-
 /** Pending changes participate in reads so agents see their writes while the dashboard is stopped. */
 function readEvents(): LocalEvent[] {
 	const events = new Map(((readJson(EVENTS_FILE) as { events?: LocalEvent[] } | null)?.events ?? []).map(event => [event.id, event]));
-	for (const change of waiting()) {
+	for (const change of waiting<Change>(INBOX_DIR)) {
 		if (change.op === "add" && !events.has(change.event.id)) events.set(change.event.id, change.event);
 		if (change.op === "remove") events.delete(change.id);
 	}
@@ -82,17 +60,6 @@ function listText(sessionId: string): string {
 		.map(({ event }) => `- ${event.title} (id ${event.id}, ${whenText(event.when)}${event.sessionId === sessionId ? ", added by this session" : ""})`);
 	return lines.length > 0 ? lines.join("\n") : "No upcoming event is kept on this computer.";
 }
-
-/** Leaves `change` for the dashboard: written under a name it skips, then renamed, so it never reads half a file. */
-function leave(change: Change): void {
-	mkdirSync(INBOX_DIR, { recursive: true });
-	const name = `${Date.now()}-${randomUUID()}`;
-	const temp = join(INBOX_DIR, `${name}.tmp`);
-	writeFileSync(temp, JSON.stringify(change));
-	renameSync(temp, join(INBOX_DIR, `${name}.json`));
-}
-
-const reply = (text: string, isError = false) => ({ content: [{ type: "text" as const, text }], isError });
 
 export default function events(pi: ExtensionAPI) {
 	const z = pi.zod;
@@ -128,9 +95,7 @@ export default function events(pi: ExtensionAPI) {
 		].join("\n"),
 		parameters: params,
 		async execute(_id, raw, _signal, _onUpdate, ctx) {
-			// A model often sends an empty string for a parameter it means to leave out.
-			const given = typeof raw === "object" && raw !== null ? Object.fromEntries(Object.entries(raw).filter(([, value]) => value !== "")) : raw;
-			const parsed = params.safeParse(given);
+			const parsed = params.safeParse(withoutEmpty(raw));
 			if (!parsed.success) return reply("Invalid user_event input.", true);
 			const { action, id, title, start, minutes = 30 } = parsed.data;
 			const sessionId = ctx.sessionManager.getSessionId();
@@ -146,14 +111,14 @@ export default function events(pi: ExtensionAPI) {
 					const same = readEvents().find(event => event.sessionId === sessionId && event.title === line && !event.when.allDay && event.when.start === startMs);
 					if (same) return reply(`This session already added it (id ${same.id}).`);
 					const event: LocalEvent = { id: randomUUID(), title: line, when: { allDay: false, start: startMs, end: startMs + minutes * MINUTE_MS }, sessionId };
-					leave({ op: "add", event });
+					leave(INBOX_DIR, { op: "add", event });
 					return reply(`Added to the Calendar page (id ${event.id}), ${whenText(event.when)}; a notice comes 10 minutes before it starts.`);
 				}
 				case "remove": {
 					const event = readEvents().find(entry => entry.id === id);
 					if (!event) return reply(`No event kept on this computer has id ${id ?? "(none given)"}.`, true);
 					if (event.sessionId !== sessionId) return reply(`This session did not add ${JSON.stringify(event.title)}, so it cannot remove it.`, true);
-					leave({ op: "remove", id: event.id, sessionId });
+					leave(INBOX_DIR, { op: "remove", id: event.id, sessionId });
 					return reply(`Removed ${JSON.stringify(event.title)} from the Calendar page.`);
 				}
 			}
