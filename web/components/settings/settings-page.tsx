@@ -143,7 +143,6 @@ export function SettingsPage({
 	workspaces,
 	workspaceList,
 	trustedProjects,
-	pins,
 }: {
 	section: SettingsSection;
 	/** The sidebar's workspace, `null` for all workspaces, which reads your user files only. */
@@ -153,7 +152,6 @@ export function SettingsPage({
 	workspaceList: WorkspaceList<Workspace>;
 	/** The projects whose agent code the user trusted, for Settings › Workspaces. */
 	trustedProjects: TrustedProject[];
-	pins: string[];
 }) {
 	const models = useRead<{ models: CatalogModel[] }>("/api/models");
 	const catalog = useMemo(
@@ -193,7 +191,7 @@ export function SettingsPage({
 		workspaces: <WorkspacesTab workspaces={workspaces} list={workspaceList} trustedProjects={trustedProjects} />,
 		sync: <SyncTab active={section === "sync"} />,
 		storage: <StorageTab cwd={cwd} active={section === "storage"} onSaved={settings.reload} />,
-		worktrees: <WorktreesTab cwd={cwd} active={section === "worktrees"} pins={pins} />,
+		worktrees: <WorktreesTab cwd={cwd} active={section === "worktrees"} />,
 		decisions: <DecisionsTab cwd={cwd} active={section === "decisions"} />,
 		extensions: <ExtensionsTab cwd={cwd} active={section === "extensions"} onSaved={settings.reload} />,
 	};

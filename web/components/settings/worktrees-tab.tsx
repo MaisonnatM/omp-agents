@@ -1,14 +1,16 @@
-import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Copy, GitMerge, RefreshCw, Trash2 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-import { MAX_WORKTREE_BATCH, type WorktreeBlockerCode, type WorktreeEntry, type WorktreeInventory, type WorktreeMerge, type WorktreeMetrics, type WorktreeRemovalPlan, type WorktreeRemovalResult } from "../../../src/worktrees-shared";
+import type { WorktreeBlockerCode, WorktreeEntry, WorktreeInventory, WorktreeMerge, WorktreeMetrics } from "../../../src/worktrees-shared";
 import { Badge, type BadgeColor } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip } from "@/components/ui/tooltip";
-import { changeWorktrees, readWorktreeMetrics, readWorktrees } from "../../api";
+import { readWorktreeMetrics, readWorktrees } from "../../api";
 import { errorText } from "../../../src/json";
 import { age, formatBytes } from "../../labels";
+import { useInlineConfirm } from "../../use-inline-confirm";
+import { removalKey as keyOf, removeWorktrees, useRemovalState, useRemovalStates, useRemovedAt } from "../../worktree-removals";
+import { Spinner } from "../spinner";
 
 type SortKey = "name" | "activity" | "size";
 
@@ -37,24 +39,10 @@ const BLOCKER_BADGES: Record<WorktreeBlockerCode, { label: string; color: BadgeC
 	unreadable: { label: "Unreadable", color: "red" },
 };
 
-type DialogState =
-	| { phase: "checking"; count: number }
-	| { phase: "ready"; plans: WorktreeRemovalPlan[]; merged: boolean }
-	| { phase: "removing"; count: number }
-	| { phase: "done"; results: WorktreeRemovalResult[]; kept: WorktreeRemovalPlan[] }
-	| { phase: "error"; message: string };
-
-type ReadablePlan = Exclude<WorktreeRemovalPlan, { kind: "unreadable" }>;
-
-const keyOf = (target: { repository: string; path: string }): string => `${target.repository}\0${target.path}`;
-
-/** A plan the server could read and nothing blocks, which a confirmation removes. */
-const canRemove = (plan: WorktreeRemovalPlan): plan is ReadablePlan => plan.kind !== "unreadable" && plan.blockers.length === 0;
-
 const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? "" : "s"}`;
 
-/** `items` in runs of at most `MAX_WORKTREE_BATCH`, the most one removal request takes. */
-const batches = <T,>(items: T[]): T[][] => Array.from({ length: Math.ceil(items.length / MAX_WORKTREE_BATCH) }, (_, index) => items.slice(index * MAX_WORKTREE_BATCH, (index + 1) * MAX_WORKTREE_BATCH));
+/** What every removal deletes and keeps, said beside each button that queues one. */
+const REMOVAL_TERMS = "Ignored files such as dependencies and .env go with each checkout; branches and session transcripts stay.";
 
 const mergedLabel = (merge: WorktreeMerge): string => (merge.by === "pull-request" ? `Merged #${merge.number}` : "Merged");
 
@@ -82,25 +70,28 @@ function pathParts(path: string, repositoryPath: string): { folder: string; name
 }
 
 /** The settings tab for Git worktrees of repositories omp sessions ran in, plus a repository path entered here. */
-export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active: boolean; pins: string[] }) {
+export function WorktreesTab({ cwd, active }: { cwd: string | null; active: boolean }) {
 	const [refresh, setRefresh] = useState(0);
 	const [extras, setExtras] = useState<string[]>([]);
 	const [pathDraft, setPathDraft] = useState("");
 	const [query, setQuery] = useState("");
 	const [filter, setFilter] = useState<FilterKey>("all");
 	const [sort, setSort] = useState<SortKey>("size");
-	const [inventory, setInventory] = useState<WorktreeInventory | null>(null);
+	const [read, setRead] = useState<{ inventory: WorktreeInventory; at: number } | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [reading, setReading] = useState(false);
 	const [metrics, setMetrics] = useState<Record<string, WorktreeMetrics>>({});
 	const [ranked, setRanked] = useState<Record<string, WorktreeMetrics>>({});
 	const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
-	const [dialog, setDialog] = useState<DialogState | null>(null);
-	const [acceptLoss, setAcceptLoss] = useState(false);
+	const removedAt = useRemovedAt();
+	const queue = useRemovalStates();
+	/** Whether nothing blocks `entry` and it is not already queued, so a selection or **Remove merged** can take it. */
+	const removable = (entry: WorktreeEntry): boolean => entry.blockers.length === 0 && !queue.has(keyOf(entry));
 
 	useEffect(() => {
 		if (!active) return;
 		const controller = new AbortController();
+		const at = Date.now();
 		setReading(true);
 		const scopes = cwd === null ? [null, ...extras] : [cwd, ...extras];
 		Promise.all(scopes.map(scope => readWorktrees(scope, controller.signal))).then(
@@ -116,7 +107,7 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 						next.repositories.push(repo);
 					}
 				}
-				setInventory(next);
+				setRead({ inventory: next, at });
 				setError(null);
 				setReading(false);
 				setSelected(current => new Set([...current].filter(key => next.repositories.some(repo => repo.worktrees.some(entry => keyOf(entry) === key)))));
@@ -131,9 +122,9 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 	}, [active, cwd, extras, refresh]);
 
 	useEffect(() => {
-		if (!active || !inventory) return;
+		if (!active || !read) return;
 		const controller = new AbortController();
-		const targets = inventory.repositories.flatMap(repo => repo.worktrees.filter(entry => !entry.missing));
+		const targets = read.inventory.repositories.flatMap(repo => repo.worktrees.filter(entry => !entry.missing));
 		let cursor = 0;
 		const worker = async (): Promise<void> => {
 			while (cursor < targets.length && !controller.signal.aborted) {
@@ -153,7 +144,14 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 		};
 		void Promise.all([worker(), worker(), worker()]);
 		return () => controller.abort();
-	}, [active, inventory]);
+	}, [active, read]);
+
+	// A worktree removed since the list was read leaves it at once, without reading every worktree again.
+	const inventory = useMemo((): WorktreeInventory | null => {
+		if (!read) return null;
+		const gone = (entry: WorktreeEntry): boolean => (removedAt.get(keyOf(entry)) ?? 0) >= read.at;
+		return { ...read.inventory, repositories: read.inventory.repositories.map(repo => ({ ...repo, worktrees: repo.worktrees.filter(entry => !gone(entry)) })) };
+	}, [read, removedAt]);
 
 	const measurable = (inventory?.repositories ?? []).flatMap(repo => repo.worktrees.filter(entry => !entry.missing));
 	const unmeasured = measurable.filter(entry => !metrics[keyOf(entry)]).length;
@@ -179,50 +177,9 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 
 	const all = (inventory?.repositories ?? []).flatMap(repo => repo.worktrees);
 	const visible = rows.flatMap(repo => repo.worktrees);
-	const chosen = visible.filter(entry => entry.blockers.length === 0 && selected.has(keyOf(entry)));
+	const chosen = visible.filter(entry => removable(entry) && selected.has(keyOf(entry)));
 	const merged = visible.filter(entry => entry.merged !== null);
 	const notices = Map.groupBy(inventory?.errors ?? [], item => item.error);
-
-	/** Previews `targets`; `onlyMerged` also keeps each one whose work the server does not find merged. */
-	const ask = (targets: WorktreeEntry[], onlyMerged: boolean): void => {
-		setAcceptLoss(false);
-		setDialog({ phase: "checking", count: targets.length });
-		const preview = async (): Promise<WorktreeRemovalPlan[]> => {
-			const plans: WorktreeRemovalPlan[] = [];
-			for (const batch of batches(targets)) plans.push(...(await changeWorktrees({ action: "preview", targets: batch, merged: onlyMerged })).plans);
-			return plans;
-		};
-		void preview().then(
-			plans => setDialog({ phase: "ready", plans, merged: onlyMerged }),
-			(err: unknown) => setDialog({ phase: "error", message: errorText(err) }),
-		);
-	};
-
-	/** Removes the plans nothing blocks; the rest are reported as kept. */
-	const confirm = (plans: WorktreeRemovalPlan[]): void => {
-		const going = plans.filter(canRemove);
-		const kept = plans.filter((plan): boolean => !canRemove(plan));
-		setDialog({ phase: "removing", count: going.length });
-		const remove = async (): Promise<WorktreeRemovalResult[]> => {
-			const results: WorktreeRemovalResult[] = [];
-			for (const batch of batches(going)) {
-				const answer = await changeWorktrees({ action: "remove", plans: batch.map(({ repository, path, confirmation }) => ({ repository, path, confirmation })) });
-				results.push(...answer.results);
-			}
-			return results;
-		};
-		void remove().then(
-			results => {
-				setDialog({ phase: "done", results, kept });
-				if (results.some(result => result.removed)) setRefresh(count => count + 1);
-			},
-			(err: unknown) => {
-				setDialog({ phase: "error", message: errorText(err) });
-				// An earlier batch may have removed worktrees before this one failed.
-				setRefresh(count => count + 1);
-			},
-		);
-	};
 
 	const addRepository = (event: FormEvent): void => {
 		event.preventDefault();
@@ -304,9 +261,7 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 					<Button type="button" variant="ghost" size="compact" leadingIcon={RefreshCw} loading={reading} onClick={() => setRefresh(count => count + 1)}>
 						Refresh
 					</Button>
-					<Button type="button" variant="secondary" size="compact" leadingIcon={GitMerge} disabled={merged.length === 0} onClick={() => ask(merged, true)}>
-						Remove merged ({merged.length})
-					</Button>
+					<RemoveMergedButton entries={merged.filter(removable)} />
 				</div>
 			</div>
 			{error ? (
@@ -324,7 +279,7 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 			{inventory && all.length > 0 && visible.length === 0 ? <p className="text-sm text-muted-foreground">No worktree matches.</p> : null}
 			{rows.map(repo => {
 				if (repo.worktrees.length === 0) return null;
-				const open = repo.worktrees.filter(entry => entry.blockers.length === 0);
+				const open = repo.worktrees.filter(removable);
 				const picked = open.filter(entry => selected.has(keyOf(entry))).length;
 				const repoBytes = totalBytes(repo.worktrees, metrics);
 				const pickAll = (): void =>
@@ -356,7 +311,7 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 									<col className="w-28" />
 									<col className="w-24" />
 									<col className="w-44" />
-									<col className="w-28" />
+									<col className="w-32" />
 								</colgroup>
 								<thead className="text-xs text-muted-foreground">
 									<tr className="border-b border-border">
@@ -397,7 +352,6 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 													return next;
 												})
 											}
-											onDelete={() => ask([entry], false)}
 										/>
 									))}
 								</tbody>
@@ -414,9 +368,7 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 						<Button type="button" variant="ghost" size="compact" onClick={() => setSelected(new Set())}>
 							Clear
 						</Button>
-						<Button type="button" variant="destructive-outline" size="compact" leadingIcon={Trash2} onClick={() => ask(chosen, false)}>
-							Delete {plural(chosen.length, "worktree")}
-						</Button>
+						<DeleteChosenButton chosen={chosen} onQueued={() => setSelected(new Set())} />
 					</div>
 				</div>
 			) : null}
@@ -429,14 +381,6 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 					Show
 				</Button>
 			</form>
-			<DialogPrimitive.Root open={dialog !== null} onOpenChange={open => { if (!open) setDialog(null); }}>
-				<DialogPrimitive.Portal>
-					<DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/40 dark:bg-black/80" />
-					<DialogPrimitive.Content aria-describedby={undefined} className="fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100vh-2rem)] w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-border bg-background p-5 text-foreground shadow-md">
-						{dialog && <RemovalBody dialog={dialog} metrics={metrics} acceptLoss={acceptLoss} pins={pins} onAcceptLoss={setAcceptLoss} onClose={() => setDialog(null)} onConfirm={confirm} />}
-					</DialogPrimitive.Content>
-				</DialogPrimitive.Portal>
-			</DialogPrimitive.Root>
 		</section>
 	);
 }
@@ -449,8 +393,47 @@ function Pending() {
 	);
 }
 
-function WorktreeRow({ entry, repositoryPath, measured, checked, onToggle, onDelete }: { entry: WorktreeEntry; repositoryPath: string; measured: WorktreeMetrics | undefined; checked: boolean; onToggle: () => void; onDelete: () => void }) {
+/** **Remove N merged**: once you confirm, removes each merged worktree nothing blocks, one at a time; it waits while any removal is queued or running. */
+function RemoveMergedButton({ entries }: { entries: WorktreeEntry[] }) {
+	const removing = useRemovalStates().size > 0;
+	const confirm = useInlineConfirm("remove-merged");
+	const count = entries.length;
+	if (count === 0 && !removing) return null;
+	const armed = confirm.isArmed("remove");
+	const label = removing ? "Removing…" : armed ? `Confirm removal of ${count}?` : `Remove ${count} merged`;
+	return (
+		<Tooltip content={`Remove each merged worktree nothing blocks, one at a time. ${REMOVAL_TERMS}`} forceOpen={armed ? false : undefined}>
+			<Button type="button" variant="secondary" size="compact" leadingIcon={removing ? Spinner : GitMerge} disabled={removing} aria-busy={removing} aria-label={label} {...confirm.props("remove", () => void removeWorktrees(entries, true))}>
+				{label}
+			</Button>
+		</Tooltip>
+	);
+}
+
+/** The selection bar's **Delete N worktrees**: once you confirm, queues the selected worktrees and clears the selection. */
+function DeleteChosenButton({ chosen, onQueued }: { chosen: WorktreeEntry[]; onQueued: () => void }) {
+	const confirm = useInlineConfirm("delete-chosen");
+	const armed = confirm.isArmed("delete");
+	const label = armed ? `Confirm deletion of ${chosen.length}?` : `Delete ${plural(chosen.length, "worktree")}`;
+	const queue = (): void => {
+		void removeWorktrees(chosen, false);
+		onQueued();
+	};
+	return (
+		<Tooltip content={`Delete each selected worktree, one at a time. ${REMOVAL_TERMS}`} forceOpen={armed ? false : undefined}>
+			<Button type="button" variant="destructive-outline" size="compact" leadingIcon={Trash2} aria-label={label} {...confirm.props("delete", queue)}>
+				{label}
+			</Button>
+		</Tooltip>
+	);
+}
+
+function WorktreeRow({ entry, repositoryPath, measured, checked, onToggle }: { entry: WorktreeEntry; repositoryPath: string; measured: WorktreeMetrics | undefined; checked: boolean; onToggle: () => void }) {
+	const state = useRemovalState(entry);
+	const confirm = useInlineConfirm(`delete-${keyOf(entry)}`);
+	const armed = confirm.isArmed("delete");
 	const blocked = entry.blockers.length > 0;
+	const label = state === "removing" ? "Removing" : state === "queued" ? "Queued" : armed ? "Confirm?" : entry.missing ? "Forget" : "Delete";
 	const pending = !measured && !entry.missing;
 	const { folder, name } = pathParts(entry.path, repositoryPath);
 	const codes = [...new Set(entry.blockers.map(blocker => blocker.code))];
@@ -458,7 +441,7 @@ function WorktreeRow({ entry, repositoryPath, measured, checked, onToggle, onDel
 	return (
 		<tr className="border-b border-border/60 align-middle last:border-b-0 hover:bg-hover/50">
 			<td className="py-2">
-				<input type="checkbox" checked={checked} disabled={blocked} aria-label={`Select ${entry.path}`} onChange={onToggle} />
+				<input type="checkbox" checked={checked} disabled={blocked || state !== null} aria-label={`Select ${entry.path}`} onChange={onToggle} />
 			</td>
 			<td className="py-2 pr-3">
 				<div className="flex min-w-0 items-center gap-1.5">
@@ -508,165 +491,24 @@ function WorktreeRow({ entry, repositoryPath, measured, checked, onToggle, onDel
 				<Button type="button" variant="ghost" size="icon-compact" aria-label={`Copy ${entry.path}`} onClick={() => void navigator.clipboard.writeText(entry.path)}>
 					<Copy aria-hidden />
 				</Button>
-				<Tooltip content={blockerText(entry.blockers)} disabled={!blocked}>
+				<Tooltip content={blocked ? blockerText(entry.blockers) : REMOVAL_TERMS} forceOpen={armed ? false : undefined}>
 					<span className="inline-flex">
-						<Button type="button" variant="ghost" size="compact" leadingIcon={Trash2} disabled={blocked} aria-label={`${entry.missing ? "Forget registration for" : "Delete"} ${entry.path}`} onClick={onDelete}>
-							{entry.missing ? "Forget" : "Delete"}
+						<Button
+							type="button"
+							variant="ghost"
+							size="compact"
+							className="w-24 justify-start"
+							leadingIcon={state === "removing" ? Spinner : Trash2}
+							disabled={blocked || state !== null}
+							aria-busy={state !== null}
+							aria-label={armed ? `Confirm ${entry.missing ? "forgetting" : "deleting"} ${entry.path}` : `${entry.missing ? "Forget registration for" : "Delete"} ${entry.path}`}
+							{...confirm.props("delete", () => void removeWorktrees([entry], false))}
+						>
+							{label}
 						</Button>
 					</span>
 				</Tooltip>
 			</td>
 		</tr>
-	);
-}
-
-function RemovalBody({
-	dialog,
-	metrics,
-	acceptLoss,
-	pins,
-	onAcceptLoss,
-	onClose,
-	onConfirm,
-}: {
-	dialog: DialogState;
-	metrics: Record<string, WorktreeMetrics>;
-	acceptLoss: boolean;
-	pins: string[];
-	onAcceptLoss: (value: boolean) => void;
-	onClose: () => void;
-	onConfirm: (plans: WorktreeRemovalPlan[]) => void;
-}) {
-	if (dialog.phase === "checking") {
-		return (
-			<>
-				<DialogPrimitive.Title className="text-base font-medium">Checking worktrees</DialogPrimitive.Title>
-				<p className="mt-2 text-sm">Checking whether {dialog.count === 1 ? "this worktree" : `these ${dialog.count} worktrees`} can be removed…</p>
-			</>
-		);
-	}
-	if (dialog.phase === "error") {
-		return (
-			<>
-				<DialogPrimitive.Title className="text-base font-medium">Could not remove the worktree</DialogPrimitive.Title>
-				<p role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400">
-					{dialog.message}
-				</p>
-				<div className="mt-4 flex justify-end">
-					<Button type="button" variant="secondary" size="compact" onClick={onClose}>
-						Close
-					</Button>
-				</div>
-			</>
-		);
-	}
-	if (dialog.phase === "removing") {
-		return (
-			<>
-				<DialogPrimitive.Title className="text-base font-medium">Removing worktrees</DialogPrimitive.Title>
-				<p className="mt-2 text-sm">Removing {plural(dialog.count, "worktree")}…</p>
-			</>
-		);
-	}
-	if (dialog.phase === "done") {
-		const removed = dialog.results.filter(result => result.removed).length;
-		const failed = dialog.results.filter(result => !result.removed && result.error !== null).length;
-		const kept = dialog.kept.length + dialog.results.length - removed - failed;
-		return (
-			<>
-				<DialogPrimitive.Title className="text-base font-medium">Removal finished</DialogPrimitive.Title>
-				<p className="mt-2 text-sm">
-					Removed {removed}. Kept {kept}. Failed {failed}. Branches and session transcripts stay.
-				</p>
-				<ul className="mt-3 min-h-0 flex-1 divide-y divide-border overflow-y-auto text-sm">
-					{dialog.results.map(result => (
-						<li key={keyOf(result)} className="py-2">
-							<p className="text-xs break-all text-muted-foreground">{result.path}</p>
-							<p className={result.removed ? "" : "text-red-600 dark:text-red-400"}>{result.removed ? "Removed" : result.error !== null ? `Failed. ${result.error}` : `Kept. ${blockerText(result.blockers)}`}</p>
-						</li>
-					))}
-					{dialog.kept.map(plan => (
-						<li key={keyOf(plan)} className="py-2">
-							<p className="text-xs break-all text-muted-foreground">{plan.path}</p>
-							<p className="text-muted-foreground">Kept. {blockerText(plan.blockers)}</p>
-						</li>
-					))}
-				</ul>
-				<div className="mt-4 flex justify-end">
-					<Button type="button" variant="secondary" size="compact" onClick={onClose}>
-						Close
-					</Button>
-				</div>
-			</>
-		);
-	}
-	const going = dialog.plans.filter(canRemove);
-	const kept = dialog.plans.filter((plan): boolean => !canRemove(plan));
-	const loss = going.some(plan => plan.ignored.length > 0 || plan.detachedCommitLoss);
-	const pinnedHere = going.flatMap(plan => plan.savedSessionIds.filter(id => pins.includes(id)));
-	const frees = totalBytes(going, metrics);
-	const title = dialog.merged ? (going.length > 0 ? `Remove ${plural(going.length, "merged worktree")}?` : "No merged worktree can be removed") : dialog.plans.length === 1 ? "Remove this worktree?" : `Remove ${dialog.plans.length} worktrees?`;
-	// Only Remove merged removes part of what it previewed; a hand-picked removal stays all or nothing.
-	const stopped = dialog.merged ? going.length === 0 : kept.length > 0;
-	return (
-		<>
-			<DialogPrimitive.Title className="text-base font-medium">{title}</DialogPrimitive.Title>
-			<p className="mt-1 text-sm text-muted-foreground">
-				{going.length > 0 && frees !== null ? `Frees about ${formatBytes(frees)}. ` : ""}
-				{dialog.merged && kept.length > 0 ? `${plural(kept.length, "worktree")} will be kept. ` : ""}
-				Branches and session transcripts stay.
-			</p>
-			<div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto text-sm">
-				{going.length > 0 ? (
-					<ul className="divide-y divide-border rounded-md border border-border">
-						{going.map(plan => {
-							const bytes = metrics[keyOf(plan)]?.allocatedBytes;
-							return (
-								<li key={keyOf(plan)} className="space-y-0.5 px-3 py-2">
-									<div className="flex items-baseline gap-2">
-										<span className="min-w-0 flex-1 truncate font-medium">{plan.branch ?? "Detached"}</span>
-										{bytes == null ? null : <span className="shrink-0 text-muted-foreground tabular-nums">{formatBytes(bytes)}</span>}
-									</div>
-									<p className="text-xs break-all text-muted-foreground">{plan.path}</p>
-									{plan.ignored.length > 0 ? <p className="text-xs text-amber-700 dark:text-amber-400">Deletes ignored files: {plan.ignored.join(", ")}</p> : null}
-									{plan.detachedCommitLoss ? <p className="text-xs text-amber-700 dark:text-amber-400">This detached commit is not on a branch, tag, or remote. Removing the registration can make it unreachable.</p> : null}
-									{plan.savedSessionIds.length > 0 ? <p className="text-xs text-muted-foreground">{plural(plan.savedSessionIds.length, "saved omp session")} ran here. Resume may fail after the directory is gone.</p> : null}
-								</li>
-							);
-						})}
-					</ul>
-				) : null}
-				{kept.length > 0 ? (
-					<details open={!dialog.merged || going.length === 0} className="group">
-						<summary className="cursor-pointer text-muted-foreground select-none">{dialog.merged ? `Kept (${kept.length})` : `Blocked (${kept.length})`}</summary>
-						<ul className="mt-2 divide-y divide-border rounded-md border border-border">
-							{kept.map(plan => (
-								<li key={keyOf(plan)} className="space-y-0.5 px-3 py-2">
-									{plan.kind !== "unreadable" ? <p className="font-medium">{plan.branch ?? "Detached"}</p> : null}
-									<p className="text-xs break-all text-muted-foreground">{plan.path}</p>
-									<p className="text-xs text-red-600 dark:text-red-400">{blockerText(plan.blockers)}</p>
-								</li>
-							))}
-						</ul>
-					</details>
-				) : null}
-			</div>
-			{pinnedHere.length > 0 ? <p className="mt-3 text-sm">{plural(pinnedHere.length, "pinned session")} ran here.</p> : null}
-			<p className="mt-3 text-xs text-muted-foreground">Shells and editors outside omp may still be using a checkout. Close them first. This page cannot see all of them.</p>
-			{loss ? (
-				<label className="mt-3 flex items-start gap-2 text-sm">
-					<input type="checkbox" className="mt-0.5" checked={acceptLoss} onChange={event => onAcceptLoss(event.target.checked)} />
-					<span>Delete the ignored files and accept a detached commit becoming unreachable when the list says so.</span>
-				</label>
-			) : null}
-			<div className="mt-4 flex justify-end gap-2">
-				<Button type="button" variant="secondary" size="compact" onClick={onClose}>
-					Cancel
-				</Button>
-				<Button type="button" variant="destructive-outline" size="compact" leadingIcon={Trash2} disabled={stopped || (loss && !acceptLoss)} onClick={() => onConfirm(dialog.plans)}>
-					{dialog.merged ? `Delete ${plural(going.length, "worktree")}` : "Delete worktree files"}
-				</Button>
-			</div>
-		</>
 	);
 }

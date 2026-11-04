@@ -286,7 +286,6 @@ export function App() {
 																		openBot={openBot}
 																		workspaceList={state.workspaceList}
 																		trustedProjects={state.trustedProjects}
-																		pins={state.pins}
 																		newSessionCompletions={state.newSessionCompletions}
 																		connected={state.connected}
 																		listed={state.listed}
