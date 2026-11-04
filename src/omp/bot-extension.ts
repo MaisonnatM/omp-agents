@@ -1,13 +1,29 @@
-// omp-agents Bots: gives a Bot's session its name, job, memory, and routines on every turn, the `remember` tool, the one
-// writer of that memory, the `set_job` tool, which asks the dashboard to change the Bot's job, and the `save_routine` and
-// `delete_routine` tools, which ask it to change the Bot's own routines. The dashboard loads it with `omp -e` and the
-// flags in `BOT_FLAGS` for a Bot's session only (`Bots.join` in src/server/bots.ts), so no other session reads it.
+// omp-agents Bots: gives a Bot's session its name, job, memory, routines, and the other Bots on every turn, the
+// `remember` tool, the one writer of that memory, the `set_job` tool, which asks the dashboard to change the Bot's job,
+// the `save_routine` and `delete_routine` tools, which ask it to change the Bot's own routines, and the `message_bot`
+// tool, which asks it to message another Bot. The dashboard loads it with `omp -e` and the flags in `BOT_FLAGS` for a
+// Bot's session only (`Bots.join` in src/server/bots.ts), so no other session reads it.
 import { randomUUID } from "node:crypto";
 import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { errorText, isObject, parseJson } from "../json";
 import { type BotRoutineRequest, MAX_COMMAND_LENGTH, parseRoutineSpec, type RoutineSpec, TRIGGER_KINDS } from "../routines";
-import { type BotCreateRequest, type BotId, type BotJobRequest, MAX_FACT_LENGTH, MAX_JOB_LENGTH, parseBots, parseBotId } from "../shared/bots";
+import { BOT_MESSAGE_STAMP } from "../shared/bot-message";
+import {
+	type Bot,
+	type BotCreateRequest,
+	type BotId,
+	type BotJobRequest,
+	type BotMessageRequest,
+	jobLine,
+	MAX_BOT_MESSAGE_LENGTH,
+	MAX_FACT_LENGTH,
+	MAX_JOB_LENGTH,
+	MESSAGE_BOT_TOOL,
+	parseBotMessageText,
+	parseBots,
+	parseBotId,
+} from "../shared/bots";
 import type { ShepherdRequest } from "../shared/shepherd";
 import { type ExtensionApi, flagValue, memoryLines, readText, rememberTool, reply } from "./extension-kit";
 
@@ -39,7 +55,7 @@ function routineLine({ id, name, enabled, schedules, triggers, task }: RoutineSp
 }
 
 /** Leaves `request` in `dir` for the dashboard: written under a name it skips, then renamed, so it never reads half a file. */
-export function leave(dir: string, request: BotRoutineRequest | BotJobRequest | BotCreateRequest | ShepherdRequest): void {
+export function leave(dir: string, request: BotRoutineRequest | BotJobRequest | BotCreateRequest | BotMessageRequest | ShepherdRequest): void {
 	try {
 		mkdirSync(dir, { recursive: true });
 		const name = `${Date.now()}-${randomUUID()}`;
@@ -82,6 +98,9 @@ export default function botExtension(pi: ExtensionApi): void {
 		return { botId, botsPath, memoryPath, botInbox: flag(BOT_FLAGS.botInbox), routinesPath: flag(BOT_FLAGS.routines), routineInbox: flag(BOT_FLAGS.routineInbox) };
 	};
 
+	/** Every Bot as `bots.json` holds them now; none when the file is missing or unreadable. */
+	const readBots = ({ botsPath }: ThisBot): Bot[] => parseBots(parseJson(readText(botsPath))) ?? [];
+
 	/** The Bot's routines as `routines.json` holds them now; none when the file is missing or unreadable, or the dashboard named none. */
 	const ownRoutines = ({ botId, routinesPath }: ThisBot): RoutineSpec[] => {
 		const value = routinesPath === null ? null : parseJson(readText(routinesPath));
@@ -92,8 +111,10 @@ export default function botExtension(pi: ExtensionApi): void {
 	pi.on("before_agent_start", (event, ctx) => {
 		const me = thisBot();
 		if (ctx.agent.kind === "sub" || !me) return undefined;
-		const bot = parseBots(parseJson(readText(me.botsPath)))?.find(bot => bot.id === me.botId);
+		const bots = readBots(me);
+		const bot = bots.find(bot => bot.id === me.botId);
 		if (!bot) return undefined;
+		const others = bots.filter(other => other.id !== me.botId);
 		const routines = ownRoutines(me);
 		const prompt = [
 			`You are ${bot.name}, an omp-agents Bot: a teammate the user keeps, with this one conversation they come back to.`,
@@ -105,6 +126,9 @@ export default function botExtension(pi: ExtensionApi): void {
 			`Your routines, one per line: its fields as \`save_routine\` takes them, then its task's kind and its prompt or command, cut at ${TASK_PREVIEW_LENGTH} characters:`,
 			...(routines.length > 0 ? routines.map(routineLine) : ["None yet."]),
 			"A routine runs on its schedules and when its triggers see something happen; each run messages this conversation with its prompt, or runs its shell command in your workspace and posts the output here. Call `save_routine` to create one, or to change one with its `id` and only the fields that change, and `delete_routine` to delete one.",
+			"The other Bots, one per line: its id, name, and kind, then its job's first sentence:",
+			...(others.length > 0 ? others.map(({ id, name, kind, job }) => `${JSON.stringify({ id, name, kind })} ${jobLine(job) || "No job yet."}`) : ["None yet."]),
+			`Call \`${MESSAGE_BOT_TOOL}\` to hand another Bot work that is its job. A message whose last line starts with \`${BOT_MESSAGE_STAMP.trimEnd()}\` comes from the Bot that line names, not the user, and your reply in this conversation does not reach it. Call \`${MESSAGE_BOT_TOOL}\` with its id only when you have a result or a question to send back, and never answer a message that needs no answer, such as thanks or an acknowledgment.`,
 		].join("\n");
 		return { systemPrompt: [...event.systemPrompt, prompt] };
 	});
@@ -209,6 +233,29 @@ export default function botExtension(pi: ExtensionApi): void {
 			if (!stored) throw new Error(`None of your routines has id ${id}.`);
 			leave(bot.routineInbox, { botId: bot.botId, change: { op: "remove", id } });
 			return reply(`Deleted routine "${stored.name}". ${APPLIES}`);
+		},
+	});
+
+	pi.registerTool<{ to: string; text: string }>({
+		name: MESSAGE_BOT_TOOL,
+		label: "Message Bot",
+		description: `Sends a message to another omp-agents Bot, by its id from the system prompt. It wakes that Bot, which reads it as from you, not the user, and can answer later with its own message. Write it whole, with what the other Bot needs to know, as Markdown of at most ${MAX_BOT_MESSAGE_LENGTH} characters.`,
+		parameters: Type.Object({
+			to: Type.String({ minLength: 1, description: "The id of the Bot to message." }),
+			text: Type.String({ minLength: 1, maxLength: MAX_BOT_MESSAGE_LENGTH, description: "The message, as Markdown; it cannot start with ! or /." }),
+		}),
+		loadMode: "essential",
+		approval: "write",
+		async execute(_toolCallId, { to, text }) {
+			const me = thisBot();
+			if (!me?.botInbox) throw new Error("This session is not an omp-agents Bot, so it cannot message Bots.");
+			if (to === me.botId) throw new Error("You cannot message yourself.");
+			const recipient = readBots(me).find(bot => bot.id === to);
+			if (!recipient) throw new Error(`No Bot has id ${to}; the system prompt lists the other Bots.`);
+			const message = parseBotMessageText(text);
+			if (!message) throw new Error(`text must not be empty, must be at most ${MAX_BOT_MESSAGE_LENGTH} characters, and cannot start with ! or /, which would run as a command in the other Bot's session.`);
+			leave(me.botInbox, { botId: me.botId, message: { to: recipient.id, text: message } });
+			return reply(`Sent to ${recipient.name}. ${APPLIES}`);
 		},
 	});
 }

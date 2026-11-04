@@ -1,7 +1,7 @@
 /** What the page shows of a Bot: the Bot its page opens, its sidebar row and group, its running session and conversation, its memory's lines, and the prompts a new Bot offers. */
 import type { Routine } from "../src/routines";
 import { DESIGNER_JOB, DESIGNER_NAME } from "../src/shared/bot-designer";
-import type { Bot, BotChange, BotId, BotKind, BotLast } from "../src/shared/bots";
+import { type Bot, type BotChange, type BotId, type BotKind, type BotLast, jobLine } from "../src/shared/bots";
 import { SHEPHERD_JOB, SHEPHERD_NAME } from "../src/shared/shepherd";
 import type { HostStatus, RosterHost, View } from "../src/shared/sessions";
 import { needsYou } from "./attention";
@@ -97,12 +97,13 @@ export interface BotRow {
 	at: number;
 }
 
-/** The conversation's last words as a row says them: yours after `You:`, a routine's after its name, the Bot's as they are. */
+/** The conversation's last words as a row says them: yours after `You:`, a routine's or another Bot's after its name, the Bot's as they are. */
 function saidLine(last: BotLast): string {
 	switch (last.from) {
 		case "user":
 			return `You: ${last.text}`;
 		case "routine":
+		case "bot-message":
 			return `${last.name}: ${last.text}`;
 		case "bot":
 			return last.text;
@@ -204,12 +205,6 @@ export function memoryEntries(text: string): MemoryEntry[] {
 		const dated = /^(\d{4}-\d{2}-\d{2})\s+(.+)$/.exec(item);
 		return [dated ? { date: dated[1]!, fact: dated[2]! } : { date: null, fact: item }];
 	});
-}
-
-/** The first sentence of a job written in Markdown, past its headings and without a list mark; empty for a blank job. */
-export function jobLine(job: string): string {
-	const line = job.split("\n").filter(text => !/^\s*#/.test(text)).map(text => text.replace(/^\s*(?:[-*+]|\d+\.)\s+/, "").trim()).find(Boolean) ?? "";
-	return /^.+?[.!?](?=\s|$)/.exec(line)?.[0] ?? line;
 }
 
 /** A job the New Bot form offers to start from, and the name it suggests while the form has none. */

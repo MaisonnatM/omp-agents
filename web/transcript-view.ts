@@ -4,7 +4,7 @@
  */
 import type { RoutineTask } from "../src/routines";
 import { taskOf, taskText } from "../src/shared/routine-message";
-import type { Item, TodoPhase } from "../src/shared/transcript";
+import { isPrompt, type Item, type PromptItem, type TodoPhase } from "../src/shared/transcript";
 
 export type ToolItem = Extract<Item, { kind: "tool" }>;
 /** A tool call or the thinking that sits with it. Consecutive ones render as one activity group between messages. */
@@ -13,13 +13,13 @@ export type ActivityItem = Extract<Item, { kind: "tool" | "thinking" }>;
 /** A prompt the dashboard sent in the user's place, which counts as a turn's prompt but renders nothing. */
 type DashboardItem = Extract<Item, { kind: "dashboard" }>;
 
-type Opener = Extract<Item, { kind: "user" | "routine" | "dashboard" }>;
+type Opener = PromptItem | DashboardItem;
 type AssistantItem = Extract<Item, { kind: "assistant" }>;
 
 export type Block = { kind: "item"; item: Exclude<Item, ActivityItem | DashboardItem> } | { kind: "activity"; id: string; entries: ActivityItem[] };
 
-/** Whether `item` opens a turn: a prompt, the user's, one a routine sent, or one the dashboard sent in their place, which shows nothing. */
-export const opensTurn = (item: Item): item is Opener => item.kind === "user" || item.kind === "routine" || item.kind === "dashboard";
+/** Whether `item` opens a turn: a prompt, the user's, one a routine or another Bot sent, or one the dashboard sent in their place, which shows nothing. */
+export const opensTurn = (item: Item): item is Opener => isPrompt(item) || item.kind === "dashboard";
 
 const blockKey = (block: Block): string => (block.kind === "item" ? block.item.id : block.id);
 
@@ -69,12 +69,14 @@ export function withEditedPrompt(blocks: readonly Block[], edit: { item: Extract
 export interface OutlineTurn {
 	/** The prompt's item id. */
 	id: string;
-	/** The prompt's text, or for a prompt that carried only images, how many it carried: `2 images`; a routine's prompt or command. */
+	/** The prompt's text, or for a prompt that carried only images, how many it carried: `2 images`; a routine's prompt or command; another Bot's message. */
 	prompt: string;
 	/** The skill the prompt invoked; `null` for any other prompt. */
 	skill: string | null;
-	/** The routine that sent the prompt, as of the send; `null` for the user's. */
+	/** The routine that sent the prompt, as of the send; `null` for any other prompt. */
 	routine: { name: string; task: RoutineTask } | null;
+	/** The name of the Bot that sent the prompt, as of the send; `null` for any other prompt. */
+	botMessage: string | null;
 	/**
 	 * A prompt of a few words that only lets the agent carry on: `approve`, such as `go`, accepts the reply before it as a
 	 * plan; `resume`, such as `continue`, picks up work the turn before stopped. `null` for any other prompt.
@@ -134,7 +136,7 @@ export interface TranscriptImage {
 }
 
 /** What an outline turn takes from its prompt; `nudge` as it reads in any turn but the first, which nudges nothing. */
-type TurnHead = Pick<OutlineTurn, "id" | "prompt" | "skill" | "routine" | "nudge">;
+type TurnHead = Pick<OutlineTurn, "id" | "prompt" | "skill" | "routine" | "botMessage" | "nudge">;
 
 /**
  * The items from one prompt up to the next, or before the first prompt, with what the transcript reads from them. A
@@ -225,6 +227,7 @@ const TURN_EQUAL: FieldEqual<OutlineTurn> = {
 	skill: same,
 	// A turn keeps the head the model before built for the same prompt, so its routine is the same object.
 	routine: same,
+	botMessage: same,
 	nudge: same,
 	reply: (a, b) => a?.id === b?.id && a?.text === b?.text,
 	tools: same,
@@ -247,15 +250,16 @@ const sameFacts = (a: Segment, b: Segment): boolean =>
 function headOf(opener: Opener): TurnHead | null {
 	if (opener.kind === "routine") {
 		const { message } = opener;
-		return { id: opener.id, prompt: taskText(message), skill: null, routine: { name: message.routine.name, task: taskOf(message) }, nudge: null };
+		return { id: opener.id, prompt: taskText(message), skill: null, routine: { name: message.routine.name, task: taskOf(message) }, botMessage: null, nudge: null };
 	}
+	if (opener.kind === "bot-message") return { id: opener.id, prompt: opener.message.text, skill: null, routine: null, botMessage: opener.message.name, nudge: null };
 	if (opener.kind !== "user") return null;
 	const text = opener.text.trim();
 	const images = opener.images?.length ?? 0;
 	const files = opener.files ?? [];
 	const prompt = text || files.join(", ") || (images > 0 ? `${images} ${images === 1 ? "image" : "images"}` : "");
 	const match = !opener.skill && images === 0 && files.length === 0 ? NUDGE.exec(text) : null;
-	return { id: opener.id, prompt, skill: opener.skill, routine: null, nudge: match ? (match[1] ? "resume" : "approve") : null };
+	return { id: opener.id, prompt, skill: opener.skill, routine: null, botMessage: null, nudge: match ? (match[1] ? "resume" : "approve") : null };
 }
 
 /**
@@ -376,7 +380,7 @@ export function transcriptModel(items: readonly Item[], working: boolean, previo
 	const regions = was.regions.slice(0, from);
 	for (let start = was.regions[from]?.start ?? 0; start < items.length; ) {
 		let end = start + 1;
-		while (end < items.length && items[end]!.kind !== "user" && items[end]!.kind !== "routine") end++;
+		while (end < items.length && !isPrompt(items[end]!)) end++;
 		regions.push(regionOf(items, start, end, working && end === items.length, was.regions[regions.length], regions.at(-1)));
 		start = end;
 	}

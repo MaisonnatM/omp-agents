@@ -106,8 +106,14 @@ export interface BotCreateRequest {
 	create: BotCreate;
 }
 
-/** A request a Bot's tool leaves in `bot-inbox/`: a `set_job`'s job, or a designer's new Bot. */
-export type BotInboxRequest = ({ op: "job" } & BotJobRequest) | ({ op: "create" } & BotCreateRequest);
+/** What a Bot's `message_bot` tool asks of the server: Bot `botId` sends `text` to Bot `to`. */
+export interface BotMessageRequest {
+	botId: BotId;
+	message: { to: BotId; text: string };
+}
+
+/** A request a Bot's tool leaves in `bot-inbox/`: a `set_job`'s job, a designer's new Bot, or a message to another Bot. */
+export type BotInboxRequest = ({ op: "job" } & BotJobRequest) | ({ op: "create" } & BotCreateRequest) | ({ op: "message" } & BotMessageRequest);
 
 /** The longest job a Bot keeps, since every turn's system prompt carries it. */
 export const MAX_JOB_LENGTH = 20_000;
@@ -123,12 +129,39 @@ export const MAX_MEMORY_BYTES = 16 * 1024;
 
 /**
  * The last words of a Bot's conversation, which its sidebar row previews: when, in ms since the epoch, who said them,
- * and the text as one line; a routine's message names the routine as of the send.
+ * and the text as one line; a routine's message names the routine, and another Bot's message that Bot, as of the send.
  */
-export type BotLast = { at: number; from: "user" | "bot"; text: string } | { at: number; from: "routine"; name: string; text: string };
+export type BotLast = { at: number; from: "user" | "bot"; text: string } | { at: number; from: "routine" | "bot-message"; name: string; text: string };
 
 /** The tool a Bot's session writes its memory with; the page marks each finished call in the conversation. */
 export const REMEMBER_TOOL = "remember";
+
+/** The tool a Bot's session messages another Bot with; the page marks each finished call in the conversation. */
+export const MESSAGE_BOT_TOOL = "message_bot";
+
+/** The longest message one Bot sends another. */
+export const MAX_BOT_MESSAGE_LENGTH = 8000;
+
+/** How many messages one Bot delivers to another in {@link BOT_MESSAGE_WINDOW_MS}, so two Bots answering each other stop. */
+export const MAX_BOT_MESSAGES_PER_HOUR = 20;
+/** The rolling window {@link MAX_BOT_MESSAGES_PER_HOUR} counts in: an hour. */
+export const BOT_MESSAGE_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * `value` trimmed as a message one Bot sends another, or `null` when it is empty, too long, or starts with `!` or `/`,
+ * which omp would run in the other Bot's session as a shell command or a command, not read as a message.
+ */
+export function parseBotMessageText(value: unknown): string | null {
+	if (typeof value !== "string") return null;
+	const text = value.trim();
+	return text && text.length <= MAX_BOT_MESSAGE_LENGTH && !/^[!/]/.test(text) ? text : null;
+}
+
+/** The first sentence of a job written in Markdown, past its headings and without a list mark; empty for a blank job. */
+export function jobLine(job: string): string {
+	const line = job.split("\n").filter(text => !/^\s*#/.test(text)).map(text => text.replace(/^\s*(?:[-*+]|\d+\.)\s+/, "").trim()).find(Boolean) ?? "";
+	return /^.+?[.!?](?=\s|$)/.exec(line)?.[0] ?? line;
+}
 
 /**
  * `bots` after `edit`, or `bots` itself when it changes nothing. A save keeps the Bot's conversation, its kind, and where
@@ -252,15 +285,21 @@ export function parseBotChange(value: unknown): BotChange | null {
 }
 
 /**
- * A request a Bot's tool leaves in `bot-inbox/`, told apart by its `job` or `create` field, or `null`. A job holds the
- * same limit as one the page saves, and a new Bot holds every rule of one the page saves.
+ * A request a Bot's tool leaves in `bot-inbox/`, told apart by its `job`, `message`, or `create` field, or `null`. A job
+ * holds the same limit as one the page saves, a message the rules of {@link parseBotMessageText} and goes to another
+ * Bot than its sender, and a new Bot every rule of one the page saves.
  */
 export function parseBotInboxRequest(value: unknown): Parsed<BotInboxRequest> {
 	if (!isObject(value)) return null;
 	const botId = parseBotId(value.botId);
 	if (!botId) return null;
-	const { job, create } = value;
+	const { job, message, create } = value;
 	if (typeof job === "string") return job.length <= MAX_JOB_LENGTH ? { ok: { op: "job", botId, job } } : null;
+	if (isObject(message)) {
+		const to = parseBotId(message.to);
+		const text = parseBotMessageText(message.text);
+		return to && to !== botId && text ? { ok: { op: "message", botId, message: { to, text } } } : null;
+	}
 	const spec = isObject(create) && parseBotSpec({ ...create, model: null, skill: null });
 	if (!spec) return null;
 	const { id, kind, name, cwd } = spec.ok;

@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { BotId, BotLast, BotSpec } from "../shared/bots";
+import { botMessageText } from "../shared/bot-message";
 import { type RoutineMessage, routineMessageText } from "../shared/routine-message";
 import { newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import { Bots, lastMessage } from "./bots";
@@ -255,6 +256,11 @@ describe("lastMessage", () => {
 		expect(lastMessage(write([bash(routineMessageText(sent("!ls")).slice(1))]))).toEqual(routine("!ls"));
 		expect(lastMessage(write([line("user", routineMessageText(command))]))).toEqual(routine("$ make test"));
 		expect(lastMessage(write([line("user", "Hello."), bash("ls")]))).toEqual({ at, from: "user", text: "Hello." });
+	});
+
+	test("another Bot's message previews under that Bot's name as one line", () => {
+		const path = write([line("user", botMessageText({ from: "triage" as BotId, name: "Triage", text: "Fix the flaky\nlogin test." }))]);
+		expect(lastMessage(path)).toEqual({ at: Date.parse("2026-05-02T09:30:00.000Z"), from: "bot-message", name: "Triage", text: "Fix the flaky login test." });
 	});
 
 	test("a file whose end is all tool output, or no file at all, has no last words", () => {

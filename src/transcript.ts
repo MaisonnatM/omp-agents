@@ -9,15 +9,15 @@
  */
 import { isObject, str } from "./json";
 import { imagesOf, textOf, toolSummary, UNREAD_LINE } from "./session-entries";
+import { type BotId, MESSAGE_BOT_TOOL, parseBotId } from "./shared/bots";
 import { splitFiles } from "./shared/prompt-files";
 import type { PromptImage } from "./shared/sessions";
 import type { RoutineMessage } from "./shared/routine-message";
-import { type Item, promptAuthor, skillInvocation, type TodoPhase, type TodoTask } from "./shared/transcript";
+import { isPrompt, type Item, type PromptItem, promptAuthor, skillInvocation, type TodoPhase, type TodoTask } from "./shared/transcript";
 
 type Json = Record<string, unknown>;
 type ToolItem = Extract<Item, { kind: "tool" }>;
-type PromptItem = Extract<Item, { kind: "user" | "dashboard" | "routine" }>;
-type StartingItem = Extract<Item, { kind: "user" | "routine" }>;
+type SentItem = PromptItem | Extract<Item, { kind: "dashboard" }>;
 
 /** A prompt omp admitted while the main agent was idle and whose turn has not shown it yet; `id` is its RPC request id. */
 export interface StartingPrompt {
@@ -57,16 +57,19 @@ function unwrapSkill(prompt: string): { text: string; skill: string | null } {
 }
 
 /**
- * The item a prompt shows as, `skill` the one it invoked: the dashboard's, a routine's, or the user's as typed, with
- * attached files as their names, not their text.
+ * The item a prompt shows as, `skill` the one it invoked: the dashboard's, a routine's, another Bot's, or the user's as
+ * typed, with attached files as their names, not their text.
  */
-function promptItem(id: string, { text, skill }: { text: string; skill: string | null }, rest: { from: string | null; entryId: string | null; images?: string[]; pending?: true }): PromptItem {
+function promptItem(id: string, { text, skill }: { text: string; skill: string | null }, rest: { from: string | null; entryId: string | null; images?: string[]; pending?: true }): SentItem {
 	const author = promptAuthor(text);
+	const pending = rest.pending ? { pending: true as const } : {};
 	switch (author.kind) {
 		case "dashboard":
 			return { id, kind: "dashboard", text, entryId: rest.entryId };
 		case "routine":
-			return { id, kind: "routine", message: withSkill(author.message, skill), entryId: rest.entryId, ...(rest.pending ? { pending: true as const } : {}) };
+			return { id, kind: "routine", message: withSkill(author.message, skill), entryId: rest.entryId, ...pending };
+		case "bot-message":
+			return { id, kind: "bot-message", message: author.message, entryId: rest.entryId, ...pending };
 		case "user":
 			return { id, kind: "user", ...typed(text), skill, ...rest };
 		default: {
@@ -92,7 +95,7 @@ function typed(prompt: string): { text: string; files?: string[] } {
 const LEADING_SKILL = /^\s*\/skill:(\S+)([\s\S]*)$/;
 
 /** A starting prompt as its live user message will show it; `null` for one the dashboard sent. */
-function startingItem({ id, text, images }: StartingPrompt): StartingItem | null {
+function startingItem({ id, text, images }: StartingPrompt): PromptItem | null {
 	const skill = LEADING_SKILL.exec(text);
 	const item = promptItem(`starting:${id}`, skill ? { text: skill[2].trim(), skill: skill[1] } : unwrapSkill(text), {
 		from: null,
@@ -140,6 +143,12 @@ function todoList(toolName: unknown, result: unknown): { todos?: TodoPhase[] } {
 	return { todos };
 }
 
+/** The Bot a `message_bot` call's arguments `args` name; absent for any other call. */
+function recipient(toolName: unknown, args: unknown): { to?: BotId } {
+	const to = toolName === MESSAGE_BOT_TOOL && isObject(args) ? parseBotId(args.to) : null;
+	return to ? { to } : {};
+}
+
 /** `next` merged after `prev`, without repeats; `prev` itself when `next` adds nothing. */
 function union(prev: string[], next: string[]): string[] {
 	const added = next.filter(id => !prev.includes(id));
@@ -180,18 +189,18 @@ export function splitSuggestions(text: string): { body: string; suggestions: str
 	return { body: text, suggestions: [] };
 }
 
-/** A prompt, a routine's message, or a reply as the transcript shows it. */
-export type MessageItem = Extract<Item, { kind: "user" | "routine" | "assistant" }>;
+/** A prompt, a routine's or another Bot's message, or a reply as the transcript shows it. */
+export type MessageItem = PromptItem | Extract<Item, { kind: "assistant" }>;
 
 /**
- * The prompts, routine messages and replies one session-file entry holds, as a fold of the whole file shows them,
- * without a prompt the dashboard sent in the user's place; a reader that wants only the user's words, as the
- * conversation search does, leaves the routine messages out. Their ids and text
+ * The prompts, routine and Bot messages and replies one session-file entry holds, as a fold of the whole file shows
+ * them, without a prompt the dashboard sent in the user's place; a reader that wants only the user's words, as the
+ * conversation search does, leaves the routine and Bot messages out. Their ids and text
  * come from the entry alone (its message's timestamp, else its own id), so one entry folded by itself names them the
  * same, without the thinking, tool calls, and order a whole fold keeps.
  */
 export function messageItemsOf(entry: unknown): MessageItem[] {
-	return new Transcript().applyEntry(entry).filter((item): item is MessageItem => item.kind === "user" || item.kind === "routine" || item.kind === "assistant");
+	return new Transcript().applyEntry(entry).filter((item): item is MessageItem => isPrompt(item) || item.kind === "assistant");
 }
 
 export class Transcript {
@@ -208,7 +217,7 @@ export class Transcript {
 	#fileLatest = 0;
 	/** Where the first item that went ahead of items already there landed since the last {@link takeDisplaced}; `null` for none. */
 	#displacedFrom: number | null = null;
-	#starting: StartingItem | null = null;
+	#starting: PromptItem | null = null;
 	#removed: string[] = [];
 
 	items(): Item[] {
@@ -299,7 +308,7 @@ export class Transcript {
 			case "message_end":
 				return this.#applyLive(message, false);
 			case "tool_execution_start":
-				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), toolSummary(event.args, event.intent), "running");
+				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), toolSummary(event.args, event.intent), "running", [], recipient(event.toolName, event.args));
 			case "tool_execution_update":
 				// A running `task` reports its subagents as they spawn, long before its result reaches the file.
 				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), undefined, undefined, spawnedAgents(event.toolName, event.partialResult));
@@ -391,7 +400,7 @@ export class Transcript {
 			} else if (block.type === "thinking" && typeof block.thinking === "string" && block.thinking) {
 				changed.push(...this.#upsert({ id: `${key}:${index}`, kind: "thinking", text: block.thinking, streaming }));
 			} else if (block.type === "toolCall") {
-				changed.push(...this.#upsertTool(str(block.id), str(block.name), toolSummary(block.arguments, block.intent), undefined, []));
+				changed.push(...this.#upsertTool(str(block.id), str(block.name), toolSummary(block.arguments, block.intent), undefined, [], recipient(block.name, block.arguments)));
 			}
 		});
 		if (!streaming && (message.stopReason === "error" || message.stopReason === "aborted")) {
@@ -407,7 +416,7 @@ export class Transcript {
 		summary: string | undefined,
 		status: ToolItem["status"] | undefined,
 		agents: string[] = [],
-		result: { todos?: TodoPhase[] } = {},
+		result: { todos?: TodoPhase[]; to?: BotId } = {},
 	): Item[] {
 		if (!callId || this.#settled.has(`tool:${callId}`)) return [];
 		return this.#upsertTool(callId, name, summary, status, agents, result);
@@ -420,7 +429,7 @@ export class Transcript {
 		summary: string | undefined,
 		status: ToolItem["status"] | undefined,
 		agents: string[],
-		result: { images?: string[]; todos?: TodoPhase[] } = {},
+		result: { images?: string[]; todos?: TodoPhase[]; to?: BotId } = {},
 	): Item[] {
 		if (!callId) return [];
 		const id = `tool:${callId}`;

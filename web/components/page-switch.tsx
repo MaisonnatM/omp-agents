@@ -200,6 +200,7 @@ export const PageSwitch = memo(function PageSwitch({
 				<BotPage
 					key={openBot.bot.id}
 					open={openBot}
+					bots={bots ?? []}
 					detailsOpen={rightOpen}
 					onToggleDetails={() => toggleSidebar("right")}
 					past={past}

@@ -4,7 +4,7 @@
 - The sidebar's **Bots** tab, just before **Sessions**, lists every Bot like a messaging app, whatever workspace the sidebar shows.
   Each row shows the Bot's avatar, its name, the time of its last message, and that message on one muted line.
   The line reads **You:** before your own words, **Working…** while the Bot works, or the question it waits on you for, in amber.
-  When a routine sent the last message, the line starts with that routine's name instead of **You:**, followed by its prompt or command.
+  When a routine sent the last message, the line starts with that routine's name instead of **You:**, followed by its prompt or command; when another Bot sent it, the line starts with that Bot's name.
   A blue dot marks a reply you have not read, and the most recent conversation comes first.
   The tab counts the Bots that wait on you: those asking you something, and those with a reply you have not read.
 - Right-click a Bot's row, or its card in the gallery, to **Pin** or **Unpin** it, to move it with **Move to section** into a section or a **New section…** you name, or to take it out with **Remove from section**.
@@ -34,7 +34,7 @@
   **Create** saves it and opens its page, `#bots/<id>`.
   A Bot made with no job learns it from you: tell it in your first message what to do, where to look, and what to ask before acting, and it saves that as its job, in its **Job** field.
 - A Bot's page shows its avatar and name in the header, the first sentence of its job under them, and its conversation below.
-  The conversation reads as a chat with your messages, the Bot's replies, and folded [routine run cards](routines.md).
+  The conversation reads as a chat with your messages, the Bot's replies, folded [routine run cards](routines.md), and the cards of [Bot messages](#bot-messages) other Bots sent it.
   It never shows the Bot's tool calls, its thinking, or the card of files it changed, whatever **Show tool calls** and **Show thinking** say.
   The Bot's conversation is not listed in the **Sessions** tab, the command palette, or the workspace list; only its Bot's page shows it.
   A new Bot greets you and offers three starters, built from its job, or asking what its job should be while it has none, which the composer lists under its action bar as it lists suggested prompts.
@@ -43,7 +43,7 @@
   Otherwise the composer writes to the Bot: the first message starts its conversation in its workspace, and a later one resumes the same session.
   What you type there stays when you leave the page, one draft per Bot, until you send it.
   Its `/` and `@` menus work as in any composer, resolved in the Bot's workspace, so you can mention a file, todo, ticket, pull request, person, email, event, or session.
-  Where the Bot used its `remember` tool, the conversation shows **Updated memory for** and the Bot's name.
+  Where the Bot used its `remember` tool, the conversation shows **Updated memory for** and the Bot's name, and where it messaged another Bot, **Messaged** and that Bot's name.
   A routine run card shows the routine's name, task icon, trigger logos, time, and status, with a command's duration when available.
   Open the card to read its prompt or command, any output, what started it, and the **Open routine** link.
 - The right sidebar shows the Bot's details, as it shows a session's on the panes.
@@ -72,6 +72,22 @@
   A change the Bot makes keeps every part of the routine it did not mention, so asking it to pause a routine leaves its schedule and task as they were.
   A Bot can change only its own routines, never another Bot's.
 - The server keeps the Bots in `bots.json` beside its access token, so every window of the app shows the same ones.
+
+## Bot messages
+
+- A Bot can message another Bot, as Grok Bots hand work off: one Bot asks another to do what is that Bot's job, and the other wakes up, does it, and can answer back later.
+  Ask a Bot in its conversation, such as "ask Triage to look at the flaky test", or let it decide; every Bot sees the other Bots' names, types, and the first sentence of their jobs on every turn.
+- The Bot that sent the message shows **Messaged** and the other Bot's name in its conversation, once the message left; click it to open that Bot.
+- The Bot that gets it shows it as a card in its conversation, with the sender's avatar, **From** and its name, and the message with its line breaks kept, then works on it as on your own message.
+  Click **From** and the name to open the sender.
+  The Bots tab and the gallery show the message as its last one, starting with the sender's name.
+  If the sender was deleted since, the card keeps the name it signed with.
+- The other Bot's reply in its own conversation does not reach the sender; it messages the sender back only when it has a result or a question, and never only to thank or acknowledge.
+- A message reaches the other Bot once the dashboard applies it, so one sent while the dashboard is stopped waits for it.
+- A Bot cannot message itself, and a message cannot start with `!` or `/`, which the other Bot would run as a command.
+- To keep two Bots from answering each other forever, one Bot can send another at most 20 messages in an hour.
+  Past that, the dashboard does not deliver the message and tells the sender once in its conversation, then drops its next messages to that Bot until fewer than 20 were sent in the last hour.
+- To stop Bots messaging each other, tell them in their conversations, or put it in their jobs.
 
 ## Bot designers
 

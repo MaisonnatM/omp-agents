@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { Routine } from "../src/routines";
 import { DESIGNER_JOB, DESIGNER_NAME } from "../src/shared/bot-designer";
-import type { Bot, BotId, BotLast } from "../src/shared/bots";
+import { type Bot, type BotId, type BotLast, jobLine } from "../src/shared/bots";
 import { SHEPHERD_JOB, SHEPHERD_NAME } from "../src/shared/shepherd";
 import type { RosterHost } from "../src/shared/sessions";
-import { botGroupKey, botGroupLabel, botGroupListName, botGroups, botHost, botMovesTo, type BotRow, botRows, botSections, botsGrouped, botsNeedingYou, botStatus, botView, JOB_TEMPLATES, jobLine, memoryEntries, NEW_BOT_DRAFT, openBot, pickKind, pickTemplate, starterPrompts } from "./bots-model";
+import { botGroupKey, botGroupLabel, botGroupListName, botGroups, botHost, botMovesTo, type BotRow, botRows, botSections, botsGrouped, botsNeedingYou, botStatus, botView, JOB_TEMPLATES, memoryEntries, NEW_BOT_DRAFT, openBot, pickKind, pickTemplate, starterPrompts } from "./bots-model";
 import type { BotRoutineRoute, Page } from "./routing";
 
 const scout = "scout" as BotId;
@@ -54,7 +54,7 @@ describe("Bots", () => {
 
 	test("a row previews the question first, then Working…, then the freshest words as plain text, else no messages", () => {
 		const named = (id: string, name: string, sessionId: string | null): Bot => ({ ...bot(sessionId), id: id as BotId, name });
-		const bots = [named("asker", "Asker", "s1"), named("worker", "Worker", "s2"), named("replied", "Replied", "s3"), named("talked", "Talked", "s4"), named("scheduled", "Scheduled", "s5"), named("fresh", "Fresh", null)];
+		const bots = [named("asker", "Asker", "s1"), named("worker", "Worker", "s2"), named("replied", "Replied", "s3"), named("talked", "Talked", "s4"), named("scheduled", "Scheduled", "s5"), named("handed", "Handed", "s6"), named("fresh", "Fresh", null)];
 		const hosts = [
 			{ sessionId: "s1", status: "needs-input", requests: [{ title: "Push to main?" }], unread: null },
 			{ sessionId: "s2", status: "working", requests: [], unread: null },
@@ -66,6 +66,7 @@ describe("Bots", () => {
 			["replied" as BotId]: { at: 2_000, from: "user", text: "How is the build?" },
 			["talked" as BotId]: { at: 1_000, from: "user", text: "Thanks." },
 			["scheduled" as BotId]: { at: 500, from: "routine", name: "Nightly build", text: "Check the **inbox**." },
+			["handed" as BotId]: { at: 400, from: "bot-message", name: "Triage", text: "Fix the `flaky` test." },
 		};
 		expect(botRows(bots, hosts, lasts).map(({ bot, host, unread, preview, at }) => [bot.name, host?.sessionId ?? null, unread, preview, at])).toEqual([
 			["Fresh", null, false, "No messages yet", Date.parse("2026-10-05T09:00:00.000Z")],
@@ -74,6 +75,7 @@ describe("Bots", () => {
 			["Worker", "s2", false, "Working…", 3_000],
 			["Talked", null, false, "You: Thanks.", 1_000],
 			["Scheduled", null, false, "Nightly build: Check the inbox.", 500],
+			["Handed", null, false, "Triage: Fix the flaky test.", 400],
 		]);
 	});
 
