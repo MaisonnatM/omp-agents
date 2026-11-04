@@ -42,12 +42,12 @@ interface DirectoryPickerProps {
 	control?: ControlId;
 }
 
-/** A working directory: **Personal** first, then a workspace the dashboard lists, or any directory typed into the search field. */
+/** A working directory: a workspace the dashboard lists, or any directory typed into the search field; **Personal** opens from the sidebar instead. */
 export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shortcut, side = "top", open, onOpenChange, onPick, control }: DirectoryPickerProps) {
 	const personal = useContext(PersonalContext);
 	const [query, setQuery] = useState("");
 	const typed = query.trim();
-	const listed = personal ? [personal, ...workspaces.filter(workspace => workspace.cwd !== personal.cwd)] : workspaces;
+	const listed = personal ? workspaces.filter(workspace => !sameDir(workspace.cwd, personal)) : workspaces;
 	const pick = (next: string): void => {
 		if (next !== cwd) onPick(next);
 	};
