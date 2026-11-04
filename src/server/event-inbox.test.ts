@@ -23,7 +23,7 @@ function config(): Kit {
 }
 
 const when = { allDay: false, start: Date.parse("2026-11-05T09:00:00Z"), end: Date.parse("2026-11-05T09:30:00Z") } as const;
-const reminder = (id: string, sessionId?: string) => ({ id, title: "Check the build time", when, ...(sessionId ? { sessionId } : {}) });
+const reminder = (id: string, sessionId: string | null = null) => ({ id, title: "Check the build time", when, sessionId });
 
 function drain({ inbox, events }: Kit): Promise<void> {
 	return new EventInbox(inbox, () => events.value, change => events.apply(change)).drain();

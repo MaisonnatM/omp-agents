@@ -48,7 +48,7 @@ The page owns what a write changes: it adds the kept event that `PUT /api/calend
 
 ### Agent reminders
 
-A `LocalEvent` may name the omp session that added it in `sessionId`; an event you added has none, and one whose `sessionId` is not a nonempty string loads without it, so older files read as before.
+A `LocalEvent`'s `sessionId` names the omp session that added it, and is `null` for an event you added; one whose `sessionId` is missing or not a nonempty string loads with `null`, so older files read as before.
 The starter kit's `user_event` extension lists the upcoming events of `events.json`, adds a timed reminder in its session's name, and removes one that session added.
 It reads the file but never writes it, and atomically renames each `{ op: "add", event }` or `{ op: "remove", id, sessionId }` into `event-inbox/` beside it.
 It also reads the pending changes, so a session sees its own reminders while the dashboard is stopped.

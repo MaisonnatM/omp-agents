@@ -289,7 +289,7 @@ export class Dashboard {
 				creditRuns: () => readCreditRuns(Date.now()),
 				localEvents: () => {
 					const events = this.#localEvents.value.flatMap(({ id, title, when, sessionId }) =>
-						when.allDay ? [] : [{ ref: `local/${id}`, title, start: when.start, end: when.end, calendar: null, color: null, url: null, sessionId: sessionId ?? null }],
+						when.allDay ? [] : [{ ref: `local/${id}`, title, start: when.start, end: when.end, calendar: null, color: null, url: null, sessionId }],
 					);
 					this.#triggerWatch.learn(eventSightings([{ scope: "event:local", events }], Date.now()));
 					return events;

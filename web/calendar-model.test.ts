@@ -180,7 +180,7 @@ describe("Google events", () => {
 });
 
 describe("events kept on this computer", () => {
-	const local = (when: LocalEvent["when"], id = "e1"): LocalEvent => ({ id, title: "Dentist", when });
+	const local = (when: LocalEvent["when"], id = "e1"): LocalEvent => ({ id, title: "Dentist", when, sessionId: null });
 
 	test("an all-day event spanning the previous month and the next shows once on every day of October", () => {
 		const entries = october({ localEvents: [local({ allDay: true, firstDay: "2026-09-28", lastDay: "2026-11-03" })] });

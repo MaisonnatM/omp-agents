@@ -1,5 +1,5 @@
 /** The Calendar page's events: your Google calendars and their events, the events it adds, and the events kept on this computer. */
-import { arrayOf, decoder, fields, isBoolean, isDay, isNumber, isObject, isSafeInteger, isString, nullable, oneOf, optional, type Parsed } from "../json";
+import { arrayOf, decoder, fields, isBoolean, isDay, isNumber, isObject, isSafeInteger, isString, nullable, oneOf, type Parsed } from "../json";
 import type { AccountId } from "./accounts";
 
 /** A calendar shown in your Google Calendar, which the Calendar page reads unless you unchecked it there. */
@@ -97,8 +97,8 @@ export interface LocalEvent {
 	id: string;
 	title: string;
 	when: EventWhen;
-	/** The omp session whose `user_event` tool added it; absent for one you added on the Calendar page. */
-	sessionId?: string;
+	/** The omp session whose `user_event` tool added it; `null` for one you added on the Calendar page. */
+	sessionId: string | null;
 }
 
 /** `GET /api/calendar/local`: every event kept on this computer. */
@@ -159,5 +159,5 @@ export const decodeCalendarEventsAnswer = decoder(
 
 /** A kept {@link LocalEventsAnswer} with every event whole, or `null`. */
 export const decodeLocalEventsAnswer = decoder(
-	fields<LocalEventsAnswer>({ events: arrayOf(fields<LocalEvent>({ id: isString, title: isString, when: isEventWhen, sessionId: optional(isString) })) }),
+	fields<LocalEventsAnswer>({ events: arrayOf(fields<LocalEvent>({ id: isString, title: isString, when: isEventWhen, sessionId: nullable(isString) })) }),
 );

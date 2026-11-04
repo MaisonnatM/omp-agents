@@ -113,7 +113,7 @@ export function calendarEntries({ routines, todos, tickets, events, localEvents 
 			source: { kind: "google", url, ref: writable ? { kind: "google", account, calendarId, eventId } : null },
 		})),
 		...(localEvents ?? []).map(
-			({ id, title, when, sessionId }): ShownEvent => ({ id, title, when, color: LOCAL_EVENT_COLOR, place: "This computer", source: { kind: "local", ref: { kind: "local", id }, sessionId: sessionId ?? null } }),
+			({ id, title, when, sessionId }): ShownEvent => ({ id, title, when, color: LOCAL_EVENT_COLOR, place: "This computer", source: { kind: "local", ref: { kind: "local", id }, sessionId } }),
 		),
 	];
 	const entries: CalendarEntry[] = [

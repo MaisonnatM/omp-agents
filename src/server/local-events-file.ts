@@ -5,15 +5,14 @@ import { type EventWhen, type LocalEvent, parseEventWhen } from "../shared/calen
 
 export type LocalEventChange = { op: "add"; event: LocalEvent } | { op: "remove"; id: string };
 
-/** An event as `events.json` and the event inbox hold it; a `sessionId` that is not a nonempty string reads as absent. */
+/** An event as `events.json` and the event inbox hold it; a `sessionId` that is not a nonempty string reads as `null`. */
 export function parseLocalEvent(value: unknown): LocalEvent | null {
 	if (!isObject(value)) return null;
 	const id = nonEmptyStr(value.id);
 	const title = nonEmptyStr(value.title);
 	const when = parseEventWhen(value.when);
-	const sessionId = nonEmptyStr(value.sessionId);
 	if (!id || !title || !when) return null;
-	return sessionId ? { id, title, when: when.ok, sessionId } : { id, title, when: when.ok };
+	return { id, title, when: when.ok, sessionId: nonEmptyStr(value.sessionId) ?? null };
 }
 
 /** `events` after `change`, or `events` itself when it changes nothing: an id already kept adds nothing, and an id no longer kept removes nothing. */
@@ -41,7 +40,7 @@ export class LocalEventsFile extends ReducerFile<LocalEvent[], [LocalEventChange
 
 	/** Keeps a new event titled `title` and saves; the event as kept. */
 	add(title: string, when: EventWhen): LocalEvent {
-		const event = { id: crypto.randomUUID(), title, when };
+		const event = { id: crypto.randomUUID(), title, when, sessionId: null };
 		this.apply({ op: "add", event });
 		return event;
 	}

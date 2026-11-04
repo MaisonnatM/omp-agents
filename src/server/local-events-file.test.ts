@@ -26,8 +26,8 @@ describe("LocalEventsFile", () => {
 		const trip = first.add("Trip", allDay("2026-10-14", "2026-10-16"));
 		expect(lunch.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
 		expect(new LocalEventsFile(path).value).toEqual([
-			{ id: lunch.id, title: "Lunch", when: { allDay: false, start: Date.parse("2026-10-07T10:30:00Z"), end: Date.parse("2026-10-07T11:30:00Z") } },
-			{ id: trip.id, title: "Trip", when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-16" } },
+			{ id: lunch.id, title: "Lunch", when: { allDay: false, start: Date.parse("2026-10-07T10:30:00Z"), end: Date.parse("2026-10-07T11:30:00Z") }, sessionId: null },
+			{ id: trip.id, title: "Trip", when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-16" }, sessionId: null },
 		]);
 
 		first.apply({ op: "remove", id: lunch.id });

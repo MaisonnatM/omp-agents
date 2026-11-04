@@ -16,7 +16,7 @@ interface LocalEvent {
 	id: string;
 	title: string;
 	when: EventWhen;
-	sessionId?: string;
+	sessionId: string | null;
 }
 type Change = { op: "add"; event: LocalEvent } | { op: "remove"; id: string; sessionId: string };
 
