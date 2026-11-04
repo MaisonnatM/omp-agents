@@ -31,10 +31,12 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before registering a PR o
    If only one approach is sound, such as for a typo or a fix the request spells out, write that plan yourself with the `technical-writing` skill and say in one line of the report why no arena ran.
    Otherwise run the `arena` skill with one runner for each approach, up to three.
    Give every runner the same prompt: the issue or the request, the checkout's path, the approach it plans, its output path `local://plan-<n>.md`, and the rule to write the plan there with the `technical-writing` skill and edit nothing else.
-   Each plan names the files it changes, the data shape, the steps in order, how to verify the result, and its risks.
+   Each plan opens with how it works today, the current code path in plain words with paths and one concrete example, then names the files it changes, the data shape, the steps in order, how to verify the result, its risks, and what is out of scope.
    Each plan also lists what it reuses: the existing helpers, components, models, and patterns, by path, that already do part of the job, so the change extends them instead of rebuilding them.
    The runners edit no files in the checkout, so spawn them without `isolated`; alternate `poteto-agent` and `poteto-agent-codex`, and run the cross-judge on `poteto-agent-codex` over the `local://plan-<n>.md` paths.
    Pick the base plan against the arena's rubric, which scores that reuse list, and graft what the other plans do better.
+   Write the chosen plan to `local://plan.md`, then spawn one fresh `poteto-agent-codex` as a blind critic: give it only that path, the checkout's path, and the absolute path of `plan-critique.md` beside this file, with the instruction to read and follow that file; never pass the conversation or paraphrase the brief.
+   Apply each finding that carries evidence and stays inside the change's scope, and say in one line of the report which findings you skipped and why; skip the critic only where no arena ran, and say so.
    With an issue, post the chosen plan on it with `save_comment`, with one line for each rejected approach that says why it lost; without one, keep the same text for the PR body in step 4.
    Call `ship_stage({stage:"implement"})`.
 3. **Implement.** Delegate to `poteto-agent`, isolated or in place per the Git safety rule in `AGENTS.md`.
@@ -70,7 +72,7 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before registering a PR o
    Call `ship_stage({stage:"ready_gate"})`.
 7. **Put live for review.** Show the issue if there is one, the PR URL, checks, findings and dispositions before promotion.
    Run `gh pr ready <number>` only after the body has the checkbox of each review that steps 5 and 6 did not skip.
-   If the body has an unchecked `- [ ] Browser proof` box from the repository's PR template, do what the box and the repository's instructions ask, then check it; the extension blocks on the unchecked box and does not look for a screenshot.
+   When the interface review applied and the body has an unchecked `- [ ] Browser proof` box from the repository's PR template, do what the box and the repository's instructions ask, then check it; the extension blocks on the unchecked box and does not look for a screenshot.
    The extension asks the user for approval and blocks the command if they decline or no UI is available.
    Request the named reviewer, if any, only after promotion succeeds.
    Call `ship_stage({stage:"live"})`.
@@ -89,4 +91,4 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before registering a PR o
 
 Do not create a second Linear issue, branch, or PR on a resumed run.
 A blocked or failed stage stays visible; report the specific blocker.
-Your final reply follows the Résumé / Action / What next format.
+Your final reply follows the final-answer format: bold answer first, then only the closing lines that have content.

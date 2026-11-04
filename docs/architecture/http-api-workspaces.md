@@ -23,9 +23,12 @@ A linked checkout is merged when `origin`'s default branch contains its commit, 
 `GET /api/worktrees/metrics?repository=&path=` reads approximate allocated disk use, the last commit time, and the modified and untracked counts for one registered checkout.
 `PUT /api/worktrees/removal` previews a removal or performs one whose confirmation still matches that preview, up to `MAX_WORKTREE_BATCH` (100) worktrees per request.
 A preview with `merged: true`, which **Remove merged** sends, adds the `unmerged` blocker to every target the same check cannot show merged, so the page removes only the merged ones nothing else blocks.
-Removal uses `git worktree remove` without `--force`, so Git keeps the branch and still refuses a dirty or locked checkout.
+Removal keeps the branch, and the preview refuses a dirty or locked checkout.
+`moveOut` in `src/worktrees.ts` has `git worktree move` rename the checkout to `<path>.removing-<id>`, which also refuses a locked one, then deletes its registration under the common git directory, then its files with no time limit.
+A deletion cut short, such as by a restart, so leaves only unregistered debris under that name: the original path stays free and the branch can be checked out again.
+`git worktree remove` deleted the files first under a 30-second limit, which left a half-deleted directory at the original path when a large `node_modules` took longer.
 The preview reads the status with executable-mode detection forced on, and refuses a checkout whose index hides changes with assume-unchanged or skip-worktree flags.
-A missing directory is removed the same way, which drops only that registration.
+A missing directory is removed with `git worktree remove`, which drops only that registration.
 `Worktrees.remove` logs each checkout it removes as `omp-agents: removed the worktree <path> for <who asked>`: `Settings › Worktrees`, `ended session <id>`, or `releasing branch <branch>`.
 A start that creates a branch's worktree and registers its session excludes a removal, and so does a removal that has begun: a removal waits for the starts under way, reads the live and saved sessions once, then checks and removes each confirmed checkout in turn.
 Starts that create no worktree, such as a resume or a Bot's session, stay parallel and wait only while a removal runs.

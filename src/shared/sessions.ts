@@ -6,7 +6,6 @@ import type { BranchChoice } from "./git";
 import { type LinkedPullRequest, parsePullRequest, type PullRequest, samePullRequest } from "./github";
 import type { ModelOption } from "./models";
 import type { TrustAsk } from "./project-trust";
-import type { ReplayFacts } from "./replay";
 import type { AdvisorState, CompactionState, GoalSlot } from "./session-controls";
 import { TICKET_ID } from "./tickets";
 import type { Workspace } from "./workspaces";
@@ -104,7 +103,6 @@ export interface SessionFacts {
 	 * worktree, or was in one that is gone; `null` counts it in `cwd` itself.
 	 */
 	workspace: Workspace | null;
-	replay?: ReplayFacts;
 }
 
 interface RosterHostBase extends SessionFacts {
@@ -132,6 +130,9 @@ interface RosterHostBase extends SessionFacts {
 	/** The main agent's turn that ended since you last looked at the session; `null` once you did, or while a turn runs. */
 	unread: UnreadTurn | null;
 }
+
+/** The tool a session calls in a turn that found nothing for the user, such as a Bot's routine run; that turn ends without marking the session unread. */
+export const STAY_QUIET_TOOL = "stay_quiet";
 
 /** A turn that ended unseen: when, in ms since the epoch, and the first line of its reply, `null` when it ended on none. */
 export interface UnreadTurn {
@@ -328,7 +329,6 @@ export type StartRequest =
 			private: boolean;
 	  }
 	| { kind: "fork"; view: View; entryId: string }
-	| { kind: "replay"; view: View; token: string; model: ModelOption | null; thinking: string | null; prompt: string | null }
 	| { kind: "resume"; sessionId: string };
 /** A `start` of a new session. */
 export type NewSessionRequest = Extract<StartRequest, { kind: "new" }>;

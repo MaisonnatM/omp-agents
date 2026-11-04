@@ -1,5 +1,5 @@
 // Removes secrets the user pasted, such as API keys, passwords, and database URLs with a password, from what omp keeps
-// of the session on disk once each turn ends: the session file, its sidecar folder, the request log's blobs, and its
+// of the session on disk once each turn ends: the session file, its sidecar folder, and its
 // rows in history.db. Each becomes `[redacted secret: <what it was>]`. The running agent keeps the real value for the
 // rest of the session, since only copies are changed; a resumed session reads the placeholder.
 import { existsSync } from "node:fs";
@@ -9,7 +9,7 @@ import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { SessionScrub, type SessionStore } from "./redact-secrets/scrub";
 
 /**
- * Where omp keeps `history.db` and its blobs, as omp's own `getHistoryDbPath` and `getBlobsDir` decide: on Linux and
+ * Where omp keeps `history.db`, as omp's own `getHistoryDbPath` decides: on Linux and
  * macOS, `$XDG_DATA_HOME/omp` once `omp config init-xdg` made it, for the default agent directory, or
  * `$XDG_DATA_HOME/omp/profiles/<name>` once made, for a profile's; otherwise the agent directory.
  */
@@ -43,11 +43,11 @@ export default function redactSecrets(pi: ExtensionAPI) {
 				const sessionId = store.getSessionId();
 				let session = scrubs.get(sessionId);
 				if (!session) {
-					session = new SessionScrub({ historyDb: join(data, "history.db"), blobsDir: join(data, "blobs"), leaseHeld: pi.pi.isSessionLeaseHeld });
+					session = new SessionScrub({ historyDb: join(data, "history.db"), leaseHeld: pi.pi.isSessionLeaseHeld });
 					scrubs.set(sessionId, session);
 				}
 				const report = await session.run(store);
-				if (report.entries + report.files + report.blobs + report.historyRows > 0) pi.logger.debug("redact-secrets: replaced secrets", { sessionId, ...report });
+				if (report.entries + report.files + report.historyRows > 0) pi.logger.debug("redact-secrets: replaced secrets", { sessionId, ...report });
 			})
 			.catch(error => pi.logger.warn("redact-secrets: scrub failed", { error: error instanceof Error ? error.message : String(error) }));
 		return queue;

@@ -1,4 +1,4 @@
-/** `ImageViewer`, one image of a list shown large, which the Todos card's Images section, the transcript's tool images, and a pull request's Markdown images open. */
+/** `ImageViewer`, one image of a list shown large, which the Todos card's Images section, the transcript's tool images, the thumbnails under agent text, and a pull request's Markdown images open. */
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ChevronLeft, ChevronRight, ExternalLink, X } from "lucide-react";
 import type { ReactNode } from "react";
@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
 import { mediaSrc } from "../api";
+import { useReturnFocus } from "../use-return-focus";
+import { useZoom, ZoomControls, ZoomPane, zoomKey } from "./zoom-pane";
 
 interface ImageViewerProps {
 	src: string;
@@ -26,8 +28,10 @@ interface ImageViewerProps {
 	onClose: () => void;
 }
 
-/** One image large, with its caption, its place in a list, and buttons and ←/→ to the images before and after it. */
+/** One image large, with its caption, its place in a list, buttons and ←/→ to the images before and after it, and zoom. */
 export function ImageViewer({ src, caption, index, count, detail, actions, previousLabel, nextLabel, onIndex, onClose }: ImageViewerProps) {
+	const zoom = useZoom(src);
+	const returnFocus = useReturnFocus();
 	const step = (by: 1 | -1): void => {
 		const next = index + by;
 		if (next >= 0 && next < count) onIndex(next);
@@ -42,9 +46,11 @@ export function ImageViewer({ src, caption, index, count, detail, actions, previ
 						event.preventDefault();
 						(event.currentTarget as HTMLElement).focus();
 					}}
-					className="fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100vh-2rem)] w-[min(72rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-3 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-hidden"
+					onCloseAutoFocus={returnFocus}
+					className="fixed top-1/2 left-1/2 z-50 flex h-[calc(100vh-2rem)] w-[min(72rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-3 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-hidden"
 					onKeyDown={event => {
-						if (event.altKey || event.metaKey || event.ctrlKey) return;
+						// Zoomed in, the arrow keys pan the image instead of stepping to the next one.
+						if (zoomKey(zoom, event) || zoom.level > 1 || event.altKey || event.metaKey || event.ctrlKey) return;
 						const by = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : null;
 						if (by === null) return;
 						event.preventDefault();
@@ -64,6 +70,7 @@ export function ImageViewer({ src, caption, index, count, detail, actions, previ
 							</DialogPrimitive.Description>
 						</div>
 						<div className="flex shrink-0 items-center gap-1">
+							<ZoomControls zoom={zoom} />
 							{actions}
 							<Tooltip content="Open the image in a new tab">
 								<Button {...activityControl("media-viewer.new-tab")} variant="ghost" size="icon-compact" aria-label="Open the image in a new tab" asChild>
@@ -87,7 +94,9 @@ export function ImageViewer({ src, caption, index, count, detail, actions, previ
 								<ChevronLeft />
 							</Button>
 						</Tooltip>
-						<img src={mediaSrc(src)} alt={caption} className="min-h-0 min-w-0 flex-1 max-h-[calc(100vh-9rem)] object-contain" />
+						<ZoomPane zoom={zoom} className="self-stretch">
+							<img src={mediaSrc(src)} alt={caption} draggable={false} className="max-h-full max-w-full object-contain" />
+						</ZoomPane>
 						<Tooltip content={nextLabel} shortcut={["→"]} disabled={index === count - 1}>
 							<Button {...activityControl("media-viewer.step")} variant="ghost" size="icon-compact" aria-label={nextLabel} disabled={index === count - 1} onClick={() => step(1)}>
 								<ChevronRight />

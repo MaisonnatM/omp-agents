@@ -1,12 +1,11 @@
 /**
  * Removes secrets from everything omp keeps of one session on disk: its entries, which omp's own session manager
- * rewrites, the files in its sidecar folder, the request-log blobs its records name, and its rows in `history.db`.
+ * rewrites, the files in its sidecar folder, and its rows in `history.db`.
  */
 import { Database } from "bun:sqlite";
 import { existsSync } from "node:fs";
 import { readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { BLOB_PREFIX, RECORD_TYPE, type RequestRecord } from "../replay/request-log-reader";
 import { eachString, Redactor, redactValue } from "./redact";
 
 /** One session entry as omp's session manager holds it; the scrub replaces whole fields, never the objects inside them. */
@@ -26,23 +25,19 @@ export interface SessionStore {
 	getArtifactsDir(): string | null;
 	isSessionOnDisk(): boolean;
 	rewriteEntries(): Promise<void>;
-	putBlobSync(data: Buffer): { ref: string };
 }
 
 export interface ScrubOptions {
 	/** omp's `history.db`. */
 	historyDb: string;
-	/** omp's blob store, where the request log keeps each request's parts. */
-	blobsDir: string;
 	/** omp's `isSessionLeaseHeld`: a subagent session another process may still write is left for a later turn. */
 	leaseHeld?: (sessionId: string) => boolean | null;
 }
 
-/** How many entries, sidecar files, request-log blobs, and `history.db` rows one run changed. */
+/** How many entries, sidecar files, and `history.db` rows one run changed. */
 export interface ScrubReport {
 	entries: number;
 	files: number;
-	blobs: number;
 	historyRows: number;
 }
 
@@ -69,10 +64,6 @@ export class SessionScrub {
 	readonly #checked = new WeakMap<object, number>();
 	/** Sidecar files already clean, by path, with their size, modification time, and the redactor version. */
 	readonly #files = new Map<string, string>();
-	/** Request-log blob references already clean at the redactor version. */
-	readonly #cleanBlobs = new Set<string>();
-	/** Request-log blob references this scrub replaced, and their redacted copies. */
-	readonly #replacedBlobs = new Map<string, string>();
 	readonly #options: ScrubOptions;
 
 	constructor(options: ScrubOptions) {
@@ -80,7 +71,7 @@ export class SessionScrub {
 	}
 
 	async run(store: SessionStore): Promise<ScrubReport> {
-		const report: ScrubReport = { entries: 0, files: 0, blobs: 0, historyRows: 0 };
+		const report: ScrubReport = { entries: 0, files: 0, historyRows: 0 };
 		const entries = store.getEntries();
 		for (const entry of entries) {
 			if (this.#checked.get(entry) === this.redactor.version) continue;
@@ -90,7 +81,7 @@ export class SessionScrub {
 		const version = this.redactor.version;
 		for (const entry of entries) {
 			if (this.#checked.get(entry) === version) continue;
-			if (await this.#redactEntry(entry, store, report)) report.entries++;
+			if (this.#redactEntry(entry)) report.entries++;
 			this.#checked.set(entry, version);
 		}
 		// A session not yet on disk is written whole from these entries when it is.
@@ -102,7 +93,7 @@ export class SessionScrub {
 	}
 
 	/** Swaps each field of `entry` holding a secret for a redacted copy, so the objects the live agent shares stay whole. */
-	async #redactEntry(entry: SessionEntry, store: SessionStore, report: ScrubReport): Promise<boolean> {
+	#redactEntry(entry: SessionEntry): boolean {
 		const user = isUserEntry(entry);
 		let changed = false;
 		for (const [key, value] of Object.entries(entry)) {
@@ -112,46 +103,7 @@ export class SessionScrub {
 			entry[key] = next;
 			changed = true;
 		}
-		if (entry.type === "custom" && entry.customType === RECORD_TYPE) {
-			const record = await this.#redactRecord(entry.data as RequestRecord, store);
-			if (record) {
-				entry.data = record;
-				report.blobs++;
-				changed = true;
-			}
-		}
 		return changed;
-	}
-
-	/**
-	 * A request-log record pointing at a redacted copy of its messages blob, marked `redacted` since its body no longer
-	 * hashes to `requestHash`; null when the blob holds no secret. The original blob is deleted.
-	 */
-	async #redactRecord(record: RequestRecord, store: SessionStore): Promise<RequestRecord | null> {
-		const ref = record?.messages?.edits;
-		if (typeof ref !== "string" || !ref.startsWith(BLOB_PREFIX)) return null;
-		const replaced = this.#replacedBlobs.get(ref);
-		if (replaced) return { ...record, messages: { ...record.messages!, edits: replaced }, redacted: true };
-		const key = `${ref}@${this.redactor.version}`;
-		if (this.#cleanBlobs.has(key)) return null;
-		const path = join(this.#options.blobsDir, ref.slice(BLOB_PREFIX.length));
-		const text = await readFile(path, "utf8").catch(() => null);
-		if (text === null) return null;
-		const edits: unknown = JSON.parse(text);
-		if (!Array.isArray(edits)) return null;
-		// Each edit copies messages from the request before, or adds one message as the provider received it.
-		const next = edits.map(edit => {
-			const user = !!edit && typeof edit === "object" && "add" in edit && roleOf(edit.add) === "user";
-			return redactValue(edit, part => this.redactor.redact(part, user));
-		});
-		if (next.every((edit, index) => edit === edits[index])) {
-			this.#cleanBlobs.add(key);
-			return null;
-		}
-		const copy = store.putBlobSync(Buffer.from(JSON.stringify(next))).ref;
-		this.#replacedBlobs.set(ref, copy);
-		await rm(path, { force: true });
-		return { ...record, messages: { ...record.messages!, edits: copy }, redacted: true };
 	}
 
 	async #scrubDir(dir: string): Promise<number> {

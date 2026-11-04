@@ -1,16 +1,17 @@
 # Starting, ending, resuming, and forking
 
 - To start a session, click **New session** at the top of the **Sessions** tab.
-  The page shows a new-session draft with the same header and composer as a running session, its header reading `New session`; the directory picker in the composer, left of the model menu, shows the directory that omp will run in.
+  The page shows a new-session draft, its header reading `New session`; the directory picker above the composer shows the directory that omp will run in.
   No omp process starts and no row appears in the sidebar until you send the first message, so leaving an empty draft leaves nothing running.
-  Above the composer, under **Start a session**, a board lists up to four items in each of three columns.
-  **Todos for agents** lists the open todos by status, as the Todo page orders them; clicking one starts a draft from it, in the todo's workspace when it names one, as **Start session** on the Todo page does.
-  **Pick up where you left off** lists the selected workspace's omp sessions, interrupted ones first, then the latest; clicking one resumes it.
-  **Pull requests waiting** lists the Pull requests board's **Your move** column, keeping the pull requests that a quick action hands to an agent; clicking one runs that quick action, as its badge on the Pull requests page does.
-  **All** opens the Todo page or the Pull requests page.
-  A scheduled start shows no board.
+  The page shows the omp logo over the question "What should we work on in" and the folder's name, and keeps the composer at its bottom, the directory and branch pickers just above it.
+  While the draft is empty, the composer lists seven starters under its buttons, numbered, as it lists a reply's suggested prompts: work you start often, such as **Run the dev server**, **Ship ENG-2722**, or **Sum up my week**, the best fit for now first.
+  They fill in what the page knows: the branch picked above the composer, your Linear issue in progress or up next, and your one open pull request when you have only one.
+  Running the dev server ranks first on a feature branch, shipping an issue when one is in progress, shepherding your pull requests when some wait on your move, and a summary of what you merged on Monday morning and at the end of the week.
+  Pressing a starter's number, or clicking it, puts its full prompt in the composer without sending it, so you can edit it first; 0 or **All of them** puts the starters there as a list. With no issue to name, **Ship a Linear issue** puts `/ship ` there for you to paste the issue's or the view's link after.
+  A personal draft lists none, and a private draft shows what ending it deletes there instead, as **Private** below says.
+  A scheduled start keeps its pickers inside the composer and lists no starters.
   The directory is the selected workspace, else the open session's workspace, else the newest live session's, else the newest past session's, so a session in a linked worktree hands its repository's main checkout to the draft, where the branch picker can pick a worktree.
-  To start in another directory, under **All workspaces** or not, pick it in the composer's directory picker, or press Cmd+Alt+P.
+  To start in another directory, under **All workspaces** or not, pick it in the directory picker, or press Cmd+Alt+P.
   It lists the workspaces the sidebar lists, and **Use** takes any directory typed into its search field.
   The message you typed stays in the composer.
   Sending the first message starts omp there and sends it the message.
@@ -44,12 +45,13 @@
   Click it to start this one session without the skill.
   It is greyed out when the directory has no skill of that name, and the session then starts without it.
   A first message that starts with `/` keeps its own skill or command and skips the pinned skill, so the toggle hides while the message starts that way.
-- **Private**, the lock toggle after the model picker, starts a session that is deleted with everything it wrote when it ends: its transcript, its subagents, its prompts in omp's history, its title, and its pins.
-  It never shows under the past sessions, never resumes, and cannot be forked or replayed, and omp's memory and autolearn stay off for it.
-  A private session shows a lock in its sidebar row and its header.
+- **Private**, the pill at the right of the page header, starts a session that is deleted with everything it wrote when it ends: its transcript, its subagents, its prompts in omp's history, its title, and its pins.
+  It never shows under the past sessions, never resumes, and cannot be forked, and omp's memory and autolearn stay off for it.
+  While it is on, the pill fills dark, the composer gets a dark outline, and the starters give way to what ending deletes and what stays: files it changes and commits it makes stay in the project, and a personal one keeps its memory.
+  A private session shows a dark **Private** chip in its sidebar row and its header.
   It ends when its omp process stops, whether through **End session**, `end_session`, or a crash; a dashboard that was not running then deletes it at its next start.
-  The toggle hides on a draft that starts from a todo, since nothing may link to a private session.
-- When the directory is in a git checkout, a branch picker sits after the directory picker in the composer.
+  The pill hides on a draft that starts from a todo, since nothing may link to a private session.
+- When the directory is in a git checkout, a branch picker sits after the directory picker.
   The picker lists the local branches, the checked-out one first, then the most recently committed to, each with where it would run: `here`, the worktree that has it checked out, or `new worktree`.
   Picking the checked-out branch keeps the directory as it is.
   Picking another branch runs omp in the worktree that has it checked out, or adds a worktree for it when none has.
@@ -86,7 +88,7 @@
   A session whose omp process exited mid-turn, for example because the computer restarted, resumes too: omp records the interrupted turn first, as it does in a terminal.
   If another omp process still writes the file, omp writes the resumed session's entries to a new file instead of mixing the two.
   The past sessions then list both files, and **Resume** on the older one opens the newer one, which holds its whole conversation and what came after, as `omp --resume` does; it says the session is already running while the newer one runs.
-  **Fork from here** and **Replay from here** read the file the pane shows.
+  **Fork from here** reads the file the pane shows.
 - Every commit an omp session makes carries an `Omp-Session: <session id>` trailer, from `~/.omp/agent/extensions/session-trailer.ts`, which `bun run omp-template` installs.
   `git log --format='%h %(trailers:key=Omp-Session,valueonly)'` lists each commit's session, and `omp -r <session id>` or **Resume** on that session reopens it.
 - Click **Fork from here** under a prompt or a turn's last reply to start a dashboard session that holds the conversation up to that point, as omp's `/branch` does.

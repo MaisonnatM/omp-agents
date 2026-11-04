@@ -45,3 +45,15 @@ The client counts an `ApiError` of 404 or 410 as deleted, since Google answers 4
 A repeat's event id deletes only that repeat; the client then forgets that calendar's kept event reads, so the next read leaves the event out.
 The Calendar page reads the kept events through `localEventsStore` in `web/reads.ts` every minute, with or without Google Calendar.
 The page owns what a write changes: it adds the kept event that `PUT /api/calendar/events/new` answers to that store, or reads the month of an event added to Google Calendar again; after a delete it takes a kept event out of `localEventsStore`, or reads the open month's events again, and the delete button stays busy until that read settles.
+
+### Agent reminders
+
+A `LocalEvent`'s `sessionId` names the omp session that added it, and is `null` for an event you added; one whose `sessionId` is missing or not a nonempty string loads with `null`, so older files read as before.
+The starter kit's `user_event` extension lists the upcoming events of `events.json`, adds a timed reminder in its session's name, and removes one that session added.
+It reads the file but never writes it, and atomically renames each `{ op: "add", event }` or `{ op: "remove", id, sessionId }` into `event-inbox/` beside it.
+It also reads the pending changes, so a session sees its own reminders while the dashboard is stopped.
+`EventInbox` in `src/server/event-inbox.ts` uses `JsonInboxDir` to apply them through `LocalEventsFile` in filename order.
+It sets aside an add that names no session and a removal whose event another session or you added, checked against the kept events when it applies the change.
+An add of an id already kept adds nothing, so a replayed change never shows an event twice.
+Only the server holding `OwnerLock` drains the inbox, and it reloads `events.json` before taking ownership, as it does `notes.json`.
+A kept event's notice and its Calendar page entry link to `hashForSession(sessionId)` when it names a session; see [Notifications](notifications.md).

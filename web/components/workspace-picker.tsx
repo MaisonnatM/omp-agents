@@ -3,7 +3,7 @@ import { Folder } from "lucide-react";
 import { useContext, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import type { Workspace } from "../../src/shared/workspaces";
-import { workspaceName } from "../labels";
+import { sameDir, workspaceName } from "../labels";
 import type { ShortcutId } from "../shortcuts";
 import { CommandPicker, type PickerItem } from "./command-picker";
 import { PersonalContext } from "./dashboard-context";
@@ -19,7 +19,7 @@ export function workspaceItems(workspaces: Workspace[], current: string | null, 
 				<span className="truncate text-xs text-muted-foreground">{workspace.cwdDisplay}</span>
 			</span>
 		),
-		selected: workspace.cwd === current || workspace.cwdDisplay === current,
+		selected: current !== null && sameDir(current, workspace),
 		onSelect: () => onPick(workspace),
 	}));
 }
@@ -42,12 +42,12 @@ interface DirectoryPickerProps {
 	control?: ControlId;
 }
 
-/** A working directory: **Personal** first, then a workspace the dashboard lists, or any directory typed into the search field. */
+/** A working directory: a workspace the dashboard lists, or any directory typed into the search field; **Personal** opens from the sidebar instead. */
 export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shortcut, side = "top", open, onOpenChange, onPick, control }: DirectoryPickerProps) {
 	const personal = useContext(PersonalContext);
 	const [query, setQuery] = useState("");
 	const typed = query.trim();
-	const listed = personal ? [personal, ...workspaces.filter(workspace => workspace.cwd !== personal.cwd)] : workspaces;
+	const listed = personal ? workspaces.filter(workspace => !sameDir(workspace.cwd, personal)) : workspaces;
 	const pick = (next: string): void => {
 		if (next !== cwd) onPick(next);
 	};
@@ -77,7 +77,7 @@ export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shor
 						heading: "Workspaces",
 						items: workspaceItems(listed, cwd, personal, workspace => pick(workspace.cwdDisplay)),
 					},
-					...(typed && !listed.some(w => w.cwd === typed || w.cwdDisplay === typed)
+					...(typed && !listed.some(w => sameDir(typed, w))
 						? [
 								{
 									key: "typed",

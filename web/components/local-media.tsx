@@ -1,75 +1,77 @@
-/** The images and videos on this computer that agent text names, shown in the message and opened large in the file dialog. */
+/** The images and videos on this computer that agent text names, shown in the message and opened large. */
 import { Play } from "lucide-react";
 import { useContext, useState } from "react";
 import { mediaSrc } from "../api";
-import { type FileTarget, fileTarget, linkedFile, mediaFileUrl } from "../file-paths";
+import { type FileBase, type FileTarget, fileTarget, linkedFile, mediaFileUrl } from "../file-paths";
 import { DashboardActionsContext } from "./dashboard-context";
 import { FileBaseContext } from "./file-link";
+import { Openable } from "./markdown-images";
 
-/** The file `path` names against the message's base, its address, and whether it plays as a video; `null` when nothing resolves it or it is no media file. */
-function useMedia(path: string): { target: FileTarget; src: string; video: boolean } | null {
-	const base = useContext(FileBaseContext);
+interface Media {
+	/** As the message writes it. */
+	path: string;
+	target: FileTarget;
+	/** Its address before `mediaSrc`, which whatever draws it applies. */
+	url: string;
+	name: string;
+	video: boolean;
+}
+
+/** The file `path` names against the message's `base`, its address, and whether it plays as a video; `null` when nothing resolves it or it is no media file. */
+function mediaOf(path: string, base: FileBase | null): Media | null {
 	const file = linkedFile(path);
 	const target = fileTarget(path, base);
 	if (!file || file.kind === "text" || target === null) return null;
-	return { target, src: mediaSrc(mediaFileUrl(target)), video: file.kind === "video" };
+	return { path, target, url: mediaFileUrl(target), name: target.path.slice(target.path.lastIndexOf("/") + 1), video: file.kind === "video" };
 }
 
-/** An image of agent text, `![alt](path)`, in place: an image, or a video that plays there. A path that loads nothing shows its `alt`. */
+/** An image of agent text, `![alt](path)`, in place: an image that opens large, or a video that plays there. A path that loads nothing shows its `alt`. */
 export function LocalMedia({ path, alt }: { path: string; alt: string }) {
-	const media = useMedia(path);
-	const openFile = useContext(DashboardActionsContext)?.openFile;
+	const media = mediaOf(path, useContext(FileBaseContext));
 	const [failed, setFailed] = useState(false);
 	if (media === null || failed) return <>{alt || path}</>;
-	const { src } = media;
-	if (media.video) return <video controls preload="metadata" src={src} onError={() => setFailed(true)} className="max-h-[60vh] max-w-full rounded-md bg-black" />;
+	if (media.video) return <video controls preload="metadata" src={mediaSrc(media.url)} onError={() => setFailed(true)} className="max-h-[60vh] max-w-full rounded-md bg-black" />;
 	return (
-		<img
-			src={src}
-			alt={alt}
-			loading="lazy"
-			onError={() => setFailed(true)}
-			onClick={openFile && (() => openFile(media.target))}
-			className="max-h-[60vh] max-w-full cursor-zoom-in"
-		/>
+		<Openable src={media.url} alt={alt} detail={media.target.path}>
+			<img src={mediaSrc(media.url)} alt={alt} loading="lazy" onError={() => setFailed(true)} className="max-h-[60vh] max-w-full" />
+		</Openable>
 	);
 }
 
-/** One file of a {@link MediaStrip}: a thumbnail, a video's first frame with a play mark, that opens large. A file that loads nothing drops out. */
-function Thumbnail({ path }: { path: string }) {
-	const media = useMedia(path);
+const THUMBNAIL = "relative cursor-zoom-in overflow-hidden rounded-md outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10";
+
+/** One file of a {@link MediaStrip}: an image's thumbnail, which opens large, or a video's first frame with a play mark, which opens in the file dialog. */
+function Thumbnail({ media, onFailed }: { media: Media; onFailed: () => void }) {
 	const openFile = useContext(DashboardActionsContext)?.openFile;
-	const [failed, setFailed] = useState(false);
-	if (media === null || failed) return null;
-	const { src } = media;
-	const name = media.target.path.slice(media.target.path.lastIndexOf("/") + 1);
+	if (!media.video)
+		return (
+			<Openable src={media.url} alt={media.name} detail={media.target.path} title={media.target.path} className={THUMBNAIL}>
+				<img src={mediaSrc(media.url)} alt={media.name} loading="lazy" onError={onFailed} className="h-32 max-w-60 object-contain" />
+			</Openable>
+		);
 	return (
-		<button
-			type="button"
-			title={media.target.path}
-			aria-label={`Open ${name}`}
-			disabled={!openFile}
-			onClick={() => openFile?.(media.target)}
-			className="relative cursor-zoom-in overflow-hidden rounded-md outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
-		>
-			{media.video ? (
-				<>
-					<video muted preload="metadata" src={src} onError={() => setFailed(true)} className="h-32 max-w-60 bg-black object-contain" />
-					<Play aria-hidden className="absolute inset-0 m-auto size-8 rounded-full bg-black/60 p-2 text-white" />
-				</>
-			) : (
-				<img src={src} alt={name} loading="lazy" onError={() => setFailed(true)} className="h-32 max-w-60 object-contain" />
-			)}
+		<button type="button" title={media.target.path} aria-label={`Open ${media.name}`} disabled={!openFile} onClick={() => openFile?.(media.target)} className={THUMBNAIL}>
+			<video muted preload="metadata" src={mediaSrc(media.url)} onError={onFailed} className="h-32 max-w-60 bg-black object-contain" />
+			<Play aria-hidden className="absolute inset-0 m-auto size-8 rounded-full bg-black/60 p-2 text-white" />
 		</button>
 	);
 }
 
-/** The images and videos a message names, in the order it names them, as thumbnails under its text. */
+/**
+ * The images and videos a message names, in the order it names them, as thumbnails under its text. An image opens
+ * large with ←/→ to the message's other images; a video opens in the file dialog. A file that loads nothing drops out.
+ */
 export function MediaStrip({ paths }: { paths: string[] }) {
+	const base = useContext(FileBaseContext);
+	const [failed, setFailed] = useState<ReadonlySet<string>>(new Set());
+	const media = paths.flatMap(path => {
+		const item = failed.has(path) ? null : mediaOf(path, base);
+		return item ? [item] : [];
+	});
 	return (
 		<figure className="mt-2 flex flex-wrap gap-1.5 empty:hidden" aria-label="Images and videos this message names">
-			{paths.map(path => (
-				<Thumbnail key={path} path={path} />
+			{media.map(item => (
+				<Thumbnail key={item.path} media={item} onFailed={() => setFailed(current => new Set(current).add(item.path))} />
 			))}
 		</figure>
 	);

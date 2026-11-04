@@ -117,20 +117,34 @@ describe("publish gate", () => {
 		expect(blocker("## Summary", ["README.md"], noThermonuclear)).toBeUndefined();
 	});
 
-	test("an unreviewed PR that needs no review is still blocked on the box", () => {
-		const reason = blocker(PROOF_BOX, ["README.md"], noThermonuclear);
+	test("an unreviewed PR that needs no review is still blocked on the box when it changes the interface", () => {
+		const reason = blocker(`${INTERFACE}\n${PROOF_BOX}`, ["web/app.tsx"], { ...noThermonuclear, ...ui });
 		expect(reason).toContain(PROOF_BOX);
 		expect(reason).not.toContain(THERMONUCLEAR);
 	});
 
-	test.each([PROOF_BOX, `  ${PROOF_BOX} (UI changes: run verify-yampa, attach screenshot)`])("a reviewed PR with %j is blocked on the box", box => {
-		const reason = blocker(`${reviewed}\n${box}`, ["README.md"]);
+	const interfaceReviewed = `${reviewed}\n${INTERFACE}`;
+
+	test.each([PROOF_BOX, `  ${PROOF_BOX} (UI changes: run verify-yampa, attach screenshot)`])("a reviewed PR changing the interface with %j is blocked on the box", box => {
+		const reason = blocker(`${interfaceReviewed}\n${box}`, ["web/app.tsx"], ui);
 		expect(reason).toContain(PROOF_BOX);
+		expect(reason).toContain(".omp/ui-paths");
 		expect(reason).not.toContain(THERMONUCLEAR);
 	});
 
-	test.each(["- [x] Browser proof", "- [X] Browser proof (UI changes)"])("a reviewed PR with %j goes live", box => {
-		expect(blocker(`${reviewed}\n${box}`, ["README.md"])).toBeUndefined();
+	test("an unchecked box blocks when GitHub lists fewer changed files than the PR has", () => {
+		expect(publishBlocker(`${interfaceReviewed}\n${PROOF_BOX}`, reviewsOf(interfaceReviewed, ["README.md"], 2, paths => ui[paths as keyof typeof ui]))).toContain(PROOF_BOX);
+	});
+
+	test.each([
+		["no ui paths", ["web/app.tsx"], {}],
+		["no changed file the ui paths match", ["README.md"], ui],
+	] as const)("a reviewed PR with an unchecked box and %s goes live", (_, files, checkout) => {
+		expect(blocker(`${reviewed}\n${PROOF_BOX}`, [...files], checkout)).toBeUndefined();
+	});
+
+	test.each(["- [x] Browser proof", "- [X] Browser proof (UI changes)"])("a reviewed PR changing the interface with %j goes live", box => {
+		expect(blocker(`${interfaceReviewed}\n${box}`, ["web/app.tsx"], ui)).toBeUndefined();
 	});
 
 	test("a PR changing a file the ui paths match is blocked on the interface box, before the thermonuclear one", () => {

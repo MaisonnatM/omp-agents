@@ -19,7 +19,7 @@ import { EmptyHome } from "./empty-home";
 import { DisconnectedPage } from "./integrations/disconnected-page";
 import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { NewSession } from "./new-session";
-import { NewSessionBoard } from "./new-session-board";
+
 import { PaneGrid } from "./pane-grid";
 import { NotesPage } from "./notes/page";
 import { BotPage, NewBot } from "./bots/bot-page";
@@ -31,6 +31,14 @@ import { TICKETS_META, TICKETS_TITLE, TicketsPage } from "./tickets/tickets-page
 import { TodoPage } from "./todo/page";
 
 /** What a new session for top-level todo `todoId` starts with: its title, then its notes, and its Workspace. `null` while the list names no such todo. */
+/** The directory a New session draft on `page` starts in: the route's, else its todo's Workspace, else `defaultWorkspace`. */
+export function newDraftCwd(page: Extract<Page, { kind: "new" }>, list: UserTodoList | null, defaultWorkspace: string): string {
+	// A directory the route names wins over the todo's Workspace, so picking another one in the draft sticks.
+	if (page.cwd !== null) return page.cwd;
+	const seed = todoSeed(list, page.todoId);
+	return seed ? todoCwd(seed, defaultWorkspace) : defaultWorkspace;
+}
+
 function todoSeed(list: UserTodoList | null, todoId: string | null): { text: string; prompt: string; workspace: string | null } | null {
 	const todo = todoId === null ? undefined : list?.todos.find(({ id }) => id === todoId);
 	if (!todo) return null;
@@ -41,7 +49,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -87,7 +95,6 @@ export const PageSwitch = memo(function PageSwitch({
 	openBot,
 	workspaceList,
 	trustedProjects,
-	pins,
 	newSessionCompletions,
 	connected,
 	listed,
@@ -113,8 +120,7 @@ export const PageSwitch = memo(function PageSwitch({
 	switch (page?.kind) {
 		case "new": {
 			const seed = todoSeed(userTodos, page.todoId);
-			// A directory the route names wins over the todo's Workspace, so picking another one in the draft sticks.
-			const cwd = page.cwd ?? (seed ? todoCwd(seed, defaultWorkspace) : defaultWorkspace);
+			const cwd = newDraftCwd(page, userTodos, defaultWorkspace);
 			// Until the todo list arrives, a todo's draft is neither the plain draft nor kept, so it cannot overwrite either.
 			const pending = page.todoId !== null && userTodos === null;
 			return (
@@ -136,7 +142,7 @@ export const PageSwitch = memo(function PageSwitch({
 					onSchedule={(op, when) => scheduleSend({ kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, todoId: seed && page.todoId }) }, when)}
 					todo={seed}
 					draftKey={pending ? null : newDraftKey(seed ? page.todoId : null)}
-					board={note => <NewSessionBoard cwd={cwd} hosts={visible.hosts} past={visible.past} workspace={workspace} note={note} />}
+					starters={{ hosts, linear: linearCallable }}
 				/>
 			);
 		}
@@ -151,7 +157,6 @@ export const PageSwitch = memo(function PageSwitch({
 					workspaces={workspaces}
 					workspaceList={workspaceList}
 					trustedProjects={trustedProjects}
-					pins={pins}
 				/>
 			);
 		case "pull-requests":
@@ -191,6 +196,7 @@ export const PageSwitch = memo(function PageSwitch({
 				<BotPage
 					key={openBot.bot.id}
 					open={openBot}
+					bots={bots ?? []}
 					detailsOpen={rightOpen}
 					onToggleDetails={() => toggleSidebar("right")}
 					past={past}

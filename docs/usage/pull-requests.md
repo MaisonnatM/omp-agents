@@ -27,15 +27,15 @@
   An issue counts when the session or one of its subagents changed or opened it (`save_issue`) or commented on it (`save_comment`), when the session names it in its `/ship` step, or when a Linear link to it is in the session's own prompt.
   Weaker evidence counts once two kinds of it agree: a read with omp's Linear tools (`get_issue`, `list_comments`), its identifier in the session's own prompt, and the session's branch, such as `eng-2716-agent-templates` or `me/eng-2712`.
   So an issue a subagent only read for context does not count, and neither does one that a `list_issues` search only listed.
-- Sessions that use `/ship` show a Ship card at the top of their transcript, with the Linear issue if the work has one, the PR, the current step, and how many of the nine steps are done, such as `1 of 9` during the plan.
-  Agents start `/ship` on their own when a request will end in a pull request, and say so in their first reply; answer "no ship" to work without it, and the Ship card goes away.
-  Click the card to see every step.
+- Sessions that use `/ship` lead the Todos card's line above their transcript with the current step and its place among the nine, such as **Plan · step 2 of 9**, and the card opens on a **Ship** section with the Linear issue if the work has one, the PR, and how many steps are done.
+  Agents start `/ship` on their own when a request will end in a pull request, and say so in their first reply; answer "no ship" to work without it, and the Ship section goes away.
+  Click the line to see every step.
   The steps are ticket, plan, implementation, draft PR, interface review, thermonuclear review, ready gate, live review, and merged.
   The ticket step links the issue you named or one that matches the work, and passes without one rather than creating a ticket.
   In the plan step the agent compares up to three ways to build the change and posts the one it chose on the Linear issue, or in the PR body when there is no issue.
-  During live review the card names the active rebase, review-comment, or CI-fix work.
+  During live review the line and the section name the active rebase, review-comment, or CI-fix work.
   omp writes each step to its session file; the dashboard reads those entries for running and past sessions and updates when the step changes.
-  Other sessions have no Ship card.
+  Other sessions have no Ship section.
 - Tabs under the sidebar header switch pages and what the sidebar lists: **Pull requests**, **Tickets**, **Bots**, **Sessions**, and **Todo** in the sidebar's tab bar, and **Notes**, **Calendar**, and **Email** as buttons in the header beside the command menu.
   Click a tab or use the left and right arrow keys while a bar tab has focus to switch pages.
   **Tickets** shows only once Linear is connected; see [Linear tickets](linear-tickets.md).
@@ -105,7 +105,7 @@
   One rebase runs at a time, so the item reads **Queued to rebase** behind another one, then **Rebasing** beside a spinner until the push ends, which can take minutes.
   A toast with a spinner and a running clock follows it at once: `Rebasing me/fix on main`, with how many rebases it waits behind, then the step the server is on: `Reading the pull request`, `Waiting for another rebase in this repository` while another rebase of the same repository runs, `Fetching main and me/fix`, `Rebasing onto main`, and `Pushing through the pre-push checks`, the long one.
   When it ends, the same toast says what came of it: the rebase, a branch that already had its base, or the server's reason for refusing, such as uncommitted changes in the workspace, local commits the pull request lacks, or failed checks.
-  When the rebase stops at a conflict, the toast counts the conflicting files and a **Resolve conflicts** session starts on the pull request, as its quick action does.
+  When the rebase stops at a conflict, the toast counts the conflicting files and names the first three, and a **Resolve conflicts** session starts on the pull request, as its quick action does.
   The list reads GitHub again once the rebases end.
   A state change, a review request, or a merge from a row shows in the list as soon as GitHub takes it, and the list then reads GitHub again; a closed pull request leaves the list, and when GitHub refuses a change, a toast says why.
   Click a **Review**, **Fix CI**, **Rebase**, or **Reply** badge to start its quick action when available, such as **Resolve conflicts** for **Rebase**.
@@ -176,6 +176,7 @@
   The session also shows in the sessions sidebar.
   Which actions show depends on the pull request: **Fix CI and conflicts** on your own open pull request with merge conflicts and failed checks, **Fix CI** on your own open pull request whose checks failed, **Resolve conflicts** on your own open pull request with merge conflicts, **Address comments** on your own open pull request with unresolved review threads or requested changes, **Review** on an open pull request that waits for your review, and **Thermonuclear review** on every open or draft pull request.
   **Fix CI and conflicts** rebases the branch and resolves its conflicts first, then fixes the checks that still fail on the rebased branch, in one session.
+  Both rebasing actions tell the session how to work through each commit that stops: list its conflicted files, add each one it resolves, take a whole side past a post-checkout hook such as pre-commit's, and continue without an editor.
   **Fix CI and conflicts**, **Fix CI**, **Resolve conflicts**, and **Address comments** end their own session through `end_session` once the fix is pushed, which moves it to the past sessions and removes its worktree; a session that could not finish, such as one with a failure it could not fix, stays open and says what is left.
   **Review** reviews the pull request's head commit and saves what it finds as the pull request's review draft, through the dashboard's `save_review_draft` tool, which only that session gets, and resumes of it too; it posts nothing on GitHub, and the draft waits on the **Review draft** tab for you to post it.
   A new draft of the same pull request replaces the one before it, findings and edits included, except the comments you added from **Code** on the same head, which stay after the new findings.

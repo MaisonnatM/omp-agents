@@ -55,4 +55,13 @@ describe("pullRequestActions", () => {
 		expect(prompt).toContain('kind:"append"');
 		expect(prompt).not.toContain("gh pr edit");
 	});
+
+	test("both rebase prompts carry the conflict steps: list the stop's files, take a side past post-checkout hooks, continue without an editor", () => {
+		for (const id of ["resolve-conflicts", "fix-ci-and-conflicts"] as const) {
+			const prompt = PULL_REQUEST_ACTIONS[id].prompt(pr({ conflicts: true }));
+			expect(prompt).toContain("git diff --name-only --diff-filter=U");
+			expect(prompt).toContain("git -c core.hooksPath=/dev/null checkout --theirs -- <file>");
+			expect(prompt).toContain("GIT_EDITOR=true gt continue");
+		}
+	});
 });

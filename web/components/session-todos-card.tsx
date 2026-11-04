@@ -1,11 +1,12 @@
-import { ChevronRight, ListChecks, Ship } from "lucide-react";
-import { memo, type ReactNode, useLayoutEffect, useState } from "react";
+import { ChevronDown, ChevronRight, ListChecks, Ship } from "lucide-react";
+import { memo, type ReactNode, useCallback, useLayoutEffect, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { SHIP_STAGES, type ShipProgress, type View } from "../../src/shared/sessions";
 import type { TodoPhase, TodoTask } from "../../src/shared/transcript";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { activityControl } from "../activity";
@@ -13,33 +14,16 @@ import { keyedStore } from "../keyed-store";
 import { hashForView } from "../routing";
 import { useStoredState } from "../stored-state";
 import { subagentTree } from "../todos-card-subagents-model";
+import { countLabel, isClosed, STAGE_LABEL, type StripSummary, shipDone, shipStep, stripSummary, todoTally, WORK_LABEL } from "../todos-strip-model";
 import type { SubagentLinksValue } from "./subagent-links";
 import { type ChangesSession, ChangesSections, useChanges } from "./todos-card-changes";
 import { SubagentsSection } from "./todos-card-subagents";
 import { Stepper } from "./arc/stepper";
 
-/** Whether the card shows the whole todo list, kept for every transcript; it starts folded to its summary. */
+/** Whether the card shows the whole todo list, kept for every transcript; it starts unfolded. */
 const OPEN_KEY = "omp-agents.todos-card-open";
 const SHOWN_KEY = "omp-agents.todos-card-shown";
 const SHIP_OPEN_KEY = "omp-agents.todos-card-ship-open";
-
-const STAGE_LABEL: Record<ShipProgress["stage"], string> = {
-	ticket: "Ticket",
-	plan: "Plan",
-	implement: "Implement",
-	draft_pr: "Draft PR",
-	interface_review: "Interface review",
-	thermonuclear: "Thermonuclear review",
-	ready_gate: "Ready gate",
-	live: "Live review",
-	merged: "Merged",
-};
-
-const WORK_LABEL: Record<NonNullable<ShipProgress["work"]>, string> = {
-	rebase: "Rebasing",
-	fix_comments: "Fixing review comments",
-	fix_ci: "Fixing CI",
-};
 
 /** Whether transcripts show the whole Todos card, which the checklist toggle in the session header and Settings → Preferences both toggle. */
 export const useTodosCardShown = () => useStoredState(SHOWN_KEY, raw => raw !== "false");
@@ -116,8 +100,6 @@ function StatusGlyph({ status }: { status: TodoTask["status"] }) {
 	);
 }
 
-const isClosed = (task: TodoTask): boolean => task.status === "completed" || task.status === "abandoned";
-
 // A task is one line of inline Markdown: code, bold, italics, strikes, and links, without blocks.
 const INLINE: Components = {
 	p: ({ children }) => <>{children}</>,
@@ -129,11 +111,13 @@ const INLINE: Components = {
 	),
 };
 const INLINE_ELEMENTS = ["p", "code", "strong", "em", "del", "a"];
+/** Inside a button, where a link cannot nest, a link shows as its text. */
+const INLINE_TEXT_ELEMENTS = INLINE_ELEMENTS.filter(element => element !== "a");
 
 /** A task's text as inline markdown; memoized on the text, so a render of the card leaves the parse alone. */
-const TaskText = memo(function TaskText({ text }: { text: string }) {
+const TaskText = memo(function TaskText({ text, links = true }: { text: string; links?: boolean }) {
 	return (
-		<ReactMarkdown remarkPlugins={[remarkGfm]} allowedElements={INLINE_ELEMENTS} unwrapDisallowed components={INLINE}>
+		<ReactMarkdown remarkPlugins={[remarkGfm]} allowedElements={links ? INLINE_ELEMENTS : INLINE_TEXT_ELEMENTS} unwrapDisallowed components={INLINE}>
 			{text}
 		</ReactMarkdown>
 	);
@@ -228,20 +212,18 @@ function Phase({ phase, label }: { phase: TodoPhase; label: string }) {
 }
 
 function TodosSection({ phases }: { phases: readonly TodoPhase[] }) {
-	const [open, setOpen] = useStoredState(OPEN_KEY, raw => raw === "true");
-	const all = phases.flatMap(phase => phase.tasks);
-	const done = all.filter(isClosed).length;
-	const current = all.find(task => task.status === "in_progress");
+	const [open, setOpen] = useStoredState(OPEN_KEY, raw => raw !== "false");
+	const { count, done, total: all, current } = todoTally(phases);
 	return (
 		<Collapsible open={open} onOpenChange={setOpen}>
 			<CollapsibleTrigger {...activityControl("transcript.todos")} className="grid w-full grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 px-3 pt-2.5 pb-3 text-left outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
 				<ListChecks aria-hidden className="size-4 text-muted-foreground" />
 				<span className="truncate text-sm">
 					<span className="font-medium text-foreground">Todos</span>
-					<span className="text-muted-foreground"> · {all.length} tasks</span>
+					<span className="text-muted-foreground"> · {countLabel(all, "task", "tasks")}</span>
 				</span>
 				<span className="flex items-center gap-1 text-xs text-muted-foreground tabular-nums">
-					{done} of {all.length}
+					{count}
 					<ChevronRight aria-hidden className={cn("size-3.5 transition-transform motion-reduce:transition-none", open && "rotate-90")} />
 				</span>
 				{current && (
@@ -253,12 +235,12 @@ function TodosSection({ phases }: { phases: readonly TodoPhase[] }) {
 					role="progressbar"
 					aria-label="Tasks done"
 					aria-valuemin={0}
-					aria-valuemax={all.length}
+					aria-valuemax={all}
 					aria-valuenow={done}
-					aria-valuetext={`${done} of ${all.length} tasks done`}
+					aria-valuetext={`${done} of ${all} tasks done`}
 					className="col-start-2 col-end-4 mt-1.5 block h-1.5 overflow-hidden rounded-full bg-muted"
 				>
-					<span className="block h-full rounded-full bg-emerald-500 transition-[width] duration-500 ease-out motion-reduce:transition-none" style={{ width: `${all.length === 0 ? 0 : (done / all.length) * 100}%` }} />
+					<span className="block h-full rounded-full bg-emerald-500 transition-[width] duration-500 ease-out motion-reduce:transition-none" style={{ width: `${all === 0 ? 0 : (done / all) * 100}%` }} />
 				</span>
 			</CollapsibleTrigger>
 			<CollapsibleContent className="border-t border-border">
@@ -274,10 +256,8 @@ function TodosSection({ phases }: { phases: readonly TodoPhase[] }) {
 
 /** The /ship run's stages in order: the ones before the current stage done, the current one in progress, and every one done once merged. */
 function ShipSection({ ship }: { ship: ShipProgress }) {
-	const [open, setOpen] = useStoredState(SHIP_OPEN_KEY, raw => raw === "true");
-	const at = SHIP_STAGES.indexOf(ship.stage);
-	const merged = ship.stage === "merged";
-	const done = merged ? SHIP_STAGES.length : at;
+	const [open, setOpen] = useStoredState(SHIP_OPEN_KEY, raw => raw !== "false");
+	const done = shipDone(ship);
 	const refs = [ship.issue, ship.pr === undefined ? undefined : `#${ship.pr}`].filter(Boolean).join(" · ");
 	return (
 		<Collapsible open={open} onOpenChange={setOpen}>
@@ -288,7 +268,7 @@ function ShipSection({ ship }: { ship: ShipProgress }) {
 					{refs && <span className="text-muted-foreground"> · {refs}</span>}
 				</span>
 				<span className="flex items-center gap-1 text-xs text-muted-foreground tabular-nums">
-					{done} of {SHIP_STAGES.length}
+					{shipStep(ship) ?? "Done"}
 					<ChevronRight aria-hidden className={cn("size-3.5 transition-transform motion-reduce:transition-none", open && "rotate-90")} />
 				</span>
 				<span className="col-start-2 col-end-4 truncate text-sm text-foreground/80">
@@ -334,11 +314,80 @@ interface SessionTodosCardProps {
 }
 
 /**
+ * The strip's one line: an icon, the lead, then the counts that fit, and the chevron at the end.
+ * A count shows whole or not at all: they drop from the last one while the lead would get less than its own width or
+ * 12rem, whichever is less, so a short lead such as a /ship step stays whole and a long task still leaves room for counts;
+ * the dropped ones stay laid out, unseen, so their widths are known as the line widens again.
+ */
+function StripLine({ summary: { lead, counts }, open }: { summary: StripSummary; open: boolean }) {
+	const [fit, setFit] = useState(counts.length);
+	const row = useRef<HTMLSpanElement>(null);
+	const leadText = useRef<HTMLSpanElement>(null);
+	const content = `${JSON.stringify(lead)}\n${counts.join("\n")}`;
+	useLayoutEffect(() => {
+		const line = row.current;
+		const text = leadText.current;
+		if (!line || !text) return;
+		const measure = (): void => {
+			const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+			let room = line.clientWidth - Math.min(text.scrollWidth, 12 * rem);
+			let fits = 0;
+			for (const count of line.querySelectorAll<HTMLElement>("[data-count]")) {
+				room -= count.offsetWidth;
+				if (room < 0) break;
+				fits++;
+			}
+			setFit(fits);
+		};
+		measure();
+		const observer = new ResizeObserver(measure);
+		observer.observe(line);
+		return () => observer.disconnect();
+	}, [content]);
+	return (
+		<>
+			{lead.kind === "ship" ? (
+				<Ship aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+			) : lead.kind === "task" ? (
+				<StatusGlyph status="in_progress" />
+			) : (
+				<ListChecks aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+			)}
+			<span ref={row} className="relative flex min-w-0 flex-1 items-center overflow-hidden">
+				<span ref={leadText} className="min-w-0 truncate">
+					{lead.kind === "ship" && (
+						<>
+							<span className="font-medium">{lead.stage}</span>
+							{lead.work && <span className="text-muted-foreground"> · {lead.work}</span>}
+							{lead.step && <span className="text-muted-foreground tabular-nums"> · {lead.step}</span>}
+						</>
+					)}
+					{lead.kind === "task" && <TaskText text={lead.markdown} links={false} />}
+					{lead.kind === "count" && <span className="font-medium tabular-nums">{lead.text}</span>}
+				</span>
+				{counts.map((count, index) => (
+					<span
+						key={count}
+						data-count
+						className={cn("shrink-0 whitespace-nowrap text-muted-foreground tabular-nums before:px-1.5 before:content-['·']", index >= fit && "invisible absolute top-0 left-0")}
+					>
+						{count}
+					</span>
+				))}
+			</span>
+			<ChevronDown aria-hidden className={cn("size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", open && "rotate-180")} />
+		</>
+	);
+}
+
+/**
  * The agent's own todo list, as its latest `todo` call left it, the subagents under the view's agent, and the files,
  * images, and pages the view's agents changed, took, and opened, each a section shown once it has something to list.
- * The todo list is a summary of progress and the task in progress, which unfolds into every phase, open tasks first.
- * The card floats at the top right of its transcript when the transcript is wide enough to keep it beside the messages,
- * and otherwise sits above them.
+ * It shows as one strip above the messages, with the /ship stage or the task in progress and each section's count in
+ * its header's words; a click opens the sections over the messages, in the conversation's bounds, and a click outside
+ * or Escape closes them, Escape giving the focus back to the strip.
+ * The sections' dialogs render inside the overlay, and Radix counts a click in them as inside it, so it stays open
+ * under a file's or an image's dialog.
  * Memoized: `phases` keeps its identity until a `todo` call changes it, so a streamed token leaves the card as it is.
  */
 export const SessionTodosCard = memo(function SessionTodosCard({ phases, view, working, changes, subagents, ship }: SessionTodosCardProps) {
@@ -346,24 +395,58 @@ export const SessionTodosCard = memo(function SessionTodosCard({ phases, view, w
 	const found = useChanges(view, changes);
 	const todos = phases.length > 0;
 	const nodes = subagents ? subagentTree(subagents.agents, view.kind === "live" ? view.agentId : null) : [];
-	const filled = ship !== null || todos || nodes.length > 0 || found !== null;
+	const summary = stripSummary({ ship, phases, subagents: nodes.length, files: found?.files.length ?? 0, images: found?.media.length ?? 0, sources: found?.sources.length ?? 0 });
+	const filled = summary !== null;
 	const key = hashForView(view);
+	// Open for one view only, so opening a subagent from the overlay leaves the next view's strip shut.
+	const [openFor, setOpenFor] = useState<string | null>(null);
+	const open = openFor === key;
+	// The overlay sizes itself to the conversation, the strip's `[data-conversation]` wrapper, not to the window, so it never covers the composer.
+	const [bounds, setBounds] = useState<Element | null>(null);
+	const strip = useCallback((node: HTMLButtonElement | null) => setBounds(node?.closest("[data-conversation]") ?? null), []);
 	useLayoutEffect(() => {
 		if (!filled) return;
 		filledCards.set(key, filledCards.get(key) + 1);
 		return () => filledCards.set(key, filledCards.get(key) - 1);
 	}, [key, filled]);
-	if (!shown || !filled) return null;
+	if (!shown || !summary) return null;
 	return (
-		<section
-			aria-label="Todos"
-			data-todos-card
-			className="mx-auto mt-3 max-h-[45%] min-h-0 w-[calc(100%-1.5rem)] max-w-[calc(var(--container-conversation)-1.5rem)] shrink-0 divide-y divide-border overflow-y-auto rounded-2xl border border-border bg-popover/95 text-popover-foreground shadow-sm backdrop-blur [scrollbar-width:thin] @min-[65.75rem]/conversation:absolute @min-[65.75rem]/conversation:top-3 @min-[65.75rem]/conversation:right-3 @min-[65.75rem]/conversation:z-10 @min-[65.75rem]/conversation:m-0 @min-[65.75rem]/conversation:max-h-[calc(100%-5rem)] @min-[65.75rem]/conversation:w-80 @min-[65.75rem]/conversation:max-w-none"
-		>
-			{ship && <ShipSection ship={ship} />}
-			{todos && <TodosSection phases={phases} />}
-			{subagents && nodes.length > 0 && <SubagentsSection links={subagents} nodes={nodes} />}
-			{found && changes && <ChangesSections view={view} session={changes} changes={found} working={working} />}
-		</section>
+		<Popover open={open} onOpenChange={next => setOpenFor(next ? key : null)}>
+			<PopoverTrigger asChild>
+				<button
+					{...activityControl("todos-card.open")}
+					ref={strip}
+					type="button"
+					className="mx-auto mt-3 flex h-9 w-[calc(100%-1.5rem)] max-w-[calc(var(--container-conversation)-1.5rem)] shrink-0 items-center gap-3 rounded-2xl border border-border bg-popover/95 px-3 text-left text-sm text-popover-foreground shadow-sm backdrop-blur outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-muted/60"
+				>
+					<StripLine summary={summary} open={open} />
+				</button>
+			</PopoverTrigger>
+			<PopoverContent
+				aria-label="Todos"
+				side="bottom"
+				sideOffset={6}
+				avoidCollisions={false}
+				collisionBoundary={bounds}
+				collisionPadding={12}
+				// Under the dialogs a file or an image opens, whose dim layer is z-40 and comes later in the page.
+				className="z-40 flex max-h-(--radix-popover-content-available-height) w-(--radix-popover-trigger-width) flex-col divide-y divide-border overflow-y-auto rounded-2xl p-0 shadow-lg [scrollbar-width:thin]"
+				// The overlay itself takes the focus, so a click on the strip lights no ring on the first section; Tab goes on into the sections.
+				onOpenAutoFocus={event => {
+					event.preventDefault();
+					(event.currentTarget as HTMLElement).focus();
+				}}
+				onEscapeKeyDown={event => {
+					// Escape in a section's menu, which renders outside the overlay, closes only that menu.
+					const target = event.target;
+					if (target instanceof Element && target.closest("[role=menu]") && !target.closest("[data-slot=popover-content]")) event.preventDefault();
+				}}
+			>
+				{ship && <ShipSection ship={ship} />}
+				{todos && <TodosSection phases={phases} />}
+				{subagents && nodes.length > 0 && <SubagentsSection links={subagents} nodes={nodes} />}
+				{found && changes && <ChangesSections view={view} session={changes} changes={found} working={working} />}
+			</PopoverContent>
+		</Popover>
 	);
 });

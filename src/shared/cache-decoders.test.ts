@@ -45,7 +45,7 @@ const events: CalendarEventsAnswer = {
 	],
 };
 
-const local: LocalEventsAnswer = { events: [{ id: "l1", title: "Dentist", when: { allDay: false, start: 1, end: 2 } }] };
+const local: LocalEventsAnswer = { events: [{ id: "l1", title: "Dentist", when: { allDay: false, start: 1, end: 2 }, sessionId: null }] };
 
 const email: EmailAnswer = {
 	accounts: [{ account: "gmail", error: null }],

@@ -15,8 +15,6 @@ import { RequestLedger } from "./server/request-ledger";
 import { createClientHandler, type SocketEnv } from "./server/socket";
 import type { Socket } from "./server/views";
 import type { ServerMsg } from "./shared/protocol";
-import * as replayLaunch from "./omp/replay-launch";
-import type { PreparedReplay } from "./replay";
 import * as ompConfig from "./omp/config";
 import type { SessionControlsConfig } from "./omp/config";
 
@@ -272,13 +270,13 @@ describe("DashboardSession turns", () => {
 		client.fire({ type: "agent_start" });
 		client.fire({ type: "agent_end", isTerminal: false, yielded: true, awaitingAsyncWork: true, messages: [assistant("started")] });
 		expect(session.status).toBe("idle");
-		expect(ended()).toEqual([{ kind: "turn-ended", reply: "started", failure: null }]);
+		expect(ended()).toEqual([{ kind: "turn-ended", reply: "started", failure: null, quiet: false }]);
 
 		client.fire({ type: "agent_start" });
 		expect(session.status).toBe("working");
 		client.fire({ type: "agent_end", isTerminal: true, yielded: true, messages: [assistant("finished")] });
 		expect(session.status).toBe("idle");
-		expect(ended().at(-1)).toEqual({ kind: "turn-ended", reply: "finished", failure: null });
+		expect(ended().at(-1)).toEqual({ kind: "turn-ended", reply: "finished", failure: null, quiet: false });
 	});
 
 	test("a terminal agent_end reports the turn's last reply once, without its suggested prompts", async () => {
@@ -292,9 +290,9 @@ describe("DashboardSession turns", () => {
 			type: "agent_end",
 			messages: [assistant("Done: ok\n\nSuggestions:\n1. Ship it"), { role: "assistant", content: [{ type: "toolCall", id: "t1" }] }, { role: "toolResult", content: [] }],
 		});
-		expect(ended()).toEqual([{ kind: "turn-ended", reply: "Done: ok", failure: null }]);
+		expect(ended()).toEqual([{ kind: "turn-ended", reply: "Done: ok", failure: null, quiet: false }]);
 		client.fire({ type: "agent_end", messages: [] });
-		expect(ended().at(-1)).toEqual({ kind: "turn-ended", reply: null, failure: null });
+		expect(ended().at(-1)).toEqual({ kind: "turn-ended", reply: null, failure: null, quiet: false });
 	});
 
 	test("a terminal agent_end whose last message failed on a usage limit or a dropped connection reports how; a handover does not", async () => {
@@ -313,8 +311,8 @@ describe("DashboardSession turns", () => {
 		client.fire({ type: "agent_start" });
 		client.fire({ type: "agent_end", messages: [{ role: "assistant", content: [], stopReason: "error", provider: "openai-codex", errorMessage: "Couldn't reach chatgpt.com (getaddrinfo ENOTFOUND). Check the URL, your network, or proxy." }] });
 		expect(updates.filter(update => update.kind === "turn-ended")).toEqual([
-			{ kind: "turn-ended", reply: null, failure: { kind: "usage-limit", provider: "opencode-go", retryAfterMs: 200_813_000 } },
-			{ kind: "turn-ended", reply: null, failure: { kind: "transient", provider: "openai-codex" } },
+			{ kind: "turn-ended", reply: null, failure: { kind: "usage-limit", provider: "opencode-go", retryAfterMs: 200_813_000 }, quiet: false },
+			{ kind: "turn-ended", reply: null, failure: { kind: "transient", provider: "openai-codex" }, quiet: false },
 		]);
 	});
 
@@ -870,21 +868,20 @@ describe("DashboardSession reattach", () => {
 		};
 		client.fire({ type: "agent_end", messages: [limited] });
 		const ended = updates.slice(from).filter(update => update.kind === "turn-ended" || update.kind === "roster");
-		expect([ended.slice(0, 2), session.status]).toEqual([[{ kind: "turn-ended", reply: null, failure: { kind: "usage-limit", provider: "opencode-go", retryAfterMs: 200_813_000 } }, { kind: "roster" }], "idle"]);
+		expect([ended.slice(0, 2), session.status]).toEqual([[{ kind: "turn-ended", reply: null, failure: { kind: "usage-limit", provider: "opencode-go", retryAfterMs: 200_813_000 }, quiet: false }, { kind: "roster" }], "idle"]);
 	});
 
-	test("a session file with no directory in its header and a broken replay marker attaches where omp started, as a replay", async () => {
+	test("a session file with no directory in its header attaches where omp started", async () => {
 		const dir = mkdtempSync(join(tmpdir(), "omp-reattach-"));
 		try {
 			const file = join(dir, "session.jsonl");
 			const at = new Date(0).toISOString();
-			writeFileSync(file, `${JSON.stringify({ type: "session", version: 3, id: "kept-1", timestamp: at })}\n${JSON.stringify({ type: "custom", id: "e1", parentId: null, timestamp: at, customType: "omp-agents-replay", data: {} })}\n`);
+			writeFileSync(file, `${JSON.stringify({ type: "session", version: 3, id: "kept-1", timestamp: at })}\n`);
 			const client = new FakeClient();
 			keptOmp(client);
 			client.getState = async () => ({ ...STATE, sessionFile: file });
 			const session = await DashboardSession.reattach("inst-kept", () => [], () => {}, false);
 			expect(session.row().cwd).toBe("/tmp/kept");
-			await expect(session.prompt("a1", "hi", [], "steer")).rejects.toThrow("Subagent prompts are blocked in a replay.");
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
 		}
@@ -902,73 +899,6 @@ describe("DashboardSession reattach", () => {
 		};
 		await expect(DashboardSession.reattach("inst-kept", () => [], () => {}, false)).rejects.toThrow("omp did not answer");
 		expect([hungUp, stops]).toEqual([["detach"], []]);
-	});
-});
-
-describe("DashboardSession replay admission", () => {
-	function preparedReplay(): PreparedReplay {
-		return {
-			forkFile: "/tmp/replay.jsonl", cwd: "/tmp/replay", config: "/tmp/replay.jsonl.replay.yml",
-			first: { text: "first", images: [] }, discard: async () => {},
-			marker: {
-				v: 1, id: "replay-id", source: { sessionId: "original", file: "/tmp/original.jsonl", turnId: "prompt-id", at: 1 },
-				roots: { original: ["/tmp/original"], replay: "/tmp/replay" }, base: { sha: "a".repeat(40), how: "head-now" },
-				model: { provider: "openai-codex", id: "gpt-5.6-sol" }, thinking: "low",
-				repaired: false, promptEdited: false, modelChanged: false, original: null, originalTurnRef: `blob:sha256:${"b".repeat(64)}`,
-			},
-		};
-	}
-
-	test("opens the native fork before applying settings and admits exactly one initial prompt", async () => {
-		const client = new FakeClient();
-		fakeOmp(client);
-		const order: string[] = [];
-		spyOn(client, "switchSession").mockImplementation(async () => { order.push("switch"); return { cancelled: false }; });
-		const model = spyOn(client, "setModel").mockImplementation(async (provider, id) => { order.push("model"); return { provider, id }; });
-		const thinking = spyOn(client, "setThinkingLevel").mockImplementation(async () => { order.push("thinking"); });
-		const ready = spyOn(replayLaunch, "requireReplayReady").mockImplementation(async () => { order.push("guard"); });
-		const prepared = preparedReplay();
-		const session = await DashboardSession.replay("replay-instance", prepared, LAUNCH, () => {});
-		expect(order).toEqual(["switch", "model", "thinking", "guard"]);
-		expect(model).toHaveBeenCalledWith("openai-codex", "gpt-5.6-sol");
-		expect(thinking).toHaveBeenCalledWith("low");
-		expect(ready).toHaveBeenCalledWith(prepared.forkFile, prepared.marker.id, expect.any(String));
-		await expect(session.setModel(prepared.marker.model, "low")).rejects.toThrow("first replay turn");
-		await expect(session.setThinking("low")).rejects.toThrow("first replay turn");
-		await expect(session.editPrompt("prompt-id", "changed")).rejects.toThrow("first replay turn");
-		await expect(session.prompt(null, "interleaved before send", [], "followUp")).rejects.toThrow("selected first replay prompt");
-		await expect(session.prompt("old-task", "steer", [], "followUp")).rejects.toThrow("Subagent");
-		await session.prompt(null, prepared.first.text, [], "followUp");
-		await expect(session.prompt(null, "interleaved", [], "followUp")).rejects.toThrow("first replay turn");
-		expect(client.calls).toEqual(["prompt first"]);
-		client.settlePrompt("req_1");
-		await settle();
-		await expect(session.prompt(null, "/new", [], "followUp")).rejects.toThrow("slash");
-		await expect(session.editPrompt("prompt-id", "  /new")).rejects.toThrow("slash");
-		await session.prompt(null, "second", [], "followUp");
-		expect(client.calls).toEqual(["prompt first", "prompt second"]);
-	});
-
-	test("a refused first send releases admission without resending it automatically", async () => {
-		const client = new FakeClient();
-		fakeOmp(client);
-		spyOn(replayLaunch, "requireReplayReady").mockResolvedValue(undefined);
-		const send = spyOn(client, "prompt").mockRejectedValueOnce(new Error("quota exhausted"));
-		const session = await DashboardSession.replay("replay-instance", preparedReplay(), LAUNCH, () => {});
-		await expect(session.prompt(null, "first", [], "followUp")).rejects.toThrow("quota exhausted");
-		await settle();
-		expect(send).toHaveBeenCalledTimes(1);
-		await session.prompt(null, "manual retry", [], "followUp");
-		expect(send).toHaveBeenCalledTimes(2);
-	});
-
-	test("cancelled opening stops the native child before failing replay startup", async () => {
-		const client = new FakeClient();
-		fakeOmp(client);
-		spyOn(client, "switchSession").mockResolvedValue({ cancelled: true });
-		const stopped = spyOn(client, "stop");
-		await expect(DashboardSession.replay("replay-instance", preparedReplay(), LAUNCH, () => {})).rejects.toThrow("cancelled");
-		expect(stopped).toHaveBeenCalledTimes(1);
 	});
 });
 

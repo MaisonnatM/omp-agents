@@ -1,12 +1,12 @@
 /** Git worktree inventory and removal. Git remains the authority for what is registered. */
-import { createHash } from "node:crypto";
-import { lstat, readdir } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { lstat, readdir, rm } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
 import { canonical, commonDir, git, holderOf, repositoryAt, worktreeAt, worktreesOf, type Registration } from "./git";
 import { errorText } from "./json";
 import { mapLimit, PROBE_PARALLEL } from "./map-limit";
 import { displayPath } from "./paths";
-import { run } from "./proc";
+import { run, runChecked } from "./proc";
 import type { MergedPullRequest } from "./pull-requests";
 import type { BranchRelease } from "./shared/git";
 import type { WorktreeBlocker, WorktreeConfirmation, WorktreeEntry, WorktreeInventory, WorktreeMerge, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalResult, WorktreeTarget } from "./worktrees-shared";
@@ -115,8 +115,8 @@ async function nestedRepositories(root: string, ignoredTop: readonly string[]): 
 	return found;
 }
 
-export async function allocatedUsage(path: string, signal?: AbortSignal): Promise<number> {
-	const { stdout, stderr, code } = await run(["du", "-sk", path], { timeoutMs: 10000, signal });
+export async function allocatedUsage(path: string, { signal, timeoutMs = 10_000 }: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<number> {
+	const { stdout, stderr, code } = await run(["du", "-sk", path], { timeoutMs, signal });
 	if (code !== 0) throw new Error(stderr.trim() || "Disk measurement exceeded its time limit.");
 	const kilobytes = Number(stdout.split(/\s/, 1)[0]);
 	if (!Number.isFinite(kilobytes) || kilobytes < 0) throw new Error("Disk measurement returned an invalid size.");
@@ -373,7 +373,7 @@ export class Worktrees {
 			const entry = await this.#find(target, null);
 			if (entry.missing || entry.blockers.some(blocker => blocker.code === "foreign" || blocker.code === "unreadable")) throw new Error("Checkout is missing or its identity cannot be verified.");
 			await Promise.all([
-				allocatedUsage(entry.path, signal).then(
+				allocatedUsage(entry.path, { signal }).then(
 					bytes => {
 						result.allocatedBytes = bytes;
 					},
@@ -483,8 +483,8 @@ export class Worktrees {
 				const result: WorktreeRemovalResult = { repository: confirmed.repository, path: confirmed.path, removed: false, blockers, error: null };
 				if (!blockers.length && current.kind !== "unreadable") {
 					try {
-						const removed = await run(["git", "-C", current.repository, "worktree", "remove", "--", current.path], { timeoutMs: 30000 });
-						if (removed.code !== 0) throw new Error(removed.stderr.trim() || "Git refused removal.");
+						if (current.kind === "registration") await runChecked(["git", "-C", current.repository, "worktree", "remove", "--", current.path], { timeoutMs: 30000 });
+						else await moveOut(current.repository, current.path);
 						result.removed = true;
 						console.log(`omp-agents: removed the worktree ${displayPath(current.path)} for ${by}`);
 					} catch (err) {
@@ -555,4 +555,18 @@ export class Worktrees {
 		// `update-ref` deletes only while the branch still points at the commit checked, so a commit made meanwhile keeps it.
 		return (await run(["git", "-C", gitDir, "update-ref", "-d", ref, local])).code === 0;
 	}
+}
+
+/**
+ * Removes the linked worktree at `path`, which {@link Worktrees.preview} just found clean. Git moves it to a sibling
+ * name, then its registration goes, then its files: a deletion cut short, such as by a restart, leaves unregistered
+ * debris under that name, never a half-deleted `path` or a branch held by a half-deleted checkout.
+ * `git worktree remove` deletes the files before the registration, and its 30-second limit cut yampa's `node_modules` short.
+ */
+async function moveOut(repository: string, path: string): Promise<void> {
+	const removing = `${path}.removing-${randomUUID().slice(0, 8)}`;
+	await runChecked(["git", "-C", repository, "worktree", "move", "--", path, removing], { timeoutMs: 30000 });
+	const registration = (await runChecked(["git", "-C", removing, "rev-parse", "--absolute-git-dir"])).trim();
+	await rm(registration, { recursive: true, force: true });
+	await rm(removing, { recursive: true, force: true });
 }

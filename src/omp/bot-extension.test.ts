@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { Schedule } from "../routines";
-import { MAX_FACT_LENGTH, MAX_JOB_LENGTH } from "../shared/bots";
+import { MAX_BOT_MESSAGE_LENGTH, MAX_FACT_LENGTH, MAX_JOB_LENGTH } from "../shared/bots";
 import botExtension, { BOT_FLAGS, type SaveRoutineParams } from "./bot-extension";
 import { loadExtension } from "./fake-extension-api";
 
@@ -28,12 +28,14 @@ const nightly = {
 	scheduledAt: null,
 	runs: [],
 };
+const relayBot = { id: "relay", kind: "pr-shepherd", name: "Relay", job: "## Role\nRelay the mail. Ask first.", cwd: "/tmp", model: null, skill: null, sessionId: null, createdAt: "2026-05-01T09:00:00.000Z" };
+const blankBot = { ...relayBot, id: "blank", kind: "routines", name: "Blank", job: "" };
 
 /**
  * The extension loaded as omp loads it for Bot `scout`, whose memory file does not exist yet, beside Bot `relay`'s routine and, unless `routines` is
- * false, its own; `job` is Scout's job in `bots.json`, and `unset` names flags the dashboard leaves out.
+ * false, its own; `job` is Scout's job in `bots.json`, `others` the other Bots it holds, and `unset` names flags the dashboard leaves out.
  */
-function loadedBot({ routines = true, job = "Watch the build.\nAsk before merging.", unset = [] as string[] } = {}) {
+function loadedBot({ routines = true, job = "Watch the build.\nAsk before merging.", others = [relayBot, blankBot], unset = [] as string[] } = {}) {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-bot-extension-"));
 	dirs.push(dir);
 	const bots = join(dir, "bots.json");
@@ -41,7 +43,7 @@ function loadedBot({ routines = true, job = "Watch the build.\nAsk before mergin
 	const routinesFile = join(dir, "routines.json");
 	const inbox = join(dir, "routine-inbox");
 	const botInbox = join(dir, "bot-inbox");
-	writeFileSync(bots, JSON.stringify({ bots: [{ id: "scout", name: "Scout", job, cwd: "/tmp", model: null, skill: null, sessionId: "s1", createdAt: "2026-05-01T09:00:00.000Z" }] }));
+	writeFileSync(bots, JSON.stringify({ bots: [{ id: "scout", name: "Scout", job, cwd: "/tmp", model: null, skill: null, sessionId: "s1", createdAt: "2026-05-01T09:00:00.000Z" }, ...others] }));
 	if (routines) writeFileSync(routinesFile, JSON.stringify({ routines: [relayMail, standup, nightly] }));
 	const flags = new Map<string, string>([
 		[BOT_FLAGS.bot, "scout"],
@@ -64,6 +66,7 @@ function loadedBot({ routines = true, job = "Watch the build.\nAsk before mergin
 		setJob: (job: string) => call("set_job", { job }),
 		saveRoutine: (params: SaveRoutineParams) => call("save_routine", params),
 		deleteRoutine: (id: string) => call("delete_routine", { id }),
+		messageBot: (to: string, text: string) => call("message_bot", { to, text }),
 	};
 }
 
@@ -86,14 +89,19 @@ test("a fact the Bot remembers lands in its memory as a dated line, and the next
 			'{"id":"r1","name":"Standup","enabled":false,"schedules":[{"kind":"weekly","days":[1,2,3,4,5],"time":{"hour":9,"minute":0}}],"triggers":[]} prompt: Post the standup.',
 			'{"id":"r3","name":"Nightly build","enabled":true,"schedules":[],"triggers":[{"kind":"pull-request"}]} command: bun install --frozen-lockfile && bun run build && bun test --coverage --reporter…',
 			"A routine runs on its schedules and when its triggers see something happen; each run messages this conversation with its prompt, or runs its shell command in your workspace and posts the output here. Call `save_routine` to create one, or to change one with its `id` and only the fields that change, and `delete_routine` to delete one.",
+			"The other Bots, one per line: its id, name, and kind, then its job's first sentence:",
+			'{"id":"relay","name":"Relay","kind":"pr-shepherd"} Relay the mail.',
+			'{"id":"blank","name":"Blank","kind":"routines"} No job yet.',
+			"Call `message_bot` to hand another Bot work that is its job. A message whose last line starts with `# omp-agents Bot message, sent by another Bot, not the user:` comes from the Bot that line names, not the user, and your reply in this conversation does not reach it. Call `message_bot` with its id only when you have a result or a question to send back, and never answer a message that needs no answer, such as thanks or an acknowledgment.",
 		].join("\n"),
 	]);
 });
 
 test("before the Bot remembers anything or has a routine its prompt says so, and a subagent it spawns gets no Bot prompt", () => {
-	const bot = loadedBot({ routines: false });
+	const bot = loadedBot({ routines: false, others: [] });
 	expect(bot.prompt()?.[1]).toContain("What you remember from earlier turns:\nNothing yet.");
 	expect(bot.prompt()?.[1]).toContain("cut at 80 characters:\nNone yet.\n");
+	expect(bot.prompt()?.[1]).toContain("then its job's first sentence:\nNone yet.\n");
 	expect(bot.prompt("sub")).toBeUndefined();
 });
 
@@ -195,4 +203,20 @@ test("set_job with an empty job asks to clear it, and refuses a job past the pag
 	expect((await bot.setJob(" ")).content[0]?.text).toBe("Cleared your job. The dashboard applies it, and while the dashboard is stopped the change waits for it.");
 	expect(bot.jobRequests()).toEqual([{ botId: "scout", job: "" }]);
 	await expect(loadedBot({ unset: [BOT_FLAGS.botInbox] }).setJob("Watch the build.")).rejects.toThrow("This session is not an omp-agents Bot, so it has no job.");
+});
+
+test("message_bot leaves the dashboard one request with the other Bot's id and the trimmed text, and names that Bot in its reply", async () => {
+	const bot = loadedBot();
+	expect((await bot.messageBot("relay", "  Forward the build report.\n")).content[0]?.text).toBe("Sent to Relay. The dashboard applies it, and while the dashboard is stopped the change waits for it.");
+	expect(bot.jobRequests()).toEqual([{ botId: "scout", message: { to: "relay", text: "Forward the build report." } }]);
+});
+
+test("message_bot refuses this Bot itself, an id no Bot has, text that omp would run as a command, and a session with no bot inbox, leaving nothing", async () => {
+	const bot = loadedBot();
+	await expect(bot.messageBot("scout", "Hello me.")).rejects.toThrow("You cannot message yourself.");
+	await expect(bot.messageBot("ghost", "Hello?")).rejects.toThrow("No Bot has id ghost; the system prompt lists the other Bots.");
+	await expect(bot.messageBot("relay", " !rm -rf ~")).rejects.toThrow("cannot start with ! or /");
+	await expect(bot.messageBot("relay", "x".repeat(MAX_BOT_MESSAGE_LENGTH + 1))).rejects.toThrow(`at most ${MAX_BOT_MESSAGE_LENGTH} characters`);
+	expect(bot.jobRequests()).toEqual([]);
+	await expect(loadedBot({ unset: [BOT_FLAGS.botInbox] }).messageBot("relay", "Hello.")).rejects.toThrow("This session is not an omp-agents Bot, so it cannot message Bots.");
 });

@@ -53,31 +53,27 @@ The server strips its own `PORT` and `OMP_AGENTS_PARENT` from the sessions, shel
 
 ## Browser smoke
 
-Open the page in managed headless Chromium, or prove a route's texts with [Smoke proof](#smoke-proof), which also checks that the server serves this checkout as it is now.
-Without `relay: false`, `browser.open` tries the omp browser relay, then fails with "extension never connected" or times out after 30 seconds.
-Without `viewport`, Chromium renders at 800×600, below the layout's desktop breakpoints, so screenshots show the narrow layout.
+Open the page with the `chrome-devtools` MCP tools (`xd://mcp__chrome-devtools_*`), which run headless Chrome on a throwaway profile, or prove a route's texts with [Smoke proof](#smoke-proof), which also checks that the server serves this checkout as it is now.
+omp's own `browser` is turned off for now (`browser.enabled = false`); eval has no `browser` global.
+Every page tool takes a `pageId`; `list_pages` names it, and the first page is `1`.
+Chrome starts at 800×600, below the layout's desktop breakpoints, so call `resize_page` with `width: 1920, height: 1080` before screenshots.
 
-The page first loads without a token and says to open the omp agents app; seed `localStorage` with `pageAccess(token)` and reload it, from the JS eval kernel:
+The page first loads without a token and says to open the omp agents app; seed `localStorage` with `pageAccess(token)` and reload it.
+Print the entries from the JS eval kernel:
 
 ```js
 const { pageAccess } = await import("<worktree>/src/server/auth.ts");
 const token = (await Bun.file(`${process.env.HOME}/.config/omp-agents/token`).text()).trim(); // or the smoke server's $XDG_CONFIG_HOME/omp-agents/token
-const tab = await browser.open({
-	name: "smoke",
-	url: `http://127.0.0.1:${port}/`,
-	app: { relay: false, tern: false },
-	viewport: { width: 1920, height: 1080 },
-	headed: false,
-	wait_until: "domcontentloaded",
-	timeout: 60000,
-});
-await tab.evaluate(entries => {
-	for (const [key, value] of Object.entries(entries)) localStorage.setItem(key, value);
-	location.reload();
-}, pageAccess(token));
-// Page JS goes through tab.evaluate; tab.run runs in Bun, where document is undefined.
-const title = await tab.evaluate(() => document.title);
+JSON.stringify(pageAccess(token));
 ```
+
+Then `navigate_page` to `http://127.0.0.1:<port>/`, and `evaluate_script` with that JSON pasted in:
+
+```js
+() => { for (const [k, v] of Object.entries(<entries JSON>)) localStorage.setItem(k, v); location.reload(); }
+```
+
+Check the result with `take_snapshot` or `take_screenshot`; `list_console_messages` and `list_network_requests` show page errors and failed calls, and `performance_start_trace` with `reload: true, autoStop: true` measures load.
 
 The page routes through the URL hash; `web/routing.ts` parses it.
 Besides a live session's own hash, the routes are:

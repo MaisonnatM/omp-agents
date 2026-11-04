@@ -1,6 +1,8 @@
 import { expect, test } from "bun:test";
 import type { Notice, StoppedSession } from "../src/shared/notices";
+import { hashForSession } from "../src/shared/sessions";
 import { presentNotice, TOAST_MS } from "./notice-model";
+import { hashForCalendar } from "./routing";
 
 const NOW = 1791000000000;
 const flags = { at: NOW, seen: false, read: false };
@@ -10,12 +12,14 @@ test("a Slack message opens in Slack and toasts briefly", () => {
 	expect(shown).toMatchObject({ source: "slack", headline: "Ann sent you 2 messages", preview: "hi", link: { href: "https://slack/x", external: true }, action: { kind: "none" }, toast: { kind: "news", timeout: TOAST_MS } });
 });
 
-test("an event stays toasted and opens the Calendar page when kept on this computer", () => {
-	const shown = presentNotice({ id: "e", ...flags, kind: "event", title: "Standup", start: NOW + 60_000, end: NOW + 600_000, calendar: null, color: null, url: null }, NOW);
+test("an event stays toasted and opens the Calendar page when kept on this computer, or the session that added it", () => {
+	const event = { id: "e", ...flags, kind: "event", title: "Standup", start: NOW + 60_000, end: NOW + 600_000, calendar: null, color: null, url: null, sessionId: null } as const;
+	const shown = presentNotice(event, NOW);
 	expect(shown.source).toBe("calendar");
 	expect(shown.headline).toStartWith("Standup starts at");
-	expect(shown.link?.external).toBe(false);
+	expect(shown.link).toEqual({ href: hashForCalendar(), external: false });
 	expect(shown.toast).toEqual({ kind: "news", timeout: 0 });
+	expect(presentNotice({ ...event, sessionId: "s1" }, NOW).link).toEqual({ href: hashForSession("s1"), external: false });
 });
 
 test("an update's action, failure, and toast follow its status", () => {

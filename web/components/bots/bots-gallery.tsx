@@ -2,9 +2,10 @@
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import type { Routine } from "../../../src/routines";
+import { jobLine } from "../../../src/shared/bots";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { botAsking, botGroupKey, botGroupLabel, botGroupListName, botGroups, botRoutines, botSections, botsGrouped, botStatus, type BotRow, jobLine } from "../../bots-model";
+import { botAsking, botGroupKey, botGroupLabel, botGroupListName, botGroups, botRoutines, botSections, botsGrouped, botStatus, type BotRow } from "../../bots-model";
 import { mailTime } from "../../labels";
 import { hashForBots, hashForNewBot } from "../../routing";
 import { PageFrame } from "../list-page";

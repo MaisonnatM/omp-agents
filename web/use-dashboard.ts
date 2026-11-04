@@ -11,7 +11,6 @@ import { openSocket, putJson } from "./api";
 import { type OpenBot, openBot as findOpenBot } from "./bots-model";
 import { clearDraft, liveDraftKey, newDraftKey, putDraft } from "./composer-drafts";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
-import { applyDiscussionMessage, discussionDisconnected } from "./discussions";
 import { applyDictationMessage, dictationDisconnected } from "./dictation";
 import { applyPaneMessage, retainPanes, retainTrajectories, useShownConversations, useShownTrajectories } from "./pane-store";
 import { DEFAULT_SPLIT_RATIOS, type SplitAxis, type SplitRatios } from "./pane-navigation";
@@ -80,8 +79,8 @@ export interface Dashboard {
 	resize: (axis: SplitAxis, ratio: number) => void;
 	/** Show `page` over the panes, as a new history entry. */
 	navigate: (page: Page) => void;
-	/** Open the new-session draft in the default directory, clearing a failed start's error. */
-	openNewSession: () => void;
+	/** Open the new-session draft in `cwd`, else the default directory, clearing a failed start's error. */
+	openNewSession: (cwd?: string) => void;
 	/** Forget the error of a failed start of `kind`. */
 	dismissStart: (kind: StartKind) => void;
 	/**
@@ -264,7 +263,6 @@ export function useDashboard(): Dashboard {
 					case "routines":
 					case "bots":
 					case "personal":
-					case "router-tasks":
 					case "scheduled":
 					case "workspaces":
 					case "project-trust":
@@ -280,9 +278,6 @@ export function useDashboard(): Dashboard {
 						else waiting?.reject(new Error(msg.error));
 						return;
 					}
-					case "discussion":
-						applyDiscussionMessage(msg);
-						return;
 					case "dictation":
 						applyDictationMessage(msg);
 						return;
@@ -303,7 +298,6 @@ export function useDashboard(): Dashboard {
 			};
 			ws.onclose = () => {
 				if (disposed) return;
-				discussionDisconnected();
 				dictationDisconnected();
 				dispatch({ t: "connected", connected: false });
 				timer = window.setTimeout(connect, retryMs);
@@ -341,9 +335,9 @@ export function useDashboard(): Dashboard {
 
 	const dismissStart = useCallback((kind: StartKind) => dispatch({ t: "dismiss-start", kind }), []);
 
-	const openNewSession = useCallback(() => {
+	const openNewSession = useCallback((cwd?: string) => {
 		dispatch({ t: "dismiss-start", kind: "new" });
-		navigate({ kind: "new", cwd: null, todoId: null });
+		navigate({ kind: "new", cwd: cwd ?? null, todoId: null });
 	}, [navigate]);
 
 	const nextReqId = useRef(0);

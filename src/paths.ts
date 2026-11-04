@@ -37,6 +37,8 @@ export const userTodoInboxDir = join(configDir, "todo-inbox");
 export const userNotesFile = join(configDir, "notes.json");
 /** Where omp's `user_note` tool leaves the notes it adds and appends to, one JSON file each, so the server stays the only writer of {@link userNotesFile}. */
 export const userNoteInboxDir = join(configDir, "note-inbox");
+/** Where omp's `user_event` tool leaves the reminders it adds and removes, one JSON file each, so the server stays the only writer of {@link localEventsFile}. */
+export const eventInboxDir = join(configDir, "event-inbox");
 /** Where omp's `end_session` tool asks the server to end a session, one `<session id>.json` each, beside {@link tokenFile}. */
 export const sessionEndInboxDir = join(configDir, "end-inbox");
 /** The routines, their runs, and the pull request heads their sessions took, beside {@link tokenFile}. */
@@ -49,10 +51,6 @@ export const botsFile = join(configDir, "bots.json");
 export const botInboxDir = join(configDir, "bot-inbox");
 /** Where a PR shepherd Bot's `fix_pull_request` and `queue_merge` tools leave their requests, one JSON file each. */
 export const shepherdInboxDir = join(configDir, "shepherd-inbox");
-/** Where a Router Bot's `start_task`, `follow`, and `finish_task` tools leave their requests, one JSON file each. */
-export const routerInboxDir = join(configDir, "router-inbox");
-/** The tasks each Router Bot handed to a background session, beside {@link botsFile}; its tools only read it. */
-export const routerTasksFile = join(configDir, "router-tasks.json");
 /** Each Bot's `<id>/memory.md`, which its own session writes, in the dashboard's data directory. */
 export const botsDir = join(dataDir, "bots");
 /** Where personal sessions run: the user's own directory, tied to no project, in the dashboard's data directory so the file dialog opens what they write there. */

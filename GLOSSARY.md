@@ -137,6 +137,11 @@ It is separate from a todo's notes field.
 What the page records of how its user uses the dashboard, by registry id only, which Settings › Activity reports.
 _Avoid_: Usage (omp's requests, in Analytics), analytics, telemetry
 
+**Starter**:
+A short-labelled button under a new session's composer while the draft is empty, whose click puts its full prompt in the composer without sending it.
+It is not the **Starter kit**.
+_Avoid_: Template, preset, suggestion (the replies' **Suggestions:**)
+
 ## Unattended work
 
 **Routine**:
@@ -161,6 +166,10 @@ _Avoid_: Bot class, role
 **Bot designer**:
 A Bot type that asks a few questions about the Bot you want, then creates it; the New Bot form starts on one named Dr Eggbot.
 _Avoid_: Bot builder, Bot factory
+
+**Bot message**:
+A message one Bot sends another, which wakes it to handle the message and lets it answer back later with one of its own.
+_Avoid_: Handoff, DM
 
 **PR shepherd**:
 A Bot type that drives your approved pull requests to merged: it starts quick-action sessions to fix them, then queues their merge.

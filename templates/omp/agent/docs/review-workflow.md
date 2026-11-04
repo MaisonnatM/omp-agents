@@ -19,6 +19,7 @@ The ship extension reads the file from the checkout and the changed files from G
 
 A pull request needs the interface review only when its repository commits `.omp/ui-paths` and a file it changes matches a glob listed there; a repository without the file never needs it.
 `.omp/ui-paths` has the same format as `.omp/review-paths`, and the ship extension also asks for the checkbox whenever GitHub lists fewer files than the pull request changes.
+A linked worktree missing one of these files reads its main checkout's, so a repository you do not want to carry your setup can keep them uncommitted in the main checkout, listed in `.git/info/exclude`.
 The `/ship` Interface review stage runs before the Thermonuclear one, so the code quality review sees the interface fixes.
 Spawn `task` with `agent: "interface-reviewer"` and `pr <N>` as the assignment; it is read-only and runs the user's `interface-review` skill in full mode, which hands off to `better-interface` and the `better-*` skills.
 It then checks the change against the app's own design system, which it reads from the repository: the shared component library, design tokens, component variants, icon library, written conventions, and sibling screens.
@@ -46,9 +47,9 @@ Append it under an existing checklist; otherwise add a `## Checks` section befor
 ## Proof boxes
 
 A repository's PR template can declare `- [ ] Browser proof`.
-The ship extension blocks `gh pr ready` and `gt submit --publish` while the PR body has that box unchecked.
+The ship extension blocks `gh pr ready` and `gt submit --publish` while the PR body has that box unchecked and the interface review applies, that is, the repository commits `.omp/ui-paths` and a changed file matches it.
 It checks the box, not a screenshot: do what the box and the repository's instructions ask, such as attaching a screenshot as [PR screenshots](#pr-screenshots) describes, then change it to `- [x] Browser proof`.
-Delete the line only when it does not apply to the PR, such as a template box for UI changes on a PR without one.
+When the interface review does not apply, the box does not block, and you may delete the line.
 Edit the box with `pr_description`'s `replace-text` change, using the exact unchecked line as `oldText` and its checked line as `newText`, keeping the rest of the description.
 
 ## PR description layout
@@ -59,10 +60,10 @@ For before-and-after evidence, use the `pr` skill's bullet shape: `**Before:** .
 
 ## PR screenshots
 
-Attach screenshots and videos with `gh pr edit <N> --attach './shot.png#Alt text'` (`gh` v2.99.0 or later); `gh pr create --draft` and `gh pr comment` take the same flag.
-It uploads to `github.com/user-attachments/assets/…`, which keeps the repository's visibility, and rewrites any `![alt](./shot.png)` in `--body-file` to the uploaded URL; otherwise it appends the image.
-Each `![alt](path)` in the body must use the exact path string given to `--attach`: for `--attach './shot.png#Alt text'` write `![Alt text](./shot.png)`, since `shot.png` or an absolute path does not match and the image is appended at the end instead.
+Attach screenshots and videos with `gh pr edit <N> --attach './shot.png#Alt text'` alone (`gh` v2.99.0 or later); `gh pr create --draft` and `gh pr comment` take the same flag.
+It uploads to `github.com/user-attachments/assets/…`, which keeps the repository's visibility, and appends the image to the body.
+Never pass `--body`, `--body-file`, `-b`, or `-F` to `gh pr edit`: the pr-description guard refuses every such command. To place or caption the appended image, read the body with `pr_description` and move its `user-attachments` URL with a `replace-text` change.
 When the cwd is not the PR's repository, pass `-R owner/repo`, or `gh` looks for the PR in the cwd's repository.
-In a Graphite repository, run `gt submit --draft` first, then `gh pr edit`: `gt submit` leaves an existing PR's description alone unless given `--edit-description`.
+In a Graphite repository, run `gt submit --draft` first, then attach: `gt submit` leaves an existing PR's description alone unless given `--edit-description`.
 Never commit images to an assets branch or link Linear upload URLs, which expire after five minutes.
-`--attach` rewrites only markdown `![alt](./shot.png)` references, not HTML `<img src>`: for a sized or side-by-side layout, attach first, then put the appended `user-attachments` URLs into the `<img>` tags and remove the appended lines.
+For a sized or side-by-side layout, attach first, then use `pr_description` to put the appended `user-attachments` URLs into `<img>` tags and remove the appended lines.

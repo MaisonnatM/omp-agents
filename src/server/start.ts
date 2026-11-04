@@ -6,7 +6,6 @@ import { errorText } from "../json";
 import { endedTurn, skipRefused } from "../live-session";
 import { type AdmittedLaunch, keptSessions, type RpcLaunch } from "../omp/rpc";
 import { continuationOf } from "../omp/sessions";
-import { prepareReplay } from "../replay";
 import { directoryOf, displayPath } from "../paths";
 import { formatOf } from "../session-formats";
 import { type PromptImage, type SessionFacts, type StartFailure, type StartRequest, type StartResult, type TaskOwner, type View } from "../shared/sessions";
@@ -51,7 +50,6 @@ export interface StartEnv {
 	linkTodo(todoId: string, sessionId: string): void;
 	/** How a start, or the resume of an attached session, joins the server. */
 	joinFor(request: StartRequest): SessionJoin;
-	mayDiscardReplay(cwd: string): Promise<string | null>;
 	/** Lets omp spawn in `cwd`, or throws {@link UntrustedProjectError} while its project's agent code is not trusted as it is now. */
 	admit(cwd: string): Promise<void>;
 	privateSessions: Pick<PrivateSessions, "launch" | "holds">;
@@ -158,21 +156,6 @@ export function createStarter(env: StartEnv): Starter {
 				if (formatOf(source).source !== "omp") return { error: "Cannot fork: this session is read-only. Only omp sessions fork here." };
 				if (env.privateSessions.holds(source)) return { error: "Cannot fork: a private session is deleted when it ends, so nothing copies it." };
 				return launch("Cannot fork", async (id, emit) => DashboardSession.fork(id, source, request.entryId, rpcLaunch, emit));
-			}
-			case "replay": {
-				const source = env.pathFor(request.view);
-				if (!source || request.view.kind === "live" && request.view.agentId !== null) return { error: "Cannot replay: the main session's file is unavailable." };
-				if (formatOf(source).source !== "omp") return { error: "Cannot replay: this session is read-only. Only omp sessions replay here." };
-				if (env.privateSessions.holds(source)) return { error: "Cannot replay: a private session is deleted when it ends, so nothing copies it." };
-				return launch("Cannot replay", async (id, emit) => {
-					const prepared = await prepareReplay(request, source, env.mayDiscardReplay);
-					try {
-						return { session: await DashboardSession.replay(id, prepared, rpcLaunch, emit), prompt: null, first: prepared.first, discard: prepared.discard };
-					} catch (error) {
-						await prepared.discard().catch(cleanup => { throw new Error(`${errorText(error)}; ${errorText(cleanup)}`); });
-						throw error;
-					}
-				});
 			}
 			case "resume": {
 				const { sessionId } = request;

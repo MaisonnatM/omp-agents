@@ -79,7 +79,7 @@ interface CompletionOptions {
 }
 
 interface Completion {
-	/** The open list, placed just before the composer. */
+	/** The open list, placed just before the composer, above it. */
 	popup: ReactNode;
 	onValueChange: (text: string) => void;
 	editorProps: HTMLAttributes<HTMLDivElement>;

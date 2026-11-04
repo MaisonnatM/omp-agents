@@ -14,6 +14,12 @@ export type NoticeSource = "github" | "slack" | "providers" | "calendar" | "sess
 /** Where a notice leads: a dashboard hash, or a page outside the dashboard that opens in a new tab. */
 export type NoticeLink = { href: string; external: boolean };
 
+/** Where an event opens: the session that added it, its page in Google Calendar, or `null` for one you kept on this computer. */
+export function eventLink(sessionId: string | null, url: string | null): NoticeLink | null {
+	if (sessionId !== null) return { href: hashForSession(sessionId), external: false };
+	return url === null ? null : { href: url, external: true };
+}
+
 /** Who a notice's picture shows. */
 export type NoticeFace =
 	| { kind: "update" }
@@ -146,7 +152,7 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 				source: "calendar",
 				headline: `${notice.title} ${notice.start > now ? "starts" : "started"} at ${SAME_DAY.format(notice.start)}`,
 				preview: `${SAME_DAY.format(notice.start)} – ${SAME_DAY.format(notice.end)} · ${notice.calendar ?? "This computer"}`,
-				link: notice.url === null ? { href: hashForCalendar(), external: false } : { href: notice.url, external: true },
+				link: eventLink(notice.sessionId, notice.url) ?? { href: hashForCalendar(), external: false },
 				face: { kind: "event", color: notice.color },
 				toast: { kind: "news", timeout: 0 },
 			};

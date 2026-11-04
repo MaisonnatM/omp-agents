@@ -1,8 +1,10 @@
 /**
  * **Update dashboard**: fast-forwards the checkout the server runs from to its branch on `origin`, installs the packages
- * when `bun.lock` changed, and has the server run again. It never stashes, resets, or merges: a checkout it cannot
+ * when `bun.lock` changed, brings the starter kit's files you never edited up to date, and has the server run again. It never stashes, resets, or merges: a checkout it cannot
  * fast-forward stays as it was, and the answer says why.
  */
+import { join } from "node:path";
+import { agentDir } from "../omp/config";
 import { run, runChecked } from "../proc";
 import { SerialLane } from "../serial-lane";
 import type { ChangelogEntry, DashboardChangelog, DashboardUpdateOutcome, DashboardUpdateStatus } from "../shared/dashboard-update";
@@ -120,6 +122,27 @@ async function bunInstall(dir: string): Promise<void> {
 	}
 }
 
+/**
+ * Runs the updated checkout's starter kit installer with `--files`, which replaces only the kit files you never edited
+ * and needs a recorded install. A failure is logged and does not stop the restart.
+ */
+async function installKitFiles(dir: string): Promise<void> {
+	try {
+		const out = await runChecked([process.execPath, join(dir, "templates", "omp", "install.ts"), "--files"], { cwd: dir, env: { PI_CODING_AGENT_DIR: agentDir }, timeoutMs: INSTALL_TIMEOUT_MS });
+		console.log(out.trimEnd());
+	} catch (err) {
+		console.error(`The starter kit's files were not updated: ${err instanceof Error ? err.message : String(err)}`);
+	}
+}
+
+/** What an update runs in the fast-forwarded checkout before the restart. */
+export interface UpdateSteps {
+	/** Installs the packages, only when `bun.lock` changed. */
+	install?: (dir: string) => Promise<void>;
+	/** Brings the starter kit's files up to date. */
+	installKit?: (dir: string) => Promise<void>;
+}
+
 const CHANGELOG = "CHANGELOG.md";
 const DAY_HEADING = /^## (\d{4}-\d{2}-\d{2})\s*$/;
 const HEADING = /^#{1,6}\s/;
@@ -176,16 +199,18 @@ export class SelfUpdate {
 	readonly #checkout: Checkout;
 	readonly #restart: () => void;
 	readonly #install: (dir: string) => Promise<void>;
+	readonly #installKit: (dir: string) => Promise<void>;
 	/** The fetches, the counts, and the update, one at a time, so a check never fetches under a fast-forward. */
 	readonly #lane = new SerialLane();
 	/** The update that started the restart, which any later one answers too. */
 	#restarting: DashboardUpdateOutcome | null = null;
 
 	/** `restart` stops the server and runs it again on the checkout as it now is. */
-	constructor(checkout: Checkout, restart: () => void, install: (dir: string) => Promise<void> = bunInstall) {
+	constructor(checkout: Checkout, restart: () => void, { install = bunInstall, installKit = installKitFiles }: UpdateSteps = {}) {
 		this.#checkout = checkout;
 		this.#restart = restart;
 		this.#install = install;
+		this.#installKit = installKit;
 	}
 
 	/** The server's own: a packaged app updates through its own updater, and a checkout through this where the server can run itself again in place. */
@@ -231,8 +256,8 @@ export class SelfUpdate {
 	}
 
 	/**
-	 * Fast-forwards the checkout, installs the packages when `bun.lock` changed, and restarts the server shortly after
-	 * answering, once the checkout holds another commit than the running one. Rejects with {@link UpdateRefused} when the
+	 * Fast-forwards the checkout, installs the packages when `bun.lock` changed, brings the starter kit's files up to
+	 * date, and restarts the server shortly after answering, once the checkout holds another commit than the running one. Rejects with {@link UpdateRefused} when the
 	 * checkout cannot fast-forward.
 	 */
 	update(): Promise<DashboardUpdateOutcome> {
@@ -244,6 +269,7 @@ export class SelfUpdate {
 			const { head, lockChanged } = await fastForward(build);
 			if (head === build.commit) return { kind: "current" };
 			if (lockChanged) await this.#install(build.dir);
+			await this.#installKit(build.dir);
 			this.#restarting = { kind: "restarting", from: build.commit, to: head, installed: lockChanged };
 			setTimeout(this.#restart, RESTART_DELAY_MS);
 			return this.#restarting;

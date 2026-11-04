@@ -4,7 +4,7 @@
 - The sidebar's **Bots** tab, just before **Sessions**, lists every Bot like a messaging app, whatever workspace the sidebar shows.
   Each row shows the Bot's avatar, its name, the time of its last message, and that message on one muted line.
   The line reads **You:** before your own words, **Working…** while the Bot works, or the question it waits on you for, in amber.
-  When a routine sent the last message, the line starts with that routine's name instead of **You:**, followed by its prompt or command.
+  When a routine sent the last message, the line starts with that routine's name instead of **You:**, followed by its prompt or command; when another Bot sent it, the line starts with that Bot's name.
   A blue dot marks a reply you have not read, and the most recent conversation comes first.
   The tab counts the Bots that wait on you: those asking you something, and those with a reply you have not read.
 - Right-click a Bot's row, or its card in the gallery, to **Pin** or **Unpin** it, to move it with **Move to section** into a section or a **New section…** you name, or to take it out with **Remove from section**.
@@ -26,15 +26,15 @@
   The last card, and **New Bot** in the header, open the New Bot form.
   Deleting a Bot returns to the gallery.
 - New Bot follows Grok's: name the Bot, pick a shape and a color, pick its **Type**, and choose **Create**; the form starts on a random shape and color, and on **Bot designer**, named **Dr Eggbot** with its job filled.
-  The type stays what you picked: **Bot designer** asks what Bot you want and creates it, as [Bot designers](#bot-designers) says, **Routines** works through its conversation and its routines, **PR shepherd** also drives your approved pull requests to merged, as [PR shepherds](#pr-shepherds) says, and **Router** hands real work to background sessions it tracks as tasks, as [Routers](#routers) says.
-  Picking **Bot designer**, **PR shepherd**, or **Router** fills its **Job** with its rules, and its name with **Dr Eggbot**, **Shepherd**, or **Atlas**, and hides the job templates.
+  The type stays what you picked: **Bot designer** asks what Bot you want and creates it, as [Bot designers](#bot-designers) says, **Routines** works through its conversation and its routines, and **PR shepherd** also drives your approved pull requests to merged, as [PR shepherds](#pr-shepherds) says.
+  Picking **Bot designer** or **PR shepherd** fills its **Job** with its rules, and its name with **Dr Eggbot** or **Shepherd**, and hides the job templates.
   Switching type swaps a name or job the last type or a template filled, and keeps one you typed; picking **Routines** after a type that filled them empties them.
   For a **Routines** Bot, the optional **Job** field starts empty, and a template above it, **PR reviewer**, **Daily retro**, **Worktree janitor**, or **Release watcher**, fills it and the name, keeping either one you typed.
   It also asks for the workspace its conversation runs in, the sidebar's workspace by default.
   **Create** saves it and opens its page, `#bots/<id>`.
   A Bot made with no job learns it from you: tell it in your first message what to do, where to look, and what to ask before acting, and it saves that as its job, in its **Job** field.
 - A Bot's page shows its avatar and name in the header, the first sentence of its job under them, and its conversation below.
-  The conversation reads as a chat with your messages, the Bot's replies, and folded [routine run cards](routines.md).
+  The conversation reads as a chat with your messages, the Bot's replies, folded [routine run cards](routines.md), and the cards of [Bot messages](#bot-messages) other Bots sent it.
   It never shows the Bot's tool calls, its thinking, or the card of files it changed, whatever **Show tool calls** and **Show thinking** say.
   The Bot's conversation is not listed in the **Sessions** tab, the command palette, or the workspace list; only its Bot's page shows it.
   A new Bot greets you and offers three starters, built from its job, or asking what its job should be while it has none, which the composer lists under its action bar as it lists suggested prompts.
@@ -43,12 +43,12 @@
   Otherwise the composer writes to the Bot: the first message starts its conversation in its workspace, and a later one resumes the same session.
   What you type there stays when you leave the page, one draft per Bot, until you send it.
   Its `/` and `@` menus work as in any composer, resolved in the Bot's workspace, so you can mention a file, todo, ticket, pull request, person, email, event, or session.
-  Where the Bot used its `remember` tool, the conversation shows **Updated memory for** and the Bot's name.
+  Where the Bot used its `remember` tool, the conversation shows **Updated memory for** and the Bot's name, and where it messaged another Bot, **Messaged** and that Bot's name.
   A routine run card shows the routine's name, task icon, trigger logos, time, and status, with a command's duration when available.
   Open the card to read its prompt or command, any output, what started it, and the **Open routine** link.
 - The right sidebar shows the Bot's details, as it shows a session's on the panes.
   Click the Bot's name in the header, the button at the header's end, or press Cmd+Alt+B to show or hide it; it keeps the width and open state of the session details sidebar.
-  Its tabs are **Details**, **Routines**, which counts the Bot's routines, a Router's **Tasks**, which counts the tasks waiting on you, and, once the Bot's conversation worked on a Linear issue, **Tickets**, which shows those issues as a session's does; it remembers the one you last picked, apart from a session's.
+  Its tabs are **Details**, **Routines**, which counts the Bot's routines, and, once the Bot's conversation worked on a Linear issue, **Tickets**, which shows those issues as a session's does; it remembers the one you last picked, apart from a session's.
   **Details** starts with the avatar, the name, the Bot's type and whether its session runs, and its workspace.
   Click the avatar to change its shape and color; the avatar follows each pick, and closing the popover saves the last one.
   Click the name to rename it: Enter or leaving the field saves, and Escape puts the name back.
@@ -71,7 +71,26 @@
   You can also ask a Bot in its conversation to add, change, or delete its routines, such as "check the build every morning at 9"; it sees a short line for each of its own routines on every turn, with the start of its prompt or command, and what it saves shows in its **Routines** tab once the dashboard applies it.
   A change the Bot makes keeps every part of the routine it did not mention, so asking it to pause a routine leaves its schedule and task as they were.
   A Bot can change only its own routines, never another Bot's.
+- A Bot can end a turn quietly, without a notification or an unread mark, when it found nothing for you, such as a routine run with nothing new.
+  Say so in its job, such as "when a run finds nothing, call `stay_quiet`"; the PR shepherd's starting job already does.
+  A quiet run leaves an earlier reply you had not read still unread.
 - The server keeps the Bots in `bots.json` beside its access token, so every window of the app shows the same ones.
+
+## Bot messages
+
+- A Bot can message another Bot, as Grok Bots hand work off: one Bot asks another to do what is that Bot's job, and the other wakes up, does it, and can answer back later.
+  Ask a Bot in its conversation, such as "ask Triage to look at the flaky test", or let it decide; every Bot sees the other Bots' names, types, and the first sentence of their jobs on every turn.
+- The Bot that sent the message shows **Messaged** and the other Bot's name in its conversation, once the message left; click it to open that Bot.
+- The Bot that gets it shows it as a card in its conversation, with the sender's avatar, **From** and its name, and the message with its line breaks kept, then works on it as on your own message.
+  Click **From** and the name to open the sender.
+  The Bots tab and the gallery show the message as its last one, starting with the sender's name.
+  If the sender was deleted since, the card keeps the name it signed with.
+- The other Bot's reply in its own conversation does not reach the sender; it messages the sender back only when it has a result or a question, and never only to thank or acknowledge.
+- A message reaches the other Bot once the dashboard applies it, so one sent while the dashboard is stopped waits for it.
+- A Bot cannot message itself, and a message cannot start with `!` or `/`, which the other Bot would run as a command.
+- To keep two Bots from answering each other forever, one Bot can send another at most 20 messages in an hour.
+  Past that, the dashboard does not deliver the message and tells the sender once in its conversation, then drops its next messages to that Bot until fewer than 20 were sent in the last hour.
+- To stop Bots messaging each other, tell them in their conversations, or put it in their jobs.
 
 ## Bot designers
 
@@ -96,33 +115,3 @@
   It queues a merge only when the head has the same changes as a commit a reviewer approved, so a rebase keeps the approval and new code waits for a fresh review.
   A refused request tells the shepherd why in its conversation, so it can tell you.
 - Its job is its rules, which you can edit like any Bot's: what it touches, what it asks you first, and how it merges.
-
-## Routers
-
-- A Router, **Atlas** unless you rename it, is the one conversation you hand work to, inspired by DeepSeek's Super-agent.
-  It answers at once and never does real work in its own turn: it asks the dashboard to start a task, a background session with its own prompt, and tells you it did.
-- Each task's session shows in **Sessions**, named after the task, and runs in the Router's workspace unless the Router names another directory.
-  A task about a pull request or a Linear issue also shows it on its session row.
-  The Router's own conversation links no pull request or issue, even one it read about or one its workspace's branch heads, so it never counts as the agent on one and never keeps a task from starting on it.
-- The Router's **Tasks** tab groups its tasks into **Needs you**, **In progress**, and **Done**, newest first.
-  Each row shows the task's title, the dot of its session while it runs, what it is **Listening to**, such as a pull request, a Slack thread, or a Linear issue, and how long ago it last changed.
-  Click a row to open its session, or Cmd-click to open it in a new pane; its menu offers **Mark done** and **Stop**, which ends its session.
-- When a task's session ends its turn, or you end the session with **End session** while it works, the task moves to **Needs you**, and the Router hears one line in its conversation, `Task "<title>" finished:` and the last line of the reply, unless it started the task quiet.
-  Prompting the task's session again moves it back to **In progress**.
-- The Router sees its open tasks on every turn, so it can mark one done or stopped, or add what one listens to, when you ask.
-- A task the dashboard cannot start, such as one in a directory you have not trusted, shows under **Done** as stopped, with why, and the Router hears why in its conversation.
-- A new Router starts with a routine, **Team events**, that wakes it when a Slack message waits on you or one of your pull requests becomes your move, including failing checks and comments to address.
-  You can edit or pause it in the Router's **Routines** tab like any routine.
-- Before the Router reads them, rules in the dashboard drop team messages that need nothing: one with only emoji, or with three words or fewer, no question mark, and no word that asks for something or reports a problem, such as "thanks!" or "sounds good".
-  The next run that reaches the Router ends its prompt with how many it dropped, such as "3 team messages didn't need anything.", which the run's card shows when you open it.
-- An event on a pull request or Slack thread that one of the Router's open tasks listens to goes straight to that task's session, without a Router turn, and moves the task back to **In progress**.
-  An event no task listens to, or one a task's session could not take, reaches the Router, and the events of one check reach it together, in one run.
-- When someone reports a bug nobody answered, the Router starts a quiet task that listens to the thread and posts there only once it has a result.
-- A supervisor checks the tasks in progress every two minutes while the dashboard runs.
-  A task whose session works with no new step for six minutes, runs the same tool call four times in a row, or died, is stopped and told to continue, with the reason and its last error.
-  While one of its tool calls still runs, such as a long build or test run, it gets 30 minutes instead of six.
-  A session that goes down on its own mid-turn, as when its process crashes or is killed, counts as died at once: the supervisor resumes it and tells it to continue without waiting for its next check.
-  The Router tells you it restarted a task unless the task is quiet, and the task's row in **Tasks** shows why.
-  After two restarts, the next time the task is stuck or its session dies the supervisor stops it and ends its session, and the Router hears why.
-- Deleting a Router deletes its tasks; their sessions stay in **Sessions**.
-- The server keeps the tasks in `router-tasks.json` beside `bots.json`.

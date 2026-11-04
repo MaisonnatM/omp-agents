@@ -1,45 +1,76 @@
 import { Check, Copy } from "lucide-react";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { MAX_TEXT_FILE_BYTES, type TextFile } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
 import { mediaSrc } from "../api";
-import { type FileBase, type FileTarget, linkedFile, mediaFileUrl, textFileUrl } from "../file-paths";
+import { type FileTarget, linkedFile, mediaFileUrl, textFileUrl } from "../file-paths";
 import { parseDelimited } from "../delimited";
 import { formatBytes } from "../labels";
 import { useRead } from "../reads";
 import { useCopy } from "../use-copy";
-import { FileBaseContext } from "./file-link";
-import { MessageMarkdown } from "./message-markdown";
+import { CodeText, extensionOf, isMarkdownPath, MarkdownDocument } from "./file-text";
 import { LoadNote } from "./sheet-details";
 import { ViewerDialog } from "./viewer-dialog";
+import { useZoom, type Zoom } from "./zoom-pane";
 
 /** The rows a table shows; a longer file shows the rest as its source. */
 const MAX_TABLE_ROWS = 1000;
 
 type Look = "markdown" | "tsv" | "csv" | "text";
 
-const LOOKS: Record<string, Look> = { md: "markdown", markdown: "markdown", tsv: "tsv", csv: "csv" };
+const TABLES: Record<string, Look> = { tsv: "tsv", csv: "csv" };
 
 /** A file that a path in agent text opened: an image or video large, else a text file rendered by its type. */
 export function FileDialog({ target, onClose }: { target: FileTarget; onClose: () => void }) {
 	const kind = linkedFile(target.path)?.kind;
-	return kind === "image" || kind === "video" ? <MediaDialog target={target} video={kind === "video"} onClose={onClose} /> : <TextFileDialog target={target} onClose={onClose} />;
+	if (kind === "image") return <ImageFileDialog target={target} onClose={onClose} />;
+	if (kind === "video") return <VideoFileDialog target={target} onClose={onClose} />;
+	return <TextFileDialog target={target} onClose={onClose} />;
 }
 
-/** An image or video on this computer, as large as the dialog allows; a video plays at once. */
-function MediaDialog({ target, video, onClose }: { target: FileTarget; video: boolean; onClose: () => void }) {
-	const { copied, copy } = useCopy();
+const LOAD_FAILED = <p className="text-sm text-muted-foreground">This file could not be loaded: it is missing, or lies in a directory that does not open here.</p>;
+
+/** An image on this computer, fitted to the dialog, that zooms; one that loads nothing says so. */
+function ImageFileDialog({ target, onClose }: { target: FileTarget; onClose: () => void }) {
 	const [failed, setFailed] = useState(false);
+	const zoom = useZoom(target.path);
+	const name = target.path.slice(target.path.lastIndexOf("/") + 1);
+	return (
+		<MediaFileDialog target={target} zoom={failed ? undefined : zoom} onClose={onClose}>
+			{failed ? (
+				<div className="flex min-h-full items-center justify-center p-4">{LOAD_FAILED}</div>
+			) : (
+				<img src={mediaSrc(mediaFileUrl(target))} alt={name} draggable={false} onError={() => setFailed(true)} className="max-h-full max-w-full object-contain p-4" />
+			)}
+		</MediaFileDialog>
+	);
+}
+
+/** A video on this computer, which plays at once; one that loads nothing says so. */
+function VideoFileDialog({ target, onClose }: { target: FileTarget; onClose: () => void }) {
+	const [failed, setFailed] = useState(false);
+	return (
+		<MediaFileDialog target={target} onClose={onClose}>
+			<div className="flex min-h-full items-center justify-center p-4">
+				{failed ? LOAD_FAILED : <video controls autoPlay src={mediaSrc(mediaFileUrl(target))} onError={() => setFailed(true)} className="max-h-[75vh] max-w-full bg-black" />}
+			</div>
+		</MediaFileDialog>
+	);
+}
+
+/** The dialog an image or video file shows in: its name, its path, and a button that copies the path. */
+function MediaFileDialog({ target, zoom, onClose, children }: { target: FileTarget; zoom?: Zoom; onClose: () => void; children: ReactNode }) {
+	const { copied, copy } = useCopy();
 	const { path } = target;
 	const name = path.slice(path.lastIndexOf("/") + 1);
-	const src = mediaSrc(mediaFileUrl(target));
 	return (
 		<ViewerDialog
 			title={name}
 			description={path}
 			bodyLabel={name}
+			zoom={zoom}
 			onClose={onClose}
 			actions={
 				<Tooltip content={copied ? "Copied" : "Copy the path"}>
@@ -49,15 +80,7 @@ function MediaDialog({ target, video, onClose }: { target: FileTarget; video: bo
 				</Tooltip>
 			}
 		>
-			<div className="flex min-h-full items-center justify-center p-4">
-				{failed ? (
-					<p className="text-sm text-muted-foreground">This file could not be loaded: it is missing, or lies in a directory that does not open here.</p>
-				) : video ? (
-					<video controls autoPlay src={src} onError={() => setFailed(true)} className="max-h-[75vh] max-w-full bg-black" />
-				) : (
-					<img src={src} alt={name} onError={() => setFailed(true)} className="max-h-[75vh] max-w-full object-contain" />
-				)}
-			</div>
+			{children}
 		</ViewerDialog>
 	);
 }
@@ -66,7 +89,7 @@ function MediaDialog({ target, video, onClose }: { target: FileTarget; video: bo
 function TextFileDialog({ target, onClose }: { target: FileTarget; onClose: () => void }) {
 	const { path } = target;
 	const read = useRead<TextFile>(textFileUrl(target));
-	const look = LOOKS[path.slice(path.lastIndexOf(".") + 1).toLowerCase()] ?? "text";
+	const look = isMarkdownPath(path) ? "markdown" : (TABLES[extensionOf(path)] ?? "text");
 	const [source, setSource] = useState(false);
 	const { copied, copy } = useCopy();
 	const file = read.data;
@@ -104,18 +127,9 @@ function TextFileDialog({ target, onClose }: { target: FileTarget; onClose: () =
 }
 
 function FileBody({ file, look }: { file: TextFile; look: Look }) {
-	const base = useMemo((): FileBase => ({ dir: file.path.slice(0, file.path.lastIndexOf("/")), session: null }), [file.path]);
-	if (look === "markdown") {
-		return (
-			<FileBaseContext.Provider value={base}>
-				<article className="px-5 py-3 text-sm leading-relaxed">
-					<MessageMarkdown text={file.text} />
-				</article>
-			</FileBaseContext.Provider>
-		);
-	}
+	if (look === "markdown") return <MarkdownDocument text={file.text} frontmatter={file.frontmatter} path={file.path} className="px-5 py-3" />;
 	if (look === "tsv" || look === "csv") return <Table text={file.text} separator={look === "tsv" ? "\t" : ","} />;
-	return <pre className="p-4 font-mono text-xs leading-relaxed whitespace-pre">{file.text}</pre>;
+	return <CodeText text={file.text} path={file.path} className="rounded-none border-0" />;
 }
 
 function Table({ text, separator }: { text: string; separator: "\t" | "," }) {

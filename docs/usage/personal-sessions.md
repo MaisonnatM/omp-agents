@@ -3,9 +3,10 @@
 - A personal session is your own assistant for everyday life, such as meals and recipes, shopping, plans, habits, and family logistics, rather than a coding agent on a project.
   A session is personal exactly when it runs in the personal directory, `personal` in the dashboard's data directory: `$XDG_DATA_HOME/omp-agents/personal`, else `~/.local/share/omp-agents/personal`.
   The dashboard creates that directory when it starts; it is not a git repository and holds no agent code, so starting there never asks you to [trust project code](per-project-agent-setup.md#trusting-a-projects-code).
-- To start one, pick **Personal**, the first item of the new session's directory picker.
-  The same picker on a conversation's move and a Bot's workspace lists it first too.
-- The page calls that directory **Personal** wherever it names a workspace: the sidebar's workspace picker and its **New session in Personal** button, the badge on a row under all workspaces, the directory pickers, and the command palette.
+- To start one, click **Personal** under **New session** in the sidebar, or press Cmd+Shift+P (Ctrl+Shift+P elsewhere).
+  A personal draft's page asks "What can I help with?" and lists no starters under the composer; its composer asks about meals, plans, and errands.
+  Neither the directory pickers, on a new session, a conversation's move, and a Bot's workspace, nor the sidebar's workspace picker list it.
+- The page calls that directory **Personal** wherever it names a workspace: the badge on a row under all workspaces, a directory picker's button on a personal session, and the command palette.
   An untitled session's row still reads as its directory's name, `personal`, until omp titles it.
 - Every turn of a personal session's main agent starts with the assistant's framing and what it remembers about you; its subagents get neither.
   It keeps any file it makes in the personal directory, which the [file dialog](changed-files-and-images.md) can open.

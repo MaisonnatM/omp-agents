@@ -1,6 +1,7 @@
 /** Reads the files that a path in agent text names: text for the page's file dialog (`GET /api/file`), images and videos for `GET /api/media`. */
 import { realpath, stat } from "node:fs/promises";
 import { dirname, extname, isAbsolute, join, resolve, sep } from "node:path";
+import { frontmatterOf } from "./frontmatter";
 import { agentDir } from "./omp/config";
 import { expandHome, HOME, tokenFile } from "./paths";
 import { MAX_TEXT_FILE_BYTES, MEDIA_FILE_EXTENSIONS, TEXT_FILE_EXTENSIONS, type TextFile } from "./shared/transcript";
@@ -80,7 +81,7 @@ export async function readTextFile(path: string, denied: readonly DeniedDir[] = 
 	} catch {
 		return refuse(415, `${named} is not UTF-8 text`);
 	}
-	return { ok: true, file: { path: named, text, size, truncated } };
+	return { ok: true, file: { path: named, text, size, truncated, frontmatter: frontmatterOf(named, text) } };
 }
 
 /** The image or video that `path` names, one of `MEDIA_FILE_EXTENSIONS`, as {@link findFile} checks it. */

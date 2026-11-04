@@ -106,10 +106,6 @@ Every server learns its sightings, but only the server that owns routines fires 
 Otherwise the runs stay queued for the next tick at a full wake, and news for a routine whose triggered run is still queued joins that run, up to 10 events, through `RoutinesFile.addTriggerEvents`, so a night of dark wakes starts one run.
 A run is keyed by its time, so a claim lands at least a millisecond after the routine's newest run.
 A routine whose schedules are all weekly hears its triggers only on the weekdays they name, by `triggersOn`, so a weekdays-only routine ignores weekend news; one with no schedule or an interval hears them every day.
-Before any routine claims, the runner's `screen`, a `RoutineScreen`, takes for each Bot, once and all Bots at a time, the events any of its routines watches, and returns the ones they should still run on; each routine then claims with the ones it watches, and one left with none claims nothing.
-Without a screen the runner uses `EVERY_EVENT`, which passes every event and adds nothing to a prompt.
-The `Dashboard`'s screen is `RouterEvents`, which drops a Router's chatter and hands an event a Router's task follows to that task's session at once, even in a dark wake, where that session's turn may stall until the next full wake; every other Bot's events pass unchanged; see [Bots](bots.md#routers).
-The screen also adds to a prompt run's prompt as the drain sends it, so a Router's message names each event's follow and how many messages its rules dropped.
 A prompt run carries the events in the trailing JSON stamp rather than fenced trigger prose.
 A command gets the events as a JSON list in the `ROUTINE_TRIGGERS` environment variable, `[]` for a scheduled run or **Run now**, which `runShell` sets beside the server's environment.
 Each event carries its kind, a title, a detail of at most 2,000 characters, and a link when it has one.
@@ -121,16 +117,16 @@ Calendar events are checked on the minute tick.
 ## One server runs the unattended work
 
 Servers on different ports share `~/.config/omp-agents`: your app and a smoke run, say.
-Routines, the todo, note, routine, and bot inboxes, the daily clean-up of checked todos, the daily sweep of omp's isolation sandboxes, and the idle stop of sessions' processes write that directory or omp's, or end processes, without anyone asking, so one server at a time runs them.
+Routines, the todo, note, event, routine, and bot inboxes, the daily clean-up of checked todos, the daily sweep of omp's isolation sandboxes, and the idle stop of sessions' processes write that directory or omp's, or end processes, without anyone asking, so one server at a time runs them.
 `OwnerLock` in `templates/omp/agent/extensions/github/owner-lock.ts` decides which, with `server.lock`, a file that holds `{pid, port}` of the owner.
 A server creates it whole through a draft file and a hard link, so a reader never sees half of it.
 Taking over a dead or invalid owner holds a short ownership lock at `<path>.reap` and rereads the original file before removal, so competing reclaimers cannot remove a new owner's lock.
 The same mechanism recovers a crashed reclaimer's lock.
 A process id that another program reused keeps the lock held; delete `server.lock` to release it.
 At startup a server that does not own the lock logs once which port does, and the minute tick tries again.
-On a takeover the server logs it, reads `routines.json` and `todos.json` again, since the previous owner kept saving them, tracks the routine sessions it attached to, fails the runs that were running a command and the scheduled sends left sending, and drains the todo, note, routine, and bot inboxes.
+On a takeover the server logs it, reads `routines.json`, `todos.json`, `notes.json`, and `events.json` again, since the previous owner kept saving them, tracks the routine sessions it attached to, fails the runs that were running a command and the scheduled sends left sending, and drains the todo, note, event, routine, and bot inboxes.
 A server that exits normally deletes its lock.
-The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, a todo, **Run now**, or a process's **Stop**; only the minute tick's routines, scheduled sends, and isolation sweep, the runs the routines' triggers start, the todo, note, routine, and bot inboxes, the end inbox's requests for sessions started in a terminal, and the process sample's idle and gone-session stops are left to the owner.
+The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, a todo, **Run now**, or a process's **Stop**; only the minute tick's routines, scheduled sends, and isolation sweep, the runs the routines' triggers start, the todo, note, event, routine, and bot inboxes, the end inbox's requests for sessions started in a terminal, and the process sample's idle and gone-session stops are left to the owner.
 Each server keeps its own copy of `routines.json` and `todos.json` in memory and saves whole, so the last server you edited in wins until the owner changes.
 `scheduled.json` is the exception: `ScheduledFile` is a `shared` `ReducerFile`, so a send added on any server reaches the owner and only one process can claim it.
 Each mutation holds an `OwnerLock` at `<path>.lock` across reload, reduction, and the immediate JSON replacement, so independent server processes keep one another's changes.
@@ -152,7 +148,7 @@ A sandbox with the marker but no checkout, left by an omp that exited while it m
 Just before it removes one, the sweep asks again whether an omp owns it, since a task run again takes the same directory; then it stops a retained native mount through omp's `stopRetainedMount`, renames the sandbox with the suffix `.omp-agents-removing`, and deletes it, so the next sweep finishes a removal cut short instead of reading half a sandbox.
 A mount that will not stop keeps its sandbox.
 Each sweep logs one line with how many sandboxes it removed and kept, by reason, and one more for each it could not read or remove.
-Storage shares this instance for a read-only `preview()` that measures removable sandboxes, and `remove(paths)` that rechecks each sandbox because the confirmed preview may be old.
+Storage shares this instance for a read-only `preview()` that measures removable sandboxes and those kept only for changes, and `remove(paths, { discardChanges })` that rechecks each sandbox because the confirmed preview may be old; only `discardChanges` lets a changed one go, and the unattended sweep never sets it.
 Each operation takes one `Worktrees.inUse` snapshot; the unattended sweep judges each sandbox once, then rechecks ownership immediately before removal.
 Preview, manual removal, and the unattended sweep share a single-flight guard.
 Manual removal accepts only direct directory children of omp's sandbox root, never symlinks, and the preview does not finish interrupted removals.

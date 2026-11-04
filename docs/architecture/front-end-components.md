@@ -54,7 +54,7 @@ A fenced code block renders as a `CodeBlock`, colored line by line by `highlight
 The grammars are a chunk of their own, which the first code the page shows loads through `loadedOnce` in `web/loaded-once.ts`; until it lands, code shows uncolored, and each highlighting component renders again in color once it does.
 In agent text, raw HTML is escaped, unsafe link schemes are filtered, and an image renders as a link unless it is a `data:` URL or a path to an image or video on this computer, which `LocalMedia` in `web/components/local-media.tsx` shows through `GET /api/media`.
 In agent text, `remarkFilePaths` in `web/file-paths.ts` turns a path to a text, image, or video file into a link, and that link, like a `file://` one, renders as a `FileLink` from `web/components/file-link.tsx`, which opens the file dialog through the dashboard context.
-It then ends the text with a `figure` naming the images and videos those links name, each once, but for those an image already shows; `MediaStrip` draws it as thumbnails, each dropping out when its file does not load.
+It then ends the text with a `figure` naming the images and videos those links name, each once, but for those an image already shows; `MediaStrip` draws it as thumbnails, each dropping out when its file does not load, and opens an image in `ImageViewer` with ←/→ to the message's other images, those in place too, a video in the file dialog.
 A `file://` address whose escapes do not decode renders as a link with no address, and text from GitHub keeps no `file://` path, since it renders through the default filter.
 A relative path resolves against `FileBaseContext`: the pane's session worktree, from `SessionFacts.worktree`, else its directory, or the directory of the file the dialog shows.
 In a session's text it also carries the session's id and the path as written, `FileTarget` in `web/file-paths.ts`, so `GET /api/file` and `GET /api/media` try the directories that session's commands ran in when the resolved path holds no file.
@@ -78,6 +78,6 @@ An image cannot read the page's CSS variables, so the diagram takes the concrete
 A render that a newer source or theme outdated is dropped, and a render that throws shows the fence's text with the error.
 
 The model learns the two formats from `src/omp/session-visuals-extension.ts`, whose `before_agent_start` handler appends a paragraph, built from the same limits, to the system prompt.
-`DashboardSession` passes it with `-e` when it starts, forks, or resumes a session (`withSessionVisuals` in `src/dashboard-session.ts`), but not for a replay, or for a resumed replay, whose requests the replay guard compares with the original's, system prompt included.
+`DashboardSession` passes it with `-e` when it starts, forks, or resumes a session (`withSessionVisuals` in `src/dashboard-session.ts`).
 The extension sits outside `templates/omp/agent/`, so the starter kit never installs it and a terminal session never loads it, and it types the part of omp's API it uses by hand, as `tsc` cannot resolve omp's package.
 `sessionVisualsExtension` in `src/server/resources.ts` names the file, and the packaged app ships it bundled as `session-visuals-extension.js`, as it ships the keeper.

@@ -3,6 +3,7 @@ import { errorText, isNonEmpty, isObject } from "./json";
 import { changeExtensions, findExtensionContribution } from "./omp/extensions";
 import { displayPath } from "./paths";
 import { SerialLane } from "./serial-lane";
+import { frontmatterOf } from "./frontmatter";
 import { Rejected } from "./settings";
 import {
 	EXTENSION_CONTRIBUTION_KINDS,
@@ -149,8 +150,9 @@ export async function readExtensionContribution(cwd: string | null, raw: unknown
 	if (!item) throw new Rejected(404, "This contribution is no longer discovered");
 	const info = await stat(item.path);
 	if (info.size > 1024 * 1024) throw new Rejected(400, "This file exceeds the one MiB preview limit");
+	const text = await Bun.file(item.path).text();
 	return {
 		pathDisplay: displayPath(item.path),
-		body: { state: "read", size: info.size, modifiedAt: info.mtimeMs, text: await Bun.file(item.path).text() },
+		body: { state: "read", size: info.size, modifiedAt: info.mtimeMs, text, frontmatter: frontmatterOf(item.path, text) },
 	};
 }

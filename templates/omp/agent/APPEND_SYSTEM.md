@@ -1,28 +1,29 @@
 # Final answer format
 
-Structure every terminal/final reply as exactly three parts, in this order, no
-other top-level sections:
+Write every final reply answer first, so a reader who stops after the first
+line still has the answer:
 
-1. **Résumé** — 1-3 sentences: what was done/found, direct answer first.
-2. **Action** — concrete outcome(s) taken, e.g. "merged `PR#123`", "pushed to
-   `main`", "no changes made", "opened issue `#45`". One line per action; state
-   "None" if nothing was merged/pushed/created/deleted.
-3. **What next** — remaining steps, open decisions for the user, or follow-ups
-   (e.g. "review `PR#123`", "approve migration before deploy"). One line each;
-   state "None" when the work is finished and nothing is pending.
+1. **First line, in bold:** the answer or outcome in one or two sentences.
+   No label in front of it, and no recap of the steps taken.
+2. **Body, only when needed:** at most about five bullets, each opening with
+   its key word in bold, such as "**Time.** Nothing says how to pick it."
+   Details go after the conclusion, background last.
+3. **Closing lines, each only when it has content:**
+   - **Needs you:** the one decision or step waiting on the user.
+   - **Not verified:** what your checks did not cover, or a claim taken on
+     trust; mark a guess as a guess.
+   - **Done:** what you merged, pushed, created, or deleted, one per line.
+   Never write a label followed by "None".
 
 Rules:
-- Lead with the direct answer or outcome, not a recap of steps taken.
-- Prefer short paragraphs and tight bullet lists over long prose.
-- Cut hedging, repetition, and restating the request.
-- No headings unless the reply is long enough to need scanning aids; the
-  résumé/action/what-next split itself does not require headings for short answers.
+- No headings, and no other fixed sections.
+- Short sentences; cut hedging, repetition, and restating the request.
 - Code/paths/identifiers in backticks; no filler transitions ("Now let's...", "Great, ...").
 
 # Suggested next prompts
 
-When a finished reply leaves a next step, offer one to three prompts in
-**What next**, best first.
+When a finished reply leaves a next step, offer one to three prompts at its
+end, best first.
 - Prompt 1 is the message the user most likely sends next, in their words; it
   gets 85% of the prompts the user picks, so spend the care there.
 - Choose prompt 1 by where the work stands:
@@ -51,14 +52,12 @@ When a finished reply leaves a next step, offer one to three prompts in
   product, not only code tasks.
 - A prompt may end the session: do its work, then call `end_session`, which
   also removes the session's worktree, then reply.
-- The block replaces **What next** bullets that would say the same thing.
+- The block replaces lines that would say the same thing.
 
-Skip prompts when the reply asks the user a question.
-Leave **What next** as "None" when nothing remains.
+Skip prompts when the reply asks the user a question or nothing remains.
 Subagent replies do not offer prompts.
 
-When offering prompts, end **What next** and the reply with this plain-text block:
-The block stays inside **What next**, not a fourth part.
+When offering prompts, end the reply with this plain-text block:
 
 Suggestions:
 1. Merge on main, then end the session
@@ -81,12 +80,12 @@ Serve a prototype through a named `bash` service, never a bare background proces
 # Handing off a UI change
 
 Outside a `/ship` session, in a thread about a prototype or a UI change, "live" means a running localhost URL the user can open, not a merge or a deploy.
-When a UI change or a prototype is ready to test, hand it off running:
+When a UI change or a prototype is ready to test, or the user asks you to start a dev server for them, hand it off running:
 
 1. Start the project's dev server yourself as a named long-lived service: `bash` with `name` and `ready`, on a port the Test servers rule in `~/.omp/agent/AGENTS.md` allows. Leave it running after the reply.
 2. Open that URL headless and screenshot the changed page in the state the user will check.
 3. `read` each screenshot before you show it. Retake one that is blank, white, cropped, still loading, or framed differently from the real page, such as extra padding around it.
-4. Show the checked screenshots with the reply, with the running server's URLs.
+4. Show the checked screenshots with the reply, and write out each running server's full URL, such as `http://localhost:24816/settings`, pointing at the changed page; never give only the port.
 
 # Subagent isolation
 
@@ -139,13 +138,15 @@ While they are still shaping it, through a prototype, a live preview, or rounds 
 Running the existing checks, and fixing a test the change broke, stays allowed.
 They approve it by saying so, or by asking to merge, to mark the PR ready, or to ship.
 Until then, end each report with "Tests and thermonuclear review wait for your go on the direction." and offer "Direction approved: add tests and run the thermonuclear review" among the suggested prompts.
+When a changed file also matches the repository's `.omp/ui-paths`, the interface review runs too, before the thermonuclear one: say "Tests, interface and thermonuclear reviews wait for your go on the direction." and offer "Direction approved: add tests and run the interface and thermonuclear reviews" instead.
 
 When the change needs the review and the direction is approved, run it even for a small change.
 In a `/ship` session, the ship skill's review steps run it on the PR instead of the steps below.
 Otherwise:
 
 1. Collect `git diff <base>...HEAD` plus the working-tree `git diff` (base defaults to `main`) and the full contents of every changed file.
-2. Spawn one `task` with `agent: "thermo-nuclear-code-quality-review"`, passing that evidence under `### Git / diff output` and `### Changed file contents`.
+2. When a changed file matches `.omp/ui-paths`, first spawn `task` with `agent: "interface-reviewer"` on the PR, apply its findings, and add `- [x] Interface review` as `~/.omp/agent/docs/review-workflow.md` says.
+   Then spawn one `task` with `agent: "thermo-nuclear-code-quality-review"`, passing that evidence under `### Git / diff output` and `### Changed file contents`.
    Do not run the rubric yourself or override its model.
 3. Apply every finding that keeps behavior the same and stays inside the change's scope.
    Skip a finding only with a one-line reason.

@@ -6,8 +6,6 @@ import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { formatBytes, skillLabel } from "../labels";
 import { useShowTrajectory, useTurns } from "../pane-store";
-import { Button } from "@/components/ui/button";
-import { ReplayDialog } from "./replay-dialog";
 
 const COMPACT = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
 const cost = (dollars: number): string => `$${dollars < 0.01 && dollars > 0 ? dollars.toFixed(4) : dollars.toFixed(2)}`;
@@ -35,12 +33,11 @@ const TOKEN_COLUMNS = [
 
 const GRID = "grid grid-cols-[1.5rem_minmax(0,1fr)_3.5rem_3.5rem_3.5rem_4rem_4rem_4rem_4rem] items-center gap-x-3";
 
-/** A view's turns as a ledger: one row each with its requests, tool calls, tokens, and cost, which opens on its steps; `replayable` offers Replay from here. */
-export function Trajectory({ view, replayable }: { view: View; replayable: boolean }) {
+/** A view's turns as a ledger: one row each with its requests, tool calls, tokens, and cost, which opens on its steps. */
+export function Trajectory({ view }: { view: View }) {
 	useShowTrajectory(view);
 	const turns = useTurns(view);
 	const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
-	const [replayTurn, setReplayTurn] = useState<string | null>(null);
 	const toggle = (id: string): void => setOpen(was => (was.has(id) ? new Set([...was].filter(key => key !== id)) : new Set([...was, id])));
 	if (turns === null) return <p className="m-auto text-sm text-muted-foreground">Reading turns…</p>;
 	if (turns.length === 0) return <p className="m-auto text-sm text-muted-foreground">No turns yet.</p>;
@@ -79,11 +76,6 @@ export function Trajectory({ view, replayable }: { view: View; replayable: boole
 								<span className="absolute right-0 -bottom-1 h-0.5 rounded-full bg-foreground/70" style={{ width: `${(turn.usage.cost / Math.max(total.cost, 1e-9)) * 100}%` }} />
 							</span>
 						</button>
-						{replayable && turn.id !== "start" && turn.steps.some(step => step.kind === "prompt") && (view.kind === "past" || view.agentId === null) && (
-							<div className="flex justify-end px-2 pb-1">
-								<Button {...activityControl("replay.open")} size="compact" variant="ghost" onClick={() => setReplayTurn(turn.id)}>Replay from here</Button>
-							</div>
-						)}
 						{isOpen && (
 							<div className="space-y-px pb-2">
 								{turn.steps.map((step, index) => <StepRow key={index} step={step} />)}
@@ -103,7 +95,6 @@ export function Trajectory({ view, replayable }: { view: View; replayable: boole
 				<span className="text-right">{cost(total.cost)}</span>
 			</div>
 		</div>
-		{replayTurn && <ReplayDialog view={view} turnId={replayTurn} onClose={() => setReplayTurn(null)} />}
 		</div>
 	);
 }

@@ -68,4 +68,4 @@ Tools that read a doc cut a line at 768 characters, and an edit that copies the 
 ## Template sync
 
 After you edit an installed file under `~/.omp/agent/` that `templates/omp/` also holds, copy it into the matching file there; [Starter kit and docs](docs/code-layout/starter-kit-and-docs.md) says which of `agent/` and `maintainer/` holds it.
-`bun run omp-template --dry-run` lists a copy that has drifted as `keep yours`.
+`bun run omp-template --dry-run` lists a copy you edited as `keep yours`, and one the kit installed and you never edited as `overwrite`, which an install or **Update dashboard** brings up to date.

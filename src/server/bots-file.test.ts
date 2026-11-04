@@ -77,6 +77,14 @@ test("a Bot saved before it could be pinned or put in a section is neither", () 
 	expect(new BotsFile(path).value.map(({ pinned, section }) => ({ pinned, section }))).toEqual([{ pinned: false, section: null }]);
 });
 
+test("a saved Bot of a kind this version no longer has drops, and the other Bots still load", () => {
+	const path = botsPath();
+	const saved = { sessionId: null, createdAt: "2026-05-01T09:00:00.000Z" };
+	writeFileSync(path, JSON.stringify({ bots: [{ ...scout, ...saved }, { ...scout, ...saved, id: "atlas", name: "Atlas", kind: "router" }] }));
+	expect(new BotsFile(path).value.map(({ id }) => id)).toEqual([scout.id]);
+	expect(readFileSync(path, "utf8")).toContain("atlas");
+});
+
 test("pinning and moving a Bot survive a restart and an edit of its job, and a section renames or goes for all its Bots at once", async () => {
 	const path = botsPath();
 	const file = new BotsFile(path);

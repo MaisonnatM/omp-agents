@@ -13,6 +13,7 @@ An update never stashes, resets, or merges:
 - It answers `current` when the checkout then holds the running commit.
 - It reads each git exit code exactly: `diff --quiet` and `merge-base --is-ancestor` answer 0 or 1, and any other code, a timeout's included, refuses with git's `fatal:` or `error:` line rather than reading as an answer.
 - Otherwise it runs `bun install --frozen-lockfile` when `bun.lock` differs between the running commit and the new one, and answers `restarting`; a failed install leaves the server running and says so.
+- Then it runs the new checkout's `templates/omp/install.ts --files` on the server's omp agent directory, which replaces each starter kit file you never edited since the recorded install with the kit's version; it logs what it did, and a failure is logged without stopping the restart.
 - 300 ms after answering, so the answer reaches the page or agent that asked, the server restarts: `restart` in `src/server.ts` stops as a shutdown does, letting go of the sessions it started, which run on in their keepers, and writing its stores, and calls `process.execve` with its own command and environment.
   The new server attaches to those sessions again as any start does.
   It keeps the owner lock, which names its pid and port, so no other server takes over the routines while it starts again; a signal or the desktop shell's pipe ending during a restart makes it exit instead.

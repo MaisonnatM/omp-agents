@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { BotId, BotLast, BotSpec } from "../shared/bots";
+import { botMessageText } from "../shared/bot-message";
 import { type RoutineMessage, routineMessageText } from "../shared/routine-message";
 import { newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import { Bots, lastMessage } from "./bots";
@@ -66,9 +67,6 @@ function harness() {
 			routineInboxDir: join(dir, "routine-inbox"),
 			shepherdExtension: "/ext/shepherd.ts",
 			shepherdInboxDir: join(dir, "shepherd-inbox"),
-			routerExtension: "/ext/router.ts",
-			routerInboxDir: join(dir, "router-inbox"),
-			routerTasksFile: join(dir, "router-tasks.json"),
 			designerExtension: "/ext/designer.ts",
 		},
 		now: () => "2026-05-02T09:00:00.000Z",
@@ -120,16 +118,6 @@ describe("Bots", () => {
 		expect(shepherdArgs?.slice(-4)).toEqual(["--omp-agents-shepherd", "herd", "--omp-agents-shepherd-inbox", join(dir, "shepherd-inbox")]);
 		expect(scoutArgs).not.toContain("/ext/shepherd.ts");
 		expect(scoutArgs).not.toContain("--omp-agents-shepherd");
-	});
-
-	test("a Router's conversation also loads the router extension with its id, inbox, and tasks file", async () => {
-		const { bots, file, sessions, dir } = harness();
-		const atlas = { ...scout, id: "atlas" as BotId, kind: "router" } as const;
-		file.apply({ op: "save", bot: atlas }, "2026-05-01T09:00:00.000Z");
-		await bots.message(atlas.id, "Fix the flaky test.");
-		const args = sessions[0]?.args;
-		expect(args?.slice(0, 4)).toEqual(["-e", "/ext/bot.ts", "-e", "/ext/router.ts"]);
-		expect(args?.slice(-6)).toEqual(["--omp-agents-router", "atlas", "--omp-agents-router-inbox", join(dir, "router-inbox"), "--omp-agents-router-tasks", join(dir, "router-tasks.json")]);
 	});
 
 	test("a Bot designer's conversation also loads the designer extension, which reads the Bot extension's flags and no others", async () => {
@@ -268,6 +256,11 @@ describe("lastMessage", () => {
 		expect(lastMessage(write([bash(routineMessageText(sent("!ls")).slice(1))]))).toEqual(routine("!ls"));
 		expect(lastMessage(write([line("user", routineMessageText(command))]))).toEqual(routine("$ make test"));
 		expect(lastMessage(write([line("user", "Hello."), bash("ls")]))).toEqual({ at, from: "user", text: "Hello." });
+	});
+
+	test("another Bot's message previews under that Bot's name as one line", () => {
+		const path = write([line("user", botMessageText({ from: "triage" as BotId, name: "Triage", text: "Fix the flaky\nlogin test." }))]);
+		expect(lastMessage(path)).toEqual({ at: Date.parse("2026-05-02T09:30:00.000Z"), from: "bot-message", name: "Triage", text: "Fix the flaky login test." });
 	});
 
 	test("a file whose end is all tool output, or no file at all, has no last words", () => {

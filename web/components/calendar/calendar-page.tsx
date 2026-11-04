@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { putJson } from "../../api";
 import { type CalendarEntry, calendarEntries } from "../../calendar-model";
+import { eventLink, type NoticeLink } from "../../notice-model";
 import { dateOfDay, localDay } from "../../../src/shared/days";
 import { calendarEventsStore, localEventsStore, monthSpan, ticketsStore, useGoogleCalendars } from "../../reads";
 import { hashForBotRoutine, hashForOpenTodo, hashForTickets } from "../../routing";
@@ -56,18 +57,20 @@ function dotClass(entry: CalendarEntry): string {
 const isClosed = (entry: CalendarEntry): boolean =>
 	(entry.kind === "todo" && entry.done) || (entry.kind === "ticket" && (entry.statusType === "completed" || entry.statusType === "canceled"));
 
-/** Where the entry links; `null` for an event kept on this computer, which has no page of its own. */
-function entryHref(entry: CalendarEntry): string | null {
+/** Where the entry links; `null` for an event you kept on this computer, which has no page of its own. */
+function entryLink(entry: CalendarEntry): NoticeLink | null {
 	switch (entry.kind) {
 		case "routine":
 		case "routine-interval":
-			return hashForBotRoutine(entry.botId, { kind: "open", id: entry.routineId });
+			return { href: hashForBotRoutine(entry.botId, { kind: "open", id: entry.routineId }), external: false };
 		case "todo":
-			return hashForOpenTodo(entry.todoId, entry.categoryId);
+			return { href: hashForOpenTodo(entry.todoId, entry.categoryId), external: false };
 		case "ticket":
-			return hashForTickets(entry.identifier);
-		case "event":
-			return entry.event.source.kind === "google" ? entry.event.source.url : null;
+			return { href: hashForTickets(entry.identifier), external: false };
+		case "event": {
+			const { source } = entry.event;
+			return source.kind === "google" ? eventLink(null, source.url) : eventLink(source.sessionId, null);
+		}
 	}
 }
 
@@ -126,19 +129,18 @@ interface EntryLinkProps {
 	children: ReactNode;
 }
 
-/** An entry as a link to what it shows, a Google event in a new tab; an event kept on this computer links nowhere. */
+/** An entry as a link to what it shows, a Google event in a new tab and a reminder an agent added in its session; an event you kept on this computer links nowhere. */
 function EntryLink({ entry, className, style, children }: EntryLinkProps) {
-	const href = entryHref(entry);
-	if (href === null) {
+	const link = entryLink(entry);
+	if (link === null) {
 		return (
 			<div className={className} style={style}>
 				{children}
 			</div>
 		);
 	}
-	const external = entry.kind === "event";
 	return (
-		<a href={href} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined} className={className} style={style}>
+		<a href={link.href} target={link.external ? "_blank" : undefined} rel={link.external ? "noreferrer" : undefined} className={className} style={style}>
 			{children}
 		</a>
 	);

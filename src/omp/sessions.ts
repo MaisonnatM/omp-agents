@@ -24,7 +24,7 @@ export interface SavedSession {
 	continuationOf?: string;
 }
 
-/** The title a session's first prompt gives it: the user's as one line, a routine's name, none for the dashboard's. */
+/** The title a session's first prompt gives it: the user's or another Bot's as one line, a routine's name, none for the dashboard's. */
 function firstTitle(firstMessage: string): string | null {
 	// omp writes this placeholder when the prefix it scans holds no user text.
 	if (!firstMessage || firstMessage === "(no messages)") return null;
@@ -34,6 +34,8 @@ function firstTitle(firstMessage: string): string | null {
 			return oneLine(firstMessage);
 		case "routine":
 			return author.message.routine.name;
+		case "bot-message":
+			return oneLine(author.message.text);
 		case "dashboard":
 			return null;
 		default: {

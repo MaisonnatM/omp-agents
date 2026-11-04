@@ -43,14 +43,6 @@ A subagent's `.jsonl` file is changed line by line: a line holding a secret is w
 A subagent session whose lease `isSessionLeaseHeld` reports held or unknown is left for a later run, since its own process may still append to it.
 Files that hold a zero byte in their first 8 KB, such as screenshots, are skipped.
 
-## The request log
-
-The kit's `request-log.ts` stores each request's new messages in omp's blob store, named by their hash.
-When a record's messages blob holds a secret, the extension stores a redacted copy, points the record's `messages.edits` at it, marks the record `redacted: true`, and deletes the original blob.
-`rebuildRequests` in `replay/request-log-reader.ts` marks a rebuilt request `redacted` when its record is, or when the request it builds on was, and `bun request-log.ts <session.jsonl>` lists those as `secrets redacted` rather than as failures.
-Their hashes no longer match, so Replay from here has no original request to compare those turns against.
-Another session that recorded byte-identical messages shares the deleted blob and loses that request's rebuild.
-
 ## history.db
 
 An interactive omp session adds each prompt to `history.db`; `omp -p` and RPC sessions do not.
@@ -68,5 +60,4 @@ It then rebuilds `history_fts`, which keeps its own copy of every word, as `omp 
 - A file the agent wrote, such as the `.env` it saved the key to, is where the secret belongs.
 - A password shorter than 8 characters is replaced inside the pair the user wrote, not wherever else it shows up.
 - Files with a zero byte in their first 8 KB are skipped.
-- A redacted turn can no longer be replayed byte for byte, and a blob another session shared is gone for it too.
 - SQLite free pages and write-ahead log frames written before `secure_delete` was on can still hold old text until they are reused or the checkpoint truncates the log.

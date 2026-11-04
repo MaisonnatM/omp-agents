@@ -1,7 +1,7 @@
 // Tracks the /ship workflow (optional Linear ticket -> plan -> draft PR -> reviews -> live for review) per session.
 // The agent declares the stage it works on through the `ship_stage` tool. GitHub decides what a live PR
 // needs next (rebase, review comments, CI), so that part is polled, never declared.
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
@@ -74,8 +74,8 @@ const NEXT: Record<Stage, string> = {
 	implement: "Implement the plan and commit on the work's branch. Do not open a PR in this stage.",
 	draft_pr: "Create a draft with `gt submit --draft` for a Graphite repository, or push and run `gh pr create --draft` otherwise. Reference the issue, or put the plan in the body without one, as the ship skill's Draft PR step says.",
 	interface_review: `If the status says the ${REVIEWS.interface_review.label} is not needed because \`${REVIEWS.interface_review.pathsFile}\` lists no changed file, record ship_stage({stage: 'thermonuclear'}) and move on. Otherwise wait until the user approves the direction, then spawn \`task\` with \`agent: "interface-reviewer"\` on the PR, apply the findings in a fresh agent, push, then add \`${REVIEWS.interface_review.box}\` to the PR body.`,
-	thermonuclear: `If the status says the ${REVIEWS.thermonuclear.label} is not needed because \`${REVIEWS.thermonuclear.pathsFile}\` lists no changed file, skip the review. Otherwise wait until the user approves the direction, then run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${REVIEWS.thermonuclear.box}\` to the PR body. If the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
-	ready_gate: `Make sure the PR body has no unchecked \`${PROOF_BOX}\` box, then run \`gt submit --publish\` for a Graphite repository or \`gh pr ready <N>\` otherwise, without asking first: the command itself asks the user to approve.`,
+	thermonuclear: `If the status says the ${REVIEWS.thermonuclear.label} is not needed because \`${REVIEWS.thermonuclear.pathsFile}\` lists no changed file, skip the review. Otherwise wait until the user approves the direction, then run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${REVIEWS.thermonuclear.box}\` to the PR body. If the ${REVIEWS.interface_review.label} was needed and the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
+	ready_gate: `When the ${REVIEWS.interface_review.label} was needed, make sure the PR body has no unchecked \`${PROOF_BOX}\` box. Then run \`gt submit --publish\` for a Graphite repository or \`gh pr ready <N>\` otherwise, without asking first: the command itself asks the user to approve.`,
 	live: "Work the first need below. Stop when the forge reports merge-ready or while waiting for review. Never merge without an explicit request.",
 	merged: "Done.",
 };
@@ -291,7 +291,10 @@ function missingReview(reviews: Reviews, stage: Stage): ReviewStage | undefined 
 	return reviewsBefore(stage).find(review => reviews[review].needed && !reviews[review].done);
 }
 
-/** A reader returning the text of a paths file from the top of the checkout holding `dir`, or `undefined` when it has none. */
+/**
+ * A reader returning the text of a paths file from the top of the checkout holding `dir`, or `undefined` when it has none.
+ * A linked worktree without the file reads its main checkout's, so a paths file kept out of git, in `.git/info/exclude`, covers every worktree.
+ */
 function checkoutReader(dir: string): (pathsFile: string) => string | undefined {
 	let root: string | undefined;
 	for (let at = dir; ; at = dirname(at)) {
@@ -301,22 +304,39 @@ function checkoutReader(dir: string): (pathsFile: string) => string | undefined 
 		}
 		if (dirname(at) === at) break;
 	}
+	const roots = root === undefined ? [] : [root];
+	const main = root === undefined ? undefined : mainCheckoutOf(root);
+	if (main !== undefined) roots.push(main);
 	return pathsFile => {
-		if (root === undefined) return undefined;
-		const file = join(root, pathsFile);
-		return existsSync(file) ? readFileSync(file, "utf8") : undefined;
+		for (const at of roots) {
+			const file = join(at, pathsFile);
+			if (existsSync(file)) return readFileSync(file, "utf8");
+		}
+		return undefined;
 	};
 }
 
-/** Why a PR with this body may not go live, or `undefined` when it may: it needs the box of every review `reviews` calls for, and no unchecked proof box. */
+/** The main checkout of the linked worktree at `root`, read from its `.git` file's `gitdir: <main>/.git/worktrees/<name>`, or `undefined` for a main checkout. */
+function mainCheckoutOf(root: string): string | undefined {
+	const git = join(root, ".git");
+	if (!statSync(git).isFile()) return undefined;
+	const gitdir = /^gitdir: (.+)$/m.exec(readFileSync(git, "utf8"))?.[1]?.trim();
+	const at = gitdir?.lastIndexOf("/.git/worktrees/") ?? -1;
+	return gitdir !== undefined && at > 0 ? gitdir.slice(0, at) : undefined;
+}
+
+/**
+ * Why a PR with this body may not go live, or `undefined` when it may: it needs the box of every review `reviews` calls for,
+ * and no unchecked proof box while the interface review is needed, since only an interface change has a page to prove.
+ */
 export function publishBlocker(body: string, reviews: Reviews): string | undefined {
 	const missing = missingReview(reviews, "live");
 	if (missing) {
 		const { label, box } = REVIEWS[missing];
 		return `Blocked: the PR is not live until the ${label} stage is done. Run it, apply and push its fixes, then add \`${box}\` to the PR body.`;
 	}
-	if (body.split("\n").some(line => line.trimStart().startsWith(PROOF_BOX))) {
-		return `Blocked: the PR body has an unchecked \`${PROOF_BOX}\` box from the repository's PR template. Do what the box and the repository's instructions ask, then check it; delete the line only when it does not apply to this PR.`;
+	if (reviews.interface_review.needed && body.split("\n").some(line => line.trimStart().startsWith(PROOF_BOX))) {
+		return `Blocked: the PR body has an unchecked \`${PROOF_BOX}\` box from the repository's PR template, and a changed file matches \`${REVIEWS.interface_review.pathsFile}\`. Do what the box and the repository's instructions ask, then check it.`;
 	}
 	return undefined;
 }

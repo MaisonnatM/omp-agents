@@ -8,7 +8,6 @@
 import { BASE64, isDay, isNonEmpty, isObject, isSafeInteger, isTexts, oneOf, parseAll, type Parsed, str } from "../json";
 import { parseRoutineSpec, type RoutineChange } from "../routines";
 import { parseBotChange } from "../shared/bots";
-import { parseRouterTaskChange } from "../shared/router";
 import {
 	GOOGLE_CLIENT_ID,
 	type GoogleClientInput,
@@ -21,15 +20,6 @@ import {
 	slackRedirectError,
 } from "../shared/accounts";
 import { type McpServerAdd, type McpServerInput, REMOTE_TRANSPORTS } from "../shared/mcp-servers";
-import {
-	type DiscussionRequest,
-	type DiscussionTurn,
-	MAX_DISCUSSION_ANSWER,
-	MAX_DISCUSSION_QUESTION,
-	MAX_DISCUSSION_QUOTE,
-	MAX_DISCUSSION_SOURCE,
-	MAX_DISCUSSION_TURNS,
-} from "../shared/discussions";
 import { type CalendarShownInput, type EventRef, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar, parseEventWhen } from "../shared/calendar";
 import { MAX_MAIL_BODY, type MailDraft, type MailPerson, type MailReply, type MailSend, type MailTrash } from "../shared/gmail";
 import { parseImages, parseModel, parseNewSessionRequest, parseSkill, parseThinking } from "../shared/sessions";
@@ -98,7 +88,7 @@ function parseLiveView(value: unknown): Parsed<LiveView> {
 	return { ok: { kind: "live", instanceId, agentId } };
 }
 
-export function parseView(value: unknown): Parsed<View> {
+function parseView(value: unknown): Parsed<View> {
 	if (isObject(value) && value.kind === "past") {
 		return typeof value.sessionId === "string" ? { ok: { kind: "past", sessionId: value.sessionId } } : null;
 	}
@@ -230,13 +220,6 @@ function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest>
 			const { entryId } = value;
 			return view && typeof entryId === "string" && entryId ? { ok: { kind: "fork", view: view.ok, entryId } } : null;
 		}
-		case "replay": {
-			const view = parseView(value.view);
-			const model = value.model === null ? { ok: null } : parseModel(value.model);
-			const thinking = parseThinking(value.thinking);
-			const { token, prompt } = value;
-			return view && isNonEmpty(token) && model && thinking && (prompt === null || typeof prompt === "string") ? { ok: { kind: "replay", view: view.ok, token, prompt, model: model.ok, thinking: thinking.ok } } : null;
-		}
 		case "resume": {
 			const { sessionId } = value;
 			return typeof sessionId === "string" && sessionId ? { ok: { kind: "resume", sessionId } } : null;
@@ -272,21 +255,6 @@ function parseViews(value: unknown): View[] | null {
 const withinLength = (value: unknown, max: number): value is string => isNonEmpty(value) && value.length <= max;
 
 const isCaptureId = (value: unknown): value is string => withinLength(value, MAX_CAPTURE_ID);
-
-function parseDiscussionTurn(value: unknown): DiscussionTurn | null {
-	if (!isObject(value)) return null;
-	const { question, answer } = value;
-	return withinLength(question, MAX_DISCUSSION_QUESTION) && withinLength(answer, MAX_DISCUSSION_ANSWER) ? { question, answer } : null;
-}
-
-/** A question about a passage: every text nonempty and within its length, and at most {@link MAX_DISCUSSION_TURNS} earlier questions. */
-export function parseDiscussionRequest(value: unknown): Parsed<DiscussionRequest> {
-	if (!isObject(value)) return null;
-	const { source, quote, question } = value;
-	const turns = Array.isArray(value.turns) && value.turns.length <= MAX_DISCUSSION_TURNS ? parseAll(value.turns, parseDiscussionTurn) : null;
-	if (!turns || !withinLength(source, MAX_DISCUSSION_SOURCE) || !withinLength(quote, MAX_DISCUSSION_QUOTE) || !withinLength(question, MAX_DISCUSSION_QUESTION)) return null;
-	return { ok: { source, quote, turns, question } };
-}
 
 /** One activity event, {@link isActivityEvent}'s fields only. */
 const parseActivityEvent = (value: unknown): ActivityEvent | null => (isActivityEvent(value) ? { kind: value.kind, key: value.key, via: value.via, at: value.at } : null);
@@ -403,10 +371,6 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 		const change = parseBotChange(value.change);
 		return change && { ok: { t: "bot", change } };
 	},
-	"router-task"(value) {
-		const change = parseRouterTaskChange(value.change);
-		return change && { ok: { t: "router-task", change } };
-	},
 	schedule(value) {
 		const change = parseScheduledChange(value.change);
 		return change && { ok: { t: "schedule", change: change.ok } };
@@ -424,11 +388,6 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 		return change && { ok: { t: "review-draft", change: change.ok } };
 	},
 	notice: ({ ids, op }) => (Array.isArray(ids) && ids.length > 0 && ids.every(isNonEmpty) && isNoticeOp(op) ? { ok: { t: "notice", ids, op } } : null),
-	discuss(value) {
-		const request = parseDiscussionRequest(value.request);
-		return isCounter(value.id) && request ? { ok: { t: "discuss", id: value.id, request: request.ok } } : null;
-	},
-	"discuss-stop": ({ id }) => (isCounter(id) ? { ok: { t: "discuss-stop", id } } : null),
 	"dictation-start": ({ captureId, cwd }) => (isCaptureId(captureId) && isNonEmpty(cwd) ? { ok: { t: "dictation-start", captureId, cwd } } : null),
 	"dictation-stop": ({ captureId }) => (isCaptureId(captureId) ? { ok: { t: "dictation-stop", captureId } } : null),
 	"dictation-discard": ({ captureId }) => (isCaptureId(captureId) ? { ok: { t: "dictation-discard", captureId } } : null),

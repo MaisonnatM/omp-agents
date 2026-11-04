@@ -1,14 +1,15 @@
-import { Activity, CircleAlert, CirclePause, History, ListRestart, Loader, Pin, Plus } from "lucide-react";
-import { useState } from "react";
+import { Activity, CircleAlert, CirclePause, History, ListRestart, Loader, Pin, Plus, UserRound } from "lucide-react";
+import { useContext, useState } from "react";
 import type { View } from "../../src/shared/sessions";
 import { SidebarContent, SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { sameView } from "../routing";
 import type { SidebarSessions } from "../sessions";
+import { sameDir } from "../labels";
 import { shortcutLabels } from "../shortcuts";
 import { useStoredKeys } from "../stored-state";
 import { ShortcutChip } from "./kbd";
-import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
+import { PersonalContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { ScheduledGroup } from "./scheduled";
 import { HostRow, PastRow } from "./session-row";
 import { SidebarSearch } from "./sidebar-search";
@@ -29,8 +30,8 @@ interface SessionListProps {
 	open: View[];
 	/** All workspaces are listed, so a titled row names its workspace. */
 	showWorkspace: boolean;
-	/** The new-session draft is open. */
-	newSessionOpen: boolean;
+	/** The open New session draft's directory; `null` while none is open. */
+	newSessionOpen: string | null;
 	/** The scheduled send whose page is open, highlighted in its group; `null` for none. */
 	scheduledOpen: string | null;
 	/** The New session button's label, naming the selected workspace. */
@@ -40,6 +41,8 @@ interface SessionListProps {
 /** The Sessions tab: New session, the search field, then the scheduled sends, and the pinned, idle, running, interrupted, and past groups. */
 export function SessionList({ lists, query, onQuery, onTogglePin, open, showWorkspace, newSessionOpen, scheduledOpen, newSessionLabel }: SessionListProps) {
 	const { start, dismissStart, openNewSession } = useDashboardActions();
+	const personal = useContext(PersonalContext);
+	const personalOpen = newSessionOpen !== null && sameDir(newSessionOpen, personal);
 	const { connected, starts: { resumeAll } } = useDashboardStatus();
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
 	const [pastShown, setPastShown] = useState(PAST_PAGE);
@@ -62,12 +65,27 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 				<SidebarMenu aria-label="Start a session">
 					<SidebarMenuItem>
 						<Tooltip content={newSessionLabel} shortcut={shortcutLabels("newSession")} side="right">
-							<SidebarMenuButton icon={Plus} isActive={newSessionOpen} aria-current={newSessionOpen ? "page" : undefined} aria-label={newSessionLabel} onClick={openNewSession}>
+							<SidebarMenuButton icon={Plus} isActive={newSessionOpen !== null && !personalOpen} aria-current={newSessionOpen !== null && !personalOpen ? "page" : undefined} aria-label={newSessionLabel} onClick={() => openNewSession()}>
 								{newSessionLabel}
 								<ShortcutChip id="newSession" className="ml-auto" />
 							</SidebarMenuButton>
 						</Tooltip>
 					</SidebarMenuItem>
+					{personal && (
+						<SidebarMenuItem>
+							<Tooltip content="Start a personal session, for life outside code" shortcut={shortcutLabels("personalSession")} side="right">
+								<SidebarMenuButton
+									icon={UserRound}
+									isActive={personalOpen}
+									aria-current={personalOpen ? "page" : undefined}
+									onClick={() => openNewSession(personal.cwdDisplay)}
+								>
+									Personal
+									<ShortcutChip id="personalSession" className="ml-auto" />
+								</SidebarMenuButton>
+							</Tooltip>
+						</SidebarMenuItem>
+					)}
 				</SidebarMenu>
 				<SidebarSearch label="Filter the sidebar's sessions" placeholder="Search sessions" query={query} onQuery={onQuery} shortcut="sessionSearch" />
 			</SidebarGroup>

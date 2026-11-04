@@ -5,7 +5,6 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { sessionContext, sessionManager } from "../../src/omp/modules";
 import { placeholder, Redactor } from "./agent/extensions/redact-secrets/redact";
-import { canonicalJson, rebuildRequests, RECORD_TYPE, sha256 } from "./agent/extensions/replay/request-log-reader";
 
 // The extension imports omp's types, which the type check cannot resolve, so it is loaded by path.
 const { default: extension, dataDir } = await import(join(import.meta.dir, "agent/extensions/redact-secrets.ts"));
@@ -86,11 +85,26 @@ function subagentFile(): string {
 	].join("\n");
 }
 
-/** A real omp session with the prompt, a reply that uses the secrets, a request-log record, a sidecar, and history rows. */
+type FileEntry = Parameters<typeof sessionContext.buildSessionContext>[0][number];
+/** The part of omp's `SessionManager` these tests drive; `src/omp/modules.ts` types only what the app calls. */
+interface TestSessionManager {
+	appendMessage(message: object): void;
+	flush(): Promise<void>;
+	getSessionFile(): string | undefined;
+	getSessionId(): string;
+	getEntries(): FileEntry[];
+	close(): Promise<void>;
+}
+const SessionManager = sessionManager.SessionManager as unknown as {
+	create(cwd: string, sessionDir: string): TestSessionManager;
+	open(path: string): Promise<TestSessionManager>;
+};
+
+/** A real omp session with the prompt, a reply that uses the secrets, a sidecar, and history rows. */
 async function session() {
 	const root = mkdtempSync(join(tmpdir(), "omp-redact-"));
 	roots.push(root);
-	const manager = sessionManager.SessionManager.create(root, join(root, "sessions"));
+	const manager = SessionManager.create(root, join(root, "sessions"));
 	const user = { role: "user", content: PROMPT, timestamp: 1 };
 	manager.appendMessage(user);
 	const assistant = {
@@ -118,22 +132,6 @@ async function session() {
 		timestamp: 4,
 	};
 	manager.appendMessage(reply);
-	const edits = [{ add: { role: "user", content: PROMPT } }];
-	const body = { model: "claude-test", messages: [{ role: "user", content: PROMPT }] };
-	const blob = (value: unknown) => manager.putBlobSync(Buffer.from(JSON.stringify(value))).ref;
-	const oldEdits = blob(edits);
-	manager.appendCustomEntry(RECORD_TYPE, {
-		requestHash: sha256(canonicalJson(body)),
-		provider: "anthropic",
-		api: "anthropic-messages",
-		model: "claude-test",
-		thinkingLevel: "low",
-		leafId: null,
-		systemPromptHash: null,
-		toolsHash: null,
-		paramsHash: blob({ model: "claude-test" }),
-		messages: { key: "messages", base: null, edits: oldEdits },
-	});
 	await manager.flush();
 	const file = manager.getSessionFile()!;
 	const sidecar = file.slice(0, -".jsonl".length);
@@ -152,14 +150,14 @@ async function session() {
 	});
 	const ctx = { sessionManager: manager };
 	const fire = (event: object) => handlers.get(event === SHUTDOWN ? "session_shutdown" : "agent_end")!(event, ctx);
-	return { root, manager, file, sidecar, oldEdits, user, assistant, fire, warnings };
+	return { root, manager, file, sidecar, user, assistant, fire, warnings };
 }
 
 const SHUTDOWN = { type: "session_shutdown" };
 
 describe("redact-secrets", () => {
 	test("a turn that goes on keeps the secrets; the turn's end replaces them everywhere omp keeps the session", async () => {
-		const { manager, file, sidecar, oldEdits, user, assistant, fire, warnings } = await session();
+		const { manager, file, sidecar, user, assistant, fire, warnings } = await session();
 		const ids = manager.getEntries().map(entry => [entry.id, entry.parentId]);
 
 		await fire({ type: "agent_end", messages: [], willContinue: true });
@@ -184,7 +182,7 @@ describe("redact-secrets", () => {
 		expect(thinking.find(line => line.includes("Done, nothing left."))).toContain("signature-kept");
 
 		// The file resumes: every line parses, the tree is intact, and the context rebuilds from it.
-		const reopened = await sessionManager.SessionManager.open(file);
+		const reopened = await SessionManager.open(file);
 		const entries = reopened.getEntries();
 		expect(entries.map(entry => [entry.id, entry.parentId])).toEqual(ids);
 		const byId = new Map(entries.map(entry => [entry.id, entry]));
@@ -192,14 +190,6 @@ describe("redact-secrets", () => {
 		expect(context.messages).toHaveLength(4);
 		expect(JSON.stringify(context.messages)).toContain(placeholder("database password"));
 		await reopened.close();
-
-		// The request log points at a redacted copy of its messages, and the original blob is gone.
-		const blobsDir = join(agentDir, "blobs");
-		expect(existsSync(join(blobsDir, oldEdits.slice("blob:sha256:".length)))).toBe(false);
-		const [request] = rebuildRequests(text, hash => readFileSync(join(blobsDir, hash), "utf8"));
-		expect(request?.redacted).toBe(true);
-		expect(leaked(JSON.stringify(request?.body))).toEqual([]);
-		expect(JSON.stringify(request?.body)).toContain(placeholder("stripe live secret key"));
 
 		// The sidecar: tool logs, a subagent's output and session file, and the subagent's own folder.
 		for (const path of filesUnder(sidecar)) expect({ path, leaked: leaked(readFileSync(path)) }).toEqual({ path, leaked: [] });

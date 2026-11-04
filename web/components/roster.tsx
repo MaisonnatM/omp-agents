@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { agentOn } from "../../src/shared/moves";
 import { activityControl } from "../activity";
 import { yourMoveCount } from "../pull-requests-model";
-import { workspaceName } from "../labels";
+import { sameDir, workspaceName } from "../labels";
 import { pullRequestsStore, ticketsStore } from "../reads";
 import { hashForTickets, type NotesListView, type SettingsRoute, type SidebarPanel, type SidebarTab, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
@@ -74,7 +74,7 @@ function SidebarWorkspacePicker({ workspaces, current, onPick }: SidebarWorkspac
 					{
 						key: "workspaces",
 						heading: "Workspaces",
-						items: workspaceItems(workspaces, current, personal, workspace => pick(workspace.cwd)()),
+						items: workspaceItems(workspaces.filter(workspace => !sameDir(workspace.cwd, personal)), current, personal, workspace => pick(workspace.cwd)()),
 					},
 				],
 			}}
@@ -143,8 +143,8 @@ interface RosterProps {
 	onTogglePin: (sessionId: string) => void;
 	/** Views on screen, highlighted in the list. */
 	open: View[];
-	/** The new-session draft is open. */
-	newSessionOpen: boolean;
+	/** The open New session draft's directory; `null` while none is open. */
+	newSessionOpen: string | null;
 	/** The scheduled send whose page is open, `null` for none. */
 	scheduledOpen: string | null;
 	/** Every Bot's row, whatever the workspace, the most recent conversation first; `null` until the server sends the Bots. */

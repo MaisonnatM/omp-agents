@@ -177,10 +177,16 @@ export interface SettingsError {
 /** What a file feeds into omp: instructions, settings, or something it can run. */
 export type OmpFileKind = "context" | "system-prompt" | "append-system" | "settings" | "agent" | "command" | "rule" | "skill" | "hook";
 
+/** A Markdown file's frontmatter: each top-level key with its value as text, a nested one as YAML; the Markdown after it starts at `end` in the text. */
+export interface Frontmatter {
+	fields: { key: string; value: string }[];
+	end: number;
+}
+
 /** A file preview without an editing contract. */
 export interface ReadOnlyFile {
 	pathDisplay: string;
-	body: { state: "read"; size: number; modifiedAt: number; text: string } | { state: "missing" } | { state: "unreadable"; error: string };
+	body: { state: "read"; size: number; modifiedAt: number; text: string; frontmatter?: Frontmatter } | { state: "missing" } | { state: "unreadable"; error: string };
 }
 
 /** A file omp reads, as found on disk. */
@@ -192,7 +198,10 @@ export interface OmpFile {
 	pathDisplay: string;
 	packaged?: string;
 	/** `hash` is the SHA-256 of `text`; a save must name it, so a file changed on disk since is not overwritten. */
-	body: { state: "read"; size: number; modifiedAt: number; text: string; hash: string } | { state: "missing" } | { state: "unreadable"; error: string };
+	body:
+		| { state: "read"; size: number; modifiedAt: number; text: string; hash: string; frontmatter?: Frontmatter }
+		| { state: "missing" }
+		| { state: "unreadable"; error: string };
 }
 
 /**

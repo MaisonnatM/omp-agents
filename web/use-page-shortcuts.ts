@@ -1,5 +1,6 @@
 import { type Dispatch, type SetStateAction, useMemo, useRef } from "react";
 import type { View } from "../src/shared/sessions";
+import type { Workspace } from "../src/shared/workspaces";
 import type { PaletteEvent, PaletteState } from "./command-palette";
 import { adjacentSession, type Layout, type Page, type SettingsRoute, type SidebarPanel, type SidebarTab } from "./routing";
 import { type ShortcutHandler, type ShortcutHandlers, type ShortcutId, useShortcuts } from "./shortcuts";
@@ -33,7 +34,9 @@ export interface PageShortcutInput {
 	dispatchPalette: Dispatch<PaletteEvent>;
 	setShortcutsOpen: Dispatch<SetStateAction<boolean>>;
 	setNewTicket: Dispatch<SetStateAction<string | null>>;
-	openNewSession: () => void;
+	openNewSession: (cwd?: string) => void;
+	/** Where personal sessions run; `null` until the server names it. */
+	personal: Workspace | null;
 	open: (view: View, mode: "replace") => void;
 	show: (layout: Layout) => void;
 	navigate: (page: Page) => void;
@@ -90,6 +93,11 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			help: () => latest.current.setShortcutsOpen(open => !open),
 			switcher: () => latest.current.dispatchPalette(latest.current.palette ? { type: "close" } : { type: "open" }),
 			newSession: () => latest.current.openNewSession(),
+			personalSession: () => {
+				const { personal } = latest.current;
+				if (!personal) return false;
+				latest.current.openNewSession(personal.cwdDisplay);
+			},
 			getStarted: () => latest.current.navigate({ kind: "get-started" }),
 			previousSession: () => step(-1),
 			nextSession: () => step(1),

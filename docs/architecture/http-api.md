@@ -5,7 +5,7 @@ This file holds the settings, analytics, and activity endpoints and the rules ev
 **Settings** reads `GET /api/settings`, or `GET /api/settings?cwd=<directory>` for a workspace.
 The server loads omp's settings with omp's own read-only loader (`Settings.loadReadOnly` in `pi-coding-agent/src/config/settings.ts`), the same way a session that starts in that directory would, and applies omp's rule for which roles use the `default` chain (`expandDefaultRetryFallbackChains`).
 It finds the files through omp's capability discovery (`pi-coding-agent/src/discovery`), agent discovery (`pi-coding-agent/src/task/discovery.ts`), and `findConfigFile` for `APPEND_SYSTEM.md`, and then reads each file from disk.
-Each file carries the SHA-256 of its text.
+Each file carries the SHA-256 of its text, and a Markdown file its parsed frontmatter, in the shape `GET /api/file` gives it.
 `workflows` lists, by name, the skills among those files whose frontmatter, as omp's discovery parsed it, names `workflow` in `metadata.tags`, a comma- or space-separated string (`workflowsOf` in `src/omp/workflows.ts`).
 The tag sits under `metadata` because omp's plugin loader (`validateAgentSkillFrontmatter` in `pi-coding-agent/src/discovery/agent-plugin-format.ts`) refuses a top-level key other than `name`, `description`, `license`, `allowed-tools`, `metadata`, and `compatibility`, and a `metadata` value that is not a string.
 Each workflow carries the skill's name as omp resolves it, its `name` field else its directory, and two paths into `files`: `skill`, and `command`, the slash command omp names the same, the project's before the user's, or `null`.
@@ -43,14 +43,18 @@ It includes each feature's uses, every feature's last use over all stored rows, 
 **Storage** reads `GET /api/storage`, or `?cwd=<known-workspace>` only to report workspace overrides.
 `StorageUsage` in `src/shared/storage.ts` includes allocated folder sizes, global cleanup rules as `AgentSettingRow`s with native defaults and exact user values for conflict checks, workspace override ids separately, and the last native background compression log.
 The three measured folders come from omp's directory exports; the archive-size card is absent because omp's archive-directory helper is private.
-`PUT /api/storage/cleanup` takes `{ action: "preview" }` for all five native phases, or `{ action: "preview", step: "sandboxes" }` for the independently measured sandbox plan.
-Apply takes `{ action: "apply", step }` for exactly one of `stale`, `blobs`, `archive`, `compress`, and `wal`.
-Sandbox apply takes `{ action: "apply", step: "sandboxes", sandboxes: string[] }`, at most 200 paths per request; the page sends one at a time.
+`PUT /api/storage/cleanup` takes `{ action: "preview", source }`: `gc` answers `{ gc }` for all five native phases, `sandboxes` answers `{ sandboxes }`, the independently measured sandbox plan, and `caches` answers `{ caches }`, each installed tool's cache path and allocated size.
+Apply takes `{ action: "apply", step }` for exactly one of `stale`, `blobs`, `archive`, `compress`, `wal`, and `packageCaches`.
+Sandbox apply takes `{ action: "apply", step: "sandboxes" | "changedSandboxes", sandboxes: string[] }`, at most 200 paths per request; the page sends one at a time.
+`changedSandboxes` also removes a sandbox kept only because its checkout holds changes; a live owner, a lock, or a checkout in use still keeps it.
+`src/server/package-caches.ts` runs `uv cache prune --force`, `pnpm store prune`, and `bun pm cache rm` for each tool on `PATH`, and answers each cache's size before and after with its error.
+`--force` skips uv's cache lock, which every running `uvx` process holds for its whole life; before the prune, the uv entries any process has open, per `lsof`, are hard-linked into `.uv-cache-keep` beside the cache and moved back afterwards.
+When `lsof` answers nothing or fails, uv's cache is left unpruned with an error rather than pruned blind.
 `src/omp/gc.ts` runs `omp gc --json` from the home directory, with all explicit phase flags for preview and one phase plus `--apply` for apply.
 Native gc owns its lock, thresholds, references, and keep rules.
 An exit with phase errors still returns its parsed report, while a held native lock or sandbox guard answers 409 with a busy error.
 `src/server/storage-routes.ts` disables the idle timeout for long storage requests and never kills a running cleanup when the page stops requesting steps.
-The page runs stale, blobs, archive, compress, and wal in that order, then sandboxes, and stops after a failed step or a request to stop.
+The page runs stale, blobs, archive, compress, and wal in that order, then sandboxes, then package caches, and stops after a failed step or a request to stop.
 Rule changes reuse `PUT /api/settings/agent` with the user value the row showed as `expected`; no separate settings writer exists.
 Storage uses omp settings' `SettingRow`: toggles save on change, whole-number fields on Enter or blur, and Reset removes the user's override.
 After a conflict, the row reloads the current value and asks the user to review it before another change.

@@ -174,21 +174,17 @@ const GROUP_LABELS: Record<OmpMemoryFileGroup, string> = {
 	decisions: "Decisions",
 };
 
-/** A file backend's files by group, and the one picked, the first by default, viewed and edited in place. */
+/** A file backend's files in a folder per group, and the one picked, the first by default, viewed and edited in place. */
 function MemoryFiles({ files, cwd, context, empty }: { files: OmpMemoryFile[]; cwd: string; context: MemoryContext; empty: string }) {
 	const [selected, setSelected] = useState<string | null>(null);
 	const open = files.find(file => file.path === selected) ?? files[0];
 	if (!open) {
 		return <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">{empty}</p>;
 	}
-	const groupsOf = (query: string): [string, OmpMemoryFile[]][] => {
-		const matches = everyWord(query);
-		return [...Map.groupBy(files.filter(file => matches(file.name)), file => file.group)].map(([group, inGroup]) => [GROUP_LABELS[group], inGroup]);
-	};
 	return (
 		<div className="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
-			<FileRail label="omp memory files" filtered={files.length > 8} groupsOf={groupsOf} open={open} onSelect={setSelected}>
-				{file => <span className="truncate">{file.name}</span>}
+			<FileRail label="omp memory files" filtered={files.length > 8} files={files} pathOf={file => `${GROUP_LABELS[file.group]}/${file.name}`} open={open} onSelect={setSelected}>
+				{(_file, name) => <span className="truncate">{name}</span>}
 			</FileRail>
 			<FileView key={open.path} file={open} saver={{ save: edit => putJson<OmpMemory>(ompMemoryUrl("/file", cwd), edit), write: context.memory.write, reload: context.memory.reload }} />
 		</div>

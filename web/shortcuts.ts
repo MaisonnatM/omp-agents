@@ -15,6 +15,7 @@ export type ShortcutId =
 	| "dictate"
 	| "switcher"
 	| "newSession"
+	| "personalSession"
 	| "sessionSearch"
 	| "endSession"
 	| "openPullRequest"
@@ -178,6 +179,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 			{ chord: { key: "s" }, scope: "outside-fields" },
 		],
 	},
+	{ id: "personalSession", category: "sessions", label: "Start a personal session", command: "Personal session", keys: [{ chord: { key: "p", mod: true, shift: true }, scope: "anywhere" }] },
 	{ id: "sessionSearch", category: "sessions", label: "Search the sidebar's sessions", keys: [{ chord: { key: "f", mod: true }, scope: "anywhere" }] },
 	{ id: "endSession", category: "sessions", label: "End the focused session", keys: [{ chord: END_SESSION, scope: "anywhere" }] },
 	{ id: "openPullRequest", category: "sessions", label: "Review, push, and open a pull request for the focused session's branch", command: "Open pull request", keys: [] },

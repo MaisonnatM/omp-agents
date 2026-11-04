@@ -6,13 +6,13 @@
 // Changes go to the dashboard's todo inbox, one file each, which the dashboard server applies and deletes, so it
 // stays the only writer of todos.json and a todo filed while it is down waits for it.
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import { CONFIG_DIR, leave, readJson, reply } from "./inbox/client";
 import { type Section, sectionFor } from "./todos/sections";
 
-const CONFIG_DIR = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "omp-agents");
 const TODOS_FILE = join(CONFIG_DIR, "todos.json");
 const INBOX_DIR = join(CONFIG_DIR, "todo-inbox");
 
@@ -44,11 +44,7 @@ function todosOf(list: List, sessionId: string): { linked: Todo | undefined; add
 }
 
 function readList(): List {
-	try {
-		return JSON.parse(readFileSync(TODOS_FILE, "utf8")) as List;
-	} catch {
-		return {};
-	}
+	return (readJson(TODOS_FILE) as List | null) ?? {};
 }
 
 /** How a todo names itself to an agent: its id, then its Workspace's folder, section, and due day when it has them. */
@@ -73,15 +69,6 @@ function listText(list: List): string {
 	return (lines.length > 0 ? lines.join("\n") : "The user's todo list has nothing left to do.") + pending;
 }
 
-/** Leaves `change` for the dashboard: written under a name it skips, then renamed, so it never reads half a file. */
-function leave(change: Record<string, unknown>): void {
-	mkdirSync(INBOX_DIR, { recursive: true });
-	const name = `${Date.now()}-${randomUUID()}`;
-	const temp = join(INBOX_DIR, `${name}.tmp`);
-	writeFileSync(temp, JSON.stringify(change));
-	renameSync(temp, join(INBOX_DIR, `${name}.json`));
-}
-
 /** Top-level todo or todo under one `id`, from the list or none: a change to an id the list lacks would apply to nothing. */
 function findTodo(list: List, id: string): { todo: Leaf; topLevel: boolean } | undefined {
 	for (const todo of list.todos ?? []) {
@@ -102,8 +89,6 @@ function workspaceNamed(value: string, cwd: string): { workspace: string | null 
 	const path = resolve(cwd, named === "~" || named.startsWith("~/") ? homedir() + named.slice(1) : named);
 	return statSync(path, { throwIfNoEntry: false })?.isDirectory() ? { workspace: path } : { error: `Not a directory: ${path}` };
 }
-
-const reply = (text: string, isError = false) => ({ content: [{ type: "text" as const, text }], isError });
 
 export default function todos(pi: ExtensionAPI) {
 	const z = pi.zod;
@@ -160,7 +145,7 @@ export default function todos(pi: ExtensionAPI) {
 					const same = todosOf(list, sessionId).added.find(todo => todo.text === title);
 					if (same) return reply(`This session already added it (id ${same.id}).`);
 					const todoId = randomUUID();
-					leave({
+					leave(INBOX_DIR, {
 						op: "add",
 						id: todoId,
 						parentId: null,
@@ -176,7 +161,7 @@ export default function todos(pi: ExtensionAPI) {
 				}
 				case "check": {
 					if (!id) return reply("check needs the todo's id.", true);
-					leave({ op: "toggle", id, doneAt: new Date().toISOString() });
+					leave(INBOX_DIR, { op: "toggle", id, doneAt: new Date().toISOString() });
 					return reply(`Checked todo ${id}.`);
 				}
 				case "edit": {
@@ -201,18 +186,18 @@ export default function todos(pi: ExtensionAPI) {
 						if ("error" in resolved) return reply(resolved.error, true);
 						named = resolved;
 					}
-					if (title) leave({ op: "edit", id, text: title });
-					if (notes !== undefined) leave({ op: "edit-body", id, body: notes });
-					if (due !== undefined) leave({ op: "set-due", id, due: due || null });
-					if (categoryId !== undefined) leave({ op: "categorize", id, categoryId });
-					if (named) leave({ op: "set-workspace", id, workspace: named.workspace });
+					if (title) leave(INBOX_DIR, { op: "edit", id, text: title });
+					if (notes !== undefined) leave(INBOX_DIR, { op: "edit-body", id, body: notes });
+					if (due !== undefined) leave(INBOX_DIR, { op: "set-due", id, due: due || null });
+					if (categoryId !== undefined) leave(INBOX_DIR, { op: "categorize", id, categoryId });
+					if (named) leave(INBOX_DIR, { op: "set-workspace", id, workspace: named.workspace });
 					return reply(`Edited todo ${id}.`);
 				}
 				case "delete": {
 					if (!id) return reply("delete needs the todo's id.", true);
 					const found = findTodo(readList(), id);
 					if (!found) return reply(`No todo with id ${id} in the list.`, true);
-					leave({ op: "remove", id });
+					leave(INBOX_DIR, { op: "remove", id });
 					return reply(`Deleted todo ${id}: ${found.todo.text}`);
 				}
 			}

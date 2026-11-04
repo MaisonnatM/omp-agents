@@ -1,6 +1,6 @@
 /** Native-order cleanup presentation and the sequential run that can stop only between operations. */
 import { errorText } from "../src/json";
-import { CLEANUP_STEPS, type CleanupRequest, type CleanupStep, type CleanupStepResult, type GcAnswer, type GcPhase, type SandboxPlan, type SandboxResult } from "../src/shared/storage";
+import { CACHE_STEP, CLEANUP_STEPS, isSandboxStep, PACKAGE_TOOLS, type CachePlan, type CacheResult, type CleanupRequest, type CleanupStep, type CleanupStepResult, type GcAnswer, type GcPhase, type PreviewSource, type Previews, type SandboxKeepReason, type SandboxPlan, type SandboxResult, type SandboxStep } from "../src/shared/storage";
 import type { SystemLoad } from "../src/shared/system";
 import { getJson, putJson } from "./api";
 import { formatBytes } from "./labels";
@@ -27,8 +27,9 @@ export interface CleanupRun {
 }
 
 type GcReports = { [P in GcPhase]: NonNullable<GcAnswer[P]> };
-type PreviewReports = GcReports & { sandboxes: SandboxPlan[] };
-type ResultReports = GcReports & { sandboxes: { results: SandboxResult[]; total: number } };
+type SandboxResults = { results: SandboxResult[]; total: number };
+type PreviewReports = GcReports & Record<SandboxStep, SandboxPlan[]> & Record<typeof CACHE_STEP, CachePlan[]>;
+type ResultReports = GcReports & Record<SandboxStep, SandboxResults> & Record<typeof CACHE_STEP, CacheResult[]>;
 type Preview = Omit<CleanupRow, "step" | "label" | "unit">;
 type Phase<P extends CleanupStep> = {
 	label: string;
@@ -49,6 +50,60 @@ function deletionResult(report: GcReports["blobs"]): CleanupResult {
 		errors: report.errors,
 	};
 }
+/** The size of plans whose bytes each count files shared elsewhere: the most removing them all can free. */
+function upperBound(plans: readonly { bytes: number | null }[] | undefined): Pick<Preview, "bytes" | "size"> {
+	if (plans === undefined) return { bytes: null, size: "" };
+	if (!plans.every(plan => plan.bytes !== null)) return { bytes: null, size: "Size unavailable" };
+	const total = plans.reduce((sum, plan) => sum + (plan.bytes ?? 0), 0);
+	return { bytes: null, size: total === 0 ? formatBytes(0) : `Up to ${formatBytes(total)}` };
+}
+
+/** The kept reason of the sandboxes each sandbox step removes: none for clean ones, `changed` for ones you choose to discard.
+ * Their sizes are upper bounds: `du` counts again the files a sandbox shares with its source checkout or a package cache through APFS clones. */
+const SANDBOX_TARGET: Record<SandboxStep, SandboxKeepReason | null> = { sandboxes: null, changedSandboxes: "changed" };
+const TARGETED: ReadonlySet<SandboxKeepReason | null> = new Set(Object.values(SANDBOX_TARGET));
+export function sandboxTargets(step: SandboxStep, plans: readonly SandboxPlan[]): SandboxPlan[] {
+	return plans.filter(plan => plan.kept === SANDBOX_TARGET[step]);
+}
+/** The sandboxes no cleanup row offers: a live owner, a lock, or something unreadable keeps them. */
+export function keptSandboxes(plans: readonly SandboxPlan[]): SandboxPlan[] {
+	return plans.filter(plan => !TARGETED.has(plan.kept));
+}
+
+function sandboxPhase(step: SandboxStep, label: string, detail: string): Phase<SandboxStep> {
+	return {
+		label, unit: ["sandbox", "sandboxes"],
+		preview: plans => {
+			const targets = plans && sandboxTargets(step, plans);
+			return { count: targets?.length ?? 0, ...upperBound(targets), detail, errors: [], available: plans !== undefined };
+		},
+		result: ({ results, total }) => ({
+			text: `${results.filter(result => result.kept === null).length} of ${total} ${total === 1 ? "sandbox" : "sandboxes"} removed`,
+			errors: results.filter(result => result.kept !== null).map(result => `${result.path}: ${result.detail ?? "Kept after rechecking."}`),
+		}),
+	};
+}
+
+const and = new Intl.ListFormat("en", { type: "conjunction" });
+const or = new Intl.ListFormat("en", { type: "disjunction" });
+/** A cache's size is the most its prune can free: projects' environments share some of its files through clones or hard links. */
+const cachePhase: Phase<typeof CACHE_STEP> = {
+	label: "Package caches", unit: ["cache", "caches"],
+	preview: plans => ({
+		count: plans?.length ?? 0, ...upperBound(plans),
+		detail: plans?.length === 0 ? `No ${or.format(PACKAGE_TOOLS)} found.`
+			: `${plans ? `Caches of ${and.format(plans.map(plan => plan.tool))}. ` : ""}Removes packages no project needs, and keeps what running tools use.`,
+		errors: [], available: plans !== undefined,
+	}),
+	result: results => {
+		const pruned = results.filter(result => result.error === null);
+		const freed = pruned.reduce((sum, result) => sum + (result.bytes !== null && result.after !== null ? Math.max(0, result.bytes - result.after) : 0), 0);
+		return {
+			text: `${pruned.length} of ${results.length} ${results.length === 1 ? "cache" : "caches"} pruned · ${formatBytes(freed)} smaller`,
+			errors: results.flatMap(result => result.error === null ? [] : [`${result.tool}: ${result.error}`]),
+		};
+	},
+};
 
 const PHASES: { [P in CleanupStep]: Phase<P> } = {
 	stale: {
@@ -100,35 +155,35 @@ const PHASES: { [P in CleanupStep]: Phase<P> } = {
 			return { text: `${checkpointed} database${checkpointed === 1 ? "" : "s"} checkpointed${busy ? ` · ${busy} busy` : ""}`, errors: [] };
 		},
 	},
-	sandboxes: {
-		label: "Sandboxes of ended tasks", unit: ["sandbox", "sandboxes"],
-		preview: plans => {
-			const removable = plans?.filter(plan => plan.kept === null);
-			const bytes = removable && removable.every(plan => plan.bytes !== null)
-				? removable.reduce((sum, plan) => sum + (plan.bytes ?? 0), 0) : null;
-			return {
-				count: removable?.length ?? 0, bytes,
-				size: plans === undefined ? "Checking…" : bytes === null ? "Size unavailable" : formatBytes(bytes),
-				detail: "Clean, unused isolation sandboxes whose omp process ended. Rechecked before removal.",
-				errors: [], available: plans !== undefined,
-			};
-		},
-		result: ({ results, total }) => ({
-			text: `${results.filter(result => result.kept === null).length} of ${total} ${total === 1 ? "sandbox" : "sandboxes"} removed`,
-			errors: results.filter(result => result.kept !== null).map(result => `${result.path}: ${result.detail ?? "Kept after rechecking."}`),
-		}),
-	},
+	sandboxes: sandboxPhase("sandboxes", "Sandboxes of ended tasks", "Clean, unused isolation sandboxes whose omp process ended. Rechecked before removal."),
+	changedSandboxes: sandboxPhase(
+		"changedSandboxes",
+		"Sandboxes of ended tasks with leftover changes",
+		"Their omp process ended with edits still inside them. Edits omp did not bring back to your checkout are lost. Rechecked before removal.",
+	),
+	packageCaches: cachePhase,
 };
 
 function previewRow<P extends CleanupStep>(step: P, report: PreviewReports[P] | undefined): CleanupRow {
 	const phase = PHASES[step];
 	return { step, label: phase.label, unit: phase.unit, ...phase.preview(report) };
 }
-export function cleanupRows(gc: GcAnswer, sandboxes: SandboxPlan[] | null): CleanupRow[] {
-	return CLEANUP_STEPS.map(step => step === "sandboxes" ? previewRow(step, sandboxes ?? undefined) : previewRow(step, gc[step]));
+/** Each preview as it stands: null until it answers, and still null when it failed. */
+export type Loaded = { [S in PreviewSource]: Previews[S] | null };
+export function cleanupRows(previews: Loaded): CleanupRow[] {
+	return CLEANUP_STEPS.map(step => isSandboxStep(step) ? previewRow(step, previews.sandboxes ?? undefined)
+		: step === CACHE_STEP ? previewRow(step, previews.caches ?? undefined)
+		: previewRow(step, previews.gc?.[step]));
 }
-export function gcResultText<P extends GcPhase>(step: P, report: ResultReports[P]): CleanupResult {
+export function stepResultText<P extends CleanupStep>(step: P, report: ResultReports[P]): CleanupResult {
 	return PHASES[step].result(report);
+}
+/** The report a single gc phase's or the package caches' apply answered for `step`. */
+function reportOf<P extends GcPhase | typeof CACHE_STEP>(step: P, answer: CleanupStepResult): ResultReports[P] {
+	if (answer.step === step && "caches" in answer) return answer.caches as ResultReports[P];
+	const report = answer.step === step && "gc" in answer ? answer.gc[step as GcPhase] : undefined;
+	if (report === undefined) throw new Error("Unexpected cleanup response.");
+	return report as ResultReports[P];
 }
 
 type Apply = Extract<CleanupRequest, { action: "apply" }>;
@@ -145,17 +200,17 @@ interface RunHooks {
 	onProgress(run: CleanupRun): void;
 }
 
-async function runSandboxes(plans: readonly SandboxPlan[], io: CleanupIo, stopped: () => boolean, onProgress: (result: CleanupResult) => void): Promise<CleanupResult> {
-	const targets = plans.filter(plan => plan.kept === null);
+async function runSandboxes(step: SandboxStep, plans: readonly SandboxPlan[], io: CleanupIo, stopped: () => boolean, onProgress: (result: CleanupResult) => void): Promise<CleanupResult> {
+	const targets = sandboxTargets(step, plans);
 	const results: SandboxResult[] = [];
 	for (const [index, target] of targets.entries()) {
 		if (stopped()) break;
-		onProgress({ ...PHASES.sandboxes.result({ results, total: targets.length }), text: `Checking and removing ${index + 1} of ${targets.length}…` });
-		const answer = await io.apply({ action: "apply", step: "sandboxes", sandboxes: [target.path] });
-		if (answer.step !== "sandboxes") throw new Error("Unexpected cleanup response.");
+		onProgress({ ...stepResultText(step, { results, total: targets.length }), text: `Checking and removing ${index + 1} of ${targets.length}…` });
+		const answer = await io.apply({ action: "apply", step, sandboxes: [target.path] });
+		if (answer.step !== step || !("sandboxes" in answer)) throw new Error("Unexpected cleanup response.");
 		results.push(...answer.sandboxes);
 	}
-	return PHASES.sandboxes.result({ results, total: targets.length });
+	return stepResultText(step, { results, total: targets.length });
 }
 
 export async function runCleanup(chosen: readonly CleanupRow[], sandboxes: readonly SandboxPlan[], { stopped, onProgress }: RunHooks, io: CleanupIo = cleanupIo): Promise<CleanupRun> {
@@ -172,17 +227,15 @@ export async function runCleanup(chosen: readonly CleanupRow[], sandboxes: reado
 		publish();
 		try {
 			let result: CleanupResult;
-			if (row.step === "sandboxes") {
-				result = await runSandboxes(sandboxes, io, stopped, result => {
-					progress.sandboxes = { state: "running", ...result };
+			if (isSandboxStep(row.step)) {
+				const step = row.step;
+				result = await runSandboxes(step, sandboxes, io, stopped, result => {
+					progress[step] = { state: "running", ...result };
 					publish();
 				});
 			} else {
-				const answer = await io.apply({ action: "apply", step: row.step });
-				if (answer.step === "sandboxes" || answer.step !== row.step) throw new Error("Unexpected cleanup response.");
-				const report = answer.gc[row.step];
-				if (report === undefined) throw new Error("Unexpected cleanup response.");
-				result = gcResultText(row.step, report);
+				const step = row.step;
+				result = stepResultText(step, reportOf(step, await io.apply({ action: "apply", step })));
 			}
 			failed = result.errors.length > 0;
 			progress[row.step] = { state: failed ? "failed" : "done", ...result };

@@ -172,7 +172,7 @@ Pass `--maintainer` to also install the maintainer git profile.
 That profile tells a session to push local `main`, to register Graphite branches, and to clean up worktrees.
 The default install leaves it out.
 
-Files and settings that you already have keep your version unless you pass `--force`.
+Files and settings that you already have keep your version unless you pass `--force`; a file you never edited since the kit installed it is brought up to date, and **Update dashboard** does that too.
 See the [kit's README](templates/omp/README.md) for what it contains.
 
 ## Usage

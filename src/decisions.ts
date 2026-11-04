@@ -1,13 +1,13 @@
 /** Reads a repository's decision records, the files the starter kit's `decision-records` skill writes. */
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { parseFrontmatter } from "./frontmatter";
 import { worktreeAt } from "./git";
 import { displayPath } from "./paths";
 import type { DecisionRecord, DecisionRecords } from "./shared/models";
 
 /** Where the skill looks for records, in its order: its own directory, then the usual ADR ones. */
 const RECORD_DIRS = ["docs/decisions", "docs/adr", "doc/adr"];
-const FRONTMATTER = /^---\n([\s\S]*?)\n---\n*/;
 const DATE = /^\d{4}-\d{2}-\d{2}/;
 
 const names = (value: unknown): string[] => (value == null ? [] : Array.isArray(value) ? value.map(String) : [String(value)]);
@@ -15,13 +15,9 @@ const names = (value: unknown): string[] => (value == null ? [] : Array.isArray(
 /** One record from its file's text; a record with no frontmatter or broken YAML still shows, with what the file holds. */
 export function parseRecord(file: string, text: string): DecisionRecord {
 	const name = file.replace(/\.md$/, "");
-	const front = FRONTMATTER.exec(text);
-	let fields: Record<string, unknown> = {};
-	try {
-		const parsed: unknown = front ? Bun.YAML.parse(front[1] ?? "") : null;
-		if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) fields = parsed as Record<string, unknown>;
-	} catch {}
-	const rest = front ? text.slice(front[0].length) : text;
+	const front = parseFrontmatter(text);
+	const fields = front?.data ?? {};
+	const rest = front ? text.slice(front.end) : text;
 	const heading = /^# (.+)\n?/m.exec(rest);
 	const date = fields.date instanceof Date ? fields.date.toISOString().slice(0, 10) : typeof fields.date === "string" ? fields.date : (DATE.exec(name)?.[0] ?? null);
 	return {

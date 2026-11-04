@@ -6,7 +6,6 @@ import { join } from "node:path";
 import { isObject, str } from "../json";
 import type { LiveSession } from "../live-session";
 import { BOT_FLAGS } from "../omp/bot-extension";
-import { ROUTER_FLAGS } from "../omp/router-extension";
 import { SHEPHERD_FLAGS } from "../omp/shepherd-extension";
 import { PLAIN_LAUNCH } from "../omp/rpc";
 import { type Bot, type BotEdit, type BotId, type BotKind, type BotLast, MAX_MEMORY_BYTES } from "../shared/bots";
@@ -20,7 +19,6 @@ import { readTail } from "../read-tail";
 import { isUserPrompt, skillArgs, splitSuggestions } from "../transcript";
 import type { BotsFile } from "./bots-file";
 import type { RoutineSpec } from "../routines";
-import { routerRoutine } from "../shared/router";
 import { shepherdRoutine } from "../shared/shepherd";
 import type { SessionJoin } from "./start";
 
@@ -30,7 +28,7 @@ type BotSession = Pick<LiveSession, "sessionId" | "prompt">;
 /** A Bot's memory and its conversation's last words, as read for its session `sessionId`. */
 type BotFiles = { sessionId: string | null; memory: string; last: BotLast | null };
 
-/** The last prompt, routine message or reply with text at the end of session file `path`, the user's own or the agent's without its suggested prompts; `null` when its end holds none or the file is gone. */
+/** The last prompt, routine or Bot message, or reply with text at the end of session file `path`, the user's own or the agent's without its suggested prompts; `null` when its end holds none or the file is gone. */
 export function lastMessage(path: string): BotLast | null {
 	for (const entry of tailEntries(path)) {
 		const last = messageOf(entry);
@@ -40,8 +38,9 @@ export function lastMessage(path: string): BotLast | null {
 }
 
 /**
- * What session-file entry `entry` previews: the user's prompt or a `/skill:` prompt as typed, a routine's message, or
- * the agent's reply. A prompt the dashboard sent, a collaborator's, and a `!` command the user ran preview nothing.
+ * What session-file entry `entry` previews: the user's prompt or a `/skill:` prompt as typed, a routine's or another
+ * Bot's message, or the agent's reply. A prompt the dashboard sent, a collaborator's, and a `!` command the user ran
+ * preview nothing.
  */
 function messageOf(entry: Record<string, unknown>): BotLast | null {
 	const at = entryTime(entry) ?? 0;
@@ -68,7 +67,7 @@ function messageOf(entry: Record<string, unknown>): BotLast | null {
 	}
 }
 
-/** What prompt `text` previews: the user's as one line, a routine's under its name, none for the dashboard's. */
+/** What prompt `text` previews: the user's as one line, a routine's or another Bot's under its name, none for the dashboard's. */
 function promptLast(at: number, text: string): BotLast | null {
 	if (!text) return null;
 	const author = promptAuthor(text);
@@ -77,6 +76,8 @@ function promptLast(at: number, text: string): BotLast | null {
 			return { at, from: "user", text: oneLine(text) };
 		case "routine":
 			return routineLast(at, author.message);
+		case "bot-message":
+			return { at, from: "bot-message", name: author.message.name, text: oneLine(author.message.text) };
 		case "dashboard":
 			return null;
 		default: {
@@ -102,8 +103,7 @@ export interface BotsDeps {
 	/**
 	 * The extension a Bot's session loads, the `bots.json` it reads and the inbox its `set_job` tool writes, the directory of
 	 * the Bots' memories, the `routines.json` and routine inbox its routine tools read and write, the extension a PR
-	 * shepherd's session loads beside it, with the inbox its tools write, the one a Router's session loads, with the inbox
-	 * its tools write and the tasks file it reads, and the one a Bot designer's session loads.
+	 * shepherd's session loads beside it, with the inbox its tools write, and the one a Bot designer's session loads.
 	 */
 	paths: {
 		extension: string;
@@ -114,9 +114,6 @@ export interface BotsDeps {
 		routineInboxDir: string;
 		shepherdExtension: string;
 		shepherdInboxDir: string;
-		routerExtension: string;
-		routerInboxDir: string;
-		routerTasksFile: string;
 		designerExtension: string;
 	};
 	now(): string;
@@ -126,20 +123,19 @@ export interface BotsDeps {
 
 /**
  * The extension each kind's session loads beside the Bot extension, with the flags it reads beyond the Bot extension's:
- * a PR shepherd's its own inbox, a Router's its own inbox and tasks file, and a Bot designer's none, since it reads the
- * Bot's id and inbox from the Bot extension's flags.
+ * a PR shepherd's its own inbox, and a Bot designer's none, since it reads the Bot's id and inbox from the Bot
+ * extension's flags.
  */
 function kindExtensions(paths: BotsDeps["paths"], id: BotId): Record<BotKind, { extension: string; flags: Record<string, string> } | null> {
 	return {
 		routines: null,
 		"pr-shepherd": { extension: paths.shepherdExtension, flags: { [SHEPHERD_FLAGS.bot]: id, [SHEPHERD_FLAGS.inbox]: paths.shepherdInboxDir } },
-		router: { extension: paths.routerExtension, flags: { [ROUTER_FLAGS.bot]: id, [ROUTER_FLAGS.inbox]: paths.routerInboxDir, [ROUTER_FLAGS.tasks]: paths.routerTasksFile } },
 		"bot-designer": { extension: paths.designerExtension, flags: {} },
 	};
 }
 
 /** The routine a new Bot of each kind starts with, which wakes it as what it watches changes; `null` for none. */
-export const startingRoutine: Record<BotKind, ((id: BotId) => RoutineSpec) | null> = { routines: null, "pr-shepherd": shepherdRoutine, router: routerRoutine, "bot-designer": null };
+export const startingRoutine: Record<BotKind, ((id: BotId) => RoutineSpec) | null> = { routines: null, "pr-shepherd": shepherdRoutine, "bot-designer": null };
 
 export class Bots {
 	readonly #deps: BotsDeps;

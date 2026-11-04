@@ -1,40 +1,10 @@
-/** Names the page gives things: sessions, models, providers, file kinds, and the click gestures that open rows. */
+/** Names the page gives things: sessions, models, providers, and the click gestures that open rows. */
 import type { MouseEvent } from "react";
-import { everyWord } from "../src/shared/every-word";
 import type { PullRequestLink } from "../src/shared/github";
-import type { OmpFile, OmpFileKind } from "../src/shared/models";
 import type { PastSession, RosterHost, SessionSource } from "../src/shared/sessions";
 import type { Workspace } from "../src/shared/workspaces";
 import { IS_MAC, modHeld } from "./shortcuts";
 import type { OpenMode } from "./routing";
-
-/** Settings page file groups, in the order the page lists them. */
-export const FILE_KIND_LABELS: Record<OmpFileKind, string> = {
-	context: "Context",
-	"system-prompt": "System prompt",
-	"append-system": "Appended system prompt",
-	settings: "Settings",
-	agent: "Agents",
-	command: "Commands",
-	rule: "Rules",
-	skill: "Skills",
-	hook: "Hooks",
-};
-
-/** The name Settings › Files lists `file` by: a skill's file is always SKILL.md, so its directory names it. */
-export function fileName(file: OmpFile): string {
-	const parts = file.path.split("/");
-	return (parts.at(-1) === "SKILL.md" ? parts.at(-2) : parts.at(-1)) ?? file.path;
-}
-
-/** The files whose {@link fileName} holds every word of `query`, by kind in {@link FILE_KIND_LABELS} order, user files before project files; kinds without such files left out. */
-export function fileGroups(files: OmpFile[], query: string): [OmpFileKind, OmpFile[]][] {
-	const matches = everyWord(query);
-	return (Object.keys(FILE_KIND_LABELS) as OmpFileKind[]).flatMap((kind): [OmpFileKind, OmpFile[]][] => {
-		const group = files.filter(file => file.kind === kind && matches(fileName(file))).toSorted((a, b) => (a.scope === b.scope ? 0 : a.scope === "user" ? -1 : 1));
-		return group.length ? [[kind, group]] : [];
-	});
-}
 
 /** Words that keep their own casing in a label. */
 const BRAND_WORDS: Record<string, string> = {
@@ -183,6 +153,9 @@ export const folderName = (dir: string): string | undefined => dir.split("/").fi
 /** What the page calls the workspace shown as `cwdDisplay`: **Personal** for where personal sessions run, else its last segment. */
 export const workspaceName = (cwdDisplay: string, personal: Workspace | null): string | undefined =>
 	cwdDisplay === personal?.cwdDisplay ? "Personal" : folderName(cwdDisplay);
+
+/** Directory `dir`, as typed or displayed, is `workspace`, such as the personal directory; never when there is none. */
+export const sameDir = (dir: string, workspace: Workspace | null): boolean => workspace !== null && (dir === workspace.cwd || dir === workspace.cwdDisplay);
 
 /** The tooltip of a private session's mark, which every place showing one repeats. */
 export const PRIVATE_NOTE = "Private: deleted with everything it wrote when it ends.";

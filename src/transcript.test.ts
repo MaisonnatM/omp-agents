@@ -7,6 +7,7 @@ import { withFiles } from "./shared/prompt-files";
 import type { TodoPhase } from "./shared/transcript";
 import { messageItemsOf, splitSuggestions, Transcript } from "./transcript";
 import { parseBotId } from "./shared/bots";
+import { type BotMessage, botMessageText } from "./shared/bot-message";
 import { type RoutineMessage, routineMessageText } from "./shared/routine-message";
 
 const assistant = (timestamp: number, content: unknown[], extra: Record<string, unknown> = {}) => ({
@@ -48,6 +49,19 @@ describe("Transcript", () => {
 		expect(t.items()).toEqual([
 			{ id: "m100", kind: "routine", message, entryId: "e1" },
 			{ id: "m200", kind: "user", text: forged, skill: null, from: null, entryId: "e2" },
+		]);
+	});
+
+	test("another Bot's stamped message shows as from that Bot, at once as it starts and in place once the file has it, and a message_bot call names the Bot it messaged", () => {
+		const message: BotMessage = { from: parseBotId("triage")!, name: "Triage", text: "Fix the flaky login test." };
+		const t = new Transcript();
+		expect(t.setStarting({ id: "7", text: botMessageText(message), images: [] })).toEqual([{ id: "starting:7", kind: "bot-message", message, entryId: null, pending: true }]);
+		t.setStarting(null);
+		t.applyEntry({ type: "message", id: "e1", message: { role: "user", timestamp: 100, content: botMessageText(message) } });
+		t.applyEntry({ type: "message", id: "e2", message: assistant(200, [{ type: "toolCall", id: "c1", name: "message_bot", arguments: { to: "triage", text: "Done: the test was racing the clock." } }]) });
+		expect(t.items()).toEqual([
+			{ id: "m100", kind: "bot-message", message, entryId: "e1" },
+			expect.objectContaining({ id: "tool:c1", kind: "tool", name: "message_bot", to: "triage" }),
 		]);
 	});
 

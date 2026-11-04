@@ -48,29 +48,7 @@
   **Navigation** lists the 15 most common moves from one view to another and the time spent on each view.
   **Active time** charts the minutes you used the dashboard each day, up to five minutes between two uses, with a table of each day's active time, visits, and changes sent.
   Only the server that runs the unattended work keeps activity, in `activity.db` in its data directory; a browser under automation records nothing.
-- **Storage** measures session files, attachments, and isolation sandboxes across all workspaces.
-  Open it from the disk reading's **Clean up…** link in the bottom bar, or at `#settings/storage`.
-  The checklist previews old reports and replicas, unused attachments, cold sessions to archive, idle files to compress, database logs, and sandboxes of ended tasks.
-  It starts with your saved cleanup switches, plus sandboxes; empty phases stay unchecked.
-  **Check again** refreshes the preview without deleting anything.
-  Sizes are approximate; cold sessions show a count, and compression shows the files' current disk use rather than promised savings.
-  Sandboxes fill in separately, and **Kept** lists the ones a live owner, changes, or another safety check protects.
-  **Clean up** asks for confirmation and names what cannot be undone.
-  Archived cold sessions leave the roster, History, and Resume, while their compressed archive stays on disk.
-  Cleanup follows omp's phase order, then rechecks and removes eligible sandboxes one at a time.
-  **Stop after this step** lets the current operation finish and starts no more.
-  Leaving Settings or reloading also prevents later steps, but does not kill the operation already running.
-  A failed step keeps its error on the row and stops the rest; **Check again** keeps the checklist's ticks for another attempt.
-  The result shows the native counts and the volume's free space before and after, not a promise that all selected bytes were freed.
-  **Cleanup rules** edits all twelve native cleanup settings through the same conflict-checked settings writer as **omp settings**.
-  Each rule saves separately; number fields save on Enter or when you leave the field, and Escape restores the value.
-  **Reset** removes your override and restores omp's default.
-  A conflict reloads the value changed on disk and asks you to review it before trying again.
-  The rules and dashboard cleanup are global; a selected workspace's overrides show a warning and apply only to terminal cleanup in that folder.
-  No new daily cleanup runs.
-  **Compress daily** runs only when you launch omp in a terminal, not for dashboard sessions, and shows the last background compression log when one exists.
-  The existing daily sandbox sweep stays in place.
-  Merged Git worktrees keep their separate review in **Worktrees**.
+- **Storage** measures session files, attachments, and isolation sandboxes, and cleans them up with omp's cleanup and the package caches; see [Storage](storage.md).
 - **Worktrees** lists every Git worktree in repositories where a session ran; **Show another repository**, below the list, lists one more.
   A session directory that is gone or outside Git is skipped; a path you enter that is not in a repository says so.
   Above the list, the tab counts the worktrees, their disk use measured so far, and the merged ones with their size; **All**, **Merged**, and **Removable** filter the rows.
@@ -78,23 +56,25 @@
   No omp session reads as no omp session, not as unused.
   Rows keep their order while sizes are measured and sort again once every size is in or you change the sort.
   A badge after the branch names what blocks deleting a checkout, with the full reason on hover; each repository's header checkbox selects every deletable row.
-  Selected rows show a bar at the bottom of the page with their count, size, **Clear**, and **Delete**.
-  **Delete** asks before it removes a linked worktree or forgets a registration whose directory is already gone.
-  It keeps the branch and session transcripts.
+  Selected rows show a bar at the bottom of the page with their count, size, **Clear**, and **Delete N worktrees**.
+  A row's **Delete**, or **Forget** for a registration whose directory is already gone, reads **Confirm?** after the first click, and a second click within three seconds queues it; the selection bar's button reads **Confirm deletion of N?** the same way and clears the selection once it queues them.
+  Queued worktrees are removed one at a time, even after you leave the page: the row reads **Queued**, then **Removing** beside a spinner, and leaves the list once it is gone.
+  One toast counts the run, such as `Removing 2 of 5 worktrees` with the branch it removes now, then sums it up, such as `Removed 4 of 5 worktrees` with how many it kept or failed to remove; a single worktree's toast says how its removal ended.
+  A worktree you picked that turns out blocked, and one whose removal fails, also toast on their own with the reason.
+  Removal keeps the branch and session transcripts.
   It refuses the main checkout, a locked checkout, unsaved changes, a nested repository, and a checkout this dashboard, a live session, or a resident subagent uses.
   Subagent blockers name the session and subagent. Known default and Bash working directories protect their containing checkouts, not unrelated siblings.
   Missing or incomplete subagent evidence and disconnected rosters keep repository-wide protection. If the repository is unknown too, every checkout stays protected.
-  Ignored files such as dependencies and `.env` are deleted with the checkout, and the confirmation names them.
-  A detached commit that no branch contains is named before its registration can be removed.
+  Ignored files such as dependencies and `.env` are deleted with the checkout, as each button's tooltip says.
+  A worktree whose detached commit no branch, tag, or remote holds is kept, with a toast that says so, since removing it could lose that commit.
   The page cannot see every shell or editor, so close other tools using a checkout before you delete it.
   Disk use is approximate, and removing a checkout may free less than the number shown.
   A row whose work has merged says **Merged** after its branch, with the pull request's number when GitHub's newest pull request from that branch merged.
   A worktree counts as merged when `origin`'s default branch contains its commit, which also covers a detached checkout, or when its branch's newest pull request merged and the branch has no commit made after the merge, which covers squash merges such as Graphite's.
   The main checkout is never flagged, and repositories GitHub cannot answer for share one warning above the list, while the default branch still flags what it contains.
-  **Remove merged** previews every merged row the search and filter show, says about how much disk it frees, and lists the ones it will remove and, folded, the ones it keeps, each with the reason.
-  It keeps a worktree with unsaved changes, one a live session uses, one whose work it cannot show merged, and everything **Delete** refuses.
-  Confirming removes only the worktrees it listed for removal, keeps their branches, and reports how many it removed, kept, and failed to remove.
-  Nothing is removed until you confirm.
+  **Remove N merged** shows while N merged rows that the search and filter show have no blocker badge, and reads **Confirm removal of N?** after the first click; a second click within three seconds queues them as **Delete** does.
+  It keeps a worktree with unsaved changes, one a live session uses, one whose work it cannot show merged, and everything **Delete** refuses, and counts those in its last toast.
+  The button reads **Removing…** beside a spinner and waits while any removal is queued or running.
 - **Models** shows which model omp uses for each role (`default`, `slow`, `plan`, `advisor`, `vision`, `smol`, `commit`, `tiny`, `task`) and the fallbacks that omp tries after that model, in order.
   A role without its own chain says that it uses the `default` role's chain.
   Chains keyed by a model or a `provider/*` wildcard appear in their own table, and the `modelProviderOrder` follows.
@@ -144,16 +124,19 @@
   They show omp's labels and save to your `~/.omp/agent/config.yml` as in **omp settings**, which shows them as a line that links here; a value the workspace's settings set locks its control, and an environment variable that sets one is named under it.
   **What a new session gets** unfolds the memory block a new session's prompt starts with, and its size in tokens; with Mnemopi and Hindsight a running session also gets memories recalled for each prompt, which the page cannot show.
   **Stored memory** shows the store of the backend picked.
-  Local lists its files by group, **Lessons**, **Summary**, **Skills**, and **Session summaries**, and Sharpshooter its decision files and how many sessions wait to be folded in; select one to read it, and edit it as in **Files**.
+  Local lists its files in a folder per group, **Lessons**, **Summary**, **Skills**, and **Session summaries**, and Sharpshooter its decision files in **Decisions**, with how many sessions wait to be folded in; folders work as in **Files**, and you select a file to read it and edit it as in **Files**.
   Mnemopi lists its memories newest first, up to 500, with a filter and a count of each kind: **Edit** changes a working memory's text, saved with **Save** or Cmd+Enter, where Enter starts a new line, and put back with Escape, **Forget** deletes it, **Retire** stops recall from using an episodic one, and facts are read-only.
   Hindsight lists the memories its server keeps for the workspace's bank, read-only.
   **Forget everything**, beside the **Stored memory** heading, deletes the workspace's Local, Sharpshooter, or Mnemopi store, and the line under the heading says what it removes; with Mnemopi it keeps the bank every workspace shares, and a memory of that bank changes everywhere when you edit or forget it.
   **Rebuild summary**, with Local, rebuilds the summary when the next session in the workspace starts.
   **Forget**, **Retire**, and **Forget everything** each ask you to click again to confirm, and an edit made elsewhere since the page read it is refused and the page shows the memory as it is now.
   Running sessions keep the memory they started with; new sessions see your changes.
-- The **Files** section lists the files that omp reads: context files such as `AGENTS.md`, the `SYSTEM.md` and `APPEND_SYSTEM.md` prompt files, `config.yml`, agents, commands, rules, skills, and hooks.
-  The field above the list narrows it to the files whose name holds every word typed; Escape clears it.
-  Select a file to read its content, and choose **Edit** to change it in place (**Create** for a file marked `missing`).
+- The **Files** section lists the files that omp reads as folders, by where they sit on disk: context files such as `AGENTS.md`, the `SYSTEM.md` and `APPEND_SYSTEM.md` prompt files, `config.yml`, agents, commands, rules, skills, and hooks.
+  The list starts inside the folder that holds every file, such as `~`. A skill shows as its directory's name in its `skills` folder, with the first two lines of its frontmatter's `description` under it, and a folder holding only one folder joins it, such as `.omp/agent`.
+  Folders start closed except those holding the open file, and opening a file from another section opens its folders.
+  The field above the list narrows it to the files whose name holds every word typed and opens every folder; Escape clears it.
+  Select a file to read it: Markdown renders as the agent's messages do, under its frontmatter's keys and values, and **Source** next to **Preview** shows its text; any other file shows as numbered lines that wrap, colored by its type.
+  Choose **Edit** to change the file in place (**Create** for a file marked `missing`).
   Save with the button or with Cmd+S. If the file changed on disk after the page read it, the save is refused and your edits stay in the editor, so you can copy them before you load the file from disk.
   A `.yml`, `.yaml`, or `.json` file must parse before it saves, and a settings file must hold a mapping.
   `~/.omp/agent/AGENTS.md` and `~/.omp/agent/config.yml` appear even before they exist, marked `missing`.
@@ -174,7 +157,7 @@
   The server keeps them too, so every window you open shows the same, and **Sync** carries them to your other machines; **Stop idle processes** is the server's own and stays on this machine.
   The width of a sidebar or a split, a folded section, and what you last picked in a menu stay with the browser that set them.
   **Theme**: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one; it applies at once and does not change omp's terminal theme.
-  **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts, and **Show todos card** shows or hides the whole Todos card, its **Subagents**, **Files**, **Images**, and **Sources** sections included, beside or above the messages of every transcript, the same choice as the checklist toggle in a session's header.
+  **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts, and **Show todos card** shows or hides the whole Todos card, its line above the messages and its **Subagents**, **Files**, **Images**, and **Sources** sections, in every transcript, the same choice as the checklist toggle in a session's header.
   **Sidebar tabs** lists the eight sidebar tabs in the order they show, each with the Cmd+number it takes, a switch that shows or hides it, and buttons that move it up or down.
   **Notes**, **Calendar**, and **Email** say **Header**: they sit in the header beside the command menu and take no number, and Cmd+1 goes to the first tab the sidebar's bar draws.
   A hidden tab only leaves the sidebar's bar or the header and loses its number: its page, its command in the command menu, its G pair, and links to it still work.

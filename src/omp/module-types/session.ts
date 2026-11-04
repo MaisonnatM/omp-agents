@@ -64,24 +64,4 @@ export interface ExitDiagnosticsModule {
 		entries: readonly FileEntry[],
 		fallbackModel?: { api: string; provider: string; model: string },
 	): object | undefined;
-	createInterruptedToolResults(entries: readonly FileEntry[], context: "fork"): object[];
-}
-export interface OmpSessionManager {
-	getSessionId(): string;
-	getCwd(): string;
-	getHeader(): Record<string, unknown> | null;
-	getEntry(id: string): (FileEntry & Record<string, unknown>) | undefined;
-	getEntries(): (FileEntry & Record<string, unknown>)[];
-	getBranch(leafId?: string): (FileEntry & Record<string, unknown>)[];
-	createBranchedSession(leafId: string, options: { copyArtifacts: boolean }): string | undefined;
-	newSession(options?: { parentSession?: string }): Promise<string | undefined>;
-	appendMessage(message: object): string;
-	appendCustomEntry(customType: string, data: unknown): string;
-	appendCustomMessageEntry(customType: string, content: string, display: boolean, details?: unknown, attribution?: "user" | "agent"): string;
-	moveTo(cwd: string): Promise<void>;
-	setAdditionalDirectories(directories: string[]): Promise<void>;
-	getSessionFile(): string | undefined;
-	putBlobSync(data: Buffer): { ref: string };
-	flush(): Promise<void>;
-	close(): Promise<void>;
 }

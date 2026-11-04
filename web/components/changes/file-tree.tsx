@@ -1,10 +1,11 @@
 /** `FileTree`: the changes explorer's folder tree of changed files, each with its status letter, and the line that tells its keys. */
-import { ChevronDown, ChevronRight, FileText, Folder } from "lucide-react";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { FileText } from "lucide-react";
+import { useEffect, useRef } from "react";
 import type { ChangedEntry } from "../../../src/shared/changes";
-import { foldersAbove, type TreeDir } from "../../changes-model";
+import type { TreeDir } from "../../changes-model";
 import { shortcutLabels } from "../../shortcuts";
 import { cn } from "@/lib/utils";
+import { FolderRows, useFolders } from "../folder-rows";
 import { LineCounts } from "../line-counts";
 
 export function FileStepHint() {
@@ -56,91 +57,53 @@ type FileTreeProps = FileOpen & {
  * marks the files a session's own calls changed.
  */
 export function FileTree({ tree, open, hrefFor, onPick }: FileTreeProps) {
-	const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
-	const [revealed, setRevealed] = useState(open);
-	if (revealed !== open) {
-		setRevealed(open);
-		const above = new Set(open === null ? [] : (foldersAbove(tree, open) ?? []));
-		if ([...closed].some(path => above.has(path))) setClosed(new Set([...closed].filter(path => !above.has(path))));
-	}
+	const folders = useFolders(tree, open, true);
 	const openRow = useRef<HTMLElement | null>(null);
 	useEffect(() => {
 		openRow.current?.scrollIntoView({ block: "nearest" });
 	}, [open]);
-	const toggle = (path: string): void =>
-		setClosed(prev => {
-			const next = new Set(prev);
-			if (!next.delete(path)) next.add(path);
-			return next;
-		});
-	const level = (dir: TreeDir, depth: number) => (
-		<>
-			{dir.dirs.map(child => {
-				const shut = closed.has(child.path);
-				const Chevron = shut ? ChevronRight : ChevronDown;
-				return (
-					<Fragment key={child.path}>
-						<li>
-							<button
-								type="button"
-								aria-expanded={!shut}
-								className="flex w-full items-center gap-1 rounded-md py-0.5 pr-1 text-left text-xs text-muted-foreground hover:bg-muted"
-								style={{ paddingLeft: depth * 12 + 4 }}
-								onClick={() => toggle(child.path)}
-							>
-								<Chevron aria-hidden className="size-3 shrink-0" />
-								<Folder aria-hidden className="size-3.5 shrink-0" />
-								<span className="truncate">{child.name}</span>
-							</button>
-						</li>
-						{!shut && level(child, depth + 1)}
-					</Fragment>
-				);
-			})}
-			{dir.files.map(file => {
-				const current = file.path === open;
-				const look = {
-					ref: current ? (row: HTMLElement | null) => void (openRow.current = row) : undefined,
-					title: `${file.path}: ${statusLabel(file)}`,
-					"aria-current": current ? ("page" as const) : undefined,
-					className: cn("flex w-full items-center gap-1.5 rounded-md py-0.5 pr-1 text-left text-xs hover:bg-muted", current && "bg-muted font-medium"),
-					style: { paddingLeft: depth * 12 + 20 },
-				};
-				const body = (
-					<>
-						<FileText aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-						<span className={cn("min-w-0 flex-1 truncate", file.status === "deleted" && "line-through opacity-70")}>{file.path.slice(file.path.lastIndexOf("/") + 1)}</span>
-						{file.session && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-sky-500" />}
-						<LineCounts added={file.added} removed={file.removed} />
-						<StatusLetter file={file} />
-					</>
-				);
-				return (
-					<li key={file.path}>
-						{hrefFor ? (
-							<a
-								{...look}
-								href={hrefFor(file.path)}
-								onClick={
-									onPick &&
-									(event => {
-										if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-										event.preventDefault();
-										onPick(file.path);
-									})
-								}
-							>
-								{body}
-							</a>
-						) : (
-							<button type="button" {...look} onClick={() => onPick(file.path)}>
-								{body}
-							</button>
-						)}
-					</li>
-				);
-			})}
-		</>
+	const fileRow = (file: ChangedEntry, indent: number) => {
+		const current = file.path === open;
+		const look = {
+			ref: current ? (row: HTMLElement | null) => void (openRow.current = row) : undefined,
+			title: `${file.path}: ${statusLabel(file)}`,
+			"aria-current": current ? ("page" as const) : undefined,
+			className: cn("flex w-full items-center gap-1.5 rounded-md py-0.5 pr-1 text-left hover:bg-muted", current && "bg-muted font-medium"),
+			style: { paddingLeft: indent },
+		};
+		const body = (
+			<>
+				<FileText aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+				<span className={cn("min-w-0 flex-1 truncate", file.status === "deleted" && "line-through opacity-70")}>{file.path.slice(file.path.lastIndexOf("/") + 1)}</span>
+				{file.session && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-sky-500" />}
+				<LineCounts added={file.added} removed={file.removed} />
+				<StatusLetter file={file} />
+			</>
+		);
+		return hrefFor ? (
+			<a
+				{...look}
+				href={hrefFor(file.path)}
+				onClick={
+					onPick &&
+					(event => {
+						if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+						event.preventDefault();
+						onPick(file.path);
+					})
+				}
+			>
+				{body}
+			</a>
+		) : (
+			<button type="button" {...look} onClick={() => onPick(file.path)}>
+				{body}
+			</button>
+		);
+	};
+	return (
+		<ul className="text-xs">
+			<FolderRows dir={tree} depth={0} folders={folders} file={fileRow} />
+		</ul>
 	);
-	return <ul>{level(tree, 0)}</ul>;
 }

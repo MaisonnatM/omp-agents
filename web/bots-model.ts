@@ -1,8 +1,7 @@
 /** What the page shows of a Bot: the Bot its page opens, its sidebar row and group, its running session and conversation, its memory's lines, and the prompts a new Bot offers. */
 import type { Routine } from "../src/routines";
 import { DESIGNER_JOB, DESIGNER_NAME } from "../src/shared/bot-designer";
-import type { Bot, BotChange, BotId, BotKind, BotLast } from "../src/shared/bots";
-import { ROUTER_JOB, ROUTER_NAME } from "../src/shared/router";
+import { type Bot, type BotChange, type BotId, type BotKind, type BotLast, jobLine } from "../src/shared/bots";
 import { SHEPHERD_JOB, SHEPHERD_NAME } from "../src/shared/shepherd";
 import type { HostStatus, RosterHost, View } from "../src/shared/sessions";
 import { needsYou } from "./attention";
@@ -98,12 +97,13 @@ export interface BotRow {
 	at: number;
 }
 
-/** The conversation's last words as a row says them: yours after `You:`, a routine's after its name, the Bot's as they are. */
+/** The conversation's last words as a row says them: yours after `You:`, a routine's or another Bot's after its name, the Bot's as they are. */
 function saidLine(last: BotLast): string {
 	switch (last.from) {
 		case "user":
 			return `You: ${last.text}`;
 		case "routine":
+		case "bot-message":
 			return `${last.name}: ${last.text}`;
 		case "bot":
 			return last.text;
@@ -207,12 +207,6 @@ export function memoryEntries(text: string): MemoryEntry[] {
 	});
 }
 
-/** The first sentence of a job written in Markdown, past its headings and without a list mark; empty for a blank job. */
-export function jobLine(job: string): string {
-	const line = job.split("\n").filter(text => !/^\s*#/.test(text)).map(text => text.replace(/^\s*(?:[-*+]|\d+\.)\s+/, "").trim()).find(Boolean) ?? "";
-	return /^.+?[.!?](?=\s|$)/.exec(line)?.[0] ?? line;
-}
-
 /** A job the New Bot form offers to start from, and the name it suggests while the form has none. */
 export interface JobTemplate {
 	label: string;
@@ -255,7 +249,6 @@ export const BOT_KIND_START: Record<BotKind, BotKindStart> = {
 	"bot-designer": { name: DESIGNER_NAME, job: DESIGNER_JOB, hint: "How it designs your Bots. Edit it to fit how you like them.", templates: [] },
 	routines: { name: "", job: "", hint: "Optional. Leave it empty and tell it in your first message.", templates: JOB_TEMPLATES },
 	"pr-shepherd": { name: SHEPHERD_NAME, job: SHEPHERD_JOB, hint: "Its rules. Edit them to fit how you merge.", templates: [] },
-	router: { name: ROUTER_NAME, job: ROUTER_JOB, hint: "Its rules. Edit them to fit how you hand off work.", templates: [] },
 };
 
 /** What the New Bot form holds of the Bot's type, name, and job. */

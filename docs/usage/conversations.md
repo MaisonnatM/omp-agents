@@ -46,9 +46,9 @@
   A `mermaid` block draws a flowchart (`graph` or `flowchart` with a direction such as `TD` or `LR`), a `sequenceDiagram`, a `stateDiagram-v2`, a `classDiagram`, or an `erDiagram`, named on its first line, in up to 20,000 characters.
   A `chart` block holds one JSON object: `{"type": "bar" | "line" | "area" | "pie", "title"?, "description"?, "x", "series": [{"key", "label"?}], "data": [...]}`.
   Each row holds the `x` key, text or a number, and each series key, a finite number, and nothing else; a chart has 1 to 5 series and 1 to 500 rows, and a pie exactly one series, whose `x` names each slice.
-  The block's header switches between **Preview** and **Source**, copies the block's exact text, and expands the visual into a dialog for a narrow pane.
+  The block's header switches between **Preview** and **Source**, copies the block's exact text, and expands the visual into a dialog for a narrow pane, where it zooms as an image does.
   A block that breaks these rules, such as a pie or gantt diagram, an unknown key, or a value that is not a number, shows its text with a note that says why.
-  Each session the dashboard starts, resumes, or forks is told these two formats in its system prompt; a replay and a terminal session are not, so a replay's requests still match the original's.
+  Each session the dashboard starts, resumes, or forks is told these two formats in its system prompt; a terminal session is not.
 - A subagent's header trail names the session's title and the subagent's id, then the subagent's type as a badge, as in `Fix login / 0-Explore` `explore`.
   Click the session's title to open the session's main agent in the pane, or focus the pane that already shows it.
 - In a subagent of a terminal session, a message steers a running subagent, prompts an idle one, and revives a parked one.
@@ -66,10 +66,13 @@
   Click a line to scroll the conversation to that prompt; the arrows above and below the lines, shown on hover, step to the previous and next turn.
   The line of the turn you are reading stays lit as you scroll; after a click it stays on that turn until you scroll yourself, since the last turns may never reach the top.
 - The **Todos** card holds the agent's todo list, its **Subagents**, and the **Files**, **Images**, and **Sources** sections of [Changed files and images](changed-files-and-images.md), each shown once it has something to list; a past session's conversation shows it too.
+  It shows as one line above the messages: the /ship stage and its step, such as **Live review · step 8 of 9**, or else the task in progress, then each section's count in its header's words, such as **Todos 6/12 · 7 Files · 1 Image · 1 Source**.
+  As the conversation narrows, the counts drop from the last one, so the stage or the task keeps room to read.
+  Click the line to open the card over the messages; click outside it or press Escape to close it, and Escape puts the focus back on the line.
+  A file or an image opened from the card opens on top of it, and closing it brings you back to the card.
   Once the view's agent made a todo list, the card shows the list as its latest `todo` call left it: how many tasks are done of all, a thin progress line, and the task in progress.
-  It floats at the conversation's top right, narrowing to fit the space beside the messages, and sits above them when that space is too narrow, so it never covers a message; it scrolls as a whole when its sections outgrow it.
-  Click the todo summary to unfold every phase, and click it again to fold it; it starts folded, and the app remembers your choice for every conversation.
-  **Show todos card** in Settings › Preferences, or the checklist toggle in the session's header, before End session or Resume, hides the whole card, its **Subagents**, **Files**, **Images**, and **Sources** sections too.
+  Click the todo summary to fold every phase, and click it again to unfold it; it starts unfolded, and the app remembers your choice for every conversation.
+  **Show todos card** in Settings › Preferences, or the checklist toggle in the session's header, before End session or Resume, hides the whole card, its line, its **Subagents**, **Files**, **Images**, and **Sources** sections too.
   Unfolded, each phase shows its done count and its open tasks first, a blocked task's reason under it; its done and dropped tasks fold into an **N done** row.
   Each status has its own mark: an empty ring for to do, a spinning arc beside a shimmering title for in progress, a green disc with a check for done, an amber disc with an exclamation mark for blocked, and a dashed ring for dropped.
   A phase with every task done folds to one line; click it to open it.
@@ -106,15 +109,18 @@
 - A path to a text file in agent text opens the file in a dialog: `.md`, `.markdown`, `.txt`, `.log`, `.csv`, `.tsv`, `.json`, `.jsonl`, `.yaml`, `.yml`, `.toml`, `.xml`, `.diff`, or `.patch`.
   An absolute or `~/` path opens from plain text, inline code, or a link, `file://` included; a relative one opens from inline code or a link, against the linked worktree the session works in, else the session's directory.
   A `:line` suffix, as in `docs/usage.md:12`, is dropped; hover the path to read the file it opens.
-  Markdown renders as the agent's messages do, a TSV or CSV file as a table of its first 1,000 rows, and anything else as plain text; **Show source** shows a rendered file's text.
+  Markdown renders as the agent's messages do, under its frontmatter's keys and values, a TSV or CSV file as a table of its first 1,000 rows, and anything else as numbered lines that wrap, colored by its type; **Show source** shows a rendered file's text.
   A path in an open Markdown file opens in the dialog's place, relative to that file.
   The dialog shows the first 1 MB of a larger file and says so; it refuses a file whose real path, past any link, has another extension, and a file that is not UTF-8.
   A todo's notes do not open paths: a path there is plain text.
 - An image or video on this computer that a prompt or the agent's text names shows in the message: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, `.svg`, `.mp4`, `.m4v`, `.webm`, or `.mov`.
   Its path is found as a text file's is, and opens the file dialog with the image large or the video playing.
-  Written as an image, `![alt](path)`, it shows in place, and a video there plays in place; otherwise each one the text names shows once as a thumbnail under the text, a video by its first frame, and opens the dialog on click.
+  Written as an image, `![alt](path)`, it shows in place and opens large on click, and a video there plays in place.
+  Otherwise each one the text names shows once as a thumbnail under the text, a video by its first frame: a video opens the dialog, and an image opens large, where the arrows, or the Left and Right keys, step through the message's images, those in place and the thumbnails alike.
   A remote image, `![](https://…)`, stays a link, so a prompt-injected address never loads.
   A path to a missing file, or to one in a directory that does not open, shows no thumbnail.
+- An image opened large, a chart or diagram expanded, and the dialog's image zoom as a browser page does: the header's − and + buttons or the − and + keys zoom out and in, the level between them or the 0 key fits it to the window again, a pinch or Cmd/Ctrl with the scroll wheel zooms around the pointer, and dragging moves a zoomed image.
+  Zoomed in, the arrow keys move the image once it has focus, which Tab gives it in the image viewer, where the Left and Right keys then no longer step to other images; Cmd+ and Cmd− still zoom the whole desktop window.
 - Every prompt has a copy button.
   Among the agent's messages, only the reply that ends each turn has one, not the messages it writes between tool calls.
   A turn still running shows none until it ends.

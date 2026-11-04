@@ -50,7 +50,7 @@ export default function designerExtension(pi: ExtensionApi): void {
 			kind: Type.Optional(
 				Type.Union(
 					BOT_KINDS.map(kind => Type.Literal(kind)),
-					{ description: "Its type: routines for most Bots, pr-shepherd for one that merges approved pull requests, router for one you talk to that hands real work to background sessions, bot-designer for another designer; routines when left out." },
+					{ description: "Its type: routines for most Bots, pr-shepherd for one that merges approved pull requests, bot-designer for another designer; routines when left out." },
 				),
 			),
 			cwd: Type.Optional(Type.String({ minLength: 1, description: "The absolute path of the directory its conversation runs in; your own workspace when left out." })),

@@ -101,8 +101,8 @@ function settled(queue: (hooks: RebaseHooks) => void): Promise<RebaseJob[]> {
 	return promise;
 }
 
-const rebased = (branch: string, kind: RebasedPullRequest["kind"] = "rebased"): RebasedPullRequest =>
-	kind === "conflict" ? { kind, branch, onto: "main", files: ["a.ts", "b.ts"] } : { kind, branch, onto: "main" };
+const rebased = (branch: string, kind: RebasedPullRequest["kind"] = "rebased", files = ["a.ts", "b.ts"]): RebasedPullRequest =>
+	kind === "conflict" ? { kind, branch, onto: "main", files } : { kind, branch, onto: "main" };
 
 describe("rebasePullRequest", () => {
 	test("says each step the server starts in its loading toast, then turns that toast into how it ended", async () => {
@@ -141,6 +141,12 @@ describe("rebasePullRequest", () => {
 		await settled(hooks => rebasePullRequest(job(1), hooks));
 		expect([...said.values()].map(words => words.slice(-2))).toEqual([["Rebasing me/branch-1 on main: Pushing through the pre-push checks", "Could not rebase me/branch-1: 2 tests failed"]]);
 	});
+
+	test("names the first conflicting files and counts the rest", async () => {
+		answers = { 1: streamed(["fetching", "rebasing"], { done: rebased("me/branch-1", "conflict", ["a.ts", "b.ts", "c.ts", "d.ts", "e.ts"]) }) };
+		await settled(hooks => rebasePullRequest(job(1), hooks));
+		expect([...said.values()].map(words => words.at(-1))).toEqual(["me/branch-1 conflicts with main: 5 files conflict: a.ts, b.ts, c.ts, and 2 more. A Resolve conflicts session takes over."]);
+	});
 });
 
 describe("rebasePullRequests", () => {
@@ -166,7 +172,7 @@ describe("rebasePullRequests", () => {
 				"Rebasing 5 of 5 pull requests: me/branch-5: Pushing through the pre-push checks",
 				"Rebased 1 of 5 pull requests: 1 already had its base, 1 stopped at a conflict, and 2 skipped, stacked on one that stopped.",
 			],
-			["me/branch-1 conflicts with main: 2 files conflict. A Resolve conflicts session takes over."],
+			["me/branch-1 conflicts with main: 2 files conflict: a.ts and b.ts. A Resolve conflicts session takes over."],
 		]);
 		expect([...typed.values()]).toEqual([["loading", undefined], [undefined]]);
 	});
@@ -190,7 +196,7 @@ describe("rebasePullRequests", () => {
 				"Rebasing me/branch-1 on main: Reading the pull request",
 				"Rebasing me/branch-1 on main: Fetching main and me/branch-1",
 				"Rebasing me/branch-1 on main: Rebasing onto main",
-				"me/branch-1 conflicts with main: 2 files conflict. A Resolve conflicts session takes over.",
+				"me/branch-1 conflicts with main: 2 files conflict: a.ts and b.ts. A Resolve conflicts session takes over.",
 			],
 			["Rebasing 1 of 1 pull request: Queued behind 1 rebase", "Rebased 0 of 1 pull request: 1 skipped, stacked on one that stopped."],
 		]);

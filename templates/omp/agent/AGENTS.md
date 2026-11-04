@@ -21,9 +21,12 @@ Force-pushes and rewriting `main` still require explicit approval.
 A server, dev server, or other listener you start to test or verify never takes a default port, such as 3000, 3001, 4200, 4317, 5000, 5173, 8000, or 8080: the user's own servers and other sessions run there.
 Use the port range the repository's docs name; otherwise pick a random port between 20000 and 39999 and check it is free with `lsof -nP -iTCP:<port> -sTCP:LISTEN || echo free` first: `lsof` exits 1 when nothing listens, and `free` marks that as the expected answer.
 Pass the port through the tool's port flag or `PORT`, and point every browser, curl, and proxy call at it.
+When you tell the user about a server you started, write its full URL, such as `http://localhost:24816/settings`, never only the port.
 
 A test or check runs headless and never opens a window on the user's screen.
-Open pages with eval's `browser.open` in managed Chromium, `app: { relay: false, tern: false }` with `headed: false`; without them, it drives the user's own Chrome through the relay or a visible Tern pane.
+Open pages with eval's `browser.open({ url, name, headed: false, app: { relay: false, tern: false } })` in managed Chromium; the URL goes inside the options object, never as a first argument. Without `app` and `headed`, it drives the user's own Chrome through the relay or a visible Tern pane.
+`tab.setCookies` takes one cookie at a time as `{ name, value, url }`; a Playwright storage-state cookie list fails with `malformed cookie input`, so loop over its `cookies`. yampa's `control-yampa doctor` writes that list to `.agents/skills/verify-yampa/.run/storage-state.json`, and the stack's URL to `state.json`'s `frontUrl`.
+`tab.run` hands you a Puppeteer `page`, not Playwright: there is no `page.getByRole` or `page.context`; use tab helpers with `role/…`, `label/…`, or `text/…` selectors.
 Start an app that opens windows, such as an Electron app, in its hidden mode, such as `OMP_AGENTS_HEADLESS=1` for the omp-agents desktop app, and open a visible window only when the user asks for one.
 
 ## Pasted secrets
@@ -42,16 +45,15 @@ A 409 answer says why the checkout stayed as it was, such as uncommitted changes
 
 ## Presenting a plan
 
-Present every plan, proposal, or recommendation as a decision card, in plain words with no jargon.
-Open with exactly three lines:
-- **You asked:** the request in one sentence.
-- **My answer:** the recommendation in one or two sentences.
-- **You decide:** the choice waiting on the user, or "nothing" when none is.
-
-Under them, at most three short bullets, **Why**, **Cost**, and **Risk**, each one or two sentences; mark a guessed number as a guess.
-When the plan adds, removes, or reorders steps in a workflow, put a mermaid flowchart of the new flow between the three lines and the bullets, with the changed step highlighted.
+Present every plan, proposal, or recommendation in the final-answer format, in plain words with no jargon.
+The bold first line is the recommendation; the choice waiting on the user goes on **Needs you:**.
+Below it, at most three bullets on why, cost, and risk, only those with something to say; mark a guessed number as a guess.
+When the plan adds, removes, or reorders steps in a workflow, put a mermaid flowchart of the new flow after the first line, with the changed step highlighted.
 Leave out file paths, line numbers, principle names, measurements, evidence lists, and rejected alternatives unless the user asks; a table only when the user must compare three or more options.
-When a reply presents a plan, the card replaces the **Résumé** of the final-answer format and is the reply's whole body: no paragraph before it, no evidence or extra section after it, only **Action** and **What next** follow.
+
+## Design work
+
+Before any change to what a screen shows, even a one-value tweak, read `skill://design-workflow` and follow it.
 
 ## Conditional references
 

@@ -3,13 +3,13 @@
 Sessions started from the dashboard are omp processes in RPC mode with tool dialogs, driven through omp's own `RpcClient`.
 Each runs under a session keeper, so it outlives the server that started it; see [Session keepers](#session-keepers).
 They use the installed CLI with `--mode rpc-ui`.
-The page starts one with a single `start` request whose `kind` is `new`, `fork`, `resume`, or `replay`, and the server answers each with one `started` reply that carries the new session's instance id or the error.
+The page starts one with a single `start` request whose `kind` is `new`, `fork`, or `resume`, and the server answers each with one `started` reply that carries the new session's instance id or the error.
 The server picks the instance id before omp spawns, so a question that omp raises while the session opens already belongs to it.
 A new session's first message rides on the `start` request: the server spawns omp, sends the message as its first prompt, and answers the page as soon as omp reports ready, with no terminal, registry, or relay involved.
 **Resume** starts the same process in the directory that the session file's header records and opens the file with omp's `switch_session` command.
 When omp could not keep writing a session file, such as when another omp process held it, it went on in a sibling file with a new session id whose header names the old one (`continuationOf`).
-`switch_session` opens the exact file it is given, so the server first asks omp's `findSessionContinuation` for the copy `omp --resume` would open, the newest one that holds the old file's last turn, and resumes that copy: its file, its recorded directory, and its replay marker.
-A fork or a replay reads the exact file the pane shows, since it starts from an entry picked there; see [the decision](../decisions/2026-11-02-resume-follows-continued-sessions.md).
+`switch_session` opens the exact file it is given, so the server first asks omp's `findSessionContinuation` for the copy `omp --resume` would open, the newest one that holds the old file's last turn, and resumes that copy: its file and its recorded directory.
+A fork reads the exact file the pane shows, since it starts from an entry picked there; see [the decision](../decisions/2026-11-02-resume-follows-continued-sessions.md).
 Prompts, Stop, live events, subagent progress, and questions stay on omp's stdio, which the keeper lends the server.
 A prompt carries omp's `streamingBehavior`, `steer` or `followUp`, so omp queues it during a turn the way its terminal does.
 A prompt omp refuses shows as a note in the session, and `LiveSession.prompt` rejects with `PromptRefused`, so a caller that has no one else to tell, such as the socket handler or a session's first message, skips it.
@@ -133,7 +133,7 @@ Each step changes nothing when repeated, and the directory goes last, so a purge
 A purge asked while one of the same session runs joins it, so a failed start and its omp's exit purge once.
 After `reattachAll`, before the page's socket is let in, the server sweeps the private root and purges every directory whose session neither the registry nor a keeper holds, as one whose omp exited while no server ran.
 A private start that fails purges its directory through `launch`, before omp runs, or through the `discard` that `launch` returns, after.
-`createStarter` refuses to fork or replay a private session, since omp writes a fork beside its source, and the page hides **Fork from here** and **Replay from here** for it.
+`createStarter` refuses to fork a private session, since omp writes a fork beside its source, and the page hides **Fork from here** for it.
 What stays: pasted images in omp's blob store until `omp gc --blobs`, omp-stats' token counts and file path with no text, and any terminal breadcrumb of omp's, which holds only a path.
 
 ## Session keepers
@@ -161,7 +161,7 @@ Each of its `ps` reads runs as `readProcessTable`, without blocking the server, 
 Startup and the socket gate then wait at most about 6 seconds, no Resume starts a second omp on its file, and `recover` counts its session as interrupted.
 Once all attached, `InterruptedSessions.recover` learns which sessions survived and answers those whose turn ran when the last server stopped, and only then is each listed again, and what it reported passed on, before the runners recover.
 Each comes back with the turn it left unread, and one whose turn ended while no server listened comes back with that turn unread, as [Session notifications](notifications.md#session-notifications) says; terminal sessions get theirs back at the first registry listing.
-Attaching to a keeper that greeted never stops omp: a session file without a readable header leaves the session in the directory omp started in, a replay marker that cannot be read counts as a replay, and a session that fails to attach is left running, unlisted, for the next server.
+Attaching to a keeper that greeted never stops omp: a session file without a readable header leaves the session in the directory omp started in, and a session that fails to attach is left running, unlisted, for the next server.
 **End session** sends the keeper `omp_agents_keeper_stop`: the keeper notes the processes under omp while omp is still their parent, sends SIGTERM to omp and to them, SIGKILL to those left after 3 seconds, removes its socket and log, and exits.
 omp exiting on its own ends the same way, except that its processes are no longer under it, so the keeper stops the ones it noted before.
 omp's background jobs, kernels and subagents lead process groups or sessions of their own and are reparented once omp exits, so the keeper's `ProcessCensus` (`src/process-census.ts`) notes the processes under omp with `ps` a second after a tool call ends, since an async call starts its job just after it returns, and every 10 seconds, each with its start time so that a reused pid is never signalled.
