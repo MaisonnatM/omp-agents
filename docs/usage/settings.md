@@ -81,23 +81,25 @@
   No omp session reads as no omp session, not as unused.
   Rows keep their order while sizes are measured and sort again once every size is in or you change the sort.
   A badge after the branch names what blocks deleting a checkout, with the full reason on hover; each repository's header checkbox selects every deletable row.
-  Selected rows show a bar at the bottom of the page with their count, size, **Clear**, and **Delete**.
-  **Delete** asks before it removes a linked worktree or forgets a registration whose directory is already gone.
-  It keeps the branch and session transcripts.
+  Selected rows show a bar at the bottom of the page with their count, size, **Clear**, and **Delete N worktrees**.
+  A row's **Delete**, or **Forget** for a registration whose directory is already gone, reads **Confirm?** after the first click, and a second click within three seconds queues it; the selection bar's button reads **Confirm deletion of N?** the same way and clears the selection once it queues them.
+  Queued worktrees are removed one at a time, even after you leave the page: the row reads **Queued**, then **Removing** beside a spinner, and leaves the list once it is gone.
+  One toast counts the run, such as `Removing 2 of 5 worktrees` with the branch it removes now, then sums it up, such as `Removed 4 of 5 worktrees` with how many it kept or failed to remove; a single worktree's toast says how its removal ended.
+  A worktree you picked that turns out blocked, and one whose removal fails, also toast on their own with the reason.
+  Removal keeps the branch and session transcripts.
   It refuses the main checkout, a locked checkout, unsaved changes, a nested repository, and a checkout this dashboard, a live session, or a resident subagent uses.
   Subagent blockers name the session and subagent. Known default and Bash working directories protect their containing checkouts, not unrelated siblings.
   Missing or incomplete subagent evidence and disconnected rosters keep repository-wide protection. If the repository is unknown too, every checkout stays protected.
-  Ignored files such as dependencies and `.env` are deleted with the checkout, and the confirmation names them.
-  A detached commit that no branch contains is named before its registration can be removed.
+  Ignored files such as dependencies and `.env` are deleted with the checkout, as each button's tooltip says.
+  A worktree whose detached commit no branch, tag, or remote holds is kept, with a toast that says so, since removing it could lose that commit.
   The page cannot see every shell or editor, so close other tools using a checkout before you delete it.
   Disk use is approximate, and removing a checkout may free less than the number shown.
   A row whose work has merged says **Merged** after its branch, with the pull request's number when GitHub's newest pull request from that branch merged.
   A worktree counts as merged when `origin`'s default branch contains its commit, which also covers a detached checkout, or when its branch's newest pull request merged and the branch has no commit made after the merge, which covers squash merges such as Graphite's.
   The main checkout is never flagged, and repositories GitHub cannot answer for share one warning above the list, while the default branch still flags what it contains.
-  **Remove merged** previews every merged row the search and filter show, says about how much disk it frees, and lists the ones it will remove and, folded, the ones it keeps, each with the reason.
-  It keeps a worktree with unsaved changes, one a live session uses, one whose work it cannot show merged, and everything **Delete** refuses.
-  Confirming removes only the worktrees it listed for removal, keeps their branches, and reports how many it removed, kept, and failed to remove.
-  Nothing is removed until you confirm.
+  **Remove N merged** shows while N merged rows that the search and filter show have no blocker badge, and reads **Confirm removal of N?** after the first click; a second click within three seconds queues them as **Delete** does.
+  It keeps a worktree with unsaved changes, one a live session uses, one whose work it cannot show merged, and everything **Delete** refuses, and counts those in its last toast.
+  The button reads **Removing…** beside a spinner and waits while any removal is queued or running.
 - **Models** shows which model omp uses for each role (`default`, `slow`, `plan`, `advisor`, `vision`, `smol`, `commit`, `tiny`, `task`) and the fallbacks that omp tries after that model, in order.
   A role without its own chain says that it uses the `default` role's chain.
   Chains keyed by a model or a `provider/*` wildcard appear in their own table, and the `modelProviderOrder` follows.
