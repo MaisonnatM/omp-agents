@@ -36,8 +36,6 @@
   Typing hides the list, and clearing the draft shows it again; the next prompt you send ends it.
   The prompts send as you would type them, so a message of your own that starts with a digit needs another character first, such as a space, while the list shows.
   omp's terminal shows the block as part of the reply.
-  The New session page lists its starters the same way, under the same buttons, while the draft is empty.
-  A starter never sends: its number, a click, Enter, and Tab all put it in the composer to edit first, and since it takes one starter at a time, it has no marks, no 0, and no **All of them** row.
 - A session that the dashboard started queues steers and follow-ups in omp itself, and the composer shows omp's own queue.
   Collab has no follow-up frame, and the host steers every guest message that arrives during a turn.
   So in a terminal session the dashboard holds a follow-up until the host reports that the turn ended, then sends it as a prompt, one per finished turn, as omp's default `followUpMode` delivers them.
@@ -67,6 +65,7 @@
   Terminal sessions show their model and thinking level in the same place, but Collab has no frame that changes them, so make those changes in the terminal.
   Subagents have no pickers.
 - The composer's bottom row starts with where the session works, left of the model menu, and shows its context counter on the right, before the clock button.
+  A new session's draft puts its directory and branch pickers above the composer instead, and a scheduled start keeps them in the bottom row.
   The counter is a ring that fills clockwise beside the percent of the session's context window used.
   It turns amber at 70% and red at 90%.
   Hover or focus it to see the token count and the window size, for example `Context 10% full: 95.6k of 1m tokens`.

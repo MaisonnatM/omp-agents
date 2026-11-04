@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { PullRequestSummary } from "../src/shared/github";
 import type { Ticket } from "../src/shared/tickets";
-import { type StarterContext, starterPrompts } from "./starters";
+import { rankedStarters, type StarterContext } from "./starters";
 
 const ticket = (id: string, fields: Partial<Ticket> = {}): Ticket => ({
 	id,
@@ -50,9 +50,10 @@ const pr = (number: number, fields: Partial<PullRequestSummary> = {}): PullReque
 const WEDNESDAY = new Date(2026, 10, 4, 15, 0);
 
 const context = (fields: Partial<StarterContext> = {}): StarterContext => ({ folder: "webapp", branch: "main", tickets: [], pullRequests: [], waiting: 0, now: WEDNESDAY, ...fields });
+const first = (fields: Partial<StarterContext> = {}) => rankedStarters(context(fields))[0];
 
 test("every starter is listed once, with its blanks filled from the draft's directory", () => {
-	const prompts = starterPrompts(context({ branch: "fix-login" }));
+	const prompts = rankedStarters(context({ branch: "fix-login" })).map(({ prompt }) => prompt);
 	expect(prompts).toHaveLength(7);
 	expect(prompts).toContain("Start the dev server on fix-login and give me the URL");
 	expect(prompts).toContain("Find which session made the uncommitted changes in webapp");
@@ -60,28 +61,29 @@ test("every starter is listed once, with its blanks filled from the draft's dire
 });
 
 test("a feature branch puts the dev server first", () => {
-	expect(starterPrompts(context({ branch: "fix-login" }))[0]).toBe("Start the dev server on fix-login and give me the URL");
-	expect(starterPrompts(context())[0]).not.toStartWith("Start the dev server");
+	expect(first({ branch: "fix-login" })).toEqual({ label: "Run the dev server", prompt: "Start the dev server on fix-login and give me the URL" });
+	expect(first().label).not.toBe("Run the dev server");
 });
 
 test("ship names the issue in progress before the one up next, and skips closed ones", () => {
 	const tickets = [ticket("ENG-1", { statusType: "completed" }), ticket("ENG-2"), ticket("ENG-3", { statusType: "started" })];
-	expect(starterPrompts(context({ tickets }))[0]).toBe("/ship ENG-3");
-	expect(starterPrompts(context({ tickets: tickets.slice(0, 2) }))).toContain("/ship ENG-2");
+	expect(first({ tickets })).toEqual({ label: "Ship ENG-3", prompt: "/ship ENG-3" });
+	expect(rankedStarters(context({ tickets: tickets.slice(0, 2) }))).toContainEqual({ label: "Ship ENG-2", prompt: "/ship ENG-2" });
+	expect(rankedStarters(context())).toContainEqual({ label: "Ship a Linear issue", prompt: "/ship " });
 });
 
 test("pull requests waiting on you put shepherd first, naming your one open pull request", () => {
 	const pullRequests = [pr(7), pr(8, { role: "reviewer" }), pr(9, { state: "merged" })];
-	expect(starterPrompts(context({ pullRequests, waiting: 2 }))[0]).toBe("Shepherd PR acme/webapp#7 until merged: rebase, fix CI, answer review threads");
-	expect(starterPrompts(context({ pullRequests: [pr(7), pr(10)], waiting: 2 }))[0]).toBe("Shepherd my open PRs until merged: rebase, fix CI, answer review threads");
+	expect(first({ pullRequests, waiting: 2 })).toEqual({ label: "Shepherd #7", prompt: "Shepherd PR acme/webapp#7 until merged: rebase, fix CI, answer review threads" });
+	expect(first({ pullRequests: [pr(7), pr(10)], waiting: 2 })).toEqual({ label: "Shepherd my PRs", prompt: "Shepherd my open PRs until merged: rebase, fix CI, answer review threads" });
 });
 
 test("Monday morning sums up last week first, a Friday evening this week", () => {
-	expect(starterPrompts(context({ now: new Date(2026, 10, 2, 9, 0) }))[0]).toBe("Summarize what I merged last week across my repos");
-	expect(starterPrompts(context({ now: new Date(2026, 10, 6, 17, 0) }))[0]).toBe("Summarize what I merged this week across my repos");
+	expect(first({ now: new Date(2026, 10, 2, 9, 0) })).toEqual({ label: "Sum up last week", prompt: "Summarize what I merged last week across my repos" });
+	expect(first({ now: new Date(2026, 10, 6, 17, 0) })).toEqual({ label: "Sum up my week", prompt: "Summarize what I merged this week across my repos" });
 });
 
 test("five issues untouched for a month put pruning above the defaults", () => {
 	const tickets = ["ENG-1", "ENG-2", "ENG-3", "ENG-4", "ENG-5"].map(id => ticket(id, { statusType: "backlog", updatedAt: "2026-09-01T00:00:00.000Z" }));
-	expect(starterPrompts(context({ tickets }))[0]).toBe("Review my Linear todos for staleness and propose what to close");
+	expect(first({ tickets }).label).toBe("Prune Linear todos");
 });

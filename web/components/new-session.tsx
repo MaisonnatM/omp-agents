@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
 import { Tooltip } from "@/components/ui/tooltip";
+import { activityControl } from "../activity";
 import { useComposerDraft } from "../composer-drafts";
 import { folderName, PRIVATE_NOTE } from "../labels";
 import type { Completions } from "../pane-store";
@@ -20,7 +21,7 @@ import { useDraftModelSelection } from "../use-draft-model";
 import { useShortcuts } from "../shortcuts";
 import type { ScheduleWhen } from "../scheduled-model";
 import type { NewOp, StartOf } from "../starts";
-import { starterPrompts } from "../starters";
+import { rankedStarters, type Starter } from "../starters";
 import { useGitCheckout } from "../use-git-checkout";
 import { useAction } from "../use-action";
 import { useSkills } from "../use-skills";
@@ -29,7 +30,6 @@ import { blockedShortcut, ComposerEditor, ComposerNote, EmptyConversation } from
 import { BranchPicker, targetOf } from "./git";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
 import { DictationButton, DictationRow, useDictation } from "./composer-dictation";
-import { useSuggestions } from "./composer-suggestions";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import type { PromptEditorHandle } from "./prompt-editor";
 import { ModelPicker } from "./model-picker";
@@ -125,7 +125,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			? { kind: "existing", name: pickedChoice.name }
 			: pickedChoice;
 	const starting = launch?.phase === "starting" || (scheduled?.busy ?? false);
-	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] } });
+	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] }, below: !scheduled });
 	const { send } = useDashboardActions();
 	// A composer that keeps no draft, as a scheduled start's, has nowhere to put text that lands after it closes.
 	const dictation = useDictation({ composer: draftKey !== null && !starting ? { draftKey, cwd } : null, text: draft, editorRef, send, connected });
@@ -153,7 +153,6 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		if (completion.onMenuKeyDown(event)) return;
 		dictation.onKeyDown(event);
 		onComposerKey(event);
-		if (!event.defaultPrevented) suggestions.onKeyDown(event);
 		if (!event.defaultPrevented && event.key === "Escape") {
 			event.currentTarget.blur();
 			event.preventDefault();
@@ -171,15 +170,21 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const name = folderName(target.dir) ?? target.dir;
 	const error = scheduled ? scheduled.error : launch?.phase === "failed" ? launch.error : null;
 	const starterList = useStarters(starters, name, choice?.name ?? checkout?.branch ?? null);
-	const suggestions = useSuggestions({
-		prompts: connected && !starting ? starterList : NO_STARTERS,
-		draft,
-		label: "Starters",
-		onFill: prompt => {
-			prefilled.current = true;
-			setDraft(prompt);
-		},
-	});
+	const pickers = (
+		<>
+			<DirectoryPicker
+				cwd={cwd}
+				workspaces={workspaces}
+				disabled={starting}
+				shortcut="directory"
+				open={directoriesOpen}
+				onOpenChange={setDirectoriesOpen}
+				onPick={onPickCwd}
+				control="composer.directory"
+			/>
+			{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
+		</>
+	);
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			{scheduled ? (
@@ -199,79 +204,84 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					{scheduled ? `Not sent: ${error}` : error}
 				</p>
 			)}
-			{scheduled ? (
+			{scheduled && (
 				<EmptyConversation title={`Scheduled in ${name}`}>
 					It starts at its time as Start session would start it. Edit the message, model, skill, directory, or branch, then save; the clock moves its time.
 					{todo && ` Your todo “${todo.text}” links to the session once it starts.`}
 				</EmptyConversation>
-			) : (
-				<EmptyConversation title={`Start omp in ${name}`}>
-					{target.creates
-						? "It starts when you send the first message, which adds the worktree, so leaving this draft leaves nothing running."
-						: "It starts when you send the first message, so leaving this draft leaves nothing running."}
-					{todo && ` Your todo “${todo.text}” links to the session once it starts.`}
-				</EmptyConversation>
 			)}
-			<div className="relative mx-auto w-full max-w-conversation px-3 pb-3">
-				{completion.popup}
-				<ComposerEditor value={editorRef}>
-					<InputMessage
-						editorRef={editorRef}
-						value={draft}
-						onValueChange={completion.onValueChange}
-						onSend={text => {
-							if (directCommand) return;
-							completion.close();
-							if (scheduled) save.run(text.trim());
-							else void attachments.read(text, async (prompt, images) => onStart({ ...opOf(prompt), images }));
-						}}
-						placeholder="Message this session…"
-						files={attachments.files}
-						onFilesChange={attachments.onFilesChange}
-						accept={ATTACH_ACCEPT}
-						leftSlot={
-							<>
-								<DirectoryPicker
-									cwd={cwd}
-									workspaces={workspaces}
-									disabled={starting}
-									shortcut="directory"
-									open={directoriesOpen}
-									onOpenChange={setDirectoriesOpen}
-									onPick={onPickCwd}
-									control="composer.directory"
-								/>
-								{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
-								<ModelPicker {...models.picker} disabled={starting || !connected} control="composer.model" />
-								{draftSkill !== null && !ownCommand && <SkillToggle name={draftSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
-								{!todo && <PrivateToggle on={isPrivate} onToggle={() => setPrivate(on => !on)} disabled={starting} />}
-							</>
-						}
-						rightSlot={({ openFilePicker }) => (
-							<>
-								<ScheduleButton draft={draft} files={attachments.files.length} disabled={starting || !connected} pending={schedule.pending} onSchedule={schedule.run} />
-								{!scheduled && <AttachButton onClick={() => openFilePicker()} disabled={starting} />}
-								<DictationButton dictation={dictation} />
-							</>
-						)}
-						disabled={starting || !connected}
-						locked={dictation.locked}
-						beforeEditor={<DictationRow dictation={dictation} />}
-						afterActions={suggestions.list}
-						sendLabel={scheduled ? "Save" : starting ? "Starting session" : "Start session"}
-						sending={starting || save.pending}
-						editorProps={{
-							...completion.editorProps,
-							"aria-activedescendant": completion.editorProps["aria-activedescendant"] ?? suggestions.activeId,
-							onBlur: suggestions.onBlur,
-							onKeyDown,
-							onPaste: scheduled ? undefined : attachments.onPaste,
-							autoFocus: true,
-						}}
-					/>
-				</ComposerEditor>
+			{/* A new session puts the composer in the page's upper middle, its directory and branch above it and its starters under it; a scheduled start docks it at the bottom. */}
+			<div className={cn("mx-auto w-full max-w-conversation px-3", scheduled ? "pb-3" : "pt-[18vh] pb-6")}>
+				{!scheduled && <div className="flex flex-wrap items-center gap-1 pb-1.5">{pickers}</div>}
+				<div className="relative">
+					{completion.popup}
+					<ComposerEditor value={editorRef}>
+						<InputMessage
+							editorRef={editorRef}
+							value={draft}
+							onValueChange={completion.onValueChange}
+							onSend={text => {
+								if (directCommand) return;
+								completion.close();
+								if (scheduled) save.run(text.trim());
+								else void attachments.read(text, async (prompt, images) => onStart({ ...opOf(prompt), images }));
+							}}
+							placeholder={scheduled ? "Message this session…" : "Describe the work; omp starts when you send it"}
+							files={attachments.files}
+							onFilesChange={attachments.onFilesChange}
+							accept={ATTACH_ACCEPT}
+							leftSlot={
+								<>
+									{scheduled && pickers}
+									<ModelPicker {...models.picker} disabled={starting || !connected} control="composer.model" />
+									{draftSkill !== null && !ownCommand && <SkillToggle name={draftSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
+									{!todo && <PrivateToggle on={isPrivate} onToggle={() => setPrivate(on => !on)} disabled={starting} />}
+								</>
+							}
+							rightSlot={({ openFilePicker }) => (
+								<>
+									<ScheduleButton draft={draft} files={attachments.files.length} disabled={starting || !connected} pending={schedule.pending} onSchedule={schedule.run} />
+									{!scheduled && <AttachButton onClick={() => openFilePicker()} disabled={starting} />}
+									<DictationButton dictation={dictation} />
+								</>
+							)}
+							disabled={starting || !connected}
+							locked={dictation.locked}
+							beforeEditor={<DictationRow dictation={dictation} />}
+							sendLabel={scheduled ? "Save" : starting ? "Starting session" : "Start session"}
+							sending={starting || save.pending}
+							editorProps={{
+								...completion.editorProps,
+								onKeyDown,
+								onPaste: scheduled ? undefined : attachments.onPaste,
+								autoFocus: true,
+							}}
+						/>
+					</ComposerEditor>
+				</div>
 				{directCommand && <ComposerNote text={directCommand} />}
 				{attachments.note && <ComposerNote text={attachments.note} />}
+				{!scheduled && todo && <p className="mt-2 px-1 text-xs text-muted-foreground">Your todo “{todo.text}” links to the session once it starts.</p>}
+				{connected && !starting && !draft.trim() && starterList.length > 0 && (
+					<div role="group" aria-label="Starters" className="mt-3 flex flex-wrap gap-2">
+						{starterList.map(starter => (
+							<Tooltip key={starter.label} content={starter.prompt}>
+								<Button
+									variant="tertiary"
+									size="compact"
+									className="rounded-full px-3 font-normal text-muted-foreground hover:text-foreground"
+									onClick={() => {
+										prefilled.current = true;
+										setDraft(starter.prompt);
+									}}
+									{...activityControl("composer.starter")}
+								>
+									{starter.label}
+								</Button>
+							</Tooltip>
+						))}
+					</div>
+				)}
 			</div>
 		</div>
 	);
@@ -283,12 +293,12 @@ export interface StarterSources {
 	linear: boolean;
 }
 
-const NO_STARTERS: string[] = [];
+const NO_STARTERS: Starter[] = [];
 const NO_TICKETS: Ticket[] = [];
 const NO_PULL_REQUESTS: PullRequestSummary[] = [];
 
 /** The starters for a draft in `folder` on `branch`, the best fit now first; none without `sources`. */
-function useStarters(sources: StarterSources | undefined, folder: string, branch: string | null): string[] {
+function useStarters(sources: StarterSources | undefined, folder: string, branch: string | null): Starter[] {
 	const { pullRequestsScope } = useDashboardStatus();
 	const tickets = ticketsStore.usePolling(null, sources?.linear ?? false).read?.data.tickets ?? NO_TICKETS;
 	const list = pullRequestsStore.use(pullRequestsScope).read?.data ?? null;
@@ -297,7 +307,7 @@ function useStarters(sources: StarterSources | undefined, folder: string, branch
 		if (!hosts) return NO_STARTERS;
 		const pullRequests = list ? listedPullRequests(list.repos) : NO_PULL_REQUESTS;
 		const waiting = list ? yourMoveCount(list, agentOn(hosts)) : 0;
-		return starterPrompts({ folder, branch, tickets, pullRequests, waiting, now: new Date() });
+		return rankedStarters({ folder, branch, tickets, pullRequests, waiting, now: new Date() });
 	}, [hosts, list, tickets, folder, branch]);
 }
 

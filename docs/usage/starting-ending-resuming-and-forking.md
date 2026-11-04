@@ -1,15 +1,15 @@
 # Starting, ending, resuming, and forking
 
 - To start a session, click **New session** at the top of the **Sessions** tab.
-  The page shows a new-session draft with the same header and composer as a running session, its header reading `New session`; the directory picker in the composer, left of the model menu, shows the directory that omp will run in.
+  The page shows a new-session draft, its header reading `New session`, with the composer about a fifth of the way down the page and the directory and branch pickers just above it; the directory picker shows the directory that omp will run in.
   No omp process starts and no row appears in the sidebar until you send the first message, so leaving an empty draft leaves nothing running.
-  While the draft is empty, the composer lists starters under its action bar, numbered as a reply's suggested prompts are: seven prompts for work you start often, the best fit for now first.
-  They fill in what the page knows: the branch picked in the composer, your Linear issue in progress or up next, and your one open pull request when you have only one.
+  While the draft is empty, a row of starters sits under the composer: seven short buttons for work you start often, such as **Run the dev server**, **Ship ENG-2722**, or **Sum up my week**, the best fit for now first.
+  They fill in what the page knows: the branch picked above the composer, your Linear issue in progress or up next, and your one open pull request when you have only one.
   Running the dev server ranks first on a feature branch, shipping an issue when one is in progress, shepherding your pull requests when some wait on your move, and a summary of what you merged on Monday morning and at the end of the week.
-  Pressing a starter's number or clicking it puts its prompt in the composer without sending it, so you can edit it first; with no issue to name, the ship starter puts `/ship ` there for you to paste the issue's or the view's link after.
-  A scheduled start lists no starters.
+  Hovering a starter shows its full prompt, and clicking it puts that prompt in the composer without sending it, so you can edit it first; with no issue to name, **Ship a Linear issue** puts `/ship ` there for you to paste the issue's or the view's link after.
+  A scheduled start keeps the composer at the page's bottom, with its pickers inside it, and lists no starters.
   The directory is the selected workspace, else the open session's workspace, else the newest live session's, else the newest past session's, so a session in a linked worktree hands its repository's main checkout to the draft, where the branch picker can pick a worktree.
-  To start in another directory, under **All workspaces** or not, pick it in the composer's directory picker, or press Cmd+Alt+P.
+  To start in another directory, under **All workspaces** or not, pick it in the directory picker, or press Cmd+Alt+P.
   It lists the workspaces the sidebar lists, and **Use** takes any directory typed into its search field.
   The message you typed stays in the composer.
   Sending the first message starts omp there and sends it the message.
@@ -48,7 +48,7 @@
   A private session shows a lock in its sidebar row and its header.
   It ends when its omp process stops, whether through **End session**, `end_session`, or a crash; a dashboard that was not running then deletes it at its next start.
   The toggle hides on a draft that starts from a todo, since nothing may link to a private session.
-- When the directory is in a git checkout, a branch picker sits after the directory picker in the composer.
+- When the directory is in a git checkout, a branch picker sits after the directory picker.
   The picker lists the local branches, the checked-out one first, then the most recently committed to, each with where it would run: `here`, the worktree that has it checked out, or `new worktree`.
   Picking the checked-out branch keeps the directory as it is.
   Picking another branch runs omp in the worktree that has it checked out, or adds a worktree for it when none has.

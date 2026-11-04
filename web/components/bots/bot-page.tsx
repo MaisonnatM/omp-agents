@@ -58,7 +58,6 @@ function BotComposer({ bot, connected, starters, completions }: { bot: Bot; conn
 	const suggestions = useSuggestions({
 		prompts: connected && !send.pending ? starters : NO_STARTERS,
 		draft: text,
-		label: "Suggested prompts",
 		onSend: value => send.run(value),
 		onFill: value => {
 			completion.onValueChange(value);
