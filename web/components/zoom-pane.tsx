@@ -11,7 +11,7 @@ const MIN = LEVELS[0];
 const MAX = LEVELS[LEVELS.length - 1];
 
 /** The level after `zoom` in direction `by`, so a pinch's in-between level still steps to the next listed one. */
-function stepped(zoom: number, by: 1 | -1): number {
+export function stepped(zoom: number, by: 1 | -1): number {
 	const next = by === 1 ? LEVELS.find(level => level > zoom + 0.001) : LEVELS.findLast(level => level < zoom - 0.001);
 	return next ?? zoom;
 }

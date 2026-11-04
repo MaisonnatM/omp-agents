@@ -46,7 +46,7 @@
   A `mermaid` block draws a flowchart (`graph` or `flowchart` with a direction such as `TD` or `LR`), a `sequenceDiagram`, a `stateDiagram-v2`, a `classDiagram`, or an `erDiagram`, named on its first line, in up to 20,000 characters.
   A `chart` block holds one JSON object: `{"type": "bar" | "line" | "area" | "pie", "title"?, "description"?, "x", "series": [{"key", "label"?}], "data": [...]}`.
   Each row holds the `x` key, text or a number, and each series key, a finite number, and nothing else; a chart has 1 to 5 series and 1 to 500 rows, and a pie exactly one series, whose `x` names each slice.
-  The block's header switches between **Preview** and **Source**, copies the block's exact text, and expands the visual into a dialog for a narrow pane.
+  The block's header switches between **Preview** and **Source**, copies the block's exact text, and expands the visual into a dialog for a narrow pane, where it zooms as an image does.
   A block that breaks these rules, such as a pie or gantt diagram, an unknown key, or a value that is not a number, shows its text with a note that says why.
   Each session the dashboard starts, resumes, or forks is told these two formats in its system prompt; a replay and a terminal session are not, so a replay's requests still match the original's.
 - A subagent's header trail names the session's title and the subagent's id, then the subagent's type as a badge, as in `Fix login / 0-Explore` `explore`.
@@ -112,9 +112,12 @@
   A todo's notes do not open paths: a path there is plain text.
 - An image or video on this computer that a prompt or the agent's text names shows in the message: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, `.svg`, `.mp4`, `.m4v`, `.webm`, or `.mov`.
   Its path is found as a text file's is, and opens the file dialog with the image large or the video playing.
-  Written as an image, `![alt](path)`, it shows in place, and a video there plays in place; otherwise each one the text names shows once as a thumbnail under the text, a video by its first frame, and opens the dialog on click.
+  Written as an image, `![alt](path)`, it shows in place and opens the dialog on click, and a video there plays in place.
+  Otherwise each one the text names shows once as a thumbnail under the text, a video by its first frame: a video opens the dialog, and an image opens large, where the arrows, or the Left and Right keys, step to the thumbnails' other images.
   A remote image, `![](https://…)`, stays a link, so a prompt-injected address never loads.
   A path to a missing file, or to one in a directory that does not open, shows no thumbnail.
+- An image opened large, a chart or diagram expanded, and the dialog's image zoom as a browser page does: the header's − and + buttons or the − and + keys zoom out and in, the level between them or the 0 key fits it to the window again, a pinch or Cmd/Ctrl with the scroll wheel zooms around the pointer, and dragging moves a zoomed image.
+  Cmd+ and Cmd− still zoom the whole desktop window.
 - Every prompt has a copy button.
   Among the agent's messages, only the reply that ends each turn has one, not the messages it writes between tool calls.
   A turn still running shows none until it ends.
