@@ -1,27 +1,24 @@
-/** The New session page's hero and board above the composer: open todos, sessions to resume, and pull requests waiting on your move, each one click from an agent. */
-import { CircleDashed, GitPullRequest, History, type LucideIcon } from "lucide-react";
-import { useContext, useMemo, type ReactNode } from "react";
+/** The New session page's hero and board above the composer: prompts to start common work with, sessions to resume, and pull requests waiting on your move, each one click from an agent. */
+import { GitPullRequest, History, type LucideIcon, MessageSquare, Zap } from "lucide-react";
+import { useMemo, type ReactNode } from "react";
 import { prKey } from "../../src/shared/github";
 import { agentOn } from "../../src/shared/moves";
 import type { PastSession, RosterHost } from "../../src/shared/sessions";
 import { cn } from "@/lib/utils";
-import { localDay } from "../../src/shared/days";
 import { pastLabel } from "../labels";
-import { boardPullRequests, boardSessions, boardTodos, BOARD_ROWS } from "../new-session-board-model";
+import { boardPullRequests, boardSessions, BOARD_ROWS, STARTERS } from "../new-session-board-model";
 import { readPinnedSkill } from "../pinned-skill";
 import { pendingOf, pullRequestStart, QUICK_ACTIONS } from "../quick-actions";
 import { pullRequestsStore } from "../reads";
-import { hashForNewSession, hashForPullRequests, hashForTodo } from "../routing";
-import { TODO_STATUS, todoCwd } from "../todo-views";
+import { hashForPullRequests } from "../routing";
 import { Age } from "./age";
-import { useDashboardActions, useDashboardStatus, UserTodosContext } from "./dashboard-context";
+import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { STATE_ICON } from "./pull-requests/avatars";
 import { MoveBadge } from "./pull-requests/pr-row";
-import { DueText, StatusIcon } from "./todo/fields";
 
 interface Props {
-	/** The composer's directory, which a todo with no Workspace starts its session in. */
-	cwd: string;
+	/** Adds a starter's prompt to the draft, unsent. */
+	prefill: (prompt: string) => void;
 	hosts: RosterHost[];
 	past: PastSession[];
 	/** The sidebar's workspace, `null` for all, which scopes the sessions. */
@@ -30,16 +27,13 @@ interface Props {
 	note: string;
 }
 
-export function NewSessionBoard({ cwd, hosts, past, workspace, note }: Props) {
+export function NewSessionBoard({ prefill, hosts, past, workspace, note }: Props) {
 	const { start } = useDashboardActions();
 	const { pullRequestsScope, starts } = useDashboardStatus();
-	const list = useContext(UserTodosContext);
 	const pullRequestList = pullRequestsStore.use(pullRequestsScope).read?.data ?? null;
-	const todos = useMemo(() => boardTodos(list?.todos ?? []), [list]);
 	const sessions = useMemo(() => boardSessions(past, workspace), [past, workspace]);
 	const pullRequests = useMemo(() => boardPullRequests(pullRequestList, agentOn(hosts)), [pullRequestList, hosts]);
 	const resuming = starts.resume?.phase === "starting" ? starts.resume.op.sessionId : null;
-	const day = localDay();
 	return (
 		<div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto px-3">
 			<div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 mx-auto h-80 max-w-3xl rounded-full bg-[radial-gradient(closest-side,color-mix(in_oklch,var(--primary)_9%,transparent),transparent)] blur-[24px]" />
@@ -49,10 +43,10 @@ export function NewSessionBoard({ cwd, hosts, past, workspace, note }: Props) {
 					<p className="text-sm text-pretty text-muted-foreground">{note}</p>
 				</div>
 				<section aria-label="Pick up work" className="mx-auto grid w-full max-w-[1040px] grid-cols-1 rounded-[18px] bg-card/80 shadow-surface-3 backdrop-blur md:grid-cols-3 [&>*+*]:border-t [&>*+*]:border-border md:[&>*+*]:border-t-0 md:[&>*+*]:border-s">
-					<Column icon={CircleDashed} title="Todos for agents" count={todos.length} all={hashForTodo({ kind: "all" })} empty="No open todos.">
-						{todos.slice(0, BOARD_ROWS).map(todo => (
-							<Row key={todo.id} title={todo.text} action="Start" onPick={() => (location.hash = hashForNewSession(todoCwd(todo, cwd), todo.id))} icon={<StatusIcon status={todo.status} className="size-3.5" />}>
-								{todo.due ? <DueText due={todo.due} day={day} /> : TODO_STATUS[todo.status].label}
+					<Column icon={Zap} title="Starters" count={STARTERS.length} empty="No starters.">
+						{STARTERS.map(starter => (
+							<Row key={starter.label} title={starter.label} action="Draft" onPick={() => prefill(starter.prompt)} icon={<MessageSquare aria-hidden className="size-3.5 text-muted-foreground" />}>
+								{starter.prompt}
 							</Row>
 						))}
 					</Column>

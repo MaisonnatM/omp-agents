@@ -1,5 +1,5 @@
 import { Lock, Sparkles } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import type { BranchChoice } from "../../src/shared/git";
 import type { NewSessionRequest } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
 import { Tooltip } from "@/components/ui/tooltip";
-import { useComposerDraft } from "../composer-drafts";
+import { useComposerDraft, withAppended } from "../composer-drafts";
 import { folderName, PRIVATE_NOTE } from "../labels";
 import type { Completions } from "../pane-store";
 import { usePinnedSkill } from "../pinned-skill";
@@ -56,8 +56,11 @@ interface NewSessionProps {
 	scheduled?: ScheduledDraft;
 	/** Where this browser keeps the unsent text; `null` keeps none. */
 	draftKey: string | null;
-	/** The hero and board above the composer, given the line under its heading; a scheduled start shows none. */
-	board?: (note: string) => ReactNode;
+	/**
+	 * The hero and board above the composer, given the line under its heading and `prefill`, which adds a prompt to the
+	 * draft, unsent, with the caret after it; a scheduled start shows none.
+	 */
+	board?: (note: string, prefill: (prompt: string) => void) => ReactNode;
 }
 
 /** What a scheduled start keeps of the draft: text only, in the draft's directory. */
@@ -87,6 +90,13 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const initial = scheduled?.request ?? null;
 	const editorRef = useRef<PromptEditorHandle>(null);
 	const [draft, setDraft] = useComposerDraft(draftKey, initial?.prompt ?? todo?.prompt ?? "");
+	// Set by `prefill` until the editor holds the new draft, so the caret lands after the prompt it added.
+	const prefilled = useRef(false);
+	useEffect(() => {
+		if (!prefilled.current) return;
+		prefilled.current = false;
+		editorRef.current?.select(draft.length);
+	}, [draft]);
 	const attachments = usePromptAttachments(true);
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null } | null>(initial && { cwd: initial.cwd, choice: initial.branch });
 	const models = useDraftModelSelection(cwd, initial ?? undefined);
@@ -185,6 +195,10 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 						? "It starts when you send the first message, which adds the worktree, so leaving this draft leaves nothing running."
 						: "Describe new work, or pick up something below. It starts when you send the first message, so leaving this draft leaves nothing running.") +
 						(todo ? ` Your todo “${todo.text}” links to the session once it starts.` : ""),
+					prompt => {
+						prefilled.current = true;
+						setDraft(current => withAppended(current, prompt));
+					},
 				)
 			)}
 			<div className="relative mx-auto w-full max-w-conversation px-3 pb-3">

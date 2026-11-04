@@ -3,11 +3,12 @@
 - To start a session, click **New session** at the top of the **Sessions** tab.
   The page shows a new-session draft with the same header and composer as a running session, its header reading `New session`; the directory picker in the composer, left of the model menu, shows the directory that omp will run in.
   No omp process starts and no row appears in the sidebar until you send the first message, so leaving an empty draft leaves nothing running.
-  Above the composer, under **Start a session**, a board lists up to four items in each of three columns.
-  **Todos for agents** lists the open todos by status, as the Todo page orders them; clicking one starts a draft from it, in the todo's workspace when it names one, as **Start session** on the Todo page does.
-  **Pick up where you left off** lists the selected workspace's omp sessions, interrupted ones first, then the latest; clicking one resumes it.
-  **Pull requests waiting** lists the Pull requests board's **Your move** column, keeping the pull requests that a quick action hands to an agent; clicking one runs that quick action, as its badge on the Pull requests page does.
-  **All** opens the Todo page or the Pull requests page.
+  Above the composer, under **Start a session**, a board lists three columns.
+  **Starters** lists seven prompts for work you start often, such as running the dev server on this branch, shipping a Linear issue, or shepherding your open pull requests until they merge.
+  Clicking one adds its prompt to the draft without sending it, so you can edit it first; **Ship a Linear issue** adds `/ship ` for you to paste the issue's or the view's link after.
+  **Pick up where you left off** lists up to four of the selected workspace's omp sessions, interrupted ones first, then the latest; clicking one resumes it.
+  **Pull requests waiting** lists up to four pull requests from the Pull requests board's **Your move** column, keeping the ones that a quick action hands to an agent; clicking one runs that quick action, as its badge on the Pull requests page does.
+  Its **All** opens the Pull requests page.
   A scheduled start shows no board.
   The directory is the selected workspace, else the open session's workspace, else the newest live session's, else the newest past session's, so a session in a linked worktree hands its repository's main checkout to the draft, where the branch picker can pick a worktree.
   To start in another directory, under **All workspaces** or not, pick it in the composer's directory picker, or press Cmd+Alt+P.

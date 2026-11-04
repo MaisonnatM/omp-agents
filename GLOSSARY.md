@@ -137,6 +137,11 @@ It is separate from a todo's notes field.
 What the page records of how its user uses the dashboard, by registry id only, which Settings › Activity reports.
 _Avoid_: Usage (omp's requests, in Analytics), analytics, telemetry
 
+**Starter**:
+A prompt in the **Starters** column of the New session page's board, which a click adds to the draft without sending it.
+It is not the **Starter kit**.
+_Avoid_: Template, preset, suggestion (the replies' **Suggestions:**)
+
 ## Unattended work
 
 **Routine**:

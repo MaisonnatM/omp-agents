@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-04
 
+- The New session page's board now starts with Starters, seven prompts for work you start often, such as running the dev server on this branch or shipping a Linear issue. Clicking one puts its prompt in the draft for you to edit and send. Todos for agents left the board; your todos stay on the Todo page.
 - The starter kit now sends agents to the review steps before they mark a pull request ready or merge it, so they stop running into the review check first.
 
 ## 2026-11-03

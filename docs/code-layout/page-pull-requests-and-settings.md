@@ -1,7 +1,7 @@
 # Page: pull requests, tickets, settings, integrations, and primitives
 
 - `web/components/pull-requests/`, `web/components/tickets/`, `web/components/settings/`, `web/components/integrations/`, and `web/components/new-session.tsx`: the other pages.
-  `web/components/new-session-board.tsx` is the New session page's board of todos, sessions, and pull requests above the composer; `web/new-session-board-model.ts` picks and orders its rows.
+  `web/components/new-session-board.tsx` is the New session page's board of starters, sessions, and pull requests above the composer; `web/new-session-board-model.ts` holds the starters' prompts and picks and orders the other rows, and `NewSession` hands the board the `prefill` that adds a starter's prompt to the draft.
   `web/components/new-session.tsx` holds `PrivateToggle`, the composer's **Private** toggle, whose tooltip is `PRIVATE_NOTE` from `web/labels.ts`, the one every private session's lock repeats.
   `web/components/tickets/tickets-page.tsx` is the tickets page, its list and the open issue beside it in a `ListSplit`, `ticket-row.tsx` an issue's row with its state and priority glyphs and chips, and `ticket-details.tsx` one issue laid out as a pull request's **Summary** is, with a header that condenses through `pull-requests/pr-details/use-condensed-header.ts` above the issue's own scroller, its fields as `MetaRow`s, and `SummarySection`s from `pull-requests/pr-details/section.tsx`.
   `web/components/pull-requests/avatars.tsx` holds the state icons, the avatars, and the reviewers' pictures that a pull request's rows and details share, and `PersonPicture`, the picture beside each person in the **Reviewers** pickers and submenu.
