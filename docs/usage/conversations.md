@@ -66,10 +66,13 @@
   Click a line to scroll the conversation to that prompt; the arrows above and below the lines, shown on hover, step to the previous and next turn.
   The line of the turn you are reading stays lit as you scroll; after a click it stays on that turn until you scroll yourself, since the last turns may never reach the top.
 - The **Todos** card holds the agent's todo list, its **Subagents**, and the **Files**, **Images**, and **Sources** sections of [Changed files and images](changed-files-and-images.md), each shown once it has something to list; a past session's conversation shows it too.
+  It shows as one line above the messages: the /ship stage and its step, such as **Live review · step 8 of 9**, or else the task in progress, then each section's count in its header's words, such as **Todos 6/12 · 7 Files · 1 Image · 1 Source**.
+  As the conversation narrows, the counts drop from the last one, so the stage or the task keeps room to read.
+  Click the line to open the card over the messages; click outside it or press Escape to close it, and Escape puts the focus back on the line.
+  A file or an image opened from the card opens on top of it, and closing it brings you back to the card.
   Once the view's agent made a todo list, the card shows the list as its latest `todo` call left it: how many tasks are done of all, a thin progress line, and the task in progress.
-  It floats at the conversation's top right, narrowing to fit the space beside the messages, and sits above them when that space is too narrow, so it never covers a message; it scrolls as a whole when its sections outgrow it.
-  Click the todo summary to unfold every phase, and click it again to fold it; it starts folded, and the app remembers your choice for every conversation.
-  **Show todos card** in Settings › Preferences, or the checklist toggle in the session's header, before End session or Resume, hides the whole card, its **Subagents**, **Files**, **Images**, and **Sources** sections too.
+  Click the todo summary to fold every phase, and click it again to unfold it; it starts unfolded, and the app remembers your choice for every conversation.
+  **Show todos card** in Settings › Preferences, or the checklist toggle in the session's header, before End session or Resume, hides the whole card, its line, its **Subagents**, **Files**, **Images**, and **Sources** sections too.
   Unfolded, each phase shows its done count and its open tasks first, a blocked task's reason under it; its done and dropped tasks fold into an **N done** row.
   Each status has its own mark: an empty ring for to do, a spinning arc beside a shimmering title for in progress, a green disc with a check for done, an amber disc with an exclamation mark for blocked, and a dashed ring for dropped.
   A phase with every task done folds to one line; click it to open it.
