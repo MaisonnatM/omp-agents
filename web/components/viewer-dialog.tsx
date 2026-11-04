@@ -1,6 +1,6 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { type LucideIcon, X } from "lucide-react";
-import { type ReactNode, useRef } from "react";
+import { type KeyboardEvent, type ReactNode, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 
@@ -12,12 +12,13 @@ interface ViewerDialogProps {
 	actions?: ReactNode;
 	/** What screen readers call the scrolling body. */
 	bodyLabel: string;
+	onKeyDown?: (event: KeyboardEvent) => void;
 	onClose: () => void;
 	children: ReactNode;
 }
 
 /** A large dialog over the page that shows one thing to read: a header with its title and actions, and a body that scrolls. */
-export function ViewerDialog({ title, description, icon: Icon, actions, bodyLabel, onClose, children }: ViewerDialogProps) {
+export function ViewerDialog({ title, description, icon: Icon, actions, bodyLabel, onKeyDown, onClose, children }: ViewerDialogProps) {
 	const body = useRef<HTMLDivElement>(null);
 	return (
 		<DialogPrimitive.Root open onOpenChange={next => !next && onClose()}>
@@ -30,6 +31,7 @@ export function ViewerDialog({ title, description, icon: Icon, actions, bodyLabe
 						body.current?.focus();
 					}}
 					className="fixed top-1/2 left-1/2 z-50 flex h-[calc(100vh-4rem)] w-[min(64rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-3 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-hidden"
+					onKeyDown={onKeyDown}
 				>
 					<div className="flex items-start gap-4">
 						{Icon && <Icon aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />}
