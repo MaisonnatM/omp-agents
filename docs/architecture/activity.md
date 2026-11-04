@@ -100,7 +100,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Settings › Analytics' context-source table | view | `settings/analytics` |
 | Settings › Integrations' Google account lines | view, action | `settings/integrations`; Add account, Remove, and the workspace picker are `PUT`s |
 | Settings › Workflows | view, action | `settings/workflows`; saving a workflow's skill is the `PUT` that Settings › Files saves with |
-| Settings › Worktrees | view, action | `settings/worktrees`; Remove merged is a `PUT` |
+| Settings › Worktrees | view, action | `settings/worktrees`; each queued removal's preview and removal are `PUT`s |
 | Settings › Preferences | view, action | `settings/preferences`; each change to a preference that follows you, the theme, transcript, sidebar tabs, notifications, pinned skill, default merge method, diff, and calendar routine choices, is action `preference`, wherever you change it; Stop idle processes is a `PUT` |
 | Settings › Sync | view, action | `settings/sync`; Sync and its switches are `PUT`s |
 | ListSplit | not observed | dragging the line is not a click |
