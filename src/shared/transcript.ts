@@ -1,5 +1,7 @@
 /** What a transcript shows: its items, the files its agent changed, its images, and the files it opens. */
 
+import { type BotMessage, readBotMessage } from "./bot-message";
+import type { BotId } from "./bots";
 import type { DiffRow } from "./changes";
 import { readRoutineMessage, type RoutineMessage } from "./routine-message";
 
@@ -45,13 +47,15 @@ export const mediaUrl = (path: string): string => `/api/media?${new URLSearchPar
 /** How a prompt the dashboard sent in the user's place starts, as an older version's project updates did; the agent read it, the user never sees it as theirs. */
 export const DASHBOARD_PROMPT_PREFIX = "[omp-agents]";
 
-/** Who sent a prompt: the user, the dashboard in the user's place, or a routine, whose message a stamp tells. */
-export type PromptAuthor = { kind: "user" } | { kind: "dashboard" } | { kind: "routine"; message: RoutineMessage };
+/** Who sent a prompt: the user, the dashboard in the user's place, or a routine or another Bot, whose message a stamp tells. */
+export type PromptAuthor = { kind: "user" } | { kind: "dashboard" } | { kind: "routine"; message: RoutineMessage } | { kind: "bot"; message: BotMessage };
 
 export function promptAuthor(text: string): PromptAuthor {
 	if (text.startsWith(DASHBOARD_PROMPT_PREFIX)) return { kind: "dashboard" };
-	const message = readRoutineMessage(text);
-	return message ? { kind: "routine", message } : { kind: "user" };
+	const routine = readRoutineMessage(text);
+	if (routine) return { kind: "routine", message: routine };
+	const bot = readBotMessage(text);
+	return bot ? { kind: "bot", message: bot } : { kind: "user" };
 }
 
 /** A `/skill:` prompt as typed: the skill's token, then `text` after a space when there is any. */
@@ -76,6 +80,8 @@ export type Item =
 	 * `pending` as a prompt's. `shell`: what omp's run of a `!` prompt printed and how it ended; absent for any other.
 	 */
 	| { id: string; kind: "routine"; message: RoutineMessage; entryId: string | null; pending?: true; shell?: { output: string; code: number | null; cancelled: boolean } }
+	/** A message another Bot sent with `message_bot`, which {@link promptAuthor} tells; it opens a turn as a prompt does. `entryId` and `pending` as a prompt's. */
+	| { id: string; kind: "bot-message"; message: BotMessage; entryId: string | null; pending?: true }
 	| { id: string; kind: "assistant"; text: string; streaming: boolean; suggestions: string[] }
 	/** The model's reasoning text. `streaming` while that reply is still arriving. A redacted block has no text and is left out. */
 	| { id: string; kind: "thinking"; text: string; streaming: boolean }
@@ -83,8 +89,9 @@ export type Item =
 	 * `agents`: the subagents a `task` call spawned, by id, in the order they appeared; empty for every other tool.
 	 * `images`: the addresses of the images its result returned, such as a screenshot, as a prompt's; absent when none.
 	 * `todos`: the agent's whole todo list after a successful `todo` call; absent for every other call.
+	 * `to`: the Bot a `message_bot` call messaged; absent for every other call.
 	 */
-	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; agents: string[]; images?: string[]; todos?: TodoPhase[] }
+	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; agents: string[]; images?: string[]; todos?: TodoPhase[]; to?: BotId }
 	| { id: string; kind: "notice"; level: "info" | "warning" | "error"; text: string };
 
 /** A task on the agent's todo list, as omp's `todo` tool records it. */

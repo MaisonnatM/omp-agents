@@ -97,7 +97,7 @@ function useReadingTurn(turns: readonly OutlineTurn[], rail: RefObject<HTMLEleme
 const excerpt = (text: string): string => plainMarkdown(text).slice(0, 240);
 
 const titleOf = (turn: OutlineTurn): string =>
-	[turn.routine?.name ?? (turn.skill && skillLabel(turn.skill)), excerpt(turn.prompt)].filter(Boolean).join(" · ") || "Prompt";
+	[turn.routine?.name ?? turn.bot ?? (turn.skill && skillLabel(turn.skill)), excerpt(turn.prompt)].filter(Boolean).join(" · ") || "Prompt";
 
 const descriptionOf = (turn: OutlineTurn): string | null => (turn.reply ? excerpt(turn.reply.text) : turn.running ? "Working…" : null);
 

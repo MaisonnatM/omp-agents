@@ -76,6 +76,7 @@ import { ImageViewer } from "./media-viewer";
 import { AGENT_PRESET, MessageMarkdown, SESSION_AGENT_PRESET, SESSION_PROMPT_PRESET } from "./message-markdown";
 import { StatusDot, statusLabel } from "./status-dot";
 import { RoutineRunCard } from "./routines/routine-run-card";
+import { BotMessageCard } from "./bots/bot-message-card";
 import { PromptHistory } from "./prompt-history";
 import { SessionTodosCard } from "./session-todos-card";
 import { CancelAgentButton, SubagentLinks } from "./subagent-links";
@@ -300,17 +301,14 @@ export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries:
 	);
 });
 
-/** A chip under an activity group for each tool `chips` names that finished in it, once per tool. */
-function ToolChips({ names, chips }: { names: string[]; chips: ToolChipLabels }) {
-	return names.map(name => {
-		const { label, icon: Icon } = chips[name]!;
-		return (
-			<p key={name} className="mt-1.5 inline-flex items-center gap-1.5 self-start rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground" data-tool-chip={name}>
-				<Icon aria-hidden className="size-3.5 shrink-0" />
-				{label}
-			</p>
-		);
-	});
+/** A chip under an activity group for each label `chips` gives a call that finished in it, once per label. */
+function ToolChips({ shown }: { shown: ToolChip[] }) {
+	return shown.map(({ name, label, icon: Icon }) => (
+		<p key={label} className="mt-1.5 inline-flex items-center gap-1.5 self-start rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground" data-tool-chip={name}>
+			<Icon aria-hidden className="size-3.5 shrink-0" />
+			{label}
+		</p>
+	));
 }
 
 /**
@@ -345,17 +343,25 @@ function Row({ messageId, settled, className, children }: { messageId: string; s
 	);
 }
 
-/** A group of tool calls and thinking, with a chip for each tool `chips` names that finished in it. Memoized on its block, so a token leaves a settled group as it is. */
+type ToolChip = { name: string; label: string; icon: LucideIcon };
+
+/** A group of tool calls and thinking, with a chip for each label `chips` gives a call that finished in it. Memoized on its block, so a token leaves a settled group as it is. */
 const ActivityRow = memo(function ActivityRow({ id, entries, settled, shown, chips }: { id: string; entries: ActivityItem[]; settled: boolean; shown: boolean; chips: ToolChipLabels }) {
-	const names = useMemo(
-		() => [...new Set(entries.flatMap(entry => (entry.kind === "tool" && entry.status === "ok" && Object.hasOwn(chips, entry.name) ? [entry.name] : [])))],
-		[entries, chips],
-	);
-	if (!shown && names.length === 0) return null;
+	const chipsShown = useMemo(() => {
+		const byLabel = new Map<string, ToolChip>();
+		for (const entry of entries) {
+			if (entry.kind !== "tool" || entry.status !== "ok" || !Object.hasOwn(chips, entry.name)) continue;
+			const { label, icon } = chips[entry.name]!;
+			const text = typeof label === "string" ? label : label(entry);
+			if (!byLabel.has(text)) byLabel.set(text, { name: entry.name, label: text, icon });
+		}
+		return [...byLabel.values()];
+	}, [entries, chips]);
+	if (!shown && chipsShown.length === 0) return null;
 	return (
 		<Row messageId={id} settled={settled}>
 			{shown && <ActivityGroup entries={entries} />}
-			<ToolChips names={names} chips={chips} />
+			<ToolChips shown={chipsShown} />
 		</Row>
 	);
 });
@@ -501,6 +507,15 @@ const RoutineRow = memo(function RoutineRow({ item, settled }: { item: RoutineIt
 	return (
 		<Row messageId={item.id} settled={settled}>
 			<RoutineRunCard item={item} copy={<CopyButton text={taskText(item.message)} label={item.message.sent.kind === "command" ? "Copy command" : "Copy prompt"} />} />
+		</Row>
+	);
+});
+
+/** Another Bot's message, as its card. Memoized on the item, so a streamed token leaves it as it is. */
+const BotMessageRow = memo(function BotMessageRow({ item, settled }: { item: Extract<Item, { kind: "bot-message" }>; settled: boolean }) {
+	return (
+		<Row messageId={item.id} settled={settled}>
+			<BotMessageCard message={item.message} />
 		</Row>
 	);
 });
@@ -732,6 +747,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 									);
 								}
 								if (item.kind === "routine") return <RoutineRow key={item.id} item={item} settled={settled} />;
+								if (item.kind === "bot-message") return <BotMessageRow key={item.id} item={item} settled={settled} />;
 								const point = forks.get(item.id);
 								const edit = editing?.item.id === item.id ? editing : null;
 								return (

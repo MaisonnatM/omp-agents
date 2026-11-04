@@ -1,15 +1,27 @@
 /** A Bot's page, its one conversation under a header whose name shows or hides its details in the right sidebar, the card of its routines or a routine's editor in place of the conversation, and the New Bot form. */
-import { BookmarkCheck } from "lucide-react";
+import { BookmarkCheck, Send } from "lucide-react";
 import { type KeyboardEvent, useId, useMemo, useRef, useState } from "react";
 import type { RoutineSpec } from "../../../src/routines";
-import { BOT_HUES, BOT_KIND_INFO, BOT_KINDS, BOT_SHAPES, type Bot, type BotId, type BotLook, MAX_JOB_LENGTH, REMEMBER_TOOL } from "../../../src/shared/bots";
+import {
+	BOT_HUES,
+	BOT_KIND_INFO,
+	BOT_KINDS,
+	BOT_SHAPES,
+	type Bot,
+	type BotId,
+	type BotLook,
+	jobLine,
+	MAX_JOB_LENGTH,
+	MESSAGE_BOT_TOOL,
+	REMEMBER_TOOL,
+} from "../../../src/shared/bots";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { InputMessage } from "@/components/ui/input-message";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { BOT_KIND_START, botAsking, jobLine, NEW_BOT_DRAFT, type NewBotDraft, type OpenBot, pickKind, pickTemplate, starterPrompts } from "../../bots-model";
+import { BOT_KIND_START, botAsking, NEW_BOT_DRAFT, type NewBotDraft, type OpenBot, pickKind, pickTemplate, starterPrompts } from "../../bots-model";
 import { botDraftKey, useComposerDraft } from "../../composer-drafts";
 import { type Completions, useShowConversation } from "../../pane-store";
 import { type ModelList, UNREAD } from "../../reads";
@@ -31,6 +43,7 @@ import { ActivityShown } from "../transcript";
 import { RoutinesCard } from "../routines/routines-card";
 import { RoutineEditor } from "../routines/routine-editor";
 import { BotAvatar } from "./bot-avatar";
+import { PeerBots } from "./bot-message-card";
 import { BotLookPicker } from "./bot-look-picker";
 
 const NO_STARTERS: string[] = [];
@@ -139,6 +152,8 @@ function MissingRoutine({ bot }: { bot: Bot }) {
 interface BotPageProps {
 	/** The Bot, and what its page shows. */
 	open: OpenBot;
+	/** Every Bot, for the faces and names of the ones this Bot messages and hears from. */
+	bots: readonly Bot[];
 	past: PastSession[];
 	lastHosts: ReadonlyMap<string, RosterHost>;
 	models: ReadonlyMap<string, ModelList>;
@@ -152,10 +167,16 @@ interface BotPageProps {
 }
 
 /** The Bot's header and its conversation, live, ended, or not begun, its name showing or hiding its details in the right sidebar; or the card of its routines, or the routine editor, in its place. */
-export function BotPage({ open, past, lastHosts, models, workspaces, connected, detailsOpen, onToggleDetails, completions }: BotPageProps) {
+export function BotPage({ open, bots, past, lastHosts, models, workspaces, connected, detailsOpen, onToggleDetails, completions }: BotPageProps) {
 	const { bot, host, view, routines, routine, status } = open;
 	const instanceId = host?.instanceId ?? null;
-	const toolChips = useMemo<ToolChipLabels>(() => ({ [REMEMBER_TOOL]: { label: `Updated memory for ${bot.name}`, icon: BookmarkCheck } }), [bot.name]);
+	const toolChips = useMemo<ToolChipLabels>(
+		() => ({
+			[REMEMBER_TOOL]: { label: `Updated memory for ${bot.name}`, icon: BookmarkCheck },
+			[MESSAGE_BOT_TOOL]: { label: tool => `Messaged ${bots.find(({ id }) => id === tool.to)?.name ?? "a Bot"}`, icon: Send },
+		}),
+		[bot.name, bots],
+	);
 	const starters = useMemo(() => (bot.sessionId === null ? starterPrompts(bot.job) : NO_STARTERS), [bot.sessionId, bot.job]);
 	useShowConversation(view);
 	switch (routine.kind) {
@@ -200,17 +221,19 @@ export function BotPage({ open, past, lastHosts, models, workspaces, connected, 
 				{view ? (
 					<ActivityShown.Provider value={false}>
 						<ToolChipsContext.Provider value={toolChips}>
-							<ViewConversation
-								view={view}
-								focused
-								host={host}
-								lastHost={instanceId !== null ? (lastHosts.get(instanceId) ?? null) : null}
-								session={bot.sessionId !== null ? (past.find(({ sessionId }) => sessionId === bot.sessionId) ?? null) : null}
-								models={(instanceId !== null && models.get(instanceId)) || UNREAD}
-								workspaces={workspaces}
-								header={false}
-								placeholder={`Message ${bot.name}`}
-							/>
+							<PeerBots.Provider value={bots}>
+								<ViewConversation
+									view={view}
+									focused
+									host={host}
+									lastHost={instanceId !== null ? (lastHosts.get(instanceId) ?? null) : null}
+									session={bot.sessionId !== null ? (past.find(({ sessionId }) => sessionId === bot.sessionId) ?? null) : null}
+									models={(instanceId !== null && models.get(instanceId)) || UNREAD}
+									workspaces={workspaces}
+									header={false}
+									placeholder={`Message ${bot.name}`}
+								/>
+							</PeerBots.Provider>
 						</ToolChipsContext.Provider>
 					</ActivityShown.Provider>
 				) : (

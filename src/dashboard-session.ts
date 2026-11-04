@@ -575,7 +575,7 @@ export class DashboardSession implements LiveSession {
 				const { steering, followUp } = await this.#child.client.abortAndRestoreQueue();
 				this.#change(() => this.#prompt.release());
 				// omp's restore leaves out a prompt it admitted but never ran, so the composer gets it back from here.
-				// Only the user's own: a message the dashboard or a routine sent is not theirs to edit.
+				// Only the user's own: a message the dashboard, a routine, or another Bot sent is not theirs to edit.
 				return [...mark.unsent(), ...steering, ...followUp].filter(({ text }) => promptAuthor(text).kind === "user").map(withdrawn);
 			}),
 		);
@@ -775,7 +775,7 @@ export class DashboardSession implements LiveSession {
 			event.type === "message_end" && isObject(event.message) && isUserPrompt(event.message) && promptAuthor(event.message.customType === SKILL_PROMPT ? skillArgs(event.message) : textOf(event.message.content)).kind === "user" && this.sessionName === null && !this.#titled
 		) {
 			// omp's RPC mode titles no prompt itself; a bare `/rename` makes omp title the session from the prompt it now holds.
-			// A prompt the dashboard or a routine sent waits for the user's own, which the title should name.
+			// A prompt the dashboard, a routine, or another Bot sent waits for the user's own, which the title should name.
 			// A `/skill:` prompt is a custom message, not a user one, and omp's title context reads it as the user's prompt; its text is the skill's, its arguments what the user typed.
 			// Through the turn gate, `/rename` can land after the turn's last state event, so read the title it made here.
 			this.#titled = true;

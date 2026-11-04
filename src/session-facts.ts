@@ -299,9 +299,10 @@ export class SessionFactsScan {
 			return;
 		}
 		if (this.#prompts && (entry.type === "message" ? isObject(entry.message) && entry.message.role === "user" : entry.type === "custom_message" && entry.customType === "skill-prompt")) {
-			// The user's own words, and what a routine sent with the events that started it, whose links name the work: a skill's expanded instructions, a dashboard prompt, and a collaborator's are left out.
+			// The user's own words, what another Bot asked, and what a routine sent with the events that started it, whose links name the work: a skill's expanded instructions, a dashboard prompt, and a collaborator's are left out.
 			for (const item of messageItemsOf(entry)) {
 				if (item.kind === "user" && item.from === null) this.#prompt(item.text);
+				else if (item.kind === "bot-message") this.#prompt(item.message.text);
 				else if (item.kind === "routine") {
 					const { triggeredBy, sent } = item.message;
 					const output = sent.kind === "command" && "output" in sent.run ? sent.run.output : "";
