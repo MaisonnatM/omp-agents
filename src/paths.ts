@@ -51,10 +51,6 @@ export const botsFile = join(configDir, "bots.json");
 export const botInboxDir = join(configDir, "bot-inbox");
 /** Where a PR shepherd Bot's `fix_pull_request` and `queue_merge` tools leave their requests, one JSON file each. */
 export const shepherdInboxDir = join(configDir, "shepherd-inbox");
-/** Where a Router Bot's `start_task`, `follow`, and `finish_task` tools leave their requests, one JSON file each. */
-export const routerInboxDir = join(configDir, "router-inbox");
-/** The tasks each Router Bot handed to a background session, beside {@link botsFile}; its tools only read it. */
-export const routerTasksFile = join(configDir, "router-tasks.json");
 /** Each Bot's `<id>/memory.md`, which its own session writes, in the dashboard's data directory. */
 export const botsDir = join(dataDir, "bots");
 /** Where personal sessions run: the user's own directory, tied to no project, in the dashboard's data directory so the file dialog opens what they write there. */

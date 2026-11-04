@@ -18,7 +18,6 @@ import { loadPullRequests, mergedPullRequests, repoOf } from "../pull-requests";
 import { createIntegrations, type Integrations, integrationFetch, integrationSignedIn } from "../integrations";
 import { errorText } from "../json";
 import type { LiveSession } from "../live-session";
-import { answerDiscussion } from "../omp/discussion";
 import { startDictation } from "../omp/dictation";
 import { agentDir } from "../omp/config";
 import { type HostSnapshot, listHosts } from "../omp/collab";
@@ -29,13 +28,12 @@ import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, personalDir, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routerInboxDir, routerTasksFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, personalDir, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
 import { rebasePullRequest } from "../pull-request-rebase";
-import { replayComparison, replayDetail } from "../replay";
-import { canonical, worktreeAt } from "../git";
+import { worktreeAt } from "../git";
 import { runShell } from "../proc";
 import type { ServedBuild } from "../served-build";
 import { SourceControl } from "../source-control";
@@ -45,8 +43,7 @@ import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
 import { MCP_SERVICES } from "../shared/accounts";
 import { agentOn } from "../shared/moves";
-import { routerLinks } from "../shared/router";
-import type { SessionFacts, StartRequest, StartResult, View } from "../shared/sessions";
+import type { StartRequest, StartResult, View } from "../shared/sessions";
 import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
 import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
@@ -83,7 +80,6 @@ import { ReviewDraftsFile } from "./review-drafts-file";
 import { RoutineRunner } from "./routine-runner";
 import { eventSightings, gmailSightings, pullRequestSightings, SLACK_SCOPE, slackSightings, TriggerWatch } from "./routine-triggers";
 import { RoutineInbox } from "./routine-inbox";
-import { Router } from "./router";
 import { ShepherdInbox } from "./shepherd-inbox";
 import { unapprovedChange } from "../pull-request-approval";
 import { configAt } from "../../templates/omp/agent/extensions/land/gate";
@@ -100,10 +96,9 @@ import { SessionFiles } from "./session-files";
 import { RequestLedger } from "./request-ledger";
 import { ACTIVITY_KEPT_DAYS, ActivityStore } from "./activity-store";
 import { DAY_MS } from "../shared/days";
-import { Discussions } from "./discussions";
 import { Dictation } from "./dictation";
 import { createClientHandler } from "./socket";
-import { botExtension, designerExtension, routerExtension, shepherdExtension } from "./resources";
+import { botExtension, designerExtension, shepherdExtension } from "./resources";
 import { createStarter, reattachAll, type SessionJoin } from "./start";
 import { EventInbox } from "./event-inbox";
 import { NoteInbox } from "./note-inbox";
@@ -168,7 +163,6 @@ export class Dashboard {
 	readonly #gmail = new GmailAccounts(accountClients("gmail", (fetch, account) => new GmailClient(fetch, account)));
 	readonly #sessions: LiveSessions;
 	readonly #views: Views;
-	readonly #pathFor: (view: View) => string | null;
 	readonly #notices: Notices;
 	readonly #broadcasts: Broadcasts;
 	readonly #lists: ListRegistry;
@@ -178,8 +172,6 @@ export class Dashboard {
 	readonly #routineInbox: RoutineInbox;
 	readonly #botInbox: BotInbox;
 	readonly #shepherdInbox: ShepherdInbox;
-	/** Router Bots' tasks, inbox, screen, and supervisor. */
-	readonly #router: Router;
 	readonly #worktrees: Worktrees;
 	/** omp's isolation sandboxes whose omp exited, removed once a day by the owner. */
 	readonly #isolationSweep: IsolationSweep;
@@ -199,7 +191,6 @@ export class Dashboard {
 	#stopMergeQueue = (): void => {};
 	readonly #loops: Loops;
 	readonly #requests: RequestLedger;
-	readonly #discussions = new Discussions(answerDiscussion);
 	readonly #dictation = new Dictation(startDictation);
 	readonly #activity = new ActivityStore(activityDb);
 	readonly #selfUpdate: SelfUpdate;
@@ -244,11 +235,9 @@ export class Dashboard {
 		this.#google = new GoogleCalendars(accountClients("google-calendar", (fetch, account) => new GoogleCalendarClient(fetch, account, () => calendars.value.get(account) ?? NO_HIDDEN)));
 		const sessions = (this.#sessions = new LiveSessions((instanceId, update) => this.#onLiveUpdate(instanceId, update)));
 		const { placement } = files.facts;
-		/** What each session links to, except that a Router's own conversation links no work item: see {@link routerLinks}. */
-		const factsOf = (sessionId: string, cwd?: string): SessionFacts => routerLinks(this.#botsFile.value, sessionId, files.factsOf(sessionId, cwd));
+		const { factsOf } = files;
 		const pathFor = (view: View): string | null =>
 			view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
-		this.#pathFor = pathFor;
 		const views = (this.#views = new Views(
 			pathFor,
 			(topic, msg) => void this.#publisher?.publish(topic, JSON.stringify(msg)),
@@ -342,18 +331,16 @@ export class Dashboard {
 			bots: {
 				msg: () => this.#bots.msg(),
 				apply: change => {
-					// Deleting a Bot deletes its routines and its tasks, first, so a crash between the saves leaves none without its Bot.
+					// Deleting a Bot deletes its routines, first, so a crash between the saves leaves none without its Bot.
 					if (change.op === "remove" && routines.removeBot(change.id)) this.#broadcasts.pushList("routines");
-					if (change.op === "remove") this.#router.tasks.apply({ op: "remove-bot", botId: change.id });
 					const created = change.op === "save" && !this.#botsFile.value.some(({ id }) => id === change.bot.id);
 					if (!this.#botsFile.apply(change, new Date().toISOString())) return false;
-					// A new PR shepherd or Router starts with the routine that wakes it as what it watches changes, after the Bot it belongs to is saved.
+					// A new PR shepherd starts with the routine that wakes it as what it watches changes, after the Bot it belongs to is saved.
 					const routine = created ? startingRoutine[change.bot.kind]?.(change.bot.id) : null;
 					if (routine && routines.apply({ op: "save", routine }, Date.now())) this.#broadcasts.pushList("routines");
 					return true;
 				},
 			},
-			"router-tasks": { msg: () => this.#router.tasks.msg(), apply: change => this.#router.tasks.change(change) },
 		}, kind => this.#broadcasts.pushList(kind)));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(factsOf), error: this.#rosterError }),
@@ -385,12 +372,6 @@ export class Dashboard {
 			pathFor,
 			savedFile: files.pathOf,
 			factsFor: factsOf,
-			mayDiscardReplay: async cwd => {
-				const at = await worktreeAt(cwd);
-				if (!at?.linked) return "This is not a registered linked worktree.";
-				const plan = await this.#worktrees.preview({ repository: await canonical(at.common), path: await canonical(at.top) });
-				return plan.blockers.length ? plan.blockers.map(blocker => blocker.message).join(" ") : plan.kind === "unreadable" ? "The checkout could not be inspected." : null;
-			},
 			onStarted: () => broadcasts.syncRoster(),
 			workspaceOf,
 			linkTodo: (todoId, sessionId) => {
@@ -424,7 +405,7 @@ export class Dashboard {
 				return this.#processSettings.value.stopIdleAfterMinutes;
 			},
 		});
-		const startSession = (this.#startSession = request => worktrees.start(() => starter(request), request.kind === "replay" || request.kind === "new" && request.branch !== null));
+		const startSession = (this.#startSession = request => worktrees.start(() => starter(request), request.kind === "new" && request.branch !== null));
 		/** The live session that continues `sessionId`, else that session resumed; rejects when it does not resume. */
 		const reach = async (sessionId: string): Promise<LiveSession> => {
 			const live = sessions.bySessionId(sessionId);
@@ -435,17 +416,13 @@ export class Dashboard {
 			if (!resumed) throw new Error("The session exited as it resumed.");
 			return resumed;
 		};
-		const router = (this.#router = new Router({
-			tasksFile: routerTasksFile, inboxDir: routerInboxDir, bots: () => this.#botsFile.value, sessions, pathOf: files.pathOf, start: startSession, reach, now: Date.now,
-			end: session => this.#endLive(session), tell: (botId, text) => this.#bots.message(botId, text), active: () => ownerLock.held, onChange: () => this.#broadcasts.pushList("router-tasks"),
-		}));
 		this.#bots = new Bots({
 			file: this.#botsFile,
 			start: startSession,
 			live: sessionId => sessions.bySessionId(sessionId),
 			session: instanceId => sessions.get(instanceId),
 			savedFile: files.pathOf,
-			paths: { extension: botExtension, botsFile, botInboxDir, botsDir, routinesFile, routineInboxDir, shepherdExtension, shepherdInboxDir, routerExtension, routerInboxDir, routerTasksFile, designerExtension },
+			paths: { extension: botExtension, botsFile, botInboxDir, botsDir, routinesFile, routineInboxDir, shepherdExtension, shepherdInboxDir, designerExtension },
 			now: () => new Date().toISOString(),
 			onChange: () => broadcasts.pushList("bots"),
 		});
@@ -471,8 +448,6 @@ export class Dashboard {
 			fullyAwake,
 			onChange: () => broadcasts.pushList("routines"),
 			messageBot: (botId, text) => this.#bots.message(botId, text),
-			// A Router's rules and tasks see its events first.
-			screen: router.screen,
 		}));
 		const scheduledRunner = (this.#scheduledRunner = new ScheduledRunner({
 			file: scheduled,
@@ -613,7 +588,6 @@ export class Dashboard {
 			runRoutine: id => runner.runNow(id),
 			messageBot: async (id, text) => void (await this.#bots.message(id, text)),
 			changeNotices: (ids, op) => notices.apply(ids, op),
-			discussions: this.#discussions,
 			dictation: this.#dictation,
 			activity: { owner: () => ownerLock.held, store: this.#activity },
 			}),
@@ -646,16 +620,6 @@ export class Dashboard {
 				},
 				learnHeads(repo, pullRequests) {
 					if (files.facts.learnHeads(repo, pullRequests)) broadcasts.pushAll();
-				},
-				replayDetail: async (view, turnId) => {
-					const file = this.#pathFor(view);
-					if (!file) throw new Error("The source session file is unavailable.");
-					return replayDetail(file, turnId);
-				},
-				replayComparison: async view => {
-					const file = this.#pathFor(view);
-					if (!file) throw new Error("The replay session file is unavailable.");
-					return replayComparison(file);
 				},
 				searchConversations: query => files.searchConversations(query),
 				sourceControl: () => this.#sourceControl.answer(this.#workspaceCwds()),
@@ -741,7 +705,6 @@ export class Dashboard {
 		this.#routineInbox.watch();
 		this.#botInbox.watch();
 		this.#shepherdInbox.watch();
-		this.#router.watch();
 		this.#endInbox.watch();
 		await this.#rescanFiles();
 		// Once the files are listed, so the notice names the sessions that stopped mid-turn with the last server.
@@ -771,7 +734,6 @@ export class Dashboard {
 		this.#routineInbox.stop();
 		this.#botInbox.stop();
 		this.#shepherdInbox.stop();
-		this.#router.stop();
 		this.#endInbox.stop();
 		await this.#sessions.dispose();
 		this.terminals.dispose();
@@ -808,7 +770,6 @@ export class Dashboard {
 	close(ws: Socket): void {
 		this.#views.watch(ws, [], []);
 		this.#requests.close(ws);
-		this.#discussions.close(ws);
 		this.#dictation.close(ws);
 	}
 
@@ -850,12 +811,9 @@ export class Dashboard {
 				this.#bots.exited(instanceId);
 				this.#personalTurnEnded(instanceId);
 				this.#sessions.remove(instanceId);
-				// Once the registry no longer holds it, so the supervisor's restart of a task's session resumes it rather than
-				// reaching the one that exited; that session is the supervisor's to continue, not one stopped mid-turn.
-				const restarting = this.#router.exited(instanceId, update.ended);
 				// A private session lives exactly as long as its omp, so it is deleted rather than interrupted; the next server's sweep finishes a purge cut short.
 				if (isPrivate) void this.#privateSessions.purge(instanceId).catch((err: unknown) => console.error(`omp-agents: deleting private session ${instanceId} failed: ${errorText(err)}`));
-				else if (sessionId && !update.ended && !restarting) this.#interrupted.interrupt(sessionId);
+				else if (sessionId && !update.ended) this.#interrupted.interrupt(sessionId);
 				this.#broadcasts.syncRoster();
 				void this.#loops.listNow();
 				return;
@@ -871,7 +829,6 @@ export class Dashboard {
 				if (sessionId) {
 					this.#reviewDrafts.switched(instanceId, sessionId);
 					this.#bots.switched(instanceId, sessionId);
-					this.#router.switched(instanceId, sessionId);
 				}
 				return;
 			}
@@ -880,7 +837,6 @@ export class Dashboard {
 				// Whoever prompted, the session works again; its own continue, already claimed, stays.
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
 				if (sessionId) this.#autoContinue.turnStarted(sessionId);
-				this.#router.turnStarted(instanceId);
 				// Its row moves up with the prompt that started the turn.
 				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
 				return;
@@ -890,7 +846,6 @@ export class Dashboard {
 				// A session started here that a usage limit or a transient fault stopped is held for its continue.
 				const sessionId = this.#sessions.started(instanceId)?.sessionId;
 				if (sessionId) this.#autoContinue.turnEnded(sessionId, update.failure);
-				this.#router.turnEnded(instanceId, update.reply);
 				this.#broadcasts.rosterChanged();
 				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
 				this.#personalTurnEnded(instanceId);
@@ -920,7 +875,7 @@ export class Dashboard {
 
 	/** How `request` joins the server: as a Review session, as a Bot's conversation, both, or plain; any but a Bot's loads the personal extension, and any but a Bot's or a personal session can move itself. */
 	#joinFor(request: StartRequest): SessionJoin {
-		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#router.join(request), this.#moves.join(request), this.#personalJoin(request)];
+		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#moves.join(request), this.#personalJoin(request)];
 		return {
 			rpc: { args: joins.flatMap(join => join.rpc.args), tools: joins.flatMap(join => join.rpc.tools) },
 			attach: session => {
@@ -955,7 +910,6 @@ export class Dashboard {
 			// What the server that ran them saved since this one started.
 			this.#routines.reload();
 			this.#bots.reload();
-			this.#router.takeOver();
 			this.#migrateRoutines();
 			this.#todos.reload();
 			this.#notes.reload();

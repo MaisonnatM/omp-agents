@@ -77,7 +77,6 @@ import type {
 	OAuthModule,
 	OAuthTerminalModule,
 	ServiceTierModule,
-	StreamModule,
 } from "./module-types/models";
 import type { IsolationOwnershipModule, LaunchClientModule, LaunchPathsModule, PsDataModule, PsTableModule, WorktreeCliModule } from "./module-types/processes";
 import type { RpcClientModule, RpcFrameModule, UtilsModule } from "./module-types/rpc";
@@ -86,7 +85,6 @@ import type {
 	ListingModule,
 	LoaderModule,
 	ModelTokenizerModule,
-	OmpSessionManager,
 	SessionContextModule,
 	SessionEntriesModule,
 	SessionPathsModule,
@@ -202,16 +200,10 @@ export const sessionEntries = await load<SessionEntriesModule>(join(srcDir, "ses
 export const sessionPaths = await load<SessionPathsModule>(join(srcDir, "session", "session-paths.ts"), { sessionDirForCwd: "function" });
 export const sessionManager = await load<{
 	SessionManager: {
-		create(cwd: string, dir?: string): OmpSessionManager;
-		open(file: string, dir?: string, storage?: undefined, options?: { suppressBreadcrumb?: boolean; throwIfMissing?: boolean }): Promise<OmpSessionManager>;
 		/** Retitles a file no process here loads, under omp's lease on the session; `null` when it did not, as when another process holds it. */
 		renameSessionTitle(sessionPath: string, title: string, options?: { cwd?: string }): Promise<string | null>;
 	};
 }>(join(srcDir, "session", "session-manager.ts"), { SessionManager: "function", "SessionManager.renameSessionTitle": "function" });
-export const transcriptEntry = await load<{
-	userTurnDraft(entry: unknown): string | undefined;
-	imageContent(content: unknown): { type: "image"; data: string; mimeType: string }[];
-}>(join(dirname(packageDir), "pi-tui", "src", "chat", "transcript-entry.ts"), { userTurnDraft: "function", imageContent: "function" });
 export const sessionContext = await load<SessionContextModule>(join(srcDir, "session", "session-context.ts"), { buildSessionContext: "function" });
 export const tokenizer = await load<TokenizerModule>(join(dirname(packageDir), "pi-agent-core", "src", "tokenizer.ts"), { Tokenizer: "function" });
 export const modelTokenizer = await load<ModelTokenizerModule>(join(dirname(packageDir), "pi-catalog", "src", "model-tokenizer.ts"), {
@@ -219,7 +211,6 @@ export const modelTokenizer = await load<ModelTokenizerModule>(join(dirname(pack
 });
 export const exitDiagnostics = await load<ExitDiagnosticsModule>(join(srcDir, "session", "exit-diagnostics.ts"), {
 	createInterruptedTurnAbortMessage: "function",
-	createInterruptedToolResults: "function",
 });
 export const dirs = await load<DirsModule>(join(utilsSrc, "dirs.ts"), {
 	getSessionsDir: "function",
@@ -300,10 +291,7 @@ export const modelRegistry = await load<ModelRegistryModule>(join(srcDir, "confi
 	"ModelRegistry.prototype.refreshProvider": "function",
 	"ModelRegistry.prototype.refresh": "function",
 	"ModelRegistry.prototype.getAvailable": "function",
-	"ModelRegistry.prototype.getApiKey": "function",
-	"ModelRegistry.prototype.resolver": "function",
 });
-export const piStream = await load<StreamModule>(join(dirname(packageDir), "pi-ai", "src", "stream.ts"), { streamSimple: "function" });
 export const logout = await load<LogoutModule>(join(srcDir, "slash-commands", "helpers", "logout.ts"), {
 	toLogoutAccounts: "function",
 	logoutCredential: "function",
@@ -320,7 +308,6 @@ export const fallbackChains = await load<FallbackChainsModule>(join(srcDir, "ses
 });
 export const modelResolver = await load<ModelResolverModule>(join(srcDir, "config", "model-resolver.ts"), {
 	resolveProviderModelReference: "function",
-	resolveRoleSelection: "function",
 	resolveAgentModelSelection: "function",
 	resolveModelOverride: "function",
 	resolveRoleChain: "function",

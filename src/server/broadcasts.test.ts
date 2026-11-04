@@ -13,7 +13,6 @@ import { PinsFile } from "./pins-file";
 import { PreferencesFile } from "./preferences-file";
 import { RequestLedger } from "./request-ledger";
 import { ReviewDraftsFile } from "./review-drafts-file";
-import { RouterTasks } from "./router-tasks";
 import { RoutinesFile } from "./routines-file";
 import { ScheduledFile } from "./scheduled-file";
 import { createClientHandler, type SocketEnv } from "./socket";
@@ -51,7 +50,6 @@ function setup(initial: PastSession[]) {
 	const preferences = new PreferencesFile(join(dir, "preferences.json"));
 	const reviewDrafts = new ReviewDraftsFile(join(dir, "review-drafts.json"));
 	const bots = new BotsFile(join(dir, "bots.json"));
-	const routerTasks = new RouterTasks({ path: join(dir, "router-tasks.json"), active: () => true, tell: async () => {}, end: async () => {}, now: () => 1000, onChange() {} });
 	const lists = new ListRegistry({
 		"user-todos": { msg: () => ({ t: "user-todos", list: todos.value }), apply: change => todos.apply(change) },
 		"user-notes": { msg: () => ({ t: "user-notes", list: notes.value }), apply: change => notes.apply(change) },
@@ -72,7 +70,6 @@ function setup(initial: PastSession[]) {
 		preferences: { msg: () => ({ t: "preferences", values: preferences.value }), apply: change => preferences.apply(change) },
 		"review-drafts": { msg: () => ({ t: "review-drafts", list: reviewDrafts.value.drafts }), apply: change => reviewDrafts.apply(change.op === "add-finding" ? { ...change, at: 0 } : change) },
 		bots: { msg: () => ({ t: "bots", bots: bots.value, memories: {}, lasts: {} }), apply: change => bots.apply(change, "2026-01-01T00:00:00.000Z") },
-		"router-tasks": { msg: () => routerTasks.msg(), apply: change => routerTasks.change(change) },
 		notices: { msg: () => ({ t: "notices", list: [] }) },
 		merges: { msg: () => ({ t: "merges", list: [] }) },
 		personal: { msg: () => ({ t: "personal", cwd: "/personal", cwdDisplay: "/personal", memory: "" }) },
@@ -202,7 +199,6 @@ describe("registered whole-list broadcasts", () => {
 		expect(lists.apply("preferences", { op: "set", key: "omp-agents.split-columns", value: "0.4" }, peer)).toBe(false);
 		expect(lists.apply("review-drafts", { op: "discard", pr: { owner: "o", repo: "r", number: 1 } }, peer)).toBe(false);
 		expect(lists.apply("bots", { op: "remove", id: "missing" as BotId }, peer)).toBe(false);
-		expect(lists.apply("router-tasks", { op: "finish", id: "missing", status: "done", note: null }, peer)).toBe(false);
 		expect(replies).toEqual([...lists.messages()].filter(msg => msg.t !== "notices" && msg.t !== "merges" && msg.t !== "personal"));
 		expect(published).toEqual([]);
 	});

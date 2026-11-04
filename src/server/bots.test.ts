@@ -66,9 +66,6 @@ function harness() {
 			routineInboxDir: join(dir, "routine-inbox"),
 			shepherdExtension: "/ext/shepherd.ts",
 			shepherdInboxDir: join(dir, "shepherd-inbox"),
-			routerExtension: "/ext/router.ts",
-			routerInboxDir: join(dir, "router-inbox"),
-			routerTasksFile: join(dir, "router-tasks.json"),
 			designerExtension: "/ext/designer.ts",
 		},
 		now: () => "2026-05-02T09:00:00.000Z",
@@ -120,16 +117,6 @@ describe("Bots", () => {
 		expect(shepherdArgs?.slice(-4)).toEqual(["--omp-agents-shepherd", "herd", "--omp-agents-shepherd-inbox", join(dir, "shepherd-inbox")]);
 		expect(scoutArgs).not.toContain("/ext/shepherd.ts");
 		expect(scoutArgs).not.toContain("--omp-agents-shepherd");
-	});
-
-	test("a Router's conversation also loads the router extension with its id, inbox, and tasks file", async () => {
-		const { bots, file, sessions, dir } = harness();
-		const atlas = { ...scout, id: "atlas" as BotId, kind: "router" } as const;
-		file.apply({ op: "save", bot: atlas }, "2026-05-01T09:00:00.000Z");
-		await bots.message(atlas.id, "Fix the flaky test.");
-		const args = sessions[0]?.args;
-		expect(args?.slice(0, 4)).toEqual(["-e", "/ext/bot.ts", "-e", "/ext/router.ts"]);
-		expect(args?.slice(-6)).toEqual(["--omp-agents-router", "atlas", "--omp-agents-router-inbox", join(dir, "router-inbox"), "--omp-agents-router-tasks", join(dir, "router-tasks.json")]);
 	});
 
 	test("a Bot designer's conversation also loads the designer extension, which reads the Bot extension's flags and no others", async () => {

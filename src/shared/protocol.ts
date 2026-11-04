@@ -4,7 +4,6 @@ import type { UserNoteChange, UserNoteList } from "../user-notes-shared";
 import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
 import type { ActivityEvent } from "./activity";
 import type { Bot, BotChange, BotId, BotLast } from "./bots";
-import type { DiscussionEvent, DiscussionRequest } from "./discussions";
 import type { DictationEvent } from "./dictation";
 import type { ModelEntry, ModelOption, PlanUsage } from "./models";
 import type { QueuedMerge } from "./merge-queue";
@@ -13,7 +12,6 @@ import type { PinChange } from "./pins";
 import type { PagePreferences, PreferenceChange } from "./preferences";
 import type { TrustAsk, TrustedProject } from "./project-trust";
 import type { ReviewDraft, ReviewDraftEdit } from "./review-drafts";
-import type { RouterTask, RouterTaskChange } from "./router";
 import type { ScheduledChange, ScheduledSend } from "./scheduled";
 import type { ContextAction, GoalChange } from "./session-controls";
 import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View, WithdrawnMessage } from "./sessions";
@@ -61,8 +59,6 @@ export type ServerMsg =
 	| { t: "bots"; bots: Bot[]; memories: Record<BotId, string>; lasts: Record<BotId, BotLast | null> }
 	/** Where personal sessions run, as a path and as the page shows it, and the newest of what they remember, within `MAX_MEMORY_BYTES`, sent when a socket opens and as each personal turn ends. */
 	| { t: "personal"; cwd: string; cwdDisplay: string; memory: string }
-	/** Every Router's tasks, whole, sent when a socket opens and after every change. */
-	| { t: "router-tasks"; tasks: RouterTask[] }
 	/** Every scheduled send, whole, soonest first, sent when a socket opens and after every change. */
 	| { t: "scheduled"; sends: ScheduledSend[] }
 	/** The directories Settings → Workspaces added and hid, whole, sent when a socket opens and after every change. */
@@ -79,8 +75,6 @@ export type ServerMsg =
 	| { t: "merges"; list: QueuedMerge[] }
 	/** Every review draft, posted ones too, whole, sent when a socket opens and after every change. */
 	| { t: "review-drafts"; list: ReviewDraft[] }
-	/** One step of the answer to this socket's `discuss` with `id`, until its `end`. */
-	| { t: "discussion"; id: number; event: DiscussionEvent }
 	/** One step of this page's `dictation-start` with `captureId`, until its `end`. */
 	| { t: "dictation"; captureId: string; event: DictationEvent }
 	/** Answers the page's message tagged `ack` once its handler settled: `error` is why it threw, `null` when it did not. */
@@ -149,8 +143,6 @@ export type ClientMsg =
 	| { t: "routine"; change: RoutineChange }
 	/** Create, edit, or remove a Bot, or send one a message; every socket then gets the Bots as they are after. */
 	| { t: "bot"; change: BotChange }
-	/** Mark a Router's task done, or stop it, which ends its session; every socket then gets the tasks as they are after. */
-	| { t: "router-task"; change: RouterTaskChange }
 	/** Schedule a message or a session start, cancel one, take one back to edit, or send one now; every socket then gets the scheduled sends as they are after. */
 	| { t: "schedule"; change: ScheduledChange }
 	/** Pin or unpin sessions; every socket then gets the pins as they are after. */
@@ -161,10 +153,6 @@ export type ClientMsg =
 	| { t: "review-draft"; change: ReviewDraftEdit }
 	/** Update notices `ids`, mark them seen or read, or clear them. */
 	| { t: "notice"; ids: string[]; op: NoticeOp }
-	/** Ask about selected text apart from every session, answered on this socket with `discussion` events for `id`, counted per page. */
-	| { t: "discuss"; id: number; request: DiscussionRequest }
-	/** Stop the answer to this socket's `discuss` with `id`, which then ends with no error. */
-	| { t: "discuss-stop"; id: number }
 	/** Open this computer's microphone for a composer, with the settings of directory `cwd`; never replayed, so a reconnect opens none. */
 	| { t: "dictation-start"; captureId: string; cwd: string }
 	/** Stop this socket's capture `captureId`, which ends with what was said. */

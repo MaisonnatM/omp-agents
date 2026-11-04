@@ -17,7 +17,6 @@ import type { FileBase } from "../file-paths";
 import { HeaderControlsContext, useHeaderControls } from "./header-controls";
 import { PastConversation } from "./past-conversation";
 import { RenderBoundary } from "./render-boundary";
-import { ReplayCompareDialog } from "./replay-compare";
 import { SidebarToggle } from "./sidebar-panel";
 import { SubagentLinks, type SubagentLinksValue } from "./subagent-links";
 
@@ -64,7 +63,7 @@ interface ViewConversationProps {
 }
 
 /**
- * A view's conversation, live or past, with its trajectory switch, its replay comparison, and what its transcript reads
+ * A view's conversation, live or past, with its trajectory switch and what its transcript reads
  * from around it. It reads none of its view's data, which `Conversation` and `Transcript` read by field, so a streamed
  * token never asks it to render.
  */
@@ -86,8 +85,6 @@ export const ViewConversation = memo(function ViewConversation({ view, focused, 
 	// Kept by view, so a pane that switches to another session shows its transcript.
 	const [trajectoryOf, setTrajectoryOf] = useState<string | null>(null);
 	const trajectory = trajectoryOf === hashForView(view);
-	const replay = view.kind === "past" ? session?.replay : view.agentId === null ? (host ?? lastHost)?.replay : undefined;
-	const [compareOf, setCompareOf] = useState<string | null>(null);
 
 	const trajectoryToggle = (
 		<Tooltip content={trajectory ? "Show the transcript" : "Show the trajectory: each turn's injected context, model requests, tool calls, and token usage"} side="bottom">
@@ -104,12 +101,6 @@ export const ViewConversation = memo(function ViewConversation({ view, focused, 
 			</Button>
 		</Tooltip>
 	);
-	const headerActions = (
-		<>
-			{replay && <Button {...activityControl("replay-compare.open")} size="compact" variant="ghost" onClick={() => setCompareOf(hashForView(view))}>Compare replay</Button>}
-			{actions}
-		</>
-	);
 	const content = view.kind === "past" ? (
 		<PastConversation
 			sessionId={view.sessionId}
@@ -118,7 +109,7 @@ export const ViewConversation = memo(function ViewConversation({ view, focused, 
 			onFork={onFork}
 			resume={resume}
 			onResume={onResume}
-			actions={headerActions}
+			actions={actions}
 			titleAction={trajectoryToggle}
 			trajectory={trajectory}
 			header={header}
@@ -133,7 +124,7 @@ export const ViewConversation = memo(function ViewConversation({ view, focused, 
 			models={models}
 			send={send}
 			onEnd={end}
-			actions={headerActions}
+			actions={actions}
 			titleAction={trajectoryToggle}
 			trajectory={trajectory}
 			focused={focused}
@@ -148,9 +139,8 @@ export const ViewConversation = memo(function ViewConversation({ view, focused, 
 		<HeaderControlsContext.Provider value={null}>
 			<SubagentLinks.Provider value={links}>
 				<FileBaseContext.Provider value={fileBase}>
-					<RenderBoundary resetKey={hashForView(view)} actions={headerActions}>
+					<RenderBoundary resetKey={hashForView(view)} actions={actions}>
 						{content}
-						{replay && compareOf === hashForView(view) && <ReplayCompareDialog view={view} facts={replay} onClose={() => setCompareOf(null)} />}
 					</RenderBoundary>
 				</FileBaseContext.Provider>
 			</SubagentLinks.Provider>

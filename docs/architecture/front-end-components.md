@@ -78,6 +78,6 @@ An image cannot read the page's CSS variables, so the diagram takes the concrete
 A render that a newer source or theme outdated is dropped, and a render that throws shows the fence's text with the error.
 
 The model learns the two formats from `src/omp/session-visuals-extension.ts`, whose `before_agent_start` handler appends a paragraph, built from the same limits, to the system prompt.
-`DashboardSession` passes it with `-e` when it starts, forks, or resumes a session (`withSessionVisuals` in `src/dashboard-session.ts`), but not for a replay, or for a resumed replay, whose requests the replay guard compares with the original's, system prompt included.
+`DashboardSession` passes it with `-e` when it starts, forks, or resumes a session (`withSessionVisuals` in `src/dashboard-session.ts`).
 The extension sits outside `templates/omp/agent/`, so the starter kit never installs it and a terminal session never loads it, and it types the part of omp's API it uses by hand, as `tsc` cannot resolve omp's package.
 `sessionVisualsExtension` in `src/server/resources.ts` names the file, and the packaged app ships it bundled as `session-visuals-extension.js`, as it ships the keeper.

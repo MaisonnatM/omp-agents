@@ -48,7 +48,7 @@
   Each row holds the `x` key, text or a number, and each series key, a finite number, and nothing else; a chart has 1 to 5 series and 1 to 500 rows, and a pie exactly one series, whose `x` names each slice.
   The block's header switches between **Preview** and **Source**, copies the block's exact text, and expands the visual into a dialog for a narrow pane, where it zooms as an image does.
   A block that breaks these rules, such as a pie or gantt diagram, an unknown key, or a value that is not a number, shows its text with a note that says why.
-  Each session the dashboard starts, resumes, or forks is told these two formats in its system prompt; a replay and a terminal session are not, so a replay's requests still match the original's.
+  Each session the dashboard starts, resumes, or forks is told these two formats in its system prompt; a terminal session is not.
 - A subagent's header trail names the session's title and the subagent's id, then the subagent's type as a badge, as in `Fix login / 0-Explore` `explore`.
   Click the session's title to open the session's main agent in the pane, or focus the pane that already shows it.
 - In a subagent of a terminal session, a message steers a running subagent, prompts an idle one, and revives a parked one.

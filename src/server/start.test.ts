@@ -24,7 +24,7 @@ import { createStarter, reattachAll, type SessionJoin } from "./start";
 
 afterEach(() => mock.restore());
 
-test("a Claude Code or Codex session neither resumes, forks, nor replays, before any omp starts", async () => {
+test("a Claude Code or Codex session neither resumes nor forks, before any omp starts", async () => {
 	const claudeFile = join(claudeCodeRoot(), "-work", "c1.jsonl");
 	const codexFile = join(codexHome(), "sessions", "2026", "10", "01", "rollout-x1.jsonl");
 	const start = createStarter({
@@ -40,17 +40,15 @@ test("a Claude Code or Codex session neither resumes, forks, nor replays, before
 		onStarted: () => {},
 		workspaceOf: async cwd => cwd,
 		linkTodo: () => {},
-		mayDiscardReplay: async () => null,
 		admit: async () => { throw new Error("A read-only start must not take a census."); },
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
 		privateSessions: fromPartial<PrivateSessions>({ holds: () => false }),
 	});
 	expect(await start({ kind: "resume", sessionId: "c1" })).toMatchObject({ ok: false, error: expect.stringContaining("read-only") });
 	expect(await start({ kind: "fork", view: { kind: "past", sessionId: "x1" }, entryId: "e1" })).toMatchObject({ ok: false, error: expect.stringContaining("read-only") });
-	expect(await start({ kind: "replay", view: { kind: "past", sessionId: "x1" }, token: "t", model: null, thinking: null, prompt: null })).toMatchObject({ ok: false, error: expect.stringContaining("read-only") });
 });
 
-test("a private session neither forks nor replays, before any omp starts, since its copy would outlive it", async () => {
+test("a private session does not fork, before any omp starts, since its copy would outlive it", async () => {
 	const root = join(tmpdir(), "omp-agents-private-start");
 	const start = createStarter({
 		sessions: fromPartial<LiveSessions>({
@@ -65,14 +63,12 @@ test("a private session neither forks nor replays, before any omp starts, since 
 		onStarted: () => {},
 		workspaceOf: async cwd => cwd,
 		linkTodo: () => {},
-		mayDiscardReplay: async () => null,
 		admit: async () => {},
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
 		privateSessions: new PrivateSessions({ root, unpin: () => {} }),
 	});
 	const view = { kind: "live", instanceId: "i1", agentId: null } as const;
 	expect(await start({ kind: "fork", view, entryId: "e1" })).toMatchObject({ ok: false, error: expect.stringContaining("private session") });
-	expect(await start({ kind: "replay", view, token: "t", model: null, thinking: null, prompt: null })).toMatchObject({ ok: false, error: expect.stringContaining("private session") });
 });
 
 test("the server learns which sessions survived before it lists or hears any, and lists none that exited as it attached", async () => {
@@ -217,7 +213,6 @@ function claimedStarter(
 		onStarted: () => {},
 		workspaceOf: async cwd => cwd,
 		linkTodo: () => {},
-		mayDiscardReplay: async () => null,
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
 		admit,
 		privateSessions: fromPartial<PrivateSessions>({ holds: () => false }),

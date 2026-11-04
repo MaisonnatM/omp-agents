@@ -6,7 +6,6 @@ import type { Notice } from "../src/shared/notices";
 import type { TrustedProject } from "../src/shared/project-trust";
 import type { ServerMsg } from "../src/shared/protocol";
 import type { ReviewDraft } from "../src/shared/review-drafts";
-import type { RouterTask } from "../src/shared/router";
 import { applyPins, type PinChange } from "../src/shared/pins";
 import type { ScheduledSend } from "../src/shared/scheduled";
 import { newestPastFirst, type PastSession, type RosterHost, type View } from "../src/shared/sessions";
@@ -63,8 +62,6 @@ export interface DashboardState extends PaneNavigation {
 	personal: Workspace | null;
 	/** What personal sessions remember, as the server last read it. */
 	personalMemory: string;
-	/** Every Router's tasks, empty until the server first sends them. */
-	routerTasks: RouterTask[];
 	/** The messages and session starts that wait for a time, soonest first, empty until the server first sends them. */
 	scheduled: ScheduledSend[];
 	/** The directories Settings → Workspaces added and hid, empty until the server first sends them. */
@@ -84,7 +81,7 @@ export interface DashboardState extends PaneNavigation {
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "user-notes" | "routines" | "bots" | "personal" | "router-tasks" | "scheduled" | "workspaces" | "project-trust" | "pins" | "notices" | "merges" | "review-drafts" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "user-notes" | "routines" | "bots" | "personal" | "scheduled" | "workspaces" | "project-trust" | "pins" | "notices" | "merges" | "review-drafts" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -239,8 +236,6 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, personal: state.personal?.cwd === action.cwd && state.personal.cwdDisplay === action.cwdDisplay ? state.personal : { cwd: action.cwd, cwdDisplay: action.cwdDisplay }, personalMemory: action.memory };
 		case "bot":
 			return state.bots ? { ...state, bots: applyBot(state.bots, action.change, action.now) } : state;
-		case "router-tasks":
-			return { ...state, routerTasks: action.tasks };
 		case "scheduled":
 			return { ...state, scheduled: action.sends };
 		case "workspaces":
@@ -300,7 +295,6 @@ export function initialState(route: Route, ratios: SplitRatios = DEFAULT_SPLIT_R
 		botLasts: {},
 		personal: null,
 		personalMemory: "",
-		routerTasks: [],
 		scheduled: [],
 		workspaceList: { added: [], hidden: [] },
 		trustedProjects: [],

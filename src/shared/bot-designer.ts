@@ -20,7 +20,7 @@ export const DESIGNER_JOB = [
 	"- Give it explicit anti-jobs: a scout does not post, a drafter does not send, and it stays quiet when there is nothing to say.",
 	"- A Bot that writes code works to the poteto-mode bar: one job, plain prose, simple code, and work it verified before it says it is done.",
 	"- Write its job as short Markdown it can follow alone: what it does, where it looks, what it asks me before acting, and what it never does.",
-	"- Pick its type: Routines for most Bots, PR shepherd for one that merges my approved pull requests, Router for one I talk to that hands real work to background sessions.",
+	"- Pick its type: Routines for most Bots, PR shepherd for one that merges my approved pull requests.",
 	"",
 	"## Create",
 	`- Once the job is clear, call \`${CREATE_TOOL}\`.`,

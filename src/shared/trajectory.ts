@@ -19,8 +19,6 @@ export const addUsage = (a: TokenUsage, b: TokenUsage): TokenUsage => ({
 	cost: a.cost + b.cost,
 });
 
-export const totalTokens = (usage: TokenUsage): number => usage.input + usage.output + usage.cacheRead + usage.cacheWrite;
-
 /** A text the trajectory carries cut to its first characters; `cut` counts the characters left out. */
 export interface Clipped {
 	text: string;
@@ -51,8 +49,6 @@ export type TurnStep =
 			name: string;
 			args: Clipped;
 			status: "running" | "ok" | "error";
-			blocked?: boolean;
-			result?: Clipped;
 			resultBytes: number | null;
 			resultImages: number;
 			durationMs: number | null;

@@ -40,9 +40,8 @@ The file is machine-specific and is not part of [settings sync](settings-sync.md
 
 `startRpc` in `src/omp/rpc.ts` is the one place a dashboard session's omp spawns.
 It takes an `AdmittedLaunch`, an `RpcLaunch` with a required `admit`, and awaits `admit` in the session's directory before it spawns.
-`DashboardSession.start`, `fork`, `resume`, and `replay`, and the replay launches `src/omp/replay-launch.ts` builds, take an `AdmittedLaunch` too, so no spawn compiles without a check, while what a start's joins build (`SessionJoin.rpc`) stays a plain `RpcLaunch`.
-`createStarter` in `src/server/start.ts` adds `StartEnv.admit`, which `src/server/dashboard.ts` binds to `ProjectTrustFile.admit`, to the joined launch, so a new session, a fork, a replay, and a resume are each checked in the directory omp would run in.
-A replay refused there discards its detached checkout as any failed replay does.
+`DashboardSession.start`, `fork`, and `resume` take an `AdmittedLaunch` too, so no spawn compiles without a check, while what a start's joins build (`SessionJoin.rpc`) stays a plain `RpcLaunch`.
+`createStarter` in `src/server/start.ts` adds `StartEnv.admit`, which `src/server/dashboard.ts` binds to `ProjectTrustFile.admit`, to the joined launch, so a new session, a fork, and a resume are each checked in the directory omp would run in.
 `launch` maps an `UntrustedProjectError` to `{ ok: false, error, trust }`, where `error` is `untrustedText(trust)`, so a bot, a routine, a scheduled send, and the shepherd, which start through the same starter, fail with plain text naming the folder.
 The socket answers a `start` the page sent through `forPage`, which reads that refusal as `refusedText(trust)`, since whoever sent it has the dialog in front of them.
 A census that throws refuses too, with its error after the start's own prefix, such as `Cannot start omp: `.

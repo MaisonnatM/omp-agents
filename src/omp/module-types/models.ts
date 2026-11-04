@@ -59,10 +59,6 @@ export interface OmpModel {
 	provider: string;
 	id: string;
 }
-/** A credential source `ModelRegistry.resolver` mints (src/config/api-key-resolver.ts), opaque to the dashboard. */
-export interface ApiKeyResolver {
-	readonly brand: "ApiKeyResolver";
-}
 /** omp's model registry (src/config/model-registry.ts), built over a credential store. */
 export interface ModelRegistryModule {
 	ModelRegistry: new (storage: AuthStorage) => {
@@ -71,10 +67,6 @@ export interface ModelRegistryModule {
 		refresh(): Promise<void>;
 		/** The chat models of the providers you can call. */
 		getAvailable(): OmpModel[];
-		/** `model`'s key now, `undefined` when it has none. */
-		getApiKey(model: OmpModel): Promise<string | undefined>;
-		/** `model`'s key for a call, minted again when the provider refuses it. */
-		resolver(model: OmpModel): ApiKeyResolver;
 	};
 }
 /** What `/logout` shows and removes (src/slash-commands/helpers/logout.ts). */
@@ -116,29 +108,10 @@ export interface FallbackChainsModule {
 export interface ModelResolverModule {
 	/** The listed model that omp runs for `provider/id`, following retired variant ids such as `grok-4.7-high` and dotted revision spellings. */
 	resolveProviderModelReference<M extends { provider: string; id: string }>(provider: string, modelId: string, models: readonly M[]): M | undefined;
-	/** The model of the first of `roles` whose `modelRoles` selector names one of `models`, as omp's commit and title calls pick theirs. */
-	resolveRoleSelection<M extends OmpModel>(roles: readonly string[], settings: OmpSettingsInstance, models: M[]): { role: string; model: M } | undefined;
 	/** `role`'s model and its retry fallbacks among `pool`, in the order omp tries them. */
 	resolveRoleChain<M extends OmpModel>(role: string, settings: OmpSettingsInstance, pool: M[]): { model: M }[];
 	resolveAgentModelSelection(options: { settingsOverride?: string | string[]; agentModel?: string[]; settings: OmpSettingsInstance; activeModelPattern?: string }): { patterns: string[]; role: string | undefined };
 	resolveModelOverride(patterns: string[], registry: { getAvailable(): OmpModel[] }, settings: OmpSettingsInstance): { model?: OmpModel; thinkingLevel?: string; warning?: string };
-}
-/** One event of a pi-ai answer stream (pi-ai src/types.ts `AssistantMessageEvent`), with the fields the dashboard reads. */
-export interface AnswerEvent {
-	type: string;
-	/** The text a `text_delta` adds. */
-	delta?: string;
-	/** Why an `error` event ended the stream. */
-	reason?: "aborted" | "error";
-	error?: { errorMessage?: string };
-}
-export interface StreamModule {
-	/** One model call with no tools (pi-ai src/stream.ts), its events as the answer streams. */
-	streamSimple(
-		model: OmpModel,
-		context: { systemPrompt: string[]; messages: { role: "user"; content: string; timestamp: number }[] },
-		options: { apiKey: ApiKeyResolver; maxTokens: number; disableReasoning: boolean; signal: AbortSignal },
-	): AsyncIterable<AnswerEvent>;
 }
 /** pi-catalog's model identity (src/identity): the vendor lineage, product family, and `major.minor.patch` revision an id names. */
 export interface ModelIdentityModule {
