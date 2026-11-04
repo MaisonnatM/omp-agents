@@ -391,19 +391,37 @@ function PrivatePill({ on, onToggle, disabled }: { on: boolean; onToggle: () => 
 	);
 }
 
-/** What a new session's empty page says above the docked composer: where the work happens, and how to begin it. */
+/** What a new session's empty page says above the docked composer: the omp mark over a serif question naming where the work happens. */
 function NewSessionWelcome({ folder, personal, isPrivate }: { folder: string; personal: boolean; isPrivate: boolean }) {
-	const title = personal ? "What can I help with?" : `What should we work on in ${folder}?`;
-	const note = isPrivate ? PRIVATE_NOTE : personal ? "Ask about plans, errands, or anything personal." : "Describe the work below, or pick a starter.";
 	return (
-		<div className="relative m-auto flex w-full max-w-conversation flex-col items-center px-6 py-10 text-center" data-empty-conversation>
-			{/* A soft halo behind the mark gives the empty page a center without a card around it. */}
-			<div aria-hidden="true" className="pointer-events-none absolute top-0 left-1/2 size-72 -translate-x-1/2 -translate-y-1/4 rounded-full bg-[radial-gradient(closest-side,color-mix(in_oklch,var(--color-foreground)_7%,transparent),transparent)]" />
-			<span aria-hidden="true" className="relative flex size-12 items-center justify-center rounded-2xl border border-border bg-background text-foreground shadow-[0_1px_2px_rgb(0_0_0/0.06),0_8px_24px_-8px_rgb(0_0_0/0.18)]">
-				{isPrivate ? <Lock className="size-5" /> : <Sparkles className="size-5" />}
-			</span>
-			<h2 className="relative mt-6 max-w-md text-2xl leading-tight font-semibold tracking-tight text-balance">{title}</h2>
-			<p className="relative mt-2 max-w-sm text-sm leading-relaxed text-pretty text-muted-foreground">{note}</p>
+		<div className="m-auto flex w-full max-w-conversation flex-col items-center px-6 py-10 text-center" data-empty-conversation>
+			{isPrivate ? <Lock aria-hidden="true" className="size-7" /> : <OmpMark className="size-8" />}
+			<h2 className="mt-5 max-w-lg font-serif text-[2rem] leading-tight font-normal tracking-tight text-balance">
+				{personal ? (
+					"What can I help with?"
+				) : (
+					<>
+						What should we work on in <span className="underline decoration-[oklch(0.62_0.21_295)]/40 decoration-2 underline-offset-[6px]">{folder}</span>?
+					</>
+				)}
+			</h2>
+			{isPrivate && <p className="mt-3 max-w-sm text-sm text-pretty text-muted-foreground">{PRIVATE_NOTE}</p>}
 		</div>
+	);
+}
+
+/** omp's mark, the gradient glyph of `web/favicon.svg`. */
+function OmpMark({ className }: { className?: string }) {
+	return (
+		<svg viewBox="8 12 48 46" aria-hidden="true" className={className}>
+			<defs>
+				<linearGradient id="omp-mark" x1="0" y1="0" x2="1" y2="1">
+					<stop offset="0" stopColor="oklch(0.7 0.24 340)" />
+					<stop offset=".5" stopColor="oklch(0.62 0.21 295)" />
+					<stop offset="1" stopColor="oklch(0.81 0.14 200)" />
+				</linearGradient>
+			</defs>
+			<path fill="url(#omp-mark)" d="M10 14h44v9H43v33h-9V23h-9v22h-9V23H10z" />
+		</svg>
 	);
 }
