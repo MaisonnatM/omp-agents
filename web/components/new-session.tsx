@@ -238,11 +238,12 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 				<NewSessionWelcome folder={name} personal={personalDraft} isPrivate={isPrivate} />
 			)}
 			{/* The composer docks at the page's bottom, a new session's directory and branch above it and its starters inside it. */}
-			<div className="mx-auto w-full max-w-conversation px-3 pb-3">
-				{!scheduled && <div className="flex flex-wrap items-center gap-1 pb-1.5">{pickers}</div>}
-				<div className="relative">
-					{completion.popup}
-					<ComposerEditor value={editorRef}>
+			{/* The pickers above the composer sit inside it too, so a pick hands the focus back to its text box. */}
+			<ComposerEditor value={editorRef}>
+				<div className="mx-auto w-full max-w-conversation px-3 pb-3">
+					{!scheduled && <div className="flex flex-wrap items-center gap-1 pb-1.5">{pickers}</div>}
+					<div className="relative">
+						{completion.popup}
 						<InputMessage
 							className={cn(isPrivate && "outline-2 outline-foreground")}
 							editorRef={editorRef}
@@ -287,13 +288,13 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 							}}
 							afterActions={suggestions.list}
 						/>
-					</ComposerEditor>
+					</div>
+					{directCommand && <ComposerNote text={directCommand} />}
+					{attachments.note && <ComposerNote text={attachments.note} />}
+					{!scheduled && todo && <p className="mt-2 px-1 text-xs text-muted-foreground">Your todo “{todo.text}” links to the session once it starts.</p>}
+					{panel}
 				</div>
-				{directCommand && <ComposerNote text={directCommand} />}
-				{attachments.note && <ComposerNote text={attachments.note} />}
-				{!scheduled && todo && <p className="mt-2 px-1 text-xs text-muted-foreground">Your todo “{todo.text}” links to the session once it starts.</p>}
-				{panel}
-			</div>
+			</ComposerEditor>
 		</div>
 	);
 }
