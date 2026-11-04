@@ -1,6 +1,6 @@
 /** Native-order cleanup presentation and the sequential run that can stop only between operations. */
 import { errorText } from "../src/json";
-import { CLEANUP_STEPS, isSandboxStep, type CleanupRequest, type CleanupStep, type CleanupStepResult, type GcAnswer, type GcPhase, type SandboxKeepReason, type SandboxPlan, type SandboxResult, type SandboxStep } from "../src/shared/storage";
+import { CACHE_STEP, CLEANUP_STEPS, isSandboxStep, type CachePlan, type CacheResult, type CleanupRequest, type CleanupStep, type CleanupStepResult, type GcAnswer, type GcPhase, type SandboxKeepReason, type SandboxPlan, type SandboxResult, type SandboxStep } from "../src/shared/storage";
 import type { SystemLoad } from "../src/shared/system";
 import { getJson, putJson } from "./api";
 import { formatBytes } from "./labels";
@@ -28,8 +28,8 @@ export interface CleanupRun {
 
 type GcReports = { [P in GcPhase]: NonNullable<GcAnswer[P]> };
 type SandboxResults = { results: SandboxResult[]; total: number };
-type PreviewReports = GcReports & Record<SandboxStep, SandboxPlan[]>;
-type ResultReports = GcReports & Record<SandboxStep, SandboxResults>;
+type PreviewReports = GcReports & Record<SandboxStep, SandboxPlan[]> & Record<typeof CACHE_STEP, CachePlan[]>;
+type ResultReports = GcReports & Record<SandboxStep, SandboxResults> & Record<typeof CACHE_STEP, CacheResult[]>;
 type Preview = Omit<CleanupRow, "step" | "label" | "unit">;
 type Phase<P extends CleanupStep> = {
 	label: string;
@@ -72,7 +72,7 @@ function sandboxPhase(step: SandboxStep, label: string, detail: string): Phase<S
 				? targets.reduce((sum, plan) => sum + (plan.bytes ?? 0), 0) : null;
 			return {
 				count: targets?.length ?? 0, bytes: null,
-				size: plans === undefined ? "Checking… can take a few minutes" : upTo === null ? "Size unavailable" : upTo === 0 ? formatBytes(0) : `Up to ${formatBytes(upTo)}`,
+				size: plans === undefined ? "" : upTo === null ? "Size unavailable" : upTo === 0 ? formatBytes(0) : `Up to ${formatBytes(upTo)}`,
 				detail, errors: [], available: plans !== undefined,
 			};
 		},
@@ -82,6 +82,33 @@ function sandboxPhase(step: SandboxStep, label: string, detail: string): Phase<S
 		}),
 	};
 }
+
+function toolNames(plans: readonly CachePlan[]): string {
+	const names = plans.map(plan => plan.tool);
+	return names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`;
+}
+/** A cache's size is the most its prune can free: projects' environments share some of its files through clones or hard links. */
+const cachePhase: Phase<typeof CACHE_STEP> = {
+	label: "Package caches", unit: ["cache", "caches"],
+	preview: plans => {
+		const total = plans?.every(plan => plan.bytes !== null) ? plans.reduce((sum, plan) => sum + (plan.bytes ?? 0), 0) : null;
+		return {
+			count: plans?.length ?? 0, bytes: null,
+			size: plans === undefined ? "" : total === null ? "Size unavailable" : total === 0 ? formatBytes(0) : `Up to ${formatBytes(total)}`,
+			detail: plans?.length === 0 ? "No uv, pnpm, or bun found."
+				: `${plans ? `Caches of ${toolNames(plans)}. ` : ""}Removes packages no project needs, and keeps what running tools use.`,
+			errors: [], available: plans !== undefined,
+		};
+	},
+	result: results => {
+		const pruned = results.filter(result => result.error === null);
+		const freed = pruned.reduce((sum, result) => sum + Math.max(0, (result.bytes ?? 0) - (result.after ?? result.bytes ?? 0)), 0);
+		return {
+			text: `${pruned.length} of ${results.length} ${results.length === 1 ? "cache" : "caches"} pruned · ${formatBytes(freed)} smaller`,
+			errors: results.flatMap(result => result.error === null ? [] : [`${result.tool}: ${result.error}`]),
+		};
+	},
+};
 
 const PHASES: { [P in CleanupStep]: Phase<P> } = {
 	stale: {
@@ -139,16 +166,19 @@ const PHASES: { [P in CleanupStep]: Phase<P> } = {
 		"Sandboxes of ended tasks with leftover changes",
 		"Their omp process ended with edits still inside them. Edits omp did not bring back to your checkout are lost. Rechecked before removal.",
 	),
+	packageCaches: cachePhase,
 };
 
 function previewRow<P extends CleanupStep>(step: P, report: PreviewReports[P] | undefined): CleanupRow {
 	const phase = PHASES[step];
 	return { step, label: phase.label, unit: phase.unit, ...phase.preview(report) };
 }
-export function cleanupRows(gc: GcAnswer, sandboxes: SandboxPlan[] | null): CleanupRow[] {
-	return CLEANUP_STEPS.map(step => isSandboxStep(step) ? previewRow(step, sandboxes ?? undefined) : previewRow(step, gc[step]));
+export function cleanupRows(gc: GcAnswer, sandboxes: SandboxPlan[] | null, caches: CachePlan[] | null): CleanupRow[] {
+	return CLEANUP_STEPS.map(step => isSandboxStep(step) ? previewRow(step, sandboxes ?? undefined)
+		: step === CACHE_STEP ? previewRow(step, caches ?? undefined)
+		: previewRow(step, gc[step]));
 }
-export function gcResultText<P extends GcPhase>(step: P, report: ResultReports[P]): CleanupResult {
+export function stepResultText<P extends GcPhase | typeof CACHE_STEP>(step: P, report: ResultReports[P]): CleanupResult {
 	return PHASES[step].result(report);
 }
 
@@ -199,12 +229,16 @@ export async function runCleanup(chosen: readonly CleanupRow[], sandboxes: reado
 					progress[step] = { state: "running", ...result };
 					publish();
 				});
+			} else if (row.step === CACHE_STEP) {
+				const answer = await io.apply({ action: "apply", step: CACHE_STEP });
+				if (answer.step !== CACHE_STEP || !("caches" in answer)) throw new Error("Unexpected cleanup response.");
+				result = stepResultText(CACHE_STEP, answer.caches);
 			} else {
 				const answer = await io.apply({ action: "apply", step: row.step });
 				if (answer.step !== row.step || !("gc" in answer)) throw new Error("Unexpected cleanup response.");
 				const report = answer.gc[row.step];
 				if (report === undefined) throw new Error("Unexpected cleanup response.");
-				result = gcResultText(row.step, report);
+				result = stepResultText(row.step, report);
 			}
 			failed = result.errors.length > 0;
 			progress[row.step] = { state: failed ? "failed" : "done", ...result };

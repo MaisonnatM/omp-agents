@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import type { CleanupStepResult, GcAnswer, SandboxPlan } from "../src/shared/storage";
-import { cleanupRows, gcResultText, runCleanup, type CleanupIo, type CleanupRun } from "./storage";
+import type { CachePlan, CleanupStepResult, GcAnswer, SandboxPlan } from "../src/shared/storage";
+import { cleanupRows, stepResultText, runCleanup, type CleanupIo, type CleanupRun } from "./storage";
 
 const report: GcAnswer = {
 	apply: false,
@@ -16,13 +16,15 @@ const sandboxes: SandboxPlan[] = [
 	{ path: "/tmp/live", kept: "owner-live", detail: "Running", bytes: null },
 	{ path: "/tmp/edited", kept: "changed", detail: "Its checkout has tracked modifications or untracked files.", bytes: 4096 },
 ];
+const caches: CachePlan[] = [{ tool: "uv", path: "/tmp/uv", bytes: 4096 }, { tool: "bun", path: "/tmp/bun", bytes: 2048 }];
 const applyReply: CleanupIo["apply"] = async request => "sandboxes" in request
 	? { step: request.step, sandboxes: request.sandboxes.map(path => ({ path, kept: null, detail: null })) }
+	: request.step === "packageCaches" ? { step: request.step, caches: caches.map(plan => ({ ...plan, after: 0, error: null })) }
 	: { step: request.step, gc: { apply: true, [request.step]: report[request.step] } };
 
 test("cleanup preserves native phase order and does not invent archive or compression savings", () => {
-	const rows = cleanupRows(report, [{ path: "/tmp/sandbox", kept: null, detail: null, bytes: 2048 }]);
-	expect(rows.map(row => row.step)).toEqual(["stale", "blobs", "archive", "compress", "wal", "sandboxes", "changedSandboxes"]);
+	const rows = cleanupRows(report, [{ path: "/tmp/sandbox", kept: null, detail: null, bytes: 2048 }], caches);
+	expect(rows.map(row => row.step)).toEqual(["stale", "blobs", "archive", "compress", "wal", "sandboxes", "changedSandboxes", "packageCaches"]);
 	expect(rows[2]).toMatchObject({ label: "Archive cold sessions", count: 5, bytes: 256 });
 	expect(rows[2]?.size).toContain("4 sessions");
 	expect(rows[3]).toMatchObject({ count: 5, bytes: null });
@@ -31,32 +33,41 @@ test("cleanup preserves native phase order and does not invent archive or compre
 });
 
 test("unknown sandbox sizes stay unknown and kept sandboxes are excluded", () => {
-	const rows = cleanupRows(report, [{ path: "/tmp/one", kept: null, detail: null, bytes: null }, { path: "/tmp/live", kept: "owner-live", detail: "Running", bytes: null }]);
+	const rows = cleanupRows(report, [{ path: "/tmp/one", kept: null, detail: null, bytes: null }, { path: "/tmp/live", kept: "owner-live", detail: "Running", bytes: null }], []);
 	expect(rows[5]).toMatchObject({ bytes: null, count: 1, size: "Size unavailable" });
-	expect(cleanupRows(report, null)[5]).toMatchObject({ available: false, size: "Checking… can take a few minutes" });
-	expect(cleanupRows(report, [])[5]).toMatchObject({ count: 0, size: "0 B" });
+	expect(cleanupRows(report, null, [])[5]).toMatchObject({ available: false, size: "" });
+	expect(cleanupRows(report, [], [])[5]).toMatchObject({ count: 0, size: "0 B" });
 });
 
 test("sandbox sizes are upper bounds kept out of the estimate, and leftover changes get their own row", () => {
-	const rows = cleanupRows(report, sandboxes);
+	const rows = cleanupRows(report, sandboxes, []);
 	expect(rows[5]).toMatchObject({ count: 2, bytes: null, size: "Up to 2.0 KB" });
 	expect(rows[6]).toMatchObject({ step: "changedSandboxes", count: 1, bytes: null, size: "Up to 4.0 KB", available: true });
 });
 
+test("package caches are upper bounds kept out of the estimate, and a failed prune claims nothing", () => {
+	expect(cleanupRows(report, [], caches)[7]).toMatchObject({ count: 2, bytes: null, size: "Up to 6.0 KB", available: true });
+	expect(cleanupRows(report, [], null)[7]).toMatchObject({ available: false });
+	expect(cleanupRows(report, [], [])[7]).toMatchObject({ count: 0, detail: "No uv, pnpm, or bun found." });
+	expect(cleanupRows(report, [], [{ ...caches[0]!, bytes: null }])[7]).toMatchObject({ size: "Size unavailable" });
+	const result = stepResultText("packageCaches", [{ ...caches[0]!, after: 1024, error: null }, { ...caches[1]!, after: null, error: "Permission denied" }]);
+	expect(result).toEqual({ text: "1 of 2 caches pruned · 3.0 KB smaller", errors: ["bun: Permission denied"] });
+});
+
 test("unsupported compression and a failed volume probe are not actionable", () => {
 	const compress = { supported: true, wouldCompress: 5, compressed: 0, leftoverScratchDirs: 0, allocatedBefore: 8192, allocatedAfter: 8192, errors: [] };
-	expect(cleanupRows({ ...report, compress: { ...compress, supported: false } }, [])[3]?.available).toBe(false);
-	expect(cleanupRows({ ...report, compress: { ...compress, probeFailure: "Read-only volume" } }, [])[3]).toMatchObject({ available: false, detail: "Read-only volume" });
+	expect(cleanupRows({ ...report, compress: { ...compress, supported: false } }, [], [])[3]?.available).toBe(false);
+	expect(cleanupRows({ ...report, compress: { ...compress, probeFailure: "Read-only volume" } }, [], [])[3]).toMatchObject({ available: false, detail: "Read-only volume" });
 });
 
 test("partial failures keep their error and never claim all selected bytes were freed", () => {
-	const result = gcResultText("blobs", { wouldDelete: 2, deleted: 1, bytes: 1024, errors: ["Permission denied"] });
+	const result = stepResultText("blobs", { wouldDelete: 2, deleted: 1, bytes: 1024, errors: ["Permission denied"] });
 	expect(result.text).toContain("1 of 2");
 	expect(result.text).toContain("selected");
 	expect(result.errors).toEqual(["Permission denied"]);
-	const compressed = gcResultText("compress", { supported: true, wouldCompress: 5, compressed: 2, leftoverScratchDirs: 0, allocatedBefore: 8192, allocatedAfter: 4096, errors: [] });
+	const compressed = stepResultText("compress", { supported: true, wouldCompress: 5, compressed: 2, leftoverScratchDirs: 0, allocatedBefore: 8192, allocatedAfter: 4096, errors: [] });
 	expect(compressed.text).toContain("less on disk");
-	expect(gcResultText("wal", { databases: [{ dbPath: "/tmp/history.db", walBytes: 4096, checkpointed: false, busy: 1 }], walBytes: 4096, checkpointed: false }).text).toContain("1 busy");
+	expect(stepResultText("wal", { databases: [{ dbPath: "/tmp/history.db", walBytes: 4096, checkpointed: false, busy: 1 }], walBytes: 4096, checkpointed: false }).text).toContain("1 busy");
 });
 
 test("the driver runs native phases in order, then eligible sandboxes individually, and measures before and after", async () => {
@@ -70,8 +81,8 @@ test("the driver runs native phases in order, then eligible sandboxes individual
 			return applyReply(request);
 		},
 	};
-	const result = await runCleanup(cleanupRows(report, sandboxes), sandboxes, { stopped: () => false, onProgress: run => progress.push(run) }, io);
-	expect(applied).toEqual(["stale", "blobs", "archive", "compress", "wal", "sandboxes:/tmp/one", "sandboxes:/tmp/two", "changedSandboxes:/tmp/edited"]);
+	const result = await runCleanup(cleanupRows(report, sandboxes, caches), sandboxes, { stopped: () => false, onProgress: run => progress.push(run) }, io);
+	expect(applied).toEqual(["stale", "blobs", "archive", "compress", "wal", "sandboxes:/tmp/one", "sandboxes:/tmp/two", "changedSandboxes:/tmp/edited", "packageCaches"]);
 	expect(result).toMatchObject({ phase: "done", before: 1000, after: 2000, stopping: false });
 	expect(Object.values(result.progress).every(step => step.state === "done")).toBe(true);
 	expect(result.progress.sandboxes?.text).toBe("2 of 2 sandboxes removed");
@@ -83,7 +94,7 @@ test("the driver runs native phases in order, then eligible sandboxes individual
 test("a requested stop finishes the current native phase and starts no later phase", async () => {
 	let stopped = false;
 	const applied: string[] = [];
-	const result = await runCleanup(cleanupRows(report, sandboxes), sandboxes, { stopped: () => stopped, onProgress: () => {} }, {
+	const result = await runCleanup(cleanupRows(report, sandboxes, caches), sandboxes, { stopped: () => stopped, onProgress: () => {} }, {
 		availableBytes: async () => 1000,
 		apply: async request => { applied.push(request.step); stopped = true; return applyReply(request); },
 	});
@@ -96,7 +107,7 @@ test("a requested stop finishes the current native phase and starts no later pha
 test("stopping a sandbox phase preserves its partial count and does not remove the next sandbox", async () => {
 	let stopped = false;
 	const applied: string[] = [];
-	const result = await runCleanup(cleanupRows(report, sandboxes).filter(row => row.step === "sandboxes"), sandboxes, { stopped: () => stopped, onProgress: () => {} }, {
+	const result = await runCleanup(cleanupRows(report, sandboxes, []).filter(row => row.step === "sandboxes"), sandboxes, { stopped: () => stopped, onProgress: () => {} }, {
 		availableBytes: async () => 1000,
 		apply: async request => {
 			if (request.step === "sandboxes") applied.push(...request.sandboxes);
@@ -111,7 +122,7 @@ test("stopping a sandbox phase preserves its partial count and does not remove t
 
 test("a phase's reported errors stop the run and keep later phases waiting", async () => {
 	const applied: string[] = [];
-	const result = await runCleanup(cleanupRows(report, []).filter(row => row.step === "blobs" || row.step === "archive"), [], { stopped: () => false, onProgress: () => {} }, {
+	const result = await runCleanup(cleanupRows(report, [], []).filter(row => row.step === "blobs" || row.step === "archive"), [], { stopped: () => false, onProgress: () => {} }, {
 		availableBytes: async () => 1000,
 		apply: async request => {
 			applied.push(request.step);
@@ -125,7 +136,7 @@ test("a phase's reported errors stop the run and keep later phases waiting", asy
 });
 
 test("a failed command stops the run while unavailable free-space readings remain unknown", async () => {
-	const result = await runCleanup(cleanupRows(report, []).filter(row => row.step === "blobs"), [], { stopped: () => false, onProgress: () => {} }, {
+	const result = await runCleanup(cleanupRows(report, [], []).filter(row => row.step === "blobs"), [], { stopped: () => false, onProgress: () => {} }, {
 		availableBytes: async () => { throw new Error("Cannot measure"); },
 		apply: async () => { throw new Error("Disk unavailable"); },
 	});
@@ -136,7 +147,7 @@ test("a failed command stops the run while unavailable free-space readings remai
 test("an unexpected phase or absent native report stops rather than claiming success", async () => {
 	const answers: CleanupStepResult[] = [{ step: "archive", gc: { apply: true } }, { step: "blobs", gc: { apply: true } }];
 	for (const answer of answers) {
-		const result = await runCleanup(cleanupRows(report, []).filter(row => row.step === "blobs"), [], { stopped: () => false, onProgress: () => {} }, {
+		const result = await runCleanup(cleanupRows(report, [], []).filter(row => row.step === "blobs"), [], { stopped: () => false, onProgress: () => {} }, {
 			availableBytes: async () => 1000,
 			apply: async () => answer,
 		});

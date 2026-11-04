@@ -2,7 +2,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Check, Circle, LoaderCircle, RefreshCw, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorText } from "../../../src/json";
-import { CLEANUP_STEPS, isSandboxStep, type CleanupStep, type GcAnswer, type SandboxPlan, type StorageUsage } from "../../../src/shared/storage";
+import { CACHE_STEP, CLEANUP_STEPS, isSandboxStep, type CachePlan, type CleanupStep, type GcAnswer, type SandboxPlan, type StorageUsage } from "../../../src/shared/storage";
 import { Button } from "@/components/ui/button";
 import { getJson, putJson } from "../../api";
 import { activityControl } from "../../activity";
@@ -142,7 +142,7 @@ function ConfirmDialog({ open, onOpenChange, chosen, sandboxes, label, onConfirm
 			<Dialog.Portal>
 				<Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 dark:bg-black/80" />
 				<Dialog.Content className="fixed top-1/2 left-1/2 z-50 max-h-[calc(100vh-2rem)] w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-lg border border-border bg-background p-5 text-foreground shadow-md">
-					<Dialog.Title className="text-base font-medium">Clean up omp's files?</Dialog.Title>
+					<Dialog.Title className="text-base font-medium">Clean up these files?</Dialog.Title>
 					<Dialog.Description className="mt-1 text-sm text-muted-foreground">
 						Cleanup runs one step at a time. Stopping waits for the current step to finish. Deleted files cannot be restored by the dashboard.
 					</Dialog.Description>
@@ -157,6 +157,9 @@ function ConfirmDialog({ open, onOpenChange, chosen, sandboxes, label, onConfirm
 						<p className="mt-2 text-sm">Cold sessions leave the roster, History, and Resume. Their compressed archive stays on disk.</p>
 					)}
 					{chosen.some(row => row.step === "stale") && <p className="mt-2 text-sm">Old debug reports and replicas are permanently deleted.</p>}
+					{chosen.some(row => row.step === CACHE_STEP) && (
+						<p className="mt-2 text-sm">Pruned packages download again when a project needs them.</p>
+					)}
 					{chosen.some(row => isSandboxStep(row.step)) && (
 						<p className="mt-2 text-sm">
 							Sandbox files, ignored files, and commits omp did not bring back are permanently deleted. Close other shells and editors using these folders first.
@@ -194,8 +197,10 @@ export function StorageTab({ active, cwd, onSaved }: { active: boolean; cwd: str
 	const [usageError, setUsageError] = useState<string | null>(null);
 	const [gc, setGc] = useState<GcAnswer | null>(null);
 	const [sandboxes, setSandboxes] = useState<SandboxPlan[] | null>(null);
+	const [caches, setCaches] = useState<CachePlan[] | null>(null);
 	const [gcError, setGcError] = useState<string | null>(null);
 	const [sandboxError, setSandboxError] = useState<string | null>(null);
+	const [cacheError, setCacheError] = useState<string | null>(null);
 	const [checking, setChecking] = useState(false);
 	const [refresh, setRefresh] = useState(0);
 	const [selected, setSelected] = useState<ReadonlySet<CleanupStep>>(new Set());
@@ -208,10 +213,11 @@ export function StorageTab({ active, cwd, onSaved }: { active: boolean; cwd: str
 	const stopButton = useRef<HTMLButtonElement>(null);
 	const result = useRef<HTMLParagraphElement>(null);
 	const busy = run?.phase === "running";
-	const rows = cleanupRows(gc ?? { apply: false }, sandboxes);
+	const rows = cleanupRows(gc ?? { apply: false }, sandboxes, caches);
 	const chosen = rows.filter(row => selected.has(row.step) && row.available && row.count > 0);
 	const knownBytes = chosen.reduce((sum, row) => sum + (row.bytes ?? 0), 0);
-	const cleanupLabel = knownBytes > 0 ? `Clean up about ${formatBytes(knownBytes)}` : "Clean up selected files";
+	const upperBounds = chosen.some(row => row.bytes === null);
+	const cleanupLabel = knownBytes > 0 ? `Clean up about ${formatBytes(knownBytes)}${upperBounds ? " or more" : ""}` : "Clean up selected files";
 	const refreshUsage = useCallback(async (): Promise<void> => {
 		try {
 			setUsage(await getJson<StorageUsage>(`/api/storage${cwd === null ? "" : `?cwd=${encodeURIComponent(cwd)}`}`));
@@ -227,10 +233,12 @@ export function StorageTab({ active, cwd, onSaved }: { active: boolean; cwd: str
 		setChecking(true);
 		setGcError(null);
 		setSandboxError(null);
+		setCacheError(null);
 		setRun(null);
 		const reads = [
 			putJson<{ gc: GcAnswer }>("/api/storage/cleanup", { action: "preview" }).then(answer => setGc(answer.gc), error => setGcError(errorText(error))),
 			putJson<{ sandboxes: SandboxPlan[] }>("/api/storage/cleanup", { action: "preview", step: "sandboxes" }).then(answer => setSandboxes(answer.sandboxes), error => setSandboxError(errorText(error))),
+			putJson<{ caches: CachePlan[] }>("/api/storage/cleanup", { action: "preview", step: CACHE_STEP }).then(answer => setCaches(answer.caches), error => setCacheError(errorText(error))),
 		];
 		void Promise.all(reads).finally(() => setChecking(false));
 	}, [active, refresh]);
@@ -263,6 +271,7 @@ export function StorageTab({ active, cwd, onSaved }: { active: boolean; cwd: str
 	const checkAgain = (): void => {
 		setGc(null);
 		setSandboxes(null);
+		setCaches(null);
 		setRefresh(value => value + 1);
 		void refreshUsage();
 	};
@@ -271,8 +280,8 @@ export function StorageTab({ active, cwd, onSaved }: { active: boolean; cwd: str
 		summary = run.stopping ? "Cleanup stopped." : "Cleanup finished.";
 		if (run.after !== null) summary += ` Free space now ${formatBytes(run.after)}${run.before !== null ? `, was ${formatBytes(run.before)}` : ""}.`;
 		summary += " Check again before another cleanup.";
-	} else if (!checking && gc && sandboxes && rows.every(row => row.count === 0)) {
-		summary = "Nothing to clean up. omp's files are already tidy.";
+	} else if (!checking && gc && sandboxes && caches && rows.every(row => row.count === 0)) {
+		summary = "Nothing to clean up. omp's files and package caches are already tidy.";
 	}
 	const kept = keptSandboxes(sandboxes ?? []);
 	return (
@@ -280,18 +289,19 @@ export function StorageTab({ active, cwd, onSaved }: { active: boolean; cwd: str
 			<UsageSection usage={usage} error={usageError} />
 			<Section
 				title="Clean up"
-				meta="Nothing changes until you confirm. Sandbox sizes are upper bounds; they, archive sizes, and compression savings are not included in the estimate."
+				meta="Nothing changes until you confirm. Sandbox and package cache sizes are upper bounds; they, archive sizes, and compression savings are not included in the estimate."
 				actions={<Button variant="ghost" size="compact" leadingIcon={RefreshCw} loading={checking} disabled={busy} onClick={checkAgain}>Check again</Button>}
 			>
 				{gcError && <ErrorText>{gcError} Check again to retry.</ErrorText>}
 				{sandboxError && <ErrorText>Cannot check isolation sandboxes. {sandboxError}</ErrorText>}
+				{cacheError && <ErrorText>Cannot check package caches. {cacheError}</ErrorText>}
 				<div className="divide-y divide-border">
 					{rows.map(row => (
 						<ChecklistRow
 							key={row.step}
 							row={row}
 							status={run?.progress[row.step]}
-							loading={isSandboxStep(row.step) ? sandboxes === null && !sandboxError : gc === null && !gcError}
+							loading={isSandboxStep(row.step) ? sandboxes === null && !sandboxError : row.step === CACHE_STEP ? caches === null && !cacheError : gc === null && !gcError}
 							finished={run?.phase === "done"}
 							disabled={busy || checking || run !== null}
 							checked={selected.has(row.step)}
