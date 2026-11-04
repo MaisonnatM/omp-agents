@@ -401,7 +401,7 @@ function NewSessionWelcome({ folder, personal, isPrivate }: { folder: string; pe
 					"What can I help with?"
 				) : (
 					<>
-						What should we work on in <span className="flowing-underline">{folder}</span>?
+						What should we work on in <span className="underline decoration-[oklch(0.62_0.21_295)]/40 decoration-2 underline-offset-[6px]">{folder}</span>?
 					</>
 				)}
 			</h2>

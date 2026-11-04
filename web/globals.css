@@ -333,44 +333,6 @@
   }
 }
 
-/* The New session question's folder name: an underline in omp's mark colors that flows sideways like liquid, with a
-   blurred copy under it as its glow. Reduced motion keeps the colors still. */
-@keyframes underline-flow {
-  to {
-    background-position: -200% 100%;
-  }
-}
-@utility flowing-underline {
-  position: relative;
-  isolation: isolate;
-  padding-bottom: 0.15em;
-  --flow: linear-gradient(90deg, oklch(0.7 0.24 340), oklch(0.62 0.21 295), oklch(0.81 0.14 200), oklch(0.62 0.21 295), oklch(0.7 0.24 340));
-  background-image: var(--flow);
-  background-size: 200% 3px;
-  background-position: 0 100%;
-  background-repeat: repeat-x;
-  animation: underline-flow 6s linear infinite;
-  &::after {
-    content: "";
-    position: absolute;
-    inset: auto 0 -0.1em;
-    height: 0.45em;
-    background-image: var(--flow);
-    background-size: 200% 100%;
-    filter: blur(10px);
-    opacity: 0.45;
-    z-index: -1;
-    animation: underline-flow 6s linear infinite;
-    pointer-events: none;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-    &::after {
-      animation: none;
-    }
-  }
-}
-
 /* The conversation column. Beside the floating todos card it moves left, as t3code's chat lane does: on a narrow
    pane it centers between the pane's left edge and the card, and the shift eases to zero as the pane widens, so a
    resize never jumps it. The 22.75rem is the card's 20rem, its 0.75rem edge gap, and 2rem clearance before it; the
