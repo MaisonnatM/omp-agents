@@ -18,7 +18,7 @@ import { ToggleSwitch } from "../toggle-switch";
 /** A settings text field or select. */
 export const FIELD = "h-7 rounded-md border border-border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-/** An entry of a settings rail, such as Files' file list. */
+/** An entry of a flat settings rail, such as omp settings' tabs; the file rails' folder rows keep the tree's tighter rows. */
 export const RAIL_BUTTON = "flex w-full items-baseline gap-2 rounded-md px-2 py-1 text-left text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring";
 
 /** A link in a settings note, to another section or a file. */

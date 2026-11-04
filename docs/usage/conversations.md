@@ -106,7 +106,7 @@
 - A path to a text file in agent text opens the file in a dialog: `.md`, `.markdown`, `.txt`, `.log`, `.csv`, `.tsv`, `.json`, `.jsonl`, `.yaml`, `.yml`, `.toml`, `.xml`, `.diff`, or `.patch`.
   An absolute or `~/` path opens from plain text, inline code, or a link, `file://` included; a relative one opens from inline code or a link, against the linked worktree the session works in, else the session's directory.
   A `:line` suffix, as in `docs/usage.md:12`, is dropped; hover the path to read the file it opens.
-  Markdown renders as the agent's messages do, under its frontmatter's keys and values, a TSV or CSV file as a table of its first 1,000 rows, and anything else as plain text; **Show source** shows a rendered file's text.
+  Markdown renders as the agent's messages do, under its frontmatter's keys and values, a TSV or CSV file as a table of its first 1,000 rows, and anything else as numbered lines that wrap, colored by its type; **Show source** shows a rendered file's text.
   A path in an open Markdown file opens in the dialog's place, relative to that file.
   The dialog shows the first 1 MB of a larger file and says so; it refuses a file whose real path, past any link, has another extension, and a file that is not UTF-8.
   A todo's notes do not open paths: a path there is plain text.

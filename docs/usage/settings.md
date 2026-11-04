@@ -155,7 +155,7 @@
   **Forget**, **Retire**, and **Forget everything** each ask you to click again to confirm, and an edit made elsewhere since the page read it is refused and the page shows the memory as it is now.
   Running sessions keep the memory they started with; new sessions see your changes.
 - The **Files** section lists the files that omp reads as folders, by where they sit on disk: context files such as `AGENTS.md`, the `SYSTEM.md` and `APPEND_SYSTEM.md` prompt files, `config.yml`, agents, commands, rules, skills, and hooks.
-  A skill shows as its directory's name in its `skills` folder, with the first two lines of its frontmatter's `description` under it, and a folder holding only one folder joins it, such as `.omp/agent`.
+  The list starts inside the folder that holds every file, such as `~`. A skill shows as its directory's name in its `skills` folder, with the first two lines of its frontmatter's `description` under it, and a folder holding only one folder joins it, such as `.omp/agent`.
   Folders start closed except those holding the open file, and opening a file from another section opens its folders.
   The field above the list narrows it to the files whose name holds every word typed and opens every folder; Escape clears it.
   Select a file to read it: Markdown renders as the agent's messages do, under its frontmatter's keys and values, and **Source** next to **Preview** shows its text; any other file shows as numbered lines that wrap, colored by its type.

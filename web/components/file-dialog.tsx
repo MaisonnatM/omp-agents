@@ -10,7 +10,7 @@ import { parseDelimited } from "../delimited";
 import { formatBytes } from "../labels";
 import { useRead } from "../reads";
 import { useCopy } from "../use-copy";
-import { MarkdownDocument } from "./file-text";
+import { CodeText, MarkdownDocument } from "./file-text";
 import { LoadNote } from "./sheet-details";
 import { ViewerDialog } from "./viewer-dialog";
 import { useZoom, type Zoom } from "./zoom-pane";
@@ -129,7 +129,7 @@ function TextFileDialog({ target, onClose }: { target: FileTarget; onClose: () =
 function FileBody({ file, look }: { file: TextFile; look: Look }) {
 	if (look === "markdown") return <MarkdownDocument text={file.text} dir={file.path.slice(0, file.path.lastIndexOf("/"))} className="px-5 py-3" />;
 	if (look === "tsv" || look === "csv") return <Table text={file.text} separator={look === "tsv" ? "\t" : ","} />;
-	return <pre className="p-4 font-mono text-xs leading-relaxed whitespace-pre">{file.text}</pre>;
+	return <CodeText text={file.text} path={file.path} className="rounded-none border-0" />;
 }
 
 function Table({ text, separator }: { text: string; separator: "\t" | "," }) {
