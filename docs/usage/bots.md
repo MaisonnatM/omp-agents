@@ -71,6 +71,9 @@
   You can also ask a Bot in its conversation to add, change, or delete its routines, such as "check the build every morning at 9"; it sees a short line for each of its own routines on every turn, with the start of its prompt or command, and what it saves shows in its **Routines** tab once the dashboard applies it.
   A change the Bot makes keeps every part of the routine it did not mention, so asking it to pause a routine leaves its schedule and task as they were.
   A Bot can change only its own routines, never another Bot's.
+- A Bot can end a turn quietly, without a notification or an unread mark, when it found nothing for you, such as a routine run with nothing new.
+  Say so in its job, such as "when a run finds nothing, call `stay_quiet`"; the PR shepherd's starting job already does.
+  A quiet run leaves an earlier reply you had not read still unread.
 - The server keeps the Bots in `bots.json` beside its access token, so every window of the app shows the same ones.
 
 ## Bot messages

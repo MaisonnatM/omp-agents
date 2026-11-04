@@ -139,6 +139,28 @@ describe("LiveSessions", () => {
 		expect(unread()).toBeNull();
 	});
 
+	test("a quiet turn gives back the unread turn its start read, while a look during it or a turn that ends aloud reads it for good", () => {
+		const sessions = registry(unreadIn(), "i1");
+		const unread = () => sessions.rows(() => facts)[0]?.unread;
+		sessions.markUnread("i1", { at: 1_000, reply: "PR #12 needs you." });
+		expect(sessions.turnStarted("i1")).toBe(true);
+		expect(unread()).toBeNull();
+		expect(sessions.endedQuietly("i1")).toBe(true);
+		expect(unread()).toEqual({ at: 1_000, reply: "PR #12 needs you." });
+
+		sessions.turnStarted("i1");
+		sessions.markRead("i1");
+		expect(sessions.endedQuietly("i1")).toBe(false);
+		expect(unread()).toBeNull();
+
+		sessions.markUnread("i1", { at: 2_000, reply: "PR #12 needs you." });
+		sessions.turnStarted("i1");
+		sessions.markUnread("i1", { at: 3_000, reply: "Fixed PR #12." });
+		sessions.turnStarted("i1");
+		sessions.endedQuietly("i1");
+		expect(unread()).toEqual({ at: 3_000, reply: "Fixed PR #12." });
+	});
+
 	test("an unread turn comes back after a restart for a session that survived it, and only when the next server restores it", () => {
 		const path = unreadIn();
 		const first = registry(path, "i-kept", "i-gone");

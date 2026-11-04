@@ -47,6 +47,9 @@ Both check the routine with `parseRoutineSpec`, so they hold the page's limits, 
 The server's `RoutineInbox` applies it, and checks ownership again; see [Routines](routines.md).
 Both tools load as `essential` and ask approval as writes, as `remember` does.
 
+The extension's `stay_quiet` tool (`STAY_QUIET_TOOL` in `src/shared/bots.ts`) takes no arguments, writes nothing, and loads as `essential` and asks approval as a read.
+`turnUpdate` marks a `turn-ended` quiet when an assistant message of the run called it, and the server then leaves the session as unread as before the turn; see [Notifications](notifications.md).
+
 A `bot` socket message carries one `BotChange`.
 `save`, `remove`, `pin`, `move`, and `rename-section` go through the list registry, so every socket hears the new list as a `bots` message, with as much of each Bot's memory as the prompt carries, so the message stays as small as the prompt's.
 The same message carries each Bot's last words, which `lastMessage` reads from the end of its session file, and the server sends it again as each turn of a Bot's conversation starts and ends, so the sidebar's previews and times follow the conversation.

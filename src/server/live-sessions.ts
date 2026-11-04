@@ -54,6 +54,8 @@ export class LiveSessions {
 	/** The turn each session ended since a page showed it in a focused window, by instance id; {@link #unreadFile} keeps them across restarts. */
 	readonly #unread = new Map<string, UnreadTurn>();
 	readonly #unreadFile: JsonFile<SavedUnread>;
+	/** The unread turn each session's running turn read as it started, by instance id, which a quiet end gives back. */
+	readonly #readByTurn = new Map<string, UnreadTurn>();
 	/**
 	 * From {@link restoreUnread} to the first registry listing, which {@link restoreListedUnread} restores them at: the
 	 * saved turns of the sessions that did not survive the restart as sessions this server started, which may be terminal
@@ -146,13 +148,34 @@ export class LiveSessions {
 
 	/** Session `instanceId` ended `turn`, which stays unread until a look or its next turn reads it, across restarts. */
 	markUnread(instanceId: string, turn: EndedTurn): void {
+		this.#readByTurn.delete(instanceId);
 		this.#unread.set(instanceId, unreadTurn(turn));
 		this.#saveUnread();
 	}
 
-	/** A page showed session `instanceId` in a focused window, or its next turn started; whether it had a turn unread. */
+	/** A page showed session `instanceId` in a focused window; whether it had a turn unread. */
 	markRead(instanceId: string): boolean {
+		this.#readByTurn.delete(instanceId);
 		if (!this.#unread.delete(instanceId)) return false;
+		this.#saveUnread();
+		return true;
+	}
+
+	/** Session `instanceId` started a turn, which reads its unread turn unless the turn ends quietly; whether it had one. */
+	turnStarted(instanceId: string): boolean {
+		const turn = this.#unread.get(instanceId);
+		if (!turn) return false;
+		this.markRead(instanceId);
+		this.#readByTurn.set(instanceId, turn);
+		return true;
+	}
+
+	/** Session `instanceId` ended a quiet turn, which gives back the unread turn its start read; whether it had one. */
+	endedQuietly(instanceId: string): boolean {
+		const turn = this.#readByTurn.get(instanceId);
+		if (!turn) return false;
+		this.#readByTurn.delete(instanceId);
+		this.#unread.set(instanceId, turn);
 		this.#saveUnread();
 		return true;
 	}
@@ -205,6 +228,7 @@ export class LiveSessions {
 		this.releaseTask(instanceId);
 		if (!this.#sessions.delete(instanceId)) return;
 		this.#subjects.delete(instanceId);
+		this.#readByTurn.delete(instanceId);
 		if (this.#unread.delete(instanceId)) this.#saveUnread();
 		this.#reindex();
 		forgetSession(instanceId);

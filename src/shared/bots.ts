@@ -139,6 +139,9 @@ export const REMEMBER_TOOL = "remember";
 /** The tool a Bot's session messages another Bot with; the page marks each finished call in the conversation. */
 export const MESSAGE_BOT_TOOL = "message_bot";
 
+/** The tool a Bot's session calls in a turn that found nothing for the user; that turn ends without marking the session unread. */
+export const STAY_QUIET_TOOL = "stay_quiet";
+
 /** The longest message one Bot sends another. */
 export const MAX_BOT_MESSAGE_LENGTH = 8000;
 

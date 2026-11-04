@@ -55,16 +55,32 @@ describe("endedTurn", () => {
 		]);
 		expect(endedTurn(skill)).toEqual({ at: Date.parse("2026-11-02T10:01:40.000Z"), reply: null });
 	});
+
+	test("a turn that stayed quiet is not one to mark unread", () => {
+		const path = sessionFile([
+			message("2026-11-02T10:00:00.000Z", "user", [text("Check the pull requests")]),
+			message("2026-11-02T10:00:05.000Z", "assistant", [{ type: "toolCall", id: "t1", name: "stay_quiet", arguments: {} }]),
+			message("2026-11-02T10:00:06.000Z", "toolResult", [text("This turn ends without notifying the user.")]),
+			message("2026-11-02T10:00:08.000Z", "assistant", [text("Nothing new.")]),
+		]);
+		expect(endedTurn(path)).toBeNull();
+	});
 });
 
 describe("turnUpdate", () => {
 	test("an agent_end ends the turn when it gives the turn back, terminal or waiting only on a background job, and not when more of the run follows", () => {
 		const messages = [{ role: "assistant", content: [text("Started.")] }];
-		const ended: TurnUpdate = { kind: "turn-ended", reply: "Started.", failure: null };
+		const ended: TurnUpdate = { kind: "turn-ended", reply: "Started.", failure: null, quiet: false };
 		expect(turnUpdate({ type: "agent_end", messages })).toEqual(ended);
 		expect(turnUpdate({ type: "agent_end", isTerminal: false, yielded: true, awaitingAsyncWork: true, messages })).toEqual(ended);
 		// omp keeps `yielded` on a terminal end it re-tags non-terminal for a queued follow-up.
 		expect(turnUpdate({ type: "agent_end", isTerminal: false, yielded: true, messages })).toBeNull();
 		expect(turnUpdate({ type: "agent_end", isTerminal: false, messages })).toBeNull();
+	});
+
+	test("an agent_end whose run called stay_quiet ends the turn quietly, and one that did not ends it aloud", () => {
+		const quiet = [{ role: "assistant", content: [{ type: "toolCall", id: "t1", name: "stay_quiet", arguments: {} }] }, { role: "toolResult", content: [] }, { role: "assistant", content: [text("Nothing new.")] }];
+		expect(turnUpdate({ type: "agent_end", messages: quiet })).toEqual({ kind: "turn-ended", reply: "Nothing new.", failure: null, quiet: true });
+		expect(turnUpdate({ type: "agent_end", messages: [{ role: "assistant", content: [text("PR #12 needs you.")] }] })).toMatchObject({ quiet: false });
 	});
 });

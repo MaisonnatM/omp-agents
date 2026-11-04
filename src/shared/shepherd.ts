@@ -55,6 +55,7 @@ export const SHEPHERD_JOB = [
 	"Treat bot review comments as claims to check against the code, and ask me before acting on anything about security, auth, billing, or data.",
 	"Once nothing blocks it, hand it to the merge queue with `queue_merge` and squash.",
 	"When the dashboard refuses a fix or a merge, tell me why and what you need from me.",
+	"When a run finds nothing for me, call `stay_quiet` so it does not notify me.",
 ].join("\n");
 
 /** The routine a new shepherd starts with: a run whenever one of your pull requests becomes your move. */
