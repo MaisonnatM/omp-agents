@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded by 2026-11-04-list-new-session-starters-in-the-composer-suggestion-list.md
 date: 2026-11-04
 decision-makers: Maxence
 ---

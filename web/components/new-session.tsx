@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
 import { Tooltip } from "@/components/ui/tooltip";
-import { activityControl } from "../activity";
 import { useComposerDraft } from "../composer-drafts";
 import { folderName, sameDir, PRIVATE_NOTE } from "../labels";
 import type { Completions } from "../pane-store";
@@ -26,6 +25,7 @@ import { useGitCheckout } from "../use-git-checkout";
 import { useAction } from "../use-action";
 import { useSkills } from "../use-skills";
 import { useCompletion } from "./completion-popup";
+import { useSuggestions } from "./composer-suggestions";
 import { blockedShortcut, ComposerEditor, ComposerNote, EmptyConversation } from "./composer";
 import { BranchPicker, targetOf } from "./git";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
@@ -161,6 +161,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		if (completion.onMenuKeyDown(event)) return;
 		dictation.onKeyDown(event);
 		onComposerKey(event);
+		if (!event.defaultPrevented) suggestions.onKeyDown(event);
 		if (!event.defaultPrevented && event.key === "Escape") {
 			event.currentTarget.blur();
 			event.preventDefault();
@@ -178,6 +179,21 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const name = folderName(target.dir) ?? target.dir;
 	const error = scheduled ? scheduled.error : launch?.phase === "failed" ? launch.error : null;
 	const starterList = useStarters(starters, name, choice?.name ?? checkout?.branch ?? null);
+	// A private draft lists its facts and a personal one its panel in the starters' place, since starters suit project work.
+	const panel = scheduled ? null : isPrivate ? <PrivateFacts personal={personalDraft} /> : personal && personalDraft && assistant ? <PersonalPanel cwd={personal.cwd} past={assistant.past} memory={assistant.memory} /> : null;
+	const starterLabels = useMemo(() => new Map(starterList.map(starter => [starter.prompt, starter.label])), [starterList]);
+	// A starter only fills the draft, since some, such as `/ship `, wait for a blank to be filled.
+	const fillStarter = (prompt: string): void => {
+		prefilled.current = true;
+		setDraft(prompt);
+	};
+	const suggestions = useSuggestions({
+		prompts: connected && !starting && !scheduled && panel === null ? [...starterLabels.keys()] : NO_PROMPTS,
+		labelOf: prompt => starterLabels.get(prompt) ?? prompt,
+		draft,
+		onSend: fillStarter,
+		onFill: fillStarter,
+	});
 	const pickers = (
 		<>
 			<DirectoryPicker
@@ -263,46 +279,20 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 							sending={starting || save.pending}
 							editorProps={{
 								...completion.editorProps,
+								"aria-activedescendant": completion.editorProps["aria-activedescendant"] ?? suggestions.activeId,
 								onKeyDown,
+								onBlur: suggestions.onBlur,
 								onPaste: scheduled ? undefined : attachments.onPaste,
 								autoFocus: true,
 							}}
+							afterActions={suggestions.list}
 						/>
 					</ComposerEditor>
 				</div>
 				{directCommand && <ComposerNote text={directCommand} />}
 				{attachments.note && <ComposerNote text={attachments.note} />}
 				{!scheduled && todo && <p className="mt-2 px-1 text-xs text-muted-foreground">Your todo “{todo.text}” links to the session once it starts.</p>}
-				{/* A private draft says what ending it deletes, and a personal one what it remembers, in place of the starters, which suit project work. */}
-				{!scheduled && isPrivate ? (
-					<PrivateFacts personal={personalDraft} />
-				) : personal && personalDraft && assistant ? (
-					<PersonalPanel cwd={personal.cwd} past={assistant.past} memory={assistant.memory} />
-				) : (
-					connected &&
-					!starting &&
-					!draft.trim() &&
-					starterList.length > 0 && (
-						<div role="group" aria-label="Starters" className="mt-3 flex flex-wrap gap-2">
-							{starterList.map(starter => (
-								<Tooltip key={starter.label} content={starter.prompt}>
-									<Button
-										variant="tertiary"
-										size="compact"
-										className="rounded-full px-3 font-normal text-muted-foreground hover:text-foreground"
-										onClick={() => {
-											prefilled.current = true;
-											setDraft(starter.prompt);
-										}}
-										{...activityControl("composer.starter")}
-									>
-										{starter.label}
-									</Button>
-								</Tooltip>
-							))}
-						</div>
-					)
-				)}
+				{panel}
 			</div>
 		</div>
 	);
@@ -322,6 +312,7 @@ export interface AssistantSources {
 }
 
 const NO_STARTERS: Starter[] = [];
+const NO_PROMPTS: string[] = [];
 const NO_TICKETS: Ticket[] = [];
 const NO_PULL_REQUESTS: PullRequestSummary[] = [];
 
