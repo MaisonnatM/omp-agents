@@ -145,19 +145,19 @@ describe("LiveSessions", () => {
 		sessions.markUnread("i1", { at: 1_000, reply: "PR #12 needs you." });
 		expect(sessions.turnStarted("i1")).toBe(true);
 		expect(unread()).toBeNull();
-		expect(sessions.endedQuietly("i1")).toBe(true);
+		sessions.turnEnded("i1", null);
 		expect(unread()).toEqual({ at: 1_000, reply: "PR #12 needs you." });
 
 		sessions.turnStarted("i1");
 		sessions.markRead("i1");
-		expect(sessions.endedQuietly("i1")).toBe(false);
+		sessions.turnEnded("i1", null);
 		expect(unread()).toBeNull();
 
 		sessions.markUnread("i1", { at: 2_000, reply: "PR #12 needs you." });
 		sessions.turnStarted("i1");
-		sessions.markUnread("i1", { at: 3_000, reply: "Fixed PR #12." });
+		sessions.turnEnded("i1", { at: 3_000, reply: "Fixed PR #12." });
 		sessions.turnStarted("i1");
-		sessions.endedQuietly("i1");
+		sessions.turnEnded("i1", null);
 		expect(unread()).toEqual({ at: 3_000, reply: "Fixed PR #12." });
 	});
 

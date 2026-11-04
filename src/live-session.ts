@@ -3,8 +3,7 @@ import { isObject } from "./json";
 import type { HostSnapshot } from "./omp/collab";
 import { type TurnFailure, turnFailureOf } from "./omp/turn-failure";
 import { entryTime, tailEntries } from "./session-entries";
-import { STAY_QUIET_TOOL } from "./shared/bots";
-import type { Delivery, MessageQueue, PromptImage, RosterHost, SessionFacts, UserAnswer, WithdrawnMessage } from "./shared/sessions";
+import { type Delivery, type MessageQueue, type PromptImage, type RosterHost, type SessionFacts, STAY_QUIET_TOOL, type UserAnswer, type WithdrawnMessage } from "./shared/sessions";
 import { isUserPrompt, splitSuggestions } from "./transcript";
 
 type WithoutKeys<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;

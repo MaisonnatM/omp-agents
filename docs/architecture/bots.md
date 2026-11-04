@@ -47,7 +47,7 @@ Both check the routine with `parseRoutineSpec`, so they hold the page's limits, 
 The server's `RoutineInbox` applies it, and checks ownership again; see [Routines](routines.md).
 Both tools load as `essential` and ask approval as writes, as `remember` does.
 
-The extension's `stay_quiet` tool (`STAY_QUIET_TOOL` in `src/shared/bots.ts`) takes no arguments, writes nothing, and loads as `essential` and asks approval as a read.
+The extension's `stay_quiet` tool (`STAY_QUIET_TOOL` in `src/shared/sessions.ts`, beside the unread turn it spares) takes no arguments, writes nothing, and loads as `essential` and asks approval as a read.
 `turnUpdate` marks a `turn-ended` quiet when an assistant message of the run called it, and the server then leaves the session as unread as before the turn; see [Notifications](notifications.md).
 
 A `bot` socket message carries one `BotChange`.

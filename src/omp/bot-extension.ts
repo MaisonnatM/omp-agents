@@ -21,11 +21,11 @@ import {
 	MAX_FACT_LENGTH,
 	MAX_JOB_LENGTH,
 	MESSAGE_BOT_TOOL,
-	STAY_QUIET_TOOL,
 	parseBotMessageText,
 	parseBots,
 	parseBotId,
 } from "../shared/bots";
+import { STAY_QUIET_TOOL } from "../shared/sessions";
 import type { ShepherdRequest } from "../shared/shepherd";
 import { type ExtensionApi, flagValue, memoryLines, readText, rememberTool, reply } from "./extension-kit";
 

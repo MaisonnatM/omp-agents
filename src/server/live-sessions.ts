@@ -165,19 +165,24 @@ export class LiveSessions {
 	turnStarted(instanceId: string): boolean {
 		const turn = this.#unread.get(instanceId);
 		if (!turn) return false;
-		this.markRead(instanceId);
+		this.#unread.delete(instanceId);
 		this.#readByTurn.set(instanceId, turn);
+		this.#saveUnread();
 		return true;
 	}
 
-	/** Session `instanceId` ended a quiet turn, which gives back the unread turn its start read; whether it had one. */
-	endedQuietly(instanceId: string): boolean {
-		const turn = this.#readByTurn.get(instanceId);
-		if (!turn) return false;
+	/**
+	 * Session `instanceId` ended its turn: `turn` stays unread as {@link markUnread} keeps it, and a quiet turn, `null`, gives
+	 * back the unread turn its start read, under its own `at`, which the page's alert already heard, so it raises none again.
+	 */
+	turnEnded(instanceId: string, turn: EndedTurn | null): void {
+		const held = this.#readByTurn.get(instanceId);
 		this.#readByTurn.delete(instanceId);
-		this.#unread.set(instanceId, turn);
-		this.#saveUnread();
-		return true;
+		if (turn) this.markUnread(instanceId, turn);
+		else if (held) {
+			this.#unread.set(instanceId, held);
+			this.#saveUnread();
+		}
 	}
 
 	/**
