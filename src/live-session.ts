@@ -3,7 +3,7 @@ import { isObject } from "./json";
 import type { HostSnapshot } from "./omp/collab";
 import { type TurnFailure, turnFailureOf } from "./omp/turn-failure";
 import { entryTime, tailEntries } from "./session-entries";
-import type { Delivery, MessageQueue, PromptImage, RosterHost, SessionFacts, UserAnswer, WithdrawnMessage } from "./shared/sessions";
+import { type Delivery, type MessageQueue, type PromptImage, type RosterHost, type SessionFacts, STAY_QUIET_TOOL, type UserAnswer, type WithdrawnMessage } from "./shared/sessions";
 import { isUserPrompt, splitSuggestions } from "./transcript";
 
 type WithoutKeys<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
@@ -23,9 +23,10 @@ export type LiveUpdate =
 
 /**
  * The main agent's turn started, or ran to its end; `reply` is its last text without suggested prompts, `null` when it ended on none,
- * and `failure` how a provider's error ended it, `null` when it ended any other way.
+ * `failure` how a provider's error ended it, `null` when it ended any other way, and `quiet` whether it called
+ * {@link STAY_QUIET_TOOL}, so it leaves the session as unread as it was before the turn.
  */
-export type TurnUpdate = { kind: "turn-started" } | { kind: "turn-ended"; reply: string | null; failure: TurnFailure | null };
+export type TurnUpdate = { kind: "turn-started" } | { kind: "turn-ended"; reply: string | null; failure: TurnFailure | null; quiet: boolean };
 
 /** The text of the last assistant message among `messages` that has any, without its suggested prompts; `null` when none has text. */
 function lastReply(messages: unknown): string | null {
@@ -40,6 +41,11 @@ function lastReply(messages: unknown): string | null {
 	return null;
 }
 
+/** Whether an assistant message among `messages` called {@link STAY_QUIET_TOOL}. */
+const stayedQuiet = (messages: unknown): boolean =>
+	Array.isArray(messages) &&
+	messages.some(message => isObject(message) && message.role === "assistant" && Array.isArray(message.content) && message.content.some(block => isObject(block) && block.type === "toolCall" && block.name === STAY_QUIET_TOOL));
+
 /**
  * What a main-agent live event does to its turn, which both transports report: `agent_start` starts one, and an
  * `agent_end` that gives the turn back ends it, as a terminal one does and one that only waits on a background job's
@@ -50,7 +56,7 @@ export function turnUpdate(event: unknown): TurnUpdate | null {
 	if (event.type === "agent_start") return { kind: "turn-started" };
 	if (event.type !== "agent_end") return null;
 	const gaveTurnBack = event.isTerminal !== false || event.awaitingAsyncWork === true;
-	return gaveTurnBack ? { kind: "turn-ended", reply: lastReply(event.messages), failure: turnFailureOf(event.messages) } : null;
+	return gaveTurnBack ? { kind: "turn-ended", reply: lastReply(event.messages), failure: turnFailureOf(event.messages), quiet: stayedQuiet(event.messages) } : null;
 }
 
 /** A turn that ended: when, in ms since the epoch, and its last reply, `null` when it ended on none. */
@@ -64,7 +70,8 @@ export interface EndedTurn {
  * of its last message, and the reply among the messages after its prompt, chosen as {@link turnUpdate} chooses an
  * `agent_end`'s. For a turn that ended while no server listened. A turn stopped before any message followed its prompt
  * counts too, at its prompt's time with no reply, as the live path marks an `agent_end` that carries none. `null` when
- * the file is gone or unreadable, its end holds no prompt or message with a time, or that time is not after `since`.
+ * the file is gone or unreadable, its end holds no prompt or message with a time, that time is not after `since`, or
+ * the turn stayed quiet.
  */
 export function endedTurn(sessionFile: string, since = Number.NEGATIVE_INFINITY): EndedTurn | null {
 	const newestFirst: unknown[] = [];
@@ -84,7 +91,7 @@ export function endedTurn(sessionFile: string, since = Number.NEGATIVE_INFINITY)
 		return null;
 	}
 	const at = lastAt ?? promptedAt;
-	return at === null || at <= since ? null : { at, reply: lastReply(newestFirst.toReversed()) };
+	return at === null || at <= since || stayedQuiet(newestFirst) ? null : { at, reply: lastReply(newestFirst.toReversed()) };
 }
 
 /** A message the session did not take; the session itself reports it, so a caller with someone to tell need not. */

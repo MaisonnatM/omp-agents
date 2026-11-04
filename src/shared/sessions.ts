@@ -131,6 +131,9 @@ interface RosterHostBase extends SessionFacts {
 	unread: UnreadTurn | null;
 }
 
+/** The tool a session calls in a turn that found nothing for the user, such as a Bot's routine run; that turn ends without marking the session unread. */
+export const STAY_QUIET_TOOL = "stay_quiet";
+
 /** A turn that ended unseen: when, in ms since the epoch, and the first line of its reply, `null` when it ended on none. */
 export interface UnreadTurn {
 	at: number;

@@ -1,8 +1,9 @@
 // omp-agents Bots: gives a Bot's session its name, job, memory, routines, and the other Bots on every turn, the
 // `remember` tool, the one writer of that memory, the `set_job` tool, which asks the dashboard to change the Bot's job,
-// the `save_routine` and `delete_routine` tools, which ask it to change the Bot's own routines, and the `message_bot`
-// tool, which asks it to message another Bot. The dashboard loads it with `omp -e` and the flags in `BOT_FLAGS` for a
-// Bot's session only (`Bots.join` in src/server/bots.ts), so no other session reads it.
+// the `save_routine` and `delete_routine` tools, which ask it to change the Bot's own routines, the `message_bot`
+// tool, which asks it to message another Bot, and the `stay_quiet` tool, which ends a turn without marking it unread.
+// The dashboard loads it with `omp -e` and the flags in `BOT_FLAGS` for a Bot's session only (`Bots.join` in
+// src/server/bots.ts), so no other session reads it.
 import { randomUUID } from "node:crypto";
 import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -24,6 +25,7 @@ import {
 	parseBots,
 	parseBotId,
 } from "../shared/bots";
+import { STAY_QUIET_TOOL } from "../shared/sessions";
 import type { ShepherdRequest } from "../shared/shepherd";
 import { type ExtensionApi, flagValue, memoryLines, readText, rememberTool, reply } from "./extension-kit";
 
@@ -256,6 +258,19 @@ export default function botExtension(pi: ExtensionApi): void {
 			if (!message) throw new Error(`text must not be empty, must be at most ${MAX_BOT_MESSAGE_LENGTH} characters, and cannot start with ! or /, which would run as a command in the other Bot's session.`);
 			leave(me.botInbox, { botId: me.botId, message: { to: recipient.id, text: message } });
 			return reply(`Sent to ${recipient.name}. ${APPLIES}`);
+		},
+	});
+
+	pi.registerTool<Record<string, never>>({
+		name: STAY_QUIET_TOOL,
+		label: "Stay quiet",
+		description:
+			"Ends this turn without notifying the user or marking the conversation unread. Call it in a turn that found nothing the user needs, such as a routine run with nothing new, then end with a short reply. Never call it in a turn that tells the user something they need to act on or know.",
+		parameters: Type.Object({}),
+		loadMode: "essential",
+		approval: "read",
+		async execute() {
+			return reply("This turn ends without notifying the user.");
 		},
 	});
 }

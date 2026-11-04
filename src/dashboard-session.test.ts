@@ -270,13 +270,13 @@ describe("DashboardSession turns", () => {
 		client.fire({ type: "agent_start" });
 		client.fire({ type: "agent_end", isTerminal: false, yielded: true, awaitingAsyncWork: true, messages: [assistant("started")] });
 		expect(session.status).toBe("idle");
-		expect(ended()).toEqual([{ kind: "turn-ended", reply: "started", failure: null }]);
+		expect(ended()).toEqual([{ kind: "turn-ended", reply: "started", failure: null, quiet: false }]);
 
 		client.fire({ type: "agent_start" });
 		expect(session.status).toBe("working");
 		client.fire({ type: "agent_end", isTerminal: true, yielded: true, messages: [assistant("finished")] });
 		expect(session.status).toBe("idle");
-		expect(ended().at(-1)).toEqual({ kind: "turn-ended", reply: "finished", failure: null });
+		expect(ended().at(-1)).toEqual({ kind: "turn-ended", reply: "finished", failure: null, quiet: false });
 	});
 
 	test("a terminal agent_end reports the turn's last reply once, without its suggested prompts", async () => {
@@ -290,9 +290,9 @@ describe("DashboardSession turns", () => {
 			type: "agent_end",
 			messages: [assistant("Done: ok\n\nSuggestions:\n1. Ship it"), { role: "assistant", content: [{ type: "toolCall", id: "t1" }] }, { role: "toolResult", content: [] }],
 		});
-		expect(ended()).toEqual([{ kind: "turn-ended", reply: "Done: ok", failure: null }]);
+		expect(ended()).toEqual([{ kind: "turn-ended", reply: "Done: ok", failure: null, quiet: false }]);
 		client.fire({ type: "agent_end", messages: [] });
-		expect(ended().at(-1)).toEqual({ kind: "turn-ended", reply: null, failure: null });
+		expect(ended().at(-1)).toEqual({ kind: "turn-ended", reply: null, failure: null, quiet: false });
 	});
 
 	test("a terminal agent_end whose last message failed on a usage limit or a dropped connection reports how; a handover does not", async () => {
@@ -311,8 +311,8 @@ describe("DashboardSession turns", () => {
 		client.fire({ type: "agent_start" });
 		client.fire({ type: "agent_end", messages: [{ role: "assistant", content: [], stopReason: "error", provider: "openai-codex", errorMessage: "Couldn't reach chatgpt.com (getaddrinfo ENOTFOUND). Check the URL, your network, or proxy." }] });
 		expect(updates.filter(update => update.kind === "turn-ended")).toEqual([
-			{ kind: "turn-ended", reply: null, failure: { kind: "usage-limit", provider: "opencode-go", retryAfterMs: 200_813_000 } },
-			{ kind: "turn-ended", reply: null, failure: { kind: "transient", provider: "openai-codex" } },
+			{ kind: "turn-ended", reply: null, failure: { kind: "usage-limit", provider: "opencode-go", retryAfterMs: 200_813_000 }, quiet: false },
+			{ kind: "turn-ended", reply: null, failure: { kind: "transient", provider: "openai-codex" }, quiet: false },
 		]);
 	});
 
@@ -868,7 +868,7 @@ describe("DashboardSession reattach", () => {
 		};
 		client.fire({ type: "agent_end", messages: [limited] });
 		const ended = updates.slice(from).filter(update => update.kind === "turn-ended" || update.kind === "roster");
-		expect([ended.slice(0, 2), session.status]).toEqual([[{ kind: "turn-ended", reply: null, failure: { kind: "usage-limit", provider: "opencode-go", retryAfterMs: 200_813_000 } }, { kind: "roster" }], "idle"]);
+		expect([ended.slice(0, 2), session.status]).toEqual([[{ kind: "turn-ended", reply: null, failure: { kind: "usage-limit", provider: "opencode-go", retryAfterMs: 200_813_000 }, quiet: false }, { kind: "roster" }], "idle"]);
 	});
 
 	test("a session file with no directory in its header attaches where omp started", async () => {

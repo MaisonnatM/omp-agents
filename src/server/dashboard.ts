@@ -837,7 +837,7 @@ export class Dashboard {
 				return;
 			}
 			case "turn-started": {
-				if (this.#sessions.markRead(instanceId)) this.#broadcasts.rosterChanged();
+				if (this.#sessions.turnStarted(instanceId)) this.#broadcasts.rosterChanged();
 				// Whoever prompted, the session works again; its own continue, already claimed, stays.
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
 				if (sessionId) this.#autoContinue.turnStarted(sessionId);
@@ -846,7 +846,8 @@ export class Dashboard {
 				return;
 			}
 			case "turn-ended": {
-				this.#sessions.markUnread(instanceId, { at: Date.now(), reply: update.reply });
+				// A quiet turn, such as a Bot's routine run that found nothing, leaves the session as unread as before it.
+				this.#sessions.turnEnded(instanceId, update.quiet ? null : { at: Date.now(), reply: update.reply });
 				// A session started here that a usage limit or a transient fault stopped is held for its continue.
 				const sessionId = this.#sessions.started(instanceId)?.sessionId;
 				if (sessionId) this.#autoContinue.turnEnded(sessionId, update.failure);
