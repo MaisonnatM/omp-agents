@@ -5,7 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-04
 
-- New session now puts the composer near the top of the page, with the directory and branch just above it, and a row of starters under it for work you start often, such as **Run the dev server**, **Ship ENG-2722**, or **Shepherd my PRs**, the best fit for now first. Hover a starter to see its full prompt, and click it to put that prompt in the composer, where you can edit it before you send.
+- New session now keeps the composer at the bottom of the page, as in a running session, under the omp logo and a question naming the folder you work in. Starters for work you start often, such as Run the dev server, Ship ENG-2722, or Shepherd my PRs, show inside the composer as the same numbered list a session suggests after a reply. Press a starter's number or click it to put its prompt in the composer, where you can edit it before you send.
 - The New session page no longer shows the board of todos, past sessions, and pull requests. Your todos stay on the Todo page, past sessions in the sidebar, and pull requests on the Pull requests page.
 - The starter kit now has agents end each reply with what they decided for you and what they did not check, so you see the choices and gaps a short summary hides.
 - Settings › Storage now lists sandboxes of ended tasks with leftover changes, with the most space they can take, and can remove them.
