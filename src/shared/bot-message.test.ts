@@ -35,7 +35,7 @@ describe("promptAuthor", () => {
 	test("tells the dashboard's prompt first, then a routine's, then a Bot's, and calls the rest the user's", () => {
 		expect(promptAuthor(`${DASHBOARD_PROMPT_PREFIX} ${botMessageText(message)}`)).toEqual({ kind: "dashboard" });
 		expect(promptAuthor(routineMessageText({ ...routine, sent: { kind: "prompt", prompt: botMessageText(message) } }))).toEqual({ kind: "routine", message: { ...routine, sent: { kind: "prompt", prompt: botMessageText(message) } } });
-		expect(promptAuthor(botMessageText({ ...message, text: routineMessageText(routine) }))).toEqual({ kind: "bot", message: { ...message, text: routineMessageText(routine) } });
+		expect(promptAuthor(botMessageText({ ...message, text: routineMessageText(routine) }))).toEqual({ kind: "bot-message", message: { ...message, text: routineMessageText(routine) } });
 		expect(promptAuthor(message.text)).toEqual({ kind: "user" });
 	});
 });

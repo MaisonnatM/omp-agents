@@ -9,7 +9,7 @@ import { addUsage, type Clipped, NO_USAGE, type TokenUsage, type Turn, type Turn
 import { REPLAY_BLOCK } from "./shared/replay";
 import { botMessageText } from "./shared/bot-message";
 import { routineMessageText } from "./shared/routine-message";
-import { promptAuthor } from "./shared/transcript";
+import { isPrompt, promptAuthor } from "./shared/transcript";
 import { messageItemsOf } from "./transcript";
 
 const TEXT_MAX = 16_000;
@@ -134,7 +134,7 @@ export class Trajectory {
 
 	/** Opens a turn when the transcript shows `entry` as a prompt, and returns it. */
 	#opens(entry: Record<string, unknown>): Turn | null {
-		const prompt = messageItemsOf(entry).find(item => item.kind === "user" || item.kind === "routine" || item.kind === "bot-message");
+		const prompt = messageItemsOf(entry).find(isPrompt);
 		if (!prompt) return null;
 		const turn: Turn = {
 			id: str(entry.id) ?? `turn-${this.#turns.length + 1}`,

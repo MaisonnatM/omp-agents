@@ -352,7 +352,7 @@ const ActivityRow = memo(function ActivityRow({ id, entries, settled, shown, chi
 		for (const entry of entries) {
 			if (entry.kind !== "tool" || entry.status !== "ok" || !Object.hasOwn(chips, entry.name)) continue;
 			const { label, icon } = chips[entry.name]!;
-			const text = typeof label === "string" ? label : label(entry);
+			const text = label(entry);
 			if (!byLabel.has(text)) byLabel.set(text, { name: entry.name, label: text, icon });
 		}
 		return [...byLabel.values()];

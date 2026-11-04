@@ -78,8 +78,8 @@ function promptLast(at: number, text: string): BotLast | null {
 			return { at, from: "user", text: oneLine(text) };
 		case "routine":
 			return routineLast(at, author.message);
-		case "bot":
-			return { at, from: "peer", name: author.message.name, text: oneLine(author.message.text) };
+		case "bot-message":
+			return { at, from: "bot-message", name: author.message.name, text: oneLine(author.message.text) };
 		case "dashboard":
 			return null;
 		default: {

@@ -43,7 +43,7 @@ import { ActivityShown } from "../transcript";
 import { RoutinesCard } from "../routines/routines-card";
 import { RoutineEditor } from "../routines/routine-editor";
 import { BotAvatar } from "./bot-avatar";
-import { PeerBots } from "./bot-message-card";
+import { KnownBots } from "./bot-message-card";
 import { BotLookPicker } from "./bot-look-picker";
 
 const NO_STARTERS: string[] = [];
@@ -170,12 +170,13 @@ interface BotPageProps {
 export function BotPage({ open, bots, past, lastHosts, models, workspaces, connected, detailsOpen, onToggleDetails, completions }: BotPageProps) {
 	const { bot, host, view, routines, routine, status } = open;
 	const instanceId = host?.instanceId ?? null;
+	const names = useMemo(() => new Map(bots.map(({ id, name }) => [id, name])), [bots]);
 	const toolChips = useMemo<ToolChipLabels>(
 		() => ({
-			[REMEMBER_TOOL]: { label: `Updated memory for ${bot.name}`, icon: BookmarkCheck },
-			[MESSAGE_BOT_TOOL]: { label: tool => `Messaged ${bots.find(({ id }) => id === tool.to)?.name ?? "a Bot"}`, icon: Send },
+			[REMEMBER_TOOL]: { label: () => `Updated memory for ${bot.name}`, icon: BookmarkCheck },
+			[MESSAGE_BOT_TOOL]: { label: tool => `Messaged ${(tool.to && names.get(tool.to)) ?? "a Bot"}`, icon: Send },
 		}),
-		[bot.name, bots],
+		[bot.name, names],
 	);
 	const starters = useMemo(() => (bot.sessionId === null ? starterPrompts(bot.job) : NO_STARTERS), [bot.sessionId, bot.job]);
 	useShowConversation(view);
@@ -221,7 +222,7 @@ export function BotPage({ open, bots, past, lastHosts, models, workspaces, conne
 				{view ? (
 					<ActivityShown.Provider value={false}>
 						<ToolChipsContext.Provider value={toolChips}>
-							<PeerBots.Provider value={bots}>
+							<KnownBots.Provider value={bots}>
 								<ViewConversation
 									view={view}
 									focused
@@ -233,7 +234,7 @@ export function BotPage({ open, bots, past, lastHosts, models, workspaces, conne
 									header={false}
 									placeholder={`Message ${bot.name}`}
 								/>
-							</PeerBots.Provider>
+							</KnownBots.Provider>
 						</ToolChipsContext.Provider>
 					</ActivityShown.Provider>
 				) : (

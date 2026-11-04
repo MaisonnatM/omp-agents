@@ -3,8 +3,8 @@ import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { botMessageText } from "../shared/bot-message";
-import { applyBot, type Bot, type BotId, defaultLook, MAX_BOT_MESSAGES_PER_HOUR } from "../shared/bots";
-import { BotInbox } from "./bot-inbox";
+import { applyBot, type Bot, BOT_MESSAGE_WINDOW_MS, type BotId, defaultLook, MAX_BOT_MESSAGES_PER_HOUR } from "../shared/bots";
+import { BotInbox, PairLimit } from "./bot-inbox";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -25,12 +25,11 @@ const newBot = { id: "8c1d6f0e-2b7a-4c39-9e58-41f7a3b2d6c0" as BotId, kind: "rou
 
 /**
  * An inbox over Bots that start as `initial`, which each save it applies edits as the dashboard's would, unless
- * `refuse`; `sent` holds each message it delivered, and `clock` is its time in ms.
+ * `refuse`; `sent` holds each message it sent a Bot.
  */
 function harness(dir: string, initial: Bot[], refuse = false) {
 	let bots = initial;
 	const sent: [BotId, string][] = [];
-	const clock = { now: 0 };
 	const inbox = new BotInbox(dir, {
 		bots: () => bots,
 		save: change => {
@@ -40,10 +39,10 @@ function harness(dir: string, initial: Bot[], refuse = false) {
 			bots = next;
 			return changed;
 		},
-		deliver: async (to, text) => sent.push([to, text]),
-		now: () => clock.now,
+		tell: async (to, text) => sent.push([to, text]),
+		now: () => 0,
 	});
-	return { inbox, bots: () => bots, sent, clock };
+	return { inbox, bots: () => bots, sent };
 }
 
 describe("BotInbox", () => {
@@ -124,33 +123,36 @@ describe("BotInbox", () => {
 		await inbox.drain();
 		expect(sent).toEqual([[relay.id, botMessageText({ from: scout.id, name: "Scout", text: "Relay the build report." })]]);
 		expect(readdirSync(dir).sort()).toEqual(["2-x.json.invalid", "3-x.json.invalid", "4-x.json.invalid"]);
-		expect(logged.mock.calls).toContainEqual([`omp-agents: set aside ${join(dir, "2-x.json")}: Bot scout messaged itself`]);
+		expect(logged.mock.calls).toContainEqual([`omp-agents: set aside ${join(dir, "2-x.json")}: it is not a request for the Bots`]);
 		expect(logged.mock.calls).toContainEqual([`omp-agents: set aside ${join(dir, "4-x.json")}: it is not a request for the Bots`]);
 		logged.mockRestore();
 	});
 
-	test("past the hourly limit from one Bot to another, the sender is told once and the rest drop, other Bots still hear from it, and an hour later it delivers again", async () => {
+	test("a message past the hourly limit is not delivered, and its sender is told once", async () => {
 		const dir = inboxDir();
-		const { inbox, sent, clock } = harness(dir, [scout, relay, eggbot]);
-		const send = async (to: string, text: string) => {
-			writeFileSync(join(dir, `${clock.now}-${sent.length}-${text}.json`), JSON.stringify({ botId: "scout", message: { to, text } }));
-			await inbox.drain();
-		};
-		for (let i = 0; i < MAX_BOT_MESSAGES_PER_HOUR; i++) {
-			clock.now = i * 1000;
-			await send("relay", `Ping ${i}.`);
-		}
-		expect(sent.length).toBe(MAX_BOT_MESSAGES_PER_HOUR);
-		await send("relay", "One too many.");
-		await send("relay", "And another.");
-		await send("eggbot", "Design me a Bot.");
-		expect(sent.slice(MAX_BOT_MESSAGES_PER_HOUR)).toEqual([
-			[scout.id, `The dashboard did not deliver your message to Relay: you sent it ${MAX_BOT_MESSAGES_PER_HOUR} messages in the last hour; the dashboard drops the next ones without telling you until the hour has passed.`],
-			[eggbot.id, botMessageText({ from: scout.id, name: "Scout", text: "Design me a Bot." })],
+		for (let i = 0; i < MAX_BOT_MESSAGES_PER_HOUR + 2; i++) writeFileSync(join(dir, `${String(i).padStart(2, "0")}-x.json`), JSON.stringify({ botId: "scout", message: { to: "relay", text: `Ping ${i}.` } }));
+		const { inbox, sent } = harness(dir, [scout, relay]);
+		await inbox.drain();
+		expect(sent.length).toBe(MAX_BOT_MESSAGES_PER_HOUR + 1);
+		expect(sent.at(-1)).toEqual([
+			scout.id,
+			`The dashboard did not deliver your message to Relay: you sent it ${MAX_BOT_MESSAGES_PER_HOUR} messages in the last hour; the dashboard drops the next ones without telling you until the hour has passed.`,
 		]);
-		clock.now = (MAX_BOT_MESSAGES_PER_HOUR - 1) * 1000 + 60 * 60 * 1000;
-		await send("relay", "Back again.");
-		expect(sent.at(-1)).toEqual([relay.id, botMessageText({ from: scout.id, name: "Scout", text: "Back again." })]);
 		expect(readdirSync(dir)).toEqual([]);
+	});
+});
+
+describe("PairLimit", () => {
+	test("past the limit from one Bot to another, the sender is told once and the rest drop, other Bots still hear from it, and an hour later it delivers again", () => {
+		const limit = new PairLimit();
+		for (let at = 0; at < MAX_BOT_MESSAGES_PER_HOUR; at++) {
+			expect(limit.check(scout.id, relay.id, at)).toBe("deliver");
+			limit.delivered(scout.id, relay.id, at);
+		}
+		expect(limit.check(scout.id, relay.id, MAX_BOT_MESSAGES_PER_HOUR)).toBe("tell");
+		expect(limit.check(scout.id, relay.id, MAX_BOT_MESSAGES_PER_HOUR)).toBe("drop");
+		expect(limit.check(scout.id, eggbot.id, MAX_BOT_MESSAGES_PER_HOUR)).toBe("deliver");
+		expect(limit.check(scout.id, relay.id, BOT_MESSAGE_WINDOW_MS - 1)).toBe("drop");
+		expect(limit.check(scout.id, relay.id, BOT_MESSAGE_WINDOW_MS)).toBe("deliver");
 	});
 });

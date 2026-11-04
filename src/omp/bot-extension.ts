@@ -10,6 +10,7 @@ import { errorText, isObject, parseJson } from "../json";
 import { type BotRoutineRequest, MAX_COMMAND_LENGTH, parseRoutineSpec, type RoutineSpec, TRIGGER_KINDS } from "../routines";
 import { BOT_MESSAGE_STAMP } from "../shared/bot-message";
 import {
+	type Bot,
 	type BotCreateRequest,
 	type BotId,
 	type BotJobRequest,
@@ -98,6 +99,9 @@ export default function botExtension(pi: ExtensionApi): void {
 		return { botId, botsPath, memoryPath, botInbox: flag(BOT_FLAGS.botInbox), routinesPath: flag(BOT_FLAGS.routines), routineInbox: flag(BOT_FLAGS.routineInbox) };
 	};
 
+	/** Every Bot as `bots.json` holds them now; none when the file is missing or unreadable. */
+	const readBots = ({ botsPath }: ThisBot): Bot[] => parseBots(parseJson(readText(botsPath))) ?? [];
+
 	/** The Bot's routines as `routines.json` holds them now; none when the file is missing or unreadable, or the dashboard named none. */
 	const ownRoutines = ({ botId, routinesPath }: ThisBot): RoutineSpec[] => {
 		const value = routinesPath === null ? null : parseJson(readText(routinesPath));
@@ -108,7 +112,7 @@ export default function botExtension(pi: ExtensionApi): void {
 	pi.on("before_agent_start", (event, ctx) => {
 		const me = thisBot();
 		if (ctx.agent.kind === "sub" || !me) return undefined;
-		const bots = parseBots(parseJson(readText(me.botsPath))) ?? [];
+		const bots = readBots(me);
 		const bot = bots.find(bot => bot.id === me.botId);
 		if (!bot) return undefined;
 		const others = bots.filter(other => other.id !== me.botId);
@@ -247,7 +251,7 @@ export default function botExtension(pi: ExtensionApi): void {
 			const me = thisBot();
 			if (!me?.botInbox) throw new Error("This session is not an omp-agents Bot, so it cannot message Bots.");
 			if (to === me.botId) throw new Error("You cannot message yourself.");
-			const recipient = parseBots(parseJson(readText(me.botsPath)))?.find(bot => bot.id === to);
+			const recipient = readBots(me).find(bot => bot.id === to);
 			if (!recipient) throw new Error(`No Bot has id ${to}; the system prompt lists the other Bots.`);
 			const message = parseBotMessageText(text);
 			if (!message) throw new Error(`text must not be empty, must be at most ${MAX_BOT_MESSAGE_LENGTH} characters, and cannot start with ! or /, which would run as a command in the other Bot's session.`);

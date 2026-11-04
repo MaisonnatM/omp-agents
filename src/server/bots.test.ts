@@ -273,7 +273,7 @@ describe("lastMessage", () => {
 
 	test("another Bot's message previews under that Bot's name as one line", () => {
 		const path = write([line("user", botMessageText({ from: "triage" as BotId, name: "Triage", text: "Fix the flaky\nlogin test." }))]);
-		expect(lastMessage(path)).toEqual({ at: Date.parse("2026-05-02T09:30:00.000Z"), from: "peer", name: "Triage", text: "Fix the flaky login test." });
+		expect(lastMessage(path)).toEqual({ at: Date.parse("2026-05-02T09:30:00.000Z"), from: "bot-message", name: "Triage", text: "Fix the flaky login test." });
 	});
 
 	test("a file whose end is all tool output, or no file at all, has no last words", () => {

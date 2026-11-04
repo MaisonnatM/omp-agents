@@ -12,6 +12,8 @@
   The transcript, trajectory, queued rows, withdrawn messages, live title's `/rename`, and past title use that classification, so a routine is never presented as the user's own prompt.
   `routine-message.ts` holds `RoutineMessage`, the snapshot of what one routine run sent, `routineMessageText`, its body and trailing JSON stamp, `readRoutineMessage`, its checked decoder, `taskOf`, its prompt or command task, and `taskText`, that task's prompt or command as text.
   `bot-message.ts` holds `BotMessage`, a message one Bot sent another, with the sender's id and its name as of the send, `botMessageText`, its body and trailing JSON stamp, and `readBotMessage`, its checked decoder; `promptAuthor` in `transcript.ts` reads it after a routine's stamp.
+  Both stamp through `stamp.ts`: `stampedText` writes a body and its trailing stamp line, and `readStamped` reads the last stamp line back with a decoder of its own.
+  `transcript.ts` also holds `PromptItem` and `isPrompt`, the items that open a turn: a user's prompt, a routine's message, or a Bot message.
   `transcript.ts` also holds `MEDIA_FILE_TYPES` and `mediaUrl`, the `GET /api/media` address of an image or video on this computer, which the media tree and the media section build; a path in agent text builds it with its session lookup through `mediaFileUrl` in `web/file-paths.ts`.
   `mcp-servers.ts` holds the rows and bodies of Settings › MCP servers, and `mcp-catalog.ts` the catalog of remote servers it offers.
   `mcp-status.ts` holds `McpRemoteStatus` and `McpTool`, where omp stands with a remote MCP server, which an integration's `McpConnection` in `accounts.ts` and a server's `McpServerStatus` in `mcp-servers.ts` both build on.

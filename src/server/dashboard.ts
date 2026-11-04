@@ -381,7 +381,7 @@ export class Dashboard {
 		this.#routineInbox = new RoutineInbox(routineInboxDir, () => routines.value, change => lists.apply("routines", change), { active: () => ownerLock.held });
 		this.#botInbox = new BotInbox(
 			botInboxDir,
-			{ bots: () => this.#botsFile.value, save: change => lists.apply("bots", change), deliver: (to, text) => this.#bots.message(to, text), now: Date.now },
+			{ bots: () => this.#botsFile.value, save: change => lists.apply("bots", change), tell: (to, text) => this.#bots.message(to, text), now: Date.now },
 			{ active: () => ownerLock.held },
 		);
 		const starter = createStarter({

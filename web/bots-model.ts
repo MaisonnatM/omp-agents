@@ -104,7 +104,7 @@ function saidLine(last: BotLast): string {
 		case "user":
 			return `You: ${last.text}`;
 		case "routine":
-		case "peer":
+		case "bot-message":
 			return `${last.name}: ${last.text}`;
 		case "bot":
 			return last.text;

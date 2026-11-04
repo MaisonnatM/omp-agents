@@ -34,7 +34,7 @@ function firstTitle(firstMessage: string): string | null {
 			return oneLine(firstMessage);
 		case "routine":
 			return author.message.routine.name;
-		case "bot":
+		case "bot-message":
 			return oneLine(author.message.text);
 		case "dashboard":
 			return null;

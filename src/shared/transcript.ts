@@ -48,14 +48,14 @@ export const mediaUrl = (path: string): string => `/api/media?${new URLSearchPar
 export const DASHBOARD_PROMPT_PREFIX = "[omp-agents]";
 
 /** Who sent a prompt: the user, the dashboard in the user's place, or a routine or another Bot, whose message a stamp tells. */
-export type PromptAuthor = { kind: "user" } | { kind: "dashboard" } | { kind: "routine"; message: RoutineMessage } | { kind: "bot"; message: BotMessage };
+export type PromptAuthor = { kind: "user" } | { kind: "dashboard" } | { kind: "routine"; message: RoutineMessage } | { kind: "bot-message"; message: BotMessage };
 
 export function promptAuthor(text: string): PromptAuthor {
 	if (text.startsWith(DASHBOARD_PROMPT_PREFIX)) return { kind: "dashboard" };
 	const routine = readRoutineMessage(text);
 	if (routine) return { kind: "routine", message: routine };
-	const bot = readBotMessage(text);
-	return bot ? { kind: "bot", message: bot } : { kind: "user" };
+	const message = readBotMessage(text);
+	return message ? { kind: "bot-message", message } : { kind: "user" };
 }
 
 /** A `/skill:` prompt as typed: the skill's token, then `text` after a space when there is any. */
@@ -93,6 +93,11 @@ export type Item =
 	 */
 	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; agents: string[]; images?: string[]; todos?: TodoPhase[]; to?: BotId }
 	| { id: string; kind: "notice"; level: "info" | "warning" | "error"; text: string };
+
+/** A prompt the page shows: the user's, a routine's, or another Bot's message; the dashboard's opens a turn but shows nothing. */
+export type PromptItem = Extract<Item, { kind: "user" | "routine" | "bot-message" }>;
+
+export const isPrompt = (item: Item): item is PromptItem => item.kind === "user" || item.kind === "routine" || item.kind === "bot-message";
 
 /** A task on the agent's todo list, as omp's `todo` tool records it. */
 export interface TodoTask {

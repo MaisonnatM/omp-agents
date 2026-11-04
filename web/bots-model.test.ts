@@ -66,7 +66,7 @@ describe("Bots", () => {
 			["replied" as BotId]: { at: 2_000, from: "user", text: "How is the build?" },
 			["talked" as BotId]: { at: 1_000, from: "user", text: "Thanks." },
 			["scheduled" as BotId]: { at: 500, from: "routine", name: "Nightly build", text: "Check the **inbox**." },
-			["handed" as BotId]: { at: 400, from: "peer", name: "Triage", text: "Fix the `flaky` test." },
+			["handed" as BotId]: { at: 400, from: "bot-message", name: "Triage", text: "Fix the `flaky` test." },
 		};
 		expect(botRows(bots, hosts, lasts).map(({ bot, host, unread, preview, at }) => [bot.name, host?.sessionId ?? null, unread, preview, at])).toEqual([
 			["Fresh", null, false, "No messages yet", Date.parse("2026-10-05T09:00:00.000Z")],

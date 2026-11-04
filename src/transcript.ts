@@ -13,12 +13,11 @@ import { type BotId, MESSAGE_BOT_TOOL, parseBotId } from "./shared/bots";
 import { splitFiles } from "./shared/prompt-files";
 import type { PromptImage } from "./shared/sessions";
 import type { RoutineMessage } from "./shared/routine-message";
-import { type Item, promptAuthor, skillInvocation, type TodoPhase, type TodoTask } from "./shared/transcript";
+import { isPrompt, type Item, type PromptItem, promptAuthor, skillInvocation, type TodoPhase, type TodoTask } from "./shared/transcript";
 
 type Json = Record<string, unknown>;
 type ToolItem = Extract<Item, { kind: "tool" }>;
-type PromptItem = Extract<Item, { kind: "user" | "dashboard" | "routine" | "bot-message" }>;
-type StartingItem = Extract<Item, { kind: "user" | "routine" | "bot-message" }>;
+type SentItem = PromptItem | Extract<Item, { kind: "dashboard" }>;
 
 /** A prompt omp admitted while the main agent was idle and whose turn has not shown it yet; `id` is its RPC request id. */
 export interface StartingPrompt {
@@ -61,7 +60,7 @@ function unwrapSkill(prompt: string): { text: string; skill: string | null } {
  * The item a prompt shows as, `skill` the one it invoked: the dashboard's, a routine's, another Bot's, or the user's as
  * typed, with attached files as their names, not their text.
  */
-function promptItem(id: string, { text, skill }: { text: string; skill: string | null }, rest: { from: string | null; entryId: string | null; images?: string[]; pending?: true }): PromptItem {
+function promptItem(id: string, { text, skill }: { text: string; skill: string | null }, rest: { from: string | null; entryId: string | null; images?: string[]; pending?: true }): SentItem {
 	const author = promptAuthor(text);
 	const pending = rest.pending ? { pending: true as const } : {};
 	switch (author.kind) {
@@ -69,7 +68,7 @@ function promptItem(id: string, { text, skill }: { text: string; skill: string |
 			return { id, kind: "dashboard", text, entryId: rest.entryId };
 		case "routine":
 			return { id, kind: "routine", message: withSkill(author.message, skill), entryId: rest.entryId, ...pending };
-		case "bot":
+		case "bot-message":
 			return { id, kind: "bot-message", message: author.message, entryId: rest.entryId, ...pending };
 		case "user":
 			return { id, kind: "user", ...typed(text), skill, ...rest };
@@ -96,7 +95,7 @@ function typed(prompt: string): { text: string; files?: string[] } {
 const LEADING_SKILL = /^\s*\/skill:(\S+)([\s\S]*)$/;
 
 /** A starting prompt as its live user message will show it; `null` for one the dashboard sent. */
-function startingItem({ id, text, images }: StartingPrompt): StartingItem | null {
+function startingItem({ id, text, images }: StartingPrompt): PromptItem | null {
 	const skill = LEADING_SKILL.exec(text);
 	const item = promptItem(`starting:${id}`, skill ? { text: skill[2].trim(), skill: skill[1] } : unwrapSkill(text), {
 		from: null,
@@ -191,7 +190,7 @@ export function splitSuggestions(text: string): { body: string; suggestions: str
 }
 
 /** A prompt, a routine's or another Bot's message, or a reply as the transcript shows it. */
-export type MessageItem = Extract<Item, { kind: "user" | "routine" | "bot-message" | "assistant" }>;
+export type MessageItem = PromptItem | Extract<Item, { kind: "assistant" }>;
 
 /**
  * The prompts, routine and Bot messages and replies one session-file entry holds, as a fold of the whole file shows
@@ -201,7 +200,7 @@ export type MessageItem = Extract<Item, { kind: "user" | "routine" | "bot-messag
  * same, without the thinking, tool calls, and order a whole fold keeps.
  */
 export function messageItemsOf(entry: unknown): MessageItem[] {
-	return new Transcript().applyEntry(entry).filter((item): item is MessageItem => item.kind === "user" || item.kind === "routine" || item.kind === "bot-message" || item.kind === "assistant");
+	return new Transcript().applyEntry(entry).filter((item): item is MessageItem => isPrompt(item) || item.kind === "assistant");
 }
 
 export class Transcript {
@@ -218,7 +217,7 @@ export class Transcript {
 	#fileLatest = 0;
 	/** Where the first item that went ahead of items already there landed since the last {@link takeDisplaced}; `null` for none. */
 	#displacedFrom: number | null = null;
-	#starting: StartingItem | null = null;
+	#starting: PromptItem | null = null;
 	#removed: string[] = [];
 
 	items(): Item[] {
