@@ -39,6 +39,10 @@ Then update with the same command plus `-X PUT -H "Origin: http://127.0.0.1:4317
 A `current` answer means origin had nothing new and the dashboard did not restart; when it still needs a restart, ask the user rather than kill its processes.
 A 409 answer says why the checkout stayed as it was, such as uncommitted changes or local commits; report it rather than stash, reset, or retry.
 
+## Design work
+
+Before any change to what a screen shows, even a one-value tweak, read `skill://design-workflow` and follow it.
+
 ## Conditional references
 
 - Models: before configuring model roles, reasoning levels, fallback chains, or responding to quota exhaustion, read `~/.omp/agent/docs/model-routing.md`.

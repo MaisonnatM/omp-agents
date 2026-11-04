@@ -7,6 +7,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - Bots can now message each other: one Bot hands work to another, which wakes up, does it, and can answer back. The message shows as a card with the sender's face in the other Bot's conversation, and as Messaged and the other Bot's name in the sender's. One Bot can send another at most 20 messages an hour, so two Bots cannot keep answering each other forever.
 - A new personal session no longer shows Your assistant under the composer, with what it remembers and your recent personal sessions. Its memory stays in a personal session's Memory tab, and past personal sessions stay in Past sessions.
+- The starter kit sends every interface change through a design workflow: agents look at your app's own screens and at reference designs before the first edit, offer five structurally different options for a redesign, and have a separate reviewer screenshot and measure the result before you see it.
 - Replay from here and Compare replay are gone from the trajectory and the pane header.
 - Behind the scenes: the starter kit no longer includes the request log, which saved every request sent to a model so a turn could be replayed.
 - Ask about this is gone. Selecting text in a conversation, a past session, or a pull request's code no longer offers a side discussion.
