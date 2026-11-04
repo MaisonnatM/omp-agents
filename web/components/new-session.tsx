@@ -231,14 +231,16 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					{scheduled ? `Not sent: ${error}` : error}
 				</p>
 			)}
-			{scheduled && (
+			{scheduled ? (
 				<EmptyConversation title={`Scheduled in ${name}`}>
 					It starts at its time as Start session would start it. Edit the message, model, skill, directory, or branch, then save; the clock moves its time.
 					{todo && ` Your todo “${todo.text}” links to the session once it starts.`}
 				</EmptyConversation>
+			) : (
+				<NewSessionWelcome folder={name} personal={personalDraft} isPrivate={isPrivate} />
 			)}
 			{/* The composer docks at the page's bottom, a new session's directory and branch above it and its starters inside it. */}
-			<div className={cn("mx-auto w-full max-w-conversation px-3 pb-3", !scheduled && "mt-auto")}>
+			<div className="mx-auto w-full max-w-conversation px-3 pb-3">
 				{!scheduled && <div className="flex flex-wrap items-center gap-1 pb-1.5">{pickers}</div>}
 				<div className="relative">
 					{completion.popup}
@@ -386,5 +388,22 @@ function PrivatePill({ on, onToggle, disabled }: { on: boolean; onToggle: () => 
 				{on && <X aria-hidden className="size-3" />}
 			</button>
 		</Tooltip>
+	);
+}
+
+/** What a new session's empty page says above the docked composer: where the work happens, and how to begin it. */
+function NewSessionWelcome({ folder, personal, isPrivate }: { folder: string; personal: boolean; isPrivate: boolean }) {
+	const title = personal ? "What can I help with?" : `What should we work on in ${folder}?`;
+	const note = isPrivate ? PRIVATE_NOTE : personal ? "Ask about plans, errands, or anything personal." : "Describe the work below, or pick a starter.";
+	return (
+		<div className="relative m-auto flex w-full max-w-conversation flex-col items-center px-6 py-10 text-center" data-empty-conversation>
+			{/* A soft halo behind the mark gives the empty page a center without a card around it. */}
+			<div aria-hidden="true" className="pointer-events-none absolute top-0 left-1/2 size-72 -translate-x-1/2 -translate-y-1/4 rounded-full bg-[radial-gradient(closest-side,color-mix(in_oklch,var(--color-foreground)_7%,transparent),transparent)]" />
+			<span aria-hidden="true" className="relative flex size-12 items-center justify-center rounded-2xl border border-border bg-background text-foreground shadow-[0_1px_2px_rgb(0_0_0/0.06),0_8px_24px_-8px_rgb(0_0_0/0.18)]">
+				{isPrivate ? <Lock className="size-5" /> : <Sparkles className="size-5" />}
+			</span>
+			<h2 className="relative mt-6 max-w-md text-2xl leading-tight font-semibold tracking-tight text-balance">{title}</h2>
+			<p className="relative mt-2 max-w-sm text-sm leading-relaxed text-pretty text-muted-foreground">{note}</p>
+		</div>
 	);
 }
