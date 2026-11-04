@@ -1,5 +1,5 @@
 /** The Settings Files section: omp's config files as folders, each viewed and edited in place (`Files`). */
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { everyWord } from "../../../src/shared/every-word";
 import type { FileEdit, OmpFile, OmpSettings, ReadOnlyFile } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { putJson, settingsUrl } from "../../api";
 import { fileTree, foldersAbove } from "../../changes-model";
+import { descriptionOf } from "../../frontmatter";
 import type { Editable } from "../../editable-read";
 import { formatBytes } from "../../labels";
 import { CodeText, isMarkdownPath, MarkdownDocument } from "../file-text";
@@ -266,17 +267,27 @@ export function FileRail<F extends Pick<OmpFile, "path" | "pathDisplay">>({
  */
 export function Files({ files: allFiles, editing, selected, onSelect }: { files: OmpFile[]; editing: Editing; selected: string | null; onSelect: (path: string) => void }) {
 	const files = allFiles.filter(file => !file.packaged);
+	const descriptions = useMemo(
+		() => new Map(allFiles.flatMap(file => (file.kind === "skill" && file.body.state === "read" ? [[file.path, descriptionOf(file.body.text)] as const] : []))),
+		[allFiles],
+	);
 	const open = files.find(file => file.path === selected) ?? files.find(file => file.kind === "context") ?? files[0];
 	if (!open) return <p className="text-sm text-muted-foreground">omp found no files.</p>;
 	return (
 		<div className="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
 			<FileRail label="omp files" filtered files={files} pathOf={file => file.pathDisplay} open={open} onSelect={onSelect}>
-				{(file, name) => (
-					<>
-						<span className={cn("truncate", file.body.state !== "read" && "text-muted-foreground")}>{name}</span>
-						{file.body.state === "missing" && <span className="ml-auto shrink-0 text-xs text-muted-foreground">missing</span>}
-					</>
-				)}
+				{(file, name) => {
+					const description = descriptions.get(file.path);
+					return (
+						<>
+							<span className="min-w-0 flex-1">
+								<span className={cn("block truncate", file.body.state !== "read" && "text-muted-foreground")}>{name}</span>
+								{description && <span className="line-clamp-2 text-xs font-normal leading-snug text-muted-foreground">{description}</span>}
+							</span>
+							{file.body.state === "missing" && <span className="shrink-0 text-xs text-muted-foreground">missing</span>}
+						</>
+					);
+				}}
 			</FileRail>
 			<FileView key={open.path} file={open} saver={settingsFiles(editing)} />
 		</div>

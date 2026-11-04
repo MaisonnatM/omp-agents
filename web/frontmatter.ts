@@ -9,8 +9,12 @@ export interface FrontmatterField {
 const FIELD = /^([A-Za-z0-9_.-]+):(?:\s+(.*))?$/;
 const BLOCK_SCALAR = /^[|>][+-]?$/;
 
-/** `"…"` or `'…'` without its quotes. */
-const unquote = (value: string): string => (/^(["']).*\1$/.test(value) ? value.slice(1, -1) : value);
+/** `"…"` without its quotes and backslash escapes, `'…'` without its quotes and doubled `''`. */
+function unquote(value: string): string {
+	if (/^".*"$/.test(value)) return value.slice(1, -1).replace(/\\(.)/g, (_, char: string) => (char === "n" ? "\n" : char === "t" ? "\t" : char));
+	if (/^'.*'$/.test(value)) return value.slice(1, -1).replaceAll("''", "'");
+	return value;
+}
 
 /** The lines under a key: a `>` block folds them into one paragraph, anything else keeps them, dedented. */
 function nestedValue(marker: string, lines: string[]): string {
@@ -46,3 +50,6 @@ function valueOf(first: string, nested: string[]): string {
 	// A plain scalar that runs on over more lines reads as one line.
 	return unquote([first, ...nested.map(line => line.trim())].filter(Boolean).join(" "));
 }
+
+/** The frontmatter's `description`, `null` when it has none. */
+export const descriptionOf = (text: string): string | null => splitFrontmatter(text).fields.find(field => field.key === "description")?.value || null;

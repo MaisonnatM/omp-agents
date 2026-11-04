@@ -14,6 +14,7 @@ test("a relative path resolves against its base, dot segments included", () => {
 	expect(absoluteFilePath("../notes/plan.md", "/repo/docs")).toBe("/repo/notes/plan.md");
 	expect(absoluteFilePath("./usage.md", "/repo/docs/")).toBe("/repo/docs/usage.md");
 	expect(absoluteFilePath("~/plan.md", null)).toBe("~/plan.md");
+	expect(absoluteFilePath("../docs/plan.md", "~/.omp/agent/skills")).toBe("~/.omp/agent/docs/plan.md");
 	expect(absoluteFilePath("plan.md", null)).toBeNull();
 });
 
