@@ -77,8 +77,9 @@
 
 - A Bot can message another Bot, as Grok Bots hand work off: one Bot asks another to do what is that Bot's job, and the other wakes up, does it, and can answer back later.
   Ask a Bot in its conversation, such as "ask Triage to look at the flaky test", or let it decide; every Bot sees the other Bots' names, types, and the first sentence of their jobs on every turn.
-- The Bot that sent the message shows **Messaged** and the other Bot's name in its conversation, once the message left.
-- The Bot that gets it shows it as a card in its conversation, with the sender's avatar, **From** and its name, and the message, then works on it as on your own message.
+- The Bot that sent the message shows **Messaged** and the other Bot's name in its conversation, once the message left; click it to open that Bot.
+- The Bot that gets it shows it as a card in its conversation, with the sender's avatar, **From** and its name, and the message with its line breaks kept, then works on it as on your own message.
+  Click **From** and the name to open the sender.
   The Bots tab and the gallery show the message as its last one, starting with the sender's name.
   If the sender was deleted since, the card keeps the name it signed with.
 - The other Bot's reply in its own conversation does not reach the sender; it messages the sender back only when it has a result or a question, and never only to thank or acknowledge.

@@ -301,14 +301,26 @@ export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries:
 	);
 });
 
-/** A chip under an activity group for each label `chips` gives a call that finished in it, once per label. */
+/** A chip under an activity group for each label `chips` gives a call that finished in it, once per label; one with an address is a link to it. */
 function ToolChips({ shown }: { shown: ToolChip[] }) {
-	return shown.map(({ name, label, icon: Icon }) => (
-		<p key={label} className="mt-1.5 inline-flex items-center gap-1.5 self-start rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground" data-tool-chip={name}>
-			<Icon aria-hidden className="size-3.5 shrink-0" />
-			{label}
-		</p>
-	));
+	return shown.map(({ name, label, href, icon: Icon }) => {
+		const className = "mt-1.5 inline-flex items-center gap-1.5 self-start rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground";
+		const content = (
+			<>
+				<Icon aria-hidden className="size-3.5 shrink-0" />
+				{label}
+			</>
+		);
+		return href ? (
+			<a key={label} href={href} className={cn(className, "transition-colors hover:bg-accent hover:text-foreground")} data-tool-chip={name}>
+				{content}
+			</a>
+		) : (
+			<p key={label} className={className} data-tool-chip={name}>
+				{content}
+			</p>
+		);
+	});
 }
 
 /**
@@ -343,7 +355,7 @@ function Row({ messageId, settled, className, children }: { messageId: string; s
 	);
 }
 
-type ToolChip = { name: string; label: string; icon: LucideIcon };
+type ToolChip = { name: string; label: string; href: string | null; icon: LucideIcon };
 
 /** A group of tool calls and thinking, with a chip for each label `chips` gives a call that finished in it. Memoized on its block, so a token leaves a settled group as it is. */
 const ActivityRow = memo(function ActivityRow({ id, entries, settled, shown, chips }: { id: string; entries: ActivityItem[]; settled: boolean; shown: boolean; chips: ToolChipLabels }) {
@@ -351,9 +363,9 @@ const ActivityRow = memo(function ActivityRow({ id, entries, settled, shown, chi
 		const byLabel = new Map<string, ToolChip>();
 		for (const entry of entries) {
 			if (entry.kind !== "tool" || entry.status !== "ok" || !Object.hasOwn(chips, entry.name)) continue;
-			const { label, icon } = chips[entry.name]!;
+			const { label, href, icon } = chips[entry.name]!;
 			const text = label(entry);
-			if (!byLabel.has(text)) byLabel.set(text, { name: entry.name, label: text, icon });
+			if (!byLabel.has(text)) byLabel.set(text, { name: entry.name, label: text, href: href?.(entry) ?? null, icon });
 		}
 		return [...byLabel.values()];
 	}, [entries, chips]);

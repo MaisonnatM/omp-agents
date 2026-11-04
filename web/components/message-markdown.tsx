@@ -366,6 +366,28 @@ export const SESSION_AGENT_PRESET: MarkdownPreset = { ...AGENT_PRESET, component
 /** A user's prompt in a session's conversation, whose `mermaid` and `chart` fences draw as visuals. */
 export const SESSION_PROMPT_PRESET: MarkdownPreset = { ...PROMPT_PRESET, components: SESSION_PROMPT_COMPONENTS };
 
+interface BreakNode {
+	type: string;
+	value?: string;
+	children?: BreakNode[];
+}
+
+/** Turns each line break inside a paragraph's text into a hard break, so lines written one under the other, such as a poem's, stay so. */
+const remarkLineBreaks = () => (root: BreakNode) => {
+	const visit = (node: BreakNode): void => {
+		if (!node.children) return;
+		node.children = node.children.flatMap(child => {
+			if (child.type !== "text" || !child.value?.includes("\n")) return [child];
+			return child.value.split(/\r?\n/).flatMap((line, i) => (i === 0 ? [{ type: "text", value: line }] : [{ type: "break" }, { type: "text", value: line }]));
+		});
+		for (const child of node.children) visit(child);
+	};
+	visit(root);
+};
+
+/** A message one Bot sent another, shown in the receiving Bot's conversation: agent text whose line breaks stay. */
+export const BOT_MESSAGE_PRESET: MarkdownPreset = { ...SESSION_AGENT_PRESET, remark: [...AGENT_PRESET.remark, remarkLineBreaks] };
+
 /**
  * Text written on GitHub or Linear, whose raw HTML renders as GitHub renders it, through rehype-sanitize's schema, which
  * follows GitHub's; HTML comments drop out, as GitHub hides them. Images load from GitHub's hosts and from this

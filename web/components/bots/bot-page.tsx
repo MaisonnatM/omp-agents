@@ -174,7 +174,11 @@ export function BotPage({ open, bots, past, lastHosts, models, workspaces, conne
 	const toolChips = useMemo<ToolChipLabels>(
 		() => ({
 			[REMEMBER_TOOL]: { label: () => `Updated memory for ${bot.name}`, icon: BookmarkCheck },
-			[MESSAGE_BOT_TOOL]: { label: tool => `Messaged ${(tool.to && names.get(tool.to)) ?? "a Bot"}`, icon: Send },
+			[MESSAGE_BOT_TOOL]: {
+				label: tool => `Messaged ${(tool.to && names.get(tool.to)) ?? "a Bot"}`,
+				href: tool => (tool.to && names.has(tool.to) ? hashForBots(tool.to) : null),
+				icon: Send,
+			},
 		}),
 		[bot.name, names],
 	);
