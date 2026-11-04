@@ -77,10 +77,8 @@ import { type ConversationHit, type ConversationSearchAnswer, PROMPT_IMAGE_TYPES
 import { TICKET_ID } from "../shared/tickets";
 import type { TrustChange } from "../shared/project-trust";
 import type { WorkspaceChange } from "../shared/workspaces";
-import type { ReplayComparison, ReplayDetail } from "../shared/replay";
 import { MEDIA_FILE_TYPES } from "../shared/transcript";
-import type { View } from "../shared/sessions";
-import { parseDevServerRequest, parseProcessStop, parseReviewDraftPost, parseView } from "./wire";
+import { parseDevServerRequest, parseProcessStop, parseReviewDraftPost } from "./wire";
 import { SystemLoadReader } from "../system-load";
 import { findMediaFile, firstFile, readTextFile } from "../local-file";
 import type { Terminals } from "../terminals";
@@ -167,8 +165,6 @@ export interface SessionRoutesEnv {
 	sourceControl(): Promise<SourceControlAnswer>;
 	/** Apply `change` to the source control settings, and pull again when it changed the automatic pulls. */
 	changeSourceControl(change: SourceControlChange): void;
-	replayDetail(view: View, turnId: string): Promise<ReplayDetail>;
-	replayComparison(view: View): Promise<ReplayComparison>;
 }
 
 /** What the file routes read: the registered worktrees and the terminal panel's shells. */
@@ -295,18 +291,6 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		const cwd = params.get("cwd");
 		return cwd === null || env.knownWorkspaces().includes(cwd) || env.addedCwds().includes(cwd) ? cwd : fail(404, `No session ran in ${cwd}`);
 	}
-
-	const replayRead = (compare: boolean) =>
-		get((params) =>
-			answer(async () => {
-				const parsed = parseView(JSON.parse(params.get("view") ?? "null"));
-				if (!parsed || (parsed.ok.kind === "live" && parsed.ok.agentId !== null)) throw new Error("Replay requires a main session.");
-				const turnId = params.get("turnId");
-				if (compare) return env.replayComparison(parsed.ok);
-				if (!turnId) throw new Error("Choose a prompt turn to replay.");
-				return env.replayDetail(parsed.ok, turnId);
-			}),
-		);
 
 	/**
 	 * A write whose refusals are `Rejected`: a settings write, `PUT /api/settings/routing`, `/api/settings/agent`, or
@@ -535,8 +519,6 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/models/connected": { GET: connected },
 		"/api/dictation/settings": { PUT: dictationEnable },
 		"/api/models/roles": { GET: roles },
-		"/api/replay/detail": { GET: replayRead(false) },
-		"/api/replay/compare": { GET: replayRead(true) },
 		"/api/analytics": { GET: analytics },
 		"/api/analytics/context": { GET: contextReport },
 		"/api/analytics/session": { GET: sessionUsage },

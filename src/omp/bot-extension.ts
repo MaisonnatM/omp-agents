@@ -8,7 +8,6 @@ import { join } from "node:path";
 import { errorText, isObject, parseJson } from "../json";
 import { type BotRoutineRequest, MAX_COMMAND_LENGTH, parseRoutineSpec, type RoutineSpec, TRIGGER_KINDS } from "../routines";
 import { type BotCreateRequest, type BotId, type BotJobRequest, MAX_FACT_LENGTH, MAX_JOB_LENGTH, parseBots, parseBotId } from "../shared/bots";
-import type { RouterRequest } from "../shared/router";
 import type { ShepherdRequest } from "../shared/shepherd";
 import { type ExtensionApi, flagValue, memoryLines, readText, rememberTool, reply } from "./extension-kit";
 
@@ -40,7 +39,7 @@ function routineLine({ id, name, enabled, schedules, triggers, task }: RoutineSp
 }
 
 /** Leaves `request` in `dir` for the dashboard: written under a name it skips, then renamed, so it never reads half a file. */
-export function leave(dir: string, request: BotRoutineRequest | BotJobRequest | BotCreateRequest | ShepherdRequest | RouterRequest): void {
+export function leave(dir: string, request: BotRoutineRequest | BotJobRequest | BotCreateRequest | ShepherdRequest): void {
 	try {
 		mkdirSync(dir, { recursive: true });
 		const name = `${Date.now()}-${randomUUID()}`;

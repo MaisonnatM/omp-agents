@@ -46,7 +46,6 @@ async function buildResources(): Promise<void> {
 	await bundle(join(ROOT, "src", "omp", "session-visuals-extension.ts"), RESOURCES, "session-visuals-extension.js", { target: "bun" });
 	await bundle(join(ROOT, "src", "omp", "bot-extension.ts"), RESOURCES, "bot-extension.js", { target: "bun" });
 	await bundle(join(ROOT, "src", "omp", "shepherd-extension.ts"), RESOURCES, "shepherd-extension.js", { target: "bun" });
-	await bundle(join(ROOT, "src", "omp", "router-extension.ts"), RESOURCES, "router-extension.js", { target: "bun" });
 	await bundle(join(ROOT, "src", "omp", "designer-extension.ts"), RESOURCES, "designer-extension.js", { target: "bun" });
 	await bundle(join(ROOT, "src", "omp", "personal-extension.ts"), RESOURCES, "personal-extension.js", { target: "bun" });
 	// The installer reads its layers beside itself, as `templates/omp/install.ts` does in a checkout.

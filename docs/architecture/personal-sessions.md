@@ -24,7 +24,7 @@ No inbox and no server writer stand between the tool and the file, as with a Bot
 ## Extension kit
 
 `src/omp/extension-kit.ts` holds what the omp-agents extensions share: `ExtensionApi`, the slice of omp's extension API they use, `flagValue`, `readText`, `reply`, `memoryLines`, and `rememberTool`.
-The Bot, designer, shepherd, router, and personal extensions import from it; `leave` and `BOT_FLAGS` stay in `src/omp/bot-extension.ts`.
+The Bot, designer, shepherd, and personal extensions import from it; `leave` and `BOT_FLAGS` stay in `src/omp/bot-extension.ts`.
 
 ## The server
 

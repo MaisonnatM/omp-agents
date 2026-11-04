@@ -32,7 +32,6 @@ import { textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { subagentFiles } from "./subagents";
 import { headKey, type LinkedPullRequest, parseRemote, type PullRequest, type PullRequestLink, prKey, pullRequestOfUrl, type Repo, repoKey } from "./shared/github";
 import { located, within } from "../templates/omp/agent/extensions/shell/commands";
-import { ReplayFold } from "./replay";
 import { taskText } from "./shared/routine-message";
 import { SHIP_STAGES, SHIP_WORK, type SessionBranch, type SessionFacts, type ShipProgress } from "./shared/sessions";
 import { TICKET_ID } from "./shared/tickets";
@@ -241,17 +240,14 @@ export class SessionFactsScan {
 	readonly fileDirs = new Set<string>();
 	/** A candidate line could not be parsed, so its working-directory evidence is incomplete. */
 	unreadableLines = false;
-	/** The fold of the replay a session's own file records, fed every entry the scan reads; `null` for a subagent's transcript, whose replay nothing reads. */
-	readonly #replay: ReplayFold | null;
 	/** The transcript's working directory, from its `session` header. */
 	#cwd: string | null = null;
 	/** The paths its successful `edit` and `write` calls changed, as omp reported them, in first-touch order. */
 	readonly #changed = new Set<string>();
 
-	/** `prompts`: whether the transcript is the session's own, whose user prompts name the work the user asked for. `replay`: the session's own file's replay fold. */
-	constructor(prompts: boolean, replay: ReplayFold | null = null) {
+	/** `prompts`: whether the transcript is the session's own, whose user prompts name the work the user asked for. */
+	constructor(prompts: boolean) {
 		this.#prompts = prompts;
-		this.#replay = replay;
 	}
 
 	/** Every changed file's absolute path, a relative one resolved against the transcript's cwd, in first-touch order. */
@@ -263,7 +259,7 @@ export class SessionFactsScan {
 		const backgrounding = this.#pending.size > 0 && line.includes('"jobId"');
 		// A call's result can matter even when it printed nothing: a `save_issue` names the issue it opened, and a quiet `gt submit` finished.
 		const answering = (this.#pending.size > 0 || this.#opening.size > 0) && line.includes('"toolResult"');
-		if (!backgrounding && !answering && !MARKERS.some(marker => line.includes(marker)) && !line.includes("omp-agents-replay") && !line.includes('"role":"user"') && !line.includes("skill-prompt")) return;
+		if (!backgrounding && !answering && !MARKERS.some(marker => line.includes(marker)) && !line.includes('"role":"user"') && !line.includes("skill-prompt")) return;
 		let entry: unknown;
 		try {
 			entry = JSON.parse(line);
@@ -272,7 +268,6 @@ export class SessionFactsScan {
 			return;
 		}
 		if (!isObject(entry)) return;
-		this.#replay?.applyEntry(entry);
 		if (entry.type === "session") {
 			this.#cwd = str(entry.cwd) ?? null;
 			return;
@@ -506,21 +501,11 @@ class TranscriptFold implements LineFold {
 	}
 }
 
-/** A session's own file: its facts, which its prompts name too, the replay it records, and the other folds of it. */
-class OwnFileFold extends TranscriptFold {
-	readonly replay: ReplayFold;
-
-	constructor(others: readonly LineFold[], replay = new ReplayFold()) {
-		super(new SessionFactsScan(true, replay), others);
-		this.replay = replay;
-	}
-}
-
 interface SessionScan {
 	modifiedAt: number;
 	cwd: string;
 	/** The session's own file. */
-	own: FoldedFile<OwnFileFold>;
+	own: FoldedFile<TranscriptFold>;
 	/** Its subagents' files, by path. */
 	subagents: Map<string, FoldedFile<TranscriptFold>>;
 	/** Every transcript's refs, in transcript order. */
@@ -704,11 +689,7 @@ export class SessionFactsIndex {
 		const workspace = dir === undefined ? null : this.placement.at(dir);
 		if (!session || sessionPath === null) return workspace ? { ...NO_FACTS, workspace } : NO_FACTS;
 		const own = this.#ownFile(sessionPath)?.fold;
-		const replay = own?.replay.facts();
-		return {
-			pullRequests: session.pullRequests, tickets: session.tickets, ship: own?.scan.ship ?? null, worktree: session.worktree, branch: session.branch,
-			workspace, ...(replay ? { replay } : {}),
-		};
+		return { pullRequests: session.pullRequests, tickets: session.tickets, ship: own?.scan.ship ?? null, worktree: session.worktree, branch: session.branch, workspace };
 	}
 
 	/** Whether omp last started session `sessionPath` as `omp -p` or `--mode json`; `false` before its first scan. */
@@ -735,7 +716,7 @@ export class SessionFactsIndex {
 	}
 
 	/** Session `path`'s own file, not its subagents'; `undefined` before its first scan. */
-	#ownFile(path: string): FoldedFile<OwnFileFold> | undefined {
+	#ownFile(path: string): FoldedFile<TranscriptFold> | undefined {
 		return this.#sessions.get(path)?.own;
 	}
 
@@ -962,7 +943,7 @@ export class SessionFactsIndex {
 	async #scan({ path, cwd, modifiedAt }: ListedSession): Promise<{ session: SessionScan; changed: boolean; submitted: boolean; moved: boolean; writtenAt: number }> {
 		let session = this.#sessions.get(path);
 		session ??= {
-			modifiedAt: Number.NaN, cwd, own: new FoldedFile(path, () => new OwnFileFold(this.#ownFileFolds.map(folds => folds.start(path)))), subagents: new Map(),
+			modifiedAt: Number.NaN, cwd, own: new FoldedFile(path, () => new TranscriptFold(new SessionFactsScan(true), this.#ownFileFolds.map(folds => folds.start(path)))), subagents: new Map(),
 			refs: [], submitted: new Map(), repo: null, named: new Set(), pullRequests: [], evidence: new Map(), tickets: [], submitsFinished: 0, workDirs: [], worktree: null, branch: null,
 			ship: null, headless: false,
 		};

@@ -66,13 +66,11 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | `/` and `@` menus | control | `completion.pick` (a click; picking by keyboard records nothing) |
 | Model and thinking switch | control, command, action | `composer.model`, `composer.advisor`; command `model`; actions `set-model`, `set-thinking`, `set-fast`, `set-advisor` |
 | Session goal | control, action | `header.goal`; action `goal` from the pill, dialog, or composer |
-| Conversation pane, pane grid, and divider | view, control | views `session`, `past`, `split`, `home`; maximize and close change the hash, so they show as views; `trajectory.toggle`, `todos-card.toggle`, `replay-compare.open`; dragging the divider is not observed |
+| Conversation pane, pane grid, and divider | view, control | views `session`, `past`, `split`, `home`; maximize and close change the hash, so they show as views; `trajectory.toggle`, `todos-card.toggle`; dragging the divider is not observed |
 | Desktop link address | not observed | display only |
 | Transcript (code blocks, session visuals, minimap, Todos card, chat history, image viewer) | control | `transcript.activity-group`, `transcript.todos`, `transcript.ship`, `transcript.subagents`, `minimap.jump`, `minimap.step`, `prompt-history.toggle`, `prompt-history.jump`, `media-viewer.open`, `media-viewer.step`, `media-viewer.new-tab`, `viewer.zoom` for the zoom buttons of the image viewer, an expanded visual, and the file dialog's image; the viewer's arrow and zoom keys, a pinch, and a drag record nothing; code block copy and session visuals are not observed |
 | Routine run card in a conversation | control, view | `transcript.routine-card` folds or unfolds the card; **Open routine** records the `bots/routine` view; copy and the output disclosure are not observed |
 | Trajectory | control | `trajectory.toggle`, `trajectory.turn`, `trajectory.step` |
-| Replay from here | control, action | `replay.open`; starting the replay is the dialog's request |
-| Replay comparison | control | `replay-compare.open` |
 | Scroll-to-bottom arrow | control | `transcript.scroll-to-bottom` |
 | Left sidebar | view, command, control | each tab's page view; tab and toggle shortcuts; `sidebar.left.toggle`, `sidebar.workspace`, `shortcuts.open`; untagged roster rows open a session, which records its view |
 | Right sidebar (session details, a Bot's details, Images) | control | `sidebar.right.toggle`, `session-details.tab.pull-requests`, `session-details.tab.browser`, `session-details.tab.tickets`, the last of which a Bot's details share, and a personal session's `session-details.tab.memory`; images use the `media-viewer.*` controls |
@@ -84,7 +82,6 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Files: Settings › Files | view | `settings/files` |
 | Settings › Storage | view, control, action | `settings/storage`; `storage.stop` stops between steps; previews and applies use `PUT /api/storage/cleanup`; rule changes use `PUT /api/settings/agent` |
 | File dialog | control | `file-dialog.open`, `file-dialog.source`, `file-dialog.copy-path` |
-| Ask about this and the discussion panel | control, action | `ask-about.open`, `discussion.close`; actions `discuss`, `discuss-stop`; Send to session is action `prompt` |
 | Dictation | action, command | actions `dictation-start`, `dictation-stop`, `dictation-discard`; command `dictate`; Enable dictation is `put /api/dictation/settings` |
 | Command palette | command | the command each item runs |
 | Keyboard shortcuts | command, control | each shortcut's command key; `shortcuts.open`, `shortcuts.tab` |
@@ -98,7 +95,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Pages: Notes | view | `notes`, `notes/item` |
 | Pages: Calendar | view, control | `calendar`; `calendar.routines.toggle` |
 | Pages: Email | view | `email`, `email/new`, `email/item` |
-| Pages: Bots | view, control, action | `bots`, `bots/new`, `bots/item`, `bots/routines`, `bots/routine`; `bots.delete`, `bots.details`, `bots.job.revert`, `bots.job.template`, `bots.kind`, `bots.look`, `bots.routine.delete`, `bots.routine.new`, `bots.routine.run`, `bots.tab.details`, `bots.tab.routines`, `bots.tab.tasks`, `bots.task.open`; `bot`, `routine`, `router-task` |
+| Pages: Bots | view, control, action | `bots`, `bots/new`, `bots/item`, `bots/routines`, `bots/routine`; `bots.delete`, `bots.details`, `bots.job.revert`, `bots.job.template`, `bots.kind`, `bots.look`, `bots.routine.delete`, `bots.routine.new`, `bots.routine.run`, `bots.tab.details`, `bots.tab.routines`; `bot`, `routine` |
 | Pages: Settings | view | `settings/<section>` |
 | Settings › Analytics' context-source table | view | `settings/analytics` |
 | Settings › Integrations' Google account lines | view, action | `settings/integrations`; Add account, Remove, and the workspace picker are `PUT`s |
@@ -111,5 +108,5 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Colors, the font, and tokens | not applicable | no interaction |
 
 The checkout menu lives at `web/components/pull-requests/pr-details/checkout-menu.tsx`, not `pull-requests/checkout-menu.tsx` as the plan lists.
-`CommandPicker`, `DirectoryPicker`, and `ModelPicker` take an optional `control`, so the same picker on Settings or the replay dialog records nothing.
+`CommandPicker`, `DirectoryPicker`, and `ModelPicker` take an optional `control`, so the same picker on Settings records nothing.
 `DetailsTab` takes a required `control`, so every new right-sidebar tab must name one.

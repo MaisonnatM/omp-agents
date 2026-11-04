@@ -97,12 +97,6 @@ Files, in `agent/`:
   The memory is a `memory.json` committed to `refs/omp/memory` in the repository, which its worktrees share and which is never pushed, so `git log -p refs/omp/memory` shows each change and the session that made it.
   Landings are read from git each time, and the `Omp-Session` trailers that `extensions/session-trailer.ts` writes say which session made each one; each session's first prompt is kept under `.git/omp-project-memory/intents/`.
   `omp -p`, `--mode json`, and subagents get neither the brief nor a catch-up.
-- `extensions/request-log.ts`: records every request omp sends to a model provider, so any turn can be rebuilt and checked against its hash.
-  Each request adds one `omp-request-log.record` entry to the session file with the model, the thinking level, the session's leaf entry, and the hashes of the system prompt, the tools, the other parameters, and the messages.
-  Those parts go to omp's blob store in `~/.omp/agent/blobs/`, written once per distinct content, and the messages are stored as edits against the session's previous request, so a turn costs about what it adds.
-  `bun ~/.omp/agent/extensions/request-log.ts <session.jsonl>` rebuilds every recorded request and checks its hash, and a request number after the path prints that request's body.
-  The record is the body this extension receives, after the extensions that load before it; Anthropic can still withhold a disabled field afterwards, Codex over WebSocket sends only the new input after the first request, and compaction, summary, and title requests are not recorded.
-  The blobs hold what the provider received, including your `AGENTS.md` files, environment details, and any secret that reached the conversation, so keep `~/.omp/agent/blobs/` as private as the session files.
 - `extensions/session-trailer.ts`: adds an `Omp-Session: <session id>` trailer to every commit an omp session makes, through a config-based `prepare-commit-msg` git hook set in omp's environment, which runs beside a repository's own hooks, husky's included.
   `git log --format='%h %(trailers:key=Omp-Session,valueonly)'` names each commit's session, and `omp -r <session id>` reopens it.
   A git without config-based hooks ignores it.

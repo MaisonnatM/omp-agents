@@ -8,7 +8,6 @@ import type { NoticeOp } from "../shared/notices";
 import type { ClientMsg, ServerMsg } from "../shared/protocol";
 import type { StartRequest, StartResult } from "../shared/sessions";
 import type { LiveSessions } from "./live-sessions";
-import type { Discussions } from "./discussions";
 import type { Dictation } from "./dictation";
 import type { ListRegistry } from "./list-registry";
 import type { Peer, Run } from "./request-ledger";
@@ -48,8 +47,6 @@ export interface SocketEnv {
 	sendScheduledNow(id: string): Promise<void>;
 	/** Act on notices `ids`; every socket then gets the notices as they are after. */
 	changeNotices(ids: string[], op: NoticeOp): Promise<void>;
-	/** The **Ask about this** answers under way. */
-	discussions: Discussions;
 	/** The one microphone capture under way. */
 	dictation: Dictation;
 	/** The activity store, written only while {@link owner} holds `server.lock`, so a smoke server on the user's state drops what it gets. */
@@ -176,14 +173,11 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 	"user-note": ({ lists }, peer, { change }) => void lists.apply("user-notes", change, peer),
 	routine: ({ lists, runRoutine }, peer, { change }) => (change.op === "run-now" ? runRoutine(change.id) : void lists.apply("routines", change, peer)),
 	bot: ({ lists, messageBot }, peer, { change }) => (change.op === "message" ? messageBot(change.id, change.text) : void lists.apply("bots", change, peer)),
-	"router-task": ({ lists }, peer, { change }) => void lists.apply("router-tasks", change, peer),
 	schedule: ({ lists, sendScheduledNow }, peer, { change }) => (change.op === "send-now" ? sendScheduledNow(change.id) : void lists.apply("scheduled", change, peer)),
 	pin: ({ lists }, peer, { change }) => void lists.apply("pins", change, peer),
 	preference: ({ lists }, peer, { change }) => void lists.apply("preferences", change, peer),
 	"review-draft": ({ lists }, peer, { change }) => void lists.apply("review-drafts", change, peer),
 	notice: ({ changeNotices }, _peer, { ids, op }) => changeNotices(ids, op),
-	discuss: ({ discussions }, peer, { id, request }) => discussions.ask(peer, id, request),
-	"discuss-stop": ({ discussions }, peer, { id }) => discussions.stop(peer.socket, id),
 	"dictation-start": ({ dictation }, peer, { captureId, cwd }) => dictation.start(peer, captureId, cwd),
 	"dictation-stop": ({ dictation }, peer, { captureId }) => dictation.stop(peer.socket, captureId),
 	"dictation-discard": ({ dictation }, peer, { captureId }) => dictation.discard(peer.socket, captureId),

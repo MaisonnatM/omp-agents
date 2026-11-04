@@ -18,7 +18,6 @@ import {
 	UserTodosContext,
 } from "./components/dashboard-context";
 import { DesktopLinkPreview } from "./components/desktop-link-preview";
-import { DiscussionPanel } from "./components/discussion-panel";
 import { FileDialog } from "./components/file-dialog";
 import { textFileUrl } from "./file-paths";
 import { newDraftCwd, PageSwitch } from "./components/page-switch";
@@ -192,15 +191,14 @@ export function App() {
 		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, changeBot, endHost, setOpenedFile, setNewTicket, editGoal, workspaceSettings],
 	);
 	const fork = startOf(state.starts, "fork");
-	const replay = startOf(state.starts, "replay");
 	const resume = startOf(state.starts, "resume");
 	const quick = startOf(state.starts, "quick");
 	const resumeAll = startOf(state.starts, "resume-all");
 	const refused = refusedStart(state.starts);
 	// The workspace whose pull requests `useWorkspaceScope` polls, so the `@` menu reads the entry the page keeps current.
 	const status = useMemo(
-		(): DashboardStatus => ({ connected: state.connected, starts: { fork, replay, resume, quick, resumeAll }, ending: state.ending, pullRequestsScope: workspace, merges: state.merges, reviewDrafts: state.reviewDrafts }),
-		[state.connected, fork, replay, resume, quick, resumeAll, state.ending, workspace, state.merges, state.reviewDrafts],
+		(): DashboardStatus => ({ connected: state.connected, starts: { fork, resume, quick, resumeAll }, ending: state.ending, pullRequestsScope: workspace, merges: state.merges, reviewDrafts: state.reviewDrafts }),
+		[state.connected, fork, resume, quick, resumeAll, state.ending, workspace, state.merges, state.reviewDrafts],
 	);
 	const mentionLists = useMemo(() => ({ todos: state.userTodos?.todos ?? [], hosts: visible.hosts, past: visible.past }), [state.userTodos, visible]);
 
@@ -338,8 +336,6 @@ export function App() {
 															open={openBot}
 															session={openBot.host ?? state.past.find(({ sessionId }) => sessionId === openBot.bot.sessionId) ?? null}
 															memory={state.botMemories[openBot.bot.id] ?? ""}
-															tasks={state.routerTasks.filter(({ botId }) => botId === openBot.bot.id)}
-															hosts={state.hosts}
 															connected={state.connected}
 														/>
 													)
@@ -367,7 +363,6 @@ export function App() {
 												onSave={async change => { await request({ t: "goal", instanceId: goalEditor.instanceId, change }); setGoalEditor(null); }}
 											/>
 										)}
-										<DiscussionPanel />
 										<CommandPalette
 											state={overlays.palette}
 											dispatch={dispatchPalette}
