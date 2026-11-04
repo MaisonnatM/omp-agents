@@ -3,6 +3,7 @@ import { Minus, Plus } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 
 /** The zoom levels the buttons and keys step through, as a browser's: 1 shows the content fitted to the pane. */
@@ -48,7 +49,10 @@ export function zoomKey(zoom: Zoom, event: KeyboardEvent): boolean {
 export function ZoomControls({ zoom }: { zoom: Zoom }) {
 	return (
 		<div className="flex items-center">
-			<Tooltip content="Zoom out" shortcut={["−"]}>
+			<span role="status" className="sr-only">
+				Zoom {Math.round(zoom.level * 100)}%
+			</span>
+			<Tooltip content="Zoom out" shortcut={["−"]} disabled={zoom.level <= MIN}>
 				<Button {...activityControl("viewer.zoom")} variant="ghost" size="icon-compact" aria-label="Zoom out" disabled={zoom.level <= MIN} onClick={() => zoom.step(-1)}>
 					<Minus />
 				</Button>
@@ -58,7 +62,7 @@ export function ZoomControls({ zoom }: { zoom: Zoom }) {
 					{Math.round(zoom.level * 100)}%
 				</Button>
 			</Tooltip>
-			<Tooltip content="Zoom in" shortcut={["+"]}>
+			<Tooltip content="Zoom in" shortcut={["+"]} disabled={zoom.level >= MAX}>
 				<Button {...activityControl("viewer.zoom")} variant="ghost" size="icon-compact" aria-label="Zoom in" disabled={zoom.level >= MAX} onClick={() => zoom.step(1)}>
 					<Plus />
 				</Button>
@@ -122,8 +126,13 @@ export function ZoomPane({ zoom, children, className }: { zoom: Zoom; children: 
 	return (
 		<div
 			ref={pane}
-			data-zoom-pane
-			className={`min-h-0 min-w-0 flex-1 overflow-auto ${pannable ? (dragging ? "cursor-grabbing" : "cursor-grab") : ""} ${className ?? ""}`}
+			// Focusable while zoomed in, so the arrow keys and Page keys pan it as the drag does.
+			tabIndex={pannable ? 0 : undefined}
+			className={cn(
+				"min-h-0 min-w-0 flex-1 overflow-auto outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
+				pannable && (dragging ? "cursor-grabbing" : "cursor-grab"),
+				className,
+			)}
 			onPointerDown={event => {
 				if (!pannable || event.button !== 0) return;
 				const element = event.currentTarget;

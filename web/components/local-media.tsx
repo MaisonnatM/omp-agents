@@ -1,6 +1,7 @@
 /** The images and videos on this computer that agent text names, shown in the message and opened large. */
 import { Play } from "lucide-react";
-import { useContext, useState } from "react";
+import { type ComponentProps, useContext, useState } from "react";
+import { activityControl } from "../activity";
 import { mediaSrc } from "../api";
 import { type FileBase, type FileTarget, fileTarget, linkedFile, mediaFileUrl } from "../file-paths";
 import { DashboardActionsContext } from "./dashboard-context";
@@ -22,23 +23,27 @@ function mediaOf(path: string, base: FileBase | null): Media | null {
 	return { target, src: mediaSrc(mediaFileUrl(target)), name: target.path.slice(target.path.lastIndexOf("/") + 1), video: file.kind === "video" };
 }
 
-/** An image of agent text, `![alt](path)`, in place: an image, or a video that plays there. A path that loads nothing shows its `alt`. */
+/** An image of agent text, `![alt](path)`, in place: an image that opens large, or a video that plays there. A path that loads nothing shows its `alt`. */
 export function LocalMedia({ path, alt }: { path: string; alt: string }) {
 	const media = mediaOf(path, useContext(FileBaseContext));
-	const openFile = useContext(DashboardActionsContext)?.openFile;
 	const [failed, setFailed] = useState(false);
 	if (media === null || failed) return <>{alt || path}</>;
-	const { src } = media;
-	if (media.video) return <video controls preload="metadata" src={src} onError={() => setFailed(true)} className="max-h-[60vh] max-w-full rounded-md bg-black" />;
+	if (media.video) return <video controls preload="metadata" src={media.src} onError={() => setFailed(true)} className="max-h-[60vh] max-w-full rounded-md bg-black" />;
+	return <OpenableImage src={mediaFileUrl(media.target)} alt={alt} detail={media.target.path} loading="lazy" onError={() => setFailed(true)} className="max-h-[60vh] max-w-full" />;
+}
+
+/** An image in a message that opens large, alone, in `ImageViewer`; `src` is before `mediaSrc`, which both apply themselves. */
+export function OpenableImage({ src, alt, detail, ...props }: ComponentProps<"img"> & { src: string; detail?: string }) {
+	const [open, setOpen] = useState(false);
 	return (
-		<img
-			src={src}
-			alt={alt}
-			loading="lazy"
-			onError={() => setFailed(true)}
-			onClick={openFile && (() => openFile(media.target))}
-			className="max-h-[60vh] max-w-full cursor-zoom-in"
-		/>
+		<>
+			<button {...activityControl("media-viewer.open")} type="button" aria-label={`Open ${alt || "image"}`} className="cursor-zoom-in" onClick={() => setOpen(true)}>
+				<img src={mediaSrc(src)} alt={alt ?? ""} {...props} />
+			</button>
+			{open && (
+				<ImageViewer src={src} caption={alt || "Image"} detail={detail} index={0} count={1} previousLabel="Previous image" nextLabel="Next image" onIndex={() => {}} onClose={() => setOpen(false)} />
+			)}
+		</>
 	);
 }
 

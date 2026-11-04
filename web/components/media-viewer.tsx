@@ -46,7 +46,8 @@ export function ImageViewer({ src, caption, index, count, detail, actions, previ
 					}}
 					className="fixed top-1/2 left-1/2 z-50 flex h-[calc(100vh-2rem)] w-[min(72rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-3 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-hidden"
 					onKeyDown={event => {
-						if (zoomKey(zoom, event) || event.altKey || event.metaKey || event.ctrlKey) return;
+						// Zoomed in, the arrow keys pan the image instead of stepping to the next one.
+						if (zoomKey(zoom, event) || zoom.level > 1 || event.altKey || event.metaKey || event.ctrlKey) return;
 						const by = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : null;
 						if (by === null) return;
 						event.preventDefault();

@@ -20,8 +20,7 @@ import { parseReviewPages, type ReviewPage } from "../review-pages";
 import { hashForPullRequests, hashForTickets, hashForTodoId } from "../routing";
 import { UserTodosContext } from "./dashboard-context";
 import { FileLink } from "./file-link";
-import { LocalMedia, MediaStrip } from "./local-media";
-import { ImageViewer } from "./media-viewer";
+import { LocalMedia, MediaStrip, OpenableImage } from "./local-media";
 import { BrandMark, LINEAR_LOGO, SLACK_LOGO } from "./integrations/brand-logos";
 import { OrgIcon } from "./org-icon";
 import { type ChipProps, isChipKind, PromptChip } from "./prompt-chip";
@@ -47,7 +46,7 @@ const imageFrom =
 	({ node: _node, ...props }: ComponentProps<"img"> & { node?: unknown }) => {
 		const { src, alt } = props;
 		if (typeof src !== "string" || src === "") return <>{alt}</>;
-		if (allowed(src)) return local ? <ZoomableImage {...props} src={src} /> : <img {...props} src={mediaSrc(src)} />;
+		if (allowed(src)) return local ? <OpenableImage {...props} src={src} /> : <img {...props} src={mediaSrc(src)} />;
 		const file = local ? linkedFile(src) : null;
 		if (file && file.kind !== "text") return <LocalMedia path={file.path} alt={alt ?? ""} />;
 		return (
@@ -56,20 +55,6 @@ const imageFrom =
 			</a>
 		);
 	};
-
-/** An image embedded in agent text, which opens large in `ImageViewer` to zoom. */
-function ZoomableImage({ src, alt, ...props }: ComponentProps<"img"> & { src: string }) {
-	const [open, setOpen] = useState(false);
-	const caption = alt || "Image";
-	return (
-		<>
-			<button {...activityControl("media-viewer.open")} type="button" aria-label={`Open ${alt || "image"}`} className="cursor-zoom-in" onClick={() => setOpen(true)}>
-				<img {...props} src={mediaSrc(src)} alt={alt ?? ""} />
-			</button>
-			{open && <ImageViewer src={src} caption={caption} index={0} count={1} previousLabel="Previous image" nextLabel="Next image" onIndex={() => {}} onClose={() => setOpen(false)} />}
-		</>
-	);
-}
 
 /** Opens an image of GitHub text large, given its opener; `null`, the default, leaves images as they are. */
 export const OpenMarkdownImage = createContext<((element: HTMLElement) => void) | null>(null);
