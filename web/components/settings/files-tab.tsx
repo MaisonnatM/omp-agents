@@ -1,35 +1,69 @@
-/** The Settings Files section: omp's config files by group, each viewed and edited in place (`Files`). */
-import { useState, type ReactNode } from "react";
+/** The Settings Files section: omp's config files as folders, each viewed and edited in place (`Files`). */
+import { useId, useMemo, useState, type ReactNode } from "react";
+import { everyWord } from "../../../src/shared/every-word";
 import type { FileEdit, OmpFile, OmpSettings, ReadOnlyFile } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { putJson, settingsUrl } from "../../api";
+import { commonDir, fileTree } from "../../changes-model";
 import type { Editable } from "../../editable-read";
-import { FILE_KIND_LABELS, fileGroups, fileName, formatBytes } from "../../labels";
+import { formatBytes } from "../../labels";
+import { CodeText, isMarkdownPath, MarkdownDocument } from "../file-text";
+import { FolderRows, useFolders } from "../folder-rows";
 import { SearchField } from "../search-field";
-import { EditBar, type Editing, RAIL_BUTTON, SaveError, useEditor, writeOrReload } from "./editor";
+import { EditBar, type Editing, SaveError, useEditor, writeOrReload } from "./editor";
 
-function FileContents({ file }: { file: ReadOnlyFile }) {
+/** What the pane says in place of a file it cannot show. */
+const NOTES = {
+	read: () => "The file is empty.",
+	missing: () => "This file does not exist yet. omp reads it from this path once you create it.",
+	unreadable: (error: string) => `Cannot read this file: ${error}`,
+};
+
+function FileContents({ file, rendered }: { file: ReadOnlyFile; rendered: boolean }) {
 	const { body } = file;
-	return body.state === "read" ? (
-		<pre
-			tabIndex={0}
-			aria-label={`Contents of ${file.pathDisplay}`}
-			className="max-h-[70vh] overflow-auto rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring"
-		>
-			{body.text || <span className="text-muted-foreground">The file is empty.</span>}
-		</pre>
-	) : (
+	if (body.state === "read" && body.text !== "") {
+		return rendered ? (
+			<div
+				tabIndex={0}
+				aria-label={`Contents of ${file.pathDisplay}`}
+				className="max-h-[70vh] overflow-auto rounded-lg border border-input px-6 py-5 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+			>
+				<MarkdownDocument text={body.text} frontmatter={body.frontmatter} path={file.pathDisplay} className="max-w-prose" />
+			</div>
+		) : (
+			<CodeText text={body.text} path={file.pathDisplay} className="max-h-[70vh]" />
+		);
+	}
+	return (
 		<p
 			className={cn(
 				"rounded-md border border-dashed border-border px-3 py-6 text-center text-sm",
 				body.state === "unreadable" ? "text-red-600 dark:text-red-400" : "text-muted-foreground",
 			)}
 		>
-			{body.state === "missing" ? "This file does not exist yet. omp reads it from this path once you create it." : `Cannot read this file: ${body.error}`}
+			{body.state === "unreadable" ? NOTES.unreadable(body.error) : NOTES[body.state]()}
 		</p>
 	);
+}
+
+/** Whether the file shows rendered, which a Markdown file with text does until Source is chosen, and the Preview and Source buttons that switch it. */
+function useRenderedView(file: ReadOnlyFile): { rendered: boolean; toggle: ReactNode } {
+	const [source, setSource] = useState(false);
+	if (file.body.state !== "read" || file.body.text === "" || !isMarkdownPath(file.pathDisplay)) return { rendered: false, toggle: null };
+	return {
+		rendered: !source,
+		toggle: (
+			<div role="group" aria-label="Show the file as" className="flex items-center gap-0.5">
+				{[false, true].map(option => (
+					<Button key={String(option)} variant="ghost" size="xs" active={source === option} aria-pressed={source === option} onClick={() => setSource(option)}>
+						{option ? "Source" : "Preview"}
+					</Button>
+				))}
+			</div>
+		),
+	};
 }
 
 /** Where a {@link FileView} saves: `save` sends the edit, `write` sends it in turn with the section's other saves, `reload` re-reads after a conflict. */
@@ -59,7 +93,7 @@ function FileFrame({ file, controls, children }: { file: ReadOnlyFile; controls?
 						</>
 					)}
 				</p>
-				{controls}
+				<div className="flex shrink-0 items-center gap-2">{controls}</div>
 			</div>
 			{children}
 		</div>
@@ -70,12 +104,15 @@ function FileFrame({ file, controls, children }: { file: ReadOnlyFile; controls?
 export function FileView<R>(
 	props: { file: ReadOnlyFile; readOnly: true } | { file: Pick<OmpFile, "path" | "pathDisplay" | "body">; saver: FileSaver<R>; readOnly?: false },
 ) {
-	return props.readOnly ? (
-		<FileFrame file={props.file}>
-			<FileContents file={props.file} />
+	return props.readOnly ? <ReadOnlyFileView file={props.file} /> : <EditableFileView file={props.file} saver={props.saver} />;
+}
+
+function ReadOnlyFileView({ file }: { file: ReadOnlyFile }) {
+	const view = useRenderedView(file);
+	return (
+		<FileFrame file={file} controls={view.toggle}>
+			<FileContents file={file} rendered={view.rendered} />
 		</FileFrame>
-	) : (
-		<EditableFileView file={props.file} saver={props.saver} />
 	);
 }
 
@@ -85,14 +122,20 @@ function EditableFileView<R>({ file, saver }: { file: Pick<OmpFile, "path" | "pa
 		writeOrReload(saver, () => saver.save({ path: file.path, text, baseHash: body.state === "read" ? body.hash : null })),
 	);
 	const viewing = editor.state.phase === "viewing";
+	const view = useRenderedView(file);
 	const conflict = editor.state.phase === "editing" && editor.state.conflict;
 	return (
 		<FileFrame
 			file={file}
-			controls={body.state !== "unreadable" && <EditBar editor={editor} label={file.pathDisplay} start={body.state === "missing" ? "Create" : "Edit"} />}
+			controls={
+				<>
+					{viewing && view.toggle}
+					{body.state !== "unreadable" && <EditBar editor={editor} label={file.pathDisplay} start={body.state === "missing" ? "Create" : "Edit"} />}
+				</>
+			}
 		>
 			{viewing ? (
-				<FileContents file={file} />
+				<FileContents file={file} rendered={view.rendered} />
 			) : (
 				<>
 					<textarea
@@ -131,11 +174,16 @@ function EditableFileView<R>({ file, saver }: { file: Pick<OmpFile, "path" | "pa
 	);
 }
 
-/** A rail of files by group, narrowed by a filter, with the open one marked; Settings › Files and a file store of omp memory. */
+/**
+ * A rail of files as folders, narrowed by a filter on their names, with the open one marked; Settings › Files and a file store of omp memory.
+ * Folders start closed except those above the open file, which open again when another file opens; a filter opens every folder.
+ */
 export function FileRail<F extends Pick<OmpFile, "path" | "pathDisplay">>({
 	label,
 	filtered,
-	groupsOf,
+	files,
+	pathOf,
+	describe,
 	open,
 	onSelect,
 	children,
@@ -144,69 +192,106 @@ export function FileRail<F extends Pick<OmpFile, "path" | "pathDisplay">>({
 	label: string;
 	/** Whether the rail shows its filter. */
 	filtered: boolean;
-	/** The files a filter leaves, by group heading. */
-	groupsOf: (query: string) => [string, F[]][];
+	files: F[];
+	/** Where a file sits in the rail, its folders joined by `/`. */
+	pathOf: (file: F) => string;
+	/** A line under a file's name, which describes its entry rather than naming it. */
+	describe?: (file: F) => string | null;
 	open: F;
 	onSelect: (path: string) => void;
-	/** A file's entry in the rail. */
-	children: (file: F) => ReactNode;
+	/** A file's entry in the rail, given the name the rail lists it by. */
+	children: (file: F, name: string) => ReactNode;
 }) {
 	const [query, setQuery] = useState("");
-	const groups = groupsOf(query);
+	const entries = files.map((file, index) => {
+		const path = pathOf(file);
+		return { path, name: path.slice(path.lastIndexOf("/") + 1), file, index };
+	});
+	const all = fileTree(entries);
+	const folders = useFolders(all, pathOf(open), false);
+	const descriptionId = useId();
+	const matches = everyWord(query);
+	const tree = query ? fileTree(entries.filter(entry => matches(entry.name))) : all;
 	return (
-		<nav aria-label={label} className="space-y-4">
+		<nav aria-label={label} className="space-y-2">
 			{filtered && <SearchField label={`Filter ${label}`} placeholder="Filter" query={query} onQuery={setQuery} className="min-w-0 flex-1" />}
-			{groups.length === 0 && <p className="px-2 text-sm text-muted-foreground">No file matches.</p>}
-			{groups.map(([heading, group]) => (
-				<div key={heading} className="space-y-1">
-					<h4 className="flex items-baseline gap-2 px-2 text-xs font-medium text-muted-foreground">
-						{heading}
-						{group.length > 1 && <span className="tabular-nums">{group.length}</span>}
-					</h4>
-					<ul>
-						{group.map(file => (
-							<li key={file.path}>
+			{tree.dirs.length + tree.files.length === 0 ? (
+				<p className="px-2 text-sm text-muted-foreground">No file matches.</p>
+			) : (
+				<ul className="text-sm">
+					<FolderRows
+						dir={tree}
+						depth={0}
+						folders={query ? { ...folders, isShut: () => false } : folders}
+						file={({ name, file, index }, indent) => {
+							const description = describe?.(file);
+							const id = `${descriptionId}-${index}`;
+							return (
 								<Tooltip content={file.pathDisplay}>
 									<button
 										type="button"
 										aria-current={file === open ? "true" : undefined}
+										aria-label={description ? name : undefined}
+										aria-describedby={description ? id : undefined}
 										onClick={() => onSelect(file.path)}
-										className={cn(RAIL_BUTTON, file === open && "bg-muted font-medium")}
+										className={cn(
+											"flex w-full flex-col rounded-md py-0.5 pr-2 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+											file === open && "bg-muted font-medium",
+										)}
+										style={{ paddingLeft: indent }}
 									>
-										{children(file)}
+										<span className="flex w-full min-w-0 items-baseline gap-2">{children(file, name)}</span>
+										{description && (
+											<span id={id} className="line-clamp-2 text-xs font-normal leading-snug text-muted-foreground">
+												{description}
+											</span>
+										)}
 									</button>
 								</Tooltip>
-							</li>
-						))}
-					</ul>
-				</div>
-			))}
+							);
+						}}
+					/>
+				</ul>
+			)}
 		</nav>
 	);
 }
 
+/** A file's place in the Files rail: below the folder that holds every file, such as `~`, and a skill by its directory, since its file is always SKILL.md. */
+function railPaths(files: OmpFile[]): Map<string, string> {
+	const paths = files.map(file => file.pathDisplay.replace(/\/SKILL\.md$/, ""));
+	const root = commonDir(paths);
+	return new Map(files.map((file, index) => [file.path, paths[index]!.slice(root.length)]));
+}
+
+/** A skill's frontmatter `description`, which its rail entry shows under its name. */
+const descriptionOf = (file: OmpFile): string | null =>
+	(file.kind === "skill" && file.body.state === "read" && file.body.frontmatter?.fields.find(field => field.key === "description")?.value) || null;
+
 /**
  * Authored files only: package-owned files are previewed through their owning library.
- * The page holds `selected`, so another section can open a file here.
+ * The page holds `selected`, so another section can open a file here; the user's context file opens first.
  */
 export function Files({ files: allFiles, editing, selected, onSelect }: { files: OmpFile[]; editing: Editing; selected: string | null; onSelect: (path: string) => void }) {
-	const files = allFiles.filter(file => !file.packaged);
-	const all = fileGroups(files, "");
-	const open = files.find((file) => file.path === selected) ?? all[0]?.[1][0];
+	const files = useMemo(() => allFiles.filter(file => !file.packaged), [allFiles]);
+	const places = useMemo(() => railPaths(files), [files]);
+	const open = files.find(file => file.path === selected) ?? files.find(file => file.kind === "context") ?? files[0];
 	if (!open) return <p className="text-sm text-muted-foreground">omp found no files.</p>;
 	return (
 		<div className="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
 			<FileRail
 				label="omp files"
 				filtered
-				groupsOf={query => fileGroups(files, query).map(([kind, group]) => [FILE_KIND_LABELS[kind], group])}
+				files={files}
+				pathOf={file => places.get(file.path)!}
+				describe={descriptionOf}
 				open={open}
 				onSelect={onSelect}
 			>
-				{file => (
+				{(file, name) => (
 					<>
-						<span className={cn("truncate", file.body.state !== "read" && "text-muted-foreground")}>{fileName(file)}</span>
-						<span className="ml-auto shrink-0 text-xs text-muted-foreground">{file.body.state === "missing" ? "missing" : file.scope === "project" ? "project" : ""}</span>
+						<span className={cn("truncate", file.body.state !== "read" && "text-muted-foreground")}>{name}</span>
+						{file.body.state === "missing" && <span className="ml-auto shrink-0 text-xs text-muted-foreground">missing</span>}
 					</>
 				)}
 			</FileRail>

@@ -26,6 +26,7 @@ import { connectedProviders, listModels } from "./omp/models";
 import { workflowsOf } from "./omp/workflows";
 import { displayPath, HOME } from "./paths";
 import type { AgentOverrideEntryEdit, AgentSettingEdit } from "./shared/agent-settings";
+import { frontmatterOf } from "./frontmatter";
 import { AGENT_SETTINGS, isAgentModelOverride } from "./shared/agents";
 import type { CatalogModel, FileEdit, ModelChain, OmpFile, OmpSettings, RetrySettings, RoleRoute, RoutingEdit } from "./shared/models";
 import type { ModelUpdate } from "./shared/notices";
@@ -68,7 +69,7 @@ export function routeRoles(modelRoles: Record<string, string>, configuredChains:
 export async function readFileBody(path: string): Promise<OmpFile["body"]> {
 	try {
 		const [info, text] = await Promise.all([stat(path), Bun.file(path).text()]);
-		return { state: "read", size: info.size, modifiedAt: info.mtimeMs, text, hash: new Bun.CryptoHasher("sha256").update(text).digest("hex") };
+		return { state: "read", size: info.size, modifiedAt: info.mtimeMs, text, hash: new Bun.CryptoHasher("sha256").update(text).digest("hex"), frontmatter: frontmatterOf(path, text) };
 	} catch (err) {
 		return (err as NodeJS.ErrnoException).code === "ENOENT" ? { state: "missing" } : { state: "unreadable", error: errorText(err) };
 	}

@@ -147,16 +147,19 @@
   They show omp's labels and save to your `~/.omp/agent/config.yml` as in **omp settings**, which shows them as a line that links here; a value the workspace's settings set locks its control, and an environment variable that sets one is named under it.
   **What a new session gets** unfolds the memory block a new session's prompt starts with, and its size in tokens; with Mnemopi and Hindsight a running session also gets memories recalled for each prompt, which the page cannot show.
   **Stored memory** shows the store of the backend picked.
-  Local lists its files by group, **Lessons**, **Summary**, **Skills**, and **Session summaries**, and Sharpshooter its decision files and how many sessions wait to be folded in; select one to read it, and edit it as in **Files**.
+  Local lists its files in a folder per group, **Lessons**, **Summary**, **Skills**, and **Session summaries**, and Sharpshooter its decision files in **Decisions**, with how many sessions wait to be folded in; folders work as in **Files**, and you select a file to read it and edit it as in **Files**.
   Mnemopi lists its memories newest first, up to 500, with a filter and a count of each kind: **Edit** changes a working memory's text, saved with **Save** or Cmd+Enter, where Enter starts a new line, and put back with Escape, **Forget** deletes it, **Retire** stops recall from using an episodic one, and facts are read-only.
   Hindsight lists the memories its server keeps for the workspace's bank, read-only.
   **Forget everything**, beside the **Stored memory** heading, deletes the workspace's Local, Sharpshooter, or Mnemopi store, and the line under the heading says what it removes; with Mnemopi it keeps the bank every workspace shares, and a memory of that bank changes everywhere when you edit or forget it.
   **Rebuild summary**, with Local, rebuilds the summary when the next session in the workspace starts.
   **Forget**, **Retire**, and **Forget everything** each ask you to click again to confirm, and an edit made elsewhere since the page read it is refused and the page shows the memory as it is now.
   Running sessions keep the memory they started with; new sessions see your changes.
-- The **Files** section lists the files that omp reads: context files such as `AGENTS.md`, the `SYSTEM.md` and `APPEND_SYSTEM.md` prompt files, `config.yml`, agents, commands, rules, skills, and hooks.
-  The field above the list narrows it to the files whose name holds every word typed; Escape clears it.
-  Select a file to read its content, and choose **Edit** to change it in place (**Create** for a file marked `missing`).
+- The **Files** section lists the files that omp reads as folders, by where they sit on disk: context files such as `AGENTS.md`, the `SYSTEM.md` and `APPEND_SYSTEM.md` prompt files, `config.yml`, agents, commands, rules, skills, and hooks.
+  The list starts inside the folder that holds every file, such as `~`. A skill shows as its directory's name in its `skills` folder, with the first two lines of its frontmatter's `description` under it, and a folder holding only one folder joins it, such as `.omp/agent`.
+  Folders start closed except those holding the open file, and opening a file from another section opens its folders.
+  The field above the list narrows it to the files whose name holds every word typed and opens every folder; Escape clears it.
+  Select a file to read it: Markdown renders as the agent's messages do, under its frontmatter's keys and values, and **Source** next to **Preview** shows its text; any other file shows as numbered lines that wrap, colored by its type.
+  Choose **Edit** to change the file in place (**Create** for a file marked `missing`).
   Save with the button or with Cmd+S. If the file changed on disk after the page read it, the save is refused and your edits stay in the editor, so you can copy them before you load the file from disk.
   A `.yml`, `.yaml`, or `.json` file must parse before it saves, and a settings file must hold a mapping.
   `~/.omp/agent/AGENTS.md` and `~/.omp/agent/config.yml` appear even before they exist, marked `missing`.

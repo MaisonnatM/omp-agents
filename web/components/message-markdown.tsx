@@ -243,7 +243,8 @@ export function fenceOf(node: Element | undefined): { language: string | null; t
 	return { language, text: node ? textOf(code ?? node).replace(/\n$/, "") : "" };
 }
 
-function CodeLines({ text, language }: { text: string; language: string | null }) {
+/** `text`'s lines, colored as `language` once the grammars load, for a `CodeBlockContent`. */
+export function CodeLines({ text, language }: { text: string; language: string | null }) {
 	useGrammars();
 	return highlightLines(text, language ?? "").map((tokens, index) => (
 		<CodeBlockLine key={index}>

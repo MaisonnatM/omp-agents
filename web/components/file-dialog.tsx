@@ -5,13 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
 import { mediaSrc } from "../api";
-import { type FileBase, type FileTarget, linkedFile, mediaFileUrl, textFileUrl } from "../file-paths";
+import { type FileTarget, linkedFile, mediaFileUrl, textFileUrl } from "../file-paths";
 import { parseDelimited } from "../delimited";
 import { formatBytes } from "../labels";
 import { useRead } from "../reads";
 import { useCopy } from "../use-copy";
-import { FileBaseContext } from "./file-link";
-import { MessageMarkdown } from "./message-markdown";
+import { CodeText, extensionOf, isMarkdownPath, MarkdownDocument } from "./file-text";
 import { LoadNote } from "./sheet-details";
 import { ViewerDialog } from "./viewer-dialog";
 import { useZoom, type Zoom } from "./zoom-pane";
@@ -21,7 +20,7 @@ const MAX_TABLE_ROWS = 1000;
 
 type Look = "markdown" | "tsv" | "csv" | "text";
 
-const LOOKS: Record<string, Look> = { md: "markdown", markdown: "markdown", tsv: "tsv", csv: "csv" };
+const TABLES: Record<string, Look> = { tsv: "tsv", csv: "csv" };
 
 /** A file that a path in agent text opened: an image or video large, else a text file rendered by its type. */
 export function FileDialog({ target, onClose }: { target: FileTarget; onClose: () => void }) {
@@ -90,7 +89,7 @@ function MediaFileDialog({ target, zoom, onClose, children }: { target: FileTarg
 function TextFileDialog({ target, onClose }: { target: FileTarget; onClose: () => void }) {
 	const { path } = target;
 	const read = useRead<TextFile>(textFileUrl(target));
-	const look = LOOKS[path.slice(path.lastIndexOf(".") + 1).toLowerCase()] ?? "text";
+	const look = isMarkdownPath(path) ? "markdown" : (TABLES[extensionOf(path)] ?? "text");
 	const [source, setSource] = useState(false);
 	const { copied, copy } = useCopy();
 	const file = read.data;
@@ -128,18 +127,9 @@ function TextFileDialog({ target, onClose }: { target: FileTarget; onClose: () =
 }
 
 function FileBody({ file, look }: { file: TextFile; look: Look }) {
-	const base = useMemo((): FileBase => ({ dir: file.path.slice(0, file.path.lastIndexOf("/")), session: null }), [file.path]);
-	if (look === "markdown") {
-		return (
-			<FileBaseContext.Provider value={base}>
-				<article className="px-5 py-3 text-sm leading-relaxed">
-					<MessageMarkdown text={file.text} />
-				</article>
-			</FileBaseContext.Provider>
-		);
-	}
+	if (look === "markdown") return <MarkdownDocument text={file.text} frontmatter={file.frontmatter} path={file.path} className="px-5 py-3" />;
 	if (look === "tsv" || look === "csv") return <Table text={file.text} separator={look === "tsv" ? "\t" : ","} />;
-	return <pre className="p-4 font-mono text-xs leading-relaxed whitespace-pre">{file.text}</pre>;
+	return <CodeText text={file.text} path={file.path} className="rounded-none border-0" />;
 }
 
 function Table({ text, separator }: { text: string; separator: "\t" | "," }) {

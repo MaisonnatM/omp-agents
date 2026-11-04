@@ -7,7 +7,7 @@
 `memoryAvailable` is `kern.memorystatus_level`, the free percentage `memory_pressure` reports, of the physical memory on macOS, since `os.freemem()` counts only never-used pages there, and `os.freemem()` elsewhere.
 `diskAvailable` and `diskTotal` come from `statfs` on the home directory: the blocks free to an unprivileged user and all the volume's blocks; on macOS the free figure leaves out purgeable space, which Finder counts.
 
-`GET /api/file?path=<absolute path>[&session=<id>&relative=<path as written>]` answers a text file for the page's file dialog: `{ path, text, size, truncated }`.
+`GET /api/file?path=<absolute path>[&session=<id>&relative=<path as written>]` answers a text file for the page's file dialog: `{ path, text, size, truncated, frontmatter? }`, with `frontmatter` for a Markdown file whose YAML frontmatter parses to a mapping (`frontmatterOf` in `src/frontmatter.ts`): each top-level key with its value as text, a nested value as YAML, and `end`, where the text after the block starts.
 The path is absolute or starts with `~`, which `expandHome` in `src/paths.ts` reads as the home directory; the page resolves a relative one against the session's worktree or directory first.
 When that path holds no file and `session` and `relative` are given, the route reads `relative` from the first directory of `SessionFiles.fileDirsOf` that holds it: the directories the session's own bash calls ran in, with `cwd` or by `cd`, `pushd`, or `env -C`, and those of the files it changed, the most recent first.
 The file's real path, after symlinks, must end in one of `TEXT_FILE_EXTENSIONS`, so a link named `notes.md` cannot reach a key file.
