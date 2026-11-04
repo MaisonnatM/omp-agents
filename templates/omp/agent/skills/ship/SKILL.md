@@ -35,6 +35,8 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before registering a PR o
    Each plan also lists what it reuses: the existing helpers, components, models, and patterns, by path, that already do part of the job, so the change extends them instead of rebuilding them.
    The runners edit no files in the checkout, so spawn them without `isolated`; alternate `poteto-agent` and `poteto-agent-codex`, and run the cross-judge on `poteto-agent-codex` over the `local://plan-<n>.md` paths.
    Pick the base plan against the arena's rubric, which scores that reuse list, and graft what the other plans do better.
+   Write the chosen plan to `local://plan.md`, then spawn one fresh `poteto-agent-codex` as a blind critic: give it only that path, the checkout's path, and the absolute path of `plan-critique.md` beside this file, with the instruction to read and follow that file; never pass the conversation or paraphrase the brief.
+   Apply each finding that carries evidence and stays inside the change's scope, and say in one line of the report which findings you skipped and why; skip the critic only where no arena ran, and say so.
    With an issue, post the chosen plan on it with `save_comment`, with one line for each rejected approach that says why it lost; without one, keep the same text for the PR body in step 4.
    Call `ship_stage({stage:"implement"})`.
 3. **Implement.** Delegate to `poteto-agent`, isolated or in place per the Git safety rule in `AGENTS.md`.

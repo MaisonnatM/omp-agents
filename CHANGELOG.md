@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-04
 
+- Behind the scenes: `/ship` now hands its chosen plan to a fresh critic on a different model, which has not seen the conversation and must back each finding with evidence, before any code is written.
 - Picking a project for a new session from the keyboard now puts the cursor back in the message box, so you can type right away.
 - Fixed: ending a session whose folder holds many installed packages no longer leaves a half-deleted folder behind, which made Resolve conflicts and other starts on that branch fail with "already exists".
 - Behind the scenes: agents checking the dashboard page now use Chrome DevTools' tools, which also show page errors, failed requests, and load times.
