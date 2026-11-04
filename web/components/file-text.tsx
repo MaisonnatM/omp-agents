@@ -2,13 +2,13 @@
 import { useMemo } from "react";
 import { CodeBlock, CodeBlockContent } from "@/components/ui/code-block";
 import { cn } from "@/lib/utils";
+import type { Frontmatter } from "../../src/shared/models";
 import type { FileBase } from "../file-paths";
-import { splitFrontmatter } from "../frontmatter";
 import { FileBaseContext } from "./file-link";
 import { CodeLines, MessageMarkdown } from "./message-markdown";
 
 /** The extension of `path`'s name, lowercased; `""` when it has none. */
-const extensionOf = (path: string): string => {
+export const extensionOf = (path: string): string => {
 	const name = path.slice(path.lastIndexOf("/") + 1);
 	return name.includes(".") ? name.slice(name.lastIndexOf(".") + 1).toLowerCase() : "";
 };
@@ -16,10 +16,11 @@ const extensionOf = (path: string): string => {
 /** Whether `path` names a Markdown file, which reads rendered. */
 export const isMarkdownPath = (path: string): boolean => ["md", "markdown"].includes(extensionOf(path));
 
-/** Markdown text with its frontmatter as a list of properties above it; a relative path in it opens against `dir`. */
-export function MarkdownDocument({ text, dir, className }: { text: string; dir: string; className?: string }) {
-	const { fields, body } = useMemo(() => splitFrontmatter(text), [text]);
+/** The Markdown file at `path` with its frontmatter, as the server read it, as a list of properties above the rest; a relative path in it opens against the file's directory. */
+export function MarkdownDocument({ text, frontmatter, path, className }: { text: string; frontmatter?: Frontmatter; path: string; className?: string }) {
+	const dir = path.slice(0, path.lastIndexOf("/"));
 	const base = useMemo((): FileBase => ({ dir, session: null }), [dir]);
+	const fields = frontmatter?.fields ?? [];
 	return (
 		<FileBaseContext.Provider value={base}>
 			<article className={cn("text-sm leading-relaxed", className)}>
@@ -33,7 +34,7 @@ export function MarkdownDocument({ text, dir, className }: { text: string; dir: 
 						))}
 					</dl>
 				)}
-				<MessageMarkdown text={body} />
+				<MessageMarkdown text={frontmatter ? text.slice(frontmatter.end) : text} />
 			</article>
 		</FileBaseContext.Provider>
 	);

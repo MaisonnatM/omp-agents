@@ -1,6 +1,7 @@
 /** What a transcript shows: its items, the files its agent changed, its images, and the files it opens. */
 
 import type { DiffRow } from "./changes";
+import type { Frontmatter } from "./models";
 import { readRoutineMessage, type RoutineMessage } from "./routine-message";
 
 /** The extensions of the files that agent text may open in the page's file dialog, `GET /api/file`. */
@@ -15,6 +16,7 @@ export interface TextFile {
 	/** The whole file's size in bytes. */
 	size: number;
 	truncated: boolean;
+	frontmatter?: Frontmatter;
 }
 
 /** The images and videos a path in agent text shows, by extension, with the type `GET /api/media` serves each as. */

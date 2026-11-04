@@ -6,28 +6,31 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { putJson, settingsUrl } from "../../api";
-import { fileTree, foldersAbove } from "../../changes-model";
-import { descriptionOf } from "../../frontmatter";
+import { commonDir, fileTree } from "../../changes-model";
 import type { Editable } from "../../editable-read";
 import { formatBytes } from "../../labels";
 import { CodeText, isMarkdownPath, MarkdownDocument } from "../file-text";
-import { FolderRows, indentOf } from "../folder-rows";
+import { FolderRows, useFolders } from "../folder-rows";
 import { SearchField } from "../search-field";
 import { EditBar, type Editing, SaveError, useEditor, writeOrReload } from "./editor";
 
-/** Where the file's relative links resolve: its directory. */
-const dirOf = (path: string): string => path.slice(0, path.lastIndexOf("/"));
+/** What the pane says in place of a file it cannot show. */
+const NOTES = {
+	read: () => "The file is empty.",
+	missing: () => "This file does not exist yet. omp reads it from this path once you create it.",
+	unreadable: (error: string) => `Cannot read this file: ${error}`,
+};
 
-function FileContents({ file, source }: { file: ReadOnlyFile; source: boolean }) {
+function FileContents({ file, rendered }: { file: ReadOnlyFile; rendered: boolean }) {
 	const { body } = file;
 	if (body.state === "read" && body.text !== "") {
-		return isMarkdownPath(file.pathDisplay) && !source ? (
+		return rendered ? (
 			<div
 				tabIndex={0}
 				aria-label={`Contents of ${file.pathDisplay}`}
 				className="max-h-[70vh] overflow-auto rounded-lg border border-input px-6 py-5 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
 			>
-				<MarkdownDocument text={body.text} dir={dirOf(file.pathDisplay)} className="max-w-prose" />
+				<MarkdownDocument text={body.text} frontmatter={body.frontmatter} path={file.pathDisplay} className="max-w-prose" />
 			</div>
 		) : (
 			<CodeText text={body.text} path={file.pathDisplay} className="max-h-[70vh]" />
@@ -40,21 +43,17 @@ function FileContents({ file, source }: { file: ReadOnlyFile; source: boolean })
 				body.state === "unreadable" ? "text-red-600 dark:text-red-400" : "text-muted-foreground",
 			)}
 		>
-			{body.state === "read"
-				? "The file is empty."
-				: body.state === "missing"
-					? "This file does not exist yet. omp reads it from this path once you create it."
-					: `Cannot read this file: ${body.error}`}
+			{body.state === "unreadable" ? NOTES.unreadable(body.error) : NOTES[body.state]()}
 		</p>
 	);
 }
 
-/** Whether a Markdown file shows its source rather than rendered, and the Preview and Source buttons that switch it; other files show only their source. */
-function useSourceView(file: ReadOnlyFile): { source: boolean; toggle: ReactNode } {
+/** Whether the file shows rendered, which a Markdown file with text does until Source is chosen, and the Preview and Source buttons that switch it. */
+function useRenderedView(file: ReadOnlyFile): { rendered: boolean; toggle: ReactNode } {
 	const [source, setSource] = useState(false);
-	if (file.body.state !== "read" || file.body.text === "" || !isMarkdownPath(file.pathDisplay)) return { source: false, toggle: null };
+	if (file.body.state !== "read" || file.body.text === "" || !isMarkdownPath(file.pathDisplay)) return { rendered: false, toggle: null };
 	return {
-		source,
+		rendered: !source,
 		toggle: (
 			<div role="group" aria-label="Show the file as" className="flex items-center gap-0.5">
 				{[false, true].map(option => (
@@ -109,10 +108,10 @@ export function FileView<R>(
 }
 
 function ReadOnlyFileView({ file }: { file: ReadOnlyFile }) {
-	const view = useSourceView(file);
+	const view = useRenderedView(file);
 	return (
 		<FileFrame file={file} controls={view.toggle}>
-			<FileContents file={file} source={view.source} />
+			<FileContents file={file} rendered={view.rendered} />
 		</FileFrame>
 	);
 }
@@ -123,7 +122,7 @@ function EditableFileView<R>({ file, saver }: { file: Pick<OmpFile, "path" | "pa
 		writeOrReload(saver, () => saver.save({ path: file.path, text, baseHash: body.state === "read" ? body.hash : null })),
 	);
 	const viewing = editor.state.phase === "viewing";
-	const view = useSourceView(file);
+	const view = useRenderedView(file);
 	const conflict = editor.state.phase === "editing" && editor.state.conflict;
 	return (
 		<FileFrame
@@ -136,7 +135,7 @@ function EditableFileView<R>({ file, saver }: { file: Pick<OmpFile, "path" | "pa
 			}
 		>
 			{viewing ? (
-				<FileContents file={file} source={view.source} />
+				<FileContents file={file} rendered={view.rendered} />
 			) : (
 				<>
 					<textarea
@@ -175,12 +174,8 @@ function EditableFileView<R>({ file, saver }: { file: Pick<OmpFile, "path" | "pa
 	);
 }
 
-/** A file's place in a {@link FileRail}: a skill's file is always SKILL.md, so its directory names it. */
-const railPath = (path: string): string => path.replace(/\/SKILL\.md$/, "");
-
 /**
  * A rail of files as folders, narrowed by a filter on their names, with the open one marked; Settings › Files and a file store of omp memory.
- * The folder that holds every file, such as `~`, is left out, so the rail starts at its children.
  * Folders start closed except those above the open file, which open again when another file opens; a filter opens every folder.
  */
 export function FileRail<F extends Pick<OmpFile, "path" | "pathDisplay">>({
@@ -208,31 +203,15 @@ export function FileRail<F extends Pick<OmpFile, "path" | "pathDisplay">>({
 	children: (file: F, name: string) => ReactNode;
 }) {
 	const [query, setQuery] = useState("");
-	const placed = files.map(file => ({ path: railPath(pathOf(file)), file }));
-	const top = fileTree(placed);
-	const root = top.files.length === 0 && top.dirs.length === 1 ? `${top.dirs[0]!.path}/` : "";
-	const placeOf = (path: string): string => (path.startsWith(root) ? path.slice(root.length) : path);
-	const entries = placed.map(({ path, file }) => {
-		const place = placeOf(path);
-		return { path: place, name: place.slice(place.lastIndexOf("/") + 1), file };
+	const entries = files.map((file, index) => {
+		const path = pathOf(file);
+		return { path, name: path.slice(path.lastIndexOf("/") + 1), file, index };
 	});
 	const all = fileTree(entries);
-	const openPath = placeOf(railPath(pathOf(open)));
-	const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set(foldersAbove(all, openPath)));
-	const [revealed, setRevealed] = useState(openPath);
-	if (revealed !== openPath) {
-		setRevealed(openPath);
-		setExpanded(new Set([...expanded, ...(foldersAbove(all, openPath) ?? [])]));
-	}
+	const folders = useFolders(all, pathOf(open), false);
 	const descriptionId = useId();
 	const matches = everyWord(query);
 	const tree = query ? fileTree(entries.filter(entry => matches(entry.name))) : all;
-	const toggle = (path: string): void =>
-		setExpanded(prev => {
-			const next = new Set(prev);
-			if (!next.delete(path)) next.add(path);
-			return next;
-		});
 	return (
 		<nav aria-label={label} className="space-y-2">
 			{filtered && <SearchField label={`Filter ${label}`} placeholder="Filter" query={query} onQuery={setQuery} className="min-w-0 flex-1" />}
@@ -243,35 +222,32 @@ export function FileRail<F extends Pick<OmpFile, "path" | "pathDisplay">>({
 					<FolderRows
 						dir={tree}
 						depth={0}
-						isShut={path => !query && !expanded.has(path)}
-						onToggle={toggle}
-						file={({ path, name, file }, depth) => {
+						folders={query ? { ...folders, isShut: () => false } : folders}
+						file={({ name, file, index }, indent) => {
 							const description = describe?.(file);
-							const id = `${descriptionId}${path}`;
+							const id = `${descriptionId}-${index}`;
 							return (
-								<li key={file.path}>
-									<Tooltip content={file.pathDisplay}>
-										<button
-											type="button"
-											aria-current={file === open ? "true" : undefined}
-											aria-label={description ? name : undefined}
-											aria-describedby={description ? id : undefined}
-											onClick={() => onSelect(file.path)}
-											className={cn(
-												"flex w-full flex-col rounded-md py-0.5 pr-2 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-												file === open && "bg-muted font-medium",
-											)}
-											style={{ paddingLeft: indentOf(depth, true) }}
-										>
-											<span className="flex w-full min-w-0 items-baseline gap-2">{children(file, name)}</span>
-											{description && (
-												<span id={id} className="line-clamp-2 text-xs font-normal leading-snug text-muted-foreground">
-													{description}
-												</span>
-											)}
-										</button>
-									</Tooltip>
-								</li>
+								<Tooltip content={file.pathDisplay}>
+									<button
+										type="button"
+										aria-current={file === open ? "true" : undefined}
+										aria-label={description ? name : undefined}
+										aria-describedby={description ? id : undefined}
+										onClick={() => onSelect(file.path)}
+										className={cn(
+											"flex w-full flex-col rounded-md py-0.5 pr-2 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+											file === open && "bg-muted font-medium",
+										)}
+										style={{ paddingLeft: indent }}
+									>
+										<span className="flex w-full min-w-0 items-baseline gap-2">{children(file, name)}</span>
+										{description && (
+											<span id={id} className="line-clamp-2 text-xs font-normal leading-snug text-muted-foreground">
+												{description}
+											</span>
+										)}
+									</button>
+								</Tooltip>
 							);
 						}}
 					/>
@@ -281,17 +257,24 @@ export function FileRail<F extends Pick<OmpFile, "path" | "pathDisplay">>({
 	);
 }
 
+/** A file's place in the Files rail: below the folder that holds every file, such as `~`, and a skill by its directory, since its file is always SKILL.md. */
+function railPaths(files: OmpFile[]): Map<string, string> {
+	const paths = files.map(file => file.pathDisplay.replace(/\/SKILL\.md$/, ""));
+	const root = commonDir(paths);
+	return new Map(files.map((file, index) => [file.path, paths[index]!.slice(root.length)]));
+}
+
 /** A skill's frontmatter `description`, which its rail entry shows under its name. */
-const skillDescriptions = (files: OmpFile[]): Map<string, string | null> =>
-	new Map(files.flatMap(file => (file.kind === "skill" && file.body.state === "read" ? [[file.path, descriptionOf(file.body.text)] as const] : [])));
+const descriptionOf = (file: OmpFile): string | null =>
+	(file.kind === "skill" && file.body.state === "read" && file.body.frontmatter?.fields.find(field => field.key === "description")?.value) || null;
 
 /**
  * Authored files only: package-owned files are previewed through their owning library.
  * The page holds `selected`, so another section can open a file here; the user's context file opens first.
  */
 export function Files({ files: allFiles, editing, selected, onSelect }: { files: OmpFile[]; editing: Editing; selected: string | null; onSelect: (path: string) => void }) {
-	const files = allFiles.filter(file => !file.packaged);
-	const descriptions = useMemo(() => skillDescriptions(allFiles), [allFiles]);
+	const files = useMemo(() => allFiles.filter(file => !file.packaged), [allFiles]);
+	const places = useMemo(() => railPaths(files), [files]);
 	const open = files.find(file => file.path === selected) ?? files.find(file => file.kind === "context") ?? files[0];
 	if (!open) return <p className="text-sm text-muted-foreground">omp found no files.</p>;
 	return (
@@ -300,8 +283,8 @@ export function Files({ files: allFiles, editing, selected, onSelect }: { files:
 				label="omp files"
 				filtered
 				files={files}
-				pathOf={file => file.pathDisplay}
-				describe={file => descriptions.get(file.path) ?? null}
+				pathOf={file => places.get(file.path)!}
+				describe={descriptionOf}
 				open={open}
 				onSelect={onSelect}
 			>

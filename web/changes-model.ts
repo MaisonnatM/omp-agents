@@ -56,6 +56,15 @@ export function fileTree<T extends { path: string } = ChangedEntry>(files: reado
 /** The files in the explorer's order, which ↓ and ↑ walk. */
 export const treeOrder = (dir: TreeDir): ChangedEntry[] => [...dir.dirs.flatMap(treeOrder), ...dir.files];
 
+/** The folder every path in `paths` sits in, ending in `/`; `""` when they share none. */
+export function commonDir(paths: readonly string[]): string {
+	const [first, ...rest] = paths;
+	if (first === undefined) return "";
+	let dir = first.slice(0, first.lastIndexOf("/") + 1);
+	for (const path of rest) while (dir && !path.startsWith(dir)) dir = dir.slice(0, dir.lastIndexOf("/", dir.length - 2) + 1);
+	return dir;
+}
+
 /** The paths of the folders that hold `path`, outermost first, which must be open for its row to show; `null` when no folder holds it. */
 export function foldersAbove<T extends { path: string }>(dir: TreeDir<T>, path: string): string[] | null {
 	if (dir.files.some(file => file.path === path)) return [];

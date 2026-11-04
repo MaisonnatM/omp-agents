@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { ChangedEntry, DiffRow } from "../src/shared/changes";
-import { changeBlocks, changesPathOf, type DiffItem, fileLines, fileTree, foldDiff, foldersAbove, lastAtOrAbove, shortPaths, treeOrder, withMember } from "./changes-model";
+import { changeBlocks, changesPathOf, commonDir, type DiffItem, fileLines, fileTree, foldDiff, foldersAbove, lastAtOrAbove, shortPaths, treeOrder, withMember } from "./changes-model";
 
 const same = (count: number, from = 1): DiffRow[] => Array.from({ length: count }, (_, at) => ({ sign: " ", old: from + at, new: from + at, text: "" }));
 const added: DiffRow = { sign: "+", old: null, new: 0, text: "" };
@@ -114,6 +114,19 @@ describe("fileTree", () => {
 		const tree = fileTree([entry("/tmp/x/notes.md"), entry("a.ts")]);
 		expect(tree.dirs.map(dir => dir.name)).toEqual(["/tmp/x"]);
 		expect(treeOrder(tree).map(file => file.path)).toEqual(["/tmp/x/notes.md", "a.ts"]);
+	});
+});
+describe("commonDir", () => {
+	test("is the deepest folder every path sits in, never a shared prefix of names", () => {
+		expect(commonDir(["~/.omp/agent/AGENTS.md", "~/.omp/agent/skills/ship", "~/.agents/skills/x"])).toBe("~/");
+		expect(commonDir(["~/a/skills/one", "~/a/skills-extra/two"])).toBe("~/a/");
+		expect(commonDir(["~/a/b/c.md"])).toBe("~/a/b/");
+	});
+
+	test("is empty when the paths share no folder", () => {
+		expect(commonDir(["~/a.md", "/etc/b.md"])).toBe("");
+		expect(commonDir(["a.md", "b.md"])).toBe("");
+		expect(commonDir([])).toBe("");
 	});
 });
 describe("changesPathOf", () => {

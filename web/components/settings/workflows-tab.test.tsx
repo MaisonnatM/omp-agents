@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import { frontmatterOf } from "../../../src/frontmatter";
 import type { OmpFile, Workflow } from "../../../src/shared/models";
 import type { Editing } from "./editor";
 import { Workflows } from "./workflows-tab";
@@ -20,7 +21,7 @@ test("packaged workflows render read-only with the frontmatter as properties rat
 		scope: "project",
 		path: "/work/plugins/review/SKILL.md",
 		pathDisplay: "plugins/review/SKILL.md",
-		body: { state: "read", text, size: text.length, modifiedAt: 1, hash: "read-revision" },
+		body: { state: "read", text, size: text.length, modifiedAt: 1, hash: "read-revision", frontmatter: frontmatterOf("SKILL.md", text) },
 	};
 	const workflow: Workflow = { name: "review", description: "Review changes", skill: file.path, command: null };
 	const packaged = renderToStaticMarkup(<Workflows workflows={[workflow]} files={[{ ...file, packaged: "review-kit" }]} editing={editing} />);

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import { frontmatterOf } from "../../../src/frontmatter";
 import type { OmpFile } from "../../../src/shared/models";
 import type { Editing } from "./editor";
 import { Files } from "./files-tab";
@@ -13,7 +14,7 @@ const editing: Editing = {
 	},
 };
 
-const read = (text: string): OmpFile["body"] => ({ state: "read", text, size: text.length, modifiedAt: 1, hash: "h" });
+const read = (text: string): OmpFile["body"] => ({ state: "read", text, size: text.length, modifiedAt: 1, hash: "h", frontmatter: frontmatterOf("SKILL.md", text) });
 
 test("the rail starts inside the folder holding every file, and a skill's description describes its entry without naming it", () => {
 	const files: OmpFile[] = [
