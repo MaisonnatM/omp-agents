@@ -47,6 +47,10 @@ Below it, at most three bullets on why, cost, and risk, only those with somethin
 When the plan adds, removes, or reorders steps in a workflow, put a mermaid flowchart of the new flow after the first line, with the changed step highlighted.
 Leave out file paths, line numbers, principle names, measurements, evidence lists, and rejected alternatives unless the user asks; a table only when the user must compare three or more options.
 
+## Design work
+
+Before any change to what a screen shows, even a one-value tweak, read `skill://design-workflow` and follow it.
+
 ## Conditional references
 
 - Models: before configuring model roles, reasoning levels, fallback chains, or responding to quota exhaustion, read `~/.omp/agent/docs/model-routing.md`.

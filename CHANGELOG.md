@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-04
 
+- The starter kit sends every interface change through a design workflow: agents look at your app's own screens and at reference designs before the first edit, offer five structurally different options for a redesign, and have a separate reviewer screenshot and measure the result before you see it.
 - Replay from here and Compare replay are gone from the trajectory and the pane header.
 - Behind the scenes: the starter kit no longer includes the request log, which saved every request sent to a model so a turn could be replayed.
 - Ask about this is gone. Selecting text in a conversation, a past session, or a pull request's code no longer offers a side discussion.

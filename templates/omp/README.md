@@ -48,13 +48,14 @@ Settings, in `config.yml`:
 
 Files, in `agent/`:
 
-- `AGENTS.md`: worktree and force-push safety, plus conditional pointers for model routing, reviews, and decision records.
+- `AGENTS.md`: worktree and force-push safety, the rule that sends every UI change through the `design-workflow` skill, plus conditional pointers for model routing, reviews, and decision records.
   Read the matching reference under `~/.omp/agent/docs/` before taking that branch of the workflow, regardless of the repository's working directory.
 - `docs/`: `model-routing.md` covers provider order and quota handling, and `review-workflow.md` covers thermonuclear and interface reviews, proof boxes, PR descriptions, and PR screenshots.
   These references load on demand rather than in every session's context.
 - `APPEND_SYSTEM.md`: short final replies that open with the answer in bold and add only the Needs you, Not verified, and Done lines that have content, ending on up to three suggested next prompts, design variants named once and quoted by that name on every surface, a UI change handed off on a running dev server with checked screenshots, questions asked through the ask tool with the recommended option first, how Cursor models call omp's `ask`, `bash`, `grep`, and skills, and a code-quality review before any pull request, which a repository limits to the files its `.omp/review-paths` globs match.
 - `agents/thermonuclear-reviewer.md`: a read-only reviewer that checks the diff against the `CODING_STANDARDS.md` at the root of the checkout it reviews, then runs the thermo-nuclear code quality review on the `plan` role's model.
 - `agents/interface-reviewer.md`: a read-only reviewer that runs your `interface-review` skill in full mode on a PR, then applies the `app-consistency-review` skill to check the change reuses the app's shared components and follows its tokens and sibling screens, on the `plan` role's model; it stops naming the missing skill when `interface-review` or `better-interface` is not installed.
+- `agents/design-critic.md`: a read-only reviewer that the `design-workflow` skill spawns on a UI change it did not build; it screenshots each page and state next to the app's sibling screens and lists every visible bug with pixel measurements, on the `default` role's model.
 - `skills/ship/SKILL.md`, `commands/ship.md`, and `extensions/ship.ts`: `/ship [Linear issue]` drives a change from an optional ticket to plan, draft PR, interface review, thermonuclear review, and live review.
   `APPEND_SYSTEM.md` has the agent start it on its own for a request that will end in a pull request, unless the user says "no ship".
   The skill holds the procedure and is tagged `workflow` in its `metadata.tags`, so the dashboard's Settings › Workflows lists and edits it; the command only tells the session to follow the skill for the issue it names.
@@ -119,6 +120,7 @@ Files, in `agent/`:
 - `extensions/events.ts`: `user_event` lists the upcoming events kept on this computer for the dashboard's Calendar page, queues a timed reminder in the session's name, and removes one that session added.
   A start without an offset is local time, a start in the past is refused, and a session that adds the same title and start again gets that event's id back.
 - `extensions/inbox/client.ts`: what `todos.ts`, `notes.ts`, and `events.ts` share to read their inboxes and leave a change there, one file each, for the dashboard to apply.
+- `skills/design-workflow/SKILL.md`: the steps `AGENTS.md` sends every UI change through: references before the first edit, five structurally different variants for a structural ask, and the `design-critic` agent before the user sees it.
 - `skills/`: `apple-design`, `emil-design-eng`, and `beautiful-shadows` for interface work; `thermo-nuclear-code-quality-review` for the reviewer; `app-consistency-review`, which the interface reviewer autoloads to check a PR against the app's shared components, tokens, and sibling screens; `decision-records`, which keeps each choice made in a project as one dated file in its `docs/decisions/`, with a `check.ts` that checks them; `ship`, the `/ship` workflow above; and `poteto-mode`, a typeable alias for pstack's `Poteto Mode` skill.
   The alias maps Cursor-only cleanup and runtime-control instructions to omp's available tools without editing the plugin cache.
 

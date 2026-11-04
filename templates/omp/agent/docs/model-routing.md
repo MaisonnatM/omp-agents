@@ -62,7 +62,7 @@ omp config get retry.paidFallback
 
 ## Role consumers
 
-- `default`: the session model, memory phase 1, and `security-reviewer`, which inherits because it has no model frontmatter.
+- `default`: the session model, memory phase 1, `design-critic`, and `security-reviewer`, which inherits because it has no model frontmatter.
 - `smol`: `scout`, `sonic`, memory phase 2, and prewalk target.
 - `slow`: `reviewer`.
 - `task`: the bundled `task` agent.
