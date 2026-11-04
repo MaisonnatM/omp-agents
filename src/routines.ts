@@ -37,8 +37,10 @@ export const MAX_TRIGGER_DETAIL = 2_000;
 export type RoutineTask =
 	/** `prompt` sent into the Bot's conversation, as if you wrote it there. */
 	| { kind: "prompt"; prompt: string }
-	/** `command` through `sh -c` in the Bot's workspace, with no omp session; what it printed is then posted into the Bot's conversation. */
-	| { kind: "command"; command: string };
+	/** `command` through `sh -c` in the Bot's workspace, with no omp session; what it printed is then posted into the Bot's conversation,
+	 * or with `post: "failures"` only when it did not exit 0. No `post` posts every run.
+	 */
+	| { kind: "command"; command: string; post?: "failures" };
 
 /**
  * A run's command: `running` from its launch, saved before it can end, then how it ended. `slept` is how long the Mac
@@ -295,7 +297,9 @@ function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
 		case "prompt":
 			return isNonEmpty(value.prompt) ? { ok: { kind: "prompt", prompt: value.prompt } } : null;
 		case "command":
-			return isNonEmpty(value.command) && value.command.length <= MAX_COMMAND_LENGTH ? { ok: { kind: "command", command: value.command } } : null;
+			if (!isNonEmpty(value.command) || value.command.length > MAX_COMMAND_LENGTH) return null;
+			if (value.post === undefined) return { ok: { kind: "command", command: value.command } };
+			return value.post === "failures" ? { ok: { kind: "command", command: value.command, post: "failures" } } : null;
 		default:
 			return null;
 	}
