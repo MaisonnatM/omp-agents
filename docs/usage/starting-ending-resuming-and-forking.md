@@ -3,13 +3,11 @@
 - To start a session, click **New session** at the top of the **Sessions** tab.
   The page shows a new-session draft with the same header and composer as a running session, its header reading `New session`; the directory picker in the composer, left of the model menu, shows the directory that omp will run in.
   No omp process starts and no row appears in the sidebar until you send the first message, so leaving an empty draft leaves nothing running.
-  Above the composer, under **Start a session**, a board lists three columns.
-  **Starters** lists seven prompts for work you start often, such as running the dev server on this branch, shipping a Linear issue, or shepherding your open pull requests until they merge.
-  Clicking one adds its prompt to the draft without sending it, so you can edit it first; **Ship a Linear issue** adds `/ship ` for you to paste the issue's or the view's link after.
-  **Pick up where you left off** lists up to four of the selected workspace's omp sessions, interrupted ones first, then the latest; clicking one resumes it.
-  **Pull requests waiting** lists up to four pull requests from the Pull requests board's **Your move** column, keeping the ones that a quick action hands to an agent; clicking one runs that quick action, as its badge on the Pull requests page does.
-  Its **All** opens the Pull requests page.
-  A scheduled start shows no board.
+  While the draft is empty, the composer lists starters under its action bar, numbered as a reply's suggested prompts are: seven prompts for work you start often, the best fit for now first.
+  They fill in what the page knows: the branch picked in the composer, your Linear issue in progress or up next, and your one open pull request when you have only one.
+  Running the dev server ranks first on a feature branch, shipping an issue when one is in progress, shepherding your pull requests when some wait on your move, and a summary of what you merged on Monday morning and at the end of the week.
+  Pressing a starter's number or clicking it puts its prompt in the composer without sending it, so you can edit it first; with no issue to name, the ship starter puts `/ship ` there for you to paste the issue's or the view's link after.
+  A scheduled start lists no starters.
   The directory is the selected workspace, else the open session's workspace, else the newest live session's, else the newest past session's, so a session in a linked worktree hands its repository's main checkout to the draft, where the branch picker can pick a worktree.
   To start in another directory, under **All workspaces** or not, pick it in the composer's directory picker, or press Cmd+Alt+P.
   It lists the workspaces the sidebar lists, and **Use** takes any directory typed into its search field.

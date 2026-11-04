@@ -36,6 +36,8 @@
   Typing hides the list, and clearing the draft shows it again; the next prompt you send ends it.
   The prompts send as you would type them, so a message of your own that starts with a digit needs another character first, such as a space, while the list shows.
   omp's terminal shows the block as part of the reply.
+  The New session page lists its starters the same way, under the same buttons, while the draft is empty.
+  A starter never sends: its number, a click, Enter, and Tab all put it in the composer to edit first, and since it takes one starter at a time, it has no marks, no 0, and no **All of them** row.
 - A session that the dashboard started queues steers and follow-ups in omp itself, and the composer shows omp's own queue.
   Collab has no follow-up frame, and the host steers every guest message that arrives during a turn.
   So in a terminal session the dashboard holds a follow-up until the host reports that the turn ended, then sends it as a prompt, one per finished turn, as omp's default `followUpMode` delivers them.

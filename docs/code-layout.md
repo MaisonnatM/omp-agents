@@ -87,7 +87,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Pages, each routed by `web/routing.ts`:
   - Get started: `web/components/get-started.tsx`, the step-by-step setup dialog and its bottom-right bubble under the toasts, mounted in `web/app.tsx` and open at `#get-started` and on a vacant home's first run, with each step's body in `web/components/get-started-steps.tsx` and its facts and surface choice in `web/get-started-model.ts`.
   - The empty home, with **New session** and **Get started**: `EmptyHome` in `web/components/empty-home.tsx`, which `PageSwitch` draws.
-  - New session: `web/components/new-session.tsx`, also used for todo drafts and scheduled starts, with the board above its composer, `NewSessionBoard` in `new-session-board.tsx`, which lists what `web/new-session-board-model.ts` picks.
+  - New session: `web/components/new-session.tsx`, also used for todo drafts and scheduled starts, which lists the starters that `starterPrompts` in `web/starters.ts` fills in and ranks under its composer through `useSuggestions`.
   - Pull requests: `web/components/pull-requests/pull-requests-page.tsx`, with the **Rebase N behind** button at its top, its board view `PullRequestsKanban` in `pull-requests-kanban.tsx` with each card `PullRequestCard` in `pr-row.tsx`, and one pull request in `pr-page.tsx` beside it.
   - Tickets: `web/components/tickets/tickets-page.tsx`.
   - Todo: `web/components/todo/page.tsx`.

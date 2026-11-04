@@ -203,6 +203,7 @@ function LiveConversation({
 	const suggestions = useSuggestions({
 		prompts: writable && requests.length === 0 ? turnSuggestions.filter(text => blockedShortcut(text, shell) === null) : [],
 		draft,
+		label: "Suggested prompts",
 		onSend: sendText,
 		onFill: text => {
 			completion.onValueChange(text);

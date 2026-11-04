@@ -4,7 +4,7 @@ import { chosenText, suggestionKey } from "./composer-suggestions";
 const prompts = ["Run the tests", "Open a PR", "Update the docs"];
 
 const press = (key: string, shiftKey = false) => ({ key, shiftKey, altKey: false, ctrlKey: false, metaKey: false, nativeEvent: { isComposing: false } });
-const list = { open: true, count: prompts.length, active: null, marked: false };
+const list = { open: true, count: prompts.length, active: null, marked: false, joins: true };
 
 test("marks plus the clicked row come back in list order, whatever the click order", () => {
 	expect(chosenText(prompts, new Set(["Update the docs"]), 0)).toBe("- Run the tests\n- Update the docs");
@@ -65,4 +65,10 @@ test("0 sends every row once there are two, with Shift too", () => {
 
 test("with one prompt, 0 stays the composer's", () => {
 	expect(suggestionKey(press("0"), { ...list, count: 1 })).toBeNull();
+});
+
+test("a list that only fills, as the starters, leaves 0 to the composer and still takes its digits", () => {
+	const starters = { ...list, joins: false };
+	expect(suggestionKey(press("0"), starters)).toBeNull();
+	expect(suggestionKey(press("2"), starters)).toEqual({ kind: "send", index: 1 });
 });

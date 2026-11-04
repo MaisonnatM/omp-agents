@@ -1,20 +1,26 @@
 import { Lock, Sparkles } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import type { PullRequestSummary } from "../../src/shared/github";
+import { agentOn } from "../../src/shared/moves";
 import type { BranchChoice } from "../../src/shared/git";
-import type { NewSessionRequest } from "../../src/shared/sessions";
+import type { NewSessionRequest, RosterHost } from "../../src/shared/sessions";
+import type { Ticket } from "../../src/shared/tickets";
 import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
 import { Tooltip } from "@/components/ui/tooltip";
-import { useComposerDraft, withAppended } from "../composer-drafts";
+import { useComposerDraft } from "../composer-drafts";
 import { folderName, PRIVATE_NOTE } from "../labels";
 import type { Completions } from "../pane-store";
+import { listedPullRequests, yourMoveCount } from "../pull-requests-model";
+import { pullRequestsStore, ticketsStore } from "../reads";
 import { usePinnedSkill } from "../pinned-skill";
 import { useDraftModelSelection } from "../use-draft-model";
 import { useShortcuts } from "../shortcuts";
 import type { ScheduleWhen } from "../scheduled-model";
 import type { NewOp, StartOf } from "../starts";
+import { starterPrompts } from "../starters";
 import { useGitCheckout } from "../use-git-checkout";
 import { useAction } from "../use-action";
 import { useSkills } from "../use-skills";
@@ -23,13 +29,13 @@ import { blockedShortcut, ComposerEditor, ComposerNote, EmptyConversation } from
 import { BranchPicker, targetOf } from "./git";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
 import { DictationButton, DictationRow, useDictation } from "./composer-dictation";
-import { useDashboardActions } from "./dashboard-context";
+import { useSuggestions } from "./composer-suggestions";
+import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import type { PromptEditorHandle } from "./prompt-editor";
 import { ModelPicker } from "./model-picker";
 import { Header } from "./page-header";
 import { ScheduleButton } from "./scheduled";
 import { DirectoryPicker } from "./workspace-picker";
-import { useGhost } from "./starter-variants";
 
 interface NewSessionProps {
 	/** Where omp starts, as typed or displayed (`~/code/webapp`). */
@@ -57,11 +63,8 @@ interface NewSessionProps {
 	scheduled?: ScheduledDraft;
 	/** Where this browser keeps the unsent text; `null` keeps none. */
 	draftKey: string | null;
-	/**
-	 * The hero and board above the composer, given the line under its heading and `prefill`, which adds a prompt to the
-	 * draft, unsent, with the caret after it; a scheduled start shows none.
-	 */
-	board?: (note: string, prefill: (prompt: string) => void, draft: string) => ReactNode;
+	/** Where the starters listed under the composer come from; a scheduled start passes none and lists none. */
+	starters?: StarterSources;
 }
 
 /** What a scheduled start keeps of the draft: text only, in the draft's directory. */
@@ -87,11 +90,11 @@ export interface ScheduledDraft {
  * The composer picks the directory, the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
  * A skill pinned in the settings shows as a toggle, on until you turn it off for this session.
  */
-export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, scheduled, draftKey, board }: NewSessionProps) {
+export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, scheduled, draftKey, starters }: NewSessionProps) {
 	const initial = scheduled?.request ?? null;
 	const editorRef = useRef<PromptEditorHandle>(null);
 	const [draft, setDraft] = useComposerDraft(draftKey, initial?.prompt ?? todo?.prompt ?? "");
-	// Set by `prefill` until the editor holds the new draft, so the caret lands after the prompt it added.
+	// Set by a starter's pick until the editor holds it as the draft, so the caret lands after the prompt.
 	const prefilled = useRef(false);
 	useEffect(() => {
 		if (!prefilled.current) return;
@@ -146,24 +149,11 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			editor.focus();
 		},
 	});
-	const ghost = useGhost();
 	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-		if (ghost && draft === "" && !event.metaKey && !event.altKey && !event.ctrlKey) {
-			if (event.key === "Tab" && !event.shiftKey) {
-				event.preventDefault();
-				prefilled.current = true;
-				setDraft(ghost.text);
-				return;
-			}
-			if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-				event.preventDefault();
-				ghost.step(event.key === "ArrowDown" ? 1 : -1);
-				return;
-			}
-		}
 		if (completion.onMenuKeyDown(event)) return;
 		dictation.onKeyDown(event);
 		onComposerKey(event);
+		if (!event.defaultPrevented) suggestions.onKeyDown(event);
 		if (!event.defaultPrevented && event.key === "Escape") {
 			event.currentTarget.blur();
 			event.preventDefault();
@@ -180,6 +170,16 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const target = checkout ? targetOf(checkout, cwd, choice) : { dir: cwd, creates: false };
 	const name = folderName(target.dir) ?? target.dir;
 	const error = scheduled ? scheduled.error : launch?.phase === "failed" ? launch.error : null;
+	const starterList = useStarters(starters, name, choice?.name ?? checkout?.branch ?? null);
+	const suggestions = useSuggestions({
+		prompts: connected && !starting ? starterList : NO_STARTERS,
+		draft,
+		label: "Starters",
+		onFill: prompt => {
+			prefilled.current = true;
+			setDraft(prompt);
+		},
+	});
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			{scheduled ? (
@@ -205,17 +205,12 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					{todo && ` Your todo “${todo.text}” links to the session once it starts.`}
 				</EmptyConversation>
 			) : (
-				board?.(
-					(target.creates
+				<EmptyConversation title={`Start omp in ${name}`}>
+					{target.creates
 						? "It starts when you send the first message, which adds the worktree, so leaving this draft leaves nothing running."
-						: "Describe new work, or pick up something below. It starts when you send the first message, so leaving this draft leaves nothing running.") +
-						(todo ? ` Your todo “${todo.text}” links to the session once it starts.` : ""),
-					prompt => {
-						prefilled.current = true;
-						setDraft(current => withAppended(current, prompt));
-					},
-					draft,
-				)
+						: "It starts when you send the first message, so leaving this draft leaves nothing running."}
+					{todo && ` Your todo “${todo.text}” links to the session once it starts.`}
+				</EmptyConversation>
 			)}
 			<div className="relative mx-auto w-full max-w-conversation px-3 pb-3">
 				{completion.popup}
@@ -230,7 +225,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 							if (scheduled) save.run(text.trim());
 							else void attachments.read(text, async (prompt, images) => onStart({ ...opOf(prompt), images }));
 						}}
-						placeholder={ghost && draft === "" ? ghost.text : "Message this session…"}
+						placeholder="Message this session…"
 						files={attachments.files}
 						onFilesChange={attachments.onFilesChange}
 						accept={ATTACH_ACCEPT}
@@ -262,22 +257,48 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 						disabled={starting || !connected}
 						locked={dictation.locked}
 						beforeEditor={<DictationRow dictation={dictation} />}
+						afterActions={suggestions.list}
 						sendLabel={scheduled ? "Save" : starting ? "Starting session" : "Start session"}
 						sending={starting || save.pending}
-						editorProps={{ ...completion.editorProps, onKeyDown, onPaste: scheduled ? undefined : attachments.onPaste, autoFocus: true }}
+						editorProps={{
+							...completion.editorProps,
+							"aria-activedescendant": completion.editorProps["aria-activedescendant"] ?? suggestions.activeId,
+							onBlur: suggestions.onBlur,
+							onKeyDown,
+							onPaste: scheduled ? undefined : attachments.onPaste,
+							autoFocus: true,
+						}}
 					/>
 				</ComposerEditor>
-				{ghost && draft === "" && (
-					<p className="flex items-center gap-1.5 px-1 pt-1.5 text-[11.5px] text-muted-foreground">
-						<span className="font-medium text-foreground/80">{ghost.reason ?? ghost.label}</span>
-						<span>· Tab drafts it · ↑↓ another ({ghost.position})</span>
-					</p>
-				)}
 				{directCommand && <ComposerNote text={directCommand} />}
 				{attachments.note && <ComposerNote text={attachments.note} />}
 			</div>
 		</div>
 	);
+}
+
+/** Where the starters' blanks and ranking come from beyond the draft: the live sessions, which tell whose move a pull request waits on, and whether Linear answers. */
+export interface StarterSources {
+	hosts: RosterHost[];
+	linear: boolean;
+}
+
+const NO_STARTERS: string[] = [];
+const NO_TICKETS: Ticket[] = [];
+const NO_PULL_REQUESTS: PullRequestSummary[] = [];
+
+/** The starters for a draft in `folder` on `branch`, the best fit now first; none without `sources`. */
+function useStarters(sources: StarterSources | undefined, folder: string, branch: string | null): string[] {
+	const { pullRequestsScope } = useDashboardStatus();
+	const tickets = ticketsStore.usePolling(null, sources?.linear ?? false).read?.data.tickets ?? NO_TICKETS;
+	const list = pullRequestsStore.use(pullRequestsScope).read?.data ?? null;
+	const hosts = sources?.hosts;
+	return useMemo(() => {
+		if (!hosts) return NO_STARTERS;
+		const pullRequests = list ? listedPullRequests(list.repos) : NO_PULL_REQUESTS;
+		const waiting = list ? yourMoveCount(list, agentOn(hosts)) : 0;
+		return starterPrompts({ folder, branch, tickets, pullRequests, waiting, now: new Date() });
+	}, [hosts, list, tickets, folder, branch]);
 }
 
 /** Whether the pinned skill applies: `missing` when the directory has no such skill. */

@@ -24,8 +24,8 @@ export const putDraft = (key: string, text: string): void => drafts.set(key, tex
 
 export const clearDraft = (key: string): void => drafts.set(key, null);
 
-/** `text` added to `draft`, a blank line after what was typed; every composer that takes text from elsewhere appends alike. */
-export const withAppended = (draft: string, text: string): string => (draft.trim() ? `${draft}\n\n${text}` : text);
+/** `text` added to `draft`, a blank line after what was typed; the mounted composer and the kept draft must append alike. */
+const withAppended = (draft: string, text: string): string => (draft.trim() ? `${draft}\n\n${text}` : text);
 
 /** What the mounted composers take from elsewhere on the page, by draft key: `send` reaches each one and says whether any did. */
 function composerChannel<T>() {

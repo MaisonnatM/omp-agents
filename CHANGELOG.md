@@ -5,7 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-04
 
-- The New session page's board now starts with Starters, seven prompts for work you start often, such as running the dev server on this branch or shipping a Linear issue. Clicking one puts its prompt in the draft for you to edit and send. Todos for agents left the board; your todos stay on the Todo page.
+- New session now suggests starters, prompts for work you start often, such as running the dev server on your branch, shipping your Linear issue in progress, or shepherding your open pull requests. They show under the composer the way a reply's suggested prompts do, the best fit for now first. Press a starter's number or click it to put it in the composer, where you can edit it before you send.
+- The New session page no longer shows the board of todos, past sessions, and pull requests above the composer. Your todos stay on the Todo page, past sessions in the sidebar, and pull requests on the Pull requests page.
 - The starter kit now sends agents to the review steps before they mark a pull request ready or merge it, so they stop running into the review check first.
 
 ## 2026-11-03

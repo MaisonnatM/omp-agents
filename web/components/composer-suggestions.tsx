@@ -1,4 +1,4 @@
-/** The suggested next prompts above the composer, which a key or click sends or fills in, alone, several marked together, or all at once. */
+/** The prompts listed under the composer's action bar, a reply's suggestions or the New session page's starters, which a key or click sends or fills in, alone, several marked together, or all at once. */
 import { AnimatePresence, motion } from "framer-motion";
 import { type ComponentProps, type FocusEventHandler, type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
@@ -38,17 +38,19 @@ interface ListState {
 	active: number | null;
 	/** Whether any listed prompt is marked. */
 	marked: boolean;
+	/** Whether 0 sends every row; a list that only fills takes one row at a time. */
+	joins: boolean;
 }
 
 /**
  * The list's action for `event`, or null to leave the key to the composer. A digit takes Shift, since some layouts type
- * digits with it; 0 sends every row once there are two.
+ * digits with it; 0 sends every row once there are two, in a list that joins rows.
  */
-export function suggestionKey(event: KeyPress, { open, count, active, marked }: ListState): SuggestionKey | null {
+export function suggestionKey(event: KeyPress, { open, count, active, marked, joins }: ListState): SuggestionKey | null {
 	if (!open || event.altKey || event.metaKey || event.ctrlKey || event.nativeEvent.isComposing) return null;
 	const numbered = /^[1-9]$/.test(event.key) ? Number(event.key) - 1 : null;
 	if (numbered !== null && numbered < count) return { kind: "send", index: numbered };
-	if (event.key === "0" && count > 1) return { kind: "send-all" };
+	if (event.key === "0" && joins && count > 1) return { kind: "send-all" };
 	if (event.shiftKey) return null;
 	if (event.key === "ArrowDown") return { kind: "move", to: active === null ? 0 : Math.min(active + 1, count - 1) };
 	if (event.key === "ArrowUp") return active === null ? null : { kind: "move", to: active === 0 ? null : active - 1 };
@@ -149,8 +151,13 @@ function SuggestionRow({ text, index, active, marked, optionId, registerItem, on
 interface SuggestionOptions {
 	prompts: string[];
 	draft: string;
-	/** Sends `text` as the composer's draft would go. */
-	onSend: (text: string) => void;
+	/** The listbox's name for screen readers. */
+	label: string;
+	/**
+	 * Sends `text` as the composer's draft would go. Without it every pick fills instead and takes one row at a time, with
+	 * no marks and no 0, as the New session page's starters do: a starter is a draft to finish, not a message.
+	 */
+	onSend?: (text: string) => void;
 	/** Puts `text` in the composer to edit first. */
 	onFill: (text: string) => void;
 }
@@ -167,11 +174,13 @@ interface Suggestions {
 }
 
 /**
- * Suggested prompts, listed under the composer's action bar while the draft is empty; docs/usage/composer.md describes the
- * keys and clicks. Marks join every send or fill, in list order; Esc, a send, a fill, and the list closing clear them.
+ * Prompts listed under the composer's action bar while the draft is empty; docs/usage/composer.md describes the keys and
+ * clicks. Marks join every send or fill, in list order; Esc, a send, a fill, and the list closing clear them.
  * Focus stays in the text field.
  */
-export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOptions): Suggestions {
+export function useSuggestions({ prompts, draft, label, onSend, onFill }: SuggestionOptions): Suggestions {
+	const joins = onSend !== undefined;
+	const send = onSend ?? onFill;
 	const open = prompts.length > 0 && draft === "";
 	const listRef = useRef<HTMLDivElement>(null);
 	const listId = useId();
@@ -206,15 +215,15 @@ export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOpt
 	};
 	const sendAll = (): void => {
 		clear();
-		onSend(chosenText(prompts, new Set(prompts), null));
+		send(chosenText(prompts, new Set(prompts), null));
 	};
 	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-		const action = suggestionKey(event, { open, count: prompts.length, active: activeIndex, marked: prompts.some(text => marked.has(text)) });
+		const action = suggestionKey(event, { open, count: prompts.length, active: activeIndex, marked: prompts.some(text => marked.has(text)), joins });
 		if (!action) return;
 		event.preventDefault();
 		switch (action.kind) {
 			case "send":
-				return take(action.index, onSend);
+				return take(action.index, send);
 			case "send-all":
 				return sendAll();
 			case "fill":
@@ -249,8 +258,8 @@ export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOpt
 							ref={listRef}
 							role="listbox"
 							id={listId}
-							aria-label="Suggested prompts"
-							aria-multiselectable="true"
+							aria-label={label}
+							aria-multiselectable={joins}
 							onMouseEnter={handlers.onMouseEnter}
 							onMouseMove={handlers.onMouseMove}
 							onMouseLeave={handlers.onMouseLeave}
@@ -268,13 +277,13 @@ export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOpt
 									optionId={`${listId}-${index}`}
 									registerItem={registerItem}
 									// The composer's frame keeps the text field focused on a mousedown here, so marking never moves focus.
-									onPick={mark => (mark ? toggleMark(text) : take(index, onSend))}
+									onPick={mark => (mark && joins ? toggleMark(text) : take(index, send))}
 								/>
 							))}
 						</div>
 						{/* 0's row, which sends every prompt. It stays out of the listbox and the fluid hover: it is a hint, not an
 						option, and the hover's gap click would send the nearest prompt instead. */}
-						{prompts.length > 1 && (
+						{joins && prompts.length > 1 && (
 							<Row
 								{...activityControl("composer-suggestions.send-all")}
 								aria-hidden="true"
