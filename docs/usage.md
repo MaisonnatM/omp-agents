@@ -38,6 +38,7 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 - [Settings](usage/settings.md)
   - [Extensions](usage/extensions.md)
 - [Settings sync](usage/settings-sync.md)
+- [Storage](usage/storage.md)
 - [Notifications](usage/notifications.md)
   - [Session notifications](usage/notifications.md#session-notifications)
 - [Updating omp-agents](usage/updating-omp-agents.md)

@@ -48,36 +48,7 @@
   **Navigation** lists the 15 most common moves from one view to another and the time spent on each view.
   **Active time** charts the minutes you used the dashboard each day, up to five minutes between two uses, with a table of each day's active time, visits, and changes sent.
   Only the server that runs the unattended work keeps activity, in `activity.db` in its data directory; a browser under automation records nothing.
-- **Storage** measures session files, attachments, and isolation sandboxes across all workspaces.
-  Open it from the disk reading's **Clean up…** link in the bottom bar, or at `#settings/storage`.
-  The checklist previews old reports and replicas, unused attachments, cold sessions to archive, idle files to compress, database logs, sandboxes of ended tasks, sandboxes of ended tasks with leftover changes, and package caches.
-  It starts with your saved cleanup switches, plus sandboxes of ended tasks; empty phases, sandboxes with leftover changes, and package caches stay unchecked.
-  **Check again** refreshes the preview without deleting anything.
-  Sizes are approximate; cold sessions show a count, and compression shows the files' current disk use rather than promised savings.
-  Sandboxes fill in separately, and can take a few minutes when many are left over.
-  Their sizes read **Up to**, since a sandbox shares some files with your checkout and the package cache, so they stay out of the **Clean up about** estimate.
-  **Sandboxes of ended tasks with leftover changes** are ones whose task ended with edits still in them; removing them deletes edits omp did not bring back to your checkout.
-  **Kept** lists the ones a live owner, a Git lock, or another safety check protects.
-  **Package caches** covers the caches of uv, pnpm, and bun, whichever are installed, and runs each tool's own prune: `uv cache prune`, `pnpm store prune`, and `bun pm cache rm`, which empties bun's cache.
-  Its size reads **Up to**, since your projects' environments share some of a cache's files, and stays out of the estimate; pruned packages download again when a project needs them.
-  uv's prune skips uv's lock, which every running `uvx` tool, such as an MCP server a session starts, holds for its whole life, and the entries a running process has open come back after the prune.
-  When some cache files belong to another user, as after a `sudo` install, the row's error names the `chown` command that fixes them.
-  **Clean up** asks for confirmation and names what cannot be undone.
-  Archived cold sessions leave the roster, History, and Resume, while their compressed archive stays on disk.
-  Cleanup follows omp's phase order, then rechecks and removes the chosen sandboxes one at a time, then prunes the package caches.
-  **Stop after this step** lets the current operation finish and starts no more.
-  Leaving Settings or reloading also prevents later steps, but does not kill the operation already running.
-  A failed step keeps its error on the row and stops the rest; **Check again** keeps the checklist's ticks for another attempt.
-  The result shows the native counts and the volume's free space before and after, not a promise that all selected bytes were freed.
-  **Cleanup rules** edits all twelve native cleanup settings through the same conflict-checked settings writer as **omp settings**.
-  Each rule saves separately; number fields save on Enter or when you leave the field, and Escape restores the value.
-  **Reset** removes your override and restores omp's default.
-  A conflict reloads the value changed on disk and asks you to review it before trying again.
-  The rules and dashboard cleanup are global; a selected workspace's overrides show a warning and apply only to terminal cleanup in that folder.
-  No new daily cleanup runs.
-  **Compress daily** runs only when you launch omp in a terminal, not for dashboard sessions, and shows the last background compression log when one exists.
-  The existing daily sandbox sweep stays in place, and never removes a sandbox with leftover changes.
-  Merged Git worktrees keep their separate review in **Worktrees**.
+- **Storage** measures session files, attachments, and isolation sandboxes, and cleans them up with omp's cleanup and the package caches; see [Storage](storage.md).
 - **Worktrees** lists every Git worktree in repositories where a session ran; **Show another repository**, below the list, lists one more.
   A session directory that is gone or outside Git is skipped; a path you enter that is not in a repository says so.
   Above the list, the tab counts the worktrees, their disk use measured so far, and the merged ones with their size; **All**, **Merged**, and **Removable** filter the rows.
