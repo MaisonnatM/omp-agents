@@ -8,11 +8,27 @@ export type GcPhase = (typeof GC_PHASES)[number];
 export const SANDBOX_STEPS = ["sandboxes", "changedSandboxes"] as const;
 export type SandboxStep = (typeof SANDBOX_STEPS)[number];
 export const isSandboxStep = oneOf(SANDBOX_STEPS);
-export const CLEANUP_STEPS = [...GC_PHASES, ...SANDBOX_STEPS] as const;
+/** Package managers' download caches, which each tool's own prune command trims. */
+export const CACHE_STEP = "packageCaches" as const;
+export const CLEANUP_STEPS = [...GC_PHASES, ...SANDBOX_STEPS, CACHE_STEP] as const;
 export type CleanupStep = (typeof CLEANUP_STEPS)[number];
 export type SandboxKeepReason = "owner-live" | "occupied" | "changed" | "locked" | "unreadable" | "failed";
 export interface SandboxResult { path: string; kept: SandboxKeepReason | null; detail: string | null }
 export interface SandboxPlan extends SandboxResult { bytes: number | null }
+export const PACKAGE_TOOLS = ["uv", "pnpm", "bun"] as const;
+export type PackageTool = (typeof PACKAGE_TOOLS)[number];
+/** One installed tool's cache; `bytes` counts files a project's environment may share through clones or hard links. */
+export interface CachePlan { tool: PackageTool; path: string; bytes: number | null }
+/** `after` is null when the prune failed or the cache could not be measured. */
+export interface CacheResult extends CachePlan { after: number | null; error: string | null }
+/** Where each step's preview comes from: one native gc dry run, the sandbox sweep, or the package managers. */
+export const PREVIEW_SOURCES = ["gc", "sandboxes", "caches"] as const;
+export type PreviewSource = (typeof PREVIEW_SOURCES)[number];
+export const PREVIEW_SOURCE: Record<CleanupStep, PreviewSource> = {
+	stale: "gc", blobs: "gc", archive: "gc", compress: "gc", wal: "gc",
+	sandboxes: "sandboxes", changedSandboxes: "sandboxes", packageCaches: "caches",
+};
+export interface Previews { gc: GcAnswer; sandboxes: SandboxPlan[]; caches: CachePlan[] }
 
 export class CleanupBusy extends Error {
 	constructor() { super("Another cleanup is running. Try again when it ends."); }
@@ -50,16 +66,19 @@ export interface StorageUsage {
 	autoCompress: { at: number; text: string } | null;
 }
 export type CleanupRequest =
-	| { action: "preview"; step?: "sandboxes" }
-	| { action: "apply"; step: GcPhase }
+	| { action: "preview"; source: PreviewSource }
+	| { action: "apply"; step: GcPhase | typeof CACHE_STEP }
 	| { action: "apply"; step: SandboxStep; sandboxes: string[] };
-export type CleanupStepResult = { step: GcPhase; gc: GcAnswer } | { step: SandboxStep; sandboxes: SandboxResult[] };
+export type CleanupStepResult =
+	| { step: GcPhase; gc: GcAnswer }
+	| { step: SandboxStep; sandboxes: SandboxResult[] }
+	| { step: typeof CACHE_STEP; caches: CacheResult[] };
 
 export function parseCleanupRequest(raw: unknown): Parsed<CleanupRequest> {
 	if (!isObject(raw) || Array.isArray(raw)) return null;
-	if (raw.action === "preview" && (raw.step === undefined || raw.step === "sandboxes")) return { ok: { action: "preview", ...(raw.step === "sandboxes" ? { step: "sandboxes" as const } : {}) } };
+	if (raw.action === "preview" && oneOf(PREVIEW_SOURCES)(raw.source)) return { ok: { action: "preview", source: raw.source } };
 	if (raw.action !== "apply") return null;
-	if (oneOf(GC_PHASES)(raw.step)) return { ok: { action: "apply", step: raw.step } };
+	if (oneOf(GC_PHASES)(raw.step) || raw.step === CACHE_STEP) return { ok: { action: "apply", step: raw.step } };
 	if (oneOf(SANDBOX_STEPS)(raw.step) && isTexts(raw.sandboxes) && raw.sandboxes.length <= 200 && raw.sandboxes.every(path => path.length > 0 && path.length < 4096)) return { ok: { action: "apply", step: raw.step, sandboxes: [...new Set(raw.sandboxes)] } };
 	return null;
 }

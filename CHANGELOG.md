@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-04
 
+- Settings › Storage can now prune the uv, pnpm, and bun package caches. Packages no project needs are deleted and download again when a project installs them, while the files running tools such as MCP servers use are kept.
 - Behind the scenes: agents now run the interface review alongside the thermonuclear one when a pull request changes UI files, attach PR screenshots without the body edit the guard refuses, and open the test browser with the right call shape.
 - A Bot can now end a run quietly when it found nothing for you, so a routine run with nothing new no longer notifies you or marks the Bot unread. The PR shepherd's starting job asks for this; add "When a run finds nothing for me, call stay_quiet." to an existing Bot's job.
 - Deleting worktrees in Settings › Worktrees now works like Rebase behind on Pull requests: click Delete, Delete N worktrees, or Remove N merged twice instead of going through a dialog, and they are removed one at a time in the background while one toast counts them, even after you leave the page. Each row says Queued, then Removing, and leaves the list once it is gone.
