@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
 import { Tooltip } from "@/components/ui/tooltip";
-import { activityControl } from "../activity";
 import { useComposerDraft } from "../composer-drafts";
 import { folderName, sameDir, PRIVATE_NOTE } from "../labels";
 import type { Completions } from "../pane-store";
@@ -26,6 +25,7 @@ import { useGitCheckout } from "../use-git-checkout";
 import { useAction } from "../use-action";
 import { useSkills } from "../use-skills";
 import { useCompletion } from "./completion-popup";
+import { useSuggestions } from "./composer-suggestions";
 import { blockedShortcut, ComposerEditor, ComposerNote, EmptyConversation } from "./composer";
 import { BranchPicker, targetOf } from "./git";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
@@ -133,7 +133,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			: pickedChoice;
 	const starting = launch?.phase === "starting" || (scheduled?.busy ?? false);
 	const privacy = todo ? null : <PrivatePill on={isPrivate} onToggle={() => setPrivate(on => !on)} disabled={starting} />;
-	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] }, below: !scheduled });
+	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] } });
 	const { send } = useDashboardActions();
 	// A composer that keeps no draft, as a scheduled start's, has nowhere to put text that lands after it closes.
 	const dictation = useDictation({ composer: draftKey !== null && !starting ? { draftKey, cwd } : null, text: draft, editorRef, send, connected });
@@ -161,6 +161,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		if (completion.onMenuKeyDown(event)) return;
 		dictation.onKeyDown(event);
 		onComposerKey(event);
+		if (!event.defaultPrevented) suggestions.onKeyDown(event);
 		if (!event.defaultPrevented && event.key === "Escape") {
 			event.currentTarget.blur();
 			event.preventDefault();
@@ -178,6 +179,21 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const name = folderName(target.dir) ?? target.dir;
 	const error = scheduled ? scheduled.error : launch?.phase === "failed" ? launch.error : null;
 	const starterList = useStarters(starters, name, choice?.name ?? checkout?.branch ?? null);
+	// A private draft lists its facts and a personal one its panel in the starters' place, since starters suit project work.
+	const panel = scheduled ? null : isPrivate ? <PrivateFacts personal={personalDraft} /> : personal && personalDraft && assistant ? <PersonalPanel cwd={personal.cwd} past={assistant.past} memory={assistant.memory} /> : null;
+	const starterLabels = useMemo(() => new Map(starterList.map(starter => [starter.prompt, starter.label])), [starterList]);
+	// A starter only fills the draft, since some, such as `/ship `, wait for a blank to be filled.
+	const fillStarter = (prompt: string): void => {
+		prefilled.current = true;
+		setDraft(prompt);
+	};
+	const suggestions = useSuggestions({
+		prompts: connected && !starting && !scheduled && panel === null ? [...starterLabels.keys()] : NO_PROMPTS,
+		labelOf: prompt => starterLabels.get(prompt) ?? prompt,
+		draft,
+		onSend: fillStarter,
+		onFill: fillStarter,
+	});
 	const pickers = (
 		<>
 			<DirectoryPicker
@@ -215,14 +231,16 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					{scheduled ? `Not sent: ${error}` : error}
 				</p>
 			)}
-			{scheduled && (
+			{scheduled ? (
 				<EmptyConversation title={`Scheduled in ${name}`}>
 					It starts at its time as Start session would start it. Edit the message, model, skill, directory, or branch, then save; the clock moves its time.
 					{todo && ` Your todo “${todo.text}” links to the session once it starts.`}
 				</EmptyConversation>
+			) : (
+				<NewSessionWelcome folder={name} personal={personalDraft} isPrivate={isPrivate} />
 			)}
-			{/* A new session puts the composer in the page's upper middle, its directory and branch above it and its starters under it; a scheduled start docks it at the bottom. */}
-			<div className={cn("mx-auto w-full max-w-conversation px-3", scheduled ? "pb-3" : "pt-[18vh] pb-6")}>
+			{/* The composer docks at the page's bottom, a new session's directory and branch above it and its starters inside it. */}
+			<div className="mx-auto w-full max-w-conversation px-3 pb-3">
 				{!scheduled && <div className="flex flex-wrap items-center gap-1 pb-1.5">{pickers}</div>}
 				<div className="relative">
 					{completion.popup}
@@ -263,46 +281,20 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 							sending={starting || save.pending}
 							editorProps={{
 								...completion.editorProps,
+								"aria-activedescendant": completion.editorProps["aria-activedescendant"] ?? suggestions.activeId,
 								onKeyDown,
+								onBlur: suggestions.onBlur,
 								onPaste: scheduled ? undefined : attachments.onPaste,
 								autoFocus: true,
 							}}
+							afterActions={suggestions.list}
 						/>
 					</ComposerEditor>
 				</div>
 				{directCommand && <ComposerNote text={directCommand} />}
 				{attachments.note && <ComposerNote text={attachments.note} />}
 				{!scheduled && todo && <p className="mt-2 px-1 text-xs text-muted-foreground">Your todo “{todo.text}” links to the session once it starts.</p>}
-				{/* A private draft says what ending it deletes, and a personal one what it remembers, in place of the starters, which suit project work. */}
-				{!scheduled && isPrivate ? (
-					<PrivateFacts personal={personalDraft} />
-				) : personal && personalDraft && assistant ? (
-					<PersonalPanel cwd={personal.cwd} past={assistant.past} memory={assistant.memory} />
-				) : (
-					connected &&
-					!starting &&
-					!draft.trim() &&
-					starterList.length > 0 && (
-						<div role="group" aria-label="Starters" className="mt-3 flex flex-wrap gap-2">
-							{starterList.map(starter => (
-								<Tooltip key={starter.label} content={starter.prompt}>
-									<Button
-										variant="tertiary"
-										size="compact"
-										className="rounded-full px-3 font-normal text-muted-foreground hover:text-foreground"
-										onClick={() => {
-											prefilled.current = true;
-											setDraft(starter.prompt);
-										}}
-										{...activityControl("composer.starter")}
-									>
-										{starter.label}
-									</Button>
-								</Tooltip>
-							))}
-						</div>
-					)
-				)}
+				{panel}
 			</div>
 		</div>
 	);
@@ -322,6 +314,7 @@ export interface AssistantSources {
 }
 
 const NO_STARTERS: Starter[] = [];
+const NO_PROMPTS: string[] = [];
 const NO_TICKETS: Ticket[] = [];
 const NO_PULL_REQUESTS: PullRequestSummary[] = [];
 
@@ -395,5 +388,40 @@ function PrivatePill({ on, onToggle, disabled }: { on: boolean; onToggle: () => 
 				{on && <X aria-hidden className="size-3" />}
 			</button>
 		</Tooltip>
+	);
+}
+
+/** What a new session's empty page says above the docked composer: the omp mark over a serif question naming where the work happens. */
+function NewSessionWelcome({ folder, personal, isPrivate }: { folder: string; personal: boolean; isPrivate: boolean }) {
+	return (
+		<div className="m-auto flex w-full max-w-conversation flex-col items-center px-6 py-10 text-center" data-empty-conversation>
+			{isPrivate ? <Lock aria-hidden="true" className="size-7" /> : <OmpMark className="size-8" />}
+			<h2 className="mt-5 max-w-lg font-serif text-[2rem] leading-tight font-normal tracking-tight text-balance">
+				{personal ? (
+					"What can I help with?"
+				) : (
+					<>
+						What should we work on in <span className="underline decoration-[oklch(0.62_0.21_295)]/40 decoration-2 underline-offset-[6px]">{folder}</span>?
+					</>
+				)}
+			</h2>
+			{isPrivate && <p className="mt-3 max-w-sm text-sm text-pretty text-muted-foreground">{PRIVATE_NOTE}</p>}
+		</div>
+	);
+}
+
+/** omp's mark, the gradient glyph of `web/favicon.svg`. */
+function OmpMark({ className }: { className?: string }) {
+	return (
+		<svg viewBox="8 12 48 46" aria-hidden="true" className={className}>
+			<defs>
+				<linearGradient id="omp-mark" x1="0" y1="0" x2="1" y2="1">
+					<stop offset="0" stopColor="oklch(0.7 0.24 340)" />
+					<stop offset=".5" stopColor="oklch(0.62 0.21 295)" />
+					<stop offset="1" stopColor="oklch(0.81 0.14 200)" />
+				</linearGradient>
+			</defs>
+			<path fill="url(#omp-mark)" d="M10 14h44v9H43v33h-9V23h-9v22h-9V23H10z" />
+		</svg>
 	);
 }
