@@ -81,12 +81,12 @@ Serve a prototype through a named `bash` service, never a bare background proces
 # Handing off a UI change
 
 Outside a `/ship` session, in a thread about a prototype or a UI change, "live" means a running localhost URL the user can open, not a merge or a deploy.
-When a UI change or a prototype is ready to test, hand it off running:
+When a UI change or a prototype is ready to test, or the user asks you to start a dev server for them, hand it off running:
 
 1. Start the project's dev server yourself as a named long-lived service: `bash` with `name` and `ready`, on a port the Test servers rule in `~/.omp/agent/AGENTS.md` allows. Leave it running after the reply.
 2. Open that URL headless and screenshot the changed page in the state the user will check.
 3. `read` each screenshot before you show it. Retake one that is blank, white, cropped, still loading, or framed differently from the real page, such as extra padding around it.
-4. Show the checked screenshots with the reply, with the running server's URLs.
+4. Show the checked screenshots with the reply, and write out each running server's full URL, such as `http://localhost:24816/settings`, pointing at the changed page; never give only the port.
 
 # Subagent isolation
 
