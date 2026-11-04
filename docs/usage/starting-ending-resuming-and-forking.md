@@ -8,7 +8,7 @@
   They fill in what the page knows: the branch picked above the composer, your Linear issue in progress or up next, and your one open pull request when you have only one.
   Running the dev server ranks first on a feature branch, shipping an issue when one is in progress, shepherding your pull requests when some wait on your move, and a summary of what you merged on Monday morning and at the end of the week.
   Pressing a starter's number, or clicking it, puts its full prompt in the composer without sending it, so you can edit it first; 0 or **All of them** puts the starters there as a list. With no issue to name, **Ship a Linear issue** puts `/ship ` there for you to paste the issue's or the view's link after.
-  A personal draft shows its **Your assistant** panel there instead, as [Personal sessions](personal-sessions.md) says, and a private draft what ending it deletes, as **Private** below says.
+  A personal draft lists none, and a private draft shows what ending it deletes there instead, as **Private** below says.
   A scheduled start keeps its pickers inside the composer and lists no starters.
   The directory is the selected workspace, else the open session's workspace, else the newest live session's, else the newest past session's, so a session in a linked worktree hands its repository's main checkout to the draft, where the branch picker can pick a worktree.
   To start in another directory, under **All workspaces** or not, pick it in the directory picker, or press Cmd+Alt+P.

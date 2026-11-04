@@ -31,7 +31,7 @@ import { BranchPicker, targetOf } from "./git";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
 import { DictationButton, DictationRow, useDictation } from "./composer-dictation";
 import { PersonalContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
-import { PersonalPanel, PrivateFacts } from "./new-session-modes";
+import { PrivateFacts } from "./new-session-modes";
 import type { PromptEditorHandle } from "./prompt-editor";
 import { ModelPicker } from "./model-picker";
 import { Header } from "./page-header";
@@ -66,8 +66,6 @@ interface NewSessionProps {
 	draftKey: string | null;
 	/** Where the starters listed under the composer come from; a scheduled start passes none and lists none. */
 	starters?: StarterSources;
-	/** What a personal draft lists under the composer instead of starters; a scheduled start passes none. */
-	assistant?: AssistantSources;
 }
 
 /** What a scheduled start keeps of the draft: text only, in the draft's directory. */
@@ -93,7 +91,7 @@ export interface ScheduledDraft {
  * The composer picks the directory, the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
  * A skill pinned in the settings shows as a toggle, on until you turn it off for this session.
  */
-export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, scheduled, draftKey, starters, assistant }: NewSessionProps) {
+export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, scheduled, draftKey, starters }: NewSessionProps) {
 	const initial = scheduled?.request ?? null;
 	const editorRef = useRef<PromptEditorHandle>(null);
 	const [draft, setDraft] = useComposerDraft(draftKey, initial?.prompt ?? todo?.prompt ?? "");
@@ -179,8 +177,8 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const name = folderName(target.dir) ?? target.dir;
 	const error = scheduled ? scheduled.error : launch?.phase === "failed" ? launch.error : null;
 	const starterList = useStarters(starters, name, choice?.name ?? checkout?.branch ?? null);
-	// A private draft lists its facts and a personal one its panel in the starters' place, since starters suit project work.
-	const panel = scheduled ? null : isPrivate ? <PrivateFacts personal={personalDraft} /> : personal && personalDraft && assistant ? <PersonalPanel cwd={personal.cwd} past={assistant.past} memory={assistant.memory} /> : null;
+	// A private draft lists its facts in the starters' place, and a personal draft lists none, since starters suit project work.
+	const panel = scheduled || !isPrivate ? null : <PrivateFacts personal={personalDraft} />;
 	const starterLabels = useMemo(() => new Map(starterList.map(starter => [starter.prompt, starter.label])), [starterList]);
 	// A starter only fills the draft, since some, such as `/ship `, wait for a blank to be filled.
 	const fillStarter = (prompt: string): void => {
@@ -188,7 +186,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		setDraft(prompt);
 	};
 	const suggestions = useSuggestions({
-		prompts: connected && !starting && !scheduled && panel === null ? [...starterLabels.keys()] : NO_PROMPTS,
+		prompts: connected && !starting && !scheduled && panel === null && !personalDraft ? [...starterLabels.keys()] : NO_PROMPTS,
 		labelOf: prompt => starterLabels.get(prompt) ?? prompt,
 		draft,
 		onSend: fillStarter,
@@ -304,13 +302,6 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 export interface StarterSources {
 	hosts: RosterHost[];
 	linear: boolean;
-}
-
-/** What a personal draft's panel lists: the past sessions, of which it shows the personal directory's, and what personal sessions remember. */
-export interface AssistantSources {
-	past: PastSession[];
-	/** `personal-memory.md`'s text. */
-	memory: string;
 }
 
 const NO_STARTERS: Starter[] = [];
