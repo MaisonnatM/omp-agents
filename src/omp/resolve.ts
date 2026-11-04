@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { errorText, isObject } from "../json";
 import { OMP_INSTALL_COMMAND, OmpMissing } from "../shared/startup";
 
-const PACKAGE_NAME = "@oh-my-pi/pi-coding-agent";
+export const PACKAGE_NAME = "@oh-my-pi/pi-coding-agent";
 
 /** Reads fresh because omp update can replace the manifest while the dashboard runs. */
 export function readManifest(path: string): Record<string, unknown> {
