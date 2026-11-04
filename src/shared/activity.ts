@@ -79,6 +79,7 @@ export const CONTROLS = [
 	{ id: "media-viewer.open", label: "Image opened large", area: "Transcript" },
 	{ id: "media-viewer.step", label: "Image viewer previous or next", area: "Transcript" },
 	{ id: "media-viewer.new-tab", label: "Image viewer, open in a new tab", area: "Transcript" },
+	{ id: "viewer.zoom", label: "Image or diagram viewer, zoom in, out, or fit", area: "Transcript" },
 	{ id: "file-dialog.open", label: "File path in agent text", area: "Transcript" },
 	{ id: "file-dialog.source", label: "File dialog, source or rendered", area: "Transcript" },
 	{ id: "file-dialog.copy-path", label: "File dialog, copy the path", area: "Transcript" },

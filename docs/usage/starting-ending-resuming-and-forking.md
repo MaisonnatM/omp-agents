@@ -7,6 +7,7 @@
   They fill in what the page knows: the branch picked above the composer, your Linear issue in progress or up next, and your one open pull request when you have only one.
   Running the dev server ranks first on a feature branch, shipping an issue when one is in progress, shepherding your pull requests when some wait on your move, and a summary of what you merged on Monday morning and at the end of the week.
   Hovering a starter shows its full prompt, and clicking it puts that prompt in the composer without sending it, so you can edit it first; with no issue to name, **Ship a Linear issue** puts `/ship ` there for you to paste the issue's or the view's link after.
+  A personal draft shows its **Your assistant** panel there instead, as [Personal sessions](personal-sessions.md) says, and a private draft what ending it deletes, as **Private** below says.
   A scheduled start keeps the composer at the page's bottom, with its pickers inside it, and lists no starters.
   The directory is the selected workspace, else the open session's workspace, else the newest live session's, else the newest past session's, so a session in a linked worktree hands its repository's main checkout to the draft, where the branch picker can pick a worktree.
   To start in another directory, under **All workspaces** or not, pick it in the directory picker, or press Cmd+Alt+P.
@@ -43,11 +44,12 @@
   Click it to start this one session without the skill.
   It is greyed out when the directory has no skill of that name, and the session then starts without it.
   A first message that starts with `/` keeps its own skill or command and skips the pinned skill, so the toggle hides while the message starts that way.
-- **Private**, the lock toggle after the model picker, starts a session that is deleted with everything it wrote when it ends: its transcript, its subagents, its prompts in omp's history, its title, and its pins.
+- **Private**, the pill at the right of the page header, starts a session that is deleted with everything it wrote when it ends: its transcript, its subagents, its prompts in omp's history, its title, and its pins.
   It never shows under the past sessions, never resumes, and cannot be forked or replayed, and omp's memory and autolearn stay off for it.
-  A private session shows a lock in its sidebar row and its header.
+  While it is on, the pill fills dark, the composer gets a dark outline, and the starters under the composer give way to what ending deletes and what stays: files it changes and commits it makes stay in the project, and a personal one keeps its memory.
+  A private session shows a dark **Private** chip in its sidebar row and its header.
   It ends when its omp process stops, whether through **End session**, `end_session`, or a crash; a dashboard that was not running then deletes it at its next start.
-  The toggle hides on a draft that starts from a todo, since nothing may link to a private session.
+  The pill hides on a draft that starts from a todo, since nothing may link to a private session.
 - When the directory is in a git checkout, a branch picker sits after the directory picker.
   The picker lists the local branches, the checked-out one first, then the most recently committed to, each with where it would run: `here`, the worktree that has it checked out, or `new worktree`.
   Picking the checked-out branch keeps the directory as it is.

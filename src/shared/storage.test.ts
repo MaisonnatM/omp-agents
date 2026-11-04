@@ -10,5 +10,7 @@ test("a preview never accepts an apply phase, and applies exactly one known phas
 
 test("sandbox requests have bounded, deduplicated paths", () => {
 	expect(parseCleanupRequest({ action: "apply", step: "sandboxes", sandboxes: ["/tmp/a", "/tmp/a"] })).toEqual({ ok: { action: "apply", step: "sandboxes", sandboxes: ["/tmp/a"] } });
+	expect(parseCleanupRequest({ action: "apply", step: "changedSandboxes", sandboxes: ["/tmp/a"] })).toEqual({ ok: { action: "apply", step: "changedSandboxes", sandboxes: ["/tmp/a"] } });
+	expect(parseCleanupRequest({ action: "apply", step: "changedSandboxes" })).toBeNull();
 	for (const sandboxes of [[""], [false], ["a".repeat(4096)], Array(201).fill("/tmp/a")]) expect(parseCleanupRequest({ action: "apply", step: "sandboxes", sandboxes })).toBeNull();
 });

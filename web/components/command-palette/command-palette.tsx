@@ -21,6 +21,7 @@ import {
 	SquareTerminal,
 	Wrench,
 	Target,
+	UserRound,
 } from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { DashboardUpdateStatus } from "../../../src/shared/dashboard-update";
@@ -71,6 +72,7 @@ import { commandKey, record } from "../../activity";
 
 const COMMAND_ICON: Partial<Record<ShortcutId, LucideIcon>> = {
 	newSession: Plus,
+	personalSession: UserRound,
 	previousSession: ArrowUp,
 	nextSession: ArrowDown,
 	back: ArrowLeft,

@@ -80,8 +80,8 @@ export interface Dashboard {
 	resize: (axis: SplitAxis, ratio: number) => void;
 	/** Show `page` over the panes, as a new history entry. */
 	navigate: (page: Page) => void;
-	/** Open the new-session draft in the default directory, clearing a failed start's error. */
-	openNewSession: () => void;
+	/** Open the new-session draft in `cwd`, else the default directory, clearing a failed start's error. */
+	openNewSession: (cwd?: string) => void;
 	/** Forget the error of a failed start of `kind`. */
 	dismissStart: (kind: StartKind) => void;
 	/**
@@ -341,9 +341,9 @@ export function useDashboard(): Dashboard {
 
 	const dismissStart = useCallback((kind: StartKind) => dispatch({ t: "dismiss-start", kind }), []);
 
-	const openNewSession = useCallback(() => {
+	const openNewSession = useCallback((cwd?: string) => {
 		dispatch({ t: "dismiss-start", kind: "new" });
-		navigate({ kind: "new", cwd: null, todoId: null });
+		navigate({ kind: "new", cwd: cwd ?? null, todoId: null });
 	}, [navigate]);
 
 	const nextReqId = useRef(0);

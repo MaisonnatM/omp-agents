@@ -7,7 +7,16 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - New session now puts the composer near the top of the page, with the directory and branch just above it, and a row of starters under it for work you start often, such as **Run the dev server**, **Ship ENG-2722**, or **Shepherd my PRs**, the best fit for now first. Hover a starter to see its full prompt, and click it to put that prompt in the composer, where you can edit it before you send.
 - The New session page no longer shows the board of todos, past sessions, and pull requests. Your todos stay on the Todo page, past sessions in the sidebar, and pull requests on the Pull requests page.
+- The starter kit now has agents end each reply with what they decided for you and what they did not check, so you see the choices and gaps a short summary hides.
+- Settings › Storage now lists sandboxes of ended tasks with leftover changes, with the most space they can take, and can remove them.
+- Their row starts unchecked, and Clean up warns that edits omp did not bring back to your checkout are lost.
+- You can zoom an image opened large, an expanded chart or diagram, and an image opened from a file path, as you zoom a web page: the − and + buttons or keys, a pinch, or Cmd or Ctrl with the scroll wheel. Click the zoom level or press 0 to fit it again, and drag to move around.
+- The images in a message, in place or as thumbnails under it, now open large, and the arrows or the Left and Right keys step through the message's other images.
+- Private is now a pill at the top right of the New session page. Turned on, it fills dark and the page says what ending the session deletes and what stays.
+- A private session's sidebar row and header now show a dark Private chip, easier to spot than the old lock.
+- The sidebar has a Personal item under New session, also on Cmd+Shift+P. It opens a page that shows what your assistant remembers and your recent personal sessions.
 - The starter kit now sends agents to the review steps before they mark a pull request ready or merge it, so they stop running into the review check first.
+- The starter kit now tells agents to write out the full address of any server they start for you, ready to click, instead of only its port number.
 
 ## 2026-11-03
 
