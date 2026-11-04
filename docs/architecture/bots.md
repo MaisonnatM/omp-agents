@@ -21,7 +21,7 @@ A Bot designer's loads `src/omp/designer-extension.ts` with no flags of its own:
 Any other start launches without the Bot extension; a session that is not a Bot's loads the personal extension instead, as [Personal sessions](personal-sessions.md) says.
 Once the session is live, `Bots` saves its session id on the Bot, and follows it after a `/move` or an edited prompt (`switched`).
 
-The extension adds to the main agent's system prompt on every turn the Bot's name, its job, its memory, and its routines, read again each turn, so a saved job or routine reaches the next turn.
+The extension adds to the main agent's system prompt on every turn the Bot's name, its job, its memory, its routines, and the other Bots, read again each turn, so a saved job or routine reaches the next turn.
 Each routine of the Bot is one short line, or **None yet.**, followed by one sentence on how a run acts and which tool creates, changes, or deletes one.
 The line holds the routine's id, name, `enabled`, schedules, and triggers as one JSON object in the shapes `save_routine` takes, then its task's kind and the first 80 characters of its prompt or command, its whitespace collapsed, with `…` when it was cut.
 The extension parses `routines.json` with `parseRoutineSpec` and keeps the entries whose `botId` is the Bot's; a missing or unreadable file, or a session started without the `routines.json` flag, reads as no routines.
@@ -33,7 +33,7 @@ It refuses a fact longer than `MAX_FACT_LENGTH`, 500 characters, so each fact st
 The extension's `set_job` tool replaces the Bot's own job, and never writes `bots.json`.
 It takes one `job`, the whole job as Markdown, trims it, refuses one longer than `MAX_JOB_LENGTH`, 20,000 characters, the limit `parseBotSpec` holds a job the page saves to, and an empty one clears the job.
 It writes one `BotJobRequest` (`src/shared/bots.ts`), the Bot's id and its job, into `bot-inbox/` the way the routine tools write theirs, and loads as `essential` and asks approval as a write.
-The server's `BotInbox` in `src/server/bot-inbox.ts` reads each file with `parseBotInboxRequest`, which tells a `set_job`'s `{ botId, job }` from a designer's `{ botId, create }`, and saves the Bot with only its `job` changed through the list registry's `bots` save, as the page's **Save job** does, so every page hears it and the next turn's prompt reads it from `bots.json`.
+The server's `BotInbox` in `src/server/bot-inbox.ts` reads each file with `parseBotInboxRequest`, which tells a `set_job`'s `{ botId, job }` from a designer's `{ botId, create }` and a `message_bot`'s `{ botId, message }`, and saves the Bot with only its `job` changed through the list registry's `bots` save, as the page's **Save job** does, so every page hears it and the next turn's prompt reads it from `bots.json`.
 It moves aside as `<name>.invalid`, with a logged reason, a file that is no request, a request from a Bot that is gone, and a save the Bots refuse; a job the Bot already holds is done and deleted.
 Only the server that owns the lock drains it, so a job waits there while the dashboard is stopped.
 
@@ -61,6 +61,29 @@ The details in the right sidebar, `BotDetails`, list its routines in their own t
 The page's `#bots/<id>` shows the Bot's session through `ViewConversation`, the conversation a pane draws, and asks for it through `useShowConversation` in `web/pane-store.ts`, so while a page covers the panes the server streams only the conversations pages show this way, such as the Bot's (`watched` in `web/use-dashboard.ts`).
 `useAttention` in `web/use-attention.ts` counts the open Bot's view as shown, so an unread turn of the open Bot is marked read as it would be in a pane.
 `useDashboard` works out the open Bot once with `openBot` in `web/bots-model.ts` and hands it to the page, the details, and `useAttention`: its conversation's view is the live session that runs it, else its saved one, and none while the page shows the routines card, a routine editor, or a routine its address names but the Bot does not have.
+
+## Bot messages
+
+A Bot message is a message one Bot sends another, which wakes it, as Grok Bots hand work off.
+The prompt lists the other Bots, one line each, their `id`, `name`, and `kind` as one JSON object, then the first sentence of their job, `jobLine` in `src/shared/bots.ts`, or **No job yet.**; **None yet.** when there are none.
+One paragraph after it says how a Bot message reads, that the Bot's reply in its own conversation does not reach the sender, and that it messages the sender back only with a result or a question, never to thank or acknowledge.
+
+The extension's `message_bot` tool, `MESSAGE_BOT_TOOL`, takes `to`, a Bot's id, and `text`, Markdown.
+It reads `bots.json` at call time, refuses the Bot's own id and an id no Bot has, and checks the text with `parseBotMessageText`, which trims it and refuses an empty text, one longer than `MAX_BOT_MESSAGE_LENGTH`, 8,000 characters, and one that starts with `!` or `/`, which omp would run in the recipient's session as a shell command or a command.
+It writes one `BotMessageRequest` (`src/shared/bots.ts`), the sender's id and `message`, `{ to, text }`, into `bot-inbox/` as `set_job` does, and loads as `essential` and asks approval as a write.
+`parseBotInboxRequest` checks `to` with `parseBotId` and the text with `parseBotMessageText` again.
+`BotInbox` sets aside a message to the sender itself or to a Bot that is gone, and otherwise delivers it: it sends `botMessageText` of the message through `Bots.message`, injected as `deliver`, as a routine's prompt goes, so it queues as a follow-up in the recipient's live session or resumes its conversation.
+
+`src/shared/bot-message.ts` stamps the message as a routine's is stamped: the body, a blank line, then one last line, `# omp-agents Bot message, sent by another Bot, not the user: {"from":"<id>","name":"<name>"}`, the sender's id and its name as of the send.
+`readBotMessage` reads the last stamp back, and `promptAuthor` in `src/shared/transcript.ts` checks it after the dashboard's prefix and a routine's stamp, so a stamped prompt is a `bot-message` item in the transcript, a `peer` preview under the sender's name in `lastMessage`, a title of its text as one line, and a turn's prompt in the outline, never the user's prompt to edit, fork, search, or resend.
+The page draws the item as `BotMessageCard` in `web/components/bots/bot-message-card.tsx`, the sender's avatar and its current name from `PeerBots`, the Bots the Bot's page provides, or the stamped name and the look `defaultLook` gives its id once the sender is gone.
+The sender's page shows a chip, **Messaged** and the recipient's name, for each `message_bot` call that finished: the transcript keeps the call's `to` on its tool item, and a `ToolChipLabels` label may be a function of that item, with one chip per label.
+
+To end two Bots answering each other, `BotInbox` delivers at most `MAX_BOT_MESSAGES_PER_HOUR`, 20, messages from one Bot to another in a rolling hour, counted in memory per pair and from the delivered ones only.
+Past it, the inbox drops the message, deletes the file, and tells the sender once, `The dashboard did not deliver your message to <name>: you sent it 20 messages in the last hour; the dashboard drops the next ones without telling you until the hour has passed.`, through the same `deliver`; the next delivery to that Bot makes it tell again.
+A delivery that fails, such as a resume that fails, tells the sender `The dashboard did not deliver your message to <name>: <why>.` and deletes the file.
+The count starts over when the dashboard restarts.
+See `2026-11-04-bot-messages-reuse-the-stamped-prompt-and-the-bot-inbox` in [decisions](../decisions/).
 
 ## Bot designers
 

@@ -43,6 +43,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   A tool row's image thumbnails open one viewer that the transcript owns, `ImageViewer` from `web/components/media-viewer.tsx`, over every tool image of the conversation.
   A grey notice line in the transcript comes from omp's `notice` events, turned into notice items by `applyEvent` in `src/transcript.ts`, which also drops the sources the dashboard hides; [Transcripts](architecture/transcripts.md) lists them.
 - Routine run card in a conversation: `RoutineRunCard` in `web/components/routines/routine-run-card.tsx`, rendered by `web/components/transcript.tsx` from a routine message snapshot.
+- Bot message card in a conversation: `BotMessageCard` in `web/components/bots/bot-message-card.tsx`, rendered by `web/components/transcript.tsx` from a `bot-message` item.
   Its folded row shows the name, task icon, trigger logos, time, status, and command duration.
   Its open fold reuses `CommandOutput` and `TriggeredBy` from `web/components/routines/routine-open.tsx`, with **Open routine** and the prompt or command's copy button.
 - Trajectory, a pane's turn-by-turn view: `Trajectory` in `web/components/trajectory.tsx`, which the road-icon toggle after the session's title in `web/components/pane.tsx` swaps for the transcript.
