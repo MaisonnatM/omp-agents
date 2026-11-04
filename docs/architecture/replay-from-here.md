@@ -33,6 +33,7 @@ The dashboard rejects local slash commands, including history edits, and subagen
 At `before_provider_request`, the guard correlates the chosen model and final user text and images with the native first prompt. A classifier that quotes that prompt is not sufficient.
 The prompt must be the trailing text of the last user message, because omp prepends a dated `<system-reminder>` block to it.
 The same request-log reconstruction exported by `request-log.ts` verifies the complete original body against its logged SHA-256.
+A request that the starter kit's `redact-secrets.ts` marked `redacted` fails that check, so a replay of a turn whose secrets were replaced has no original body to compare against; see [Pasted secrets](pasted-secrets.md).
 The pre-send comparison includes the complete envelope, not a combination of component hashes. It permits only known root-prefix relocation, the per-session `client_metadata` and `prompt_cache_key` fields, and an explicitly selected model's top-level routing and generated workstation metadata.
 Those two fields carry the session, thread, and turn ids, which every fork gets fresh, so only the raw hash still covers them.
 Dates, messages, images, other cache metadata, loaded docs, tool catalog text and schemas, thinking, and unknown repair outcomes stay unchanged. Missing evidence or different APIs produces unknown, and no body is changed to manufacture equality.

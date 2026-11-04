@@ -92,12 +92,16 @@ Files, in `agent/`:
   The memory is a `memory.json` committed to `refs/omp/memory` in the repository, which its worktrees share and which is never pushed, so `git log -p refs/omp/memory` shows each change and the session that made it.
   Landings are read from git each time, and the `Omp-Session` trailers that `extensions/session-trailer.ts` writes say which session made each one; each session's first prompt is kept under `.git/omp-project-memory/intents/`.
   `omp -p`, `--mode json`, and subagents get neither the brief nor a catch-up.
+- `extensions/redact-secrets.ts`: once each turn ends, replaces every secret in what omp keeps of the session on disk with `[redacted secret: <what it was>]`: the session file, the folder of tool logs and subagent files beside it, the request log's blobs, and the session's rows in `history.db`.
+  It finds keys by their shape, such as Stripe, GitHub, OpenAI, Anthropic, Supabase, AWS, and Google keys, the password in a database URL, and, in what you wrote, `password:` and `NAME_PASSWORD=` pairs, then that value wherever else it shows up.
+  The running agent keeps the real values until the session ends, so save a pasted secret where it belongs in the same turn; the provider has already received it.
+  See [Pasted secrets](../../docs/architecture/pasted-secrets.md) for what it leaves.
 - `extensions/request-log.ts`: records every request omp sends to a model provider, so any turn can be rebuilt and checked against its hash.
   Each request adds one `omp-request-log.record` entry to the session file with the model, the thinking level, the session's leaf entry, and the hashes of the system prompt, the tools, the other parameters, and the messages.
   Those parts go to omp's blob store in `~/.omp/agent/blobs/`, written once per distinct content, and the messages are stored as edits against the session's previous request, so a turn costs about what it adds.
   `bun ~/.omp/agent/extensions/request-log.ts <session.jsonl>` rebuilds every recorded request and checks its hash, and a request number after the path prints that request's body.
   The record is the body this extension receives, after the extensions that load before it; Anthropic can still withhold a disabled field afterwards, Codex over WebSocket sends only the new input after the first request, and compaction, summary, and title requests are not recorded.
-  The blobs hold what the provider received, including your `AGENTS.md` files, environment details, and any secret that reached the conversation, so keep `~/.omp/agent/blobs/` as private as the session files.
+  The blobs hold what the provider received, including your `AGENTS.md` files and environment details, so keep `~/.omp/agent/blobs/` as private as the session files; `extensions/redact-secrets.ts` replaces the secrets in them, and a request it changed is listed as `secrets redacted` since its hash can no longer match.
 - `extensions/session-trailer.ts`: adds an `Omp-Session: <session id>` trailer to every commit an omp session makes, through a config-based `prepare-commit-msg` git hook set in omp's environment, which runs beside a repository's own hooks, husky's included.
   `git log --format='%h %(trailers:key=Omp-Session,valueonly)'` names each commit's session, and `omp -r <session id>` reopens it.
   A git without config-based hooks ignores it.

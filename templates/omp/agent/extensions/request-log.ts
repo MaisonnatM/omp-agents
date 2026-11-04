@@ -111,6 +111,8 @@ if (import.meta.main) {
 	const sessionText = sessionPath.endsWith(".gz") ? Bun.gunzipSync(raw).toString() : raw.toString();
 	const requests = rebuildRequests(sessionText, hash => readFileSync(join(blobsDir, hash), "utf8"));
 	const matches = (request: RebuiltRequest) => request.hash === request.record.requestHash;
+	/** A request rebuilt whole from blobs `redact-secrets.ts` rewrote: its secrets read as placeholders and its hash cannot match. */
+	const redacted = (request: RebuiltRequest) => request.redacted === true && request.error === undefined && !matches(request);
 
 	if (selected !== undefined) {
 		const request = requests[Number(selected) - 1];
@@ -118,7 +120,7 @@ if (import.meta.main) {
 			console.error(`request ${selected} not found; this session records ${requests.length}`);
 			process.exit(1);
 		}
-		if (!matches(request)) {
+		if (!matches(request) && !redacted(request)) {
 			console.error(`request ${selected}: ${request.error ?? `rebuilt hash ${request.hash} differs from ${request.record.requestHash}`}`);
 			process.exit(1);
 		}
@@ -126,11 +128,12 @@ if (import.meta.main) {
 	} else {
 		requests.forEach((request, index) => {
 			const { model, thinkingLevel, requestHash } = request.record;
-			const status = matches(request) ? "ok" : (request.error ?? `rebuilt hash ${request.hash} differs`);
+			const status = matches(request) ? "ok" : redacted(request) ? "secrets redacted" : (request.error ?? `rebuilt hash ${request.hash} differs`);
 			console.log(`${index + 1}\t${model}\t${thinkingLevel}\t${requestHash.slice(0, 12)}\t${status}`);
 		});
 		const exact = requests.filter(matches).length;
-		console.log(`${exact} of ${requests.length} requests rebuilt with a matching hash`);
-		if (exact !== requests.length) process.exit(1);
+		const withSecretsRedacted = requests.filter(redacted).length;
+		console.log(`${exact} of ${requests.length} requests rebuilt with a matching hash${withSecretsRedacted > 0 ? `, ${withSecretsRedacted} with secrets redacted` : ""}`);
+		if (exact + withSecretsRedacted !== requests.length) process.exit(1);
 	}
 }

@@ -6,6 +6,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-11-04
 
 - The starter kit now sends agents to the review steps before they mark a pull request ready or merge it, so they stop running into the review check first.
+- A key or password you paste into a session no longer stays in the saved session. Once the agent finishes its turn, the starter kit replaces it with a note saying what kind of secret it was, so save it where it belongs in that same turn.
 
 ## 2026-11-03
 

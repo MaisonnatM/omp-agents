@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 export const RECORD_TYPE = "omp-request-log.record";
-const BLOB_PREFIX = "blob:sha256:";
+export const BLOB_PREFIX = "blob:sha256:";
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 export type Body = { [key: string]: Json };
 /** `count` messages copied from the base request starting at index `from`, or one message the base did not send. */
@@ -24,6 +24,8 @@ export interface RequestRecord {
 	paramsHash: string;
 	/** Blob holding the edits that turn the base request's messages into this request's `key` field. */
 	messages: { key: string; base: string | null; edits: string } | null;
+	/** Set when `redact-secrets.ts` replaced a secret in this request's messages, so the body no longer hashes to `requestHash`. */
+	redacted?: boolean;
 }
 
 /** JSON with every object's keys sorted, so equal bodies hash equally whatever order a provider built them in. */
@@ -45,11 +47,14 @@ export interface RebuiltRequest {
 	/** SHA-256 of the rebuilt body as canonical JSON; equals `record.requestHash` when the rebuild is exact. */
 	hash?: string;
 	error?: string;
+	/** The request or one it builds on had a secret replaced, so `hash` cannot equal `record.requestHash`. */
+	redacted?: boolean;
 }
 
 /** Rebuilds every request a session file records, in file order. */
 export function rebuildRequests(sessionText: string, readBlob: (hash: string) => string): RebuiltRequest[] {
 	const messagesByRequest = new Map<string, Json[]>();
+	const redactedRequests = new Set<string>();
 	const read = (ref: string): Json => {
 		if (!/^blob:sha256:[a-f0-9]{64}$/.test(ref)) throw new Error(`not a blob reference: ${ref}`);
 		return JSON.parse(readBlob(ref.slice(BLOB_PREFIX.length))) as Json;
@@ -61,6 +66,8 @@ export function rebuildRequests(sessionText: string, readBlob: (hash: string) =>
 		try { entry = JSON.parse(line); } catch { continue; }
 		if (entry.type !== "custom" || entry.customType !== RECORD_TYPE || !entry.data) continue;
 		const record = entry.data;
+		const redacted = record.redacted === true || (record.messages?.base != null && redactedRequests.has(record.messages.base));
+		if (redacted) redactedRequests.add(record.requestHash);
 		try {
 			const body: Body = {};
 			for (const ref of [record.paramsHash, record.systemPromptHash, record.toolsHash]) {
@@ -78,9 +85,9 @@ export function rebuildRequests(sessionText: string, readBlob: (hash: string) =>
 				messagesByRequest.set(record.requestHash, items);
 				body[key] = items;
 			}
-			rebuilt.push({ record, body, hash: sha256(canonicalJson(body)) });
+			rebuilt.push({ record, body, hash: sha256(canonicalJson(body)), ...(redacted ? { redacted } : {}) });
 		} catch (error) {
-			rebuilt.push({ record, error: error instanceof Error ? error.message : String(error) });
+			rebuilt.push({ record, error: error instanceof Error ? error.message : String(error), ...(redacted ? { redacted } : {}) });
 		}
 	}
 	return rebuilt;

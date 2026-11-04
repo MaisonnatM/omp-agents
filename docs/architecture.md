@@ -15,6 +15,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Session processes](architecture/session-processes.md)
   - [The idle stop](architecture/session-processes.md#the-idle-stop)
 - [Replay from here](architecture/replay-from-here.md)
+- [Pasted secrets](architecture/pasted-secrets.md)
 - [Socket requests](architecture/socket-requests.md)
 - [Project trust](architecture/project-trust.md)
 - [Ask about this](architecture/ask-about-this.md)
