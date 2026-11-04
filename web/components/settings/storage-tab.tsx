@@ -9,7 +9,7 @@ import { activityControl } from "../../activity";
 import { age, formatBytes } from "../../labels";
 import { valueOf } from "../../omp-settings";
 import { hashForSettings } from "../../routing";
-import { cleanupRows, runCleanup, sandboxTargets, type CleanupRow, type CleanupRun, type StepProgress } from "../../storage";
+import { cleanupRows, keptSandboxes, runCleanup, sandboxTargets, type CleanupRow, type CleanupRun, type StepProgress } from "../../storage";
 import { ErrorText, LINK, type RowContext, Section, SettingRow } from "./editor";
 
 function UsageSection({ usage, error }: { usage: StorageUsage | null; error: string | null }) {
@@ -165,9 +165,9 @@ function ConfirmDialog({ open, onOpenChange, chosen, sandboxes, label, onConfirm
 					{chosen.some(row => row.step === "changedSandboxes") && (
 						<p className="mt-2 text-sm">Sandboxes with leftover changes lose those edits too, unless omp already brought them back to your checkout.</p>
 					)}
-					{chosen.flatMap(row => isSandboxStep(row.step) ? [row.step] : []).map(step => (
+					{chosen.flatMap(row => isSandboxStep(row.step) ? [{ step: row.step, label: row.label }] : []).map(({ step, label }) => (
 						<details key={step} className="mt-3 text-xs text-muted-foreground">
-							<summary className="cursor-pointer">{step === "sandboxes" ? "Review sandboxes to remove" : "Review sandboxes with leftover changes"}</summary>
+							<summary className="cursor-pointer">Review: {label}</summary>
 							<ul className="mt-2 space-y-2">
 								{sandboxTargets(step, sandboxes).map(plan => (
 									<li key={plan.path} className="flex items-baseline justify-between gap-4">
@@ -274,13 +274,13 @@ export function StorageTab({ active, cwd, onSaved }: { active: boolean; cwd: str
 	} else if (!checking && gc && sandboxes && rows.every(row => row.count === 0)) {
 		summary = "Nothing to clean up. omp's files are already tidy.";
 	}
-	const kept = sandboxes?.filter(plan => plan.kept !== null && plan.kept !== "changed") ?? [];
+	const kept = keptSandboxes(sandboxes ?? []);
 	return (
 		<div className="space-y-10">
 			<UsageSection usage={usage} error={usageError} />
 			<Section
 				title="Clean up"
-				meta="Nothing changes until you confirm. Archive sizes and compression savings are not included in the estimate."
+				meta="Nothing changes until you confirm. Sandbox sizes are upper bounds; they, archive sizes, and compression savings are not included in the estimate."
 				actions={<Button variant="ghost" size="compact" leadingIcon={RefreshCw} loading={checking} disabled={busy} onClick={checkAgain}>Check again</Button>}
 			>
 				{gcError && <ErrorText>{gcError} Check again to retry.</ErrorText>}

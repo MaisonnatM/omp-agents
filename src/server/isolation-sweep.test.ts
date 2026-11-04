@@ -173,7 +173,7 @@ describe("isolation sweep", () => {
 		const sweep = sweepOf(root, { inUse: async () => { inUseReads++; return []; } });
 		await sweep.preview();
 		writeFileSync(join(changed, "m", "new.txt"), "keep me");
-		const results = await sweep.remove([changed, clean, outside, linked], false);
+		const results = await sweep.remove([changed, clean, outside, linked]);
 		expect(inUseReads).toBe(2);
 		expect(results.map(result => result.kept)).toEqual(["changed", null, "unreadable", "unreadable"]);
 		expect(existsSync(changed) && existsSync(outside) && existsSync(linked)).toBe(true);
@@ -192,7 +192,7 @@ describe("isolation sweep", () => {
 		expect(plans.find(plan => plan.path === edited)?.bytes).toBeGreaterThan(0);
 		expect(plans.find(plan => plan.path === live)).toMatchObject({ kept: "owner-live", bytes: null });
 		expect((await sweep.sweep()).map(result => result.kept).sort()).toEqual(["changed", "owner-live"]);
-		expect((await sweep.remove([edited, live], true)).map(result => result.kept)).toEqual([null, "owner-live"]);
+		expect((await sweep.remove([edited, live], { discardChanges: true })).map(result => result.kept)).toEqual([null, "owner-live"]);
 		expect(existsSync(edited)).toBe(false);
 		expect(existsSync(live)).toBe(true);
 	});
@@ -209,7 +209,7 @@ describe("isolation sweep", () => {
 		await git(source, "worktree", "add", "-q", "-b", "task", join(dir, "m"));
 		await git(source, "worktree", "lock", join(dir, "m"));
 		writeFileSync(join(dir, "m", "new.txt"), "new\n");
-		const [result] = await sweepOf(root).remove([dir], true);
+		const [result] = await sweepOf(root).remove([dir], { discardChanges: true });
 		expect(result?.kept).toBe("locked");
 		expect(existsSync(dir)).toBe(true);
 	});
@@ -220,12 +220,12 @@ describe("isolation sweep", () => {
 		const barrier = Promise.withResolvers<string[]>();
 		const sweep = sweepOf(root, { inUse: () => barrier.promise });
 		const preview = sweep.preview();
-		await expect(sweep.remove([], false)).rejects.toBeInstanceOf(CleanupBusy);
+		await expect(sweep.remove([])).rejects.toBeInstanceOf(CleanupBusy);
 		await expect(sweep.sweep()).rejects.toBeInstanceOf(CleanupBusy);
 		expect(sweep.tick()).toBeNull();
 		barrier.resolve([]);
 		await preview;
-		expect(await sweep.remove([], false)).toEqual([]);
+		expect(await sweep.remove([])).toEqual([]);
 	});
 
 	test("the unattended sweep reads occupied paths once and judges each sandbox only once", async () => {

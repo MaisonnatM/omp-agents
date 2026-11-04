@@ -54,8 +54,13 @@ function deletionResult(report: GcReports["blobs"]): CleanupResult {
 /** The kept reason of the sandboxes each sandbox step removes: none for clean ones, `changed` for ones you choose to discard.
  * Their sizes are upper bounds: `du` counts again the files a sandbox shares with its source checkout or a package cache through APFS clones. */
 const SANDBOX_TARGET: Record<SandboxStep, SandboxKeepReason | null> = { sandboxes: null, changedSandboxes: "changed" };
+const TARGETED: ReadonlySet<SandboxKeepReason | null> = new Set(Object.values(SANDBOX_TARGET));
 export function sandboxTargets(step: SandboxStep, plans: readonly SandboxPlan[]): SandboxPlan[] {
 	return plans.filter(plan => plan.kept === SANDBOX_TARGET[step]);
+}
+/** The sandboxes no cleanup row offers: a live owner, a lock, or something unreadable keeps them. */
+export function keptSandboxes(plans: readonly SandboxPlan[]): SandboxPlan[] {
+	return plans.filter(plan => !TARGETED.has(plan.kept));
 }
 
 function sandboxPhase(step: SandboxStep, label: string, detail: string): Phase<SandboxStep> {
@@ -67,7 +72,7 @@ function sandboxPhase(step: SandboxStep, label: string, detail: string): Phase<S
 				? targets.reduce((sum, plan) => sum + (plan.bytes ?? 0), 0) : null;
 			return {
 				count: targets?.length ?? 0, bytes: null,
-				size: plans === undefined ? "Checking…" : upTo === null ? "Size unavailable" : upTo === 0 ? formatBytes(0) : `Up to ${formatBytes(upTo)}`,
+				size: plans === undefined ? "Checking… can take a few minutes" : upTo === null ? "Size unavailable" : upTo === 0 ? formatBytes(0) : `Up to ${formatBytes(upTo)}`,
 				detail, errors: [], available: plans !== undefined,
 			};
 		},
@@ -132,7 +137,7 @@ const PHASES: { [P in CleanupStep]: Phase<P> } = {
 	changedSandboxes: sandboxPhase(
 		"changedSandboxes",
 		"Sandboxes of ended tasks with leftover changes",
-		"Their omp process ended with edits still in the checkout. Edits omp did not bring back to your checkout are lost.",
+		"Their omp process ended with edits still inside them. Edits omp did not bring back to your checkout are lost. Rechecked before removal.",
 	),
 };
 

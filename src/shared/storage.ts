@@ -7,7 +7,7 @@ export type GcPhase = (typeof GC_PHASES)[number];
 /** Sandboxes of ended tasks: clean ones, then ones whose checkout still holds changes, which only an explicit choice removes. */
 export const SANDBOX_STEPS = ["sandboxes", "changedSandboxes"] as const;
 export type SandboxStep = (typeof SANDBOX_STEPS)[number];
-export const isSandboxStep = (step: CleanupStep): step is SandboxStep => (SANDBOX_STEPS as readonly string[]).includes(step);
+export const isSandboxStep = oneOf(SANDBOX_STEPS);
 export const CLEANUP_STEPS = [...GC_PHASES, ...SANDBOX_STEPS] as const;
 export type CleanupStep = (typeof CLEANUP_STEPS)[number];
 export type SandboxKeepReason = "owner-live" | "occupied" | "changed" | "locked" | "unreadable" | "failed";

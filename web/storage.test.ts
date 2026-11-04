@@ -33,7 +33,7 @@ test("cleanup preserves native phase order and does not invent archive or compre
 test("unknown sandbox sizes stay unknown and kept sandboxes are excluded", () => {
 	const rows = cleanupRows(report, [{ path: "/tmp/one", kept: null, detail: null, bytes: null }, { path: "/tmp/live", kept: "owner-live", detail: "Running", bytes: null }]);
 	expect(rows[5]).toMatchObject({ bytes: null, count: 1, size: "Size unavailable" });
-	expect(cleanupRows(report, null)[5]).toMatchObject({ available: false, size: "Checking…" });
+	expect(cleanupRows(report, null)[5]).toMatchObject({ available: false, size: "Checking… can take a few minutes" });
 	expect(cleanupRows(report, [])[5]).toMatchObject({ count: 0, size: "0 B" });
 });
 

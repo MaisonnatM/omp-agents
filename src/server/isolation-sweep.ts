@@ -44,6 +44,9 @@ export interface IsolationSweepDeps {
 }
 
 const keep = (path: string, kept: SandboxKeepReason, detail: string): SandboxResult => ({ path, kept, detail });
+/** Whether a judged sandbox may go: a clean one always, one with changes only when `discardChanges`. */
+const lettable = (judged: SandboxResult | undefined, discardChanges: boolean): boolean =>
+	judged === undefined || (discardChanges && judged.kept === "changed");
 
 export class IsolationSweep {
 	readonly #deps: IsolationSweepDeps;
@@ -71,8 +74,8 @@ export class IsolationSweep {
 		return this.#exclusive(() => this.#preview());
 	}
 
-	/** Rechecks each requested direct child before removal, never following a symlink out of the root; `discardChanges` removes one whose checkout holds changes. */
-	remove(paths: readonly string[], discardChanges: boolean): Promise<SandboxResult[]> {
+	/** Rechecks each requested direct child before removal, never following a symlink out of the root; `discardChanges` also removes one whose checkout holds changes. */
+	remove(paths: readonly string[], { discardChanges = false }: { discardChanges?: boolean } = {}): Promise<SandboxResult[]> {
 		return this.#exclusive(async () => {
 			const inUse = await this.#deps.inUse();
 			const results: SandboxResult[] = [];
@@ -126,18 +129,17 @@ export class IsolationSweep {
 		const inUse = await this.#deps.inUse();
 		const plans = await mapLimit(dirs, SANDBOX_READS, async (path): Promise<SandboxPlan | null> => {
 			try {
-				const judged = await this.#judge(path, inUse, false);
+				const judged = await this.#judge(path, inUse);
 				if (judged === null) return null;
-				if (judged && judged.kept !== "changed") return { ...judged, bytes: null };
-				const bytes = await allocatedUsage(path, { timeoutMs: MEASURE_TIMEOUT_MS }).catch(() => null);
+				const bytes = lettable(judged, true) ? await allocatedUsage(path, { timeoutMs: MEASURE_TIMEOUT_MS }).catch(() => null) : null;
 				return { ...(judged ?? { path, kept: null, detail: null }), bytes };
 			} catch (error) { return { ...keep(path, "unreadable", errorText(error)), bytes: null }; }
 		});
 		return plans.filter(plan => plan !== null);
 	}
 
-	/** Why sandbox `dir` stays, `undefined` when it may go, `null` when it is no sandbox; changes in its checkout keep it unless `discardChanges`. */
-	async #judge(dir: string, inUse: readonly string[], discardChanges: boolean): Promise<SandboxResult | null | undefined> {
+	/** Why sandbox `dir` stays, `undefined` when it may go, `null` when it is no sandbox. */
+	async #judge(dir: string, inUse: readonly string[]): Promise<SandboxResult | null | undefined> {
 		let marker: unknown;
 		try {
 			marker = JSON.parse(await readFile(join(dir, this.#deps.ownerFile), "utf8"));
@@ -169,13 +171,14 @@ export class IsolationSweep {
 		}
 		const status = await run(["git", "-C", checkout, "status", "--porcelain=v1", "-z", "--untracked-files=all"], { timeoutMs: STATUS_TIMEOUT_MS });
 		if (status.code !== 0) return keep(dir, "unreadable", status.stderr.trim() || "git status failed.");
-		if (status.stdout && !discardChanges) return keep(dir, "changed", "Its checkout has tracked modifications or untracked files.");
+		if (status.stdout) return keep(dir, "changed", "Its checkout has tracked modifications or untracked files.");
 		return undefined;
 	}
 
 	async #removeIfEligible(path: string, inUse: readonly string[], discardChanges: boolean): Promise<SandboxResult | null> {
-		const judged = await this.#judge(path, inUse, discardChanges);
-		return judged === undefined ? this.#remove(path) : judged;
+		const judged = await this.#judge(path, inUse);
+		if (judged === null) return null;
+		return judged !== undefined && !lettable(judged, discardChanges) ? judged : this.#remove(path);
 	}
 
 	/** Removes sandbox `dir`, which {@link #judge} let go, unless a new task claimed it meanwhile. */
