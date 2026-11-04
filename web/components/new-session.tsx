@@ -133,7 +133,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			: pickedChoice;
 	const starting = launch?.phase === "starting" || (scheduled?.busy ?? false);
 	const privacy = todo ? null : <PrivatePill on={isPrivate} onToggle={() => setPrivate(on => !on)} disabled={starting} />;
-	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] }, below: !scheduled });
+	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] } });
 	const { send } = useDashboardActions();
 	// A composer that keeps no draft, as a scheduled start's, has nowhere to put text that lands after it closes.
 	const dictation = useDictation({ composer: draftKey !== null && !starting ? { draftKey, cwd } : null, text: draft, editorRef, send, connected });
@@ -237,8 +237,8 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					{todo && ` Your todo “${todo.text}” links to the session once it starts.`}
 				</EmptyConversation>
 			)}
-			{/* A new session puts the composer in the page's upper middle, its directory and branch above it and its starters under it; a scheduled start docks it at the bottom. */}
-			<div className={cn("mx-auto w-full max-w-conversation px-3", scheduled ? "pb-3" : "pt-[18vh] pb-6")}>
+			{/* The composer docks at the page's bottom, a new session's directory and branch above it and its starters inside it. */}
+			<div className={cn("mx-auto w-full max-w-conversation px-3 pb-3", !scheduled && "mt-auto")}>
 				{!scheduled && <div className="flex flex-wrap items-center gap-1 pb-1.5">{pickers}</div>}
 				<div className="relative">
 					{completion.popup}
