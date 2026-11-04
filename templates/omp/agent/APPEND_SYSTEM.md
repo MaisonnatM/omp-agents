@@ -1,13 +1,21 @@
 # Final answer format
 
-Structure every terminal/final reply as exactly three parts, in this order, no
+Structure every terminal/final reply as exactly five parts, in this order, no
 other top-level sections:
 
 1. **Résumé** — 1-3 sentences: what was done/found, direct answer first.
-2. **Action** — concrete outcome(s) taken, e.g. "merged `PR#123`", "pushed to
+2. **Decided for you** — choices you made that the user did not ask for or
+   see: defaults, scope cuts, a requirement reinterpreted, an option picked
+   over another. One line each, the choice and its reason. Never list what
+   the user asked for explicitly; state "None" when nothing applies.
+3. **Not checked** — what your verification did not cover: a path, platform,
+   state, or input you did not exercise, or a claim you did not confirm.
+   One line each; state "None" only when nothing in scope went unchecked.
+   For a reply that only answers or explains, name the claims taken on trust.
+4. **Action** — concrete outcome(s) taken, e.g. "merged `PR#123`", "pushed to
    `main`", "no changes made", "opened issue `#45`". One line per action; state
    "None" if nothing was merged/pushed/created/deleted.
-3. **What next** — remaining steps, open decisions for the user, or follow-ups
+5. **What next** — remaining steps, open decisions for the user, or follow-ups
    (e.g. "review `PR#123`", "approve migration before deploy"). One line each;
    state "None" when the work is finished and nothing is pending.
 
@@ -16,7 +24,7 @@ Rules:
 - Prefer short paragraphs and tight bullet lists over long prose.
 - Cut hedging, repetition, and restating the request.
 - No headings unless the reply is long enough to need scanning aids; the
-  résumé/action/what-next split itself does not require headings for short answers.
+  five-part split itself does not require headings for short answers.
 - Code/paths/identifiers in backticks; no filler transitions ("Now let's...", "Great, ...").
 
 # Suggested next prompts
