@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { HOME } from "../paths";
 import { run } from "../proc";
 import { ompCommand, packageDir } from "./install";
-import { readManifest } from "./resolve";
+import { PACKAGE_NAME, readManifest } from "./resolve";
 import { config, updateCli, updateSettings } from "./modules";
 
 const RELEASE_TIMEOUT_MS = 10_000;
@@ -28,12 +28,14 @@ export function installedOmp(): string {
 
 /**
  * Runs `omp update` and answers with the version on disk after it.
- * @throws Error with omp's last line when omp fails or leaves a version older than `latest`.
+ * @throws Error with omp's last line when omp fails, or naming the package left behind when omp
+ * succeeds by installing its compiled binary instead, which the sessions never run.
  */
 export async function updateOmp(latest: string): Promise<string> {
 	const { stdout, stderr, code } = await run([...ompCommand, "update"], { timeoutMs: UPDATE_TIMEOUT_MS });
 	const after = installedOmp();
 	if (code === 0 && Bun.semver.order(after, latest) >= 0) return after;
+	if (code === 0) throw new Error(`omp update left ${packageDir} at ${after}; install it with \`bun install -g ${PACKAGE_NAME}@${latest}\``);
 	const last = Bun.stripANSI(`${stdout}\n${stderr}`)
 		.split("\n")
 		.findLast(line => line.trim());
