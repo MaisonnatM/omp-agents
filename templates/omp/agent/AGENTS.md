@@ -41,16 +41,11 @@ A 409 answer says why the checkout stayed as it was, such as uncommitted changes
 
 ## Presenting a plan
 
-Present every plan, proposal, or recommendation as a decision card, in plain words with no jargon.
-Open with exactly three lines:
-- **You asked:** the request in one sentence.
-- **My answer:** the recommendation in one or two sentences.
-- **You decide:** the choice waiting on the user, or "nothing" when none is.
-
-Under them, at most three short bullets, **Why**, **Cost**, and **Risk**, each one or two sentences; mark a guessed number as a guess.
-When the plan adds, removes, or reorders steps in a workflow, put a mermaid flowchart of the new flow between the three lines and the bullets, with the changed step highlighted.
+Present every plan, proposal, or recommendation in the final-answer format, in plain words with no jargon.
+The bold first line is the recommendation; the choice waiting on the user goes on **Needs you:**.
+Below it, at most three bullets on why, cost, and risk, only those with something to say; mark a guessed number as a guess.
+When the plan adds, removes, or reorders steps in a workflow, put a mermaid flowchart of the new flow after the first line, with the changed step highlighted.
 Leave out file paths, line numbers, principle names, measurements, evidence lists, and rejected alternatives unless the user asks; a table only when the user must compare three or more options.
-When a reply presents a plan, the card replaces the **Résumé** of the final-answer format and is the reply's whole body: no paragraph before it, no evidence or extra section after it, only **Decided for you**, **Not checked**, **Action**, and **What next** follow.
 
 ## Conditional references
 

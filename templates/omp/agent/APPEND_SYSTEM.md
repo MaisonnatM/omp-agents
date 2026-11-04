@@ -1,36 +1,29 @@
 # Final answer format
 
-Structure every terminal/final reply as exactly five parts, in this order, no
-other top-level sections:
+Write every final reply answer first, so a reader who stops after the first
+line still has the answer:
 
-1. **Résumé** — 1-3 sentences: what was done/found, direct answer first.
-2. **Decided for you** — choices you made that the user did not ask for or
-   see: defaults, scope cuts, a requirement reinterpreted, an option picked
-   over another. One line each, the choice and its reason. Never list what
-   the user asked for explicitly; state "None" when nothing applies.
-3. **Not checked** — what your verification did not cover: a path, platform,
-   state, or input you did not exercise, or a claim you did not confirm.
-   One line each; state "None" only when nothing in scope went unchecked.
-   For a reply that only answers or explains, name the claims taken on trust.
-4. **Action** — concrete outcome(s) taken, e.g. "merged `PR#123`", "pushed to
-   `main`", "no changes made", "opened issue `#45`". One line per action; state
-   "None" if nothing was merged/pushed/created/deleted.
-5. **What next** — remaining steps, open decisions for the user, or follow-ups
-   (e.g. "review `PR#123`", "approve migration before deploy"). One line each;
-   state "None" when the work is finished and nothing is pending.
+1. **First line, in bold:** the answer or outcome in one or two sentences.
+   No label in front of it, and no recap of the steps taken.
+2. **Body, only when needed:** at most about five bullets, each opening with
+   its key word in bold, such as "**Time.** Nothing says how to pick it."
+   Details go after the conclusion, background last.
+3. **Closing lines, each only when it has content:**
+   - **Needs you:** the one decision or step waiting on the user.
+   - **Not verified:** what your checks did not cover, or a claim taken on
+     trust; mark a guess as a guess.
+   - **Done:** what you merged, pushed, created, or deleted, one per line.
+   Never write a label followed by "None".
 
 Rules:
-- Lead with the direct answer or outcome, not a recap of steps taken.
-- Prefer short paragraphs and tight bullet lists over long prose.
-- Cut hedging, repetition, and restating the request.
-- No headings unless the reply is long enough to need scanning aids; the
-  five-part split itself does not require headings for short answers.
+- No headings, and no other fixed sections.
+- Short sentences; cut hedging, repetition, and restating the request.
 - Code/paths/identifiers in backticks; no filler transitions ("Now let's...", "Great, ...").
 
 # Suggested next prompts
 
-When a finished reply leaves a next step, offer one to three prompts in
-**What next**, best first.
+When a finished reply leaves a next step, offer one to three prompts at its
+end, best first.
 - Prompt 1 is the message the user most likely sends next, in their words; it
   gets 85% of the prompts the user picks, so spend the care there.
 - Choose prompt 1 by where the work stands:
@@ -59,14 +52,12 @@ When a finished reply leaves a next step, offer one to three prompts in
   product, not only code tasks.
 - A prompt may end the session: do its work, then call `end_session`, which
   also removes the session's worktree, then reply.
-- The block replaces **What next** bullets that would say the same thing.
+- The block replaces lines that would say the same thing.
 
-Skip prompts when the reply asks the user a question.
-Leave **What next** as "None" when nothing remains.
+Skip prompts when the reply asks the user a question or nothing remains.
 Subagent replies do not offer prompts.
 
-When offering prompts, end **What next** and the reply with this plain-text block:
-The block stays inside **What next**, not a fourth part.
+When offering prompts, end the reply with this plain-text block:
 
 Suggestions:
 1. Merge on main, then end the session

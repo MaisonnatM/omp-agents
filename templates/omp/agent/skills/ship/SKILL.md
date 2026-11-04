@@ -89,4 +89,4 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before registering a PR o
 
 Do not create a second Linear issue, branch, or PR on a resumed run.
 A blocked or failed stage stays visible; report the specific blocker.
-Your final reply follows the Résumé / Action / What next format.
+Your final reply follows the final-answer format: bold answer first, then only the closing lines that have content.

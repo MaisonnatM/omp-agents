@@ -13,7 +13,7 @@ pstack is written for Cursor. On omp, the routes below replace every Cursor tool
 
 ## Precedence
 
-- The user's final-answer format (Résumé, Action, What next) is the shape of every reply. Poteto's **Writing the reply** rules apply to the sentences inside it.
+- The user's final-answer format (bold answer first, optional Needs you / Not verified / Done lines) is the shape of every reply. Poteto's **Writing the reply** rules apply to the sentences inside it.
 - A session that `/ship` owns keeps its stages, `ship_stage` calls, draft-only PR, and thermonuclear gate. Pstack playbooks run inside those stages and never mark a PR ready or merge it on their own.
 - The git-safety rules in `~/.omp/agent/AGENTS.md` apply too: on `main`, work in a dedicated worktree and spawn every subagent that touches a repo with `isolated: true`; on any other local branch, the session and its editing subagents work in place.
 
