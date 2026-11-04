@@ -11,7 +11,7 @@ test("a Slack message opens in Slack and toasts briefly", () => {
 });
 
 test("an event stays toasted and opens the Calendar page when kept on this computer", () => {
-	const shown = presentNotice({ id: "e", ...flags, kind: "event", title: "Standup", start: NOW + 60_000, end: NOW + 600_000, calendar: null, color: null, url: null }, NOW);
+	const shown = presentNotice({ id: "e", ...flags, kind: "event", title: "Standup", start: NOW + 60_000, end: NOW + 600_000, calendar: null, color: null, url: null, sessionId: null }, NOW);
 	expect(shown.source).toBe("calendar");
 	expect(shown.headline).toStartWith("Standup starts at");
 	expect(shown.link?.external).toBe(false);

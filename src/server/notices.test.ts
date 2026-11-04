@@ -377,7 +377,7 @@ describe("Notices", () => {
 	});
 
 	test("an event is a notice from ten minutes before it starts until it ends, dated then, and Google failing keeps only Google's", async () => {
-		const event = (ref: string, start: number): FoundEvent => ({ ref, title: ref, start, end: start + 30 * MINUTE, calendar: null, color: null, url: null });
+		const event = (ref: string, start: number): FoundEvent => ({ ref, title: ref, start, end: start + 30 * MINUTE, calendar: null, color: null, url: null, sessionId: null });
 		const state: State = { latest: null, installed: "18.8.0", models: [], localEvents: [event("local/a", 100 * MINUTE)], googleEvents: [event("google/work/b", 105 * MINUTE)] };
 		const notices = new Notices(noticesPath(), sources(state), () => {});
 		const ids = () => notices.list.map(({ id, at }) => [id, at]);

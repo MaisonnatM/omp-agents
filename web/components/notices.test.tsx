@@ -4,7 +4,7 @@ import type { Notice } from "../../src/shared/notices";
 import { NoticeOrigin } from "./notices";
 
 const base = { id: "n", at: 0, seen: false, read: false };
-const event = { ...base, kind: "event", title: "Standup", start: 0, end: 1, color: null } as const;
+const event = { ...base, kind: "event", title: "Standup", start: 0, end: 1, color: null, sessionId: null } as const;
 
 const sourceOf = (notice: Notice) => renderToStaticMarkup(<NoticeOrigin notice={notice} />);
 

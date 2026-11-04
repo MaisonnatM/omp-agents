@@ -121,7 +121,7 @@ describe("TriggerWatch", () => {
 
 	test("a calendar event is news once, as it comes within the lead, and again when it moves", () => {
 		const now = Date.parse("2026-10-05T09:00:00Z");
-		const standup = { ref: "local/1", title: "Standup", start: now + EVENT_LEAD_MS + 60_000, end: now + EVENT_LEAD_MS + 20 * 60_000, calendar: null, color: null, url: null };
+		const standup = { ref: "local/1", title: "Standup", start: now + EVENT_LEAD_MS + 60_000, end: now + EVENT_LEAD_MS + 20 * 60_000, calendar: null, color: null, url: null, sessionId: null };
 		const watch = new TriggerWatch();
 		const seen = (event: typeof standup, at: number) => news(watch, eventSightings([{ scope: "event:local", events: [event] }], at));
 		expect(seen(standup, now)).toEqual([]);
