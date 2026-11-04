@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { applyMemoryOps, indexText, MEMORY_KINDS, MEMORY_LIMIT, memoryTip, parseOps, readMemory, type Slug } from "./project-memory/memory";
 import { intentOf, isFirstPrompt, lastSeen, newsFor, NOTE_TYPE } from "./project-memory/news";
@@ -8,6 +9,7 @@ const text = (value: string, isError?: boolean) => ({ content: [{ type: "text" a
 export default function projectMemory(pi: ExtensionAPI) {
 	const z = pi.zod;
 	const params = z.object({
+		repo: z.string().optional().describe("A folder in another git repository, for a session that keeps several repositories' memory; omitted, the session's own."),
 		read: z.string().optional().describe("A memory's slug: returns its line, source, and body."),
 		ops: z
 			.array(
@@ -37,10 +39,11 @@ export default function projectMemory(pi: ExtensionAPI) {
 		async execute(_id, raw, _signal, _onUpdate, ctx) {
 			const parsed = params.safeParse(raw);
 			if (!parsed.success) return text("Invalid project_memory input.", true);
-			const { read, ops } = parsed.data;
+			const { repo, read, ops } = parsed.data;
 			if (read !== undefined && ops !== undefined) return text("Pass either read or ops, not both.", true);
-			const place = placeOf(ctx.cwd);
-			if (!place) return text(`Project memory needs a git repository, and ${ctx.cwd} is not in one.`, true);
+			const folder = repo === undefined ? ctx.cwd : resolve(ctx.cwd, repo);
+			const place = placeOf(folder);
+			if (!place) return text(`Project memory needs a git repository, and ${folder} is not in one.`, true);
 			const { commonDir } = place.root;
 			try {
 				if (ops === undefined) {

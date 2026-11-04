@@ -93,7 +93,7 @@ function session(id: string, cwd: string, options: { kind?: "main" | "sub"; mode
 			branch.push({ type: "message", message: { role: "user", content: prompt } });
 			return message?.content ?? null;
 		},
-		async call(params: { read?: string; ops?: RawOp[] }): Promise<{ text: string; isError: boolean }> {
+		async call(params: { repo?: string; read?: string; ops?: RawOp[] }): Promise<{ text: string; isError: boolean }> {
 			const result = await tool?.execute("call", params, undefined, undefined, ctx);
 			return { text: result?.content.map(part => part.text).join("") ?? "", isError: result?.isError ?? false };
 		},
@@ -347,5 +347,14 @@ describe("project_memory tool", () => {
 		mkdirSync(outside, { recursive: true });
 		expect(await session("s-outside", outside).call({})).toEqual({ text: `Project memory needs a git repository, and ${outside} is not in one.`, isError: true });
 		expect(git(dir, "for-each-ref", MEMORY_REF)).toBe("");
+	});
+
+	test("repo reads and writes another repository's memory, and leaves the session's own alone", async () => {
+		const own = world().dir;
+		const other = world().dir;
+		const me = session("bbbbbbbb-mine", own);
+		expect((await me.call({ repo: other, ops: [add("theirs", "fact", "Theirs.")] })).isError).toBe(false);
+		expect(await session("aaaaaaaa-there", other).call({})).toEqual({ text: `theirs [fact] — Theirs. (updated ${today})`, isError: false });
+		expect(await me.call({})).toEqual({ text: "This repository has no memories yet.", isError: false });
 	});
 });
