@@ -180,7 +180,7 @@ describe("Google events", () => {
 });
 
 describe("events kept on this computer", () => {
-	const local = (when: LocalEvent["when"], id = "e1"): LocalEvent => ({ id, title: "Dentist", when });
+	const local = (when: LocalEvent["when"], id = "e1"): LocalEvent => ({ id, title: "Dentist", when, sessionId: null });
 
 	test("an all-day event spanning the previous month and the next shows once on every day of October", () => {
 		const entries = october({ localEvents: [local({ allDay: true, firstDay: "2026-09-28", lastDay: "2026-11-03" })] });
@@ -192,7 +192,7 @@ describe("events kept on this computer", () => {
 		const entries = october({ events: [google], localEvents: [local({ allDay: false, start: at("2026-10-08T23:30:00Z"), end: at("2026-10-09T00:15:00Z") })] });
 		expect(entries).toEqual([
 			{ kind: "event", day: "2026-10-09", at: null, event: { id: '["google-calendar","personal"]/one', title: "Birthday", when: { allDay: true, firstDay: "2026-10-09", lastDay: "2026-10-09" }, color: "#4285f4", place: "Personal", source: { kind: "google", url: "https://calendar.google.com/calendar/event?eid=one", ref: { kind: "google", account: "google-calendar", calendarId: "personal", eventId: "one" } } } },
-			{ kind: "event", day: "2026-10-09", at: at("2026-10-09T01:30:00+02:00"), event: { id: "e1", title: "Dentist", when: { allDay: false, start: at("2026-10-08T23:30:00Z"), end: at("2026-10-09T00:15:00Z") }, color: "#64748b", place: "This computer", source: { kind: "local", ref: { kind: "local", id: "e1" } } } },
+			{ kind: "event", day: "2026-10-09", at: at("2026-10-09T01:30:00+02:00"), event: { id: "e1", title: "Dentist", when: { allDay: false, start: at("2026-10-08T23:30:00Z"), end: at("2026-10-09T00:15:00Z") }, color: "#64748b", place: "This computer", source: { kind: "local", ref: { kind: "local", id: "e1" }, sessionId: null } } },
 		]);
 	});
 });

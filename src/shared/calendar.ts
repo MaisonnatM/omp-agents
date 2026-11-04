@@ -97,6 +97,8 @@ export interface LocalEvent {
 	id: string;
 	title: string;
 	when: EventWhen;
+	/** The omp session whose `user_event` tool added it; `null` for one you added on the Calendar page. */
+	sessionId: string | null;
 }
 
 /** `GET /api/calendar/local`: every event kept on this computer. */
@@ -156,4 +158,6 @@ export const decodeCalendarEventsAnswer = decoder(
 );
 
 /** A kept {@link LocalEventsAnswer} with every event whole, or `null`. */
-export const decodeLocalEventsAnswer = decoder(fields<LocalEventsAnswer>({ events: arrayOf(fields<LocalEvent>({ id: isString, title: isString, when: isEventWhen })) }));
+export const decodeLocalEventsAnswer = decoder(
+	fields<LocalEventsAnswer>({ events: arrayOf(fields<LocalEvent>({ id: isString, title: isString, when: isEventWhen, sessionId: nullable(isString) })) }),
+);

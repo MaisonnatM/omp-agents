@@ -29,7 +29,7 @@ import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, personalDir, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routerInboxDir, routerTasksFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, personalDir, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routerInboxDir, routerTasksFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -105,6 +105,7 @@ import { Dictation } from "./dictation";
 import { createClientHandler } from "./socket";
 import { botExtension, designerExtension, routerExtension, shepherdExtension } from "./resources";
 import { createStarter, reattachAll, type SessionJoin } from "./start";
+import { EventInbox } from "./event-inbox";
 import { NoteInbox } from "./note-inbox";
 import { TodoInbox } from "./todo-inbox";
 import { UserNotesFile } from "./user-notes-file";
@@ -161,7 +162,7 @@ export class Dashboard {
 	readonly terminals = new Terminals();
 	/** Aborts as the dashboard stops, which stops every routine command still running. */
 	readonly #stopping = new AbortController();
-	/** Which of the servers beside each other, such as a smoke run on another port, runs routines and the todo and note inboxes. */
+	/** Which of the servers beside each other, such as a smoke run on another port, runs routines and the todo, note, and event inboxes. */
 	readonly #ownerLock: OwnerLock;
 	readonly #google: GoogleCalendars;
 	readonly #gmail = new GmailAccounts(accountClients("gmail", (fetch, account) => new GmailClient(fetch, account)));
@@ -173,6 +174,7 @@ export class Dashboard {
 	readonly #lists: ListRegistry;
 	readonly #todoInbox: TodoInbox;
 	readonly #noteInbox: NoteInbox;
+	readonly #eventInbox: EventInbox;
 	readonly #routineInbox: RoutineInbox;
 	readonly #botInbox: BotInbox;
 	readonly #shepherdInbox: ShepherdInbox;
@@ -286,8 +288,8 @@ export class Dashboard {
 				},
 				creditRuns: () => readCreditRuns(Date.now()),
 				localEvents: () => {
-					const events = this.#localEvents.value.flatMap(({ id, title, when }) =>
-						when.allDay ? [] : [{ ref: `local/${id}`, title, start: when.start, end: when.end, calendar: null, color: null, url: null }],
+					const events = this.#localEvents.value.flatMap(({ id, title, when, sessionId }) =>
+						when.allDay ? [] : [{ ref: `local/${id}`, title, start: when.start, end: when.end, calendar: null, color: null, url: null, sessionId }],
 					);
 					this.#triggerWatch.learn(eventSightings([{ scope: "event:local", events }], Date.now()));
 					return events;
@@ -299,7 +301,7 @@ export class Dashboard {
 							"error" in read
 								? null
 								: read.events.flatMap(({ account, calendarId, eventId, title, calendar, color, url, when }) =>
-										when.allDay ? [] : [{ ref: `google/${account}/${calendarId}/${eventId}`, title, start: when.start, end: when.end, calendar, color, url }],
+										when.allDay ? [] : [{ ref: `google/${account}/${calendarId}/${eventId}`, title, start: when.start, end: when.end, calendar, color, url, sessionId: null }],
 									),
 					}));
 					this.#triggerWatch.learn(eventSightings(accounts.flatMap(({ account, events }) => (events ? [{ scope: `event:google/${account}`, events }] : [])), Date.now()));
@@ -375,6 +377,7 @@ export class Dashboard {
 		};
 		this.#todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), workspaceOf, { active: () => ownerLock.held });
 		this.#noteInbox = new NoteInbox(userNoteInboxDir, change => lists.apply("user-notes", change), { active: () => ownerLock.held });
+		this.#eventInbox = new EventInbox(eventInboxDir, () => this.#localEvents.value, change => this.#localEvents.apply(change), { active: () => ownerLock.held });
 		this.#routineInbox = new RoutineInbox(routineInboxDir, () => routines.value, change => lists.apply("routines", change), { active: () => ownerLock.held });
 		this.#botInbox = new BotInbox(botInboxDir, () => this.#botsFile.value, change => lists.apply("bots", change), { active: () => ownerLock.held });
 		const starter = createStarter({
@@ -730,10 +733,11 @@ export class Dashboard {
 			this.#scheduledRunner.recover();
 		} else {
 			const owner = this.#ownerLock.holder();
-			console.log(`omp-agents: the server on port ${owner?.port ?? "?"} (pid ${owner?.pid ?? "?"}) runs routines and the todo and note inboxes; this one takes over when it exits.`);
+			console.log(`omp-agents: the server on port ${owner?.port ?? "?"} (pid ${owner?.pid ?? "?"}) runs routines and the todo, note, and event inboxes; this one takes over when it exits.`);
 		}
 		this.#todoInbox.watch();
 		this.#noteInbox.watch();
+		this.#eventInbox.watch();
 		this.#routineInbox.watch();
 		this.#botInbox.watch();
 		this.#shepherdInbox.watch();
@@ -763,6 +767,7 @@ export class Dashboard {
 		this.#stopMergeQueue();
 		this.#todoInbox.stop();
 		this.#noteInbox.stop();
+		this.#eventInbox.stop();
 		this.#routineInbox.stop();
 		this.#botInbox.stop();
 		this.#shepherdInbox.stop();
@@ -941,12 +946,12 @@ export class Dashboard {
 		this.#autoContinue.cancel(sessionId);
 	}
 
-	/** Takes over routines and the todo and note inboxes when the server that ran them is gone; whether this server runs them. */
+	/** Takes over routines and the todo, note, and event inboxes when the server that ran them is gone; whether this server runs them. */
 	#claimUnattendedWork(): boolean {
 		const was = this.#ownerLock.held;
 		const owns = this.#ownerLock.acquire();
 		if (owns && !was) {
-			console.log("omp-agents: this server now runs routines and the todo and note inboxes.");
+			console.log("omp-agents: this server now runs routines and the todo, note, and event inboxes.");
 			// What the server that ran them saved since this one started.
 			this.#routines.reload();
 			this.#bots.reload();
@@ -954,6 +959,7 @@ export class Dashboard {
 			this.#migrateRoutines();
 			this.#todos.reload();
 			this.#notes.reload();
+			this.#localEvents.reload();
 			this.#broadcasts.pushList("routines");
 			this.#broadcasts.pushList("bots");
 			this.#broadcasts.pushList("user-todos");
@@ -962,6 +968,7 @@ export class Dashboard {
 			this.#scheduledRunner.recover();
 			void this.#todoInbox.drain();
 			void this.#noteInbox.drain();
+			void this.#eventInbox.drain();
 			void this.#routineInbox.drain();
 			void this.#botInbox.drain();
 			void this.#shepherdInbox.drain();

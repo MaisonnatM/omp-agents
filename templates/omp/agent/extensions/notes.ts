@@ -2,12 +2,10 @@
 // one, and append to one. Changes go to the dashboard's note inbox, one file each, which the dashboard server applies
 // and deletes, so it stays the only writer of notes.json and a note added while it is down waits for it.
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import { CONFIG_DIR, leave, readJson, reply, waiting, withoutEmpty } from "./inbox/client";
 
-const CONFIG_DIR = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "omp-agents");
 const NOTES_FILE = join(CONFIG_DIR, "notes.json");
 const TODOS_FILE = join(CONFIG_DIR, "todos.json");
 const INBOX_DIR = join(CONFIG_DIR, "note-inbox");
@@ -24,30 +22,10 @@ interface Note {
 }
 type Change = { op: "add"; note: Note } | { op: "append"; id: string; text: string; at: string };
 
-function readJson(path: string): unknown {
-	try {
-		return JSON.parse(readFileSync(path, "utf8"));
-	} catch {
-		return null;
-	}
-}
-
-/** The changes the inbox holds that the dashboard has not applied yet, oldest first. */
-function waiting(): Change[] {
-	let names: string[] = [];
-	try {
-		names = readdirSync(INBOX_DIR).filter(name => name.endsWith(".json")).sort();
-	} catch {}
-	return names.flatMap(name => {
-		const change = readJson(join(INBOX_DIR, name)) as Change | null;
-		return change ? [change] : [];
-	});
-}
-
 /** Pending changes participate in reads so agents see their writes while the dashboard is stopped. */
 function readNotes(): Note[] {
 	const notes = new Map(((readJson(NOTES_FILE) as { notes?: Note[] } | null)?.notes ?? []).map(note => [note.id, note]));
-	for (const change of waiting()) {
+	for (const change of waiting<Change>(INBOX_DIR)) {
 		if (change.op === "add" && !notes.has(change.note.id)) notes.set(change.note.id, change.note);
 		if (change.op === "append") {
 			const note = notes.get(change.id);
@@ -83,17 +61,6 @@ function listText(query: string | undefined): string {
 	return words.length > 0 ? "No note holds every word of the query." : "The user has no notes.";
 }
 
-/** Leaves `change` for the dashboard: written under a name it skips, then renamed, so it never reads half a file. */
-function leave(change: Change): void {
-	mkdirSync(INBOX_DIR, { recursive: true });
-	const name = `${Date.now()}-${randomUUID()}`;
-	const temp = join(INBOX_DIR, `${name}.tmp`);
-	writeFileSync(temp, JSON.stringify(change));
-	renameSync(temp, join(INBOX_DIR, `${name}.json`));
-}
-
-const reply = (text: string, isError = false) => ({ content: [{ type: "text" as const, text }], isError });
-
 export default function notes(pi: ExtensionAPI) {
 	const z = pi.zod;
 	const params = z.object({
@@ -117,10 +84,9 @@ export default function notes(pi: ExtensionAPI) {
 		].join(" "),
 		parameters: params,
 		async execute(_id, raw, _signal, _onUpdate, ctx) {
-			const parsed = params.safeParse(raw);
+			const parsed = params.safeParse(withoutEmpty(raw));
 			if (!parsed.success) return reply("Invalid user_note input.", true);
-			// A model often sends an empty string for a parameter it means to leave out.
-			const { action, query, id, title, body, todo_id: todoId, text } = Object.fromEntries(Object.entries(parsed.data).map(([key, value]) => [key, value || undefined])) as typeof parsed.data;
+			const { action, query, id, title, body, todo_id: todoId, text } = parsed.data;
 			switch (action) {
 				case "list":
 					return reply(listText(query));
@@ -137,14 +103,14 @@ export default function notes(pi: ExtensionAPI) {
 					if (same) return reply(`This session already added it (id ${same.id}); append to it instead.`);
 					const at = new Date().toISOString();
 					const note: Note = { id: randomUUID(), title: line, body: body ?? "", todoId: todoId ?? null, addedBy: sessionId, createdAt: at, updatedAt: at };
-					leave({ op: "add", note });
+					leave(INBOX_DIR, { op: "add", note });
 					return reply(`Added to the user's notes (id ${note.id}).`);
 				}
 				case "append": {
 					if (!text?.trim()) return reply("append needs text.", true);
 					const note = readNotes().find(entry => entry.id === id);
 					if (!note) return reply(`No note has id ${id ?? "(none given)"}.`, true);
-					leave({ op: "append", id: note.id, text, at: new Date().toISOString() });
+					leave(INBOX_DIR, { op: "append", id: note.id, text, at: new Date().toISOString() });
 					return reply(`Appended to ${JSON.stringify(untitled(note))}.`);
 				}
 			}

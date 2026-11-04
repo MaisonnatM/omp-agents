@@ -88,7 +88,8 @@ export type ProviderSubject = PlanSubject | CreditsSubject;
 /**
  * A timed event of the Calendar page that starts within {@link EVENT_LEAD_MS} or runs now, from `start` to `end` in epoch
  * ms. `calendar`, `color`, and `url` are its Google calendar's name and color and the event in Google Calendar, each
- * `null` for an event kept on this computer.
+ * `null` for an event kept on this computer. `sessionId` is the omp session that added an event kept on this computer,
+ * `null` for one you added and for a Google event.
  */
 export interface EventSubject {
 	kind: "event";
@@ -98,6 +99,7 @@ export interface EventSubject {
 	calendar: string | null;
 	color: string | null;
 	url: string | null;
+	sessionId: string | null;
 }
 
 /** An interrupted dashboard session that stopped while its turn ran, with its listed file's title and `cwdDisplay`, each `null` while no listed file gives one. */

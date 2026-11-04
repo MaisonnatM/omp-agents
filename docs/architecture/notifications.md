@@ -28,6 +28,7 @@ The stopped check (`STOPPED_KINDS`) runs at startup once the session files are l
   A provider with a run open is a notice.
 - The events come from `LocalEventsFile` and, for each signed-in Google Calendar account, `GoogleCalendars.byAccount` over the next ten minutes (`EVENT_LEAD_MS`), each timed event a notice from that lead before its start until its end, dated at that lead.
   Google's events, one scope per account, and the local ones are separate scopes: an account whose read fails keeps its notices as they were while the other accounts' change, and the Calendar page shows why.
+  An event's notice opens the session that added it when the event names one in `sessionId`, which only a kept event added by the `user_event` tool does; otherwise it opens the event in Google Calendar, or the Calendar page for a kept event.
 - The stopped notice lists `InterruptedSessions.midTurn`, the interrupted dashboard sessions whose turn ran when they stopped, each with its listed session file's title and `cwdDisplay`, `null` without a listed file; none gives no notice.
   `presentNotice` names each as the sidebar names a past session: its title, else its folder's name, else **Untitled session**.
   Its **Continue all** sends the sidebar's `resume-all` with the notice's session ids.
