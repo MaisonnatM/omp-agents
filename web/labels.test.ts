@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { OmpFile } from "../src/shared/models";
-import { age, commandLabel, dayLabel, fileGroups, mailTime, modelLabel, modelOrg, providerLabel, skillLabel } from "./labels";
+import { age, commandLabel, dayLabel, fileGroups, sameDir, mailTime, modelLabel, modelOrg, providerLabel, skillLabel } from "./labels";
 
 describe("model labels", () => {
 	test("a direct provider's model reads as its family and dotted version", () => {
@@ -112,5 +112,18 @@ describe("file groups", () => {
 		]);
 		expect(paths("mode poteto")).toEqual([["skill", ["/u/.omp/agent/skills/poteto-mode/SKILL.md"]]]);
 		expect(paths("skill")).toEqual([]);
+	});
+});
+
+describe("sameDir", () => {
+	const personal = { cwd: "/Users/me/.local/share/omp-agents/personal", cwdDisplay: "~/.local/share/omp-agents/personal" };
+	test("the personal directory matches as resolved or as displayed", () => {
+		expect(sameDir(personal.cwd, personal)).toBe(true);
+		expect(sameDir(personal.cwdDisplay, personal)).toBe(true);
+	});
+	test("another directory, or no personal directory yet, does not match", () => {
+		expect(sameDir("~/code/omp-agents", personal)).toBe(false);
+		expect(sameDir("", personal)).toBe(false);
+		expect(sameDir(personal.cwd, null)).toBe(false);
 	});
 });

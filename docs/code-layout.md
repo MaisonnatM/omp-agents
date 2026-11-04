@@ -16,7 +16,7 @@ Each part of the screen, by the name you would call it, with the component that 
 Start a UI change here, then read that file's entry under [Page](#page).
 
 - Composer, the box you type a prompt in: `InputMessage` in `web/components/ui/input-message.tsx`, with its text field, `PromptEditor`, in `web/components/prompt-editor.tsx`.
-  A live session mounts it in `web/components/conversation.tsx`, and the new-session page in `web/components/new-session.tsx`, whose `PrivateToggle` draws the **Private** toggle.
+  A live session mounts it in `web/components/conversation.tsx`, and the new-session page in `web/components/new-session.tsx`, whose `PrivatePill` draws the header's **Private** pill.
 - The composer's directory, branch, and context ring: the directory is `DirectoryPicker` in `web/components/workspace-picker.tsx`, with the **Personal** item first, or `DirectoryLabel` in `web/components/composer.tsx` where the session cannot move, in the composer's `leftSlot`, followed in the new-session draft by `BranchPicker` in `web/components/git.tsx`; the ring is `ContextRingMenu` for dashboard sessions and read-only `ContextRing` for terminal sessions in `web/components/context-ring.tsx`, in its `rightSlot`.
 - Rows above the composer: queued prompts in `web/components/composer-queue.tsx`, suggested prompts in `web/components/composer-suggestions.tsx`, scheduled sends in `web/components/scheduled.tsx`, and the open question, `UserRequestCard` in `web/components/user-request.tsx`, drawn by `question-card.tsx`.
 - `/` and `@` menus: `CompletionPopup` in `web/components/completion-popup.tsx`, over `web/mentions.ts`.
