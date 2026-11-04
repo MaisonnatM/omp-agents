@@ -9,8 +9,11 @@ import { type LocalEvent, MAX_EVENT_TITLE } from "../shared/calendar";
 import { type InboxEntry, type InboxOptions, JsonInboxDir } from "./json-inbox";
 import { type LocalEventChange, parseLocalEvent } from "./local-events-file";
 
-/** `value` as a change an agent may make to `events`, or why not. */
-function parseAgentEventChange(value: unknown, events: readonly LocalEvent[]): InboxEntry<LocalEventChange> {
+/** A change an agent asked for; a removal names the session asking, checked against the events when it applies. */
+type AgentEventChange = Extract<LocalEventChange, { op: "add" }> | { op: "remove"; id: string; sessionId: string };
+
+/** `value` as a change an agent may make, or why not. */
+function parseAgentEventChange(value: unknown): InboxEntry<AgentEventChange> {
 	if (!isObject(value)) return { invalid: "it is not a change to the calendar's events" };
 	if (value.op === "add") {
 		const event = parseLocalEvent(value.event);
@@ -21,22 +24,23 @@ function parseAgentEventChange(value: unknown, events: readonly LocalEvent[]): I
 	if (value.op === "remove") {
 		const id = nonEmptyStr(value.id);
 		const sessionId = nonEmptyStr(value.sessionId);
-		if (!id || !sessionId) return { invalid: "a removal must name the event and the session removing it" };
-		const target = events.find(event => event.id === id);
-		if (target && target.sessionId !== sessionId) return { invalid: `event ${id} was not added by session ${sessionId}` };
-		return { item: { op: "remove", id } };
+		return id && sessionId ? { item: { op: "remove", id, sessionId } } : { invalid: "a removal must name the event and the session removing it" };
 	}
 	return { invalid: `an agent may only add or remove an event, not ${String(value.op)}` };
 }
 
-export class EventInbox extends JsonInboxDir<LocalEventChange> {
+export class EventInbox extends JsonInboxDir<AgentEventChange> {
 	constructor(dir: string, events: () => readonly LocalEvent[], apply: (change: LocalEventChange) => void, options?: InboxOptions) {
 		super(
 			dir,
 			{
-				parse: (_name, value) => parseAgentEventChange(value, events()),
+				parse: (_name, value) => parseAgentEventChange(value),
 				apply(change) {
-					apply(change);
+					if (change.op === "remove") {
+						const target = events().find(event => event.id === change.id);
+						if (target && target.sessionId !== change.sessionId) throw new Error(`event ${change.id} was not added by session ${change.sessionId}`);
+						apply({ op: "remove", id: change.id });
+					} else apply(change);
 					return true;
 				},
 			},
