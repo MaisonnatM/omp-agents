@@ -50,7 +50,7 @@ Open with exactly three lines:
 Under them, at most three short bullets, **Why**, **Cost**, and **Risk**, each one or two sentences; mark a guessed number as a guess.
 When the plan adds, removes, or reorders steps in a workflow, put a mermaid flowchart of the new flow between the three lines and the bullets, with the changed step highlighted.
 Leave out file paths, line numbers, principle names, measurements, evidence lists, and rejected alternatives unless the user asks; a table only when the user must compare three or more options.
-When a reply presents a plan, the card replaces the **Résumé** of the final-answer format and is the reply's whole body: no paragraph before it, no evidence or extra section after it, only **Action** and **What next** follow.
+When a reply presents a plan, the card replaces the **Résumé** of the final-answer format and is the reply's whole body: no paragraph before it, no evidence or extra section after it, only **Decided for you**, **Not checked**, **Action**, and **What next** follow.
 
 ## Conditional references
 
