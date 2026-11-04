@@ -115,8 +115,8 @@ async function nestedRepositories(root: string, ignoredTop: readonly string[]): 
 	return found;
 }
 
-export async function allocatedUsage(path: string, signal?: AbortSignal): Promise<number> {
-	const { stdout, stderr, code } = await run(["du", "-sk", path], { timeoutMs: 10000, signal });
+export async function allocatedUsage(path: string, { signal, timeoutMs = 10_000 }: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<number> {
+	const { stdout, stderr, code } = await run(["du", "-sk", path], { timeoutMs, signal });
 	if (code !== 0) throw new Error(stderr.trim() || "Disk measurement exceeded its time limit.");
 	const kilobytes = Number(stdout.split(/\s/, 1)[0]);
 	if (!Number.isFinite(kilobytes) || kilobytes < 0) throw new Error("Disk measurement returned an invalid size.");
@@ -373,7 +373,7 @@ export class Worktrees {
 			const entry = await this.#find(target, null);
 			if (entry.missing || entry.blockers.some(blocker => blocker.code === "foreign" || blocker.code === "unreadable")) throw new Error("Checkout is missing or its identity cannot be verified.");
 			await Promise.all([
-				allocatedUsage(entry.path, signal).then(
+				allocatedUsage(entry.path, { signal }).then(
 					bytes => {
 						result.allocatedBytes = bytes;
 					},

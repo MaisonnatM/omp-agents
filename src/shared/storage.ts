@@ -4,7 +4,11 @@ import type { AgentSettingRow } from "./agent-settings";
 
 export const GC_PHASES = ["stale", "blobs", "archive", "compress", "wal"] as const;
 export type GcPhase = (typeof GC_PHASES)[number];
-export const CLEANUP_STEPS = [...GC_PHASES, "sandboxes"] as const;
+/** Sandboxes of ended tasks: clean ones, then ones whose checkout still holds changes, which only an explicit choice removes. */
+export const SANDBOX_STEPS = ["sandboxes", "changedSandboxes"] as const;
+export type SandboxStep = (typeof SANDBOX_STEPS)[number];
+export const isSandboxStep = (step: CleanupStep): step is SandboxStep => (SANDBOX_STEPS as readonly string[]).includes(step);
+export const CLEANUP_STEPS = [...GC_PHASES, ...SANDBOX_STEPS] as const;
 export type CleanupStep = (typeof CLEANUP_STEPS)[number];
 export type SandboxKeepReason = "owner-live" | "occupied" | "changed" | "locked" | "unreadable" | "failed";
 export interface SandboxResult { path: string; kept: SandboxKeepReason | null; detail: string | null }
@@ -48,14 +52,14 @@ export interface StorageUsage {
 export type CleanupRequest =
 	| { action: "preview"; step?: "sandboxes" }
 	| { action: "apply"; step: GcPhase }
-	| { action: "apply"; step: "sandboxes"; sandboxes: string[] };
-export type CleanupStepResult = { step: GcPhase; gc: GcAnswer } | { step: "sandboxes"; sandboxes: SandboxResult[] };
+	| { action: "apply"; step: SandboxStep; sandboxes: string[] };
+export type CleanupStepResult = { step: GcPhase; gc: GcAnswer } | { step: SandboxStep; sandboxes: SandboxResult[] };
 
 export function parseCleanupRequest(raw: unknown): Parsed<CleanupRequest> {
 	if (!isObject(raw) || Array.isArray(raw)) return null;
 	if (raw.action === "preview" && (raw.step === undefined || raw.step === "sandboxes")) return { ok: { action: "preview", ...(raw.step === "sandboxes" ? { step: "sandboxes" as const } : {}) } };
 	if (raw.action !== "apply") return null;
 	if (oneOf(GC_PHASES)(raw.step)) return { ok: { action: "apply", step: raw.step } };
-	if (raw.step === "sandboxes" && isTexts(raw.sandboxes) && raw.sandboxes.length <= 200 && raw.sandboxes.every(path => path.length > 0 && path.length < 4096)) return { ok: { action: "apply", step: "sandboxes", sandboxes: [...new Set(raw.sandboxes)] } };
+	if (oneOf(SANDBOX_STEPS)(raw.step) && isTexts(raw.sandboxes) && raw.sandboxes.length <= 200 && raw.sandboxes.every(path => path.length > 0 && path.length < 4096)) return { ok: { action: "apply", step: raw.step, sandboxes: [...new Set(raw.sandboxes)] } };
 	return null;
 }

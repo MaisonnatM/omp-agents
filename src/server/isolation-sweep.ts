@@ -4,6 +4,7 @@
  * the repository. omp removes one when its task ends, but one whose omp exited first stays, gigabytes each.
  * The sweep removes a sandbox only when its omp no longer runs and its checkout is clean, unlocked, and unused; a
  * directory without the marker, such as a pull request's checkout, is not one, and anything it cannot read stays.
+ * Only Storage, on your confirmation, also removes one whose checkout still holds changes.
  */
 import type { Dirent } from "node:fs";
 import { lstat, readdir, readFile, rename, rm } from "node:fs/promises";
@@ -21,6 +22,8 @@ export const SWEEP_EVERY_MS = 24 * 60 * 60_000;
 const SANDBOX_READS = 4;
 /** A first `git status` in a copied checkout hashes every file again, since the copy changed each file's inode and times. */
 const STATUS_TIMEOUT_MS = 120_000;
+/** A sandbox holds a full checkout with its dependencies, which `du` can take more than ten seconds to walk. */
+const MEASURE_TIMEOUT_MS = 120_000;
 /** The checkout directories omp makes in a sandbox, the current one first. */
 const CHECKOUT_DIRS = ["m", "merged"];
 /** The suffix a sandbox takes while it is removed, so a removal cut short is finished by the next sweep rather than read as a sandbox again. */
@@ -63,13 +66,13 @@ export class IsolationSweep {
 		return running;
 	}
 
-	/** A dry run, including each kept reason, with measured sizes only for removable sandboxes. */
+	/** A dry run, including each kept reason, with measured sizes for the sandboxes cleanup can remove, with or without their changes. */
 	preview(): Promise<SandboxPlan[]> {
 		return this.#exclusive(() => this.#preview());
 	}
 
-	/** Rechecks each requested direct child before removal, never following a symlink out of the root. */
-	remove(paths: readonly string[]): Promise<SandboxResult[]> {
+	/** Rechecks each requested direct child before removal, never following a symlink out of the root; `discardChanges` removes one whose checkout holds changes. */
+	remove(paths: readonly string[], discardChanges: boolean): Promise<SandboxResult[]> {
 		return this.#exclusive(async () => {
 			const inUse = await this.#deps.inUse();
 			const results: SandboxResult[] = [];
@@ -79,7 +82,7 @@ export class IsolationSweep {
 						results.push(keep(path, "unreadable", "Not an isolation sandbox in omp's directory."));
 						continue;
 					}
-					const result = await this.#removeIfEligible(path, inUse);
+					const result = await this.#removeIfEligible(path, inUse, discardChanges);
 					results.push(result ?? keep(path, "unreadable", "Its owner marker is gone."));
 				} catch (error) { results.push(keep(path, "unreadable", errorText(error))); }
 			}
@@ -94,7 +97,7 @@ export class IsolationSweep {
 			await Promise.all(dirs.filter(dir => dir.endsWith(REMOVING_SUFFIX)).map(dir => rm(dir, { recursive: true, force: true }).catch((error: unknown) => console.error(`omp-agents: cannot finish removing ${dir}: ${errorText(error)}`))));
 			const inUse = await this.#deps.inUse();
 			const results = await mapLimit(dirs.filter(dir => !dir.endsWith(REMOVING_SUFFIX)), SANDBOX_READS, async path => {
-				try { return await this.#removeIfEligible(path, inUse); }
+				try { return await this.#removeIfEligible(path, inUse, false); }
 				catch (error) { return keep(path, "unreadable", errorText(error)); }
 			});
 			return results.filter(result => result !== null);
@@ -123,18 +126,18 @@ export class IsolationSweep {
 		const inUse = await this.#deps.inUse();
 		const plans = await mapLimit(dirs, SANDBOX_READS, async (path): Promise<SandboxPlan | null> => {
 			try {
-				const judged = await this.#judge(path, inUse);
+				const judged = await this.#judge(path, inUse, false);
 				if (judged === null) return null;
-				if (judged) return { ...judged, bytes: null };
-				const bytes = await allocatedUsage(path).catch(() => null);
-				return { path, kept: null, detail: null, bytes };
+				if (judged && judged.kept !== "changed") return { ...judged, bytes: null };
+				const bytes = await allocatedUsage(path, { timeoutMs: MEASURE_TIMEOUT_MS }).catch(() => null);
+				return { ...(judged ?? { path, kept: null, detail: null }), bytes };
 			} catch (error) { return { ...keep(path, "unreadable", errorText(error)), bytes: null }; }
 		});
 		return plans.filter(plan => plan !== null);
 	}
 
-	/** Why sandbox `dir` stays, `undefined` when it may go, `null` when it is no sandbox. */
-	async #judge(dir: string, inUse: readonly string[]): Promise<SandboxResult | null | undefined> {
+	/** Why sandbox `dir` stays, `undefined` when it may go, `null` when it is no sandbox; changes in its checkout keep it unless `discardChanges`. */
+	async #judge(dir: string, inUse: readonly string[], discardChanges: boolean): Promise<SandboxResult | null | undefined> {
 		let marker: unknown;
 		try {
 			marker = JSON.parse(await readFile(join(dir, this.#deps.ownerFile), "utf8"));
@@ -153,9 +156,6 @@ export class IsolationSweep {
 		if (checkout === null) return undefined;
 		const at = await worktreeAt(checkout);
 		if (!at || (await canonical(at.top)) !== (await canonical(checkout))) return keep(dir, "unreadable", `${checkout} is not a Git checkout of its own.`);
-		const status = await run(["git", "-C", checkout, "status", "--porcelain=v1", "-z", "--untracked-files=all"], { timeoutMs: STATUS_TIMEOUT_MS });
-		if (status.code !== 0) return keep(dir, "unreadable", status.stderr.trim() || "git status failed.");
-		if (status.stdout) return keep(dir, "changed", "Its checkout has tracked modifications or untracked files.");
 		if (at.linked) {
 			const top = await canonical(at.top);
 			let own: Registration | undefined;
@@ -167,11 +167,14 @@ export class IsolationSweep {
 			if (!own) return keep(dir, "unreadable", "Its checkout is not registered in its repository.");
 			if (own.locked !== null) return keep(dir, "locked", `Git locked its checkout${own.locked ? `: ${own.locked}` : "."}`);
 		}
+		const status = await run(["git", "-C", checkout, "status", "--porcelain=v1", "-z", "--untracked-files=all"], { timeoutMs: STATUS_TIMEOUT_MS });
+		if (status.code !== 0) return keep(dir, "unreadable", status.stderr.trim() || "git status failed.");
+		if (status.stdout && !discardChanges) return keep(dir, "changed", "Its checkout has tracked modifications or untracked files.");
 		return undefined;
 	}
 
-	async #removeIfEligible(path: string, inUse: readonly string[]): Promise<SandboxResult | null> {
-		const judged = await this.#judge(path, inUse);
+	async #removeIfEligible(path: string, inUse: readonly string[], discardChanges: boolean): Promise<SandboxResult | null> {
+		const judged = await this.#judge(path, inUse, discardChanges);
 		return judged === undefined ? this.#remove(path) : judged;
 	}
 

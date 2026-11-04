@@ -173,11 +173,45 @@ describe("isolation sweep", () => {
 		const sweep = sweepOf(root, { inUse: async () => { inUseReads++; return []; } });
 		await sweep.preview();
 		writeFileSync(join(changed, "m", "new.txt"), "keep me");
-		const results = await sweep.remove([changed, clean, outside, linked]);
+		const results = await sweep.remove([changed, clean, outside, linked], false);
 		expect(inUseReads).toBe(2);
 		expect(results.map(result => result.kept)).toEqual(["changed", null, "unreadable", "unreadable"]);
 		expect(existsSync(changed) && existsSync(outside) && existsSync(linked)).toBe(true);
 		expect(existsSync(clean)).toBe(false);
+	});
+
+	test("preview sizes a sandbox kept for its changes, and only a removal that discards changes takes it", async () => {
+		const root = scratch();
+		const edited = await sandbox(root, "tedited");
+		writeFileSync(join(edited, "m", "a.txt"), "edited\n");
+		const live = await sandbox(root, "tlive");
+		writeFileSync(join(live, "m", "a.txt"), "edited\n");
+		const sweep = sweepOf(root, { live: ["tlive"] });
+		const plans = await sweep.preview();
+		expect(plans.find(plan => plan.path === edited)?.kept).toBe("changed");
+		expect(plans.find(plan => plan.path === edited)?.bytes).toBeGreaterThan(0);
+		expect(plans.find(plan => plan.path === live)).toMatchObject({ kept: "owner-live", bytes: null });
+		expect((await sweep.sweep()).map(result => result.kept).sort()).toEqual(["changed", "owner-live"]);
+		expect((await sweep.remove([edited, live], true)).map(result => result.kept)).toEqual([null, "owner-live"]);
+		expect(existsSync(edited)).toBe(false);
+		expect(existsSync(live)).toBe(true);
+	});
+
+	test("a removal that discards changes still keeps a changed checkout Git locked", async () => {
+		const root = scratch();
+		const source = join(scratch(), "app");
+		mkdirSync(source);
+		await git(source, "init", "-q", "-b", "main");
+		await git(source, "commit", "-q", "--allow-empty", "-m", "one");
+		const dir = join(root, "tlocked");
+		mkdirSync(dir);
+		writeFileSync(join(dir, OWNER_FILE), JSON.stringify({ pid: 4242, id: "tlocked" }));
+		await git(source, "worktree", "add", "-q", "-b", "task", join(dir, "m"));
+		await git(source, "worktree", "lock", join(dir, "m"));
+		writeFileSync(join(dir, "m", "new.txt"), "new\n");
+		const [result] = await sweepOf(root).remove([dir], true);
+		expect(result?.kept).toBe("locked");
+		expect(existsSync(dir)).toBe(true);
 	});
 
 	test("manual preview, removal, and the unattended sweep share one guard", async () => {
@@ -186,12 +220,12 @@ describe("isolation sweep", () => {
 		const barrier = Promise.withResolvers<string[]>();
 		const sweep = sweepOf(root, { inUse: () => barrier.promise });
 		const preview = sweep.preview();
-		await expect(sweep.remove([])).rejects.toBeInstanceOf(CleanupBusy);
+		await expect(sweep.remove([], false)).rejects.toBeInstanceOf(CleanupBusy);
 		await expect(sweep.sweep()).rejects.toBeInstanceOf(CleanupBusy);
 		expect(sweep.tick()).toBeNull();
 		barrier.resolve([]);
 		await preview;
-		expect(await sweep.remove([])).toEqual([]);
+		expect(await sweep.remove([], false)).toEqual([]);
 	});
 
 	test("the unattended sweep reads occupied paths once and judges each sandbox only once", async () => {

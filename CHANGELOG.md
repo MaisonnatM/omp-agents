@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-04
 
+- Settings › Storage now shows up to how much space the sandboxes of ended tasks with leftover changes take, and can remove them. Their row starts unchecked, and Clean up warns that edits omp did not bring back to your checkout are lost.
 - You can zoom an image opened large, an expanded chart or diagram, and an image opened from a file path, as you zoom a web page: the − and + buttons or keys, a pinch, or Cmd or Ctrl with the scroll wheel. Click the zoom level or press 0 to fit it again, and drag to move around.
 - The images in a message, in place or as thumbnails under it, now open large, and the arrows or the Left and Right keys step through the message's other images.
 - The starter kit now sends agents to the review steps before they mark a pull request ready or merge it, so they stop running into the review check first.
