@@ -6,7 +6,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-11-04
 
 - The starter kit now sends agents to the review steps before they mark a pull request ready or merge it, so they stop running into the review check first.
-- The starter kit now tells agents to write out the full address of a dev server they start for you, ready to click, instead of only its port number.
+- The starter kit now tells agents to write out the full address of any server they start for you, ready to click, instead of only its port number.
 
 ## 2026-11-03
 
