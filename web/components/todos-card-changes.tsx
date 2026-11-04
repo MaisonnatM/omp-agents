@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
+import { countLabel } from "../todos-strip-model";
 import { useChangedFiles, useMedia, useSources } from "../pane-store";
 import { useStoredKeys } from "../stored-state";
 import { ChangedFileList, FileChangesDialog } from "./changed-files-section";
@@ -120,7 +121,7 @@ export function ChangesSections({ view, session: { sessionId, cwd, facts }, chan
 				<ChangesSection
 					title={
 						<>
-							<span className="truncate">{files.length === 1 ? "1 File" : `${files.length} Files`}</span>
+							<span className="truncate">{countLabel(files.length, "File", "Files")}</span>
 							<LineCounts {...lineTotals(files.flatMap(file => file.changes))} />
 						</>
 					}
@@ -135,21 +136,17 @@ export function ChangesSections({ view, session: { sessionId, cwd, facts }, chan
 						)
 					}
 				>
-					<div className="max-h-[min(30vh,11.5rem)] overflow-y-auto">
-						<ChangedFileList files={files} onOpen={path => setShown({ kind: sessionId === null ? "history" : "changes", path })} />
-					</div>
+					<ChangedFileList files={files} onOpen={path => setShown({ kind: sessionId === null ? "history" : "changes", path })} />
 				</ChangesSection>
 			)}
 			{media.length > 0 && (
-				<ChangesSection title={media.length === 1 ? "1 Image" : `${media.length} Images`} open={!closed.has("images")} onToggle={() => toggle("images")} fold="changes-card.images.fold">
+				<ChangesSection title={countLabel(media.length, "Image", "Images")} open={!closed.has("images")} onToggle={() => toggle("images")} fold="changes-card.images.fold">
 					<MediaStrip media={media} view={view} pullRequests={facts?.pullRequests ?? []} tickets={facts?.tickets ?? []} />
 				</ChangesSection>
 			)}
 			{sources.length > 0 && (
-				<ChangesSection title={sources.length === 1 ? "1 Source" : `${sources.length} Sources`} open={!closed.has("sources")} onToggle={() => toggle("sources")} fold="changes-card.sources.fold">
-					<div className="max-h-[min(30vh,11.5rem)] overflow-y-auto">
-						<SourceList sources={sources} />
-					</div>
+				<ChangesSection title={countLabel(sources.length, "Source", "Sources")} open={!closed.has("sources")} onToggle={() => toggle("sources")} fold="changes-card.sources.fold">
+					<SourceList sources={sources} />
 				</ChangesSection>
 			)}
 			{history && <FileChangesDialog file={history} onClose={() => setShown(null)} />}

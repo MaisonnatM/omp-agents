@@ -27,15 +27,15 @@
   An issue counts when the session or one of its subagents changed or opened it (`save_issue`) or commented on it (`save_comment`), when the session names it in its `/ship` step, or when a Linear link to it is in the session's own prompt.
   Weaker evidence counts once two kinds of it agree: a read with omp's Linear tools (`get_issue`, `list_comments`), its identifier in the session's own prompt, and the session's branch, such as `eng-2716-agent-templates` or `me/eng-2712`.
   So an issue a subagent only read for context does not count, and neither does one that a `list_issues` search only listed.
-- Sessions that use `/ship` show a Ship card at the top of their transcript, with the Linear issue if the work has one, the PR, the current step, and how many of the nine steps are done, such as `1 of 9` during the plan.
-  Agents start `/ship` on their own when a request will end in a pull request, and say so in their first reply; answer "no ship" to work without it, and the Ship card goes away.
-  Click the card to see every step.
+- Sessions that use `/ship` lead the Todos card's line above their transcript with the current step and its place among the nine, such as **Plan · step 2 of 9**, and the card opens on a **Ship** section with the Linear issue if the work has one, the PR, and how many steps are done.
+  Agents start `/ship` on their own when a request will end in a pull request, and say so in their first reply; answer "no ship" to work without it, and the Ship section goes away.
+  Click the line to see every step.
   The steps are ticket, plan, implementation, draft PR, interface review, thermonuclear review, ready gate, live review, and merged.
   The ticket step links the issue you named or one that matches the work, and passes without one rather than creating a ticket.
   In the plan step the agent compares up to three ways to build the change and posts the one it chose on the Linear issue, or in the PR body when there is no issue.
-  During live review the card names the active rebase, review-comment, or CI-fix work.
+  During live review the line and the section name the active rebase, review-comment, or CI-fix work.
   omp writes each step to its session file; the dashboard reads those entries for running and past sessions and updates when the step changes.
-  Other sessions have no Ship card.
+  Other sessions have no Ship section.
 - Tabs under the sidebar header switch pages and what the sidebar lists: **Pull requests**, **Tickets**, **Bots**, **Sessions**, and **Todo** in the sidebar's tab bar, and **Notes**, **Calendar**, and **Email** as buttons in the header beside the command menu.
   Click a tab or use the left and right arrow keys while a bar tab has focus to switch pages.
   **Tickets** shows only once Linear is connected; see [Linear tickets](linear-tickets.md).
