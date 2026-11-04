@@ -19,12 +19,17 @@ The installer:
 - applies each setting in [`config.yml`](config.yml) with `omp config set`, so omp writes it and every other key in your `config.yml` stays as it is;
 - adds the [`cursor/plugins`](https://github.com/cursor/plugins) marketplace and installs its `pstack` plugin, unless they are already there.
 
-A file or a setting that you already have keeps your version, and the installer lists it as `keep yours`.
-Pass `--force` to overwrite those with the kit's version.
+A setting that you already have keeps your value, and the installer lists it as `keep yours`.
+A file that you already have is replaced, listed as `overwrite`, only when you never edited it: it matches what the last install wrote, which the installer records in `starter-kit-installed.json` in the agent directory, or a version the kit shipped before, which the kit's git history holds.
+A file you edited keeps your version and is listed as `keep yours`; merge the kit's changes into it by hand, or pass `--force` to overwrite it and every other `keep yours` with the kit's version.
 Running the installer again changes nothing that already matches.
+After one install with `--maintainer`, later installs copy `maintainer/` too.
+
+`bun run omp-template --files` brings only the files up to date, as the last recorded install chose them, and never adds back a file you deleted; it needs no omp and does nothing before an install has been recorded.
+**Update dashboard** runs it in the updated checkout before the server restarts, so a landed kit change reaches the files you never edited.
 
 The desktop app's **Get started** starter kit step and **Install omp Starter Kit…** menu run this same non-forced installer.
-That step's read-only status includes files, settings, marketplace, and plugins; `keep yours` is complete rather than an invitation to overwrite it.
+That step's read-only status includes files, settings, marketplace, and plugins; `keep yours` is complete rather than an invitation to overwrite it, and an outdated file you never edited is pending.
 CLI calls use the resolved omp package, including `OMP_PACKAGE_DIR` when set.
 
 Restart running omp sessions to pick up the new files and settings.
@@ -63,7 +68,7 @@ Files, in `agent/`:
   The gate reads the PR and the review paths in the checkout the publishing command runs in, which a `cd`, `env -C`, `bash -c`, `gt --cwd`, or the bash call's cwd names.
   It refuses the command when that checkout is not one of the PR's repository, such as `gh pr ready 7 -R other/repo` from this repository, when a variable or `cd -` hides the directory, and when the command sets `GH_REPO` or `GH_HOST` inline.
   A PR on a repository you cannot push to, such as a contribution to someone else's project, skips the review gates.
-  A PR body with an unchecked `- [ ] Browser proof` box, which a repository's PR template can declare, also blocks going live; the extension checks the box, not a screenshot.
+  A PR body with an unchecked `- [ ] Browser proof` box, which a repository's PR template can declare, also blocks going live when the interface review applies; the extension checks the box, not a screenshot.
   Dashboard and CLI GitHub calls share separate GraphQL/REST reset cooldowns; exhausted quota is not reported as bad credentials or a fresh successful read, and stale `/ship` status cannot advance a gate.
 - `extensions/pr-description.ts`: the essential `pr_description` tool reads and edits descriptions with checked fresh reads, private original backups, and guards against accidental empty output, missing or ambiguous replacement anchors, and concurrent changes observed before the write.
   Use `change: {kind:"append", text:"..."}` or `{kind:"replace-text", oldText:"...", newText:"..."}` for surgical edits; full replacement requires the exact `original` returned by `{kind:"read"}`, and clearing requires `allowEmpty: true`.

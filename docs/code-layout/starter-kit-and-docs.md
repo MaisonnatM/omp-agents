@@ -3,6 +3,8 @@
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`).
 Its `agent/` files are the default kit.
 The installer's `planStarterKit` reads the same file, setting, marketplace, and plugin requirements for installation and Get started; customized `keep` entries count as present.
+Its `planKitFiles` replaces a file you have only when you never edited it: its git blob id matches the one `starter-kit-installed.json` in the agent directory recorded at the last install, or one the kit's files had in its git history; that record also remembers `--maintainer`.
+`--files` runs only that file plan, never adding back a recorded file you deleted, and `SelfUpdate` in `src/server/self-update.ts` runs it after a fast-forward; `templates/omp/install.test.ts` covers an outdated unedited file, an edited one, the git history, and `--files` on a scratch agent directory.
 The dashboard supplies read-only native snapshots instead of running CLI config initialization, and installation uses the exact resolved omp command, including `OMP_PACKAGE_DIR`.
 Packaged resources include `agent/`, `config.yml`, and `install.js`.
 `templates/omp/README.md` lists what each of its extensions does.
@@ -20,7 +22,7 @@ Packaged resources include `agent/`, `config.yml`, and `install.js`.
 `agent/extensions/ship.ts` gates draft PRs and putting a PR live on bash commands that `agent/extensions/shell/commands.ts` splits into words outside quotes, past `NAME=value` assignments and `env` prefixes, and that its `located` places in the directory each runs in.
 `templates/omp/ship.test.ts` tests that parsing, the `gh pr view` selector it builds from a `gh pr ready`, including a `-R` given before `ready`, and the owner check `tool_result` uses before it marks the tracked PR live.
 It also tests `reviewNeeded` for each review in `REVIEWS`: the thermonuclear review is needed when the checkout has no `.omp/review-paths`, and the interface review only when it has `.omp/ui-paths`; with the file, either is needed when GitHub lists fewer changed files than the PR has, or when a changed file matches one of its globs.
-Then `publishBlocker` requires the checkbox of each needed review, interface first, and always forbids an unchecked `- [ ] Browser proof` box, and `authDiagnosis` names the GitHub credential that GitHub rejects without printing its token.
+Then `publishBlocker` requires the checkbox of each needed review, interface first, and forbids an unchecked `- [ ] Browser proof` box only while the interface review is needed, and `authDiagnosis` names the GitHub credential that GitHub rejects without printing its token.
 `agent/agents/interface-reviewer.md` is the read-only agent the `/ship` Interface review stage spawns; it runs the user's `interface-review` skill, which the kit does not ship, and stops naming the skill when it or `better-interface` is missing, then applies the autoloaded `app-consistency-review` skill.
 `agent/skills/app-consistency-review/SKILL.md` checks a PR's interface changes against the app's shared components, tokens, and sibling screens, and lists every new pattern.
 `agent/extensions/pr-description.ts` registers the essential `pr_description` tool and refuses direct shell body writes that skip its checked read, private original backup, empty-output and replacement-anchor checks, and fresh preflight comparison.
@@ -42,6 +44,7 @@ It also links [decisions](../decisions/), one file per design choice and why it 
 [`CHANGELOG.md`](../../CHANGELOG.md) holds what each change to `main` did, in everyday words, as the header's What's new lists it; [Changelog](../../CODING_STANDARDS.md#changelog) says how to write it, and `.gitattributes` merges it with git's union driver so two branches' lines never conflict.
 [`.omp/review-paths`](../../.omp/review-paths) lists, one glob per line, this repository's shared contracts and central files; a PR that changes one needs the thermonuclear review, and `agent/extensions/ship.ts` reads the file from the checkout to decide whether the publish gate asks for the review checkbox.
 [`.omp/ui-paths`](../../.omp/ui-paths) lists the page's components and styles the same way; a PR that changes one needs the interface review, and without the file `ship.ts` never asks for it.
+A linked worktree missing one of these files reads its main checkout's, so a repository can keep them uncommitted there.
 [Getting started](../getting-started.md) walks a new user through a first session and each integration's sign-in, and lists what a new computer needs beyond the starter kit and Settings sync; `docs/images/` holds the README's screenshot.
 `docs/usage.md`, `docs/architecture.md`, and `docs/code-layout.md` are indexes, one line per file in `docs/usage/`, `docs/architecture/`, and `docs/code-layout/`, so an agent reads only the feature it needs; `src/docs.test.ts` fails a doc over 32 KiB.
 `docs/usage/extensions.md` explains package management and activation boundaries, and `docs/architecture/extensions.md` describes its native adapters and HTTP endpoints.

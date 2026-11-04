@@ -29,6 +29,18 @@ When the parent is itself untracked, track it first, from the bottom of the stac
 A warning that branches "diverged from Graphite's tracking" concerns the branches it names; ignore it unless it names your stack.
 Read the stack with `gt log short --stack`; `gt log` and `gt state` print every tracked branch in the repository.
 
+## Resolve conflicts in a rebase or restack
+
+A rebase stops once per conflicting commit; repeat these steps until no commit stops:
+
+1. List the conflicted files with `git diff --name-only --diff-filter=U`.
+2. `read` a file's `:conflicts` before writing `conflict://`; each stop needs a fresh read.
+3. To take a whole side, run `git -c core.hooksPath=/dev/null checkout --theirs -- <file>`.
+   During a rebase `--ours` is the base and `--theirs` is the branch's commit.
+   A post-checkout hook, such as yampa's pre-commit one, fails the plain command with `Unmerged files` after it took that side.
+4. Format a resolved file, then `git add` it.
+5. Continue with `GIT_EDITOR=true gt continue`, or `GIT_EDITOR=true git rebase --continue` without Graphite.
+
 ## Create drafts before publishing
 
 Create the PR as a draft with `gt submit --draft` when Graphite is configured, or `gh pr create --draft` otherwise.
@@ -36,8 +48,8 @@ The ship extension blocks publication until a thermonuclear review is applied an
 When the review applies, run the thermonuclear stage once the user approves the direction, commit and push its fixes, then add `- [x] Thermo-nuclear code quality review` to the PR body.
 When the repository commits `.omp/ui-paths` and a changed file matches it, the interface review runs first the same way and earns `- [x] Interface review`.
 Follow `~/.omp/agent/docs/review-workflow.md` for when the review applies and for the review and checkbox rules.
-The extension also blocks while the body has an unchecked `- [ ] Browser proof` box, which yampa's PR template declares.
-For a change under `front/components/` or `front/app/`, run the verify-yampa skill, attach a screenshot of the changed UI with `gh pr edit <N> --attach`, then check the box; otherwise delete the line.
+When the interface review applies, the extension also blocks while the body has an unchecked `- [ ] Browser proof` box, which yampa's PR template declares.
+Then run the verify-yampa skill, attach a screenshot of the changed UI with `gh pr edit <N> --attach`, and check the box; when the interface review does not apply, delete the line.
 The extension checks the box, not the screenshot.
 Only then run `gt submit --publish` or `gh pr ready <N>`; the extension asks the user to approve before the command runs.
 A new branch has no PR body to check: create its draft first rather than retrying publication.

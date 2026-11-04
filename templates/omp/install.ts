@@ -1,11 +1,17 @@
 /**
  * Installs the omp starter kit: copies `agent/` into the omp agent directory and applies `config.yml` through
- * `omp config set`, so omp writes every setting and leaves the rest of your config alone. A file or a setting you
- * already have keeps your version unless you pass `--force`. `--maintainer` copies `maintainer/` on top, and a
- * file there replaces the `agent/` file with the same relative path.
+ * `omp config set`, so omp writes every setting and leaves the rest of your config alone. A setting you already have
+ * keeps your value unless you pass `--force`. A file you already have is replaced only when you never edited it: it
+ * matches what the last install wrote, as `starter-kit-installed.json` records, or a version the kit shipped before, as
+ * the kit's git history holds; one you edited keeps your version unless you pass `--force`. `--maintainer` copies
+ * `maintainer/` on top, and a file there replaces the `agent/` file with the same relative path; later installs
+ * remember it. `--files` only brings the files up to date, never adds back one you deleted, and needs no omp; the
+ * dashboard's Update runs it.
  *
  *   bun run omp-template [--dry-run] [--force] [--maintainer]
+ *   bun run omp-template --files [--dry-run]
  */
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -51,6 +57,69 @@ export function planSettings(settings: [string, unknown][], user: Json, force: b
 export interface KitFile {
 	rel: string;
 	text: string;
+}
+
+/** Where the installer records, in the agent directory, what it last wrote there. */
+export const INSTALLED_RECORD = "starter-kit-installed.json";
+
+/** Whether the last install copied `maintainer/`, and the git blob id of each file it wrote, by its path in the agent directory. */
+export interface InstalledRecord {
+	maintainer: boolean;
+	files: Record<string, string>;
+}
+
+/** The id `git hash-object` gives `text`, so a recorded file and the kit's history compare alike. */
+export function blobId(text: string): string {
+	const bytes = Buffer.from(text);
+	return createHash("sha1").update(`blob ${bytes.length}\0`).update(bytes).digest("hex");
+}
+
+/** The record the last install left in `agentDir`, or `null` before the first install that keeps one. */
+export function readInstalledRecord(agentDir: string): InstalledRecord | null {
+	const path = join(agentDir, INSTALLED_RECORD);
+	if (!existsSync(path)) return null;
+	const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+	if (!isObject(parsed) || typeof parsed.maintainer !== "boolean" || !isObject(parsed.files)) throw new Error(`${path} is not a starter kit install record`);
+	const files: Record<string, string> = {};
+	for (const [rel, id] of Object.entries(parsed.files)) if (typeof id === "string") files[rel] = id;
+	return { maintainer: parsed.maintainer, files };
+}
+
+/** Records the files an install wrote or found already matching, keeping the entries of the files it left alone. */
+function writeInstalledRecord(agentDir: string, previous: InstalledRecord | null, maintainer: boolean, files: readonly (KitFile & { action: Action })[]): void {
+	const recorded = { ...previous?.files };
+	for (const file of files) if (file.action !== "keep") recorded[file.rel] = blobId(file.text);
+	const record: InstalledRecord = { maintainer, files: recorded };
+	writeFileSync(join(agentDir, INSTALLED_RECORD), `${JSON.stringify(record, null, "\t")}\n`);
+}
+
+const histories = new Map<string, Map<string, Set<string>>>();
+
+/**
+ * Every blob id each kit file has had in `kit`'s git history, by its path in the agent directory, read once per
+ * process; empty when the kit is not in a git checkout, as in the packaged app.
+ */
+function kitHistory(kit: string): Map<string, Set<string>> {
+	const known = histories.get(kit);
+	if (known) return known;
+	const history = new Map<string, Set<string>>();
+	histories.set(kit, history);
+	let listing = "";
+	try {
+		const args = ["log", "--format=", "--raw", "--no-abbrev", "--no-renames", "--diff-merges=first-parent", "--relative", "--", "agent", "maintainer"];
+		const proc = Bun.spawnSync(["git", "-C", kit, ...args], { stdout: "pipe", stderr: "ignore" });
+		if (proc.exitCode === 0) listing = proc.stdout.toString();
+	} catch {
+		return history;
+	}
+	for (const line of listing.split("\n")) {
+		const [, before, after, rel] = /^:\d+ \d+ ([0-9a-f]+) ([0-9a-f]+) \w+\t(?:agent|maintainer)\/(.+)$/.exec(line) ?? [];
+		if (!before || !after || !rel) continue;
+		const ids = history.get(rel) ?? new Set<string>();
+		ids.add(before).add(after);
+		history.set(rel, ids);
+	}
+	return history;
 }
 
 /** Later layers replace the same relative path. The result is sorted by `rel`. */
@@ -106,8 +175,15 @@ function layerFiles(root: string): KitFile[] {
 	return [...new Glob("**/*").scanSync({ cwd: root, dot: true })].sort().map(rel => ({ rel, text: readFileSync(join(root, rel), "utf8") }));
 }
 
-export interface StarterKitPlan {
-	files: (KitFile & { dest: string; action: Action })[];
+export type FileStep = KitFile & { dest: string; action: Action };
+
+export interface KitFilesPlan {
+	/** Whether `maintainer/` is copied: as asked, else as the last install did. */
+	maintainer: boolean;
+	files: FileStep[];
+}
+
+export interface StarterKitPlan extends KitFilesPlan {
 	settings: SettingStep[];
 	marketplace: { source: string; action: Action };
 	plugins: { id: string; action: Action }[];
@@ -119,19 +195,43 @@ export interface StarterKitSnapshot {
 	plugins: ReadonlySet<string>;
 }
 
-/** Read-only, including settings and plugins. Callers supply native or CLI reads, never config initialization here. */
-export function planStarterKit(kit: string, agentDir: string, snapshot: StarterKitSnapshot, { force = false, maintainer = false } = {}): StarterKitPlan {
+export interface PlanOptions {
+	force?: boolean;
+	/** Copies `maintainer/` too; without it, as the last install did. */
+	maintainer?: boolean;
+}
+
+/**
+ * Read-only. A file you have is replaced when it differs and you never edited it: it matches what the last install
+ * recorded, or a version in the kit's history.
+ */
+export function planKitFiles(kit: string, agentDir: string, { force = false, maintainer }: PlanOptions = {}): KitFilesPlan {
 	if (!existsSync(join(kit, "agent"))) throw new Error(`Starter kit files are missing from ${kit}`);
+	const record = readInstalledRecord(agentDir);
+	const withMaintainer = maintainer ?? record?.maintainer ?? false;
 	const layers = [layerFiles(join(kit, "agent"))];
-	if (maintainer) layers.push(layerFiles(join(kit, "maintainer")));
+	if (withMaintainer) layers.push(layerFiles(join(kit, "maintainer")));
+	const untouched = (rel: string, current: string): boolean => {
+		const id = blobId(current);
+		return record?.files[rel] === id || kitHistory(kit).get(rel)?.has(id) === true;
+	};
 	const files = overlayFiles(layers).map(file => {
 		const dest = join(agentDir, file.rel);
-		return { ...file, dest, action: planValue(existsSync(dest) ? readFileSync(dest, "utf8") : undefined, file.text, force) };
+		const current = existsSync(dest) ? readFileSync(dest, "utf8") : undefined;
+		const replace = force || (current !== undefined && current !== file.text && untouched(file.rel, current));
+		return { ...file, dest, action: planValue(current, file.text, replace) };
 	});
+	return { maintainer: withMaintainer, files };
+}
+
+/** Read-only, including settings and plugins. Callers supply native or CLI reads, never config initialization here. */
+export function planStarterKit(kit: string, agentDir: string, snapshot: StarterKitSnapshot, options: PlanOptions = {}): StarterKitPlan {
+	const { maintainer, files } = planKitFiles(kit, agentDir, options);
 	const userConfigPath = join(agentDir, "config.yml");
 	const user = existsSync(userConfigPath) ? readYamlMapping(userConfigPath) : {};
-	const settings = planSettings(settingsOf(readYamlMapping(join(kit, "config.yml")), snapshot.knownSettings), user, force);
+	const settings = planSettings(settingsOf(readYamlMapping(join(kit, "config.yml")), snapshot.knownSettings), user, options.force ?? false);
 	return {
+		maintainer,
 		files,
 		settings,
 		marketplace: { source: STARTER_KIT_MARKETPLACE.source, action: snapshot.hasMarketplace ? "same" : "create" },
@@ -139,19 +239,49 @@ export function planStarterKit(kit: string, agentDir: string, snapshot: StarterK
 	};
 }
 
+const writes = (action: Action): boolean => action === "create" || action === "update";
+
+function writeFiles(files: readonly FileStep[]): void {
+	for (const file of files.filter(f => writes(f.action))) {
+		mkdirSync(dirname(file.dest), { recursive: true });
+		writeFileSync(file.dest, file.text);
+	}
+}
+
+/** `--files`: the kit's files only, as the last install chose them, never adding back one you deleted since. */
+function updateFiles(kit: string, agentDir: string, dryRun: boolean): void {
+	const record = readInstalledRecord(agentDir);
+	if (!record) {
+		console.log(`No starter kit install is recorded in ${agentDir}, so nothing changed; run bun run omp-template once.`);
+		return;
+	}
+	console.log(`${dryRun ? "Would update" : "Updating"} the omp starter kit's files in ${agentDir}`);
+	const plan = planKitFiles(kit, agentDir, { maintainer: record.maintainer });
+	const files = plan.files.map(file => (file.action === "create" && file.rel in record.files ? { ...file, action: "keep" as const } : file));
+	for (const file of files) if (file.action !== "same") print(file.action, `file ${file.rel}`);
+	if (dryRun) {
+		console.log("Dry run, nothing written.");
+		return;
+	}
+	writeFiles(files);
+	writeInstalledRecord(agentDir, record, plan.maintainer, files);
+	console.log("Done.");
+}
+
 async function main(argv: string[]): Promise<void> {
-	const knownFlags = ["--dry-run", "--force", "--maintainer"];
+	const knownFlags = ["--dry-run", "--force", "--maintainer", "--files"];
 	const unknown = argv.find(arg => !knownFlags.includes(arg));
-	if (unknown) throw new Error(`unknown option ${unknown}; use --dry-run, --force, or --maintainer`);
+	if (unknown) throw new Error(`unknown option ${unknown}; use --dry-run, --force, --maintainer, or --files`);
 	const dryRun = argv.includes("--dry-run");
 	const force = argv.includes("--force");
-	const maintainer = argv.includes("--maintainer");
-	const { command: ompCommand } = resolveOmp();
-
 	const kit = import.meta.dir;
 	const agentDir = process.env.PI_CODING_AGENT_DIR || join(homedir(), ".omp", "agent");
-	const profile = maintainer ? " and the maintainer git profile" : "";
-	console.log(`${dryRun ? "Would install" : "Installing"} the omp starter kit${profile} into ${agentDir}${force ? ", overwriting your versions" : ""}`);
+	if (argv.includes("--files")) {
+		if (force || argv.includes("--maintainer")) throw new Error("--files takes only --dry-run");
+		updateFiles(kit, agentDir, dryRun);
+		return;
+	}
+	const { command: ompCommand } = resolveOmp();
 
 	const listed: unknown = JSON.parse(await omp(ompCommand, ["config", "list", "--json"]));
 	if (!isObject(listed) || Array.isArray(listed)) throw new Error("omp config list returned no settings");
@@ -160,7 +290,11 @@ async function main(argv: string[]): Promise<void> {
 		hasMarketplace: new RegExp(`^\\s*${STARTER_KIT_MARKETPLACE.name}\\s`, "m").test(await omp(ompCommand, ["plugin", "marketplace", "list"])),
 		plugins: pluginIds(JSON.parse(await omp(ompCommand, ["plugin", "list", "--json"]))),
 	};
-	const { files, settings, marketplace, plugins } = planStarterKit(kit, agentDir, snapshot, { force, maintainer });
+	const previous = readInstalledRecord(agentDir);
+	const plan = planStarterKit(kit, agentDir, snapshot, { force, maintainer: argv.includes("--maintainer") || undefined });
+	const { maintainer, files, settings, marketplace, plugins } = plan;
+	const profile = maintainer ? " and the maintainer git profile" : "";
+	console.log(`${dryRun ? "Would install" : "Installing"} the omp starter kit${profile} into ${agentDir}${force ? ", overwriting your versions" : ""}`);
 	for (const file of files) print(file.action, `file ${file.rel}`);
 	for (const setting of settings) print(setting.action, `setting ${setting.target}`);
 	print(marketplace.action, `marketplace ${marketplace.source}`);
@@ -173,11 +307,8 @@ async function main(argv: string[]): Promise<void> {
 		return;
 	}
 
-	const writes = (action: Action): boolean => action === "create" || action === "update";
-	for (const file of files.filter(f => writes(f.action))) {
-		mkdirSync(dirname(file.dest), { recursive: true });
-		writeFileSync(file.dest, file.text);
-	}
+	writeFiles(files);
+	writeInstalledRecord(agentDir, previous, maintainer, files);
 	for (const { target, value } of settings.filter(s => writes(s.action))) {
 		await omp(ompCommand, ["config", "set", target, typeof value === "object" ? JSON.stringify(value) : String(value)]);
 	}
