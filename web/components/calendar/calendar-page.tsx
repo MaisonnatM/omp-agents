@@ -3,6 +3,7 @@ import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 import { errorText } from "../../../src/json";
 import type { Routine } from "../../../src/routines";
 import type { EventRef, LocalEvent } from "../../../src/shared/calendar";
+import { hashForSession } from "../../../src/shared/sessions";
 import type { UserTodoList } from "../../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -56,7 +57,7 @@ function dotClass(entry: CalendarEntry): string {
 const isClosed = (entry: CalendarEntry): boolean =>
 	(entry.kind === "todo" && entry.done) || (entry.kind === "ticket" && (entry.statusType === "completed" || entry.statusType === "canceled"));
 
-/** Where the entry links; `null` for an event kept on this computer, which has no page of its own. */
+/** Where the entry links; `null` for an event you kept on this computer, which has no page of its own. */
 function entryHref(entry: CalendarEntry): string | null {
 	switch (entry.kind) {
 		case "routine":
@@ -66,8 +67,11 @@ function entryHref(entry: CalendarEntry): string | null {
 			return hashForOpenTodo(entry.todoId, entry.categoryId);
 		case "ticket":
 			return hashForTickets(entry.identifier);
-		case "event":
-			return entry.event.source.kind === "google" ? entry.event.source.url : null;
+		case "event": {
+			const { source } = entry.event;
+			if (source.kind === "google") return source.url;
+			return source.sessionId === null ? null : hashForSession(source.sessionId);
+		}
 	}
 }
 
@@ -126,7 +130,7 @@ interface EntryLinkProps {
 	children: ReactNode;
 }
 
-/** An entry as a link to what it shows, a Google event in a new tab; an event kept on this computer links nowhere. */
+/** An entry as a link to what it shows, a Google event in a new tab and a reminder an agent added in its session; an event you kept on this computer links nowhere. */
 function EntryLink({ entry, className, style, children }: EntryLinkProps) {
 	const href = entryHref(entry);
 	if (href === null) {
@@ -136,7 +140,7 @@ function EntryLink({ entry, className, style, children }: EntryLinkProps) {
 			</div>
 		);
 	}
-	const external = entry.kind === "event";
+	const external = entry.kind === "event" && entry.event.source.kind === "google";
 	return (
 		<a href={href} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined} className={className} style={style}>
 			{children}

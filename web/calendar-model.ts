@@ -25,9 +25,10 @@ export interface ShownEvent {
 	place: string;
 	/**
 	 * Where it lives: a Google event's page in Google Calendar, or this computer, with the `ref` that deletes it; `null`
-	 * for an event of a Google calendar you may only read.
+	 * for an event of a Google calendar you may only read. A kept event's `sessionId` is the omp session that added it,
+	 * `null` for one you added.
 	 */
-	source: { kind: "google"; url: string; ref: GoogleEventRef | null } | { kind: "local"; ref: LocalEventRef };
+	source: { kind: "google"; url: string; ref: GoogleEventRef | null } | { kind: "local"; ref: LocalEventRef; sessionId: string | null };
 }
 
 /** One thing on one day; `day` is the local day, `YYYY-MM-DD`, and `at` its time, `null` for one without. */
@@ -111,7 +112,9 @@ export function calendarEntries({ routines, todos, tickets, events, localEvents 
 			place: calendar,
 			source: { kind: "google", url, ref: writable ? { kind: "google", account, calendarId, eventId } : null },
 		})),
-		...(localEvents ?? []).map(({ id, title, when }): ShownEvent => ({ id, title, when, color: LOCAL_EVENT_COLOR, place: "This computer", source: { kind: "local", ref: { kind: "local", id } } })),
+		...(localEvents ?? []).map(
+			({ id, title, when, sessionId }): ShownEvent => ({ id, title, when, color: LOCAL_EVENT_COLOR, place: "This computer", source: { kind: "local", ref: { kind: "local", id }, sessionId: sessionId ?? null } }),
+		),
 	];
 	const entries: CalendarEntry[] = [
 		...routines.flatMap(routine => routineEntries(routine, from, to, now)),

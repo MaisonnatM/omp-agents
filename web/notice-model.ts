@@ -146,7 +146,12 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 				source: "calendar",
 				headline: `${notice.title} ${notice.start > now ? "starts" : "started"} at ${SAME_DAY.format(notice.start)}`,
 				preview: `${SAME_DAY.format(notice.start)} – ${SAME_DAY.format(notice.end)} · ${notice.calendar ?? "This computer"}`,
-				link: notice.url === null ? { href: hashForCalendar(), external: false } : { href: notice.url, external: true },
+				link:
+					notice.sessionId !== null
+						? { href: hashForSession(notice.sessionId), external: false }
+						: notice.url === null
+							? { href: hashForCalendar(), external: false }
+							: { href: notice.url, external: true },
 				face: { kind: "event", color: notice.color },
 				toast: { kind: "news", timeout: 0 },
 			};
