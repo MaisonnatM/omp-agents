@@ -24,6 +24,8 @@ Pass the port through the tool's port flag or `PORT`, and point every browser, c
 
 A test or check runs headless and never opens a window on the user's screen.
 Open pages with eval's `browser.open` in managed Chromium, `app: { relay: false, tern: false }` with `headed: false`; without them, it drives the user's own Chrome through the relay or a visible Tern pane.
+`tab.setCookies` takes one cookie at a time as `{ name, value, url }`; a Playwright storage-state cookie list fails with `malformed cookie input`, so loop over its `cookies`. yampa's `control-yampa doctor` writes that list to `.agents/skills/verify-yampa/.run/storage-state.json`, and the stack's URL to `state.json`'s `frontUrl`.
+`tab.run` hands you a Puppeteer `page`, not Playwright: there is no `page.getByRole` or `page.context`; use tab helpers with `role/…`, `label/…`, or `text/…` selectors.
 Start an app that opens windows, such as an Electron app, in its hidden mode, such as `OMP_AGENTS_HEADLESS=1` for the omp-agents desktop app, and open a visible window only when the user asks for one.
 
 ## omp-agents dashboard

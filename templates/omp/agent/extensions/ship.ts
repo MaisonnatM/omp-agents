@@ -1,7 +1,7 @@
 // Tracks the /ship workflow (optional Linear ticket -> plan -> draft PR -> reviews -> live for review) per session.
 // The agent declares the stage it works on through the `ship_stage` tool. GitHub decides what a live PR
 // needs next (rebase, review comments, CI), so that part is polled, never declared.
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
@@ -291,7 +291,10 @@ function missingReview(reviews: Reviews, stage: Stage): ReviewStage | undefined 
 	return reviewsBefore(stage).find(review => reviews[review].needed && !reviews[review].done);
 }
 
-/** A reader returning the text of a paths file from the top of the checkout holding `dir`, or `undefined` when it has none. */
+/**
+ * A reader returning the text of a paths file from the top of the checkout holding `dir`, or `undefined` when it has none.
+ * A linked worktree without the file reads its main checkout's, so a paths file kept out of git, in `.git/info/exclude`, covers every worktree.
+ */
 function checkoutReader(dir: string): (pathsFile: string) => string | undefined {
 	let root: string | undefined;
 	for (let at = dir; ; at = dirname(at)) {
@@ -301,11 +304,25 @@ function checkoutReader(dir: string): (pathsFile: string) => string | undefined 
 		}
 		if (dirname(at) === at) break;
 	}
+	const roots = root === undefined ? [] : [root];
+	const main = root === undefined ? undefined : mainCheckoutOf(root);
+	if (main !== undefined) roots.push(main);
 	return pathsFile => {
-		if (root === undefined) return undefined;
-		const file = join(root, pathsFile);
-		return existsSync(file) ? readFileSync(file, "utf8") : undefined;
+		for (const at of roots) {
+			const file = join(at, pathsFile);
+			if (existsSync(file)) return readFileSync(file, "utf8");
+		}
+		return undefined;
 	};
+}
+
+/** The main checkout of the linked worktree at `root`, read from its `.git` file's `gitdir: <main>/.git/worktrees/<name>`, or `undefined` for a main checkout. */
+function mainCheckoutOf(root: string): string | undefined {
+	const git = join(root, ".git");
+	if (!statSync(git).isFile()) return undefined;
+	const gitdir = /^gitdir: (.+)$/m.exec(readFileSync(git, "utf8"))?.[1]?.trim();
+	const at = gitdir?.lastIndexOf("/.git/worktrees/") ?? -1;
+	return gitdir !== undefined && at > 0 ? gitdir.slice(0, at) : undefined;
 }
 
 /**

@@ -19,6 +19,7 @@ The ship extension reads the file from the checkout and the changed files from G
 
 A pull request needs the interface review only when its repository commits `.omp/ui-paths` and a file it changes matches a glob listed there; a repository without the file never needs it.
 `.omp/ui-paths` has the same format as `.omp/review-paths`, and the ship extension also asks for the checkbox whenever GitHub lists fewer files than the pull request changes.
+A linked worktree missing one of these files reads its main checkout's, so a repository you do not want to carry your setup can keep them uncommitted in the main checkout, listed in `.git/info/exclude`.
 The `/ship` Interface review stage runs before the Thermonuclear one, so the code quality review sees the interface fixes.
 Spawn `task` with `agent: "interface-reviewer"` and `pr <N>` as the assignment; it is read-only and runs the user's `interface-review` skill in full mode, which hands off to `better-interface` and the `better-*` skills.
 It then checks the change against the app's own design system, which it reads from the repository: the shared component library, design tokens, component variants, icon library, written conventions, and sibling screens.

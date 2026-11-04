@@ -232,6 +232,15 @@ describe("ship publication gate", () => {
 		if (blocked) expect(result?.reason).toContain("- [ ] Browser proof");
 	});
 
+	test("a linked worktree without ui paths reads its main checkout's, so an unchecked proof box there blocks", () => {
+		const worktree = checkout(undefined, undefined, checkout(undefined, "web/**/*.tsx\n"));
+		const { result } = exercise("ship", {
+			command: "gh pr ready 7", approve: true, cwd: worktree,
+			responses: answers(prView(`## Checks\n${UNCHECKED}\n- [x] Interface review\n- [x] Thermo-nuclear code quality review`, ["web/app.tsx"])),
+		});
+		expect(result?.reason).toContain("- [ ] Browser proof");
+	});
+
 	test.each([[undefined, false], ["web/**/*.tsx\n", true]])("a reviewed PR changing web/app.tsx without the interface box, with ui paths %j, is blocked: %s", (uiPaths, blocked) => {
 		const { result, confirmations } = exercise("ship", {
 			command: "gh pr ready 7", approve: true, cwd: checkout(undefined, uiPaths),

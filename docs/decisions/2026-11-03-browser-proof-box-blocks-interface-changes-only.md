@@ -22,7 +22,7 @@ The kit already decides whether a PR changes the interface: `reviewNeeded` reads
 
 ## Consequences
 
-A repository that wants the box enforced commits `.omp/ui-paths`; yampa, whose template declares the box, commits none yet.
+A repository that wants the box enforced keeps `.omp/ui-paths`; yampa, whose template declares the box, keeps it uncommitted in the main checkout, which its linked worktrees read when they lack the file.
 When GitHub lists fewer changed files than the PR has, the interface review counts as needed, so the box blocks.
 
 ## Confirmation
