@@ -58,7 +58,7 @@ function ExtraSpent({ extra }: { extra: ExtraUsage }) {
 	);
 }
 
-function CreditSpent({ balance }: { balance: CreditBalance }) {
+function CreditSpent({ name, balance }: { name: string; balance: CreditBalance }) {
 	const left = balance.limit !== null && balance.limit > 0 ? (balance.limit - balance.used) / balance.limit : 1;
 	const exhausted = balance.limit !== null && balance.used >= balance.limit;
 	const expires = balance.expiresAt === null ? "" : ` Expires ${DAY_FORMAT.format(balance.expiresAt)}.`;
@@ -71,7 +71,7 @@ function CreditSpent({ balance }: { balance: CreditBalance }) {
 					exhausted ? "text-red-600 dark:text-red-400" : left < LOW ? "text-amber-600 dark:text-amber-400" : "text-foreground",
 				)}
 			>
-				{spendLabel(balance)}
+				<span className="text-muted-foreground">{name}</span> {spendLabel(balance)}
 			</span>
 		</Tooltip>
 	);
@@ -96,8 +96,8 @@ function PlanRow({ plan }: { plan: PlanUsage }) {
 					/>
 				</span>
 			</Tooltip>
-			{nameOnly && <span aria-hidden className="whitespace-nowrap text-foreground">{plan.name}</span>}
-			{nameOnly && plan.balance && <CreditSpent balance={plan.balance} />}
+			{nameOnly && !plan.balance && <span aria-hidden className="whitespace-nowrap text-foreground">{plan.name}</span>}
+			{nameOnly && plan.balance && <CreditSpent name={plan.name} balance={plan.balance} />}
 			{plan.extra && <ExtraSpent extra={plan.extra} />}
 			{plan.windows.map(window => (
 				<WindowLeft key={window.label} window={window} />
