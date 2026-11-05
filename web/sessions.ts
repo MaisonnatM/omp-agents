@@ -23,17 +23,24 @@ export const isPrivateHost = (host: RosterHost | null | undefined): boolean => h
 
 /**
  * The sessions the sidebar, the palette, and the pages list: none in a temporary directory, none counting in a hidden workspace,
- * and none that is a Bot's conversation, which only its Bot's page shows.
+ * and none that is a Bot's conversation, which only its Bot's page and the Sessions tab's Bots group show. `bots` holds the
+ * live Bot conversations outside those directories, each titled with its Bot's name from `botNames`, by session id.
  */
 export function discoverableSessions(
 	hosts: RosterHost[],
 	past: PastSession[],
 	hidden: ReadonlySet<string>,
-	botSessions: ReadonlySet<string>,
-): { hosts: RosterHost[]; past: PastSession[] } {
-	const listed = <T extends RosterHost | PastSession>(rows: T[]): T[] =>
-		rows.filter(row => discoverableCwd(row.cwd, hidden) && !hidden.has(workspaceCwd(row)) && !botSessions.has(row.sessionId));
-	return { hosts: listed(hosts), past: listed(past) };
+	botNames: ReadonlyMap<string, string>,
+): { hosts: RosterHost[]; past: PastSession[]; bots: RosterHost[] } {
+	const shown = (row: RosterHost | PastSession): boolean => discoverableCwd(row.cwd, hidden) && !hidden.has(workspaceCwd(row));
+	return {
+		hosts: hosts.filter(host => shown(host) && !botNames.has(host.sessionId)),
+		past: past.filter(session => shown(session) && !botNames.has(session.sessionId)),
+		bots: hosts.flatMap(host => {
+			const name = botNames.get(host.sessionId);
+			return name !== undefined && shown(host) ? [{ ...host, sessionName: name }] : [];
+		}),
+	};
 }
 
 /**
@@ -91,11 +98,13 @@ export interface SidebarSessions {
 	running: RosterHost[];
 	/** Live sessions that finished their turn: the blue dot. */
 	idle: RosterHost[];
+	/** Live Bot conversations, titled with their Bot's name. */
+	bots: RosterHost[];
 	interrupted: PastSession[];
 	ended: PastSession[];
 }
 
-export function sidebarSessions(hosts: RosterHost[], past: PastSession[], workspace: string | null, pinned: ReadonlySet<string>): SidebarSessions {
+export function sidebarSessions(hosts: RosterHost[], past: PastSession[], bots: RosterHost[], workspace: string | null, pinned: ReadonlySet<string>): SidebarSessions {
 	const listed = (row: RosterHost | PastSession): boolean => workspace === null || workspaceCwd(row) === workspace;
 	const isPinned = (row: { sessionId: string }): boolean => pinned.has(row.sessionId);
 	const shownHosts = hosts.filter(listed);
@@ -108,6 +117,7 @@ export function sidebarSessions(hosts: RosterHost[], past: PastSession[], worksp
 		},
 		running: unpinnedHosts.filter(host => host.status !== "idle"),
 		idle: unpinnedHosts.filter(host => host.status === "idle"),
+		bots: bots.filter(listed),
 		interrupted: shownPast.filter(session => session.interrupted && !isPinned(session)),
 		ended: shownPast.filter(session => !session.interrupted && !isPinned(session)),
 	};
@@ -124,6 +134,7 @@ export function searchSessions(lists: SidebarSessions, query: string): SidebarSe
 		pinned: { hosts: hosts(lists.pinned.hosts), past: past(lists.pinned.past) },
 		running: hosts(lists.running),
 		idle: hosts(lists.idle),
+		bots: hosts(lists.bots),
 		interrupted: past(lists.interrupted),
 		ended: past(lists.ended),
 	};
@@ -141,8 +152,8 @@ export function latestSession({ pinned, running, idle, interrupted, ended }: Sid
 }
 
 /** Every row of the sessions tab in its order, which the previous and next session keys walk. */
-export function listedViews({ pinned, running, idle, interrupted, ended }: SidebarSessions): View[] {
+export function listedViews({ pinned, running, idle, bots, interrupted, ended }: SidebarSessions): View[] {
 	const live = (hosts: RosterHost[]): View[] => hosts.map(({ instanceId }) => ({ kind: "live", instanceId, agentId: null }));
 	const saved = (sessions: PastSession[]): View[] => sessions.map(({ sessionId }) => ({ kind: "past", sessionId }));
-	return [...live(pinned.hosts), ...saved(pinned.past), ...live([...idle, ...running]), ...saved([...interrupted, ...ended])];
+	return [...live(pinned.hosts), ...saved(pinned.past), ...live([...idle, ...running, ...bots]), ...saved([...interrupted, ...ended])];
 }

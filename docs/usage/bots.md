@@ -36,7 +36,7 @@
 - A Bot's page shows its avatar and name in the header, the first sentence of its job under them, and its conversation below.
   The conversation reads as a chat with your messages, the Bot's replies, folded [routine run cards](routines.md), and the cards of [Bot messages](#bot-messages) other Bots sent it.
   It never shows the Bot's tool calls, its thinking, or the card of files it changed, whatever **Show tool calls** and **Show thinking** say.
-  The Bot's conversation is not listed in the **Sessions** tab, the command palette, or the workspace list; only its Bot's page shows it.
+  The Bot's conversation is not listed in the command palette or the workspace list, nor among the **Sessions** tab's other sessions; while it runs, the **Sessions** tab's **Bots** group lists it under its Bot's name.
   A new Bot greets you and offers three starters, built from its job, or asking what its job should be while it has none, which the composer lists under its action bar as it lists suggested prompts.
   The composer reads **Message** and the Bot's name.
   While its session runs, the conversation and its composer work as in a pane.
@@ -65,6 +65,7 @@
   An address that names a routine the Bot does not have, such as one deleted, shows that, with a link back to the conversation.
   Saving a routine opens it once the server has saved it; a save it refuses says why and keeps the editor open.
   The page offers no **End session**, and Cmd+W does nothing there, so the Bot's one conversation stays open; a session that ended another way resumes with your next message.
+  A conversation with no turn running whose file nothing wrote for a day ends by itself, so an idle Bot holds no omp process; your next message resumes it.
 - **Delete**, in red, asks first, and says that the Bot's routines go with it.
   Deleting a Bot forgets it and deletes its routines, but its conversation stays one of your sessions, and its memory file stays.
 - Every routine belongs to a Bot: on a schedule, or when a Slack message, a pull request, a calendar event, or unread mail triggers it, it messages the Bot, or runs a command in the Bot's workspace and posts the output into its conversation; see [Routines](routines.md).

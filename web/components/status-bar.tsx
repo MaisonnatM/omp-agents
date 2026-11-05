@@ -1,5 +1,6 @@
 import { Cpu, HardDrive, MemoryStick, SquareTerminal } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { Bot } from "../../src/shared/bots";
 import type { LiveSessionProcesses, SessionProcess } from "../../src/shared/processes";
 import type { RosterHost } from "../../src/shared/sessions";
 import type { SystemLoad } from "../../src/shared/system";
@@ -27,7 +28,7 @@ const FACT = "flex items-center gap-1 whitespace-nowrap rounded-sm tabular-nums 
 const cpuLabel = (percent: number): string => (percent > 0 && percent < 0.5 ? "<1%" : `${Math.round(percent)}%`);
 
 /** The CPU fact, whose popover lists what every live session runs, busiest session first, read again every few seconds while it is open. */
-function CpuFact({ cpu, hosts }: { cpu: string; hosts: readonly RosterHost[] }) {
+function CpuFact({ cpu, titles }: { cpu: string; titles: SessionTitles }) {
 	const popover = useHoverPopover();
 	return (
 		<Popover {...popover.root}>
@@ -42,14 +43,14 @@ function CpuFact({ cpu, hosts }: { cpu: string; hosts: readonly RosterHost[] }) 
 					<p className="text-sm font-medium tabular-nums">{`CPU ${cpu} busy across all cores`}</p>
 					<p className="text-xs text-muted-foreground">Per process, 100% is one full core.</p>
 				</div>
-				<SessionProcessList hosts={hosts} />
+				<SessionProcessList titles={titles} />
 			</PopoverContent>
 		</Popover>
 	);
 }
 
 /** Every live session's processes, polled while mounted, which is while the CPU card is open. */
-function SessionProcessList({ hosts }: { hosts: readonly RosterHost[] }) {
+function SessionProcessList({ titles }: { titles: SessionTitles }) {
 	const { read, error } = sessionProcessesStore.usePolling();
 	if (!read) {
 		return (
@@ -64,10 +65,9 @@ function SessionProcessList({ hosts }: { hosts: readonly RosterHost[] }) {
 		.sort((a, b) => b.cpuPercent - a.cpuPercent);
 	return (
 		<div className="max-h-96 overflow-y-auto">
-			{busiest.map(({ session, cpuPercent }) => {
-				const host = hosts.find(each => each.instanceId === session.instanceId);
-				return <SessionGroup key={session.instanceId} title={host ? hostLabel(host) : "Session"} cpuPercent={cpuPercent} session={session} readAt={read.at} />;
-			})}
+			{busiest.map(({ session, cpuPercent }) => (
+				<SessionGroup key={session.instanceId} title={titles.get(session.instanceId) ?? "Session"} cpuPercent={cpuPercent} session={session} readAt={read.at} />
+			))}
 		</div>
 	);
 }
@@ -150,7 +150,7 @@ function DiskFact({ available, total }: { available: number; total: number }) {
 }
 
 /** The machine's CPU percent, available memory, and free disk space, read again every few seconds while the page is visible. */
-function MachineLoad({ hosts }: { hosts: readonly RosterHost[] }) {
+function MachineLoad({ titles }: { titles: SessionTitles }) {
 	const [tick, setTick] = useState(0);
 	useEffect(() => {
 		const timer = setInterval(() => {
@@ -164,7 +164,7 @@ function MachineLoad({ hosts }: { hosts: readonly RosterHost[] }) {
 	const memory = `${formatBytes(load.memoryAvailable)} of ${formatBytes(load.memoryTotal)} memory available`;
 	return (
 		<>
-			{cpu !== null && <CpuFact cpu={cpu} hosts={hosts} />}
+			{cpu !== null && <CpuFact cpu={cpu} titles={titles} />}
 			<Tooltip content={memory} side="top">
 				<span tabIndex={0} aria-label={memory} className={FACT}>
 					<MemoryStick aria-hidden className="size-3 shrink-0" />
@@ -176,16 +176,28 @@ function MachineLoad({ hosts }: { hosts: readonly RosterHost[] }) {
 	);
 }
 
+/** Each live session's title in the CPU card, by instance id: its Bot's name for a Bot's conversation, else its own title. */
+type SessionTitles = ReadonlyMap<string, string>;
+
 interface StatusBarProps {
 	usage: DashboardState["usage"];
 	/** Every live session, which names the sessions in the CPU card. */
 	hosts: readonly RosterHost[];
+	/** The Bots, which name their conversations in the CPU card; `null` before the first list. */
+	bots: readonly Bot[] | null;
 	terminalOpen: boolean;
 	onToggleTerminal: () => void;
 }
 
 /** The window's bottom strip: plan quota on the left; the terminal's toggle and the machine's load on the right. */
-export function StatusBar({ usage, hosts, terminalOpen, onToggleTerminal }: StatusBarProps) {
+export function StatusBar({ usage, hosts, bots, terminalOpen, onToggleTerminal }: StatusBarProps) {
+	const titles = useMemo(() => {
+		const botNames = new Map((bots ?? []).flatMap(bot => (bot.sessionId === null ? [] : [[bot.sessionId, bot.name] as const])));
+		return new Map(hosts.map(host => {
+			const botName = botNames.get(host.sessionId);
+			return [host.instanceId, botName === undefined ? hostLabel(host) : `${botName} · Bot`];
+		}));
+	}, [hosts, bots]);
 	return (
 		<footer className="flex min-h-7 shrink-0 items-center gap-4 border-t border-border px-3 py-1 text-xs">
 			<PlanUsageList usage={usage} />
@@ -196,7 +208,7 @@ export function StatusBar({ usage, hosts, terminalOpen, onToggleTerminal }: Stat
 						Terminal
 					</button>
 				</Tooltip>
-				<MachineLoad hosts={hosts} />
+				<MachineLoad titles={titles} />
 			</div>
 		</footer>
 	);

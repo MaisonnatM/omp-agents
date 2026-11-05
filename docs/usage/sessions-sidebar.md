@@ -3,7 +3,7 @@
 - The content header and both sidebar header rows are 48 px tall at the default font size, each with a hairline under it.
 - The sidebar's tab bar shows **Pull requests**, **Tickets**, **Bots**, **Sessions**, and **Todo**, above the list of the one open.
   **Notes**, **Calendar**, and **Email** are buttons in the header, right after the command menu button, between two dividers; each opens its page and shows its list in the sidebar below the tab bar, with no tab selected, and the open one's button stays pressed.
-  The **Bots** tab lists your Bots, which the **Sessions** tab does not; see [Bots](bots.md).
+  The **Bots** tab lists your Bots; the **Sessions** tab lists only their running conversations, in a **Bots** group after the running sessions, each under its Bot's name; see [Bots](bots.md).
   The **Sessions** tab counts the sessions of the picked workspace that need you: each that asks you something, or finished a turn you have not looked at since.
   A finished turn you have read leaves the count, though its session stays idle.
 - The dot before each session shows when it waits on you.
@@ -100,7 +100,7 @@
   Click it or press Enter to move focus into the popover, then follow **Clean up…** to [Settings › Storage](settings.md).
 - Hover or click the CPU for a popover that lists what every live session runs besides omp, read again every 5 seconds while it is open.
   Clicking the CPU while hover opened it, or pressing Enter on it, moves focus into the popover, so Tab reaches each **Stop**.
-  The busiest session comes first, by the CPU of omp and its processes together, each named by its session name or else its folder.
+  The busiest session comes first, by the CPU of omp and its processes together, each named by its session name or else its folder; a Bot's conversation reads its Bot's name and **Bot**.
   The CPU of a process is the share of one core it uses, so one process can show more than 100%; macOS reads it as an average that decays over the last minute.
   Each session starts with the CPU, memory, and process count of omp and its MCP servers, which end with the session and have no **Stop**.
   Below it come its jobs and services, biggest memory first.
