@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-05
 
+- The Sessions tab now lists running Bot conversations in a **Bots** group, under each Bot's name, so every open session shows somewhere; the CPU card names them the same way.
+- A Bot's conversation idle for a day, with nothing written to it, now ends by itself so it holds no omp process; your next message to the Bot resumes it.
 - Fixed: a session whose omp exits before it is ready no longer leaves its socket file behind, which blocked the next start on that session.
 - The model menu now lists models from a provider you configured with an API key, such as API credits.
 - The bottom bar names that provider beside the plan windows. It has no percent, because the plan report has no balance for it.
@@ -179,48 +181,3 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - A PR shepherd Bot asked to merge a pull request in a project set up this way now starts a session that lands it the same way, instead of merging it on GitHub without running the checks on the result.
 - Fixed: with the starter kit on the current omp, the tool agents use to edit a pull request's description loads again, instead of an error at the start of every session.
 - With the starter kit, sessions in the same project now share a memory: a new session starts with the project's remembered decisions, facts, and lessons and the work that last landed, and a running one hears when another session lands work or changes the memory, starting with work that touches the same files.
-
-## 2026-10-30
-
-- Fixed: Remove merged in Settings › Worktrees, and ending a session, no longer delete a worktree that another running session still works in, even a session started in another project.
-- The server log now names each worktree it removes and what asked for it.
-- After you run the thermonuclear or interface review yourself on a pull request, the agent now ticks its review checkbox once the fixes are pushed, so marking the pull request ready is no longer blocked for a missing tick.
-- When an agent builds a prototype or design screenshots, it keeps them in its own copy of the project and serves the prototype so it stays up, so they no longer disappear and get rebuilt from memory.
-- Behind the scenes: the starter kit tells sessions on Cursor models how to run commands, search files, and open skills, so they stop waiting an hour on a command, failing searches, and dumping whole skills.
-- When a prototype or a page change is ready, the agent now starts the app itself and gives you the pages to open, with screenshots it checked first, and "make it live" gets you that link instead of a merge.
-- Behind the scenes: the pull request rebase tests build their repositories once and copy them for each test, and wait up to 30 seconds, so they pass when the machine is busy.
-- Fixed: a helper agent that works on its own copy of a repository now puts its changes back only where its agent says, and the starter kit refuses to put them in your main copy while it is on main, keeping them aside for you instead.
-- When an agent shows you design options, it names each one, such as Mode chip, and uses that same name in previews, Slack posts, tickets, pull requests, and suggested prompts, so a number never points at the wrong design.
-- A Bot's details now have their own Routines tab, which lists its routines and counts them on the tab.
-- A Bot's Details tab now shows its Usage: the tokens its conversation used and what they would cost at list price, with its requests and cache hit rate.
-- Putting a pull request live from another folder now checks it in that folder, so the checks read the right pull request and its own review rules.
-- Putting live a pull request of another of your repositories is refused with the folder to run it from, where it used to skip the review checks.
-- A todo can name the workspace it is about, such as yampa or omp-agents: pick it from the open todo's Workspace button, and its row shows the workspace's name.
-- Work on it, Plan it, Start session, and the new-session board start a todo's session in its workspace instead of the sidebar's.
-- A todo an agent adds belongs to the workspace that session runs in, unless the agent names another.
-- With a workspace picked at the top of the sidebar, the Todo lists and their counts show only that workspace's todos; All workspaces shows every todo.
-- When a session finds its work belongs in another project, it now moves itself there once its turn ends, and the sidebar follows; before, it asked you to type /move.
-- The End session button in a session's header is now a filled button, so it stands out.
-- The End session button in a session's header shows its stop icon again; it was an empty, invisible button.
-- You can pin a Bot to keep it at the top of the Bots tab and the gallery: right-click it and choose Pin.
-- You can group your Bots into sections: right-click a Bot, choose Move to section, then New section.
-- A section's menu in the Bots tab renames it or removes it, and you can fold any group of Bots.
-- Behind the scenes: the starter kit's guide now names a reply's three parts the way the agent writes them, so it no longer confuses new readers.
-- New Bot now asks for a type: Routines, the Bots you had, or PR shepherd.
-- A PR shepherd watches your approved pull requests and starts a session to fix conflicts, failing checks, or review comments, then queues the merge.
-- A PR shepherd merges only what a reviewer approved: a rebase is fine, but new code waits for a fresh review, and it tells you why.
-- A PR shepherd tries each fix at most twice per pull request, then asks you.
-- Fixed: a session on a Cursor model asks you its questions with the question form instead of in plain text, because the starter kit now points it to omp's question tool.
-- Cmd+W now ends the focused session, in place of Cmd+Shift+X.
-- Cmd+Shift+W now closes the window, since Cmd+W ends a session.
-- End session in a session's header is now a stop icon; hover it to see its name and shortcut.
-- You can click Review visuals, the eye in the Browser's toolbar, to open every page the agent asks you to look at, each in its own Browser tab.
-- An agent's list of pages to review now shows as a small card in its reply.
-- The Browser's tabs look like a web browser's, with the App tab pinned first and a close button on each review tab.
-- Maximize Browser and Open in default browser now sit in the Browser's ⋯ menu, which leaves the address field more room.
-- You can stop a session's dev server from the Browser's server menu with Stop dev server.
-- The Browser's server menu now shows each dev server's command without long folder paths, as the CPU card does.
-- Fixed: Settings › Source control now looks for `gh` and `gt` on the app's current `PATH`, not only the one it started with.
-- Fixed: a reply that shows a screenshot keeps its suggested prompts, because the starter kit now has the agent put the screenshot above them.
-- Fixed: Settings, Notes, Calendar, and Email show the sidebar's tab bar again, so a tab such as Sessions takes you back.
-- Fixed: on macOS, the title bar's Back and Forward buttons now line up with the window's close, minimize, and zoom buttons, with a gap after them.

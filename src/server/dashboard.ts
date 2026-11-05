@@ -541,6 +541,7 @@ export class Dashboard {
 				await scheduledRunner.tick();
 				await runner.tick();
 				await this.#mergeCleanup.tick();
+				await this.#bots.stopIdle(Date.now());
 			},
 			onNoticeTick: () => notices.check(UPDATE_KINDS),
 			onActivityTick: async () => {

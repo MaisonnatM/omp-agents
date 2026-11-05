@@ -1,7 +1,9 @@
 /**
  * The Bots on the server: how a Bot's session launches with the Bot extension, which conversation each Bot is bound
- * to as that session lives, and a message to a Bot, which reaches its live session or resumes it.
+ * to as that session lives, a message to a Bot, which reaches its live session or resumes it, and the idle stop of a
+ * conversation nothing used for a day.
  */
+import { statSync } from "node:fs";
 import { join } from "node:path";
 import { isObject, str } from "../json";
 import type { LiveSession } from "../live-session";
@@ -22,8 +24,11 @@ import type { RoutineSpec } from "../routines";
 import { shepherdRoutine } from "../shared/shepherd";
 import type { SessionJoin } from "./start";
 
-/** What a message needs of a live session. */
-type BotSession = Pick<LiveSession, "sessionId" | "prompt">;
+/** What a message and the idle stop need of a live session. */
+type BotSession = Pick<LiveSession, "sessionId" | "prompt" | "row" | "end">;
+
+/** How long a Bot's live conversation sits idle, its file unwritten, before {@link Bots.stopIdle} ends it. */
+export const BOT_IDLE_STOP_MS = 24 * 60 * 60_000;
 
 /** A Bot's memory and its conversation's last words, as read for its session `sessionId`. */
 type BotFiles = { sessionId: string | null; memory: string; last: BotLast | null };
@@ -256,6 +261,21 @@ export class Bots {
 			});
 		this.#sending.set(id, sent);
 		return sent;
+	}
+
+	/**
+	 * Ends each Bot's live conversation that is idle and whose file nothing wrote for {@link BOT_IDLE_STOP_MS}, unless a
+	 * message to it is under way; the Bot's next message resumes it.
+	 */
+	async stopIdle(now: number): Promise<void> {
+		for (const bot of this.list) {
+			if (bot.sessionId === null || this.#sending.has(bot.id)) continue;
+			const live = this.#deps.live(bot.sessionId);
+			if (!live || live.row().status !== "idle") continue;
+			const path = this.#deps.savedFile(live.sessionId);
+			const written = path === null ? undefined : statSync(path, { throwIfNoEntry: false })?.mtimeMs;
+			if (written !== undefined && now - written >= BOT_IDLE_STOP_MS) await live.end();
+		}
 	}
 
 	async #send(id: BotId, text: string): Promise<string> {

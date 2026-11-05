@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import type { LiveRow } from "../live-session";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { BotId, BotLast, BotSpec } from "../shared/bots";
 import { botMessageText } from "../shared/bot-message";
 import { type RoutineMessage, routineMessageText } from "../shared/routine-message";
 import { newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
-import { Bots, lastMessage } from "./bots";
+import { BOT_IDLE_STOP_MS, Bots, lastMessage } from "./bots";
 import { BotsFile } from "./bots-file";
 
 const dirs: string[] = [];
@@ -24,6 +25,8 @@ interface FakeSession {
 	/** Each message it took, as `<delivery> <text>`. */
 	heard: string[];
 	ended: boolean;
+	/** Whether a turn runs, which keeps the idle stop off it. */
+	working?: boolean;
 }
 
 /** Bots over a fresh `bots.json`, with a starter that joins each start as the server's does and keeps the session files it wrote. */
@@ -40,6 +43,8 @@ function harness() {
 			? {
 					sessionId: session.sessionId,
 					prompt: async (_agentId: string | null, text: string, _images: unknown[], delivery: string) => void session.heard.push(`${delivery} ${text}`),
+					row: () => ({ status: session.working ? "working" : "idle" }) as LiveRow,
+					end: async () => end(session),
 				}
 			: undefined;
 	const bots: Bots = new Bots({
@@ -214,6 +219,28 @@ describe("Bots", () => {
 		expect(bots.msg()).toMatchObject({ memories: { scout: "- 2026-05-02 Prefers short answers.\n" }, lasts: { scout: { text: "Still here." } } });
 		file.apply({ op: "remove", id: scout.id }, "2026-05-02T09:00:00.000Z");
 		expect(bots.msg()).toEqual({ t: "bots", bots: [], memories: {}, lasts: {} });
+	});
+
+	test("the idle stop ends a conversation idle with its file unwritten for a day, keeps a busy or recent one, and the next message resumes it", async () => {
+		const { bots, sessions, requests, dir } = harness();
+		await bots.message(scout.id, "Hello.");
+		const file = join(dir, "s1.jsonl");
+		writeFileSync(file, "");
+		const written = Date.parse("2026-05-02T09:00:00.000Z");
+		utimesSync(file, written / 1000, written / 1000);
+
+		await bots.stopIdle(written + BOT_IDLE_STOP_MS - 1);
+		expect(sessions[0]?.ended).toBe(false);
+		sessions[0]!.working = true;
+		await bots.stopIdle(written + BOT_IDLE_STOP_MS);
+		expect(sessions[0]?.ended).toBe(false);
+		sessions[0]!.working = false;
+		await bots.stopIdle(written + BOT_IDLE_STOP_MS);
+		expect(sessions[0]?.ended).toBe(true);
+
+		expect(await bots.message(scout.id, "Back again.")).toBe("s1");
+		expect(requests.at(-1)).toEqual({ kind: "resume", sessionId: "s1" });
+		expect(sessions[1]?.heard).toEqual(["followUp Back again."]);
 	});
 });
 

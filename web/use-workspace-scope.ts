@@ -25,8 +25,11 @@ function useSelectedWorkspace(workspaces: Workspace[]): [string | null, (cwd: st
 
 /** The directories the sidebar, the palette, and the pages list, and the workspace they are scoped to. */
 export interface WorkspaceScope {
-	/** The sessions in neither a temporary nor a hidden directory, and no Bot's conversation. The raw lists keep the others for what links to them. */
-	visible: { hosts: RosterHost[]; past: PastSession[] };
+	/**
+	 * The sessions in neither a temporary nor a hidden directory, and no Bot's conversation, with the live Bot conversations apart,
+	 * titled with their Bot's name. The raw lists keep the others for what links to them.
+	 */
+	visible: { hosts: RosterHost[]; past: PastSession[]; bots: RosterHost[] };
 	hiddenCwds: ReadonlySet<string>;
 	/** The workspaces, as {@link listWorkspaces} lists them. */
 	workspaces: Workspace[];
@@ -42,8 +45,8 @@ export interface WorkspaceScope {
 export function useWorkspaceScope(state: DashboardState): WorkspaceScope {
 	// Temporary and hidden workspaces, and Bots' conversations, remain in the raw sessions; only discoverable sessions enter the workspace list and sidebar view.
 	const hiddenCwds = useMemo(() => new Set(state.workspaceList.hidden.map(hidden => hidden.cwd)), [state.workspaceList.hidden]);
-	const botSessions = useMemo(() => new Set((state.bots ?? []).flatMap(bot => (bot.sessionId === null ? [] : [bot.sessionId]))), [state.bots]);
-	const visible = useMemo(() => discoverableSessions(state.hosts, state.past, hiddenCwds, botSessions), [state.hosts, state.past, hiddenCwds, botSessions]);
+	const botNames = useMemo(() => new Map((state.bots ?? []).flatMap(bot => (bot.sessionId === null ? [] : [[bot.sessionId, bot.name] as const]))), [state.bots]);
+	const visible = useMemo(() => discoverableSessions(state.hosts, state.past, hiddenCwds, botNames), [state.hosts, state.past, hiddenCwds, botNames]);
 	const workspaces = useMemo(
 		() => listWorkspaces(visible.hosts, visible.past, state.workspaceList.added.filter(added => !hiddenCwds.has(added.cwd))),
 		[visible, state.workspaceList.added, hiddenCwds],

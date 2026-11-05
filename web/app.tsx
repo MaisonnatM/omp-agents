@@ -382,7 +382,7 @@ export function App() {
 											onCreateTicket={setNewTicket}
 										/>
 									</SidebarProvider>
-									<StatusBar usage={state.usage} hosts={state.hosts} terminalOpen={terminal.open} onToggleTerminal={terminal.toggle} />
+									<StatusBar usage={state.usage} hosts={state.hosts} bots={state.bots} terminalOpen={terminal.open} onToggleTerminal={terminal.toggle} />
 									<DesktopLinkPreview />
 								</div>
 							</PersonalContext.Provider>
