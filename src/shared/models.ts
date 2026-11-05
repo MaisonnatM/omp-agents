@@ -61,10 +61,13 @@ export interface PlanUsage {
 	balance?: CreditBalance | null;
 }
 
+/** The footer row for Anthropic API credits, from a model-config provider of this id or an API key saved in Settings. */
+export const API_CREDITS_PROVIDER = "anthropic-api";
+
 /** Names that are not the title of the provider id. The page and `omp usage` rows share this table. */
 export const PROVIDER_NAMES: Record<string, string> = {
 	anthropic: "Anthropic",
-	"anthropic-api": "API credits",
+	[API_CREDITS_PROVIDER]: "API credits",
 	"openai-codex": "OpenAI Codex",
 	cursor: "Cursor",
 };

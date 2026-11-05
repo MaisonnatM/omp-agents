@@ -11,6 +11,7 @@ It keeps a report's `resetCredits` as omp's `availableCount`, which counts banke
 A limit in `usd` without a window, such as omp's `anthropic:extra` when Claude extra usage is on, becomes the plan's `extra`: the dollars spent, the monthly cap or `null`, and whether it is used up; a plan with only extra usage still counts.
 A window omp meters in `usd`, such as Cursor's `Other Models`, also keeps its dollars as `usd`.
 `plansWithConfiguredProviders` adds a name-only plan for each provider whose model config sets an API key when this report left it out, such as prepaid API credits.
+An Anthropic API key saved in Settings is a stored `api_key` row beside the Anthropic sign-in, so `configuredProviders` also lists `anthropic-api` for it, once, whether or not a model config names that provider.
 That plan has no windows, extra usage, or reset credits. The footer shows its name, and plan notices ignore it.
 `readConsoleCreditBalance` in `src/console-credits.ts` then looks for a Firefox or Zen `sessionKey` cookie for `platform.claude.com` and reads that organization's promotional credit grant.
 When the grant is there, the API credits row gains `balance`: dollars spent, the grant, and the soonest expiry.

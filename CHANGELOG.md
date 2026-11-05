@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-05
 
+- Fixed: an Anthropic API key added in Settings now shows as API credits in the bottom bar, even while you stay signed in to a Claude plan.
 - Starting a new session while several conversations are open shows that new session alone.
 - Ending a session that is open beside another one leaves a single conversation, instead of filling the empty side with the next session.
 - Esc on a split closes the pane that was added last. Esc on a maximized pane still brings the other panes back.

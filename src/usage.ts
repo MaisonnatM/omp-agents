@@ -4,7 +4,7 @@ import { isObject, num, str } from "./json";
 import { ompCommand } from "./omp/install";
 import { configuredProviders } from "./omp/models";
 import { run } from "./proc";
-import { type CreditBalance, type ExtraUsage, PROVIDER_NAMES, type PlanUsage, type PlanWindow, type ResetCredits, type UsdAmount } from "./shared/models";
+import { API_CREDITS_PROVIDER, type CreditBalance, type ExtraUsage, PROVIDER_NAMES, type PlanUsage, type PlanWindow, type ResetCredits, type UsdAmount } from "./shared/models";
 
 const TIMEOUT_MS = 30_000;
 
@@ -109,7 +109,7 @@ export function parsePlanUsage(stdout: string): PlanUsage[] {
 
 /**
  * Plans plus a name-only row for each configured provider `omp usage` did not report.
- * A model-config API key, such as prepaid API credits, has no quota window in that report.
+ * An API key, from the model config or saved in Settings for Anthropic's API credits, has no quota window in that report.
  */
 export function plansWithConfiguredProviders(plans: readonly PlanUsage[], configured: readonly string[]): PlanUsage[] {
 	const shown = new Set(plans.map(plan => plan.provider));
@@ -124,7 +124,7 @@ export function plansWithConfiguredProviders(plans: readonly PlanUsage[], config
 export function withCreditBalance(plans: readonly PlanUsage[], balance: CreditBalance | null): PlanUsage[] {
 	if (!balance) return [...plans];
 	return plans.map(plan =>
-		plan.provider === "anthropic-api" && plan.windows.length === 0 && plan.extra === null ? { ...plan, balance } : plan,
+		plan.provider === API_CREDITS_PROVIDER && plan.windows.length === 0 && plan.extra === null ? { ...plan, balance } : plan,
 	);
 }
 

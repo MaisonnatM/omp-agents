@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CatalogModel } from "../shared/models";
 import type { CredentialOrigin } from "./module-types/models";
-import { connectedProviderIds, modelEntries, resolveRoles } from "./models";
+import { configuredProviderIds, connectedProviderIds, modelEntries, resolveRoles } from "./models";
 import { auth, modelRegistry } from "./modules";
 
 const listed = (selector: string): CatalogModel => ({ selector, provider: selector.slice(0, selector.indexOf("/")), name: selector, contextWindow: null, thinking: ["low", "high"] });
@@ -90,10 +90,10 @@ describe("modelEntries", () => {
 	});
 });
 
-describe("connectedProviderIds", () => {
-	const source = (present: Record<string, CredentialOrigin["kind"]>) => (id: string): CredentialOrigin | undefined =>
-		present[id] === undefined ? undefined : { kind: present[id] };
+const source = (present: Record<string, CredentialOrigin["kind"]>) => (id: string): CredentialOrigin | undefined =>
+	present[id] === undefined ? undefined : { kind: present[id] };
 
+describe("connectedProviderIds", () => {
 	test("keeps a sign-in provider with a credential, and a catalog provider whose key comes from the model config", () => {
 		const connected = connectedProviderIds(
 			["anthropic", "cursor"],
@@ -105,6 +105,21 @@ describe("connectedProviderIds", () => {
 
 	test("leaves out a sign-in provider with no credential and a keyless catalog provider", () => {
 		expect([...connectedProviderIds(["anthropic"], ["anthropic", "local-demo"], source({}))]).toEqual([]);
+	});
+});
+
+describe("configuredProviderIds", () => {
+	test("an Anthropic API key saved in Settings adds the API credits row beside the Anthropic sign-in", () => {
+		expect(configuredProviderIds(["anthropic", "cursor"], source({ anthropic: "oauth", cursor: "oauth" }), true)).toEqual(["anthropic-api"]);
+		expect(configuredProviderIds(["anthropic", "cursor"], source({ anthropic: "oauth", cursor: "oauth" }), false)).toEqual([]);
+	});
+
+	test("a model-config API credits provider and a saved key give one row", () => {
+		expect(configuredProviderIds(["anthropic-api", "anthropic-api"], source({ "anthropic-api": "config" }), true)).toEqual(["anthropic-api"]);
+	});
+
+	test("a saved key still adds the row when an API credits provider takes its key from the environment", () => {
+		expect(configuredProviderIds(["anthropic-api"], source({ "anthropic-api": "env" }), true)).toEqual(["anthropic-api"]);
 	});
 });
 
