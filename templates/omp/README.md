@@ -99,6 +99,10 @@ Files, in `agent/`:
   The memory is a `memory.json` committed to `refs/omp/memory` in the repository, which its worktrees share and which is never pushed, so `git log -p refs/omp/memory` shows each change and the session that made it.
   Landings are read from git each time, and the `Omp-Session` trailers that `extensions/session-trailer.ts` writes say which session made each one; each session's first prompt is kept under `.git/omp-project-memory/intents/`.
   `omp -p`, `--mode json`, and subagents get neither the brief nor a catch-up.
+- `extensions/redact-secrets.ts`: once each turn ends, replaces every secret in what omp keeps of the session on disk with `[redacted secret: <what it was>]`: the session file, the folder of tool logs and subagent files beside it, and the session's rows in `history.db`.
+  It finds keys by their shape, such as Stripe, GitHub, OpenAI, Anthropic, Supabase, AWS, and Google keys, the password in a database URL, and, in what you wrote, `password:` and `NAME_PASSWORD=` pairs, then that value wherever else it shows up.
+  The running agent keeps the real values until the session ends, so save a pasted secret where it belongs in the same turn; the provider has already received it.
+  See [Pasted secrets](../../docs/architecture/pasted-secrets.md) for what it leaves.
 - `extensions/session-trailer.ts`: adds an `Omp-Session: <session id>` trailer to every commit an omp session makes, through a config-based `prepare-commit-msg` git hook set in omp's environment, which runs beside a repository's own hooks, husky's included.
   `git log --format='%h %(trailers:key=Omp-Session,valueonly)'` names each commit's session, and `omp -r <session id>` reopens it.
   A git without config-based hooks ignores it.

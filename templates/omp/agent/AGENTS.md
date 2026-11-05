@@ -30,6 +30,10 @@ Use `take_snapshot` for the page's elements and their `uid`s, which `click`, `fi
 There is no cookie tool, and `evaluate_script` sets only non-`httpOnly` cookies; yampa verification is unaffected, since `control-yampa browser start` runs its own Playwright Chromium with the session cookie.
 Start an app that opens windows, such as an Electron app, in its hidden mode, such as `OMP_AGENTS_HEADLESS=1` for the omp-agents desktop app, and open a visible window only when the user asks for one.
 
+## Pasted secrets
+
+When the user pastes a secret, such as an API key, a password, or a database URL with a password, save it where it belongs, such as the project's env file, Vercel, or the keychain, in the same turn: once the turn ends the session's saved copy reads `[redacted secret: …]`, so a resumed session no longer has the value.
+
 ## omp-agents dashboard
 
 Never kill, signal, or `osascript quit` the omp-agents dashboard's processes: its window goes down with them.

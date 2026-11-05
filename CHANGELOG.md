@@ -52,6 +52,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - A private session's sidebar row and header now show a dark Private chip, easier to spot than the old lock.
 - The sidebar has a Personal item under New session, also on Cmd+Shift+P. It opens a page that shows what your assistant remembers and your recent personal sessions.
 - The starter kit now sends agents to the review steps before they mark a pull request ready or merge it, so they stop running into the review check first.
+- A key or password you paste into a session no longer stays in the saved session. Once the agent finishes its turn, the starter kit replaces it with a note saying what kind of secret it was, so save it where it belongs in that same turn.
 - The starter kit now tells agents to write out the full address of any server they start for you, ready to click, instead of only its port number.
 
 ## 2026-11-03
