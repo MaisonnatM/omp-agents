@@ -1,7 +1,7 @@
 import { createCache } from "../cache";
 import { isObject } from "../json";
 import { runJson } from "../proc";
-import { type CatalogModel, type ConnectedModels, type DraftModel, type ModelEntry, type ModelRole, selectorOf, splitSelector } from "../shared/models";
+import { API_CREDITS_PROVIDER, type CatalogModel, type ConnectedModels, type DraftModel, type ModelEntry, type ModelRole, selectorOf, splitSelector } from "../shared/models";
 import { loadOmpConfig, type OmpConfig, readSelector, routedSelectors } from "./config";
 import { ompCommand } from "./install";
 import { auth, config, modelRegistry, modelResolver, oauth, serviceTiers } from "./modules";
@@ -81,10 +81,14 @@ export function connectedProviderIds(
 	return new Set(ids);
 }
 
-/** Catalog providers whose model config sets an API key, once each. */
+/**
+ * Catalog providers whose model config sets an API key, once each, plus the API credits row when an Anthropic API key
+ * is saved in Settings. That key sits beside the Anthropic sign-in, so the Anthropic plan row cannot stand for it.
+ */
 export function configuredProviderIds(
 	catalogProviders: readonly string[],
 	source: (id: string) => CredentialOrigin | undefined,
+	anthropicApiKeySaved: boolean,
 ): string[] {
 	const ids: string[] = [];
 	const seen = new Set<string>();
@@ -93,6 +97,7 @@ export function configuredProviderIds(
 		seen.add(provider);
 		if (source(provider)?.kind === "config") ids.push(provider);
 	}
+	if (anthropicApiKeySaved && !ids.includes(API_CREDITS_PROVIDER)) ids.push(API_CREDITS_PROVIDER);
 	return ids;
 }
 
@@ -116,7 +121,7 @@ export async function connectedProviders(): Promise<Set<string>> {
 	}
 }
 
-/** Catalog providers whose model config sets an API key. Same registry pass as {@link connectedProviders}, without the sign-in ids. */
+/** {@link configuredProviderIds} from the same registry pass as {@link connectedProviders}, and the stored Anthropic rows. */
 export async function configuredProviders(): Promise<string[]> {
 	const storage = await auth.discoverAuthStorage();
 	try {
@@ -124,6 +129,7 @@ export async function configuredProviders(): Promise<string[]> {
 		return configuredProviderIds(
 			registry.getAvailable().map(model => model.provider),
 			id => storage.keys.source(id),
+			storage.credentials.list("anthropic").some(row => row.credential.type === "api_key"),
 		);
 	} finally {
 		storage.close();
