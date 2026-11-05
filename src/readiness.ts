@@ -18,7 +18,7 @@ export async function readStarterKitStatus(): Promise<StarterKitStatus> {
 		hasMarketplace: marketplaces.marketplaces.some(marketplace => marketplace.name === STARTER_KIT_MARKETPLACE.name),
 		plugins,
 	});
-	const actions = [...plan.files, ...plan.settings, plan.marketplace, ...plan.plugins].map(step => step.action);
+	const actions = [...plan.files, ...plan.settings, plan.marketplace, ...plan.plugins, ...plan.mcpServers].map(step => step.action);
 	return {
 		pending: actions.filter(action => action === "create" || action === "update").length,
 		kept: actions.filter(action => action === "keep").length,
