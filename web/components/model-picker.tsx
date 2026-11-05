@@ -321,7 +321,8 @@ function ModelSearch({ list, current, disabled, onPick }: { list: ModelList; cur
 		const frame = requestAnimationFrame(() => input.current?.focus());
 		return () => cancelAnimationFrame(frame);
 	}, []);
-	const shown = menuModels(list.data?.models ?? [], query, current);
+	const models = list.data?.models ?? [];
+	const shown = menuModels(models, query, current);
 	const results: PickerList = list.error
 		? { kind: "failed", error: list.error }
 		: list.data === null
