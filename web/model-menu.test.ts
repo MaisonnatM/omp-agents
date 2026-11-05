@@ -1,8 +1,33 @@
 import { describe, expect, test } from "bun:test";
 import type { ExtraUsage, ModelEntry, PlanUsage } from "../src/shared/models";
-import { contextVariants, modelMatch, providerQuota } from "./model-menu";
+import { contextVariants, menuModels, modelMatch, providerQuota } from "./model-menu";
 
 const entry = (provider: string, id: string, contextWindow: number | null): ModelEntry => ({ provider, id, name: id, contextWindow, curated: false });
+
+describe("menuModels", () => {
+	const row = (provider: string, id: string, curated = false): ModelEntry => ({ provider, id, name: id, contextWindow: null, curated });
+
+	test("an empty search shows role models, the current model, and every API credits model", () => {
+		const models = [
+			row("anthropic", "claude-opus-5-5", true),
+			row("anthropic", "claude-sonnet-5"),
+			row("anthropic-api", "claude-opus-5-5"),
+			row("anthropic-api", "claude-sonnet-5"),
+			row("cursor", "grok-4.7"),
+		];
+		expect(menuModels(models, "", "cursor/grok-4.7").map(model => `${model.provider}/${model.id}`)).toEqual([
+			"anthropic/claude-opus-5-5",
+			"anthropic-api/claude-opus-5-5",
+			"anthropic-api/claude-sonnet-5",
+			"cursor/grok-4.7",
+		]);
+	});
+
+	test("a search lists every connected model", () => {
+		const models = [row("anthropic", "claude-sonnet-5"), row("cursor", "grok-4.7")];
+		expect(menuModels(models, "sonnet", null)).toBe(models);
+	});
+});
 
 describe("contextVariants", () => {
 	const models = [

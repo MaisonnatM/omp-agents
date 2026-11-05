@@ -79,6 +79,17 @@ describe("modelEntries", () => {
 		expect(entries.map(entry => entry.provider)).toEqual(["openrouter", "openrouter", "cursor", "anthropic", "anthropic"]);
 	});
 
+	test("API credits follows Anthropic when Anthropic is in the provider order", () => {
+		const listed = [model("cursor/grok-4.7"), model("anthropic/claude-opus-5-5"), model("anthropic-api/claude-opus-5-5"), model("opencode-go/deepseek")];
+		const entries = modelEntries(listed, { ...noRouting, modelProviderOrder: ["anthropic", "cursor", "opencode-go"] }, new Set(listed.map(entry => entry.provider)));
+		expect(entries.map(entry => `${entry.provider}/${entry.id}`)).toEqual([
+			"anthropic/claude-opus-5-5",
+			"anthropic-api/claude-opus-5-5",
+			"cursor/grok-4.7",
+			"opencode-go/deepseek",
+		]);
+	});
+
 	test("models of providers you are not connected to are left out, even when curated", () => {
 		const entries = modelEntries(models, { ...noRouting, modelRoles: { default: "cursor/grok-4.7" } }, new Set(["anthropic"]));
 		expect(entries.map(entry => entry.id)).toEqual(["claude-opus-5-5", "claude-fable-5-1"]);

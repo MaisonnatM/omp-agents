@@ -172,7 +172,13 @@ export function modelEntries<T extends ListedModel>(
 		}),
 	);
 	const order = config.modelProviderOrder;
-	const rank = (provider: string): number => (order.includes(provider) ? order.indexOf(provider) : order.length);
+	// API credits bills the same Claude models as Anthropic, so it sits immediately after that provider.
+	const rank = (provider: string): number => {
+		const named = provider === API_CREDITS_PROVIDER ? "anthropic" : provider;
+		const index = order.indexOf(named);
+		const base = index < 0 ? order.length : index;
+		return provider === API_CREDITS_PROVIDER ? base + 0.5 : base;
+	};
 	return models
 		.filter(model => connected.has(model.provider))
 		.toSorted((a, b) => rank(a.provider) - rank(b.provider))

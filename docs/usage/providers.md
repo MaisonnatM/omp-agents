@@ -16,7 +16,7 @@
   **Add API key**, or **Replace API key** when one is stored, asks for the Anthropic Console key in a masked field. Choose **Save API key**.
   Do not paste it into a session conversation.
   Saving replaces an API key stored on that row, and one previously stored on Anthropic, and keeps Anthropic subscription sign-ins.
-  A new session bills the key when you pick an API credits model. An Anthropic model still uses the subscription sign-in.
+  The model menu lists that group beside Anthropic before you search. A new session bills the key when you pick one of those models. An Anthropic model still uses the subscription sign-in.
   The dashboard moves a key that an older version stored on Anthropic onto this row the next time it starts.
   **Cancel** closes the entry without saving.
   The key stays in omp's credential store, not dashboard settings or settings sync.

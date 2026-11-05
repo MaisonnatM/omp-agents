@@ -21,7 +21,7 @@ import {
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
 import { modelLabel, modelOrg, providerLabel, providerOrg } from "../labels";
-import { contextVariants, levelLabel, modelMatch, providerQuota } from "../model-menu";
+import { contextVariants, levelLabel, menuModels, modelMatch, providerQuota } from "../model-menu";
 import type { ModelList } from "../reads";
 import { shortcutLabels } from "../shortcuts";
 import { CommandResults, type PickerGroup, type PickerList } from "./command-picker";
@@ -311,7 +311,7 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 	);
 }
 
-/** Before you type, the models your roles and fallback chains name plus the current one; typing searches every connected model. */
+/** Before you type, role models, the current one, and the API credits group; typing searches every connected model. */
 function ModelSearch({ list, current, disabled, onPick }: { list: ModelList; current: string | null; disabled?: boolean; onPick: (model: ModelEntry) => void }) {
 	const plans = useContext(Plans);
 	const [query, setQuery] = useState("");
@@ -321,8 +321,7 @@ function ModelSearch({ list, current, disabled, onPick }: { list: ModelList; cur
 		const frame = requestAnimationFrame(() => input.current?.focus());
 		return () => cancelAnimationFrame(frame);
 	}, []);
-	const models = list.data?.models ?? [];
-	const shown = query.trim() === "" ? models.filter(model => model.curated || selectorOf(model) === current) : models;
+	const shown = menuModels(list.data?.models ?? [], query, current);
 	const results: PickerList = list.error
 		? { kind: "failed", error: list.error }
 		: list.data === null
