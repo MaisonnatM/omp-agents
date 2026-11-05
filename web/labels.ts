@@ -1,6 +1,7 @@
 /** Names the page gives things: sessions, models, providers, and the click gestures that open rows. */
 import type { MouseEvent } from "react";
 import type { PullRequestLink } from "../src/shared/github";
+import { PROVIDER_NAMES } from "../src/shared/models";
 import type { PastSession, RosterHost, SessionSource } from "../src/shared/sessions";
 import type { Workspace } from "../src/shared/workspaces";
 import { IS_MAC, modHeld } from "./shortcuts";
@@ -33,7 +34,7 @@ function labelWord(word: string): string {
 const labelWords = (words: string[]): string => words.filter(Boolean).map(labelWord).join(" ");
 
 /** A provider id as its name: `openai-codex` reads `OpenAI Codex`. */
-export const providerLabel = (provider: string): string => labelWords(provider.split("-"));
+export const providerLabel = (provider: string): string => PROVIDER_NAMES[provider] ?? labelWords(provider.split("-"));
 
 /** A skill name as its title: `poteto-mode` reads `Poteto Mode`. */
 export const skillLabel = (name: string): string => labelWords(name.split(/[-_\s]+/));
@@ -62,7 +63,12 @@ export function modelLabel(selector: string): string {
 }
 
 /** Providers whose id is not the org that makes their models. */
-const PROVIDER_ORGS: Record<string, string> = { "openai-codex": "openai", "opencode-go": "opencode", "opencode-zen": "opencode" };
+const PROVIDER_ORGS: Record<string, string> = {
+	"anthropic-api": "anthropic",
+	"openai-codex": "openai",
+	"opencode-go": "opencode",
+	"opencode-zen": "opencode",
+};
 
 export const providerOrg = (provider: string): string => PROVIDER_ORGS[provider] ?? provider;
 

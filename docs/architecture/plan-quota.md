@@ -10,4 +10,6 @@ A continue that a usage limit schedules ([Scheduled sends](scheduled-sends.md)) 
 It keeps a report's `resetCredits` as omp's `availableCount`, which counts banked credits whether or not one can be redeemed now, and the soonest expiry among the credits omp counts, those neither `expired` nor `redeemed` with some left, or `null` when it is 0.
 A limit in `usd` without a window, such as omp's `anthropic:extra` when Claude extra usage is on, becomes the plan's `extra`: the dollars spent, the monthly cap or `null`, and whether it is used up; a plan with only extra usage still counts.
 A window omp meters in `usd`, such as Cursor's `Other Models`, also keeps its dollars as `usd`.
+`plansWithConfiguredProviders` adds a name-only plan for each provider whose model config sets an API key when this report left it out, such as prepaid API credits.
+That plan has no windows, extra usage, or reset credits. The footer shows its name, and plan notices ignore it.
 omp reports no dollars for a Codex account's credit balance, so a Codex plan never has `extra`.

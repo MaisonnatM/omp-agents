@@ -38,7 +38,10 @@ export interface ResetCredits {
 	nextExpiresAt: number | null;
 }
 
-/** A provider account that `omp usage` reports plan limits for. */
+/**
+ * A provider account `omp usage` reports plan limits for, or a configured provider it has no balance for.
+ * No windows and no extra usage is that second case: the footer shows the name only.
+ */
 export interface PlanUsage {
 	provider: string;
 	name: string;
@@ -49,6 +52,17 @@ export interface PlanUsage {
 	/** `null` when the plan has no credit to redeem. */
 	resetCredits: ResetCredits | null;
 }
+
+/** Names that are not the title of the provider id. The page and `omp usage` rows share this table. */
+export const PROVIDER_NAMES: Record<string, string> = {
+	anthropic: "Anthropic",
+	"anthropic-api": "API credits",
+	"openai-codex": "OpenAI Codex",
+	cursor: "Cursor",
+};
+
+/** A configured provider `omp usage` has no balance for. */
+export const isNameOnlyPlan = (plan: Pick<PlanUsage, "windows" | "extra">): boolean => plan.windows.length === 0 && plan.extra === null;
 
 /** A model a session can switch to; `provider/id` is omp's model selector. */
 export interface ModelOption {

@@ -1,5 +1,5 @@
 /** What the model menu derives from the model list and plan usage. */
-import type { ExtraUsage, ModelEntry, PlanUsage, PlanWindow } from "../src/shared/models";
+import { type ExtraUsage, isNameOnlyPlan, type ModelEntry, type PlanUsage, type PlanWindow } from "../src/shared/models";
 import { everyWord } from "../src/shared/every-word";
 
 /** A trailing context size in a model id, as Cursor's `claude-opus-5-5-1m` names its 1M-token variant. */
@@ -38,7 +38,7 @@ export interface ProviderQuota {
 export function providerQuota(plans: readonly PlanUsage[], provider: string): ProviderQuota | null {
 	let best: { used: number | null; plan: PlanUsage } | null = null;
 	for (const plan of plans) {
-		if (plan.provider !== provider || (plan.windows.length === 0 && plan.extra === null)) continue;
+		if (plan.provider !== provider || isNameOnlyPlan(plan)) continue;
 		const used = plan.windows.length === 0 ? null : Math.max(...plan.windows.map(window => 1 - window.remaining));
 		if (!best || (used !== null && (best.used === null || used < best.used))) best = { used, plan };
 	}

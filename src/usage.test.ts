@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parsePlanUsage } from "./usage";
+import { parsePlanUsage, plansWithConfiguredProviders } from "./usage";
 
 const limit = (label: string, window: string, amount: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
 	label,
@@ -145,5 +145,27 @@ describe("parsePlanUsage", () => {
 	test("rejects output that is not a usage report", () => {
 		expect(() => parsePlanUsage("Error: not logged in")).toThrow();
 		expect(() => parsePlanUsage(JSON.stringify({ generatedAt: 1 }))).toThrow("omp usage --json printed no reports");
+	});
+});
+
+describe("plansWithConfiguredProviders", () => {
+	const plan = (provider: string) => ({
+		provider,
+		name: provider,
+		account: null,
+		windows: [{ id: "5h", label: "5h", title: "5h", remaining: 1, resetsAt: null, exhausted: false }],
+		extra: null,
+		resetCredits: null,
+	});
+
+	test("adds a name-only row for a configured provider that usage left out", () => {
+		const plans = plansWithConfiguredProviders([plan("anthropic")], ["anthropic-api"]);
+		expect(plans.map(each => each.provider)).toEqual(["anthropic", "anthropic-api"]);
+		expect(plans[1]).toEqual({ provider: "anthropic-api", name: "API credits", account: null, windows: [], extra: null, resetCredits: null });
+	});
+
+	test("leaves a provider usage already reported as that report", () => {
+		const reported = plan("anthropic-api");
+		expect(plansWithConfiguredProviders([reported], ["anthropic-api"])).toEqual([reported]);
 	});
 });
