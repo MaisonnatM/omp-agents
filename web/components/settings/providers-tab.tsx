@@ -1,9 +1,9 @@
-import { CircleAlert, CircleCheck, ExternalLink, LoaderCircle, LogOut, Plus, RefreshCw } from "lucide-react";
+import { CircleAlert, CircleCheck, ExternalLink, KeyRound, LoaderCircle, LogOut, Plus, RefreshCw } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MenuItem } from "@/components/ui/menu";
-import { type LoginPrompt, type ModelProvider, type ProviderAccount, type ProviderLogin, type ProvidersAnswer, providerConnected } from "../../../src/shared/providers";
+import { ANTHROPIC_API_KEY_METHOD, type LoginPrompt, type ModelProvider, type ProviderAccount, type ProviderLogin, type ProvidersAnswer, providerConnected } from "../../../src/shared/providers";
 import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
 import { readTime } from "../../labels";
@@ -24,17 +24,19 @@ const cancelLogin = async (): Promise<void> => {
 };
 
 /** The question a running sign-in waits on, masked when the provider marks the answer secret. */
-function PromptForm({ prompt }: { prompt: LoginPrompt }) {
+function PromptForm({ prompt, apiKey = false }: { prompt: LoginPrompt; apiKey?: boolean }) {
 	const [value, setValue] = useState("");
 	const [sending, setSending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	const submit = async (event: FormEvent): Promise<void> => {
 		event.preventDefault();
+		if (sending) return;
 		setSending(true);
 		setError(null);
 		try {
 			await putJson("/api/providers/login/answer", { prompt: prompt.id, value });
+			setValue("");
 			await refresh();
 		} catch (err) {
 			setError(errorText(err));
@@ -59,7 +61,7 @@ function PromptForm({ prompt }: { prompt: LoginPrompt }) {
 			</label>
 			<div className="flex items-center gap-2">
 				<Button type="submit" size="compact" loading={sending} disabled={!prompt.allowEmpty && value.trim() === ""}>
-					Continue
+					{apiKey ? "Save API key" : "Continue"}
 				</Button>
 				{error && (
 					<p role="alert" className="text-xs text-red-600 dark:text-red-400">
@@ -73,6 +75,7 @@ function PromptForm({ prompt }: { prompt: LoginPrompt }) {
 
 /** Where the sign-in for this row stands: the page to open and its question while it runs, then how it ended. */
 function LoginCallout({ login }: { login: ProviderLogin }) {
+	const apiKey = login.method === ANTHROPIC_API_KEY_METHOD;
 	if (login.phase === "failed") {
 		return (
 			<Callout
@@ -85,7 +88,7 @@ function LoginCallout({ login }: { login: ProviderLogin }) {
 					</Button>
 				}
 			>
-				Sign-in failed: {login.error}
+				{apiKey ? "API key save failed" : "Sign-in failed"}: {login.error}
 			</Callout>
 		);
 	}
@@ -101,7 +104,7 @@ function LoginCallout({ login }: { login: ProviderLogin }) {
 					</Button>
 				}
 			>
-				{login.identity ? `Signed in as ${login.identity}.` : "Signed in."} New omp sessions can use its models.
+				{apiKey ? "API key saved. New omp sessions can use it." : `${login.identity ? `Signed in as ${login.identity}.` : "Signed in."} New omp sessions can use its models.`}
 			</Callout>
 		);
 	}
@@ -110,9 +113,9 @@ function LoginCallout({ login }: { login: ProviderLogin }) {
 		<div className="space-y-3">
 			<Callout
 				tone="info"
-				icon={LoaderCircle}
+				icon={apiKey && prompt ? KeyRound : LoaderCircle}
 				role="status"
-				spin
+				spin={!apiKey || !prompt}
 				action={
 					<div className="flex items-center gap-2">
 						<Button variant="ghost" size="compact" onClick={() => void cancelLogin()}>
@@ -126,10 +129,10 @@ function LoginCallout({ login }: { login: ProviderLogin }) {
 					</div>
 				}
 			>
-				<p className="whitespace-pre-wrap">{instructions ?? (url ? "Sign in on the provider's page." : "Starting the sign-in…")}</p>
-				{progress && <p className="mt-1 text-xs opacity-80">{progress}</p>}
+				<p className="whitespace-pre-wrap">{apiKey ? (prompt ? "Paste your Anthropic Console API key below. Subscription sign-ins and fallback routing stay as they are." : "Saving API key…") : instructions ?? (url ? "Sign in on the provider's page." : "Starting the sign-in…")}</p>
+				{!apiKey && progress && <p className="mt-1 text-xs opacity-80">{progress}</p>}
 			</Callout>
-			{prompt && <PromptForm key={prompt.id} prompt={prompt} />}
+			{prompt && <PromptForm key={prompt.id} prompt={prompt} apiKey={apiKey} />}
 		</div>
 	);
 }
@@ -225,8 +228,8 @@ function ProviderRow({ provider, login }: { provider: ModelProvider; login: Prov
 				<MoreActionsMenu name={provider.name} disabled={starting}>
 					{(connected ? provider.methods : others).map(method => (
 						<MenuItem key={method.id} onClick={() => void start(method.id)}>
-							<Plus />
-							{method.id === first!.id ? verb : `${verb} with ${method.name}`}
+							{method.id === ANTHROPIC_API_KEY_METHOD ? <KeyRound /> : <Plus />}
+							{method.id === ANTHROPIC_API_KEY_METHOD ? (provider.accounts.some(account => account.kind === "api_key") ? "Replace API key" : "Add API key") : method.id === first!.id ? verb : `${verb} with ${method.name}`}
 						</MenuItem>
 					))}
 				</MoreActionsMenu>
@@ -244,7 +247,7 @@ function ProviderRow({ provider, login }: { provider: ModelProvider; login: Prov
 						<h3 className="truncate text-[13px] font-medium">{provider.name}</h3>
 						{running ? (
 							<Badge variant="dot" size="compact" color="blue">
-								Signing in
+								{login.method === ANTHROPIC_API_KEY_METHOD ? (login.prompt ? "Enter key" : "Saving key") : "Signing in"}
 							</Badge>
 						) : (
 							connected && (

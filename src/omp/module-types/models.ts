@@ -11,7 +11,7 @@ export interface CredentialOrigin {
 export interface StoredCredential {
 	id: number;
 	provider: string;
-	credential: { type: "oauth" | "api_key" };
+	credential: { type: "oauth" } | { type: "api_key"; key: string };
 }
 /** What a provider's sign-in asks the page for (pi-ai src/registry/oauth/types.ts `OAuthPrompt`). */
 export interface OAuthPrompt {
@@ -41,6 +41,9 @@ export interface AuthStorage {
 		hasOAuth(provider: string): boolean;
 		list(provider: string): StoredCredential[];
 		set(provider: string, credential: Record<string, unknown> & { type: "oauth" }): Promise<void>;
+		/** Upserts one credential by identity. A different API key adds a row. `source: "login"` ranks above an environment variable. */
+		upsert(provider: string, credential: { type: "api_key"; key: string; source?: "login" }): Promise<unknown>;
+		removeById(provider: string, credentialId: number): Promise<boolean>;
 	};
 	/** Runs `provider`'s `/login` flow and stores what it returns; `undefined` when it stored nothing. */
 	oauth: { login(provider: string, controller: OAuthLoginController): Promise<OAuthLoginIdentity | undefined> };

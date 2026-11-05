@@ -3,6 +3,12 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-05
+
+- Settings › Providers can add or replace an Anthropic API key in a masked field, so you do not paste it into a conversation.
+- Saving that key keeps your subscription sign-ins.
+- Fallback routing stays as it is.
+
 ## 2026-11-04
 
 - Behind the scenes: `/ship` plans now open with how the code works today and end with what is out of scope, and the chosen plan goes to a fresh critic on a different model, which has not seen the conversation and must back each finding with evidence, before any code is written.

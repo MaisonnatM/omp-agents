@@ -67,3 +67,6 @@ export interface ProvidersAnswer {
 
 /** The longest answer a sign-in's question takes, room for a pasted redirect address. */
 export const MAX_LOGIN_ANSWER = 8192;
+
+/** Settings' Anthropic Console key. Its credential is filed under `anthropic`, not under this method id. */
+export const ANTHROPIC_API_KEY_METHOD = "anthropic-api-key";
