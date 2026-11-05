@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { age, commandLabel, dayLabel, sameDir, mailTime, modelLabel, modelOrg, providerLabel, skillLabel } from "./labels";
+import { age, commandLabel, dayLabel, sameDir, mailTime, modelLabel, modelOrg, providerLabel, providerOrg, skillLabel } from "./labels";
 
 describe("model labels", () => {
 	test("a direct provider's model reads as its family and dotted version", () => {
@@ -41,6 +41,9 @@ describe("model labels", () => {
 	test("provider ids and skill names read as titles, keeping brand casing", () => {
 		expect(providerLabel("openai-codex")).toBe("OpenAI Codex");
 		expect(providerLabel("openrouter")).toBe("OpenRouter");
+		expect(providerLabel("anthropic-api")).toBe("API credits");
+		expect(providerOrg("anthropic-api")).toBe("anthropic");
+		expect(modelOrg("anthropic-api/claude-opus-5-5")).toBe("anthropic");
 		expect(skillLabel("poteto-mode")).toBe("Poteto Mode");
 		expect(skillLabel("Poteto Mode")).toBe("Poteto Mode");
 	});

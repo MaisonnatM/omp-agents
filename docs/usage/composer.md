@@ -55,7 +55,7 @@
   The providers that `modelProviderOrder` names come first, in that order.
   Typing searches every connected model, and every word typed must appear in the model's selector, label, or name, in any order.
   Each provider's heading shows how much of its plan is used, by the tightest window of the account with the most left, since omp moves to that account, then the dollars that account spent on extra usage, as `77% used · $12.40 extra`; hover it for that account's windows and the extra usage cap.
-  The list contains models that the session's omp RPC process offers from providers you are connected to, the ones omp's `/login` marks as signed in or given a key.
+  The list contains models that the session's omp RPC process offers from providers you are connected to: the ones omp's `/login` marks as signed in or given a key, and a provider whose model config sets an API key.
   Models that omp finds without a login, such as Apple's on-device model or a local Ollama, stay out of the list.
   A login made in a terminal shows the next time the menu opens.
   Each row shows the logo of the org that makes the model, its label (`Opus 5.5`), and its id, muted, to tell apart models that share a label.

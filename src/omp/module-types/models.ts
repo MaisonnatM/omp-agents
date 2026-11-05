@@ -64,7 +64,8 @@ export interface OmpModel {
 }
 /** omp's model registry (src/config/model-registry.ts), built over a credential store. */
 export interface ModelRegistryModule {
-	ModelRegistry: new (storage: AuthStorage) => {
+	/** `modelsPath` reads that file instead of the agent dir's `models.yml`. */
+	ModelRegistry: new (storage: AuthStorage, modelsPath?: string) => {
 		refreshProvider(provider: string, strategy: "online"): Promise<void>;
 		/** Loads the models, fetching a provider's catalog only when none is cached. */
 		refresh(): Promise<void>;

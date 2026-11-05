@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { CatalogModel } from "../shared/models";
-import { modelEntries, resolveRoles } from "./models";
+import type { CredentialOrigin } from "./module-types/models";
+import { connectedProviderIds, modelEntries, resolveRoles } from "./models";
+import { auth, modelRegistry } from "./modules";
 
 const listed = (selector: string): CatalogModel => ({ selector, provider: selector.slice(0, selector.indexOf("/")), name: selector, contextWindow: null, thinking: ["low", "high"] });
 const catalog = [listed("anthropic/claude-opus-5-5"), listed("anthropic/claude-haiku-4-5"), listed("openrouter/minimax/minimax-m3:batch")];
@@ -82,5 +87,75 @@ describe("modelEntries", () => {
 	test("a field beyond the picker entry stays on it", () => {
 		const [entry] = modelEntries([{ provider: "anthropic", id: "claude-opus-5-5", name: "Opus", contextWindow: 1_000_000, thinkingLevels: ["low", "high"] }], noRouting, new Set(["anthropic"]));
 		expect(entry?.thinkingLevels).toEqual(["low", "high"]);
+	});
+});
+
+describe("connectedProviderIds", () => {
+	const source = (present: Record<string, CredentialOrigin["kind"]>) => (id: string): CredentialOrigin | undefined =>
+		present[id] === undefined ? undefined : { kind: present[id] };
+
+	test("keeps a sign-in provider with a credential, and a catalog provider whose key comes from the model config", () => {
+		const connected = connectedProviderIds(
+			["anthropic", "cursor"],
+			["anthropic", "anthropic-api", "anthropic-api", "from-env", "local-demo"],
+			source({ anthropic: "oauth", "anthropic-api": "config", "from-env": "env" }),
+		);
+		expect([...connected].sort()).toEqual(["anthropic", "anthropic-api"]);
+	});
+
+	test("leaves out a sign-in provider with no credential and a keyless catalog provider", () => {
+		expect([...connectedProviderIds(["anthropic"], ["anthropic", "local-demo"], source({}))]).toEqual([]);
+	});
+});
+
+describe("model config API keys", () => {
+	test("a provider whose model config sets an API key is a config source, and a keyless one is not", async () => {
+		const dir = mkdtempSync(join(tmpdir(), "omp-agents-models-"));
+		const modelsPath = join(dir, "models.yml");
+		writeFileSync(
+			modelsPath,
+			[
+				"providers:",
+				"  anthropic-api:",
+				"    baseUrl: https://api.anthropic.com",
+				"    api: anthropic-messages",
+				"    auth: apiKey",
+				"    apiKey: test-key",
+				"    models:",
+				"      - id: claude-haiku-5-5",
+				"        name: Claude Haiku 5.5 (API credits)",
+				"        input: [text]",
+				"        contextWindow: 100000",
+				"        maxTokens: 128000",
+				"  local-demo:",
+				"    baseUrl: http://127.0.0.1:9",
+				"    api: openai-completions",
+				"    auth: none",
+				"    models:",
+				"      - id: demo",
+				"        name: Demo",
+				"        input: [text]",
+				"        contextWindow: 1000",
+				"        maxTokens: 100",
+				"",
+			].join("\n"),
+		);
+		// The config key stays in the registry's memory. This still opens the real credential store, as the other store tests do.
+		const storage = await auth.discoverAuthStorage();
+		try {
+			const registry = new modelRegistry.ModelRegistry(storage, modelsPath);
+			const connected = connectedProviderIds(
+				[],
+				registry.getAvailable().map(model => model.provider),
+				id => storage.keys.source(id),
+			);
+			expect(storage.keys.source("anthropic-api")?.kind).toBe("config");
+			expect(storage.keys.source("local-demo")).toBeUndefined();
+			expect(connected.has("anthropic-api")).toBe(true);
+			expect(connected.has("local-demo")).toBe(false);
+		} finally {
+			storage.close();
+			rmSync(dir, { recursive: true, force: true });
+		}
 	});
 });

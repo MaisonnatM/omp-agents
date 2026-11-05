@@ -1,16 +1,11 @@
 /** Plan quota left per provider, read from `omp usage --json` of this same omp package. */
 import { isObject, num, str } from "./json";
 import { ompCommand } from "./omp/install";
+import { configuredProviders } from "./omp/models";
 import { run } from "./proc";
-import type { ExtraUsage, PlanUsage, PlanWindow, ResetCredits, UsdAmount } from "./shared/models";
+import { type ExtraUsage, PROVIDER_NAMES, type PlanUsage, type PlanWindow, type ResetCredits, type UsdAmount } from "./shared/models";
 
 const TIMEOUT_MS = 30_000;
-
-const PROVIDER_NAMES: Record<string, string> = {
-	anthropic: "Anthropic",
-	"openai-codex": "OpenAI Codex",
-	cursor: "Cursor",
-};
 
 /** The name the page shows for omp's provider id `provider`: `Anthropic` for `anthropic`, `Minimax Code` for `minimax-code`. */
 export const providerName = (provider: string): string =>
@@ -111,12 +106,34 @@ export function parsePlanUsage(stdout: string): PlanUsage[] {
 	return plans;
 }
 
+/**
+ * Plans plus a name-only row for each configured provider `omp usage` did not report.
+ * A model-config API key, such as prepaid API credits, has no quota window and no balance in that report.
+ */
+export function plansWithConfiguredProviders(plans: readonly PlanUsage[], configured: readonly string[]): PlanUsage[] {
+	const shown = new Set(plans.map(plan => plan.provider));
+	const extra = configured.filter(id => !shown.has(id)).sort();
+	return [
+		...plans,
+		...extra.map(provider => ({ provider, name: providerName(provider), account: null, windows: [], extra: null, resetCredits: null })),
+	];
+}
+
 /** omp exits non-zero when some provider fails, after printing the reports it did get. */
 export async function fetchPlanUsage(): Promise<PlanUsage[]> {
 	const { stdout, stderr, code } = await run([...ompCommand, "usage", "--json"], { timeoutMs: TIMEOUT_MS });
+	let plans: PlanUsage[];
 	try {
-		return parsePlanUsage(stdout);
+		plans = parsePlanUsage(stdout);
 	} catch {
 		throw new Error(stderr.trim().split("\n").pop() || `omp usage exited with code ${code}`);
 	}
+	// A credential-store miss must not hide the plan windows this command already returned.
+	let configured: string[] = [];
+	try {
+		configured = await configuredProviders();
+	} catch {
+		configured = [];
+	}
+	return plansWithConfiguredProviders(plans, configured);
 }

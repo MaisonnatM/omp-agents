@@ -6,7 +6,7 @@ import { loadOmpConfig, type OmpConfig, readSelector, routedSelectors } from "./
 import { ompCommand } from "./install";
 import { auth, config, modelRegistry, modelResolver, oauth, serviceTiers } from "./modules";
 import type { OmpSettingsInstance } from "./module-types/config";
-import type { ModelRegistryModule, ServiceTierModel } from "./module-types/models";
+import type { CredentialOrigin, ModelRegistryModule, ServiceTierModel } from "./module-types/models";
 
 const MODELS_TIMEOUT_MS = 30_000;
 
@@ -61,14 +61,70 @@ async function readCatalog(): Promise<CatalogModel[]> {
 }
 
 /**
- * The providers you are signed in to or gave a key, the ones omp's `/login` marks as connected. omp also lists the models
- * of local runtimes it finds without a login, such as Apple's on-device model; those are not connected. The store opens
- * on each call, so a login from a terminal counts at once.
+ * Sign-in providers that have a credential, plus catalog providers whose key comes from the model config.
+ * A missing source is not connected. A config key counts even when the provider is not a `/login` provider.
+ * An `env` or stored `api_key` counts for a sign-in provider only. A catalog provider needs `config`, which is the
+ * model-file key this row is for, not a key from the environment.
+ */
+export function connectedProviderIds(
+	oauthIds: readonly string[],
+	catalogProviders: readonly string[],
+	source: (id: string) => CredentialOrigin | undefined,
+): Set<string> {
+	const ids = oauthIds.flatMap(id => (source(id) === undefined ? [] : [id]));
+	const seen = new Set(ids);
+	for (const provider of catalogProviders) {
+		if (seen.has(provider) || source(provider)?.kind !== "config") continue;
+		ids.push(provider);
+		seen.add(provider);
+	}
+	return new Set(ids);
+}
+
+/** Catalog providers whose model config sets an API key, once each. */
+export function configuredProviderIds(
+	catalogProviders: readonly string[],
+	source: (id: string) => CredentialOrigin | undefined,
+): string[] {
+	const ids: string[] = [];
+	const seen = new Set<string>();
+	for (const provider of catalogProviders) {
+		if (seen.has(provider)) continue;
+		seen.add(provider);
+		if (source(provider)?.kind === "config") ids.push(provider);
+	}
+	return ids;
+}
+
+/**
+ * The providers you are signed in to or gave a key: the ones omp's `/login` marks as connected, and any provider whose
+ * model config sets an API key. Loading the registry installs that key without running a command that prints it.
+ * omp also lists the models of local runtimes it finds without a login, such as Apple's on-device model; those are not
+ * connected. The store opens on each call, so a login from a terminal counts at once.
  */
 export async function connectedProviders(): Promise<Set<string>> {
 	const storage = await auth.discoverAuthStorage();
 	try {
-		return new Set(oauth.getOAuthProviders().flatMap(({ id }) => (storage.keys.source(id) === undefined ? [] : [id])));
+		const registry = new modelRegistry.ModelRegistry(storage);
+		return connectedProviderIds(
+			oauth.getOAuthProviders().map(({ id }) => id),
+			registry.getAvailable().map(model => model.provider),
+			id => storage.keys.source(id),
+		);
+	} finally {
+		storage.close();
+	}
+}
+
+/** Catalog providers whose model config sets an API key. Same registry pass as {@link connectedProviders}, without the sign-in ids. */
+export async function configuredProviders(): Promise<string[]> {
+	const storage = await auth.discoverAuthStorage();
+	try {
+		const registry = new modelRegistry.ModelRegistry(storage);
+		return configuredProviderIds(
+			registry.getAvailable().map(model => model.provider),
+			id => storage.keys.source(id),
+		);
 	} finally {
 		storage.close();
 	}

@@ -189,20 +189,43 @@ export async function startKeeper(dir: string, instanceId: string, { cwd, argv, 
 			return false;
 		}
 	};
+	// The keeper removes its socket on the way out. This client can see the hang-up first, and a bind can
+	// land after that removal. A kill also skips the exit hook. Wait until the process is gone, then remove
+	// the path, so the rejection leaves nothing for the next start.
+	const release = async (): Promise<void> => {
+		const until = Date.now() + LISTEN_TIMEOUT_MS;
+		while (running() && Date.now() < until) await Bun.sleep(10);
+		rmSync(socket, { force: true });
+		rmSync(pidFileOf(socket), { force: true });
+	};
 	const deadline = Date.now() + LISTEN_TIMEOUT_MS;
+	let failure: Error | null = null;
 	for (;;) {
 		try {
 			return await connect(dir, instanceId, null);
 		} catch (error) {
-			if (!notListening(error)) throw error;
+			if (!notListening(error)) {
+				failure = error instanceof Error ? error : new Error(String(error));
+				break;
+			}
 		}
-		if (!Number.isSafeInteger(pid) || !running()) throw new Error(`The session keeper exited. ${tail(log)}`.trim());
+		if (!Number.isSafeInteger(pid) || !running()) {
+			failure = new Error(`The session keeper exited. ${tail(log)}`.trim());
+			break;
+		}
 		if (Date.now() > deadline) {
-			process.kill(pid, "SIGTERM");
-			throw new Error(`The session keeper did not listen within ${LISTEN_TIMEOUT_MS / 1000} s.`);
+			try {
+				process.kill(pid, "SIGTERM");
+			} catch {
+				// Already gone.
+			}
+			failure = new Error(`The session keeper did not listen within ${LISTEN_TIMEOUT_MS / 1000} s.`);
+			break;
 		}
 		await Bun.sleep(20);
 	}
+	await release();
+	throw failure;
 }
 
 /**
