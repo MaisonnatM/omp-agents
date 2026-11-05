@@ -5,8 +5,8 @@
  * matches what the last install wrote, as `starter-kit-installed.json` records, or a version the kit shipped before, as
  * the kit's git history holds; one you edited keeps your version unless you pass `--force`. `--maintainer` copies
  * `maintainer/` on top, and a file there replaces the `agent/` file with the same relative path; later installs
- * remember it. `--files` only brings the files up to date, never adds back one you deleted, and needs no omp; the
- * dashboard's Update runs it.
+ * remember it. `mcp.json` gains each kit MCP server you lack; one you already list keeps your entry. `--files` only
+ * brings the files up to date, never adds back one you deleted, and needs no omp; the dashboard's Update runs it.
  *
  *   bun run omp-template [--dry-run] [--force] [--maintainer]
  *   bun run omp-template --files [--dry-run]
@@ -156,6 +156,34 @@ function pluginIds(listing: unknown): Set<string> {
 export const STARTER_KIT_MARKETPLACE = { name: "cursor-plugins", source: "cursor/plugins" };
 /** pstack provides the `Poteto Mode` skill that `poteto-mode` points at, and the `poteto-agent` that `/ship` delegates to. */
 const PLUGINS = ["pstack@cursor-plugins"];
+/** `chrome-devtools` drives headless Chrome on a throwaway profile, which the kit's `design-critic` and browser checks use. */
+const MCP_SERVERS: Record<string, Json> = {
+	"chrome-devtools": { type: "stdio", command: "npx", args: ["-y", "chrome-devtools-mcp@latest", "--headless", "--isolated"] },
+};
+
+export type McpStep = { name: string; config: Json; action: Action };
+
+function readMcpServers(path: string): Json {
+	if (!existsSync(path)) return {};
+	const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+	if (!isObject(parsed) || (parsed.mcpServers !== undefined && !isObject(parsed.mcpServers))) throw new Error(`${path} has no mcpServers object`);
+	return parsed.mcpServers ?? {};
+}
+
+export function planMcpServers(agentDir: string): McpStep[] {
+	const mine = readMcpServers(join(agentDir, "mcp.json"));
+	return Object.entries(MCP_SERVERS).map(([name, config]) => ({ name, config, action: mine[name] === undefined ? "create" : "same" }));
+}
+
+/** Adds only the servers you lack, keeping every other key of `mcp.json`. */
+export function writeMcpServers(path: string, steps: readonly McpStep[]): void {
+	const added = steps.filter(step => step.action === "create");
+	if (added.length === 0) return;
+	const parsed: Json = existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : {};
+	parsed.mcpServers = { ...readMcpServers(path), ...Object.fromEntries(added.map(step => [step.name, step.config])) };
+	mkdirSync(dirname(path), { recursive: true });
+	writeFileSync(path, `${JSON.stringify(parsed, null, 2)}\n`);
+}
 
 const LABEL: Record<Action, string> = { create: "add", update: "overwrite", keep: "keep yours", same: "unchanged" };
 
@@ -187,6 +215,7 @@ export interface StarterKitPlan extends KitFilesPlan {
 	settings: SettingStep[];
 	marketplace: { source: string; action: Action };
 	plugins: { id: string; action: Action }[];
+	mcpServers: McpStep[];
 }
 
 export interface StarterKitSnapshot {
@@ -236,6 +265,7 @@ export function planStarterKit(kit: string, agentDir: string, snapshot: StarterK
 		settings,
 		marketplace: { source: STARTER_KIT_MARKETPLACE.source, action: snapshot.hasMarketplace ? "same" : "create" },
 		plugins: PLUGINS.map(id => ({ id, action: snapshot.plugins.has(id) ? "same" : "create" })),
+		mcpServers: planMcpServers(agentDir),
 	};
 }
 
@@ -292,13 +322,14 @@ async function main(argv: string[]): Promise<void> {
 	};
 	const previous = readInstalledRecord(agentDir);
 	const plan = planStarterKit(kit, agentDir, snapshot, { force, maintainer: argv.includes("--maintainer") || undefined });
-	const { maintainer, files, settings, marketplace, plugins } = plan;
+	const { maintainer, files, settings, marketplace, plugins, mcpServers } = plan;
 	const profile = maintainer ? " and the maintainer git profile" : "";
 	console.log(`${dryRun ? "Would install" : "Installing"} the omp starter kit${profile} into ${agentDir}${force ? ", overwriting your versions" : ""}`);
 	for (const file of files) print(file.action, `file ${file.rel}`);
 	for (const setting of settings) print(setting.action, `setting ${setting.target}`);
 	print(marketplace.action, `marketplace ${marketplace.source}`);
 	for (const plugin of plugins) print(plugin.action, `plugin ${plugin.id}`);
+	for (const server of mcpServers) print(server.action, `MCP server ${server.name}`);
 
 	const kept = [...files, ...settings].filter(step => step.action === "keep").length;
 	const keptNote = kept > 0 ? ` ${kept} of yours ${dryRun ? "would stay" : "stayed"}; pass --force to overwrite them.` : "";
@@ -309,6 +340,7 @@ async function main(argv: string[]): Promise<void> {
 
 	writeFiles(files);
 	writeInstalledRecord(agentDir, previous, maintainer, files);
+	writeMcpServers(join(agentDir, "mcp.json"), mcpServers);
 	for (const { target, value } of settings.filter(s => writes(s.action))) {
 		await omp(ompCommand, ["config", "set", target, typeof value === "object" ? JSON.stringify(value) : String(value)]);
 	}

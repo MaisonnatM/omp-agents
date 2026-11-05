@@ -86,7 +86,7 @@ export class Broadcasts {
 		if (this.listening()) this.#syncPast();
 	}
 
-	/** Run `omp usage`, publish its report or why it failed, and answer with that report. */
+	/** Run `omp usage`, including a name-only row for each configured provider it left out, and answer with that report. */
 	async refreshUsage(): Promise<Extract<ServerMsg, { t: "usage" }>> {
 		let usage: Extract<ServerMsg, { t: "usage" }>;
 		try {

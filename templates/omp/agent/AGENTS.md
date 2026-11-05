@@ -24,9 +24,10 @@ Pass the port through the tool's port flag or `PORT`, and point every browser, c
 When you tell the user about a server you started, write its full URL, such as `http://localhost:24816/settings`, never only the port.
 
 A test or check runs headless and never opens a window on the user's screen.
-Open pages with eval's `browser.open({ url, name, headed: false, app: { relay: false, tern: false } })` in managed Chromium; the URL goes inside the options object, never as a first argument. Without `app` and `headed`, it drives the user's own Chrome through the relay or a visible Tern pane.
-`tab.setCookies` takes one cookie at a time as `{ name, value, url }`; a Playwright storage-state cookie list fails with `malformed cookie input`, so loop over its `cookies`. yampa's `control-yampa doctor` writes that list to `.agents/skills/verify-yampa/.run/storage-state.json`, and the stack's URL to `state.json`'s `frontUrl`.
-`tab.run` hands you a Puppeteer `page`, not Playwright: there is no `page.getByRole` or `page.context`; use tab helpers with `role/…`, `label/…`, or `text/…` selectors.
+Open pages with the `chrome-devtools` MCP tools (`xd://mcp__chrome-devtools_*`), which the starter kit adds to `mcp.json` and which run headless Chrome on a throwaway profile.
+Every page tool takes a `pageId` from `list_pages`, the first page being `1`; `resize_page` to 1920×1080 before screenshots, since Chrome starts at 800×600.
+Use `take_snapshot` for the page's elements and their `uid`s, which `click`, `fill`, and `hover` take; `list_console_messages`, `list_network_requests`, and `performance_start_trace` cover errors, failed calls, and load time.
+There is no cookie tool, and `evaluate_script` sets only non-`httpOnly` cookies; yampa verification is unaffected, since `control-yampa browser start` runs its own Playwright Chromium with the session cookie.
 Start an app that opens windows, such as an Electron app, in its hidden mode, such as `OMP_AGENTS_HEADLESS=1` for the omp-agents desktop app, and open a visible window only when the user asks for one.
 
 ## Pasted secrets

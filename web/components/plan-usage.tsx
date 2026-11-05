@@ -1,6 +1,6 @@
 /** How much of each provider plan's usage windows is left, shown in the status bar and the model menu. */
 import { createContext } from "react";
-import type { ExtraUsage, PlanUsage, PlanWindow, ResetCredits, UsdAmount } from "../../src/shared/models";
+import { type ExtraUsage, isNameOnlyPlan, type PlanUsage, type PlanWindow, type ResetCredits, type UsdAmount } from "../../src/shared/models";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { DashboardState } from "../dashboard-state";
@@ -66,16 +66,18 @@ function creditsLine({ count, nextExpiresAt }: ResetCredits): string {
 function PlanRow({ plan }: { plan: PlanUsage }) {
 	const name = plan.account ? `${plan.name} · ${plan.account}` : plan.name;
 	const label = plan.resetCredits ? `${name}. ${creditsLine(plan.resetCredits)}` : name;
+	const nameOnly = isNameOnlyPlan(plan);
 	return (
 		<li className="flex items-center gap-2 border-border not-first:border-l not-first:pl-2.5">
 			<Tooltip content={label}>
 				<span role="img" aria-label={label} className="flex shrink-0 items-center">
 					<OrgIcon
 						org={providerOrg(plan.provider)}
-						fallback={<span className="font-medium text-foreground">{plan.name}</span>}
+						fallback={nameOnly ? null : <span className="font-medium text-foreground">{plan.name}</span>}
 					/>
 				</span>
 			</Tooltip>
+			{nameOnly && <span aria-hidden className="whitespace-nowrap text-foreground">{plan.name}</span>}
 			{plan.extra && <ExtraSpent extra={plan.extra} />}
 			{plan.windows.map(window => (
 				<WindowLeft key={window.label} window={window} />

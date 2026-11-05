@@ -1,6 +1,7 @@
 # HTTP API: models, skills, and session starts
 
 `GET /api/models/connected?cwd=<directory>` answers `{ models }`: the models that `omp models` lists from the providers you are connected to, for the new-session draft's model menu.
+A provider whose model config sets an API key counts as connected. A local model found with no key does not.
 Each model is `{ provider, id, name, contextWindow, curated, thinkingLevels }`; `curated` marks the ones that the directory's `modelRoles` or `retry.fallbackChains` name, as omp resolves each selector, and `thinkingLevels` are the ones omp's catalog lists (`modelEntries` in `src/omp/models.ts`).
 The models of the providers that `modelProviderOrder` names come first, in that order, and the rest keep omp's order.
 A live session's `list-models` answer builds the same entries from the models that its omp RPC process offers and the config of the session's directory.

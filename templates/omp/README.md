@@ -17,7 +17,8 @@ The installer:
 - copies every file under [`agent/`](agent) into your omp agent directory, `~/.omp/agent` (or `PI_CODING_AGENT_DIR` when set);
 - with `--maintainer`, also copies [`maintainer/`](maintainer), and a file there replaces the `agent/` file with the same path;
 - applies each setting in [`config.yml`](config.yml) with `omp config set`, so omp writes it and every other key in your `config.yml` stays as it is;
-- adds the [`cursor/plugins`](https://github.com/cursor/plugins) marketplace and installs its `pstack` plugin, unless they are already there.
+- adds the [`cursor/plugins`](https://github.com/cursor/plugins) marketplace and installs its `pstack` plugin, unless they are already there;
+- adds the `chrome-devtools` MCP server, headless on a throwaway profile, to `mcp.json` in the agent directory, unless you already list a server by that name.
 
 A setting that you already have keeps your value, and the installer lists it as `keep yours`.
 A file that you already have is replaced, listed as `overwrite`, only when you never edited it: it matches what the last install wrote, which the installer records in `starter-kit-installed.json` in the agent directory, or a version the kit shipped before, which the kit's git history holds.
@@ -29,7 +30,7 @@ After one install with `--maintainer`, later installs copy `maintainer/` too.
 **Update dashboard** runs it in the updated checkout before the server restarts, so a landed kit change reaches the files you never edited.
 
 The desktop app's **Get started** starter kit step and **Install omp Starter Kit…** menu run this same non-forced installer.
-That step's read-only status includes files, settings, marketplace, and plugins; `keep yours` is complete rather than an invitation to overwrite it, and an outdated file you never edited is pending.
+That step's read-only status includes files, settings, marketplace, plugins, and MCP servers; `keep yours` is complete rather than an invitation to overwrite it, and an outdated file you never edited is pending.
 CLI calls use the resolved omp package, including `OMP_PACKAGE_DIR` when set.
 
 Restart running omp sessions to pick up the new files and settings.
@@ -54,7 +55,7 @@ Files, in `agent/`:
   These references load on demand rather than in every session's context.
 - `APPEND_SYSTEM.md`: short final replies that open with the answer in bold and add only the Needs you, Not verified, and Done lines that have content, ending on up to three suggested next prompts, design variants named once and quoted by that name on every surface, a UI change handed off on a running dev server with checked screenshots, questions asked through the ask tool with the recommended option first, how Cursor models call omp's `ask`, `bash`, `grep`, and skills, and a code-quality review before any pull request, which a repository limits to the files its `.omp/review-paths` globs match.
 - `agents/thermonuclear-reviewer.md`: a read-only reviewer that checks the diff against the `CODING_STANDARDS.md` at the root of the checkout it reviews, then runs the thermo-nuclear code quality review on the `plan` role's model.
-- `agents/interface-reviewer.md`: a read-only reviewer that runs your `interface-review` skill in full mode on a PR, then applies the `app-consistency-review` skill to check the change reuses the app's shared components and follows its tokens and sibling screens, on the `plan` role's model; it stops naming the missing skill when `interface-review` or `better-interface` is not installed.
+- `agents/interface-reviewer.md`: a read-only reviewer that runs the `interface-review` skill in full mode on a PR, then applies the `app-consistency-review` skill to check the change reuses the app's shared components and follows its tokens and sibling screens, on the `plan` role's model.
 - `agents/design-critic.md`: a read-only reviewer that the `design-workflow` skill spawns on a UI change it did not build; it screenshots each page and state next to the app's sibling screens and lists every visible bug with pixel measurements, on the `default` role's model.
 - `skills/ship/SKILL.md`, `commands/ship.md`, and `extensions/ship.ts`: `/ship [Linear issue]` drives a change from an optional ticket to plan, draft PR, interface review, thermonuclear review, and live review.
   `APPEND_SYSTEM.md` has the agent start it on its own for a request that will end in a pull request, unless the user says "no ship".
@@ -127,6 +128,7 @@ Files, in `agent/`:
 - `skills/design-workflow/SKILL.md`: the steps `AGENTS.md` sends every UI change through: references before the first edit, five structurally different variants for a structural ask, and the `design-critic` agent before the user sees it.
 - `skills/`: `apple-design`, `emil-design-eng`, and `beautiful-shadows` for interface work; `thermo-nuclear-code-quality-review` for the reviewer; `app-consistency-review`, which the interface reviewer autoloads to check a PR against the app's shared components, tokens, and sibling screens; `decision-records`, which keeps each choice made in a project as one dated file in its `docs/decisions/`, with a `check.ts` that checks them; `ship`, the `/ship` workflow above; and `poteto-mode`, a typeable alias for pstack's `Poteto Mode` skill.
   The alias maps Cursor-only cleanup and runtime-control instructions to omp's available tools without editing the plugin cache.
+- `skills/interface-review/` and `skills/better-*/`: Jakub Krehel's change-scoped interface review, the `better-interface` review it hands off to, and the six discipline skills that one routes to: accessibility, colors, layout, typography, UI, and writing.
 
 ## Requirements
 
@@ -136,8 +138,7 @@ Files, in `agent/`:
   Edit `config.yml` before you install to drop a provider, or change the roles later in the dashboard's **Settings**.
 - For `/ship`: the [GitHub CLI](https://cli.github.com) signed in, and the Linear MCP server connected to omp.
   [Graphite](https://graphite.dev) is used when a repository is set up for it.
-- For `/ship`'s interface review: your own `interface-review` skill, plus the `better-interface` and `better-*` skills it hands off to, under `~/.agents/skills/` or `~/.omp/agent/skills/`.
-  The kit does not ship them; a repository without `.omp/ui-paths` never runs the review.
+- For `/ship`'s interface review: a repository with `.omp/ui-paths`; without it the review never runs.
 - For `/ship`'s plan: the `arena` and `technical-writing` skills from pstack, under `~/.agents/skills/` or `~/.omp/agent/skills/`.
   The kit does not ship them; without them the plan step stops and names the missing skill.
 
@@ -165,4 +166,4 @@ Before the dashboard starts a session that would run the project's extensions, h
 ## Licenses
 
 The kit is MIT-licensed with the rest of the repository.
-The `apple-design`, `emil-design-eng`, `beautiful-shadows`, and `thermo-nuclear-code-quality-review` skills are copies of MIT-licensed skills by their authors; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The `apple-design`, `emil-design-eng`, `beautiful-shadows`, `thermo-nuclear-code-quality-review`, `interface-review`, and `better-*` skills are copies of MIT-licensed skills by their authors; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

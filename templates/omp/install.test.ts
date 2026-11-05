@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { blobId, INSTALLED_RECORD, type InstalledRecord, overlayFiles, planKitFiles, planSettings, readInstalledRecord, settingsOf } from "./install";
+import { blobId, INSTALLED_RECORD, type InstalledRecord, overlayFiles, planKitFiles, planMcpServers, planSettings, readInstalledRecord, settingsOf, writeMcpServers } from "./install";
 
 const known = new Set(["modelRoles", "retry.fallbackChains", "task.isolation.merge"]);
 
@@ -161,5 +161,31 @@ describe("omp-template --files", () => {
 		const after = readInstalledRecord(agentDir);
 		expect(after?.files["extensions/ship.ts"]).toBe(blobId(kitShip));
 		expect(after?.files["extensions/land.ts"]).toBe(blobId("installed before"));
+	});
+});
+
+describe("MCP servers", () => {
+	test("adds chrome-devtools beside your servers and other keys, and never rewrites one you list", () => {
+		const agentDir = scratch();
+		const path = join(agentDir, "mcp.json");
+		writeFileSync(path, JSON.stringify({ note: "mine", mcpServers: { sentry: { type: "http", url: "https://mcp.sentry.dev/mcp" } } }));
+		const first = planMcpServers(agentDir);
+		expect(first.map(step => [step.name, step.action])).toEqual([["chrome-devtools", "create"]]);
+		writeMcpServers(path, first);
+		const written = JSON.parse(readFileSync(path, "utf8"));
+		expect(written.note).toBe("mine");
+		expect(Object.keys(written.mcpServers)).toEqual(["sentry", "chrome-devtools"]);
+
+		writeFileSync(path, JSON.stringify({ mcpServers: { "chrome-devtools": { type: "stdio", command: "my-chrome" } } }));
+		const again = planMcpServers(agentDir);
+		expect(again.map(step => step.action)).toEqual(["same"]);
+		writeMcpServers(path, again);
+		expect(JSON.parse(readFileSync(path, "utf8")).mcpServers["chrome-devtools"].command).toBe("my-chrome");
+	});
+
+	test("creates mcp.json when you have none", () => {
+		const agentDir = scratch();
+		writeMcpServers(join(agentDir, "mcp.json"), planMcpServers(agentDir));
+		expect(Object.keys(JSON.parse(readFileSync(join(agentDir, "mcp.json"), "utf8")).mcpServers)).toEqual(["chrome-devtools"]);
 	});
 });

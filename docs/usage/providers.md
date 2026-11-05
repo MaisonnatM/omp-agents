@@ -12,6 +12,16 @@
   The row says **Signing in** until the sign-in ends, and **Cancel** abandons it.
   It then says **Signed in** with the account, or why the sign-in failed, until you choose **Dismiss**.
   One sign-in runs at a time: starting another abandons the first, and a sign-in not finished within 5 minutes fails.
+- Anthropic's **⋯** menu also offers **Add API key**, or **Replace API key** when one is stored.
+  Paste your Anthropic Console key into the masked field and choose **Save API key**.
+  Do not paste it into a session conversation.
+  Saving replaces stored Anthropic API keys and keeps subscription sign-ins.
+  Fallback routing stays as it is.
+  **Cancel** closes the entry without saving.
+  The key stays in omp's credential store, not dashboard settings or settings sync.
+  It is not shown again after saving.
+  Saving does not verify the key's balance or validity.
+  API requests use Anthropic Console credits or paid balance.
 - A connected row lists each stored account or key, and its **⋯** menu offers **Add account** to sign in to another one, as `/login` does for a provider you already use.
   **Sign out** asks first, then removes that one credential, as `/logout` does.
   A provider whose key omp reads from an environment variable, with nothing stored, shows as connected with the variable's name; unset the variable to sign out, as Settings cannot remove it.

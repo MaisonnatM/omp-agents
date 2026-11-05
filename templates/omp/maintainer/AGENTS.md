@@ -3,6 +3,24 @@
 Applies to every omp session on this machine.
 If `PI_CODING_AGENT_DIR` is set, substitute that directory for `~/.omp/agent` in the reference paths below.
 
+## Session project
+
+When the request targets a different project than the session's cwd, such as another repository's code, tickets, or paths, say so in your first reply.
+When you have the `move_session` tool, which the omp-agents dashboard gives the sessions it runs, call it with the project's path as your turn's last step and end the turn; the dashboard moves the session once the turn ends.
+Otherwise you cannot move the session yourself; tell the user which command fits:
+- `/move <path>` relocates this session to that project and reloads its context files and settings.
+- `/wt [<branch>]` moves this session into a new worktree of its current repository, carrying uncommitted changes; it never switches repositories.
+  When the work needs a fresh worktree of another repository, suggest `/move <path>` then `/wt <branch>`; suggest `/wt` alone when the repository is right but the session sits on `main` and must edit.
+Read-only work in the other project, such as reading, searching, or answering questions, needs no confirmation: do it through absolute paths while you flag the mismatch.
+Before editing, committing, or running checks there, wait until the session runs there or the user confirms working from the current one.
+
+## Linear tickets
+
+At the start of each session's task, check Linear for an existing matching ticket before creating a branch.
+When a ticket exists, reuse its branch or use its suggested branch name when compatible with the Git safety rules below.
+If the session must use another branch, keep it and link the resulting PR to the ticket in Linear.
+Link any resulting PR to the matching ticket in Linear even when using the ticket's branch, with `xd://mcp__linear_save_issue` and `{ id, links: [{ url, title }] }`; the `create_attachment` tools upload files and fail on a URL.
+
 ## Git safety
 
 Where to edit follows the branch of the checkout the session runs in, its cwd.
@@ -28,6 +46,10 @@ To learn where uncommitted or unmerged changes came from, search past sessions w
 A server, dev server, or other listener you start to test or verify never takes a default port, such as 3000, 3001, 4200, 4317, 5000, 5173, 8000, or 8080: the user's own servers and other sessions run there.
 Use the port range the repository's docs name; otherwise pick a random port between 20000 and 39999 and check it is free with `lsof -nP -iTCP:<port> -sTCP:LISTEN || echo free` first: `lsof` exits 1 when nothing listens, and `free` marks that as the expected answer.
 Pass the port through the tool's port flag or `PORT`, and point every browser, curl, and proxy call at it.
+When you tell the user about a server you started, write its full URL, such as `http://localhost:24816/settings`, never only the port.
+
+A test or check runs headless and never opens a window on the user's screen.
+Start an app that opens windows, such as an Electron app, in its hidden mode, such as `OMP_AGENTS_HEADLESS=1` for the omp-agents desktop app, and open a visible window only when the user asks for one.
 
 ## omp-agents dashboard
 
@@ -39,6 +61,21 @@ Then update with the same command plus `-X PUT -H "Origin: http://127.0.0.1:4317
 A `current` answer means origin had nothing new and the dashboard did not restart; when it still needs a restart, ask the user rather than kill its processes.
 A 409 answer says why the checkout stayed as it was, such as uncommitted changes or local commits; report it rather than stash, reset, or retry.
 
+## Docs and changelog
+
+This section narrows the harness rule that a permanent fix or feature must update docs and changelog.
+A change needs a docs or changelog edit only when a reader of that page would act differently because of it; a PR adds none by default.
+Cosmetic UI changes, internal refactors, and fixes that restore documented behavior leave docs untouched.
+When the repository has its own docs rules, they decide.
+
+## Presenting a plan
+
+Present every plan, proposal, or recommendation in the final-answer format, in plain words with no jargon.
+The bold first line is the recommendation; the choice waiting on the user goes on **Needs you:**.
+Below it, at most three bullets on why, cost, and risk, only those with something to say; mark a guessed number as a guess.
+When the plan adds, removes, or reorders steps in a workflow, put a mermaid flowchart of the new flow after the first line, with the changed step highlighted.
+Leave out file paths, line numbers, principle names, measurements, evidence lists, and rejected alternatives unless the user asks; a table only when the user must compare three or more options.
+
 ## Design work
 
 Before any change to what a screen shows, even a one-value tweak, read `skill://design-workflow` and follow it.
@@ -47,5 +84,5 @@ Before any change to what a screen shows, even a one-value tweak, read `skill://
 
 - Models: before configuring model roles, reasoning levels, fallback chains, or responding to quota exhaustion, read `~/.omp/agent/docs/model-routing.md`.
   Check `omp usage` at the start of a long session.
-- Reviews: before a thermonuclear or interface review or writing or editing a PR description, read `~/.omp/agent/docs/review-workflow.md`.
+- Reviews: before marking a PR ready, merging one, a thermonuclear or interface review, or writing or editing a PR description, read `~/.omp/agent/docs/review-workflow.md`.
 - Decisions: when you choose between options that would each work, when the user settles a choice, or before you change code a decision record may cover, read `~/.omp/agent/skills/decision-records/SKILL.md`.

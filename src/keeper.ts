@@ -10,7 +10,7 @@
  * hears the questions omp still waits on, and every whole frame omp writes from then on. omp's output while no client
  * listens is dropped: the server reads omp's state and the session file instead.
  */
-import { unlinkSync, writeFileSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 import { createServer, type Socket } from "node:net";
 import { isObject } from "./json";
 import { HELLO, type KeeperHello, pidFileOf, STOP } from "./keeper-wire";
@@ -241,6 +241,13 @@ async function main(): Promise<void> {
 	});
 	const pidFile = pidFileOf(socketPath);
 	writeFileSync(pidFile, String(process.pid), { mode: 0o600 });
+	// `listen` creates the socket file when the bind lands, which can be after omp has already exited
+	// and after the first removal below. The exit hook removes it on the way out, so a failed start leaves no file.
+	const dropSocket = (): void => {
+		rmSync(socketPath, { force: true });
+		rmSync(pidFile, { force: true });
+	};
+	process.on("exit", dropSocket);
 	server.listen(socketPath);
 
 	const output = (async () => {
@@ -253,17 +260,12 @@ async function main(): Promise<void> {
 			});
 	})();
 	void Promise.all([omp.exited, output.catch(() => {})]).then(async ([code]) => {
+		// Before `close` hangs up anyone already connected. A bind that lands later is removed by the exit hook.
+		dropSocket();
 		close();
 		// The client hears the end only once nothing omp started runs on.
 		await census.reap();
 		server.close();
-		for (const path of [socketPath, pidFile]) {
-			try {
-				unlinkSync(path);
-			} catch {
-				// Already gone.
-			}
-		}
 		const last = gate.kind === "starting" ? null : gate.client;
 		if (!last) process.exit(code);
 		last.end(() => process.exit(code));

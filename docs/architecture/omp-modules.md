@@ -90,9 +90,16 @@ The main ones:
   `discovery/index.ts` supplies provider state, foreign-user-source opt-ins, and read-only settings binding; `src/omp/scoped-discovery.ts` serializes that process-wide binding.
   `src/omp/extensions.ts` keeps installed scope copies separate and discovery preview distinct from session runtime; see [Extensions library](extensions.md).
 - Credentials: `pi-coding-agent/src/session/auth-broker-config.ts` (`discoverAuthStorage`) and `pi-ai/src/registry/oauth/index.ts` (`getOAuthProviders`).
-  `connectedProviders` in `src/omp/models.ts` keeps the `/login` providers that have a credential, as omp's RPC `get_login_providers` marks them `authenticated`.
+  `connectedProviders` in `src/omp/models.ts` keeps the `/login` providers that have a credential, as omp's RPC `get_login_providers` marks them `authenticated`, and any provider whose model config sets an API key.
+  It constructs `ModelRegistry` without `refresh`, so that key counts without running a command that prints it, and a local model found with no key stays out.
+  `connectedProviderIds` keeps a sign-in provider with any credential, and a catalog provider whose model config sets an API key. `configuredProviderIds` is only that second set, which the footer shows when `omp usage` has no balance for it.
   It opens the credential store on each call and closes it, so a login in a terminal counts at the next call.
   Settings › Providers runs omp's own `/login` and `/logout` through `src/omp/providers.ts`: `AuthStorage.oauth.login` (`pi-ai/src/auth-storage.ts`) with `captureBrowserSession` from `pi-coding-agent/src/utils/browser-session.ts` for a cookie sign-in, `formatLoginIdentity` from `pi-coding-agent/src/cli/oauth-terminal.ts`, `ModelRegistry.refreshProvider` from `pi-coding-agent/src/config/model-registry.ts` afterwards, as `omp login` does, and `toLogoutAccounts` and `logoutCredential` from `pi-coding-agent/src/slash-commands/helpers/logout.ts`.
+  Direct Anthropic API-key entry uses `AuthStorage.credentials.upsert` and `removeById` from `pi-ai/src/auth/types.ts`, through the discovered store, including its broker.
+  The saved key has `source: "login"`, so it ranks above an environment variable, as `pool.storeLoginApiKey` does.
+  Upsert matches an API key by its value, so a different key is removed after the new one is stored.
+  Replacing the provider's whole credential set is not used: a broker snapshot does not hold the real OAuth refresh token.
+  `oauth.login` stores a string result under the method id, not under `storeCredentialsAs`, so this entry does not register a second OAuth provider.
 - Model selectors: `parseRetryFallbackSelector` in `pi-coding-agent/src/session/retry-fallback-chains.ts`, which only `readSelector` in `src/omp/config.ts` calls.
   `readSelector` reads a selector against the `provider/id` of the listed models, so a `:level` splits off only after an id that `omp models` lists, and returns the selector's provider, id, and suffix.
   `resolveSelector` keeps the read only when its model is listed, and `routedSelectors` names every selector of the routing: each role's, and each fallback chain's key and entries.

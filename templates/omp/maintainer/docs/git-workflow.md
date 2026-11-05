@@ -9,7 +9,7 @@ git_common_dir=$(git rev-parse --path-format=absolute --git-common-dir)
 test -f "$git_common_dir/.graphite_repo_config"
 ```
 
-A successful `test` means the repository uses Graphite.
+A successful `test` means the repository uses Graphite, except omp-agents (`MaisonnatM/omp-agents`), which never uses Graphite: there use plain `git`, `git push`, and `gh pr create --draft`, and never run `gt`.
 In a linked worktree, `.git` is a file pointing to worktree-specific metadata; Graphite's repository configuration belongs in the shared Git directory.
 `--path-format=absolute` makes the result independent of the current subdirectory.
 If Graphite is configured, prefer `gt create` and `gt submit`; `git worktree add` alone does not register a branch with Graphite.

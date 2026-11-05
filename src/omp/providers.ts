@@ -3,12 +3,35 @@
  * credentials are filed under, the sign-in itself, and removing one stored credential. The credential store opens and
  * closes on each call, so a sign-in from a terminal shows at the next read.
  */
-import type { CredentialOrigin, OAuthLoginController } from "./module-types/models";
+import type { AuthStorage, CredentialOrigin, OAuthLoginController } from "./module-types/models";
 import { auth, browserSession, logout, modelRegistry, oauth, oauthTerminal } from "./modules";
-import type { ModelProvider } from "../shared/providers";
+import { ANTHROPIC_API_KEY_METHOD, MAX_LOGIN_ANSWER, type ModelProvider } from "../shared/providers";
 
 /** The callbacks a sign-in reports through; omp adds the isolated browser that a cookie sign-in opens. */
 export type LoginHooks = Omit<OAuthLoginController, "onBrowserSession">;
+
+const KEY_NOT_SAVED = "The API key could not be saved. Check that omp's credential store is available.";
+const KEY_NOT_REPLACED = "The API key was saved, but some previous API keys could not be removed. Refresh Providers and remove the old keys.";
+const MODELS_NOT_REFRESHED = "The API key was saved, but models could not refresh. Refresh Providers before trying again.";
+
+/**
+ * Stores `key` as Anthropic's login API key and removes API keys that were already stored with a different value.
+ * OAuth rows stay. A different key does not match omp's upsert, so the old rows are removed after the new one is stored.
+ */
+export async function replaceAnthropicApiKey(credentials: AuthStorage["credentials"], key: string, signal: AbortSignal): Promise<void> {
+	signal.throwIfAborted();
+	const superseded = credentials.list("anthropic").filter(row => row.credential.type === "api_key" && row.credential.key !== key);
+	try {
+		await credentials.upsert("anthropic", { type: "api_key", key, source: "login" });
+	} catch (cause) {
+		throw new Error(KEY_NOT_SAVED, { cause });
+	}
+	try {
+		for (const row of superseded) await credentials.removeById("anthropic", row.id);
+	} catch (cause) {
+		throw new Error(KEY_NOT_REPLACED, { cause });
+	}
+}
 
 /** The environment variable omp reads `provider`'s key from, when no stored credential takes precedence over it. */
 const envKeyOf = (origin: CredentialOrigin | undefined): string | null => (origin?.kind === "env" ? (origin.envVar ?? "an environment variable") : null);
@@ -30,6 +53,7 @@ export async function listProviders(): Promise<ModelProvider[]> {
 			const accounts = logout.toLogoutAccounts(key, storage.credentials.list(key)).map(({ credentialId, label, detail, type }) => ({ credentialId, label, detail, kind: type }));
 			providers.set(key, { id: key, name, methods: [{ id, name }], accounts, envKey: envKeyOf(storage.keys.source(key)) });
 		}
+		providers.get("anthropic")?.methods.push({ id: ANTHROPIC_API_KEY_METHOD, name: "API key" });
 		return [...providers.values()];
 	} finally {
 		storage.close();
@@ -41,6 +65,28 @@ export async function listProviders(): Promise<ModelProvider[]> {
  * credential unlocked. Answers the account it stored, `null` for an API key; throws when it stored nothing.
  */
 export async function loginProvider(method: string, provider: string, hooks: LoginHooks): Promise<string | null> {
+	if (method === ANTHROPIC_API_KEY_METHOD) {
+		const key = (await hooks.onPrompt({ message: "Anthropic API key", secret: true })).trim();
+		hooks.signal.throwIfAborted();
+		if (!key || key.length > MAX_LOGIN_ANSWER || /[\r\n]/.test(key)) throw new Error("Enter a non-empty API key on one line.");
+		let storage: Awaited<ReturnType<typeof auth.discoverAuthStorage>>;
+		try {
+			storage = await auth.discoverAuthStorage();
+		} catch (cause) {
+			throw new Error(KEY_NOT_SAVED, { cause });
+		}
+		try {
+			await replaceAnthropicApiKey(storage.credentials, key, hooks.signal);
+			try {
+				await new modelRegistry.ModelRegistry(storage).refreshProvider("anthropic", "online");
+			} catch (cause) {
+				throw new Error(MODELS_NOT_REFRESHED, { cause });
+			}
+		} finally {
+			storage.close();
+		}
+		return null;
+	}
 	const storage = await auth.discoverAuthStorage();
 	try {
 		const identity = await storage.oauth.login(method, { ...hooks, onBrowserSession: browserSession.captureBrowserSession });

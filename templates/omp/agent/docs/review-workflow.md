@@ -25,7 +25,7 @@ Spawn `task` with `agent: "interface-reviewer"` and `pr <N>` as the assignment; 
 It then checks the change against the app's own design system, which it reads from the repository: the shared component library, design tokens, component variants, icon library, written conventions, and sibling screens.
 It flags a raw element where a shared component exists, a component that duplicates one, a shared component used against its siblings' pattern, hard-coded values where a token exists, and layout, state, or copy that departs from sibling screens, each citing the component, token, or sibling it should match.
 It also lists, under **New patterns**, each kind of UI the change presents in a new way where the app has one established way, such as a list shown as cards in an app whose lists are all tables, even when the PR justifies it.
-The kit does not ship those skills: when one is missing, the agent names it and stops without reviewing, and the user installs it before the stage resumes.
+When a read fails, the agent names the missing skill and stops without reviewing.
 Apply the findings in a fresh agent, commit and push, then add its checkbox as [Review checkboxes](#review-checkboxes) says.
 
 ## Stalled review and fix agents

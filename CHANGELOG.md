@@ -3,6 +3,17 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-05
+
+- Fixed: a session whose omp exits before it is ready no longer leaves its socket file behind, which blocked the next start on that session.
+- The model menu now lists models from a provider you configured with an API key, such as API credits.
+- The bottom bar names that provider beside the plan windows. It has no percent, because the plan report has no balance for it.
+- Behind the scenes: installing the starter kit now adds a headless Chrome DevTools connection for agents that check pages in the browser, and ships the interface review skills so pull request interface reviews can run without a separate install.
+- Behind the scenes: the starter kit's maintainer profile adds rules for sessions aimed at another project, Linear tickets, docs and changelog edits, plan replies, and headless test windows, and `/ship` plans now include how the code works today plus a second-model critique before coding starts.
+- Settings › Providers can add or replace an Anthropic API key in a masked field, so you do not paste it into a conversation.
+- Saving that key keeps your subscription sign-ins.
+- Fallback routing stays as it is.
+
 ## 2026-11-04
 
 - Behind the scenes: `/ship` plans now open with how the code works today and end with what is out of scope, and the chosen plan goes to a fresh critic on a different model, which has not seen the conversation and must back each finding with evidence, before any code is written.
@@ -213,12 +224,3 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Fixed: a reply that shows a screenshot keeps its suggested prompts, because the starter kit now has the agent put the screenshot above them.
 - Fixed: Settings, Notes, Calendar, and Email show the sidebar's tab bar again, so a tab such as Sessions takes you back.
 - Fixed: on macOS, the title bar's Back and Forward buttons now line up with the window's close, minimize, and zoom buttons, with a gap after them.
-
-## 2026-10-29
-
-- Fixed: a session's Changes dialog now shows line counts for files it edits in another checkout of the project from its first edit, rather than marking them S until it runs a command there.
-- New: Get started walks you through setup on first launch, one step per screen in a dialog. Sign in to a model provider right there, choose how terminal sessions show, install the starter kit, connect GitHub and your tools, then start your first session from a suggested task. Close it and it waits in a bubble at the bottom right until setup is done; reopen it any time from the bubble or Cmd+K.
-- When omp is not installed, the desktop app now shows the command to install it, with Copy and Retry, instead of a startup error.
-- Fixed: the desktop app's starter kit now includes its model settings.
-- A Bot's right sidebar now shows only Details, and Tickets once its conversation worked on a Linear issue; the PRs and Browser tabs are gone there.
-- Settings, Notes, Calendar, and Email now show their list in the left sidebar without the tab bar above it.
