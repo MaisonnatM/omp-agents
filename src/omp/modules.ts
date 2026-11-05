@@ -291,6 +291,7 @@ export const modelRegistry = await load<ModelRegistryModule>(join(srcDir, "confi
 	"ModelRegistry.prototype.refreshProvider": "function",
 	"ModelRegistry.prototype.refresh": "function",
 	"ModelRegistry.prototype.getAvailable": "function",
+	"ModelRegistry.prototype.getAll": "function",
 });
 export const logout = await load<LogoutModule>(join(srcDir, "slash-commands", "helpers", "logout.ts"), {
 	toLogoutAccounts: "function",

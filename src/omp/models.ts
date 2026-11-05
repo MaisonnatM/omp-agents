@@ -2,6 +2,7 @@ import { createCache } from "../cache";
 import { isObject } from "../json";
 import { runJson } from "../proc";
 import { API_CREDITS_PROVIDER, type CatalogModel, type ConnectedModels, type DraftModel, type ModelEntry, type ModelRole, selectorOf, splitSelector } from "../shared/models";
+import { settleApiCredits } from "./api-credits";
 import { loadOmpConfig, type OmpConfig, readSelector, routedSelectors } from "./config";
 import { ompCommand } from "./install";
 import { auth, config, modelRegistry, modelResolver, oauth, serviceTiers } from "./modules";
@@ -42,6 +43,11 @@ export function listModels(): Promise<CatalogModel[]> {
 	return catalogs.get("", readCatalog);
 }
 
+/** Makes the next {@link listModels} run `omp models` again, once a write changed what it lists. */
+export function dropModelList(): void {
+	catalogs.drop("");
+}
+
 async function readCatalog(): Promise<CatalogModel[]> {
 	const data = await runJson([...ompCommand, "models", "--json"], { timeoutMs: MODELS_TIMEOUT_MS });
 	if (!isObject(data) || !Array.isArray(data.models)) throw new Error("omp models --json printed no models");
@@ -61,10 +67,9 @@ async function readCatalog(): Promise<CatalogModel[]> {
 }
 
 /**
- * Sign-in providers that have a credential, plus catalog providers whose key comes from the model config.
- * A missing source is not connected. A config key counts even when the provider is not a `/login` provider.
- * An `env` or stored `api_key` counts for a sign-in provider only. A catalog provider needs `config`, which is the
- * model-file key this row is for, not a key from the environment.
+ * Sign-in providers that have a credential, plus catalog providers whose key comes from the model config or the
+ * credential store, such as the API credits key Settings saves. A missing source is not connected.
+ * An `env` key counts for a sign-in provider only: omp reports one for a catalog provider whose variable may hold nothing.
  */
 export function connectedProviderIds(
 	oauthIds: readonly string[],
@@ -74,7 +79,8 @@ export function connectedProviderIds(
 	const ids = oauthIds.flatMap(id => (source(id) === undefined ? [] : [id]));
 	const seen = new Set(ids);
 	for (const provider of catalogProviders) {
-		if (seen.has(provider) || source(provider)?.kind !== "config") continue;
+		const kind = source(provider)?.kind;
+		if (seen.has(provider) || (kind !== "config" && kind !== "api_key")) continue;
 		ids.push(provider);
 		seen.add(provider);
 	}
@@ -82,8 +88,8 @@ export function connectedProviderIds(
 }
 
 /**
- * Catalog providers whose model config sets an API key, once each, plus the API credits row when an Anthropic API key
- * is saved in Settings. That key sits beside the Anthropic sign-in, so the Anthropic plan row cannot stand for it.
+ * Catalog providers whose model config sets an API key, once each, plus the API credits row when Settings saved an
+ * Anthropic API key under that provider. `omp usage` reports no quota for a key, so no other row stands for it.
  */
 export function configuredProviderIds(
 	catalogProviders: readonly string[],
@@ -103,7 +109,8 @@ export function configuredProviderIds(
 
 /**
  * The providers you are signed in to or gave a key: the ones omp's `/login` marks as connected, and any provider whose
- * model config sets an API key. Loading the registry installs that key without running a command that prints it.
+ * model config sets an API key or that has a stored one. Loading the registry installs a config key without running a
+ * command that prints it.
  * omp also lists the models of local runtimes it finds without a login, such as Apple's on-device model; those are not
  * connected. The store opens on each call, so a login from a terminal counts at once.
  */
@@ -111,6 +118,15 @@ export async function connectedProviders(): Promise<Set<string>> {
 	const storage = await auth.discoverAuthStorage();
 	try {
 		const registry = new modelRegistry.ModelRegistry(storage);
+		if (
+			await settleApiCredits(storage.credentials, async () => {
+				await registry.refresh();
+				return registry.getAll().flatMap(model => (model.provider === "anthropic" ? [model.id] : []));
+			})
+		) {
+			dropModelList();
+			await registry.refresh();
+		}
 		return connectedProviderIds(
 			oauth.getOAuthProviders().map(({ id }) => id),
 			registry.getAvailable().map(model => model.provider),
@@ -121,7 +137,7 @@ export async function connectedProviders(): Promise<Set<string>> {
 	}
 }
 
-/** {@link configuredProviderIds} from the same registry pass as {@link connectedProviders}, and the stored Anthropic rows. */
+/** {@link configuredProviderIds} from the same registry pass as {@link connectedProviders}, and the stored API credits rows. */
 export async function configuredProviders(): Promise<string[]> {
 	const storage = await auth.discoverAuthStorage();
 	try {
@@ -129,7 +145,7 @@ export async function configuredProviders(): Promise<string[]> {
 		return configuredProviderIds(
 			registry.getAvailable().map(model => model.provider),
 			id => storage.keys.source(id),
-			storage.credentials.list("anthropic").some(row => row.credential.type === "api_key"),
+			storage.credentials.list(API_CREDITS_PROVIDER).some(row => row.credential.type === "api_key"),
 		);
 	} finally {
 		storage.close();

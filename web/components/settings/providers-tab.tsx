@@ -104,7 +104,7 @@ function LoginCallout({ login }: { login: ProviderLogin }) {
 					</Button>
 				}
 			>
-				{apiKey ? "API key saved. New omp sessions can use it." : `${login.identity ? `Signed in as ${login.identity}.` : "Signed in."} New omp sessions can use its models.`}
+				{apiKey ? "API key saved. Pick an API credits model to start a session on it." : `${login.identity ? `Signed in as ${login.identity}.` : "Signed in."} New omp sessions can use its models.`}
 			</Callout>
 		);
 	}
@@ -129,7 +129,7 @@ function LoginCallout({ login }: { login: ProviderLogin }) {
 					</div>
 				}
 			>
-				<p className="whitespace-pre-wrap">{apiKey ? (prompt ? "Paste your Anthropic Console API key below. Subscription sign-ins and fallback routing stay as they are." : "Saving API key…") : instructions ?? (url ? "Sign in on the provider's page." : "Starting the sign-in…")}</p>
+				<p className="whitespace-pre-wrap">{apiKey ? (prompt ? "Paste your Anthropic Console API key below. Sessions on API credits models bill it; your Anthropic sign-in stays as it is." : "Saving API key…") : instructions ?? (url ? "Sign in on the provider's page." : "Starting the sign-in…")}</p>
 				{!apiKey && progress && <p className="mt-1 text-xs opacity-80">{progress}</p>}
 			</Callout>
 			{prompt && <PromptForm key={prompt.id} prompt={prompt} apiKey={apiKey} />}
