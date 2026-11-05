@@ -5,6 +5,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-05
 
+- Starting a new session while several conversations are open shows that new session alone.
+- Ending a session that is open beside another one leaves a single conversation, instead of filling the empty side with the next session.
+- Esc on a split closes the pane that was added last. Esc on a maximized pane still brings the other panes back.
 - The Sessions tab now lists running Bot conversations in a **Bots** group, under each Bot's name, so every open session shows somewhere; the CPU card names them the same way.
 - A Bot's conversation idle for a day, with nothing written to it, now ends by itself so it holds no omp process; your next message to the Bot resumes it.
 - Fixed: a session whose omp exits before it is ready no longer leaves its socket file behind, which blocked the next start on that session.

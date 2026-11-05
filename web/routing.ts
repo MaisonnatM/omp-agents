@@ -511,8 +511,8 @@ export function swapView(layout: Layout, from: View, to: View): Layout {
 
 /**
  * The layout once start `op` answers with live session `instanceId`, `null` to leave it: a resumed session takes the
- * pane of the past session it continues, a new session or a fork opens in the focused pane, and a quick action's
- * session runs in the background.
+ * pane of the past session it continues, a new session opens alone, a fork opens in the focused pane, and a quick
+ * action's session runs in the background.
  */
 export function layoutAfterStart(layout: Layout, op: StartOp, instanceId: string): Layout | null {
 	const live: LiveView = { kind: "live", instanceId, agentId: null };
@@ -520,6 +520,7 @@ export function layoutAfterStart(layout: Layout, op: StartOp, instanceId: string
 		case "resume":
 			return swapView(layout, { kind: "past", sessionId: op.sessionId }, live);
 		case "new":
+			return { panes: [live], focus: 0, maximized: false };
 		case "fork":
 			return openView(layout, live, "replace");
 		case "quick":
@@ -541,19 +542,34 @@ export function layoutAfterResumeAll(layout: Layout, started: { sessionId: strin
 	return panes.some((view, index) => view !== layout.panes[index]) ? { ...layout, panes } : null;
 }
 
-/**
- * The layout once live session `instanceId` ends. Each pane showing it, or one of its subagents, shows the next
- * session in `listed` (the sidebar's live sessions before ending, in order), else the previous, skipping sessions
- * already open or absent from `eligible`, the latest live sessions not currently ending. A pane left without one closes.
- */
-export function endSession(layout: Layout, instanceId: string, listed: string[], eligible: ReadonlySet<string>): Layout {
+function showsEnded(pane: View, instanceId: string): boolean {
+	return pane.kind === "live" && pane.instanceId === instanceId;
+}
+
+/** One pane's replacement once its session ends. A single conversation stays a single conversation. */
+function replaceEnded(layout: Layout, instanceId: string, listed: string[], eligible: ReadonlySet<string>): Layout {
 	const at = listed.indexOf(instanceId);
 	const neighbors = (at < 0 ? [] : [...listed.slice(at + 1), ...listed.slice(0, at).reverse()])
 		.filter(id => eligible.has(id))
 		.map((id): View => ({ kind: "live", instanceId: id, agentId: null }))
 		.filter(view => !layout.panes.some(pane => sameView(pane, view)));
-	const panes = layout.panes.map(pane => (pane.kind === "live" && pane.instanceId === instanceId ? (neighbors.shift() ?? pane) : pane));
-	return panes.reduceRight((next, pane, index) => (pane.kind === "live" && pane.instanceId === instanceId ? closePane(next, index) : next), { ...layout, panes });
+	const panes = layout.panes.map(pane => (showsEnded(pane, instanceId) ? (neighbors.shift() ?? pane) : pane));
+	return panes.reduceRight((next, pane, index) => (showsEnded(pane, instanceId) ? closePane(next, index) : next), { ...layout, panes });
+}
+
+/**
+ * The layout once live session `instanceId` ends. One pane shows the next session in `listed` (the sidebar's live
+ * sessions before ending, in order), else the previous, skipping sessions absent from `eligible`. A split that shows
+ * the ended session leaves the split: the focused pane stays when it is another session, otherwise the first other
+ * pane stays, and when every pane was that session the next session opens alone.
+ */
+export function endSession(layout: Layout, instanceId: string, listed: string[], eligible: ReadonlySet<string>): Layout {
+	const ended = layout.panes.some(pane => showsEnded(pane, instanceId));
+	if (!ended || layout.panes.length < 2) return replaceEnded(layout, instanceId, listed, eligible);
+	const focused = layout.panes[layout.focus];
+	const stay = focused && !showsEnded(focused, instanceId) ? focused : layout.panes.find(pane => !showsEnded(pane, instanceId));
+	if (stay) return { panes: [stay], focus: 0, maximized: false };
+	return { ...replaceEnded({ panes: [layout.panes[0]!], focus: 0, maximized: false }, instanceId, listed, eligible), maximized: false };
 }
 
 /**

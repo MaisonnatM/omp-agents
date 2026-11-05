@@ -2,7 +2,7 @@ import { type Dispatch, type SetStateAction, useMemo, useRef } from "react";
 import type { View } from "../src/shared/sessions";
 import type { Workspace } from "../src/shared/workspaces";
 import type { PaletteEvent, PaletteState } from "./command-palette";
-import { adjacentSession, type Layout, type Page, type SettingsRoute, type SidebarPanel, type SidebarTab } from "./routing";
+import { adjacentSession, closePane, type Layout, type Page, type SettingsRoute, type SidebarPanel, type SidebarTab } from "./routing";
 import { type ShortcutHandler, type ShortcutHandlers, type ShortcutId, useShortcuts } from "./shortcuts";
 import { positionHandlers } from "./sidebar-tabs";
 import { useHistoryPosition } from "./use-history-position";
@@ -134,9 +134,14 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			email: goTo.email,
 			...positions,
 			restore: () => {
-				const { maximized, layout, show } = latest.current;
-				if (!maximized) return false;
-				show({ ...layout, maximized: false });
+				const { page, maximized, layout, show } = latest.current;
+				if (page) return false;
+				if (maximized) {
+					show({ ...layout, maximized: false });
+					return;
+				}
+				if (layout.panes.length < 2) return false;
+				show(closePane(layout, layout.panes.length - 1));
 			},
 			terminal: () => latest.current.toggleTerminal(),
 			openPullRequest: () => {

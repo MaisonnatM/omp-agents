@@ -11,9 +11,14 @@
   A plain click on a row outside the split opens it alone, full width, and the page remembers the split.
   A plain click on any session of that split later brings the split back, in the same order and sizes, with that session focused.
   Closing a pane, or ending its session, forgets the split it belonged to, and a new split that shares a session replaces the older one.
+  Ending a session that is open in a split leaves one conversation on the page.
+  The focused pane stays when it shows a different session.
+  Otherwise the first other pane stays.
+  When every pane showed the session that ended, the next sidebar session opens alone, the same way ending the only pane does.
   Back and forward return to the exact panes in the hash.
   Click or tab into a pane to focus it.
-  A new session or a fork opens in the focused pane.
+  A new session opens alone, leaving the split.
+  A fork opens in the focused pane.
   With four panes open, Cmd-click and **Open in split** replace the focused pane.
   A row that is already open focuses its pane instead of opening a second copy.
   The **×** in a pane's header closes it.
@@ -30,6 +35,8 @@
   Each split keeps its own sizes while the page is open, and the sizes of the split on screen are stored in the app, so they survive a reload.
 - The maximize button in a pane's header makes that pane fill the page.
   The other panes keep running behind it, with their drafts and scroll positions, and the restore button or Esc brings the split back exactly as it was.
+  Esc on a split that is not maximized closes the pane that was added last, which undoes that split.
+  Esc does this only while Sessions is showing the panes, so a dialog or another page still takes Esc first when it handles it.
   A plain click on a row outside the split opens it alone, as above; a remembered split comes back unmaximized.
   Cmd-click and **Open in split** bring the split back.
   Closing the maximized pane brings the split back too.
