@@ -90,14 +90,15 @@ The main ones:
   `discovery/index.ts` supplies provider state, foreign-user-source opt-ins, and read-only settings binding; `src/omp/scoped-discovery.ts` serializes that process-wide binding.
   `src/omp/extensions.ts` keeps installed scope copies separate and discovery preview distinct from session runtime; see [Extensions library](extensions.md).
 - Credentials: `pi-coding-agent/src/session/auth-broker-config.ts` (`discoverAuthStorage`) and `pi-ai/src/registry/oauth/index.ts` (`getOAuthProviders`).
-  `connectedProviders` in `src/omp/models.ts` keeps the `/login` providers that have a credential, as omp's RPC `get_login_providers` marks them `authenticated`, and any provider whose model config or credential store holds an API key.
-  It constructs `ModelRegistry` without `refresh` unless it just moved a legacy Anthropic API key onto `anthropic-api` or added that provider to `models.yml`, and a local model found with no key stays out.
-  `connectedProviderIds` keeps a sign-in provider with any credential, and a catalog provider whose model config or credential store sets an API key. `configuredProviderIds` is only the config-key set, plus `anthropic-api` when an Anthropic API key is stored, which the footer shows when `omp usage` has no balance for it.
+  `connectedProviders` in `src/omp/models.ts` keeps the `/login` providers that have a credential, as omp's RPC `get_login_providers` marks them `authenticated`, and any provider whose model config sets an API key, plus API credits when that key is stored.
+  It constructs `ModelRegistry` without `refresh`, and a local model found with no key stays out.
+  `connectedProviderIds` keeps a sign-in provider with any credential, a catalog provider whose model config sets an API key, and API credits when its key is stored. Another catalog provider's stored key does not count. `configuredProviderIds` is only the config-key set, plus `anthropic-api` when an Anthropic API key is stored, which the footer shows when `omp usage` has no balance for it.
   It opens the credential store on each call and closes it, so a login in a terminal counts at the next call.
   Settings › Providers runs omp's own `/login` and `/logout` through `src/omp/providers.ts`: `AuthStorage.oauth.login` (`pi-ai/src/auth-storage.ts`) with `captureBrowserSession` from `pi-coding-agent/src/utils/browser-session.ts` for a cookie sign-in, `formatLoginIdentity` from `pi-coding-agent/src/cli/oauth-terminal.ts`, `ModelRegistry.refreshProvider` from `pi-coding-agent/src/config/model-registry.ts` afterwards, as `omp login` does, and `toLogoutAccounts` and `logoutCredential` from `pi-coding-agent/src/slash-commands/helpers/logout.ts`.
   Direct Anthropic API-key entry uses `AuthStorage.credentials.upsert` and `removeById` from `pi-ai/src/auth/types.ts`, through the discovered store, including its broker.
   The key is filed under `anthropic-api`, not beside the Anthropic sign-in, and `src/omp/api-credits.ts` adds that provider to `models.yml` with `auth: none` so omp sends the stored key.
-  A key saved earlier under `anthropic` is moved the next time providers or the session picker load.
+  A key saved earlier under `anthropic` is moved once, when the dashboard server starts (`adoptLegacyApiCredits` in `src/omp/providers.ts`), not when a page reads providers.
+  The `models.yml` entry is inserted under `providers:` and marked, so removing the last key deletes that block and leaves the rest of the file as it was.
   The saved key has `source: "login"`, so it ranks above an environment variable, as `pool.storeLoginApiKey` does.
   Upsert matches an API key by its value, so a different key is removed after the new one is stored.
   Replacing the provider's whole credential set is not used: a broker snapshot does not hold the real OAuth refresh token.

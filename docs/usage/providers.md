@@ -12,11 +12,12 @@
   The row says **Signing in** until the sign-in ends, and **Cancel** abandons it.
   It then says **Signed in** with the account, or why the sign-in failed, until you choose **Dismiss**.
   One sign-in runs at a time: starting another abandons the first, and a sign-in not finished within 5 minutes fails.
-- Anthropic's **⋯** menu also offers **Add API key**, or **Replace API key** when one is stored.
-  Paste your Anthropic Console key into the masked field and choose **Save API key**.
+- **Anthropic API credits** is its own row, next to Anthropic.
+  **Add API key**, or **Replace API key** when one is stored, asks for the Anthropic Console key in a masked field. Choose **Save API key**.
   Do not paste it into a session conversation.
-  Saving replaces stored Anthropic API keys and keeps subscription sign-ins.
-  Fallback routing stays as it is.
+  Saving replaces an API key stored on that row, and one previously stored on Anthropic, and keeps Anthropic subscription sign-ins.
+  A new session bills the key when you pick an API credits model. An Anthropic model still uses the subscription sign-in.
+  The dashboard moves a key that an older version stored on Anthropic onto this row the next time it starts.
   **Cancel** closes the entry without saving.
   The key stays in omp's credential store, not dashboard settings or settings sync.
   It is not shown again after saving.

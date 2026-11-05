@@ -11,6 +11,7 @@
   `src/mcp-status.ts` has `remoteStatusOf`, the one reading of a remote server's tool list into its status that both files use.
   `src/providers.ts` lists the model providers and runs the sign-ins and sign-outs that Settings › Providers starts, with `src/provider-logins.ts` holding the one sign-in under way, and `src/omp/providers.ts` calling omp for them.
   `src/omp/providers.test.ts` checks that a new Anthropic API key replaces older keys and leaves subscription sign-ins in place.
+  `src/omp/api-credits.ts` writes the API credits provider into `models.yml` and moves a key that was stored beside the Anthropic sign-in. The server calls that move once as it starts.
   `src/shared/providers.ts` holds the shapes the page shares.
   See [Providers](../architecture/http-api-providers.md).
 - `src/google-calendar.ts`: `GoogleCalendarClient`, one account's calendars checked in its Google Calendar list and the events in a span of those the Calendar page shows, read from Google's Calendar API with omp's sign-in to that account's server, and the events it adds to and deletes from the calendars you may write to; `GoogleCalendars` merges every signed-in account's and sends each write to the account it names.

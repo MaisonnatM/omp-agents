@@ -32,24 +32,31 @@ async function dir(): Promise<string> {
 describe("API credits models.yml entry", () => {
 	test("adds anthropic-api once, and leaves an entry someone else wrote", async () => {
 		const root = await dir();
+		const path = join(root, "models.yml");
+		await Bun.write(path, "# keep me\nproviders:\n  other:\n    baseUrl: https://example.com\n");
 		expect(await addApiCreditsProvider(["claude-sonnet"], root)).toBe(true);
-		expect(await addApiCreditsProvider(["other"], root)).toBe(false);
-		const text = await readFile(join(root, "models.yml"), "utf8");
-		expect(text).toContain("anthropic-api:");
+		expect(await addApiCreditsProvider(["unused"], root)).toBe(false);
+		const text = await readFile(path, "utf8");
+		expect(text).toContain("# keep me");
+		expect(text).toContain("other:");
 		expect(text).toContain("claude-sonnet");
-		expect(text).not.toContain("other");
+		expect(text).not.toContain("unused");
 	});
 
-	test("removes only the entry this module wrote", async () => {
+	test("removes only the marked entry this module wrote", async () => {
 		const root = await dir();
+		const path = join(root, "models.yml");
+		await Bun.write(path, "# keep me\nproviders:\n  other:\n    baseUrl: https://example.com\n");
 		await addApiCreditsProvider(["claude-sonnet"], root);
 		await removeApiCreditsProvider(root);
-		expect(await readFile(join(root, "models.yml"), "utf8")).not.toContain("anthropic-api");
+		const text = await readFile(path, "utf8");
+		expect(text).toContain("# keep me");
+		expect(text).toContain("other:");
+		expect(text).not.toContain("anthropic-api");
 
-		const kept = join(root, "models.yml");
-		await Bun.write(kept, Bun.YAML.stringify({ providers: { "anthropic-api": { ...apiCreditsEntry(["kept"]), auth: "apiKey", apiKey: "stay" } } }, null, 2));
+		await Bun.write(path, Bun.YAML.stringify({ providers: { "anthropic-api": { ...apiCreditsEntry(["kept"]), auth: "apiKey", apiKey: "stay" } } }, null, 2));
 		await removeApiCreditsProvider(root);
-		expect(await readFile(kept, "utf8")).toContain("apiKey");
+		expect(await readFile(path, "utf8")).toContain("apiKey");
 	});
 
 	test("moves a key saved beside the Anthropic sign-in and writes the provider", async () => {

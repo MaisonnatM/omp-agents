@@ -34,11 +34,23 @@ function apiCreditsRow(storage: AuthStorage): ModelProvider {
 /** The environment variable omp reads `provider`'s key from, when no stored credential takes precedence over it. */
 const envKeyOf = (origin: CredentialOrigin | undefined): string | null => (origin?.kind === "env" ? (origin.envVar ?? "an environment variable") : null);
 
+/**
+ * Moves an Anthropic API key saved beside the sign-in onto API credits, and adds that provider to `models.yml` when it is missing.
+ * The server calls this once as it starts. A later read of providers does not write the credential store or the file.
+ */
+export async function adoptLegacyApiCredits(): Promise<void> {
+	const storage = await auth.discoverAuthStorage();
+	try {
+		if (await settleApiCredits(storage.credentials, () => anthropicModelIds(storage))) dropModelList();
+	} finally {
+		storage.close();
+	}
+}
+
 /** Every available `/login` entry, grouped by the provider its credentials are filed under, in omp's order. */
 export async function listProviders(): Promise<ModelProvider[]> {
 	const storage = await auth.discoverAuthStorage();
 	try {
-		if (await settleApiCredits(storage.credentials, () => anthropicModelIds(storage))) dropModelList();
 		const providers = new Map<string, ModelProvider>();
 		for (const { id, name, available, storeCredentialsAs } of oauth.getOAuthProviders()) {
 			if (!available) continue;
@@ -77,11 +89,14 @@ export async function loginProvider(method: string, provider: string, hooks: Log
 			throw new Error(KEY_NOT_SAVED, { cause });
 		}
 		try {
-			await replaceAnthropicApiKey(storage.credentials, key, hooks.signal);
+			let wrote = false;
 			try {
-				await addApiCreditsProvider(await anthropicModelIds(storage));
+				wrote = await addApiCreditsProvider(await anthropicModelIds(storage));
+				await replaceAnthropicApiKey(storage.credentials, key, hooks.signal);
 				dropModelList();
 			} catch (cause) {
+				if (wrote) await removeApiCreditsProvider().catch(() => undefined);
+				if (cause instanceof Error && cause.message.startsWith("The API key")) throw cause;
 				throw new Error(MODELS_NOT_REFRESHED, { cause });
 			}
 		} finally {

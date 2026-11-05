@@ -103,8 +103,12 @@ describe("connectedProviderIds", () => {
 		expect([...connected].sort()).toEqual(["anthropic", "anthropic-api"]);
 	});
 
-	test("keeps a catalog provider whose key is stored, as Settings saves the API credits key", () => {
-		const connected = connectedProviderIds(["anthropic"], ["anthropic", "anthropic-api", "from-env"], source({ anthropic: "oauth", "anthropic-api": "api_key", "from-env": "env" }));
+	test("keeps API credits when its key is stored, and leaves another catalog provider's stored key out", () => {
+		const connected = connectedProviderIds(
+			["anthropic"],
+			["anthropic", "anthropic-api", "other", "from-env"],
+			source({ anthropic: "oauth", "anthropic-api": "api_key", other: "api_key", "from-env": "env" }),
+		);
 		expect([...connected].sort()).toEqual(["anthropic", "anthropic-api"]);
 	});
 

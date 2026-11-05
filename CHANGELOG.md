@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-05
 
+- The model menu now has an API credits group for an Anthropic API key saved in Settings. A session you start from that group bills the key. A session on Anthropic still uses your Claude plan.
+- An API key that an older version saved on Anthropic moves to that group the next time the dashboard starts.
 - Fixed: an Anthropic API key added in Settings now shows as API credits in the bottom bar, even while you stay signed in to a Claude plan.
 - Starting a new session while several conversations are open shows that new session alone.
 - Ending a session that is open beside another one leaves a single conversation, instead of filling the empty side with the next session.

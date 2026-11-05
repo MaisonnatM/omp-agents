@@ -2,7 +2,6 @@ import { createCache } from "../cache";
 import { isObject } from "../json";
 import { runJson } from "../proc";
 import { API_CREDITS_PROVIDER, type CatalogModel, type ConnectedModels, type DraftModel, type ModelEntry, type ModelRole, selectorOf, splitSelector } from "../shared/models";
-import { settleApiCredits } from "./api-credits";
 import { loadOmpConfig, type OmpConfig, readSelector, routedSelectors } from "./config";
 import { ompCommand } from "./install";
 import { auth, config, modelRegistry, modelResolver, oauth, serviceTiers } from "./modules";
@@ -67,8 +66,8 @@ async function readCatalog(): Promise<CatalogModel[]> {
 }
 
 /**
- * Sign-in providers that have a credential, plus catalog providers whose key comes from the model config or the
- * credential store, such as the API credits key Settings saves. A missing source is not connected.
+ * Sign-in providers that have a credential, plus catalog providers whose key comes from the model config.
+ * A stored API key counts only for API credits. Any other catalog provider needs `config`. A missing source is not connected.
  * An `env` key counts for a sign-in provider only: omp reports one for a catalog provider whose variable may hold nothing.
  */
 export function connectedProviderIds(
@@ -80,7 +79,8 @@ export function connectedProviderIds(
 	const seen = new Set(ids);
 	for (const provider of catalogProviders) {
 		const kind = source(provider)?.kind;
-		if (seen.has(provider) || (kind !== "config" && kind !== "api_key")) continue;
+		const storedCredits = provider === API_CREDITS_PROVIDER && kind === "api_key";
+		if (seen.has(provider) || (kind !== "config" && !storedCredits)) continue;
 		ids.push(provider);
 		seen.add(provider);
 	}
@@ -109,7 +109,7 @@ export function configuredProviderIds(
 
 /**
  * The providers you are signed in to or gave a key: the ones omp's `/login` marks as connected, and any provider whose
- * model config sets an API key or that has a stored one. Loading the registry installs a config key without running a
+ * model config sets an API key, plus API credits when its key is stored. Loading the registry installs a config key without running a
  * command that prints it.
  * omp also lists the models of local runtimes it finds without a login, such as Apple's on-device model; those are not
  * connected. The store opens on each call, so a login from a terminal counts at once.
@@ -118,15 +118,6 @@ export async function connectedProviders(): Promise<Set<string>> {
 	const storage = await auth.discoverAuthStorage();
 	try {
 		const registry = new modelRegistry.ModelRegistry(storage);
-		if (
-			await settleApiCredits(storage.credentials, async () => {
-				await registry.refresh();
-				return registry.getAll().flatMap(model => (model.provider === "anthropic" ? [model.id] : []));
-			})
-		) {
-			dropModelList();
-			await registry.refresh();
-		}
 		return connectedProviderIds(
 			oauth.getOAuthProviders().map(({ id }) => id),
 			registry.getAvailable().map(model => model.provider),
