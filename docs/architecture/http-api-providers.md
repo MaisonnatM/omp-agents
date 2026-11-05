@@ -12,6 +12,12 @@ While it runs, `login` is `{ phase: "running", url, instructions, progress, prom
 For the paste-code providers, omp asks for the code or redirect address while its local callback also listens, and whichever comes first finishes the sign-in.
 A sign-in ends as `{ phase: "done", identity }`, after `ModelRegistry.refreshProvider` re-reads the provider's models, or `{ phase: "failed", error }`, and stays until the next one starts or `PUT /api/providers/login/cancel`, which also aborts one under way.
 A flow that stores nothing, such as Ollama's with an empty key, fails, as `omp login` reports it.
+The Anthropic row adds method `anthropic-api-key`, which reuses the same secret prompt and answer routes.
+It saves the key with `source: "login"` through `discoverAuthStorage`, then removes only older API-key rows.
+OAuth accounts stay, including when a broker holds them.
+The page receives credential metadata only.
+Key-save failures use fixed messages, and the native error stays on `cause`, so a secret in the store's error is not sent to the page.
+This method does not change model-role or fallback settings.
 
 `PUT /api/providers/sign-out`, with `{ provider, credentialId }`, removes that row through omp's `logoutCredential`, which refreshes the provider's models, and answers the providers after.
 `parseLoginMethod`, `parseLoginAnswer`, and `parseProviderSignOut` in `src/server/wire.ts` check the bodies.

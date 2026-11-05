@@ -7,6 +7,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - Behind the scenes: installing the starter kit now adds a headless Chrome DevTools connection for agents that check pages in the browser, and ships the interface review skills so pull request interface reviews can run without a separate install.
 - Behind the scenes: the starter kit's maintainer profile adds rules for sessions aimed at another project, Linear tickets, docs and changelog edits, plan replies, and headless test windows, and `/ship` plans now include how the code works today plus a second-model critique before coding starts.
+- Settings › Providers can add or replace an Anthropic API key in a masked field, so you do not paste it into a conversation.
+- Saving that key keeps your subscription sign-ins.
+- Fallback routing stays as it is.
 
 ## 2026-11-04
 
