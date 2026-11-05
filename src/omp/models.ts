@@ -42,6 +42,11 @@ export function listModels(): Promise<CatalogModel[]> {
 	return catalogs.get("", readCatalog);
 }
 
+/** Makes the next {@link listModels} run `omp models` again, once a write changed what it lists. */
+export function dropModelList(): void {
+	catalogs.drop("");
+}
+
 async function readCatalog(): Promise<CatalogModel[]> {
 	const data = await runJson([...ompCommand, "models", "--json"], { timeoutMs: MODELS_TIMEOUT_MS });
 	if (!isObject(data) || !Array.isArray(data.models)) throw new Error("omp models --json printed no models");
@@ -62,9 +67,8 @@ async function readCatalog(): Promise<CatalogModel[]> {
 
 /**
  * Sign-in providers that have a credential, plus catalog providers whose key comes from the model config.
- * A missing source is not connected. A config key counts even when the provider is not a `/login` provider.
- * An `env` or stored `api_key` counts for a sign-in provider only. A catalog provider needs `config`, which is the
- * model-file key this row is for, not a key from the environment.
+ * A stored API key counts only for API credits. Any other catalog provider needs `config`. A missing source is not connected.
+ * An `env` key counts for a sign-in provider only: omp reports one for a catalog provider whose variable may hold nothing.
  */
 export function connectedProviderIds(
 	oauthIds: readonly string[],
@@ -74,7 +78,9 @@ export function connectedProviderIds(
 	const ids = oauthIds.flatMap(id => (source(id) === undefined ? [] : [id]));
 	const seen = new Set(ids);
 	for (const provider of catalogProviders) {
-		if (seen.has(provider) || source(provider)?.kind !== "config") continue;
+		const kind = source(provider)?.kind;
+		const storedCredits = provider === API_CREDITS_PROVIDER && kind === "api_key";
+		if (seen.has(provider) || (kind !== "config" && !storedCredits)) continue;
 		ids.push(provider);
 		seen.add(provider);
 	}
@@ -82,8 +88,8 @@ export function connectedProviderIds(
 }
 
 /**
- * Catalog providers whose model config sets an API key, once each, plus the API credits row when an Anthropic API key
- * is saved in Settings. That key sits beside the Anthropic sign-in, so the Anthropic plan row cannot stand for it.
+ * Catalog providers whose model config sets an API key, once each, plus the API credits row when Settings saved an
+ * Anthropic API key under that provider. `omp usage` reports no quota for a key, so no other row stands for it.
  */
 export function configuredProviderIds(
 	catalogProviders: readonly string[],
@@ -103,7 +109,8 @@ export function configuredProviderIds(
 
 /**
  * The providers you are signed in to or gave a key: the ones omp's `/login` marks as connected, and any provider whose
- * model config sets an API key. Loading the registry installs that key without running a command that prints it.
+ * model config sets an API key, plus API credits when its key is stored. Loading the registry installs a config key without running a
+ * command that prints it.
  * omp also lists the models of local runtimes it finds without a login, such as Apple's on-device model; those are not
  * connected. The store opens on each call, so a login from a terminal counts at once.
  */
@@ -121,7 +128,7 @@ export async function connectedProviders(): Promise<Set<string>> {
 	}
 }
 
-/** {@link configuredProviderIds} from the same registry pass as {@link connectedProviders}, and the stored Anthropic rows. */
+/** {@link configuredProviderIds} from the same registry pass as {@link connectedProviders}, and the stored API credits rows. */
 export async function configuredProviders(): Promise<string[]> {
 	const storage = await auth.discoverAuthStorage();
 	try {
@@ -129,7 +136,7 @@ export async function configuredProviders(): Promise<string[]> {
 		return configuredProviderIds(
 			registry.getAvailable().map(model => model.provider),
 			id => storage.keys.source(id),
-			storage.credentials.list("anthropic").some(row => row.credential.type === "api_key"),
+			storage.credentials.list(API_CREDITS_PROVIDER).some(row => row.credential.type === "api_key"),
 		);
 	} finally {
 		storage.close();
@@ -165,7 +172,13 @@ export function modelEntries<T extends ListedModel>(
 		}),
 	);
 	const order = config.modelProviderOrder;
-	const rank = (provider: string): number => (order.includes(provider) ? order.indexOf(provider) : order.length);
+	// API credits bills the same Claude models as Anthropic, so it sits immediately after that provider.
+	const rank = (provider: string): number => {
+		const named = provider === API_CREDITS_PROVIDER ? "anthropic" : provider;
+		const index = order.indexOf(named);
+		const base = index < 0 ? order.length : index;
+		return provider === API_CREDITS_PROVIDER ? base + 0.5 : base;
+	};
 	return models
 		.filter(model => connected.has(model.provider))
 		.toSorted((a, b) => rank(a.provider) - rank(b.provider))

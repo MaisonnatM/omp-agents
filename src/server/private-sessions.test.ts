@@ -3,16 +3,30 @@ import { afterEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { packageDir } from "../omp/install";
 import { dirs } from "../omp/modules";
 import { PLAIN_LAUNCH } from "../omp/rpc";
 import { PrivateSessions } from "./private-sessions";
 
+// omp does not re-export this. Loading the package's own module closes the connection that module cached.
+const { closeSessionIndex } = await import(join(packageDir, "src/session/session-index.ts")) as { closeSessionIndex: () => void };
+
 const roots: string[] = [];
 afterEach(() => {
 	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
-	rmSync(dirs.getHistoryDbPath(), { force: true });
+	removeHistory();
 	rmSync(dirs.getCustomSessionFilesDir(), { recursive: true, force: true });
 });
+
+/**
+ * Drops `history.db` and its log. An earlier test file can leave the session index holding them, and that connection
+ * puts the tables back after a rewrite unless it is closed first.
+ */
+function removeHistory(): void {
+	closeSessionIndex();
+	const path = dirs.getHistoryDbPath();
+	for (const suffix of ["", "-wal", "-shm"]) rmSync(path + suffix, { force: true });
+}
 
 function writeSession(file: string, sessionId: string): void {
 	mkdirSync(dirname(file), { recursive: true });
@@ -29,6 +43,7 @@ function writeMarker(file: string, named = file): string {
 
 /** omp's `history.db`, as its history and session index write it, with one prompt, title, and recap for each session in `prompts`. */
 function seedHistory(prompts: Record<string, string>): void {
+	removeHistory();
 	const db = new Database(dirs.getHistoryDbPath());
 	db.run(`
 CREATE TABLE history (id INTEGER PRIMARY KEY AUTOINCREMENT, prompt TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL DEFAULT 0, cwd TEXT, session_id TEXT, use_count INTEGER NOT NULL DEFAULT 1);
@@ -102,13 +117,14 @@ test("purging a private session deletes its files, its subagents', and omp's his
 test("a purge cut short leaves the session private with its files, the next one finishes it, and one after that changes nothing", async () => {
 	const { sessions, launched } = setup();
 	const main = await launched("i1", "s-private");
+	removeHistory();
 	writeFileSync(dirs.getHistoryDbPath(), "not a database\n".repeat(100));
 
 	await expect(sessions.purge("i1")).rejects.toThrow("file is not a database");
 	expect(sessions.has("i1")).toBe(true);
 	expect(existsSync(main)).toBe(true);
 
-	rmSync(dirs.getHistoryDbPath());
+	removeHistory();
 	seedHistory({ "s-private": "book the clinic appointment", "s-other": "fix the flaky build" });
 	await sessions.purge("i1");
 	expect(sessions.has("i1")).toBe(false);

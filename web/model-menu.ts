@@ -1,5 +1,5 @@
 /** What the model menu derives from the model list and plan usage. */
-import { type CreditBalance, type ExtraUsage, isNameOnlyPlan, type ModelEntry, type PlanUsage, type PlanWindow } from "../src/shared/models";
+import { API_CREDITS_PROVIDER, type CreditBalance, type ExtraUsage, isNameOnlyPlan, type ModelEntry, type PlanUsage, type PlanWindow } from "../src/shared/models";
 import { everyWord } from "../src/shared/every-word";
 
 /** A trailing context size in a model id, as Cursor's `claude-opus-5-5-1m` names its 1M-token variant. */
@@ -52,6 +52,18 @@ export function providerQuota(plans: readonly PlanUsage[], provider: string): Pr
 			extra: best.plan.extra,
 			balance: best.plan.balance ?? null,
 		}
+	);
+}
+
+/**
+ * What the model menu lists before a search: role and fallback models, the current one, and every API credits model.
+ * The credits group is a billing choice, not a role, so it stays visible while the subscription models stay curated.
+ * A search lists every connected model.
+ */
+export function menuModels(models: readonly ModelEntry[], query: string, current: string | null): readonly ModelEntry[] {
+	if (query.trim() !== "") return models;
+	return models.filter(
+		model => model.curated || model.provider === API_CREDITS_PROVIDER || `${model.provider}/${model.id}` === current,
 	);
 }
 

@@ -3,6 +3,7 @@ import "./preflight";
 import type { Server, ServerWebSocket } from "bun";
 import { errorText } from "./json";
 import { ompVersion } from "./omp/install";
+import { adoptLegacyApiCredits } from "./omp/providers";
 import { displayPath, tokenFile } from "./paths";
 import { HOSTNAME, listeningLine, portFromEnv } from "./server/address";
 import { loadToken } from "./server/auth";
@@ -107,6 +108,7 @@ await dashboard.start(server);
 console.log(listeningLine(PORT, ompVersion));
 console.log(`Serving ${describeServed(served)}`);
 console.log(`The access token is in ${displayPath(tokenFile)}; delete the file and restart to rotate it.`);
+void adoptLegacyApiCredits().catch(err => console.error(`omp-agents: could not move an Anthropic API key onto API credits: ${errorText(err)}`));
 
 /**
  * Lets go of the sessions started here, which run on, and stops the server, then exits, or with `rerun` runs this server's own command again

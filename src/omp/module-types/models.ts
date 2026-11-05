@@ -71,6 +71,8 @@ export interface ModelRegistryModule {
 		refresh(): Promise<void>;
 		/** The chat models of the providers you can call. */
 		getAvailable(): OmpModel[];
+		/** Every model omp knows, whether or not a credential unlocks its provider. */
+		getAll(): OmpModel[];
 	};
 }
 /** What `/logout` shows and removes (src/slash-commands/helpers/logout.ts). */
