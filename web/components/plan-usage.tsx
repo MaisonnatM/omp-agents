@@ -1,6 +1,6 @@
 /** How much of each provider plan's usage windows is left, shown in the status bar and the model menu. */
 import { createContext } from "react";
-import { type ExtraUsage, isNameOnlyPlan, type PlanUsage, type PlanWindow, type ResetCredits, type UsdAmount } from "../../src/shared/models";
+import { type CreditBalance, type ExtraUsage, isNameOnlyPlan, type PlanUsage, type PlanWindow, type ResetCredits, type UsdAmount } from "../../src/shared/models";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { DashboardState } from "../dashboard-state";
@@ -58,6 +58,25 @@ function ExtraSpent({ extra }: { extra: ExtraUsage }) {
 	);
 }
 
+function CreditSpent({ name, balance }: { name: string; balance: CreditBalance }) {
+	const left = balance.limit !== null && balance.limit > 0 ? (balance.limit - balance.used) / balance.limit : 1;
+	const exhausted = balance.limit !== null && balance.used >= balance.limit;
+	const expires = balance.expiresAt === null ? "" : ` Expires ${DAY_FORMAT.format(balance.expiresAt)}.`;
+	return (
+		<Tooltip content={`API credits: ${spendLabel(balance)} spent.${expires}`}>
+			<span
+				tabIndex={0}
+				className={cn(
+					"whitespace-nowrap rounded-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring",
+					exhausted ? "text-red-600 dark:text-red-400" : left < LOW ? "text-amber-600 dark:text-amber-400" : "text-foreground",
+				)}
+			>
+				<span className="text-muted-foreground">{name}</span> {spendLabel(balance)}
+			</span>
+		</Tooltip>
+	);
+}
+
 function creditsLine({ count, nextExpiresAt }: ResetCredits): string {
 	const credits = count === 1 ? "1 reset credit" : `${count} reset credits`;
 	return nextExpiresAt === null ? `${credits}.` : `${credits}, ${count === 1 ? "expires" : "next expires"} ${DAY_FORMAT.format(nextExpiresAt)}.`;
@@ -77,7 +96,8 @@ function PlanRow({ plan }: { plan: PlanUsage }) {
 					/>
 				</span>
 			</Tooltip>
-			{nameOnly && <span aria-hidden className="whitespace-nowrap text-foreground">{plan.name}</span>}
+			{nameOnly && !plan.balance && <span aria-hidden className="whitespace-nowrap text-foreground">{plan.name}</span>}
+			{nameOnly && plan.balance && <CreditSpent name={plan.name} balance={plan.balance} />}
 			{plan.extra && <ExtraSpent extra={plan.extra} />}
 			{plan.windows.map(window => (
 				<WindowLeft key={window.label} window={window} />

@@ -66,6 +66,7 @@ function ProviderHeading({ provider, plans = NO_PLANS }: { provider: string; pla
 	const quota = providerQuota(plans, provider);
 	const parts = quota && [
 		...(quota.used === null ? [] : [`${Math.round(quota.used * 100)}% used`]),
+		...(quota.balance ? [spendLabel(quota.balance)] : []),
 		...(quota.extra ? [`${dollars(quota.extra.used)} extra`] : []),
 	];
 	return (
@@ -77,6 +78,7 @@ function ProviderHeading({ provider, plans = NO_PLANS }: { provider: string; pla
 					className="ml-auto tabular-nums"
 					title={[
 						...quota.windows.map(window => `${quota.account}: ${window.title}: ${Math.round((1 - window.remaining) * 100)}% used`),
+						...(quota.balance ? [`${quota.account}: ${spendLabel(quota.balance)} spent`] : []),
 						...(quota.extra ? [`${quota.account}: ${quota.extra.title}: ${spendLabel(quota.extra)} spent`] : []),
 					].join("\n")}
 				>

@@ -13,6 +13,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Fixed: a session whose omp exits before it is ready no longer leaves its socket file behind, which blocked the next start on that session.
 - The model menu now lists models from a provider you configured with an API key, such as API credits.
 - The bottom bar names that provider beside the plan windows. It has no percent, because the plan report has no balance for it.
+- When Firefox or Zen is signed in to the Claude Console, the API credits row shows the dollars spent of the monthly grant, such as $11.13 / $200.00. A Chrome-only sign-in stays a name.
 - Behind the scenes: installing the starter kit now adds a headless Chrome DevTools connection for agents that check pages in the browser, and ships the interface review skills so pull request interface reviews can run without a separate install.
 - Behind the scenes: the starter kit's maintainer profile adds rules for sessions aimed at another project, Linear tickets, docs and changelog edits, plan replies, and headless test windows, and `/ship` plans now include how the code works today plus a second-model critique before coding starts.
 - Settings › Providers can add or replace an Anthropic API key in a masked field, so you do not paste it into a conversation.
