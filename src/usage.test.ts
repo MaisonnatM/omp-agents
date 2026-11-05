@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parsePlanUsage, plansWithConfiguredProviders } from "./usage";
+import { parsePlanUsage, plansWithConfiguredProviders, withCreditBalance } from "./usage";
 
 const limit = (label: string, window: string, amount: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
 	label,
@@ -167,5 +167,28 @@ describe("plansWithConfiguredProviders", () => {
 	test("leaves a provider usage already reported as that report", () => {
 		const reported = plan("anthropic-api");
 		expect(plansWithConfiguredProviders([reported], ["anthropic-api"])).toEqual([reported]);
+	});
+});
+
+describe("withCreditBalance", () => {
+	const row = (provider: string) => ({
+		provider,
+		name: provider,
+		account: null,
+		windows: [] as [],
+		extra: null,
+		resetCredits: null,
+	});
+	const grant = { used: 11.13, limit: 200, expiresAt: Date.parse("2026-12-03T00:00:00Z") };
+
+	test("puts the grant on the name-only API credits row and leaves the subscription row", () => {
+		const plans = [row("anthropic"), row("anthropic-api")];
+		expect(withCreditBalance(plans, grant)[1]).toEqual({ ...plans[1], balance: grant });
+		expect(withCreditBalance(plans, grant)[0]).toEqual(plans[0]);
+	});
+
+	test("a missing grant leaves the rows unchanged", () => {
+		const plans = [row("anthropic-api")];
+		expect(withCreditBalance(plans, null)).toEqual(plans);
 	});
 });

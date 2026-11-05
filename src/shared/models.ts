@@ -38,9 +38,15 @@ export interface ResetCredits {
 	nextExpiresAt: number | null;
 }
 
+/** A prepaid grant, such as monthly API credits: dollars spent of the grant, and when the soonest tranche expires. */
+export interface CreditBalance extends UsdAmount {
+	expiresAt: number | null;
+}
+
 /**
  * A provider account `omp usage` reports plan limits for, or a configured provider it has no balance for.
- * No windows and no extra usage is that second case: the footer shows the name only.
+ * No windows and no extra usage is that second case: the footer shows the name, and {@link CreditBalance} when the
+ * Console session reports a grant.
  */
 export interface PlanUsage {
 	provider: string;
@@ -51,6 +57,8 @@ export interface PlanUsage {
 	extra: ExtraUsage | null;
 	/** `null` when the plan has no credit to redeem. */
 	resetCredits: ResetCredits | null;
+	/** The prepaid grant, when a Console session reported one. Absent when it did not. */
+	balance?: CreditBalance | null;
 }
 
 /** Names that are not the title of the provider id. The page and `omp usage` rows share this table. */

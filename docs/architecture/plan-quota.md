@@ -12,4 +12,9 @@ A limit in `usd` without a window, such as omp's `anthropic:extra` when Claude e
 A window omp meters in `usd`, such as Cursor's `Other Models`, also keeps its dollars as `usd`.
 `plansWithConfiguredProviders` adds a name-only plan for each provider whose model config sets an API key when this report left it out, such as prepaid API credits.
 That plan has no windows, extra usage, or reset credits. The footer shows its name, and plan notices ignore it.
+`readConsoleCreditBalance` in `src/console-credits.ts` then looks for a Firefox or Zen `sessionKey` cookie for `platform.claude.com` and reads that organization's promotional credit grant.
+When the grant is there, the API credits row gains `balance`: dollars spent, the grant, and the soonest expiry.
+A missing cookie, a refused session, or no promotional tranche leaves the row as the name.
+Chrome's cookie store is encrypted, so a Console sign-in that exists only there is not read.
+This is outside `omp usage` because that report has no balance for an API key, and an individual Console organization cannot call the Admin cost API.
 omp reports no dollars for a Codex account's credit balance, so a Codex plan never has `extra`.

@@ -1,9 +1,10 @@
 /** Plan quota left per provider, read from `omp usage --json` of this same omp package. */
+import { readConsoleCreditBalance } from "./console-credits";
 import { isObject, num, str } from "./json";
 import { ompCommand } from "./omp/install";
 import { configuredProviders } from "./omp/models";
 import { run } from "./proc";
-import { type ExtraUsage, PROVIDER_NAMES, type PlanUsage, type PlanWindow, type ResetCredits, type UsdAmount } from "./shared/models";
+import { type CreditBalance, type ExtraUsage, PROVIDER_NAMES, type PlanUsage, type PlanWindow, type ResetCredits, type UsdAmount } from "./shared/models";
 
 const TIMEOUT_MS = 30_000;
 
@@ -108,7 +109,7 @@ export function parsePlanUsage(stdout: string): PlanUsage[] {
 
 /**
  * Plans plus a name-only row for each configured provider `omp usage` did not report.
- * A model-config API key, such as prepaid API credits, has no quota window and no balance in that report.
+ * A model-config API key, such as prepaid API credits, has no quota window in that report.
  */
 export function plansWithConfiguredProviders(plans: readonly PlanUsage[], configured: readonly string[]): PlanUsage[] {
 	const shown = new Set(plans.map(plan => plan.provider));
@@ -119,8 +120,17 @@ export function plansWithConfiguredProviders(plans: readonly PlanUsage[], config
 	];
 }
 
+/** Puts `balance` on the name-only API credits row. A missing balance leaves every plan as it was. */
+export function withCreditBalance(plans: readonly PlanUsage[], balance: CreditBalance | null): PlanUsage[] {
+	if (!balance) return [...plans];
+	return plans.map(plan =>
+		plan.provider === "anthropic-api" && plan.windows.length === 0 && plan.extra === null ? { ...plan, balance } : plan,
+	);
+}
+
 /** omp exits non-zero when some provider fails, after printing the reports it did get. */
 export async function fetchPlanUsage(): Promise<PlanUsage[]> {
+	const credits = readConsoleCreditBalance().catch(() => null);
 	const { stdout, stderr, code } = await run([...ompCommand, "usage", "--json"], { timeoutMs: TIMEOUT_MS });
 	let plans: PlanUsage[];
 	try {
@@ -135,5 +145,5 @@ export async function fetchPlanUsage(): Promise<PlanUsage[]> {
 	} catch {
 		configured = [];
 	}
-	return plansWithConfiguredProviders(plans, configured);
+	return withCreditBalance(plansWithConfiguredProviders(plans, configured), await credits);
 }

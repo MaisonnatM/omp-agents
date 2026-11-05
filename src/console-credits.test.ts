@@ -1,0 +1,101 @@
+import { Database } from "bun:sqlite";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, test } from "bun:test";
+import { apiOrganizationIds, consoleSessionKey, creditBalanceOf, fetchConsoleCreditBalance, sessionKeyIn } from "./console-credits";
+
+const dirs: string[] = [];
+afterEach(() => {
+	for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
+function cookieDatabase(rows: { host: string; name: string; value: string; lastAccessed: number }[]): string {
+	const dir = mkdtempSync(join(tmpdir(), "console-cookies-test-"));
+	dirs.push(dir);
+	const path = join(dir, "cookies.sqlite");
+	const db = new Database(path);
+	db.run("CREATE TABLE moz_cookies (host TEXT, name TEXT, value TEXT, lastAccessed INTEGER)");
+	const insert = db.query("INSERT INTO moz_cookies (host, name, value, lastAccessed) VALUES (?, ?, ?, ?)");
+	for (const row of rows) insert.run(row.host, row.name, row.value, row.lastAccessed);
+	db.close();
+	return path;
+}
+
+const tranche = (granted: number, remaining: number, expires: string, exponent = 2) => ({
+	granted_amount_minor_units: granted,
+	remaining_amount_minor_units: remaining,
+	expires_at: expires,
+	remaining: { credits: { amount_minor: remaining, exponent } },
+});
+
+describe("creditBalanceOf", () => {
+	test("spent is the grant minus what is left, in the tranche's units", () => {
+		const balance = creditBalanceOf({
+			promo_tranches: [tranche(20_000, 18_887, "2026-12-03T00:00:00Z")],
+		});
+		expect(Math.round((balance?.used ?? 0) * 100)).toBe(1_113);
+		expect(balance?.limit).toBe(200);
+		expect(balance?.expiresAt).toBe(Date.parse("2026-12-03T00:00:00Z"));
+	});
+
+	test("sums tranches and keeps the soonest expiry", () => {
+		const balance = creditBalanceOf({
+			promo_tranches: [tranche(10_000, 4_000, "2026-12-03T00:00:00Z"), tranche(5_000, 5_000, "2026-11-20T00:00:00Z")],
+		});
+		expect(Math.round((balance?.used ?? 0) * 100)).toBe(6_000);
+		expect(balance?.limit).toBe(150);
+		expect(balance?.expiresAt).toBe(Date.parse("2026-11-20T00:00:00Z"));
+	});
+
+	test("no promotional tranche is no balance", () => {
+		expect(creditBalanceOf({ promo_tranches: [], amount: 500 })).toBeNull();
+		expect(creditBalanceOf(null)).toBeNull();
+	});
+});
+
+describe("apiOrganizationIds", () => {
+	test("keeps organizations that can call the API, in listed order", () => {
+		expect(
+			apiOrganizationIds([
+				{ uuid: "chat", capabilities: ["chat", "claude_max"] },
+				{ uuid: "api-org", capabilities: ["api", "api_individual"] },
+			]),
+		).toEqual(["api-org"]);
+	});
+});
+
+describe("sessionKeyIn", () => {
+	test("the newest platform.claude.com sessionKey, not a claude.ai one", () => {
+		const path = cookieDatabase([
+			{ host: ".platform.claude.com", name: "sessionKey", value: "older", lastAccessed: 1 },
+			{ host: "platform.claude.com", name: "sessionKey", value: "newer", lastAccessed: 5 },
+			{ host: "claude.ai", name: "sessionKey", value: "other", lastAccessed: 9 },
+		]);
+		expect(sessionKeyIn(path)).toEqual({ value: "newer", lastAccessed: 5 });
+		expect(consoleSessionKey([path])).toBe("newer");
+	});
+});
+
+describe("fetchConsoleCreditBalance", () => {
+	test("asks the API organization and skips one that is not", async () => {
+		const calls: string[] = [];
+		const fetchImpl = async (input: string, init?: RequestInit) => {
+			const url = String(input);
+			calls.push(url);
+			expect(new Headers(init?.headers).get("cookie")).toBe("sessionKey=secret");
+			if (url.endsWith("/api/organizations")) {
+				return Response.json([
+					{ uuid: "chat", capabilities: ["chat"] },
+					{ uuid: "api-org", capabilities: ["api"] },
+				]);
+			}
+			return Response.json({ promo_tranches: [tranche(20_000, 18_887, "2026-12-03T00:00:00Z")] });
+		};
+		const balance = await fetchConsoleCreditBalance("secret", fetchImpl);
+		expect(calls.some(url => url.includes("/chat/"))).toBe(false);
+		expect(calls.some(url => url.endsWith("/api-org/prepaid/credits"))).toBe(true);
+		expect(Math.round((balance?.used ?? 0) * 100)).toBe(1_113);
+		expect(balance?.limit).toBe(200);
+	});
+});

@@ -1,5 +1,5 @@
 /** What the model menu derives from the model list and plan usage. */
-import { type ExtraUsage, isNameOnlyPlan, type ModelEntry, type PlanUsage, type PlanWindow } from "../src/shared/models";
+import { type CreditBalance, type ExtraUsage, isNameOnlyPlan, type ModelEntry, type PlanUsage, type PlanWindow } from "../src/shared/models";
 import { everyWord } from "../src/shared/every-word";
 
 /** A trailing context size in a model id, as Cursor's `claude-opus-5-5-1m` names its 1M-token variant. */
@@ -28,6 +28,8 @@ export interface ProviderQuota {
 	/** That account's windows, the ones the heading's tooltip lists. */
 	windows: PlanWindow[];
 	extra: ExtraUsage | null;
+	/** The prepaid grant, when this provider's row has one. */
+	balance: CreditBalance | null;
 }
 
 /**
@@ -38,11 +40,19 @@ export interface ProviderQuota {
 export function providerQuota(plans: readonly PlanUsage[], provider: string): ProviderQuota | null {
 	let best: { used: number | null; plan: PlanUsage } | null = null;
 	for (const plan of plans) {
-		if (plan.provider !== provider || isNameOnlyPlan(plan)) continue;
+		if (plan.provider !== provider || (isNameOnlyPlan(plan) && !plan.balance)) continue;
 		const used = plan.windows.length === 0 ? null : Math.max(...plan.windows.map(window => 1 - window.remaining));
 		if (!best || (used !== null && (best.used === null || used < best.used))) best = { used, plan };
 	}
-	return best && { used: best.used, account: best.plan.account ?? best.plan.name, windows: best.plan.windows, extra: best.plan.extra };
+	return (
+		best && {
+			used: best.used,
+			account: best.plan.account ?? best.plan.name,
+			windows: best.plan.windows,
+			extra: best.plan.extra,
+			balance: best.plan.balance ?? null,
+		}
+	);
 }
 
 /** The model search's filter, as cmdk calls it: every word typed is in the model's selector or one of its names, in any order. */

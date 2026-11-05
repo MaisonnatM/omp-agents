@@ -42,12 +42,29 @@ describe("providerQuota", () => {
 	test("the tightest window of the account with the most left, with that account's windows and extra usage", () => {
 		const work = plan("anthropic", [0.8, 0.25], "work", spent);
 		const personal = plan("anthropic", [0.5, 0.6], "personal", { ...spent, used: 1 });
-		expect(providerQuota([work, personal, plan("cursor", [0], "cursor")], "anthropic")).toEqual({ used: 0.5, account: "personal", windows: personal.windows, extra: personal.extra });
+		expect(providerQuota([work, personal, plan("cursor", [0], "cursor")], "anthropic")).toEqual({
+			used: 0.5,
+			account: "personal",
+			windows: personal.windows,
+			extra: personal.extra,
+			balance: null,
+		});
 	});
 
 	test("an account with only extra usage counts when no account has a window", () => {
 		expect(providerQuota([plan("anthropic", [], "extra-only", spent), plan("anthropic", [0.9], "plan")], "anthropic")?.account).toBe("plan");
-		expect(providerQuota([plan("anthropic", [], "extra-only", spent)], "anthropic")).toEqual({ used: null, account: "extra-only", windows: [], extra: spent });
+		expect(providerQuota([plan("anthropic", [], "extra-only", spent)], "anthropic")).toEqual({
+			used: null,
+			account: "extra-only",
+			windows: [],
+			extra: spent,
+			balance: null,
+		});
+	});
+
+	test("a name-only API credits row counts when it has a grant", () => {
+		const credits = { ...plan("anthropic-api", []), balance: { used: 11.13, limit: 200, expiresAt: null } };
+		expect(providerQuota([credits], "anthropic-api")).toEqual({ used: null, account: "anthropic-api", windows: [], extra: null, balance: credits.balance });
 	});
 
 	test("null for a provider without a plan, windows, or extra usage", () => {
