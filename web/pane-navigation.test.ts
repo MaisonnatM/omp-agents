@@ -223,17 +223,16 @@ describe("explicit history and startup", () => {
 		expect(hashForLayout(select(select(state, live("c")), live("b")).layout)).toBe("#a,b@1");
 	});
 
-	test("a start's unidentified live pane retires the old overlapping group and is remembered once the roster names it", () => {
+	test("a new session opens alone and retires the split it left", () => {
 		let state = select(select(setup(), live("c")), live("b"));
 		expect(hashForLayout(state.layout)).toBe("#a,b@1");
 		const next = layoutAfterStart(state.layout, { kind: "new", cwd: "/work", prompt: "hi", images: [], model: null, thinking: null, skill: null, branch: null, todoId: null, private: false }, "fresh");
 		if (!next) throw new Error("A new session must open a pane");
 		state = command(state, { kind: "edit", layout: next });
-		expect(hashForLayout(state.layout)).toBe("#a,fresh@1");
-		const beforeFacts = select(state, live("b"));
-		expect(hashForLayout(beforeFacts.layout)).toBe("#b");
+		expect(hashForLayout(state.layout)).toBe("#fresh");
 		state = roster(state, [host("a"), host("b"), host("c"), host("fresh")]);
-		expect(hashForLayout(select(select(state, live("c")), live("a")).layout)).toBe("#a,fresh");
+		expect(hashForLayout(select(state, live("a")).layout)).toBe("#a");
+		expect(hashForLayout(select(state, live("b")).layout)).toBe("#b");
 	});
 
 	test("resuming all changes only the past panes and keeps their source group's geometry", () => {
@@ -265,12 +264,12 @@ describe("ending sessions", () => {
 		expect(hashForLayout(select(state, live("a", "worker")).layout)).toBe("#a/worker");
 	});
 
-	test("successful end keeps existing neighbor replacement and registers only the surviving split", () => {
+	test("a successful end of one side leaves the other conversation alone and forgets that split", () => {
 		let state = setup("#a,b@1");
 		state = reduce(state, { t: "end", instanceId: "b" });
 		state = reduce(state, { t: "end-success", instanceId: "b", listed: ["a", "b", "c", "d"] });
-		expect(hashForLayout(state.layout)).toBe("#a,c@1");
-		expect(hashForLayout(select(select(state, live("d")), live("a")).layout)).toBe("#a,c");
+		expect(hashForLayout(state.layout)).toBe("#a");
+		expect(hashForLayout(select(select(state, live("d")), live("a")).layout)).toBe("#a");
 		expect(hashForLayout(select(state, past("session-b")).layout)).toBe("#past/session-b");
 	});
 });

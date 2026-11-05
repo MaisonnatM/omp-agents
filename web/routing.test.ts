@@ -300,6 +300,7 @@ describe("opening and closing panes", () => {
 		const layout = split([a, past, b], 2);
 		const quick: StartOp = { kind: "quick", cwd: "/tmp", branch: null, prompt: "fix", subject: { kind: "ticket", id: "ENG-7", action: "work" }, skill: null };
 		expect(layoutAfterStart(layout, { kind: "resume", sessionId: "s" }, "c")).toEqual(split([a, c, b], 1));
+		expect(layoutAfterStart(layout, { kind: "new", cwd: "/work", prompt: "hi", images: [], model: null, thinking: null, skill: null, branch: null, todoId: null, private: false }, "c")).toEqual(split([c], 0));
 		expect(layoutAfterStart(layout, { kind: "fork", view: a, itemId: "u1", point: { entryId: "e1", prefill: true } }, "c")).toEqual(split([a, past, c], 2));
 		expect(layoutAfterStart(layout, quick, "c")).toBeNull();
 		expect(layoutAfterStart(layout, { kind: "resume-all", sessionIds: ["s"] }, "c")).toBeNull();
@@ -312,18 +313,24 @@ describe("opening and closing panes", () => {
 		expect(layoutAfterResumeAll(split([s1, a], 1), started)).toBeNull();
 	});
 
-	test("ending a session shows the next listed session in its pane, else the previous, skipping open ones", () => {
+	test("ending the only pane shows the next listed session, else the previous", () => {
 		const listed = ["a", "b", "c", "d"];
 		const eligible = new Set(listed);
 		expect(endSession(split([b], 0), "b", listed, eligible)).toEqual(split([c], 0));
 		expect(endSession(split([d], 0), "d", listed, eligible)).toEqual(split([c], 0));
-		expect(endSession(maximized([b, c], 0), "b", listed, eligible)).toEqual(maximized([d, c], 0));
-		expect(endSession(split([a, d, c], 1), "d", listed, eligible)).toEqual(split([a, b, c], 1));
 	});
 
-	test("each pane of the ended session, its subagents included, takes its own neighbor while any are left, and the rest close", () => {
+	test("ending a session that is open in a split leaves one other conversation, and leaves a maximized split the same way", () => {
+		const listed = ["a", "b", "c", "d"];
+		const eligible = new Set(listed);
+		expect(endSession(maximized([b, c], 0), "b", listed, eligible)).toEqual(split([c], 0));
+		expect(endSession(split([a, d, c], 1), "d", listed, eligible)).toEqual(split([a], 0));
+		expect(endSession(split([a, d, c], 2), "d", listed, eligible)).toEqual(split([c], 0));
+	});
+
+	test("ending a session shown in every pane of a split opens the next session alone", () => {
 		const subagent: View = { kind: "live", instanceId: "b", agentId: "x" };
-		expect(endSession(split([b, subagent], 1), "b", ["a", "b", "c"], new Set(["a", "c"]))).toEqual(split([c, a], 1));
+		expect(endSession(split([b, subagent], 1), "b", ["a", "b", "c"], new Set(["a", "c"]))).toEqual(split([c], 0));
 		expect(endSession(split([b, subagent], 1), "b", ["b", "c"], new Set(["c"]))).toEqual(split([c], 0));
 		expect(endSession(maximized([subagent, a, b], 0), "b", ["a", "b"], new Set(["a"]))).toEqual(split([a], 0));
 	});
