@@ -126,6 +126,11 @@ describe("connectedProviderIds", () => {
 	test("leaves out a sign-in provider with no credential and a keyless catalog provider", () => {
 		expect([...connectedProviderIds(["anthropic"], ["anthropic", "local-demo"], source({}))]).toEqual([]);
 	});
+
+	test("a saved API credits key stays connected when the registry's catalog has not caught up", () => {
+		expect([...connectedProviderIds(["anthropic"], ["anthropic"], source({ anthropic: "oauth" }), true)].sort()).toEqual(["anthropic", "anthropic-api"]);
+		expect(connectedProviderIds(["anthropic"], ["anthropic"], source({ anthropic: "oauth" }), false).has("anthropic-api")).toBe(false);
+	});
 });
 
 describe("configuredProviderIds", () => {

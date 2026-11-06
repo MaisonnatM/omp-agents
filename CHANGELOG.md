@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-06
 
+- Fixed: the composer model menu now lists Anthropic API credits after you save the key, without restarting the dashboard.
 - With the starter kit, saying "council" now asks Claude Opus, GPT Sol, and Gemini Pro for their review or advice side by side, with a score out of 10 for each round of a code review.
 - Behind the scenes: the list of outside tools an agent sees is now names grouped by service, instead of every tool's description, so sessions spend far less of their context on it.
 - Fixed: subagents that edit for a session on `main` are now told to write in its worktree by full path, instead of using an option omp does not have, so their edits stop being refused.
