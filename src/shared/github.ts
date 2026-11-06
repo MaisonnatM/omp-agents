@@ -3,7 +3,7 @@
 import { arrayOf, decoder, fields, isBoolean, isNumber, isString, isTexts, nullable, oneOf, optional, type Parsed, type Shape } from "../json";
 import type { ChangedEntry } from "./changes";
 import type { MergeMethod } from "./source-control";
-import type { ReviewVerdict } from "./review-drafts";
+import type { ReviewVerdict } from "./review-verdict";
 
 /** A GitHub repository. */
 export interface Repo {

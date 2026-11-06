@@ -8,7 +8,7 @@ import { putJson } from "../../../api";
 import { readPinnedSkill } from "../../../pinned-skill";
 import { useAction } from "../../../use-action";
 import { toasts } from "../../toaster";
-import type { DetailContentProps } from ".";
+import type { DetailContentProps } from "./detail-props";
 
 const PLACES: { place: CheckoutPlace; icon: LucideIcon; label: string; description: string }[] = [
 	{ place: "worktree", icon: GitBranch, label: "In a separate worktree", description: "Its own folder and thread. Nothing you have open moves." },

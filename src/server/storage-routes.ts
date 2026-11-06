@@ -3,7 +3,7 @@ import { gcApply, gcPreview, storageUsage } from "../omp/gc";
 import { CACHE_STEP, CleanupBusy, parseCleanupRequest, type CleanupStepResult, type PreviewSource, type Previews, type SandboxPlan, type SandboxResult } from "../shared/storage";
 import { cleanCaches, previewCaches } from "./package-caches";
 import { answer, checked, fail } from "./http";
-import type { Handler, RouteKit, Routes, SessionRoutesEnv } from "./routes";
+import type { Handler, RouteKit, Routes, SessionRoutesEnv } from "./route-kit";
 
 export interface StorageRoutesEnv {
 	preview(): Promise<SandboxPlan[]>;

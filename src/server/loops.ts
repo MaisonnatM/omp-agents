@@ -1,7 +1,7 @@
 import { existsSync, type FSWatcher, mkdirSync, watch } from "node:fs";
 import { join } from "node:path";
 import { errorText } from "../json";
-import type { SessionFormat } from "../session-formats";
+import type { SessionFormat } from "../session-format";
 import { DAY_MS } from "../shared/days";
 
 /** The registry has no change feed; listing it is one local IPC round trip per host. */

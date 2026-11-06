@@ -2,24 +2,9 @@
 import { arrayOf, decoder, fields, type Guard, isNumber, isObject, isSafeInteger, isString, oneOf } from "../json";
 import { ANALYTICS_RANGES, type AnalyticsRange } from "./analytics";
 import type { ClientMsg } from "./protocol";
+import { ACTIVITY_KINDS, ACTIVITY_VIAS, type ActivityEvent, type ActivityKind, type ActivityVia } from "./activity-event";
 
-/** A page or settings section shown, a shortcut run, a socket message or `PUT` sent, a tagged control clicked, or the window coming to the foreground or leaving it. */
-export const ACTIVITY_KINDS = ["view", "command", "action", "control", "presence"] as const;
-
-export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
-
-/** How a command ran: its shortcut's key, or the command palette. */
-export const ACTIVITY_VIAS = ["keyboard", "palette"] as const;
-
-export type ActivityVia = (typeof ACTIVITY_VIAS)[number];
-
-/** One thing the user did, at `at` ms. `key` is a registry id, never user content; `via` is set on commands only. */
-export interface ActivityEvent {
-	kind: ActivityKind;
-	key: string;
-	via: ActivityVia | null;
-	at: number;
-}
+export { ACTIVITY_KINDS, ACTIVITY_VIAS, type ActivityEvent, type ActivityKind, type ActivityVia };
 
 /** The `presence` keys. */
 export type Presence = "foreground" | "background";

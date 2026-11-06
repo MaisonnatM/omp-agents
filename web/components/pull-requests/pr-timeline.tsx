@@ -9,7 +9,7 @@ import { approvalCount, timelineRows, type TimelineRow, type Verdict } from "../
 import { commentCount } from "../../pull-requests-model";
 import { PullRequestMarkdown } from "./pr-markdown";
 import { Avatar } from "./avatars";
-import type { Placement } from "./pr-details";
+import type { Placement } from "./pr-details/detail-props";
 import { REVIEW_STYLE, ThreadPlace } from "./pr-details/message";
 
 const ROW_CLASS = "relative mb-5 pl-12 [contain-intrinsic-block-size:48px] [content-visibility:auto]";

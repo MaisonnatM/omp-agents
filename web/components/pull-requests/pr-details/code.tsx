@@ -13,7 +13,7 @@ import { CodeToolbar } from "./code-toolbar";
 import { type CodeControls, CodeControlsContext, LineCommentBox } from "./diff-controls";
 import { useDiffPreferences } from "./diff-preferences";
 import { useViewedFiles, ViewedFilesContext, ViewedToggle } from "./viewed-files";
-import type { Placement } from ".";
+import type { Placement } from "./detail-props";
 
 interface CodeProps {
 	pr: PullRequest;

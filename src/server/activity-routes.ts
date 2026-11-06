@@ -5,7 +5,7 @@ import type { ActivityRead } from "../shared/activity";
 import { isAnalyticsRange } from "../shared/analytics";
 import type { ActivityStore } from "./activity-store";
 import { answer, fail } from "./http";
-import type { RouteKit, Routes } from "./routes";
+import type { RouteKit, Routes } from "./route-kit";
 
 /** What the activity read takes of the store. */
 export type ActivityRoutesEnv = Pick<ActivityStore, "rows" | "lastUsed">;

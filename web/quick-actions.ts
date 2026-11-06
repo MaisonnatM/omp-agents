@@ -4,11 +4,11 @@
  * which routines share.
  */
 import { PULL_REQUEST_ACTIONS, type PullRequestActionId, type QuickAction } from "../src/pull-request-actions";
+import type { BranchChoice } from "../src/shared/git";
 import { type PullRequestSummary, type PullRequest, samePullRequest } from "../src/shared/github";
 import type { NewSessionRequest, WorkItem } from "../src/shared/sessions";
 import type { Ticket } from "../src/shared/tickets";
 import type { UserTodo } from "../src/user-todos-shared";
-import type { QuickOp, StartOf } from "./starts";
 import { todoCwd } from "./todo-views";
 
 /** The actions that tickets and todos share: work on it, or plan it first. */
@@ -23,6 +23,16 @@ export type QuickSubject =
 	| { kind: "pull-request"; pr: PullRequest; action: PullRequestActionId }
 	| { kind: "ticket"; id: string; action: WorkActionId }
 	| { kind: "todo"; id: string; text: string; action: WorkActionId };
+
+/** A quick start's request. Defined here so the start list can hold one without this file importing the start list. */
+export type QuickOp = {
+	kind: "quick";
+	cwd: string;
+	branch: BranchChoice | null;
+	prompt: string;
+	subject: QuickSubject;
+	skill: string | null;
+};
 
 /** What the server links the session that `subject` starts to: a pull request or issue as its subject, or a todo; a Review start saves a review draft of its pull request. */
 export function startTarget(subject: QuickSubject): Pick<NewSessionRequest, "subject" | "todoId" | "reviewDraft"> {
@@ -57,10 +67,10 @@ function actionOn(subject: QuickSubject, item: QuickItem): QuickActionId | null 
 }
 
 /** `quick` when it works on `item`, else `null`: the start whose failure `item`'s details show. */
-export const quickOn = (quick: StartOf<"quick"> | null, item: QuickItem): StartOf<"quick"> | null => (quick && actionOn(quick.op.subject, item) !== null ? quick : null);
+export const quickOn = <T extends { op: QuickOp }>(quick: T | null, item: QuickItem): T | null => (quick && actionOn(quick.op.subject, item) !== null ? quick : null);
 
 /** The action of the quick start under way on `item`, if any. */
-export function pendingOf(quick: StartOf<"quick"> | null, item: QuickItem): QuickActionId | null {
+export function pendingOf(quick: ({ op: QuickOp } & { phase: string }) | null, item: QuickItem): QuickActionId | null {
 	const on = quickOn(quick, item);
 	return on?.phase === "starting" ? on.op.subject.action : null;
 }
