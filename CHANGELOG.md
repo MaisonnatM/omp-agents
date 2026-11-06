@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-06
 
+- With the starter kit, saying "council" now asks Claude Opus, GPT Sol, and Gemini Pro for their review or advice side by side, with a score out of 10 for each round of a code review.
 - Behind the scenes: the list of outside tools an agent sees is now names grouped by service, instead of every tool's description, so sessions spend far less of their context on it.
 - Fixed: subagents that edit for a session on `main` are now told to write in its worktree by full path, instead of using an option omp does not have, so their edits stop being refused.
 - Fixed: poteto agents now open the poteto mode file in one step instead of failing on its name and searching folders.
@@ -210,14 +211,3 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - New Bot now starts on a new type, Bot designer, named Dr Eggbot with its job filled in, adapted from Lauren Tan's Dr Eggbot Grok Bot.
 - A Bot designer asks you a few short questions about the Bot you want, then creates it for you, and the new Bot shows in the Bots tab.
 - Switching a new Bot's type swaps the name and job that type filled in, and keeps any you typed yourself.
-
-## 2026-10-31
-
-- Before a session runs a project's own agent code, such as its extensions, tools, or MCP servers, the dashboard now asks you to trust it once, and asks again when a piece is new or has changed.
-- Settings › Workspaces now lists the projects you trusted, with Stop trusting to have the next session there ask again.
-- With the starter kit, when you say "Merge on main", the agent now merges your branch into a fresh copy of main, runs the project's checks on the result, and only then pushes.
-- Agents can no longer push or merge straight into main in a project set up this way, so a change that breaks the checks never lands.
-- When a check stops a merge, the agent is told which tests failed, even in a long test run, so it can fix them without running everything again.
-- A PR shepherd Bot asked to merge a pull request in a project set up this way now starts a session that lands it the same way, instead of merging it on GitHub without running the checks on the result.
-- Fixed: with the starter kit on the current omp, the tool agents use to edit a pull request's description loads again, instead of an error at the start of every session.
-- With the starter kit, sessions in the same project now share a memory: a new session starts with the project's remembered decisions, facts, and lessons and the work that last landed, and a running one hears when another session lands work or changes the memory, starting with work that touches the same files.

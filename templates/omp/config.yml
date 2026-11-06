@@ -53,12 +53,14 @@ modelProviderOrder:
   - cursor
 
 # `isolated: true` subagents work in their own clone of the checkout their `checkout` option names; successful changes apply back there as a patch.
+# `perCallModel: on` lets a task call pick an approved model per spawn, which the council skill needs.
 task:
   isolation:
     enabled: true
     merge: patch
   eager: default
   maxConcurrency: 2
+  perCallModel: "on"
 
 # Publish every terminal session to the local Collab registry, so the omp-agents dashboard can drive it.
 collab:
