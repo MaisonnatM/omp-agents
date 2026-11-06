@@ -67,13 +67,15 @@ async function readCatalog(): Promise<CatalogModel[]> {
 
 /**
  * Sign-in providers that have a credential, plus catalog providers whose key comes from the model config.
- * A stored API key counts only for API credits. Any other catalog provider needs `config`. A missing source is not connected.
+ * A stored API key counts only for API credits, including when the registry's catalog has not reloaded it yet.
+ * Any other catalog provider needs `config`. A missing source is not connected.
  * An `env` key counts for a sign-in provider only: omp reports one for a catalog provider whose variable may hold nothing.
  */
 export function connectedProviderIds(
 	oauthIds: readonly string[],
 	catalogProviders: readonly string[],
 	source: (id: string) => CredentialOrigin | undefined,
+	apiCreditsKeySaved = false,
 ): Set<string> {
 	const ids = oauthIds.flatMap(id => (source(id) === undefined ? [] : [id]));
 	const seen = new Set(ids);
@@ -84,7 +86,9 @@ export function connectedProviderIds(
 		ids.push(provider);
 		seen.add(provider);
 	}
-	return new Set(ids);
+	// The registry's available list can lag a key saved after this process started. The credential row is the source the Providers page already shows.
+	if (apiCreditsKeySaved) seen.add(API_CREDITS_PROVIDER);
+	return seen;
 }
 
 /**
@@ -122,6 +126,7 @@ export async function connectedProviders(): Promise<Set<string>> {
 			oauth.getOAuthProviders().map(({ id }) => id),
 			registry.getAvailable().map(model => model.provider),
 			id => storage.keys.source(id),
+			storage.credentials.list(API_CREDITS_PROVIDER).some(row => row.credential.type === "api_key"),
 		);
 	} finally {
 		storage.close();
