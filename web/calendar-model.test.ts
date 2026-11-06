@@ -21,7 +21,7 @@ const OCTOBER = { year: 2026, month: 9 };
 /** Wednesday 14 October 2026, noon. */
 const NOW = at("2026-10-14T12:00:00+02:00");
 
-const run = (iso: string, fields: Partial<RoutineRun> = {}): RoutineRun => ({ at: at(iso), outcome: { kind: "pending", queued: false }, errors: [], triggeredBy: [], ...fields });
+const run = (iso: string, fields: Partial<RoutineRun> = {}): RoutineRun => ({ at: at(iso), outcome: { kind: "failed" }, errors: [], triggeredBy: [], ...fields });
 /** A routine whose runs a schedule started, unless `fields` says otherwise. */
 const routine = (fields: Partial<Routine>): Routine => ({
 	id: "r1",

@@ -47,7 +47,10 @@ export type StartKind = StartOp["kind"];
  */
 export type Start<Op extends StartOp = StartOp> = { op: Op } & ({ phase: "starting" } | ({ phase: "failed" } & StartFailure));
 
-/** The starts of this page, by the `reqId` the server answers with. At most one per kind: a new start replaces the last of its kind. */
+/**
+ * The starts of this page, by the `reqId` the server answers with. A new start drops the failure the last one of its
+ * kind left, but never one still waiting, so two quick actions in a row both open their session or show their failure.
+ */
 export type Starts = ReadonlyMap<number, Start>;
 
 export type StartOf<K extends StartKind> = Start<Extract<StartOp, { kind: K }>>;
@@ -77,15 +80,15 @@ const isOfKind =
 	(start: Start): start is StartOf<K> =>
 		start.op.kind === kind;
 
-/** The start of `kind`, under way or failed, if there is one. */
-export const startOf = <K extends StartKind>(starts: Starts, kind: K): StartOf<K> | null => [...starts.values()].find(isOfKind(kind)) ?? null;
+/** The start of `kind` begun last, under way or failed, if there is one. */
+export const startOf = <K extends StartKind>(starts: Starts, kind: K): StartOf<K> | null => [...starts.values()].findLast(isOfKind(kind)) ?? null;
 
 export function beginStart(starts: Starts, reqId: number, op: StartOp): Starts {
-	const next = new Map([...starts].filter(([, start]) => start.op.kind !== op.kind));
+	const next = new Map([...starts].filter(([, start]) => start.phase === "starting" || start.op.kind !== op.kind));
 	return next.set(reqId, { op, phase: "starting" });
 }
 
-/** Start `reqId` while it waits for the server's answer; `null` once it settled or was replaced. */
+/** Start `reqId` while it waits for the server's answer; `null` once it settled. */
 export function pendingStart(starts: Starts, reqId: number): Start | null {
 	const start = starts.get(reqId);
 	return start?.phase === "starting" ? start : null;

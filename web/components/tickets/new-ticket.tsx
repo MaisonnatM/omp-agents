@@ -17,11 +17,18 @@ import { preferredTeam, rememberTeam } from "./team-select";
 
 const MAX_ATTACHMENT_MB = MAX_TICKET_ATTACHMENT_BYTES / (1024 * 1024);
 
-/** Where the form stands: being written, sent to Linear, refused with Linear's reason, or opened while the dialog stays for the next one. */
+/**
+ * Where the form stands: being written, sent to Linear, attaching its files to the issue Linear opened, refused with
+ * Linear's reason, or opened while the dialog stays for the next one.
+ */
 type TicketSubmit = Submit<
+	| { kind: "attaching"; identifier: string }
 	/** `refused` names each file Linear did not attach, with its reason. */
-	{ kind: "created"; identifier: string; refused: string[] }
+	| { kind: "created"; identifier: string; refused: string[] }
 >;
+
+/** The form is sending the issue or its files, so neither the form nor the dialog takes a change or a close. */
+const sending = (submit: TicketSubmit): boolean => submit.kind === "creating" || submit.kind === "attaching";
 
 /** The new issue's fields the pills set. `assignee` is `"me"` until another is picked, as the issue opens assigned to you. */
 interface Fields {
@@ -48,13 +55,14 @@ function firstStatus(statuses: TicketStatus[]): TicketStatus | undefined {
  * or with Create more on the dialog stays for the next issue.
  */
 export function NewTicketDialog({ title, onClose }: { title: string; onClose: () => void }) {
-	const [creating, setCreating] = useState(false);
+	const [submit, setSubmit] = useState<TicketSubmit>({ kind: "writing" });
 	const [expanded, setExpanded] = useState(false);
 	return (
-		<FormDialog busy={creating} onClose={onClose} className={expanded ? "top-[5vh] h-[90vh] w-[min(60rem,calc(100vw-2rem))]" : "top-[15%] w-[min(44rem,calc(100vw-2rem))]"}>
+		<FormDialog busy={sending(submit)} onClose={onClose} className={expanded ? "top-[5vh] h-[90vh] w-[min(60rem,calc(100vw-2rem))]" : "top-[15%] w-[min(44rem,calc(100vw-2rem))]"}>
 			<NewTicketForm
 				title={title}
-				onCreating={setCreating}
+				submit={submit}
+				onSubmit={setSubmit}
 				onCreated={onClose}
 				actions={
 					<Tooltip content={expanded ? "Shrink the dialog" : "Expand the dialog"} side="bottom">
@@ -70,13 +78,15 @@ export function NewTicketDialog({ title, onClose }: { title: string; onClose: ()
 
 interface NewTicketFormProps {
 	title: string;
-	onCreating: (creating: boolean) => void;
+	/** Where the form stands, kept by the dialog, which takes no close while the form sends. */
+	submit: TicketSubmit;
+	onSubmit: (submit: TicketSubmit) => void;
 	onCreated: () => void;
 	/** The header's buttons before its close button. */
 	actions: ReactNode;
 }
 
-function NewTicketForm({ title: initialTitle, onCreating, onCreated, actions }: NewTicketFormProps) {
+function NewTicketForm({ title: initialTitle, submit, onSubmit: setSubmit, onCreated, actions }: NewTicketFormProps) {
 	const teams = useRead<TicketTeam[]>("/api/linear/teams");
 	const [title, setTitle] = useState(initialTitle);
 	const [description, setDescription] = useState("");
@@ -85,7 +95,6 @@ function NewTicketForm({ title: initialTitle, onCreating, onCreated, actions }: 
 	const [files, setFiles] = useState<File[]>([]);
 	const [fileNote, setFileNote] = useState<string | null>(null);
 	const [createMore, setCreateMore] = useState(false);
-	const [submit, setSubmit] = useState<TicketSubmit>({ kind: "writing" });
 	const [retry, setRetry] = useState(0);
 	const titleRef = useRef<HTMLTextAreaElement>(null);
 	const descriptionRef = useRef<HTMLTextAreaElement>(null);
@@ -95,7 +104,7 @@ function NewTicketForm({ title: initialTitle, onCreating, onCreated, actions }: 
 	const team = teams.data?.find(candidate => candidate.id === teamId) ?? null;
 	const options = useRead<TicketOptions>(team ? `/api/ticket/options?${new URLSearchParams({ team: team.id })}` : null, retry);
 	const status = (fields.state !== null ? options.data?.statuses.find(candidate => candidate.status === fields.state) : undefined) ?? (options.data ? firstStatus(options.data.statuses) : undefined);
-	const creating = submit.kind === "creating";
+	const creating = sending(submit);
 	const ready = title.trim() !== "" && team !== null && !creating;
 	const set = (change: Partial<Fields>): void => setFields(current => ({ ...current, ...change }));
 	const openOptions = (): void => {
@@ -105,7 +114,6 @@ function NewTicketForm({ title: initialTitle, onCreating, onCreated, actions }: 
 	const create = async (): Promise<void> => {
 		if (!ready) return;
 		setSubmit({ kind: "creating" });
-		onCreating(true);
 		const draft: TicketDraft = {
 			title: title.trim(),
 			description,
@@ -122,10 +130,10 @@ function NewTicketForm({ title: initialTitle, onCreating, onCreated, actions }: 
 			({ identifier } = await putJson<{ identifier: string }>("/api/ticket/new", draft));
 		} catch (err) {
 			setSubmit({ kind: "failed", error: errorText(err) });
-			onCreating(false);
 			return;
 		}
 		rememberTeam(team.id);
+		setSubmit({ kind: "attaching", identifier });
 		const refused: string[] = [];
 		for (const file of files) {
 			try {
@@ -135,7 +143,6 @@ function NewTicketForm({ title: initialTitle, onCreating, onCreated, actions }: 
 			}
 		}
 		void ticketsStore.refresh(null, { fresh: true });
-		onCreating(false);
 		if (!createMore && refused.length === 0) {
 			onCreated();
 			location.hash = hashForTickets(identifier);
@@ -307,7 +314,7 @@ function NewTicketForm({ title: initialTitle, onCreating, onCreated, actions }: 
 				</label>
 				<Tooltip content="Create issue" shortcut={[chordLabel({ key: "Enter", mod: true })]} side="top" disabled={!ready}>
 					<Button type="submit" size="compact" className="rounded-full" loading={creating} disabled={!ready}>
-						Create issue
+						{submit.kind === "attaching" ? "Attaching files…" : "Create issue"}
 					</Button>
 				</Tooltip>
 			</div>

@@ -14,7 +14,8 @@ interface NotesEditorProps {
 	label: string;
 	/** The text cannot change, as while the server is lost or the todo is archived. */
 	readOnly: boolean;
-	onSave: (value: string) => void;
+	/** Saves the markdown; settles once the server has handled it, and rejects when the server did not take it. */
+	onSave: (value: string) => Promise<void>;
 }
 
 const THEME = {

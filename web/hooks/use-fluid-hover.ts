@@ -211,6 +211,63 @@ function resolveActivator(element: HTMLElement): HTMLElement {
  */
 const measurementAttempts = 3;
 
+/**
+ * The rect of every item in `items`, in `container`'s coordinate space, or
+ * null when an item has no layout box. On the last attempt (`settle`) a
+ * boxless item is left out as a sparse slot instead, so one row that stays
+ * hidden (`display: none`) cannot keep the whole list unmeasured; it is still
+ * null when no item has a box, as the list itself is hidden then and the item
+ * observer measures it again once it shows.
+ */
+export function itemRectsIn(
+  container: HTMLElement,
+  items: ReadonlyMap<number, HTMLElement>,
+  settle: boolean
+): ItemRect[] | null {
+  const rects: ItemRect[] = [];
+  let boxless = 0;
+  for (const [index, element] of items) {
+    // An element inside a display:none / not-yet-laid-out popup has no
+    // offsetParent and reports every offset as 0. Publishing that would pin
+    // overlays to the top of the list, so the pass is incomplete until the
+    // last attempt. A boxless element is the only case: `position: fixed`
+    // items also have no offsetParent but do have a size.
+    const hasLayoutBox =
+      element.offsetParent !== null ||
+      element.offsetWidth > 0 ||
+      element.offsetHeight > 0;
+    if (!hasLayoutBox) {
+      boxless++;
+      continue;
+    }
+    // Use offset* instead of getBoundingClientRect so measurements are
+    // unaffected by CSS transforms (e.g. scaleY animation on the parent
+    // motion.div). offsetTop/offsetLeft are layout values relative to the
+    // offsetParent (the scroll container), matching the coordinate space
+    // used by `position: absolute` children. Items nested inside positioned
+    // descendants of the container (a sidebar sub-menu's rows live inside a
+    // positioned row) accumulate those ancestors' offsets, so every rect
+    // lands in the container's own coordinate space; for a flat list the
+    // loop never runs and this is exactly the plain offsetTop/offsetLeft.
+    let top = element.offsetTop;
+    let left = element.offsetLeft;
+    let ancestor = element.offsetParent as HTMLElement | null;
+    while (ancestor && ancestor !== container && container.contains(ancestor)) {
+      top += ancestor.offsetTop + ancestor.clientTop;
+      left += ancestor.offsetLeft + ancestor.clientLeft;
+      ancestor = ancestor.offsetParent as HTMLElement | null;
+    }
+    rects[index] = {
+      top,
+      height: element.offsetHeight,
+      left,
+      width: element.offsetWidth,
+    };
+  }
+  if (boxless === 0) return rects;
+  return settle && boxless < items.size ? rects : null;
+}
+
 export function useFluidHover<T extends HTMLElement>(
   containerRef: RefObject<T | null>,
   options: UseFluidHoverOptions = {}
@@ -247,62 +304,23 @@ export function useFluidHover<T extends HTMLElement>(
   const itemRectsRef = useRef<ItemRect[]>([]);
   const sessionRef = useRef(0);
   const rafIdRef = useRef<number | null>(null);
-  const remeasureRafIdRef = useRef<number | null>(null);
-  // True from a remeasure until its frame runs: a burst of registrations (a
-  // list of rows mounting) drops readiness and queues the pass once, instead
-  // of a state write and a frame request per item.
-  const remeasurePendingRef = useRef(false);
+  // The measurement pass queued for the next frame, if any. `coalescing`
+  // marks the first frame of a remeasure: a burst of registrations (a list of
+  // rows mounting) drops readiness and queues the pass once, instead of a
+  // state write and a frame request per item.
+  const queuedRef = useRef<{ frame: number; coalescing: boolean } | null>(null);
 
   /**
    * Publishes a rect for every registered item. Returns false when the
    * measurement could not be completed (no container, or an item without a
-   * layout box) — nothing is published in that case, so the last complete
-   * measurement stands instead of being overwritten with zeroes.
+   * layout box before the last attempt) — nothing is published in that case,
+   * so the last complete measurement stands instead of being overwritten
+   * with zeroes.
    */
-  const runMeasurement = useCallback(() => {
+  const runMeasurement = useCallback((settle: boolean) => {
     const container = containerRef.current;
-    if (!container) return false;
-    const rects: ItemRect[] = [];
-    let everyItemHasLayout = true;
-    itemsRef.current.forEach((element, index) => {
-      // An element inside a display:none / not-yet-laid-out popup has no
-      // offsetParent and reports every offset as 0. Publishing that would pin
-      // overlays to the top of the list, so treat the whole pass as
-      // incomplete. A boxless element is the only case: `position: fixed`
-      // items also have no offsetParent but do have a size.
-      const hasLayoutBox =
-        element.offsetParent !== null ||
-        element.offsetWidth > 0 ||
-        element.offsetHeight > 0;
-      if (!hasLayoutBox) {
-        everyItemHasLayout = false;
-        return;
-      }
-      // Use offset* instead of getBoundingClientRect so measurements are
-      // unaffected by CSS transforms (e.g. scaleY animation on the parent
-      // motion.div). offsetTop/offsetLeft are layout values relative to the
-      // offsetParent (the scroll container), matching the coordinate space
-      // used by `position: absolute` children. Items nested inside positioned
-      // descendants of the container (a sidebar sub-menu's rows live inside a
-      // positioned row) accumulate those ancestors' offsets, so every rect
-      // lands in the container's own coordinate space; for a flat list the
-      // loop never runs and this is exactly the plain offsetTop/offsetLeft.
-      let top = element.offsetTop;
-      let left = element.offsetLeft;
-      let ancestor = element.offsetParent as HTMLElement | null;
-      while (ancestor && ancestor !== container && container.contains(ancestor)) {
-        top += ancestor.offsetTop + ancestor.clientTop;
-        left += ancestor.offsetLeft + ancestor.clientLeft;
-        ancestor = ancestor.offsetParent as HTMLElement | null;
-      }
-      rects[index] = {
-        top,
-        height: element.offsetHeight,
-        left,
-        width: element.offsetWidth,
-      };
-    });
-    if (!everyItemHasLayout) return false;
+    const rects = container && itemRectsIn(container, itemsRef.current, settle);
+    if (!rects) return false;
     // Skip the state update when nothing moved (a cheap top/left/width/height
     // compare) so redundant remeasures don't churn re-renders.
     const prev = itemRectsRef.current;
@@ -327,7 +345,7 @@ export function useFluidHover<T extends HTMLElement>(
   }, [containerRef]);
 
   const measureItems = useCallback(() => {
-    runMeasurement();
+    runMeasurement(false);
   }, [runMeasurement]);
 
   /**
@@ -337,31 +355,30 @@ export function useFluidHover<T extends HTMLElement>(
    * true while another pass is still queued.
    */
   const scheduleMeasurement = useCallback(
-    (attemptsLeft: number) => {
-      if (remeasureRafIdRef.current !== null) {
-        cancelAnimationFrame(remeasureRafIdRef.current);
+    (attemptsLeft: number, coalescing = false) => {
+      if (queuedRef.current !== null) {
+        cancelAnimationFrame(queuedRef.current.frame);
       }
-      remeasureRafIdRef.current = requestAnimationFrame(() => {
-        remeasureRafIdRef.current = null;
-        remeasurePendingRef.current = false;
-        if (runMeasurement()) {
+      const frame = requestAnimationFrame(() => {
+        queuedRef.current = null;
+        if (runMeasurement(attemptsLeft === 1)) {
           setIsMeasured(true);
         } else if (attemptsLeft > 1) {
           scheduleMeasurement(attemptsLeft - 1);
         }
       });
+      queuedRef.current = { frame, coalescing };
     },
     [runMeasurement]
   );
 
   const remeasure = useCallback(() => {
-    if (remeasurePendingRef.current) return;
-    remeasurePendingRef.current = true;
+    if (queuedRef.current?.coalescing) return;
     // Readiness drops first: until the pass below settles, the published rects
     // may not describe what is on screen, and an overlay positioned from them
     // would be corrected after mounting — which animates as a slide.
     setIsMeasured(false);
-    scheduleMeasurement(measurementAttempts);
+    scheduleMeasurement(measurementAttempts, true);
   }, [scheduleMeasurement]);
 
   // Observes the registered items themselves (not just the container): rows
@@ -523,11 +540,10 @@ export function useFluidHover<T extends HTMLElement>(
       if (rafIdRef.current !== null) {
         cancelAnimationFrame(rafIdRef.current);
       }
-      if (remeasureRafIdRef.current !== null) {
-        cancelAnimationFrame(remeasureRafIdRef.current);
-        remeasureRafIdRef.current = null;
+      if (queuedRef.current !== null) {
+        cancelAnimationFrame(queuedRef.current.frame);
+        queuedRef.current = null;
       }
-      remeasurePendingRef.current = false;
       itemRoRef.current?.disconnect();
       itemRoRef.current = null;
     };

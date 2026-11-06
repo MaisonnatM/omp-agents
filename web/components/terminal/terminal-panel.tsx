@@ -1,6 +1,6 @@
 /** `TerminalPanel`: the resizable panel under the panes holding the terminal tabs, and its shown/height state. */
 import { ChevronDown, LoaderIcon, Plus, X } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { TerminalInfo } from "../../../src/shared/terminals";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -89,8 +89,8 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 		};
 	}, [open, inventory.state]);
 
-	// The last tab closing hides the panel, and the next open starts a fresh shell.
-	useEffect(() => {
+	// The last tab closing hides the panel, and the next open starts a fresh shell; a layout effect, so a panel with no tabs never paints.
+	useLayoutEffect(() => {
 		if (inventory.state !== "ready" || inventory.tabs.length !== 0) return;
 		setOpen(false);
 		setInventory(LOADING_TABS);

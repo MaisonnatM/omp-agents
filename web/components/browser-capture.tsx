@@ -13,6 +13,7 @@ import { annotationText, type Area, boundsOf, cardPlace, dragArea, elementAt, ty
 import { appendToComposer, attachToComposer } from "../composer-drafts";
 import { annotationReference } from "../prompt-tokens";
 import { type ShortcutId, shortcutBindings, shortcutKeys, useShortcuts } from "../shortcuts";
+import { useAction } from "../use-action";
 import type { Webview } from "../use-webview";
 import { toasts } from "./toaster";
 
@@ -100,8 +101,10 @@ export interface PickingSession {
 	stop: () => boolean;
 	/** Switches to the mode whose shortcut is `key`, pressed in the app while Select has its focus. */
 	pickKey: (key: string) => void;
-	/** Adds `marking` and the selected elements to the composer as one chip and its picture, and stops picking once it did. */
-	attach: (marking: Marking) => Promise<void>;
+	/** Adds `marking` and the selected elements to the composer as one chip and its picture, and stops picking once it did; a press while one runs is dropped. */
+	attach: (marking: Marking) => void;
+	/** An Attach is capturing the page. */
+	attaching: boolean;
 	/** Attaches a picture of all the page shows to the composer. */
 	screenshot: () => Promise<void>;
 }
@@ -129,6 +132,18 @@ export function usePicking(webview: Webview, draftKey: string): PickingSession {
 		toasts.add({ title: attached ? "Added to the composer" : "Open the session's conversation to attach the capture" });
 		return attached;
 	};
+	// Picking stops only once the chip and its picture are in the composer, so a failed capture or a closed conversation keeps the marks to try again.
+	const attach = useAction(async ({ marks, comment, pageWidth }: Marking) => {
+		const picked = await webview.resolveSelection();
+		const png = await webview.capture();
+		if (png === null) return void toasts.add({ title: "Could not capture the Browser" });
+		const boxes = elements.filter(box => picked.some(element => element.id === box.id));
+		if (!attachFile(await annotationFile(png, marks, boxes, pageWidth, color))) return;
+		choose(null);
+		const regions = marks.filter(mark => mark.kind === "region").length;
+		const { label, content } = annotationText({ comment, page: webview.page(), elements: picked, regions, strokes: marks.length - regions });
+		appendToComposer(draftKey, annotationReference(label, content));
+	}, "Could not attach the marks");
 	return {
 		mode,
 		color,
@@ -144,18 +159,8 @@ export function usePicking(webview: Webview, draftKey: string): PickingSession {
 			const item = MODES.find(({ shortcut }) => shortcutBindings(shortcut).some(binding => "chord" in binding && binding.chord.key === key));
 			if (mode !== null && item) choose(item.mode);
 		},
-		// Picking stops only once the chip and its picture are in the composer, so a failed capture or a closed conversation keeps the marks to try again.
-		attach: async ({ marks, comment, pageWidth }) => {
-			const picked = await webview.resolveSelection();
-			const png = await webview.capture();
-			if (png === null) return void toasts.add({ title: "Could not capture the Browser" });
-			const boxes = elements.filter(box => picked.some(element => element.id === box.id));
-			if (!attachFile(await annotationFile(png, marks, boxes, pageWidth, color))) return;
-			choose(null);
-			const regions = marks.filter(mark => mark.kind === "region").length;
-			const { label, content } = annotationText({ comment, page: webview.page(), elements: picked, regions, strokes: marks.length - regions });
-			appendToComposer(draftKey, annotationReference(label, content));
-		},
+		attach: attach.run,
+		attaching: attach.pending,
 		screenshot: async () => {
 			const png = await webview.capture();
 			if (png === null) return void toasts.add({ title: "Could not capture the Browser" });
@@ -178,6 +183,8 @@ interface PickingProps {
 	onMode: (mode: PickMode) => void;
 	onDeselect: (id: number) => void;
 	onAttach: (marking: Marking) => void;
+	/** An Attach is capturing the page, so the button shows it and takes no second press. */
+	attaching: boolean;
 }
 
 /**
@@ -185,7 +192,7 @@ interface PickingProps {
  * line, and Erase removes the mark or selected element it clicks, until **Attach** in the card beside them. Under
  * Select, it lets the pointer through to the app and still shows the marks.
  */
-export function Picking({ mode, color, elements, onMode, onDeselect, onAttach }: PickingProps) {
+export function Picking({ mode, color, elements, onMode, onDeselect, onAttach, attaching }: PickingProps) {
 	const [marks, setMarks] = useState<Mark[]>([]);
 	const [drawing, setDrawing] = useState<Drawing | null>(null);
 	const [comment, setComment] = useState("");
@@ -294,7 +301,7 @@ export function Picking({ mode, color, elements, onMode, onDeselect, onAttach }:
 								attach();
 							}}
 						/>
-						<Button {...activityControl("browser.annotation.attach")} size="compact" className="mt-0.5 shrink-0" onClick={attach}>
+						<Button {...activityControl("browser.annotation.attach")} size="compact" className="mt-0.5 shrink-0" loading={attaching} onClick={attach}>
 							Attach
 						</Button>
 					</div>

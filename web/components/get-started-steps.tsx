@@ -178,6 +178,8 @@ export function KitStep({ kit }: { kit: Observation<StarterKitStatus> }) {
 		}
 	}, "Could not install the starter kit");
 	const done = kit.kind === "known" && kit.value.pending === 0;
+	// The store is the word on what is installed, so a failed run it has since seen installed shows nothing.
+	const outcome = result && (result.ok || !done) ? result : null;
 	return (
 		<div className="space-y-5">
 			<IntegrationList label="Starter kit">
@@ -198,12 +200,12 @@ export function KitStep({ kit }: { kit: Observation<StarterKitStatus> }) {
 					{!run && !done && <p className="text-xs text-muted-foreground">Open omp agents in the desktop app to install it.</p>}
 					<Button size="compact" variant="outline" render={<a href={hashForSettings("extensions")} />}>Manage installed packages</Button>
 					<Unavailable fact={kit} />
-					{result && (
-						<Callout tone={result.ok ? "info" : "danger"} icon={result.ok ? Check : CircleAlert} role="alert">
-							<p>{result.ok ? "Installed. New sessions load its files and settings." : "Installation failed. You can try again."}</p>
+					{outcome && (
+						<Callout tone={outcome.ok ? "info" : "danger"} icon={outcome.ok ? Check : CircleAlert} role="alert">
+							<p>{outcome.ok ? "Installed. New sessions load its files and settings." : "Installation failed. You can try again."}</p>
 							<details className="mt-1">
 								<summary className="cursor-pointer">Installer output</summary>
-								<pre className="mt-2 max-h-48 overflow-auto text-xs break-words whitespace-pre-wrap">{result.message}</pre>
+								<pre className="mt-2 max-h-48 overflow-auto text-xs break-words whitespace-pre-wrap">{outcome.message}</pre>
 							</details>
 						</Callout>
 					)}

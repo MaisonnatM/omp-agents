@@ -47,19 +47,19 @@ const ACTION_BUTTON = "shrink-0 font-medium @max-[30rem]/pr-header:gap-0 @max-[3
 const HEADER_BADGE = "inline-flex h-6 shrink-0 items-center gap-1 rounded-md border px-[7px] text-xs";
 
 function TitleEditor({ detail, headingRef, placement, send }: { detail: PullRequestDetail; headingRef: RefObject<HTMLHeadingElement | null>; placement: Placement; send: SendPullRequest }) {
-	const [editing, setEditing] = useState(false);
-	const [title, setTitle] = useState(detail.title);
+	// The title being typed, `null` while the heading shows: the draft exists only while editing.
+	const [title, setTitle] = useState<string | null>(null);
 	const save = useAction(async () => {
-		const value = title.trim();
+		const value = title?.trim();
 		if (!value) return;
 		if (value !== detail.title) await send({ field: "title", title: value });
-		setEditing(false);
+		setTitle(null);
 	}, "Could not save the title");
 	const Heading = placement === "page" ? "h1" : "h3";
-	if (editing) return (
-		<form className="flex min-h-7 min-w-0 items-center gap-1 sm:min-h-6" onSubmit={event => { event.preventDefault(); save.run(); }} onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); if (!save.pending) setEditing(false); } }}>
+	if (title !== null) return (
+		<form className="flex min-h-7 min-w-0 items-center gap-1 sm:min-h-6" onSubmit={event => { event.preventDefault(); save.run(); }} onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); if (!save.pending) setTitle(null); } }}>
 			<input autoFocus aria-label="Pull request title" value={title} maxLength={MAX_PULL_REQUEST_TITLE} required disabled={save.pending} onChange={event => setTitle(event.target.value)} className="h-7 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
-			<Button type="button" size="xs" variant="ghost" disabled={save.pending} onClick={() => setEditing(false)}>Cancel</Button>
+			<Button type="button" size="xs" variant="ghost" disabled={save.pending} onClick={() => setTitle(null)}>Cancel</Button>
 			<Button type="submit" size="xs" variant="outline" loading={save.pending}>{save.pending ? "Saving..." : "Save"}</Button>
 		</form>
 	);
@@ -67,7 +67,7 @@ function TitleEditor({ detail, headingRef, placement, send }: { detail: PullRequ
 		<div className="group flex min-h-7 min-w-0 items-center gap-1 sm:min-h-6">
 			<Heading ref={headingRef} tabIndex={-1} title={detail.title} className="min-w-0 flex-1 truncate text-base font-semibold leading-snug outline-none">{detail.title}</Heading>
 			<span className="flex shrink-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
-				<Button size="icon-xs" variant="ghost-muted" aria-label="Edit title" onClick={() => { setTitle(detail.title); setEditing(true); }}><Pencil aria-hidden className="size-3" /></Button>
+				<Button size="icon-xs" variant="ghost-muted" aria-label="Edit title" onClick={() => setTitle(detail.title)}><Pencil aria-hidden className="size-3" /></Button>
 			</span>
 		</div>
 	);

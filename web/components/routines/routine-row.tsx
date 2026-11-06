@@ -148,6 +148,7 @@ export function RoutineRow({ routine, botName, open, connected, now }: RoutineRo
 	const latest = runs[0];
 	const picked = runs.find(({ at }) => at === pickedAt) ?? latest;
 	const health = latest && runHealth(latest);
+	// A run the server holds queued, sending, or running takes no second Run now: it would claim another run beside it.
 	const running = runNow.pending || health === "running" || health === "waiting";
 	const toggle = (): void => {
 		// Opened afresh, the row shows the latest run until a tick picks another.
@@ -179,7 +180,7 @@ export function RoutineRow({ routine, botName, open, connected, now }: RoutineRo
 							size="compact"
 							leadingIcon={Play}
 							aria-label={`Run ${name} now`}
-							disabled={!connected}
+							disabled={!connected || running}
 							loading={runNow.pending}
 							onClick={() => runNow.run()}
 							className={cn(

@@ -28,6 +28,9 @@ export interface RoutineRunnerDeps {
 	messageBot(botId: BotId, text: string): Promise<string>;
 }
 
+/** Why a run a stopped server left sending failed: its prompt may have reached the Bot or not. */
+export const STOPPED_WHILE_SENDING = "The dashboard stopped while it sent this run's prompt. Check the Bot's conversation before you run it again.";
+
 export class RoutineRunner {
 	readonly #deps: RoutineRunnerDeps;
 	/** Routines with a command running. A run holds one outcome and ten run-now claims push it out of the history, so the file cannot say whether a command still runs. */
@@ -42,13 +45,15 @@ export class RoutineRunner {
 	}
 
 	/**
-	 * Takes over what a stopped server left in the runs: a command saved as running failed, since it died with that server.
+	 * Takes over what a stopped server left in the runs: a command saved as running failed, since it died with that server,
+	 * and so did a prompt saved as sending, which may or may not have reached the Bot.
 	 * Called by the server that owns routines when it starts or takes over, and never beside one that runs them.
 	 */
 	recover(): void {
 		const { file, now } = this.#deps;
 		for (const routine of file.value) {
 			for (const { at, outcome } of routine.runs) {
+				if (outcome.kind === "sending") file.failed(routine.id, at, STOPPED_WHILE_SENDING);
 				if (outcome.kind !== "command" || outcome.run.phase !== "running") continue;
 				file.command(routine.id, at, { phase: "stopped", reason: "dashboard", output: "", startedAt: outcome.run.startedAt, endedAt: now() });
 				file.failed(routine.id, at, "The dashboard stopped while the command ran.");
@@ -94,7 +99,7 @@ export class RoutineRunner {
 			for (const routine of file.value.filter(routine => triggersOn(routine, now))) {
 				const seen = events.filter(event => isTriggeredBy(routine, event.kind)).slice(0, MAX_TRIGGER_EVENTS);
 				if (seen.length === 0) continue;
-				const waiting = routine.runs.find(run => run.outcome.kind === "pending" && run.outcome.queued && run.triggeredBy.length > 0);
+				const waiting = routine.runs.find(run => run.outcome.kind === "queued" && run.triggeredBy.length > 0);
 				if (waiting) file.addTriggerEvents(routine.id, waiting.at, seen);
 				// Runs are keyed by their time, so a second claim in the same millisecond takes the next one.
 				else this.#claim(routine, Math.max(now, (routine.runs[0]?.at ?? 0) + 1), seen);
@@ -117,9 +122,9 @@ export class RoutineRunner {
 			if (!next) return;
 			const { routine, run } = next;
 			const { task } = routine;
-			file.dequeue(routine.id, run.at);
 			switch (task.kind) {
 				case "prompt":
+					file.sending(routine.id, run.at);
 					await this.#message(routine, run.at, sentText(routine, run, { kind: "prompt", prompt: task.prompt }));
 					break;
 				case "command":
@@ -212,7 +217,7 @@ const sentText = (routine: Routine, { at, triggeredBy }: Pick<RoutineRun, "at" |
 function oldestQueued(routines: Routine[]): { routine: Routine; run: RoutineRun } | null {
 	let oldest: { routine: Routine; run: RoutineRun } | null = null;
 	for (const routine of routines) {
-		for (const run of routine.runs) if (run.outcome.kind === "pending" && run.outcome.queued && (!oldest || run.at < oldest.run.at)) oldest = { routine, run };
+		for (const run of routine.runs) if (run.outcome.kind === "queued" && (!oldest || run.at < oldest.run.at)) oldest = { routine, run };
 	}
 	return oldest;
 }

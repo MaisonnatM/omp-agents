@@ -9,6 +9,25 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Behind the scenes: the saved runtime fixes let agents read selected lines of tool help without losing the tool or flooding the conversation with its inventory.
 - Behind the scenes: historical consults now explain when an exact session file is needed, and the Memory curator uses it when working across projects.
 - Fixed: Claude extra usage now appears automatically in the account's billing currency, including euros, in the bottom bar and model menu.
+- Fixed: a note or todo you edit while the dashboard is reconnecting is now saved once it reconnects, instead of being dropped, and the reconnect no longer replaces the text you typed.
+- Fixed: after a failed write to disk, such as a full disk, later changes are saved again once the disk has room, instead of only at the next clean stop.
+- Fixed: a routine run cut off by a server stop while sending its message now shows as failed, saying the message may not have arrived, instead of "Running…" until the next run. A run being sent reads "Sending…", and **Run now** waits while the last run is still under way.
+- Fixed: a failed storage cleanup now says it failed, not that it was stopped.
+- Fixed: a worktree removal or rebase that hits an error no longer blocks every later one until you reload the page, and a worktree removal cut short by a stop is finished at the next start.
+- Fixed: two quick actions started in a row now both open their session or show their failure.
+- Fixed: dictation no longer stays blocked for every page after a capture that never reported its end.
+- Fixed: on the Extensions tab, a failed progress read keeps checking instead of stopping, and approving clears the old error.
+- Fixed: when a pull request comment posts but closing it fails, retrying only closes it, so the comment is not posted twice.
+- Fixed: pressing an action button twice quickly in Settings and other panels now runs it once.
+- Fixed: settings sync drops a result from a remote you changed during the sync, and the desktop app still stops its server when you quit during startup and says when an update did not install.
+- Fixed: a session move waiting on a turn that ends with a question now goes, a prompt to a session whose omp has exited is refused with a plain message, and unread marks saved before a restart survive it.
+- Fixed: an auto-continue scheduled while the usage limit was being read survives a restart.
+- Fixed: a terminal tab you open after its shell exited shows the exit at once, instead of waiting forever.
+- Fixed: a sign-in row no longer shows an old failure beside a fresh sign-in link.
+- Fixed: when an update fails to download in the desktop app, it now says so, and a background update check no longer answers the one you asked for.
+- Fixed: code highlighting and Markdown now still show if their extra code fails to load.
+- Fixed: a hover card such as the CPU card opens on a pen or touch tap after it closed, and pressing Attach in the Browser twice captures once.
+- Fixed: Settings › Worktrees no longer stays on "Reading" after you leave the tab mid-read, and Escape on a pull request edit throws away the draft text.
 
 ## 2026-11-05
 

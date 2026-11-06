@@ -52,11 +52,17 @@ export type CommandRun =
 	/** `sh` could not start, as when the workspace is gone. */
 	| { phase: "failed"; error: string; startedAt: number; endedAt: number };
 
-/** A claimed run waits `pending` until it sends its prompt into conversation `sessionId` or runs its command. */
+/**
+ * Where a claimed run stands: `queued` until a tick starts it, then `sending` while its prompt goes into the Bot's
+ * conversation, `sent` into conversation `sessionId` once it went, or its `command`. A run that started nothing is
+ * `failed`, with its `errors` saying why; so is one a stopped server left `sending`, which the next server fails.
+ */
 export type RoutineOutcome =
-	| { kind: "pending"; queued: boolean }
+	| { kind: "queued" }
+	| { kind: "sending" }
 	| { kind: "sent"; sessionId: string }
-	| { kind: "command"; run: CommandRun };
+	| { kind: "command"; run: CommandRun }
+	| { kind: "failed" };
 
 export interface RoutineRun {
 	at: number;

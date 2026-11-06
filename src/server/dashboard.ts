@@ -199,11 +199,11 @@ export class Dashboard {
 	/** Why the last registry listing failed, shown with the roster. */
 	#rosterError: string | null = null;
 	/**
-	 * Whether the registry was listed since the last poll tick found no listener. True until {@link start} lists it, so a
-	 * page that connects earlier neither lists nor follows the registry before reattachAll and the restore of the unread
-	 * turns finish, nor before the session files are indexed, which the first listing reads.
+	 * The registry listing: `unlisted` until {@link start} lists it, so a page that connects earlier neither lists nor
+	 * follows the registry before reattachAll and the restore of the unread turns finish, nor before the session files are
+	 * indexed, which the first listing reads; then `stale` once a poll tick found no listener, and `fresh` once listed again.
 	 */
-	#registryFresh = true;
+	#registry: "unlisted" | "fresh" | "stale" = "unlisted";
 	/** Whether the activity was checked since the last activity tick found no listener. */
 	#activityFresh = false;
 	readonly #usage: UsagePoll;
@@ -517,7 +517,7 @@ export class Dashboard {
 		this.#loops = new Loops([...SESSION_FORMATS, { root: privateSessionsDir, createRoot: true }], {
 			onRegistryTick: async () => {
 				if (broadcasts.listening()) await this.#listRegistry();
-				else this.#registryFresh = false;
+				else this.#registry = "stale";
 			},
 			onFileChange(path) {
 				views.poke(path);
@@ -696,11 +696,7 @@ export class Dashboard {
 		this.#reattached.resolve();
 		this.#broadcasts.syncRoster();
 		this.#loops.watch();
-		if (this.#ownerLock.acquire()) {
-			this.#migrateRoutines();
-			this.#runner.recover();
-			this.#scheduledRunner.recover();
-		} else {
+		if (!this.#claimUnattendedWork()) {
 			const owner = this.#ownerLock.holder();
 			console.log(`omp-agents: the server on port ${owner?.port ?? "?"} (pid ${owner?.pid ?? "?"}) runs routines and the todo, note, and event inboxes; this one takes over when it exits.`);
 		}
@@ -760,7 +756,7 @@ export class Dashboard {
 		this.#requests.open(ws);
 		this.#broadcasts.open(ws);
 		// The registry was not polled while nobody listened; list it now rather than at the next tick.
-		if (!this.#registryFresh) void this.#listRegistry();
+		if (this.#registry === "stale") void this.#listRegistry();
 		if (!this.#activityFresh) void this.#checkActivity();
 		void this.#usage.opened();
 	}
@@ -907,7 +903,11 @@ export class Dashboard {
 		this.#autoContinue.cancel(sessionId);
 	}
 
-	/** Takes over routines and the todo, note, and event inboxes when the server that ran them is gone; whether this server runs them. */
+	/**
+	 * Takes over routines and the todo, note, and event inboxes when no other server runs them, at start or on the minute
+	 * tick after the server that ran them is gone, with the same steps either way; whether this server runs them. Losing
+	 * them needs no step: every owner action checks the lock as it runs.
+	 */
 	#claimUnattendedWork(): boolean {
 		const was = this.#ownerLock.held;
 		const owns = this.#ownerLock.acquire();
@@ -993,7 +993,7 @@ export class Dashboard {
 			hosts = [];
 			this.#rosterError = errorText(err);
 		}
-		this.#registryFresh = true;
+		this.#registry = "fresh";
 		const joinedOrLeft = this.#sessions.follow(hosts);
 		// Only a listing that worked knows which terminal sessions still run.
 		if (this.#rosterError === null) this.#sessions.restoreListedUnread(hosts, this.#files.pathOf);

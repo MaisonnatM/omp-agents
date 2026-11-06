@@ -27,9 +27,9 @@ export interface ProviderLogins {
 
 type Running = Extract<ProviderLogin, { phase: "running" }>;
 
-/** One sign-in: what the page reads, how to stop it, and the answer its open question waits for. */
+/** One sign-in: what the page reads, less the open question, how to stop it, and that question with the answer it waits for. */
 interface Attempt {
-	login: ProviderLogin;
+	login: Omit<Running, "prompt"> | Exclude<ProviderLogin, Running>;
 	controller: AbortController;
 	pending: { prompt: LoginPrompt; answer: PromiseWithResolvers<string> } | null;
 }
@@ -47,17 +47,21 @@ export function createProviderLogins(run: RunLogin): ProviderLogins {
 	let promptIds = 0;
 
 	return {
-		state: () => current?.login ?? null,
+		state() {
+			if (!current) return null;
+			const { login, pending } = current;
+			return login.phase === "running" ? { ...login, prompt: pending?.prompt ?? null } : login;
+		},
 		start(provider, method) {
 			if (current) stop(current, new Error("Another sign-in started."));
 			const attempt: Attempt = {
-				login: { provider, method, phase: "running", url: null, instructions: null, progress: null, prompt: null },
+				login: { provider, method, phase: "running", url: null, instructions: null, progress: null },
 				controller: new AbortController(),
 				pending: null,
 			};
 			current = attempt;
 			const { signal } = attempt.controller;
-			const update = (patch: Partial<Running>): void => {
+			const update = (patch: Partial<Omit<Running, "prompt">>): void => {
 				if (attempt.login.phase === "running") attempt.login = { ...attempt.login, ...patch };
 			};
 			const settle = (login: ProviderLogin): void => {
@@ -79,7 +83,6 @@ export function createProviderLogins(run: RunLogin): ProviderLogins {
 					// A paste prompt the provider stopped awaiting, once its own callback won, rejects with no one listening.
 					answer.promise.catch(() => {});
 					attempt.pending = { prompt, answer };
-					update({ prompt });
 					return answer.promise;
 				},
 			}).then(
@@ -92,7 +95,6 @@ export function createProviderLogins(run: RunLogin): ProviderLogins {
 			const pending = attempt?.pending;
 			if (!attempt || pending?.prompt.id !== promptId) return false;
 			attempt.pending = null;
-			if (attempt.login.phase === "running") attempt.login = { ...attempt.login, prompt: null };
 			pending.answer.resolve(value);
 			return true;
 		},

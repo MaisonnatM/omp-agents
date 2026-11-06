@@ -33,7 +33,8 @@ interface TodoPageProps {
 	openId: string | null;
 	/** Changes would not reach the server, so the list is read-only. */
 	disabled: boolean;
-	onChange: (change: UserTodoChange) => void;
+	/** Settles once the server has handled the change, which the notes editor waits on before it shows what arrives. */
+	onChange: (change: UserTodoChange) => Promise<void>;
 	hosts: RosterHost[];
 	past: PastSession[];
 	/** Where **Start session** opens the new-session draft of a todo with no Workspace. */

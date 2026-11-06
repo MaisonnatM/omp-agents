@@ -343,12 +343,7 @@ export interface MarkdownPreset {
 }
 
 /** `RAW_HTML`, or, should its chunk fail to load, no plugins, which leaves the raw HTML as escaped text. */
-const rawHtmlPlugins = loadedOnce<Plugins>(() =>
-	import("./raw-html").then(
-		({ RAW_HTML }) => RAW_HTML,
-		() => [],
-	),
-);
+const rawHtmlPlugins = loadedOnce<Plugins>(() => import("./raw-html").then(({ RAW_HTML }) => RAW_HTML), []);
 
 export const loadRawHtml = (): Promise<unknown> => rawHtmlPlugins.load();
 

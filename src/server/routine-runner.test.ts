@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ShellResult } from "../proc";
 import { COMMAND_TIMEOUT_MS, type RoutineTask, type Schedule, type TriggerEvent } from "../routines";
 import type { BotId } from "../shared/bots";
 import { readRoutineMessage, type RoutineMessage, routineMessageText } from "../shared/routine-message";
-import { RoutineRunner } from "./routine-runner";
+import { RoutineRunner, STOPPED_WHILE_SENDING } from "./routine-runner";
 import { RoutinesFile } from "./routines-file";
 
 const dirs: string[] = [];
@@ -129,12 +129,28 @@ describe("RoutineRunner", () => {
 		const scout = fake.bots.get(SCOUT)!;
 		fake.bots.delete(SCOUT);
 		await runner.runNow("r1");
-		expect(file.value[0]?.runs[0]).toEqual({ at: T0 + HOUR, outcome: { kind: "pending", queued: false }, errors: ["Notes: This Bot is gone."], triggeredBy: [] });
+		expect(file.value[0]?.runs[0]).toEqual({ at: T0 + HOUR, outcome: { kind: "failed" }, errors: ["Notes: This Bot is gone."], triggeredBy: [] });
 
 		fake.bots.set(SCOUT, scout);
 		fake.now += HOUR;
 		await runner.tick();
 		expect(file.value[0]?.runs[0]?.outcome).toEqual({ kind: "sent", sessionId: "s-scout" });
+	});
+
+	test("a run a stopped server left sending its prompt loads as failed, saying so, and is not sent again", async () => {
+		const path = routinesPath();
+		fileWith(path).flush();
+		// What a server leaves when it stops while the prompt goes: the run off the queue, with nothing sent and no error.
+		const saved = JSON.parse(readFileSync(path, "utf8")) as { routines: Record<string, unknown>[] };
+		saved.routines[0] = { ...saved.routines[0], scheduledAt: T0 + HOUR, runs: [{ at: T0 + HOUR, outcome: { kind: "pending", queued: false }, errors: [], triggeredBy: [] }] };
+		writeFileSync(path, JSON.stringify(saved));
+
+		const file = new RoutinesFile(path);
+		const { runner, fake } = harness(file);
+		runner.recover();
+		expect(file.value[0]?.runs).toEqual([{ at: T0 + HOUR, outcome: { kind: "failed" }, errors: [STOPPED_WHILE_SENDING], triggeredBy: [] }]);
+		await runner.tick();
+		expect(fake.messages).toEqual([]);
 	});
 
 	describe("a trigger", () => {

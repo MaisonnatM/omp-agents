@@ -13,7 +13,7 @@ afterEach(() => {
 	for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-test("a run from before `outcome` reads its command result, and a malformed or missing one as pending, and the routine stays", () => {
+test("a run from before `outcome` reads its command result, and a malformed or missing one as still sending, and the routine stays", () => {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-routines-"));
 	dirs.push(dir);
 	const path = join(dir, "omp-agents", "routines.json");
@@ -39,8 +39,8 @@ test("a run from before `outcome` reads its command result, and a malformed or m
 	expect(new RoutinesFile(path).value[0]?.runs.map(run => run.outcome)).toEqual([
 		{ kind: "command", run: { phase: "exited", code: 0, output: "ok\n", startedAt: 4, endedAt: 5 } },
 		{ kind: "command", run: { phase: "running", startedAt: 3 } },
-		{ kind: "pending", queued: false },
-		{ kind: "pending", queued: false },
+		{ kind: "sending" },
+		{ kind: "sending" },
 	]);
 });
 
@@ -91,10 +91,10 @@ test("an older file keeps its other routines, reads one schedule as a list, and 
 			// Before triggers, the schedules counted from the newest run.
 			scheduledAt: 4,
 			runs: [
-				{ at: 4, outcome: { kind: "pending", queued: true }, errors: [], triggeredBy: [] },
+				{ at: 4, outcome: { kind: "queued" }, errors: [], triggeredBy: [] },
 				{ at: 3, outcome: { kind: "sent", sessionId: "s1" }, errors: [], triggeredBy: [] },
 				{ at: 2, outcome: { kind: "sent", sessionId: "s2" }, errors: [], triggeredBy: [] },
-				{ at: 1, outcome: { kind: "pending", queued: false }, errors: [], triggeredBy: [] },
+				{ at: 1, outcome: { kind: "sending" }, errors: [], triggeredBy: [] },
 			],
 		},
 	]);
@@ -179,6 +179,29 @@ test("a triggered run keeps the schedules' clock, which a scheduled run moves, a
 	file.claim("r1", 20, [dm]);
 	expect(file.value[0]).toMatchObject({ scheduledAt: 10, runs: [{ at: 20, triggeredBy: [dm] }, { at: 10, triggeredBy: [] }] });
 	file.flush();
+	expect(new RoutinesFile(path).value).toEqual(file.value);
+});
+
+test("a queued, sending, or failed run saves in the shape older servers read, and reads back the same", () => {
+	const dir = mkdtempSync(join(tmpdir(), "omp-agents-routines-"));
+	dirs.push(dir);
+	const path = join(dir, "routines.json");
+	const file = new RoutinesFile(path);
+	file.apply({ op: "save", routine: { id: "r1", botId: "scout" as BotId, name: "Notes", schedules: [{ kind: "every", minutes: 60 }], triggers: [], task: { kind: "prompt", prompt: "Hi." }, enabled: true } }, 1);
+	file.claim("r1", 10, []);
+	file.claim("r1", 20, []);
+	file.claim("r1", 30, []);
+	file.sending("r1", 20);
+	file.sending("r1", 10);
+	file.failed("r1", 10, "This Bot is gone.");
+	expect(file.value[0]?.runs.map(run => run.outcome)).toEqual([{ kind: "queued" }, { kind: "sending" }, { kind: "failed" }]);
+	file.flush();
+	const saved = JSON.parse(readFileSync(path, "utf8")) as { routines: { runs: { outcome: unknown }[] }[] };
+	expect(saved.routines[0]?.runs.map(run => run.outcome)).toEqual([
+		{ kind: "pending", queued: true },
+		{ kind: "pending", queued: false },
+		{ kind: "pending", queued: false },
+	]);
 	expect(new RoutinesFile(path).value).toEqual(file.value);
 });
 

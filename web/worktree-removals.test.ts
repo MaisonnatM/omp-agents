@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, type Mock, mock, spyOn, test } from "bun:test";
 import type { ReactNode } from "react";
 import type { WorktreeBlocker, WorktreeRemovalRequest, WorktreeRemovalResult } from "../src/worktrees-shared";
 import { toasts } from "./components/toaster";
@@ -133,5 +133,16 @@ describe("removeWorktrees", () => {
 		expect([...said.values()]).toEqual([["Removing 2 worktrees: Checking whether they can be removed", "Could not check 2 worktrees: The server answered for 1 of 2 worktrees."]]);
 		await removeWorktrees([target("a")], false);
 		expect(removed()).toEqual(["a"]);
+	});
+
+	test("a run that throws ends with its error, and the next run still removes", async () => {
+		// The first toast update, which says run `a` is checking, throws.
+		(toasts.update as Mock<typeof toasts.update>).mockImplementationOnce(() => {
+			throw new Error("The toaster is gone.");
+		});
+		await removeWorktrees([target("a")], false);
+		await removeWorktrees([target("b")], false);
+		expect(removed()).toEqual(["b"]);
+		expect([...said.values()].map(words => words.at(-1))).toEqual(["Could not remove a: The toaster is gone.", "Removed b: Its branch and session transcripts stay."]);
 	});
 });

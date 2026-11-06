@@ -2,8 +2,8 @@
  * Picks a dashboard session's work back up after a provider's error ended its turn: schedules a `continue`, as a
  * scheduled send that the scheduled runner delivers, for when a usage limit resets, or after a backoff that grows with
  * each transient connection or provider fault in a row. A turn the session starts first, from any prompt, cancels it,
- * and so does an edited prompt or End session. While `scheduled.json` holds the session's continue, or its limit's usage
- * read runs, the session is held: it stays on its task for its merge cleanup, across a server restart too.
+ * and so does an edited prompt or End session. While `scheduled.json` holds the session's continue, the session is held:
+ * it stays on its task for its merge cleanup, across a server restart too, including one while its usage read runs.
  */
 import { randomUUID } from "node:crypto";
 import type { TurnFailure } from "../omp/turn-failure";
@@ -72,8 +72,6 @@ export interface AutoContinueDeps {
 
 export class AutoContinue {
 	readonly #deps: AutoContinueDeps;
-	/** Each session whose continue waits on its usage read, with that limit; a cancel meanwhile takes it out. */
-	readonly #reading = new Map<string, UsageLimit>();
 	/** How many transient faults in a row each session's retries followed; the count lives in memory and starts over with the server. */
 	readonly #retries = new Map<string, number>();
 
@@ -83,7 +81,7 @@ export class AutoContinue {
 
 	/** Whether session `sessionId` waits on its continue, so its merge cleanup counts it as still on its task. */
 	held(sessionId: string): boolean {
-		return this.#reading.has(sessionId) || this.#deps.file.value.some(send => holds(send) && send.target.sessionId === sessionId);
+		return this.#deps.file.value.some(send => holds(send) && send.target.sessionId === sessionId);
 	}
 
 	/**
@@ -105,21 +103,26 @@ export class AutoContinue {
 	}
 
 	/**
-	 * A turn of session `sessionId` ended on `hit`: holds the session at once, then schedules its continue, in place of one it
-	 * waits on, from plan usage read now. Its transient retries start over.
+	 * A turn of session `sessionId` ended on `hit`: schedules its continue at once, in place of one it waits on, from the
+	 * provider's error, then moves it to when plan usage read now says, unless it no longer waits meanwhile. Its transient
+	 * retries start over.
 	 */
 	async limited(sessionId: string, hit: UsageLimit): Promise<void> {
 		const { file, plans, now, onChange } = this.#deps;
 		this.#retries.delete(sessionId);
 		const at = now();
-		this.#reading.set(sessionId, hit);
-		// Without a usage report the provider's own wait still counts.
-		const read = await plans().catch(() => []);
-		if (this.#reading.get(sessionId) !== hit) return;
-		this.#reading.delete(sessionId);
-		const when = continueWhen(hit, read, at);
-		file.apply({ op: "continue", send: { id: randomUUID(), at: when.at, reset: when.reset, target: { kind: "continue", sessionId, provider: when.provider, cause: "usage-limit" } } }, now());
-		onChange();
+		const id = randomUUID();
+		const schedule = (read: readonly PlanUsage[]): void => {
+			const when = continueWhen(hit, read, at);
+			file.apply({ op: "continue", send: { id, at: when.at, reset: when.reset, target: { kind: "continue", sessionId, provider: when.provider, cause: "usage-limit" } } }, now());
+			onChange();
+		};
+		// The provider's own wait holds the session in the file while the read runs, so a restart meanwhile keeps the
+		// continue; it waits at least RESET_MARGIN_MS, longer than a usage read takes.
+		schedule([]);
+		const read = await plans().catch(() => null);
+		// A turn start, a cancel, a retry, or the page's edit that dropped or replaced the continue meanwhile leaves it be.
+		if (read && file.value.some(send => send.id === id && send.state.phase === "waiting")) schedule(read);
 	}
 
 	/** Schedules session `sessionId`'s next retry after `provider`'s transient fault, in place of the continue it waits on, unless none is left. */
@@ -132,20 +135,17 @@ export class AutoContinue {
 			return;
 		}
 		this.#retries.set(sessionId, retried + 1);
-		this.#reading.delete(sessionId);
 		const at = now();
 		file.apply({ op: "continue", send: { id: randomUUID(), at: at + wait, reset: null, target: { kind: "continue", sessionId, provider: providerName(provider), cause: "transient" } } }, at);
 		onChange();
 	}
 
 	/**
-	 * Session `sessionId` started a turn, from any prompt: its continue, or the one still being scheduled, is canceled; one under way
-	 * stays. Its transient retries keep counting, so a retry's own turn that fails again waits longer.
+	 * Session `sessionId` started a turn, from any prompt: its continue, or the one still being timed by its usage read, is
+	 * canceled; one under way stays. Its transient retries keep counting, so a retry's own turn that fails again waits longer.
 	 */
 	turnStarted(sessionId: string): void {
-		const reading = this.#reading.delete(sessionId);
-		const dropped = this.#deps.file.apply({ op: "drop-continue", sessionId }, this.#deps.now());
-		if (reading || dropped) this.#deps.onChange();
+		if (this.#deps.file.apply({ op: "drop-continue", sessionId }, this.#deps.now())) this.#deps.onChange();
 	}
 
 	/** Session `sessionId` moved to a new id or ended: as {@link turnStarted}, and its transient retries start over. */

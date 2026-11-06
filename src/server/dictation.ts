@@ -43,9 +43,12 @@ export class Dictation {
 		this.#owned(ws, captureId)?.capture?.dispose();
 	}
 
-	/** `ws` closed: no page reads its capture any more, so the microphone closes. */
+	/** `ws` closed: no page reads its capture any more, so the microphone closes and is free for the next capture at once. */
 	close(ws: Socket): void {
-		if (this.#slot?.socket === ws) this.#slot.capture?.dispose();
+		const slot = this.#slot;
+		if (slot?.socket !== ws) return;
+		this.#slot = null;
+		slot.capture?.dispose();
 	}
 
 	#owned(ws: Socket, captureId: string): Slot | null {

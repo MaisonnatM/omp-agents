@@ -19,7 +19,8 @@ export interface DictationTarget {
 
 /**
  * A capture under way or how it ended. `starting` until the microphone records, `listening` while it does, `transcribing`
- * once it stopped; `off` found dictation off in its directory, `empty` heard nothing, `failed` says why, with what it heard before.
+ * once it stopped, `cancelling` once you stopped it while it started; `off` found dictation off in its directory, `empty`
+ * heard nothing, `failed` says why, with what it heard before.
  */
 export type Dictation =
 	| Capturing
@@ -27,22 +28,23 @@ export type Dictation =
 	| { phase: "empty"; captureId: string; target: DictationTarget }
 	| { phase: "failed"; captureId: string; target: DictationTarget; error: string; preview: string };
 
-/** A capture that still holds the microphone, which keeps its composer's draft read-only. */
+/**
+ * A capture that still holds the microphone, which keeps its composer's draft read-only. A `cancelling` one waits only for
+ * its end, which puts nothing in the draft and says nothing.
+ */
 export interface Capturing {
-	phase: "starting" | "listening" | "transcribing";
+	phase: "starting" | "listening" | "transcribing" | "cancelling";
 	captureId: string;
 	target: DictationTarget;
 	preview: string;
 	processing: DictationProcessing | null;
-	/** Set once you cancelled the start: its end puts nothing in the draft and says nothing. */
-	cancelled: boolean;
 }
 
 export const capturing = (dictation: Dictation | null): dictation is Capturing =>
-	dictation?.phase === "starting" || dictation?.phase === "listening" || dictation?.phase === "transcribing";
+	dictation?.phase === "starting" || dictation?.phase === "listening" || dictation?.phase === "transcribing" || dictation?.phase === "cancelling";
 
-/** Whether Stop applies: a capture that transcribes already stopped, and only Discard ends it sooner. */
-export const stoppable = (dictation: Dictation | null): dictation is Capturing => capturing(dictation) && dictation.phase !== "transcribing";
+/** Whether Stop applies: a capture that transcribes or cancels already stopped, and only Discard ends it sooner. */
+export const stoppable = (dictation: Dictation | null): dictation is Capturing => dictation?.phase === "starting" || dictation?.phase === "listening";
 
 let current: Dictation | null = null;
 const listeners = new Set<() => void>();
@@ -70,14 +72,14 @@ export function startDictation(target: DictationTarget, send: Send): void {
 	if (capturing(current)) return;
 	const captureId = crypto.randomUUID();
 	send({ t: "dictation-start", captureId, cwd: target.cwd });
-	set({ phase: "starting", captureId, target, preview: "", processing: null, cancelled: false });
+	set({ phase: "starting", captureId, target, preview: "", processing: null });
 }
 
 /** Stops the capture: a recording one ends with what was said, a starting one ends with nothing. */
 export function stopDictation(send: Send): void {
 	if (!stoppable(current)) return;
 	send({ t: "dictation-stop", captureId: current.captureId });
-	if (current.phase === "starting") set({ ...current, cancelled: true });
+	if (current.phase === "starting") set({ ...current, phase: "cancelling" });
 }
 
 /** Stops the capture of the composer of `draftKey`, keeping what it heard, when the page's capture is its. */
@@ -102,12 +104,13 @@ export function keepPreview(): void {
 	set(null);
 }
 
-/** `dictation` after `event` of its capture. */
+/** `dictation` after `event` of its capture; a cancelling capture waits only for its end. */
 function withEvent(dictation: Capturing, event: Exclude<DictationEvent, { kind: "end" }>): Dictation | null {
+	if (dictation.phase === "cancelling") return dictation;
 	switch (event.kind) {
 		case "off": {
-			const { captureId, target, cancelled } = dictation;
-			return cancelled ? null : { phase: "off", captureId, target, settings: event.settings };
+			const { captureId, target } = dictation;
+			return { phase: "off", captureId, target, settings: event.settings };
 		}
 		case "processing":
 			return { ...dictation, processing: event.processing };
@@ -126,8 +129,8 @@ function withEvent(dictation: Capturing, event: Exclude<DictationEvent, { kind: 
 export function applyDictationMessage({ captureId, event }: Extract<ServerMsg, { t: "dictation" }>): void {
 	if (!capturing(current) || current.captureId !== captureId) return;
 	if (event.kind !== "end") return set(withEvent(current, event));
-	const { target, preview, cancelled } = current;
-	if (cancelled) return set(null);
+	const { target, preview } = current;
+	if (current.phase === "cancelling") return set(null);
 	if (event.error !== null) return set({ phase: "failed", captureId, target, error: event.error, preview: event.text || preview });
 	if (event.text.trim() === "") return set({ phase: "empty", captureId, target });
 	replaceInComposer(target.draftKey, target.text, { start: target.start, end: target.end, text: event.text });
@@ -137,8 +140,8 @@ export function applyDictationMessage({ captureId, event }: Extract<ServerMsg, {
 /** The socket closed, and the server closed the microphone it held for it. */
 export function dictationDisconnected(): void {
 	if (!capturing(current)) return;
-	const { captureId, target, preview, cancelled } = current;
-	set(cancelled ? null : { phase: "failed", captureId, target, error: "Lost the connection to the server.", preview });
+	const { captureId, target, preview } = current;
+	set(current.phase === "cancelling" ? null : { phase: "failed", captureId, target, error: "Lost the connection to the server.", preview });
 }
 
 /** What a button of the status row does: each maps to one store function, or to a new capture for `retry`. */
@@ -159,6 +162,8 @@ export function rowOf(dictation: Dictation): DictationRow | null {
 			return null;
 		case "starting":
 			return { status: "Preparing dictation…", detail: null, tone: "muted", actions: ["cancel"] };
+		case "cancelling":
+			return { status: "Cancelling…", detail: null, tone: "muted", actions: ["discard"] };
 		case "listening":
 			return {
 				status: dictation.processing ? `Listening on this computer · transcribed by ${processingText(dictation.processing)}` : "Listening on this computer",

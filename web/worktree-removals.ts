@@ -150,12 +150,22 @@ let draining = false;
 async function drain(): Promise<void> {
 	if (draining) return;
 	draining = true;
-	for (let run = runs[0]; run; run = runs[0]) {
-		await execute(run);
-		runs.shift();
-		run.done();
+	try {
+		for (let run = runs[0]; run; run = runs[0]) {
+			try {
+				await execute(run);
+			} catch (error) {
+				// A run that threw ends like one whose check failed, so the queue moves on to the next.
+				states.set(run.targets.map(worktreeKey), null);
+				settleToast(run.toast, { title: `Could not remove ${run.targets.length === 1 ? nameOf(run.targets[0]!) : worktrees(run.targets.length)}`, description: errorText(error) });
+			} finally {
+				runs.shift();
+				run.done();
+			}
+		}
+	} finally {
+		draining = false;
 	}
-	draining = false;
 }
 
 /**

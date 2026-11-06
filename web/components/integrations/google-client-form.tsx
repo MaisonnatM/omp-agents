@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
 import { integrationsStore } from "../../reads";
+import { useAction } from "../../use-action";
 import { describedBy, External, Field, FIELD, Step } from "./client-form";
 import { Callout } from "./integration-row";
 
@@ -44,13 +45,22 @@ export function GoogleClientForm({ id, setup, connected, onDone }: GoogleClientF
 	const [clientSecret, setClientSecret] = useState("");
 	const [callbackPort, setCallbackPort] = useState(String(setup.callbackPort));
 	const [errors, setErrors] = useState<FieldErrors>({});
-	const [saving, setSaving] = useState(false);
-	const [saveError, setSaveError] = useState<string | null>(null);
+	const write = useAction(async (body: GoogleClientInput) => {
+		try {
+			await putJson<McpIntegration>(`/api/integrations/${id}/client`, body);
+			await integrationsStore.refresh();
+		} catch (err) {
+			const message = errorText(err);
+			throw new Error(body.clientSecret ? message.replaceAll(body.clientSecret, "the client secret") : message);
+		}
+		onDone();
+	}, null);
+	const saving = write.pending;
 	const replacing = setup.configured || setup.hasClientSecret || setup.clientId !== null;
 	const port = portOf(callbackPort);
 	const keepsSecret = !clientSecret.trim() && setup.hasClientSecret && clientId.trim() === setup.clientId;
 
-	const save = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+	const save = (event: FormEvent<HTMLFormElement>): void => {
 		event.preventDefault();
 		if (saving) return;
 		const next: FieldErrors = {};
@@ -58,7 +68,7 @@ export function GoogleClientForm({ id, setup, connected, onDone }: GoogleClientF
 		if (!clientSecret.trim() && !keepsSecret) next.clientSecret = setup.hasClientSecret ? "Enter the new client's secret. A blank secret only keeps the saved one for the same client ID." : "Enter the OAuth client's secret.";
 		if (port === null) next.callbackPort = "Enter a callback port from 1 to 65535.";
 		setErrors(next);
-		setSaveError(null);
+		write.dismiss();
 		const first = FIELD_ORDER.find(field => next[field]);
 		if (first || port === null) {
 			if (first) refs[first].current?.focus();
@@ -67,23 +77,13 @@ export function GoogleClientForm({ id, setup, connected, onDone }: GoogleClientF
 		const secret = clientSecret.trim();
 		const body: GoogleClientInput = { clientId: clientId.trim(), callbackPort: port };
 		if (secret) body.clientSecret = secret;
-		setSaving(true);
-		try {
-			await putJson<McpIntegration>(`/api/integrations/${id}/client`, body);
-			await integrationsStore.refresh();
-			onDone();
-		} catch (err) {
-			const message = errorText(err);
-			setSaveError(secret ? message.replaceAll(secret, "the client secret") : message);
-		} finally {
-			setSaving(false);
-		}
+		write.run(body);
 	};
 
 	const clearError = (field: keyof FieldErrors) => setErrors(current => (current[field] ? { ...current, [field]: undefined } : current));
 
 	return (
-		<form aria-label={`${MCP_SERVICES[id].label} OAuth client`} noValidate onSubmit={event => void save(event)} className="space-y-4 rounded-lg bg-muted/60 p-4 text-[13px]">
+		<form aria-label={`${MCP_SERVICES[id].label} OAuth client`} noValidate onSubmit={save} className="space-y-4 rounded-lg bg-muted/60 p-4 text-[13px]">
 			<ol className="space-y-2.5">
 				<Step n={1}>
 					In a <External href={`https://console.cloud.google.com/apis/library/${text.library}`}>Google Cloud project</External>, turn on the {text.api}.
@@ -156,9 +156,9 @@ export function GoogleClientForm({ id, setup, connected, onDone }: GoogleClientF
 					/>
 				</Field>
 			</div>
-			{saveError && (
+			{write.error && (
 				<Callout tone="danger" icon={CircleAlert} role="alert">
-					Cannot save the OAuth client: {saveError}
+					Cannot save the OAuth client: {write.error}
 				</Callout>
 			)}
 			<div className="flex flex-wrap items-center justify-end gap-2">

@@ -13,6 +13,7 @@ import type { Editable } from "../../editable-read";
 import { formatValue, isChanged, valueOf } from "../../omp-settings";
 import type { ReadState } from "../../reads";
 import { hashForSettings } from "../../routing";
+import { useAction } from "../../use-action";
 import { ToggleSwitch } from "../toggle-switch";
 
 /** A settings text field or select. */
@@ -70,26 +71,21 @@ export async function writeOrReload<T>(target: { write: Editable<T>["write"]; re
 export const saveAgentSetting = (editing: Pick<Editing, "cwd" | "write" | "reload">, edit: AgentSettingEdit): Promise<OmpSettings> =>
 	writeOrReload(editing, () => putJson<OmpSettings>(settingsUrl("/agent", editing.cwd), edit));
 
-/** A save-on-change control's pending value and error, kept beside that control. */
+/** A save-on-change control's pending value and error, kept beside that control. A second save while one runs is dropped. */
 export function useSaving<K>() {
-	const [state, setState] = useState<{ saving: K | null; error: string | null }>({ saving: null, error: null });
-	return {
-		...state,
-		run: (key: K, send: () => Promise<unknown>): void => {
-			setState({ saving: key, error: null });
-			void send().then(
-				() => setState({ saving: null, error: null }),
-				(err: unknown) => setState({
-					saving: null,
-					error: err instanceof ApiError && err.conflict ? "Changed since you opened it. This shows it as it is now." : errorText(err),
-				}),
-			);
-		},
-	};
+	const action = useAction(async (_key: K, send: () => Promise<unknown>) => {
+		try {
+			await send();
+		} catch (err) {
+			throw err instanceof ApiError && err.conflict ? new Error("Changed since you opened it. This shows it as it is now.") : err;
+		}
+	}, null);
+	return { saving: action.state.kind === "pending" ? action.state.args[0] : null, error: action.error, run: action.run };
 }
 
+/** Where an edit stands; `saved` is whether the view follows a save, rather than the first view or a cancel. */
 type EditorState<T> =
-	| { phase: "viewing" }
+	| { phase: "viewing"; saved: boolean }
 	| { phase: "editing"; draft: T; error: string | null; conflict: boolean }
 	| { phase: "saving"; draft: T };
 
@@ -106,7 +102,7 @@ interface Editor<T> {
 
 /** Edit, then save or cancel. A failed save keeps the draft and shows why, for another try. `R` is what the save answers, the page's settings unless another read. */
 export function useEditor<T, R = OmpSettings>(original: T, save: (draft: T) => Promise<R>): Editor<T> {
-	const [state, setState] = useState<EditorState<T>>({ phase: "viewing" });
+	const [state, setState] = useState<EditorState<T>>({ phase: "viewing", saved: false });
 	const draft = state.phase === "viewing" ? original : state.draft;
 	return {
 		state,
@@ -114,13 +110,13 @@ export function useEditor<T, R = OmpSettings>(original: T, save: (draft: T) => P
 		dirty: state.phase !== "viewing" && JSON.stringify(draft) !== JSON.stringify(original),
 		start: () => setState({ phase: "editing", draft: original, error: null, conflict: false }),
 		change: next => setState(prev => (prev.phase === "editing" ? { phase: "editing", draft: next, error: null, conflict: false } : prev)),
-		cancel: () => setState({ phase: "viewing" }),
+		cancel: () => setState({ phase: "viewing", saved: false }),
 		submit: async () => {
 			if (state.phase !== "editing") return;
 			setState({ phase: "saving", draft: state.draft });
 			try {
 				await save(state.draft);
-				setState({ phase: "viewing" });
+				setState({ phase: "viewing", saved: true });
 			} catch (err) {
 				const conflict = err instanceof ApiError && err.conflict;
 				setState({ phase: "editing", draft: state.draft, error: errorText(err), conflict });
@@ -585,14 +581,9 @@ function rowControl(props: ControlProps, hintId: string | undefined): { element:
 /** One setting: what it does, whether it differs from omp's default, its control, and the layer notes that apply. */
 export function SettingRow({ row, context: { editing, projectFile, onOpenFile }, mode = "immediate", hidden, disabled: blocked = false }: { row: AgentSettingRow; context: RowContext; mode?: "immediate" | "explicit"; hidden?: boolean; disabled?: boolean }) {
 	const immediate = useSaving<{ shown: unknown }>();
-	const [status, setStatus] = useState("");
 	const editor = useEditor<{ change: AgentSettingChange; expected: unknown }>(
 		{ change: { value: row.user ?? row.default }, expected: row.user ?? null },
-		async draft => {
-			const result = await saveAgentSetting(editing, { id: row.id, ...draft.change, expected: draft.expected });
-			setStatus(`Saved ${row.label.toLowerCase()}.`);
-			return result;
-		},
+		draft => saveAgentSetting(editing, { id: row.id, ...draft.change, expected: draft.expected }),
 	);
 	const labelId = useId();
 	const controlId = useId();
@@ -605,7 +596,6 @@ export function SettingRow({ row, context: { editing, projectFile, onOpenFile },
 		: immediate.saving ? immediate.saving.shown : valueOf(row);
 	const disabled = saving || blocked || (locked && mode === "immediate");
 	const change = (next: AgentSettingChange): void => {
-		setStatus("");
 		if (mode === "explicit") {
 			editor.change({ ...editor.draft, change: next });
 		} else {
@@ -685,7 +675,7 @@ export function SettingRow({ row, context: { editing, projectFile, onOpenFile },
 				</p>
 			)}
 			{mode === "explicit" ? <SaveError editor={editor} /> : immediate.error && <ErrorText>Not saved: {immediate.error}</ErrorText>}
-			{status && <p role="status" className="text-xs text-muted-foreground">{status}</p>}
+			{editor.state.phase === "viewing" && editor.state.saved && <p role="status" className="text-xs text-muted-foreground">Saved {row.label.toLowerCase()}.</p>}
 		</li>
 	);
 }

@@ -25,8 +25,8 @@ export class PromptTurn {
 	#turnStarts = 0;
 	/** The live user messages seen, so Stop can tell whether the starting prompt's turn showed it. */
 	#promptsShown = 0;
-	/** The ids of the `prompt_result`s that came while a prompt waited for its ack: its own may come first. */
-	#resultsBeforeAck: Set<string> | null = null;
+	/** For each prompt waiting for its ack, the ids of the `prompt_result`s that came meanwhile: its own may come first. */
+	readonly #awaitingAck = new Set<Set<string>>();
 
 	get running(): boolean {
 		return this.#running;
@@ -43,10 +43,11 @@ export class PromptTurn {
 	send(): PendingPrompt {
 		const idle = !this.busy;
 		const starts = this.#turnStarts;
-		const settled = (this.#resultsBeforeAck = new Set<string>());
+		const settled = new Set<string>();
+		this.#awaitingAck.add(settled);
 		return {
 			close: () => {
-				this.#resultsBeforeAck = null;
+				this.#awaitingAck.delete(settled);
 			},
 			acked: prompt => {
 				if (prompt && idle && this.#turnStarts === starts && !settled.has(prompt.id)) this.#starting = prompt;
@@ -56,7 +57,7 @@ export class PromptTurn {
 
 	/** A `prompt_result`: the prompt ended, with or without a turn. */
 	result(id: string): void {
-		this.#resultsBeforeAck?.add(id);
+		for (const settled of this.#awaitingAck) settled.add(id);
 		if (id === this.#starting?.id) this.#starting = null;
 	}
 

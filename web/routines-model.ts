@@ -172,10 +172,11 @@ function commandWords(command: CommandRun): string {
 export function runWords(run: RoutineRun): string {
 	const { outcome } = run;
 	if (outcome.kind === "command") return commandWords(outcome.run);
+	if (outcome.kind === "sending") return "Sending…";
 	const parts = [
 		outcome.kind === "sent" && "Sent to the Bot",
 		run.errors.length > 0 && `${run.errors.length} ${run.errors.length === 1 ? "error" : "errors"}`,
-		outcome.kind === "pending" && outcome.queued && "Queued",
+		outcome.kind === "queued" && "Queued",
 	].filter(part => part !== false);
 	return parts.length > 0 ? parts.join(", ") : "Nothing sent";
 }
@@ -186,8 +187,12 @@ export type RunHealth = "ok" | "failed" | "running" | "waiting";
 export function runHealth({ outcome, errors }: RoutineRun): RunHealth {
 	if (errors.length > 0) return "failed";
 	switch (outcome.kind) {
-		case "pending":
+		case "queued":
 			return "waiting";
+		case "sending":
+			return "running";
+		case "failed":
+			return "failed";
 		case "sent":
 			return "ok";
 		case "command":

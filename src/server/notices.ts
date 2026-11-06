@@ -68,6 +68,15 @@ const MARKS = ["seen", "read", "cleared"] as const;
 type Mark = (typeof MARKS)[number];
 /** The ids of each mark, and the scope of each marked notice, so a restart can tell which check would find it again. */
 type Marks = Record<Mark, string[]> & { scopes: Record<string, string> };
+/**
+ * A notice the user marked: its marks, never empty; its scope, `null` from a file older than marks' scopes until a check
+ * finds it again; and since when the checks no longer find it.
+ */
+interface Marked {
+	marks: Set<Mark>;
+	scope: string | null;
+	goneSince: number | null;
+}
 
 /** How long a mark outlives its notice: a pull request whose state flickers, as GitHub works out its conflicts again, does not toast twice. */
 const MARK_GRACE_MS = 10 * 60_000;
@@ -189,25 +198,21 @@ export class Notices {
 	readonly #file: JsonFile<Marks>;
 	readonly #sources: NoticeSources;
 	readonly #changed: () => void;
-	readonly #marks: Record<Mark, Set<string>>;
-	/** The scope of each marked notice. */
-	readonly #markScopes: Map<string, string>;
+	/** Each marked notice, by id; one entry, so forgetting a notice forgets its marks, scope, and absence together. */
+	readonly #marked = new Map<string, Marked>();
 	/** By id, in the order found. */
 	#found = new Map<string, Found>();
 	/** The status of each notice the user updated; any other is available. */
 	readonly #status = new Map<string, NoticeStatus>();
 	/** The scopes checked since the server started. */
 	readonly #answered = new Set<string>();
-	/** When each marked notice stopped being found. */
-	readonly #gone = new Map<string, number>();
 	/** Each kind's last failure, logged once until it changes. */
 	readonly #failures = new Map<NoticeKind, string>();
 
 	constructor(path: string, sources: NoticeSources, changed: () => void) {
 		this.#file = new JsonFile(path, { parse: parseMarks, holds: "notice marks", onInvalid: "ignore" });
 		const marks = this.#file.load();
-		this.#marks = { seen: new Set(marks?.seen), read: new Set(marks?.read), cleared: new Set(marks?.cleared) };
-		this.#markScopes = new Map(Object.entries(marks?.scopes ?? {}));
+		for (const mark of MARKS) for (const id of marks?.[mark] ?? []) this.#mark(id, mark, marks?.scopes[id] ?? null);
 		this.#sources = sources;
 		this.#changed = changed;
 	}
@@ -215,9 +220,10 @@ export class Notices {
 	/** What the bell lists: every notice found but not cleared, newest first. */
 	get list(): Notice[] {
 		return [...this.#found.values()]
-			.filter(({ id }) => !this.#marks.cleared.has(id))
+			.filter(({ id }) => !this.#marked.get(id)?.marks.has("cleared"))
 			.map(({ scope: _, ...found }): Notice => {
-				const marks = { seen: this.#marks.seen.has(found.id), read: this.#marks.read.has(found.id) };
+				const marked = this.#marked.get(found.id)?.marks;
+				const marks = { seen: marked?.has("seen") ?? false, read: marked?.has("read") ?? false };
 				return isUpdate(found) ? { ...found, ...marks, status: this.#status.get(found.id) ?? AVAILABLE } : { ...found, ...marks };
 			})
 			.toSorted((a, b) => b.at - a.at);
@@ -253,15 +259,13 @@ export class Notices {
 		for (const id of this.#status.keys()) if (!next.has(id)) this.#status.delete(id);
 		let rescoped = false;
 		for (const [id, { scope }] of next) {
-			if (this.#isMarked(id) && this.#markScopes.get(id) !== scope) {
-				this.#markScopes.set(id, scope);
+			const marked = this.#marked.get(id);
+			if (marked && marked.scope !== scope) {
+				marked.scope = scope;
 				rescoped = true;
 			}
 		}
-		const missingFromAnAnswer = (id: string): boolean => {
-			const scope = this.#markScopes.get(id);
-			return !next.has(id) && scope !== undefined && answered.has(scope);
-		};
+		const missingFromAnAnswer = (id: string, { scope }: Marked): boolean => !next.has(id) && scope !== null && answered.has(scope);
 		if (this.#forgetGone(now, missingFromAnAnswer) || rescoped || carried) this.#save();
 		this.#changed();
 	}
@@ -276,33 +280,35 @@ export class Notices {
 		if (replaced?.kind !== "stopped" || replacement?.kind !== "stopped") return false;
 		const listed = new Set(replaced.sessions.map(({ sessionId }) => sessionId));
 		if (!replacement.sessions.every(({ sessionId }) => listed.has(sessionId))) return false;
-		const marks = MARKS.filter(mark => this.#marks[mark].has(replaced.id));
-		for (const mark of marks) this.#marks[mark].add(replacement.id);
-		if (marks.length > 0) this.#markScopes.set(replacement.id, replacement.scope);
-		return marks.length > 0;
+		const marked = this.#marked.get(replaced.id);
+		if (!marked) return false;
+		for (const mark of marked.marks) this.#mark(replacement.id, mark, replacement.scope);
+		return true;
+	}
+
+	#mark(id: string, mark: Mark, scope: string | null): void {
+		const marked = this.#marked.get(id);
+		if (!marked) this.#marked.set(id, { marks: new Set([mark]), scope, goneSince: null });
+		else {
+			marked.marks.add(mark);
+			if (scope !== null) marked.scope = scope;
+		}
 	}
 
 	/** Forgets the marks of each notice `gone` says the checks no longer find, once it has been gone {@link MARK_GRACE_MS}. Whether any went. */
-	#forgetGone(now: number, gone: (id: string) => boolean): boolean {
+	#forgetGone(now: number, gone: (id: string, marked: Marked) => boolean): boolean {
 		let forgot = false;
-		for (const marks of Object.values(this.#marks)) {
-			for (const id of marks) {
-				if (!gone(id)) {
-					if (this.#found.has(id)) this.#gone.delete(id);
-					continue;
-				}
-				const since = this.#gone.get(id) ?? now;
-				this.#gone.set(id, since);
-				if (now - since >= MARK_GRACE_MS) forgot = marks.delete(id) || forgot;
+		for (const [id, marked] of this.#marked) {
+			if (!gone(id, marked)) {
+				if (this.#found.has(id)) marked.goneSince = null;
+				continue;
 			}
+			marked.goneSince ??= now;
+			if (now - marked.goneSince < MARK_GRACE_MS) continue;
+			this.#marked.delete(id);
+			forgot = true;
 		}
-		for (const id of this.#gone.keys()) if (!this.#isMarked(id)) this.#gone.delete(id);
-		for (const id of this.#markScopes.keys()) if (!this.#isMarked(id)) this.#markScopes.delete(id);
 		return forgot;
-	}
-
-	#isMarked(id: string): boolean {
-		return MARKS.some(mark => this.#marks[mark].has(id));
 	}
 
 	async #find(kind: NoticeKind): Promise<Checked> {
@@ -351,19 +357,15 @@ export class Notices {
 			await Promise.all(listed.map(found => (isUpdate(found) ? this.#update(found) : undefined)));
 			return;
 		}
-		for (const { id, scope } of listed) {
-			this.#marks[op === "clear" ? "cleared" : op].add(id);
-			this.#markScopes.set(id, scope);
-		}
+		for (const { id, scope } of listed) this.#mark(id, op === "clear" ? "cleared" : op, scope);
 		this.#save();
 		this.#changed();
 	}
 
 	async #update(found: Found & UpdateSubject): Promise<void> {
 		if (this.#updateStarted(found.id)) return;
-		this.#marks.seen.add(found.id);
-		this.#marks.read.add(found.id);
-		this.#markScopes.set(found.id, found.scope);
+		this.#mark(found.id, "seen", found.scope);
+		this.#mark(found.id, "read", found.scope);
 		this.#save();
 		this.#setStatus(found.id, { state: "updating" });
 		try {
@@ -422,6 +424,9 @@ export class Notices {
 	}
 
 	#save(): void {
-		this.#file.save({ seen: [...this.#marks.seen], read: [...this.#marks.read], cleared: [...this.#marks.cleared], scopes: Object.fromEntries(this.#markScopes) });
+		const marked = [...this.#marked];
+		const ids = (mark: Mark): string[] => marked.flatMap(([id, { marks }]) => (marks.has(mark) ? [id] : []));
+		const scopes = Object.fromEntries(marked.flatMap(([id, { scope }]) => (scope === null ? [] : [[id, scope]])));
+		this.#file.save({ seen: ids("seen"), read: ids("read"), cleared: ids("cleared"), scopes });
 	}
 }

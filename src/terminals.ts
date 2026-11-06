@@ -33,7 +33,8 @@ export interface TerminalListener {
 /** One shell in a pseudo-terminal. */
 export class Terminal {
 	readonly id = crypto.randomUUID();
-	readonly #listeners = new Set<TerminalListener>();
+	/** The pages a running shell sends to, or how it exited, which a page that attaches after the exit hears at once. */
+	#state: { kind: "running"; listeners: Set<TerminalListener> } | { kind: "exited"; code: number | null } = { kind: "running", listeners: new Set() };
 	readonly #scrollback = new Scrollback(SCROLLBACK_BYTES);
 	readonly #proc: Subprocess;
 
@@ -50,13 +51,15 @@ export class Terminal {
 				...size,
 				data: (_terminal, chunk) => {
 					this.#scrollback.push(chunk);
-					for (const listener of this.#listeners) listener.output(chunk);
+					if (this.#state.kind === "running") for (const listener of this.#state.listeners) listener.output(chunk);
 				},
 			},
 		});
 		void this.#proc.exited.then(() => {
-			for (const listener of this.#listeners) listener.exit(this.#proc.exitCode);
-			this.#listeners.clear();
+			const running = this.#state;
+			const code = this.#proc.exitCode;
+			this.#state = { kind: "exited", code };
+			if (running.kind === "running") for (const listener of running.listeners) listener.exit(code);
 			onExit(this);
 		});
 	}
@@ -65,11 +68,16 @@ export class Terminal {
 		return { id: this.id, cwd: this.cwd, cwdDisplay: displayPath(this.cwd) };
 	}
 
-	/** Replays the kept output to `listener`, then sends it what follows; returns the detach. */
+	/** Replays the kept output to `listener`, then sends it what follows, or the exit of a shell already gone; returns the detach. */
 	attach(listener: TerminalListener): () => void {
 		for (const chunk of this.#scrollback.chunks) listener.output(chunk);
-		this.#listeners.add(listener);
-		return () => void this.#listeners.delete(listener);
+		if (this.#state.kind === "exited") {
+			listener.exit(this.#state.code);
+			return () => {};
+		}
+		const { listeners } = this.#state;
+		listeners.add(listener);
+		return () => void listeners.delete(listener);
 	}
 
 	write(input: string | Uint8Array): void {

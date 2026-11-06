@@ -1,6 +1,6 @@
 /** Git worktree inventory and removal. Git remains the authority for what is registered. */
 import { createHash, randomUUID } from "node:crypto";
-import { lstat, readdir, rm } from "node:fs/promises";
+import { lstat, readdir, readFile, rm } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
 import { canonical, commonDir, git, holderOf, repositoryAt, worktreeAt, worktreesOf, type Registration } from "./git";
 import { errorText } from "./json";
@@ -146,7 +146,8 @@ export class Worktrees {
 	/** A start already underway finishes registering before removal snapshots; new starts wait only for removal. */
 	async start<T>(task: () => Promise<T>, checkout: boolean): Promise<T> {
 		// A removal queued while this waited would otherwise take the checkout chain ahead of this start and wait for it.
-		while (this.#removing) await this.#removing;
+		// A removal that failed answers its own caller; this start only waits for it to end.
+		while (this.#removing) await this.#removing.catch(() => {});
 		const pending = checkout ? this.checkout(task) : task();
 		this.#starting.add(pending);
 		try {
@@ -319,7 +320,9 @@ export class Worktrees {
 			return probed?.ok && probed.value !== null ? [probed.value] : [];
 		}));
 		const listingOf = await probeEach(repositories, async repository => {
-			const listed = await worktreesOf(repository);
+			// A removal a stop cut short is no checkout of yours; it goes behind the removals under way.
+			void this.checkout(() => this.#sweep(repository)).catch((err: unknown) => console.error(`omp-agents: could not finish removing worktrees of ${displayPath(repository)}: ${errorText(err)}`));
+			const listed = (await worktreesOf(repository)).filter(registration => !REMOVING.test(registration.path));
 			return { listed, mainPath: listed[0] ? await canonical(listed[0].path) : "" };
 		});
 		// Every repository's checkouts in one queue, so many repositories read no more checkouts at once than one does.
@@ -555,18 +558,60 @@ export class Worktrees {
 		// `update-ref` deletes only while the branch still points at the commit checked, so a commit made meanwhile keeps it.
 		return (await run(["git", "-C", gitDir, "update-ref", "-d", ref, local])).code === 0;
 	}
+
+	/**
+	 * Finishes each removal of `repository` that a stop cut short: a checkout still registered under its removing name,
+	 * and the files an older server left once it had dropped the registration, which only their `.git` file ties to it.
+	 */
+	async #sweep(repository: string): Promise<void> {
+		const registered = new Set(await Promise.all((await worktreesOf(repository)).map(registration => canonical(registration.path))));
+		for (const path of registered) if (REMOVING.test(path)) await finishMoveOut(repository, path);
+		const admin = join(repository, "worktrees");
+		for (const parent of new Set([...registered].map(path => dirname(path)))) {
+			for (const name of await readdir(parent).catch(() => [] as string[])) {
+				const path = join(parent, name);
+				if (!REMOVING.test(name) || registered.has(path)) continue;
+				const pointer = /^gitdir: (.+)$/m.exec(await readFile(join(path, ".git"), "utf8").catch(() => ""))?.[1];
+				if (pointer && dirname(await canonical(pointer)) === admin) await rm(path, { recursive: true, force: true });
+			}
+		}
+	}
 }
+
+/** The name {@link moveOut} gives a checkout it deletes: its own, then `.removing-` and 8 hex digits. */
+const REMOVING = /\.removing-[0-9a-f]{8}$/;
 
 /**
  * Removes the linked worktree at `path`, which {@link Worktrees.preview} just found clean. Git moves it to a sibling
- * name, then its registration goes, then its files: a deletion cut short, such as by a restart, leaves unregistered
- * debris under that name, never a half-deleted `path` or a branch held by a half-deleted checkout.
+ * name, so `path` is never half deleted, then {@link finishMoveOut} deletes it.
  * `git worktree remove` deletes the files before the registration, and its 30-second limit cut yampa's `node_modules` short.
  */
 async function moveOut(repository: string, path: string): Promise<void> {
 	const removing = `${path}.removing-${randomUUID().slice(0, 8)}`;
 	await runChecked(["git", "-C", repository, "worktree", "move", "--", path, removing], { timeoutMs: 30000 });
-	const registration = (await runChecked(["git", "-C", removing, "rev-parse", "--absolute-git-dir"])).trim();
-	await rm(registration, { recursive: true, force: true });
+	await finishMoveOut(repository, removing);
+}
+
+/**
+ * Deletes the checkout of `repository` registered at `removing`: it lets go of its branch, then its files go, then its
+ * registration. A stop at any step leaves it registered under its removing name, holding no branch once its files start
+ * to go, so the next {@link Worktrees.inventory} finishes it.
+ */
+async function finishMoveOut(repository: string, removing: string): Promise<void> {
+	const admin = await registrationOf(repository, removing);
+	// `update-ref` changes no file and runs no hook, as `git checkout --detach` would.
+	if (admin) await runChecked(["git", "--git-dir", admin, "update-ref", "--no-deref", "HEAD", "HEAD"]);
 	await rm(removing, { recursive: true, force: true });
+	if (admin) await rm(admin, { recursive: true, force: true });
+}
+
+/** The directory in `repository`'s git directory that registers the checkout at `path`; `null` when none does. */
+async function registrationOf(repository: string, path: string): Promise<string | null> {
+	const root = join(repository, "worktrees");
+	const target = await canonical(path);
+	for (const name of await readdir(root).catch(() => [] as string[])) {
+		const pointer = await readFile(join(root, name, "gitdir"), "utf8").catch(() => null);
+		if (pointer !== null && (await canonical(dirname(pointer.trim()))) === target) return join(root, name);
+	}
+	return null;
 }

@@ -44,8 +44,8 @@ function streamed(steps: RebaseStep[], last: { done: RebasedPullRequest } | { er
 	return new Response(body, { headers: { "content-type": "application/x-ndjson" } });
 }
 
-/** The server's answer to each pull request number. */
-let answers: Record<number, Response>;
+/** The server's answer to each pull request number; a promise holds the queue on that rebase until it resolves. */
+let answers: Record<number, Response | Promise<Response>>;
 let requested: PullRequestRebase[];
 /** A toast as the queue left it. */
 interface Shown {
@@ -203,5 +203,27 @@ describe("rebasePullRequests", () => {
 
 		await settled(hooks => rebasePullRequests([job(2, 1)], hooks));
 		expect(requested.map(({ number }) => number)).toEqual([1, 2]);
+	});
+
+	test("rebases what sits on a pull request whose earlier rebase stopped, once it rebases again in the same busy queue", async () => {
+		const held = Promise.withResolvers<Response>();
+		answers = { 1: streamed(["fetching", "rebasing"], { done: rebased("me/branch-1", "conflict") }), 9: held.promise };
+		const first = settled(hooks => rebasePullRequests([job(1), job(9)], hooks));
+		while (!requested.some(({ number }) => number === 9)) await Bun.sleep(1);
+		answers[1] = streamed(["fetching", "rebasing", "pushing"], { done: rebased("me/branch-1") });
+		answers[2] = streamed(["fetching", "rebasing", "pushing"], { done: rebased("me/branch-2") });
+		const second = settled(hooks => rebasePullRequests([job(1), job(2, 1)], hooks));
+		held.resolve(streamed(["fetching"], { done: rebased("me/branch-9", "current") }));
+		await Promise.all([first, second]);
+		expect(requested.map(({ number }) => number)).toEqual([1, 9, 1, 2]);
+	});
+
+	test("a run whose list refresh throws leaves the queue running the next one", async () => {
+		answers = { 1: streamed(["fetching"], { done: rebased("me/branch-1", "current") }), 2: streamed(["fetching"], { done: rebased("me/branch-2", "current") }) };
+		const logged = spyOn(console, "error").mockImplementation(() => {});
+		rebasePullRequest(job(1), { resolve: () => {}, refresh: () => { throw new Error("The list is gone."); } });
+		await settled(hooks => rebasePullRequest(job(2), hooks));
+		expect(requested.map(({ number }) => number)).toEqual([1, 2]);
+		expect(logged).toHaveBeenCalledTimes(1);
 	});
 });

@@ -10,6 +10,7 @@ const CLOSE_MS = 120;
  */
 export function useHoverPopover<Trigger extends HTMLElement = HTMLButtonElement>() {
 	const [open, setOpen] = useState(false);
+	// How the popover opened: true for a hover. It outlives a close, for the close's focus, so read it with `open`.
 	const hovered = useRef(false);
 	const trigger = useRef<Trigger>(null);
 	const content = useRef<HTMLDivElement>(null);
@@ -43,7 +44,7 @@ export function useHoverPopover<Trigger extends HTMLElement = HTMLButtonElement>
 			},
 			onPointerLeave: closeAfterHover,
 			onClick: (event: MouseEvent) => {
-				if (!hovered.current) return;
+				if (!open || !hovered.current) return;
 				event.preventDefault();
 				hovered.current = false;
 				content.current?.querySelector("button")?.focus();

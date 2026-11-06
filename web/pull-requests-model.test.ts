@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { LinkedPullRequest, PullRequestSummary, PullRequestComment, PullRequestDetail, PullRequestThread, RepoPullRequests, Reviewer, StackedPullRequest } from "../src/shared/github";
+import { type LinkedPullRequest, type PullRequestSummary, type PullRequestComment, type PullRequestDetail, type PullRequestThread, pullRequestName, type RepoPullRequests, type Reviewer, type StackedPullRequest } from "../src/shared/github";
 import { type AgentOn, actionFacts, agentOn, moveOf } from "../src/shared/moves";
 import { pullRequestActions } from "../src/pull-request-actions";
 import type { RosterHost } from "../src/shared/sessions";
@@ -311,9 +311,9 @@ describe("pull request board", () => {
 	});
 
 	describe("a drop", () => {
-		const drop = (summary: PullRequestSummary, to: MoveGroup, agent: AgentOn = noAgent) => {
+		const drop = (summary: PullRequestSummary, to: MoveGroup, agent: AgentOn = noAgent, moving: PullRequestSummary | null = null) => {
 			const [section] = pullRequestSections([summary], DEFAULT_ORDER, agent);
-			return boardDrop(section!.rows[0]!, section!.title, to);
+			return boardDrop(section!.rows[0]!, section!.title, to, moving);
 		};
 
 		test("on its own column does nothing", () => {
@@ -336,6 +336,13 @@ describe("pull request board", () => {
 		test("on Drafts converts your open pull request to a draft, and on an open column marks your draft ready for review", () => {
 			expect(drop(pr(1), "Drafts")).toEqual({ kind: "state", state: "draft", label: "Convert to draft" });
 			for (const to of ["Your move", "Approved", "Waiting on others"] as const) expect(drop(pr(2, { state: "draft" }), to)).toEqual({ kind: "state", state: "open", label: "Ready for review" });
+		});
+
+		test("that changes a state waits while GitHub still moves another card, so the board makes one move at a time", () => {
+			const moving = pr(9, { state: "draft" });
+			expect(drop(pr(1), "Drafts", noAgent, moving)).toEqual({ kind: "refused", why: `Wait until GitHub moves ${pullRequestName(moving)}` });
+			expect(drop(pr(2, { state: "draft" }), "Your move", noAgent, moving)).toMatchObject({ kind: "refused" });
+			expect(drop(pr(3, { checks: "failing" }), "Agent on it", noAgent, moving)).toMatchObject({ kind: "agent" });
 		});
 
 		test("is refused for a pull request you do not author, a merged one, and a column only GitHub fills, which outranks authorship", () => {

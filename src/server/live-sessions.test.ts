@@ -186,6 +186,7 @@ describe("LiveSessions", () => {
 	test("a terminal session's unread turn comes back at the first registry listing after a restart, which forgets only the turns of the sessions it does not list", () => {
 		const path = unreadIn();
 		const first = registry(path);
+		first.restoreUnread(new Set());
 		list(first, [host("t-kept"), host("t-gone")]);
 		first.markUnread("t-kept", { at: 1_000, reply: "Fixed the test." });
 		first.markUnread("t-gone", { at: 2_000, reply: null });
@@ -218,6 +219,7 @@ describe("LiveSessions", () => {
 		const hosts = [host("t-ended"), host("t-quiet"), host("t-working", true), host("t-unknown", null), host("t-stopped")];
 		spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-02T10:00:00.000Z"));
 		const first = registry(path, "i-dash");
+		first.restoreUnread(new Set());
 		list(first, hosts);
 		for (const instanceId of ["t-ended", "t-quiet", "t-working", "t-unknown"]) first.markUnread(instanceId, { at: 1_000, reply: "Saved reply." });
 		flushJsonFiles();
@@ -291,5 +293,18 @@ describe("LiveSessions", () => {
 		const next = registry(path, "i1");
 		next.restoreUnread(new Set(["i1"]));
 		expect(unreadOf(next)).toEqual([["i1", { at: 1_000, reply: "Done." }]]);
+	});
+
+	test("a turn marked before the restore keeps the turns the previous server saved, and the restore keeps the newer mark", () => {
+		const path = unreadIn();
+		const first = registry(path, "i-kept", "i-both");
+		first.markUnread("i-kept", { at: 1_000, reply: "Fixed the test." });
+		first.markUnread("i-both", { at: 1_500, reply: "Old." });
+		flushJsonFiles();
+
+		const next = registry(path, "i-kept", "i-both");
+		next.markUnread("i-both", { at: 2_000, reply: "New." });
+		next.restoreUnread(new Set(["i-kept", "i-both"]));
+		expect(unreadOf(next)).toEqual([["i-kept", { at: 1_000, reply: "Fixed the test." }], ["i-both", { at: 2_000, reply: "New." }]]);
 	});
 });

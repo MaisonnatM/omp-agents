@@ -1,6 +1,5 @@
 import { Check, LoaderCircle, Target } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
-import { errorText } from "../../src/json";
 import type { GoalChange, GoalSlot, SessionGoal } from "../../src/shared/session-controls";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -85,26 +84,26 @@ export function GoalDialog({ goal, focus, continues, onClose, onSave }: { goal: 
 	const [objective, setObjective] = useState(goal?.objective ?? "");
 	const [budget, setBudget] = useState(goal?.tokenBudget === null || !goal ? "none" : BUDGETS.some(({ value }) => value === String(goal.tokenBudget)) ? String(goal.tokenBudget) : "custom");
 	const [custom, setCustom] = useState(String(goal?.tokenBudget ?? ""));
-	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState<{ field: "objective" | "budget" | null; message: string } | null>(null);
+	const save = useAction(onSave, null);
+	const busy = save.pending;
+	/** The field the form refuses, which a save never sets; a refused save is `save.error`. */
+	const [error, setError] = useState<{ field: "objective" | "budget"; message: string } | null>(null);
 	const objectiveInput = useRef<HTMLTextAreaElement>(null);
 	const budgetInput = useRef<HTMLInputElement>(null);
 	const errorMessage = useRef<HTMLParagraphElement>(null);
-	useEffect(() => { if (error?.field === null) errorMessage.current?.focus(); }, [error]);
-	const submit = async () => {
+	useEffect(() => { if (save.error !== null) errorMessage.current?.focus(); }, [save.error]);
+	const submit = () => {
 		if (busy) return;
 		const tokenBudget = budget === "none" ? null : Number(budget === "custom" ? custom : budget);
 		const field = !objective.trim() ? "objective" : tokenBudget !== null && (!Number.isSafeInteger(tokenBudget) || tokenBudget <= 0) ? "budget" : null;
 		if (field) {
 			setError({ field, message: field === "objective" ? "Enter the goal's objective." : "Enter a positive whole token count." });
+			save.dismiss();
 			(field === "objective" ? objectiveInput.current : budgetInput.current)?.focus();
 			return;
 		}
-		setBusy(true);
 		setError(null);
-		try { await onSave({ op: "set", objective: objective.trim(), tokenBudget }); }
-		catch (err) { setError({ field: null, message: errorText(err) }); }
-		finally { setBusy(false); }
+		save.run({ op: "set", objective: objective.trim(), tokenBudget });
 	};
 	return (
 		<FormDialog busy={busy} onClose={onClose} className="top-24 w-[min(30rem,calc(100vw-2rem))]">
@@ -131,7 +130,7 @@ export function GoalDialog({ goal, focus, continues, onClose, onSave }: { goal: 
 				</div>
 				<p className="text-xs text-muted-foreground">{continues ? "The goal can keep working on its own." : "Advances when you send a prompt. Turn on automatic continuation in omp's goal settings."}</p>
 				{goal && <p className="text-xs text-muted-foreground">Saving replaces the goal and resets its token and time counts.</p>}
-				{error && <p ref={errorMessage} id={`${id}-error`} role="alert" tabIndex={-1} className={ERROR_TEXT}>{error.message}</p>}
+				{(error ?? save.error) && <p ref={errorMessage} id={`${id}-error`} role="alert" tabIndex={-1} className={ERROR_TEXT}>{error?.message ?? save.error}</p>}
 				<div className="flex justify-end gap-2">
 					<Button type="button" variant="ghost" disabled={busy} onClick={onClose}>Cancel</Button>
 					<Button type="submit" loading={busy} disabled={busy}>{goal ? "Save goal" : "Set goal"}</Button>

@@ -113,7 +113,7 @@ test.each([
 function analytics(range: AnalyticsRange, requests: number): Analytics {
 	return {
 		range,
-		sync: { phase: "idle", current: 1, total: 1, lastSyncedAt: 1, error: null },
+		sync: { phase: "idle" },
 		totals: { requests, failed: 0, tokens: { input: 100, output: 200, cacheRead: 0, cacheWrite: 0, total: 300 }, cost: 0.5, cacheRate: 0 },
 		providers: [],
 		series: [{ start: 1, tokens: 300, cost: 0.5, requests, providers: [] }],

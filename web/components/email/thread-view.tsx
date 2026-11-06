@@ -3,7 +3,6 @@ import { ChevronsUpDown, ExternalLink, Paperclip, RefreshCw, Reply, ReplyAll, Tr
 import { useReducer, useState } from "react";
 import type { MailAttachment, MailMessage, MailPerson, MailReply, MailThread, MailTrash } from "../../../src/shared/gmail";
 import { MailEditor } from "./mail-editor";
-import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -14,6 +13,7 @@ import { formatBytes, mailTime } from "../../labels";
 import { gmailStore, mailThreadScope, mailThreadStore, useMailThread } from "../../reads";
 import { hashForEmail, type EmailThread } from "../../routing";
 import { shortcutLabels, useShortcuts } from "../../shortcuts";
+import { useAction } from "../../use-action";
 import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, type BarAction } from "../list-split";
 import { LoadNote } from "../sheet-details";
 import { MailFrame } from "./mail-frame";
@@ -208,8 +208,12 @@ export function ThreadDetail({ target, listed, position, onPrevious, onNext, add
 	const [folds, fold] = useReducer(foldsAfter, NO_FOLDS);
 	const url = thread?.url ?? listed?.url ?? null;
 	const [expanded, setExpanded] = useState(false);
-	const [trashing, setTrashing] = useState(false);
-	const [actionError, setActionError] = useState<string | null>(null);
+	const trash = useAction(async () => {
+		await putJson<object>("/api/gmail/trash", { account, thread: id } satisfies MailTrash);
+		onTrashed();
+		void gmailStore.refresh(null, { fresh: true });
+	}, null);
+	const trashing = trash.pending;
 	const last = messages.at(-1);
 	const canReply = last !== undefined && !trashing;
 	const reply = useReplyDraft(id, last, address ?? "");
@@ -219,24 +223,12 @@ export function ThreadDetail({ target, listed, position, onPrevious, onNext, add
 		reply.compose(all);
 		return true;
 	};
-	const trash = async (): Promise<void> => {
-		setTrashing(true);
-		setActionError(null);
-		try {
-			await putJson<object>("/api/gmail/trash", { account, thread: id } satisfies MailTrash);
-			onTrashed();
-			void gmailStore.refresh(null, { fresh: true });
-		} catch (err) {
-			setActionError(`Cannot delete the conversation: ${errorText(err)}`);
-			setTrashing(false);
-		}
-	};
 	useShortcuts({
 		emailReply: () => compose(false),
 		emailReplyAll: () => compose(true),
 		emailTrash: () => {
 			if (trashing) return false;
-			void trash();
+			trash.run();
 		},
 	});
 
@@ -269,7 +261,7 @@ export function ThreadDetail({ target, listed, position, onPrevious, onNext, add
 					</Button>
 				</Tooltip>
 				<Tooltip content="Delete" shortcut={shortcutLabels("emailTrash")} disabled={trashing}>
-					<Button variant="ghost" size="icon-compact" aria-label="Delete" disabled={trashing} onClick={() => void trash()}>
+					<Button variant="ghost" size="icon-compact" aria-label="Delete" disabled={trashing} onClick={() => trash.run()}>
 						<Trash2 />
 					</Button>
 				</Tooltip>
@@ -298,7 +290,7 @@ export function ThreadDetail({ target, listed, position, onPrevious, onNext, add
 				)}
 				{!thread && <LoadNote loading="Asking Gmail for the conversation…" error={error && `Cannot load the conversation: ${error}`} />}
 				{thread && error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">Cannot refresh the conversation: {error}</p>}
-				{actionError && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{actionError}</p>}
+				{trash.error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">Cannot delete the conversation: {trash.error}</p>}
 				{thread && messages.length === 0 && <p className="text-sm text-muted-foreground">This conversation holds only drafts.</p>}
 				{rows.length > 0 && (
 					<ol aria-label="Messages" className="-mx-2">

@@ -10,7 +10,7 @@ import { Badge, type BadgeColor } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MenuItem } from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
-import { errorText } from "../../../src/json";
+import { useAction } from "../../use-action";
 import type { SignInControls } from "../../use-sign-in";
 import { Callout } from "./integration-row";
 
@@ -79,20 +79,10 @@ interface ConfirmProps {
 
 /** Asks `question` before `run`; a failure stays in the question, to try again or cancel. */
 export function Confirm({ icon, question, detail, confirm, run, onDone }: ConfirmProps) {
-	const [running, setRunning] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-
-	const go = async (): Promise<void> => {
-		setRunning(true);
-		setError(null);
-		try {
-			await run();
-			onDone();
-		} catch (err) {
-			setError(errorText(err));
-			setRunning(false);
-		}
-	};
+	const go = useAction(async () => {
+		await run();
+		onDone();
+	}, null);
 
 	return (
 		<Callout
@@ -102,19 +92,19 @@ export function Confirm({ icon, question, detail, confirm, run, onDone }: Confir
 			label={question}
 			action={
 				<div className="flex items-center gap-2">
-					<Button variant="ghost" size="compact" autoFocus disabled={running} onClick={onDone}>
+					<Button variant="ghost" size="compact" autoFocus disabled={go.pending} onClick={onDone}>
 						Cancel
 					</Button>
-					<Button size="compact" loading={running} onClick={() => void go()}>
+					<Button size="compact" loading={go.pending} onClick={() => go.run()}>
 						{confirm}
 					</Button>
 				</div>
 			}
 		>
 			{question} {detail}
-			{error && (
+			{go.error && (
 				<p role="alert" className="mt-1">
-					{confirm} failed: {error}
+					{confirm} failed: {go.error}
 				</p>
 			)}
 		</Callout>

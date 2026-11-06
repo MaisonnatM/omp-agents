@@ -4,9 +4,9 @@ import { MCP_CATALOG, MCP_CATEGORIES, type McpCatalogEntry, type McpCategory } f
 import type { McpServerRow } from "../../../src/shared/mcp-servers";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
 import { mcpServersStore } from "../../reads";
+import { useAction } from "../../use-action";
 import { useSignIn } from "../../use-sign-in";
 import { MarkTile } from "./integration-row";
 import { MCP_LOGOS } from "./mcp-logos";
@@ -15,8 +15,6 @@ const refresh = (): Promise<void> => mcpServersStore.refresh();
 
 /** One catalog entry: what it gives, how it signs in, and the button that adds it, or where its sign-in stands once added. */
 function CatalogCard({ entry, added }: { entry: McpCatalogEntry; added: McpServerRow | undefined }) {
-	const [adding, setAdding] = useState(false);
-	const [addError, setAddError] = useState<string | null>(null);
 	const add = async (): Promise<McpServerRow> => {
 		const row = await putJson<McpServerRow>("/api/mcp-servers/add", { catalog: entry.id });
 		await refresh();
@@ -25,19 +23,11 @@ function CatalogCard({ entry, added }: { entry: McpCatalogEntry; added: McpServe
 	// An OAuth entry opens its vendor's sign-in once the server names it, as Connect does; an open one is just added.
 	const { starting, waitingUrl, failure, connect } = useSignIn(added?.signIn ?? null, refresh, async () => (await add()).signIn);
 
-	const addOpen = async (): Promise<void> => {
-		setAdding(true);
-		setAddError(null);
-		try {
-			await add();
-		} catch (err) {
-			setAddError(errorText(err));
-		} finally {
-			setAdding(false);
-		}
-	};
+	const addOpen = useAction(async () => {
+		await add();
+	}, null);
 
-	const error = addError ?? failure;
+	const error = addOpen.error ?? failure;
 	return (
 		<li className="flex flex-col gap-3 rounded-xl bg-surface-3 p-4 shadow-surface-2">
 			<div className="flex items-start gap-3">
@@ -71,9 +61,9 @@ function CatalogCard({ entry, added }: { entry: McpCatalogEntry; added: McpServe
 						variant="secondary"
 						size="compact"
 						leadingIcon={Plus}
-						loading={starting || adding}
+						loading={starting || addOpen.pending}
 						aria-label={`Add ${entry.label}`}
-						onClick={() => void (entry.auth === "oauth" ? connect() : addOpen())}
+						onClick={() => (entry.auth === "oauth" ? void connect() : addOpen.run())}
 					>
 						Add
 					</Button>

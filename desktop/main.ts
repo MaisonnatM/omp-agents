@@ -86,7 +86,7 @@ const HEADLESS = process.env.OMP_AGENTS_HEADLESS === "1";
 app.setPath("userData", join(app.getPath("userData"), `port-${PORT}`));
 const BOUNDS_FILE = join(app.getPath("userData"), "window.json");
 
-/** The server this shell started, while it runs. `null` when the shell uses a server started elsewhere. */
+/** The server this shell started, from its spawn until it exits, so a quit during the launch stops it too. `null` when the shell uses a server started elsewhere. */
 let server: ChildProcess | null = null;
 const serverLog: string[] = [];
 let quitting = false;
@@ -153,6 +153,10 @@ function launch(): Promise<ChildProcess> {
 		env: { ...process.env, ...SERVER.env, PORT: String(PORT), OMP_AGENTS_PARENT: "stdin" },
 		stdio: ["pipe", "pipe", "pipe"],
 	});
+	server = child;
+	child.once("exit", () => {
+		if (server === child) server = null;
+	});
 	const { promise, resolve: listening, reject } = Promise.withResolvers<ChildProcess>();
 	const deadline = setTimeout(() => {
 		child.kill("SIGTERM");
@@ -214,13 +218,13 @@ async function connect(win: BrowserWindow): Promise<void> {
 		}
 		if (found === "free") {
 			const child = await launch();
-			server = child;
 			child.once("exit", (code, signal) => {
-				if (server === child) server = null;
 				if (!quitting) showError(win, "The server stopped", `It exited with ${signal ?? `code ${code}`}.`);
 			});
 		}
 	} catch (err) {
+		// A quit stopped the launch: the window is closing, and its stop is no failure.
+		if (quitting) return;
 		if (err instanceof ServerExit && err.code === OMP_MISSING_EXIT) await showOmpMissing(win);
 		else showError(win, "The server did not start", errorText(err));
 		return;
@@ -405,10 +409,18 @@ function stopServer(): Promise<void> {
 	return promise;
 }
 
+/** Stops the server, then installs; an install that fails starts nothing, so the window says why and its Retry starts the server again. */
 async function restartToUpdate(): Promise<void> {
+	if (!updates) return;
 	quitting = true;
 	await stopServer();
-	updates?.install();
+	try {
+		await updates.install();
+	} catch (err) {
+		quitting = false;
+		const win = BrowserWindow.getAllWindows()[0];
+		if (win) showError(win, "The update did not install", errorText(err));
+	}
 }
 
 function updateItem(): MenuItemConstructorOptions[] {

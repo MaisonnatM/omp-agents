@@ -47,6 +47,12 @@ function parseStarted(value: unknown): { instanceId: string; sessionId: string }
 }
 
 /**
+ * A run that has not sent or launched anything, as the file keeps it: `pending`, `queued` until a tick starts it. One
+ * off the queue with `errors` failed; one without was sending, as a stopped server may have left it.
+ */
+const unstarted = (queued: boolean, errors: readonly string[]): RoutineOutcome => (queued ? { kind: "queued" } : errors.length > 0 ? { kind: "failed" } : { kind: "sending" });
+
+/**
  * A run's `outcome`, or the fields it had before: `queued` or `queue`, `started` sessions, and `command`. Of several sessions, only a pull request routine's run started more than one, and the first stays.
  * A run from before every routine had a Bot that started a session sent its prompt into that session.
  */
@@ -55,23 +61,38 @@ function parseRun(value: unknown): RoutineRun | null {
 	// A run from before triggers was started by a schedule or Run now.
 	const triggeredBy = "triggeredBy" in value ? parseAll(value.triggeredBy, parseTriggerEvent) : [];
 	if (!triggeredBy) return null;
+	const { errors } = value;
 	if (isObject(value.outcome)) {
 		const { outcome } = value;
 		let parsed: RoutineOutcome | null = null;
-		if (outcome.kind === "pending" && typeof outcome.queued === "boolean") parsed = { kind: "pending", queued: outcome.queued };
+		if (outcome.kind === "pending" && typeof outcome.queued === "boolean") parsed = unstarted(outcome.queued, errors);
 		if ((outcome.kind === "sent" || outcome.kind === "session") && typeof outcome.sessionId === "string") parsed = { kind: "sent", sessionId: outcome.sessionId };
 		if (outcome.kind === "command") {
 			const run = parseCommandRun(outcome.run);
 			if (run) parsed = { kind: "command", run };
 		}
-		return parsed ? { at: value.at, outcome: parsed, errors: value.errors, triggeredBy } : null;
+		return parsed ? { at: value.at, outcome: parsed, errors, triggeredBy } : null;
 	}
 	const queued = "queued" in value ? value.queued : isTexts(value.queue) && value.queue.length > 0;
 	const started = parseAll(value.started, parseStarted);
 	if (typeof queued !== "boolean" || !started) return null;
 	const command = parseCommandRun(value.command);
-	const outcome: RoutineOutcome = command ? { kind: "command", run: command } : started.length > 0 ? { kind: "sent", sessionId: started[0]!.sessionId } : { kind: "pending", queued };
-	return { at: value.at, outcome, errors: value.errors, triggeredBy };
+	const outcome: RoutineOutcome = command ? { kind: "command", run: command } : started.length > 0 ? { kind: "sent", sessionId: started[0]!.sessionId } : unstarted(queued, errors);
+	return { at: value.at, outcome, errors, triggeredBy };
+}
+
+/** `run` as the file keeps it: a run that has not started is `pending`, which servers before `sending` read too. */
+function runJson(run: RoutineRun): unknown {
+	const { outcome } = run;
+	switch (outcome.kind) {
+		case "queued":
+			return { ...run, outcome: { kind: "pending", queued: true } };
+		case "sending":
+		case "failed":
+			return { ...run, outcome: { kind: "pending", queued: false } };
+		default:
+			return run;
+	}
 }
 
 /** What a parse of a file from before every routine had a Bot found: whether a routine moved to a Bot, and the workspace of the Routines Bot when one moved there. */
@@ -164,7 +185,13 @@ export class RoutinesFile extends ReducerFile<Routine[], [change: Exclude<Routin
 
 	constructor(path: string) {
 		const migration: Migration = { moved: false, workspace: null };
-		super(path, { parse: value => parseRoutines(value, migration), toJson: routines => ({ routines }), holds: "a list of routines", empty: [], reduce: applyRoutine });
+		super(path, {
+			parse: value => parseRoutines(value, migration),
+			toJson: routines => ({ routines: routines.map(routine => ({ ...routine, runs: routine.runs.map(runJson) })) }),
+			holds: "a list of routines",
+			empty: [],
+			reduce: applyRoutine,
+		});
 		this.#migration = migration;
 	}
 
@@ -198,7 +225,7 @@ export class RoutinesFile extends ReducerFile<Routine[], [change: Exclude<Routin
 		this.#updateRoutine(id, routine => ({
 			...routine,
 			scheduledAt: triggeredBy.length === 0 ? at : routine.scheduledAt,
-			runs: [{ at, outcome: { kind: "pending", queued: true }, errors: [], triggeredBy } satisfies RoutineRun, ...routine.runs].slice(0, MAX_ROUTINE_RUNS),
+			runs: [{ at, outcome: { kind: "queued" }, errors: [], triggeredBy } satisfies RoutineRun, ...routine.runs].slice(0, MAX_ROUTINE_RUNS),
 		}));
 	}
 
@@ -207,9 +234,9 @@ export class RoutinesFile extends ReducerFile<Routine[], [change: Exclude<Routin
 		this.#updateRun(id, at, run => ({ ...run, triggeredBy: [...run.triggeredBy, ...events].slice(0, MAX_TRIGGER_EVENTS) }));
 	}
 
-	/** Takes routine `id`'s run at `at` off the queue, saved before its message or command starts. */
-	dequeue(id: string, at: number): void {
-		this.#updateRun(id, at, run => ({ ...run, outcome: { kind: "pending", queued: false } }));
+	/** Takes routine `id`'s run at `at` off the queue as it sends its prompt, saved before the prompt goes. */
+	sending(id: string, at: number): void {
+		this.#updateRun(id, at, run => ({ ...run, outcome: { kind: "sending" } }));
 	}
 
 	/** Records the Bot conversation the run at `at` sent its prompt into. */
@@ -222,10 +249,17 @@ export class RoutinesFile extends ReducerFile<Routine[], [change: Exclude<Routin
 		this.#updateRun(id, at, run => ({ ...run, outcome: { kind: "command", run: command } }));
 	}
 
-	/** Records why the run at `at` could not start something; the same error twice in a row records once, so a retry each tick does not pile up. */
+	/**
+	 * Records why the run at `at` could not start something, which fails a run that had not started; the same error twice
+	 * in a row records once, so a retry each tick does not pile up.
+	 */
 	failed(id: string, at: number, error: string): void {
 		if (this.#run(id, at)?.errors.at(-1) === error) return;
-		this.#updateRun(id, at, run => ({ ...run, errors: [...run.errors, error] }));
+		this.#updateRun(id, at, run => ({
+			...run,
+			outcome: run.outcome.kind === "queued" || run.outcome.kind === "sending" ? { kind: "failed" } : run.outcome,
+			errors: [...run.errors, error],
+		}));
 	}
 
 	#run(id: string, at: number): RoutineRun | undefined {

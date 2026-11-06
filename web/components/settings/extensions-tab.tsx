@@ -1,5 +1,5 @@
 import { Blocks, CircleAlert, Package, Plus, RefreshCw } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useReducer, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ import { getJson, putJson, settingsUrl } from "../../api";
 import { readTime } from "../../labels";
 import { hashForSettings } from "../../routing";
 import { useRead } from "../../reads";
+import { followed, NO_OPERATION, nextReadIn, operationBusy, operationError, operationReducer } from "../../extension-operation";
 import { useInlineConfirm } from "../../use-inline-confirm";
 import { FormDialog, FormDialogHeader, ERROR_TEXT, isSubmitChord } from "../form-dialog";
 import { Field, FIELD } from "../form-field";
@@ -386,10 +387,11 @@ export function ExtensionsTab({ cwd, active, onSaved }: { cwd: string | null; ac
 	const [catalogSelected, setCatalogSelected] = useState<string | null>(null);
 	const [install, setInstall] = useState<{ entry: ExtensionCatalogEntry | null } | null>(null);
 	const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
-	const [job, setJob] = useState<{ cwd: string | null; value: ExtensionOperation } | null>(null);
-	const [sending, setSending] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [pollFailed, setPollFailed] = useState(false);
+	const [operation, dispatch] = useReducer(operationReducer, NO_OPERATION);
+	const job = followed(operation);
+	/** A change or an approval answer of yours is on its way. */
+	const sending = operation.kind === "sending" || operation.kind === "approving";
+	const error = operationError(operation);
 	const [preview, setPreview] = useState<ExtensionContribution | null>(null);
 	const previewRead = useRead<ReadOnlyFile>(
 		preview ? settingsUrl("/extensions/contribution", cwd, { kind: preview.kind, path: preview.path, provider: preview.provider, scope: preview.scope }) : null,
@@ -397,7 +399,7 @@ export function ExtensionsTab({ cwd, active, onSaved }: { cwd: string | null; ac
 	const [source, setSource] = useState("");
 	const [registryUrl, setRegistryUrl] = useState<string | null>(null);
 	const armed = useInlineConfirm(cwd ?? "user");
-	const busy = sending || job?.value.state === "working" || job?.value.state === "needs-approval";
+	const busy = operationBusy(operation);
 	useEffect(() => {
 		setSelected(null);
 		setCatalogSelected(null);
@@ -408,61 +410,54 @@ export function ExtensionsTab({ cwd, active, onSaved }: { cwd: string | null; ac
 		setScopeFilter("all");
 		setSourceFilter("all");
 	}, [cwd]);
+	/** Follows `value`, the server's answer about an operation in scope `scope`, and reads the extensions again once it ends. */
+	const land = (scope: string | null, value: ExtensionOperation): void => {
+		dispatch({ kind: "answer", cwd: scope, op: value });
+		if (value.state === "done" || value.state === "failed") {
+			setVersion((version) => version + 1);
+			setCatalogRequest(null);
+			onSaved();
+		}
+	};
 	useEffect(() => {
-		if (!job || (job.value.state !== "working" && job.value.state !== "needs-approval")) return;
+		const delay = nextReadIn(operation);
+		if (delay === null || !("op" in operation)) return;
+		const { cwd: scope, op } = operation;
 		let stopped = false;
 		const timer = setTimeout(async () => {
 			try {
-				const value = await getJson<ExtensionOperation>(settingsUrl("/extensions/operation", job.cwd, { id: job.value.id }));
-				if (stopped) return;
-				setJob({ cwd: job.cwd, value });
-				if (value.state === "done" || value.state === "failed") {
-					setVersion((value) => value + 1);
-					setCatalogRequest(null);
-					onSaved();
-				}
+				const value = await getJson<ExtensionOperation>(settingsUrl("/extensions/operation", scope, { id: op.id }));
+				if (!stopped) land(scope, value);
 			} catch (err) {
-				if (!stopped) {
-					setError(errorText(err));
-					setPollFailed(true);
-				}
+				if (!stopped) dispatch({ kind: "fail", error: errorText(err) });
 			}
-		}, 700);
+		}, delay);
 		return () => {
 			stopped = true;
 			clearTimeout(timer);
 		};
-	}, [job, onSaved]);
+	}, [operation, onSaved]);
 	async function send(change: ExtensionChange) {
-		setSending(true);
-		setError(null);
-		setPollFailed(false);
+		if (operationBusy(operation)) return;
+		dispatch({ kind: "send" });
 		try {
 			const value = await putJson<ExtensionOperation>(settingsUrl("/extensions", cwd), change);
-			setJob({ cwd, value });
+			land(cwd, value);
 			setConfirmation(null);
 			setInstall(null);
 		} catch (err) {
-			setError(errorText(err));
-		} finally {
-			setSending(false);
+			dispatch({ kind: "refuse", error: errorText(err) });
 		}
 	}
 	async function approve(approved: boolean) {
-		if (job?.value.state !== "needs-approval") return;
-		setSending(true);
-		setError(null);
+		if (operation.kind !== "running" && operation.kind !== "stalled") return;
+		const { cwd: scope, op } = operation;
+		if (op.state !== "needs-approval") return;
+		dispatch({ kind: "approve" });
 		try {
-			const value = await putJson<ExtensionOperation>(settingsUrl("/extensions/approval", job.cwd), {
-				id: job.value.id,
-				token: job.value.approval.token,
-				approved,
-			});
-			setJob({ cwd: job.cwd, value });
+			land(scope, await putJson<ExtensionOperation>(settingsUrl("/extensions/approval", scope), { id: op.id, token: op.approval.token, approved }));
 		} catch (err) {
-			setError(errorText(err));
-		} finally {
-			setSending(false);
+			dispatch({ kind: "fail", error: errorText(err) });
 		}
 	}
 	const packages = (snapshot?.packages ?? []).filter(
@@ -577,16 +572,8 @@ export function ExtensionsTab({ cwd, active, onSaved }: { cwd: string | null; ac
 						)}
 					</div>
 					{job && <p className="break-all text-xs text-muted-foreground">Operation scope: {job.cwd ?? "User · all workspaces"}</p>}
-					{pollFailed && job && (
-						<Button
-							size="compact"
-							variant="outline"
-							onClick={() => {
-								setError(null);
-								setPollFailed(false);
-								setJob({ ...job });
-							}}
-						>
+					{operation.kind === "stalled" && (
+						<Button size="compact" variant="outline" onClick={() => dispatch({ kind: "retry" })}>
 							Check operation
 						</Button>
 					)}

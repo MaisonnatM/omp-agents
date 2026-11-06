@@ -14,9 +14,9 @@ import {
 	type SyncSide,
 	type SyncSkip,
 } from "../../../src/shared/settings-sync";
-import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
 import { useEditableRead } from "../../editable-read";
+import { useAction } from "../../use-action";
 import { age } from "../../labels";
 import { IntegrationList } from "../integrations/integration-row";
 import { ErrorText, FIELD, Section } from "./editor";
@@ -28,6 +28,8 @@ const ITEM_LABEL = Object.fromEntries(SYNC_ITEMS.map(item => [item.id, item.labe
 const ago = (at: number): string => (Date.now() - at < 60_000 ? "just now" : `${age(at)} ago`);
 
 type Pending = "save" | "sync" | "create";
+/** A write the tab sends: the control that sent it, the request, and what clears once it lands. */
+type SyncWrite = { of: Pending; request: () => Promise<SyncAnswer>; done: () => void };
 
 function Paths({ verb, paths }: { verb: string; paths: string[] }) {
 	if (paths.length === 0) return null;
@@ -128,8 +130,11 @@ export function SyncTab({ active }: { active: boolean }) {
 	const read = useEditableRead<SyncAnswer>(active ? "/api/sync" : null);
 	const [draft, setDraft] = useState<Pick<SyncSettings, "remote" | "branch"> | null>(null);
 	const [repoName, setRepoName] = useState(DEFAULT_SYNC_REPO);
-	const [pending, setPending] = useState<Pending | null>(null);
-	const [error, setError] = useState<{ of: Pending; text: string } | null>(null);
+	const write = useAction(async ({ request, done }: SyncWrite) => {
+		await read.write(request);
+		done();
+	}, null);
+	const pending = write.state.kind === "pending" ? write.state.args[0].of : null;
 	const [choices, setChoices] = useState<Record<string, SyncSide>>({});
 	const answer = read.data;
 	const settings = answer?.settings ?? DEFAULT_SYNC_SETTINGS;
@@ -138,37 +143,20 @@ export function SyncTab({ active }: { active: boolean }) {
 	const conflicted = last?.kind === "conflict" ? last : null;
 	const missing = last?.kind === "failed" ? missingGithubRepo(settings.remote, last.error) : null;
 
-	const send = async (kind: Pending, request: () => Promise<SyncAnswer>): Promise<boolean> => {
-		setPending(kind);
-		setError(null);
-		try {
-			await read.write(request);
-			return true;
-		} catch (err) {
-			setError({ of: kind, text: errorText(err) });
-			return false;
-		} finally {
-			setPending(null);
-		}
-	};
-	const save = (next: SyncSettings): Promise<boolean> => send("save", () => putJson("/api/sync", next));
-	const sync = async (chosen: Record<string, SyncSide>): Promise<void> => {
-		if (await send("sync", () => putJson("/api/sync/run", { choices: chosen }))) setChoices({});
-	};
-	const create = async (name: string): Promise<void> => {
-		if (await send("create", () => putJson("/api/sync/create-repo", { name }))) setDraft(null);
-	};
-	const submit = async (event: FormEvent): Promise<void> => {
+	const save = (next: SyncSettings, done = (): void => {}): void => write.run({ of: "save", request: () => putJson("/api/sync", next), done });
+	const sync = (chosen: Record<string, SyncSide>): void => write.run({ of: "sync", request: () => putJson("/api/sync/run", { choices: chosen }), done: () => setChoices({}) });
+	const create = (name: string): void => write.run({ of: "create", request: () => putJson("/api/sync/create-repo", { name }), done: () => setDraft(null) });
+	const submit = (event: FormEvent): void => {
 		event.preventDefault();
-		if (await save({ ...settings, ...shown })) setDraft(null);
+		save({ ...settings, ...shown }, () => setDraft(null));
 	};
 	const submitCreate = (event: FormEvent): void => {
 		event.preventDefault();
-		void create(repoName.trim());
+		create(repoName.trim());
 	};
 	const changed = draft !== null && (draft.remote.trim() !== settings.remote || draft.branch.trim() !== settings.branch);
 	const decided = conflicted?.conflicts.every(conflict => choices[conflict.path]) ?? false;
-	const errorOf = (of: Pending) => error?.of === of && <ErrorText>{error.text}</ErrorText>;
+	const errorOf = (of: Pending) => write.state.kind === "failed" && write.state.args[0].of === of && <ErrorText>{write.state.error}</ErrorText>;
 	return (
 		<>
 			<Section title="Remote" meta="A Git repository only you can read, such as a private GitHub repository. Sync uses this machine's git credentials and never asks for a password.">
@@ -206,7 +194,7 @@ export function SyncTab({ active }: { active: boolean }) {
 				title="Last sync"
 				meta="Fetches the remote, merges each file with this machine's against the last sync, sends what changed here, and writes what changed there."
 				actions={
-					<Button variant="secondary" size="compact" leadingIcon={RefreshCcw} loading={pending === "sync"} disabled={!answer || pending !== null || settings.remote === ""} onClick={() => void sync({})}>
+					<Button variant="secondary" size="compact" leadingIcon={RefreshCcw} loading={pending === "sync"} disabled={!answer || pending !== null || settings.remote === ""} onClick={() => sync({})}>
 						Sync
 					</Button>
 				}
@@ -217,7 +205,7 @@ export function SyncTab({ active }: { active: boolean }) {
 				{answer && <LastSync last={last} />}
 				{missing && (
 					<div className="space-y-2">
-						<Button variant="secondary" size="compact" loading={pending === "create"} disabled={pending !== null} onClick={() => void create(missing)}>
+						<Button variant="secondary" size="compact" loading={pending === "create"} disabled={pending !== null} onClick={() => create(missing)}>
 							Create {missing} on GitHub
 						</Button>
 						{errorOf("create")}
@@ -234,7 +222,7 @@ export function SyncTab({ active }: { active: boolean }) {
 							))}
 						</IntegrationList>
 						<Skipped skipped={conflicted.skipped} />
-						<Button variant="primary" size="compact" leadingIcon={RefreshCcw} loading={pending === "sync"} disabled={pending !== null || !decided} onClick={() => void sync(choices)}>
+						<Button variant="primary" size="compact" leadingIcon={RefreshCcw} loading={pending === "sync"} disabled={pending !== null || !decided} onClick={() => sync(choices)}>
 							Sync with these choices
 						</Button>
 					</div>
@@ -255,7 +243,7 @@ export function SyncTab({ active }: { active: boolean }) {
 										aria-label={`Sync ${item.label}`}
 										checked={on}
 										disabled={!answer || pending !== null}
-										onCheckedChange={next => void save({ ...settings, excluded: next ? settings.excluded.filter(id => id !== item.id) : [...settings.excluded, item.id] })}
+										onCheckedChange={next => save({ ...settings, excluded: next ? settings.excluded.filter(id => id !== item.id) : [...settings.excluded, item.id] })}
 									/>
 								</label>
 							</li>

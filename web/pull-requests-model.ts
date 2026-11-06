@@ -1,6 +1,6 @@
 /** Pull request links, what each pull request waits on next, the list's sections and stacks, the board's columns and what a drop on one does, what stands between a pull request and its merge, its open review threads, and the state changes it offers. */
 import { PULL_REQUEST_ACTIONS, type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
-import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestChange, type PullRequestDetail, type Repo, type RepoPullRequests, type Reviewer, prKey, repoKey, samePullRequest, type SettableState, type StackedPullRequest, unresolvedOf } from "../src/shared/github";
+import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestChange, type PullRequestDetail, type Repo, type RepoPullRequests, type Reviewer, prKey, pullRequestName, repoKey, samePullRequest, type SettableState, type StackedPullRequest, unresolvedOf } from "../src/shared/github";
 import { type AgentOn, hasOpenThreads, type MoveId, moveOf, readyOnceChecksPass } from "../src/shared/moves";
 import type { ReviewDraft } from "../src/shared/review-drafts";
 
@@ -393,9 +393,10 @@ const refused = (why: string): BoardDrop => ({ kind: "refused", why });
 /**
  * What dropping `row` from the column `from` on the column `to` does; `null` when it stays in its column. **Agent on it**
  * starts the quick action of its move, **Recently merged** merges it when its row offers the merge, **Drafts** converts
- * your open pull request to a draft, and an open column marks your draft ready for review.
+ * your open pull request to a draft, and an open column marks your draft ready for review. The board changes one pull
+ * request's state at a time, so those two wait while GitHub still makes the change for `moving`.
  */
-export function boardDrop({ pr, move }: SectionRow, from: MoveGroup, to: MoveGroup): BoardDrop | null {
+export function boardDrop({ pr, move }: SectionRow, from: MoveGroup, to: MoveGroup, moving: PullRequest | null): BoardDrop | null {
 	if (from === to) return null;
 	if (pr.state === "merged") return refused("It is merged already");
 	if (to === "Agent on it") {
@@ -410,14 +411,17 @@ export function boardDrop({ pr, move }: SectionRow, from: MoveGroup, to: MoveGro
 	if (to === "Drafts") {
 		if (pr.state !== "open") return refused("It is a draft already");
 		if (pr.role !== "author") return refused("Only its author changes whether it is a draft");
-		return { kind: "state", state: "draft", label: "Convert to draft" };
+		return stateDrop("draft", "Convert to draft", moving);
 	}
 	if (pr.state === "draft" && READY_COLUMNS.includes(to)) {
 		if (pr.role !== "author") return refused("Only its author changes whether it is a draft");
-		return { kind: "state", state: "open", label: "Ready for review" };
+		return stateDrop("open", "Ready for review", moving);
 	}
 	return refused(`${to} fills from GitHub; no step moves it there`);
 }
+
+const stateDrop = (state: Extract<SettableState, "open" | "draft">, label: string, moving: PullRequest | null): BoardDrop =>
+	moving ? refused(`Wait until GitHub moves ${pullRequestName(moving)}`) : { kind: "state", state, label };
 
 /** The pull request as `list` holds it, with the workspace a session on it starts in; `null` when `list` leaves it out. */
 export function listedPullRequest(list: PullRequestList, pr: PullRequest): { pr: PullRequestSummary; cwd: string } | null {

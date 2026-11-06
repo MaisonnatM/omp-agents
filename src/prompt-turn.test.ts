@@ -35,6 +35,17 @@ describe("PromptTurn", () => {
 		expect(late.starting).toBeNull();
 	});
 
+	test("a prompt_result that comes before its ack still lets go of the prompt when another send's ack closed first", () => {
+		const turn = new PromptTurn();
+		const first = turn.send();
+		const second = turn.send();
+		first.close();
+		turn.result("req_2");
+		second.close();
+		second.acked({ ...prompt, id: "req_2" });
+		expect(turn.starting).toBeNull();
+	});
+
 	test("a prompt sent while busy, whose turn started before its ack, or that omp ran itself is not held", () => {
 		const running = new PromptTurn();
 		running.turnStarted();

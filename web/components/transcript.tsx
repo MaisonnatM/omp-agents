@@ -68,7 +68,7 @@ import { hashForView, sameView } from "../routing";
 import type { StartOf } from "../starts";
 import { usePaneLoaded, useTranscript } from "../pane-store";
 import { revealed, useReveal } from "../message-reveal";
-import { type ActivityItem, EMPTY_TRANSCRIPT, type ForkPoint, replacingPrompt, type ToolItem, transcriptModel, withEditedPrompt } from "../transcript-view";
+import { type ActivityItem, EMPTY_TRANSCRIPT, type ForkPoint, replacingPrompt, resendOf, type ToolItem, transcriptModel, withEditedPrompt } from "../transcript-view";
 import { useAction } from "../use-action";
 import { useCopy } from "../use-copy";
 import { type ToolChipLabels, ToolChipsContext } from "./tool-chips";
@@ -669,26 +669,19 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 		return id;
 	}, [items]);
 	const editable = onEdit ? model.editable : null;
+	// The text being written; whether its resend runs or failed lives in `resend` alone, keyed to this object.
 	const [editing, setEditing] = useState<{
 		item: Extract<Item, { kind: "user" }>;
 		position: number;
 		entryId: string;
 		text: string;
-		submitted: string | null;
-		error: string | null;
 		save: NonNullable<TranscriptProps["onEdit"]>;
 	} | null>(null);
-	const resend = useAction(async (edit: NonNullable<typeof editing>) => {
-		const sending = { ...edit, submitted: edit.text.trim() };
-		setEditing(sending);
-		try {
-			await sending.save(sending.entryId, sending.submitted);
-			setEditing(null);
-		} catch (error) {
-			setEditing(current => current === sending ? { ...sending, error: errorText(error) } : current);
-			throw error;
-		}
-	}, "Could not resend the message");
+	const resend = useAction(async (edit: NonNullable<typeof editing>, submitted: string) => {
+		await edit.save(edit.entryId, submitted);
+		setEditing(current => (current === edit ? null : current));
+	}, null);
+	const { submitted, error: resendError } = resendOf(editing, resend.state);
 	// Reads the blocks through `modelRef`, so a streamed token keeps the callback, and the memoized rows, as they are.
 	const beginEditing = useCallback((item: Extract<Item, { kind: "user" }>, entryId: string) => {
 		const save = onEdit;
@@ -698,12 +691,10 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 			position: modelRef.current.blocks.findIndex(block => block.kind === "item" && block.item.id === item.id),
 			entryId,
 			text: item.text,
-			submitted: null,
-			error: null,
 			save,
 		});
 	}, [onEdit]);
-	const visibleBlocks = useMemo(() => withEditedPrompt(blocks, editing), [blocks, editing]);
+	const visibleBlocks = useMemo(() => withEditedPrompt(blocks, editing && { ...editing, submitted }), [blocks, editing, submitted]);
 	// Item ids repeat across views (a fork keeps its source's history), so the fork's own view must match.
 	const here = fork && sameView(fork.op.view, view) ? fork : null;
 	const revealId = useReveal(view);
@@ -777,11 +768,11 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 											<PromptEditor
 												initial={edit.item.text}
 												text={edit.text}
-												pending={resend.pending}
+												pending={submitted !== null}
 												working={working}
-												error={edit.error}
-												onChange={text => setEditing(current => current ? { ...current, text, error: null } : current)}
-												onSave={() => resend.run(edit)}
+												error={resendError}
+												onChange={text => setEditing(current => current ? { ...current, text } : current)}
+												onSave={() => resend.run(edit, edit.text.trim())}
 												onCancel={() => setEditing(null)}
 											/>
 										) : undefined}

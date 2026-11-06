@@ -179,9 +179,6 @@ export function PullRequestsKanban({ pulls, section }: { pulls: PullRequests; se
 	const reduced = useReducedMotion();
 	const scroller = useRef<HTMLDivElement>(null);
 	const [hold, setHold] = useState<Hold | null>(null);
-	const drop = hold && boardDrop(hold.card.row, hold.from, hold.over);
-	/** The card waiting on GitHub after a drop, by {@link prKey}. */
-	const [moving, setMoving] = useState<string | null>(null);
 	/** The card whose merge confirmation is open, by {@link prKey}, which a drop on **Recently merged** opens. */
 	const [confirming, setConfirming] = useState<string | null>(null);
 	const [said, say] = useState("");
@@ -193,16 +190,15 @@ export function PullRequestsKanban({ pulls, section }: { pulls: PullRequests; se
 	const y = useMotionValue(0);
 	const rotate = useSpring(useTransform(useVelocity(x), [-1600, 0, 1600], [-7, 0, 7], { clamp: true }), { stiffness: 500, damping: 32 });
 
-	const change = useAction(async (card: BoardCard, next: ListChange) => {
-		const key = prKey(card.row.pr);
-		setMoving(key);
-		try {
-			await onChange(card.row.pr, next);
-		} finally {
-			setMoving(current => (current === key ? null : current));
-		}
-	}, "GitHub refused the change");
-	const onMergeOpenChange = useCallback((pr: PullRequest, open: boolean) => setConfirming(open ? prKey(pr) : null), []);
+	const change = useAction((card: BoardCard, next: ListChange) => onChange(card.row.pr, next), "GitHub refused the change");
+	/** The card waiting on GitHub after a drop, by {@link prKey}: the one `change` runs for. */
+	const moving = change.state.kind === "pending" ? prKey(change.state.args[0].row.pr) : null;
+	/** A card waiting on GitHub or on its merge confirmation stays put, so no card is ever both. */
+	const busy = (key: string): boolean => key === moving || key === confirming;
+	const onMergeOpenChange = useCallback((pr: PullRequest, open: boolean) => setConfirming(open && prKey(pr) !== moving ? prKey(pr) : null), [moving]);
+	/** What letting go of the held card over `over` does; a move waits for the one GitHub is still making. */
+	const dropAt = (held: Hold, over: MoveGroup): BoardDrop | null => boardDrop(held.card.row, held.from, over, change.state.kind === "pending" ? change.state.args[0].row.pr : null);
+	const drop = hold && dropAt(hold, hold.over);
 
 	const several = useMemo(() => new Set(columns.flatMap(({ cards }) => cards.map(({ repo }) => repo))).size > 1, [columns]);
 	const heldKey = hold && prKey(hold.card.row.pr);
@@ -255,7 +251,7 @@ export function PullRequestsKanban({ pulls, section }: { pulls: PullRequests; se
 			if (hold || target.closest("button, input, textarea, [role=menuitem]")) return false;
 			const element = target.closest<HTMLElement>(`[${CARD_KEY}]`);
 			const found = element && find(element.getAttribute(CARD_KEY)!);
-			if (!element || !found) return false;
+			if (!element || !found || busy(prKey(found.card.row.pr))) return false;
 			pressed.current = { ...found, box: element.getBoundingClientRect() };
 			return true;
 		},
@@ -285,7 +281,7 @@ export function PullRequestsKanban({ pulls, section }: { pulls: PullRequests; se
 			const active = document.activeElement;
 			const element = active instanceof HTMLAnchorElement ? active.closest<HTMLElement>(`[${CARD_KEY}]`) : null;
 			const found = !hold && element && find(element.getAttribute(CARD_KEY)!);
-			if (!element || !found) return false;
+			if (!element || !found || busy(prKey(found.card.row.pr))) return false;
 			setHold({ ...found, over: found.from, by: "keys", width: element.offsetWidth, height: element.offsetHeight });
 			say(`Picked up ${pullRequestName(found.card.row.pr)} in ${found.from}. Left and right choose a column, Space or Enter drops it, Escape puts it back.`);
 		},
@@ -299,7 +295,7 @@ export function PullRequestsKanban({ pulls, section }: { pulls: PullRequests; se
 				const over = titles[titles.indexOf(hold.over) + (event.key === "ArrowLeft" ? -1 : 1)];
 				if (over) {
 					setHold({ ...hold, over });
-					const next = boardDrop(hold.card.row, hold.from, over);
+					const next = dropAt(hold, over);
 					say(`${over}: ${next ? dropText(next) : "where it is now"}`);
 					document.querySelector(`[${COLUMN_KEY}="${over}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: reduced ? "auto" : "smooth" });
 				}
@@ -315,8 +311,8 @@ export function PullRequestsKanban({ pulls, section }: { pulls: PullRequests; se
 		};
 		window.addEventListener("keydown", onKey, true);
 		return () => window.removeEventListener("keydown", onKey, true);
-		// `drop` and `release` follow `hold`, and a drop's work reads nothing that changes while a card is in hand.
-	}, [hold, columns, reduced]);
+		// `drop` and `release` follow `hold` and the move under way, and a drop's work reads nothing else that changes while a card is in hand.
+	}, [hold, columns, reduced, change.state]);
 
 	useEffect(() => {
 		const pr = refocus.current;

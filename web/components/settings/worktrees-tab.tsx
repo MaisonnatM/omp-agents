@@ -118,7 +118,11 @@ export function WorktreesTab({ cwd, active }: { cwd: string | null; active: bool
 				setReading(false);
 			},
 		);
-		return () => controller.abort();
+		// An aborted read settles into nothing, so its end clears `reading` here; a new read sets it again.
+		return () => {
+			controller.abort();
+			setReading(false);
+		};
 	}, [active, cwd, extras, refresh]);
 
 	useEffect(() => {

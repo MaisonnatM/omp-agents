@@ -53,7 +53,10 @@ const states = queueStates<RebaseState>();
 let draining = false;
 /** A branch of the pull request's repository, as one key: the queue spans repositories, and a stack links its pull requests by branch within one. */
 const branchKey = (pr: PullRequest, branch: string): string => `${repoKey(pr)}:${branch}`;
-/** The head branches, by {@link branchKey}, of the pull requests that stopped since the queue was last empty, whatever run queued them. */
+/**
+ * The head branches, by {@link branchKey}, whose latest rebase since the queue was last empty stopped, whatever run
+ * queued it; one that rebases again later leaves.
+ */
 const stopped = new Set<string>();
 
 /** Where `pr` stands in the queue; `null` while it is not in it. */
@@ -75,9 +78,9 @@ interface Ended {
 async function rebaseOne({ job, run }: Entry): Promise<Ended> {
 	const { pr, cwd } = job;
 	if (pr.stackedOn !== null && stopped.has(branchKey(pr, pr.stackedOn))) return { outcome: "skipped", text: { title: `Did not rebase ${pr.head}`, description: `It is stacked on ${pr.stackedOn}, whose rebase stopped.` } };
-	toasts.update(run.toast, progress(run, job, { step: null }));
-	showQueue();
 	try {
+		toasts.update(run.toast, progress(run, job, { step: null }));
+		showQueue();
 		const request: PullRequestRebase = { owner: pr.owner, repo: pr.repo, number: pr.number, cwd };
 		const done = await putSteps<RebaseStep, RebasedPullRequest>("/api/pull-request/rebase", request, step => toasts.update(run.toast, progress(run, job, { step })));
 		if (done.kind === "rebased") return { outcome: done.kind, text: { title: `Rebased ${done.branch} on ${done.onto}` } };
@@ -147,25 +150,34 @@ function showQueue(): void {
 async function drain(): Promise<void> {
 	if (draining) return;
 	draining = true;
-	for (let next = queue[0]; next; next = queue[0]) {
-		const { job, run } = next;
-		const key = prKey(job.pr);
-		states.set([key], "running");
-		const { outcome, text } = await rebaseOne(next);
-		queue.shift();
-		states.set([key], null);
-		run.outcomes[outcome] += 1;
-		if (STOPS[outcome]) stopped.add(branchKey(job.pr, job.pr.head));
-		run.left -= 1;
-		if (!run.bulk) settleToast(run.toast, text);
-		// A bulk run's toast counts the rebased ones and those that had their base; what stopped one gets a toast of its own.
-		else if (outcome === "conflict" || outcome === "failed") toasts.add(text);
-		if (run.left > 0) continue;
-		run.hooks.refresh();
-		if (run.bulk) settleToast(run.toast, summary(run));
+	try {
+		for (let next = queue[0]; next; next = queue[0]) {
+			const { job, run } = next;
+			const key = prKey(job.pr);
+			states.set([key], "running");
+			const { outcome, text } = await rebaseOne(next);
+			queue.shift();
+			states.set([key], null);
+			run.outcomes[outcome] += 1;
+			const branch = branchKey(job.pr, job.pr.head);
+			if (STOPS[outcome]) stopped.add(branch);
+			else stopped.delete(branch);
+			run.left -= 1;
+			if (!run.bulk) settleToast(run.toast, text);
+			// A bulk run's toast counts the rebased ones and those that had their base; what stopped one gets a toast of its own.
+			else if (outcome === "conflict" || outcome === "failed") toasts.add(text);
+			if (run.left > 0) continue;
+			if (run.bulk) settleToast(run.toast, summary(run));
+			run.hooks.refresh();
+		}
+	} catch (error) {
+		// A page callback that threw, such as `refresh`, ends this pass; the jobs behind it still run.
+		console.error("The rebase queue hit an error:", error);
+	} finally {
+		draining = false;
+		if (queue.length > 0) void drain();
+		else stopped.clear();
 	}
-	stopped.clear();
-	draining = false;
 }
 
 function enqueue(jobs: readonly RebaseJob[], hooks: RebaseHooks, bulk: boolean): void {

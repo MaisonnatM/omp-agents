@@ -189,10 +189,12 @@ export async function startKeeper(dir: string, instanceId: string, { cwd, argv, 
 			return false;
 		}
 	};
-	// The keeper removes its socket on the way out. This client can see the hang-up first, and a bind can
-	// land after that removal. A kill also skips the exit hook. Wait until the process is gone, then remove
-	// the path, so the rejection leaves nothing for the next start.
+	// Whatever failed the start, a keeper still running holds an omp no server would reach again, so it stops with every
+	// process under it. The keeper removes its socket on the way out. This client can see the hang-up first, and a bind
+	// can land after that removal. A kill also skips the exit hook. Wait until the process is gone, then remove the path,
+	// so the rejection leaves nothing for the next start.
 	const release = async (): Promise<void> => {
+		if (running()) await stopTree(pid, STUCK_GRACE_MS);
 		const until = Date.now() + LISTEN_TIMEOUT_MS;
 		while (running() && Date.now() < until) await Bun.sleep(10);
 		rmSync(socket, { force: true });
@@ -214,11 +216,6 @@ export async function startKeeper(dir: string, instanceId: string, { cwd, argv, 
 			break;
 		}
 		if (Date.now() > deadline) {
-			try {
-				process.kill(pid, "SIGTERM");
-			} catch {
-				// Already gone.
-			}
 			failure = new Error(`The session keeper did not listen within ${LISTEN_TIMEOUT_MS / 1000} s.`);
 			break;
 		}

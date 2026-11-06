@@ -24,12 +24,10 @@ export interface SessionMovesDeps {
 export class SessionMoves {
 	readonly #deps: SessionMovesDeps;
 	/**
-	 * The directory of each call the tool took, by tool call id, until the call's end names its session: the tool cannot
-	 * know its session, since a reattached session gets its tools before it is listed.
+	 * Each move call a session started, by tool call id, until its end or the end of its turn or session. Its start names
+	 * the session, since the tool cannot know it: a reattached session gets its tools before it is listed.
 	 */
-	readonly #called = new Map<string, string>();
-	/** The instance id of each move call a session started, by tool call id, so a turn cut off before the call's end forgets it. */
-	readonly #callers = new Map<string, string>();
+	readonly #calls = new Map<string, MoveCall>();
 	readonly #tool: RpcHostTool = {
 		name: MOVE_SESSION_TOOL,
 		label: "Move session",
@@ -51,7 +49,10 @@ export class SessionMoves {
 			if (!dir) throw new Error(`Not a directory: ${path.trim()}`);
 			// A move reloads omp in the new directory, which runs that project's code as a start would.
 			await this.#deps.admit(dir);
-			this.#called.set(toolCallId, dir);
+			// A turn cut off while the directory was checked forgot this call, so nothing would hand its move over.
+			const call = this.#calls.get(toolCallId);
+			if (!call) throw new Error("This turn ended before the move was taken; nothing moves.");
+			call.dir = dir;
 			return `When this turn ends, the dashboard moves this session to ${dir} and reloads its context files. End your turn now; do not work in ${dir} before the move.`;
 		},
 	};
@@ -73,12 +74,11 @@ export class SessionMoves {
 		if (!isObject(event)) return;
 		if (event.type === "agent_end") return this.#forget(instanceId);
 		if (typeof event.toolCallId !== "string") return;
-		if (event.type === "tool_execution_start" && event.toolName === MOVE_SESSION_TOOL) this.#callers.set(event.toolCallId, instanceId);
+		if (event.type === "tool_execution_start" && event.toolName === MOVE_SESSION_TOOL) this.#calls.set(event.toolCallId, { caller: instanceId, dir: null });
 		if (event.type !== "tool_execution_end") return;
-		const dir = this.#called.get(event.toolCallId);
-		this.#called.delete(event.toolCallId);
-		this.#callers.delete(event.toolCallId);
-		if (dir !== undefined && event.isError !== true) this.#deps.session(instanceId)?.moveAfterTurn(dir);
+		const call = this.#calls.get(event.toolCallId);
+		this.#calls.delete(event.toolCallId);
+		if (call?.dir && event.isError !== true) this.#deps.session(instanceId)?.moveAfterTurn(call.dir);
 	}
 
 	/** Session `instanceId` exited, ending any move call it left running. */
@@ -87,10 +87,12 @@ export class SessionMoves {
 	}
 
 	#forget(instanceId: string): void {
-		for (const [toolCallId, caller] of this.#callers) {
-			if (caller !== instanceId) continue;
-			this.#callers.delete(toolCallId);
-			this.#called.delete(toolCallId);
-		}
+		for (const [toolCallId, call] of this.#calls) if (call.caller === instanceId) this.#calls.delete(toolCallId);
 	}
+}
+
+/** A move call: the session that started it, and the directory the tool took, `null` until it takes one. */
+interface MoveCall {
+	caller: string;
+	dir: string | null;
 }

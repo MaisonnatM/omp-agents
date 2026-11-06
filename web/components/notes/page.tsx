@@ -30,7 +30,8 @@ interface NotesPageProps {
 	view: NotesListView;
 	openId: string | null;
 	disabled: boolean;
-	onChange: (change: UserNoteChange) => void;
+	/** Settles once the server has handled the change, which the notes editor waits on before it shows what arrives. */
+	onChange: (change: UserNoteChange) => Promise<void>;
 	hosts: RosterHost[];
 	past: PastSession[];
 }

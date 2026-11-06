@@ -1,4 +1,4 @@
-import type { PullRequestDetail } from "../../../../src/shared/github";
+import type { PullRequestChange, PullRequestDetail } from "../../../../src/shared/github";
 import { canApprove, canSubmitReview, type ReviewVerdict } from "../../../../src/shared/review-drafts";
 
 export const VERDICT_LABELS: Record<ReviewVerdict, string> = { approve: "Approve", "request-changes": "Request changes", comment: "Comment" };
@@ -19,4 +19,18 @@ export function composerLabel({ pending, reviewStarted }: { pending: number; rev
 export function reviewPlaceholder(verdict: ReviewVerdict, lineComments: number): string {
 	if (canSubmitReview(verdict, "", lineComments)) return "Summarize your review (optional)";
 	return verdict === "request-changes" ? "Summarize your review (required to request changes)" : "Summarize your review or add line comments";
+}
+
+/** The state change a **Close with comment** or **Reopen with comment** sends once its comment posted. */
+export type FollowUp = "close" | "reopen";
+
+export const stateChange = (then: FollowUp): PullRequestChange => ({ field: "state", state: then === "close" ? "closed" : "open" });
+
+/**
+ * Posts `body`, then hands `then`, if any, to `change`, a separate action, so a state change that fails after the
+ * comment posted fails alone and retries without posting the comment again.
+ */
+export async function postComment(send: (change: PullRequestChange) => Promise<void>, body: string, then: FollowUp | null, change: (then: FollowUp) => void): Promise<void> {
+	await send({ field: "comment", body });
+	if (then) change(then);
 }

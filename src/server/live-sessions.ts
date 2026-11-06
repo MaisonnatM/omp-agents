@@ -57,11 +57,12 @@ export class LiveSessions {
 	/** The unread turn each session's running turn read as it started, by instance id, which a quiet end gives back. */
 	readonly #readByTurn = new Map<string, UnreadTurn>();
 	/**
-	 * From {@link restoreUnread} to the first registry listing, which {@link restoreListedUnread} restores them at: the
-	 * saved turns of the sessions that did not survive the restart as sessions this server started, which may be terminal
-	 * sessions', and the previous server's `heardUntil`. The file keeps both meanwhile.
+	 * The turns the previous server saved unread, with its `heardUntil`: `unrestored` until {@link restoreUnread} takes back
+	 * those of the sessions this server attached to, then `listing` until the first registry listing after it, which
+	 * {@link restoreListedUnread} restores the terminal sessions' at, then `restored`. Every save until then keeps the turns
+	 * not taken back and that `heardUntil`, so nothing marked earlier writes over them.
 	 */
-	#pending: { turns: Map<string, UnreadTurn>; heardUntil: number | undefined } | null = null;
+	#restore: { phase: "unrestored" | "listing"; turns: Map<string, UnreadTurn>; heardUntil: number | undefined } | { phase: "restored" };
 	/**
 	 * The sessions by the session file they continue, the earliest added first. A session's id changes when omp moves it to
 	 * another file or the registry lists its host on another session, so the index is rebuilt where either can happen.
@@ -74,6 +75,10 @@ export class LiveSessions {
 		this.#onUpdate = onUpdate;
 		this.#taskClaims = taskClaims;
 		this.#unreadFile = new JsonFile(unreadPath, { parse: decoder(isSavedUnread), holds: "a list of unread turns", onInvalid: "ignore" });
+		const saved = this.#unreadFile.load();
+		// A file an older server saved may hold more of each turn; only `at` and `reply` come back.
+		const turns = new Map((saved?.turns ?? []).map(({ instanceId, at, reply }) => [instanceId, { at, reply }]));
+		this.#restore = { phase: "unrestored", turns, heardUntil: saved?.heardUntil };
 	}
 
 	get(instanceId: string): LiveSession | undefined {
@@ -186,16 +191,20 @@ export class LiveSessions {
 	}
 
 	/**
-	 * The turns sessions `instanceIds` ended unread under the previous server come back; the other saved turns wait for
-	 * {@link restoreListedUnread}, since a terminal session may have ended them. Called once, by reattachAll, before any
-	 * session is listed or any turn is marked, so the file still holds the previous server's turns.
+	 * The turns sessions `instanceIds` ended unread under the previous server come back, unless this server marked a newer
+	 * one; the other saved turns wait for {@link restoreListedUnread}, since a terminal session may have ended them. Called
+	 * once, by reattachAll.
 	 */
 	restoreUnread(instanceIds: ReadonlySet<string>): void {
-		const saved = this.#unreadFile.load();
-		const pending = new Map<string, UnreadTurn>();
-		// A file an older server saved may hold more of each turn; only `at` and `reply` come back.
-		for (const { instanceId, at, reply } of saved?.turns ?? []) (instanceIds.has(instanceId) ? this.#unread : pending).set(instanceId, { at, reply });
-		this.#pending = { turns: pending, heardUntil: saved?.heardUntil };
+		if (this.#restore.phase !== "unrestored") return;
+		const { turns, heardUntil } = this.#restore;
+		for (const instanceId of instanceIds) {
+			const turn = turns.get(instanceId);
+			if (!turn) continue;
+			turns.delete(instanceId);
+			if (!this.#unread.has(instanceId)) this.#unread.set(instanceId, turn);
+		}
+		this.#restore = { phase: "listing", turns, heardUntil };
 	}
 
 	/**
@@ -203,12 +212,12 @@ export class LiveSessions {
 	 * none while a turn runs; else the last turn of its session file, which `savedFile` finds by session id, when it came
 	 * after the previous server's `heardUntil`, and none while the host cannot tell whether that turn still runs; else the
 	 * turn saved before the restart. A session this server started is left as reattachAll settled it. The saved turns of
-	 * the sessions it does not list are forgotten; later listings change nothing.
+	 * the sessions it does not list are forgotten; a listing before {@link restoreUnread} or after the first changes nothing.
 	 */
 	restoreListedUnread(hosts: HostSnapshot[], savedFile: (sessionId: string) => string | null): void {
-		if (!this.#pending) return;
-		const { turns, heardUntil } = this.#pending;
-		this.#pending = null;
+		if (this.#restore.phase !== "listing") return;
+		const { turns, heardUntil } = this.#restore;
+		this.#restore = { phase: "restored" };
 		for (const host of hosts) {
 			if (!(this.#sessions.get(host.instanceId) instanceof SessionGuest)) continue;
 			const file = savedFile(host.sessionId);
@@ -246,9 +255,10 @@ export class LiveSessions {
 	}
 
 	#saveUnread(): void {
-		const turns = new Map([...(this.#pending?.turns ?? []), ...this.#unread]);
-		// Until the first listing, this server has heard no terminal session, so it keeps the previous server's time.
-		const heardUntil = this.#pending ? this.#pending.heardUntil : Date.now();
+		const saved = this.#restore.phase === "restored" ? null : this.#restore;
+		const turns = new Map([...(saved?.turns ?? []), ...this.#unread]);
+		// Until the first listing after the restore, this server has heard no terminal session, so it keeps the previous server's time.
+		const heardUntil = saved ? saved.heardUntil : Date.now();
 		this.#unreadFile.save({ turns: [...turns].map(([instanceId, turn]) => ({ instanceId, ...turn })), heardUntil });
 	}
 

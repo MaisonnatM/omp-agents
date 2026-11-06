@@ -520,6 +520,35 @@ describe("worktree removal", () => {
 		expect(unresolved[0]?.blockers[0]?.message).toContain("Session started subagent unresolved");
 		expect(existsSync(path)).toBe(true);
 	});
+
+	test("finishes a removal a stop cut short, registered or not, keeps its branch, and lists neither", async () => {
+		const { parent, main } = await repo();
+		const kept = await linked(parent, main, "kept");
+		// Stopped right after the move.
+		const moved = await linked(parent, main, "moved");
+		await git(main, "worktree", "move", moved, `${moved}.removing-0123abcd`);
+		// Stopped by an older server once it had dropped the registration.
+		const dropped = await linked(parent, main, "dropped");
+		await git(main, "worktree", "move", dropped, `${dropped}.removing-89abcdef`);
+		rmSync((await git(`${dropped}.removing-89abcdef`, "rev-parse", "--absolute-git-dir")).trim(), { recursive: true });
+		const worktrees = new Worktrees({ knownCwds: () => [main], activity: () => [], live: () => [], serverCwd: "/no/such/dashboard", mergedPullRequests: noPullRequests });
+		const listed = await worktrees.inventory(null);
+		expect(listed.repositories.map(item => item.worktrees.map(entry => entry.path))).toEqual([[main, kept]]);
+		await worktrees.checkout(async () => {});
+		expect(existsSync(`${moved}.removing-0123abcd`)).toBe(false);
+		expect(existsSync(`${dropped}.removing-89abcdef`)).toBe(false);
+		expect(existsSync(kept)).toBe(true);
+		expect((await git(main, "worktree", "list", "--porcelain")).match(/^worktree /gm)).toHaveLength(2);
+		expect(await git(main, "branch", "--format=%(refname:short)")).toBe("dropped\nkept\nmain\nmoved\n");
+	});
+
+	test("a start waiting on a removal that failed still runs", async () => {
+		const worktrees = new Worktrees({ knownCwds: () => [], activity: () => [], live: () => { throw new Error("Sessions unreadable."); }, serverCwd: "/no/such/dashboard", mergedPullRequests: noPullRequests });
+		const removal = worktrees.remove([{ repository: "/no/such/repository", path: "/no/such/checkout", confirmation: "c" }], "test");
+		const started = worktrees.start(async () => "started", false);
+		await expect(removal).rejects.toThrow("Sessions unreadable.");
+		expect(await started).toBe("started");
+	});
 });
 
 test("hidden index flags fail closed for removal", async () => {

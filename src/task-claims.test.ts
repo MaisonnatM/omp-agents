@@ -97,6 +97,19 @@ test("a surviving session or keeper retains its task across server restart; dead
 	expect(restarted.claim("/repo/.git", "ticket:ENG-2650", "replacement", "/repo")).toBeNull();
 });
 
+test("a launch a restart cut off frees its task in the new server, which keeps the pid, while a launch this server runs holds it", () => {
+	const path = claimsPath();
+	const claims = new TaskClaims(path);
+	expect(claims.claim("/repo/.git", "ticket:ENG-2650", "running-launch", "/repo")).toBeNull();
+	expect(claims.claim("/repo/.git", "ticket:ENG-2650", "duplicate", "/repo")?.instanceId).toBe("running-launch");
+	// What the server before the restart left: a launch it reserved under this very pid, with no keeper started yet.
+	const cutOff = { repository: "/repo/.git", identity: "ticket:ENG-2651", instanceId: "cut-off", sessionId: null, cwd: "/repo", pid: process.pid, keeperPidFile: join(path, "..", "none.pid"), port: 0 };
+	const file: unknown = JSON.parse(readFileSync(path, "utf8"));
+	if (!isObject(file) || !Array.isArray(file.claims)) throw new Error("The claims file holds no claims.");
+	writeFileSync(path, JSON.stringify({ ...file, claims: [...file.claims, cutOff] }));
+	expect(claims.claim("/repo/.git", "ticket:ENG-2651", "replacement", "/repo")).toBeNull();
+});
+
 test("corrupt owner state fails closed and is not silently replaced", () => {
 	const path = claimsPath();
 	writeFileSync(path, "not json");

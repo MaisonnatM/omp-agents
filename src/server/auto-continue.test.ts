@@ -93,7 +93,8 @@ describe("AutoContinue", () => {
 			[continued("s2", "Opencode Go"), NOW + 31 * MINUTE, "Opencode Go limit", "waiting"],
 			[continued("s1", "Anthropic"), NOW + 4 * HOUR + MINUTE, "Anthropic 5h", "waiting"],
 		]);
-		expect(fake.changes).toBe(3);
+		// Each limit schedules from the provider's error at once, then from the usage read.
+		expect(fake.changes).toBe(6);
 	});
 
 	test("a usage read that fails still schedules from the provider's error", async () => {
@@ -126,6 +127,16 @@ describe("AutoContinue", () => {
 		expect([after.auto.held("s1"), occupiedBy("idle", after.auto.held("s1")), after.auto.held("s2")]).toEqual([true, true, false]);
 		after.file.apply({ op: "remove", id: after.file.value[0]!.id }, NOW);
 		expect(after.auto.held("s1")).toBe(false);
+	});
+
+	test("a restart while the usage read runs keeps the session held and its continue scheduled from the provider's error", async () => {
+		const before = harness();
+		before.holdUsage();
+		void before.auto.limited("s1", anthropic(HOUR));
+		before.file.flush();
+
+		const after = harness(before.dir);
+		expect([after.auto.held("s1"), after.pending()]).toEqual([true, [[continued("s1", "Anthropic"), NOW + HOUR + MINUTE, "Anthropic limit", "waiting"]]]);
 	});
 
 	test("a continue the page cancels holds no more, and neither does one that fails, while one under way still holds", async () => {

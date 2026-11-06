@@ -442,6 +442,7 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview }: {
 							onMode={picking.choose}
 							onDeselect={webview.deselect}
 							onAttach={picking.attach}
+							attaching={picking.attaching}
 						/>
 					)}
 				</div>

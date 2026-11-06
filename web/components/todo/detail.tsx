@@ -137,7 +137,8 @@ interface TodoDetailProps {
 	/** The picker of the open todo a key opened, `null` for none. */
 	picker: TodoField | null;
 	onPicker: (field: TodoField | null) => void;
-	onChange: (change: UserTodoChange) => void;
+	/** Settles once the server has handled the change, which the notes editor waits on before it shows what arrives. */
+	onChange: (change: UserTodoChange) => Promise<void>;
 	/** Opens another todo: a sub-todo from its row. */
 	onOpen: (id: string) => void;
 	onClose: () => void;
