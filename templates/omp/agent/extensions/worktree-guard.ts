@@ -369,7 +369,7 @@ export default function worktreeGuard(pi: ExtensionAPI) {
 		if (!reason) return;
 		return {
 			block: true,
-			reason: `${reason} Its changes were kept, not applied: apply the kept patch in the right checkout yourself, and spawn each later isolated subagent with \`checkout\` set to that checkout's path.`,
+			reason: `${reason} Its changes were kept, not applied: apply the kept patch in the right checkout yourself, and spawn each later editing subagent without \`isolated\`, naming that checkout's absolute path for every file and command.`,
 		};
 	});
 

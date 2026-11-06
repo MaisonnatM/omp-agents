@@ -760,7 +760,7 @@ describe("checkout ownership", () => {
 		git(dir, "worktree", "add", "-q", "-b", "work", worktree);
 		const [onMain, inWorktree] = calls([{ apply: dir }, { apply: worktree }]);
 		expect(onMain).toContain("main checkout, on its default branch `main`");
-		expect(onMain).toContain("spawn each later isolated subagent with `checkout` set to that checkout's path");
+		expect(onMain).toContain("spawn each later editing subagent without `isolated`, naming that checkout's absolute path");
 		expect(inWorktree).toBeNull();
 	});
 
