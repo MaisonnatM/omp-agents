@@ -59,6 +59,11 @@ task:
     merge: patch
   eager: default
   maxConcurrency: 2
+  perCallModel: "on"
+  perCallModelAllow:
+    - anthropic/claude-opus-5-5
+    - openai-codex/gpt-6.1-sol
+    - cursor/gemini-3.1-pro
 
 # Publish every terminal session to the local Collab registry, so the omp-agents dashboard can drive it.
 collab:
