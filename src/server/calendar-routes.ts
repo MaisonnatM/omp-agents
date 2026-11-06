@@ -5,7 +5,7 @@ import type { LocalEventsAnswer, NewEventAnswer } from "../shared/calendar";
 import { DAY_MS } from "../shared/days";
 import { answer, checked, fail } from "./http";
 import type { LocalEventsFile } from "./local-events-file";
-import type { RouteKit, Routes } from "./routes";
+import type { RouteKit, Routes } from "./route-kit";
 import { parseCalendarShown, parseEventRef, parseNewEvent } from "./wire";
 
 /** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */

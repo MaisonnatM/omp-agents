@@ -6,7 +6,7 @@
  * {@link GmailAccounts} merges every signed-in account's inbox and sends each write to its account.
  */
 import { createCache } from "./cache";
-import type { AccountClients } from "./google-accounts";
+import type { AccountClients } from "./account-clients";
 import { errorText, isObject, nonEmptyStr, str } from "./json";
 import { mapLimit } from "./map-limit";
 import { ApiError, type SignedFetch } from "./signed-fetch";

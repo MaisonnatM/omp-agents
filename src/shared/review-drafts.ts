@@ -5,12 +5,12 @@
 import { arrayOf, fields, type Guard, isNumber, isString, nullable, oneOf } from "../json";
 import { parseFullDiff } from "./changes";
 import { type PullRequest, type PullRequestDetail, samePullRequest } from "./github";
+import { REVIEW_VERDICTS, type ReviewVerdict } from "./review-verdict";
 
 /** The tool a Review session saves its draft through, which the server serves and the Review prompt names. */
 export const REVIEW_DRAFT_TOOL = "save_review_draft";
 
-export const REVIEW_VERDICTS = ["approve", "request-changes", "comment"] as const;
-export type ReviewVerdict = (typeof REVIEW_VERDICTS)[number];
+export { REVIEW_VERDICTS, type ReviewVerdict };
 
 /** A finding waits on the user until accepted, which posts it, or dismissed, which leaves it out. */
 export const FINDING_STATES = ["pending", "accepted", "dismissed"] as const;

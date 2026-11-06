@@ -2,7 +2,7 @@
 import type { Routine, RoutineChange } from "../routines";
 import type { UserNoteChange, UserNoteList } from "../user-notes-shared";
 import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
-import type { ActivityEvent } from "./activity";
+import type { ActivityEvent } from "./activity-event";
 import type { Bot, BotChange, BotId, BotLast } from "./bots";
 import type { DictationEvent } from "./dictation";
 import type { ModelEntry, ModelOption, PlanUsage } from "./models";

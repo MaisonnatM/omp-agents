@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ActivityRead } from "../shared/activity";
 import { activityRoutes } from "./activity-routes";
-import type { RouteKit, Routes } from "./routes";
+import type { RouteKit, Routes } from "./route-kit";
 
 const handler = async (): Promise<Response> => new Response();
 const kit: RouteKit = {

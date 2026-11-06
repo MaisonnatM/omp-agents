@@ -46,7 +46,8 @@
   `gc.test.ts` checks report validation, native preview and apply against an isolated fixture directory, global rule rows with workspace overrides, and refusal of a live native cleanup lock.
   `module-types/config.ts` also declares the background compression log export loaded by `modules.ts`.
 - `src/readiness.ts`: the read-only starter-kit snapshot, using native settings and marketplace registries plus the installer-owned non-forced plan; see [Get started](../architecture/get-started.md).
-- `src/activity.ts`: `foldActivity`, which folds the stored activity rows into Settings › Activity's uses, last uses, moves between views, time on each view, and days; `src/shared/activity.ts` holds the event kinds, the key pattern, `CONTROLS`, `ACTION_MESSAGES`, and the answer's decoder.
+- `src/activity.ts`: `foldActivity`, which folds the stored activity rows into Settings › Activity's uses, last uses, moves between views, time on each view, and days; `src/shared/activity.ts` holds the key pattern, `CONTROLS`, `ACTION_MESSAGES`, and the answer's decoder.
+  `src/shared/activity-event.ts` holds one event and its kinds, which the socket protocol imports, so the protocol does not import `activity.ts`.
 - `src/analytics.ts`: merges Claude Code's and Codex's requests into omp-stats' `StatsRead` with `withForeignUsage`, then folds per-file rows into sessions and workspaces.
   It joins each saved session's `SessionSummary`, its file, its title, and the workspace it counts in, without reading transcripts.
 - `src/context-sources.ts`: splits a request's input by source, from its context messages and a subagent's recorded system prompt, and folds the index's rows into the Analytics tab's context-source report.

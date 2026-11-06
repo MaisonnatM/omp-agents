@@ -5,6 +5,7 @@
  * account per server on their host, as `src/google-accounts.ts` keeps them.
  */
 import type { GoogleAccounts } from "./google-accounts";
+import type { IntegrationKind } from "./integration-kind";
 import { clientSetup, type ClientSave, planGoogleSave, planSlackSave } from "./mcp-clients";
 import { remoteStatusOf } from "./mcp-status";
 import { addMcpServer, findMcpServers, mcpBearer, type McpServer, mcpSignedIn, signInMcp, signOutMcp, userMcpConfigPath, writeMcpServer } from "./omp/mcp";
@@ -32,19 +33,6 @@ import {
 } from "./shared/accounts";
 import { createSignIn, type SignIn } from "./sign-in";
 import { type SignedFetch, signedFetch } from "./signed-fetch";
-
-/**
- * What Settings › Integrations does with one service: its one server's connection, or each of its accounts. A sign-in
- * and a removal name an account, `null` to add one or for a service of one server.
- */
-export interface IntegrationKind<Connections extends { connection: McpConnection } | { accounts: GoogleAccount[] }> {
-	/** Where omp stands with the service; what `signIn` targets keeps its status while the sign-in waits on the browser. */
-	load(fresh: boolean, signIn: SignIn<AccountId | null>): Promise<Connections>;
-	signIn(account: AccountId | null, signal: AbortSignal, waiting: (url: string) => void): Promise<void>;
-	remove(account: AccountId | null): Promise<void>;
-	/** Drops the sign-ins made with an OAuth client that changed. */
-	dropSignIns(): Promise<void>;
-}
 
 const serversOf = (id: McpIntegrationId): Promise<McpServer[]> => findMcpServers(MCP_SERVICES[id].host);
 

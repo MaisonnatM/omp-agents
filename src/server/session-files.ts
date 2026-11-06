@@ -6,7 +6,8 @@ import { continuationOf, type SavedSession } from "../omp/sessions";
 import { displayPath } from "../paths";
 import { branchPullRequest } from "../pull-requests";
 import { SessionFactsIndex } from "../session-facts";
-import { formatOf, SESSION_FORMATS, type SessionFormat } from "../session-formats";
+import type { SessionFormat } from "../session-format";
+import { formatOf, SESSION_FORMATS } from "../session-formats";
 import type { ConversationHit, PastSession, SessionFacts } from "../shared/sessions";
 
 const sameSession = (a: SavedSession, b: SavedSession): boolean =>

@@ -1,7 +1,7 @@
 /** Sessions as the roster, the panes, and the new-session draft see them: live hosts, past sessions, views, requests, and starts. */
 import { BASE64, isNonEmpty, isObject, type Parsed } from "../json";
 import { isTodoId } from "../user-todos-parse";
-import type { BotId } from "./bots";
+import type { BotId } from "./bot-id";
 import type { BranchChoice } from "./git";
 import { type LinkedPullRequest, parsePullRequest, type PullRequest, samePullRequest } from "./github";
 import type { ModelOption } from "./models";

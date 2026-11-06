@@ -3,7 +3,7 @@ import type { ModelOption } from "../src/shared/models";
 import type { TrustAsk } from "../src/shared/project-trust";
 import type { ClientMsg } from "../src/shared/protocol";
 import type { PromptImage, StartFailure, StartResult, View } from "../src/shared/sessions";
-import { type QuickSubject, startTarget } from "./quick-actions";
+import { type QuickOp, startTarget } from "./quick-actions";
 import type { ForkPoint } from "./transcript-view";
 
 /**
@@ -31,12 +31,12 @@ export type StartOp =
 	| { kind: "fork"; view: View; itemId: string; point: ForkPoint }
 	| { kind: "resume"; sessionId: string }
 	/** `skill`: the skill pinned in the settings, `null` for none. `branch`: the branch whose worktree it starts in, `null` to start in `cwd`. */
-	| { kind: "quick"; cwd: string; branch: BranchChoice | null; prompt: string; subject: QuickSubject; skill: string | null }
+	| QuickOp
 	| { kind: "resume-all"; sessionIds: string[] };
 
 export type NewOp = Extract<StartOp, { kind: "new" }>;
 
-export type QuickOp = Extract<StartOp, { kind: "quick" }>;
+export type { QuickOp };
 
 export type StartKind = StartOp["kind"];
 

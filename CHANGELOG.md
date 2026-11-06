@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-06
 
+- Behind the scenes: each group of API routes now lives in its own file, so a mail change and a session change are no longer the same edit.
+- Behind the scenes: a change to one part of the dashboard no longer has to be read together with another part that only shared a type with it.
 - Behind the scenes: agents can list shared project memory even when their provider supplies empty fields for unused options.
 - Behind the scenes: the saved runtime fixes let agents read selected lines of tool help without losing the tool or flooding the conversation with its inventory.
 - Behind the scenes: historical consults now explain when an exact session file is needed, and the Memory curator uses it when working across projects.

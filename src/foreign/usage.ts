@@ -1,6 +1,5 @@
 import { existsSync } from "node:fs";
 import { FoldedFile, type LineFold } from "../line-reader";
-import type { SessionFormat } from "../session-formats";
 
 /** One request's tokens in omp's buckets: `input` leaves out what the cache read or wrote. */
 export interface RequestTokens {
@@ -51,13 +50,16 @@ export interface UsageFiles {
 
 const READ_BATCH = 16;
 
-/** Every transcript the formats with {@link SessionFormat.usage} keep, each folded incrementally. */
+/** A format's root and, when it records requests, where those transcripts sit. */
+type UsageSource = { readonly root: string; readonly usage?: UsageFiles };
+
+/** Every transcript whose format names usage files, each folded incrementally. */
 export class ForeignUsage {
-	readonly #formats: readonly SessionFormat[];
+	readonly #formats: readonly UsageSource[];
 	readonly #price: Pricer;
 	readonly #files = new Map<string, FoldedFile<UsageFold>>();
 
-	constructor(formats: readonly SessionFormat[], price: Pricer) {
+	constructor(formats: readonly UsageSource[], price: Pricer) {
 		this.#formats = formats;
 		this.#price = price;
 	}

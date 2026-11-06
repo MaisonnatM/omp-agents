@@ -68,6 +68,7 @@ The main ones:
 - Documents: `convertBufferWithMarkit` in `pi-coding-agent/src/utils/markit.ts`, the converter behind omp's `read` of a PDF, Word, PowerPoint, Excel, or EPUB file, which `src/omp/documents.ts` calls for `PUT /api/attachment/document`.
 - RPC: `pi-coding-agent/src/modes/rpc/rpc-client.ts`, `rpc-frame.ts`, and the frame types in `rpc-types.ts`.
   `RpcClient` drops `extension_ui_request` and `session_info_update` frames, so `src/omp/rpc.ts` reads them from its own copy of omp's stdout (`UNROUTED_FRAMES`); see [Dashboard sessions](dashboard-sessions.md).
+  `src/omp/module-types/rpc-host-tool.ts` holds the host tool a session serves over RPC, which `src/omp/rpc.ts` registers, so that module does not import the client declaration that names its `RpcClient`.
   `RpcClient`'s `spawn` option may return any process with `pid`, `exited`, `stdin`, `stdout`, `peekStderr`, and `kill` (`RpcAgentProcess`); `start()` waits for omp's `ready` line, sends `negotiate_protocol` when it offers protocol 2, then `set_host_tools`, and a stdout that ends makes it call `kill`; see [Session keepers](dashboard-sessions.md#session-keepers).
   omp answers `negotiate_protocol` again whenever it is sent (`rpc-mode.ts`), and `RpcFrameDecoder` throws on a chunk sequence that does not start at index 0 or that another frame interrupts; omp writes a frame over 1 MB as such a sequence.
   `get_state` reports `isStreaming` and `isCompacting`, and `get_subagents` returns `RpcSubagentSnapshot`s with the fields of a subagent lifecycle frame.

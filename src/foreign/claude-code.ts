@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { basename, join, relative, sep } from "node:path";
 import { isObject, nonEmptyStr, num, parseJson, str } from "../json";
-import type { SessionFormat } from "../session-formats";
+import type { SessionFormat } from "../session-format";
 import { lineId, oneLine, textOf, unreadLine } from "../session-entries";
 import { type FileEdges, ForeignFiles, type SessionSummary } from "./files";
 import type { ForeignRequest, Pricer, RequestTokens, UsageFold } from "./usage";

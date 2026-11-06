@@ -4,7 +4,8 @@
  * time and the search itself reads none.
  */
 import type { LineFold } from "./line-reader";
-import { formatOf, SESSION_FORMATS, type SessionFormat } from "./session-formats";
+import type { SessionFormat } from "./session-format";
+import { formatOf, SESSION_FORMATS } from "./session-formats";
 import { everyWord, searchWords } from "./shared/every-word";
 import type { ConversationHit } from "./shared/sessions";
 import { messageItemsOf } from "./transcript";

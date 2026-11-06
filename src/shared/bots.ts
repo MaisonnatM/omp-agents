@@ -1,11 +1,10 @@
 /** Bots: named, long-lived teammates, each one conversation with a job and a memory; how a change edits the list `bots.json` keeps, and which Bot the page and the file may hold. */
 import { isNonEmpty, isObject, type Parsed } from "../json";
 import { modelOfSelector } from "./models";
+import type { BotId } from "./bot-id";
 import { parseSkill } from "./sessions";
 
-declare const BOT_ID: unique symbol;
-/** A Bot's id, which the page picks when it creates one, so a save sent twice saves once. */
-export type BotId = string & { readonly [BOT_ID]: true };
+export type { BotId };
 
 /** The shapes a Bot's avatar takes. */
 export const BOT_SHAPES = ["circle", "triangle", "hexagon", "square", "cloud", "diamond", "clover", "pill"] as const;

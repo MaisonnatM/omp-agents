@@ -11,7 +11,7 @@ import { childEnv } from "../proc";
 import { ompCommand } from "./install";
 import { rpc, rpcFrameFile, rpcFrames, utils } from "./modules";
 import type { ServiceTierModel } from "./module-types/models";
-import type { RpcHostTool } from "./module-types/rpc";
+import type { RpcHostTool } from "./module-types/rpc-host-tool";
 
 /** Fields read from omp's Goal (pi-tui/tools/goal, exposed by goals/state.ts). */
 export interface RpcGoal {

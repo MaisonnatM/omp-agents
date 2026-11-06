@@ -5,9 +5,10 @@
  * account signs in as, and the workspaces each address is linked to, live in a {@link GoogleAccountsStore}.
  */
 import { randomBytes } from "node:crypto";
+import type { AccountClients } from "./account-clients";
 import { gmailAddress } from "./gmail";
 import { calendarAddress } from "./google-calendar";
-import type { IntegrationKind } from "./integrations";
+import type { IntegrationKind } from "./integration-kind";
 import { errorText } from "./json";
 import { planGoogleScope } from "./mcp-clients";
 import { remoteStatusOf } from "./mcp-status";
@@ -103,14 +104,6 @@ async function accountServer(id: AccountsService, account: AccountId): Promise<M
 
 /** Calls Google's APIs with omp's sign-in to `server`. */
 const serverFetch = (server: McpServer): SignedFetch => signedFetch(async () => mcpBearer(server));
-
-/** One client of each signed-in account of a service. */
-export interface AccountClients<C> {
-	/** Each account omp holds a sign-in to, in the order of omp's config, with its client. */
-	signedIn(): Promise<{ account: AccountId; client: C }[]>;
-	/** Account `account`'s client; throws when the service has no such account. */
-	get(account: AccountId): Promise<C>;
-}
 
 /**
  * A client per account of `id`, made by `make` on first use with the account's sign-in. Every sign-in lands on a new

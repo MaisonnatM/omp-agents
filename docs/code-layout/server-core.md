@@ -28,7 +28,10 @@
   `src/shared/access.ts` holds the storage keys and socket subprotocol that the page and the server share.
   `src/server/socket.test.ts` runs the start and Resume all handlers over a stub env and checks the refusal the page reads: a project's untrusted code tells whoever sent the start to trust it, and Resume all carries that ask.
   `src/server/application-socket.test.ts` boots this actual application in a subprocess with isolated config and data and checks denied handshakes, authenticated roster delivery, and credential-free protocol negotiation.
-- `src/server/routes.ts`: the `/api/` endpoints, in groups (sessions, integrations, providers, calendar, Gmail, pull requests, files, todos, the dashboard's own update, settings sync, and session processes), each handed only its part of `RouteEnv`.
+- `src/server/routes.ts` composes the `/api/` endpoints and keeps `RouteEnv`, handing each group only its part.
+  `src/server/route-kit.ts` holds `RouteKit`, `Routes`, and `SessionRoutesEnv`, which the route groups import, so a group does not import `routes.ts`.
+  `src/server/session-routes.ts`, `src/server/integration-routes.ts`, `src/server/provider-routes.ts`, `src/server/gmail-routes.ts`, `src/server/pull-request-routes.ts`, `src/server/file-routes.ts`, `src/server/todo-routes.ts`, `src/server/dashboard-routes.ts`, `src/server/sync-routes.ts`, and `src/server/process-routes.ts` each hold one of those groups.
+  `src/server/dir-param.ts` reads the `?cwd=` directory the session and file groups both take.
   Every read goes through `get`, and every write through `write(parse, run, refuse?)`, which checks the origin and the JSON body, answers a body `parse` refuses with its response, and maps an error `run` throws through `refuse`, else to a 500.
   A route that an image, a video, or a mail frame loads goes through `media` instead of `get`, which also takes the media key as `?key=`, since such a tag sends no header.
   `src/server/calendar-routes.ts` serves the calendar group, Google Calendar's calendars and events and the events kept on this computer, which `routes.ts` composes with the rest.
