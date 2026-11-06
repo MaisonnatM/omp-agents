@@ -23,8 +23,8 @@ The council is three members, one strong model from each of three providers, at 
 | Gemini Pro | `cursor/gemini-3.1-pro:high` |
 
 Members the user names replace these.
-omp runs a member only on a model that both the `model` list in `~/.omp/agent/agents/council.md` and `task.perCallModelAllow` name exactly, without its `:level`; a glob grants nothing.
-Before spawning a named member outside them, add its exact selector to both with the user's go.
+omp runs a member only on a model that both the `model` list in `~/.omp/agent/agents/council.md` and `task.perCallModelAllow` in `~/.omp/agent/config.yml` name; a glob grants nothing.
+Before spawning a named member outside them, and with the user's go, add `provider/model-id:high` to the agent's `model` list and `provider/model-id`, without the level, to `task.perCallModelAllow`.
 
 ## Spawn
 
@@ -33,9 +33,9 @@ Give every member the same assignment: the user's request, the goal behind it, a
 For a review or feedback, write "read-only: report findings, edit nothing" into the assignment.
 For a code review, ask each member for a score out of 10.
 
-omp checks every member's model before it starts any of them, and refuses the whole call when one is unknown or unapproved.
-The refusal names that member: report it, then spawn the others again without it.
-A member whose model runs out of quota or credentials fails alone, and never falls back to another model.
+omp checks every member's model before the call runs, and refuses the whole call when one is unknown, unapproved, or on a provider that is not signed in.
+The refusal names that member's model: report the member, then spawn the others again without it.
+A member whose model runs out of quota or loses its sign-in mid-run fails alone, and never falls back to another model.
 Report each failed member with its error, and continue with the members that answered; never substitute another model.
 
 ## Rounds
