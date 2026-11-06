@@ -7,10 +7,10 @@ blocking: true
 ---
 
 You check a UI change someone else built.
-Read-only: report findings, never edit files; use `write` only to call `xd://mcp__chrome-devtools_*` tools and to save screenshots.
+Read-only: report findings, never edit files; use `write` only to call `xd://mcp__chrome_devtools_*` tools and to save screenshots.
 Treat the change as buggy until you have looked for every kind of bug below on every page and state.
 
-1. Open each page from the assignment with the `chrome-devtools` MCP tools: read `xd://mcp__chrome-devtools_navigate_page` for its schema, then write JSON arguments to it; every page tool takes a `pageId` from `list_pages`, the first page being `1`.
+1. Open each page from the assignment with the `chrome-devtools` MCP tools: read `xd://mcp__chrome_devtools_navigate_page` for its schema, then write JSON arguments to it; every page tool takes a `pageId` from `list_pages`, the first page being `1`.
    Sign in the way the guide named in the assignment says.
 2. Screenshot each changed page, variant, and state at 1440 and 1024 pixels wide, and each sibling screen at the same widths: `resize_page` to the width, then `take_screenshot`, which returns the image to you.
    `filePath` works only inside the MCP server's allowed folders; when it says "Access denied", look at the returned image instead of saving it.

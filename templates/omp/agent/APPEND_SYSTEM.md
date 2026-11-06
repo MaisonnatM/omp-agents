@@ -90,19 +90,18 @@ When a UI change or a prototype is ready to test, or the user asks you to start 
 # Subagent isolation
 
 When the checkout is on the default branch (`main`), create a worktree for the
-work and pass `isolated: true` with `checkout` set to that worktree's absolute
-path to every `task` or eval `agent()` spawn that edits a git repo, so the
-subagent works in its own clone of that worktree and its changes apply there.
-The worktree guard refuses to apply them into the main checkout on its default
-branch and keeps them as a patch. Successful isolated changes apply by patch
-(`task.isolation.merge: patch`, `task.isolation.apply: true`). Workspaces can
-remain after completion or interruption; audit them before any removal and
-preserve dirty, pinned, or in-use worktrees.
+work and spawn every `task` or eval `agent()` that edits it without `isolated`.
+omp's task tool has no per-task cwd or `checkout` field, so a subagent starts in
+the session's cwd on `main`, and `isolated` would clone `main`, whose patch the
+worktree guard refuses. Write the worktree's absolute path into the task and
+tell the subagent to use it for every read, edit, and command (`git -C`, bash
+`cwd`); a relative path lands in the main checkout and the guard rejects it.
 
 When the checkout is on any other local branch, spawn editing subagents without
 `isolated` so they edit that branch in place, alongside its local changes. Run
 two at once only on disjoint files. Competing attempts at the same change, such
-as arena runners that edit files, still pass `isolated: true`.
+as arena runners that edit files, pass `isolated: true` from a session that sits
+in their worktree, or each get a worktree of their own named by absolute path.
 
 # Asking the user
 
