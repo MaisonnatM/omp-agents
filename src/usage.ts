@@ -3,6 +3,8 @@ import { readConsoleCreditBalance } from "./console-credits";
 import { isObject, num, str } from "./json";
 import { ompCommand } from "./omp/install";
 import { configuredProviders } from "./omp/models";
+import type { UsageReport } from "./omp/module-types/models";
+import { readRawUsageReports } from "./omp/usage";
 import { run } from "./proc";
 import { API_CREDITS_PROVIDER, type CreditBalance, type ExtraUsage, PROVIDER_NAMES, type PlanUsage, type PlanWindow, type ResetCredits, type UsdAmount } from "./shared/models";
 
@@ -61,6 +63,7 @@ function parseExtra(raw: unknown): ExtraUsage | null {
 	if (!usd) return null;
 	return {
 		...usd,
+		currency: "USD",
 		title: str(raw.label) || "Extra usage",
 		exhausted: str(raw.status) === "exhausted" || (usd.limit !== null && usd.used >= usd.limit),
 	};
@@ -78,19 +81,127 @@ function parseResetCredits(raw: unknown): ResetCredits | null {
 	return { count, nextExpiresAt: expiries.length ? Math.min(...expiries) : null };
 }
 
+interface BillingMoney {
+	value: number;
+	currency: string;
+}
+
+function billingMoney(minor: unknown, exponent: unknown, currency: unknown): BillingMoney | null {
+	if (typeof minor !== "number" || !Number.isSafeInteger(minor) || minor < 0) return null;
+	if (typeof exponent !== "number" || !Number.isInteger(exponent) || exponent < 0 || exponent > 9) return null;
+	if (typeof currency !== "string" || !/^[A-Za-z]{3}$/.test(currency)) return null;
+	return { value: minor / 10 ** exponent, currency: currency.toUpperCase() };
+}
+
+/** `null` disables billing; an absent or invalid observation leaves normalized CLI spend intact. */
+function claudeExtra(raw: unknown): ExtraUsage | null | undefined {
+	if (!isObject(raw)) return undefined;
+	const modern = raw.spend !== undefined && raw.spend !== null;
+	const spend = modern ? raw.spend : raw.extra_usage;
+	if (!isObject(spend)) return undefined;
+	const enabled = modern ? spend.enabled : spend.is_enabled;
+	if (enabled === false) return null;
+	if (enabled !== true) return undefined;
+	const used = modern && isObject(spend.used)
+		? billingMoney(spend.used.amount_minor, spend.used.exponent, spend.used.currency)
+		: !modern
+			? billingMoney(spend.used_credits, spend.decimal_places ?? 2, spend.currency ?? "USD")
+			: null;
+	if (!used) return undefined;
+	const cap = modern ? spend.limit : spend.monthly_limit;
+	const limit = cap === null
+		? null
+		: modern && isObject(cap)
+			? billingMoney(cap.amount_minor, cap.exponent, cap.currency)
+			: !modern
+				? billingMoney(cap, spend.decimal_places ?? 2, spend.currency ?? "USD")
+				: undefined;
+	if (limit === undefined || (cap !== null && !limit)) return undefined;
+	if (limit && (limit.currency !== used.currency || limit.value <= 0)) return undefined;
+	return {
+		used: used.value,
+		limit: limit?.value ?? null,
+		currency: used.currency,
+		title: "Claude Extra Usage",
+		exhausted: limit !== null && used.value >= limit.value,
+	};
+}
+
+interface ReportIdentity {
+	orgId: string | null;
+	accountId: string | null;
+	email: string | null;
+}
+
+function reportIdentity(report: { metadata?: unknown; limits?: unknown }): ReportIdentity | null {
+	const metadata = isObject(report.metadata) ? report.metadata : {};
+	const scopes = (Array.isArray(report.limits) ? report.limits : []).filter(isObject).map(limit => limit.scope).filter(isObject);
+	const field = (key: string): string[] => [...new Set([metadata[key], ...scopes.map(scope => scope[key])]
+		.filter((value): value is string => typeof value === "string" && value.trim() !== "")
+		.map(value => value.trim()))];
+	const orgIds = field("orgId");
+	const accountIds = field("accountId");
+	if (orgIds.length > 1 || accountIds.length > 1) return null;
+	const email = str(metadata.email)?.trim().toLowerCase() || null;
+	if (accountIds.length === 0 && !email) return null;
+	return { orgId: orgIds[0] ?? null, accountId: accountIds[0] ?? null, email };
+}
+
+function sameIdentity(left: ReportIdentity, right: ReportIdentity): boolean {
+	if (left.orgId !== null && right.orgId !== null && left.orgId !== right.orgId) return false;
+	if (left.accountId !== null && right.accountId !== null) return left.accountId === right.accountId;
+	if (left.orgId !== right.orgId) return false;
+	return left.email !== null && left.email === right.email;
+}
+
+/** Merge billing before a report without quota windows can be discarded, without replacing CLI quotas. */
+function withRawBilling(report: Record<string, unknown>, reports: readonly UsageReport[], cliReports: readonly unknown[]): Record<string, unknown> {
+	const identity = reportIdentity(report);
+	if (!identity) return report;
+	const matches = reports.filter(candidate => {
+		if (candidate.provider !== report.provider) return false;
+		const other = reportIdentity(candidate);
+		return other !== null && sameIdentity(identity, other);
+	});
+	if (matches.length !== 1) return report;
+	const match = matches[0]!;
+	if (!isObject(match.raw)) return report;
+	const matchedIdentity = reportIdentity(match)!;
+	if (identity.accountId === null || matchedIdentity.accountId === null) {
+		const accountIds = new Set<string>();
+		for (const candidate of [...cliReports, ...reports]) {
+			if (!isObject(candidate) || candidate.provider !== report.provider) continue;
+			const other = reportIdentity(candidate);
+			if (other?.orgId === identity.orgId && other.email === identity.email && other.accountId !== null) {
+				accountIds.add(other.accountId);
+			}
+		}
+		if (accountIds.size > 1) return report;
+	}
+	const targets = cliReports.filter(candidate => {
+		if (!isObject(candidate) || candidate.provider !== report.provider) return false;
+		const other = reportIdentity(candidate);
+		return other !== null && sameIdentity(matchedIdentity, other);
+	});
+	return targets.length === 1 ? { ...report, raw: match.raw } : report;
+}
+
 /**
  * Plans with at least one quota window or extra usage, in omp's order. A window is named by its id (`5h`, `7d`),
  * plus its model tier when it meters one model. Limits that would share a name keep omp's label.
  */
-export function parsePlanUsage(stdout: string): PlanUsage[] {
+export function parsePlanUsage(stdout: string, rawReports: readonly UsageReport[] = []): PlanUsage[] {
 	const data: unknown = JSON.parse(stdout);
 	if (!isObject(data) || !Array.isArray(data.reports)) throw new Error("omp usage --json printed no reports");
 	const plans: PlanUsage[] = [];
-	for (const report of data.reports as unknown[]) {
-		if (!isObject(report) || !Array.isArray(report.limits)) continue;
+	for (const rawReport of data.reports as unknown[]) {
+		if (!isObject(rawReport) || !Array.isArray(rawReport.limits)) continue;
+		const report = withRawBilling(rawReport, rawReports, data.reports);
 		const provider = str(report.provider);
-		const windows = (report.limits as unknown[]).map(parseLimit).filter(window => window !== null);
-		const extra = (report.limits as unknown[]).map(parseExtra).find(found => found !== null) ?? null;
+		const limits = report.limits as unknown[];
+		const windows = limits.map(parseLimit).filter(window => window !== null);
+		const billing = provider === "anthropic" ? claudeExtra(report.raw) : undefined;
+		const extra = billing === undefined ? limits.map(parseExtra).find(found => found !== null) ?? null : billing;
 		if (!provider || (windows.length === 0 && extra === null)) continue;
 		const metadata = isObject(report.metadata) ? report.metadata : {};
 		plans.push({
@@ -131,10 +242,11 @@ export function withCreditBalance(plans: readonly PlanUsage[], balance: CreditBa
 /** omp exits non-zero when some provider fails, after printing the reports it did get. */
 export async function fetchPlanUsage(): Promise<PlanUsage[]> {
 	const credits = readConsoleCreditBalance().catch(() => null);
+	const rawReports = await readRawUsageReports().catch(() => null);
 	const { stdout, stderr, code } = await run([...ompCommand, "usage", "--json"], { timeoutMs: TIMEOUT_MS });
 	let plans: PlanUsage[];
 	try {
-		plans = parsePlanUsage(stdout);
+		plans = parsePlanUsage(stdout, rawReports ?? []);
 	} catch {
 		throw new Error(stderr.trim().split("\n").pop() || `omp usage exited with code ${code}`);
 	}

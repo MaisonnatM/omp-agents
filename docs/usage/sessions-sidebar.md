@@ -89,7 +89,10 @@
   Two limits that would share a name, like Cursor's monthly limits, show omp's label instead.
   Amber means less than 20% is left, and red means the window is used up, as omp reports it.
   Hover or focus a window to see omp's full limit name and when it resets.
-  Next to the provider logo, before the windows, a plan with extra usage, the pay-as-you-go spend past its plan such as Claude's, shows the dollars spent and the cap, as `extra $12.40 / $50.00`; amber means less than 20% of the cap is left, and red means it is used up.
+  Next to the provider logo, before the windows, a plan with extra usage, the pay-as-you-go spend past its plan such as Claude's, shows the amount spent and the cap, as `extra $12.40 / $50.00`.
+  Extra usage keeps the provider's billing currency without conversion, so a euro account shows euros.
+  When the provider reports no cap, only the spend appears, as `extra €13.65`.
+  Amber means less than 20% of a known cap is left, and red means the extra usage is used up.
   A connected provider that is not a sign-in plan, such as prepaid API credits configured with an API key, shows its name beside its logo and no percent.
   An Anthropic API key added under Settings, Providers shows as API credits too, even while you stay signed in to a Claude plan.
   When Firefox or Zen is signed in to the Claude Console, that row also shows the dollars spent of the monthly grant, as `$11.13 / $200.00`.

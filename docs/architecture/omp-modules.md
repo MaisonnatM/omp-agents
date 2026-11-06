@@ -103,6 +103,11 @@ The main ones:
   Upsert matches an API key by its value, so a different key is removed after the new one is stored.
   Replacing the provider's whole credential set is not used: a broker snapshot does not hold the real OAuth refresh token.
   `oauth.login` stores a string result under the method id, not under `storeCredentialsAs`, so this entry does not register a second OAuth provider.
+- Plan billing: `AuthStorage.usage.reports` in `pi-ai/src/auth-storage.ts`, opened through `discoverAuthStorage` and called by `src/omp/usage.ts`.
+  Its options are `{ provider?: string, signal?: AbortSignal }`, and its result is `Promise<UsageReport[] | null>`.
+  The narrow contract lives in `src/omp/module-types/models.ts`; every native value still comes through `modules.ts`.
+  Native reports retain Claude's raw billing, including non-USD money that normalized limits can omit; the dashboard supplements only the CLI report for the same account.
+  This uses omp's credential owner, not direct token or billing requests; see [Plan quota](plan-quota.md).
 - Model selectors: `parseRetryFallbackSelector` in `pi-coding-agent/src/session/retry-fallback-chains.ts`, which only `readSelector` in `src/omp/config.ts` calls.
   `readSelector` reads a selector against the `provider/id` of the listed models, so a `:level` splits off only after an id that `omp models` lists, and returns the selector's provider, id, and suffix.
   `resolveSelector` keeps the read only when its model is listed, and `routedSelectors` names every selector of the routing: each role's, and each fallback chain's key and entries.

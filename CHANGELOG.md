@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-06
+
+- Fixed: Claude extra usage now appears automatically in the account's billing currency, including euros, in the bottom bar and model menu.
+
 ## 2026-11-05
 
 - Behind the scenes: a check that deletes a private session now passes after another check has already saved a session title, so the full test run no longer stops there.
