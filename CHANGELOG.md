@@ -5,6 +5,10 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-06
 
+- Behind the scenes: the list of outside tools an agent sees is now names grouped by service, instead of every tool's description, so sessions spend far less of their context on it.
+- Fixed: subagents that edit for a session on `main` are now told to write in its worktree by full path, instead of using an option omp does not have, so their edits stop being refused.
+- Fixed: poteto agents now open the poteto mode file in one step instead of failing on its name and searching folders.
+- Fixed: the design critic now calls the browser tools by their real names.
 - Behind the scenes: each group of API routes now lives in its own file, so a mail change and a session change are no longer the same edit.
 - Behind the scenes: a change to one part of the dashboard no longer has to be read together with another part that only shared a type with it.
 - Behind the scenes: agents can list shared project memory even when their provider supplies empty fields for unused options.
