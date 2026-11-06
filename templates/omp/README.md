@@ -96,6 +96,8 @@ Files, in `agent/`:
   Before a session's first prompt it gets a brief: the repository's memory index and the last 10 landings on its default branch, each with the session that made it and that session's first prompt.
   Before a later prompt, and only when something is new, it gets a catch-up on what other sessions landed and remembered since, listing first the landings that touch files its own branch changed.
   The `project_memory` tool lists, reads, and changes the memory, decisions, facts, and lessons of one line and a body each, in batches that apply whole or not at all; a subagent can only read it.
+  Omit `read` and `ops` to list the index; empty `read: ""` and `ops: []` placeholders also mean omitted.
+  A nonempty `read` and a nonempty `ops` batch together are refused before anything is written.
   The memory is a `memory.json` committed to `refs/omp/memory` in the repository, which its worktrees share and which is never pushed, so `git log -p refs/omp/memory` shows each change and the session that made it.
   Landings are read from git each time, and the `Omp-Session` trailers that `extensions/session-trailer.ts` writes say which session made each one; each session's first prompt is kept under `.git/omp-project-memory/intents/`.
   `omp -p`, `--mode json`, and subagents get neither the brief nor a catch-up.
