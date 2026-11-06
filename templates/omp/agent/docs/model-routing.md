@@ -70,3 +70,5 @@ omp config get retry.paidFallback
 - `thermo_review`: `thermo-nuclear-code-quality-review`; keep it on the `plan` model so both thermonuclear agents grade alike.
 - `advisor`, `vision`, `commit`, `tiny`: advisor runtime, image turns, commit messages, and titles, memory, and auto-thinking.
 - `judge`: the `:auto` effort classifier, unexpected-stop detection, and eval `judge()`.
+
+The `council` agent reads no role: the council skill passes one model per provider on each spawn, which `task.perCallModelAllow` limits to its three, and its Gemini Pro member spends Cursor quota with no fallback.

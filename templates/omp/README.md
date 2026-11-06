@@ -45,6 +45,7 @@ Settings, in `config.yml`:
 - `modelProviderOrder`: the same three providers in the same order.
 - `task.isolation`: `isolated: true` subagents work in their own clone of the session's checkout, and successful changes apply back there as a patch; omp 18.16.0 has no per-task `checkout` or cwd, so a session on `main` spawns editing subagents without `isolated` and names its worktree's absolute path in their task.
   At most two subagents run at once.
+- `task.perCallModel: on` with `task.perCallModelAllow`: a `task` call may pick its model per spawn, only among the council's three models.
 - `collab.autoStart: control`: every terminal session publishes itself so that the omp-agents dashboard can drive it.
 
 Files, in `agent/`:
@@ -58,7 +59,7 @@ Files, in `agent/`:
 - `agents/interface-reviewer.md`: a read-only reviewer that runs the `interface-review` skill in full mode on a PR, then applies the `app-consistency-review` skill to check the change reuses the app's shared components and follows its tokens and sibling screens, on the `plan` role's model.
 - `agents/design-critic.md`: a read-only reviewer that the `design-workflow` skill spawns on a UI change it did not build; it screenshots each page and state next to the app's sibling screens and lists every visible bug with pixel measurements, on the `default` role's model.
 - `skills/council/SKILL.md` and `agents/council.md`: say "council" and three models from three providers, Claude Opus, GPT Sol, and Gemini Pro, review or advise on the request in rounds, scored out of 10 for a code review.
-  The skill passes each member's model on its `task` call, which `config.yml`'s `task.perCallModel: on` allows, and the agent's `model` list approves exactly those three.
+  The skill passes each member's model on its `task` call; the agent's `model` list and `task.perCallModelAllow` approve exactly those three.
 - `skills/ship/SKILL.md`, `commands/ship.md`, and `extensions/ship.ts`: `/ship [Linear issue]` drives a change from an optional ticket to plan, draft PR, interface review, thermonuclear review, and live review.
   `APPEND_SYSTEM.md` has the agent start it on its own for a request that will end in a pull request, unless the user says "no ship".
   The skill holds the procedure and is tagged `workflow` in its `metadata.tags`, so the dashboard's Settings › Workflows lists and edits it; the command only tells the session to follow the skill for the issue it names.

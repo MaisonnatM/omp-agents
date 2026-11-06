@@ -53,7 +53,7 @@ modelProviderOrder:
   - cursor
 
 # `isolated: true` subagents work in their own clone of the checkout their `checkout` option names; successful changes apply back there as a patch.
-# `perCallModel: on` lets a task call pick an approved model per spawn, which the council skill needs.
+# `perCallModel: on` lets a task call pick its model per spawn, which the council skill needs; the allowlist keeps that to the council's models.
 task:
   isolation:
     enabled: true
@@ -61,6 +61,10 @@ task:
   eager: default
   maxConcurrency: 2
   perCallModel: "on"
+  perCallModelAllow:
+    - anthropic/claude-opus-5-5
+    - openai-codex/gpt-6.1-sol
+    - cursor/gemini-3.1-pro
 
 # Publish every terminal session to the local Collab registry, so the omp-agents dashboard can drive it.
 collab:

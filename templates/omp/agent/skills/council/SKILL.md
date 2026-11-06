@@ -14,9 +14,7 @@ When the user wants to discard the implementation and explore new ideas, skip fi
 
 ## Members
 
-The council is three members, one strong model from each of three providers, at high reasoning effort.
-Members the user names replace the defaults.
-Otherwise use the latest flagship of each provider:
+The council is three members, one strong model from each of three providers, at high reasoning effort:
 
 | Member | Model |
 | --- | --- |
@@ -24,26 +22,29 @@ Otherwise use the latest flagship of each provider:
 | GPT Sol | `openai-codex/gpt-6.1-sol:high` |
 | Gemini Pro | `cursor/gemini-3.1-pro:high` |
 
-Check `omp models --json` when a newer flagship may exist, and spawn the newest one.
+Members the user names replace these.
+omp runs a member only on a model that both the `model` list in `~/.omp/agent/agents/council.md` and `task.perCallModelAllow` name exactly, without its `:level`; a glob grants nothing.
+Before spawning a named member outside them, add its exact selector to both with the user's go.
 
 ## Spawn
 
-Spawn the three members in one `task` call: one `tasks[]` item each, with `agent: "council"` and the member's exact selector in `model`.
+Spawn the members in one `task` call: one `tasks[]` item each, with `agent: "council"` and the member's exact selector in `model`.
 Give every member the same assignment: the user's request, the goal behind it, and pointers to the context, such as the branch, the diff command, or the PR number.
 For a review or feedback, write "read-only: report findings, edit nothing" into the assignment.
 For a code review, ask each member for a score out of 10.
 
-A per-call `model` needs `task.perCallModel: on`; omp refuses the call while it is `off`, its default.
-A per-call member never falls back to another model: an unavailable model or an exhausted quota fails that member's spawn.
-Report the failed member and its error, and run the council with the members that answered; never substitute another model for it.
-`task.maxConcurrency` may hold the third member in a queue; wait for it.
+omp checks every member's model before it starts any of them, and refuses the whole call when one is unknown or unapproved.
+The refusal names that member: report it, then spawn the others again without it.
+A member whose model runs out of quota or credentials fails alone, and never falls back to another model.
+Report each failed member with its error, and continue with the members that answered; never substitute another model.
 
 ## Rounds
 
 Collect the members' replies, then summarize the useful findings, where the members disagree, and the recommended next steps.
-Each full review pass is one round; a fresh review after fixes starts a new round.
+Each full review pass is one round.
 When you agree with a recommendation, make the change, then spawn fresh members for the next round.
-Continue until every member is satisfied.
+Their assignment carries the previous round's findings, what changed, and each declined finding with its reason.
+Continue until every member that ran is satisfied.
 Keep the scope fixed across rounds: decline each finding outside the original request, and say why.
 
 ## Results
@@ -59,8 +60,8 @@ Rounds: 2
 | --- | --- | --- |
 | Claude Opus | 7/10 | 9/10 |
 | GPT Sol | 8/10 | 10/10 |
-| Gemini Pro | failed | failed |
+| Gemini Pro | 7/10 | 9/10 |
 ```
 
-When the work ends in an open pull request, put the table in its description with the `pr_description` tool, never in a comment.
+When the work ends in a pull request, put the table in its description with the `pr_description` tool, above any closing footer line, never in a comment; a PR opened after the council gets it when it opens.
 Otherwise put it in the final reply.

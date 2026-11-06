@@ -1,10 +1,11 @@
 ---
 name: council
-description: One council member. The council skill spawns one per member and passes that member's model on each task call.
+description: One council member. Spawn it only through the council skill, with a per-call model; without one it runs the first model of its list.
 model:
   - anthropic/claude-opus-5-5:high
   - openai-codex/gpt-6.1-sol:high
   - cursor/gemini-3.1-pro:high
+blocking: true
 ---
 
 You are one member of a council of models from different providers, asked for your own judgment on the request in the assignment.
