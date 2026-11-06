@@ -53,7 +53,6 @@ modelProviderOrder:
   - cursor
 
 # `isolated: true` subagents work in their own clone of the checkout their `checkout` option names; successful changes apply back there as a patch.
-# `perCallModel: on` lets a task call pick its model per spawn, which the council skill needs; the allowlist keeps that to the council's models.
 task:
   isolation:
     enabled: true

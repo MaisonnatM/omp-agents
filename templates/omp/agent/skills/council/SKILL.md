@@ -23,20 +23,24 @@ The council is three members, one strong model from each of three providers, at 
 | Gemini Pro | `cursor/gemini-3.1-pro:high` |
 
 Members the user names replace these.
-omp runs a member only on a model that both the `model` list in `~/.omp/agent/agents/council.md` and `task.perCallModelAllow` in `~/.omp/agent/config.yml` name; a glob grants nothing.
+For this council, approve each model through the `model` list in `~/.omp/agent/agents/council.md` and `task.perCallModelAllow` in `~/.omp/agent/config.yml`.
+Use exact models in both lists, since a glob grants nothing.
 Before spawning a named member outside them, and with the user's go, add `provider/model-id:high` to the agent's `model` list and `provider/model-id`, without the level, to `task.perCallModelAllow`.
 
 ## Spawn
 
-Spawn the members in one `task` call: one `tasks[]` item each, with `agent: "council"` and the member's exact selector in `model`.
+Read `~/.omp/agent/docs/model-routing.md` and check `omp usage` before spawning.
+Per-call workers do not use quota-aware fallback routing.
+If a member's included quota is exhausted, report it as unavailable unless the user explicitly approved paid usage for that route.
+
+Spawn the available members in one `task` call: one `tasks[]` item each, with `agent: "council"` and the member's exact selector in `model`.
 Give every member the same assignment: the user's request, the goal behind it, and pointers to the context, such as the branch, the diff command, or the PR number.
 For a review or feedback, write "read-only: report findings, edit nothing" into the assignment.
 For a code review, ask each member for a score out of 10.
 
-omp checks every member's model before the call runs, and refuses the whole call when one is unknown, unapproved, or on a provider that is not signed in.
-The refusal names that member's model: report the member, then spawn the others again without it.
-A member whose model runs out of quota or loses its sign-in mid-run fails alone, and never falls back to another model.
-Report each failed member with its error, and continue with the members that answered; never substitute another model.
+If omp rejects the batch before dispatch, report the rejected model and its error, then retry the remaining requested members unchanged.
+If a worker fails, report that member and its error, and continue with the members that answered.
+Never substitute another model.
 
 ## Rounds
 
