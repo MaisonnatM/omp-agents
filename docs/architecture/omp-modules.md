@@ -20,6 +20,28 @@ Build and install both patched packages, `@oh-my-pi/pi-ai` and `@oh-my-pi/pi-cod
 The dashboard does not apply this patch at startup, and installing or upgrading stock OMP removes the runtime changes.
 The [routing policy](../../templates/omp/agent/docs/model-routing.md) describes the opt-in `retry.paidFallback` setting and its billing limits.
 
+Tool documentation selectors and historical-consult diagnostics are preserved in [`patches/omp-18.16.0-runtime-tool-contracts.patch`](../../patches/omp-18.16.0-runtime-tool-contracts.patch), including their regression tests.
+It uses the same upstream release and commit as the paid Cursor patch, and the two patches apply independently.
+From that release checkout, check and apply it:
+
+```sh
+git apply --check /absolute/path/to/omp-agents/patches/omp-18.16.0-runtime-tool-contracts.patch
+git apply /absolute/path/to/omp-agents/patches/omp-18.16.0-runtime-tool-contracts.patch
+bun install --frozen-lockfile
+bun test packages/coding-agent/test/write-xdev-dispatch.test.ts packages/coding-agent/test/task/seance.test.ts
+bun --cwd=packages/coding-agent run gen:bundle
+```
+
+A source checkout needs the matching pi-natives addon installed or built before those tests.
+Install the rebuilt coding-agent CLI bundle and its companion files from `dist/`, plus the SDK sources `pi-coding-agent/src/internal-urls/router.ts`, `pi-coding-agent/src/internal-urls/xd-protocol.ts`, `pi-coding-agent/src/tools/xdev.ts`, `pi-coding-agent/src/task/seance.ts`, and `pi-coding-agent/src/prompts/tools/seance-task-guidance.md`.
+Keep a rollback copy of the installed sources and bundle, and preserve any other installed runtime patches when building; rebuilding a pristine release would remove them from the CLI.
+The dashboard does not apply this patch, stock runtime upgrades remove it, and already-running sessions retain their loaded handlers until restarted.
+The read router applies ordinary line and raw selectors to `xd://` documentation; device writes reject those suffixes instead of executing the bare device.
+Missing-device errors give a short discovery hint rather than dumping the mounted inventory.
+Historical task consults search session IDs only in the caller's artifacts and current project, including when given a full UUID.
+Cross-project callers pass the exact `file` returned by eval's archive as `sourceSession`; the Memory curator's saved job follows that handoff.
+The native implementation lives in `pi-coding-agent/src/task/seance.ts`, with task guidance in `pi-coding-agent/src/prompts/tools/seance-task-guidance.md`.
+
 Paths in this document that start with `pi-coding-agent/`, `pi-ai/`, `pi-catalog/`, `pi-tui/`, `pi-utils/`, or `omp-stats/` are inside that install, in `@oh-my-pi/`.
 They are not in this repository.
 The main ones:

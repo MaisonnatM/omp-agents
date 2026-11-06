@@ -39,7 +39,9 @@ export default function projectMemory(pi: ExtensionAPI) {
 		async execute(_id, raw, _signal, _onUpdate, ctx) {
 			const parsed = params.safeParse(raw);
 			if (!parsed.success) return text("Invalid project_memory input.", true);
-			const { repo, read, ops } = parsed.data;
+			const { repo } = parsed.data;
+			const read = parsed.data.read === "" ? undefined : parsed.data.read;
+			const ops = parsed.data.ops?.length ? parsed.data.ops : undefined;
 			if (read !== undefined && ops !== undefined) return text("Pass either read or ops, not both.", true);
 			const folder = repo === undefined ? ctx.cwd : resolve(ctx.cwd, repo);
 			const place = placeOf(folder);

@@ -171,6 +171,57 @@ describe("planOps", () => {
 });
 
 describe("memory store", () => {
+	test("empty optional placeholders list existing memory without writing", async () => {
+		const { dir } = world();
+		const me = session("bbbbbbbb-mine", dir);
+		await me.call({ ops: [add("existing", "fact", "Existing memory.")] });
+		const tip = git(dir, "rev-parse", MEMORY_REF);
+		const expected = await me.call({ repo: dir });
+		for (const placeholders of [{ read: "" }, { ops: [] }, { read: "", ops: [] }]) {
+			expect(await me.call({ repo: dir, ...placeholders })).toEqual(expected);
+			expect(git(dir, "rev-parse", MEMORY_REF)).toBe(tip);
+		}
+		expect(expected.isError).toBe(false);
+		expect(expected.text).toContain("existing [fact]");
+		expect(await me.call({ repo: "", read: "", ops: [] })).toEqual(expected);
+		expect(git(dir, "rev-parse", MEMORY_REF)).toBe(tip);
+	});
+
+	test("empty placeholders permit a real batch and a real read", async () => {
+		const { dir } = world();
+		const me = session("bbbbbbbb-mine", dir);
+		expect((await me.call({ repo: dir, read: "", ops: [add("existing", "fact", "Existing memory.", "Memory detail.")] })).isError).toBe(false);
+		const tip = git(dir, "rev-parse", MEMORY_REF);
+		const result = await me.call({ repo: dir, read: "existing", ops: [] });
+		expect(result.isError).toBe(false);
+		expect(result.text).toContain("Memory detail.");
+		expect(git(dir, "rev-parse", MEMORY_REF)).toBe(tip);
+	});
+
+	test("nonempty read and ops conflict before any memory is written", async () => {
+		const { dir } = world();
+		const me = session("bbbbbbbb-mine", dir);
+		await me.call({ ops: [add("existing", "fact", "Existing memory.")] });
+		const tip = git(dir, "rev-parse", MEMORY_REF);
+		expect((await me.call({ repo: dir, read: "existing", ops: [{ op: "delete", slug: "existing" }] })).isError).toBe(true);
+		expect(git(dir, "rev-parse", MEMORY_REF)).toBe(tip);
+		expect((await me.call({ read: "existing" })).isError).toBe(false);
+	});
+
+	test("subagents may list and read with placeholders but cannot mutate", async () => {
+		const { dir } = world();
+		const me = session("bbbbbbbb-mine", dir);
+		await me.call({ ops: [add("existing", "fact", "Existing memory.", "Memory detail.")] });
+		const tip = git(dir, "rev-parse", MEMORY_REF);
+		const sub = session("cccccccc-sub", dir, { kind: "sub" });
+		for (const placeholders of [{ read: "" }, { ops: [] }, { read: "", ops: [] }]) {
+			expect(await sub.call({ repo: dir, ...placeholders })).toEqual(await me.call({}));
+		}
+		expect(await sub.call({ read: "existing", ops: [] })).toEqual(await me.call({ read: "existing" }));
+		expect((await sub.call({ read: "", ops: [{ op: "delete", slug: "existing" }] })).isError).toBe(true);
+		expect(git(dir, "rev-parse", MEMORY_REF)).toBe(tip);
+	});
+
 	test("a refused batch leaves the ref where it was", async () => {
 		const { dir } = world();
 		const me = session("bbbbbbbb-mine", dir);

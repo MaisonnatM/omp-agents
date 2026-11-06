@@ -3,6 +3,12 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-06
+
+- Behind the scenes: agents can list shared project memory even when their provider supplies empty fields for unused options.
+- Behind the scenes: the saved runtime fixes let agents read selected lines of tool help without losing the tool or flooding the conversation with its inventory.
+- Behind the scenes: historical consults now explain when an exact session file is needed, and the Memory curator uses it when working across projects.
+
 ## 2026-11-05
 
 - Behind the scenes: a check that deletes a private session now passes after another check has already saved a session title, so the full test run no longer stops there.

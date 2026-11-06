@@ -1,0 +1,170 @@
+diff --git a/packages/coding-agent/src/internal-urls/router.ts b/packages/coding-agent/src/internal-urls/router.ts
+index 86b6792f17..0df2e28d8d 100644
+--- a/packages/coding-agent/src/internal-urls/router.ts
++++ b/packages/coding-agent/src/internal-urls/router.ts
+@@ -276,6 +276,11 @@ export class InternalUrlRouter {
+ 	 */
+ 	peelWriteSelector(input: string, tool: string): string {
+ 		const { path, sel } = this.split(input);
++		if (sel !== undefined && this.#registered(path)?.handler.spec.write?.scope === "device") {
++			throw new ToolError(
++				`${tool} does not accept read selectors on device URLs. Read ${path} for docs.`,
++			);
++		}
+ 		if (sel === undefined || WHOLE_FILE_SELECTOR_RE.test(sel)) return path;
+ 		throw new ToolError(
+ 			`${tool} does not accept the trailing selector ":${sel}" — it addresses a whole file. ` +
+diff --git a/packages/coding-agent/src/internal-urls/xd-protocol.ts b/packages/coding-agent/src/internal-urls/xd-protocol.ts
+index 504c089c3f..6f2faf9031 100644
+--- a/packages/coding-agent/src/internal-urls/xd-protocol.ts
++++ b/packages/coding-agent/src/internal-urls/xd-protocol.ts
+@@ -57,7 +57,7 @@ export class XdProtocolHandler implements ProtocolHandler {
+ 	readonly scheme = "xd";
+ 	readonly spec: SchemeSpec = {
+ 		backing: "device",
+-		selectors: "none",
++		selectors: "lines",
+ 		immutable: true,
+ 		compactTranscript: true,
+ 		write: { via: "handler", payload: "text", scope: "device", tier: deviceWriteTier },
+diff --git a/packages/coding-agent/src/prompts/tools/seance-task-guidance.md b/packages/coding-agent/src/prompts/tools/seance-task-guidance.md
+index 6d052bff54..4a3a9218a6 100644
+--- a/packages/coding-agent/src/prompts/tools/seance-task-guidance.md
++++ b/packages/coding-agent/src/prompts/tools/seance-task-guidance.md
+@@ -1,3 +1,4 @@
+ Historical consults: use `agent: "seance"` with `sourceSession` (id/path); optional `model` overrides the saved source model. The source stays unchanged.
++Session IDs (including full UUIDs) search only the caller's artifact tree and current project. For cross-project consults, pass the session's exact `.jsonl` path from the archive's `file` field as `sourceSession`, not its ID; do not read the source transcript yourself.
+ If the saved model is absent/unavailable, set `model` explicitly.
+ When the user points at an earlier session, the consult IS the read: NEVER read, grep, or re-run its `.jsonl` here. Only facts that changed since (an open PR's state) need a live check.
+diff --git a/packages/coding-agent/src/task/seance.ts b/packages/coding-agent/src/task/seance.ts
+index 64b2d52302..5bd1eb9b97 100644
+--- a/packages/coding-agent/src/task/seance.ts
++++ b/packages/coding-agent/src/task/seance.ts
+@@ -154,7 +154,10 @@ export async function resolveSeanceSource(
+ 		const matchGlobal = chooseId(await SessionManager.listAll(storage), source);
+ 		if (matchGlobal) return validateSourceFile(matchGlobal.path, storage);
+ 	}
+-	throw new Error(`Session "${label}" was not found.`);
++	const scope = options.includeGlobal
++		? "ID lookup searched the caller's artifact tree and all projects."
++		: "ID lookup is scoped to the caller's artifact tree and current project. Pass the session's exact .jsonl path as sourceSession for a cross-project consult.";
++	throw new Error(`Session "${label}" was not found. ${scope}`);
+ }
+ const modelSelectorInputSchema = type("string | string[]");
+ export const seanceTaskSchemaFields = {
+diff --git a/packages/coding-agent/src/tools/xdev.ts b/packages/coding-agent/src/tools/xdev.ts
+index 0146853e35..5f6ad32d49 100644
+--- a/packages/coding-agent/src/tools/xdev.ts
++++ b/packages/coding-agent/src/tools/xdev.ts
+@@ -423,7 +423,7 @@ function resolveRequiredXdevTool(state: XdevState, name: string): Tool {
+ 	const inst = resolveXdevTool(state, name);
+ 	if (!inst) {
+ 		throw new ToolError(
+-			`No such tool: ${XD_URL_PREFIX}${name}. Mounted devices: ${[...state.mountedNames].join(", ")}. Active top-level tools are also dispatchable via ${XD_URL_PREFIX}<tool>.`,
++			`No such tool: ${XD_URL_PREFIX}${sanitizeCatalogSummary(name, 100)}. Read ${XD_URL_PREFIX} for available devices; read ${XD_URL_PREFIX}<tool> for docs.`,
+ 		);
+ 	}
+ 	return inst;
+diff --git a/packages/coding-agent/test/task/seance.test.ts b/packages/coding-agent/test/task/seance.test.ts
+index a68a3ab211..4c68cd03eb 100644
+--- a/packages/coding-agent/test/task/seance.test.ts
++++ b/packages/coding-agent/test/task/seance.test.ts
+@@ -207,14 +207,17 @@ describe("seance source resolution", () => {
+ 			const cwd = path.join(tempDir.path(), "project");
+ 			const otherCwd = path.join(tempDir.path(), "other-project");
+ 			const foreignFile = path.join(sessionDirForCwd(otherCwd), "foreign.jsonl");
+-			await writeSession(foreignFile, "foreign-project-id", otherCwd);
++			const foreignId = "67a29a48-05a0-4de6-bcd1-83dfe9c9a6e2";
++			await writeSession(foreignFile, foreignId, otherCwd);
+ 
+-			await expect(resolveSeanceSource("foreign-project-id", { cwd })).rejects.toThrow(
+-				'Session "foreign-project-id" was not found.',
+-			);
+-			await expect(resolveSeanceSource("foreign-project-id", { cwd, includeGlobal: true })).resolves.toMatchObject({
++			await expect(resolveSeanceSource(foreignId, { cwd })).rejects.toThrow(/current project.*\.jsonl path as sourceSession/);
++			await expect(resolveSeanceSource(foreignFile, { cwd })).resolves.toMatchObject({
+ 				file: foreignFile,
+-				id: "foreign-project-id",
++				id: foreignId,
++			});
++			await expect(resolveSeanceSource(foreignId, { cwd, includeGlobal: true })).resolves.toMatchObject({
++				file: foreignFile,
++				id: foreignId,
+ 			});
+ 		});
+ 	});
+diff --git a/packages/coding-agent/test/write-xdev-dispatch.test.ts b/packages/coding-agent/test/write-xdev-dispatch.test.ts
+index d6b5e44850..6da022b6d9 100644
+--- a/packages/coding-agent/test/write-xdev-dispatch.test.ts
++++ b/packages/coding-agent/test/write-xdev-dispatch.test.ts
+@@ -75,6 +75,53 @@ function createTestXdevState(
+ }
+ 
+ describe("read and write route xd:// device URLs", () => {
++	it("rejects selector-bearing writes without invoking or approving the bare device", async () => {
++		let calls = 0;
++		const device: AgentTool = {
++			name: "mutate",
++			label: "Mutate",
++			description: "A mutating device",
++			parameters: type({}),
++			approval: () => "write",
++			async execute() {
++				calls++;
++				return { content: [{ type: "text", text: "mutated" }] };
++			},
++		};
++		const write = new WriteTool(xdevSession(process.cwd(), { xdev: createTestXdevState([device]) }));
++		for (const suffix of [":raw", ":conflicts", ":1-3", ":raw:1+80"]) {
++			const args = { path: `xd://mutate${suffix}`, content: "{}" };
++			if (typeof write.approval !== "function") throw new Error("expected a function approval");
++			expect(write.approval(args)).toBe("exec");
++			await expect(write.execute("write-xd-selector", args)).rejects.toThrow("selector");
++		}
++		expect(calls).toBe(0);
++	});
++
++	it("bounds unknown-device diagnostics without dumping the mounted inventory", () => {
++		const tools: Tool[] = Array.from({ length: 300 }, (_, index) => ({
++			name: `private_device_${index}`,
++			label: "Device",
++			description: "Device",
++			parameters: type({}),
++			async execute() { return { content: [] }; },
++		}));
++		const state = createTestXdevState(tools);
++		for (const name of ["missing", "missing".repeat(1_000), "😀".repeat(1_000)]) {
++			let failure: unknown;
++			try {
++				xdevDocs(state, name);
++			} catch (error) {
++				failure = error;
++			}
++			expect(failure).toBeInstanceOf(ToolError);
++			if (!(failure instanceof ToolError)) throw failure;
++			expect(failure.message).toContain("Read xd://");
++			expect(Buffer.byteLength(failure.message)).toBeLessThan(250);
++			expect(failure.message).not.toContain("private_device_");
++		}
++	});
++
+ 	it("lists, documents, and dispatches an ast_edit device", async () => {
+ 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "write-xdev-"));
+ 		try {
+@@ -101,6 +148,16 @@ describe("read and write route xd:// device URLs", () => {
+ 			const docs = await read!.execute("read-xd-docs", { path: "xd://ast_edit" });
+ 			expect(docs.content.find(entry => entry.type === "text")?.text).toContain("# ast_edit");
+ 
++			const rawDocs = await read!.execute("read-xd-raw", { path: "xd://ast_edit:raw" });
++			const rawText = rawDocs.content.find(entry => entry.type === "text")?.text ?? "";
++			expect(rawText.startsWith("# ast_edit")).toBe(true);
++			for (const suffix of [":raw:1+3", ":1-3:raw"]) {
++				const page = await read!.execute("read-xd-page", { path: `xd://ast_edit${suffix}` });
++				expect(page.content.find(entry => entry.type === "text")?.text).toBe(
++					rawText.split("\n").slice(0, 3).join("\n"),
++				);
++			}
++
+ 			const content = JSON.stringify({
+ 				ops: [{ pat: "legacyWrap($A, $B)", out: "modernWrap($A, $B)" }],
+ 				paths: [filePath],
