@@ -203,7 +203,10 @@ export class MediaTree {
 		this.#lock = join(dirname(path), `.${basename(path)}.lock`);
 		this.#dir = artifactsDir(path);
 		this.#own = new FoldedFile(path, () => new MediaFold(agentId));
-		this.#emit = emit;
+		// The one check a read still in flight at `close` meets, whichever await it was on.
+		this.#emit = (...args) => {
+			if (!this.#closed) emit(...args);
+		};
 	}
 
 	get loaded(): boolean {
@@ -232,15 +235,9 @@ export class MediaTree {
 		this.#reads.poke();
 	}
 
-	/** Stops emitting: a read still in flight and every later poke are ignored, and the files read so far are released. */
+	/** Stops emitting: a read still in flight and every later poke are ignored; the tree's owner drops it to release what it read. */
 	close(): void {
 		this.#closed = true;
-		this.#subagents.clear();
-		this.#media = [];
-		this.#paths.clear();
-		this.#sources = [];
-		this.#urls.clear();
-		this.#checks.clear();
 	}
 
 	async #read(): Promise<void> {
@@ -262,13 +259,11 @@ export class MediaTree {
 				return restarted ? null : { media: file.fold.media.slice(media), named: file.fold.named.slice(named), sources: file.fold.sources.slice(sources) };
 			}),
 		);
-		if (this.#closed) return;
 		if (this.#loaded && !reads.includes(null)) {
 			const added = await this.#admit(
 				reads.flatMap(read => read?.media ?? []),
 				reads.flatMap(read => read?.named ?? []),
 			);
-			if (this.#closed) return;
 			const sources = this.#admitSources(reads.flatMap(read => read?.sources ?? []));
 			if (added.length === 0 && sources.length === 0) return;
 			this.#media = merge(this.#media, added);
@@ -282,7 +277,6 @@ export class MediaTree {
 			folds.flatMap(fold => fold.media),
 			folds.flatMap(fold => fold.named),
 		);
-		if (this.#closed) return;
 		this.#urls.clear();
 		this.#loaded = true;
 		this.#media = media;

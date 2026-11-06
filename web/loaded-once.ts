@@ -8,16 +8,18 @@ export interface LoadedOnce<T> {
 	load(): Promise<T>;
 }
 
-/** `make` runs once, on the first `load`; it must not reject, so a chunk that fails to load resolves to what the page shows without it. */
-export function loadedOnce<T>(make: () => Promise<T>): LoadedOnce<T> {
+/** `make` runs once, on the first `load`; should it reject, as a chunk that fails to load does, the value is `fallback`, what the page shows without it. */
+export function loadedOnce<T>(make: () => Promise<T>, fallback: T): LoadedOnce<T> {
 	let loading: Promise<T> | null = null;
 	const loaded: { value: T | null; load(): Promise<T> } = {
 		value: null,
 		load: () =>
-			(loading ??= make().then(value => {
-				loaded.value = value;
-				return value;
-			})),
+			(loading ??= make()
+				.catch(() => fallback)
+				.then(value => {
+					loaded.value = value;
+					return value;
+				})),
 	};
 	return loaded;
 }

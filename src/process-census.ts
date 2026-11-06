@@ -215,13 +215,13 @@ export class ProcessCensus {
 		this.#every = setInterval(() => this.note(), times.everyMs);
 	}
 
-	/** Notes the processes under the root now, and forgets the noted ones that are gone; whether `ps` answered. */
-	note(): boolean {
+	/** Notes the processes under the root now, and forgets the noted ones that are gone; nothing once {@link reap} took the noted set. */
+	note(): void {
+		if (this.#reaping) return;
 		const table = processTable();
-		if (!table) return false;
+		if (!table) return;
 		forgetGone(this.#noted, table);
 		for (const [pid, started] of descendants(table, this.#root)) this.#noted.set(pid, started);
-		return true;
 	}
 
 	/** Notes them in a moment, as an async tool call starts its background job just after it returns. */

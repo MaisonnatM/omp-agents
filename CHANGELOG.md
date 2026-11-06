@@ -18,6 +18,12 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Fixed: settings sync drops a result from a remote you changed during the sync, and the desktop app still stops its server when you quit during startup and says when an update did not install.
 - Fixed: a session move waiting on a turn that ends with a question now goes, a prompt to a session whose omp has exited is refused with a plain message, and unread marks saved before a restart survive it.
 - Fixed: an auto-continue scheduled while the usage limit was being read survives a restart.
+- Fixed: a terminal tab you open after its shell exited shows the exit at once, instead of waiting forever.
+- Fixed: a sign-in row no longer shows an old failure beside a fresh sign-in link.
+- Fixed: when an update fails to download in the desktop app, it now says so, and a background update check no longer answers the one you asked for.
+- Fixed: code highlighting and Markdown now still show if their extra code fails to load.
+- Fixed: a hover card such as the CPU card opens on a pen or touch tap after it closed, and pressing Attach in the Browser twice captures once.
+- Fixed: Settings › Worktrees no longer stays on "Reading" after you leave the tab mid-read, and Escape on a pull request edit throws away the draft text.
 
 ## 2026-11-05
 

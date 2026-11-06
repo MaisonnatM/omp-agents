@@ -4,7 +4,7 @@
  * Nothing restarts on its own, since quitting stops every session the dashboard started.
  */
 import { dialog, Notification } from "electron";
-import { autoUpdater } from "electron-updater";
+import { autoUpdater, type UpdateCheckResult } from "electron-updater";
 import { errorText } from "../src/json";
 
 /** Lets the window and the server start before the first check competes with them. */
@@ -23,37 +23,19 @@ export interface Updates {
 /** Starts checking; `changed` runs when a version finishes downloading, so the menu can offer it. */
 export function startUpdates(changed: () => void): Updates {
 	let ready: string | null = null;
-	let asked = false;
 	autoUpdater.autoInstallOnAppQuit = true;
-	// The download that follows ends in a notification, so a manual check needs no dialog of its own.
-	autoUpdater.on("update-available", () => {
-		asked = false;
-	});
 	autoUpdater.on("update-downloaded", info => {
 		ready = info.version;
 		changed();
 		new Notification({ title: `omp agents ${info.version} is ready`, body: "It installs when you quit, or now from the app menu." }).show();
 	});
-	autoUpdater.on("update-not-available", info => {
-		if (!asked) return;
-		asked = false;
-		void dialog.showMessageBox({ message: "omp agents is up to date", detail: `Version ${info.version} is the newest.` });
-	});
-	autoUpdater.on("error", err => {
-		console.error(`omp-agents: update check failed: ${errorText(err)}`);
-		if (!asked) return;
-		asked = false;
-		dialog.showErrorBox("Update check failed", errorText(err));
-	});
+	autoUpdater.on("error", err => console.error(`omp-agents: update check failed: ${errorText(err)}`));
 	const check = (): void => void autoUpdater.checkForUpdates().catch(() => {});
 	setTimeout(check, FIRST_CHECK_DELAY_MS).unref();
 	setInterval(check, CHECK_EVERY_MS).unref();
 	return {
 		ready: () => ready,
-		checkNow() {
-			asked = true;
-			check();
-		},
+		checkNow: () => void answerCheck(),
 		// Silent, and relaunched once installed, as T3 Code installs.
 		install() {
 			const { promise, reject: failed } = Promise.withResolvers<never>();
@@ -62,4 +44,20 @@ export function startUpdates(changed: () => void): Updates {
 			return promise;
 		},
 	};
+}
+
+/**
+ * Answers a check the user asked for from that check's own result and its download, not from the updater's events, which
+ * any check fires; a download that succeeds needs no dialog, since it ends in the notification.
+ */
+async function answerCheck(): Promise<void> {
+	let result: UpdateCheckResult | null;
+	try {
+		result = await autoUpdater.checkForUpdates();
+		await result?.downloadPromise;
+	} catch (err) {
+		dialog.showErrorBox("Update check failed", errorText(err));
+		return;
+	}
+	if (result && !result.isUpdateAvailable) void dialog.showMessageBox({ message: "omp agents is up to date", detail: `Version ${result.updateInfo.version} is the newest.` });
 }

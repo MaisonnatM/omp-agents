@@ -143,7 +143,7 @@ export class DashboardSession implements LiveSession {
 	thinkingLevel: string | null = null;
 	/** Levels the current model accepts, `off` first. */
 	thinkingLevels: string[] = [];
-	switching = false;
+	/** The model switches asked for and not yet read back. */
 	#switches = 0;
 	/** `null` while the model has no priority tier for `/fast` to turn on. */
 	fast: FastMode | null = null;
@@ -408,6 +408,11 @@ export class DashboardSession implements LiveSession {
 		return this.#prompt.starting;
 	}
 
+	/** Whether a model switch is asked for and not yet read back. */
+	get switching(): boolean {
+		return this.#switches > 0;
+	}
+
 	requests(): UserRequest[] {
 		return this.#requests.list();
 	}
@@ -620,7 +625,7 @@ export class DashboardSession implements LiveSession {
 
 	/** Switches serialize with state reads; the flag is set before queuing so the page can show progress immediately. Rejects when omp refuses the switch. */
 	setModel({ provider, id }: ModelOption, thinking: string | null): Promise<void> {
-		this.switching = ++this.#switches > 0;
+		this.#switches++;
 		this.thinkingLevels = [];
 		this.#emit({ kind: "roster" });
 		return this.#modelLane.run(async () => {
@@ -633,7 +638,7 @@ export class DashboardSession implements LiveSession {
 				throw err;
 			} finally {
 				await this.#readModelState("Model state refresh failed");
-				this.switching = --this.#switches > 0;
+				this.#switches--;
 				this.#emit({ kind: "roster" });
 			}
 		});

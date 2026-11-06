@@ -273,3 +273,12 @@ test("all time includes old foreign usage and an unknown model's tokens, even fo
 		{ start: 0, tokens: 10, requests: 1 }, { start: 1_000, tokens: 0, requests: 0 }, { start: 2_000, tokens: 0, requests: 0 },
 	]);
 });
+
+test("omp-stats' sync reads as its phase alone: a failed sync always says why, and an idle one keeps no earlier failure", () => {
+	const empty = { totalRequests: 0, failedRequests: 0, totalInputTokens: 0, totalOutputTokens: 0, totalCacheReadTokens: 0, totalCacheWriteTokens: 0, totalCost: 0, cacheRate: 0, avgTokensPerSecond: null };
+	const syncOf = (sync: StatsRead["sync"]) =>
+		buildAnalytics("all", { window: { cutoff: null, bucketMs: 1_000, now: 0 }, dashboard: { overall: empty, byModel: [], byAgentType: [] }, tools: { byTool: [] }, sync, rows: [], providerSeries: [] }, root, () => null).sync;
+	expect(syncOf({ phase: "error", current: 3, total: 9, lastSyncedAt: null, error: null })).toEqual({ phase: "error", error: "Unknown error" });
+	expect(syncOf({ phase: "idle", current: 9, total: 9, lastSyncedAt: 1_000, error: "disk full" })).toEqual({ phase: "idle" });
+	expect(syncOf({ phase: "syncing", current: 3, total: 9, lastSyncedAt: null, error: null })).toEqual({ phase: "syncing", current: 3, total: 9 });
+});

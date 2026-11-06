@@ -90,6 +90,17 @@ describe("Terminals", () => {
 		expect(terminals.get(terminal.id)).toBeUndefined();
 	});
 
+	test("a page that attaches after the shell exited, as one whose socket opens late, hears the exit at once", async () => {
+		const terminals = new Terminals();
+		const terminal = opened(terminals);
+		const first = watch(terminal);
+		terminal.write("exit 4\r");
+		expect(await first.exited).toBe(4);
+		let heard: number | null | undefined;
+		terminal.attach({ output() {}, exit: code => void (heard = code) });
+		expect(heard).toBe(4);
+	});
+
 	test("resizing the terminal resizes what the shell sees, and a kill hangs up on it", async () => {
 		const terminals = new Terminals();
 		const terminal = opened(terminals);

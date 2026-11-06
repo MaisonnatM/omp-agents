@@ -1,7 +1,7 @@
 import { afterEach, expect, mock, spyOn, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { descendants, parseListeners, parsePs, sessionGroups, stopTree } from "./process-census";
+import { descendants, ProcessCensus, parseListeners, parsePs, sessionGroups, stopTree } from "./process-census";
 
 /** omp (100) with an MCP server in its process group, two jobs, and a shared worker it spawned, which has a child of its own. */
 const PS = `
@@ -83,4 +83,28 @@ test("a tree's root that exits on SIGTERM gets no SIGKILL, and the child that ig
 	await root.exited;
 	expect(sent).toEqual(["root SIGTERM", "child SIGTERM", "child SIGKILL"]);
 	expect(Bun.spawnSync(["ps", "-o", "pid=", "-p", String(child)]).stdout.toString().trim()).toBe("");
+});
+
+test("a note once the reap started adds nothing to what the reap stops", async () => {
+	const dir = mkdtempSync(join("/tmp", "opc-"));
+	dirs.push(dir);
+	writeFileSync(join(dir, "root.ts"), ROOT);
+	const root = Bun.spawn([process.execPath, join(dir, "root.ts")], { stdout: "pipe" });
+	const child = Number(new TextDecoder().decode((await root.stdout.getReader().read()).value));
+	const census = new ProcessCensus(root.pid, { everyMs: 60_000, soonMs: 0, graceMs: 500 });
+	const sent: number[] = [];
+	const kill = process.kill.bind(process);
+	spyOn(process, "kill").mockImplementation((pid, name) => {
+		if (pid === root.pid || pid === child) sent.push(pid);
+		return kill(pid, name);
+	});
+
+	const reaping = census.reap();
+	census.note();
+	await reaping;
+	mock.restore();
+	expect(sent).toEqual([]);
+	process.kill(child, "SIGKILL");
+	root.kill("SIGKILL");
+	await root.exited;
 });

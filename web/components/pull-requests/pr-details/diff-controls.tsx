@@ -24,10 +24,10 @@ function useCodeControls(): CodeControls {
 /** The bar under the lines picked in a diff, and the form that adds a comment on them to the Review draft. */
 export function LineCommentBox({ path, range, onClose }: LineCommentSlotProps) {
 	const { addComment } = useCodeControls();
-	const [writing, setWriting] = useState(false);
-	const [body, setBody] = useState("");
-	const add = useAction(async () => {
-		await addComment(path, { line: range.end, startLine: range.start === range.end ? null : range.start, side: range.side, body: body.trim() });
+	// The comment being typed, `null` while its form is closed: Escape drops the text with the form.
+	const [body, setBody] = useState<string | null>(null);
+	const add = useAction(async (text: string) => {
+		await addComment(path, { line: range.end, startLine: range.start === range.end ? null : range.start, side: range.side, body: text });
 		toasts.add({ title: "Comment added to Review draft" });
 		onClose();
 	}, "Could not add the comment");
@@ -38,19 +38,19 @@ export function LineCommentBox({ path, range, onClose }: LineCommentSlotProps) {
 				<span>
 					{range.side === "LEFT" ? "Old" : "New"} {lines}
 				</span>
-				<Button size="xs" variant="outline" leadingIcon={MessageSquarePlus} onClick={() => setWriting(true)}>
+				<Button size="xs" variant="outline" leadingIcon={MessageSquarePlus} onClick={() => setBody(open => open ?? "")}>
 					Add comment
 				</Button>
 				<Button size="xs" variant="ghost" onClick={onClose}>
 					Cancel
 				</Button>
 			</div>
-			{writing && (
+			{body !== null && (
 				<form
 					className="mt-2 space-y-2"
 					onSubmit={event => {
 						event.preventDefault();
-						if (body.trim()) add.run();
+						if (body.trim()) add.run(body.trim());
 					}}
 				>
 					<textarea
@@ -63,7 +63,7 @@ export function LineCommentBox({ path, range, onClose }: LineCommentSlotProps) {
 							if (event.nativeEvent.isComposing) return;
 							if (event.key === "Escape") {
 								event.preventDefault();
-								setWriting(false);
+								setBody(null);
 							} else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
 								event.preventDefault();
 								event.currentTarget.form?.requestSubmit();

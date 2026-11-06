@@ -11,6 +11,7 @@ import { useAction } from "../../use-action";
 import { MoreActionsMenu } from "../more-actions-menu";
 import { LoadNote } from "../sheet-details";
 import { Callout, IntegrationList, MetaDot } from "../integrations/integration-row";
+import { Confirm } from "../integrations/mcp-connection-controls";
 import { Section } from "./editor";
 import { ProviderLogo } from "./provider-logos";
 
@@ -135,38 +136,20 @@ function LoginCallout({ login }: { login: ProviderLogin }) {
 /** One stored credential, and the question that signs omp out of it. */
 function AccountLine({ provider, account }: { provider: ModelProvider; account: ProviderAccount }) {
 	const [confirming, setConfirming] = useState(false);
-	const signOut = useAction(async () => {
-		const answer = await putJson<ProvidersAnswer>("/api/providers/sign-out", { provider: provider.id, credentialId: account.credentialId });
-		providersStore.update(() => answer);
-	}, null);
-	const signingOut = signOut.pending;
-	const error = signOut.error;
-
 	if (confirming) {
+		// The sign-out lives in the question, so Cancel drops a failure with it.
 		return (
-			<Callout
-				tone="danger"
+			<Confirm
 				icon={LogOut}
-				role="group"
-				label={`Sign omp out of ${account.label}?`}
-				action={
-					<div className="flex items-center gap-2">
-						<Button variant="ghost" size="compact" autoFocus disabled={signingOut} onClick={() => setConfirming(false)}>
-							Cancel
-						</Button>
-						<Button size="compact" loading={signingOut} onClick={() => signOut.run()}>
-							Sign out
-						</Button>
-					</div>
-				}
-			>
-				Remove {account.label} from omp? Sessions stop using it for {provider.name}.
-				{error && (
-					<p role="alert" className="mt-1">
-						Sign-out failed: {error}
-					</p>
-				)}
-			</Callout>
+				question={`Sign omp out of ${account.label}?`}
+				detail={`Sessions stop using it for ${provider.name}.`}
+				confirm="Sign out"
+				run={async () => {
+					const answer = await putJson<ProvidersAnswer>("/api/providers/sign-out", { provider: provider.id, credentialId: account.credentialId });
+					providersStore.update(() => answer);
+				}}
+				onDone={() => setConfirming(false)}
+			/>
 		);
 	}
 	return (

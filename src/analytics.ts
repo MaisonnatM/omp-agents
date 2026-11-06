@@ -1,8 +1,8 @@
 import { basename, isAbsolute, relative, sep } from "node:path";
 import type { FileUsage, ForeignRequest } from "./foreign/usage";
-import type { StatsDashboard, StatsProviderPoint, StatsUsage } from "./omp/module-types/stats";
+import type { StatsDashboard, StatsProviderPoint, StatsSync, StatsUsage } from "./omp/module-types/stats";
 import type { SessionModelRow, StatsRead, StatsWindow } from "./omp/stats";
-import type { Analytics, AnalyticsProviderUsage, AnalyticsRange, AnalyticsSession, TokenCounts, Usage } from "./shared/analytics";
+import type { Analytics, AnalyticsProviderUsage, AnalyticsRange, AnalyticsSession, AnalyticsSync, TokenCounts, Usage } from "./shared/analytics";
 import { selectorOf } from "./shared/models";
 
 /** How many sessions the page lists. */
@@ -218,6 +218,18 @@ export function withForeignUsage(read: StatsRead, files: Iterable<FileUsage>): S
 	return { ...read, dashboard: { overall, byModel: [...byModel.values()], byAgentType: [...byAgentType.values()] }, rows, providerSeries: [...points.values()] };
 }
 
+/** omp-stats' sync, which carries every field in every phase, as the phase it is in. */
+function syncOf({ phase, current, total, error }: StatsSync): AnalyticsSync {
+	switch (phase) {
+		case "idle":
+			return { phase };
+		case "syncing":
+			return { phase, current, total };
+		case "error":
+			return { phase, error: error ?? "Unknown error" };
+	}
+}
+
 /** The page's payload from one omp-stats read over `range`. */
 export function buildAnalytics(range: AnalyticsRange, read: StatsRead, root: string, factsOf: (sessionId: string) => SessionSummary | null): Analytics {
 	const { dashboard, tools, sync } = read;
@@ -228,7 +240,7 @@ export function buildAnalytics(range: AnalyticsRange, read: StatsRead, root: str
 	}
 	return {
 		range,
-		sync: { phase: sync.phase, current: sync.current, total: sync.total, lastSyncedAt: sync.lastSyncedAt, error: sync.error },
+		sync: syncOf(sync),
 		totals: usageOf(dashboard.overall),
 		...chartOf(read.providerSeries, read.window),
 		models: dashboard.byModel

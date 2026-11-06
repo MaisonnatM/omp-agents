@@ -31,18 +31,15 @@ function LabelChips({ labels }: { labels: PullRequestDetail["labels"] }) {
 }
 
 function Description({ detail, send }: { detail: PullRequestDetail; send: SendPullRequest }) {
-	const [editing, setEditing] = useState(false);
-	const [body, setBody] = useState(detail.body);
-	const [original, setOriginal] = useState(detail.body);
+	// The text being typed and the description it started from, `null` while the description shows.
+	const [draft, setDraft] = useState<{ body: string; original: string } | null>(null);
 	const save = useAction(async () => {
+		if (draft === null) return;
+		const { body, original } = draft;
 		if (body !== original) await send({ field: "body", body, original, ...(!body.trim() ? { allowEmpty: true } : {}) });
-		setEditing(false);
+		setDraft(null);
 	}, "Could not save the description");
-	const edit = (): void => {
-		setBody(detail.body);
-		setOriginal(detail.body);
-		setEditing(true);
-	};
+	const editing = draft !== null;
 	return (
 		// Keyed on editing, so a collapsed section opens again for its editor.
 		<SummarySection
@@ -50,13 +47,13 @@ function Description({ detail, send }: { detail: PullRequestDetail; send: SendPu
 			title="Description"
 			actions={
 				!editing && (
-					<Button size="icon-xs" variant="ghost-muted" aria-label="Edit description" onClick={edit}>
+					<Button size="icon-xs" variant="ghost-muted" aria-label="Edit description" onClick={() => setDraft({ body: detail.body, original: detail.body })}>
 						<Pencil aria-hidden className="size-3" />
 					</Button>
 				)
 			}
 		>
-			{editing ? (
+			{draft !== null ? (
 				<form
 					className="space-y-2"
 					onSubmit={event => {
@@ -67,22 +64,22 @@ function Description({ detail, send }: { detail: PullRequestDetail; send: SendPu
 						if (event.key !== "Escape" || save.pending) return;
 						event.preventDefault();
 						event.stopPropagation();
-						setEditing(false);
+						setDraft(null);
 					}}
 				>
 					<textarea
 						autoFocus
 						aria-label="Pull request description"
 						placeholder="Describe this pull request"
-						value={body}
+						value={draft.body}
 						maxLength={MAX_PULL_REQUEST_BODY}
 						disabled={save.pending}
 						rows={10}
-						onChange={event => setBody(event.target.value)}
+						onChange={event => setDraft({ ...draft, body: event.target.value })}
 						className="block max-h-[60vh] min-h-40 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
 					/>
 					<div className="flex justify-end gap-1">
-						<Button type="button" variant="ghost" size="xs" disabled={save.pending} onClick={() => setEditing(false)}>
+						<Button type="button" variant="ghost" size="xs" disabled={save.pending} onClick={() => setDraft(null)}>
 							Cancel
 						</Button>
 						<Button type="submit" variant="outline" size="xs" loading={save.pending}>

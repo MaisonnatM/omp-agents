@@ -25,7 +25,7 @@ const integrations: IntegrationsAnswer = {
 const usage: Usage = { requests: 2, failed: 0, tokens: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0, total: 3 }, cost: 0.1, cacheRate: 0 };
 const analytics: Analytics = {
 	range: "24h",
-	sync: { phase: "idle", current: 1, total: 1, lastSyncedAt: 1, error: null },
+	sync: { phase: "syncing", current: 1, total: 2 },
 	totals: usage,
 	providers: [{ provider: "anthropic", tokens: 3, cost: 0.1, requests: 2 }],
 	series: [{ start: 1, tokens: 3, cost: 0.1, requests: 2, providers: [{ provider: "anthropic", tokens: 3, cost: 0.1, requests: 2 }] }],

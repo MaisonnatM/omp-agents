@@ -1,5 +1,5 @@
 /** The Analytics tab's ranges and token usage. */
-import { arrayOf, decoder, fields, isBoolean, isNumber, isString, isTexts, nullable, oneOf, type Shape } from "../json";
+import { arrayOf, decoder, fields, isBoolean, isNumber, isString, isTexts, nullable, oneOf, type Shape, tagged } from "../json";
 
 /** The time ranges the Analytics tab reads, shortest first; `today` starts at local midnight and `all` has no start. */
 export const ANALYTICS_RANGES = ["today", "24h", "7d", "30d", "90d", "all"] as const;
@@ -36,11 +36,13 @@ export interface AnalyticsProviderUsage {
 	requests: number;
 }
 
+/** How far omp-stats has indexed the session files: `syncing` counts the files done of all, which grow while it syncs, and `error` says why the last sync failed. */
+export type AnalyticsSync = { phase: "idle" } | { phase: "syncing"; current: number; total: number } | { phase: "error"; error: string };
+
 /** Request usage over one time range, from omp-stats and Claude Code's and Codex's transcripts. */
 export interface Analytics {
 	range: AnalyticsRange;
-	/** How far omp-stats has indexed the session files; numbers grow while it syncs. */
-	sync: { phase: "idle" | "syncing" | "error"; current: number; total: number; lastSyncedAt: number | null; error: string | null };
+	sync: AnalyticsSync;
 	totals: Usage;
 	/** Recorded request providers, most tokens first, then lexical provider order. */
 	providers: AnalyticsProviderUsage[];
@@ -90,13 +92,7 @@ const isProviderUsage = fields<AnalyticsProviderUsage>({ provider: isString, tok
 export const decodeAnalytics = decoder(
 	fields<Analytics>({
 		range: oneOf(ANALYTICS_RANGES),
-		sync: fields<Analytics["sync"]>({
-			phase: oneOf(["idle", "syncing", "error"]),
-			current: isNumber,
-			total: isNumber,
-			lastSyncedAt: nullable(isNumber),
-			error: nullable(isString),
-		}),
+		sync: tagged<AnalyticsSync, "phase">("phase", { idle: {}, syncing: { current: isNumber, total: isNumber }, error: { error: isString } }),
 		totals: isUsage,
 		providers: arrayOf(isProviderUsage),
 		series: arrayOf(fields<Analytics["series"][number]>({ start: isNumber, tokens: isNumber, cost: isNumber, requests: isNumber, providers: arrayOf(isProviderUsage) })),

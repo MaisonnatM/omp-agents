@@ -12,12 +12,7 @@ interface Grammars {
 const NO_GRAMMARS: Grammars = { registered: () => false, highlight: () => ({ type: "root", children: [] }) };
 
 /** The grammars, a chunk of their own: until they land, every text highlights as uncolored lines. */
-const grammars = loadedOnce<Grammars>(() =>
-	import("lowlight").then(
-		({ common, createLowlight }) => createLowlight(common),
-		() => NO_GRAMMARS,
-	),
-);
+const grammars = loadedOnce<Grammars>(() => import("lowlight").then(({ common, createLowlight }) => createLowlight(common)), NO_GRAMMARS);
 
 export const loadGrammars = (): Promise<unknown> => grammars.load();
 

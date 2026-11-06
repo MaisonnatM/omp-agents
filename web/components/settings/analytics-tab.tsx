@@ -161,7 +161,7 @@ export function AnalyticsTab({ active }: { active: boolean }) {
 		<div className="space-y-7">
 			<RangePicker range={range} onChange={setRange} />
 			{data?.sync.phase === "syncing" && <p role="status" className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">Indexing sessions… {data.sync.total > 0 && `${full.format(data.sync.current)} of ${full.format(data.sync.total)}`}</p>}
-			{data?.sync.phase === "error" && <p role="alert" className="text-sm text-red-600 dark:text-red-400">Indexing failed. omp will retry: {data.sync.error ?? "Unknown error"}</p>}
+			{data?.sync.phase === "error" && <p role="alert" className="text-sm text-red-600 dark:text-red-400">Indexing failed. omp will retry: {data.sync.error}</p>}
 			{error && data && <p role="alert" className="text-sm text-red-600 dark:text-red-400">Cannot refresh analytics: {error}</p>}
 			<div aria-busy={switching || undefined} className={cn("transition-opacity duration-150", switching && "opacity-50")}>
 				{!data ? <LoadNote loading="Reading omp's usage…" error={error} /> : data.totals.requests === 0 ? (
