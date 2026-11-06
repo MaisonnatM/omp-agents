@@ -133,9 +133,9 @@ describe("parsePlanUsage", () => {
 		});
 		const plans = parsePlanUsage(stdout);
 		expect(plans.map(plan => [plan.windows.length, plan.extra])).toEqual([
-			[1, { used: 12.4, limit: 50, title: "Claude Extra Usage", exhausted: false }],
-			[0, { used: 3, limit: null, title: "Claude Extra Usage", exhausted: false }],
-			[0, { used: 50, limit: 50, title: "Claude Extra Usage", exhausted: true }],
+			[1, { used: 12.4, limit: 50, currency: "USD", title: "Claude Extra Usage", exhausted: false }],
+			[0, { used: 3, limit: null, currency: "USD", title: "Claude Extra Usage", exhausted: false }],
+			[0, { used: 50, limit: 50, currency: "USD", title: "Claude Extra Usage", exhausted: true }],
 			[1, null],
 		]);
 		expect(plans[3]?.windows[0]).toMatchObject({ remaining: 0.75, usd: { used: 5, limit: 20 } });
@@ -145,6 +145,130 @@ describe("parsePlanUsage", () => {
 	test("rejects output that is not a usage report", () => {
 		expect(() => parsePlanUsage("Error: not logged in")).toThrow();
 		expect(() => parsePlanUsage(JSON.stringify({ generatedAt: 1 }))).toThrow("omp usage --json printed no reports");
+	});
+});
+
+describe("Claude raw billing", () => {
+	const identity = { accountId: "account-a", email: "maxence@yampa.ai", orgId: "org-a" };
+	const money = (amount_minor: unknown = 1365, currency: unknown = "EUR", exponent: unknown = 2) => ({ amount_minor, currency, exponent });
+	const spend = (used: unknown = money(), cap: unknown = null) => ({ enabled: true, used, limit: cap });
+	const report = (raw: unknown, metadata: Record<string, unknown> = identity, limits: unknown[] = []) => ({ provider: "anthropic", metadata, limits, raw });
+	const cli = (metadata: Record<string, unknown> = identity, limits: unknown[] = []) => report(undefined, metadata, limits);
+	const normalized = { id: "anthropic:extra", label: "Claude Extra Usage", amount: { unit: "usd", used: 3, limit: 50 } };
+	const parse = (raw: unknown, limits: unknown[] = []) => parsePlanUsage(JSON.stringify({ reports: [cli(identity, limits)] }), [report(raw)]);
+
+	test("keeps EUR 13.65 with no cap even when the CLI report has no limits", () => {
+		expect(parse({ spend: spend() })).toEqual([{
+			provider: "anthropic",
+			name: "Anthropic",
+			account: "maxence@yampa.ai",
+			windows: [],
+			extra: { used: 13.65, limit: null, currency: "EUR", title: "Claude Extra Usage", exhausted: false },
+			resetCredits: null,
+		}]);
+	});
+
+	test("keeps CLI quota windows and reset credits when raw billing supplements them", () => {
+		const quota = limit("Custom Claude quota", "custom", { remainingFraction: 0.25 });
+		const stdout = JSON.stringify({ reports: [{ ...cli(identity, [quota]), resetCredits: { availableCount: 2 } }] });
+		const plan = parsePlanUsage(stdout, [report({ spend: spend() }, identity, [limit("Ignored native quota", "5h", { remainingFraction: 1 })])])[0];
+		expect(plan?.windows).toEqual([{ id: "custom", label: "custom", title: "Custom Claude quota", remaining: 0.25, resetsAt: 1790870400000, exhausted: false }]);
+		expect(plan?.resetCredits).toEqual({ count: 2, nextExpiresAt: null });
+		expect(plan?.extra?.currency).toBe("EUR");
+	});
+
+	test("preserves normalized USD spend when raw billing is absent or invalid", () => {
+		for (const raw of [undefined, {}, { spend: { enabled: true } }, { spend: spend(money(), money(5000, "USD")) }]) {
+			expect(parse(raw, [normalized])[0]?.extra).toEqual({ used: 3, limit: 50, currency: "USD", title: "Claude Extra Usage", exhausted: false });
+		}
+		expect(parse({ spend: spend(money(1365, "USD"), money(5000, "usd")) })[0]?.extra)
+			.toEqual({ used: 13.65, limit: 50, currency: "USD", title: "Claude Extra Usage", exhausted: false });
+	});
+
+	test("only compares matching currencies and allows distinct valid exponents", () => {
+		expect(parse({ spend: spend(money(1365, "eur"), money(100, "EUR", 1)) })[0]?.extra)
+			.toEqual({ used: 13.65, limit: 10, currency: "EUR", title: "Claude Extra Usage", exhausted: true });
+		for (const cap of [money(5000, "USD"), money(0), money(-1), {}]) {
+			expect(parse({ spend: spend(money(), cap) })).toEqual([]);
+		}
+	});
+
+	test("disabled modern billing suppresses stale CLI extra and does not revive legacy spend", () => {
+		const legacy = { is_enabled: true, used_credits: 2000, monthly_limit: 5000 };
+		expect(parse({ spend: { enabled: false }, extra_usage: legacy }, [normalized])).toEqual([]);
+		expect(parse({ extra_usage: { is_enabled: false } }, [normalized])).toEqual([]);
+		const quota = limit("Claude 5 Hour", "5h", { remainingFraction: 0.5 });
+		expect(parse({ spend: { enabled: false } }, [quota, normalized])[0]?.extra).toBeNull();
+	});
+
+	test("reads legacy cents only without a modern spend observation", () => {
+		const legacy = { is_enabled: true, used_credits: 1365, monthly_limit: null };
+		expect(parse({ extra_usage: legacy })[0]?.extra).toEqual({ used: 13.65, limit: null, currency: "USD", title: "Claude Extra Usage", exhausted: false });
+		expect(parse({ extra_usage: { ...legacy, currency: "EUR" } })[0]?.extra?.currency).toBe("EUR");
+		expect(parse({ spend: { enabled: true }, extra_usage: legacy })).toEqual([]);
+		expect(parse({ spend: { enabled: true }, extra_usage: legacy }, [normalized])[0]?.extra?.used).toBe(3);
+	});
+
+	test("rejects malformed amounts, currencies, exponents, and missing caps", () => {
+		const invalid = [
+			money(-1), money(1.5), money("1365"), money(Number.MAX_SAFE_INTEGER + 1),
+			money(NaN), money(Infinity), money(1, "EU"), money(1, "EURO"),
+			money(1, "12A"), money(1, null), money(1, "EUR", -1),
+			money(1, "EUR", 1.5), money(1, "EUR", 10), money(1, "EUR", "2"),
+		];
+		for (const used of invalid) expect(parse({ spend: spend(used) })).toEqual([]);
+		for (const cap of invalid) expect(parse({ spend: spend(money(), cap) })).toEqual([]);
+		for (const value of [{ enabled: true, used: money() }, { enabled: "true", used: money(), limit: null }]) {
+			expect(parse({ spend: value })).toEqual([]);
+		}
+	});
+
+	test("matches account and organization rather than an email shared across subscriptions", () => {
+		const stdout = JSON.stringify({ reports: [
+			cli(identity, [normalized]),
+			cli({ ...identity, orgId: "org-b" }, [normalized]),
+			cli({ ...identity, accountId: "account-b" }, [normalized]),
+		] });
+		const plans = parsePlanUsage(stdout, [report({ spend: spend() })]);
+		expect(plans.map(plan => [plan.extra?.used, plan.extra?.currency])).toEqual([[13.65, "EUR"], [3, "USD"], [3, "USD"]]);
+	});
+
+	test("uses email only when an account id is unavailable and the organization matches", () => {
+		const emailOnly = { email: identity.email.toUpperCase(), orgId: identity.orgId };
+		const stdout = JSON.stringify({ reports: [cli()] });
+		expect(parsePlanUsage(stdout, [report({ spend: spend() }, emailOnly)])[0]?.extra?.used).toBe(13.65);
+		expect(parsePlanUsage(stdout, [report({ spend: spend() }, { ...emailOnly, orgId: "org-b" })])).toEqual([]);
+		expect(parsePlanUsage(stdout, [report({ spend: spend() }, { email: identity.email })])).toEqual([]);
+	});
+
+	test("does not attach ambiguous native or CLI identities", () => {
+		const raw = report({ spend: spend() });
+		const stdout = JSON.stringify({ reports: [cli()] });
+		expect(parsePlanUsage(stdout, [raw, raw])).toEqual([]);
+		const emailOnly = { email: identity.email, orgId: identity.orgId };
+		const accounts = JSON.stringify({ reports: [cli(), cli({ ...identity, accountId: "account-b" })] });
+		expect(parsePlanUsage(accounts, [report({ spend: spend() }, emailOnly)])).toEqual([]);
+		expect(parsePlanUsage(stdout, [
+			report({ spend: spend() }, emailOnly),
+			report({ spend: spend() }, { ...identity, accountId: "account-b" }),
+		])).toEqual([]);
+		const scoped = [limit("Quota", "5h", { remainingFraction: 1 }, { scope: { accountId: "different-account" } })];
+		expect(parsePlanUsage(stdout, [report({ spend: spend() }, identity, scoped)])).toEqual([]);
+	});
+
+	test("keeps Claude euros without an organization and leaves another provider's extra alone", () => {
+		const cursorExtra = { id: "cursor:extra", label: "Cursor extra", amount: { unit: "usd", used: 5, limit: null } };
+		const cursor = { ...cli({ accountId: "cursor-account", email: "maxence@yampa.ai" }, [cursorExtra]), provider: "cursor" };
+		const stdout = JSON.stringify({ reports: [cursor, cli({ accountId: identity.accountId, email: identity.email })] });
+		const plans = parsePlanUsage(stdout, [
+			{ ...report({ spend: { enabled: false } }), provider: "cursor", metadata: { accountId: "cursor-account", email: "maxence@yampa.ai" } },
+			report({ spend: spend() }),
+		]);
+		expect(plans.map(plan => [plan.provider, plan.extra?.used, plan.extra?.currency])).toEqual([
+			["cursor", 5, "USD"],
+			["anthropic", 13.65, "EUR"],
+		]);
+		expect(parsePlanUsage(JSON.stringify({ reports: [cursor] }), [report({ spend: spend() })])[0]?.extra?.used).toBe(5);
 	});
 });
 

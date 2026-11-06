@@ -8,6 +8,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Behind the scenes: agents can list shared project memory even when their provider supplies empty fields for unused options.
 - Behind the scenes: the saved runtime fixes let agents read selected lines of tool help without losing the tool or flooding the conversation with its inventory.
 - Behind the scenes: historical consults now explain when an exact session file is needed, and the Memory curator uses it when working across projects.
+- Fixed: Claude extra usage now appears automatically in the account's billing currency, including euros, in the bottom bar and model menu.
 
 ## 2026-11-05
 

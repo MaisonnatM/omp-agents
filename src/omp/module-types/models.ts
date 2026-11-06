@@ -32,6 +32,14 @@ export interface OAuthLoginController {
 export interface OAuthLoginIdentity {
 	type: "oauth" | "api_key";
 }
+/** The usage report fields retained by omp's credential store, including the provider's unnormalized response. */
+export interface UsageReport {
+	provider: string;
+	limits: unknown[];
+	metadata?: Record<string, unknown>;
+	raw?: unknown;
+}
+
 /** Subset of omp's `AuthStorage` (pi-ai src/auth-storage.ts) this app reads and writes. */
 export interface AuthStorage {
 	/** Where `provider`'s credential comes from (a login, a stored key, an environment variable), `undefined` with none. */
@@ -47,6 +55,8 @@ export interface AuthStorage {
 	};
 	/** Runs `provider`'s `/login` flow and stores what it returns; `undefined` when it stored nothing. */
 	oauth: { login(provider: string, controller: OAuthLoginController): Promise<OAuthLoginIdentity | undefined> };
+	/** Native reports retain provider billing fields that the CLI's normalized amounts cannot express. */
+	usage: { reports(options?: { provider?: string; signal?: AbortSignal }): Promise<UsageReport[] | null> };
 	close(): void;
 }
 export interface AuthModule {

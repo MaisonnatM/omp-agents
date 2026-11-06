@@ -54,7 +54,9 @@
   A name counts as the model omp runs for it, so a fallback of `cursor/grok-4.7-high` lists `cursor/grok-4.7`.
   The providers that `modelProviderOrder` names come first, in that order.
   Typing searches every connected model, and every word typed must appear in the model's selector, label, or name, in any order.
-  Each provider's heading shows how much of its plan is used, by the tightest window of the account with the most left, since omp moves to that account, then the dollars that account spent on extra usage, as `77% used · $12.40 extra`; hover it for that account's windows and the extra usage cap.
+  Each provider's heading shows how much of its plan is used, by the tightest window of the account with the most left, since omp moves to that account, then that account's extra usage spend, as `77% used · €13.65 extra`.
+  Extra usage keeps the provider's billing currency without conversion.
+  Hover the heading for that account's windows and the extra usage cap, when the provider reports one.
   The list contains models that the session's omp RPC process offers from providers you are connected to: the ones omp's `/login` marks as signed in or given a key, and a provider whose model config sets an API key.
   Models that omp finds without a login, such as Apple's on-device model or a local Ollama, stay out of the list.
   A login made in a terminal shows the next time the menu opens.

@@ -62,7 +62,7 @@ describe("providerQuota", () => {
 		extra,
 		resetCredits: null,
 	});
-	const spent: ExtraUsage = { used: 12.4, limit: 50, title: "Claude Extra Usage", exhausted: false };
+	const spent: ExtraUsage = { used: 12.4, limit: 50, currency: "USD", title: "Claude Extra Usage", exhausted: false };
 
 	test("the tightest window of the account with the most left, with that account's windows and extra usage", () => {
 		const work = plan("anthropic", [0.8, 0.25], "work", spent);

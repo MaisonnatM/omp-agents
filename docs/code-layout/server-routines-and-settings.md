@@ -17,7 +17,8 @@
 - `src/pull-request-actions.ts`: the pull request actions, which pull requests each applies to and its prompt, which the Pull requests page's quick actions and a PR shepherd's fixes use; both rebasing prompts share `CONFLICT_STEPS`, how a session works through each commit a rebase stops at.
 - `src/shared/shepherd.ts`: what a PR shepherd's `fix_pull_request` and `queue_merge` tools ask of the server, `ShepherdRequest` and its parser, and a new shepherd's job and starter routine; `src/omp/shepherd-extension.ts` is the omp extension that gives only a shepherd's session those tools; see [Bots](../architecture/bots.md#pr-shepherds).
 - `src/pull-request-approval.ts`: `unapprovedChange`, whether a pull request's head has the same stable `git patch-id` as a commit a reviewer approved, which a shepherd's merge needs.
-- `src/usage.ts`: runs `omp usage --json` and parses it into plan windows, and names a provider as the page shows it (`providerName`).
+- `src/usage.ts`: runs `omp usage --json`, parses CLI plan windows, and supplements Claude extra usage through `src/omp/usage.ts` in the original billing currency.
+  It names a provider as the page shows it (`providerName`).
   `src/console-credits.ts` reads a Firefox or Zen Claude Console session for the API credits row's monthly grant.
   `src/server/usage-poll.ts` (`UsagePoll`) runs it for the dashboard: on the usage tick and a page's open, each followed by the plan notice check, and fresh for a continue, which skips that check.
 - `src/system-load.ts`: reads the machine's CPU percent, available memory, and free disk space for `GET /api/system`; `src/shared/system.ts` holds the shape the page shares.

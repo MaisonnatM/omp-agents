@@ -1,6 +1,6 @@
 /** How much of each provider plan's usage windows is left, shown in the status bar and the model menu. */
 import { createContext } from "react";
-import { type CreditBalance, type ExtraUsage, isNameOnlyPlan, type PlanUsage, type PlanWindow, type ResetCredits, type UsdAmount } from "../../src/shared/models";
+import { type CreditBalance, type ExtraUsage, isNameOnlyPlan, type PlanUsage, type PlanWindow, type ResetCredits } from "../../src/shared/models";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { DashboardState } from "../dashboard-state";
@@ -15,8 +15,18 @@ export const NO_PLANS: readonly PlanUsage[] = [];
 /** The plans of the last `omp usage` run, for the model menu's quota line per provider. */
 export const Plans = createContext<readonly PlanUsage[]>(NO_PLANS);
 
-/** Dollars spent, out of the cap when there is one: `$12.40 / $50.00`. */
-export const spendLabel = ({ used, limit }: UsdAmount): string => (limit === null ? dollars(used) : `${dollars(used)} / ${dollars(limit)}`);
+const currencyFormats = new Map<string, Intl.NumberFormat>();
+
+/** Spend in the billing currency, with its cap when present; USD retains sub-cent precision. */
+export function spendLabel({ used, limit, currency = "USD" }: Pick<ExtraUsage, "used" | "limit"> & { currency?: string }): string {
+	let formatter = currencyFormats.get(currency);
+	if (currency !== "USD" && !formatter) {
+		formatter = new Intl.NumberFormat("en-US", { style: "currency", currency });
+		currencyFormats.set(currency, formatter);
+	}
+	const format = currency === "USD" ? dollars : formatter!.format;
+	return limit === null ? format(used) : `${format(used)} / ${format(limit)}`;
+}
 
 function WindowLeft({ window }: { window: PlanWindow }) {
 	const percent = Math.round(window.remaining * 100);

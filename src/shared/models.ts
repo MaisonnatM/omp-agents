@@ -25,8 +25,11 @@ export interface UsdAmount {
 	limit: number | null;
 }
 
-/** Pay-as-you-go spend past the plan's windows, such as Claude's extra usage: a USD limit without a window. */
-export interface ExtraUsage extends UsdAmount {
+/** Pay-as-you-go spend past the plan's windows, in the account's billing currency. */
+export interface ExtraUsage {
+	used: number;
+	limit: number | null;
+	currency: string;
 	/** omp's name for the limit, e.g. `Claude Extra Usage`. */
 	title: string;
 	exhausted: boolean;

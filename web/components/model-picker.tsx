@@ -28,7 +28,6 @@ import { CommandResults, type PickerGroup, type PickerList } from "./command-pic
 import { ComposerEditor } from "./composer";
 import { OrgIcon } from "./org-icon";
 import { NO_PLANS, Plans, spendLabel } from "./plan-usage";
-import { dollars } from "./settings/analytics-format";
 
 /** Truncates a model's name without clipping descenders such as Opus's p: the padding gives `overflow:hidden` room below the line, and the negative margin takes it back. */
 export const MODEL_NAME_TRUNCATE = "truncate py-1 -my-1";
@@ -67,7 +66,7 @@ function ProviderHeading({ provider, plans = NO_PLANS }: { provider: string; pla
 	const parts = quota && [
 		...(quota.used === null ? [] : [`${Math.round(quota.used * 100)}% used`]),
 		...(quota.balance ? [spendLabel(quota.balance)] : []),
-		...(quota.extra ? [`${dollars(quota.extra.used)} extra`] : []),
+		...(quota.extra ? [`${spendLabel({ ...quota.extra, limit: null })} extra`] : []),
 	];
 	return (
 		<span className="flex w-full items-center gap-1.5">
