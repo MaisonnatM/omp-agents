@@ -3,9 +3,9 @@ import { type FormEvent, type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { TrustChange, TrustedProject } from "../../../src/shared/project-trust";
 import type { Workspace, WorkspaceChange, WorkspaceList } from "../../../src/shared/workspaces";
-import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
 import { folderName } from "../../labels";
+import { useAction } from "../../use-action";
 import { IntegrationList } from "../integrations/integration-row";
 import { Section } from "./editor";
 
@@ -36,23 +36,14 @@ interface WorkspacesTabProps {
 
 /** Sends changes to `url` one at a time: the change under way, and why the last one failed. Every page then hears the list after it over its socket. */
 function useChanges<C>(url: string) {
-	const [pending, setPending] = useState<C | null>(null);
-	const [error, setError] = useState<string | null>(null);
-	/** Whether the server took `next`. */
-	const change = async (next: C): Promise<boolean> => {
-		setPending(next);
-		setError(null);
-		try {
-			await putJson(url, next);
-			return true;
-		} catch (err) {
-			setError(errorText(err));
-			return false;
-		} finally {
-			setPending(null);
-		}
-	};
-	return { pending, error, change };
+	const action = useAction(async (next: C, done: () => void) => {
+		await putJson(url, next);
+		done();
+	}, null);
+	const pending = action.state.kind === "pending" ? action.state.args[0] : null;
+	/** Sends `next`, then runs `done` once the server took it. */
+	const change = (next: C, done = (): void => {}): void => action.run(next, done);
+	return { pending, error: action.error, change };
 }
 
 function ChangeError({ error }: { error: string | null }) {
@@ -80,7 +71,7 @@ function TrustedProjects({ projects }: { projects: TrustedProject[] }) {
 							workspace={{ cwd: root, cwdDisplay: rootDisplay }}
 							note={pieces === 1 ? "1 piece of agent code" : `${pieces} pieces of agent code`}
 							action={
-								<Button variant="ghost" size="compact" leadingIcon={ShieldOff} loading={pending?.root === root} disabled={pending !== null} onClick={() => void change({ op: "forget", root })}>
+								<Button variant="ghost" size="compact" leadingIcon={ShieldOff} loading={pending?.root === root} disabled={pending !== null} onClick={() => change({ op: "forget", root })}>
 									Stop trusting
 								</Button>
 							}
@@ -97,13 +88,13 @@ export function WorkspacesTab({ workspaces, list: { added, hidden }, trustedProj
 	const addedCwds = new Set(added.map(entry => entry.cwd));
 	const [path, setPath] = useState("");
 	const { pending, error, change } = useChanges<WorkspaceChange>("/api/workspaces");
-	const add = async (event: FormEvent): Promise<void> => {
+	const add = (event: FormEvent): void => {
 		event.preventDefault();
-		if (await change({ op: "add", cwd: path })) setPath("");
+		change({ op: "add", cwd: path }, () => setPath(""));
 	};
 	const choose = async (): Promise<void> => {
 		const cwd = await desktop?.pickDirectory?.();
-		if (cwd) await change({ op: "add", cwd });
+		if (cwd) change({ op: "add", cwd });
 	};
 	return (
 		<>
@@ -138,7 +129,7 @@ export function WorkspacesTab({ workspaces, list: { added, hidden }, trustedProj
 								workspace={workspace}
 								note={addedCwds.has(workspace.cwd) ? "Added" : null}
 								action={
-									<Button variant="ghost" size="compact" leadingIcon={EyeOff} loading={pending?.op === "hide" && pending.cwd === workspace.cwd} disabled={pending !== null} onClick={() => void change({ op: "hide", cwd: workspace.cwd })}>
+									<Button variant="ghost" size="compact" leadingIcon={EyeOff} loading={pending?.op === "hide" && pending.cwd === workspace.cwd} disabled={pending !== null} onClick={() => change({ op: "hide", cwd: workspace.cwd })}>
 										Hide
 									</Button>
 								}
@@ -156,7 +147,7 @@ export function WorkspacesTab({ workspaces, list: { added, hidden }, trustedProj
 								workspace={workspace}
 								note={null}
 								action={
-									<Button variant="ghost" size="compact" leadingIcon={Eye} loading={pending?.op === "show" && pending.cwd === workspace.cwd} disabled={pending !== null} onClick={() => void change({ op: "show", cwd: workspace.cwd })}>
+									<Button variant="ghost" size="compact" leadingIcon={Eye} loading={pending?.op === "show" && pending.cwd === workspace.cwd} disabled={pending !== null} onClick={() => change({ op: "show", cwd: workspace.cwd })}>
 										Show
 									</Button>
 								}

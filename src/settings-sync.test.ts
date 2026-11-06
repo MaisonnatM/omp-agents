@@ -360,4 +360,16 @@ describe("SettingsSync", () => {
 		const last = (await a.sync.sync()).last;
 		expect(last).toMatchObject({ kind: "failed", error: expect.stringContaining("does not appear to be a git repository") });
 	});
+
+	test("drops the outcome of a sync that ran while the remote changed, since it was about the old remote", async () => {
+		const { remote, a } = await pair();
+		const store = a.places.stores.todos;
+		const read = store.read.bind(store);
+		store.read = () => {
+			a.sync.configure({ remote: `${remote}-other`, branch: "main", excluded: [] });
+			return read();
+		};
+		expect((await a.sync.sync()).last).toBeNull();
+		expect(a.sync.answer().settings.remote).toBe(`${remote}-other`);
+	});
 });

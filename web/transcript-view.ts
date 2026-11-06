@@ -5,6 +5,7 @@
 import type { RoutineTask } from "../src/routines";
 import { taskOf, taskText } from "../src/shared/routine-message";
 import { isPrompt, type Item, type PromptItem, type TodoPhase } from "../src/shared/transcript";
+import type { ActionState } from "./use-action";
 
 export type ToolItem = Extract<Item, { kind: "tool" }>;
 /** A tool call or the thinking that sits with it. Consecutive ones render as one activity group between messages. */
@@ -63,6 +64,15 @@ export function withEditedPrompt(blocks: readonly Block[], edit: { item: Extract
 		return blocks.with(edit.position, prompt);
 	}
 	return blocks.toSpliced(Math.min(edit.position, blocks.length), 0, prompt);
+}
+
+/**
+ * Where the resend of `edit` stands, read from the one action that sends it: the text it sent while that runs, or why
+ * it failed. A resend of an earlier edit, such as one that answers after you moved on, shows on neither.
+ */
+export function resendOf<E>(edit: E | null, resend: ActionState<[E, string]>): { submitted: string | null; error: string | null } {
+	if (edit === null || resend.kind === "idle" || resend.args[0] !== edit) return { submitted: null, error: null };
+	return resend.kind === "pending" ? { submitted: resend.args[1], error: null } : { submitted: null, error: resend.error };
 }
 
 /** One turn of a transcript's outline: the prompt that opened it and the reply it ended on. */

@@ -66,7 +66,7 @@ export function exportNotes(editor: LexicalEditor): string {
 export interface NotesSync {
 	/** Save now what changed since the last load or save. */
 	save(): void;
-	/** The saved notes changed: an echo of a save is ignored, and another window's change shows unless you have changed the text. */
+	/** The saved notes changed: they show once no save waits for the server, unless you have changed the text. */
 	receive(value: string): void;
 	/** Save what changed and stop listening. */
 	dispose(): void;
@@ -74,24 +74,49 @@ export interface NotesSync {
 
 /**
  * Saves `editor`'s notes through `onSave` `delayMs` after the last change, and on {@link NotesSync.save}. A note you
- * never changed never saves, since exporting would rewrite markdown the editor normalizes.
+ * never changed never saves, since exporting would rewrite markdown the editor normalizes. `onSave` settles once the
+ * server has handled the save; until every save has, what arrives is its echo or older, so it does not replace the text.
+ * A save the server refused leaves the text changed, so it does not get replaced and saves again.
  */
-export function registerNotesSync(editor: LexicalEditor, value: string, onSave: (markdown: string) => void, delayMs: number): NotesSync {
+export function registerNotesSync(editor: LexicalEditor, value: string, onSave: (markdown: string) => Promise<void>, delayMs: number): NotesSync {
 	/** The markdown the editor exports for what was last loaded or saved: the text holds changes only when it differs. */
 	let baseline = exportNotes(editor);
 	/** The saved notes the editor last loaded or saved. */
 	let current = value;
-	/** Saves whose echo has not come back, oldest first. */
-	const sent: string[] = [];
+	/** The saved notes as last heard of: received, or saved since. */
+	let latest = value;
+	/** How many saves the server has not handled yet. */
+	let waiting = 0;
+	let disposed = false;
 	let cancel = (): void => {};
+	/** Shows `latest` once no save waits, unless it shows already or you have changed the text. */
+	const adopt = (): void => {
+		if (disposed || waiting > 0 || latest === current || exportNotes(editor) !== baseline) return;
+		editor.update(() => $importNotes(latest), { discrete: true });
+		editor.dispatchCommand(CLEAR_HISTORY_COMMAND, undefined);
+		current = latest;
+		baseline = exportNotes(editor);
+	};
 	const save = (): void => {
 		cancel();
 		const markdown = exportNotes(editor);
 		if (markdown === baseline) return;
+		const before = baseline;
 		baseline = markdown;
 		current = markdown;
-		sent.push(markdown);
-		onSave(markdown);
+		latest = markdown;
+		waiting += 1;
+		onSave(markdown)
+			.then(
+				() => {},
+				() => {
+					if (baseline === markdown) baseline = before;
+				},
+			)
+			.finally(() => {
+				waiting -= 1;
+				adopt();
+			});
 	};
 	const stop = editor.registerUpdateListener(({ dirtyElements, dirtyLeaves }) => {
 		if (dirtyElements.size === 0 && dirtyLeaves.size === 0) return;
@@ -102,20 +127,13 @@ export function registerNotesSync(editor: LexicalEditor, value: string, onSave: 
 	return {
 		save,
 		receive(value) {
-			const echo = sent.indexOf(value);
-			if (echo >= 0) {
-				sent.splice(0, echo + 1);
-				return;
-			}
-			if (value === current || exportNotes(editor) !== baseline) return;
-			editor.update(() => $importNotes(value), { discrete: true });
-			editor.dispatchCommand(CLEAR_HISTORY_COMMAND, undefined);
-			current = value;
-			baseline = exportNotes(editor);
+			latest = value;
+			adopt();
 		},
 		dispose() {
 			stop();
 			save();
+			disposed = true;
 		},
 	};
 }

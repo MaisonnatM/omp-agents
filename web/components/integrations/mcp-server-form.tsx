@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
 import { mcpServersStore } from "../../reads";
+import { useAction } from "../../use-action";
 import { describedBy, FIELD, Field } from "./client-form";
 import { Callout } from "./integration-row";
 
@@ -19,30 +20,29 @@ export function McpServerForm({ onDone }: { onDone: () => void }) {
 	const [transport, setTransport] = useState<RemoteTransport>("http");
 	const [headerName, setHeaderName] = useState("");
 	const [headerValue, setHeaderValue] = useState("");
-	const [saving, setSaving] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-
-	const save = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
-		event.preventDefault();
-		if (saving) return;
+	const save = useAction(async () => {
 		const value = headerValue.trim();
 		const header = headerName.trim() || value ? { name: headerName.trim(), value } : null;
-		setSaving(true);
-		setError(null);
 		try {
 			await putJson<McpServerRow>("/api/mcp-servers/add", { name: name.trim(), url: url.trim(), transport, header });
 			await mcpServersStore.refresh();
-			onDone();
 		} catch (err) {
 			const message = errorText(err);
-			setError(value ? message.replaceAll(value, "the header's value") : message);
-		} finally {
-			setSaving(false);
+			throw new Error(value ? message.replaceAll(value, "the header's value") : message);
 		}
-	};
+		onDone();
+	}, null);
 
 	return (
-		<form aria-label="Add an MCP server" noValidate onSubmit={event => void save(event)} className="space-y-4 rounded-lg bg-muted/60 p-4 text-[13px]">
+		<form
+			aria-label="Add an MCP server"
+			noValidate
+			onSubmit={(event: FormEvent<HTMLFormElement>) => {
+				event.preventDefault();
+				save.run();
+			}}
+			className="space-y-4 rounded-lg bg-muted/60 p-4 text-[13px]"
+		>
 			<p className="text-pretty text-muted-foreground">Add a remote server by its address. If it signs in with OAuth, Connect on its row once it is added.</p>
 			<div className="grid gap-3 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_10rem]">
 				<Field id={ids.name} label="Name" hint="Prefixes its tools in a session.">
@@ -116,16 +116,16 @@ export function McpServerForm({ onDone }: { onDone: () => void }) {
 					/>
 				</Field>
 			</div>
-			{error && (
+			{save.error && (
 				<Callout tone="danger" icon={CircleAlert} role="alert">
-					Cannot add the server: {error}
+					Cannot add the server: {save.error}
 				</Callout>
 			)}
 			<div className="flex items-center justify-end gap-2">
-				<Button type="button" variant="ghost" size="compact" disabled={saving} onClick={onDone}>
+				<Button type="button" variant="ghost" size="compact" disabled={save.pending} onClick={onDone}>
 					Cancel
 				</Button>
-				<Button type="submit" size="compact" loading={saving}>
+				<Button type="submit" size="compact" loading={save.pending}>
 					Add server
 				</Button>
 			</div>

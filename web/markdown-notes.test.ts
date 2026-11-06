@@ -124,15 +124,25 @@ test("formatting markdown cannot hold does not stay on the text", () => {
 	expect(exportNotes(editor)).toBe("**hi**");
 });
 
-/** A fresh editor holding `markdown`, its sync, and every markdown the sync saved. */
+/** A fresh editor holding `markdown`, its sync, every markdown the sync saved, and the server's answer to each save. */
 function synced(markdown: string) {
 	const notes = newEditor();
 	notes.update(() => $importNotes(markdown), { discrete: true });
 	const saves: string[] = [];
-	const sync = registerNotesSync(notes, markdown, saved => saves.push(saved), 800);
+	const answers: PromiseWithResolvers<void>[] = [];
+	const sync = registerNotesSync(
+		notes,
+		markdown,
+		saved => {
+			saves.push(saved);
+			answers.push(Promise.withResolvers<void>());
+			return answers.at(-1)!.promise;
+		},
+		800,
+	);
 	const type = (text: string): void => notes.update(() => $getRoot().getLastChildOrThrow<ParagraphNode>().append($createTextNode(text)), { discrete: true });
 	const text = (): string => notes.read(() => $getRoot().getTextContent());
-	return { notes, saves, sync, type, text };
+	return { notes, saves, answers, sync, type, text };
 }
 
 test("a note you never changed never saves, even one the editor would write differently", () => {
@@ -179,4 +189,47 @@ test("another window's change shows while you have changed nothing, and waits wh
 	expect(text()).toBe("from elsewhere!");
 	sync.dispose();
 	expect(saves).toEqual(["from elsewhere!"]);
+});
+
+/** Lets the sync act on the server's answers: a zero-delay task runs once every pending promise callback has. */
+function answered(): Promise<void> {
+	const { promise, resolve } = Promise.withResolvers<void>();
+	setTimeout(resolve, 0);
+	return promise;
+}
+
+test("what arrives while a save waits for the server, such as the list a reconnect brings, leaves the saved text alone", async () => {
+	const { answers, sync, type, text } = synced("a");
+	type("b");
+	sync.save();
+	sync.receive("a");
+	expect(text()).toBe("ab");
+	sync.receive("ab");
+	answers[0]!.resolve();
+	await answered();
+	expect(text()).toBe("ab");
+});
+
+test("a change from elsewhere shows once the save is answered, even one that matches the earlier save", async () => {
+	const { answers, sync, type, text } = synced("a");
+	type("b");
+	sync.save();
+	answers[0]!.resolve();
+	await answered();
+	sync.receive("elsewhere");
+	expect(text()).toBe("elsewhere");
+	sync.receive("ab");
+	expect(text()).toBe("ab");
+});
+
+test("a save the server refused keeps the text and saves it again", async () => {
+	const { saves, answers, sync, type, text } = synced("a");
+	type("b");
+	sync.save();
+	answers[0]!.reject(new Error("refused"));
+	await answered();
+	sync.receive("elsewhere");
+	expect(text()).toBe("ab");
+	sync.save();
+	expect(saves).toEqual(["ab", "ab"]);
 });

@@ -834,6 +834,48 @@ describe("DashboardSession reattach", () => {
 		expect(updates.filter(update => update.kind === "exited")).toEqual([{ kind: "exited", ended: true }]);
 	});
 
+	test("a prompt after omp exited, or after the server hung up on it, is refused plainly and never reaches the client", async () => {
+		const exited = new FakeClient();
+		const { exit } = keptOmp(exited);
+		const gone = await DashboardSession.reattach("inst-kept", () => [], () => {}, false);
+		exit.resolve("exit");
+		await settle();
+		await expect(gone.prompt(null, "hello", [], "steer")).rejects.toThrow("This session's omp exited; resume it to send more.");
+		expect(exited.calls).not.toContain("prompt hello");
+
+		const detached = new FakeClient();
+		keptOmp(detached);
+		const left = await DashboardSession.reattach("inst-left", () => [], () => {}, false);
+		await left.dispose();
+		await expect(left.prompt(null, "hello", [], "steer")).rejects.toThrow("The server is restarting; send it again once the session is back.");
+		expect(detached.calls).not.toContain("prompt hello");
+	});
+
+	test("an End session whose stop fails leaves the session running, so omp's later exit is no End", async () => {
+		const client = new FakeClient();
+		const { exit } = keptOmp(client);
+		const updates: DashboardUpdate[] = [];
+		const session = await DashboardSession.reattach("inst-kept", () => [], update => updates.push(update), false);
+		client.stop = async () => {
+			throw new Error("stop timed out");
+		};
+		await expect(session.end()).rejects.toThrow("stop timed out");
+		exit.resolve("exit");
+		await settle();
+		expect(updates.filter(update => update.kind === "exited")).toEqual([{ kind: "exited", ended: false }]);
+	});
+
+	test("a move waiting for the turn's end goes when the turn ends with a question still open", async () => {
+		const client = new FakeClient();
+		keptOmp(client);
+		client.getState = async () => ({ ...STATE, sessionId: "kept-1", isStreaming: true });
+		const session = await DashboardSession.reattach("inst-kept", () => [], () => {}, false);
+		session.moveAfterTurn("/tmp/elsewhere");
+		client.fire({ type: "agent_end", messages: [] });
+		await settle();
+		expect([session.status, client.calls.filter(call => call.startsWith("prompt"))]).toEqual(["needs-input", ["prompt /move /tmp/elsewhere"]]);
+	});
+
 	test("a session attached while it only waits on a background job reads idle until the job's result starts its next turn", async () => {
 		const client = new FakeClient();
 		keptOmp(client);

@@ -9,6 +9,7 @@ import { portFromEnv } from "./server/address";
 import type { PullRequest } from "./shared/github";
 import { hashForSession, type NewSessionRequest } from "./shared/sessions";
 
+/** A task's owner: `sessionId` is `null` while the session launches, and `pid` names the server launching it; once bound, `pid` names the session's omp. */
 export interface TaskClaim {
 	repository: string;
 	identity: string;
@@ -19,6 +20,14 @@ export interface TaskClaim {
 	keeperPidFile: string;
 	port: number;
 }
+
+/**
+ * The launches this process runs, by claims file and instance id. A restart keeps the server's pid, since it runs the
+ * new server in the same process, so a launch it cut off would otherwise still name a running server; this set starts
+ * empty in the new one.
+ */
+const launching = new Set<string>();
+const launchKey = (file: string, instanceId: string): string => `${file}\0${instanceId}`;
 
 /** Live ownership, plus the explicit identity each ended session keeps for its resume, by session id. */
 interface ClaimsFile {
@@ -78,7 +87,10 @@ export class TaskClaims {
 				else if (claim.sessionId) kept.saved[claim.sessionId] = claim.identity;
 			}
 			conflict = kept.claims.find(claim => claim.repository === repository && claim.identity === identity) ?? null;
-			if (!conflict) kept.claims.push({ repository, identity, instanceId, sessionId: null, cwd, pid: process.pid, keeperPidFile: join(keepersDir, `${instanceId}.pid`), port: portFromEnv() });
+			if (!conflict) {
+				kept.claims.push({ repository, identity, instanceId, sessionId: null, cwd, pid: process.pid, keeperPidFile: join(keepersDir, `${instanceId}.pid`), port: portFromEnv() });
+				launching.add(launchKey(this.#file, instanceId));
+			}
 			return kept;
 		});
 		return conflict;
@@ -86,6 +98,7 @@ export class TaskClaims {
 
 	/** Once spawned, the session process, not the dashboard process, owns the task across dashboard restarts. */
 	bind(instanceId: string, pid: number, sessionId: string, cwd: string): void {
+		launching.delete(launchKey(this.#file, instanceId));
 		if (!existsSync(this.#file)) return;
 		this.#change(file => {
 			if (!file.claims.some(claim => claim.instanceId === instanceId)) return file;
@@ -96,6 +109,7 @@ export class TaskClaims {
 
 	/** Releases a failed launch or an ended session, which keeps its identity for a later resume. */
 	release(instanceId: string): void {
+		launching.delete(launchKey(this.#file, instanceId));
 		if (!existsSync(this.#file)) return;
 		this.#change(file => {
 			const released = file.claims.find(claim => claim.instanceId === instanceId);
@@ -143,8 +157,14 @@ export class TaskClaims {
 		return file;
 	}
 
+	/**
+	 * Whether `owner` still works on its task: its omp, once bound, or else the server launching it, which is this process
+	 * only for a launch it started. Either way a keeper the launch already started holds it too, since the next server
+	 * reattaches that keeper and binds the claim to its omp.
+	 */
 	#alive(owner: TaskClaim): boolean {
-		if (this.#running(owner.pid)) return true;
+		const launcher = owner.sessionId === null && owner.pid === process.pid;
+		if (launcher ? launching.has(launchKey(this.#file, owner.instanceId)) : this.#running(owner.pid)) return true;
 		try {
 			const pid = Number(readFileSync(owner.keeperPidFile, "utf8").trim());
 			return Number.isSafeInteger(pid) && pid > 0 && this.#running(pid);

@@ -95,6 +95,22 @@ test("a failed JSON write keeps its dirty value for a later flush", () => {
 	expect(file.flush()).toBe(true);
 });
 
+test("a save after a failed write is written at the end of its tick once the disk takes it", async () => {
+	const { path, file } = numbersIn();
+	const tick = async (): Promise<void> => {
+		const { promise, resolve } = Promise.withResolvers<void>();
+		setImmediate(resolve);
+		await promise;
+	};
+	mkdirSync(path);
+	file.save([7]);
+	await tick();
+	rmSync(path, { recursive: true });
+	file.save([8]);
+	await tick();
+	expect(JSON.parse(readFileSync(path, "utf8"))).toEqual([8]);
+});
+
 async function compete(script: string, path: string): Promise<string[]> {
 	const children = [1, 2].map(id => Bun.spawn([process.execPath, "--eval", script], {
 		env: { ...process.env, SHARED_PATH: path, WRITER_ID: String(id) },

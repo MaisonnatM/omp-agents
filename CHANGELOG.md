@@ -3,6 +3,22 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-06
+
+- Fixed: a note or todo you edit while the dashboard is reconnecting is now saved once it reconnects, instead of being dropped, and the reconnect no longer replaces the text you typed.
+- Fixed: after a failed write to disk, such as a full disk, later changes are saved again once the disk has room, instead of only at the next clean stop.
+- Fixed: a routine run cut off by a server stop while sending its message now shows as failed, saying the message may not have arrived, instead of "Running…" until the next run. A run being sent reads "Sending…", and **Run now** waits while the last run is still under way.
+- Fixed: a failed storage cleanup now says it failed, not that it was stopped.
+- Fixed: a worktree removal or rebase that hits an error no longer blocks every later one until you reload the page, and a worktree removal cut short by a stop is finished at the next start.
+- Fixed: two quick actions started in a row now both open their session or show their failure.
+- Fixed: dictation no longer stays blocked for every page after a capture that never reported its end.
+- Fixed: on the Extensions tab, a failed progress read keeps checking instead of stopping, and approving clears the old error.
+- Fixed: when a pull request comment posts but closing it fails, retrying only closes it, so the comment is not posted twice.
+- Fixed: pressing an action button twice quickly in Settings and other panels now runs it once.
+- Fixed: settings sync drops a result from a remote you changed during the sync, and the desktop app still stops its server when you quit during startup and says when an update did not install.
+- Fixed: a session move waiting on a turn that ends with a question now goes, a prompt to a session whose omp has exited is refused with a plain message, and unread marks saved before a restart survive it.
+- Fixed: an auto-continue scheduled while the usage limit was being read survives a restart.
+
 ## 2026-11-05
 
 - Behind the scenes: a check that deletes a private session now passes after another check has already saved a session title, so the full test run no longer stops there.

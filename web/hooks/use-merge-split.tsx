@@ -79,13 +79,26 @@ export function useSelectionRuns(checkedIndices: readonly number[]): Run[] {
 
 // One in-flight merge or split; geometry is recomputed from the live runs each
 // render so rapid toggles redirect instead of freezing.
-interface Boundary {
+export interface Boundary {
   tid: number;
   kind: "merge" | "split";
   survivorId: number; // persisting run (merged run / split's upper run)
   otherId: number; // merge: absorbed run; split: new lower run
   gapIndex: number; // bridging/deselected row — where the halves meet
   phase: "converge" | "commit" | "splitIn" | "diverge";
+  // When its motion window ends, on performance.now()'s clock: a merge then
+  // commits, a split drops. The one timer follows the earliest of these, so no
+  // timer outlives the boundary it resolves.
+  due: number;
+}
+
+// The boundaries once every motion window ending by `now` has: a merge
+// commits, a split drops. A committed merge waits for its follow-up render.
+export function resolveDue(boundaries: Boundary[], now: number): Boundary[] {
+  if (!boundaries.some((b) => b.phase !== "commit" && b.due <= now)) return boundaries;
+  return boundaries.flatMap((b) =>
+    b.phase === "commit" || b.due > now ? [b] : b.kind === "merge" ? [{ ...b, phase: "commit" as const }] : []
+  );
 }
 
 // Two runs within `outer`, ordered, separated by exactly one row (a single-row
@@ -118,7 +131,6 @@ export function useMergeSplitBlocks(
   const [boundaries, setBoundaries] = useState<Boundary[]>([]);
   const prevRunsRef = useRef<Run[]>([]);
   const tidRef = useRef(0);
-  const timersRef = useRef(new Map<number, ReturnType<typeof setTimeout>>());
   const runsSig = runs.map((g) => `${g.id}:${g.start}-${g.end}`).join("|");
 
   // Detect merges/splits before paint (so the first frame already shows the
@@ -127,6 +139,7 @@ export function useMergeSplitBlocks(
   useLayoutEffect(() => {
     const prev = prevRunsRef.current;
     const cur = runs;
+    const now = performance.now();
     const found: Boundary[] = [];
     for (const c of cur) {
       const p = bridgePair(c, prev); // two prev runs collapsed into one
@@ -138,6 +151,7 @@ export function useMergeSplitBlocks(
           otherId: c.id === p.up.id ? p.lo.id : p.up.id,
           gapIndex: p.gap,
           phase: "converge",
+          due: now + convergeMs,
         });
     }
     for (const p of prev) {
@@ -150,30 +164,10 @@ export function useMergeSplitBlocks(
           otherId: c.lo.id,
           gapIndex: c.gap,
           phase: "splitIn",
+          due: now + splitMs,
         });
     }
     prevRunsRef.current = cur.map((r) => ({ ...r }));
-    // Resolve each new boundary after its motion window (merge → swap to one
-    // block; split → drop), so an interrupted animation can't strand a half.
-    for (const b of found) {
-      timersRef.current.set(
-        b.tid,
-        setTimeout(() => {
-          timersRef.current.delete(b.tid);
-          setBoundaries((bs) =>
-            bs.some((x) => x.tid === b.tid)
-              ? bs.flatMap((x) =>
-                  x.tid !== b.tid
-                    ? [x]
-                    : x.kind === "merge"
-                    ? [{ ...x, phase: "commit" as const }]
-                    : []
-                )
-              : bs
-          );
-        }, b.kind === "merge" ? convergeMs : splitMs)
-      );
-    }
     const stillValid = (b: Boundary) =>
       b.kind === "merge"
         ? cur.some(
@@ -184,27 +178,21 @@ export function useMergeSplitBlocks(
           )
         : cur.some((c) => c.id === b.survivorId && c.end === b.gapIndex - 1) &&
           cur.some((c) => c.id === b.otherId && c.start === b.gapIndex + 1);
-    setBoundaries((active) => {
-      // Cancel the resolve timer of any boundary the latest selection
-      // invalidated — otherwise it sits in timersRef until firing as a no-op.
-      // Clearing is idempotent, so a double-invoked updater is harmless.
-      for (const b of active) {
-        if (stillValid(b)) continue;
-        const timer = timersRef.current.get(b.tid);
-        if (timer !== undefined) {
-          clearTimeout(timer);
-          timersRef.current.delete(b.tid);
-        }
-      }
-      return [...active.filter(stillValid), ...found];
-    });
+    setBoundaries((active) => [...active.filter(stillValid), ...found]);
   }, [runsSig]);
 
-  // Clear any pending timers on unmount.
+  // Resolve each boundary after its motion window (merge → swap to one block;
+  // split → drop), so an interrupted animation can't strand a half. One timer,
+  // for the earliest window, replaced whenever the boundaries change and
+  // cleared with them on unmount.
   useEffect(() => {
-    const timers = timersRef.current;
-    return () => timers.forEach(clearTimeout);
-  }, []);
+    const open = boundaries.filter((b) => b.phase !== "commit");
+    if (open.length === 0) return;
+    const next = Math.min(...open.map((b) => b.due));
+    // Resolves as of `next`, not the clock, so a timer firing a hair early still moves on.
+    const timer = setTimeout(() => setBoundaries((bs) => resolveDue(bs, next)), Math.max(0, next - performance.now()));
+    return () => clearTimeout(timer);
+  }, [boundaries]);
 
   // Follow-up render: a fresh split holds its abutting frame once then
   // diverges; a committed merge is dropped.

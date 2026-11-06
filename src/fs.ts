@@ -74,8 +74,11 @@ export function flushJsonFiles(): void {
 export class JsonFile<T> {
 	readonly #path: string;
 	readonly #options: JsonFileOptions<T>;
-	/** The value saved and not yet written, in a box so that a saved `null` is one. */
-	#unwritten: { value: T } | null = null;
+	/**
+	 * The value saved and not yet written, in a box so that a saved `null` is one: `scheduled` while a write at the end of
+	 * this tick is due, `failed` once that write failed, so the next save schedules another.
+	 */
+	#unwritten: { write: "scheduled" | "failed"; value: T } | null = null;
 
 	constructor(path: string, options: JsonFileOptions<T>) {
 		this.#path = path;
@@ -117,13 +120,13 @@ export class JsonFile<T> {
 
 	/** Replaces the file with `value` at the end of this tick, unless a later save replaces it first; a crash mid-write leaves the last complete file. */
 	save(value: T): void {
-		if (!this.#unwritten) {
+		if (this.#unwritten?.write !== "scheduled") {
 			// A second store of this path writes what the first saved before its own.
-			pending.get(this.#path)?.flush();
+			if (pending.get(this.#path) !== this) pending.get(this.#path)?.flush();
 			pending.set(this.#path, this);
 			setImmediate(() => this.flush());
 		}
-		this.#unwritten = { value };
+		this.#unwritten = { write: "scheduled", value };
 	}
 
 	/** Whether the dirty value reached disk; a failed write stays pending for a later flush. */
@@ -136,6 +139,7 @@ export class JsonFile<T> {
 			atomicWriteTextSync(this.#path, `${JSON.stringify(toJson ? toJson(unwritten.value) : unwritten.value, null, indent)}\n`, mode);
 		} catch (err) {
 			console.error(`omp-agents: cannot write ${this.#path}: ${errorText(err)}`);
+			this.#unwritten = { write: "failed", value: unwritten.value };
 			return false;
 		}
 		this.#unwritten = null;

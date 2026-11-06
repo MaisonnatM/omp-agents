@@ -44,58 +44,68 @@ export interface DictationCapture {
 	dispose(): void;
 }
 
+type Bridge = InstanceType<typeof rpcDictation.RpcDictationBridge>;
+
 /**
  * Opens this computer's microphone for capture `captureId` with the settings of `cwd`. Where dictation is off, `emit` gets
  * the settings and the microphone stays closed; else where speech goes, the microphone's state, and the text so far.
- * Either way the last event is one `end`. The text is never sent anywhere but `emit`.
+ * Either way the last event is one `end`, which never waits on omp's bridge for a stop before the microphone opens, a
+ * dispose, or a bridge that fails. The text is never sent anywhere but `emit`.
  */
 export function startDictation(cwd: string, captureId: string, emit: (event: DictationEvent) => void): DictationCapture {
-	let bridge: InstanceType<typeof rpcDictation.RpcDictationBridge> | null = null;
-	let read: OpenRegistry | null = null;
-	let cancelled = false;
-	let ended = false;
+	let capture: { phase: "opening" } | { phase: "bridged"; bridge: Bridge; read: OpenRegistry } | { phase: "ended" } = { phase: "opening" };
 	const end = (text: string, error: string | null): void => {
-		if (ended) return;
-		ended = true;
-		read?.close();
+		if (capture.phase === "ended") return;
+		if (capture.phase === "bridged") capture.read.close();
+		capture = { phase: "ended" };
 		emit({ kind: "end", text, error });
 	};
+	/** Read through a call, since a stop or dispose can end the capture while the opening awaits. */
+	const ended = (): boolean => capture.phase === "ended";
 	void (async () => {
+		let read: OpenRegistry | null = null;
 		try {
 			const dir = await directoryOf(cwd);
+			if (ended()) return;
 			if (dir === null) return end("", `${cwd} is not a directory`);
 			read = await openRegistry(dir);
-			if (cancelled) return end("", null);
+			if (ended()) return read.close();
 			const settings = read.settings;
 			if (!sttSettings.cfgSttEnabled.get(settings)) {
 				emit({ kind: "off", settings: settingsOf(read) });
+				read.close();
 				return end("", "Dictation is off");
 			}
 			emit({ kind: "processing", processing: processingOf(read) });
 			const registry = read.registry;
-			bridge = new rpcDictation.RpcDictationBridge(
+			const bridge = new rpcDictation.RpcDictationBridge(
 				null,
 				frame => {
+					if (capture.phase === "ended") return;
 					if (frame.type === "dictation_state") emit({ kind: "state", state: frame.state });
 					else if (frame.type === "dictation_transcript") emit({ kind: "preview", text: frame.text });
 					else end(frame.text, frame.error ?? null);
 				},
 				() => new sttController.STTController({ settings, registry }),
 			);
-			// A failed or stopped start has already sent its `dictation_end` frame.
-			bridge.start(captureId).catch(() => {});
+			capture = { phase: "bridged", bridge, read };
+			// A failed or stopped start has already sent its `dictation_end` frame; one that did not ends here.
+			bridge.start(captureId).catch((error: unknown) => end("", errorText(error)));
 		} catch (error) {
+			if (capture.phase === "opening") read?.close();
 			end("", errorText(error));
 		}
 	})();
 	return {
 		stop() {
-			if (bridge) bridge.stop().catch(() => {});
-			else cancelled = true;
+			if (capture.phase === "bridged") capture.bridge.stop().catch((error: unknown) => end("", errorText(error)));
+			// Nothing was said before the microphone opened.
+			else end("", null);
 		},
 		dispose() {
-			if (bridge) bridge.dispose();
-			else cancelled = true;
+			// Whoever disposes drops the text, so the capture ends now, whether or not the bridge sends its own end.
+			if (capture.phase === "bridged") capture.bridge.dispose();
+			end("", null);
 		},
 	};
 }

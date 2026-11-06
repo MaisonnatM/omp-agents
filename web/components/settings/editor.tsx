@@ -13,6 +13,7 @@ import type { Editable } from "../../editable-read";
 import { formatValue, isChanged, valueOf } from "../../omp-settings";
 import type { ReadState } from "../../reads";
 import { hashForSettings } from "../../routing";
+import { useAction } from "../../use-action";
 import { ToggleSwitch } from "../toggle-switch";
 
 /** A settings text field or select. */
@@ -70,22 +71,16 @@ export async function writeOrReload<T>(target: { write: Editable<T>["write"]; re
 export const saveAgentSetting = (editing: Pick<Editing, "cwd" | "write" | "reload">, edit: AgentSettingEdit): Promise<OmpSettings> =>
 	writeOrReload(editing, () => putJson<OmpSettings>(settingsUrl("/agent", editing.cwd), edit));
 
-/** A save-on-change control's pending value and error, kept beside that control. */
+/** A save-on-change control's pending value and error, kept beside that control. A second save while one runs is dropped. */
 export function useSaving<K>() {
-	const [state, setState] = useState<{ saving: K | null; error: string | null }>({ saving: null, error: null });
-	return {
-		...state,
-		run: (key: K, send: () => Promise<unknown>): void => {
-			setState({ saving: key, error: null });
-			void send().then(
-				() => setState({ saving: null, error: null }),
-				(err: unknown) => setState({
-					saving: null,
-					error: err instanceof ApiError && err.conflict ? "Changed since you opened it. This shows it as it is now." : errorText(err),
-				}),
-			);
-		},
-	};
+	const action = useAction(async (_key: K, send: () => Promise<unknown>) => {
+		try {
+			await send();
+		} catch (err) {
+			throw err instanceof ApiError && err.conflict ? new Error("Changed since you opened it. This shows it as it is now.") : err;
+		}
+	}, null);
+	return { saving: action.state.kind === "pending" ? action.state.args[0] : null, error: action.error, run: action.run };
 }
 
 type EditorState<T> =

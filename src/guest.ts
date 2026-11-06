@@ -75,14 +75,25 @@ function statusOf(host: HostSnapshot): HostStatus {
 	return host.busy ? "working" : "idle";
 }
 
+/** A guest in its room. `readOnly`: the room grants no control, from its link or the host's welcome. `socket` is `connecting` until the welcome. */
+interface Joined {
+	phase: "joined";
+	room: Room;
+	readOnly: boolean;
+	socket: { phase: "connecting" } | { phase: "live" } | { phase: "reconnecting"; reason: string };
+}
+
+/**
+ * The guest's link to the host's room. Only `joined` holds the room, so a frame can go out only between the join and the
+ * end, and every frame that acts on the session takes its socket from `SessionGuest.#writer`.
+ * `ended.at`: when the guest ended, for rejoin backoff; `ended.generation`: the room it left, `null` when it never joined one.
+ */
+type RoomLink = { phase: "connecting" } | Joined | { phase: "ended"; reason: string; at: number; generation: number | null };
+
 /** A terminal session, joined through its Collab room. Its registry row is the guest's snapshot of it. */
 export class SessionGuest implements LiveSession {
 	readonly instanceId: string;
-	/** Room generation this guest is joined to; `null` until the link resolves. */
-	generation: number | null = null;
-	control: ControlPhase = { phase: "connecting" };
-	/** When the guest ended, for rejoin backoff. */
-	#endedAt: number | null = null;
+	#link: RoomLink = { phase: "connecting" };
 	/** Whether the host left the registry or switched rooms: the guest leaves the roster at once, and a host still listed is joined anew. */
 	#replaced = false;
 	/** The host's last status-line snapshot; `null` until the welcome arrives. */
@@ -90,9 +101,6 @@ export class SessionGuest implements LiveSession {
 
 	/** The registry's latest listing of this session, replaced on every poll. */
 	#host: HostSnapshot;
-	#socket: CollabSocket | null = null;
-	#readOnly = true;
-	#closed = false;
 	#agents: HostAgent[] = [];
 	#activity = new Map<string, string>();
 	readonly #subagentFiles = new SubagentFiles(() => this.#emit({ kind: "roster" }));
@@ -130,8 +138,28 @@ export class SessionGuest implements LiveSession {
 		return this.#host.sessionId;
 	}
 
+	/** Room generation this guest is joined to, or left; `null` until the link resolves. */
+	get generation(): number | null {
+		const link = this.#link;
+		if (link.phase === "joined") return link.room.generation;
+		return link.phase === "ended" ? link.generation : null;
+	}
+
+	get control(): ControlPhase {
+		const link = this.#link;
+		if (link.phase === "ended") return { phase: "ended", reason: link.reason };
+		if (link.phase === "connecting") return link;
+		return link.socket.phase === "live" ? { phase: "live", readOnly: link.readOnly } : link.socket;
+	}
+
 	get canWrite(): boolean {
-		return this.control.phase === "live" && !this.#readOnly;
+		return this.#writer() !== null;
+	}
+
+	/** The room's socket while the room is live and grants this guest control. */
+	#writer(): CollabSocket | null {
+		const link = this.#link;
+		return link.phase === "joined" && link.socket.phase === "live" && !link.readOnly ? link.room.socket : null;
 	}
 
 	row(): LiveRow {
@@ -181,7 +209,7 @@ export class SessionGuest implements LiveSession {
 
 	/** Gone, or ended for longer than {@link REJOIN_MS} while its host stays listed; the server then joins that host with a new guest. */
 	finished(now: number): boolean {
-		return this.#replaced || (this.#endedAt !== null && now - this.#endedAt > REJOIN_MS);
+		return this.#replaced || (this.#link.phase === "ended" && now - this.#link.at > REJOIN_MS);
 	}
 
 	agents(): AgentRow[] {
@@ -193,7 +221,7 @@ export class SessionGuest implements LiveSession {
 			parentId: agent.parentId && ids.has(agent.parentId) ? agent.parentId : null,
 			status: agent.status,
 			activity: this.#activity.get(agent.id) ?? null,
-			canMessage: !this.#readOnly && agent.status !== "aborted",
+			canMessage: this.canWrite && agent.status !== "aborted",
 			queue: this.queue(agent.id),
 		}));
 	}
@@ -235,9 +263,9 @@ export class SessionGuest implements LiveSession {
 		if (!key) {
 			if (this.#running("")) this.#steered = true;
 			const images = message.images?.map(image => ({ type: "image", ...image }));
-			this.#socket?.send({ t: "prompt", text: message.payload, images: images?.length ? images : undefined });
+			this.#writer()?.send({ t: "prompt", text: message.payload, images: images?.length ? images : undefined });
 		} else if (this.#agents.some(a => a.id === key && !a.isMain && a.status !== "aborted")) {
-			this.#socket?.send({ t: "agent-cmd", cmd: "chat", agentId: key, text: message.payload });
+			this.#writer()?.send({ t: "agent-cmd", cmd: "chat", agentId: key, text: message.payload });
 		}
 	}
 
@@ -274,7 +302,7 @@ export class SessionGuest implements LiveSession {
 				this.#followUps.delete("");
 				this.#emit({ kind: "roster" });
 			}
-			this.#socket?.send({ t: "abort" });
+			this.#writer()?.send({ t: "abort" });
 			return held.map(({ text, images = [] }) => ({ text, images }));
 		});
 	}
@@ -285,14 +313,14 @@ export class SessionGuest implements LiveSession {
 		void this.#turn.run(() => {
 			if (!this.#steered && !this.state?.queued) return;
 			this.#interrupted = true;
-			this.#socket?.send({ t: "abort" });
+			this.#writer()?.send({ t: "abort" });
 		});
 	}
 
 	/** omp's Agent Hub kill over Collab: settles once sent to the host, which aborts a running subagent and tombstones it. */
 	async cancelAgent(agentId: string): Promise<void> {
-		if (!this.canWrite || !this.#running(agentId)) return;
-		this.#socket?.send({ t: "agent-cmd", cmd: "kill", agentId });
+		if (!this.#running(agentId)) return;
+		this.#writer()?.send({ t: "agent-cmd", cmd: "kill", agentId });
 	}
 
 	/** Whether the agent's turn runs, as the host last reported it: its `state` frames for the main agent, its registry for subagents. */
@@ -321,9 +349,10 @@ export class SessionGuest implements LiveSession {
 
 	/** Reply to a host `ui-request`. The host takes the first answer from any writer or its own terminal. */
 	answer(requestId: string, answer: UserAnswer): void {
-		if (!this.canWrite || !this.#requests.take(requestId, answer)) return;
+		const writer = this.#writer();
+		if (!writer || !this.#requests.take(requestId, answer)) return;
 		// A missing value is the host's cancel.
-		this.#socket?.send({ t: "ui-response", reqId: Number(requestId), value: answer.kind === "value" ? answer.value : undefined });
+		writer.send({ t: "ui-response", reqId: Number(requestId), value: answer.kind === "value" ? answer.value : undefined });
 	}
 
 	/**
@@ -351,11 +380,10 @@ export class SessionGuest implements LiveSession {
 
 	/** Terminal: the host vanished or rotated rooms, the relay gave up, or the dashboard shut down. */
 	disconnect(reason: string): void {
-		if (this.#closed) return;
-		this.#closed = true;
-		this.#endedAt = Date.now();
-		this.#socket?.close();
-		this.#socket = null;
+		const link = this.#link;
+		if (link.phase === "ended") return;
+		this.#link = { phase: "ended", reason, at: Date.now(), generation: link.phase === "joined" ? link.room.generation : null };
+		if (link.phase === "joined") link.room.socket.close();
 		this.#requests.clear();
 		this.#subagentFiles.close();
 		for (const [key, held] of this.#followUps) {
@@ -364,7 +392,7 @@ export class SessionGuest implements LiveSession {
 			this.#emit({ kind: "note", agentId: key || null, level: "warning", text: `Not sent, the room closed before the turn ended:\n${texts}` });
 		}
 		this.#followUps.clear();
-		this.#setControl({ phase: "ended", reason });
+		this.#emit({ kind: "roster" });
 	}
 
 	async #start(host: HostSnapshot): Promise<void> {
@@ -375,44 +403,47 @@ export class SessionGuest implements LiveSession {
 			this.disconnect(errorText(err));
 			return;
 		}
-		if (this.#closed) return;
-		this.generation = room.generation;
-		this.#readOnly = room.writeToken === undefined;
-		const socket = room.socket;
-		this.#socket = socket;
+		if (this.#link.phase === "ended") return;
+		this.#link = { phase: "joined", room, readOnly: room.writeToken === undefined, socket: { phase: "connecting" } };
+		const { socket } = room;
 		socket.onOpen = () => {
 			socket.send({ t: "hello", proto: COLLAB_PROTO, name: DISPLAY_NAME, writeToken: room.writeToken });
 		};
 		socket.onFrame = frame => this.#onFrame(frame);
 		socket.onClose = (reason, willReconnect) => {
-			if (willReconnect) this.#setControl({ phase: "reconnecting", reason });
-			else this.disconnect(reason);
+			const link = this.#link;
+			if (!willReconnect) this.disconnect(reason);
+			else if (link.phase === "joined") {
+				this.#link = { ...link, socket: { phase: "reconnecting", reason } };
+				this.#emit({ kind: "roster" });
+			}
 		};
 		socket.connect();
 	}
 
 	#onFrame(frame: Frame): void {
-		if (this.#closed) return;
+		const link = this.#link;
+		if (link.phase !== "joined") return;
 		// Only the host's state and its agents end a turn; a turn streams as `event` frames, which leave nothing to release.
 		if (frame.t === "event" || this.#followUps.size === 0) {
-			this.#apply(frame);
+			this.#apply(link, frame);
 			return;
 		}
 		const running = [...this.#followUps.keys()].filter(key => this.#running(key));
-		this.#apply(frame);
+		this.#apply(link, frame);
 		this.#release(running);
 	}
 
-	#apply(frame: Frame): void {
+	#apply(link: Joined, frame: Frame): void {
 		switch (frame.t) {
 			case "welcome":
-				this.#readOnly = this.#readOnly || frame.readOnly === true;
+				this.#link = { ...link, readOnly: link.readOnly || frame.readOnly === true, socket: { phase: "live" } };
 				this.#setAgents(parseAgents(frame.agents));
 				this.state = parseState(frame.state);
 				// The host replays its pending questions after every welcome.
 				this.#requests.clear();
 				// Rows carry `canMessage`, which depends on the welcome's read-only verdict.
-				this.#setControl({ phase: "live", readOnly: this.#readOnly });
+				this.#emit({ kind: "roster" });
 				return;
 			case "event": {
 				const event = frame.event;
@@ -474,10 +505,5 @@ export class SessionGuest implements LiveSession {
 		for (const { id } of this.#agents) if (!agents.some(agent => agent.id === id)) this.#activity.delete(id);
 		this.#subagentFiles.update(this.#agents, agents);
 		this.#agents = agents;
-	}
-
-	#setControl(control: ControlPhase): void {
-		this.control = control;
-		this.#emit({ kind: "roster" });
 	}
 }

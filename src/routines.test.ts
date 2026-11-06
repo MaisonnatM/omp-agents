@@ -147,7 +147,7 @@ describe("applyRoutine", () => {
 	});
 
 	test("an edit keeps the routine's creation, schedule clock, and runs", () => {
-		const run = { at: at("2026-10-05T09:00:00+02:00"), outcome: { kind: "pending", queued: true } as const, errors: [], triggeredBy: [] };
+		const run = { at: at("2026-10-05T09:00:00+02:00"), outcome: { kind: "queued" } as const, errors: [], triggeredBy: [] };
 		const saved = routine({ scheduledAt: run.at, runs: [run] });
 		expect(applyRoutine([saved], { op: "save", routine: { ...spec, name: "Morning notes", schedules: [daily] } }, now)).toEqual([
 			{ ...saved, name: "Morning notes", schedules: [daily] },
@@ -155,7 +155,7 @@ describe("applyRoutine", () => {
 	});
 
 	test("a save that matches the stored routine returns the same list", () => {
-		const saved = routine({ runs: [{ at: at("2026-10-05T09:00:00+02:00"), outcome: { kind: "pending", queued: true }, errors: [], triggeredBy: [] }] });
+		const saved = routine({ runs: [{ at: at("2026-10-05T09:00:00+02:00"), outcome: { kind: "queued" }, errors: [], triggeredBy: [] }] });
 		const list = [saved];
 		expect(applyRoutine(list, { op: "save", routine: spec }, now)).toBe(list);
 		expect(applyRoutine(list, { op: "save", routine: { ...spec, triggers: [{ kind: "event" }] } }, now)).not.toBe(list);

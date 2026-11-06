@@ -16,8 +16,8 @@ export interface Updates {
 	ready(): string | null;
 	/** Checks now and answers in a dialog, even when there is nothing new. */
 	checkNow(): void;
-	/** Quits and opens the new version. Call it once the server has stopped. */
-	install(): void;
+	/** Quits and opens the new version, or rejects with why it could not, since electron-updater reports a failed install only as an `error` event. Call it once the server has stopped. */
+	install(): Promise<never>;
 }
 
 /** Starts checking; `changed` runs when a version finishes downloading, so the menu can offer it. */
@@ -55,6 +55,11 @@ export function startUpdates(changed: () => void): Updates {
 			check();
 		},
 		// Silent, and relaunched once installed, as T3 Code installs.
-		install: () => autoUpdater.quitAndInstall(true, true),
+		install() {
+			const { promise, reject: failed } = Promise.withResolvers<never>();
+			autoUpdater.once("error", failed);
+			autoUpdater.quitAndInstall(true, true);
+			return promise;
+		},
 	};
 }

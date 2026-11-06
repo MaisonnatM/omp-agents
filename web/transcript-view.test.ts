@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { parseBotId } from "../src/shared/bots";
 import type { RoutineMessage } from "../src/shared/routine-message";
 import type { Item } from "../src/shared/transcript";
-import { type Block, nextSuggestions, type TranscriptModel, transcriptModel, withEditedPrompt } from "./transcript-view";
+import { type Block, nextSuggestions, resendOf, type TranscriptModel, transcriptModel, withEditedPrompt } from "./transcript-view";
 
 const blocksOf = (items: Item[]): readonly Block[] => transcriptModel(items, false).blocks;
 const ids = (blocks: readonly Block[]): string[] => blocks.map(block => (block.kind === "item" ? block.item.id : block.id));
@@ -68,6 +68,17 @@ describe("transcript rendering", () => {
 		}
 		expect(ids(withEditedPrompt(replaced, { ...edit, submitted: null }))).toEqual(["u", "old", "new"]);
 		expect(ids(withEditedPrompt(blocksOf([replacement, user]), edit))).toEqual(["new", "old", "u"]);
+	});
+});
+
+describe("resendOf", () => {
+	test("shows a resend's text while it runs and its failure after, only on the edit it sent", () => {
+		const sent = { text: "resent" };
+		const later = { text: "written after" };
+		expect(resendOf(sent, { kind: "pending", args: [sent, "resent"] })).toEqual({ submitted: "resent", error: null });
+		expect(resendOf(sent, { kind: "failed", args: [sent, "resent"], error: "offline" })).toEqual({ submitted: null, error: "offline" });
+		expect(resendOf(later, { kind: "failed", args: [sent, "resent"], error: "offline" })).toEqual({ submitted: null, error: null });
+		expect(resendOf(null, { kind: "pending", args: [sent, "resent"] })).toEqual({ submitted: null, error: null });
 	});
 });
 

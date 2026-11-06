@@ -113,4 +113,13 @@ describe("the move_session tool", () => {
 		ended("c2", false, "i2");
 		expect(moved).toEqual([dir]);
 	});
+
+	test("a call its turn cut off while the directory was checked errors to the model, and its end moves nothing", async () => {
+		const { moves, moved, call, ended } = setup();
+		const result = call("c1", tempDir());
+		moves.heard("i1", { type: "agent_end", messages: [] });
+		await expect(result).rejects.toThrow("This turn ended before the move was taken; nothing moves.");
+		ended("c1");
+		expect(moved).toEqual([]);
+	});
 });

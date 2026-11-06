@@ -107,6 +107,27 @@ async function reach(instanceId: string, opening: Opening, onFrame: (frame: Reco
 	}
 }
 
+/** omp's process: running; stopping on **End session**; exited, however it came to; or left running for the next server, which is no exit. */
+type ProcessPhase = "running" | "ending" | "exited" | "detached";
+
+/** Why a session in `process` takes no more prompts, or `null` while omp runs. */
+function goneText(process: ProcessPhase): string | null {
+	switch (process) {
+		case "running":
+			return null;
+		case "ending":
+			return "This session is ending.";
+		case "exited":
+			return "This session's omp exited; resume it to send more.";
+		case "detached":
+			return "The server is restarting; send it again once the session is back.";
+		default: {
+			const unhandled: never = process;
+			return unhandled;
+		}
+	}
+}
+
 export class DashboardSession implements LiveSession {
 	readonly instanceId: string;
 	readonly startedAt: number;
@@ -141,10 +162,8 @@ export class DashboardSession implements LiveSession {
 	readonly #emit: (update: DashboardUpdate) => void;
 	/** Whether the last prompt the user sent was a `/` command, whose `command_output` frames the conversation shows. */
 	#userCommand = false;
-	/** Whether **End session** stopped the process, rather than omp exiting on its own. */
-	#ended = false;
-	/** Whether omp exited, however it came to; hanging up on it as the server shuts down is no exit. */
-	#exited = false;
+	/** omp's process, as far as this session knows it. */
+	#process: ProcessPhase = "running";
 	/** Prompt, dequeue, promote, interrupt, flush, and edit, so an abort cannot land before the steer it should deliver. */
 	readonly #turn = new SerialLane();
 	/** Model setters and state reads share a lane, separate from ordered turn commands. */
@@ -193,10 +212,11 @@ export class DashboardSession implements LiveSession {
 		client.onSubagentProgress(payload => this.#onSubagent(SUBAGENT_PROGRESS, payload));
 		void child.exited.then(how => {
 			if (how === "detach") return;
-			this.#exited = true;
+			const ended = this.#process === "ending";
+			this.#process = "exited";
 			this.#change(() => this.#prompt.release());
 			requests.clear();
-			emit({ kind: "exited", ended: this.#ended });
+			emit({ kind: "exited", ended });
 		});
 	}
 
@@ -365,11 +385,12 @@ export class DashboardSession implements LiveSession {
 
 	/** Once its process exited. That reports itself ({@link DashboardUpdate} `exited`), so this catches only a session that exited before it was listed. */
 	finished(): boolean {
-		return this.#exited;
+		return this.#process === "exited";
 	}
 
 	/** omp keeps running, turn and all, and the next server attaches to it again ({@link reattach}). */
 	async dispose(): Promise<void> {
+		this.#process = "detached";
 		this.#child.detach();
 	}
 
@@ -425,6 +446,7 @@ export class DashboardSession implements LiveSession {
 	 * rejects with {@link PromptRefused}.
 	 */
 	async prompt(agentId: string | null, text: string, images: PromptImage[], delivery: Delivery): Promise<void> {
+		this.#refuseUnlessRunning();
 		if (agentId !== null && images.length > 0) throw new Error("omp sends a subagent text only.");
 		if (agentId === null) {
 			const command = goalCommand(text, this.goal.kind === "set" ? this.goal.goal : null);
@@ -470,12 +492,20 @@ export class DashboardSession implements LiveSession {
 	 * command itself without a turn or a `prompt_result`, so only a `/skill:` prompt among `/` prompts is held.
 	 */
 	async #promptMain(text: string, images: PromptImage[], delivery?: Delivery): Promise<void> {
+		// omp may have exited while this prompt waited on the turn lane.
+		this.#refuseUnlessRunning();
 		this.#userCommand = text.startsWith("/");
 		const pending = this.#prompt.send();
 		const content = images.map(image => ({ type: "image" as const, ...image }));
 		const id = await this.#child.client.prompt(text, content.length > 0 ? content : undefined, delivery).finally(() => pending.close());
 		const local = text.startsWith("/") && !text.startsWith("/skill:");
 		this.#change(() => pending.acked(id && !local ? { id, text, images } : null));
+	}
+
+	/** Rejects with {@link PromptRefused} once omp is no longer running for this server, which no client error would say plainly. */
+	#refuseUnlessRunning(): void {
+		const gone = goneText(this.#process);
+		if (gone !== null) throw new PromptRefused(gone);
 	}
 
 	/** A `!` command, which omp runs in the session's directory and records in its file for the agent to see. */
@@ -656,9 +686,16 @@ export class DashboardSession implements LiveSession {
 		}).finally(() => this.#readModelState("Goal refresh failed")));
 	}
 
-	end(): Promise<void> {
-		this.#ended = true;
-		return this.#child.client.stop();
+	/** Stops omp, whose exit then reports as ended; a stop that fails leaves it running, so a later exit is no End. */
+	async end(): Promise<void> {
+		if (this.#process === "exited" || this.#process === "detached") return;
+		this.#process = "ending";
+		try {
+			await this.#child.client.stop();
+		} catch (err) {
+			if (this.#process === "ending") this.#process = "running";
+			throw err;
+		}
 	}
 
 	/** Moves the session to `dir` as the user's `/move` does, once a turn ends with it idle: omp refuses `/move` while a turn runs. */
@@ -666,10 +703,10 @@ export class DashboardSession implements LiveSession {
 		this.#moveTo = dir;
 	}
 
-	/** Sends the move waiting for this turn's end, unless the session is busy again, which keeps it for the next one. */
+	/** Sends the move waiting for this turn's end, unless a turn runs again, which keeps it for the next one; a question left waiting does not. */
 	#moveIfIdle(): void {
 		const dir = this.#moveTo;
-		if (dir === null || this.status !== "idle") return;
+		if (dir === null || this.#prompt.busy) return;
 		this.#moveTo = null;
 		this.prompt(null, `/move ${dir}`, [], "steer").catch((err: unknown) => this.#fail(`Could not move to ${dir}`, err));
 	}

@@ -86,4 +86,17 @@ describe("Dictation", () => {
 		dictation.close(owner.peer.socket);
 		expect(calls).toEqual(["start c1 in /app", "dispose c1"]);
 	});
+
+	test("a closed socket frees the microphone for the next capture even when its capture sends no end", () => {
+		const calls: string[] = [];
+		const silent: StartCapture = (_cwd, captureId) => ({ stop: () => {}, dispose: () => void calls.push(`dispose ${captureId}`) });
+		const dictation = new Dictation(silent);
+		const gone = page();
+		const next = page();
+		dictation.start(gone.peer, "c1", "/app");
+		dictation.close(gone.peer.socket);
+		dictation.start(next.peer, "c2", "/app");
+		expect(calls).toEqual(["dispose c1"]);
+		expect(events(next.sent, "c2")).toEqual([]);
+	});
 });

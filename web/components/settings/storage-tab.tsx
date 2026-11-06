@@ -277,7 +277,7 @@ export function StorageTab({ active, cwd, onSaved }: { active: boolean; cwd: str
 	};
 	let summary = "";
 	if (run?.phase === "done") {
-		summary = run.stopping ? "Cleanup stopped." : "Cleanup finished.";
+		summary = { finished: "Cleanup finished.", stopped: "Cleanup stopped.", failed: "Cleanup failed." }[run.ended];
 		if (run.after !== null) summary += ` Free space now ${formatBytes(run.after)}${run.before !== null ? `, was ${formatBytes(run.before)}` : ""}.`;
 		summary += " Check again before another cleanup.";
 	} else if (!checking && PREVIEW_SOURCES.every(source => previews[source] !== null) && rows.every(row => row.count === 0)) {
@@ -330,10 +330,10 @@ export function StorageTab({ active, cwd, onSaved }: { active: boolean; cwd: str
 							ref={stopButton}
 							variant="secondary"
 							size="compact"
-							disabled={run.stopping}
-							onClick={() => { stopped.current = true; setRun(current => current && { ...current, stopping: true }); }}
+							disabled={run.stopRequested}
+							onClick={() => { stopped.current = true; setRun(current => current?.phase === "running" ? { ...current, stopRequested: true } : current); }}
 						>
-							{run.stopping ? "Stopping after this step…" : "Stop after this step"}
+							{run.stopRequested ? "Stopping after this step…" : "Stop after this step"}
 						</Button>
 					) : (
 						<Button

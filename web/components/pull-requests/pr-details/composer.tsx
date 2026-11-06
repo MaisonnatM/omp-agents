@@ -10,17 +10,20 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import { errorText } from "../../../../src/json";
 import { putJson } from "../../../api";
+import { useAction } from "../../../use-action";
 import { useInlineConfirm } from "../../../use-inline-confirm";
 import { useDashboardActions } from "../../dashboard-context";
 import { ERROR_TEXT, isSubmitChord } from "../../form-dialog";
 import { SegmentedTab, SegmentedTabs, SegmentedTabsList } from "../../segmented-tabs";
 import type { SendPullRequest } from "../pr-fields";
-import { composerLabel, reviewPlaceholder, reviewVerdicts, VERDICT_LABELS } from "./composer.logic";
+import { composerLabel, type FollowUp, postComment, reviewPlaceholder, reviewVerdicts, stateChange, VERDICT_LABELS } from "./composer.logic";
 import { FIELD } from "./review-draft";
 
 type Mode = "comment" | "review";
+
+/** What the composer posts: a comment, with the state change it then asks for, if any, or a review. */
+type Post = { kind: "comment"; then: FollowUp | null } | { kind: "review" };
 
 const VERDICT_ICONS: Record<ReviewVerdict, ReactNode> = {
 	comment: <MessageSquare aria-hidden className="size-3" />,
@@ -58,48 +61,38 @@ export function PullRequestComposer({ detail, openDraft, send, onDraftPosted }: 
 			setVerdict(openDraft.verdict);
 		}
 	}
-	const [busy, setBusy] = useState(false);
-	const [failure, setFailure] = useState<string | null>(null);
 	const commentRef = useRef<HTMLTextAreaElement>(null);
 	const reviewRef = useRef<HTMLTextAreaElement>(null);
-	if (!detail.canComment) return null;
-	const reviewable = verdicts.length > 0;
-	const reviewStarted = pending > 0 || summary.trim() !== "";
-	const mode: Mode = reviewable ? requestedMode : "comment";
-	const picked = verdicts.includes(verdict) ? verdict : "comment";
-
-	const run = async (act: () => Promise<void>): Promise<void> => {
-		if (busy) return;
-		setBusy(true);
-		setFailure(null);
-		try {
-			await act();
-			setOpen(false);
-		} catch (err) {
-			setFailure(errorText(err));
-		} finally {
-			setBusy(false);
-		}
-	};
-	const comment = (then: "close" | "reopen" | null): Promise<void> =>
-		run(async () => {
-			await send({ field: "comment", body });
-			setBody("");
-			if (!then) return;
-			try {
-				await send({ field: "state", state: then === "close" ? "closed" : "open" });
-			} catch (err) {
-				throw new Error(`the comment posted, but ${then === "close" ? "closing" : "reopening"} failed: ${errorText(err)}`);
-			}
-		});
-	const review = (): Promise<void> =>
-		run(async () => {
+	// The state change after a comment is its own action, so when it fails the comment stays posted and the change retries alone.
+	const change = useAction(async (then: FollowUp) => {
+		await send(stateChange(then));
+		setOpen(false);
+	}, null);
+	const post = useAction(async (what: Post) => {
+		change.dismiss();
+		if (what.kind === "review") {
 			if (openDraft) {
 				await putJson<ReviewDraft>("/api/review-draft/post", { owner: detail.owner, repo: detail.repo, number: detail.number, submit: { verdict: picked, summary } });
 				onDraftPosted();
 			} else await send({ field: "review", verdict: picked, body: summary });
 			setSummary("");
-		});
+			setOpen(false);
+			return;
+		}
+		await postComment(send, body, what.then, change.run);
+		setBody("");
+		if (!what.then) setOpen(false);
+	}, null);
+	if (!detail.canComment) return null;
+	const reviewable = verdicts.length > 0;
+	const reviewStarted = pending > 0 || summary.trim() !== "";
+	const mode: Mode = reviewable ? requestedMode : "comment";
+	const picked = verdicts.includes(verdict) ? verdict : "comment";
+	const busy = post.pending || change.pending;
+	/** The comment button whose post or state change is under way. */
+	const loading = change.state.kind === "pending" ? change.state.args[0] : post.state.kind === "pending" && post.state.args[0].kind === "comment" ? (post.state.args[0].then ?? "comment") : null;
+	const unchanged = change.state.kind === "failed" ? change.state : null;
+	const failure = post.error ?? (unchanged && `the comment posted, but ${unchanged.args[0] === "close" ? "closing" : "reopening"} failed: ${unchanged.error}`);
 
 	const badge = pending > 0 && (
 		<span aria-hidden className="pointer-events-none absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-info px-1 text-3xs font-semibold text-white tabular-nums">
@@ -111,6 +104,7 @@ export function PullRequestComposer({ detail, openDraft, send, onDraftPosted }: 
 			open={open}
 			onOpenChange={next => {
 				if (next) setRequestedMode(reviewStarted ? "review" : "comment");
+				else post.dismiss();
 				setOpen(next);
 			}}
 		>
@@ -163,14 +157,21 @@ export function PullRequestComposer({ detail, openDraft, send, onDraftPosted }: 
 					</div>
 				</div>
 				{mode === "review" ? (
-					<ReviewForm textareaRef={reviewRef} summary={summary} onSummary={setSummary} verdict={picked} verdicts={verdicts} onVerdict={setVerdict} lineComments={lineComments} busy={busy} onSubmit={() => void review()} />
+					<ReviewForm textareaRef={reviewRef} summary={summary} onSummary={setSummary} verdict={picked} verdicts={verdicts} onVerdict={setVerdict} lineComments={lineComments} busy={busy} onSubmit={() => post.run({ kind: "review" })} />
 				) : (
-					<CommentForm scope={prKey(detail)} state={detail.state} textareaRef={commentRef} body={body} onBody={setBody} busy={busy} onSubmit={then => void comment(then)} />
+					<CommentForm scope={prKey(detail)} state={detail.state} textareaRef={commentRef} body={body} onBody={setBody} busy={busy} loading={loading} onSubmit={then => post.run({ kind: "comment", then })} />
 				)}
 				{failure && (
-					<p role="alert" className={`${ERROR_TEXT} mt-2`}>
-						GitHub did not take it: {failure}
-					</p>
+					<div className="mt-2 flex items-start justify-between gap-2">
+						<p role="alert" className={ERROR_TEXT}>
+							GitHub did not take it: {failure}
+						</p>
+						{unchanged && (
+							<Button size="xs" variant="outline" className="shrink-0" onClick={() => change.run(unchanged.args[0])}>
+								{unchanged.args[0] === "close" ? "Retry close" : "Retry reopen"}
+							</Button>
+						)}
+					</div>
 				)}
 			</PopoverContent>
 		</Popover>
@@ -191,16 +192,13 @@ interface CommentFormProps {
 	body: string;
 	onBody: (body: string) => void;
 	busy: boolean;
-	onSubmit: (then: "close" | "reopen" | null) => void;
+	/** The button whose post or state change is under way, if any. */
+	loading: FollowUp | "comment" | null;
+	onSubmit: (then: FollowUp | null) => void;
 }
 
-function CommentForm({ scope, state, textareaRef, body, onBody, busy, onSubmit }: CommentFormProps) {
+function CommentForm({ scope, state, textareaRef, body, onBody, busy, loading, onSubmit }: CommentFormProps) {
 	const confirm = useInlineConfirm(scope);
-	const [pressed, setPressed] = useState<"close" | "reopen" | null>(null);
-	const submit = (then: "close" | "reopen" | null): void => {
-		setPressed(then);
-		onSubmit(then);
-	};
 	const ready = body.trim() !== "" && body.length <= MAX_COMMENT_BODY && !busy;
 	const followUp = state === "open" || state === "draft" ? "close" : state === "closed" ? "reopen" : null;
 	return (
@@ -213,12 +211,12 @@ function CommentForm({ scope, state, textareaRef, body, onBody, busy, onSubmit }
 				placeholder="Leave a comment"
 				aria-label="Comment on this pull request"
 				onChange={event => onBody(event.target.value)}
-				onKeyDown={event => submitKey(event, () => ready && submit(null))}
+				onKeyDown={event => submitKey(event, () => ready && onSubmit(null))}
 				className={TEXTAREA}
 			/>
 			<div className="flex flex-wrap justify-end gap-2">
 				{followUp === "close" && (
-					<Button size="xs" variant="destructive-outline" leadingIcon={GitPullRequestClosed} loading={busy && pressed === "close"} disabled={!ready} {...confirm.props("close", () => submit("close"))}>
+					<Button size="xs" variant="destructive-outline" leadingIcon={GitPullRequestClosed} loading={loading === "close"} disabled={!ready} {...confirm.props("close", () => onSubmit("close"))}>
 						<span className="inline-grid">
 							<span aria-hidden className="invisible col-start-1 row-start-1">
 								Close with comment
@@ -228,11 +226,11 @@ function CommentForm({ scope, state, textareaRef, body, onBody, busy, onSubmit }
 					</Button>
 				)}
 				{followUp === "reopen" && (
-					<Button size="xs" variant="outline" leadingIcon={GitPullRequest} loading={busy && pressed === "reopen"} disabled={!ready} onClick={() => submit("reopen")}>
+					<Button size="xs" variant="outline" leadingIcon={GitPullRequest} loading={loading === "reopen"} disabled={!ready} onClick={() => onSubmit("reopen")}>
 						Reopen with comment
 					</Button>
 				)}
-				<Button size="xs" variant="outline" leadingIcon={Send} loading={busy && pressed === null} disabled={!ready} onClick={() => submit(null)}>
+				<Button size="xs" variant="outline" leadingIcon={Send} loading={loading === "comment"} disabled={!ready} onClick={() => onSubmit(null)}>
 					Comment
 				</Button>
 			</div>

@@ -73,10 +73,14 @@ describe("the page's capture", () => {
 		expect(currentDictation()).toMatchObject({ phase: "starting", captureId: id });
 	});
 
-	test("a stop while starting cancels it: its end lands nothing and says nothing", () => {
+	test("a stop while starting cancels it: it shows no recording that comes after, stops once, and its end lands nothing and says nothing", () => {
 		const id = start();
 		stopDictation(send);
 		expect(sent.at(-1)).toEqual({ t: "dictation-stop", captureId: id });
+		event(id, { kind: "state", state: "recording" }, { kind: "preview", text: "late" });
+		expect(currentDictation()).toMatchObject({ phase: "cancelling", preview: "" });
+		stopDictation(send);
+		expect(sent).toHaveLength(2);
 		event(id, { kind: "end", text: "late words", error: null });
 		expect(currentDictation()).toBeNull();
 		expect(draft("live/a")).toBeNull();
@@ -101,7 +105,7 @@ describe("the page's capture", () => {
 		dismissDictation();
 		const cancelled = start();
 		stopDictation(send);
-		event(cancelled, { kind: "off", settings });
+		event(cancelled, { kind: "off", settings }, { kind: "end", text: "", error: "Dictation is off" });
 		expect(currentDictation()).toBeNull();
 	});
 
@@ -130,7 +134,7 @@ describe("the page's capture", () => {
 });
 
 describe("rowOf", () => {
-	const capturing = { captureId: "c", target, preview: "", processing: null, cancelled: false };
+	const capturing = { captureId: "c", target, preview: "", processing: null };
 	const row = rowOf;
 
 	test("a capture under way offers Cancel, then Stop and Discard, then only Discard", () => {

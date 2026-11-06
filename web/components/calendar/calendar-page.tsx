@@ -1,6 +1,5 @@
 import { Plus, Trash2 } from "lucide-react";
 import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
-import { errorText } from "../../../src/json";
 import type { Routine } from "../../../src/routines";
 import type { EventRef, LocalEvent } from "../../../src/shared/calendar";
 import type { UserTodoList } from "../../../src/user-todos-shared";
@@ -21,6 +20,7 @@ import {
 } from "@/components/kibo-ui/calendar";
 import { cn } from "@/lib/utils";
 import { putJson } from "../../api";
+import { type Action, useAction } from "../../use-action";
 import { type CalendarEntry, calendarEntries } from "../../calendar-model";
 import { eventLink, type NoticeLink } from "../../notice-model";
 import { dateOfDay, localDay } from "../../../src/shared/days";
@@ -183,12 +183,15 @@ function CellEntry({ entry }: { entry: CalendarEntry }) {
 	);
 }
 
-/** Deletes the event `eventRef` names, named `title` in what it says when it cannot. */
-type DeleteEventHandler = (eventRef: EventRef, title: string) => Promise<void>;
+/** Deletes the event `eventRef` names, named `title` in what it says when it cannot; one delete runs at a time. */
+type EventDelete = Action<[eventRef: EventRef, title: string]>;
 
-/** The button that deletes the event `eventRef` names, busy until `onDelete` settles. */
-function DeleteEvent({ eventRef, title, onDelete }: { eventRef: EventRef; title: string; onDelete: DeleteEventHandler }) {
-	const [deleting, setDeleting] = useState(false);
+const sameEvent = (a: EventRef, b: EventRef): boolean =>
+	a.kind === "local" ? b.kind === "local" && a.id === b.id : b.kind === "google" && a.account === b.account && a.calendarId === b.calendarId && a.eventId === b.eventId;
+
+/** The button that deletes the event `eventRef` names, busy while it is the one deleting and off while another is. */
+function DeleteEvent({ eventRef, title, remove }: { eventRef: EventRef; title: string; remove: EventDelete }) {
+	const deleting = remove.state.kind === "pending" && sameEvent(remove.state.args[0], eventRef);
 	return (
 		<Tooltip content="Delete this event" side="left">
 			<Button
@@ -197,11 +200,8 @@ function DeleteEvent({ eventRef, title, onDelete }: { eventRef: EventRef; title:
 				className="mt-0.5 shrink-0"
 				aria-label={`Delete ${title}`}
 				loading={deleting}
-				onClick={async () => {
-					setDeleting(true);
-					await onDelete(eventRef, title);
-					setDeleting(false);
-				}}
+				disabled={remove.pending && !deleting}
+				onClick={() => remove.run(eventRef, title)}
 			>
 				<Trash2 />
 			</Button>
@@ -210,10 +210,10 @@ function DeleteEvent({ eventRef, title, onDelete }: { eventRef: EventRef; title:
 }
 
 /**
- * A day's entries, each with what it is, as the day's list and a day's hover card show them; with `onDelete`, an event
+ * A day's entries, each with what it is, as the day's list and a day's hover card show them; with `remove`, an event
  * kept on this computer or of a Google calendar you may write to has a delete button.
  */
-function DayEntries({ entries, onDelete }: { entries: CalendarEntry[]; onDelete?: DeleteEventHandler }) {
+function DayEntries({ entries, remove }: { entries: CalendarEntry[]; remove?: EventDelete }) {
 	return (
 		<ul className="space-y-px">
 			{entries.map(entry => (
@@ -225,7 +225,7 @@ function DayEntries({ entries, onDelete }: { entries: CalendarEntry[]; onDelete?
 							<span className="block truncate text-xs text-muted-foreground">{entryDetail(entry)}</span>
 						</span>
 					</EntryLink>
-					{onDelete && entry.kind === "event" && entry.event.source.ref && <DeleteEvent eventRef={entry.event.source.ref} title={entry.event.title} onDelete={onDelete} />}
+					{remove && entry.kind === "event" && entry.event.source.ref && <DeleteEvent eventRef={entry.event.source.ref} title={entry.event.title} remove={remove} />}
 				</li>
 			))}
 		</ul>
@@ -243,12 +243,12 @@ function DayHeading({ day, count, className }: { day: Date; count: number; class
 }
 
 /** The chosen day's entries beside the month. */
-function DayList({ day, entries, onDelete }: { day: Date | null; entries: CalendarEntry[]; onDelete: DeleteEventHandler }) {
+function DayList({ day, entries, remove }: { day: Date | null; entries: CalendarEntry[]; remove: EventDelete }) {
 	if (day === null) return <p className="px-2 text-sm text-muted-foreground">Choose a day to list everything on it.</p>;
 	return (
 		<section aria-label={day.toDateString()} className="space-y-2 lg:sticky lg:top-0 lg:self-start">
 			<DayHeading day={day} count={entries.length} className="px-2" />
-			{entries.length === 0 ? <p className="px-2 text-sm text-muted-foreground">Nothing on this day.</p> : <DayEntries entries={entries} onDelete={onDelete} />}
+			{entries.length === 0 ? <p className="px-2 text-sm text-muted-foreground">Nothing on this day.</p> : <DayEntries entries={entries} remove={remove} />}
 		</section>
 	);
 }
@@ -331,7 +331,6 @@ export function CalendarPage({ routines, todos, ticketsShown, workspace }: Calen
 	const [selected, setSelected] = useState<Date | null>(() => new Date(now));
 	/** The day the new-event dialog opened on, while it is open. */
 	const [newEventDay, setNewEventDay] = useState<string | null>(null);
-	const [deleteError, setDeleteError] = useState<string | null>(null);
 	const tickets = ticketsStore.usePolling(null, ticketsShown).read?.data.tickets ?? null;
 	const { connected, accounts } = useGoogleCalendars(workspace);
 	const span = monthSpan(year, month);
@@ -366,14 +365,8 @@ export function CalendarPage({ routines, todos, ticketsShown, workspace }: Calen
 	// Claims C even while the dialog is open, so the page's key never falls through to the App's Create ticket.
 	useShortcuts({ calendarNewEvent: openNewEvent });
 	/** Deletes the event `eventRef` names, then shows the day without it: an event kept on this computer at once, and a Google event once its month is read again. */
-	const deleteEvent = async (eventRef: EventRef, title: string): Promise<void> => {
-		setDeleteError(null);
-		try {
-			await putJson<object>("/api/calendar/events/delete", eventRef);
-		} catch (err) {
-			setDeleteError(`Cannot delete ${title}: ${errorText(err)}`);
-			return;
-		}
+	const remove = useAction(async (eventRef: EventRef, _title: string) => {
+		await putJson<object>("/api/calendar/events/delete", eventRef);
 		switch (eventRef.kind) {
 			case "local":
 				localEventsStore.update(answer => ({ events: answer.events.filter(event => event.id !== eventRef.id) }));
@@ -386,7 +379,7 @@ export function CalendarPage({ routines, todos, ticketsShown, workspace }: Calen
 				return unhandled;
 			}
 		}
-	};
+	}, null);
 	/** Shows a new event, which starts on `day`: one kept on this computer at once, and one added to Google Calendar once its month is read again. */
 	const created = (day: string, kept: LocalEvent | null): void => {
 		const date = dateOfDay(day);
@@ -399,7 +392,7 @@ export function CalendarPage({ routines, todos, ticketsShown, workspace }: Calen
 	const failures: string[] = [];
 	if (connected && eventsRead.error) failures.push(`Cannot read Google Calendar: ${eventsRead.error}`);
 	if (localRead.error) failures.push(`Cannot read the events on this computer: ${localRead.error}`);
-	if (deleteError) failures.push(deleteError);
+	if (remove.state.kind === "failed") failures.push(`Cannot delete ${remove.state.args[1]}: ${remove.state.error}`);
 	return (
 		<PageFrame title="Calendar" meta={[showRoutines && "Routine runs", connected && "Google events", "events on this computer", "due todos", ticketsShown && "Linear tickets"].filter(Boolean).join(", ")}>
 			{failures.map(failure => (
@@ -447,7 +440,7 @@ export function CalendarPage({ routines, todos, ticketsShown, workspace }: Calen
 						})}
 					</div>
 				</CalendarProvider>
-				<DayList day={shownDay === null ? null : selected} entries={shownDay === null ? [] : (byDay.get(shownDay) ?? [])} onDelete={deleteEvent} />
+				<DayList day={shownDay === null ? null : selected} entries={shownDay === null ? [] : (byDay.get(shownDay) ?? [])} remove={remove} />
 			</div>
 			{newEventDay !== null && <NewEventDialog day={newEventDay} workspace={workspace} onClose={() => setNewEventDay(null)} onCreated={created} />}
 		</PageFrame>

@@ -18,13 +18,12 @@ export interface CleanupRow {
 }
 export interface CleanupResult { text: string; errors: string[] }
 export interface StepProgress extends CleanupResult { state: "waiting" | "running" | "done" | "failed" }
-export interface CleanupRun {
-	phase: "running" | "done";
-	progress: Partial<Record<CleanupStep, StepProgress>>;
-	stopping: boolean;
-	before: number | null;
-	after: number | null;
-}
+type Progress = Partial<Record<CleanupStep, StepProgress>>;
+/** How a run ended: every chosen step ran, you stopped it, or a step failed and the rest did not start. */
+export type CleanupEnd = "finished" | "stopped" | "failed";
+export type CleanupRun =
+	| { phase: "running"; progress: Progress; stopRequested: boolean; before: number | null }
+	| { phase: "done"; progress: Progress; ended: CleanupEnd; before: number | null; after: number | null };
 
 type GcReports = { [P in GcPhase]: NonNullable<GcAnswer[P]> };
 type SandboxResults = { results: SandboxResult[]; total: number };
@@ -214,15 +213,15 @@ async function runSandboxes(step: SandboxStep, plans: readonly SandboxPlan[], io
 }
 
 export async function runCleanup(chosen: readonly CleanupRow[], sandboxes: readonly SandboxPlan[], { stopped, onProgress }: RunHooks, io: CleanupIo = cleanupIo): Promise<CleanupRun> {
-	const progress: CleanupRun["progress"] = Object.fromEntries(chosen.map(row => [row.step, { state: "waiting", text: "Waiting", errors: [] }]));
+	const progress: Progress = Object.fromEntries(chosen.map(row => [row.step, { state: "waiting", text: "Waiting", errors: [] }]));
 	let before: number | null = null;
-	let failed = false;
-	const publish = (): void => onProgress({ phase: "running", progress: { ...progress }, stopping: stopped() || failed, before, after: null });
+	let ended: CleanupEnd = "finished";
+	const publish = (): void => onProgress({ phase: "running", progress: { ...progress }, stopRequested: stopped(), before });
 	publish();
 	before = await io.availableBytes().catch(() => null);
 	publish();
 	for (const row of chosen) {
-		if (stopped() || failed) break;
+		if (stopped()) break;
 		progress[row.step] = { state: "running", text: "Running…", errors: [] };
 		publish();
 		try {
@@ -237,14 +236,17 @@ export async function runCleanup(chosen: readonly CleanupRow[], sandboxes: reado
 				const step = row.step;
 				result = stepResultText(step, reportOf(step, await io.apply({ action: "apply", step })));
 			}
-			failed = result.errors.length > 0;
-			progress[row.step] = { state: failed ? "failed" : "done", ...result };
+			if (result.errors.length > 0) ended = "failed";
+			progress[row.step] = { state: ended === "failed" ? "failed" : "done", ...result };
 		} catch (error) {
-			failed = true;
-			progress[row.step] = { state: "failed", text: "Cleanup stopped", errors: [errorText(error)] };
+			ended = "failed";
+			progress[row.step] = { state: "failed", text: "Failed", errors: [errorText(error)] };
 		}
 		publish();
+		if (ended === "failed") break;
 	}
+	// A stop asked for during the last step may have cut its sandboxes short, so it counts too.
+	if (ended === "finished" && stopped()) ended = "stopped";
 	const after = await io.availableBytes().catch(() => null);
-	return { phase: "done", progress: { ...progress }, stopping: stopped() || failed, before, after };
+	return { phase: "done", progress: { ...progress }, ended, before, after };
 }

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
 import { integrationsStore } from "../../reads";
+import { useAction } from "../../use-action";
 import { CONTROL, describedBy, External, Field, FIELD, Step } from "./client-form";
 import { Callout } from "./integration-row";
 
@@ -83,17 +84,26 @@ export function SlackAppForm({ setup, connected, onDone }: SlackAppFormProps) {
 	const [callbackPort, setCallbackPort] = useState(String(setup?.callbackPort ?? 3000));
 	const [scope, setScope] = useState(setup?.scope.trim() ? setup.scope : SLACK_USER_SCOPES.join(" "));
 	const [errors, setErrors] = useState<FieldErrors>({});
-	const [saving, setSaving] = useState(false);
-	const [saveError, setSaveError] = useState<string | null>(null);
+	const write = useAction(async (body: SlackClientInput) => {
+		try {
+			await putJson<McpIntegration>("/api/integrations/slack/client", body);
+			await integrationsStore.refresh();
+		} catch (err) {
+			const message = errorText(err);
+			throw new Error(body.clientSecret ? message.replaceAll(body.clientSecret, "the client secret") : message);
+		}
+		onDone();
+	}, null);
+	const saving = write.pending;
 	const replacing = setup?.configured === true || setup?.hasClientSecret === true || Boolean(setup?.clientId);
 
-	const save = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+	const save = (event: FormEvent<HTMLFormElement>): void => {
 		event.preventDefault();
 		if (saving) return;
 		const draft = { clientId, clientSecret, redirectUri, callbackPort, scope };
 		const next = validateSlackSetup(draft, setup);
 		setErrors(next);
-		setSaveError(null);
+		write.dismiss();
 		const first = FIELD_ORDER.find(field => next[field]);
 		if (first) {
 			refs[first].current?.focus();
@@ -107,21 +117,11 @@ export function SlackAppForm({ setup, connected, onDone }: SlackAppFormProps) {
 			scope: scope.trim(),
 		};
 		if (secret) body.clientSecret = secret;
-		setSaving(true);
-		try {
-			await putJson<McpIntegration>("/api/integrations/slack/client", body);
-			await integrationsStore.refresh();
-			onDone();
-		} catch (err) {
-			const message = errorText(err);
-			setSaveError(secret ? message.replaceAll(secret, "the client secret") : message);
-		} finally {
-			setSaving(false);
-		}
+		write.run(body);
 	};
 
 	return (
-		<form aria-label="Slack app settings" noValidate onSubmit={event => void save(event)} className="space-y-4 rounded-lg bg-muted/60 p-4 text-[13px]">
+		<form aria-label="Slack app settings" noValidate onSubmit={save} className="space-y-4 rounded-lg bg-muted/60 p-4 text-[13px]">
 			<ol className="space-y-2.5">
 				<Step n={1}>
 					Create a new internal app in <External href="https://api.slack.com/apps">Your Slack apps</External>. Leave any existing production app unchanged.
@@ -246,9 +246,9 @@ export function SlackAppForm({ setup, connected, onDone }: SlackAppFormProps) {
 			<Callout tone="warning" icon={CircleAlert}>
 				Token rotation is irreversible. Turn it on in Slack for this new app only. Slack cannot turn it off later. A sign-in without a refresh token is refused.
 			</Callout>
-			{saveError && (
+			{write.error && (
 				<Callout tone="danger" icon={CircleAlert} role="alert">
-					Cannot save the app settings: {saveError}
+					Cannot save the app settings: {write.error}
 				</Callout>
 			)}
 			<div className="flex flex-wrap items-center justify-end gap-2">

@@ -83,7 +83,7 @@ test("the driver runs native phases in order, then eligible sandboxes individual
 	};
 	const result = await runCleanup(cleanupRows({ gc: report, sandboxes: sandboxes, caches: caches }), sandboxes, { stopped: () => false, onProgress: run => progress.push(run) }, io);
 	expect(applied).toEqual(["stale", "blobs", "archive", "compress", "wal", "sandboxes:/tmp/one", "sandboxes:/tmp/two", "changedSandboxes:/tmp/edited", "packageCaches"]);
-	expect(result).toMatchObject({ phase: "done", before: 1000, after: 2000, stopping: false });
+	expect(result).toMatchObject({ phase: "done", before: 1000, after: 2000, ended: "finished" });
 	expect(Object.values(result.progress).every(step => step.state === "done")).toBe(true);
 	expect(result.progress.sandboxes?.text).toBe("2 of 2 sandboxes removed");
 	expect(result.progress.changedSandboxes?.text).toBe("1 of 1 sandbox removed");
@@ -99,7 +99,7 @@ test("a requested stop finishes the current native phase and starts no later pha
 		apply: async request => { applied.push(request.step); stopped = true; return applyReply(request); },
 	});
 	expect(applied).toEqual(["stale"]);
-	expect(result.stopping).toBe(true);
+	expect(result).toMatchObject({ phase: "done", ended: "stopped" });
 	expect(result.progress.stale?.state).toBe("done");
 	expect(result.progress.blobs?.state).toBe("waiting");
 });
@@ -116,11 +116,11 @@ test("stopping a sandbox phase preserves its partial count and does not remove t
 		},
 	});
 	expect(applied).toEqual(["/tmp/one"]);
-	expect(result.stopping).toBe(true);
+	expect(result).toMatchObject({ phase: "done", ended: "stopped" });
 	expect(result.progress.sandboxes).toMatchObject({ state: "done", text: "1 of 2 sandboxes removed" });
 });
 
-test("a phase's reported errors stop the run and keep later phases waiting", async () => {
+test("a phase's reported errors end the run as failed, not stopped, and keep later phases waiting", async () => {
 	const applied: string[] = [];
 	const result = await runCleanup(cleanupRows({ gc: report, sandboxes: [], caches: [] }).filter(row => row.step === "blobs" || row.step === "archive"), [], { stopped: () => false, onProgress: () => {} }, {
 		availableBytes: async () => 1000,
@@ -130,7 +130,7 @@ test("a phase's reported errors stop the run and keep later phases waiting", asy
 		},
 	});
 	expect(applied).toEqual(["blobs"]);
-	expect(result.stopping).toBe(true);
+	expect(result).toMatchObject({ phase: "done", ended: "failed" });
 	expect(result.progress.blobs).toMatchObject({ state: "failed", errors: ["Permission denied"] });
 	expect(result.progress.archive?.state).toBe("waiting");
 });
@@ -140,7 +140,7 @@ test("a failed command stops the run while unavailable free-space readings remai
 		availableBytes: async () => { throw new Error("Cannot measure"); },
 		apply: async () => { throw new Error("Disk unavailable"); },
 	});
-	expect(result).toMatchObject({ before: null, after: null, stopping: true });
+	expect(result).toMatchObject({ before: null, after: null, ended: "failed" });
 	expect(result.progress.blobs).toMatchObject({ state: "failed", errors: ["Disk unavailable"] });
 });
 
@@ -151,7 +151,7 @@ test("an unexpected phase or absent native report stops rather than claiming suc
 			availableBytes: async () => 1000,
 			apply: async () => answer,
 		});
-		expect(result.stopping).toBe(true);
+		expect(result).toMatchObject({ phase: "done", ended: "failed" });
 		expect(result.progress.blobs).toMatchObject({ state: "failed", errors: ["Unexpected cleanup response."] });
 	}
 });

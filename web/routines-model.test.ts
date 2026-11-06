@@ -50,7 +50,7 @@ const routine = (fields: Partial<Routine>): Routine => ({
 	...fields,
 });
 
-const run = (fields: Partial<RoutineRun>): RoutineRun => ({ at: at(5, 9), outcome: { kind: "pending", queued: false }, errors: [], triggeredBy: [], ...fields });
+const run = (fields: Partial<RoutineRun>): RoutineRun => ({ at: at(5, 9), outcome: { kind: "failed" }, errors: [], triggeredBy: [], ...fields });
 
 describe("schedule words", () => {
 	test("an interval reads in its largest whole unit", () => {
@@ -172,10 +172,11 @@ describe("past run", () => {
 describe("last run", () => {
 	const sent = { kind: "sent", sessionId: "01a0" } as const;
 
-	test("says it went to the Bot, and names its errors, or that it waits its turn", () => {
+	test("says it went to the Bot, and names its errors, or that it waits its turn or sends", () => {
 		expect(runWords(run({ outcome: sent, errors: ["GitHub timed out", "No such directory"] }))).toBe("Sent to the Bot, 2 errors");
 		expect(runWords(run({ errors: ["GitHub timed out"] }))).toBe("1 error");
-		expect(runWords(run({ outcome: { kind: "pending", queued: true } }))).toBe("Queued");
+		expect(runWords(run({ outcome: { kind: "queued" } }))).toBe("Queued");
+		expect(runWords(run({ outcome: { kind: "sending" } }))).toBe("Sending…");
 	});
 
 	test("a run that sent nothing says so", () => {
@@ -204,7 +205,7 @@ describe("command runs", () => {
 		expect(runWords(run({ errors: ["The last run's command is still running."] }))).toBe("1 error");
 	});
 
-	test("a run's health fails on any error or an unsuccessful command, runs while its command does, and waits while pending", () => {
+	test("a run's health fails on any error or an unsuccessful command, runs while its command does or it sends, and waits while queued", () => {
 		const command = (commandRun: CommandRun) => runHealth(run({ outcome: { kind: "command", run: commandRun } }));
 		expect(command({ phase: "exited", code: 0, output: "", ...window })).toBe("ok");
 		expect(command({ phase: "exited", code: 3, output: "", ...window })).toBe("failed");
@@ -212,7 +213,9 @@ describe("command runs", () => {
 		expect(command({ phase: "running", startedAt: at(5, 9) })).toBe("running");
 		expect(runHealth(run({ outcome: { kind: "sent", sessionId: "s" } }))).toBe("ok");
 		expect(runHealth(run({ outcome: { kind: "sent", sessionId: "s" }, errors: ["late"] }))).toBe("failed");
-		expect(runHealth(run({ outcome: { kind: "pending", queued: true } }))).toBe("waiting");
+		expect(runHealth(run({ outcome: { kind: "queued" } }))).toBe("waiting");
+		expect(runHealth(run({ outcome: { kind: "sending" } }))).toBe("running");
+		expect(runHealth(run({ outcome: { kind: "failed" }, errors: ["The dashboard stopped while it sent this run's prompt."] }))).toBe("failed");
 	});
 });
 
@@ -233,7 +236,7 @@ describe("run strip", () => {
 
 	test("counts its runs by how they went, in one order", () => {
 		expect(runCountWords([ok(12), failed(11), ok(10)])).toBe("2 succeeded, 1 failed");
-		expect(runCountWords([run({}), failed(11)])).toBe("1 failed, 1 waiting");
+		expect(runCountWords([run({ outcome: { kind: "queued" } }), failed(11)])).toBe("1 failed, 1 waiting");
 		expect(runCountWords([])).toBe("No runs yet");
 	});
 

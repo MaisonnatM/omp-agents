@@ -476,6 +476,27 @@ describe("SessionGuest linking", () => {
 		expect(guest.control).toEqual({ phase: "ended", reason: "relay gave up" });
 		expect(socket.closed).toBe(true);
 	});
+
+	test("a Stop queued behind a steer still being prepared sends nothing once the room dropped meanwhile", async () => {
+		const { guest, socket } = await joinRoom({ welcome: { state: { isStreaming: true } } });
+		const prepared = Promise.withResolvers<string>();
+		spyOn(commands, "expandPrompt").mockImplementation(() => prepared.promise);
+		const sending = guest.prompt(null, "now", [], "steer");
+		const stopping = guest.interrupt();
+		socket.onClose?.("relay dropped", true);
+		prepared.resolve("now");
+		await sending;
+		await stopping;
+		expect(socket.messages).toEqual([]);
+	});
+
+	test("a reconnect notice from the socket after the guest ended leaves it ended", async () => {
+		const { guest, socket } = await joinRoom();
+		guest.disconnect("Dashboard shut down.");
+		socket.onClose?.("relay dropped", true);
+		expect(guest.control).toEqual({ phase: "ended", reason: "Dashboard shut down." });
+		expect(guest.canWrite).toBe(false);
+	});
 });
 
 describe("SessionGuest lifetime", () => {

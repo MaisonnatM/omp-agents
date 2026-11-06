@@ -4,10 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MenuItem } from "@/components/ui/menu";
 import { ANTHROPIC_API_KEY_METHOD, type LoginPrompt, type ModelProvider, type ProviderAccount, type ProviderLogin, type ProvidersAnswer, providerConnected } from "../../../src/shared/providers";
-import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
 import { readTime } from "../../labels";
 import { providersStore } from "../../reads";
+import { useAction } from "../../use-action";
 import { MoreActionsMenu } from "../more-actions-menu";
 import { LoadNote } from "../sheet-details";
 import { Callout, IntegrationList, MetaDot } from "../integrations/integration-row";
@@ -26,22 +26,17 @@ const cancelLogin = async (): Promise<void> => {
 /** The question a running sign-in waits on, masked when the provider marks the answer secret. */
 function PromptForm({ prompt, apiKey = false }: { prompt: LoginPrompt; apiKey?: boolean }) {
 	const [value, setValue] = useState("");
-	const [sending, setSending] = useState(false);
-	const [error, setError] = useState<string | null>(null);
+	const answer = useAction(async () => {
+		await putJson("/api/providers/login/answer", { prompt: prompt.id, value });
+		setValue("");
+		await refresh();
+	}, null);
+	const sending = answer.pending;
+	const error = answer.error;
 
-	const submit = async (event: FormEvent): Promise<void> => {
+	const submit = (event: FormEvent): void => {
 		event.preventDefault();
-		if (sending) return;
-		setSending(true);
-		setError(null);
-		try {
-			await putJson("/api/providers/login/answer", { prompt: prompt.id, value });
-			setValue("");
-			await refresh();
-		} catch (err) {
-			setError(errorText(err));
-			setSending(false);
-		}
+		answer.run();
 	};
 
 	return (
@@ -140,20 +135,12 @@ function LoginCallout({ login }: { login: ProviderLogin }) {
 /** One stored credential, and the question that signs omp out of it. */
 function AccountLine({ provider, account }: { provider: ModelProvider; account: ProviderAccount }) {
 	const [confirming, setConfirming] = useState(false);
-	const [signingOut, setSigningOut] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-
-	const signOut = async (): Promise<void> => {
-		setSigningOut(true);
-		setError(null);
-		try {
-			const answer = await putJson<ProvidersAnswer>("/api/providers/sign-out", { provider: provider.id, credentialId: account.credentialId });
-			providersStore.update(() => answer);
-		} catch (err) {
-			setError(errorText(err));
-			setSigningOut(false);
-		}
-	};
+	const signOut = useAction(async () => {
+		const answer = await putJson<ProvidersAnswer>("/api/providers/sign-out", { provider: provider.id, credentialId: account.credentialId });
+		providersStore.update(() => answer);
+	}, null);
+	const signingOut = signOut.pending;
+	const error = signOut.error;
 
 	if (confirming) {
 		return (
@@ -167,7 +154,7 @@ function AccountLine({ provider, account }: { provider: ModelProvider; account: 
 						<Button variant="ghost" size="compact" autoFocus disabled={signingOut} onClick={() => setConfirming(false)}>
 							Cancel
 						</Button>
-						<Button size="compact" loading={signingOut} onClick={() => void signOut()}>
+						<Button size="compact" loading={signingOut} onClick={() => signOut.run()}>
 							Sign out
 						</Button>
 					</div>
@@ -197,37 +184,27 @@ function AccountLine({ provider, account }: { provider: ModelProvider; account: 
 
 /** One provider: its accounts, the buttons that sign in, and the sign-in under way for it. */
 function ProviderRow({ provider, login }: { provider: ModelProvider; login: ProviderLogin | null }) {
-	const [starting, setStarting] = useState(false);
-	const [startError, setStartError] = useState<string | null>(null);
+	const start = useAction(async (method: string) => {
+		const answer = await putJson<ProvidersAnswer>("/api/providers/login", { method });
+		providersStore.update(() => answer);
+	}, null);
+	const starting = start.pending;
+	const startError = start.error;
 	const connected = providerConnected(provider);
 	const running = login?.phase === "running";
 	const [first, ...others] = provider.methods;
-
-	const start = async (method: string): Promise<void> => {
-		setStarting(true);
-		setStartError(null);
-		try {
-			const answer = await putJson<ProvidersAnswer>("/api/providers/login", { method });
-			providersStore.update(() => answer);
-		} catch (err) {
-			setStartError(errorText(err));
-		} finally {
-			setStarting(false);
-		}
-	};
-
 	const verb = connected ? "Add account" : "Connect";
 	const actions = running ? null : (
 		<>
 			{!connected && (
-				<Button variant="secondary" size="compact" loading={starting} onClick={() => void start(first!.id)}>
+				<Button variant="secondary" size="compact" loading={starting} onClick={() => start.run(first!.id)}>
 					Connect
 				</Button>
 			)}
 			{(connected || others.length > 0) && (
 				<MoreActionsMenu name={provider.name} disabled={starting}>
 					{(connected ? provider.methods : others).map(method => (
-						<MenuItem key={method.id} onClick={() => void start(method.id)}>
+						<MenuItem key={method.id} onClick={() => start.run(method.id)}>
 							{method.id === ANTHROPIC_API_KEY_METHOD ? <KeyRound /> : <Plus />}
 							{method.id === ANTHROPIC_API_KEY_METHOD ? (provider.accounts.some(account => account.kind === "api_key") ? "Replace API key" : "Add API key") : method.id === first!.id ? verb : `${verb} with ${method.name}`}
 						</MenuItem>

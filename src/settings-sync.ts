@@ -447,6 +447,9 @@ interface SyncState {
 	last: SyncOutcome | null;
 }
 
+/** Whether `next` points sync at another remote or branch than `before`, so an outcome about `before` says nothing about it. */
+const movedFrom = (before: SyncSettings, next: SyncSettings): boolean => next.remote !== before.remote || next.branch !== before.branch;
+
 function parseState(value: unknown): SyncState | null {
 	if (!isObject(value)) return null;
 	const settings = parseSyncSettings(value.settings);
@@ -473,11 +476,9 @@ export class SettingsSync {
 		return { settings: this.#state.settings, last: this.#state.last };
 	}
 
-	/** Saves `settings`; another remote or branch drops the last outcome, which was about the old one. */
+	/** Saves `settings`; another remote or branch drops the last outcome, which was about the old one, and the outcome of a sync under way. */
 	configure(settings: SyncSettings): SyncAnswer {
-		const { remote, branch } = this.#state.settings;
-		const moved = settings.remote !== remote || settings.branch !== branch;
-		this.#save({ settings, last: moved ? null : this.#state.last });
+		this.#save({ settings, last: movedFrom(this.#state.settings, settings) ? null : this.#state.last });
 		return this.answer();
 	}
 
@@ -494,8 +495,9 @@ export class SettingsSync {
 	sync(choices: Readonly<Record<string, SyncSide>> = {}): Promise<SyncAnswer> {
 		return this.#lane.run(async () => {
 			const at = Date.now();
-			const last = await this.#run(choices).catch((err: unknown): SyncOutcome => ({ kind: "failed", at, error: errorText(err) }));
-			this.#save({ ...this.#state, last });
+			const { settings } = this.#state;
+			const last = await this.#run(settings, choices).catch((err: unknown): SyncOutcome => ({ kind: "failed", at, error: errorText(err) }));
+			if (!movedFrom(settings, this.#state.settings)) this.#save({ ...this.#state, last });
 			return this.answer();
 		});
 	}
@@ -505,8 +507,8 @@ export class SettingsSync {
 		this.#file.save(state);
 	}
 
-	async #run(choices: Readonly<Record<string, SyncSide>>): Promise<SyncOutcome> {
-		const { remote, branch, excluded } = this.#state.settings;
+	async #run(settings: SyncSettings, choices: Readonly<Record<string, SyncSide>>): Promise<SyncOutcome> {
+		const { remote, branch, excluded } = settings;
 		if (remote === "") throw new Error("Name a Git remote first");
 		const items = SYNC_ITEMS.filter(item => !excluded.includes(item.id));
 		const repo = this.#repo;

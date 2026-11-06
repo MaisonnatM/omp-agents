@@ -8,12 +8,22 @@ const quick = { kind: "quick", cwd: "/tmp", branch: null, prompt: "fix", subject
 const ok = { ok: true, instanceId: "i1", workspace: "/tmp", prompt: null } as const;
 
 describe("starts", () => {
-	test("a new start replaces the last of its kind and keeps the other kinds", () => {
-		let starts: Starts = beginStart(new Map(), 1, resume);
+	test("a new start drops the failure the last of its kind left and keeps the other kinds", () => {
+		let starts: Starts = settleStart(beginStart(new Map(), 1, resume), 1, { ok: false, error: "no file" });
 		starts = beginStart(starts, 2, fork);
 		starts = beginStart(starts, 3, { kind: "resume", sessionId: "s2" });
 		expect([...starts.keys()]).toEqual([2, 3]);
 		expect(startOf(starts, "resume")?.op.sessionId).toBe("s2");
+	});
+
+	test("two quick actions in a row both wait for their answer, and each answer settles its own start", () => {
+		const other = { ...quick, subject: { kind: "ticket", id: "ENG-8", action: "work" } } as const;
+		let starts = beginStart(beginStart(new Map(), 1, quick), 2, other);
+		expect(startOf(starts, "quick")).toMatchObject({ phase: "starting", op: { subject: { id: "ENG-8" } } });
+		starts = settleStart(starts, 2, ok);
+		expect(startOf(starts, "quick")).toMatchObject({ phase: "starting", op: { subject: { id: "ENG-7" } } });
+		starts = settleStart(starts, 1, { ok: false, error: "busy" });
+		expect(startOf(starts, "quick")).toMatchObject({ phase: "failed", error: "busy", op: { subject: { id: "ENG-7" } } });
 	});
 
 	test("an answer settles only a start still waiting: success removes it, failure keeps the reason", () => {

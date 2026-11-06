@@ -5,9 +5,9 @@ import { catalogEntry } from "../../../src/shared/mcp-catalog";
 import type { McpServerRow, McpTransport, OwnServer } from "../../../src/shared/mcp-servers";
 import { Button } from "@/components/ui/button";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
-import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
 import { mcpServersStore } from "../../reads";
+import { useAction } from "../../use-action";
 import { useSignIn } from "../../use-sign-in";
 import { MoreActionsMenu } from "../more-actions-menu";
 import { IntegrationRow, MarkTile, MetaDot } from "./integration-row";
@@ -55,22 +55,14 @@ export function McpServerItem({ server }: { server: OwnServer }) {
 	const signIn = useSignIn(server.signIn, refresh, start);
 	const { refreshing } = mcpServersStore.use();
 	const [confirming, setConfirming] = useState<"sign-out" | "remove" | null>(null);
-	const [toggling, setToggling] = useState(false);
-	const [toggleError, setToggleError] = useState<string | null>(null);
 	const tools = useToolList(status.kind === "ready" ? { tools: status.tools, server: { name, url: server.url ?? "" } } : null);
 
-	const setEnabled = async (enabled: boolean): Promise<void> => {
-		setToggling(true);
-		setToggleError(null);
-		try {
-			await putJson<McpServerRow>("/api/mcp-servers/enabled", { name, enabled });
-			await refresh();
-		} catch (err) {
-			setToggleError(errorText(err));
-		} finally {
-			setToggling(false);
-		}
-	};
+	const setEnabled = useAction(async (enabled: boolean) => {
+		await putJson<McpServerRow>("/api/mcp-servers/enabled", { name, enabled });
+		await refresh();
+	}, null);
+	const toggling = setEnabled.pending;
+	const toggleError = setEnabled.error;
 
 	const badge = signIn.waitingUrl ? WAITING_STATUS : STATUS[status.kind];
 	const busy = signIn.starting || toggling;
@@ -81,7 +73,7 @@ export function McpServerItem({ server }: { server: OwnServer }) {
 	if (source.editable) {
 		if (status.kind !== "disabled") {
 			menuItems.push(
-				<MenuItem key="disable" onClick={() => void setEnabled(false)}>
+				<MenuItem key="disable" onClick={() => setEnabled.run(false)}>
 					<PowerOff />
 					Disable
 				</MenuItem>,
@@ -102,7 +94,7 @@ export function McpServerItem({ server }: { server: OwnServer }) {
 			<>
 				{status.kind === "signed-out" ? <ConnectButton signIn={signIn} /> : <Reconnecting signIn={signIn} />}
 				{status.kind === "disabled" && source.editable && (
-					<Button variant="secondary" size="compact" leadingIcon={Power} loading={toggling} onClick={() => void setEnabled(true)}>
+					<Button variant="secondary" size="compact" leadingIcon={Power} loading={toggling} onClick={() => setEnabled.run(true)}>
 						Enable
 					</Button>
 				)}

@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { BotChange } from "../src/shared/bots";
 import type { PinChange } from "../src/shared/pins";
 import type { TrustChange } from "../src/shared/project-trust";
-import type { AckedFrame, ClientMsg, ResumeFrame, ServerMsg } from "../src/shared/protocol";
+import type { ClientMsg, ServerMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
 import type { UserNoteChange } from "../src/user-notes-shared";
 import type { UserTodoChange } from "../src/user-todos-shared";
@@ -12,6 +12,7 @@ import { type OpenBot, openBot as findOpenBot } from "./bots-model";
 import { clearDraft, liveDraftKey, newDraftKey, putDraft } from "./composer-drafts";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
 import { applyDictationMessage, dictationDisconnected } from "./dictation";
+import { Outbox } from "./outbox";
 import { applyPaneMessage, retainPanes, retainTrajectories, useShownConversations, useShownTrajectories } from "./pane-store";
 import { DEFAULT_SPLIT_RATIOS, type SplitAxis, type SplitRatios } from "./pane-navigation";
 import {
@@ -89,13 +90,16 @@ export interface Dashboard {
 	 * each session it resumes live in the pane that shows it.
 	 */
 	start: (op: StartOp) => void;
-	/** Change the Todo page's list, which shows at once and reaches the server and every other window. */
-	changeTodo: (change: UserTodoChange) => void;
-	/** Change the Notes page's list, which shows at once and reaches the server and every other window. */
-	changeNote: (change: UserNoteChange) => void;
-	/** Pin or unpin sessions, which shows at once and reaches the server and every other window. */
+	/**
+	 * Change the Todo page's list, which shows at once and reaches the server and every other window, on the next socket
+	 * while none is open; settles once the server has handled it, and rejects with the server's error.
+	 */
+	changeTodo: (change: UserTodoChange) => Promise<void>;
+	/** Change the Notes page's list, as {@link Dashboard.changeTodo} does the Todo page's. */
+	changeNote: (change: UserNoteChange) => Promise<void>;
+	/** Pin or unpin sessions, which shows at once and reaches the server, on the next socket while none is open, and every other window. */
 	changePins: (change: PinChange) => void;
-	/** Add, change, or delete a Bot, which shows at once and reaches the server and every other window. */
+	/** Add, change, or delete a Bot, which shows at once and reaches the server, on the next socket while none is open, and every other window. */
 	changeBot: (change: Exclude<BotChange, { op: "message" }>) => void;
 	/** Trust the pieces `refused` asks about, then send its start again, which replaces it; rejects with why the trust could not be saved. */
 	trustAndStart: (refused: RefusedStart) => Promise<void>;
@@ -145,22 +149,17 @@ export function useDashboard(): Dashboard {
 		recordAction(msg);
 	}, []);
 
-	const outbox = useRef(new Map<number, { frame: AckedFrame; resolve: () => void; reject: (error: Error) => void }>());
-	const nextAck = useRef(0);
-	const request = useCallback((msg: ClientMsg) => {
-		const { promise, resolve, reject } = Promise.withResolvers<void>();
-		const ws = socketRef.current;
-		if (ws?.readyState !== WebSocket.OPEN) {
-			reject(new Error("Not connected to the server."));
-			return promise;
-		}
-		const ack = nextAck.current++;
-		const frame: AckedFrame = { ...msg, ack, floor: Math.min(ack, ...outbox.current.keys()) };
-		outbox.current.set(ack, { frame, resolve, reject });
-		ws.send(JSON.stringify(frame));
-		recordAction(msg);
-		return promise;
-	}, []);
+	const [outbox] = useState(() => new Outbox(() => socketRef.current, recordAction));
+	const request = useCallback((msg: ClientMsg) => outbox.request(msg), [outbox]);
+	// A change to the user's data waits for the socket rather than being lost while it is closed; a failure is logged, since the server's list then wins.
+	const write = useCallback(
+		(msg: ClientMsg) => {
+			const done = outbox.write(msg);
+			done.catch((error: unknown) => console.error(`The server did not take a ${msg.t} change:`, error));
+			return done;
+		},
+		[outbox],
+	);
 
 	useEffect(() => installActivity({ connected: () => socketRef.current?.readyState === WebSocket.OPEN, send: batch => request(batch) }), [request]);
 	useEffect(() => sendPreferencesThrough(change => send({ t: "preference", change })), [send]);
@@ -218,7 +217,7 @@ export function useDashboard(): Dashboard {
 				retryMs = 500;
 				dispatch({ t: "connected", connected: true });
 				ws.send(JSON.stringify({ t: "watch", views: watchedRef.current, trajectories: trajectoriesRef.current } satisfies ClientMsg));
-				ws.send(JSON.stringify({ t: "resume", frames: [...outbox.current.values()].map(entry => entry.frame) } satisfies ResumeFrame));
+				outbox.resume(ws);
 				flushActivity();
 			};
 			ws.onmessage = event => {
@@ -271,13 +270,9 @@ export function useDashboard(): Dashboard {
 					case "review-drafts":
 						dispatch(msg);
 						return;
-					case "done": {
-						const waiting = outbox.current.get(msg.ack);
-						outbox.current.delete(msg.ack);
-						if (msg.error === null) waiting?.resolve();
-						else waiting?.reject(new Error(msg.error));
+					case "done":
+						outbox.settle(msg.ack, msg.error);
 						return;
-					}
 					case "dictation":
 						applyDictationMessage(msg);
 						return;
@@ -310,7 +305,7 @@ export function useDashboard(): Dashboard {
 			clearTimeout(timer);
 			socketRef.current?.close();
 		};
-	}, [show]);
+	}, [show, outbox]);
 
 	useEffect(() => {
 		const onHash = (): void => dispatch({ t: "route", route: routeFromHash(location.hash) });
@@ -352,30 +347,30 @@ export function useDashboard(): Dashboard {
 	const changeTodo = useCallback(
 		(change: UserTodoChange) => {
 			dispatch({ t: "user-todo", change });
-			send({ t: "user-todo", change });
+			return write({ t: "user-todo", change });
 		},
-		[send],
+		[write],
 	);
 	const changeNote = useCallback(
 		(change: UserNoteChange) => {
 			dispatch({ t: "user-note", change });
-			send({ t: "user-note", change });
+			return write({ t: "user-note", change });
 		},
-		[send],
+		[write],
 	);
 	const changePins = useCallback(
 		(change: PinChange) => {
 			dispatch({ t: "pin", change });
-			send({ t: "pin", change });
+			void write({ t: "pin", change });
 		},
-		[send],
+		[write],
 	);
 	const changeBot = useCallback(
 		(change: Exclude<BotChange, { op: "message" }>) => {
 			dispatch({ t: "bot", change, now: new Date().toISOString() });
-			send({ t: "bot", change });
+			void write({ t: "bot", change });
 		},
-		[send],
+		[write],
 	);
 	const dismissTrust = useCallback((reqId: number) => dispatch({ t: "trust-dismiss", reqId }), []);
 	const trustAndStart = useCallback(
