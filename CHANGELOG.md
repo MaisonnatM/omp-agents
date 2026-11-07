@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-07
 
+- The bell's Out of credit alert now also comes up when DeepSeek says Insufficient Balance, OpenRouter says Insufficient credits, or a monthly spend limit is reached, not only when a provider refuses a request with a payment error.
 - Fixed: a Bot page's model menu now lists the models, instead of staying on Loading models.
 - The API credits row at the bottom of the window turns red and reads used up when Anthropic refuses requests because the key's credit ran out, and the bell's alert now reads Out of credit: API credits.
 - Fixed: with the new omp 18.18.0 credit patch applied, a session whose Anthropic API key runs out of credit moves to the next model in its fallback list and stays off that key, instead of stopping or going back to it.

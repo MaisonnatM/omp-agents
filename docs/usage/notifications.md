@@ -19,7 +19,7 @@
   - **Providers**: a provider that stopped serving, checked after each `omp usage` run, every minute while a page is open.
     - A plan window that `omp usage` reports used up, such as Cursor's `Other Models`, with when it resets and how many reset credits the plan holds.
       The notice goes once the window resets.
-    - A provider whose prepaid credits ran out, such as OpenRouter answering `402 Insufficient credits`: a request to it failed for that in the last day, and none has worked since; the notice counts those failures since the first one.
+    - A provider whose prepaid credits ran out, such as OpenRouter answering `402 Insufficient credits`, DeepSeek answering `Insufficient Balance`, or a monthly spend limit reached: a request to it failed for that in the last day, and none has worked since; the notice counts those failures since the first one.
       A request to the provider that works ends it, and a failure of another kind, such as a dropped connection, neither ends nor counts toward it.
   - **Calendar**: an event with a start time, kept on this computer or of a Google calendar the Calendar page shows, from ten minutes before it starts until it ends, checked every minute.
     All-day events give none, and Google events need the Google Calendar sign-in of **Settings › Integrations**.
