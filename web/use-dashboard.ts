@@ -285,6 +285,8 @@ export function useDashboard(): Dashboard {
 						if (msg.values === null) ws.send(JSON.stringify({ t: "preference", change: { op: "seed", values: storedPreferences() } } satisfies ClientMsg));
 						else adoptPreferences(msg.values);
 						return;
+					case "sport":
+						return;
 					default: {
 						const never: never = msg;
 						return never;
