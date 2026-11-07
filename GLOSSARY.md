@@ -207,7 +207,7 @@ A dated number for one metric, such as a finger max of 112 kg on a test day or a
 _Avoid_: Test result, record, value, entry
 
 **Phase**:
-A dated stretch of the plan with its own weekly slots, such as a strength block, ending where the next one starts; a load logged in one phase never carries into the next.
+A dated stretch of the plan with its own weekly slots, such as a strength block; phases never overlap, a day between two of them has no workout, and a load logged in one phase never carries into the next.
 _Avoid_: Cycle, block, period, mesocycle
 
 **Deload week**:
