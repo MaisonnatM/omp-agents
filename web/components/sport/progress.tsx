@@ -140,13 +140,13 @@ function chartOf(state: SportState, figure: Figure, from: string | null, today: 
 			const first = all[0];
 			const test = nextTest(state, metric.id, today);
 			const parts = [
-				last && first && first !== last ? `${last.value >= first.value ? "+" : "−"}${amount(Math.abs(last.value - first.value), metric.unit)} depuis le ${shortDate(first.at)}.` : null,
-				last && value !== null ? (metric.better === "higher" ? last.value >= value : last.value <= value) ? "Objectif atteint." : `Il te reste ${amount(Math.abs(value - last.value), metric.unit)} pour atteindre ${amount(value, metric.unit)}${goal?.by ? ` d'ici le ${shortDate(goal.by)}` : ""}.` : null,
-				test ? `Prochain test le ${shortDate(test)}.` : null,
+				last && first && first !== last ? `${last.value >= first.value ? "+" : "−"}${amount(Math.abs(last.value - first.value), metric.unit)} depuis le ${shortDate(first.at)}` : null,
+				last && value !== null ? (metric.better === "higher" ? last.value >= value : last.value <= value) ? "Objectif atteint" : `Il te reste ${amount(Math.abs(value - last.value), metric.unit)} pour atteindre ${amount(value, metric.unit)}${goal?.by ? ` d'ici le ${shortDate(goal.by)}` : ""}` : null,
+				test ? `Prochain test le ${shortDate(test)}` : null,
 			];
 			return {
 				title: metric.label,
-				sentence: parts.filter(part => part).join(" ") || null,
+				sentence: parts.flatMap(part => (part ? [part.endsWith(".") ? part : `${part}.`] : [])).join(" ") || null,
 				spec: line(series, rows.map(row => ({ day: shortDate(row.at), value: row.value, ...(value === null ? {} : { goal: value }) }))),
 				dashed: ["goal"],
 				format: kg => amount(kg, metric.unit),

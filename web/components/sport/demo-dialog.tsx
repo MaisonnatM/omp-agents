@@ -51,7 +51,6 @@ export function DemoDialog({ title, demos, at, onAt, onClose }: DemoDialogProps)
 							src={`https://www.youtube-nocookie.com/embed/${demo.youtubeId}?autoplay=1&rel=0&playsinline=1`}
 							referrerPolicy="strict-origin-when-cross-origin"
 							allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-							allowFullScreen
 							className="size-full"
 						/>
 					) : (

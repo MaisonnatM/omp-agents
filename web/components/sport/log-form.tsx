@@ -370,7 +370,7 @@ export function WeighForm({ state, metric, today, disabled, onChange, onClose }:
 						<input type="date" className={FIELD} value={date} max={today} onChange={event => setDate(event.target.value || today)} />
 					</label>
 				</div>
-				{last && <p className="text-xs text-muted-foreground">Dernière pesée : {amount(last.value, metric.unit)} le {shortDate(last.at)}.</p>}
+				{last && <p className="text-xs text-muted-foreground">Dernière pesée : {amount(last.value, metric.unit)} le {shortDate(last.at)}</p>}
 				{error && <p role="alert" className={ERROR_TEXT}>{error}</p>}
 			</div>
 			<div className="flex items-center justify-end gap-3 border-t border-border px-4 py-3">
