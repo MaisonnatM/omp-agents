@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { exercise, log, measurement, SEMI, STATE, withLogs, withMeasurements } from "../src/sport-fixtures";
-import type { Plan } from "../src/shared/sport";
+import type { Climb, FrenchGrade, Plan } from "../src/shared/sport";
 import { dayPlan, loadFor, records } from "../src/sport-week";
-import { beaten, daySummary, demosOf, dose, effortWord, loadSource, loadText, opening, painWord, phaseLabel, testOf, weekTitle } from "./sport-view";
+import { amount, beaten, bodyweightOf, daySummary, demosOf, dose, effortWord, hardest, journalWeeks, loadSource, loadText, logDetail, measured, nextTest, opening, painWord, phaseLabel, recordLogs, sendsText, testOf, weekTitle } from "./sport-view";
 
 const plan = STATE.plan!;
 const demo = (youtubeId: string) => ({ youtubeId, by: "Lattice", cues: ["a", "b", "c"] as [string, string, string], caution: null });
@@ -101,5 +101,52 @@ describe("tests and records", () => {
 			{ label: "Semi-arquée", now: "+17 kg", was: "+15 kg" },
 			{ label: "Meilleur bloc", now: "7a+", was: null },
 		]);
+	});
+});
+
+describe("journal and progress", () => {
+	const climb = (grade: FrenchGrade): Climb => ({ kind: "boulder", grade, color: null, kilter: false, attempts: null });
+
+	test("an amount reads the French way", () => {
+		expect(amount(113.3, "kg")).toBe("113,3 kg");
+		expect(amount(5, "")).toBe("5");
+	});
+
+	test("the bodyweight is the metric a max rule subtracts, and measurements come oldest first", () => {
+		expect(bodyweightOf(STATE)?.id).toBe("bodyweight");
+		expect(bodyweightOf({ ...STATE, plan: null })).toBeNull();
+		const state = withMeasurements(STATE, measurement("m4", "bodyweight", 80, "2026-12-01"), measurement("m3", "bodyweight", 81, "2026-11-01"));
+		expect(measured(state, "bodyweight").map(({ value }) => value)).toEqual([82, 81, 80]);
+	});
+
+	test("a session's sends read their count and the hardest grade", () => {
+		expect(hardest([climb("6c"), climb("7b+"), climb("7a")])?.grade).toBe("7b+");
+		expect(sendsText([climb("6c"), climb("7b+")])).toBe("2 · 7b+");
+		expect(sendsText([])).toBe("aucune");
+	});
+
+	test("a journal row reads the heaviest load, the hardest grade, the effort, and the pain", () => {
+		expect(logDetail(log("l1", "2026-11-17", { loads: { semi: 15, open: 10 }, climbs: [climb("7b+")], rpe: 8, pain: { level: 4, where: "fingers" } }))).toBe("+15 kg · 7b+ · effort 8 · ⚠ doigts 4/10");
+		expect(logDetail(log("l2", "2026-11-17", { status: "skipped", rpe: 8 }))).toBe("pas faite");
+		expect(logDetail(log("l3", "2026-11-17"))).toBe("");
+	});
+
+	test("only the log that first reached a record is marked", () => {
+		const state = withLogs(STATE, log("l1", "2026-11-17", { workout: "mardi", loads: { semi: 15 } }), log("l2", "2026-11-24", { workout: "mardi", loads: { semi: 17 }, climbs: [climb("7a")] }), log("l3", "2026-12-01", { workout: "mardi", loads: { semi: 16 } }));
+		expect([...recordLogs(state, records(state))]).toEqual(["l2"]);
+	});
+
+	test("the journal groups logs by week, newest first, and counts the done ones and their planned minutes", () => {
+		const state = withLogs(STATE, log("l1", "2026-11-17", { workout: "mardi" }), log("l2", "2026-11-19", { workout: "jeudi" }), log("l3", "2026-11-24", { workout: "mardi", status: "skipped" }));
+		expect(journalWeeks(state).map(({ monday, logs, done, minutes }) => ({ monday, logs: logs.map(({ id }) => id), done, minutes }))).toEqual([
+			{ monday: "2026-11-23", logs: ["l3"], done: 0, minutes: 0 },
+			{ monday: "2026-11-16", logs: ["l2", "l1"], done: 2, minutes: 210 },
+		]);
+	});
+
+	test("the next test is the first override day from today that tests the metric", () => {
+		expect(nextTest(STATE, "max", "2026-11-17")).toBe("2026-12-29");
+		expect(nextTest(STATE, "max", "2026-12-30")).toBeNull();
+		expect(nextTest(STATE, "bodyweight", "2026-11-17")).toBeNull();
 	});
 });

@@ -20,6 +20,8 @@ import {
 	hashForOpenTodo,
 	hashForTodo,
 	hashForNotes,
+	hashForSport,
+	type SportRoute,
 	hashForTodoId,
 	hashForView,
 	type Layout,
@@ -43,6 +45,22 @@ test("notes routes address each list and encode the open note", () => {
 	expect(routeFromHash("#notes/agents?open=n1")).toEqual({ kind: "page", page: { kind: "notes", list: { kind: "agents" }, open: "n1" } });
 	expect(routeFromHash("#notes/unknown")).toEqual({ kind: "page", page: { kind: "notes", list: { kind: "all" }, open: null } });
 	expect(routeFromHash("#notes/project/p%2F1?open=n1")).toMatchObject({ kind: "page", page: { kind: "notes", list: { kind: "all" } } });
+});
+
+test("sport routes open the week on a day, the journal on a log, and the progress, and round-trip", () => {
+	const routes: [SportRoute, string][] = [
+		[{ tab: "week", day: null }, "#sport"],
+		[{ tab: "week", day: "2026-11-17" }, "#sport?day=2026-11-17"],
+		[{ tab: "journal", open: null }, "#sport/journal"],
+		[{ tab: "journal", open: "log / 1" }, "#sport/journal?open=log%20%2F%201"],
+		[{ tab: "progress" }, "#sport/progress"],
+	];
+	for (const [route, hash] of routes) {
+		expect(hashForSport(route)).toBe(hash);
+		expect(routeFromHash(hash)).toEqual({ kind: "page", page: { kind: "sport", ...route } });
+	}
+	expect(routeFromHash("#sport?day=17-11-2026")).toEqual({ kind: "page", page: { kind: "sport", tab: "week", day: null } });
+	expect(routeFromHash("#sport/week")).toEqual({ kind: "page", page: { kind: "sport", tab: "week", day: null } });
 });
 
 describe("layout hash", () => {
