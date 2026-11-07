@@ -16,6 +16,10 @@
   A [private](starting-ending-resuming-and-forking.md) personal session reads and writes the same memory, since you asked for what it keeps.
 - The [session details sidebar](session-details-sidebar.md) of a personal session adds a **Memory** tab, which lists every fact with the day it was kept.
   The page only lists the facts; to change or forget one, edit `personal-memory.md` itself.
+- A personal session also has a `sport` tool for your training: it reads your week with each day's workouts and loads, a metric's history as a chart, and the whole training file, logs a workout, records a test result, and sets your plan and targets.
+  When you have a plan, each turn also starts with one line for today: the phase, the day's workouts, and any pain flag.
+  The dashboard saves each change the tool leaves; while it is stopped, the change waits and the tool already reads it.
+  The tool never changes or removes what you entered yourself, and removing an entry stays on the Sport page.
 - A session started in the personal directory stays there: its agent has no `move_session` tool.
-  If you move one out yourself, its next turns lose the framing and the memory, and `remember` refuses.
+  If you move one out yourself, its next turns lose the framing, the memory, and the line for today, and `remember` and `sport` refuse.
 - A Bot whose workspace is **Personal** stays a Bot: it keeps its own memory, not the personal one.

@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-07
 
+- Your personal assistant can now read your training week with each day's loads, log a workout, record a test result, and set your plan and targets, and the dashboard saves each change for you; it never changes or deletes what you entered yourself.
 - Behind the scenes: the dashboard now keeps your training plan, test results, targets, and workout log together and works out each week's workouts and loads, ready for the coming Sport page.
 - Fixed: the daily cleanup and Settings › Storage now check a subagent's copy of your repository for edits and live sessions even when omp keeps that copy outside the task's folder.
 - Fixed: removing a leftover task's folder now also deletes that outside copy, instead of leaving it behind.
