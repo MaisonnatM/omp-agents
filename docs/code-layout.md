@@ -71,6 +71,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   A row's or card's right-click menu is `RowContextMenu` in `pr-row.tsx`, which lists the `⋯` menu's `PullRequestMenuItems` from `pr-menu.tsx`, with its **Reviewers** submenu.
 - Bottom bar, with plan quota, the **Terminal** button, and CPU, memory, and disk: `StatusBar` in `web/components/status-bar.tsx`, whose CPU card lists every live session's processes with **Stop**; the terminal panel is `web/components/terminal/terminal-panel.tsx`.
   The disk card's **Clean up…** link opens Settings › Storage.
+  Its plan quota, each plan's windows and the **API credits** row with its grant and its red `used up` once a provider refuses requests for lack of credit, is `PlanUsageList` in `web/components/plan-usage.tsx`.
 - The three things called Files:
   - The Todos card's **Files** section, a session's changed files: `ChangedFileList` in `web/components/changed-files-section.tsx`.
   - The session changes dialog that a file or **Review** opens: `web/components/changes/session-changes-dialog.tsx`, with its explorer in `changes-explorer.tsx` and tree in `file-tree.tsx` beside it.

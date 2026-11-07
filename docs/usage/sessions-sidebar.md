@@ -98,6 +98,7 @@
   When Firefox or Zen is signed in to the Claude Console, that row also shows the dollars spent of the monthly grant, as `$11.13 / $200.00`.
   Amber means less than 20% of the grant is left, and red means it is used up.
   Hover or focus it to see when the grant expires.
+  When that provider refused a request in the last day because its credit balance ran out, such as Anthropic's `Your credit balance is too low` reply, the row turns red and reads `used up`, or keeps its dollars in red when it shows a grant, and its hover says since when.
   A sign-in that exists only in Chrome stays a name, because that browser's cookies are encrypted.
   A window omp meters in dollars, such as Cursor's `Other Models`, adds the dollars spent to its hover.
   The server runs `omp usage --json` every minute while a page is open, and once when a page opens after a minute with none.

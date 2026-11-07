@@ -68,12 +68,15 @@ function ExtraSpent({ extra }: { extra: ExtraUsage }) {
 	);
 }
 
-function CreditSpent({ name, balance }: { name: string; balance: CreditBalance }) {
+/** The grant, amber below {@link LOW} left and red once spent or once the provider refuses requests for lack of credit. */
+function CreditSpent({ name, balance, outOfCreditSince }: { name: string; balance: CreditBalance; outOfCreditSince?: number }) {
 	const left = balance.limit !== null && balance.limit > 0 ? (balance.limit - balance.used) / balance.limit : 1;
-	const exhausted = balance.limit !== null && balance.used >= balance.limit;
+	const exhausted = (balance.limit !== null && balance.used >= balance.limit) || outOfCreditSince !== undefined;
+	const state = exhausted ? ", used up" : left < LOW ? ", running low" : "";
+	const refused = outOfCreditSince === undefined ? "" : ` Requests refused for lack of credit since ${new Date(outOfCreditSince).toLocaleString()}.`;
 	const expires = balance.expiresAt === null ? "" : ` Expires ${DAY_FORMAT.format(balance.expiresAt)}.`;
 	return (
-		<Tooltip content={`API credits: ${spendLabel(balance)} spent.${expires}`}>
+		<Tooltip content={`API credits: ${spendLabel(balance)} spent${state}.${refused}${expires}`}>
 			<span
 				tabIndex={0}
 				className={cn(
@@ -82,6 +85,20 @@ function CreditSpent({ name, balance }: { name: string; balance: CreditBalance }
 				)}
 			>
 				<span className="text-muted-foreground">{name}</span> {spendLabel(balance)}
+			</span>
+		</Tooltip>
+	);
+}
+
+/** A provider with no balance to show that refuses requests for lack of credit. */
+function CreditRefused({ name, since }: { name: string; since: number }) {
+	return (
+		<Tooltip content={`${name}: used up. Requests refused for lack of credit since ${new Date(since).toLocaleString()}.`}>
+			<span
+				tabIndex={0}
+				className="whitespace-nowrap rounded-sm text-red-600 outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-red-400"
+			>
+				<span className="text-muted-foreground">{name}</span> used up
 			</span>
 		</Tooltip>
 	);
@@ -106,8 +123,9 @@ function PlanRow({ plan }: { plan: PlanUsage }) {
 					/>
 				</span>
 			</Tooltip>
-			{nameOnly && !plan.balance && <span aria-hidden className="whitespace-nowrap text-foreground">{plan.name}</span>}
-			{nameOnly && plan.balance && <CreditSpent name={plan.name} balance={plan.balance} />}
+			{nameOnly && !plan.balance && plan.outOfCreditSince === undefined && <span aria-hidden className="whitespace-nowrap text-foreground">{plan.name}</span>}
+			{nameOnly && !plan.balance && plan.outOfCreditSince !== undefined && <CreditRefused name={plan.name} since={plan.outOfCreditSince} />}
+			{nameOnly && plan.balance && <CreditSpent name={plan.name} balance={plan.balance} outOfCreditSince={plan.outOfCreditSince} />}
 			{plan.extra && <ExtraSpent extra={plan.extra} />}
 			{plan.windows.map(window => (
 				<WindowLeft key={window.label} window={window} />

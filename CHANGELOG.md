@@ -6,6 +6,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-11-07
 
 - Fixed: a Bot page's model menu now lists the models, instead of staying on Loading models.
+- The API credits row at the bottom of the window turns red and reads used up when Anthropic refuses requests because the key's credit ran out, and the bell's alert now reads Out of credit: API credits.
+- Fixed: with the new omp fix applied, a session whose Anthropic API key runs out of credit moves to the next model in its fallback list and stays off that key, instead of stopping or going back to it.
 
 ## 2026-11-06
 

@@ -42,6 +42,9 @@ Historical task consults search session IDs only in the caller's artifacts and c
 Cross-project callers pass the exact `file` returned by eval's archive as `sourceSession`; the Memory curator's saved job follows that handoff.
 The native implementation lives in `pi-coding-agent/src/task/seance.ts`, with task guidance in `pi-coding-agent/src/prompts/tools/seance-task-guidance.md`.
 
+[`patches/omp-18.16.0-credit-balance-fallback.patch`](../../patches/omp-18.16.0-credit-balance-fallback.patch) adds Anthropic's 400 `credit balance is too low` to `CREDITS_EXHAUSTED_PATTERN` in `pi-ai/src/error/rate-limit.ts`, so a spent API key is a usage limit and falls back like a 429 quota; [its record](../decisions/2026-11-07-a-spent-api-key-is-a-usage-limit-in-a-runtime-patch.md) says why.
+It applies independently on `v18.16.0` and as is on `v18.18.0`; apply it as above, run `rate-limit-utils`, `anthropic-stream-envelope`, and `agent-session-retry-fallback` tests, rebuild the CLI bundle, which inlines `pi-ai`, and restart sessions.
+
 Paths in this document that start with `pi-coding-agent/`, `pi-ai/`, `pi-catalog/`, `pi-tui/`, `pi-utils/`, or `omp-stats/` are inside that install, in `@oh-my-pi/`.
 They are not in this repository.
 The main ones:

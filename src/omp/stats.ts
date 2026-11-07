@@ -66,10 +66,14 @@ const CREDITS_WINDOW_MS = 24 * 60 * 60_000;
 
 const ERROR_CHARS = 300;
 
+// Anthropic refuses a spent API key with a 400 (or an in-stream error) that says so, not a 402.
+const CREDIT_BALANCE_TOO_LOW = "credit balance is too low";
+
 const SETTLED_PROVIDER_REQUESTS = `
 	SELECT provider, model, timestamp, stop_reason = 'error' AS failed, error_message AS error FROM messages
 	WHERE timestamp >= ?1 AND stop_reason != 'aborted' AND provider IN (
-		SELECT provider FROM messages WHERE stop_reason = 'error' AND timestamp >= ?1 AND error_message LIKE '%402%')
+		SELECT provider FROM messages WHERE stop_reason = 'error' AND timestamp >= ?1
+			AND (error_message LIKE '%402%' OR error_message LIKE '%${CREDIT_BALANCE_TOO_LOW}%'))
 	ORDER BY timestamp`;
 
 export interface ProviderRequest {
@@ -133,11 +137,12 @@ export const listPrice: Pricer = (provider, model, { input, output, cacheRead, c
 	return catalog.calculateCost(known, { input, output, cacheRead, cacheWrite, totalTokens: input + output + cacheRead + cacheWrite, cttl, cost }, timestamp).total;
 };
 
-const isBillingCap = (error: string | null): boolean => error !== null && /\b402\b/.test(error) && rateLimit.is402BillingCapBody(error);
+const isBillingCap = (error: string | null): boolean =>
+	error !== null && ((/\b402\b/.test(error) && rateLimit.is402BillingCapBody(error)) || error.toLowerCase().includes(CREDIT_BALANCE_TOO_LOW));
 
 /**
  * The credit runs in `requests`, which must be in time order: a request that worked ends its provider's run, and any
- * failure other than a billing 402 neither starts, ends, nor counts toward one.
+ * failure other than a billing 402 or Anthropic's spent-balance refusal neither starts, ends, nor counts toward one.
  */
 export function creditRuns(requests: ProviderRequest[]): CreditRun[] {
 	const runs = new Map<string, CreditRun | null>();

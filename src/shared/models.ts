@@ -62,6 +62,11 @@ export interface PlanUsage {
 	resetCredits: ResetCredits | null;
 	/** The prepaid grant, when a Console session reported one. Absent when it did not. */
 	balance?: CreditBalance | null;
+	/**
+	 * When the provider began refusing requests for lack of credit, with none working since, over the last day.
+	 * Set on a name-only row only; absent when no request was refused.
+	 */
+	outOfCreditSince?: number;
 }
 
 /** The footer row for Anthropic API credits, from a model-config provider of this id or an API key saved in Settings. */
