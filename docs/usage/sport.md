@@ -55,7 +55,7 @@
 ## Progrès
 
 - **Progrès**, or `#sport/progress`, shows a card per measurement with how far it moved since the first, the best boulder and route of the last 8 weeks, your bodyweight's four-week average, and how much of the plan you followed.
-  Click a card to chart it below, over 8 weeks, 12 weeks, or everything; a target shows as a dashed line.
+  Click a card to chart it below, over 8 weeks, 12 weeks, or everything; a target shows as a dashed line labeled « Objectif » with its value, and a lone measurement shows as a dot.
 - **Records** lists your best mark on each measurement, load, and grade since the beginning, with its date.
 
 ## What the page leaves out

@@ -88,7 +88,7 @@ export function ProgressTab({ state, today }: { state: SportState; today: string
 					<p className="py-10 text-center text-sm text-muted-foreground">{chart.empty}</p>
 				) : (
 					<Suspense fallback={<div className="h-64" />}>
-						<ChartView spec={chart.spec} label={chart.title} expanded={false} dashed={chart.dashed} format={chart.format} fit />
+						<ChartView spec={chart.spec} label={chart.title} expanded={false} reference={chart.reference} format={chart.format} fit />
 					</Suspense>
 				)}
 			</section>
@@ -117,7 +117,7 @@ interface Chart {
 	title: string;
 	sentence: string | null;
 	spec: ChartSpec;
-	dashed: string[];
+	reference: { value: number; label: string } | null;
 	format: (value: number) => string;
 	/** What the chart says with nothing to draw. */
 	empty: string;
@@ -125,14 +125,14 @@ interface Chart {
 
 const line = (series: ChartSpec["series"], data: ChartSpec["data"]): ChartSpec => ({ type: "line", title: null, description: null, x: "day", series, data });
 
-/** The chart of `figure` from `from`, `null` for everything, to `today`, with `goal` dashed across it. */
+/** The chart of `figure` from `from`, `null` for everything, to `today`, with `goal` as a labeled line across it. */
 function chartOf(state: SportState, figure: Figure, from: string | null, today: string, goal: SportState["targets"][number] | null): Chart {
 	switch (figure.kind) {
 		case "metric": {
 			const { metric } = figure;
 			const rows = measured(state, metric.id).filter(({ at }) => at <= today && (from === null || at >= from));
 			const value = goal?.kind === "metric" ? goal.value : null;
-			const series = [{ key: "value", label: metric.label }, ...(value === null ? [] : [{ key: "goal", label: `Objectif ${amount(value, metric.unit)}` }])];
+			const series = [{ key: "value", label: metric.label }];
 			const all = measured(state, metric.id);
 			const last = all.at(-1);
 			const first = all[0];
@@ -145,8 +145,8 @@ function chartOf(state: SportState, figure: Figure, from: string | null, today: 
 			return {
 				title: metric.label,
 				sentence: parts.flatMap(part => (part ? [part.endsWith(".") ? part : `${part}.`] : [])).join(" ") || null,
-				spec: line(series, rows.map(row => ({ day: shortDate(row.at), value: row.value, ...(value === null ? {} : { goal: value }) }))),
-				dashed: ["goal"],
+				spec: line(series, rows.map(row => ({ day: shortDate(row.at), value: row.value }))),
+				reference: value === null ? null : { value, label: `Objectif ${amount(value, metric.unit)}` },
 				format: kg => amount(kg, metric.unit),
 				empty: `Aucune mesure de ${metric.label.toLowerCase()} sur la période.`,
 			};
@@ -161,8 +161,8 @@ function chartOf(state: SportState, figure: Figure, from: string | null, today: 
 			return {
 				title: `${label} par semaine`,
 				sentence: best === -1 ? null : `${label} sur la période : ${FRENCH_GRADES[best]}${aim ? `, objectif ${aim}` : ""}.`,
-				spec: best === -1 ? line([], []) : line([{ key: "grade", label: CLIMB_LABEL[climb] }, ...(aim ? [{ key: "goal", label: `Objectif ${aim}` }] : [])], weeks.map(week => ({ day: shortDate(week.monday), ...(week[climb] ? { grade: gradeRank(week[climb]) } : {}), ...(aim ? { goal: gradeRank(aim) } : {}) }))),
-				dashed: ["goal"],
+				spec: best === -1 ? line([], []) : line([{ key: "grade", label: CLIMB_LABEL[climb] }], weeks.map(week => ({ day: shortDate(week.monday), ...(week[climb] ? { grade: gradeRank(week[climb]) } : {}) }))),
+				reference: aim ? { value: gradeRank(aim), label: `Objectif ${aim}` } : null,
 				format: rank => FRENCH_GRADES[Math.round(rank)] ?? "",
 				empty: climb === "boulder" ? "Aucun bloc réussi sur la période." : "Aucune voie réussie sur la période.",
 			};
@@ -178,7 +178,7 @@ function chartOf(state: SportState, figure: Figure, from: string | null, today: 
 				title: "Séances faites par semaine",
 				sentence: null,
 				spec: { type: "bar", title: null, description: null, x: "day", series: [{ key: "planned", label: "Prévues" }, { key: "done", label: "Faites" }], data },
-				dashed: [],
+				reference: null,
 				format: count => String(count),
 				empty: "Le plan n'a pas encore commencé.",
 			};
