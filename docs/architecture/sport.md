@@ -28,6 +28,7 @@ A change that changes nothing or is refused returns the same state, so the `List
 A missing optional field takes its default and a field the module does not know drops; a field of the wrong shape or type refuses the whole state or change.
 The file is held to shapes and types alone, so a length limit, a range, or a plan check tightened later never refuses data already saved.
 A change is also held to the length and range limits, a YouTube id of 11 characters, and lists of at most 200 items.
+A change's `of-max` load rule must name its `less`, `null` to subtract nothing, because a rule written before `less` existed subtracted the bodyweight and would otherwise read as subtracting nothing; the file still reads a left-out `less` as `null`.
 A `set-plan` is refused when its slots, habits, or `opensAs` lists name nothing, its ids or override days repeat, a phase ends before it starts or overlaps another, or a deload Monday is not a Monday of its phase; a `set-targets` or `set-metrics` is refused when its ids repeat.
 A refused change says why, with the path of the first wrong field and the rule it broke, such as `plan.routines[0].items[0].demo.youtubeId must be 11 characters`.
 A file that does not read, or that comes from a newer version, moves aside to `sport.json.invalid` rather than being overwritten.
