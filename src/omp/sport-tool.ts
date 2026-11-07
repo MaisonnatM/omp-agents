@@ -4,6 +4,7 @@
  * the dashboard will, with `agentSportChange`, before it leaves one, so a refusal reaches the agent with its reason.
  */
 import { randomUUID } from "node:crypto";
+import { inbox } from "../../templates/omp/agent/extensions/inbox/client";
 import { isObject, parseJson } from "../json";
 import { localDay } from "../shared/days";
 import { MAX_CHART_ROWS } from "../shared/session-visuals";
@@ -12,7 +13,7 @@ import { applySport } from "../sport";
 import { agentSportChange, withAgentChanges } from "../sport-agent";
 import { parseSportState } from "../sport-parse";
 import { dayPlan, painFlags, type PlannedDay, weekPlan } from "../sport-week";
-import { type ExtensionApi, type ExtensionTool, leave, readText, reply, type ToolContext, waiting } from "./extension-kit";
+import { type ExtensionApi, type ExtensionTool, readText, reply, type ToolContext } from "./extension-kit";
 
 export const SPORT_TOOL = "sport";
 
@@ -63,7 +64,7 @@ function jsonParam(name: string, value: unknown): unknown {
 }
 
 /** `sport.json` with the changes its inbox still holds, oldest first, as the dashboard will apply them. */
-export const readSport = ({ file, inbox }: SportPaths): SportState => withAgentChanges(parseSportState(parseJson(readText(file))) ?? EMPTY_SPORT, waiting(inbox));
+export const readSport = ({ file, inbox: dir }: SportPaths): SportState => withAgentChanges(parseSportState(parseJson(readText(file))) ?? EMPTY_SPORT, inbox<object>(dir).waiting());
 
 /** One day of the week as the `week` action shows it: its phase by name, and each exercise without its rule and demo. */
 const dayView = ({ phase, workouts, ...day }: PlannedDay) => ({
@@ -95,7 +96,7 @@ function leaveAll(paths: SportPaths, state: SportState, changes: object[]): void
 		if ("error" in change) throw new Error(`The change was refused, so nothing was left for the dashboard: ${change.error}.`);
 		return applySport(next, change.ok);
 	}, state);
-	for (const change of changes) leave(paths.inbox, change);
+	for (const change of changes) inbox<object>(paths.inbox).leave(change);
 }
 
 /** The entry `given` describes, merged over the one an agent wrote when `given.id` names it, or a new one in `sessionId`'s name. */

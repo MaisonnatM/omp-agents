@@ -4,11 +4,11 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
-import { CONFIG_DIR, leave, readJson, reply, waiting, withoutEmpty } from "./inbox/client";
+import { CONFIG_DIR, inbox, readJson, reply, withoutEmpty } from "./inbox/client";
 
 const NOTES_FILE = join(CONFIG_DIR, "notes.json");
 const TODOS_FILE = join(CONFIG_DIR, "todos.json");
-const INBOX_DIR = join(CONFIG_DIR, "note-inbox");
+const INBOX = inbox<Change>(join(CONFIG_DIR, "note-inbox"));
 
 // The shape of src/user-notes-shared.ts, which this file cannot import: change it with that one.
 interface Note {
@@ -25,7 +25,7 @@ type Change = { op: "add"; note: Note } | { op: "append"; id: string; text: stri
 /** Pending changes participate in reads so agents see their writes while the dashboard is stopped. */
 function readNotes(): Note[] {
 	const notes = new Map(((readJson(NOTES_FILE) as { notes?: Note[] } | null)?.notes ?? []).map(note => [note.id, note]));
-	for (const change of waiting<Change>(INBOX_DIR)) {
+	for (const change of INBOX.waiting()) {
 		if (change.op === "add" && !notes.has(change.note.id)) notes.set(change.note.id, change.note);
 		if (change.op === "append") {
 			const note = notes.get(change.id);
@@ -107,14 +107,14 @@ export default function notes(pi: ExtensionAPI) {
 					if (same) return reply(`This session already added it (id ${same.id}); append to it instead.`);
 					const at = new Date().toISOString();
 					const note: Note = { id: randomUUID(), title: line, body: body ?? "", todoId: todoId ?? null, addedBy: sessionId, createdAt: at, updatedAt: at };
-					leave(INBOX_DIR, { op: "add", note });
+					INBOX.leave({ op: "add", note });
 					return reply(`Added to the user's notes (id ${note.id}).`);
 				}
 				case "append": {
 					if (!text?.trim()) return reply("append needs text.", true);
 					const note = readNotes().find(entry => entry.id === id);
 					if (!note) return reply(`No note has id ${id ?? "(none given)"}.`, true);
-					leave(INBOX_DIR, { op: "append", id: note.id, text, at: new Date().toISOString() });
+					INBOX.leave({ op: "append", id: note.id, text, at: new Date().toISOString() });
 					return reply(`Appended to ${JSON.stringify(untitled(note))}.`);
 				}
 			}

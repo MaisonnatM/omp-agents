@@ -5,6 +5,7 @@
 // The dashboard loads it with `omp -e` and the flags in `BOT_FLAGS` for a Bot's session only (`Bots.join` in
 // src/server/bots.ts), so no other session reads it.
 import { randomUUID } from "node:crypto";
+import { inbox } from "../../templates/omp/agent/extensions/inbox/client";
 import { isObject, parseJson } from "../json";
 import { type BotRoutineRequest, MAX_COMMAND_LENGTH, parseRoutineSpec, type RoutineSpec, TRIGGER_KINDS } from "../routines";
 import { BOT_MESSAGE_STAMP } from "../shared/bot-message";
@@ -23,7 +24,7 @@ import {
 	parseBotId,
 } from "../shared/bots";
 import { STAY_QUIET_TOOL } from "../shared/sessions";
-import { type ExtensionApi, flagValue, leave, memoryLines, readText, rememberTool, reply } from "./extension-kit";
+import { type ExtensionApi, flagValue, memoryLines, readText, rememberTool, reply } from "./extension-kit";
 
 /**
  * The flags a Bot's session starts with: its id, the `bots.json` it reads its name and job from, the directory its
@@ -138,7 +139,7 @@ export default function botExtension(pi: ExtensionApi): void {
 			if (!bot?.botInbox) throw new Error("This session is not an omp-agents Bot, so it has no job.");
 			const text = job.trim();
 			if (text.length > MAX_JOB_LENGTH) throw new Error(`job is ${text.length} characters; keep it to at most ${MAX_JOB_LENGTH}.`);
-			leave(bot.botInbox, { botId: bot.botId, job: text } satisfies BotJobRequest);
+			inbox<BotJobRequest>(bot.botInbox).leave({ botId: bot.botId, job: text });
 			return reply(`${text ? "Saved your job" : "Cleared your job"}. ${APPLIES}`);
 		},
 	});
@@ -199,7 +200,7 @@ export default function botExtension(pi: ExtensionApi): void {
 					`The routine is not valid: a new routine needs a name and a task, and every routine needs at least one schedule or trigger, schedules in range, each trigger kind at most once, and a prompt or a command that is not empty, a command at most ${MAX_COMMAND_LENGTH} characters.`,
 				);
 			}
-			leave(bot.routineInbox, { botId: bot.botId, change: { op: "save", routine: spec.ok } } satisfies BotRoutineRequest);
+			inbox<BotRoutineRequest>(bot.routineInbox).leave({ botId: bot.botId, change: { op: "save", routine: spec.ok } });
 			return reply(`${stored ? "Changed" : "Created"} routine "${spec.ok.name}". ${APPLIES}\n${routineLine(spec.ok)}`);
 		},
 	});
@@ -216,7 +217,7 @@ export default function botExtension(pi: ExtensionApi): void {
 			if (!bot?.routineInbox) throw new Error(NO_ROUTINES);
 			const stored = ownRoutines(bot).find(routine => routine.id === id);
 			if (!stored) throw new Error(`None of your routines has id ${id}.`);
-			leave(bot.routineInbox, { botId: bot.botId, change: { op: "remove", id } } satisfies BotRoutineRequest);
+			inbox<BotRoutineRequest>(bot.routineInbox).leave({ botId: bot.botId, change: { op: "remove", id } });
 			return reply(`Deleted routine "${stored.name}". ${APPLIES}`);
 		},
 	});
@@ -239,7 +240,7 @@ export default function botExtension(pi: ExtensionApi): void {
 			if (!recipient) throw new Error(`No Bot has id ${to}; the system prompt lists the other Bots.`);
 			const message = parseBotMessageText(text);
 			if (!message) throw new Error(`text must not be empty, must be at most ${MAX_BOT_MESSAGE_LENGTH} characters, and cannot start with ! or /, which would run as a command in the other Bot's session.`);
-			leave(me.botInbox, { botId: me.botId, message: { to: recipient.id, text: message } } satisfies BotMessageRequest);
+			inbox<BotMessageRequest>(me.botInbox).leave({ botId: me.botId, message: { to: recipient.id, text: message } });
 			return reply(`Sent to ${recipient.name}. ${APPLIES}`);
 		},
 	});

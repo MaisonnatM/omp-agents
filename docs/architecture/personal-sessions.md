@@ -30,15 +30,16 @@ No inbox and no server writer stand between `remember` and the file, as with a B
 `set_plan` and `set_targets` replace their part whole, and `set_plan` refuses a plan over `MAX_PLAN_BYTES`, 64 KB as JSON.
 `set_plan`, `set_targets`, and `measure` take an optional `metrics` list, merged by id into the state's metrics and left as a `set-metrics` before the change, since a fresh state holds no metric for a load rule, a target, or a measurement to name.
 The tool checks every change with `agentSportChange` against the state the ones before it leave, and leaves none when one is refused, so the agent reads the reason.
-It then leaves each change in the inbox with the kit's `leave`, whose names rise strictly within a process, so the dashboard applies them in order.
+It then leaves each change in the inbox with `inbox` from `templates/omp/agent/extensions/inbox/client.ts`, whose names rise strictly within a process, so the dashboard applies them in order.
 The description lists the workout kinds from `WORKOUT_KINDS` and tells the agent to state each workout's `kind`, the one a mixed session leads with, since a plan without it is refused.
 It also tells the agent to check a video through YouTube's oEmbed address before it writes one, and never to invent an id.
 
 ## Extension kit
 
-`src/omp/extension-kit.ts` holds what the omp-agents extensions share: `ExtensionApi`, the slice of omp's extension API they use, `ToolContext`, `flagValue`, `readText`, `reply`, `leave`, `waiting`, `memoryLines`, and `rememberTool`.
-`leave` writes a change as a JSON file in an inbox directory, through a temporary name and a rename, for the dashboard to apply, and `waiting` reads the changes an inbox still holds, oldest first.
+`src/omp/extension-kit.ts` holds what the omp-agents extensions share: `ExtensionApi`, the slice of omp's extension API they use, `ToolContext`, `flagValue`, `readText`, `reply`, `memoryLines`, and `rememberTool`.
 The Bot, designer, shepherd, and personal extensions import from it; `BOT_FLAGS` stays in `src/omp/bot-extension.ts`.
+Their tools reach their inboxes through `inbox` in `templates/omp/agent/extensions/inbox/client.ts`, the starter kit's `user_note`, `user_todo`, and `user_event` tools' too, so one copy names the inbox files.
+`inbox<T>(dir)` types the changes an inbox takes: its `leave` writes one as a JSON file through a temporary name and a rename, under a name that sorts after the one before it, and its `waiting` reads those the dashboard has not applied yet, oldest first, leaving out a file that is not a JSON object.
 
 ## The server
 

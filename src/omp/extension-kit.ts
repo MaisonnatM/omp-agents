@@ -1,8 +1,7 @@
-/** What every omp-agents extension shares: the part of omp's extension API it uses, its flags, the inboxes its tools leave changes in, and the `remember` tool's Markdown memory. */
-import { randomUUID } from "node:crypto";
-import { appendFileSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { errorText, parseJson } from "../json";
+/** What every omp-agents extension shares: the part of omp's extension API it uses, its flags, and the `remember` tool's Markdown memory. */
+import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
+import { dirname } from "node:path";
+import { errorText } from "../json";
 import { readTail } from "../read-tail";
 import { MAX_FACT_LENGTH, MAX_MEMORY_BYTES, REMEMBER_TOOL } from "../shared/bots";
 
@@ -71,42 +70,6 @@ export function readText(path: string): string {
 	} catch {
 		return "";
 	}
-}
-
-let lastStamp = 0;
-
-/**
- * Leaves `change` in `dir` for the dashboard: written under a name it skips, then renamed, so it never reads half a file.
- * Each name sorts after the one before it, so the dashboard applies one session's changes in the order it left them, even
- * two left in the same millisecond.
- */
-export function leave(dir: string, change: object): void {
-	try {
-		mkdirSync(dir, { recursive: true });
-		lastStamp = Math.max(Date.now(), lastStamp + 1);
-		const name = `${lastStamp}-${randomUUID()}`;
-		const temp = join(dir, `${name}.tmp`);
-		writeFileSync(temp, JSON.stringify(change));
-		renameSync(temp, join(dir, `${name}.json`));
-	} catch (error) {
-		throw new Error(`Cannot leave the change for the dashboard: ${errorText(error)}`);
-	}
-}
-
-/** The changes `dir` holds that the dashboard has not applied yet, oldest first, leaving out a file that is not JSON. */
-export function waiting(dir: string): unknown[] {
-	let names: string[] = [];
-	try {
-		names = readdirSync(dir)
-			.filter(name => name.endsWith(".json"))
-			.sort();
-	} catch {
-		return [];
-	}
-	return names.flatMap(name => {
-		const change = parseJson(readText(join(dir, name)));
-		return change === undefined ? [] : [change];
-	});
 }
 
 export const reply = (text: string): ToolResult => ({ content: [{ type: "text", text }], details: undefined });

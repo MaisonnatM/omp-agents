@@ -2,11 +2,12 @@
 // action's session on a pull request or to queue its merge, and the lines of the system prompt that say what each does.
 // The dashboard loads it with `omp -e`, beside the Bot extension, for a PR shepherd Bot's session only
 // (`Bots.join` in src/server/bots.ts), so no other session has these tools.
+import { inbox } from "../../templates/omp/agent/extensions/inbox/client";
 import { parseBotId } from "../shared/bots";
 import { parsePullRequest } from "../shared/github";
 import { MAX_FIXES_PER_PULL_REQUEST, SHEPHERD_FIXES, type ShepherdChange, type ShepherdRequest } from "../shared/shepherd";
 import { MERGE_METHODS } from "../shared/source-control";
-import { type ExtensionApi, flagValue, leave, reply } from "./extension-kit";
+import { type ExtensionApi, flagValue, reply } from "./extension-kit";
 
 /** The flags a shepherd's session starts with: its Bot's id, and the directory its tools leave their requests in. */
 export const SHEPHERD_FLAGS = {
@@ -41,9 +42,9 @@ export default function shepherdExtension(pi: ExtensionApi): void {
 	/** Leaves `change` for the dashboard, from this session's shepherd. */
 	const ask = (change: ShepherdChange): void => {
 		const botId = parseBotId(flagValue(pi, SHEPHERD_FLAGS.bot));
-		const inbox = flagValue(pi, SHEPHERD_FLAGS.inbox);
-		if (!botId || !inbox) throw new Error("This session is not an omp-agents PR shepherd.");
-		leave(inbox, { botId, change } satisfies ShepherdRequest);
+		const dir = flagValue(pi, SHEPHERD_FLAGS.inbox);
+		if (!botId || !dir) throw new Error("This session is not an omp-agents PR shepherd.");
+		inbox<ShepherdRequest>(dir).leave({ botId, change });
 	};
 
 	const pullRequest = ({ owner, repo, number }: PullRequestParams) => {

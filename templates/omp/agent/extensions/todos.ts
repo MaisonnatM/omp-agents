@@ -10,11 +10,12 @@ import { readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
-import { CONFIG_DIR, leave, readJson, reply } from "./inbox/client";
+import { CONFIG_DIR, inbox, readJson, reply } from "./inbox/client";
 import { type Section, sectionFor } from "./todos/sections";
 
 const TODOS_FILE = join(CONFIG_DIR, "todos.json");
 const INBOX_DIR = join(CONFIG_DIR, "todo-inbox");
+const INBOX = inbox<object>(INBOX_DIR);
 
 interface Leaf {
 	id: string;
@@ -149,7 +150,7 @@ export default function todos(pi: ExtensionAPI) {
 					const same = todosOf(list, sessionId).added.find(todo => todo.text === title);
 					if (same) return reply(`This session already added it (id ${same.id}).`);
 					const todoId = randomUUID();
-					leave(INBOX_DIR, {
+					INBOX.leave({
 						op: "add",
 						id: todoId,
 						parentId: null,
@@ -165,7 +166,7 @@ export default function todos(pi: ExtensionAPI) {
 				}
 				case "check": {
 					if (!id) return reply("check needs the todo's id.", true);
-					leave(INBOX_DIR, { op: "toggle", id, doneAt: new Date().toISOString() });
+					INBOX.leave({ op: "toggle", id, doneAt: new Date().toISOString() });
 					return reply(`Checked todo ${id}.`);
 				}
 				case "edit": {
@@ -190,18 +191,18 @@ export default function todos(pi: ExtensionAPI) {
 						if ("error" in resolved) return reply(resolved.error, true);
 						named = resolved;
 					}
-					if (title) leave(INBOX_DIR, { op: "edit", id, text: title });
-					if (notes !== undefined) leave(INBOX_DIR, { op: "edit-body", id, body: notes });
-					if (due !== undefined) leave(INBOX_DIR, { op: "set-due", id, due: due || null });
-					if (categoryId !== undefined) leave(INBOX_DIR, { op: "categorize", id, categoryId });
-					if (named) leave(INBOX_DIR, { op: "set-workspace", id, workspace: named.workspace });
+					if (title) INBOX.leave({ op: "edit", id, text: title });
+					if (notes !== undefined) INBOX.leave({ op: "edit-body", id, body: notes });
+					if (due !== undefined) INBOX.leave({ op: "set-due", id, due: due || null });
+					if (categoryId !== undefined) INBOX.leave({ op: "categorize", id, categoryId });
+					if (named) INBOX.leave({ op: "set-workspace", id, workspace: named.workspace });
 					return reply(`Edited todo ${id}.`);
 				}
 				case "delete": {
 					if (!id) return reply("delete needs the todo's id.", true);
 					const found = findTodo(readList(), id);
 					if (!found) return reply(`No todo with id ${id} in the list.`, true);
-					leave(INBOX_DIR, { op: "remove", id });
+					INBOX.leave({ op: "remove", id });
 					return reply(`Deleted todo ${id}: ${found.todo.text}`);
 				}
 			}
