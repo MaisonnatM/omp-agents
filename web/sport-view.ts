@@ -288,7 +288,7 @@ export function journalWeeks(state: SportState): JournalWeek[] {
 	return [...weeks.values()];
 }
 
-/** The first day from `today` on whose override tests `metric`, `null` when none is planned. */
+/** The first override day from `today` whose workout tests `metric`, `null` when none is planned. */
 export function nextTest(state: SportState, metric: string, today: string): string | null {
 	const plan = state.plan;
 	if (!plan) return null;

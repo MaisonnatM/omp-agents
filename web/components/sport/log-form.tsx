@@ -116,7 +116,7 @@ export function LogForm({ state, target: { date, workout, log }, disabled, onCha
 		save();
 	};
 	const kicker = [longDate(date), log ? null : workout?.name].filter(part => part).join(" · ");
-	const heaviestKg = Object.values(loads);
+	const lifted = Object.values(loads);
 	return (
 		<FormDialog busy={false} onClose={onClose} className="top-[4%] w-[min(40rem,calc(100vw-2rem))]">
 			<FormDialogHeader title={log ? "Modifier la séance" : workout ? "Séance faite" : "Séance libre"} busy={false} />
@@ -208,7 +208,7 @@ export function LogForm({ state, target: { date, workout, log }, disabled, onCha
 				</label>
 				<Stats
 					cells={[
-						rows.length > 0 ? { label: "Charges", value: `${rows.filter(({ done }) => done).length} sur ${rows.length}` } : { label: "Charge", value: heaviestKg.length ? signedKg(Math.max(...heaviestKg)) : "—" },
+						rows.length > 0 ? { label: "Charges", value: `${rows.filter(({ done }) => done).length} sur ${rows.length}` } : { label: "Charge", value: lifted.length ? signedKg(Math.max(...lifted)) : "—" },
 						{ label: "Réussites", value: sendsText(climbs) },
 						{ label: "Douleur", value: pain === null || pain === 0 ? "aucune" : `${pain}/10 · ${PAIN_PLACE_LABEL[where].toLowerCase()}` },
 						{ label: "Effort", value: effortText(rpe) },
