@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { EMPTY_SPORT, type Measurement, type Plan, type SportChange, type SportState } from "./shared/sport";
+import { EMPTY_SPORT, type Measurement, type Metric, type Plan, type SportChange, type SportState } from "./shared/sport";
 import { applySport } from "./sport";
-import { log, measurement } from "./sport-fixtures";
+import { exercise, log, measurement } from "./sport-fixtures";
 
 const max = (id: string, at: string, value = 112): Measurement => measurement(id, "max", value, at);
 const after = (state: SportState, ...changes: SportChange[]): SportState => changes.reduce(applySport, state);
@@ -9,14 +9,16 @@ const logIds = ({ log }: SportState): string => log.map(({ id }) => id).join(" "
 const measurementIds = ({ measurements }: SportState): string => measurements.map(({ id }) => id).join(" ");
 
 const PLAN: Plan = { title: "Grimpe", habits: [], routines: [], workouts: [], phases: [], overrides: [] };
+const MAX_METRIC: Metric = { id: "max", label: "Max", unit: "kg", better: "higher" };
+const WITH_MAX: SportState = { ...EMPTY_SPORT, metrics: [MAX_METRIC] };
 
 describe("applySport", () => {
 	test("sets the plan, the targets, and the metrics, and changes nothing when they are the same", () => {
 		const state = after(
 			EMPTY_SPORT,
+			{ op: "set-metrics", metrics: [MAX_METRIC] },
 			{ op: "set-plan", plan: PLAN },
 			{ op: "set-targets", targets: [{ id: "max", label: "Max", by: "2027-02-07", kind: "metric", metric: "max", value: 119 }] },
-			{ op: "set-metrics", metrics: [{ id: "max", label: "Max", unit: "kg", better: "higher" }] },
 		);
 		expect(state.plan).toEqual(PLAN);
 		expect(state.targets.map(({ id }) => id)).toEqual(["max"]);
@@ -65,7 +67,7 @@ describe("applySport", () => {
 
 	test("keeps measurements ordered by date, removes one, and restores it at its index", () => {
 		const state = after(
-			EMPTY_SPORT,
+			WITH_MAX,
 			{ op: "add-measurement", measurement: max("nov", "2026-11-17", 117) },
 			{ op: "add-measurement", measurement: max("aug", "2026-08-26") },
 			{ op: "add-measurement", measurement: max("aug", "2026-08-27") },
@@ -80,11 +82,27 @@ describe("applySport", () => {
 	});
 
 	test("edits a measurement in place, moves it when its day changes, and changes nothing for an unknown id or the same value", () => {
-		const state = after(EMPTY_SPORT, { op: "add-measurement", measurement: max("aug", "2026-08-26") }, { op: "add-measurement", measurement: max("nov", "2026-11-17", 117) });
+		const state = after(WITH_MAX, { op: "add-measurement", measurement: max("aug", "2026-08-26") }, { op: "add-measurement", measurement: max("nov", "2026-11-17", 117) });
 		const fixed = applySport(state, { op: "edit-measurement", measurement: max("nov", "2026-11-17", 118) });
 		expect(fixed.measurements.map(({ value }) => value)).toEqual([112, 118]);
 		expect(measurementIds(applySport(state, { op: "edit-measurement", measurement: max("aug", "2026-12-01") }))).toBe("nov aug");
 		expect(applySport(state, { op: "edit-measurement", measurement: max("aug", "2026-08-26") })).toBe(state);
 		expect(applySport(state, { op: "edit-measurement", measurement: max("sep", "2026-09-01") })).toBe(state);
+	});
+
+	test("refuses a change that names a metric the state does not hold, and a set-metrics that drops one still named", () => {
+		const bodyweight: Metric = { id: "bodyweight", label: "Poids", unit: "kg", better: "lower" };
+		const rule = { kind: "of-max" as const, metric: "max", fraction: 0.87, offsetKg: 0, less: "bodyweight" };
+		const plan: Plan = { ...PLAN, workouts: [{ id: "mardi", name: "Mardi", place: "gym", minutes: 60, blocks: [{ title: "Poutre", items: [{ ...exercise("semi", "Semi"), load: rule }] }] }] };
+		expect(applySport(EMPTY_SPORT, { op: "add-measurement", measurement: max("aug", "2026-08-26") })).toBe(EMPTY_SPORT);
+		expect(applySport(EMPTY_SPORT, { op: "set-targets", targets: [{ id: "t", label: "Max", by: null, kind: "metric", metric: "max", value: 119 }] })).toBe(EMPTY_SPORT);
+		expect(applySport(WITH_MAX, { op: "set-plan", plan })).toBe(WITH_MAX);
+		const state = after(WITH_MAX, { op: "set-metrics", metrics: [MAX_METRIC, bodyweight] }, { op: "set-plan", plan });
+		expect(state.plan).toEqual(plan);
+		expect(applySport(state, { op: "set-metrics", metrics: [MAX_METRIC] })).toBe(state);
+		const measured = applySport(WITH_MAX, { op: "add-measurement", measurement: max("aug", "2026-08-26") });
+		expect(applySport(measured, { op: "edit-measurement", measurement: measurement("aug", "poids", 82, "2026-08-26") })).toBe(measured);
+		expect(applySport(measured, { op: "set-metrics", metrics: [bodyweight] })).toBe(measured);
+		expect(applySport(WITH_MAX, { op: "set-metrics", metrics: [bodyweight] }).metrics).toEqual([bodyweight]);
 	});
 });

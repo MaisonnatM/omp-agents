@@ -1,6 +1,6 @@
 /** Applying changes to the Sport module's state, which the server does to `sport.json` and the page to the state it shows. */
 import { canonicalJson } from "./json";
-import type { Measurement, SportChange, SportState, WorkoutLog } from "./shared/sport";
+import { exercisesOf, type Measurement, type Metric, type Plan, type SportChange, type SportState, type Target, type WorkoutLog } from "./shared/sport";
 
 const same = (a: unknown, b: unknown): boolean => canonicalJson(a) === canonicalJson(b);
 
@@ -39,23 +39,36 @@ const MEASUREMENTS = datedList<Measurement>(measurement => measurement.at);
 const withLog = (state: SportState, log: WorkoutLog[]): SportState => (log === state.log ? state : { ...state, log });
 const withMeasurements = (state: SportState, measurements: Measurement[]): SportState => (measurements === state.measurements ? state : { ...state, measurements });
 
-/** `state` after `change`, the same object when nothing changed. */
+/** The metrics `plan`'s load rules read. */
+const ruleMetrics = (plan: Plan | null): string[] => (plan ? exercisesOf(plan) : []).flatMap(({ load }) => (load?.kind !== "of-max" ? [] : load.less === null ? [load.metric] : [load.metric, load.less]));
+
+const targetMetrics = (targets: Target[]): string[] => targets.flatMap(target => (target.kind === "metric" ? [target.metric] : []));
+
+const known = (metrics: Metric[], ids: string[]): boolean => ids.every(id => metrics.some(metric => metric.id === id));
+
+/**
+ * `state` after `change`, the same object when nothing changed. A change that names a metric the state does not hold,
+ * or a `set-metrics` that drops one a measurement, a target, or a load rule still names, is refused the same way, so
+ * every metric id in the state names one of its metrics.
+ */
 export function applySport(state: SportState, change: SportChange): SportState {
 	switch (change.op) {
 		case "set-plan":
-			return same(state.plan, change.plan) ? state : { ...state, plan: change.plan };
+			return same(state.plan, change.plan) || !known(state.metrics, ruleMetrics(change.plan)) ? state : { ...state, plan: change.plan };
 		case "set-targets":
-			return same(state.targets, change.targets) ? state : { ...state, targets: change.targets };
+			return same(state.targets, change.targets) || !known(state.metrics, targetMetrics(change.targets)) ? state : { ...state, targets: change.targets };
 		case "set-metrics":
-			return same(state.metrics, change.metrics) ? state : { ...state, metrics: change.metrics };
+			return same(state.metrics, change.metrics) || !known(change.metrics, [...state.measurements.map(({ metric }) => metric), ...targetMetrics(state.targets), ...ruleMetrics(state.plan)])
+				? state
+				: { ...state, metrics: change.metrics };
 		case "add-measurement":
-			return withMeasurements(state, MEASUREMENTS.add(state.measurements, change.measurement));
+			return known(state.metrics, [change.measurement.metric]) ? withMeasurements(state, MEASUREMENTS.add(state.measurements, change.measurement)) : state;
 		case "edit-measurement":
-			return withMeasurements(state, MEASUREMENTS.edit(state.measurements, change.measurement));
+			return known(state.metrics, [change.measurement.metric]) ? withMeasurements(state, MEASUREMENTS.edit(state.measurements, change.measurement)) : state;
 		case "remove-measurement":
 			return withMeasurements(state, MEASUREMENTS.remove(state.measurements, change.id));
 		case "restore-measurement":
-			return withMeasurements(state, MEASUREMENTS.restore(state.measurements, change.measurement, change.index));
+			return known(state.metrics, [change.measurement.metric]) ? withMeasurements(state, MEASUREMENTS.restore(state.measurements, change.measurement, change.index)) : state;
 		case "add-log":
 			return withLog(state, LOGS.add(state.log, change.log));
 		case "edit-log":

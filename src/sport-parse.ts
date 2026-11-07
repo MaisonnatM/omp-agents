@@ -10,6 +10,7 @@ import {
 	type Climb,
 	type Demo,
 	type Exercise,
+	exercisesOf,
 	FRENCH_GRADES,
 	type Habit,
 	type LoadRule,
@@ -47,8 +48,8 @@ function parseLoadRule(value: unknown): LoadRule | null {
 	if (!isObject(value)) return null;
 	if (value.kind === "fixed") return isNumber(value.kg) ? { kind: "fixed", kg: value.kg } : null;
 	if (value.kind !== "of-max") return null;
-	const { metric, fraction, offsetKg = 0 } = value;
-	return isId(metric) && isNumber(fraction) && fraction > 0 && fraction <= 1 && isNumber(offsetKg) ? { kind: "of-max", metric, fraction, offsetKg } : null;
+	const { metric, fraction, offsetKg = 0, less = null } = value;
+	return isId(metric) && isNumber(fraction) && fraction > 0 && fraction <= 1 && isNumber(offsetKg) && isOptionalId(less) ? { kind: "of-max", metric, fraction, offsetKg, less } : null;
 }
 
 function parseDemo(value: unknown): Demo | null {
@@ -156,7 +157,7 @@ function parsePlan(value: unknown): Plan | null {
 	if (!slots.every(({ workout }) => workoutIds.has(workout))) return null;
 	const routineIds = new Set(routines.map(({ id }) => id));
 	if (!habits.every(({ routine }) => routine === null || routineIds.has(routine))) return null;
-	const exercises = [...workouts.flatMap(({ blocks }) => blocks.flatMap(({ items }) => items)), ...routines.flatMap(({ items }) => items)];
+	const exercises = exercisesOf({ title, habits, routines, workouts, phases, overrides });
 	const keys = new Set(exercises.map(({ key }) => key));
 	if (!exercises.every(({ opensAs }) => opensAs.every(key => keys.has(key)))) return null;
 	return { title, habits, routines, workouts, phases, overrides };

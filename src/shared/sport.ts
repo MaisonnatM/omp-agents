@@ -3,9 +3,6 @@ import type { DayKey } from "./days";
 
 export const SPORT_VERSION = 1;
 
-/** The metric an `of-max` load rule subtracts from the share of the max it asks for: what the user weighs. */
-export const BODYWEIGHT = "bodyweight";
-
 /** French climbing grades, easiest first, one table for boulders and routes. */
 export const FRENCH_GRADES = [
 	"4", "4+",
@@ -50,8 +47,11 @@ export interface Measurement {
 /** A result the user trains toward: a metric's value, or a grade sent in boulder or route, by a day or open-ended. */
 export type Target = { id: string; label: string; by: string | null } & ({ kind: "metric"; metric: string; value: number } | { kind: ClimbKind; grade: FrenchGrade });
 
-/** The kilograms an exercise calls for: a share of a metric's last value less the bodyweight, plus an offset, or a fixed load. */
-export type LoadRule = { kind: "of-max"; metric: string; fraction: number; offsetKg: number } | { kind: "fixed"; kg: number };
+/**
+ * The kilograms an exercise calls for: a share of a metric's last value, less the last value of `less` when it names a
+ * metric such as the bodyweight, plus an offset; or a fixed load.
+ */
+export type LoadRule = { kind: "of-max"; metric: string; fraction: number; offsetKg: number; less: string | null } | { kind: "fixed"; kg: number };
 
 /** A video that shows an exercise, with three cues to watch for. */
 export interface Demo {
@@ -191,6 +191,9 @@ export type SportChange =
 	| { op: "edit-log"; log: WorkoutLog }
 	| { op: "remove-log"; id: string }
 	| { op: "restore-log"; log: WorkoutLog; index: number };
+
+/** Every exercise of `plan`'s workouts and routines. */
+export const exercisesOf = (plan: Plan): Exercise[] => [...plan.workouts.flatMap(({ blocks }) => blocks.flatMap(({ items }) => items)), ...plan.routines.flatMap(({ items }) => items)];
 
 /** `grade`'s place in {@link FRENCH_GRADES}, higher for harder. */
 export const gradeRank = (grade: FrenchGrade): number => FRENCH_GRADES.indexOf(grade);
