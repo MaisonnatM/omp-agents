@@ -32,6 +32,14 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-07
 
+- Behind the scenes: the dashboard now keeps your training plan, test results, targets, and workout log together and works out each week's workouts and loads, ready for the coming Sport page.
+- New Sport page, from the Sport button in the header: your training week day by day, with each exercise's load worked out from your last test or your last session.
+- Click an exercise to watch its demo video with three tips; the video loads only when you press play.
+- Press Fait… on a workout to note your loads, sends, effort, and any pain; the next sessions start from what you noted, and pain in your fingers takes the fingerboard out for a week.
+- The Journal tab lists every session you noted, week by week, and the Progrès tab charts your tests and best grades against your targets, with your records.
+- Behind the scenes: the dashboard keeps each demo's preview picture on your computer after loading it once, and YouTube's player comes from its privacy-enhanced address.
+- Your personal assistant can now read your training week with each day's loads, log a workout, record a test result, and set your plan and targets, and the dashboard saves each change for you; it never changes or deletes what you entered yourself.
+- Behind the scenes: the dashboard now keeps your training plan, test results, targets, and workout log together and works out each week's workouts and loads, which the Sport page shows.
 - Fixed: the daily cleanup and Settings › Storage now check a subagent's copy of your repository for edits and live sessions even when omp keeps that copy outside the task's folder.
 - Fixed: removing a leftover task's folder now also deletes that outside copy, instead of leaving it behind.
 - Fixed: a Bot page's model menu now lists the models, instead of staying on Loading models.

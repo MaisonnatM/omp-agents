@@ -214,6 +214,15 @@ _Avoid_: Cycle, block, period, mesocycle
 A week inside a phase, named by its Monday, that follows the phase's lighter slots instead of its normal ones.
 _Avoid_: Rest week, recovery week, off week
 
+**Routine (Sport)**:
+A named list of exercises the plan repeats outside the workouts, such as « Mobilité hanche » or the evening stretches, which a habit can name; an exercise whose `opensAs` lists a routine's exercises opens on the Sport page as their demos.
+It is not a Bot's routine (see **Routine**).
+_Avoid_: Program, circuit
+
+**Demo**:
+An exercise's YouTube video with three cues and an optional caution, which the Sport page shows as a thumbnail and loads only when the user clicks play.
+_Avoid_: Tutorial, clip, embed
+
 ## Distribution
 
 **Starter kit**:

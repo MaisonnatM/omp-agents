@@ -158,8 +158,8 @@
   The width of a sidebar or a split, a folded section, and what you last picked in a menu stay with the browser that set them.
   **Theme**: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one; it applies at once and does not change omp's terminal theme.
   **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts, and **Show todos card** shows or hides the whole Todos card, its line above the messages and its **Subagents**, **Files**, **Images**, and **Sources** sections, in every transcript, the same choice as the checklist toggle in a session's header.
-  **Sidebar tabs** lists the eight sidebar tabs in the order they show, each with the Cmd+number it takes, a switch that shows or hides it, and buttons that move it up or down.
-  **Notes**, **Calendar**, and **Email** say **Header**: they sit in the header beside the command menu and take no number, and Cmd+1 goes to the first tab the sidebar's bar draws.
+  **Sidebar tabs** lists the nine sidebar tabs in the order they show, each with the Cmd+number it takes, a switch that shows or hides it, and buttons that move it up or down.
+  **Notes**, **Calendar**, **Email**, and **Sport** say **Header**: they sit in the header beside the command menu and take no number, and Cmd+1 goes to the first tab the sidebar's bar draws.
   A hidden tab only leaves the sidebar's bar or the header and loses its number: its page, its command in the command menu, its G pair, and links to it still work.
   While omp holds no sign-in to Linear or Gmail, the **Tickets** or **Email** row says that tab shows only once the service is connected.
   Putting every tab back in its default order and shown forgets the choice, so the sidebar follows the default again.

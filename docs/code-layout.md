@@ -94,6 +94,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - Notes: `web/components/notes/page.tsx`, with its sidebar lists in `web/components/notes/nav.tsx`.
   - Calendar: `web/components/calendar/calendar-page.tsx`, with **Show routines** in `web/components/calendar/calendar-nav.tsx`, both reading the saved display preference in `web/use-calendar-display.ts`.
   - Email: `web/components/email/email-page.tsx`.
+  - Sport: `web/components/sport/page.tsx`, with its sidebar tab in `web/components/sport/nav.tsx`, the week in `week.tsx` and `day-detail.tsx`, the demos in `demo-dialog.tsx`, the Fait dialog in `log-form.tsx`, the journal in `journal.tsx`, and the progress in `progress.tsx`, all in `web/components/sport/`.
   - Bots: the gallery of every Bot at `#bots` in `web/components/bots/bots-gallery.tsx`, a Bot's page and the New Bot form with its job templates in `web/components/bots/bot-page.tsx`, the Bot's details in the right sidebar in `web/components/bots/bot-details.tsx`, the card of its routines from `web/components/routines/routines-card.tsx` in place of the conversation, with each row in `web/components/routines/routine-row.tsx` and an open row's rest in `web/components/routines/routine-open.tsx`, the sidebar's **Bots** tab in `web/components/bots/bots-nav.tsx`, each Bot's face in `web/components/bots/bot-avatar.tsx`, and its shape and color choice in `web/components/bots/bot-look-picker.tsx`.
     The New Bot form's type picker starts on Bot designer and fills each type's starting name and job from `BOT_KIND_START` in `web/bots-model.ts`.
     The right-click menu of a Bot's row and card, which pins it and moves it between sections, is in `web/components/bots/bot-menu.tsx`.
@@ -134,6 +135,6 @@ Its files, listed by area:
 - [Shell, state, and models](code-layout/page-core.md)
 - [List models, sidebar tabs, model menu, and mentions](code-layout/page-models.md)
 - [Status bar, terminal, HTTP reads, shortcuts, and theme](code-layout/page-reads-and-chrome.md)
-- [Sidebar, Todo, Notes, Bots, Routines, Calendar, and Email](code-layout/page-pages.md)
+- [Sidebar, Todo, Notes, Bots, Routines, Calendar, Email, and Sport](code-layout/page-pages.md)
 - [Panes, session details, and changes](code-layout/page-panes.md)
 - [Pull requests, tickets, settings, integrations, and primitives](code-layout/page-pull-requests-and-settings.md)

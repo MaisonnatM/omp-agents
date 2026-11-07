@@ -58,6 +58,7 @@
   `src/sport-agent.ts` holds `agentSportChanges`, which turns a `sport` tool request into the changes an agent may make, and `withAgentChanges`, the state with the requests an inbox still holds.
   `src/server/sport-inbox.ts` drains the `sport` tool's requests from `sport-inbox/` through `JsonInboxDir` while its server owns the lock, and deletes a file only once the dashboard has written its changes to `sport.json`.
   `src/omp/sport-tool.ts` registers `sport` in personal sessions, reads the state with pending requests, and leaves one request per call without writing `sport.json`.
+  `src/server/sport-thumbs.ts` serves `GET /api/sport/thumb`, each demo's YouTube thumbnail, fetched once and kept in `sportThumbsDir` from `src/paths.ts`.
   `src/sport-fixtures.ts` holds the sample plan and the builders the Sport tests share.
   See [Sport](../architecture/sport.md).
 - `templates/omp/agent/extensions/inbox/client.ts`: what every tool that leaves changes in an inbox shares, `notes.ts`, `todos.ts`, `events.ts`, and `google-accounts.ts` and the Bot, designer, shepherd, and `sport` tools under `src/omp/` alike: `CONFIG_DIR`, `readJson`, the tool `reply`, and `inbox<T>(dir)`, whose `leave` writes one change under a `.tmp` name then renames it, under a name that sorts after the one before it, and whose `waiting` reads the changes the dashboard has not applied yet, oldest first.

@@ -64,11 +64,12 @@ Alt is Option on macOS.
 | R / A | Email page, outside text fields | Reply, or reply to all, to the open conversation's last message |
 | # | Email page, outside text fields | Move the open conversation to Gmail's Trash |
 | C | Email page, outside text fields | Write a new mail |
+| ← / → | Sport page's week, outside text fields | Open the day before or after |
 | Alt+Shift+↑ / Alt+Shift+↓ | Todo page or Pull requests page | Move the focused todo, or the Pull requests page's focused pull request, section, or repository, up or down |
 | ↓ / ↑ | Changes page or a pull request's **Code** tab, outside text fields | Open the next or previous changed file |
 
 - Press `?` outside a text field, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
-  The dialog groups them in tabs by category: General, Sessions, Pull requests, Todo, Notes, Email, Calendar, and Changes.
+  The dialog groups them in tabs by category: General, Sessions, Pull requests, Todo, Notes, Email, Calendar, Sport, and Changes.
   Its header states the rule for where a key works: chords with Cmd, Alt, or Ctrl work anywhere, even while you type, and single keys and G pairs work outside text fields; a **Composer only** tag marks the keys that work only in the composer.
   Each tab's column headings stay pinned while its list scrolls, and rows fade in under them.
   Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the header's **Notes** and **Email** buttons, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the Calendar page's **New event**, and an Email conversation's **Reply**, **Reply all**, **Delete**, and **Open in Gmail**.
@@ -76,7 +77,7 @@ Alt is Option on macOS.
   The numbers count only the bar's tabs, in the order **Settings › Preferences** sets: a tab you hide, or Tickets without a Linear sign-in, takes no number, and the tabs after it move up one.
   A number with no tab is left to the window.
   In the default order with Linear connected, Cmd+1 opens **Pull requests**, Cmd+2 **Tickets**, Cmd+3 **Bots**, Cmd+4 **Sessions**, and Cmd+5 **Todo**; without Linear, each tab after **Pull requests** takes the number one lower.
-  **Notes**, **Calendar**, and **Email**, the buttons in the header beside the command menu, take no number; Notes keeps G then N and Email keeps G then M.
+  **Notes**, **Calendar**, **Email**, and **Sport**, the buttons in the header beside the command menu, take no number; Notes keeps G then N and Email keeps G then M, and Sport has no pair.
   Cmd with T, L, R, D, Q, O, P, S, Tab, or 6 through 0 is left to the window, whose menu takes Cmd+R, Cmd+Q, and Cmd+0, and Cmd+Shift+W to close it; see [Desktop app](desktop-app.md).
   Single keys and the G pairs work only while no text field has focus, so they never take what you type.
   For a pair, press G, then the second key within 1.5 seconds.

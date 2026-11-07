@@ -100,7 +100,10 @@ Each write below takes `?cwd=`, runs one at a time, answers 400 without it, answ
 `readDecisions` in `src/decisions.ts` finds the repository's top through git, else takes `cwd` itself, and reads the first of `docs/decisions`, docs/adr, and doc/adr that exists, or answers `dir: null`.
 Each record is its file name, title, `status`, `date`, `decision-makers`, `supersedes`, `superseded-by`, and the Markdown after its title, newest first; a file with no frontmatter or broken YAML still lists, with only what it holds.
 
-Every response from these endpoints is JSON.
+**Sport thumbnails** reads `GET /api/sport/thumb?id=<11-character YouTube id>` and answers the video's `hqdefault.jpg` from `i.ytimg.com`, which `src/server/sport-thumbs.ts` fetches once and keeps as `<id>.jpg` in `sportThumbsDir`, `<data dir>/sport-thumbs`, so the page's `img-src` stays `'self'`.
+It answers a JSON 400 for any other id, 404 when YouTube has no thumbnail, and 502 when YouTube does not answer; as an image route, it also takes the media key as `?key=`.
+
+Every response from these endpoints but that image is JSON.
 An error is `{ error, conflict? }` with the HTTP status.
 Any other `/api/` path answers a JSON 404.
 The page reports a response that is not JSON with its status and text.
