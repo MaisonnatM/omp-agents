@@ -50,6 +50,11 @@
   `src/server/note-inbox.ts` drains agent adds and appends from `note-inbox/` through `JsonInboxDir` while its server owns the lock.
   `templates/omp/agent/extensions/notes.ts` registers `user_note`, reads persisted notes and pending adds, and leaves requests without writing `notes.json`.
   See [User notes](../architecture/user-notes.md).
+- `src/shared/sport.ts`, `src/sport.ts`, and `src/sport-parse.ts` hold the Sport module's state, its reducer `applySport`, and its boundary parsers.
+  `src/sport-week.ts` derives the week, each exercise's load, the pain flags, the best grades, the records, and the adherence from the state.
+  `src/server/sport-file.ts` keeps `sport.json` with `ReducerFile`, registered in `src/server/list-registry.ts` under `sport`.
+  `src/sport-fixtures.ts` holds the sample plan and the builders the Sport tests share.
+  See [Sport](../architecture/sport.md).
 - `templates/omp/agent/extensions/inbox/client.ts`: what `notes.ts`, `todos.ts`, and `events.ts` share to reach their inboxes: `CONFIG_DIR`, `readJson`, `waiting`, the changes an inbox holds that the dashboard has not applied yet, oldest first, `leave`, which writes one change under a `.tmp` name then renames it, and the tool `reply`.
   `withoutEmpty` drops the empty strings a model sends for a parameter it means to leave out, before `user_note` and `user_event` check their parameters; `user_todo` keeps them, since an empty `due`, `section`, or `workspace` clears that field.
 - `src/shared/workspaces.ts`: the Settings › Workspaces list, `WorkspaceList` of added and hidden directories, its `WorkspaceChange`, and `applyWorkspace`, which the server applies to its file.

@@ -66,6 +66,7 @@ import type { AskReply, CompletionScope, LiveView, StartRequest, UserAnswer, Vie
 import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues, TodoTicketRequest } from "../shared/tickets";
 import type { TrustChange } from "../shared/project-trust";
 import type { WorkspaceChange } from "../shared/workspaces";
+import { parseSportChange } from "../sport-parse";
 import { MAX_TICKET_DESCRIPTION, MAX_TICKET_TITLE } from "../tickets";
 import { parseNoteChange } from "../user-notes-parse";
 import { isTodoId, parseTodoChange } from "../user-todos-parse";
@@ -362,6 +363,10 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	"user-note"(value) {
 		const change = parseNoteChange(value.change);
 		return change && { ok: { t: "user-note", change } };
+	},
+	"sport-change"(value) {
+		const change = parseSportChange(value.change);
+		return "ok" in change ? { ok: { t: "sport-change", change: change.ok } } : null;
 	},
 	routine(value) {
 		const change = parseRoutineChange(value.change);

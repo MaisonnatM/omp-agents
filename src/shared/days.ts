@@ -35,3 +35,14 @@ export function daysBetween(first: string, last: string): string[] {
 		days.push(day);
 	}
 }
+
+/** The days of a week, Monday first, as the Sport plan's weeks name them. */
+export const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+export type DayKey = (typeof DAY_KEYS)[number];
+
+/** `day` moved by `days` on the calendar alone, so no time zone or daylight saving change shifts it. */
+export const addDays = (day: string, days: number): string => new Date(Date.parse(day) + days * DAY_MS).toISOString().slice(0, 10);
+
+export const weekdayOf = (day: string): DayKey => DAY_KEYS[(new Date(Date.parse(day)).getUTCDay() + 6) % 7]!;
+
+export const mondayOf = (day: string): string => addDays(day, -DAY_KEYS.indexOf(weekdayOf(day)));

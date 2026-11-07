@@ -259,6 +259,7 @@ export function useDashboard(): Dashboard {
 					case "models":
 					case "user-todos":
 					case "user-notes":
+					case "sport":
 					case "routines":
 					case "bots":
 					case "personal":
