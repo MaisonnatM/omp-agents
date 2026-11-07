@@ -1,5 +1,5 @@
 /** The Sport page: the plan's week, the journal of logged sessions, and the progress charts, under one header. */
-import { Plus } from "lucide-react";
+import { Plus, Scale } from "lucide-react";
 import { useState } from "react";
 import { addDays, localDay } from "../../../src/shared/days";
 import type { Exercise, SportChange, SportState } from "../../../src/shared/sport";
@@ -64,13 +64,13 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 				<>
 					<Tooltip content="Noter une séance hors du plan">
 						<Button variant="ghost" size="compact" leadingIcon={Plus} disabled={disabled} onClick={() => logFor(selected, null)} {...activityControl("sport.log.free")}>
-							Séance libre
+							<span className="max-[699px]:sr-only">Séance libre</span>
 						</Button>
 					</Tooltip>
 					{bodyweight && (
 						<Tooltip content="Noter ton poids du jour">
-							<Button variant="ghost" size="compact" leadingIcon={Plus} disabled={disabled} onClick={() => setWeighing(true)} {...activityControl("sport.weigh.open")}>
-								Pesée
+							<Button variant="ghost" size="compact" leadingIcon={Scale} disabled={disabled} onClick={() => setWeighing(true)} {...activityControl("sport.weigh.open")}>
+								<span className="max-[699px]:sr-only">Pesée</span>
 							</Button>
 						</Tooltip>
 					)}
