@@ -57,7 +57,6 @@ function entryRefusal<T extends Entry>(noun: string, stored: T | undefined, entr
 
 const isKeyOf = <T extends object>(entry: T, key: string): key is Extract<keyof T, string> => key in entry;
 
-/** The fields of `entry` named in `keys`. */
 function pick<T extends object>(entry: T, keys: string[]): Partial<T> {
 	const picked: Partial<T> = {};
 	for (const key of keys) if (isKeyOf(entry, key)) picked[key] = entry[key];

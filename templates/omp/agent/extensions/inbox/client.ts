@@ -26,7 +26,6 @@ export interface Inbox<T> {
 
 let lastStamp = 0;
 
-/** The inbox in `dir`. */
 export function inbox<T extends object>(dir: string): Inbox<T> {
 	return {
 		// Written under a name the dashboard skips, then renamed, so it never reads half a file. Each name sorts after
