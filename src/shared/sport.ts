@@ -24,6 +24,10 @@ export type PainPlace = (typeof PAIN_PLACES)[number];
 export const CLIMB_KINDS = ["boulder", "route"] as const;
 export type ClimbKind = (typeof CLIMB_KINDS)[number];
 
+/** What a workout trains, which colors its day on the page; a mixed session takes the kind it leads with. */
+export const WORKOUT_KINDS = ["hangboard", "boulder", "route", "hip", "strength"] as const;
+export type WorkoutKind = (typeof WORKOUT_KINDS)[number];
+
 /** Something the user measures, such as the finger max or the bodyweight, and which way is better. */
 export interface Metric {
 	id: string;
@@ -82,6 +86,7 @@ export interface Exercise {
 export interface Workout {
 	id: string;
 	name: string;
+	kind: WorkoutKind;
 	place: Place;
 	minutes: number;
 	blocks: { title: string; items: Exercise[] }[];

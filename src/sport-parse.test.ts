@@ -7,7 +7,7 @@ const LOG = { id: "l1", date: "2026-11-17", workout: "mardi" };
 const READ_LOG = log("l1", "2026-11-17", { workout: "mardi", title: "" });
 
 const plan = (fields: Record<string, unknown> = {}) => ({
-	workouts: [{ id: "mardi", name: "Mardi", place: "gym", blocks: [{ title: "Poutre", items: [{ key: "semi", name: "Semi", hang: true, load: { kind: "of-max", metric: "max", fraction: 0.87, less: "bodyweight" } }] }] }],
+	workouts: [{ id: "mardi", name: "Mardi", kind: "hangboard", place: "gym", blocks: [{ title: "Poutre", items: [{ key: "semi", name: "Semi", hang: true, load: { kind: "of-max", metric: "max", fraction: 0.87, less: "bodyweight" } }] }] }],
 	routines: [{ id: "hanche", name: "Hanche", items: [{ key: "h1", name: "Pigeon" }] }],
 	habits: [{ label: "Hanche", routine: "hanche" }],
 	phases: [{ id: "p1", name: "Transition", start: "2026-11-16", end: "2026-12-06", week: { tue: [{ workout: "mardi" }] }, deloadMondays: ["2026-11-30"] }],
@@ -50,6 +50,7 @@ describe("parseSportState", () => {
 			opensAs: [],
 			hang: true,
 		});
+		expect(state?.plan?.workouts[0]?.kind).toBe("hangboard");
 		expect(state?.plan?.phases[0]?.week).toEqual({ mon: [], tue: [{ workout: "mardi", optional: false }], wed: [], thu: [], fri: [], sat: [], sun: [] });
 		expect(state && "extra" in state).toBe(false);
 	});
@@ -70,7 +71,9 @@ describe("parseSportState", () => {
 			{ targets: [{ id: "t", label: "Bloc", kind: "boulder", grade: "8a", by: "soon" }] },
 			{ targets: [{ id: "t", label: "Max", kind: "metric", value: 119 }] },
 			{ plan: "plan" },
-			{ plan: plan({ workouts: [{ id: "mardi", name: "Mardi", place: "beach", blocks: [] }] }) },
+			{ plan: plan({ workouts: [{ id: "mardi", name: "Mardi", kind: "hangboard", place: "beach", blocks: [] }] }) },
+			{ plan: plan({ workouts: [{ id: "mardi", name: "Mardi", place: "gym", blocks: [] }] }) },
+			{ plan: plan({ workouts: [{ id: "mardi", name: "Mardi", kind: "yoga", place: "gym", blocks: [] }] }) },
 			{ plan: plan({ routines: [{ id: "hanche", name: "Hanche", items: [{ key: "h1", name: "Pigeon", load: { kind: "percent" } }] }] }) },
 		]) {
 			expect(parseSportState(value)).toBeNull();
@@ -151,9 +154,16 @@ describe("parseSportChange", () => {
 	});
 
 	test("refuses an of-max rule that leaves out what it subtracts, since a rule from before `less` subtracted the bodyweight", () => {
-		const hang = (load: Record<string, unknown>) => ({ op: "set-plan", plan: plan({ workouts: [{ id: "mardi", name: "Mardi", place: "gym", blocks: [{ items: [{ key: "semi", name: "Semi", hang: true, load }] }] }] }) });
+		const hang = (load: Record<string, unknown>) => ({ op: "set-plan", plan: plan({ workouts: [{ id: "mardi", name: "Mardi", kind: "hangboard", place: "gym", blocks: [{ items: [{ key: "semi", name: "Semi", hang: true, load }] }] }] }) });
 		expect(refusal(hang({ kind: "of-max", metric: "max", fraction: 0.87, offsetKg: 0 }))).toBe("plan.workouts[0].blocks[0].items[0].load.less is required; use null to subtract nothing");
 		expect(parseSportChange(hang({ kind: "of-max", metric: "max", fraction: 0.87, less: null }))).toMatchObject({ ok: { plan: { workouts: [{ blocks: [{ items: [{ load: { offsetKg: 0, less: null } }] }] }] } } });
+	});
+
+	test("refuses a workout that leaves out its kind or names one the page cannot color", () => {
+		const withKind = (kind?: string) => ({ op: "set-plan", plan: plan({ workouts: [{ id: "mardi", name: "Mardi", kind, place: "gym" }] }) });
+		expect(refusal(withKind())).toBe("plan.workouts[0].kind must be one of hangboard, boulder, route, hip, strength");
+		expect(refusal(withKind("yoga"))).toBe("plan.workouts[0].kind must be one of hangboard, boulder, route, hip, strength");
+		expect(parseSportChange(withKind("hip"))).toMatchObject({ ok: { plan: { workouts: [{ kind: "hip" }] } } });
 	});
 
 	test("refuses a plan whose names point nowhere or whose dates disagree", () => {

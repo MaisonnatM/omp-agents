@@ -31,6 +31,7 @@ import {
 	type Target,
 	type WeekSlots,
 	type Workout,
+	WORKOUT_KINDS,
 	type WorkoutLog,
 } from "./shared/sport";
 
@@ -74,6 +75,7 @@ const GRADE: Rule<(typeof FRENCH_GRADES)[number]> = { is: oneOf(FRENCH_GRADES), 
 const PLACE = choice(PLACES);
 const CLIMB_KIND = choice(CLIMB_KINDS);
 const PAIN_PLACE = choice(PAIN_PLACES);
+const WORKOUT_KIND = choice(WORKOUT_KINDS);
 const TARGET_KIND = choice(["metric", ...CLIMB_KINDS]);
 const SENT_ID: Rule<string> = { is: (value): value is string => isNonEmpty(value) && value.length <= MAX_SPORT_ID, must: `must be 1 to ${MAX_SPORT_ID} characters` };
 
@@ -233,7 +235,14 @@ const parseBlock: Parse<Workout["blocks"][number]> = (value, path, rules) => {
 
 const parseWorkout: Parse<Workout> = (value, path, rules) => {
 	const read = fieldsOf(value, path, rules);
-	return { id: read.one("id", rules.id), name: read.one("name", rules.name), place: read.one("place", PLACE), minutes: read.one("minutes", rules.count, 0), blocks: read.list("blocks", parseBlock) };
+	return {
+		id: read.one("id", rules.id),
+		name: read.one("name", rules.name),
+		kind: read.one("kind", WORKOUT_KIND),
+		place: read.one("place", PLACE),
+		minutes: read.one("minutes", rules.count, 0),
+		blocks: read.list("blocks", parseBlock),
+	};
 };
 
 const parseRoutine: Parse<Routine> = (value, path, rules) => {

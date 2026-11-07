@@ -38,16 +38,16 @@ export const OPEN = exercise("open", "Main ouverte", { sets: 5, holdSec: 10, res
 export const PULLS = exercise("tractions", "Tractions lestées", { sets: 3, reps: 3, restSec: 180, load: { kind: "fixed", kg: 35 } });
 export const ABRAHANGS = exercise("abrahangs", "Abrahangs", { sets: 10, holdSec: 10, hang: true });
 
-const workout = (id: string, name: string, place: Workout["place"], minutes: number, ...blocks: [string, Exercise[]][]): Workout => ({ id, name, place, minutes, blocks: blocks.map(([title, items]) => ({ title, items })) });
+const workout = (id: string, name: string, kind: Workout["kind"], place: Workout["place"], minutes: number, ...blocks: [string, Exercise[]][]): Workout => ({ id, name, kind, place, minutes, blocks: blocks.map(([title, items]) => ({ title, items })) });
 
 const WORKOUTS: Workout[] = [
-	workout("hanche", "Mobilité hanche", "home", 15, ["Routine", [exercise("mobilite", "Mobilité hanche", { opensAs: ["h1", "h2", "h3"] })]]),
-	workout("mardi", "Semi-arquée et bloc max", "gym", 120, ["Chauffe", [exercise("chauffe", "Suspensions progressives", { hang: true })]], ["Poutre", [SEMI]], ["Bloc", [exercise("limit", "Blocs à vue max")]]),
-	workout("mercredi", "Abrahangs", "home", 20, ["Poutre", [ABRAHANGS]]),
-	workout("jeudi", "Volume", "gym", 90, ["Continuité", [exercise("continuite", "4×4")]], ["Gainage", [exercise("gainage", "Gainage")]]),
-	workout("samedi", "Main ouverte et projet", "gym", 150, ["Poutre", [OPEN]], ["Projet", [exercise("projet", "Projet")]], ["Tirage", [PULLS]]),
-	workout("voie", "Voie", "gym", 120, ["Voie", [exercise("voie", "Voies")]]),
-	workout("test", "Test du max", "home", 45, ["Test", [exercise("max", "Max 10 s", { hang: true })]]),
+	workout("hanche", "Mobilité hanche", "hip", "home", 15, ["Routine", [exercise("mobilite", "Mobilité hanche", { opensAs: ["h1", "h2", "h3"] })]]),
+	workout("mardi", "Semi-arquée et bloc max", "hangboard", "gym", 120, ["Chauffe", [exercise("chauffe", "Suspensions progressives", { hang: true })]], ["Poutre", [SEMI]], ["Bloc", [exercise("limit", "Blocs à vue max")]]),
+	workout("mercredi", "Abrahangs", "hangboard", "home", 20, ["Poutre", [ABRAHANGS]]),
+	workout("jeudi", "Volume", "boulder", "gym", 90, ["Continuité", [exercise("continuite", "4×4")]], ["Gainage", [exercise("gainage", "Gainage")]]),
+	workout("samedi", "Main ouverte et projet", "hangboard", "gym", 150, ["Poutre", [OPEN]], ["Projet", [exercise("projet", "Projet")]], ["Tirage", [PULLS]]),
+	workout("voie", "Voie", "route", "gym", 120, ["Voie", [exercise("voie", "Voies")]]),
+	workout("test", "Test du max", "hangboard", "home", 45, ["Test", [exercise("max", "Max 10 s", { hang: true })]]),
 ];
 
 export const slots = (...ids: string[]) => ids.map(workout => ({ workout, optional: workout === "voie" }));
