@@ -1,7 +1,8 @@
 /**
- * The `sport` tool of a personal session: it reads the Sport module's state with the changes its inbox still holds, and
- * leaves each change it makes in that inbox for the dashboard, the one writer of `sport.json`. It checks every change as
- * the dashboard will, with `agentSportChange`, before it leaves one, so a refusal reaches the agent with its reason.
+ * The `sport` tool of a personal session: it reads the Sport module's state with the requests its inbox still holds,
+ * and leaves one request per call in that inbox for the dashboard, the one writer of `sport.json`. It checks the
+ * request as the dashboard will, with `agentSportChanges`, before it leaves it, so a refusal reaches the agent with its
+ * reason.
  */
 import { randomUUID } from "node:crypto";
 import { inbox } from "../../templates/omp/agent/extensions/inbox/client";
@@ -9,16 +10,12 @@ import { isObject, parseJson } from "../json";
 import { localDay } from "../shared/days";
 import { MAX_CHART_ROWS } from "../shared/session-visuals";
 import { EMPTY_SPORT, type SportState, WORKOUT_KINDS } from "../shared/sport";
-import { applySport } from "../sport";
-import { agentSportChange, withAgentChanges } from "../sport-agent";
+import { type AgentSportRequest, agentSportChanges, MAX_PLAN_BYTES, withAgentChanges } from "../sport-agent";
 import { parseSportState } from "../sport-parse";
 import { dayPlan, painFlags, type PlannedDay, weekPlan } from "../sport-week";
 import { type ExtensionApi, type ExtensionTool, readText, reply, type ToolContext } from "./extension-kit";
 
 export const SPORT_TOOL = "sport";
-
-/** The biggest plan `set_plan` leaves, as JSON. */
-export const MAX_PLAN_BYTES = 64 * 1024;
 
 /** Where a personal session reads the Sport module and leaves its changes. */
 export interface SportPaths {
@@ -63,8 +60,8 @@ function jsonParam(name: string, value: unknown): unknown {
 	return parsed;
 }
 
-/** `sport.json` with the changes its inbox still holds, oldest first, as the dashboard will apply them. */
-export const readSport = ({ file, inbox: dir }: SportPaths): SportState => withAgentChanges(parseSportState(parseJson(readText(file))) ?? EMPTY_SPORT, inbox<object>(dir).waiting());
+/** `sport.json` with the requests its inbox still holds, oldest first, as the dashboard will apply them. */
+export const readSport = ({ file, inbox: dir }: SportPaths): SportState => withAgentChanges(parseSportState(parseJson(readText(file))) ?? EMPTY_SPORT, inbox<AgentSportRequest>(dir).waiting());
 
 /** One day of the week as the `week` action shows it: its phase by name, and each exercise without its rule and demo. */
 const dayView = ({ phase, workouts, ...day }: PlannedDay) => ({
@@ -80,36 +77,20 @@ const dayView = ({ phase, workouts, ...day }: PlannedDay) => ({
 	})),
 });
 
-/** The `set-metrics` change that adds or replaces the metrics in `given`, by id, keeping the others. */
-function metricsChange(state: SportState, given: unknown): object {
-	const list = jsonParam("metrics", given);
-	if (!Array.isArray(list)) throw new Error("metrics must be a list of metrics.");
-	const byId = new Map(list.flatMap(metric => (isObject(metric) ? [[metric.id, metric] as const] : [])));
-	const added = list.filter(metric => !isObject(metric) || !state.metrics.some(({ id }) => id === metric.id));
-	return { op: "set-metrics", metrics: [...state.metrics.map(metric => byId.get(metric.id) ?? metric), ...added] };
-}
+const ENTRY_OPS = {
+	log: { add: "add-log", edit: "edit-log", day: "date" },
+	measurement: { add: "add-measurement", edit: "edit-measurement", day: "at" },
+} as const;
 
-/** Leaves `changes` in order, once each one passes against the state the ones before it leave. */
-function leaveAll(paths: SportPaths, state: SportState, changes: object[]): void {
-	changes.reduce<SportState>((next, value) => {
-		const change = agentSportChange(next, value);
-		if ("error" in change) throw new Error(`The change was refused, so nothing was left for the dashboard: ${change.error}.`);
-		return applySport(next, change.ok);
-	}, state);
-	for (const change of changes) inbox<object>(paths.inbox).leave(change);
-}
-
-/** The entry `given` describes, merged over the one an agent wrote when `given.id` names it, or a new one in `sessionId`'s name. */
-function entryOf<T extends { id: string; addedBy: string | null }>(name: string, given: unknown, stored: T[], defaults: object, sessionId: string): { entry: object; id: string; edit: boolean } {
-	const fields = jsonParam(name, given);
-	if (!isObject(fields)) throw new Error(`${name} must be an object.`);
-	if (fields.id === undefined) {
-		const id = randomUUID();
-		return { entry: { ...defaults, ...fields, id, addedBy: sessionId }, id, edit: false };
-	}
-	const old = stored.find(({ id }) => id === fields.id);
-	if (!old) throw new Error(`No ${name} has id ${String(fields.id)}; leave id out to add one.`);
-	return { entry: { ...old, ...fields, addedBy: old.addedBy }, id: old.id, edit: true };
+/** The change `given` asks for: an edit of the fields it gives when its id names an entry, or an add in `sessionId`'s name. */
+function entryChange(name: keyof typeof ENTRY_OPS, given: unknown, sessionId: string): { change: Record<string, unknown>; id: string; edit: boolean } {
+	const value = jsonParam(name, given);
+	if (!isObject(value)) throw new Error(`${name} must be an object.`);
+	const { id, ...fields } = value;
+	const { add, edit, day } = ENTRY_OPS[name];
+	if (id !== undefined) return { change: { op: edit, id, fields }, id: String(id), edit: true };
+	const added = randomUUID();
+	return { change: { op: add, [name]: { [day]: localDay(), ...fields, id: added, addedBy: sessionId } }, id: added, edit: false };
 }
 
 /** The line a personal turn's prompt carries for today when there is a plan: the phase, the workouts, and the pain flags. */
@@ -152,7 +133,11 @@ export function sportTool(pi: ExtensionApi, pathsOf: (ctx: ToolContext) => Sport
 			const paths = pathsOf(ctx);
 			const state = readSport(paths);
 			const sessionId = ctx.sessionManager.getSessionId();
-			const withMetrics = (change: object): object[] => (params.metrics === undefined ? [change] : [metricsChange(state, params.metrics), change]);
+			const leave = (change: Record<string, unknown>): void => {
+				const result = agentSportChanges(state, { metrics: params.metrics === undefined ? [] : jsonParam("metrics", params.metrics), change });
+				if ("error" in result) throw new Error(`The change was refused, so nothing was left for the dashboard: ${result.error}.`);
+				inbox<AgentSportRequest>(paths.inbox).leave(result.ok.request);
+			};
 			switch (params.action) {
 				case "read":
 					return reply(JSON.stringify(state));
@@ -169,25 +154,23 @@ export function sportTool(pi: ExtensionApi, pathsOf: (ctx: ToolContext) => Sport
 					return reply(`Draw it with this in a \`\`\`chart block:\n${JSON.stringify({ type: "line", title, x: "at", series: [{ key: "value", label: metric.label }], data: data.slice(-MAX_CHART_ROWS) })}`);
 				}
 				case "log": {
-					const { entry, id, edit } = entryOf("log", params.log, state.log, { date: localDay() }, sessionId);
-					leaveAll(paths, state, [{ op: edit ? "edit-log" : "add-log", log: entry }]);
+					const { change, id, edit } = entryChange("log", params.log, sessionId);
+					leave(change);
 					return reply(`${edit ? "Changed" : "Logged"} workout log ${id}. ${APPLIES}`);
 				}
 				case "measure": {
-					const { entry, id, edit } = entryOf("measurement", params.measurement, state.measurements, { at: localDay() }, sessionId);
-					leaveAll(paths, state, withMetrics({ op: edit ? "edit-measurement" : "add-measurement", measurement: entry }));
+					const { change, id, edit } = entryChange("measurement", params.measurement, sessionId);
+					leave(change);
 					return reply(`${edit ? "Changed" : "Added"} measurement ${id}. ${APPLIES}`);
 				}
 				case "set_plan": {
 					if (params.plan === undefined) throw new Error("set_plan needs plan, the whole plan, or null to clear it.");
 					const plan = jsonParam("plan", params.plan);
-					const bytes = Buffer.byteLength(JSON.stringify(plan));
-					if (bytes > MAX_PLAN_BYTES) throw new Error(`plan is ${bytes} bytes as JSON; keep it to at most ${MAX_PLAN_BYTES}. Nothing was left for the dashboard.`);
-					leaveAll(paths, state, withMetrics({ op: "set-plan", plan }));
+					leave({ op: "set-plan", plan });
 					return reply(`${plan === null ? "Cleared the plan" : "Saved the plan"}. ${APPLIES}`);
 				}
 				case "set_targets":
-					leaveAll(paths, state, withMetrics({ op: "set-targets", targets: jsonParam("targets", params.targets) }));
+					leave({ op: "set-targets", targets: jsonParam("targets", params.targets) });
 					return reply(`Saved the targets. ${APPLIES}`);
 				default: {
 					const never: never = params.action;

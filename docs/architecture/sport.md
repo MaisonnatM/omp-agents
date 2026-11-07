@@ -40,16 +40,20 @@ The page keeps the latest snapshot in `DashboardState.sport`, `null` until the f
 
 ## The agent
 
-A personal session's `sport` tool never writes `sport.json`; it leaves each change as a JSON file in `sportInboxDir`, `<data dir>/sport-inbox`, and the server stays the file's only writer.
+A personal session's `sport` tool never writes `sport.json`; it leaves one request per call as a JSON file in `sportInboxDir`, `<data dir>/sport-inbox`, and the server stays the file's only writer.
+A request holds the metrics the call adds or replaces by id and one change, and an edit names the entry and only the fields it changes.
 See [Personal sessions](personal-sessions.md) for the tool's actions.
 `SportInbox` in `src/server/sport-inbox.ts` builds on `JsonInboxDir`, so the dashboard that holds the owner lock applies the files oldest first, through the same `ListRegistry` path as the page, and a stopped dashboard leaves them for the next start.
 
-`agentSportChange` in `src/sport-agent.ts` decides what an agent may change, the same for the tool before it leaves a file and for the inbox before it applies one.
-An agent may set the plan, the targets, and the metrics.
-It may add a log or a measurement only in a session's name, its `addedBy`, and edit one only when an agent wrote it.
+`agentSportChanges` in `src/sport-agent.ts` turns a request into the changes it applies, the same for the tool before it leaves a file and for the inbox before it applies one.
+It resolves the request against the state at hand, so an edit merges its fields over the entry as it stands then, and a request applies whole or not at all.
+An agent may set the plan, at most `MAX_PLAN_BYTES`, 64 KB as JSON, and the targets, and add or replace metrics by id.
+It may add a log or a measurement only in a session's name, its `addedBy`, under an id no entry holds, and edit one only when an agent wrote it, keeping its id and `addedBy`.
 It may never edit what the user wrote, nor remove or restore anything; only the Sport page does.
-A change must also pass `sportRefusal` in `src/sport.ts` against the state at hand, so a change naming an unknown metric, or a `set-metrics` dropping one still in use, says why rather than vanishing.
+The resulting changes must also pass `sportRefusal` in `src/sport.ts`, so a change naming an unknown metric says why rather than vanishing.
 The inbox sets a refused file aside as `.invalid` and logs the reason.
+An add the state already holds as it is applies as nothing, so a file applied once and left behind does no harm when it is read again.
+See [A sport tool call leaves one request the server resolves](../decisions/2026-11-07-a-sport-tool-call-leaves-one-request-the-server-resolves.md).
 
 ## The week
 

@@ -339,6 +339,12 @@ function unique<T>(items: T[], path: string, idOf: (item: T) => string): void {
 	}
 }
 
+const parseMetrics: Parse<Metric[]> = (list, path, rules) => {
+	const metrics = listOf(list, path, rules, parseMetric);
+	unique(metrics, path, ({ id }) => id);
+	return metrics;
+};
+
 /**
  * Refuses a sent plan whose names point nowhere or whose dates disagree: a slot naming no workout, a habit no routine,
  * an `opensAs` no exercise key, a repeated id or override day, a phase that ends before it starts or overlaps another,
@@ -407,11 +413,8 @@ function readChange(value: unknown): SportChange {
 			unique(targets, "targets", ({ id }) => id);
 			return { op, targets };
 		}
-		case "set-metrics": {
-			const metrics = read.nested("metrics", (list, path, rules) => listOf(list, path, rules, parseMetric));
-			unique(metrics, "metrics", ({ id }) => id);
-			return { op, metrics };
-		}
+		case "set-metrics":
+			return { op, metrics: read.nested("metrics", parseMetrics) };
 		case "add-measurement":
 		case "edit-measurement":
 			return { op, measurement: read.nested("measurement", parseMeasurement) };
@@ -430,12 +433,24 @@ function readChange(value: unknown): SportChange {
 	}
 }
 
-/** One change from the page or the agent, whole, or why it is refused: the path of the first wrong field and its rule. */
-export function parseSportChange(value: unknown): Parsed<SportChange, { error: string }> {
+/** What `read` returns, or why it is refused: the path of the first wrong field and its rule. */
+function parsing<T>(read: () => T): Parsed<T, { error: string }> {
 	try {
-		return { ok: readChange(value) };
+		return { ok: read() };
 	} catch (err) {
 		if (err instanceof Refused) return { error: err.message };
 		throw err;
 	}
 }
+
+/** One change from the page or the agent, whole, or why it is refused. */
+export const parseSportChange = (value: unknown): Parsed<SportChange, { error: string }> => parsing(() => readChange(value));
+
+/** The metrics an agent's request adds or replaces by id, or why they are refused. */
+export const parseSportMetrics = (value: unknown): Parsed<Metric[], { error: string }> => parsing(() => parseMetrics(value, "metrics", SENT));
+
+/** The workout log an agent's edit leaves, its fields over the stored log, or why it is refused. */
+export const parseSportLog = (value: unknown): Parsed<WorkoutLog, { error: string }> => parsing(() => parseLog(value, "log", SENT));
+
+/** The measurement an agent's edit leaves, its fields over the stored one, or why it is refused. */
+export const parseSportMeasurement = (value: unknown): Parsed<Measurement, { error: string }> => parsing(() => parseMeasurement(value, "measurement", SENT));

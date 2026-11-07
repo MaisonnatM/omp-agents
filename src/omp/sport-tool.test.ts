@@ -3,10 +3,11 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { EMPTY_SPORT, type SportState } from "../shared/sport";
+import { MAX_PLAN_BYTES } from "../sport-agent";
 import { log, measurement, SEMI, STATE, withLogs } from "../sport-fixtures";
 import { loadFor } from "../sport-week";
 import { loadExtension } from "./fake-extension-api";
-import { MAX_PLAN_BYTES, readSport, type SportParams, sportTool, todayLine } from "./sport-tool";
+import { readSport, type SportParams, sportTool, todayLine } from "./sport-tool";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -30,19 +31,21 @@ test("a log is left for the dashboard in the session's name, and the next read a
 	setSystemTime(new Date("2026-11-17T12:00:00"));
 	const tool = sport();
 	const text = await tool.call({ action: "log", log: { workout: "mardi", title: "Mardi", rpe: 8, loads: { semi: 16 } } });
-	const [change] = tool.left();
+	const [{ metrics, change }] = tool.left();
+	expect(metrics).toEqual([]);
 	expect(change.op).toBe("add-log");
 	expect(text).toBe(`Logged workout log ${change.log.id}. The dashboard applies it, and while the dashboard is stopped the change waits for it.`);
 	const read: SportState = JSON.parse(await tool.call({ action: "read" }));
 	expect(read.log).toEqual([log(change.log.id, "2026-11-17", { workout: "mardi", title: "Mardi", rpe: 8, loads: { semi: 16 }, addedBy: "session-1" })]);
 });
 
-test("an edit keeps the fields it leaves out and the log's author, and an edit of the user's log is refused with nothing left", async () => {
+test("an edit leaves only the fields it changes and keeps the log's author, and an edit of the user's log is refused with nothing left", async () => {
 	const tool = sport(withLogs(STATE, log("mine", "2026-11-17"), log("agent", "2026-11-17", { rpe: 6, addedBy: "session-0" })));
 	await tool.call({ action: "log", log: { id: "agent", note: "Doigts frais" } });
+	expect(tool.left()).toEqual([{ metrics: [], change: { op: "edit-log", id: "agent", fields: { note: "Doigts frais" } } }]);
 	expect(tool.state().log.find(({ id }) => id === "agent")).toEqual(log("agent", "2026-11-17", { rpe: 6, note: "Doigts frais", addedBy: "session-0" }));
 	await expect(tool.call({ action: "log", log: { id: "mine", rpe: 9 } })).rejects.toThrow("workout log mine was written by the user, so an agent may not change it");
-	await expect(tool.call({ action: "log", log: { id: "nobody" } })).rejects.toThrow("No log has id nobody; leave id out to add one.");
+	await expect(tool.call({ action: "log", log: { id: "nobody" } })).rejects.toThrow("no workout log has id nobody; leave id out to add one.");
 	expect(tool.left()).toHaveLength(1);
 });
 
@@ -75,7 +78,7 @@ test("a measurement of a metric the state lacks is refused with its name, and pa
 	const tool = sport();
 	await expect(tool.call({ action: "measure", measurement: { metric: "grip", value: 50 } })).rejects.toThrow("it names a metric not in the metrics list, grip; add it to the metrics first");
 	await tool.call({ action: "measure", measurement: { metric: "grip", value: 50 }, metrics: [{ id: "grip", label: "Pince", unit: "kg" }, { id: "max", label: "Max 10 s", unit: "kg" }] });
-	expect(tool.left().map(({ op }) => op)).toEqual(["set-metrics", "add-measurement"]);
+	expect(tool.left()).toMatchObject([{ metrics: [{ id: "grip", better: "higher" }, { id: "max", label: "Max 10 s" }], change: { op: "add-measurement" } }]);
 	const state = tool.state();
 	expect(state.metrics).toEqual([{ id: "max", label: "Max 10 s", unit: "kg", better: "higher" }, STATE.metrics[1], { id: "grip", label: "Pince", unit: "kg", better: "higher" }]);
 	expect(state.measurements.at(-1)).toMatchObject({ metric: "grip", value: 50, at: "2026-11-17", addedBy: "session-1" });
@@ -103,7 +106,7 @@ test("a plan with a workout that leaves out its kind is refused with the field, 
 test("a plan over 64 KB is refused before anything is left", async () => {
 	const tool = sport();
 	const plan = { ...STATE.plan, title: "x".repeat(MAX_PLAN_BYTES) };
-	await expect(tool.call({ action: "set_plan", plan })).rejects.toThrow(`keep it to at most ${MAX_PLAN_BYTES}. Nothing was left for the dashboard.`);
+	await expect(tool.call({ action: "set_plan", plan })).rejects.toThrow(`keep it to at most ${MAX_PLAN_BYTES}.`);
 	expect(() => tool.left()).toThrow("ENOENT");
 });
 

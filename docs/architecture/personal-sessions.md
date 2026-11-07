@@ -24,13 +24,13 @@ No inbox and no server writer stand between `remember` and the file, as with a B
 
 ## The sport tool
 
-`sportTool` in `src/omp/sport-tool.ts` reads `sport.json` and folds in the changes still waiting in `sportInboxDir`, with `withAgentChanges` from `src/sport-agent.ts`, so a session sees its own change before the dashboard applies it.
+`sportTool` in `src/omp/sport-tool.ts` reads `sport.json` and folds in the requests still waiting in `sportInboxDir`, with `withAgentChanges` from `src/sport-agent.ts`, so a session sees its own change before the dashboard applies it.
 `read` gives that state, `week` gives `weekPlan` with each exercise's load and the day's `painFlags`, and `history` gives a metric's measurements as a `chart` block's JSON.
-`log` and `measure` add an entry in the session's name, the id omp's `ctx.sessionManager.getSessionId()` gives, or edit one an agent wrote by merging the given fields over it.
+`log` and `measure` add an entry in the session's name, the id omp's `ctx.sessionManager.getSessionId()` gives, or edit one an agent wrote with only the fields given, which the dashboard merges over the entry as it stands when it applies them.
 `set_plan` and `set_targets` replace their part whole, and `set_plan` refuses a plan over `MAX_PLAN_BYTES`, 64 KB as JSON.
-`set_plan`, `set_targets`, and `measure` take an optional `metrics` list, merged by id into the state's metrics and left as a `set-metrics` before the change, since a fresh state holds no metric for a load rule, a target, or a measurement to name.
-The tool checks every change with `agentSportChange` against the state the ones before it leave, and leaves none when one is refused, so the agent reads the reason.
-It then leaves each change in the inbox with `inbox` from `templates/omp/agent/extensions/inbox/client.ts`, whose names rise strictly within a process, so the dashboard applies them in order.
+Each takes an optional `metrics` list, merged by id into the state's metrics before the change, since a fresh state holds no metric for a load rule, a target, or a measurement to name.
+The tool checks its request with `agentSportChanges` as the dashboard will and leaves nothing when it is refused, so the agent reads the reason.
+It then leaves the request, its metrics and its change, as one file with `inbox` from `templates/omp/agent/extensions/inbox/client.ts`, whose names rise strictly within a process, so the dashboard applies them in order and each call applies whole or not at all.
 The description lists the workout kinds from `WORKOUT_KINDS` and tells the agent to state each workout's `kind`, the one a mixed session leads with, since a plan without it is refused.
 It also tells the agent to check a video through YouTube's oEmbed address before it writes one, and never to invent an id.
 
