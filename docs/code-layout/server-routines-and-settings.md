@@ -20,7 +20,7 @@
 - `src/pull-request-approval.ts`: `unapprovedChange`, whether a pull request's head has the same stable `git patch-id` as a commit a reviewer approved, which a shepherd's merge needs.
 - `src/usage.ts`: runs `omp usage --json`, parses CLI plan windows, and supplements Claude extra usage through `src/omp/usage.ts` in the original billing currency.
   It names a provider as the page shows it (`providerName`).
-  `src/console-credits.ts` reads a Firefox or Zen Claude Console session for the API credits row's monthly grant.
+  `src/console-credits.ts` reads a Firefox or Zen Claude Console session for the API credits row's balance: the monthly grant, or the prepaid dollars left without one.
   `src/server/usage-poll.ts` (`UsagePoll`) runs it for the dashboard: on the usage tick and a page's open, each followed by the plan notice check, and fresh for a continue, which skips that check.
 - `src/system-load.ts`: reads the machine's CPU percent, available memory, and free disk space for `GET /api/system`; `src/shared/system.ts` holds the shape the page shares.
 - `src/settings.ts`: builds the settings page's model routing, omp's own settings, file list, and workflows from one load of omp's settings (`loadSessionSettings` and `ompConfigOf` in `src/omp/config.ts`), and checks and saves its edits.

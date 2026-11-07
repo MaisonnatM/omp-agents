@@ -27,7 +27,7 @@ import { shortcutLabels } from "../shortcuts";
 import { CommandResults, type PickerGroup, type PickerList } from "./command-picker";
 import { ComposerEditor } from "./composer";
 import { OrgIcon } from "./org-icon";
-import { creditLabel, NO_PLANS, Plans, spendLabel } from "./plan-usage";
+import { creditView, NO_PLANS, Plans, spendLabel } from "./plan-usage";
 
 /** Truncates a model's name without clipping descenders such as Opus's p: the padding gives `overflow:hidden` room below the line, and the negative margin takes it back. */
 export const MODEL_NAME_TRUNCATE = "truncate py-1 -my-1";
@@ -65,7 +65,7 @@ function ProviderHeading({ provider, plans = NO_PLANS }: { provider: string; pla
 	const quota = providerQuota(plans, provider);
 	const parts = quota && [
 		...(quota.used === null ? [] : [`${Math.round(quota.used * 100)}% used`]),
-		...(quota.balance ? [creditLabel(quota.balance)] : []),
+		...(quota.balance ? [creditView(quota.balance).amount] : []),
 		...(quota.extra ? [`${spendLabel({ ...quota.extra, limit: null })} extra`] : []),
 	];
 	return (
@@ -77,7 +77,7 @@ function ProviderHeading({ provider, plans = NO_PLANS }: { provider: string; pla
 					className="ml-auto tabular-nums"
 					title={[
 						...quota.windows.map(window => `${quota.account}: ${window.title}: ${Math.round((1 - window.remaining) * 100)}% used`),
-						...(quota.balance ? [`${quota.account}: ${creditLabel(quota.balance)}${quota.balance.kind === "grant" ? " spent" : ""}`] : []),
+						...(quota.balance ? [`${quota.account}: ${creditView(quota.balance).phrase}`] : []),
 						...(quota.extra ? [`${quota.account}: ${quota.extra.title}: ${spendLabel(quota.extra)} spent`] : []),
 					].join("\n")}
 				>

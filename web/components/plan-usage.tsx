@@ -28,16 +28,54 @@ export function spendLabel({ used, limit, currency = "USD" }: Pick<ExtraUsage, "
 	return limit === null ? format(used) : `${format(used)} / ${format(limit)}`;
 }
 
-/** The API credits amount: dollars spent of the grant, or with no grant, the prepaid dollars left, $0.00 once usage ran past them. */
-export const creditLabel = (balance: CreditBalance): string =>
-	balance.kind === "grant" ? spendLabel(balance) : `${dollars(Math.max(0, balance.left))} left`;
+type Tone = "out" | "low" | "ok";
 
-/** What the API credits row's hover says, and how its amount is colored. */
-function creditState(balance: CreditBalance): { tooltip: string; tone: "out" | "low" | "ok" } {
-	if (balance.kind === "prepaid") return { tooltip: `API credits: ${creditLabel(balance)}. No monthly grant.`, tone: balance.left <= 0 ? "out" : "ok" };
-	const expires = balance.expiresAt === null ? "" : ` Expires ${DAY_FORMAT.format(balance.expiresAt)}.`;
-	const left = balance.limit > 0 ? (balance.limit - balance.used) / balance.limit : 1;
-	return { tooltip: `API credits: ${creditLabel(balance)} spent.${expires}`, tone: balance.used >= balance.limit ? "out" : left < LOW ? "low" : "ok" };
+const TONE_CLASS: Record<Tone, string> = {
+	out: "text-red-600 dark:text-red-400",
+	low: "text-amber-600 dark:text-amber-400",
+	ok: "text-foreground",
+};
+
+/**
+ * How the API credits balance reads in the footer and the model menu: the `amount` beside the name, the `phrase` a
+ * sentence uses, the footer's `tooltip`, and its `tone`. With no grant, the dollars left never read below $0.00.
+ */
+export function creditView(balance: CreditBalance): { amount: string; phrase: string; tooltip: string; tone: Tone } {
+	switch (balance.kind) {
+		case "grant": {
+			const amount = spendLabel(balance);
+			const expires = balance.expiresAt === null ? "" : ` Expires ${DAY_FORMAT.format(balance.expiresAt)}.`;
+			const left = balance.limit > 0 ? (balance.limit - balance.used) / balance.limit : 1;
+			return {
+				amount,
+				phrase: `${amount} spent`,
+				tooltip: `API credits: ${amount} spent.${expires}`,
+				tone: balance.used >= balance.limit ? "out" : left < LOW ? "low" : "ok",
+			};
+		}
+		case "prepaid": {
+			const amount = `${dollars(Math.max(0, balance.left))} left`;
+			return { amount, phrase: amount, tooltip: `API credits: ${amount}. No monthly grant.`, tone: balance.left <= 0 ? "out" : "ok" };
+		}
+		default: {
+			const never: never = balance;
+			return never;
+		}
+	}
+}
+
+/** One footer figure: a muted label, then the value in its tone, with the details on hover or focus. */
+function QuotaChip({ label, value, tooltip, tone }: { label: string; value: string; tooltip: string; tone: Tone }) {
+	return (
+		<Tooltip content={tooltip}>
+			<span
+				tabIndex={0}
+				className={cn("whitespace-nowrap rounded-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring", TONE_CLASS[tone])}
+			>
+				<span className="text-muted-foreground">{label}</span> {value}
+			</span>
+		</Tooltip>
+	);
 }
 
 function WindowLeft({ window }: { window: PlanWindow }) {
@@ -45,56 +83,30 @@ function WindowLeft({ window }: { window: PlanWindow }) {
 	const reset = window.resetsAt === null ? "" : ` Resets ${new Date(window.resetsAt).toLocaleString()}.`;
 	const spent = window.usd ? ` ${spendLabel(window.usd)} spent.` : "";
 	return (
-		<Tooltip content={`${window.title}: ${window.exhausted ? "used up" : `${percent}% left`}.${spent}${reset}`}>
-			<span
-				tabIndex={0}
-				className={cn(
-					"whitespace-nowrap rounded-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring",
-					window.exhausted
-						? "text-red-600 dark:text-red-400"
-						: window.remaining < LOW
-							? "text-amber-600 dark:text-amber-400"
-							: "text-foreground",
-				)}
-			>
-				<span className="text-muted-foreground">{window.label}</span> {percent}%
-			</span>
-		</Tooltip>
+		<QuotaChip
+			label={window.label}
+			value={`${percent}%`}
+			tooltip={`${window.title}: ${window.exhausted ? "used up" : `${percent}% left`}.${spent}${reset}`}
+			tone={window.exhausted ? "out" : window.remaining < LOW ? "low" : "ok"}
+		/>
 	);
 }
 
 function ExtraSpent({ extra }: { extra: ExtraUsage }) {
 	const low = extra.limit !== null && extra.used / extra.limit > 1 - LOW;
 	return (
-		<Tooltip content={`${extra.title}: ${spendLabel(extra)} spent${extra.exhausted ? ", used up" : ""}.`}>
-			<span
-				tabIndex={0}
-				className={cn(
-					"whitespace-nowrap rounded-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring",
-					extra.exhausted ? "text-red-600 dark:text-red-400" : low ? "text-amber-600 dark:text-amber-400" : "text-foreground",
-				)}
-			>
-				<span className="text-muted-foreground">extra</span> {spendLabel(extra)}
-			</span>
-		</Tooltip>
+		<QuotaChip
+			label="extra"
+			value={spendLabel(extra)}
+			tooltip={`${extra.title}: ${spendLabel(extra)} spent${extra.exhausted ? ", used up" : ""}.`}
+			tone={extra.exhausted ? "out" : low ? "low" : "ok"}
+		/>
 	);
 }
 
 function CreditAmount({ name, balance }: { name: string; balance: CreditBalance }) {
-	const { tooltip, tone } = creditState(balance);
-	return (
-		<Tooltip content={tooltip}>
-			<span
-				tabIndex={0}
-				className={cn(
-					"whitespace-nowrap rounded-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring",
-					tone === "out" ? "text-red-600 dark:text-red-400" : tone === "low" ? "text-amber-600 dark:text-amber-400" : "text-foreground",
-				)}
-			>
-				<span className="text-muted-foreground">{name}</span> {creditLabel(balance)}
-			</span>
-		</Tooltip>
-	);
+	const { amount, tooltip, tone } = creditView(balance);
+	return <QuotaChip label={name} value={amount} tooltip={tooltip} tone={tone} />;
 }
 
 function creditsLine({ count, nextExpiresAt }: ResetCredits): string {

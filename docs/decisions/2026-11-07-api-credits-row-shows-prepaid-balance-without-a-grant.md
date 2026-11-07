@@ -31,10 +31,11 @@ The Console's billing page showed -$0.72 for that account, which confirms the ce
 With a grant, the row and the model menu are unchanged: dollars spent of the grant.
 Without one, both show `$X left`, never below `$0.00`, and the footer turns red at or below zero.
 A Console answer in another currency, or without `amount`, leaves the row as the name.
+With several API organizations, the first one with a grant wins, and with none, the first one's prepaid balance shows.
 
 ## Confirmation
 
-`src/console-credits.test.ts` checks that a grant wins, that the cents become dollars left, below zero included, and that another currency gives no balance; `web/components/plan-usage.test.ts` checks that an overdrawn balance reads `$0.00 left`.
+`src/console-credits.test.ts` checks that a grant wins, on a later organization too, that the cents become dollars left, below zero included, and that another currency gives no balance; `web/components/plan-usage.test.ts` checks that an overdrawn balance reads `$0.00 left` in red.
 
 ## Revisit when
 

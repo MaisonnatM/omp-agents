@@ -122,16 +122,17 @@ function exponentOf(tranche: Record<string, unknown>): number {
 
 /**
  * The promotional grant, dollars spent of it, when the Console reports one; otherwise the prepaid dollars left.
- * Each tranche's minor units use that tranche's exponent, defaulting to cents, and the expiry is the soonest tranche's.
+ * Each tranche's minor units use that tranche's exponent, defaulting to cents, and are read as US dollars, the currency
+ * the Console bills API credits in; the expiry is the soonest tranche's.
  * The prepaid `amount` is in US cents, as the billing fields named `_cents` beside it are, and drops below zero when usage ran past it.
  */
 export function creditBalanceOf(body: unknown): CreditBalance | null {
-	if (!isObject(body) || !Array.isArray(body.promo_tranches)) return null;
+	if (!isObject(body)) return null;
 	let used = 0;
 	let granted = 0;
 	let tranches = 0;
 	let expiresAt: number | null = null;
-	for (const raw of body.promo_tranches) {
+	for (const raw of Array.isArray(body.promo_tranches) ? body.promo_tranches : []) {
 		if (!isObject(raw)) continue;
 		const grantMinor = num(raw.granted_amount_minor_units);
 		const leftMinor = num(raw.remaining_amount_minor_units);
@@ -164,15 +165,17 @@ async function getJson(url: string, sessionKey: string, fetchImpl: FetchLike): P
 	}
 }
 
-/** The balance of the first API organization this session can read, or null when the session cannot. */
+/** The first API organization's grant this session can read, else the first one's prepaid balance, or null when the session reads neither. */
 export async function fetchConsoleCreditBalance(sessionKey: string, fetchImpl: FetchLike = fetch): Promise<CreditBalance | null> {
 	const orgs = await getJson(`${CONSOLE}/api/organizations`, sessionKey, fetchImpl);
+	let prepaid: CreditBalance | null = null;
 	for (const id of apiOrganizationIds(orgs)) {
 		const body = await getJson(`${CONSOLE}/api/organizations/${encodeURIComponent(id)}/prepaid/credits`, sessionKey, fetchImpl);
 		const balance = creditBalanceOf(body);
-		if (balance) return balance;
+		if (balance?.kind === "grant") return balance;
+		prepaid ??= balance;
 	}
-	return null;
+	return prepaid;
 }
 
 /** The balance from the newest Firefox or Zen Console session, or null when there is none or the Console refuses it. */

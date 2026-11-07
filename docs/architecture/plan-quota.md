@@ -24,9 +24,10 @@ See [Keep CLI quotas and supplement Claude raw billing](../decisions/2026-11-06-
 `plansWithConfiguredProviders` adds a name-only plan for each provider whose model config sets an API key when this report left it out, such as prepaid API credits.
 An Anthropic API key saved in Settings is a stored `api_key` row beside the Anthropic sign-in, so `configuredProviders` also lists `anthropic-api` for it, once, whether or not a model config names that provider.
 That plan has no windows, extra usage, or reset credits. The footer shows its name, and plan notices ignore it.
-`readConsoleCreditBalance` in `src/console-credits.ts` then looks for a Firefox or Zen `sessionKey` cookie for `platform.claude.com` and reads that organization's promotional credit grant.
-When the grant is there, the API credits row gains `balance`: dollars spent, the grant, and the soonest expiry.
-A missing cookie, a refused session, or no promotional tranche leaves the row as the name.
+`readConsoleCreditBalance` in `src/console-credits.ts` then looks for a Firefox or Zen `sessionKey` cookie for `platform.claude.com` and reads each API organization's prepaid credits.
+The API credits row gains `balance`, one of two kinds: `grant`, the dollars spent of the promotional grant, the grant, and the soonest expiry, or with no grant, `prepaid`, the dollars `left`, read from the Console's `amount` in US cents and below zero when usage ran past it.
+The first organization with a grant wins; with none, the first organization's prepaid balance does.
+A missing cookie, a refused session, or an answer with no grant and no amount in US dollars leaves the row as the name.
 Chrome's cookie store is encrypted, so a Console sign-in that exists only there is not read.
 This is outside `omp usage` because that report has no balance for an API key, and an individual Console organization cannot call the Admin cost API.
 omp reports no dollars for a Codex account's credit balance, so a Codex plan never has `extra`.
