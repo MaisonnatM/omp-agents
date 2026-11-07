@@ -168,8 +168,8 @@ const parseDemo: Parse<Demo> = (value, path, rules) => {
 	const read = fieldsOf(value, path, rules);
 	const youtubeId = read.one("youtubeId", rules.youtubeId);
 	const [first, second, third, ...more] = read.list("cues", ruled(rules.text));
-	if (third === undefined || more.length > 0) refuse(pathTo(path, "cues"), "must be 3 cues");
-	return { youtubeId, by: read.one("by", rules.text, ""), cues: [first!, second!, third], caution: read.one("caution", orNull(rules.note), null) };
+	if (first === undefined || second === undefined || third === undefined || more.length > 0) refuse(pathTo(path, "cues"), "must be 3 cues");
+	return { youtubeId, by: read.one("by", rules.text, ""), cues: [first, second, third], caution: read.one("caution", orNull(rules.note), null) };
 };
 
 const parseExercise: Parse<Exercise> = (value, path, rules) => {
