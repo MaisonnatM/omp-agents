@@ -33,23 +33,28 @@ describe("creditBalanceOf", () => {
 	test("spent is the grant minus what is left, in the tranche's units", () => {
 		const balance = creditBalanceOf({
 			promo_tranches: [tranche(20_000, 18_887, "2026-12-03T00:00:00Z")],
+			amount: 18_887,
+			currency: "USD",
 		});
-		expect(Math.round((balance?.used ?? 0) * 100)).toBe(1_113);
-		expect(balance?.limit).toBe(200);
-		expect(balance?.expiresAt).toBe(Date.parse("2026-12-03T00:00:00Z"));
+		expect(balance).toEqual({ kind: "grant", used: 11.13, limit: 200, expiresAt: Date.parse("2026-12-03T00:00:00Z") });
 	});
 
 	test("sums tranches and keeps the soonest expiry", () => {
 		const balance = creditBalanceOf({
 			promo_tranches: [tranche(10_000, 4_000, "2026-12-03T00:00:00Z"), tranche(5_000, 5_000, "2026-11-20T00:00:00Z")],
 		});
-		expect(Math.round((balance?.used ?? 0) * 100)).toBe(6_000);
-		expect(balance?.limit).toBe(150);
-		expect(balance?.expiresAt).toBe(Date.parse("2026-11-20T00:00:00Z"));
+		expect(balance).toEqual({ kind: "grant", used: 60, limit: 150, expiresAt: Date.parse("2026-11-20T00:00:00Z") });
 	});
 
-	test("no promotional tranche is no balance", () => {
-		expect(creditBalanceOf({ promo_tranches: [], amount: 500 })).toBeNull();
+	test("with no grant, the prepaid cents left, below zero when usage ran past them", () => {
+		expect(creditBalanceOf({ promo_tranches: [], amount: -72, currency: "USD" })).toEqual({ kind: "prepaid", left: -0.72 });
+		expect(creditBalanceOf({ amount: -72, currency: "USD" })).toEqual({ kind: "prepaid", left: -0.72 });
+		expect(creditBalanceOf({ promo_tranches: [], amount: 500, currency: "USD" })).toEqual({ kind: "prepaid", left: 5 });
+	});
+
+	test("no grant and no dollar amount is no balance", () => {
+		expect(creditBalanceOf({ promo_tranches: [], amount: 500, currency: "EUR" })).toBeNull();
+		expect(creditBalanceOf({ promo_tranches: [] })).toBeNull();
 		expect(creditBalanceOf(null)).toBeNull();
 	});
 });
@@ -95,7 +100,25 @@ describe("fetchConsoleCreditBalance", () => {
 		const balance = await fetchConsoleCreditBalance("secret", fetchImpl);
 		expect(calls.some(url => url.includes("/chat/"))).toBe(false);
 		expect(calls.some(url => url.endsWith("/api-org/prepaid/credits"))).toBe(true);
-		expect(Math.round((balance?.used ?? 0) * 100)).toBe(1_113);
-		expect(balance?.limit).toBe(200);
+		expect(balance).toMatchObject({ kind: "grant", limit: 200 });
+	});
+
+	test("a grant on a later organization beats a prepaid balance on the first", async () => {
+		const fetchImpl = async (input: string) => {
+			const url = String(input);
+			if (url.endsWith("/api/organizations")) return Response.json([{ uuid: "prepaid-org", capabilities: ["api"] }, { uuid: "grant-org", capabilities: ["api"] }]);
+			if (url.includes("/prepaid-org/")) return Response.json({ promo_tranches: [], amount: 500, currency: "USD" });
+			return Response.json({ promo_tranches: [tranche(20_000, 18_887, "2026-12-03T00:00:00Z")] });
+		};
+		expect(await fetchConsoleCreditBalance("secret", fetchImpl)).toMatchObject({ kind: "grant", limit: 200 });
+	});
+
+	test("with no grant anywhere, the first organization's prepaid balance", async () => {
+		const fetchImpl = async (input: string) => {
+			const url = String(input);
+			if (url.endsWith("/api/organizations")) return Response.json([{ uuid: "first", capabilities: ["api"] }, { uuid: "second", capabilities: ["api"] }]);
+			return Response.json({ promo_tranches: [], amount: url.includes("/first/") ? -72 : 500, currency: "USD" });
+		};
+		expect(await fetchConsoleCreditBalance("secret", fetchImpl)).toEqual({ kind: "prepaid", left: -0.72 });
 	});
 });

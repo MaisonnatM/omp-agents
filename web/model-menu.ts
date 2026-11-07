@@ -28,7 +28,7 @@ export interface ProviderQuota {
 	/** That account's windows, the ones the heading's tooltip lists. */
 	windows: PlanWindow[];
 	extra: ExtraUsage | null;
-	/** The prepaid grant, when this provider's row has one. */
+	/** The API credits balance, when this provider's row has one. */
 	balance: CreditBalance | null;
 }
 

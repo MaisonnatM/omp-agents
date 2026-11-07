@@ -1,6 +1,7 @@
 # Page: status bar, terminal, HTTP reads, shortcuts, and theme
 
 - `web/components/status-bar.tsx`: the window's bottom strip, with `PlanUsageList` from `web/components/plan-usage.tsx` on the left, and on the right the **Terminal** button and the machine's CPU, available memory, and free disk space from `GET /api/system`.
+  In `plan-usage.tsx`, `creditView` decides how the API credits balance reads and is colored, for this strip and the model menu's heading alike.
   The CPU fact is a popover, opened by hover or click through `useHoverPopover`, that lists every live session's processes, busiest session first, each session named by `hostLabel` over the roster `app.tsx` passes, and each row with its own `useAction` for **Stop**, which `writeProcessStop` sends.
   The disk fact uses the same popover behavior, breaks down the volume that holds the home directory, and links **Clean up…** to Settings › Storage.
 - `web/components/terminal/terminal-panel.tsx`: the terminal panel under the panes, its tabs, height, and open state, and `useTerminalPanel`, which saves the last two in localStorage.
