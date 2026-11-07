@@ -57,13 +57,13 @@ const DESCRIPTION = [
 	"- read: the whole state as JSON.",
 	"- week: the 7 days of the week `date` falls in (default today), Monday first, each with its phase, its workouts, each exercise's load in kg added worked out from the newest test and the newest log, and the pain flags of `date`. Quote these loads; never work them out yourself.",
 	"- history: the measurements of `metric` as a ```chart block's JSON, ready to draw.",
-	"- log: adds a workout log, or edits one an agent wrote when `log.id` names it, keeping the fields you leave out. `log` is {date: YYYY-MM-DD, default today; workout: a plan workout id or null; title; status: done | skipped; rpe: 1-10 or null; pain: {level: 0-10, where: fingers | elbow | shoulder | hip | other} or null; loads: {exercise key: kg added}; climbs: [{kind: boulder | route, grade: French such as 7a+, color, kilter, attempts}]; note}.",
-	"- measure: adds a measurement, or edits one an agent wrote when `measurement.id` names it. `measurement` is {metric: a metric id, value, at: YYYY-MM-DD, default today, note}.",
+	"- log: adds a workout log, or edits one this session wrote when `log.id` names it, keeping the fields you leave out. `log` is {date: YYYY-MM-DD, default today; workout: a plan workout id or null; title; status: done | skipped; rpe: 1-10 or null; pain: {level: 0-10, where: fingers | elbow | shoulder | hip | other} or null; loads: {exercise key: kg added}; climbs: [{kind: boulder | route, grade: French such as 7a+, color, kilter, attempts}]; note}.",
+	"- measure: adds a measurement, or edits one this session wrote when `measurement.id` names it. `measurement` is {metric: a metric id, value, at: YYYY-MM-DD, default today, note}.",
 	`- set_plan: replaces the plan with \`plan\`, at most ${MAX_PLAN_BYTES / 1024} KB as JSON, or clears it with null. A plan is {title, habits: [{label, routine: routine id or null}], routines: [{id, name, minutes, items: [exercise]}], workouts: [{id, name, kind: ${WORKOUT_KINDS.join(" | ")}, place: home | gym | outdoor, minutes, blocks: [{title, items: [exercise]}]}], phases: [{id, name, start, end, week, deloadWeek, deloadMondays: [YYYY-MM-DD]}], overrides: [{date, slots}]}, where a week is {mon..sun: [{workout: workout id, optional}]} and an exercise is {key, name, sets, reps, holdSec, restSec, load: {kind: "fixed", kg} or {kind: "of-max", metric, fraction, offsetKg, less} or null, note, demo, opensAs: [exercise keys], hang: true for a finger hang}. Always state each workout's \`kind\`, the one it leads with when it mixes several, and an of-max rule's \`less\`: the bodyweight metric's id for a hang on the user's weight, or null.`,
 	"- set_targets: replaces the targets with `targets`, [{id, label, by: YYYY-MM-DD or null, kind: metric with metric and value, or boulder | route with grade}].",
 	"A load rule, a target, or a measurement may name only a metric the state holds. On a fresh state, or for a new metric, pass `metrics` with set_plan, set_targets, or measure: [{id, label, unit, better: higher | lower}], added or replaced by id before the change.",
 	'An exercise\'s demo is {youtubeId, by, cues: [3 short cues], caution or null}. Before you write a video, fetch https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=<id>&format=json and use it only when that answers with the video; never invent or guess an id, and leave demo null when you have no checked video.',
-	"An agent never changes a log or a measurement the user wrote, and never removes one; the user does that on the Sport page.",
+	"An agent edits only a log or a measurement its own session wrote, never one the user or another session wrote, and never removes one; the user does that on the Sport page.",
 ].join("\n");
 
 /** `value` as the JSON it names: a model sometimes sends an object parameter as its JSON text. */
@@ -135,8 +135,8 @@ export function sportTool(pi: ExtensionApi, pathsOf: (ctx: ToolContext) => Sport
 			),
 			date: Type.Optional(Type.String({ description: "week: a day of the week to show, YYYY-MM-DD; today when left out." })),
 			metric: Type.Optional(Type.String({ description: "history: the metric id." })),
-			log: object("log: the workout log, with id only to edit one an agent wrote."),
-			measurement: object("measure: the measurement, with id only to edit one an agent wrote."),
+			log: object("log: the workout log, with id only to edit one this session wrote."),
+			measurement: object("measure: the measurement, with id only to edit one this session wrote."),
 			plan: object("set_plan: the whole plan, or null to clear it."),
 			targets: object("set_targets: the whole list of targets."),
 			metrics: object("set_plan, set_targets, measure: metrics to add or replace by id before the change."),
@@ -151,7 +151,7 @@ export function sportTool(pi: ExtensionApi, pathsOf: (ctx: ToolContext) => Sport
 			const state = readSport(paths);
 			const sessionId = ctx.sessionManager.getSessionId();
 			const leave = (change: Record<string, unknown>): void => {
-				const result = agentSportChanges(state, { metrics: params.metrics === undefined ? [] : jsonParam("metrics", params.metrics), change });
+				const result = agentSportChanges(state, { sessionId, metrics: params.metrics === undefined ? [] : jsonParam("metrics", params.metrics), change });
 				if ("error" in result) throw new Error(`The change was refused, so nothing was left for the dashboard: ${result.error}.`);
 				inbox<AgentSportRequest>(paths.inbox).leave(result.ok.request);
 			};

@@ -1,10 +1,10 @@
 /**
- * What a personal session may change in the Sport module. Each `sport` tool call leaves one request, the metrics it adds
- * or replaces by id and one change, which the tool checks before it leaves the file and the server's sport inbox checks
- * again against the state it applies to. An agent sets the targets and the plan, and adds or edits measurements and
- * workout logs in a session's name; an edit names the entry and the fields it changes, so the server merges them over
- * the entry as it stands then. An agent never changes one the user wrote, and never removes or restores one, which only
- * the page does.
+ * What a personal session may change in the Sport module. Each `sport` tool call leaves one request, the session that
+ * left it, the metrics it adds or replaces by id, and one change, which the tool checks before it leaves the file and
+ * the server's sport inbox checks again against the state it applies to. An agent sets the targets and the plan, adds
+ * measurements and workout logs in its session's name, and edits only the ones its session wrote; an edit names the
+ * entry and the fields it changes, so the server merges them over the entry as it stands then. An agent never changes
+ * one the user wrote, and never removes or restores one, which only the page does.
  */
 import { canonicalJson, isObject, type Parsed } from "./json";
 import type { Measurement, Metric, SportChange, SportState, WorkoutLog } from "./shared/sport";
@@ -28,8 +28,9 @@ export type AgentSportChange =
 	| Edit<"edit-measurement", Measurement>
 	| Edit<"edit-log", WorkoutLog>;
 
-/** What one `sport` tool call leaves for the dashboard: the metrics it adds or replaces by id, then its change. */
+/** What one `sport` tool call leaves for the dashboard: the session that left it, the metrics it adds or replaces by id, then its change. */
 export interface AgentSportRequest {
+	sessionId: string;
 	metrics: Metric[];
 	change: AgentSportChange;
 }
@@ -43,15 +44,16 @@ const PAGE_ONLY: Record<Exclude<SportChange["op"], AgentSportChange["op"]>, stri
 };
 
 /**
- * Why an agent may not write `entry` where `stored` is, or `null` when it may. A user's entry is the page's alone, an
- * agent's names its session, and an add may not replace another entry; an add the state already holds as it is reads
- * as applied, so a request the server applied but could not delete applies again as nothing.
+ * Why session `sessionId` may not write `entry` where `stored` is, or `null` when it may. A user's entry is the page's
+ * alone, an agent's names its session, an edit changes only an entry its own session wrote, and an add may not replace
+ * another entry; an add the state already holds as it is reads as applied, so a request the server applied but could
+ * not delete applies again as nothing.
  */
-function entryRefusal<T extends Entry>(noun: string, stored: T | undefined, entry: T, edit: boolean): string | null {
+function entryRefusal<T extends Entry>(noun: string, sessionId: string, stored: T | undefined, entry: T, edit: boolean): string | null {
 	if (stored?.addedBy === null) return `${noun} ${stored.id} was written by the user, so an agent may not change it`;
-	if (entry.addedBy === null) return `an agent's ${noun} must name the session that added it`;
-	if (stored === undefined) return null;
-	if (edit) return stored.addedBy === entry.addedBy ? null : `${noun} ${stored.id} was added by ${stored.addedBy}, which an edit may not change`;
+	if (edit && stored?.addedBy !== sessionId) return `${noun} ${entry.id} was added by session ${stored?.addedBy}; an agent may edit only a ${noun} its own session wrote`;
+	if (entry.addedBy !== sessionId) return `an agent's ${noun} must name the session that sent it, ${sessionId}, as addedBy`;
+	if (stored === undefined || edit) return null;
 	return canonicalJson(stored) === canonicalJson(entry) ? null : `${noun} ${stored.id} exists already; leave id out to add one, or edit it`;
 }
 
@@ -63,8 +65,8 @@ function pick<T extends object>(entry: T, keys: string[]): Partial<T> {
 	return picked;
 }
 
-/** The edit `value` asks for of an entry in `list`, its fields read from the merged entry, with that entry. */
-function edited<T extends Entry>(noun: string, list: T[], value: Record<string, unknown>, parse: (entry: unknown) => Parsed<T, Refusal>): Parsed<{ id: string; fields: Partial<T>; entry: T }, Refusal> {
+/** The edit `value` asks session `sessionId` to make of an entry in `list`, its fields read from the merged entry, with that entry. */
+function edited<T extends Entry>(noun: string, sessionId: string, list: T[], value: Record<string, unknown>, parse: (entry: unknown) => Parsed<T, Refusal>): Parsed<{ id: string; fields: Partial<T>; entry: T }, Refusal> {
 	const { id, fields } = value;
 	if (typeof id !== "string") return { error: `id must name the ${noun} to edit` };
 	if (!isObject(fields) || Array.isArray(fields)) return { error: "fields must be an object" };
@@ -73,19 +75,19 @@ function edited<T extends Entry>(noun: string, list: T[], value: Record<string, 
 	const entry = parse({ ...stored, ...fields });
 	if ("error" in entry) return entry;
 	if (entry.ok.id !== id) return { error: `an edit may not change ${noun} ${id}'s id` };
-	const why = entryRefusal(noun, stored, entry.ok, true);
+	const why = entryRefusal(noun, sessionId, stored, entry.ok, true);
 	return why === null ? { ok: { id, fields: pick(entry.ok, Object.keys(fields)), entry: entry.ok } } : { error: why };
 }
 
-/** `value`, a request's change, as an agent may make it to `state`, with the whole change it applies as. */
-function agentChange(state: SportState, value: unknown): Parsed<{ change: AgentSportChange; applies: SportChange }, Refusal> {
+/** `value`, a request's change, as session `sessionId` may make it to `state`, with the whole change it applies as. */
+function agentChange(state: SportState, sessionId: string, value: unknown): Parsed<{ change: AgentSportChange; applies: SportChange }, Refusal> {
 	if (!isObject(value)) return { error: "change must be an object" };
 	if (value.op === "edit-log") {
-		const edit = edited("workout log", state.log, value, parseSportLog);
+		const edit = edited("workout log", sessionId, state.log, value, parseSportLog);
 		return "error" in edit ? edit : { ok: { change: { op: "edit-log", id: edit.ok.id, fields: edit.ok.fields }, applies: { op: "edit-log", log: edit.ok.entry } } };
 	}
 	if (value.op === "edit-measurement") {
-		const edit = edited("measurement", state.measurements, value, parseSportMeasurement);
+		const edit = edited("measurement", sessionId, state.measurements, value, parseSportMeasurement);
 		return "error" in edit ? edit : { ok: { change: { op: "edit-measurement", id: edit.ok.id, fields: edit.ok.fields }, applies: { op: "edit-measurement", measurement: edit.ok.entry } } };
 	}
 	const planBytes = value.op === "set-plan" ? Buffer.byteLength(JSON.stringify(value.plan ?? null)) : 0;
@@ -98,11 +100,11 @@ function agentChange(state: SportState, value: unknown): Parsed<{ change: AgentS
 		case "set-targets":
 			return { ok: { change, applies: change } };
 		case "add-measurement": {
-			const why = entryRefusal("measurement", state.measurements.find(({ id }) => id === change.measurement.id), change.measurement, false);
+			const why = entryRefusal("measurement", sessionId, state.measurements.find(({ id }) => id === change.measurement.id), change.measurement, false);
 			return why === null ? { ok: { change, applies: change } } : { error: why };
 		}
 		case "add-log": {
-			const why = entryRefusal("workout log", state.log.find(({ id }) => id === change.log.id), change.log, false);
+			const why = entryRefusal("workout log", sessionId, state.log.find(({ id }) => id === change.log.id), change.log, false);
 			return why === null ? { ok: { change, applies: change } } : { error: why };
 		}
 		case "edit-measurement":
@@ -127,18 +129,20 @@ function agentChange(state: SportState, value: unknown): Parsed<{ change: AgentS
  */
 export function agentSportChanges(state: SportState, value: unknown): Parsed<{ request: AgentSportRequest; changes: SportChange[]; state: SportState }, Refusal> {
 	if (!isObject(value)) return { error: "a sport request must be an object" };
+	const { sessionId } = value;
+	if (typeof sessionId !== "string" || sessionId === "") return { error: "a sport request must name the session that left it" };
 	const metrics = parseSportMetrics(value.metrics ?? []);
 	if ("error" in metrics) return metrics;
 	const merged = [...state.metrics.map(metric => metrics.ok.find(({ id }) => id === metric.id) ?? metric), ...metrics.ok.filter(metric => !state.metrics.some(({ id }) => id === metric.id))];
 	const changes: SportChange[] = canonicalJson(merged) === canonicalJson(state.metrics) ? [] : [{ op: "set-metrics", metrics: merged }];
 	let next = changes.reduce(applySport, state);
-	const change = agentChange(next, value.change);
+	const change = agentChange(next, sessionId, value.change);
 	if ("error" in change) return change;
 	const why = sportRefusal(next, change.ok.applies);
 	if (why !== null) return { error: why };
 	changes.push(change.ok.applies);
 	next = applySport(next, change.ok.applies);
-	return { ok: { request: { metrics: metrics.ok, change: change.ok.change }, changes, state: next } };
+	return { ok: { request: { sessionId, metrics: metrics.ok, change: change.ok.change }, changes, state: next } };
 }
 
 /** `state` after the requests `values`, oldest first, the ones the server takes from a personal session, as it will apply them. */

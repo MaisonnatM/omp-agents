@@ -39,12 +39,13 @@ test("a log is left for the dashboard in the session's name, and the next read a
 	expect(read.log).toEqual([log(change.log.id, "2026-11-17", { workout: "mardi", title: "Mardi", rpe: 8, loads: { semi: 16 }, addedBy: "session-1" })]);
 });
 
-test("an edit leaves only the fields it changes and keeps the log's author, and an edit of the user's log is refused with nothing left", async () => {
-	const tool = sport(withLogs(STATE, log("mine", "2026-11-17"), log("agent", "2026-11-17", { rpe: 6, addedBy: "session-0" })));
-	await tool.call({ action: "log", log: { id: "agent", note: "Doigts frais" } });
-	expect(tool.left()).toEqual([{ metrics: [], change: { op: "edit-log", id: "agent", fields: { note: "Doigts frais" } } }]);
-	expect(tool.state().log.find(({ id }) => id === "agent")).toEqual(log("agent", "2026-11-17", { rpe: 6, note: "Doigts frais", addedBy: "session-0" }));
+test("an edit of the session's own log leaves only the fields it changes, and an edit of the user's or another session's log is refused with nothing left", async () => {
+	const tool = sport(withLogs(STATE, log("mine", "2026-11-17"), log("own", "2026-11-17", { rpe: 6, addedBy: "session-1" }), log("other", "2026-11-17", { addedBy: "session-0" })));
+	await tool.call({ action: "log", log: { id: "own", note: "Doigts frais" } });
+	expect(tool.left()).toEqual([{ sessionId: "session-1", metrics: [], change: { op: "edit-log", id: "own", fields: { note: "Doigts frais" } } }]);
+	expect(tool.state().log.find(({ id }) => id === "own")).toEqual(log("own", "2026-11-17", { rpe: 6, note: "Doigts frais", addedBy: "session-1" }));
 	await expect(tool.call({ action: "log", log: { id: "mine", rpe: 9 } })).rejects.toThrow("workout log mine was written by the user, so an agent may not change it");
+	await expect(tool.call({ action: "log", log: { id: "other", rpe: 9 } })).rejects.toThrow("an agent may edit only a workout log its own session wrote");
 	await expect(tool.call({ action: "log", log: { id: "nobody" } })).rejects.toThrow("no workout log has id nobody; leave id out to add one.");
 	expect(tool.left()).toHaveLength(1);
 });

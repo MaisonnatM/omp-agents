@@ -38,8 +38,9 @@ function inboxOver(dir: string, start: SportState, { active, written = () => tru
 	return { inbox, state: () => state };
 }
 
-/** Writes the request one `sport` tool call leaves, as file `name`. */
-const leave = (dir: string, name: string, change: unknown, metrics: Metric[] = []) => writeFileSync(join(dir, name), JSON.stringify({ metrics, change }));
+/** Writes the request one `sport` tool call of session `sessionId` leaves, as file `name`. */
+const leave = (dir: string, name: string, change: unknown, { metrics = [], sessionId = "s1" }: { metrics?: Metric[]; sessionId?: string } = {}) =>
+	writeFileSync(join(dir, name), JSON.stringify({ sessionId, metrics, change }));
 
 const GRIP: Metric = { id: "grip", label: "Pince", unit: "kg", better: "higher" };
 
@@ -47,7 +48,7 @@ describe("SportInbox", () => {
 	test("applies an agent's requests oldest first, each edit merged over the entry as the ones before it leave it", async () => {
 		const dir = inboxDir();
 		leave(dir, "2-x.json", { op: "add-log", log: log("a", "2026-11-17", { addedBy: "s1" }) });
-		leave(dir, "1-x.json", { op: "add-measurement", measurement: { ...measurement("g1", "grip", 50, "2026-11-17"), addedBy: "s1" } }, [GRIP]);
+		leave(dir, "1-x.json", { op: "add-measurement", measurement: { ...measurement("g1", "grip", 50, "2026-11-17"), addedBy: "s1" } }, { metrics: [GRIP] });
 		leave(dir, "3-x.json", { op: "edit-log", id: "a", fields: { rpe: 7 } });
 		leave(dir, "4-x.json", { op: "edit-log", id: "a", fields: { note: "Bonne séance" } });
 		const { inbox, state } = inboxOver(dir, STATE);
@@ -58,38 +59,55 @@ describe("SportInbox", () => {
 		expect(readdirSync(dir)).toEqual([]);
 	});
 
+	test("an agent edits only a log its own session wrote, and another session's edit is set aside", async () => {
+		const errors = spyOn(console, "error").mockImplementation(() => {});
+		const dir = inboxDir();
+		const start = withLogs(STATE, log("a", "2026-11-17", { rpe: 6, addedBy: "session-a" }));
+		leave(dir, "1-x.json", { op: "edit-log", id: "a", fields: { rpe: 9 } }, { sessionId: "session-b" });
+		leave(dir, "2-x.json", { op: "edit-log", id: "a", fields: { note: "Doigts frais" } }, { sessionId: "session-a" });
+		const { inbox, state } = inboxOver(dir, start);
+		await inbox.drain();
+		const reasons = errors.mock.calls.map(([line]) => String(line));
+		errors.mockRestore();
+		expect(state().log).toEqual([log("a", "2026-11-17", { rpe: 6, note: "Doigts frais", addedBy: "session-a" })]);
+		expect(readdirSync(dir)).toEqual(["1-x.json.invalid"]);
+		expect(reasons).toEqual([expect.stringContaining("1-x.json: workout log a was added by session session-a; an agent may edit only a workout log its own session wrote")]);
+	});
+
 	test("sets aside each request an agent may not make, whole and with its reason", async () => {
 		const errors = spyOn(console, "error").mockImplementation(() => {});
 		const dir = inboxDir();
-		const start = withLogs(STATE, log("mine", "2026-11-16"), log("theirs", "2026-11-16", { addedBy: "s1" }));
+		const start = withLogs(STATE, log("mine", "2026-11-16"), log("own", "2026-11-16", { addedBy: "s1" }));
 		const plan = { ...STATE.plan, title: "x".repeat(MAX_PLAN_BYTES) };
 		leave(dir, "1-x.json", { op: "remove-log", id: "mine" });
 		leave(dir, "2-x.json", { op: "edit-log", id: "mine", fields: { rpe: 9 } });
 		leave(dir, "3-x.json", { op: "add-log", log: log("b", "2026-11-17") });
 		leave(dir, "4-x.json", { op: "add-measurement", measurement: { ...measurement("g1", "grip", 50, "2026-11-17"), addedBy: "s1" } });
-		leave(dir, "5-x.json", { op: "set-metrics", metrics: [GRIP] }, [GRIP]);
+		leave(dir, "5-x.json", { op: "set-metrics", metrics: [GRIP] }, { metrics: [GRIP] });
 		leave(dir, "6-x.json", { op: "edit-log", id: "ghost", fields: { rpe: 3 } });
-		leave(dir, "7-x.json", { op: "add-log", log: log("theirs", "2026-11-16", { rpe: 4, addedBy: "s2" }) });
-		leave(dir, "8-x.json", { op: "edit-log", id: "theirs", fields: { addedBy: "s2" } });
+		leave(dir, "7-x.json", { op: "add-log", log: log("own", "2026-11-16", { rpe: 4, addedBy: "s1" }) });
+		leave(dir, "8-x.json", { op: "edit-log", id: "own", fields: { addedBy: "s2" } });
 		leave(dir, "9-x.json", { op: "set-plan", plan });
 		writeFileSync(join(dir, "10-x.json"), "{not json");
+		writeFileSync(join(dir, "11-x.json"), JSON.stringify({ metrics: [], change: { op: "set-plan", plan: null } }));
 		const { inbox, state } = inboxOver(dir, start);
 		await inbox.drain();
 		expect(state()).toEqual(start);
-		const names = Array.from({ length: 10 }, (_, i) => `${i + 1}-x.json`);
+		const names = Array.from({ length: 11 }, (_, i) => `${i + 1}-x.json`);
 		expect(readdirSync(dir).toSorted()).toEqual(names.map(name => `${name}.invalid`).toSorted());
 		const reasons = Object.fromEntries(errors.mock.calls.map(([line]) => String(line).match(/(\d+-x\.json): (.*)$/)?.slice(1) ?? []));
 		errors.mockRestore();
 		expect(reasons).toMatchObject({
 			"1-x.json": "an agent may not remove a log; only the Sport page removes or restores one",
 			"2-x.json": "workout log mine was written by the user, so an agent may not change it",
-			"3-x.json": "an agent's workout log must name the session that added it",
+			"3-x.json": "an agent's workout log must name the session that sent it, s1, as addedBy",
 			"4-x.json": "it names a metric not in the metrics list, grip; add it to the metrics first",
 			"5-x.json": "an agent passes metrics beside its change, added or replaced by id, never the whole list",
 			"6-x.json": "no workout log has id ghost; leave id out to add one",
-			"7-x.json": "workout log theirs exists already; leave id out to add one, or edit it",
-			"8-x.json": "workout log theirs was added by s1, which an edit may not change",
+			"7-x.json": "workout log own exists already; leave id out to add one, or edit it",
+			"8-x.json": "an agent's workout log must name the session that sent it, s1, as addedBy",
 			"9-x.json": `the plan is ${Buffer.byteLength(JSON.stringify(plan))} bytes as JSON; keep it to at most ${MAX_PLAN_BYTES}`,
+			"11-x.json": "a sport request must name the session that left it",
 		});
 		expect(Object.keys(reasons).toSorted()).toEqual(names.toSorted());
 	});
