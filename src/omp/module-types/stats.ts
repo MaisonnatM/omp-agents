@@ -60,9 +60,9 @@ export interface StatsLiveModule {
 export interface StatsDbModule {
 	initDb(): Promise<Database>;
 }
-/** omp's request-error classifier (pi-ai src/error/rate-limit.ts): whether a 402's body names a billing cap, as its credential rotation decides. */
+/** omp's request-error classifier (pi-ai src/error/rate-limit.ts): whether a failure is a billing cap, which topping the account up clears and waiting never does. */
 export interface RateLimitModule {
-	is402BillingCapBody(message: string | undefined): boolean;
+	isBillingCapUsageLimit(status: number | undefined, message: string | undefined): boolean;
 }
 /** The fields of an assistant message that failed which omp's classifier reads (pi-ai src/types.ts `AssistantMessage`). */
 export interface FailedMessage {
