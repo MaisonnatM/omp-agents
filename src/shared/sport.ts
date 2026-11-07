@@ -184,6 +184,7 @@ export type SportChange =
 	| { op: "set-targets"; targets: Target[] }
 	| { op: "set-metrics"; metrics: Metric[] }
 	| { op: "add-measurement"; measurement: Measurement }
+	| { op: "edit-measurement"; measurement: Measurement }
 	| { op: "remove-measurement"; id: string }
 	| { op: "restore-measurement"; measurement: Measurement; index: number }
 	| { op: "add-log"; log: WorkoutLog }
