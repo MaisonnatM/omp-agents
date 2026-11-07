@@ -106,6 +106,7 @@ import { EventInbox } from "./event-inbox";
 import { NoteInbox } from "./note-inbox";
 import { TodoInbox } from "./todo-inbox";
 import { SportFile } from "./sport-file";
+import type { JsonInboxDir } from "./json-inbox";
 import { SportInbox } from "./sport-inbox";
 import { UserNotesFile } from "./user-notes-file";
 import { UserTodosFile } from "./user-todos-file";
@@ -172,14 +173,8 @@ export class Dashboard {
 	readonly #notices: Notices;
 	readonly #broadcasts: Broadcasts;
 	readonly #lists: ListRegistry;
-	readonly #todoInbox: TodoInbox;
-	readonly #noteInbox: NoteInbox;
-	readonly #sportInbox: SportInbox;
-	readonly #eventInbox: EventInbox;
-	readonly #signInInbox: SignInInbox;
-	readonly #routineInbox: RoutineInbox;
-	readonly #botInbox: BotInbox;
-	readonly #shepherdInbox: ShepherdInbox;
+	/** The inboxes the owner applies, each a tool's changes to one of the dashboard's files. */
+	readonly #inboxes: readonly JsonInboxDir<unknown>[];
 	readonly #worktrees: Worktrees;
 	/** omp's isolation sandboxes whose omp exited, removed once a day by the owner. */
 	readonly #isolationSweep: IsolationSweep;
@@ -373,9 +368,9 @@ export class Dashboard {
 			await placement.place([cwd], worktreeAt);
 			return placement.cwdOf(cwd);
 		};
-		this.#todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), workspaceOf, { active: () => ownerLock.held });
-		this.#noteInbox = new NoteInbox(userNoteInboxDir, change => lists.apply("user-notes", change), { active: () => ownerLock.held });
-		this.#sportInbox = new SportInbox(
+		const todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), workspaceOf, { active: () => ownerLock.held });
+		const noteInbox = new NoteInbox(userNoteInboxDir, change => lists.apply("user-notes", change), { active: () => ownerLock.held });
+		const sportInbox = new SportInbox(
 			sportInboxDir,
 			() => sport.value,
 			changes => {
@@ -384,8 +379,8 @@ export class Dashboard {
 			},
 			{ active: () => ownerLock.held },
 		);
-		this.#eventInbox = new EventInbox(eventInboxDir, () => this.#localEvents.value, change => this.#localEvents.apply(change), { active: () => ownerLock.held });
-		this.#signInInbox = new SignInInbox(
+		const eventInbox = new EventInbox(eventInboxDir, () => this.#localEvents.value, change => this.#localEvents.apply(change), { active: () => ownerLock.held });
+		const signInInbox = new SignInInbox(
 			signInInboxDir,
 			{
 				report: async ({ account, at }) => {
@@ -394,8 +389,8 @@ export class Dashboard {
 			},
 			{ active: () => ownerLock.held },
 		);
-		this.#routineInbox = new RoutineInbox(routineInboxDir, () => routines.value, change => lists.apply("routines", change), { active: () => ownerLock.held });
-		this.#botInbox = new BotInbox(
+		const routineInbox = new RoutineInbox(routineInboxDir, () => routines.value, change => lists.apply("routines", change), { active: () => ownerLock.held });
+		const botInbox = new BotInbox(
 			botInboxDir,
 			{ bots: () => this.#botsFile.value, save: change => lists.apply("bots", change), tell: (to, text) => this.#bots.message(to, text), now: Date.now },
 			{ active: () => ownerLock.held },
@@ -528,7 +523,7 @@ export class Dashboard {
 			onChange: () => broadcasts.pushList("merges"),
 			onMerged: pr => void mergeCleanup.merged(pr),
 		});
-		this.#shepherdInbox = new ShepherdInbox(
+		const shepherdInbox = new ShepherdInbox(
 			shepherdInboxDir,
 			{
 				bots: () => this.#botsFile.value,
@@ -542,6 +537,7 @@ export class Dashboard {
 			},
 			{ active: () => ownerLock.held },
 		);
+		this.#inboxes = [todoInbox, noteInbox, sportInbox, eventInbox, signInInbox, routineInbox, botInbox, shepherdInbox];
 		// Private sessions' files poke the views that follow them, but no format lists them, so they never show as past sessions.
 		this.#loops = new Loops([...SESSION_FORMATS, { root: privateSessionsDir, createRoot: true }], {
 			onRegistryTick: async () => {
@@ -729,14 +725,7 @@ export class Dashboard {
 			const owner = this.#ownerLock.holder();
 			console.log(`omp-agents: the server on port ${owner?.port ?? "?"} (pid ${owner?.pid ?? "?"}) runs routines and the todo, note, and event inboxes; this one takes over when it exits.`);
 		}
-		this.#todoInbox.watch();
-		this.#noteInbox.watch();
-		this.#sportInbox.watch();
-		this.#eventInbox.watch();
-		this.#signInInbox.watch();
-		this.#routineInbox.watch();
-		this.#botInbox.watch();
-		this.#shepherdInbox.watch();
+		for (const inbox of this.#inboxes) inbox.watch();
 		this.#endInbox.watch();
 		await this.#rescanFiles();
 		// Once the files are listed, so the notice names the sessions that stopped mid-turn with the last server.
@@ -760,14 +749,7 @@ export class Dashboard {
 	async stop(): Promise<void> {
 		this.#loops.stop();
 		this.#stopMergeQueue();
-		this.#todoInbox.stop();
-		this.#noteInbox.stop();
-		this.#sportInbox.stop();
-		this.#eventInbox.stop();
-		this.#signInInbox.stop();
-		this.#routineInbox.stop();
-		this.#botInbox.stop();
-		this.#shepherdInbox.stop();
+		for (const inbox of this.#inboxes) inbox.stop();
 		this.#endInbox.stop();
 		await this.#sessions.dispose();
 		this.terminals.dispose();
@@ -960,14 +942,7 @@ export class Dashboard {
 			this.#broadcasts.pushList("user-notes");
 			this.#runner.recover();
 			this.#scheduledRunner.recover();
-			void this.#todoInbox.drain();
-			void this.#noteInbox.drain();
-			void this.#sportInbox.drain();
-			void this.#eventInbox.drain();
-			void this.#signInInbox.drain();
-			void this.#routineInbox.drain();
-			void this.#botInbox.drain();
-			void this.#shepherdInbox.drain();
+			for (const inbox of this.#inboxes) void inbox.drain();
 			// It learned what the triggers see while another server ran routines, which that server fired.
 			this.#triggerWatch.forget();
 		}
