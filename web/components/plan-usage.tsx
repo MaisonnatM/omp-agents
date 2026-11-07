@@ -34,7 +34,7 @@ export const creditLabel = (balance: CreditBalance): string =>
 
 /** What the API credits row's hover says, and how its amount is colored. */
 function creditState(balance: CreditBalance): { tooltip: string; tone: "out" | "low" | "ok" } {
-	if (balance.kind === "prepaid") return { tooltip: `API credits: ${creditLabel(balance)}. No promotional grant.`, tone: balance.left <= 0 ? "out" : "ok" };
+	if (balance.kind === "prepaid") return { tooltip: `API credits: ${creditLabel(balance)}. No monthly grant.`, tone: balance.left <= 0 ? "out" : "ok" };
 	const expires = balance.expiresAt === null ? "" : ` Expires ${DAY_FORMAT.format(balance.expiresAt)}.`;
 	const left = balance.limit > 0 ? (balance.limit - balance.used) / balance.limit : 1;
 	return { tooltip: `API credits: ${creditLabel(balance)} spent.${expires}`, tone: balance.used >= balance.limit ? "out" : left < LOW ? "low" : "ok" };
