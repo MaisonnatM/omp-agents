@@ -26,52 +26,46 @@ export default function personalExtension(pi: ExtensionApi): void {
 	pi.registerFlag(PERSONAL_FLAGS.sport, { type: "string", description: "The omp-agents Sport module's file, which personal sessions read." });
 	pi.registerFlag(PERSONAL_FLAGS.sportInbox, { type: "string", description: "The directory personal sessions leave their Sport changes in for the dashboard." });
 
-	const personal = (cwd: string): boolean => {
-		const dir = flagValue(pi, PERSONAL_FLAGS.dir);
-		return dir !== null && cwd === dir;
-	};
-
-	/** The memory for a session in `cwd`, or `null` when `cwd` is not the personal directory or the dashboard named none. */
-	const memoryIn = (cwd: string): string | null => (personal(cwd) ? flagValue(pi, PERSONAL_FLAGS.memory) : null);
-
-	/** The Sport module's paths for a session in `cwd`, or `null` when `cwd` is not the personal directory or the dashboard named none. */
-	const sportIn = (cwd: string): SportPaths | null => {
+	/**
+	 * What a session in `cwd` reads and writes as a personal session: the memory, and the Sport module's paths when the
+	 * dashboard named them; `null` when `cwd` is not the personal directory or the dashboard named no memory.
+	 */
+	const personalIn = (cwd: string): { memory: string; sport: SportPaths | null } | null => {
+		const memory = flagValue(pi, PERSONAL_FLAGS.memory);
+		if (memory === null || cwd !== flagValue(pi, PERSONAL_FLAGS.dir)) return null;
 		const file = flagValue(pi, PERSONAL_FLAGS.sport);
 		const inbox = flagValue(pi, PERSONAL_FLAGS.sportInbox);
-		return personal(cwd) && file !== null && inbox !== null ? { file, inbox } : null;
+		return { memory, sport: file !== null && inbox !== null ? { file, inbox } : null };
+	};
+
+	const notPersonal = (what: string): never => {
+		throw new Error(`This session is not in the personal directory, so it has no ${what}.`);
 	};
 
 	// Registered only once the session is personal, so every other session's tool list stays as it was. Either hook may
 	// be the first to see it: `session_start` can fire before omp sets the flags, and a session can move in later.
 	let mounted = false;
 	const mount = (cwd: string): void => {
-		if (mounted || memoryIn(cwd) === null) return;
+		const personal = personalIn(cwd);
+		if (mounted || personal === null) return;
 		mounted = true;
 		pi.registerTool(
-			rememberTool(pi, `Adds one fact about the user to their personal memory, which every later personal turn's system prompt carries. Use one short sentence that stays true, at most ${MAX_FACT_LENGTH} characters.`, ({ cwd }) => {
-				const memory = memoryIn(cwd);
-				if (memory === null) throw new Error("This session is not in the personal directory, so it has no personal memory.");
-				return memory;
-			}),
+			rememberTool(
+				pi,
+				`Adds one fact about the user to their personal memory, which every later personal turn's system prompt carries. Use one short sentence that stays true, at most ${MAX_FACT_LENGTH} characters.`,
+				({ cwd }) => personalIn(cwd)?.memory ?? notPersonal("personal memory"),
+			),
 		);
-		if (sportIn(cwd) === null) return;
-		pi.registerTool(
-			sportTool(pi, ({ cwd }) => {
-				const paths = sportIn(cwd);
-				if (paths === null) throw new Error("This session is not in the personal directory, so it has no Sport module.");
-				return paths;
-			}),
-		);
+		if (personal.sport !== null) pi.registerTool(sportTool(pi, ({ cwd }) => personalIn(cwd)?.sport ?? notPersonal("Sport module")));
 	};
 
 	pi.on("session_start", (_event, ctx) => mount(ctx.cwd));
 
 	pi.on("before_agent_start", (event, ctx) => {
-		const memory = memoryIn(ctx.cwd);
-		if (ctx.agent.kind === "sub" || memory === null) return undefined;
+		const personal = personalIn(ctx.cwd);
+		if (ctx.agent.kind === "sub" || personal === null) return undefined;
 		mount(ctx.cwd);
-		const sport = sportIn(ctx.cwd);
-		const today = sport && todayLine(readSport(sport), localDay());
-		return { systemPrompt: [...event.systemPrompt, [FRAMING, ...memoryLines(memory), ...(today ? [today] : [])].join("\n")] };
+		const today = personal.sport && todayLine(readSport(personal.sport), localDay());
+		return { systemPrompt: [...event.systemPrompt, [FRAMING, ...memoryLines(personal.memory), ...(today ? [today] : [])].join("\n")] };
 	});
 }
