@@ -1,12 +1,18 @@
 // omp-agents session visuals: tells a session the dashboard started which fenced blocks its conversation draws as a
-// diagram or a chart. The dashboard loads it with `omp -e` (`withSessionVisuals` in src/dashboard-session.ts), so a
-// session started in a terminal never reads it.
+// diagram or a chart, and, on a Cursor model, where to find the dashboard's tools. The dashboard loads it with `omp -e`
+// (`withSessionVisuals` in src/dashboard-session.ts), so a session started in a terminal never reads it.
 import { MAX_CHART_ROWS, MAX_CHART_SERIES, MAX_MERMAID_SOURCE } from "../shared/session-visuals";
 
 /** The part of omp's `ExtensionAPI` this uses, by hand: `tsc` cannot resolve omp's own package here. */
 interface ExtensionApi {
-	on(event: "before_agent_start", handler: (event: { systemPrompt: string[] }) => { systemPrompt: string[] }): void;
+	on(
+		event: "before_agent_start",
+		handler: (event: { systemPrompt: string[] }, ctx: { model?: { api: string } }) => { systemPrompt: string[] },
+	): void;
 }
+
+/** omp's API for Cursor models, whose backend shows the model only its own native tools. */
+const CURSOR_API = "cursor-agent";
 
 const VISUALS_PROMPT = [
 	"This session's conversation is shown in the omp-agents dashboard, which draws two kinds of fenced code block in a message as a picture; use one only when a diagram or a chart makes the answer clearer than text.",
@@ -16,6 +22,12 @@ const VISUALS_PROMPT = [
 	'After you change something a person should look at in the app, such as a page, a dialog, or a layout, add a ```review-pages block to your reply, before any `Suggestions:` block: a JSON array of `{"label": string, "url": string, "note"?: string}`, one per page to look at, at most 8. Each `url` is the running dev server on this computer (`http://localhost:<port>/...`); `note` says how to reach a state the address cannot open, such as "Click Settings, then open the Sync tab". The Browser shows a Review visuals button that opens each page in its own Browser tab.',
 ].join("\n");
 
+/** Cursor hides every tool omp adds, the dashboard's included, behind its dynamic-tool lookup, so the model assumes they are missing. */
+export const CURSOR_TOOLS_PROMPT =
+	"This session runs on a Cursor model, which lists most of your tools, such as land, end_session, move_session, pr_description, user_note, user_todo, project_memory, and ship_stage, only as dynamic tools, not in your function list. Call GetDynamicTools to see them and CallDynamicTool to run one; never decide a tool these instructions name is missing before you look it up.";
+
 export default function sessionVisuals(pi: ExtensionApi): void {
-	pi.on("before_agent_start", event => ({ systemPrompt: [...event.systemPrompt, VISUALS_PROMPT] }));
+	pi.on("before_agent_start", (event, ctx) => ({
+		systemPrompt: ctx.model?.api === CURSOR_API ? [...event.systemPrompt, VISUALS_PROMPT, CURSOR_TOOLS_PROMPT] : [...event.systemPrompt, VISUALS_PROMPT],
+	}));
 }

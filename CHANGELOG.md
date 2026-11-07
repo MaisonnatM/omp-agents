@@ -6,6 +6,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-11-07
 
 - Fixed: a Bot page's model menu now lists the models, instead of staying on Loading models.
+- Fixed: sessions on a Cursor model now find the dashboard's tools, such as landing on main, ending the session, and moving it to another folder, instead of saying they are missing.
 
 ## 2026-11-06
 
