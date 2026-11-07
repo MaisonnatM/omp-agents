@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { BODYWEIGHT, FRENCH_GRADES, gradeRank, mondayOf, type SportState } from "./shared/sport";
+import { mondayOf } from "./shared/days";
+import { BODYWEIGHT, FRENCH_GRADES, gradeRank, type SportState } from "./shared/sport";
 import { ABRAHANGS, log, measurement, OPEN, PULLS, SEMI, STATE, withLogs, withMeasurements } from "./sport-fixtures";
 import { parseSportState } from "./sport-parse";
 import { adherence, bestGrades, loadFor, painFlags, records, weekPlan } from "./sport-week";
@@ -189,6 +190,7 @@ describe("days", () => {
 		expect(mondayOf("2026-11-01")).toBe("2026-10-26");
 		expect(mondayOf("2027-03-28")).toBe("2027-03-22");
 		expect(dayItems(STATE, "2026-11-17").semi?.load).toBe(15);
+		expect(adherence(STATE, "2026-10-26", "2026-11-22").planned).toBe(7);
 	});
 });
 

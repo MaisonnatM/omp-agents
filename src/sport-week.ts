@@ -3,23 +3,19 @@
  * exercise's load, the pain flags, the best grade per week, the records, and how many planned workouts were done.
  * Every date is a `YYYY-MM-DD` day, counted on the calendar alone.
  */
+import { addDays, DAY_KEYS, type DayKey, daysBetween, mondayOf, weekdayOf } from "./shared/days";
 import {
-	addDays,
 	BODYWEIGHT,
 	type ClimbKind,
 	type Exercise,
 	type FrenchGrade,
 	gradeRank,
 	type Measurement,
-	mondayOf,
 	type PainPlace,
 	type Phase,
 	type Plan,
 	type Slot,
 	type SportState,
-	WEEKDAYS,
-	type Weekday,
-	weekdayOf,
 	type Workout,
 	type WorkoutLog,
 } from "./shared/sport";
@@ -48,7 +44,7 @@ export interface PlannedWorkout {
 
 export interface PlannedDay {
 	date: string;
-	weekday: Weekday;
+	weekday: DayKey;
 	phase: Phase | null;
 	deload: boolean;
 	/** The plan replaces this day's phase slots, as on a test day. */
@@ -136,7 +132,7 @@ export function painFlags(state: SportState, date: string): PainFlag[] {
 /** The seven days of the week `monday` falls in, each with its workouts, their loads, and the hangs a finger pain flag removes. */
 export function weekPlan(state: SportState, monday: string): PlannedDay[] {
 	const { plan } = state;
-	return WEEKDAYS.map((weekday, i) => {
+	return DAY_KEYS.map((weekday, i) => {
 		const date = addDays(mondayOf(monday), i);
 		const { phase, deload, override, slots } = slotsOn(plan, date);
 		const fingersRest = painFlags(state, date).some(flag => flag.where === "fingers" && flag.date < date);
@@ -195,7 +191,7 @@ export function records(state: SportState): SportRecords {
 export function adherence(state: SportState, from: string, to: string): Adherence {
 	let planned = 0;
 	let done = 0;
-	for (let date = from; date <= to; date = addDays(date, 1)) {
+	for (const date of daysBetween(from, to)) {
 		for (const { workout, optional } of slotsOn(state.plan, date).slots) {
 			const did = logOf(state, date, workout)?.status === "done";
 			if (did) done++;
