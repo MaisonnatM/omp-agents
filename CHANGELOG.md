@@ -8,6 +8,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Fixed: a Bot page's model menu now lists the models, instead of staying on Loading models.
 - Fixed: sessions on a Cursor model now find the dashboard's tools, such as landing on main, ending the session, and moving it to another folder, instead of saying they are missing.
 - The API credits row in the bottom bar now shows the dollars left on your Console balance when you have no monthly grant, in red once it runs out, instead of only its name.
+- The paid Cursor fallback patch and the tool documentation patch for omp now apply to omp 18.18.0, together with the Cursor tools patch.
 
 ## 2026-11-06
 

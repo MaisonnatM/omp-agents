@@ -7,43 +7,30 @@ Those files hold only types, so the app imports a type from them directly and ev
 It finds the package through `omp` on `PATH`, or `OMP_PACKAGE_DIR` when set; with a Bun global install that is `~/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent`.
 `bun run omp-release` checks a new omp release against these modules and the files listed below; the [omp release skill](../../.agents/skills/omp-release/SKILL.md) says how to read its report.
 
-Paid Cursor fallback is an external OMP runtime change, preserved in [`patches/omp-18.16.0-paid-cursor-fallback.patch`](../../patches/omp-18.16.0-paid-cursor-fallback.patch) with its regression tests.
-Its base is upstream tag `v18.16.0`, commit `650f3a108229ee11bf68ba3377f4e8c3391cd424`; do not apply it to another release without porting and verifying it.
-From a clean checkout of that release, check and apply the patch:
+Three runtime patches change omp itself, each kept in `patches/` with its regression tests against upstream tag `v18.18.0`, commit `b5a6b2f7e5b6606b6562e678ead83f21738f34a0`; do not apply them to another release without porting and verifying them.
+The dashboard applies none of them, so installing or upgrading stock omp removes them all.
+From a clean checkout of that release, apply all three, run their tests, and build the CLI:
 
 ```sh
-git apply --check /absolute/path/to/omp-agents/patches/omp-18.16.0-paid-cursor-fallback.patch
-git apply /absolute/path/to/omp-agents/patches/omp-18.16.0-paid-cursor-fallback.patch
-```
-
-Build and install both patched packages, `@oh-my-pi/pi-ai` and `@oh-my-pi/pi-coding-agent`, including the CLI bundle and SDK sources and declarations.
-The dashboard does not apply this patch at startup, and installing or upgrading stock OMP removes the runtime changes.
-The [routing policy](../../templates/omp/agent/docs/model-routing.md) describes the opt-in `retry.paidFallback` setting and its billing limits.
-
-Tool documentation selectors and historical-consult diagnostics are preserved in [`patches/omp-18.16.0-runtime-tool-contracts.patch`](../../patches/omp-18.16.0-runtime-tool-contracts.patch), including their regression tests.
-It uses the same upstream release and commit as the paid Cursor patch, and the two patches apply independently.
-From that release checkout, check and apply it:
-
-```sh
-git apply --check /absolute/path/to/omp-agents/patches/omp-18.16.0-runtime-tool-contracts.patch
-git apply /absolute/path/to/omp-agents/patches/omp-18.16.0-runtime-tool-contracts.patch
+for p in paid-cursor-fallback runtime-tool-contracts cursor-dynamic-tools-rule; do git apply /absolute/path/to/omp-agents/patches/omp-18.18.0-$p.patch; done
 bun install --frozen-lockfile
-bun test packages/coding-agent/test/write-xdev-dispatch.test.ts packages/coding-agent/test/task/seance.test.ts
+bun --cwd=packages/ai test test/auth-storage-model-usage-health.test.ts test/cursor-usage.test.ts test/cursor-system-prompt-history.test.ts
+bun --cwd=packages/coding-agent test test/paid-cursor-routing.test.ts test/write-xdev-dispatch.test.ts test/task/seance.test.ts test/agent-session-tool-rebuild-skip.test.ts test/tools/read-repeat-hint.test.ts
 bun --cwd=packages/coding-agent run gen:bundle
 ```
 
-A source checkout needs the matching pi-natives addon installed or built before those tests.
-Install the rebuilt coding-agent CLI bundle and its companion files from `dist/`, plus the SDK sources `pi-coding-agent/src/internal-urls/router.ts`, `pi-coding-agent/src/internal-urls/xd-protocol.ts`, `pi-coding-agent/src/tools/xdev.ts`, `pi-coding-agent/src/task/seance.ts`, and `pi-coding-agent/src/prompts/tools/seance-task-guidance.md`.
-Keep a rollback copy of the installed sources and bundle, and preserve any other installed runtime patches when building; rebuilding a pristine release would remove them from the CLI.
-The dashboard does not apply this patch, stock runtime upgrades remove it, and already-running sessions retain their loaded handlers until restarted.
-The read router applies ordinary line and raw selectors to `xd://` documentation; device writes reject those suffixes instead of executing the bare device.
-Missing-device errors give a short discovery hint rather than dumping the mounted inventory.
-Historical task consults search session IDs only in the caller's artifacts and current project, including when given a full UUID.
-Cross-project callers pass the exact `file` returned by eval's archive as `sourceSession`; the Memory curator's saved job follows that handoff.
-The native implementation lives in `pi-coding-agent/src/task/seance.ts`, with task guidance in `pi-coding-agent/src/prompts/tools/seance-task-guidance.md`.
+A source checkout needs the matching pi-natives addon in `packages/natives/native/` before those tests.
+Build once with all three applied, since a CLI built without one of them drops it.
+Install the rebuilt `dist/cli.js`, then copy each source file the patches change, as `git diff --name-only v18.18.0 -- packages/ai/src packages/coding-agent/src` lists them, over the installed one in `pi-ai/src/` or `pi-coding-agent/src/`, keeping a rollback copy of everything replaced.
+Already-running sessions keep their loaded code until restarted.
 
-[`patches/omp-18.18.0-cursor-dynamic-tools-rule.patch`](../../patches/omp-18.18.0-cursor-dynamic-tools-rule.patch), on tag `v18.18.0` (commit `b5a6b2f7`), adds `cursorDynamicToolsRule` to `pi-ai/src/providers/cursor.ts`: a system-prompt entry naming the tools Cursor hides behind `GetDynamicTools`, all but its native ones.
-Apply it as above, test with `bun --cwd=packages/ai test test/cursor-system-prompt-history.test.ts`, then install the rebuilt `dist/cli.js` and that source; stock upgrades remove it, and the dashboard's own [Cursor paragraph](front-end-components.md#session-visuals) still reaches its sessions.
+- `omp-18.18.0-paid-cursor-fallback.patch` adds the opt-in `retry.paidFallback` setting, which the [routing policy](../../templates/omp/agent/docs/model-routing.md) describes with its billing limits.
+- `omp-18.18.0-runtime-tool-contracts.patch` lists MCP devices by name per server in `read xd://` and mount notices, in `pi-coding-agent/src/internal-urls/router.ts`, `pi-coding-agent/src/internal-urls/xd-protocol.ts`, and `pi-coding-agent/src/tools/xdev.ts`.
+  The read router applies ordinary line and raw selectors to `xd://` documentation; device writes reject those suffixes instead of executing the bare device.
+  Missing-device errors give a short discovery hint rather than dumping the mounted inventory.
+  Historical task consults, in `pi-coding-agent/src/task/seance.ts` with guidance in `pi-coding-agent/src/prompts/tools/seance-task-guidance.md`, search session IDs only in the caller's artifacts and current project, including when given a full UUID.
+  Cross-project callers pass the exact `file` returned by eval's archive as `sourceSession`; the Memory curator's saved job follows that handoff.
+- `omp-18.18.0-cursor-dynamic-tools-rule.patch` adds `cursorDynamicToolsRule` to `pi-ai/src/providers/cursor.ts`: a system-prompt entry naming the tools Cursor hides behind `GetDynamicTools`, all but its native ones; the dashboard's own [Cursor paragraph](front-end-components.md#session-visuals) still reaches its sessions without it.
 
 Paths in this document that start with `pi-coding-agent/`, `pi-ai/`, `pi-catalog/`, `pi-tui/`, `pi-utils/`, or `omp-stats/` are inside that install, in `@oh-my-pi/`.
 They are not in this repository.
