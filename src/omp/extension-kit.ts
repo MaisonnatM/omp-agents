@@ -1,7 +1,8 @@
-/** What every omp-agents extension shares: the part of omp's extension API it uses, its flags, and the `remember` tool's Markdown memory. */
-import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
-import { dirname } from "node:path";
-import { errorText } from "../json";
+/** What every omp-agents extension shares: the part of omp's extension API it uses, its flags, the inboxes its tools leave changes in, and the `remember` tool's Markdown memory. */
+import { randomUUID } from "node:crypto";
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { errorText, parseJson } from "../json";
 import { readTail } from "../read-tail";
 import { MAX_FACT_LENGTH, MAX_MEMORY_BYTES, REMEMBER_TOOL } from "../shared/bots";
 
@@ -18,8 +19,13 @@ export interface ExtensionTool<Params> {
 	loadMode: "essential";
 	/** omp's approval tier: `read` for a tool with no side effect, `write` for one that changes something. */
 	approval: "read" | "write";
-	/** omp passes every tool the session's context; this reads only its `cwd`, the session's workspace. */
-	execute(toolCallId: string, params: Params, signal: AbortSignal | undefined, onUpdate: unknown, ctx: { cwd: string }): Promise<ToolResult>;
+	/** omp passes every tool the session's context; this reads only its `cwd`, the session's workspace, and its session id. */
+	execute(toolCallId: string, params: Params, signal: AbortSignal | undefined, onUpdate: unknown, ctx: ToolContext): Promise<ToolResult>;
+}
+
+export interface ToolContext {
+	cwd: string;
+	sessionManager: { getSessionId(): string };
 }
 
 interface SchemaOptions {
@@ -44,6 +50,7 @@ export interface ExtensionApi {
 			Union(schemas: unknown[], options?: SchemaOptions): unknown;
 			Array(items: unknown, options: SchemaOptions & { minItems?: number; uniqueItems?: boolean }): unknown;
 			Optional(schema: unknown): unknown;
+			Unknown(options: SchemaOptions): unknown;
 		};
 	};
 }
@@ -66,6 +73,42 @@ export function readText(path: string): string {
 	}
 }
 
+let lastStamp = 0;
+
+/**
+ * Leaves `change` in `dir` for the dashboard: written under a name it skips, then renamed, so it never reads half a file.
+ * Each name sorts after the one before it, so the dashboard applies one session's changes in the order it left them, even
+ * two left in the same millisecond.
+ */
+export function leave(dir: string, change: object): void {
+	try {
+		mkdirSync(dir, { recursive: true });
+		lastStamp = Math.max(Date.now(), lastStamp + 1);
+		const name = `${lastStamp}-${randomUUID()}`;
+		const temp = join(dir, `${name}.tmp`);
+		writeFileSync(temp, JSON.stringify(change));
+		renameSync(temp, join(dir, `${name}.json`));
+	} catch (error) {
+		throw new Error(`Cannot leave the change for the dashboard: ${errorText(error)}`);
+	}
+}
+
+/** The changes `dir` holds that the dashboard has not applied yet, oldest first, leaving out a file that is not JSON. */
+export function waiting(dir: string): unknown[] {
+	let names: string[] = [];
+	try {
+		names = readdirSync(dir)
+			.filter(name => name.endsWith(".json"))
+			.sort();
+	} catch {
+		return [];
+	}
+	return names.flatMap(name => {
+		const change = parseJson(readText(join(dir, name)));
+		return change === undefined ? [] : [change];
+	});
+}
+
 export const reply = (text: string): ToolResult => ({ content: [{ type: "text", text }], details: undefined });
 
 /** The memory at `path` as a system prompt carries it: its newest facts, after a note when older ones were cut, or `Nothing yet.` */
@@ -83,7 +126,7 @@ export function memoryLines(path: string): string[] {
  * The `remember` tool, the one writer of a Markdown memory: each fact is a dated `- YYYY-MM-DD <fact>` line. `memoryPath`
  * names the file for the session calling it, or throws why it has none.
  */
-export function rememberTool(pi: ExtensionApi, description: string, memoryPath: (ctx: { cwd: string }) => string): ExtensionTool<{ fact: string }> {
+export function rememberTool(pi: ExtensionApi, description: string, memoryPath: (ctx: ToolContext) => string): ExtensionTool<{ fact: string }> {
 	return {
 		name: REMEMBER_TOOL,
 		label: "Remember",
