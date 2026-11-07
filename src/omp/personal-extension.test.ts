@@ -2,6 +2,7 @@ import { afterEach, expect, setSystemTime, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { log, STATE } from "../sport-fixtures";
 import { loadExtension } from "./fake-extension-api";
 import personalExtension, { PERSONAL_FLAGS } from "./personal-extension";
 
@@ -11,20 +12,24 @@ afterEach(() => {
 	for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-/** The extension loaded as the dashboard loads it into every session, with a personal directory and a memory file that does not exist yet. */
-function loadedPersonal(flags = true) {
+/** The extension loaded as the dashboard loads it into every session, with a personal directory, and a memory file and a sport file that do not exist yet; `flags` leaves out the sport flags, or every flag. */
+function loadedPersonal(flags: "all" | "memory" | "none" = "all") {
 	const root = mkdtempSync(join(tmpdir(), "omp-agents-personal-"));
 	dirs.push(root);
 	const personal = join(root, "personal");
 	const memory = join(root, "personal-memory.md");
-	const named = new Map<string, string>(flags ? [[PERSONAL_FLAGS.dir, personal], [PERSONAL_FLAGS.memory, memory]] : []);
-	return { personal, memory, ...loadExtension(personalExtension, named, "/work/app") };
+	const sport = join(root, "sport.json");
+	const sportInbox = join(root, "sport-inbox");
+	const memoryFlags: [string, string][] = [[PERSONAL_FLAGS.dir, personal], [PERSONAL_FLAGS.memory, memory]];
+	const sportFlags: [string, string][] = [[PERSONAL_FLAGS.sport, sport], [PERSONAL_FLAGS.sportInbox, sportInbox]];
+	const named = new Map<string, string>(flags === "all" ? [...memoryFlags, ...sportFlags] : flags === "memory" ? memoryFlags : []);
+	return { personal, memory, sport, ...loadExtension(personalExtension, named, "/work/app") };
 }
 
 test("a session in the personal directory remembers a fact as a dated line, and its next turn's prompt carries it", async () => {
 	const session = loadedPersonal();
 	session.start(session.personal);
-	expect(session.tools()).toEqual(["remember"]);
+	expect(session.tools()).toEqual(["remember", "sport"]);
 	setSystemTime(new Date("2026-11-03T10:00:00.000Z"));
 	await session.call("remember", { fact: "  Allergic to\npeanuts. " }, session.personal);
 	await session.call("remember", { fact: "Cooks for four." }, session.personal);
@@ -46,7 +51,7 @@ test("a session elsewhere gets neither the tool nor the memory, and a subagent i
 });
 
 test("without the dashboard's flags the extension stays inert in any directory", () => {
-	const session = loadedPersonal(false);
+	const session = loadedPersonal("none");
 	session.start(session.personal);
 	expect(session.tools()).toEqual([]);
 	expect(session.prompt("main", session.personal)).toEqual(undefined);
@@ -57,7 +62,7 @@ test("a session that moves into the personal directory gains remember on its nex
 	session.start("/work/app");
 	expect(session.tools()).toEqual([]);
 	expect(session.prompt("main", session.personal)).toHaveLength(2);
-	expect(session.tools()).toEqual(["remember"]);
+	expect(session.tools()).toEqual(["remember", "sport"]);
 	await expect(session.call("remember", { fact: "Cooks for four." }, "/work/app")).rejects.toThrow("not in the personal directory");
 	expect(() => readFileSync(session.memory, "utf8")).toThrow("ENOENT");
 });
@@ -72,4 +77,22 @@ test("a memory past 16 KiB reaches the prompt as its newest facts only", () => {
 	const kept = prompt.split("\n").filter(line => line.startsWith("- 2026-11-03 Fact number "));
 	expect(kept.join("\n").length).toBeLessThanOrEqual(16 * 1024);
 	expect(kept.join("\n").length).toBeGreaterThan(15 * 1024);
+});
+
+test("without the sport flags a personal session keeps remember alone and its prompt names no training", () => {
+	const session = loadedPersonal("memory");
+	writeFileSync(session.sport, JSON.stringify(STATE));
+	session.start(session.personal);
+	expect(session.tools()).toEqual(["remember"]);
+	expect(session.prompt("main", session.personal)?.[1]).not.toContain("sport:");
+});
+
+test("a personal turn's prompt ends with today's phase, workouts, and pain flags once there is a plan, and names nothing before", () => {
+	const session = loadedPersonal();
+	setSystemTime(new Date("2026-11-17T12:00:00"));
+	expect(session.prompt("main", session.personal)?.[1]).toEndWith("Nothing yet.");
+	writeFileSync(session.sport, JSON.stringify({ ...STATE, plan: null }));
+	expect(session.prompt("main", session.personal)?.[1]).toEndWith("Nothing yet.");
+	writeFileSync(session.sport, JSON.stringify({ ...STATE, log: [log("l1", "2026-11-14", { pain: { level: 4, where: "fingers" } })] }));
+	expect(session.prompt("main", session.personal)?.[1]).toEndWith("\nToday 2026-11-17, sport: phase transition; Semi-arquée et bloc max; pain flags: fingers 4/10 until 2026-11-21.");
 });

@@ -53,6 +53,9 @@
 - `src/shared/sport.ts`, `src/sport.ts`, and `src/sport-parse.ts` hold the Sport module's state, its reducer `applySport`, and its boundary parsers.
   `src/sport-week.ts` derives the week, each exercise's load, the pain flags, the best grades, the records, and the adherence from the state.
   `src/server/sport-file.ts` keeps `sport.json` with `ReducerFile`, registered in `src/server/list-registry.ts` under `sport`.
+  `src/sport-agent.ts` holds `agentSportChange`, what an agent may change, and `withAgentChanges`, the state with the changes an inbox still holds.
+  `src/server/sport-inbox.ts` drains the `sport` tool's changes from `sport-inbox/` through `JsonInboxDir` while its server owns the lock.
+  `src/omp/sport-tool.ts` registers `sport` in personal sessions, reads the state with pending changes, and leaves changes without writing `sport.json`.
   `src/sport-fixtures.ts` holds the sample plan and the builders the Sport tests share.
   See [Sport](../architecture/sport.md).
 - `templates/omp/agent/extensions/inbox/client.ts`: what `notes.ts`, `todos.ts`, and `events.ts` share to reach their inboxes: `CONFIG_DIR`, `readJson`, `waiting`, the changes an inbox holds that the dashboard has not applied yet, oldest first, `leave`, which writes one change under a `.tmp` name then renames it, and the tool `reply`.
@@ -74,7 +77,7 @@
   It also holds the checks the Browser's preload and the page run: `isPreviewSelection` and `isPreviewElement` on what the app reports, and `isTypingTarget`, which keeps a key typed in a text field from a shortcut.
 - `src/shared/moves.ts` holds `moveOf`, `agentOn`, `actionFacts`, `readyOnceChecksPass`, and `YOUR_MOVES`, shared by the Pull requests page and bell, and `yourMoves`, the pull requests whose move is yours, which the bell and the routines' pull request trigger both read.
   Its `PrimaryControl` union and pure `primaryControl` choose the header control, with finished states before conflicts, drafts, an armed merge, and a merge now or when ready.
-- `src/server/json-inbox.ts`: `JsonInboxDir<T>`, the directory of one-JSON-file requests that `todo-inbox.ts`, `note-inbox.ts`, `event-inbox.ts`, `routine-inbox.ts`, `bot-inbox.ts`, and `end-inbox.ts` read.
+- `src/server/json-inbox.ts`: `JsonInboxDir<T>`, the directory of one-JSON-file requests that `todo-inbox.ts`, `note-inbox.ts`, `event-inbox.ts`, `sport-inbox.ts`, `routine-inbox.ts`, `bot-inbox.ts`, and `end-inbox.ts` read.
   Each inbox gives it a `parse` that turns a file into a request, or says why it is not one, and an `apply` that returns whether the file is done.
   A drain reads the files oldest name first, moves a file that does not parse, or whose `apply` throws, to `<name>.invalid` with a logged reason, deletes a file once `apply` returns true, and leaves one that returns false for the next drain.
   A drain lists and reads through `node:fs/promises`, so a burst of requests never blocks the event loop, reads the files it claimed at once, and applies them one at a time in name order, after the files of a drain already under way, so an async `apply` keeps that order too.
