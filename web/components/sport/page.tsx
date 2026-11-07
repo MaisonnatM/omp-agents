@@ -2,7 +2,7 @@
 import { Plus, Scale } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { addDays, localDay } from "../../../src/shared/days";
-import type { Exercise, SportChange, SportState } from "../../../src/shared/sport";
+import { type Exercise, exercisesOf, type SportChange, type SportState } from "../../../src/shared/sport";
 import { dayPlan, phaseOn } from "../../../src/sport-week";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -92,7 +92,7 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 									<h2 className="text-base font-semibold">Pas encore de plan</h2>
 									<p className="text-muted-foreground">Ton agent personnel écrit le plan. Demande-lui par exemple :</p>
 									<blockquote className="rounded-lg border border-border bg-card px-4 py-3">« {ASK_FOR_PLAN} »</blockquote>
-									<p className="text-muted-foreground">La semaine s'affiche ici dès qu'il l'enregistre. En attendant, + Séance libre note une séance au journal.</p>
+									<p className="text-muted-foreground">La semaine s'affiche ici dès qu'il l'enregistre. En attendant, « Séance libre » note une séance au journal.</p>
 								</div>
 							) : (
 								<WeekTab
@@ -133,7 +133,7 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 						onClose={() => setTarget(null)}
 					/>
 				)}
-				{saved && <SummaryDialog saved={saved} onClose={() => setSaved(null)} />}
+				{saved && <SummaryDialog saved={saved} exercises={plan ? exercisesOf(plan) : []} onClose={() => setSaved(null)} />}
 				{weighing && bodyweight && <WeighForm state={state} metric={bodyweight} today={today} disabled={disabled} onChange={onChange} onClose={() => setWeighing(false)} />}
 			</PageFrame>
 		</SportRoot>

@@ -40,8 +40,9 @@
   Each load starts on the planned one; uncheck an exercise you did not do, or type the load you used.
   Pick the effort from 1 to 10 and any pain from 0 to 10 with where it hurts, and add the boulders and routes you sent with their grade and color.
   On a test day, type the result; the coming loads are worked out from it.
-- **Enregistrer** saves and shows « Séance notée » with the session's load, sends, effort, and any record it beat.
+- **Enregistrer** saves and shows « Séance notée » with **Charge max**, the heaviest load and the exercise that lifted it, the sends, the effort, and any record it beat.
   The next sessions of that exercise start from the load you saved, until a new test or a new phase.
+  The open session in the journal shows the same **Charge max**.
 - **Pesée** notes a bodyweight, today unless you pick another day; a second weight on the same day replaces the first.
 
 ## Journal

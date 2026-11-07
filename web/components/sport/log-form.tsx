@@ -3,7 +3,7 @@ import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import { Check, Plus, X } from "lucide-react";
 import { type KeyboardEvent, useId, useState } from "react";
-import { type Climb, CLIMB_KINDS, type ClimbKind, FRENCH_GRADES, type FrenchGrade, type Measurement, type Metric, PAIN_PLACES, type PainPlace, type SportChange, type SportState, type WorkoutLog } from "../../../src/shared/sport";
+import { type Climb, CLIMB_KINDS, type ClimbKind, exercisesOf, FRENCH_GRADES, type Measurement, type Metric, PAIN_PLACES, type PainPlace, type SportChange, type SportState, type WorkoutLog } from "../../../src/shared/sport";
 import { applySport } from "../../../src/sport";
 import { PAIN_FLAG_DAYS, PAIN_FLAG_LEVEL, type PlannedExercise, type PlannedWorkout, records } from "../../../src/sport-week";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { activityControl } from "../../activity";
 import { amount, ARKOSE_COLORS, beaten, CLIMB_LABEL, dose, effortWord, hardest, longDate, measured, PAIN_PLACE_AT, PAIN_PLACE_LABEL, painWord, sendsText, shortDate, signedKg, testOf } from "../../sport-view";
 import { ERROR_TEXT, isSubmitChord } from "../form-dialog";
 import { FIELD, TEXT_AREA } from "../form-field";
-import { effortText, type Saved, Stats } from "./log-summary";
+import { effortText, heaviest, type Saved, Stats } from "./log-summary";
 import { SportDialog } from "./sport-dialog";
 
 /** What the Fait dialog logs: a planned workout of `date`, or a free session when `workout` is `null`; `log` is the one it edits. */
@@ -120,7 +120,6 @@ export function LogForm({ state, target: { date, workout, log }, disabled, onCha
 		save();
 	};
 	const kicker = [longDate(date), log ? null : workout?.name].filter(part => part).join(" · ");
-	const lifted = Object.values(loads);
 	return (
 		<SportDialog title={log ? "Modifier la séance" : workout ? "Séance faite" : "Séance libre"} onClose={onClose} className="top-[4%] w-[min(40rem,calc(100vw-2rem))]">
 			<div className="flex flex-col gap-5 px-5 pt-1 pb-4" onKeyDown={onKeyDown}>
@@ -211,7 +210,7 @@ export function LogForm({ state, target: { date, workout, log }, disabled, onCha
 				</label>
 				<Stats
 					cells={[
-						rows.length > 0 ? { label: "Charges", value: `${rows.filter(({ done }) => done).length} sur ${rows.length}` } : { label: "Charge", value: lifted.length ? signedKg(Math.max(...lifted)) : "—" },
+						rows.length > 0 ? { label: "Charges", value: `${rows.filter(({ done }) => done).length} sur ${rows.length}` } : { label: "Charge max", value: heaviest(loads, state.plan ? exercisesOf(state.plan) : []) },
 						{ label: "Réussites", value: sendsText(climbs) },
 						{ label: "Douleur", value: pain === null || pain === 0 ? "aucune" : `${pain}/10 · ${PAIN_PLACE_LABEL[where].toLowerCase()}` },
 						{ label: "Effort", value: effortText(rpe) },

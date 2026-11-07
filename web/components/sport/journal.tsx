@@ -77,7 +77,7 @@ export function JournalTab({ state, open, disabled, onChange, onEdit, keys }: Jo
 	}
 	const list = (
 		<div className="mx-auto w-full max-w-3xl px-3 py-2">
-			{weeks.length === 0 && <p className="px-3 py-4 text-sm text-muted-foreground">Aucune séance notée. Dans la semaine, Fait… note une séance du plan, et + Séance libre une autre.</p>}
+			{weeks.length === 0 && <p className="px-3 py-4 text-sm text-muted-foreground">Aucune séance notée. Dans la semaine, « Fait… » note une séance du plan, et « Séance libre » une autre.</p>}
 			{weeks.map(week => (
 				<section key={week.monday} aria-label={`Semaine du ${shortDate(week.monday)}`} className="pb-2">
 					<h3 className="flex items-baseline justify-between px-2 pt-2 pb-1 text-xs text-muted-foreground">
@@ -160,7 +160,7 @@ function LogDetail({ state, log, record, disabled, onEdit, onRemove }: { state: 
 				<Stats
 					cells={[
 						{ label: "Durée prévue", value: workout ? duration(workout.minutes) : "—" },
-						{ label: "Charge", value: heaviest(log) },
+						{ label: "Charge max", value: heaviest(log.loads, names) },
 						{ label: "Réussites", value: sendsText(log.climbs) },
 						{ label: "Effort", value: effortText(log.rpe) },
 					]}

@@ -1,5 +1,5 @@
 /** The open day of the week: each workout with its demos, blocks, exercises, and loads, then the daily habits. */
-import { Check, Play } from "lucide-react";
+import { Check, Play, Plus } from "lucide-react";
 import type { DayKey } from "../../../src/shared/days";
 import type { Exercise, Plan } from "../../../src/shared/sport";
 import type { PlannedDay, PlannedExercise, PlannedWorkout } from "../../../src/sport-week";
@@ -35,7 +35,7 @@ export function DayDetail({ plan, day, today, disabled, onDemo, onLog }: DayDeta
 					<p className="text-xs text-muted-foreground first-letter:uppercase">{kicker}</p>
 					<h2 className="text-xl font-semibold">Repos</h2>
 					<p className="mt-1 text-sm text-muted-foreground">Rien de prévu ce jour.</p>
-					<Button variant="tertiary" size="compact" className="mt-3" disabled={disabled} onClick={() => onLog(null)}>+ Séance libre</Button>
+					<Button variant="tertiary" size="compact" leadingIcon={Plus} className="mt-3" disabled={disabled} onClick={() => onLog(null)}>Séance libre</Button>
 				</section>
 			) : (
 				day.workouts.map(workout => <WorkoutCard key={workout.id} plan={plan} day={day} kicker={kicker} workout={workout} disabled={disabled} onDemo={onDemo} onLog={onLog} />)

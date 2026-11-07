@@ -1,6 +1,6 @@
 /** A log's figures as a row of cells, and the dialog that sums a session up once it is logged, with the records it beat. */
 import { Star } from "lucide-react";
-import type { Measurement, Metric, WorkoutLog } from "../../../src/shared/sport";
+import type { Exercise, Measurement, Metric, WorkoutLog } from "../../../src/shared/sport";
 import { Button } from "@/components/ui/button";
 import { hashForSport } from "../../routing";
 import { amount, type Beaten, duration, effortWord, sendsText, shortDate, signedKg } from "../../sport-view";
@@ -23,10 +23,12 @@ export function Stats({ cells }: { cells: { label: string; value: string }[] }) 
 /** A log's effort as its figures show it: `8/10 · dur`, `—` without one. */
 export const effortText = (rpe: number | null): string => (rpe === null ? "—" : `${rpe}/10 · ${effortWord(rpe).toLowerCase()}`);
 
-/** The heaviest load a log lifted, `—` without one. */
-export function heaviest(log: WorkoutLog): string {
-	const kgs = Object.values(log.loads);
-	return kgs.length ? signedKg(Math.max(...kgs)) : "—";
+/** The heaviest of `loads` with its exercise's name from `exercises`, `+35 kg · Tractions lestées`, `—` without one. */
+export function heaviest(loads: Record<string, number>, exercises: Exercise[]): string {
+	const top = Object.entries(loads).reduce<[string, number] | null>((best, entry) => (best === null || entry[1] > best[1] ? entry : best), null);
+	if (top === null) return "—";
+	const name = exercises.find(({ key }) => key === top[0])?.name;
+	return name ? `${signedKg(top[1])} · ${name}` : signedKg(top[1]);
 }
 
 /** What a save sums up: the log, the minutes its workout planned, the records it beat, and the max a test measured. */
@@ -37,7 +39,7 @@ export interface Saved {
 	test: { metric: Metric; value: number; was: Measurement | null } | null;
 }
 
-export function SummaryDialog({ saved: { log, minutes, beaten, test }, onClose }: { saved: Saved; onClose: () => void }) {
+export function SummaryDialog({ saved: { log, minutes, beaten, test }, exercises, onClose }: { saved: Saved; exercises: Exercise[]; onClose: () => void }) {
 	return (
 		<SportDialog title="Séance notée" onClose={onClose} className="top-[15%] w-[min(32rem,calc(100vw-2rem))]">
 			<div className="flex flex-col gap-4 px-5 pt-3 pb-4">
@@ -48,7 +50,7 @@ export function SummaryDialog({ saved: { log, minutes, beaten, test }, onClose }
 				<Stats
 					cells={[
 						{ label: "Durée prévue", value: minutes === null ? "—" : duration(minutes) },
-						{ label: "Charge", value: heaviest(log) },
+						{ label: "Charge max", value: heaviest(log.loads, exercises) },
 						{ label: "Réussites", value: sendsText(log.climbs) },
 						{ label: "Effort", value: effortText(log.rpe) },
 					]}
