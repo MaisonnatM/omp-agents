@@ -47,7 +47,7 @@ describe("parseSportState", () => {
 			load: { kind: "of-max", metric: "max", fraction: 0.87, offsetKg: 0 },
 			note: "",
 			demo: null,
-			opensAs: null,
+			opensAs: [],
 			hang: true,
 		});
 		expect(state?.plan?.phases[0]?.week).toEqual({ mon: [], tue: [{ workout: "mardi", optional: false }], wed: [], thu: [], fri: [], sat: [], sun: [] });

@@ -11,7 +11,7 @@ export const exercise = (key: string, name: string, fields: Partial<Exercise> = 
 	load: null,
 	note: "",
 	demo: null,
-	opensAs: null,
+	opensAs: [],
 	hang: false,
 	...fields,
 });

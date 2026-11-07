@@ -1,5 +1,5 @@
 /** The Sport module's state, which `sport.json` holds and the server alone writes, and the changes the page and the agent send. */
-import { DAY_MS } from "./days";
+import type { DayKey } from "./days";
 
 export const SPORT_VERSION = 1;
 
@@ -17,16 +17,6 @@ export const FRENCH_GRADES = [
 ] as const;
 
 export type FrenchGrade = (typeof FRENCH_GRADES)[number];
-
-export const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
-export type Weekday = (typeof WEEKDAYS)[number];
-
-/** `day`, as `YYYY-MM-DD`, moved by `days` on the calendar alone, so no time zone or daylight saving change shifts it. */
-export const addDays = (day: string, days: number): string => new Date(Date.parse(day) + days * DAY_MS).toISOString().slice(0, 10);
-
-export const weekdayOf = (day: string): Weekday => WEEKDAYS[(new Date(Date.parse(day)).getUTCDay() + 6) % 7]!;
-
-export const mondayOf = (day: string): string => addDays(day, -WEEKDAYS.indexOf(weekdayOf(day)));
 
 export const PLACES = ["home", "gym", "outdoor"] as const;
 export type Place = (typeof PLACES)[number];
@@ -84,7 +74,7 @@ export interface Exercise {
 	note: string;
 	demo: Demo | null;
 	/** The exercises this one opens as, such as a hip routine's three stretches, by key. */
-	opensAs: string[] | null;
+	opensAs: string[];
 	/** A hang on the fingers, which a finger pain flag removes. */
 	hang: boolean;
 }
@@ -116,7 +106,7 @@ export interface Slot {
 	optional: boolean;
 }
 
-export type WeekSlots = Record<Weekday, Slot[]>;
+export type WeekSlots = Record<DayKey, Slot[]>;
 
 /** A stretch of the plan, start and end included, with its standard week and the lighter week its deload Mondays start. */
 export interface Phase {

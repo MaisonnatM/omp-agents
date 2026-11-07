@@ -4,6 +4,7 @@
  * refuses the whole state or change, never a part of it. Fields the module does not know drop.
  */
 import { isBoolean, isDay, isNonEmpty, isNumber, isObject, isSafeInteger, oneOf, parseAll } from "./json";
+import { DAY_KEYS, weekdayOf } from "./shared/days";
 import {
 	CLIMB_KINDS,
 	type Climb,
@@ -26,11 +27,9 @@ import {
 	type SportChange,
 	type SportState,
 	type Target,
-	WEEKDAYS,
 	type WeekSlots,
 	type Workout,
 	type WorkoutLog,
-	weekdayOf,
 } from "./shared/sport";
 
 export const MAX_SPORT_ID = 200;
@@ -63,10 +62,10 @@ function parseDemo(value: unknown): Demo | null {
 
 function parseExercise(value: unknown): Exercise | null {
 	if (!isObject(value)) return null;
-	const { key, name, sets = null, reps = null, holdSec = null, restSec = null, note = "", opensAs = null, hang = false } = value;
+	const { key, name, sets = null, reps = null, holdSec = null, restSec = null, note = "", opensAs = [], hang = false } = value;
 	if (!isId(key) || !isText(name) || !isText(note) || !isBoolean(hang)) return null;
 	if (!isCount(sets) || !isCount(reps) || !isCount(holdSec) || !isCount(restSec)) return null;
-	if (!(opensAs === null || (Array.isArray(opensAs) && opensAs.every(isId)))) return null;
+	if (!(Array.isArray(opensAs) && opensAs.every(isId))) return null;
 	const load = value.load == null ? null : parseLoadRule(value.load);
 	const demo = value.demo == null ? null : parseDemo(value.demo);
 	if ((value.load != null && !load) || (value.demo != null && !demo)) return null;
@@ -82,7 +81,7 @@ function parseSlot(value: unknown): Slot | null {
 function parseWeekSlots(value: unknown): WeekSlots | null {
 	if (!isObject(value)) return null;
 	const week: Partial<WeekSlots> = {};
-	for (const day of WEEKDAYS) {
+	for (const day of DAY_KEYS) {
 		const slots = parseAll(value[day] ?? [], parseSlot);
 		if (!slots) return null;
 		week[day] = slots;
@@ -153,13 +152,13 @@ function parsePlan(value: unknown): Plan | null {
 	const byStart = phases.toSorted((a, b) => a.start.localeCompare(b.start));
 	if (byStart.some((phase, i) => i > 0 && phase.start <= byStart[i - 1]!.end)) return null;
 	const workoutIds = new Set(workouts.map(({ id }) => id));
-	const slots = [...phases.flatMap(({ week, deloadWeek }) => WEEKDAYS.flatMap(day => [...week[day], ...deloadWeek[day]])), ...overrides.flatMap(({ slots }) => slots)];
+	const slots = [...phases.flatMap(({ week, deloadWeek }) => DAY_KEYS.flatMap(day => [...week[day], ...deloadWeek[day]])), ...overrides.flatMap(({ slots }) => slots)];
 	if (!slots.every(({ workout }) => workoutIds.has(workout))) return null;
 	const routineIds = new Set(routines.map(({ id }) => id));
 	if (!habits.every(({ routine }) => routine === null || routineIds.has(routine))) return null;
 	const exercises = [...workouts.flatMap(({ blocks }) => blocks.flatMap(({ items }) => items)), ...routines.flatMap(({ items }) => items)];
 	const keys = new Set(exercises.map(({ key }) => key));
-	if (!exercises.every(({ opensAs }) => opensAs === null || opensAs.every(key => keys.has(key)))) return null;
+	if (!exercises.every(({ opensAs }) => opensAs.every(key => keys.has(key)))) return null;
 	return { title, habits, routines, workouts, phases, overrides };
 }
 
