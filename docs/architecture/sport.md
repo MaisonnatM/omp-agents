@@ -38,6 +38,19 @@ A file that does not read, or that comes from a newer version, moves aside to `s
 The `ListRegistry` connects `sport-change` client changes to `sport` snapshots on the roster topic.
 The page keeps the latest snapshot in `DashboardState.sport`, `null` until the first one comes.
 
+## The agent
+
+A personal session's `sport` tool never writes `sport.json`; it leaves each change as a JSON file in `sportInboxDir`, `<data dir>/sport-inbox`, and the server stays the file's only writer.
+See [Personal sessions](personal-sessions.md) for the tool's actions.
+`SportInbox` in `src/server/sport-inbox.ts` builds on `JsonInboxDir`, so the dashboard that holds the owner lock applies the files oldest first, through the same `ListRegistry` path as the page, and a stopped dashboard leaves them for the next start.
+
+`agentSportChange` in `src/sport-agent.ts` decides what an agent may change, the same for the tool before it leaves a file and for the inbox before it applies one.
+An agent may set the plan, the targets, and the metrics.
+It may add a log or a measurement only in a session's name, its `addedBy`, and edit one only when an agent wrote it.
+It may never edit what the user wrote, nor remove or restore anything; only the Sport page does.
+A change must also pass `sportRefusal` in `src/sport.ts` against the state at hand, so a change naming an unknown metric, or a `set-metrics` dropping one still in use, says why rather than vanishing.
+The inbox sets a refused file aside as `.invalid` and logs the reason.
+
 ## The week
 
 `src/sport-week.ts` derives everything else, the same for the page and the agent.
