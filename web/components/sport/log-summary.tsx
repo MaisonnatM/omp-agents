@@ -14,7 +14,7 @@ export function Stats({ cells }: { cells: { label: string; value: string }[] }) 
 			{cells.map(({ label, value }) => (
 				<div key={label} className="bg-background px-3 py-2">
 					<dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{label}</dt>
-					<dd className="truncate text-sm font-medium tabular-nums">{value}</dd>
+					<dd className="text-sm font-medium text-pretty break-words tabular-nums">{value}</dd>
 				</div>
 			))}
 		</dl>
