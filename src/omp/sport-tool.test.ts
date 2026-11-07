@@ -58,6 +58,7 @@ test("week shows each day's phase, workouts, and loads from the newest test, and
 	const { painFlags, days } = JSON.parse(await tool.call({ action: "week", date: "2026-11-19" }));
 	expect(painFlags).toEqual([{ logId: "p", date: "2026-11-16", level: 4, where: "elbow", until: "2026-11-23" }]);
 	expect(days.map(({ date, phase }: { date: string; phase: string }) => [date, phase])).toEqual(["16", "17", "18", "19", "20", "21", "22"].map(day => [`2026-11-${day}`, "transition"]));
+	expect(days[1].workouts.map(({ id, kind }: { id: string; kind: string }) => [id, kind])).toEqual([["mardi", "hangboard"]]);
 	const semi = days[1].workouts[0].blocks[1].items[0];
 	expect(semi).toEqual({ key: "semi", name: SEMI.name, sets: 5, reps: null, holdSec: 10, restSec: 180, hang: true, note: "", load: loadFor(STATE, SEMI, "2026-11-17"), removed: false });
 });
@@ -90,6 +91,13 @@ test("on a fresh state a plan needs its metrics, which set_plan takes along, and
 	await expect(tool.call({ action: "set_plan" })).rejects.toThrow("set_plan needs plan, the whole plan, or null to clear it.");
 	await tool.call({ action: "set_plan", plan: null });
 	expect(tool.state().plan).toBeNull();
+});
+
+test("a plan with a workout that leaves out its kind is refused with the field, and nothing is left", async () => {
+	const tool = sport();
+	const plan = STATE.plan && { ...STATE.plan, workouts: STATE.plan.workouts.map(({ kind: _kind, ...workout }) => workout) };
+	await expect(tool.call({ action: "set_plan", plan })).rejects.toThrow("plan.workouts[0].kind must be one of hangboard, boulder, route, hip, strength");
+	expect(() => tool.left()).toThrow("ENOENT");
 });
 
 test("a plan over 64 KB is refused before anything is left", async () => {

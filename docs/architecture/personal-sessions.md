@@ -31,7 +31,8 @@ No inbox and no server writer stand between `remember` and the file, as with a B
 `set_plan`, `set_targets`, and `measure` take an optional `metrics` list, merged by id into the state's metrics and left as a `set-metrics` before the change, since a fresh state holds no metric for a load rule, a target, or a measurement to name.
 The tool checks every change with `agentSportChange` against the state the ones before it leave, and leaves none when one is refused, so the agent reads the reason.
 It then leaves each change in the inbox with the kit's `leave`, whose names rise strictly within a process, so the dashboard applies them in order.
-The description tells the agent to check a video through YouTube's oEmbed address before it writes one, and never to invent an id.
+The description lists the workout kinds from `WORKOUT_KINDS` and tells the agent to state each workout's `kind`, the one a mixed session leads with, since a plan without it is refused.
+It also tells the agent to check a video through YouTube's oEmbed address before it writes one, and never to invent an id.
 
 ## Extension kit
 
