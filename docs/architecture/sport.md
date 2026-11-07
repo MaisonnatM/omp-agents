@@ -24,9 +24,12 @@ Every metric id in the state names one of its metrics: a change that names a met
 A change that changes nothing or is refused returns the same state, so the `ListRegistry` resends the state only to the socket that sent it.
 
 `SportFile` uses `ReducerFile` to keep `sport.json` beside the access token.
-`parseSportState` and `parseSportChange` in `src/sport-parse.ts` read the file and the socket's changes with the same field rules.
-A missing optional field takes its default and a field the module does not know drops; a field that is there but wrong refuses the whole state or change.
-A plan whose slots, habits, or `opensAs` lists name nothing, whose ids repeat, whose phases overlap, or whose deload Mondays fall outside their phase is refused.
+`parseSportState` and `parseSportChange` in `src/sport-parse.ts` read the file and the socket's changes with the same field parsers under two rule tables.
+A missing optional field takes its default and a field the module does not know drops; a field of the wrong shape or type refuses the whole state or change.
+The file is held to shapes and types alone, so a length limit, a range, or a plan check tightened later never refuses data already saved.
+A change is also held to the length and range limits, a YouTube id of 11 characters, and lists of at most 200 items.
+A `set-plan` is refused when its slots, habits, or `opensAs` lists name nothing, its ids or override days repeat, a phase ends before it starts or overlaps another, or a deload Monday is not a Monday of its phase; a `set-targets` or `set-metrics` is refused when its ids repeat.
+A refused change says why, with the path of the first wrong field and the rule it broke, such as `plan.routines[0].items[0].demo.youtubeId must be 11 characters`.
 A file that does not read, or that comes from a newer version, moves aside to `sport.json.invalid` rather than being overwritten.
 The `ListRegistry` connects `sport-change` client changes to `sport` snapshots on the roster topic.
 

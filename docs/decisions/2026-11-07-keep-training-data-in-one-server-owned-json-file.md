@@ -18,5 +18,6 @@ We accept that the plan is no longer a document the user edits by hand, and that
 
 ## Consequences
 
-`src/sport-parse.ts` refuses a malformed file whole and `SportFile` moves it to `sport.json.invalid`, so a bad hand edit never silently loses data.
+`src/sport-parse.ts` refuses a file of the wrong shape whole and `SportFile` moves it to `sport.json.invalid`, so a bad hand edit never silently loses data.
+The file is read with types alone and only changes meet the limits and the plan checks, so a rule tightened later never refuses a saved file.
 The agent tool will write through the server rather than the file, as the notes inbox does.

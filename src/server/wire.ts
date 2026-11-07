@@ -366,7 +366,7 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	},
 	"sport-change"(value) {
 		const change = parseSportChange(value.change);
-		return change && { ok: { t: "sport-change", change } };
+		return "ok" in change ? { ok: { t: "sport-change", change: change.ok } } : null;
 	},
 	routine(value) {
 		const change = parseRoutineChange(value.change);

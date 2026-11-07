@@ -1,16 +1,17 @@
 /**
- * Reading the Sport module's state and its changes from untyped JSON: `sport.json` and the page's `sport-change` messages.
- * A field left out reads as its default, so a file from an older version still reads; a field that is there but wrong
- * refuses the whole state or change, never a part of it. Fields the module does not know drop.
+ * Reading the Sport module's state and its changes from untyped JSON: `sport.json` and the `sport-change` messages of
+ * the page and the agent. A field left out reads as its default, so a file from an older version still reads, and fields
+ * the module does not know drop. The file is held to shapes and types alone, so a rule tightened later never refuses
+ * data already saved; a change is also held to the length and range limits and to a plan whose names point somewhere.
+ * A wrong field refuses the whole state or change, and a change's refusal names the field and the rule it broke.
  */
-import { isBoolean, isDay, isNonEmpty, isNumber, isObject, isSafeInteger, oneOf, parseAll } from "./json";
+import { isBoolean, isDay, isNonEmpty, isNumber, isObject, isSafeInteger, isString, nullable, oneOf, type Parsed, recordOf } from "./json";
 import { DAY_KEYS, weekdayOf } from "./shared/days";
 import {
 	CLIMB_KINDS,
 	type Climb,
 	type Demo,
 	type Exercise,
-	exercisesOf,
 	FRENCH_GRADES,
 	type Habit,
 	type LoadRule,
@@ -33,246 +34,386 @@ import {
 	type WorkoutLog,
 } from "./shared/sport";
 
+/** The longest id, short text, and note a change may carry, and the most items any of its lists may hold. */
 export const MAX_SPORT_ID = 200;
+export const MAX_SPORT_TEXT = 200;
+export const MAX_SPORT_NOTE = 4000;
+export const MAX_SPORT_ITEMS = 200;
 
-const isId = (value: unknown): value is string => isNonEmpty(value) && value.length <= MAX_SPORT_ID;
-const isText = (value: unknown): value is string => typeof value === "string";
-const isOptionalId = (value: unknown): value is string | null => value === null || isId(value);
-const isCount = (value: unknown): value is number | null => value === null || (isSafeInteger(value) && value >= 0);
-const isGrade = oneOf(FRENCH_GRADES);
-const YOUTUBE_ID = /^[\w-]{11}$/;
-
-const distinct = (ids: string[]): boolean => new Set(ids).size === ids.length;
-
-function parseLoadRule(value: unknown): LoadRule | null {
-	if (!isObject(value)) return null;
-	if (value.kind === "fixed") return isNumber(value.kg) ? { kind: "fixed", kg: value.kg } : null;
-	if (value.kind !== "of-max") return null;
-	const { metric, fraction, offsetKg = 0, less = null } = value;
-	return isId(metric) && isNumber(fraction) && fraction > 0 && fraction <= 1 && isNumber(offsetKg) && isOptionalId(less) ? { kind: "of-max", metric, fraction, offsetKg, less } : null;
+/** A check a field must pass, and how its refusal ends. */
+interface Rule<T> {
+	is: (value: unknown) => value is T;
+	must: string;
 }
 
-function parseDemo(value: unknown): Demo | null {
-	if (!isObject(value)) return null;
-	const { youtubeId, by = "", cues, caution = null } = value;
-	if (typeof youtubeId !== "string" || !YOUTUBE_ID.test(youtubeId) || !isText(by) || !(caution === null || isText(caution))) return null;
-	if (!Array.isArray(cues) || cues.length !== 3 || !cues.every(isText)) return null;
-	const [first, second, third] = cues;
-	return { youtubeId, by, cues: [first, second, third], caution };
+/** Thrown inside the parse with the path of the wrong field and its rule, and caught where the parse starts. */
+class Refused extends Error {}
+
+function refuse(path: string, must: string): never {
+	throw new Refused(`${path} ${must}`);
 }
 
-function parseExercise(value: unknown): Exercise | null {
-	if (!isObject(value)) return null;
-	const { key, name, sets = null, reps = null, holdSec = null, restSec = null, note = "", opensAs = [], hang = false } = value;
-	if (!isId(key) || !isText(name) || !isText(note) || !isBoolean(hang)) return null;
-	if (!isCount(sets) || !isCount(reps) || !isCount(holdSec) || !isCount(restSec)) return null;
-	if (!(Array.isArray(opensAs) && opensAs.every(isId))) return null;
-	const load = value.load == null ? null : parseLoadRule(value.load);
-	const demo = value.demo == null ? null : parseDemo(value.demo);
-	if ((value.load != null && !load) || (value.demo != null && !demo)) return null;
-	return { key, name, sets, reps, holdSec, restSec, load, note, demo, opensAs, hang };
+const field = <T>(value: unknown, path: string, rule: Rule<T>): T => (rule.is(value) ? value : refuse(path, rule.must));
+
+const orNull = <T>(rule: Rule<T>): Rule<T | null> => ({ is: nullable(rule.is), must: `${rule.must}, or null` });
+
+const choice = <const T extends string>(values: readonly T[]): Rule<T> => ({ is: oneOf(values), must: `must be one of ${values.join(", ")}` });
+
+const wholeFrom = (min: number, max = Number.MAX_SAFE_INTEGER): Rule<number> => ({
+	is: (value): value is number => isSafeInteger(value) && value >= min && value <= max,
+	must: max === Number.MAX_SAFE_INTEGER ? `must be a whole number from ${min}` : `must be a whole number from ${min} to ${max}`,
+});
+
+const textUpTo = (max: number): Rule<string> => ({ is: (value): value is string => isString(value) && value.length <= max, must: `must be a string of at most ${max} characters` });
+
+const STRING: Rule<string> = { is: isString, must: "must be a string" };
+const NUMBER: Rule<number> = { is: isNumber, must: "must be a number" };
+const BOOLEAN: Rule<boolean> = { is: isBoolean, must: "must be true or false" };
+const DAY: Rule<string> = { is: isDay, must: "must be a YYYY-MM-DD day" };
+const GRADE: Rule<(typeof FRENCH_GRADES)[number]> = { is: oneOf(FRENCH_GRADES), must: "must be a French grade such as 7a+" };
+const PLACE = choice(PLACES);
+const CLIMB_KIND = choice(CLIMB_KINDS);
+const PAIN_PLACE = choice(PAIN_PLACES);
+const TARGET_KIND = choice(["metric", ...CLIMB_KINDS]);
+const SENT_ID: Rule<string> = { is: (value): value is string => isNonEmpty(value) && value.length <= MAX_SPORT_ID, must: `must be 1 to ${MAX_SPORT_ID} characters` };
+
+/** What the fields of a state or a change must be, by kind of field. */
+interface Rules {
+	id: Rule<string>;
+	name: Rule<string>;
+	text: Rule<string>;
+	note: Rule<string>;
+	count: Rule<number>;
+	fraction: Rule<number>;
+	youtubeId: Rule<string>;
+	rpe: Rule<number>;
+	painLevel: Rule<number>;
+	attempts: Rule<number>;
+	loads: Rule<Record<string, number>>;
+	items: number;
 }
 
-function parseSlot(value: unknown): Slot | null {
-	if (!isObject(value)) return null;
-	const { workout, optional = false } = value;
-	return isId(workout) && isBoolean(optional) ? { workout, optional } : null;
+const STORED: Rules = {
+	id: STRING,
+	name: STRING,
+	text: STRING,
+	note: STRING,
+	count: NUMBER,
+	fraction: NUMBER,
+	youtubeId: STRING,
+	rpe: NUMBER,
+	painLevel: NUMBER,
+	attempts: NUMBER,
+	loads: { is: recordOf(isNumber), must: "must map exercise keys to numbers" },
+	items: Number.POSITIVE_INFINITY,
+};
+
+const SENT: Rules = {
+	id: SENT_ID,
+	name: { is: (value): value is string => isNonEmpty(value) && value.length <= MAX_SPORT_TEXT, must: `must be 1 to ${MAX_SPORT_TEXT} characters` },
+	text: textUpTo(MAX_SPORT_TEXT),
+	note: textUpTo(MAX_SPORT_NOTE),
+	count: wholeFrom(0),
+	fraction: { is: (value): value is number => isNumber(value) && value > 0 && value <= 1, must: "must be above 0 and at most 1" },
+	youtubeId: { is: (value): value is string => isString(value) && /^[\w-]{11}$/.test(value), must: "must be 11 characters" },
+	rpe: wholeFrom(1, 10),
+	painLevel: wholeFrom(0, 10),
+	attempts: wholeFrom(1),
+	loads: {
+		is: (value): value is Record<string, number> => recordOf(isNumber)(value) && Object.keys(value).length <= MAX_SPORT_ITEMS && Object.keys(value).every(SENT_ID.is),
+		must: `must map up to ${MAX_SPORT_ITEMS} exercise keys of 1 to ${MAX_SPORT_ID} characters to numbers`,
+	},
+	items: MAX_SPORT_ITEMS,
+};
+
+type Parse<T> = (value: unknown, path: string, rules: Rules) => T;
+
+const ruled =
+	<T>(rule: Rule<T>): Parse<T> =>
+	(value, path) =>
+		field(value, path, rule);
+
+const pathTo = (path: string, key: string): string => (path ? `${path}.${key}` : key);
+
+function listOf<T>(value: unknown, path: string, rules: Rules, parse: Parse<T>): T[] {
+	if (!Array.isArray(value)) refuse(path, "must be a list");
+	if (value.length > rules.items) refuse(path, `must hold at most ${rules.items} items`);
+	return value.map((item, i) => parse(item, `${path}[${i}]`, rules));
 }
 
-function parseWeekSlots(value: unknown): WeekSlots | null {
-	if (!isObject(value)) return null;
-	const week: Partial<WeekSlots> = {};
-	for (const day of DAY_KEYS) {
-		const slots = parseAll(value[day] ?? [], parseSlot);
-		if (!slots) return null;
-		week[day] = slots;
-	}
-	return week as WeekSlots;
-}
-
-const NO_WEEK: WeekSlots = { mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] };
-
-function parsePhase(value: unknown): Phase | null {
-	if (!isObject(value)) return null;
-	const { id, name, start, end, deloadMondays = [] } = value;
-	if (!isId(id) || !isText(name) || !isDay(start) || !isDay(end) || start > end) return null;
-	const week = parseWeekSlots(value.week ?? NO_WEEK);
-	const deloadWeek = parseWeekSlots(value.deloadWeek ?? NO_WEEK);
-	if (!week || !deloadWeek || !Array.isArray(deloadMondays)) return null;
-	if (!deloadMondays.every((day): day is string => isDay(day) && weekdayOf(day) === "mon" && day >= start && day <= end)) return null;
-	return { id, name, start, end, week, deloadWeek, deloadMondays };
-}
-
-function parseWorkout(value: unknown): Workout | null {
-	if (!isObject(value)) return null;
-	const { id, name, place, minutes = 0 } = value;
-	if (!isId(id) || !isText(name) || !oneOf(PLACES)(place) || !isCount(minutes) || minutes === null) return null;
-	const blocks = parseAll(value.blocks ?? [], block => {
-		if (!isObject(block)) return null;
-		const { title = "" } = block;
-		const items = parseAll(block.items ?? [], parseExercise);
-		return isText(title) && items ? { title, items } : null;
-	});
-	return blocks && { id, name, place, minutes, blocks };
-}
-
-function parseRoutine(value: unknown): Routine | null {
-	if (!isObject(value)) return null;
-	const { id, name, minutes = 0 } = value;
-	const items = parseAll(value.items ?? [], parseExercise);
-	return isId(id) && isText(name) && isCount(minutes) && minutes !== null && items ? { id, name, minutes, items } : null;
-}
-
-function parseHabit(value: unknown): Habit | null {
-	if (!isObject(value)) return null;
-	const { label, routine = null } = value;
-	return isNonEmpty(label) && isOptionalId(routine) ? { label, routine } : null;
-}
-
-function parseOverride(value: unknown): Override | null {
-	if (!isObject(value)) return null;
-	const { date } = value;
-	const slots = parseAll(value.slots ?? [], parseSlot);
-	return isDay(date) && slots ? { date, slots } : null;
-}
-
-/**
- * A plan whose every name points somewhere: slots at workouts, habits at routines, `opensAs` at exercises, and ids, phase
- * spans, and override days that do not overlap.
- */
-function parsePlan(value: unknown): Plan | null {
-	if (!isObject(value)) return null;
-	const { title = "" } = value;
-	const habits = parseAll(value.habits ?? [], parseHabit);
-	const routines = parseAll(value.routines ?? [], parseRoutine);
-	const workouts = parseAll(value.workouts ?? [], parseWorkout);
-	const phases = parseAll(value.phases ?? [], parsePhase);
-	const overrides = parseAll(value.overrides ?? [], parseOverride);
-	if (!isText(title) || !habits || !routines || !workouts || !phases || !overrides) return null;
-	if (!distinct(workouts.map(({ id }) => id)) || !distinct(routines.map(({ id }) => id)) || !distinct(phases.map(({ id }) => id)) || !distinct(overrides.map(({ date }) => date))) return null;
-	const byStart = phases.toSorted((a, b) => a.start.localeCompare(b.start));
-	if (byStart.some((phase, i) => i > 0 && phase.start <= byStart[i - 1]!.end)) return null;
-	const workoutIds = new Set(workouts.map(({ id }) => id));
-	const slots = [...phases.flatMap(({ week, deloadWeek }) => DAY_KEYS.flatMap(day => [...week[day], ...deloadWeek[day]])), ...overrides.flatMap(({ slots }) => slots)];
-	if (!slots.every(({ workout }) => workoutIds.has(workout))) return null;
-	const routineIds = new Set(routines.map(({ id }) => id));
-	if (!habits.every(({ routine }) => routine === null || routineIds.has(routine))) return null;
-	const exercises = exercisesOf({ title, habits, routines, workouts, phases, overrides });
-	const keys = new Set(exercises.map(({ key }) => key));
-	if (!exercises.every(({ opensAs }) => opensAs.every(key => keys.has(key)))) return null;
-	return { title, habits, routines, workouts, phases, overrides };
-}
-
-function parseMetric(value: unknown): Metric | null {
-	if (!isObject(value)) return null;
-	const { id, label, unit = "", better = "higher" } = value;
-	return isId(id) && isText(label) && isText(unit) && (better === "higher" || better === "lower") ? { id, label, unit, better } : null;
-}
-
-function parseMeasurement(value: unknown): Measurement | null {
-	if (!isObject(value)) return null;
-	const { id, metric, value: measured, at, note = "", addedBy = null } = value;
-	return isId(id) && isId(metric) && isNumber(measured) && isDay(at) && isText(note) && isOptionalId(addedBy) ? { id, metric, value: measured, at, note, addedBy } : null;
-}
-
-function parseTarget(value: unknown): Target | null {
-	if (!isObject(value)) return null;
-	const { id, label, by = null, kind } = value;
-	if (!isId(id) || !isText(label) || !(by === null || isDay(by))) return null;
-	if (kind === "metric") return isId(value.metric) && isNumber(value.value) ? { id, label, by, kind, metric: value.metric, value: value.value } : null;
-	return oneOf(CLIMB_KINDS)(kind) && isGrade(value.grade) ? { id, label, by, kind, grade: value.grade } : null;
-}
-
-function parsePain(value: unknown): Pain | null {
-	if (!isObject(value)) return null;
-	const { level, where } = value;
-	return isSafeInteger(level) && level >= 0 && level <= 10 && oneOf(PAIN_PLACES)(where) ? { level, where } : null;
-}
-
-function parseClimb(value: unknown): Climb | null {
-	if (!isObject(value)) return null;
-	const { kind, grade, color = null, kilter = false, attempts = null } = value;
-	if (!oneOf(CLIMB_KINDS)(kind) || !isGrade(grade) || !(color === null || isText(color)) || !isBoolean(kilter)) return null;
-	return attempts === null || (isSafeInteger(attempts) && attempts >= 1) ? { kind, grade, color, kilter, attempts } : null;
-}
-
-function parseLog(value: unknown): WorkoutLog | null {
-	if (!isObject(value)) return null;
-	const { id, date, workout = null, title = "", status = "done", rpe = null, loads = {}, note = "", addedBy = null } = value;
-	if (!isId(id) || !isDay(date) || !isOptionalId(workout) || !isText(title) || !(status === "done" || status === "skipped")) return null;
-	if (!(rpe === null || (isSafeInteger(rpe) && rpe >= 1 && rpe <= 10)) || !isText(note) || !isOptionalId(addedBy)) return null;
-	const kilos = isObject(loads) && !Array.isArray(loads) ? Object.entries(loads) : null;
-	if (!kilos?.every((entry): entry is [string, number] => isId(entry[0]) && isNumber(entry[1]))) return null;
-	const pain = value.pain == null ? null : parsePain(value.pain);
-	const climbs = parseAll(value.climbs ?? [], parseClimb);
-	if ((value.pain != null && !pain) || !climbs) return null;
-	return { id, date, workout, title, status, rpe, pain, loads: Object.fromEntries(kilos), climbs, note, addedBy };
-}
-
-const isIndex = (value: unknown): value is number => isSafeInteger(value) && value >= 0;
-
-/** What `sport.json` holds, the log and the measurements oldest first, `null` when it holds none or comes from a newer version. */
-export function parseSportState(value: unknown): SportState | null {
-	if (!isObject(value) || Array.isArray(value)) return null;
-	const { v = SPORT_VERSION } = value;
-	if (!isSafeInteger(v) || v > SPORT_VERSION) return null;
-	const metrics = parseAll(value.metrics ?? [], parseMetric);
-	const measurements = parseAll(value.measurements ?? [], parseMeasurement);
-	const targets = parseAll(value.targets ?? [], parseTarget);
-	const plan = value.plan == null ? null : parsePlan(value.plan);
-	const log = parseAll(value.log ?? [], parseLog);
-	if (!metrics || !measurements || !targets || (value.plan != null && !plan) || !log) return null;
-	if (!distinct(metrics.map(({ id }) => id)) || !distinct(measurements.map(({ id }) => id)) || !distinct(targets.map(({ id }) => id)) || !distinct(log.map(({ id }) => id))) return null;
+/** The fields of the object at `path`, each read under `rules` and refused with its own path. */
+function fieldsOf(value: unknown, path: string, rules: Rules) {
+	if (!isObject(value) || Array.isArray(value)) refuse(path || "the value", "must be an object");
+	const object = value;
 	return {
-		v: SPORT_VERSION,
-		metrics,
-		measurements: measurements.toSorted((a, b) => a.at.localeCompare(b.at)),
-		targets,
-		plan,
-		log: log.toSorted((a, b) => a.date.localeCompare(b.date)),
+		/** The field through `rule`, `fallback` when it is left out. */
+		one: <T>(key: string, rule: Rule<T>, fallback?: T): T => field(object[key] === undefined ? fallback : object[key], pathTo(path, key), rule),
+		/** The object at `key`, read from `fallback` when it is left out. */
+		nested: <T>(key: string, parse: Parse<T>, fallback?: unknown): T => parse(object[key] === undefined ? fallback : object[key], pathTo(path, key), rules),
+		/** The object at `key`, `null` when it is left out or null. */
+		maybe: <T>(key: string, parse: Parse<T>): T | null => (object[key] == null ? null : parse(object[key], pathTo(path, key), rules)),
+		/** The list at `key`, empty when it is left out. */
+		list: <T>(key: string, parse: Parse<T>): T[] => listOf(object[key] ?? [], pathTo(path, key), rules, parse),
 	};
 }
 
-/** One change from the page, whole, or `null` when any part of it is wrong. */
-export function parseSportChange(value: unknown): SportChange | null {
-	if (!isObject(value)) return null;
-	const { op, id, index } = value;
+const parseLoadRule: Parse<LoadRule> = (value, path, rules) => {
+	const read = fieldsOf(value, path, rules);
+	const kind = read.one("kind", choice(["of-max", "fixed"]));
+	if (kind === "fixed") return { kind, kg: read.one("kg", NUMBER) };
+	return { kind, metric: read.one("metric", rules.id), fraction: read.one("fraction", rules.fraction), offsetKg: read.one("offsetKg", NUMBER, 0), less: read.one("less", orNull(rules.id), null) };
+};
+
+const parseDemo: Parse<Demo> = (value, path, rules) => {
+	const read = fieldsOf(value, path, rules);
+	const youtubeId = read.one("youtubeId", rules.youtubeId);
+	const [first, second, third, ...more] = read.list("cues", ruled(rules.text));
+	if (third === undefined || more.length > 0) refuse(pathTo(path, "cues"), "must be 3 cues");
+	return { youtubeId, by: read.one("by", rules.text, ""), cues: [first!, second!, third], caution: read.one("caution", orNull(rules.note), null) };
+};
+
+const parseExercise: Parse<Exercise> = (value, path, rules) => {
+	const read = fieldsOf(value, path, rules);
+	const count = orNull(rules.count);
+	return {
+		key: read.one("key", rules.id),
+		name: read.one("name", rules.name),
+		sets: read.one("sets", count, null),
+		reps: read.one("reps", count, null),
+		holdSec: read.one("holdSec", count, null),
+		restSec: read.one("restSec", count, null),
+		load: read.maybe("load", parseLoadRule),
+		note: read.one("note", rules.note, ""),
+		demo: read.maybe("demo", parseDemo),
+		opensAs: read.list("opensAs", ruled(rules.id)),
+		hang: read.one("hang", BOOLEAN, false),
+	};
+};
+
+const parseSlot: Parse<Slot> = (value, path, rules) => {
+	const read = fieldsOf(value, path, rules);
+	return { workout: read.one("workout", rules.id), optional: read.one("optional", BOOLEAN, false) };
+};
+
+const parseWeekSlots: Parse<WeekSlots> = (value, path, rules) => {
+	const read = fieldsOf(value, path, rules);
+	return { mon: read.list("mon", parseSlot), tue: read.list("tue", parseSlot), wed: read.list("wed", parseSlot), thu: read.list("thu", parseSlot), fri: read.list("fri", parseSlot), sat: read.list("sat", parseSlot), sun: read.list("sun", parseSlot) };
+};
+
+const parsePhase: Parse<Phase> = (value, path, rules) => {
+	const read = fieldsOf(value, path, rules);
+	return {
+		id: read.one("id", rules.id),
+		name: read.one("name", rules.name),
+		start: read.one("start", DAY),
+		end: read.one("end", DAY),
+		week: read.nested("week", parseWeekSlots, {}),
+		deloadWeek: read.nested("deloadWeek", parseWeekSlots, {}),
+		deloadMondays: read.list("deloadMondays", ruled(DAY)),
+	};
+};
+
+const parseBlock: Parse<Workout["blocks"][number]> = (value, path, rules) => {
+	const read = fieldsOf(value, path, rules);
+	return { title: read.one("title", rules.text, ""), items: read.list("items", parseExercise) };
+};
+
+const parseWorkout: Parse<Workout> = (value, path, rules) => {
+	const read = fieldsOf(value, path, rules);
+	return { id: read.one("id", rules.id), name: read.one("name", rules.name), place: read.one("place", PLACE), minutes: read.one("minutes", rules.count, 0), blocks: read.list("blocks", parseBlock) };
+};
+
+const parseRoutine: Parse<Routine> = (value, path, rules) => {
+	const read = fieldsOf(value, path, rules);
+	return { id: read.one("id", rules.id), name: read.one("name", rules.name), minutes: read.one("minutes", rules.count, 0), items: read.list("items", parseExercise) };
+};
+
+const parseHabit: Parse<Habit> = (value, path, rules) => {
+	const read = fieldsOf(value, path, rules);
+	return { label: read.one("label", rules.name), routine: read.one("routine", orNull(rules.id), null) };
+};
+
+const parseOverride: Parse<Override> = (value, path, rules) => {
+	const read = fieldsOf(value, path, rules);
+	return { date: read.one("date", DAY), slots: read.list("slots", parseSlot) };
+};
+
+const parsePlan: Parse<Plan> = (value, path, rules) => {
+	const read = fieldsOf(value, path, rules);
+	return {
+		title: read.one("title", rules.text, ""),
+		habits: read.list("habits", parseHabit),
+		routines: read.list("routines", parseRoutine),
+		workouts: read.list("workouts", parseWorkout),
+		phases: read.list("phases", parsePhase),
+		overrides: read.list("overrides", parseOverride),
+	};
+};
+
+const parseMetric: Parse<Metric> = (value, path, rules) => {
+	const read = fieldsOf(value, path, rules);
+	return { id: read.one("id", rules.id), label: read.one("label", rules.name), unit: read.one("unit", rules.text, ""), better: read.one("better", choice(["higher", "lower"]), "higher") };
+};
+
+const parseMeasurement: Parse<Measurement> = (value, path, rules) => {
+	const read = fieldsOf(value, path, rules);
+	return {
+		id: read.one("id", rules.id),
+		metric: read.one("metric", rules.id),
+		value: read.one("value", NUMBER),
+		at: read.one("at", DAY),
+		note: read.one("note", rules.note, ""),
+		addedBy: read.one("addedBy", orNull(rules.id), null),
+	};
+};
+
+const parseTarget: Parse<Target> = (value, path, rules) => {
+	const read = fieldsOf(value, path, rules);
+	const target = { id: read.one("id", rules.id), label: read.one("label", rules.name), by: read.one("by", orNull(DAY), null) };
+	const kind = read.one("kind", TARGET_KIND);
+	if (kind === "metric") return { ...target, kind, metric: read.one("metric", rules.id), value: read.one("value", NUMBER) };
+	return { ...target, kind, grade: read.one("grade", GRADE) };
+};
+
+const parsePain: Parse<Pain> = (value, path, rules) => {
+	const read = fieldsOf(value, path, rules);
+	return { level: read.one("level", rules.painLevel), where: read.one("where", PAIN_PLACE) };
+};
+
+const parseClimb: Parse<Climb> = (value, path, rules) => {
+	const read = fieldsOf(value, path, rules);
+	return {
+		kind: read.one("kind", CLIMB_KIND),
+		grade: read.one("grade", GRADE),
+		color: read.one("color", orNull(rules.text), null),
+		kilter: read.one("kilter", BOOLEAN, false),
+		attempts: read.one("attempts", orNull(rules.attempts), null),
+	};
+};
+
+const parseLog: Parse<WorkoutLog> = (value, path, rules) => {
+	const read = fieldsOf(value, path, rules);
+	return {
+		id: read.one("id", rules.id),
+		date: read.one("date", DAY),
+		workout: read.one("workout", orNull(rules.id), null),
+		title: read.one("title", rules.text, ""),
+		status: read.one("status", choice(["done", "skipped"]), "done"),
+		rpe: read.one("rpe", orNull(rules.rpe), null),
+		pain: read.maybe("pain", parsePain),
+		loads: read.one("loads", rules.loads, {}),
+		climbs: read.list("climbs", parseClimb),
+		note: read.one("note", rules.note, ""),
+		addedBy: read.one("addedBy", orNull(rules.id), null),
+	};
+};
+
+function unique<T>(items: T[], path: string, idOf: (item: T) => string): void {
+	const seen = new Set<string>();
+	for (const item of items) {
+		const id = idOf(item);
+		if (seen.has(id)) refuse(path, `must not repeat ${id}`);
+		seen.add(id);
+	}
+}
+
+/**
+ * Refuses a sent plan whose names point nowhere or whose dates disagree: a slot naming no workout, a habit no routine,
+ * an `opensAs` no exercise key, a repeated id or override day, a phase that ends before it starts or overlaps another,
+ * or a deload Monday that is not a Monday of its phase.
+ */
+function checkPlan({ habits, routines, workouts, phases, overrides }: Plan): void {
+	unique(workouts, "plan.workouts", ({ id }) => id);
+	unique(routines, "plan.routines", ({ id }) => id);
+	unique(phases, "plan.phases", ({ id }) => id);
+	unique(overrides, "plan.overrides", ({ date }) => date);
+	const workoutIds = new Set(workouts.map(({ id }) => id));
+	const checkSlots = (slots: Slot[], path: string) => slots.forEach(({ workout }, i) => workoutIds.has(workout) || refuse(`${path}[${i}].workout`, "must name a workout of the plan"));
+	phases.forEach(({ start, end, week, deloadWeek, deloadMondays }, i) => {
+		const path = `plan.phases[${i}]`;
+		if (start > end) refuse(`${path}.end`, "must not come before its start");
+		const overlapped = phases.findIndex((other, j) => j !== i && other.start <= end && start <= other.end);
+		if (overlapped >= 0) refuse(path, `must not overlap plan.phases[${overlapped}]`);
+		deloadMondays.forEach((day, k) => (weekdayOf(day) === "mon" && start <= day && day <= end) || refuse(`${path}.deloadMondays[${k}]`, "must be a Monday within its phase"));
+		for (const day of DAY_KEYS) {
+			checkSlots(week[day], `${path}.week.${day}`);
+			checkSlots(deloadWeek[day], `${path}.deloadWeek.${day}`);
+		}
+	});
+	overrides.forEach(({ slots }, i) => checkSlots(slots, `plan.overrides[${i}].slots`));
+	const routineIds = new Set(routines.map(({ id }) => id));
+	habits.forEach(({ routine }, i) => routine === null || routineIds.has(routine) || refuse(`plan.habits[${i}].routine`, "must name a routine of the plan"));
+	const exercises: [Exercise, string][] = [
+		...workouts.flatMap(({ blocks }, w) => blocks.flatMap(({ items }, b) => items.map((item, i): [Exercise, string] => [item, `plan.workouts[${w}].blocks[${b}].items[${i}]`]))),
+		...routines.flatMap(({ items }, r) => items.map((item, i): [Exercise, string] => [item, `plan.routines[${r}].items[${i}]`])),
+	];
+	const keys = new Set(exercises.map(([{ key }]) => key));
+	for (const [{ opensAs }, path] of exercises) opensAs.forEach((key, k) => keys.has(key) || refuse(`${path}.opensAs[${k}]`, "must name an exercise key of the plan"));
+}
+
+/** What `sport.json` holds, the log and the measurements oldest first, `null` when it holds none or comes from a newer version. */
+export function parseSportState(value: unknown): SportState | null {
+	try {
+		const read = fieldsOf(value, "", STORED);
+		read.one("v", wholeFrom(0, SPORT_VERSION), SPORT_VERSION);
+		return {
+			v: SPORT_VERSION,
+			metrics: read.list("metrics", parseMetric),
+			measurements: read.list("measurements", parseMeasurement).toSorted((a, b) => a.at.localeCompare(b.at)),
+			targets: read.list("targets", parseTarget),
+			plan: read.maybe("plan", parsePlan),
+			log: read.list("log", parseLog).toSorted((a, b) => a.date.localeCompare(b.date)),
+		};
+	} catch (err) {
+		if (err instanceof Refused) return null;
+		throw err;
+	}
+}
+
+function readChange(value: unknown): SportChange {
+	const read = fieldsOf(value, "", SENT);
+	const index = () => read.one("index", wholeFrom(0));
+	const op = read.one("op", STRING);
 	switch (op) {
 		case "set-plan": {
-			if (value.plan === null) return { op, plan: null };
-			const plan = parsePlan(value.plan);
-			return plan && { op, plan };
+			const plan = read.nested("plan", (value, path, rules) => (value === null ? null : parsePlan(value, path, rules)));
+			if (plan) checkPlan(plan);
+			return { op, plan };
 		}
 		case "set-targets": {
-			const targets = parseAll(value.targets, parseTarget);
-			return targets && distinct(targets.map(({ id }) => id)) ? { op, targets } : null;
+			const targets = read.nested("targets", (list, path, rules) => listOf(list, path, rules, parseTarget));
+			unique(targets, "targets", ({ id }) => id);
+			return { op, targets };
 		}
 		case "set-metrics": {
-			const metrics = parseAll(value.metrics, parseMetric);
-			return metrics && distinct(metrics.map(({ id }) => id)) ? { op, metrics } : null;
+			const metrics = read.nested("metrics", (list, path, rules) => listOf(list, path, rules, parseMetric));
+			unique(metrics, "metrics", ({ id }) => id);
+			return { op, metrics };
 		}
 		case "add-measurement":
-		case "edit-measurement": {
-			const measurement = parseMeasurement(value.measurement);
-			return measurement && { op, measurement };
-		}
-		case "restore-measurement": {
-			const measurement = parseMeasurement(value.measurement);
-			return measurement && isIndex(index) ? { op, measurement, index } : null;
-		}
+		case "edit-measurement":
+			return { op, measurement: read.nested("measurement", parseMeasurement) };
+		case "restore-measurement":
+			return { op, measurement: read.nested("measurement", parseMeasurement), index: index() };
 		case "add-log":
-		case "edit-log": {
-			const log = parseLog(value.log);
-			return log && { op, log };
-		}
-		case "restore-log": {
-			const log = parseLog(value.log);
-			return log && isIndex(index) ? { op, log, index } : null;
-		}
+		case "edit-log":
+			return { op, log: read.nested("log", parseLog) };
+		case "restore-log":
+			return { op, log: read.nested("log", parseLog), index: index() };
 		case "remove-measurement":
 		case "remove-log":
-			return isId(id) ? { op, id } : null;
+			return { op, id: read.one("id", SENT_ID) };
 		default:
-			return null;
+			return refuse("op", "must name a Sport change");
+	}
+}
+
+/** One change from the page or the agent, whole, or why it is refused: the path of the first wrong field and its rule. */
+export function parseSportChange(value: unknown): Parsed<SportChange, { error: string }> {
+	try {
+		return { ok: readChange(value) };
+	} catch (err) {
+		if (err instanceof Refused) return { error: err.message };
+		throw err;
 	}
 }
