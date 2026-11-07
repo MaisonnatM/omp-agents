@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-07
 
+- The bell's Out of credit alert now also comes up when DeepSeek says Insufficient Balance, OpenRouter says Insufficient credits, or a monthly spend limit is reached, not only when a provider refuses a request with a payment error.
 - Fixed: a Bot page's model menu now lists the models, instead of staying on Loading models.
 - The API credits row at the bottom of the window turns red and reads used up when Anthropic refuses requests because the key's credit ran out, and the bell's alert now reads Out of credit: API credits.
 - Fixed: with the new omp 18.18.0 credit patch applied, a session whose Anthropic API key runs out of credit moves to the next model in its fallback list and stays off that key, instead of stopping or going back to it.
@@ -209,16 +210,3 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - You can work the Inbox from the keyboard: J and K move, 1 to 9 answer or send a suggestion, 0 sends every suggestion, R replies, D marks done, E ends the session, and the next item opens on its own.
 - An Inbox notice offers the same button as the notices bell: a pull request's quick action, Merge, or Continue all.
 - When a quick action cannot start because another session already works on the same pull request, issue, or todo, the note now names that session and offers Open session and End it and start again, instead of a long error.
-
-## 2026-11-01
-
-- Agents can now land work from a separate worktree while their session sits on main, and the landing report names the checks that passed.
-- A new session no longer opens with long grey lists of the tools its connected services added; the conversation starts with your message.
-- Fixed: when your first message starts with /, to call a skill or a command, the pinned skill's button now hides instead of showing its name crossed out.
-- Fixed: hovering the pinned skill's greyed-out button now says why, when the folder has no skill of that name.
-- Fixed: after a session or a Bot moved up or down in the sidebar, hovering, selecting, or right-clicking a row could light up the row next to it, so it looked like the wrong session was picked.
-- Fixed: a click just between two sidebar rows could open a session from elsewhere in the list after the list reordered.
-- Behind the scenes: the checks for "Merge on main" now pass when an agent runs them from inside a session.
-- New Bot now starts on a new type, Bot designer, named Dr Eggbot with its job filled in, adapted from Lauren Tan's Dr Eggbot Grok Bot.
-- A Bot designer asks you a few short questions about the Bot you want, then creates it for you, and the new Bot shows in the Bots tab.
-- Switching a new Bot's type swaps the name and job that type filled in, and keeps any you typed yourself.
