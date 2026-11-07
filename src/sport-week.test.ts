@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mondayOf } from "./shared/days";
-import { BODYWEIGHT, FRENCH_GRADES, gradeRank, type SportState } from "./shared/sport";
+import { FRENCH_GRADES, gradeRank, type SportState } from "./shared/sport";
 import { ABRAHANGS, log, measurement, OPEN, PULLS, SEMI, STATE, withLogs, withMeasurements } from "./sport-fixtures";
 import { parseSportState } from "./sport-parse";
 import { adherence, bestGrades, loadFor, painFlags, records, weekPlan } from "./sport-week";
@@ -59,7 +59,7 @@ describe("weekPlan", () => {
 
 describe("loadFor", () => {
 	test("a new max and bodyweight give Tuesday 24 November +19 kg", () => {
-		const state = withMeasurements(STATE, measurement("m3", "max", 117, "2026-11-17"), measurement("m4", BODYWEIGHT, 82.5, "2026-11-17"));
+		const state = withMeasurements(STATE, measurement("m3", "max", 117, "2026-11-17"), measurement("m4", "bodyweight", 82.5, "2026-11-17"));
 		expect(loadFor(state, SEMI, "2026-11-24")).toBe(19);
 		expect(loadFor(state, SEMI, "2026-11-16")).toBe(15);
 	});
@@ -76,7 +76,7 @@ describe("loadFor", () => {
 		const state = withMeasurements(withLogs(STATE, log("l1", "2026-11-21", { loads: { open: 13 } })), measurement("m3", "max", 117, "2026-11-25"));
 		expect(loadFor(state, OPEN, "2026-11-24")).toBe(13);
 		expect(loadFor(state, OPEN, "2026-11-28")).toBe(15);
-		expect(loadFor(withMeasurements(state, measurement("m4", BODYWEIGHT, 83, "2026-11-26")), OPEN, "2026-11-24")).toBe(13);
+		expect(loadFor(withMeasurements(state, measurement("m4", "bodyweight", 83, "2026-11-26")), OPEN, "2026-11-24")).toBe(13);
 	});
 
 	test("a new phase brings the rule back, also for an exercise without one", () => {
@@ -90,10 +90,14 @@ describe("loadFor", () => {
 
 	test("an unknown max or bodyweight gives an unknown load", () => {
 		expect(loadFor({ ...STATE, measurements: [] }, SEMI, "2026-11-17")).toBeNull();
-		expect(loadFor({ ...STATE, measurements: STATE.measurements.filter(({ metric }) => metric !== BODYWEIGHT) }, SEMI, "2026-11-17")).toBeNull();
+		expect(loadFor({ ...STATE, measurements: STATE.measurements.filter(({ metric }) => metric !== "bodyweight") }, SEMI, "2026-11-17")).toBeNull();
 		expect(loadFor(STATE, SEMI, "2026-08-25")).toBeNull();
 		expect(dayItems({ ...STATE, measurements: [] }, "2026-11-17").semi?.load).toBeNull();
 		expect(loadFor({ ...STATE, measurements: [] }, PULLS, "2026-11-17")).toBe(35);
+	});
+
+	test("a rule that subtracts nothing gives the share of the max alone", () => {
+		expect(loadFor(STATE, { ...SEMI, load: { kind: "of-max", metric: "max", fraction: 0.8, offsetKg: 0, less: null } }, "2026-11-17")).toBe(90);
 	});
 });
 
@@ -145,14 +149,14 @@ describe("grades", () => {
 describe("records", () => {
 	test("keeps the best of each metric by its direction and the heaviest load of each exercise, first reached", () => {
 		const state = withLogs(
-			withMeasurements(STATE, measurement("m3", "max", 117, "2026-11-17"), measurement("m4", BODYWEIGHT, 82.5, "2026-11-17"), measurement("m5", "max", 117, "2026-12-29")),
+			withMeasurements(STATE, measurement("m3", "max", 117, "2026-11-17"), measurement("m4", "bodyweight", 82.5, "2026-11-17"), measurement("m5", "max", 117, "2026-12-29")),
 			log("l1", "2026-11-21", { loads: { open: 13, tractions: 35 } }),
 			log("l2", "2026-11-28", { loads: { open: 13, tractions: 37.5 } }),
 		);
 		expect(records(state)).toEqual({
 			metrics: [
 				{ metric: "max", value: 117, at: "2026-11-17" },
-				{ metric: BODYWEIGHT, value: 82, at: "2026-08-26" },
+				{ metric: "bodyweight", value: 82, at: "2026-08-26" },
 			],
 			loads: [
 				{ key: "open", kg: 13, date: "2026-11-21" },

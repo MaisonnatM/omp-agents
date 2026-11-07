@@ -44,7 +44,7 @@ describe("parseSportState", () => {
 			reps: null,
 			holdSec: null,
 			restSec: null,
-			load: { kind: "of-max", metric: "max", fraction: 0.87, offsetKg: 0 },
+			load: { kind: "of-max", metric: "max", fraction: 0.87, offsetKg: 0, less: null },
 			note: "",
 			demo: null,
 			opensAs: [],

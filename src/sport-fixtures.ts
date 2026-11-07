@@ -1,5 +1,5 @@
 /** The Sport module's sample state and builders, for its tests: the climbing plan from 16 November 2026 to the February tests. */
-import { BODYWEIGHT, type Exercise, type Measurement, type Phase, type SportState, type WeekSlots, type Workout, type WorkoutLog } from "./shared/sport";
+import { type Exercise, type Measurement, type Phase, type SportState, type WeekSlots, type Workout, type WorkoutLog } from "./shared/sport";
 
 export const exercise = (key: string, name: string, fields: Partial<Exercise> = {}): Exercise => ({
 	key,
@@ -33,8 +33,8 @@ export const log = (id: string, date: string, fields: Partial<WorkoutLog> = {}):
 
 export const measurement = (id: string, metric: string, value: number, at: string): Measurement => ({ id, metric, value, at, note: "", addedBy: null });
 
-export const SEMI = exercise("semi", "Semi-arquée", { sets: 5, holdSec: 10, restSec: 180, hang: true, load: { kind: "of-max", metric: "max", fraction: 0.87, offsetKg: 0 }, demo: { youtubeId: "3IdQnBtnGjQ", by: "Lattice", cues: ["Épaules engagées", "Poignets neutres", "Pas de rebond"], caution: null } });
-export const OPEN = exercise("open", "Main ouverte", { sets: 5, holdSec: 10, restSec: 180, hang: true, load: { kind: "of-max", metric: "max", fraction: 0.87, offsetKg: -5 }, demo: { youtubeId: "HBa-ilEp4Os", by: "Lattice", cues: ["Trois doigts", "Bras tendus", "Lâcher propre"], caution: "Pas de rebond" } });
+export const SEMI = exercise("semi", "Semi-arquée", { sets: 5, holdSec: 10, restSec: 180, hang: true, load: { kind: "of-max", metric: "max", fraction: 0.87, offsetKg: 0, less: "bodyweight" }, demo: { youtubeId: "3IdQnBtnGjQ", by: "Lattice", cues: ["Épaules engagées", "Poignets neutres", "Pas de rebond"], caution: null } });
+export const OPEN = exercise("open", "Main ouverte", { sets: 5, holdSec: 10, restSec: 180, hang: true, load: { kind: "of-max", metric: "max", fraction: 0.87, offsetKg: -5, less: "bodyweight" }, demo: { youtubeId: "HBa-ilEp4Os", by: "Lattice", cues: ["Trois doigts", "Bras tendus", "Lâcher propre"], caution: "Pas de rebond" } });
 export const PULLS = exercise("tractions", "Tractions lestées", { sets: 3, reps: 3, restSec: 180, load: { kind: "fixed", kg: 35 } });
 export const ABRAHANGS = exercise("abrahangs", "Abrahangs", { sets: 10, holdSec: 10, hang: true });
 
@@ -60,9 +60,9 @@ export const STATE: SportState = {
 	v: 1,
 	metrics: [
 		{ id: "max", label: "Max total", unit: "kg", better: "higher" },
-		{ id: BODYWEIGHT, label: "Poids", unit: "kg", better: "lower" },
+		{ id: "bodyweight", label: "Poids", unit: "kg", better: "lower" },
 	],
-	measurements: [measurement("m1", "max", 112, "2026-08-26"), measurement("m2", BODYWEIGHT, 82, "2026-08-26")],
+	measurements: [measurement("m1", "max", 112, "2026-08-26"), measurement("m2", "bodyweight", 82, "2026-08-26")],
 	targets: [
 		{ id: "t1", label: "Max", by: "2027-02-07", kind: "metric", metric: "max", value: 119 },
 		{ id: "t2", label: "Bloc", by: null, kind: "boulder", grade: "8a" },

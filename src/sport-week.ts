@@ -5,7 +5,6 @@
  */
 import { addDays, DAY_KEYS, type DayKey, daysBetween, mondayOf, weekdayOf } from "./shared/days";
 import {
-	BODYWEIGHT,
 	type ClimbKind,
 	type Exercise,
 	type FrenchGrade,
@@ -106,8 +105,8 @@ export function loadFor(state: SportState, exercise: Exercise, date: string): nu
 	if (!rule) return null;
 	if (rule.kind === "fixed") return rule.kg;
 	const max = measured(state, rule.metric, date);
-	const weight = measured(state, BODYWEIGHT, date);
-	return max && weight ? Math.round(rule.fraction * max.value - weight.value + rule.offsetKg) : null;
+	const less = rule.less === null ? 0 : measured(state, rule.less, date)?.value;
+	return max && less !== undefined ? Math.round(rule.fraction * max.value - less + rule.offsetKg) : null;
 }
 
 /** The phase of `date`, whether its week is a deload week, and its slots: the plan's override for the day, else the phase's. */
