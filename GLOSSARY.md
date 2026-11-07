@@ -202,6 +202,18 @@ A pain the user rated 3 out of 10 or more, with where it hurts, which changes th
 It shows on the Sport page and in the personal session's prompt, never under the bell.
 _Avoid_: Alert, notice (see **Notice**), injury
 
+**Measurement**:
+A dated number for one metric, such as a finger max of 112 kg on a test day or a bodyweight of 82 kg; the newest one up to a day sets that day's loads.
+_Avoid_: Test result, record, value, entry
+
+**Phase**:
+A dated stretch of the plan with its own weekly slots, such as a strength block, ending where the next one starts; a load logged in one phase never carries into the next.
+_Avoid_: Cycle, block, period, mesocycle
+
+**Deload week**:
+A week inside a phase, named by its Monday, that follows the phase's lighter slots instead of its normal ones.
+_Avoid_: Rest week, recovery week, off week
+
 ## Distribution
 
 **Starter kit**:
