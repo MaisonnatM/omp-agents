@@ -25,9 +25,10 @@ export const SIDEBAR_TABS = [
 	{ value: "notes", label: "Notes", icon: PAGE_ICON.notes, place: "header" },
 	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar, place: "header" },
 	{ value: "email", label: "Email", icon: PAGE_ICON.email, place: "header", integration: "gmail" },
+	{ value: "sport", label: "Sport", icon: PAGE_ICON.sport, place: "header" },
 ] as const satisfies readonly { value: string; label: string; icon: LucideIcon; place: TabPlace; integration?: McpIntegrationId }[];
 
-/** A sidebar tab, whose trigger sits in the bar or the header; the tickets, Bots, todo, notes, calendar, and email tabs go with their pages, the sessions and pull requests tabs with the panes. */
+/** A sidebar tab, whose trigger sits in the bar or the header; the tickets, Bots, todo, notes, calendar, email, and sport tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 /** What the sidebar shows: a tab's panel, or the settings sections while the Settings page is open. */
@@ -172,6 +173,14 @@ export interface ScheduledRoute {
 	id: string | null;
 }
 
+/**
+ * The Sport page's tab: the week with day `day` open (`null` for today), the journal with log `open` beside it (`null` for
+ * none), or the progress charts.
+ */
+export type SportRoute = { tab: "week"; day: string | null } | { tab: "journal"; open: string | null } | { tab: "progress" };
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
 /** A page that covers the panes. */
 export type Page =
 	| { kind: "get-started" }
@@ -184,7 +193,8 @@ export type Page =
 	| { kind: "calendar" }
 	| ({ kind: "email" } & EmailRoute)
 	| ({ kind: "new" } & NewSessionRoute)
-	| ({ kind: "scheduled" } & ScheduledRoute);
+	| ({ kind: "scheduled" } & ScheduledRoute)
+	| ({ kind: "sport" } & SportRoute);
 
 /** What the hash names: a page over the panes, a session by its id, or the panes themselves. */
 export type Route = { kind: "page"; page: Page } | { kind: "session"; sessionId: string } | { kind: "panes"; layout: Layout };
@@ -235,6 +245,8 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
  * - `#email` opens the Email page, your Gmail inboxes' latest conversations, `#email/new` a new mail, and
  *   `#email/<account>/<thread id>` that account's conversation in full in the main content.
+ * - `#sport` opens the Sport page on this week, `?day=<YYYY-MM-DD>` on that day's week with that day open, `#sport/journal` on
+ *   the workout journal, `?open=<log id>` with that log open, and `#sport/progress` on the progress charts.
  * - `#repo/<dir>` opens every file of the git checkout that directory is in, read only, and `#repo/<dir>/<path>` the file at that path; both are encoded.
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
@@ -269,6 +281,12 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		const [account, thread, ...more] = (rest ?? "").split("/").map(decodeSegment);
 		return { kind: "email", target: account && thread && more.length === 0 ? { account, thread } : null };
 	},
+	sport: (rest, query) => {
+		if (rest === "journal") return { kind: "sport", tab: "journal", open: query.get("open") || null };
+		if (rest === "progress") return { kind: "sport", tab: "progress" };
+		const day = query.get("day");
+		return { kind: "sport", tab: "week", day: day !== null && DAY.test(day) ? day : null };
+	},
 };
 
 const isPageKind = (head: string): head is Page["kind"] => Object.hasOwn(PAGES, head);
@@ -299,6 +317,8 @@ function restOfPage(page: Page): string | null {
 			return page.target === null || page.target === "new" ? page.target : `${encodeURIComponent(page.target.account)}/${encodeURIComponent(page.target.thread)}`;
 		case "scheduled":
 			return page.id === null ? null : encodeURIComponent(page.id);
+		case "sport":
+			return page.tab === "week" ? null : page.tab;
 		case "calendar":
 		case "get-started":
 			return null;
@@ -317,6 +337,9 @@ function queryOfPage(page: Page): string | null {
 		case "todo":
 		case "notes":
 			return page.open === null ? null : `open=${encodeURIComponent(page.open)}`;
+		case "sport":
+			if (page.tab === "week") return page.day === null ? null : `day=${page.day}`;
+			return page.tab === "journal" && page.open !== null ? `open=${encodeURIComponent(page.open)}` : null;
 		case "settings":
 		case "pull-requests":
 		case "tickets":
@@ -361,6 +384,7 @@ export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
 export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
 export const hashForScheduled = (id: string): string => hashForPage({ kind: "scheduled", id });
+export const hashForSport = (route: SportRoute): string => hashForPage({ kind: "sport", ...route });
 
 /**
  * The route a hash names. A page's kind is its first segment. `#session/<id>` names a session by its id, which outlives

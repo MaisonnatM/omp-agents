@@ -16,7 +16,7 @@ import { activityControl } from "../activity";
 import { yourMoveCount } from "../pull-requests-model";
 import { sameDir, workspaceName } from "../labels";
 import { pullRequestsStore, ticketsStore } from "../reads";
-import { hashForTickets, type NotesListView, type SettingsRoute, type SidebarPanel, type SidebarTab, type TodoListView } from "../routing";
+import { hashForTickets, type NotesListView, type SettingsRoute, type SidebarPanel, type SidebarTab, type SportRoute, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SidebarSessions } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
@@ -31,6 +31,7 @@ import { CalendarNav } from "./calendar/calendar-nav";
 import { EmailNav } from "./email/email-nav";
 import { NotesNav } from "./notes/nav";
 import { SessionList } from "./session-list";
+import { SportNav } from "./sport/nav";
 import { SettingsNav } from "./settings/settings-nav";
 import { workspaceItems } from "./workspace-picker";
 import { TodoCategories } from "./todo/categories";
@@ -168,6 +169,8 @@ interface RosterProps {
 	notesView: NotesListView;
 	/** The Calendar page is open. */
 	calendarOpen: boolean;
+	/** The Sport page's tab while it is open, `null` on any other page. */
+	sportOpen: SportRoute | null;
 	/** The settings section and workspace the sidebar's settings links keep. */
 	settingsRoute: SettingsRoute;
 	/** The tickets section a sidebar link last chose. */
@@ -204,6 +207,7 @@ export function Roster({
 	userNotes,
 	notesView,
 	calendarOpen,
+	sportOpen,
 	settingsRoute,
 	sectionTarget,
 	onSectionTarget,
@@ -311,6 +315,11 @@ export function Roster({
 			<TabPanel value="email" asChild>
 				<SidebarContent>
 					<EmailNav workspace={workspace} />
+				</SidebarContent>
+			</TabPanel>
+			<TabPanel value="sport" asChild>
+				<SidebarContent>
+					<SportNav open={sportOpen} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="settings" asChild>

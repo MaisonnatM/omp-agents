@@ -28,7 +28,7 @@ import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, personalDir, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, signInInboxDir, sourceControlFile, sportFile, sportInboxDir, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, personalDir, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, signInInboxDir, sourceControlFile, sportFile, sportInboxDir, sportThumbsDir, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -697,6 +697,7 @@ export class Dashboard {
 					return this.#processSettings.value;
 				},
 			},
+			sportThumbs: { dir: sportThumbsDir, fetch: url => fetch(url) },
 		});
 	}
 

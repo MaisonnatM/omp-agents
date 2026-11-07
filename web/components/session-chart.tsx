@@ -1,19 +1,31 @@
-/** `ChartView`: a session's `chart` fence drawn with `recharts`, a chunk of its own that `SessionVisual` loads on first use. */
+/** `ChartView`: a session's `chart` fence drawn with `recharts`, a chunk of its own that `SessionVisual` and the Sport page load on first use. */
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, XAxis, YAxis } from "recharts";
 import type { ChartSpec } from "../../src/shared/session-visuals";
 import { type ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
 
-/** How each cartesian chart draws one series, as shadcn's chart examples do. */
+/** How each cartesian chart draws one series, as shadcn's chart examples do; a dashed series is a line's only. */
 const CARTESIAN = {
 	bar: { Chart: BarChart, mark: (key: string, color: string) => <Bar key={key} dataKey={key} fill={color} radius={4} /> },
-	line: { Chart: LineChart, mark: (key: string, color: string) => <Line key={key} dataKey={key} type="natural" stroke={color} strokeWidth={2} dot={false} /> },
+	line: { Chart: LineChart, mark: (key: string, color: string, dashed: boolean) => <Line key={key} dataKey={key} type="natural" stroke={color} strokeWidth={2} strokeDasharray={dashed ? "6 4" : undefined} dot={false} /> },
 	area: { Chart: AreaChart, mark: (key: string, color: string) => <Area key={key} dataKey={key} type="natural" stroke={color} fill={color} fillOpacity={0.4} /> },
 };
 
 const chartColor = (index: number): string => `var(--chart-${(index % 5) + 1})`;
 
-export function ChartView({ spec, label, expanded }: { spec: ChartSpec; label: string; expanded: boolean }) {
+interface ChartViewProps {
+	spec: ChartSpec;
+	label: string;
+	expanded: boolean;
+	/** The keys of the line series drawn dashed, such as a target. */
+	dashed?: string[];
+	/** How the axis and the tooltip write a value, such as `113,3 kg` or a grade; the default is the number. */
+	format?: (value: number) => string;
+	/** The value axis spans the values instead of starting at zero. */
+	fit?: boolean;
+}
+
+export function ChartView({ spec, label, expanded, dashed = [], format, fit = false }: ChartViewProps) {
 	if (spec.type === "pie") {
 		const [series] = spec.series;
 		// Keyed by slice name, which the spec does not limit, so no name reads an inherited property.
@@ -43,10 +55,10 @@ export function ChartView({ spec, label, expanded }: { spec: ChartSpec; label: s
 			<Chart accessibilityLayer data={spec.data} margin={{ left: 4, right: 12 }}>
 				<CartesianGrid vertical={false} />
 				<XAxis dataKey={spec.x} tickLine={false} axisLine={false} tickMargin={10} />
-				<YAxis tickLine={false} axisLine={false} tickMargin={8} width="auto" />
-				<ChartTooltip content={<ChartTooltipContent />} />
+				<YAxis tickLine={false} axisLine={false} tickMargin={8} width="auto" domain={fit ? ["auto", "auto"] : undefined} tickFormatter={format} />
+				<ChartTooltip content={<ChartTooltipContent formatter={format && ((value, name) => <><span className="text-muted-foreground">{config[String(name)]?.label ?? name}</span><span className="ml-auto font-mono font-medium text-foreground tabular-nums">{format(Number(value))}</span></>)} />} />
 				{spec.series.length > 1 && <ChartLegend content={<ChartLegendContent />} />}
-				{spec.series.map(({ key }) => mark(key, `var(--color-${key})`))}
+				{spec.series.map(({ key }) => mark(key, `var(--color-${key})`, dashed.includes(key)))}
 			</Chart>
 		</ChartContainer>
 	);

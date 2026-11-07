@@ -112,6 +112,7 @@ export const AppSidebar = memo(function AppSidebar({
 			notesView={notesView}
 			todoSessions={todoSessions}
 			calendarOpen={page?.kind === "calendar"}
+			sportOpen={page?.kind === "sport" ? page : null}
 			settingsRoute={settings}
 			sectionTarget={sectionTarget}
 			onSectionTarget={onSectionTarget}

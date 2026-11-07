@@ -54,6 +54,7 @@ export type ShortcutId =
 	| "notes"
 	| "calendar"
 	| "email"
+	| "sport"
 	| "workspace"
 	| "nextPullRequest"
 	| "previousPullRequest"
@@ -87,6 +88,8 @@ export type ShortcutId =
 	| "emailReplyAll"
 	| "emailTrash"
 	| "emailCompose"
+	| "sportPreviousDay"
+	| "sportNextDay"
 	| "nextChangedFile"
 	| "previousChangedFile"
 	| "moveUp"
@@ -131,6 +134,7 @@ export const SHORTCUT_CATEGORIES = [
 	{ id: "notes", label: "Notes" },
 	{ id: "email", label: "Email" },
 	{ id: "calendar", label: "Calendar" },
+	{ id: "sport", label: "Sport" },
 	{ id: "changes", label: "Changes" },
 ] as const;
 
@@ -269,6 +273,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "notes", category: "general", label: "Go to your notes", command: "Go to notes", keys: [{ goTo: "n" }] },
 	{ id: "calendar", category: "general", label: "Go to your calendar", command: "Go to calendar", keys: [] },
 	{ id: "email", category: "general", label: "Go to your email", command: "Go to email", keys: [{ goTo: "m" }] },
+	{ id: "sport", category: "general", label: "Go to your sport week", command: "Go to sport", keys: [] },
 	{ id: "workspace", category: "general", label: "Choose the sidebar's workspace", keys: [{ goTo: "w" }] },
 	{ id: "nextPullRequest", category: "pull-requests", label: "Pull requests: move to the next pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "previousPullRequest", category: "pull-requests", label: "Pull requests: move to the previous pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
@@ -307,6 +312,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "emailReplyAll", category: "email", label: "Email: reply to everyone on the open conversation's last message", keys: [{ chord: { key: "a" }, scope: "outside-fields" }] },
 	{ id: "emailTrash", category: "email", label: "Email: move the open conversation to Gmail's Trash", keys: [{ chord: { key: "#" }, scope: "outside-fields" }] },
 	{ id: "emailCompose", category: "email", label: "Email: write a new mail", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
+	{ id: "sportPreviousDay", category: "sport", label: "Sport week: open the day before", keys: [{ chord: { key: "ArrowLeft" }, scope: "outside-fields" }] },
+	{ id: "sportNextDay", category: "sport", label: "Sport week: open the day after", keys: [{ chord: { key: "ArrowRight" }, scope: "outside-fields" }] },
 	{ id: "nextChangedFile", category: "changes", label: "Changes: open the next changed file", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "previousChangedFile", category: "changes", label: "Changes: open the previous changed file", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "moveUp", category: "todo", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
@@ -383,6 +390,8 @@ const KEY_LABEL: Record<string, string> = {
 	Escape: "Esc",
 	ArrowUp: "↑",
 	ArrowDown: "↓",
+	ArrowLeft: "←",
+	ArrowRight: "→",
 	Enter: IS_MAC ? "↩" : "Enter",
 	Backspace: IS_MAC ? "⌫" : "Backspace",
 	Tab: IS_MAC ? "⇥" : "Tab",

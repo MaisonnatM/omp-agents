@@ -4,7 +4,7 @@ import { type Layout, openView, type Page, type SettingsRoute, settingsSection, 
 import { useStoredState } from "./stored-state";
 
 /** The sidebar panel that goes with each page; the panes keep the tab you chose. A session's changes go with the sessions. */
-const PAGE_TAB: Partial<Record<Page["kind"], SidebarPanel>> = { "pull-requests": "pull-requests", tickets: "tickets", todo: "todo", bots: "bots", notes: "notes", calendar: "calendar", email: "email", settings: "settings" };
+const PAGE_TAB: Partial<Record<Page["kind"], SidebarPanel>> = { "pull-requests": "pull-requests", tickets: "tickets", todo: "todo", bots: "bots", notes: "notes", calendar: "calendar", email: "email", sport: "sport", settings: "settings" };
 
 /** The page each tab shows, but for Sessions, which shows the panes, and Bots while it has one to open. */
 const TAB_PAGE: Record<Exclude<SidebarTab, "sessions">, Page> = {
@@ -15,6 +15,7 @@ const TAB_PAGE: Record<Exclude<SidebarTab, "sessions">, Page> = {
 	notes: { kind: "notes", list: { kind: "all" }, open: null },
 	calendar: { kind: "calendar" },
 	email: { kind: "email", target: null },
+	sport: { kind: "sport", tab: "week", day: null },
 };
 
 /** The settings section the header's Settings button, `G ,`, and the sidebar keep: the open page's, else the last one open, which this browser remembers, else Analytics. */

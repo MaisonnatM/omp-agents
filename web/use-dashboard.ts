@@ -4,6 +4,7 @@ import type { PinChange } from "../src/shared/pins";
 import type { TrustChange } from "../src/shared/project-trust";
 import type { ClientMsg, ServerMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
+import type { SportChange } from "../src/shared/sport";
 import type { UserNoteChange } from "../src/user-notes-shared";
 import type { UserTodoChange } from "../src/user-todos-shared";
 import { errorText } from "../src/json";
@@ -97,6 +98,8 @@ export interface Dashboard {
 	changeTodo: (change: UserTodoChange) => Promise<void>;
 	/** Change the Notes page's list, as {@link Dashboard.changeTodo} does the Todo page's. */
 	changeNote: (change: UserNoteChange) => Promise<void>;
+	/** Change the Sport page's state, as {@link Dashboard.changeTodo} does the Todo page's list. */
+	changeSport: (change: SportChange) => Promise<void>;
 	/** Pin or unpin sessions, which shows at once and reaches the server, on the next socket while none is open, and every other window. */
 	changePins: (change: PinChange) => void;
 	/** Add, change, or delete a Bot, which shows at once and reaches the server, on the next socket while none is open, and every other window. */
@@ -359,6 +362,13 @@ export function useDashboard(): Dashboard {
 		},
 		[write],
 	);
+	const changeSport = useCallback(
+		(change: SportChange) => {
+			dispatch({ t: "sport-change", change });
+			return write({ t: "sport-change", change });
+		},
+		[write],
+	);
 	const changePins = useCallback(
 		(change: PinChange) => {
 			dispatch({ t: "pin", change });
@@ -382,5 +392,5 @@ export function useDashboard(): Dashboard {
 		[start],
 	);
 
-	return { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changePins, changeBot, trustAndStart, dismissTrust };
+	return { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changeSport, changePins, changeBot, trustAndStart, dismissTrust };
 }
