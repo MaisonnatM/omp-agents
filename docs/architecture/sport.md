@@ -35,12 +35,13 @@ The `ListRegistry` connects `sport-change` client changes to `sport` snapshots o
 `src/sport-week.ts` derives everything else, the same for the page and the agent.
 Every date is a `YYYY-MM-DD` day computed on the calendar alone, so no time zone or daylight saving change moves a Monday.
 
-`weekPlan` gives the seven days of a week.
+`dayPlan` gives one day of the plan and `weekPlan` the seven days of a week, reading the pain flags once for the whole week.
 A day takes its override when the plan has one, else the deload slots of its phase when its Monday is a deload Monday, else the phase's normal slots; a day outside every phase has none.
-Each workout carries its exercises with their load, and the day's log of it.
+Each workout carries its own fields, its exercises with their load, and the day's log of it, done or skipped.
 
-`loadFor` gives an exercise's load on a day.
-The newest load logged for the exercise before that day wins while both days fall in the same phase and no newer measurement of the rule's metric came since the log.
+`loadFor` gives an exercise's load on a day with where it comes from: the log that lifted it, or the rule with the day of the max it read.
+A skipped log adds no load, climb, or record; only its pain still flags.
+The newest load logged done for the exercise before that day wins while both days fall in the same phase and no newer measurement of the rule's metric came since the log.
 Otherwise the rule gives it from the newest measurements on or before that day, rounded to the kilogram, and an unknown measurement of either metric gives an unknown load.
 An exercise without a rule takes its last logged load within the phase and has none after.
 
