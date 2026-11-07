@@ -28,7 +28,7 @@ import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, personalDir, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, signInInboxDir, sourceControlFile, sportFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, personalDir, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, signInInboxDir, sourceControlFile, sportFile, sportInboxDir, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -106,6 +106,7 @@ import { EventInbox } from "./event-inbox";
 import { NoteInbox } from "./note-inbox";
 import { TodoInbox } from "./todo-inbox";
 import { SportFile } from "./sport-file";
+import { SportInbox } from "./sport-inbox";
 import { UserNotesFile } from "./user-notes-file";
 import { UserTodosFile } from "./user-todos-file";
 import { UsagePoll } from "./usage-poll";
@@ -173,6 +174,7 @@ export class Dashboard {
 	readonly #lists: ListRegistry;
 	readonly #todoInbox: TodoInbox;
 	readonly #noteInbox: NoteInbox;
+	readonly #sportInbox: SportInbox;
 	readonly #eventInbox: EventInbox;
 	readonly #signInInbox: SignInInbox;
 	readonly #routineInbox: RoutineInbox;
@@ -373,6 +375,7 @@ export class Dashboard {
 		};
 		this.#todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), workspaceOf, { active: () => ownerLock.held });
 		this.#noteInbox = new NoteInbox(userNoteInboxDir, change => lists.apply("user-notes", change), { active: () => ownerLock.held });
+		this.#sportInbox = new SportInbox(sportInboxDir, () => sport.value, change => lists.apply("sport", change), { active: () => ownerLock.held });
 		this.#eventInbox = new EventInbox(eventInboxDir, () => this.#localEvents.value, change => this.#localEvents.apply(change), { active: () => ownerLock.held });
 		this.#signInInbox = new SignInInbox(
 			signInInboxDir,
@@ -720,6 +723,7 @@ export class Dashboard {
 		}
 		this.#todoInbox.watch();
 		this.#noteInbox.watch();
+		this.#sportInbox.watch();
 		this.#eventInbox.watch();
 		this.#signInInbox.watch();
 		this.#routineInbox.watch();
@@ -750,6 +754,7 @@ export class Dashboard {
 		this.#stopMergeQueue();
 		this.#todoInbox.stop();
 		this.#noteInbox.stop();
+		this.#sportInbox.stop();
 		this.#eventInbox.stop();
 		this.#signInInbox.stop();
 		this.#routineInbox.stop();
@@ -949,6 +954,7 @@ export class Dashboard {
 			this.#scheduledRunner.recover();
 			void this.#todoInbox.drain();
 			void this.#noteInbox.drain();
+			void this.#sportInbox.drain();
 			void this.#eventInbox.drain();
 			void this.#signInInbox.drain();
 			void this.#routineInbox.drain();

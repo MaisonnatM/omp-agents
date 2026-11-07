@@ -5,7 +5,7 @@
  */
 import { PERSONAL_FLAGS } from "../omp/personal-extension";
 import { PLAIN_LAUNCH } from "../omp/rpc";
-import { absoluteDir, displayPath, personalDir, personalMemoryFile } from "../paths";
+import { absoluteDir, displayPath, personalDir, personalMemoryFile, sportFile, sportInboxDir } from "../paths";
 import { readTail } from "../read-tail";
 import { MAX_MEMORY_BYTES } from "../shared/bots";
 import type { ServerMsg } from "../shared/protocol";
@@ -13,7 +13,10 @@ import type { StartRequest } from "../shared/sessions";
 import { personalExtension } from "./resources";
 import type { SessionJoin } from "./start";
 
-const PERSONAL_LAUNCH = { ...PLAIN_LAUNCH, args: ["-e", personalExtension, `--${PERSONAL_FLAGS.dir}`, personalDir, `--${PERSONAL_FLAGS.memory}`, personalMemoryFile] };
+const PERSONAL_LAUNCH = {
+	...PLAIN_LAUNCH,
+	args: ["-e", personalExtension, `--${PERSONAL_FLAGS.dir}`, personalDir, `--${PERSONAL_FLAGS.memory}`, personalMemoryFile, `--${PERSONAL_FLAGS.sport}`, sportFile, `--${PERSONAL_FLAGS.sportInbox}`, sportInboxDir],
+};
 
 /** How a start joins the server: with the personal extension unless `isBot` holds of it, as of a Bot's conversation, whose Bot keeps its own memory. */
 export const personalJoin =
