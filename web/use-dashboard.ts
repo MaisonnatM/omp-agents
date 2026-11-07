@@ -259,6 +259,7 @@ export function useDashboard(): Dashboard {
 					case "models":
 					case "user-todos":
 					case "user-notes":
+					case "sport":
 					case "routines":
 					case "bots":
 					case "personal":
@@ -284,8 +285,6 @@ export function useDashboard(): Dashboard {
 						// A server that keeps none yet, as after an upgrade, takes what this browser kept; the first page to seed wins.
 						if (msg.values === null) ws.send(JSON.stringify({ t: "preference", change: { op: "seed", values: storedPreferences() } } satisfies ClientMsg));
 						else adoptPreferences(msg.values);
-						return;
-					case "sport":
 						return;
 					default: {
 						const never: never = msg;

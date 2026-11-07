@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { TrustAsk } from "../src/shared/project-trust";
+import { EMPTY_SPORT } from "../src/shared/sport";
 import type { LiveView, RosterHost, View } from "../src/shared/sessions";
 import { type DashboardState, initialState, reduce } from "./dashboard-state";
 import type { Layout } from "./routing";
@@ -101,5 +102,11 @@ describe("dashboard state", () => {
 		expect(reduce(onPage, { t: "end-success", instanceId: "a", listed: ["a"] }).cover).toEqual(page);
 		const onPanes = reduce(reduce(blank(), { t: "route", route: { kind: "panes", layout: layout([live("a")]) } }), { t: "end", instanceId: "a" });
 		expect(reduce(onPanes, { t: "end-success", instanceId: "a", listed: ["a"] }).cover).toBeNull();
+	});
+
+	test("the Sport state is null until the server first sends it, then the latest one sent", () => {
+		expect(blank().sport).toBeNull();
+		const sent = { ...EMPTY_SPORT, metrics: [{ id: "max", label: "Max", unit: "kg", better: "higher" as const }] };
+		expect(reduce(blank(), { t: "sport", state: sent }).sport).toBe(sent);
 	});
 });

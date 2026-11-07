@@ -32,6 +32,7 @@ A `set-plan` is refused when its slots, habits, or `opensAs` lists name nothing,
 A refused change says why, with the path of the first wrong field and the rule it broke, such as `plan.routines[0].items[0].demo.youtubeId must be 11 characters`.
 A file that does not read, or that comes from a newer version, moves aside to `sport.json.invalid` rather than being overwritten.
 The `ListRegistry` connects `sport-change` client changes to `sport` snapshots on the roster topic.
+The page keeps the latest snapshot in `DashboardState.sport`, `null` until the first one comes.
 
 ## The week
 

@@ -8,6 +8,7 @@ import type { ServerMsg } from "../src/shared/protocol";
 import type { ReviewDraft } from "../src/shared/review-drafts";
 import { applyPins, type PinChange } from "../src/shared/pins";
 import type { ScheduledSend } from "../src/shared/scheduled";
+import type { SportState } from "../src/shared/sport";
 import { newestPastFirst, type PastSession, type RosterHost, type View } from "../src/shared/sessions";
 import type { Workspace, WorkspaceList } from "../src/shared/workspaces";
 import type { Routine } from "../src/routines";
@@ -50,6 +51,8 @@ export interface DashboardState extends PaneNavigation {
 	userTodos: UserTodoList | null;
 	/** The Notes page's list, `null` until the server first sends it; a change shows here before the server answers. */
 	userNotes: UserNoteList | null;
+	/** The Sport module's state, `null` until the server first sends it. */
+	sport: SportState | null;
 	/** Every routine, empty until the server first sends them. */
 	routines: Routine[];
 	/** Every Bot, `null` until the server first sends them; a change shows here before the server answers. */
@@ -81,7 +84,7 @@ export interface DashboardState extends PaneNavigation {
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "user-notes" | "routines" | "bots" | "personal" | "scheduled" | "workspaces" | "project-trust" | "pins" | "notices" | "merges" | "review-drafts" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "user-notes" | "sport" | "routines" | "bots" | "personal" | "scheduled" | "workspaces" | "project-trust" | "pins" | "notices" | "merges" | "review-drafts" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -228,6 +231,8 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, userTodos: action.list };
 		case "user-notes":
 			return { ...state, userNotes: action.list };
+		case "sport":
+			return { ...state, sport: action.state };
 		case "routines":
 			return { ...state, routines: action.routines };
 		case "bots":
@@ -289,6 +294,7 @@ export function initialState(route: Route, ratios: SplitRatios = DEFAULT_SPLIT_R
 		models: new Map(),
 		userTodos: null,
 		userNotes: null,
+		sport: null,
 		routines: [],
 		bots: null,
 		botMemories: {},
