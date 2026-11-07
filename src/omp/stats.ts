@@ -66,22 +66,22 @@ const CREDITS_WINDOW_MS = 24 * 60 * 60_000;
 
 const ERROR_CHARS = 300;
 
-// Anthropic refuses a spent API key with a 400 (or an in-stream error) that says so, which stock omp's classifier misses.
-const CREDIT_BALANCE_TOO_LOW = "credit balance is too low";
-
-// Every provider's requests: omp's billing-cap test is a set of regexes SQL cannot run, and the day's timestamp range
-// is scanned whole either way.
-const SETTLED_REQUESTS = `
-	SELECT provider, model, timestamp, stop_reason = 'error' AS failed, error_message AS error FROM messages
-	WHERE timestamp >= ? AND stop_reason != 'aborted'
+// Each provider's failures since its last request that worked in the range, an aborted request counting as neither;
+// omp's billing-cap test is a set of regexes SQL cannot run, so `creditRuns` picks the billing caps out of these.
+const FAILURES_SINCE_LAST_SUCCESS = `
+	WITH worked AS (
+		SELECT provider, max(timestamp) AS at FROM messages
+		WHERE timestamp >= ?1 AND stop_reason NOT IN ('error', 'aborted')
+		GROUP BY provider)
+	SELECT provider, model, timestamp, error_message AS error FROM messages LEFT JOIN worked USING (provider)
+	WHERE stop_reason = 'error' AND error_message IS NOT NULL AND timestamp >= ?1 AND timestamp > coalesce(worked.at, 0)
 	ORDER BY timestamp`;
 
-interface ProviderRequest {
+interface Failure {
 	provider: string;
 	model: string;
 	timestamp: number;
-	failed: number;
-	error: string | null;
+	error: string;
 }
 
 export type CreditRun = Omit<CreditsSubject, "kind">;
@@ -137,15 +137,20 @@ export const listPrice: Pricer = (provider, model, { input, output, cacheRead, c
 	return catalog.calculateCost(known, { input, output, cacheRead, cacheWrite, totalTokens: input + output + cacheRead + cacheWrite, cttl, cost }, timestamp).total;
 };
 
-// A billing cap is one waiting never clears, so an error that says the limit will reset is a plan window, which the plan
-// notice covers, even when omp's spend-limit test matches it, as with Cursor's "set a Spend Limit to continue".
-const ANNOUNCES_RESET = /\bwill reset\b/i;
+// Anthropic refuses a spent API key with a 400 (or an in-stream error) that says so, which stock omp misses;
+// patches/omp-18.18.0-credit-balance-fallback.patch adds the phrase to omp, so this goes once omp ships it.
+const CREDIT_BALANCE_TOO_LOW = /\bcredit balance is too low\b/i;
+
+// A billing cap is one waiting never clears, so Cursor's plan window, whose usage limits reset with the monthly cycle,
+// is out even though omp's spend-limit test matches its "set a Spend Limit to continue"; the plan notice covers it.
+const PLAN_WINDOW_RESETS = /\busage limits? will reset\b/i;
 
 // The stats database keeps only the error text, so a 402 there stands for the response status.
-const isBillingCap = (error: string | null): boolean =>
-	error !== null &&
-	((rateLimit.isBillingCapUsageLimit(/\b402\b/.test(error) ? 402 : undefined, error) && !ANNOUNCES_RESET.test(error)) ||
-		error.toLowerCase().includes(CREDIT_BALANCE_TOO_LOW));
+function isBillingCap(error: string): boolean {
+	if (CREDIT_BALANCE_TOO_LOW.test(error)) return true;
+	if (PLAN_WINDOW_RESETS.test(error)) return false;
+	return rateLimit.isBillingCapUsageLimit(/\b402\b/.test(error) ? 402 : undefined, error);
+}
 
 /**
  * The runs of credit failures in `db` over the day before `now`: a request that worked ends its provider's run, and
@@ -153,18 +158,14 @@ const isBillingCap = (error: string | null): boolean =>
  * toward one.
  */
 export function creditRuns(db: Database, now: number): CreditRun[] {
-	const runs = new Map<string, CreditRun | null>();
-	for (const { provider, model, timestamp, failed, error } of db.query<ProviderRequest, [number]>(SETTLED_REQUESTS).all(now - CREDITS_WINDOW_MS)) {
-		if (!failed) {
-			runs.set(provider, null);
-			continue;
-		}
+	const runs = new Map<string, CreditRun>();
+	for (const { provider, model, timestamp, error } of db.query<Failure, [number]>(FAILURES_SINCE_LAST_SUCCESS).all(now - CREDITS_WINDOW_MS)) {
 		if (!isBillingCap(error)) continue;
 		const run = runs.get(provider);
-		const text = (error ?? "").slice(0, ERROR_CHARS);
+		const text = error.slice(0, ERROR_CHARS);
 		runs.set(provider, run ? { ...run, model, failures: run.failures + 1, error: text } : { provider, model, failures: 1, since: timestamp, error: text });
 	}
-	return [...runs.values()].filter(run => run !== null);
+	return [...runs.values()];
 }
 
 export async function readCreditRuns(now: number): Promise<CreditRun[]> {
