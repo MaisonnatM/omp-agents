@@ -183,6 +183,25 @@ _Avoid_: Delayed message, routine
 The one server that holds `server.lock` and runs the unattended work.
 _Avoid_: Leader, primary
 
+## Sport
+
+**Workout**:
+One training session the plan schedules on a day, such as a fingerboard and limit-bouldering evening, with its exercises and the load each one calls for; the Sport page shows it as « Séance ».
+_Avoid_: Session (see **Session**), template, training session
+
+**Workout log**:
+What the user actually did on a day, planned or not: the loads used, the boulders and routes climbed with their French grade, and how it felt; the Sport page shows it as « Journal ».
+_Avoid_: Session log, entry, history
+
+**Target**:
+A result the user trains toward, such as a 119 kg total finger max or 8a in bouldering, optionally with a date; the Sport page shows it as « Objectif ».
+_Avoid_: Goal (see **Goal**), objective
+
+**Pain flag**:
+A pain the user rated 3 out of 10 or more, with where it hurts, which changes the coming days' workouts; finger pain drops the fingerboard for 7 days.
+It shows on the Sport page and in the personal session's prompt, never under the bell.
+_Avoid_: Alert, notice (see **Notice**), injury
+
 ## Distribution
 
 **Starter kit**:
