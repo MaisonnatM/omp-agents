@@ -39,8 +39,8 @@ export function WeekTab({ state, plan, selected, today, disabled, onDemo, onLog 
 	}, [selected]);
 	const step = (days: number) => hashForSport({ tab: "week", day: addDays(selected, days) });
 	return (
-		<div className="flex h-full min-h-0 flex-col min-[700px]:flex-row">
-			<nav aria-label="Jours" className="min-h-0 shrink-0 basis-[40%] overflow-y-auto border-b border-border px-3 py-3 min-[700px]:basis-auto min-[700px]:w-80 min-[700px]:border-r min-[700px]:border-b-0">
+		<div className="flex h-full min-h-0 flex-col @3xl/sport:flex-row">
+			<nav aria-label="Jours" className="min-h-0 shrink-0 basis-[40%] overflow-y-auto border-b border-border px-3 py-3 @3xl/sport:w-80 @3xl/sport:basis-auto @3xl/sport:border-r @3xl/sport:border-b-0">
 				<div className="flex items-center gap-1 px-1">
 					<Tooltip content="Semaine précédente">
 						<Button variant="ghost" size="icon-compact" aria-label="Semaine précédente" asChild>
@@ -94,16 +94,18 @@ export function WeekTab({ state, plan, selected, today, disabled, onDemo, onLog 
 				))}
 			</nav>
 			<div className="min-h-0 flex-1 overflow-y-auto">
-				<div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-4 pb-20 min-[700px]:px-6 min-[700px]:pb-6">
+				<div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 @3xl/sport:px-6">
 					{flag && <PainBanner flag={flag} today={today} />}
 					<DayDetail plan={plan} day={day} today={today} disabled={disabled} onDemo={onDemo} onLog={workout => onLog(day.date, workout)} />
 				</div>
+				{pending && (
+					<div className="sticky bottom-0 px-4 pb-4 @3xl/sport:hidden">
+						<Button className="w-full" leadingIcon={Check} disabled={disabled} onClick={() => onLog(day.date, pending)} {...activityControl("sport.log.open")}>
+							Séance faite…
+						</Button>
+					</div>
+				)}
 			</div>
-			{pending && (
-				<Button className="fixed inset-x-4 bottom-4 z-20 min-[700px]:hidden" leadingIcon={Check} disabled={disabled} onClick={() => onLog(day.date, pending)} {...activityControl("sport.log.open")}>
-					Séance faite…
-				</Button>
-			)}
 		</div>
 	);
 }

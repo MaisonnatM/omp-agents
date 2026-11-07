@@ -5,6 +5,7 @@ import type { Exercise, Plan } from "../../../src/shared/sport";
 import type { PlannedDay, PlannedExercise, PlannedWorkout } from "../../../src/sport-week";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { demosOf, dose, duration, loadSource, loadText, longDate, PLACE_LABEL, shortDate, workoutDemos } from "../../sport-view";
 import { DemoStrip } from "./demo-strip";
@@ -96,7 +97,7 @@ function ExerciseRow({ item: { exercise, load, removed }, onDemo }: { item: Plan
 	const source = removed ? "retiré · douleur aux doigts" : loadSource(load);
 	const side = [dose(exercise), exercise.note].filter(Boolean).join(" · ");
 	return (
-		<li className="flex items-start justify-between gap-4 py-2 text-sm">
+		<li className="flex flex-col gap-0.5 py-2 text-sm @md/sport:flex-row @md/sport:items-start @md/sport:justify-between @md/sport:gap-4">
 			<div className="min-w-0">
 				{onDemo && !removed ? (
 					<button type="button" onClick={onDemo} {...activityControl("sport.demo.open")} className="inline-flex items-center gap-1 rounded-sm text-left underline decoration-dotted underline-offset-4 outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">
@@ -108,7 +109,7 @@ function ExerciseRow({ item: { exercise, load, removed }, onDemo }: { item: Plan
 				)}
 				{source && <p className="text-xs text-muted-foreground">{source}</p>}
 			</div>
-			<div className={removed ? "shrink-0 text-right text-muted-foreground line-through" : "shrink-0 text-right"}>
+			<div className={cn("min-w-0 @md/sport:max-w-[50%] @md/sport:text-right", removed && "text-muted-foreground line-through")}>
 				{side && <p className="text-muted-foreground">{side}</p>}
 				{kg && !removed && <p className="font-medium tabular-nums">{kg}</p>}
 			</div>

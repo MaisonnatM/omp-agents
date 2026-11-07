@@ -59,8 +59,8 @@ export function ProgressTab({ state, today }: { state: SportState; today: string
 	const from = weeks === null ? null : addDays(mondayOf(today), -7 * (weeks - 1));
 	const chart = chartOf(state, card.figure, from, today, target(card.figure));
 	return (
-		<div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 min-[700px]:px-6">
-			<div role="radiogroup" aria-label="Mesures" className="grid grid-cols-2 gap-3 min-[900px]:grid-cols-5">
+		<div className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 @3xl/sport:px-6">
+			<div role="radiogroup" aria-label="Mesures" className="grid grid-cols-2 gap-3 @4xl/sport:grid-cols-5">
 				{cards.map(entry => {
 					const on = entry === card;
 					return (

@@ -2,6 +2,7 @@
 
 - The **Sport** button in the header, a `#sport` address, or **Go to sport** in the command menu shows your training week in place of the panes.
   The sidebar then lists **Semaine**, **Journal**, and **Progrès**, the same three tabs the page's header shows.
+  On a page narrower than 768 pixels, such as a phone's or a narrow window's, the tabs move to a row under the header, and **Séance libre** and **Pesée** show their icon alone.
   The page's words are in French, as the plan is.
 - The header names the open day's phase and week, such as « transition · semaine 1 sur 3 ».
   **Séance libre** logs a session the plan did not schedule, and **Pesée** adds a bodyweight once a load rule subtracts one.
@@ -22,7 +23,7 @@
   Below the workouts, **Chaque jour** lists the daily habits, with **Démos** for one that follows a routine.
 - When you noted pain of 3 out of 10 or more in the last 7 days, a banner says where and when.
   Finger pain removes the fingerboard and every hang for the next 7 days; the open day shows them struck through.
-- On a narrow screen, while the open day has a workout not noted yet, a **Séance faite…** button stays at the bottom of the screen.
+- On a narrow page, while the open day has a workout not noted yet, a **Séance faite…** button stays at the bottom of the day.
 
 ## Demos
 
