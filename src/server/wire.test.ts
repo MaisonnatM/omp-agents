@@ -160,6 +160,12 @@ describe("parseClientMsg", () => {
 		expect(change({ op: "restore", parentId: null, todo: top, index: -1 })).toBeNull();
 	});
 
+	test("sport-change takes a whole change and refuses a wrong one", () => {
+		expect(msg({ t: "sport-change", change: { op: "remove-log", id: "l1", extra: 1 } })).toEqual({ t: "sport-change", change: { op: "remove-log", id: "l1" } });
+		expect(msg({ t: "sport-change", change: { op: "remove-log", id: "" } })).toBeNull();
+		expect(msg({ t: "sport-change" })).toBeNull();
+	});
+
 	describe("routine", () => {
 		const change = (value: unknown) => msg({ t: "routine", change: value });
 		const weekdays: Schedule = { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } };
