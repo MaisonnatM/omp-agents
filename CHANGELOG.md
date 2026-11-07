@@ -28,7 +28,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-07
 
-- Behind the scenes: the dashboard now keeps your training plan, test results, targets, and workout log in one sport.json file and works out each week's workouts and loads from it, ready for the coming Sport page.
+- Behind the scenes: the dashboard now keeps your training plan, test results, targets, and workout log together and works out each week's workouts and loads, ready for the coming Sport page.
 - Fixed: the daily cleanup and Settings › Storage now check a subagent's copy of your repository for edits and live sessions even when omp keeps that copy outside the task's folder.
 - Fixed: removing a leftover task's folder now also deletes that outside copy, instead of leaving it behind.
 - Fixed: a Bot page's model menu now lists the models, instead of staying on Loading models.
