@@ -1,0 +1,240 @@
+From 171478372731058558ed910f2caa96ea403a342c Mon Sep 17 00:00:00 2001
+From: maxence_maisonnat <maisonnatmax@gmail.com>
+Date: Sat, 7 Nov 2026 11:45:44 +0100
+Subject: [PATCH] fix(ai/cursor): tell the model which tools are dynamic-only
+
+Cursor's backend keeps MCP tools out of the model's function list. The
+model sees only its native tools plus GetDynamicTools/CallDynamicTool, so
+it reports omp tools such as land or end_session as unavailable instead
+of looking them up.
+
+The request builder now derives the advertised MCP tool definitions and,
+when any exist, appends one system-prompt entry naming them in order and
+pointing at GetDynamicTools and CallDynamicTool. Root system entries, the
+history `<rules>` entry and requestContext.rules all read that prompt, so
+the rule reaches the model on the first turn and every later one. The
+advertised tools and allowed-tools header are unchanged.
+
+Omp-Session: 01a1b59a-9df8-752f-b412-98a0184fcedf
+---
+ packages/ai/src/providers/cursor.ts           | 60 +++++++++++++++----
+ .../test/cursor-system-prompt-history.test.ts | 54 +++++++++++++++--
+ 2 files changed, 97 insertions(+), 17 deletions(-)
+
+diff --git a/packages/ai/src/providers/cursor.ts b/packages/ai/src/providers/cursor.ts
+index 54c9e21..826c9df 100644
+--- a/packages/ai/src/providers/cursor.ts
++++ b/packages/ai/src/providers/cursor.ts
+@@ -567,6 +567,8 @@ interface CursorGrpcRequest {
+ 	requestBytes: Uint8Array;
+ 	blobStore: Map<string, Uint8Array>;
+ 	conversationState: ConversationStateStructure;
++	requestContextTools: McpToolDefinition[];
++	requestContextRules: CursorRule[];
+ }
+ 
+ interface CursorTransportRequest extends CursorGrpcRequest {
+@@ -1427,19 +1429,13 @@ function streamCursorWithWireMode(
+ 				},
+ 				wireMode,
+ 			);
+-			const { requestBytes, conversationState } = builtRequest;
++			const { requestBytes, conversationState, requestContextTools, requestContextRules } = builtRequest;
+ 			serializedFallbackWireModelId = builtRequest.fallbackWireModelId;
+ 			// A retry resumes the checkpoint its earlier requests wrote, so every
+ 			// request of the turn must share the first one's route.
+ 			turnRecords.wireRoute ??= builtRequest.wireRoute;
+ 			if (builtRequest.wireRoute !== turnRecords.wireRoute) turnRecords.mixedRoutes = true;
+ 			conversationEntry.state = conversationState;
+-			const requestContextTools = buildMcpToolDefinitions(
+-				context.tools,
+-				model.requiresCursorToolSchemaProjection === true,
+-				options?.externalToolExecutor === true,
+-			);
+-			const requestContextRules = buildCursorRequestContextRules(context.systemPrompt);
+ 
+ 			const baseUrl = model.baseUrl || CURSOR_API_URL;
+ 			const requestPath = transportMode === "http2" ? CURSOR_RUN_PATH : CURSOR_RUN_SSE_PATH;
+@@ -6295,6 +6291,20 @@ export function buildCursorRequestContextRules(systemPrompt: readonly string[] |
+ 	);
+ }
+ 
++/**
++ * Cursor keeps MCP tools out of the model's function list; the model reaches
++ * them only through GetDynamicTools and CallDynamicTool. Without this rule it
++ * reports advertised tools as unavailable.
++ */
++export function cursorDynamicToolsRule(toolNames: readonly string[]): string | undefined {
++	if (toolNames.length === 0) return undefined;
++	return (
++		`Cursor lists these tools only as dynamic tools, not in your function list: ${toolNames.join(", ")}. ` +
++		"Call GetDynamicTools to see their schemas and CallDynamicTool to run one. " +
++		"Never conclude one of them is missing before you look it up."
++	);
++}
++
+ /**
+  * Local tools Cursor already drives natively over the exec channel, so
+  * advertising them again as MCP tools would give the model two ways to call the
+@@ -7153,7 +7163,19 @@ async function buildGrpcRequestForWireMode(
+ ): Promise<CursorTransportRequest> {
+ 	const blobStore = state.blobStore;
+ 
+-	const systemPromptIds = buildCursorSystemPromptJsons(context.systemPrompt).map(json =>
++	const requestContextTools = buildMcpToolDefinitions(
++		context.tools,
++		model.requiresCursorToolSchemaProjection === true,
++		options?.externalToolExecutor === true,
++	);
++	const dynamicToolsRule = cursorDynamicToolsRule(requestContextTools.map(tool => tool.name));
++	// Root system entries, the history `<rules>` entry and requestContext.rules all
++	// read this one prompt, so the rule reaches the model on first and later turns.
++	const promptContext: Context = dynamicToolsRule
++		? { ...context, systemPrompt: [...(context.systemPrompt ?? []), dynamicToolsRule] }
++		: context;
++
++	const systemPromptIds = buildCursorSystemPromptJsons(promptContext.systemPrompt).map(json =>
+ 		storeCursorBlob(blobStore, new TextEncoder().encode(json)),
+ 	);
+ 
+@@ -7218,7 +7240,15 @@ async function buildGrpcRequestForWireMode(
+ 				// its turns hold the partial turn the server resumes from, which
+ 				// `context.messages` cannot rebuild.
+ 				{ conversationState: state.conversationState, replayed: false }
+-			: buildCursorConversationState(model, context, state, blobStore, systemPromptIds, historyEndIndex, builtRoute);
++			: buildCursorConversationState(
++					model,
++					promptContext,
++					state,
++					blobStore,
++					systemPromptIds,
++					historyEndIndex,
++					builtRoute,
++				);
+ 	const { conversationState } = built;
+ 	// Fingerprints of the history as built, to tell which field the hook below edited.
+ 	const builtRootHash = built.replayed ? hashCursorBlobIds(conversationState.rootPromptMessagesJson) : undefined;
+@@ -7255,7 +7285,7 @@ async function buildGrpcRequestForWireMode(
+ 		if (rootAsBuilt || turnsAsBuilt) {
+ 			const rebuilt = buildCursorConversationState(
+ 				model,
+-				context,
++				promptContext,
+ 				state,
+ 				blobStore,
+ 				systemPromptIds,
+@@ -7303,7 +7333,15 @@ async function buildGrpcRequestForWireMode(
+ 		detail: detail || undefined,
+ 	});
+ 
+-	return { requestBytes, blobStore, conversationState, fallbackWireModelId, wireRoute };
++	return {
++		requestBytes,
++		blobStore,
++		conversationState,
++		requestContextTools,
++		requestContextRules: buildCursorRequestContextRules(promptContext.systemPrompt),
++		fallbackWireModelId,
++		wireRoute,
++	};
+ }
+ 
+ /**
+diff --git a/packages/ai/test/cursor-system-prompt-history.test.ts b/packages/ai/test/cursor-system-prompt-history.test.ts
+index 031cbb8..1d2bb23 100644
+--- a/packages/ai/test/cursor-system-prompt-history.test.ts
++++ b/packages/ai/test/cursor-system-prompt-history.test.ts
+@@ -4,7 +4,7 @@
+ // its own `<rules>` entry lost omp's system prompt from the second turn on.
+ import { describe, expect, it } from "bun:test";
+ import { buildGrpcRequest } from "@oh-my-pi/pi-ai/providers/cursor";
+-import type { AssistantMessage, Context, Message, Model } from "@oh-my-pi/pi-ai/types";
++import type { AssistantMessage, Context, Message, Model, Tool } from "@oh-my-pi/pi-ai/types";
+ import { buildModel } from "@oh-my-pi/pi-catalog/build";
+ 
+ const model: Model<"cursor-agent"> = buildModel({
+@@ -42,22 +42,31 @@ const firstAnswer: AssistantMessage = {
+ };
+ const secondUser: Message = { role: "user", content: "What is the project codeword?", timestamp: 3 };
+ 
+-async function rootEntries(context: Context): Promise<{ role: string; content: unknown }[]> {
++async function buildRequest(
++	context: Context,
++): Promise<{ root: { role: string; content: unknown }[]; rules: string[] }> {
+ 	const blobStore = new Map<string, Uint8Array>();
+-	const { conversationState } = await buildGrpcRequest(model, context, undefined, {
++	const { conversationState, requestContextRules } = await buildGrpcRequest(model, context, undefined, {
+ 		conversationId: `history-${crypto.randomUUID()}`,
+ 		blobStore,
+ 	});
+-	return conversationState.rootPromptMessagesJson.map(id => {
++	const root = conversationState.rootPromptMessagesJson.map(id => {
+ 		const bytes = blobStore.get(Buffer.from(id).toString("hex"));
+ 		const { role, content } = JSON.parse(new TextDecoder().decode(bytes));
+ 		return { role, content };
+ 	});
++	return { root, rules: requestContextRules.map(rule => rule.content) };
+ }
+ 
++const tool = (name: string): Tool => ({
++	name,
++	description: `${name} tool`,
++	parameters: { type: "object", properties: {} },
++});
++
+ describe("cursor system prompt on history-bearing roots", () => {
+ 	it("carries the system prompt as a <rules> entry after the system entries", async () => {
+-		const root = await rootEntries({ systemPrompt, messages: [firstUser, firstAnswer, secondUser] });
++		const { root } = await buildRequest({ systemPrompt, messages: [firstUser, firstAnswer, secondUser] });
+ 
+ 		expect(root).toEqual([
+ 			{ role: "system", content: "omp base prompt" },
+@@ -69,11 +78,44 @@ describe("cursor system prompt on history-bearing roots", () => {
+ 	});
+ 
+ 	it("leaves a history-less root to the server's own <rules> entry", async () => {
+-		const root = await rootEntries({ systemPrompt, messages: [firstUser] });
++		const { root } = await buildRequest({ systemPrompt, messages: [firstUser] });
+ 
+ 		expect(root).toEqual([
+ 			{ role: "system", content: "omp base prompt" },
+ 			{ role: "system", content: "The project codeword is PERIWINKLE-4821." },
+ 		]);
+ 	});
++
++	it("names the tools only Cursor's dynamic tools reach, on the first turn and later ones", async () => {
++		const tools = [tool("bash"), tool("read"), tool("land"), tool("end_session")];
++		const first = await buildRequest({ systemPrompt, tools, messages: [firstUser] });
++		const later = await buildRequest({ systemPrompt, tools, messages: [firstUser, firstAnswer, secondUser] });
++
++		const dynamicEntries = first.rules.filter(rule => rule.includes("GetDynamicTools"));
++		expect(dynamicEntries).toHaveLength(1);
++		const [rule] = dynamicEntries;
++		expect(rule).toContain("function list: land, end_session.");
++		expect(rule).not.toMatch(/\b(bash|read)\b/);
++		expect(first.rules).toEqual([...systemPrompt, rule]);
++		expect(later.rules).toEqual(first.rules);
++		expect(later.root.slice(0, 4)).toEqual([
++			{ role: "system", content: "omp base prompt" },
++			{ role: "system", content: "The project codeword is PERIWINKLE-4821." },
++			{ role: "system", content: rule },
++			{ role: "user", content: `<rules>\n${[...systemPrompt, rule].join("\n\n")}\n</rules>` },
++		]);
++	});
++
++	it("adds no dynamic tools entry when every tool is native", async () => {
++		const tools = [tool("bash"), tool("read")];
++		const first = await buildRequest({ systemPrompt, tools, messages: [firstUser] });
++		const later = await buildRequest({ systemPrompt, tools, messages: [firstUser, firstAnswer, secondUser] });
++
++		expect(first.rules).toEqual(systemPrompt);
++		expect(later.root.slice(0, 3)).toEqual([
++			{ role: "system", content: "omp base prompt" },
++			{ role: "system", content: "The project codeword is PERIWINKLE-4821." },
++			{ role: "user", content: "<rules>\nomp base prompt\n\nThe project codeword is PERIWINKLE-4821.\n</rules>" },
++		]);
++	});
+ });
+-- 
+2.56.0
+

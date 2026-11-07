@@ -42,6 +42,9 @@ Historical task consults search session IDs only in the caller's artifacts and c
 Cross-project callers pass the exact `file` returned by eval's archive as `sourceSession`; the Memory curator's saved job follows that handoff.
 The native implementation lives in `pi-coding-agent/src/task/seance.ts`, with task guidance in `pi-coding-agent/src/prompts/tools/seance-task-guidance.md`.
 
+[`patches/omp-18.18.0-cursor-dynamic-tools-rule.patch`](../../patches/omp-18.18.0-cursor-dynamic-tools-rule.patch), on tag `v18.18.0` (commit `b5a6b2f7`), adds `cursorDynamicToolsRule` to `pi-ai/src/providers/cursor.ts`: a system-prompt entry naming the tools Cursor hides behind `GetDynamicTools`, all but its native ones.
+Apply it as above, test with `bun --cwd=packages/ai test test/cursor-system-prompt-history.test.ts`, then install the rebuilt `dist/cli.js` and that source; stock upgrades remove it, and the dashboard's own [Cursor paragraph](front-end-components.md#session-visuals) still reaches its sessions.
+
 Paths in this document that start with `pi-coding-agent/`, `pi-ai/`, `pi-catalog/`, `pi-tui/`, `pi-utils/`, or `omp-stats/` are inside that install, in `@oh-my-pi/`.
 They are not in this repository.
 The main ones:
