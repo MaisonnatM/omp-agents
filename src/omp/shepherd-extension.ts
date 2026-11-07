@@ -4,10 +4,9 @@
 // (`Bots.join` in src/server/bots.ts), so no other session has these tools.
 import { parseBotId } from "../shared/bots";
 import { parsePullRequest } from "../shared/github";
-import { MAX_FIXES_PER_PULL_REQUEST, SHEPHERD_FIXES, type ShepherdChange } from "../shared/shepherd";
+import { MAX_FIXES_PER_PULL_REQUEST, SHEPHERD_FIXES, type ShepherdChange, type ShepherdRequest } from "../shared/shepherd";
 import { MERGE_METHODS } from "../shared/source-control";
-import { leave } from "./bot-extension";
-import { type ExtensionApi, flagValue, reply } from "./extension-kit";
+import { type ExtensionApi, flagValue, leave, reply } from "./extension-kit";
 
 /** The flags a shepherd's session starts with: its Bot's id, and the directory its tools leave their requests in. */
 export const SHEPHERD_FLAGS = {
@@ -44,7 +43,7 @@ export default function shepherdExtension(pi: ExtensionApi): void {
 		const botId = parseBotId(flagValue(pi, SHEPHERD_FLAGS.bot));
 		const inbox = flagValue(pi, SHEPHERD_FLAGS.inbox);
 		if (!botId || !inbox) throw new Error("This session is not an omp-agents PR shepherd.");
-		leave(inbox, { botId, change });
+		leave(inbox, { botId, change } satisfies ShepherdRequest);
 	};
 
 	const pullRequest = ({ owner, repo, number }: PullRequestParams) => {

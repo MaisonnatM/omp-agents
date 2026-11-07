@@ -7,9 +7,9 @@ import { randomUUID } from "node:crypto";
 import { statSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { CREATE_TOOL } from "../shared/bot-designer";
-import { BOT_KIND_INFO, BOT_KINDS, type BotId, MAX_JOB_LENGTH, parseBotId } from "../shared/bots";
-import { BOT_FLAGS, leave } from "./bot-extension";
-import { type ExtensionApi, flagValue, reply } from "./extension-kit";
+import { BOT_KIND_INFO, BOT_KINDS, type BotCreateRequest, type BotId, MAX_JOB_LENGTH, parseBotId } from "../shared/bots";
+import { BOT_FLAGS } from "./bot-extension";
+import { type ExtensionApi, flagValue, leave, reply } from "./extension-kit";
 
 export interface CreateBotParams {
 	name: string;
@@ -69,7 +69,7 @@ export default function designerExtension(pi: ExtensionApi): void {
 			if (text.length > MAX_JOB_LENGTH) throw new Error(`job is ${text.length} characters; keep it to at most ${MAX_JOB_LENGTH}.`);
 			if (!type) throw new Error(`kind must be one of ${BOT_KINDS.join(", ")}.`);
 			if (!isAbsolute(workspace) || !isDirectory(workspace)) throw new Error(`cwd ${workspace} is not the absolute path of a directory.`);
-			leave(inbox, { botId, create: { id: randomUUID() as BotId, kind: type, name: title, job: text, cwd: workspace } });
+			leave(inbox, { botId, create: { id: randomUUID() as BotId, kind: type, name: title, job: text, cwd: workspace } } satisfies BotCreateRequest);
 			return reply(`Asked the dashboard to create ${title}, a ${BOT_KIND_INFO[type].label} Bot in ${workspace}. It shows in the Bots tab once the dashboard applies it.`);
 		},
 	});
