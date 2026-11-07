@@ -4,9 +4,10 @@ import { isObject, num, str } from "./json";
 import { ompCommand } from "./omp/install";
 import { configuredProviders } from "./omp/models";
 import type { UsageReport } from "./omp/module-types/models";
+import { type CreditRun, readCreditRuns } from "./omp/stats";
 import { readRawUsageReports } from "./omp/usage";
 import { run } from "./proc";
-import { API_CREDITS_PROVIDER, type CreditBalance, type ExtraUsage, PROVIDER_NAMES, type PlanUsage, type PlanWindow, type ResetCredits, type UsdAmount } from "./shared/models";
+import { API_CREDITS_PROVIDER, type CreditBalance, type ExtraUsage, isNameOnlyPlan, PROVIDER_NAMES, type PlanUsage, type PlanWindow, type ResetCredits, type UsdAmount } from "./shared/models";
 
 const TIMEOUT_MS = 30_000;
 
@@ -239,9 +240,19 @@ export function withCreditBalance(plans: readonly PlanUsage[], balance: CreditBa
 	);
 }
 
+/** Marks each name-only row whose provider is refusing requests for lack of credit, from the bell's credit runs. */
+export function withCreditRuns(plans: readonly PlanUsage[], runs: readonly CreditRun[]): PlanUsage[] {
+	const since = new Map(runs.map(run => [run.provider, run.since]));
+	return plans.map(plan => {
+		const outOfCreditSince = since.get(plan.provider);
+		return outOfCreditSince !== undefined && isNameOnlyPlan(plan) ? { ...plan, outOfCreditSince } : plan;
+	});
+}
+
 /** omp exits non-zero when some provider fails, after printing the reports it did get. */
 export async function fetchPlanUsage(): Promise<PlanUsage[]> {
 	const credits = readConsoleCreditBalance().catch(() => null);
+	const refusals = readCreditRuns(Date.now()).catch(() => []);
 	const rawReports = await readRawUsageReports().catch(() => null);
 	const { stdout, stderr, code } = await run([...ompCommand, "usage", "--json"], { timeoutMs: TIMEOUT_MS });
 	let plans: PlanUsage[];
@@ -257,5 +268,5 @@ export async function fetchPlanUsage(): Promise<PlanUsage[]> {
 	} catch {
 		configured = [];
 	}
-	return withCreditBalance(plansWithConfiguredProviders(plans, configured), await credits);
+	return withCreditRuns(withCreditBalance(plansWithConfiguredProviders(plans, configured), await credits), await refusals);
 }

@@ -12,6 +12,12 @@ test("a Slack message opens in Slack and toasts briefly", () => {
 	expect(shown).toMatchObject({ source: "slack", headline: "Ann sent you 2 messages", preview: "hi", link: { href: "https://slack/x", external: true }, action: { kind: "none" }, toast: { kind: "news", timeout: TOAST_MS } });
 });
 
+test("a provider out of credit names its footer row, so the API key reads as API credits", () => {
+	const shown = presentNotice({ id: "c", ...flags, kind: "credits", provider: "anthropic-api", model: "claude-opus-5-5", failures: 2, since: NOW, error: "Your credit balance is too low" }, NOW);
+	expect(shown.headline).toBe("Out of credit: API credits");
+	expect(shown.preview).toStartWith("2 requests to claude-opus-5-5 failed since");
+});
+
 test("an event stays toasted and opens the Calendar page when kept on this computer, or the session that added it", () => {
 	const event = { id: "e", ...flags, kind: "event", title: "Standup", start: NOW + 60_000, end: NOW + 600_000, calendar: null, color: null, url: null, sessionId: null } as const;
 	const shown = presentNotice(event, NOW);

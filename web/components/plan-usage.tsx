@@ -104,9 +104,15 @@ function ExtraSpent({ extra }: { extra: ExtraUsage }) {
 	);
 }
 
-function CreditAmount({ name, balance }: { name: string; balance: CreditBalance }) {
+/** The balance in its tone, turned red once the provider refuses requests for lack of credit. */
+function CreditAmount({ name, balance, outOfCreditSince }: { name: string; balance: CreditBalance; outOfCreditSince?: number }) {
 	const { amount, tooltip, tone } = creditView(balance);
-	return <QuotaChip label={name} value={amount} tooltip={tooltip} tone={tone} />;
+	if (outOfCreditSince === undefined) return <QuotaChip label={name} value={amount} tooltip={tooltip} tone={tone} />;
+	return <QuotaChip label={name} value={amount} tooltip={`${tooltip}${refusedSince(outOfCreditSince)}`} tone="out" />;
+}
+
+function refusedSince(since: number): string {
+	return ` Requests refused for lack of credit since ${new Date(since).toLocaleString()}.`;
 }
 
 function creditsLine({ count, nextExpiresAt }: ResetCredits): string {
@@ -128,8 +134,11 @@ function PlanRow({ plan }: { plan: PlanUsage }) {
 					/>
 				</span>
 			</Tooltip>
-			{nameOnly && !plan.balance && <span aria-hidden className="whitespace-nowrap text-foreground">{plan.name}</span>}
-			{nameOnly && plan.balance && <CreditAmount name={plan.name} balance={plan.balance} />}
+			{nameOnly && !plan.balance && plan.outOfCreditSince === undefined && <span aria-hidden className="whitespace-nowrap text-foreground">{plan.name}</span>}
+			{nameOnly && !plan.balance && plan.outOfCreditSince !== undefined && (
+				<QuotaChip label={plan.name} value="used up" tooltip={`${plan.name}: used up.${refusedSince(plan.outOfCreditSince)}`} tone="out" />
+			)}
+			{nameOnly && plan.balance && <CreditAmount name={plan.name} balance={plan.balance} outOfCreditSince={plan.outOfCreditSince} />}
 			{plan.extra && <ExtraSpent extra={plan.extra} />}
 			{plan.windows.map(window => (
 				<WindowLeft key={window.label} window={window} />

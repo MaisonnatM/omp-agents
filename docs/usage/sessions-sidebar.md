@@ -99,6 +99,7 @@
   Amber means less than 20% of the grant is left, and red means it is used up.
   Hover or focus it to see when the grant expires.
   When the Console reports no grant, the row shows the prepaid dollars left instead, as `$4.50 left`, and `$0.00 left` in red once usage runs past the balance; the model menu's API credits heading shows the same.
+  When that provider refused a request in the last day because its credit balance ran out, such as Anthropic's `Your credit balance is too low` reply, the row turns red and reads `used up`, or keeps its amount in red when it shows a balance, and its hover says since when.
   A sign-in that exists only in Chrome stays a name, because that browser's cookies are encrypted.
   A window omp meters in dollars, such as Cursor's `Other Models`, adds the dollars spent to its hover.
   The server runs `omp usage --json` every minute while a page is open, and once when a page opens after a minute with none.

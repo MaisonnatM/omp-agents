@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parsePlanUsage, plansWithConfiguredProviders, withCreditBalance } from "./usage";
+import { parsePlanUsage, plansWithConfiguredProviders, withCreditBalance, withCreditRuns } from "./usage";
 
 const limit = (label: string, window: string, amount: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
 	label,
@@ -314,5 +314,21 @@ describe("withCreditBalance", () => {
 	test("a missing grant leaves the rows unchanged", () => {
 		const plans = [row("anthropic-api")];
 		expect(withCreditBalance(plans, null)).toEqual(plans);
+	});
+});
+
+describe("withCreditRuns", () => {
+	const run = (provider: string, since: number) => ({ provider, model: "claude-opus-5-5", failures: 3, since, error: "Your credit balance is too low" });
+
+	test("marks the name-only row of a provider refusing requests for lack of credit, and no plan with windows", () => {
+		const apiKey = { provider: "anthropic-api", name: "API credits", account: null, windows: [], extra: null, resetCredits: null };
+		const subscription = { ...apiKey, provider: "anthropic", name: "Anthropic", windows: [{ id: "5h", label: "5h", title: "5 hour", remaining: 0, exhausted: true, resetsAt: null }] };
+		const marked = withCreditRuns([subscription, apiKey], [run("anthropic-api", 7), run("anthropic", 8)]);
+		expect(marked).toEqual([subscription, { ...apiKey, outOfCreditSince: 7 }]);
+	});
+
+	test("no runs leave the rows unchanged", () => {
+		const plans = [{ provider: "anthropic-api", name: "API credits", account: null, windows: [], extra: null, resetCredits: null }];
+		expect(withCreditRuns(plans, [])).toEqual(plans);
 	});
 });

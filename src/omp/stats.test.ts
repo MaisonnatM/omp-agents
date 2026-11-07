@@ -34,6 +34,18 @@ describe("creditRuns", () => {
 		]);
 		expect(runs).toEqual([]);
 	});
+
+	test("Anthropic's spent-balance 400 and its in-stream twin start an API credits run", () => {
+		const refusal =
+			'400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_1"}';
+		const runs = creditRuns([
+			request("anthropic-api", 1, null, "claude-opus-5-5"),
+			request("anthropic-api", 2, "Anthropic stream error (invalid_request_error): Your credit balance is too low to access the Anthropic API.", "claude-opus-5-5"),
+			request("anthropic-api", 3, refusal, "claude-opus-5-5"),
+			request("anthropic", 4, '400 {"type":"error","error":{"type":"invalid_request_error","message":"prompt is too long"}}', "claude-opus-5-5"),
+		]);
+		expect(runs).toEqual([{ provider: "anthropic-api", model: "claude-opus-5-5", failures: 2, since: 2, error: refusal.slice(0, 300) }]);
+	});
 });
 
 test("listPrice uses omp's bundled API rates with Claude's cache lifetimes, and an unknown model costs zero", () => {

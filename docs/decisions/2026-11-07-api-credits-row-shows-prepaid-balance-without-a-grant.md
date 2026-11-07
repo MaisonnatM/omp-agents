@@ -35,7 +35,7 @@ With several API organizations, the first one with a grant wins, and with none, 
 
 ## Confirmation
 
-`src/console-credits.test.ts` checks that a grant wins, on a later organization too, that the cents become dollars left, below zero included, and that another currency gives no balance; `web/components/plan-usage.test.ts` checks that an overdrawn balance reads `$0.00 left` in red.
+`src/console-credits.test.ts` checks that a grant wins, on a later organization too, that the cents become dollars left, below zero included, and that another currency gives no balance; `web/components/plan-usage.test.tsx` checks that an overdrawn balance reads `$0.00 left` in red.
 
 ## Revisit when
 

@@ -141,7 +141,7 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 			return {
 				...NEWS,
 				source: "providers",
-				headline: `${providerLabel(notice.provider)} is out of credits`,
+				headline: `Out of credit: ${providerLabel(notice.provider)}`,
 				preview: `${notice.failures === 1 ? "A request" : `${notice.failures} requests`} to ${notice.model} failed since ${timeLabel(notice.since, now)}: ${notice.error}`,
 				link: { href: hashForSettings("providers"), external: false },
 				face: { kind: "provider", provider: notice.provider, window: "credits" },

@@ -23,9 +23,9 @@ The stopped check (`STOPPED_KINDS`) runs at startup once the session files are l
   `users.info` gives each author's 72-pixel profile picture as the notice's `avatarUrl`, which the page's `img-src` allows from `avatars.slack-edge.com`, `secure.gravatar.com`, and `a.slack-edge.com`; a lookup that fails leaves it `null`, and the page shows the initial.
   Without a Slack sign-in, which `integrationSignedIn("slack")` reads, the check finds nothing.
 - The plan notices come from the plans of the last `omp usage` run, which `Broadcasts.refreshUsage` answers with, one per window whose `exhausted` is set; when that run failed, the check fails too and keeps its notices.
-- `readCreditRuns` in `src/omp/stats.ts` reads the last day's requests, in order, of each provider that had an error naming `402` then, aborted requests left out.
-  `creditRuns` starts a run at a failure whose error names `402` and that `is402BillingCapBody` reads as a billing cap, counts each such failure after it, and ends it at the provider's next request that worked; another error neither starts nor ends a run.
-  A provider with a run open is a notice.
+- `readCreditRuns` in `src/omp/stats.ts` reads the last day's requests, in order, of each provider that had an error naming `402` or `credit balance is too low` then, aborted requests left out.
+  `creditRuns` starts a run at a failure whose error either names `402` and reads as a billing cap to `is402BillingCapBody`, or carries Anthropic's 400 `credit balance is too low`, counts each such failure after it, and ends it at the provider's next request that worked; another error neither starts nor ends a run.
+  A provider with a run open is a notice, headed `Out of credit:` and the provider's footer name, and the footer's row for a name-only provider turns red; see [Plan quota](plan-quota.md).
 - The events come from `LocalEventsFile` and, for each signed-in Google Calendar account, `GoogleCalendars.byAccount` over the next ten minutes (`EVENT_LEAD_MS`), each timed event a notice from that lead before its start until its end, dated at that lead.
   Google's events, one scope per account, and the local ones are separate scopes: an account whose read fails keeps its notices as they were while the other accounts' change, and the Calendar page shows why.
   An event's notice opens the session that added it when the event names one in `sessionId`, which only a kept event added by the `user_event` tool does; otherwise it opens the event in Google Calendar, or the Calendar page for a kept event.

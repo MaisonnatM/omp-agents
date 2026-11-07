@@ -30,4 +30,6 @@ The first organization with a grant wins; with none, the first organization's pr
 A missing cookie, a refused session, or an answer with no grant and no amount in US dollars leaves the row as the name.
 Chrome's cookie store is encrypted, so a Console sign-in that exists only there is not read.
 This is outside `omp usage` because that report has no balance for an API key, and an individual Console organization cannot call the Admin cost API.
+`withCreditRuns` then sets `outOfCreditSince` on a name-only row whose provider has a run of refused requests in `readCreditRuns` from `src/omp/stats.ts`, the same runs that raise the bell's out-of-credit notice.
+A run counts a 402 billing cap and Anthropic's 400 `credit balance is too low`, so the footer turns red even when the balance read above still shows dollars left; the 20% amber threshold stays the existing one for a known grant.
 omp reports no dollars for a Codex account's credit balance, so a Codex plan never has `extra`.
