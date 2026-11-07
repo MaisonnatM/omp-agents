@@ -33,7 +33,6 @@ import {
 	weekdayOf,
 } from "./shared/sport";
 
-/** The longest id a change may name. */
 export const MAX_SPORT_ID = 200;
 
 const isId = (value: unknown): value is string => isNonEmpty(value) && value.length <= MAX_SPORT_ID;
@@ -43,7 +42,6 @@ const isCount = (value: unknown): value is number | null => value === null || (i
 const isGrade = oneOf(FRENCH_GRADES);
 const YOUTUBE_ID = /^[\w-]{11}$/;
 
-/** Every id `ids` gives is different. */
 const distinct = (ids: string[]): boolean => new Set(ids).size === ids.length;
 
 function parseLoadRule(value: unknown): LoadRule | null {
@@ -203,11 +201,12 @@ function parseLog(value: unknown): WorkoutLog | null {
 	const { id, date, workout = null, title = "", status = "done", rpe = null, loads = {}, note = "", addedBy = null } = value;
 	if (!isId(id) || !isDay(date) || !isOptionalId(workout) || !isText(title) || !(status === "done" || status === "skipped")) return null;
 	if (!(rpe === null || (isSafeInteger(rpe) && rpe >= 1 && rpe <= 10)) || !isText(note) || !isOptionalId(addedBy)) return null;
-	if (!isObject(loads) || Array.isArray(loads) || !Object.entries(loads).every(([key, kg]) => isId(key) && isNumber(kg))) return null;
+	const kilos = isObject(loads) && !Array.isArray(loads) ? Object.entries(loads) : null;
+	if (!kilos?.every((entry): entry is [string, number] => isId(entry[0]) && isNumber(entry[1]))) return null;
 	const pain = value.pain == null ? null : parsePain(value.pain);
 	const climbs = parseAll(value.climbs ?? [], parseClimb);
 	if ((value.pain != null && !pain) || !climbs) return null;
-	return { id, date, workout, title, status, rpe, pain, loads: { ...(loads as Record<string, number>) }, climbs, note, addedBy };
+	return { id, date, workout, title, status, rpe, pain, loads: Object.fromEntries(kilos), climbs, note, addedBy };
 }
 
 const isIndex = (value: unknown): value is number => isSafeInteger(value) && value >= 0;
