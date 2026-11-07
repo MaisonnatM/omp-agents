@@ -28,6 +28,17 @@ export function spendLabel({ used, limit, currency = "USD" }: Pick<ExtraUsage, "
 	return limit === null ? format(used) : `${format(used)} / ${format(limit)}`;
 }
 
+/** The API credits amount: dollars spent of the grant, or with no grant, the prepaid dollars left. */
+export const creditLabel = (balance: CreditBalance): string => (balance.kind === "grant" ? spendLabel(balance) : `${dollars(balance.left)} left`);
+
+/** What the API credits row's hover says, and how its amount is colored. */
+function creditState(balance: CreditBalance): { tooltip: string; tone: "out" | "low" | "ok" } {
+	if (balance.kind === "prepaid") return { tooltip: `API credits: ${creditLabel(balance)}. No promotional grant.`, tone: balance.left <= 0 ? "out" : "ok" };
+	const expires = balance.expiresAt === null ? "" : ` Expires ${DAY_FORMAT.format(balance.expiresAt)}.`;
+	const left = balance.limit > 0 ? (balance.limit - balance.used) / balance.limit : 1;
+	return { tooltip: `API credits: ${creditLabel(balance)} spent.${expires}`, tone: balance.used >= balance.limit ? "out" : left < LOW ? "low" : "ok" };
+}
+
 function WindowLeft({ window }: { window: PlanWindow }) {
 	const percent = Math.round(window.remaining * 100);
 	const reset = window.resetsAt === null ? "" : ` Resets ${new Date(window.resetsAt).toLocaleString()}.`;
@@ -68,20 +79,18 @@ function ExtraSpent({ extra }: { extra: ExtraUsage }) {
 	);
 }
 
-function CreditSpent({ name, balance }: { name: string; balance: CreditBalance }) {
-	const left = balance.limit !== null && balance.limit > 0 ? (balance.limit - balance.used) / balance.limit : 1;
-	const exhausted = balance.limit !== null && balance.used >= balance.limit;
-	const expires = balance.expiresAt === null ? "" : ` Expires ${DAY_FORMAT.format(balance.expiresAt)}.`;
+function CreditAmount({ name, balance }: { name: string; balance: CreditBalance }) {
+	const { tooltip, tone } = creditState(balance);
 	return (
-		<Tooltip content={`API credits: ${spendLabel(balance)} spent.${expires}`}>
+		<Tooltip content={tooltip}>
 			<span
 				tabIndex={0}
 				className={cn(
 					"whitespace-nowrap rounded-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring",
-					exhausted ? "text-red-600 dark:text-red-400" : left < LOW ? "text-amber-600 dark:text-amber-400" : "text-foreground",
+					tone === "out" ? "text-red-600 dark:text-red-400" : tone === "low" ? "text-amber-600 dark:text-amber-400" : "text-foreground",
 				)}
 			>
-				<span className="text-muted-foreground">{name}</span> {spendLabel(balance)}
+				<span className="text-muted-foreground">{name}</span> {creditLabel(balance)}
 			</span>
 		</Tooltip>
 	);
@@ -107,7 +116,7 @@ function PlanRow({ plan }: { plan: PlanUsage }) {
 				</span>
 			</Tooltip>
 			{nameOnly && !plan.balance && <span aria-hidden className="whitespace-nowrap text-foreground">{plan.name}</span>}
-			{nameOnly && plan.balance && <CreditSpent name={plan.name} balance={plan.balance} />}
+			{nameOnly && plan.balance && <CreditAmount name={plan.name} balance={plan.balance} />}
 			{plan.extra && <ExtraSpent extra={plan.extra} />}
 			{plan.windows.map(window => (
 				<WindowLeft key={window.label} window={window} />

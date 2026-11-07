@@ -87,8 +87,8 @@ describe("providerQuota", () => {
 		});
 	});
 
-	test("a name-only API credits row counts when it has a grant", () => {
-		const credits = { ...plan("anthropic-api", []), balance: { used: 11.13, limit: 200, expiresAt: null } };
+	test("a name-only API credits row counts when it has a balance", () => {
+		const credits = { ...plan("anthropic-api", []), balance: { kind: "prepaid" as const, left: -0.72 } };
 		expect(providerQuota([credits], "anthropic-api")).toEqual({ used: null, account: "anthropic-api", windows: [], extra: null, balance: credits.balance });
 	});
 

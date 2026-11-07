@@ -6,6 +6,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-11-07
 
 - Fixed: a Bot page's model menu now lists the models, instead of staying on Loading models.
+- The API credits row in the bottom bar now shows the dollars left on your Console balance when you have no monthly grant, in red once it runs out, instead of only its name.
 
 ## 2026-11-06
 

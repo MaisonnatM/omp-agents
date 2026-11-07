@@ -1,7 +1,7 @@
 /**
- * Monthly API-credit grant from a signed-in Claude Console session.
+ * API credits balance from a signed-in Claude Console session.
  * omp's usage report has no balance for an API key, and an individual Console org cannot call the Admin cost API,
- * so this reads the `sessionKey` cookie Firefox and Zen store for platform.claude.com and the billing page's grant.
+ * so this reads the `sessionKey` cookie Firefox and Zen store for platform.claude.com and the billing page's balance.
  */
 import { Database } from "bun:sqlite";
 import { copyFileSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
@@ -121,9 +121,9 @@ function exponentOf(tranche: Record<string, unknown>): number {
 }
 
 /**
- * Dollars spent of the promotional grant, and the grant itself.
- * Each tranche's minor units use that tranche's exponent, defaulting to cents.
- * The expiry is the soonest tranche's. No promotional tranche is no balance: a purchased remainder has no cap to show.
+ * The promotional grant, dollars spent of it, when the Console reports one; otherwise the prepaid dollars left.
+ * Each tranche's minor units use that tranche's exponent, defaulting to cents, and the expiry is the soonest tranche's.
+ * The prepaid `amount` is in US cents, as the billing fields named `_cents` beside it are, and drops below zero when usage ran past it.
  */
 export function creditBalanceOf(body: unknown): CreditBalance | null {
 	if (!isObject(body) || !Array.isArray(body.promo_tranches)) return null;
@@ -143,8 +143,9 @@ export function creditBalanceOf(body: unknown): CreditBalance | null {
 		if (!Number.isNaN(at)) expiresAt = expiresAt === null ? at : Math.min(expiresAt, at);
 		tranches += 1;
 	}
-	if (tranches === 0 || granted <= 0) return null;
-	return { used, limit: granted, expiresAt };
+	if (tranches > 0 && granted > 0) return { kind: "grant", used, limit: granted, expiresAt };
+	const cents = num(body.amount);
+	return body.currency === "USD" && cents !== undefined ? { kind: "prepaid", left: cents / 100 } : null;
 }
 
 /** Enough of `fetch` for the Console calls. Tests pass a stand-in; `fetch` itself also has `preconnect`. */
@@ -163,7 +164,7 @@ async function getJson(url: string, sessionKey: string, fetchImpl: FetchLike): P
 	}
 }
 
-/** The promotional grant of the first API organization this session can read, or null when the session cannot. */
+/** The balance of the first API organization this session can read, or null when the session cannot. */
 export async function fetchConsoleCreditBalance(sessionKey: string, fetchImpl: FetchLike = fetch): Promise<CreditBalance | null> {
 	const orgs = await getJson(`${CONSOLE}/api/organizations`, sessionKey, fetchImpl);
 	for (const id of apiOrganizationIds(orgs)) {
@@ -174,7 +175,7 @@ export async function fetchConsoleCreditBalance(sessionKey: string, fetchImpl: F
 	return null;
 }
 
-/** The grant from the newest Firefox or Zen Console session, or null when there is none or the Console refuses it. */
+/** The balance from the newest Firefox or Zen Console session, or null when there is none or the Console refuses it. */
 export async function readConsoleCreditBalance(fetchImpl: FetchLike = fetch): Promise<CreditBalance | null> {
 	const sessionKey = consoleSessionKey();
 	if (!sessionKey) return null;
