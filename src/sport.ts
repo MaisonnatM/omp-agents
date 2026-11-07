@@ -44,31 +44,64 @@ const ruleMetrics = (plan: Plan | null): string[] => (plan ? exercisesOf(plan) :
 
 const targetMetrics = (targets: Target[]): string[] => targets.flatMap(target => (target.kind === "metric" ? [target.metric] : []));
 
-const known = (metrics: Metric[], ids: string[]): boolean => ids.every(id => metrics.some(metric => metric.id === id));
+/** The ids among `ids` that `metrics` does not hold, each once. */
+const missing = (metrics: Metric[], ids: string[]): string[] => [...new Set(ids)].filter(id => !metrics.some(metric => metric.id === id));
+
+const unknownMetrics = (state: SportState, ids: string[]): string | null => {
+	const unknown = missing(state.metrics, ids);
+	return unknown.length === 0 ? null : `it names ${unknown.length === 1 ? "a metric" : "metrics"} not in the metrics list, ${unknown.join(", ")}; add ${unknown.length === 1 ? "it" : "them"} to the metrics first`;
+};
 
 /**
- * `state` after `change`, the same object when nothing changed. A change that names a metric the state does not hold,
- * or a `set-metrics` that drops one a measurement, a target, or a load rule still names, is refused the same way, so
- * every metric id in the state names one of its metrics.
+ * Why `state` refuses `change`, or `null` when it takes it: a change that names a metric the state does not hold, or a
+ * `set-metrics` that drops one a measurement, a target, or a load rule still names, so every metric id in the state names
+ * one of its metrics.
  */
-export function applySport(state: SportState, change: SportChange): SportState {
+export function sportRefusal(state: SportState, change: SportChange): string | null {
 	switch (change.op) {
 		case "set-plan":
-			return same(state.plan, change.plan) || !known(state.metrics, ruleMetrics(change.plan)) ? state : { ...state, plan: change.plan };
+			return unknownMetrics(state, ruleMetrics(change.plan));
 		case "set-targets":
-			return same(state.targets, change.targets) || !known(state.metrics, targetMetrics(change.targets)) ? state : { ...state, targets: change.targets };
-		case "set-metrics":
-			return same(state.metrics, change.metrics) || !known(change.metrics, [...state.measurements.map(({ metric }) => metric), ...targetMetrics(state.targets), ...ruleMetrics(state.plan)])
-				? state
-				: { ...state, metrics: change.metrics };
+			return unknownMetrics(state, targetMetrics(change.targets));
+		case "set-metrics": {
+			const dropped = missing(change.metrics, [...state.measurements.map(({ metric }) => metric), ...targetMetrics(state.targets), ...ruleMetrics(state.plan)]);
+			return dropped.length === 0 ? null : `it drops metrics a measurement, a target, or a load rule still names, ${dropped.join(", ")}`;
+		}
 		case "add-measurement":
-			return known(state.metrics, [change.measurement.metric]) ? withMeasurements(state, MEASUREMENTS.add(state.measurements, change.measurement)) : state;
 		case "edit-measurement":
-			return known(state.metrics, [change.measurement.metric]) ? withMeasurements(state, MEASUREMENTS.edit(state.measurements, change.measurement)) : state;
+		case "restore-measurement":
+			return unknownMetrics(state, [change.measurement.metric]);
+		case "remove-measurement":
+		case "add-log":
+		case "edit-log":
+		case "remove-log":
+		case "restore-log":
+			return null;
+		default: {
+			const never: never = change;
+			return never;
+		}
+	}
+}
+
+/** `state` after `change`, the same object when nothing changed or `sportRefusal` refuses it. */
+export function applySport(state: SportState, change: SportChange): SportState {
+	if (sportRefusal(state, change) !== null) return state;
+	switch (change.op) {
+		case "set-plan":
+			return same(state.plan, change.plan) ? state : { ...state, plan: change.plan };
+		case "set-targets":
+			return same(state.targets, change.targets) ? state : { ...state, targets: change.targets };
+		case "set-metrics":
+			return same(state.metrics, change.metrics) ? state : { ...state, metrics: change.metrics };
+		case "add-measurement":
+			return withMeasurements(state, MEASUREMENTS.add(state.measurements, change.measurement));
+		case "edit-measurement":
+			return withMeasurements(state, MEASUREMENTS.edit(state.measurements, change.measurement));
 		case "remove-measurement":
 			return withMeasurements(state, MEASUREMENTS.remove(state.measurements, change.id));
 		case "restore-measurement":
-			return known(state.metrics, [change.measurement.metric]) ? withMeasurements(state, MEASUREMENTS.restore(state.measurements, change.measurement, change.index)) : state;
+			return withMeasurements(state, MEASUREMENTS.restore(state.measurements, change.measurement, change.index));
 		case "add-log":
 			return withLog(state, LOGS.add(state.log, change.log));
 		case "edit-log":
