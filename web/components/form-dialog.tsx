@@ -58,18 +58,20 @@ interface FormDialogHeaderProps {
 	lead?: ReactNode;
 	/** Shown before the close button. */
 	actions?: ReactNode;
+	/** The close button's tooltip and accessible name, for a dialog in another language. */
+	closeLabel?: string;
 }
 
 /** A {@link FormDialog}'s header: its title, and its actions and close button at its end. */
-export function FormDialogHeader({ title, busy, lead, actions }: FormDialogHeaderProps) {
+export function FormDialogHeader({ title, busy, lead, actions, closeLabel = "Close" }: FormDialogHeaderProps) {
 	return (
 		<div className="flex items-center gap-1.5 px-4 pt-3.5 text-[13px]">
 			{lead}
 			<DialogPrimitive.Title className="font-normal text-foreground">{title}</DialogPrimitive.Title>
 			<div className="ml-auto flex items-center gap-0.5">
 				{actions}
-				<Tooltip content="Close" shortcut={["Esc"]} side="bottom">
-					<DialogPrimitive.Close render={<Button variant="ghost" size="icon-compact" aria-label="Close" disabled={busy} />}>
+				<Tooltip content={closeLabel} shortcut={["Esc"]} side="bottom">
+					<DialogPrimitive.Close render={<Button variant="ghost" size="icon-compact" aria-label={closeLabel} disabled={busy} />}>
 						<X />
 					</DialogPrimitive.Close>
 				</Tooltip>

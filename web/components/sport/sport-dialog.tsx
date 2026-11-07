@@ -1,4 +1,4 @@
-/** The Sport page's dialog shell: a {@link FormDialog} whose copy screen readers read as French. */
+/** The Sport page's dialog shell: a {@link FormDialog} whose copy, close button included, reads as French. */
 import type { ReactNode } from "react";
 import { FormDialog, FormDialogHeader } from "../form-dialog";
 
@@ -15,7 +15,7 @@ export function SportDialog({ title, onClose, className, children }: SportDialog
 		<FormDialog busy={false} onClose={onClose} className={className}>
 			{/* The dialog renders in a portal, outside the page's `lang`. */}
 			<div lang="fr" className="flex flex-col">
-				<FormDialogHeader title={title} busy={false} />
+				<FormDialogHeader title={title} busy={false} closeLabel="Fermer" />
 				{children}
 			</div>
 		</FormDialog>
