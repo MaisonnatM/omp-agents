@@ -26,7 +26,6 @@ export const addDays = (day: string, days: number): string => new Date(Date.pars
 
 export const weekdayOf = (day: string): Weekday => WEEKDAYS[(new Date(Date.parse(day)).getUTCDay() + 6) % 7]!;
 
-/** The Monday of `day`'s week. */
 export const mondayOf = (day: string): string => addDays(day, -WEEKDAYS.indexOf(weekdayOf(day)));
 
 export const PLACES = ["home", "gym", "outdoor"] as const;
