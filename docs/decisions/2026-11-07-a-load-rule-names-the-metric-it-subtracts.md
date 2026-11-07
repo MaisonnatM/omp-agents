@@ -18,3 +18,4 @@ We accept that every hang rule repeats `less: "bodyweight"`.
 ## Consequences
 
 `applySport` in `src/sport.ts` refuses a change that names a metric the state does not hold, and a `set-metrics` that drops a metric a measurement, a target, or a load rule still names, so a rule's `metric` and `less` always name a metric.
+`parseSportChange` refuses an `of-max` rule that leaves `less` out, so a rule written in the old shape, which subtracted the bodyweight, is not saved as one that subtracts nothing.

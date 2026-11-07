@@ -7,7 +7,7 @@ const LOG = { id: "l1", date: "2026-11-17", workout: "mardi" };
 const READ_LOG = log("l1", "2026-11-17", { workout: "mardi", title: "" });
 
 const plan = (fields: Record<string, unknown> = {}) => ({
-	workouts: [{ id: "mardi", name: "Mardi", place: "gym", blocks: [{ title: "Poutre", items: [{ key: "semi", name: "Semi", hang: true, load: { kind: "of-max", metric: "max", fraction: 0.87 } }] }] }],
+	workouts: [{ id: "mardi", name: "Mardi", place: "gym", blocks: [{ title: "Poutre", items: [{ key: "semi", name: "Semi", hang: true, load: { kind: "of-max", metric: "max", fraction: 0.87, less: "bodyweight" } }] }] }],
 	routines: [{ id: "hanche", name: "Hanche", items: [{ key: "h1", name: "Pigeon" }] }],
 	habits: [{ label: "Hanche", routine: "hanche" }],
 	phases: [{ id: "p1", name: "Transition", start: "2026-11-16", end: "2026-12-06", week: { tue: [{ workout: "mardi" }] }, deloadMondays: ["2026-11-30"] }],
@@ -44,7 +44,7 @@ describe("parseSportState", () => {
 			reps: null,
 			holdSec: null,
 			restSec: null,
-			load: { kind: "of-max", metric: "max", fraction: 0.87, offsetKg: 0, less: null },
+			load: { kind: "of-max", metric: "max", fraction: 0.87, offsetKg: 0, less: "bodyweight" },
 			note: "",
 			demo: null,
 			opensAs: [],
@@ -84,13 +84,14 @@ describe("parseSportState", () => {
 			measurements: [{ id: "a", metric: "max", value: 112, at: "2026-08-26", note: long }],
 			plan: plan({
 				phases: [{ id: "p1", name: "", start: "2026-12-06", end: "2026-11-16", week: { tue: [{ workout: "jeudi" }] }, deloadMondays: ["2026-12-01"] }],
-				routines: [{ id: "hanche", name: "Hanche", items: [{ key: "x".repeat(MAX_SPORT_ID + 1), name: "Pigeon", sets: -1, opensAs: ["h9"], demo: { youtubeId: "short", cues: ["a", "b", "c"] } }] }],
+				routines: [{ id: "hanche", name: "Hanche", items: [{ key: "x".repeat(MAX_SPORT_ID + 1), name: "Pigeon", sets: -1, opensAs: ["h9"], load: { kind: "of-max", metric: "max", fraction: 0.87 }, demo: { youtubeId: "short", cues: ["a", "b", "c"] } }] }],
 			}),
 		});
 		expect(state?.log.map(({ id, rpe }) => `${id} ${rpe}`)).toEqual(["l1 11", "l1 null"]);
 		expect(state?.measurements[0]?.note).toBe(long);
 		expect(state?.plan?.phases[0]?.week.tue).toEqual([{ workout: "jeudi", optional: false }]);
 		expect(state?.plan?.routines[0]?.items[0]?.demo?.youtubeId).toBe("short");
+		expect(state?.plan?.routines[0]?.items[0]?.load).toEqual({ kind: "of-max", metric: "max", fraction: 0.87, offsetKg: 0, less: null });
 	});
 });
 
@@ -147,6 +148,12 @@ describe("parseSportChange", () => {
 		expect(refusal(withItem({ hang: "yes" }))).toBe("plan.routines[0].items[0].hang must be true or false");
 		expect(refusal(withItem({ name: "" }))).toBe(`plan.routines[0].items[0].name must be 1 to ${MAX_SPORT_TEXT} characters`);
 		expect(refusal(withItem({ key: "x".repeat(MAX_SPORT_ID + 1) }))).toBe(`plan.routines[0].items[0].key must be 1 to ${MAX_SPORT_ID} characters`);
+	});
+
+	test("refuses an of-max rule that leaves out what it subtracts, since a rule from before `less` subtracted the bodyweight", () => {
+		const hang = (load: Record<string, unknown>) => ({ op: "set-plan", plan: plan({ workouts: [{ id: "mardi", name: "Mardi", place: "gym", blocks: [{ items: [{ key: "semi", name: "Semi", hang: true, load }] }] }] }) });
+		expect(refusal(hang({ kind: "of-max", metric: "max", fraction: 0.87, offsetKg: 0 }))).toBe("plan.workouts[0].blocks[0].items[0].load.less is required; use null to subtract nothing");
+		expect(parseSportChange(hang({ kind: "of-max", metric: "max", fraction: 0.87, less: null }))).toMatchObject({ ok: { plan: { workouts: [{ blocks: [{ items: [{ load: { offsetKg: 0, less: null } }] }] }] } } });
 	});
 
 	test("refuses a plan whose names point nowhere or whose dates disagree", () => {

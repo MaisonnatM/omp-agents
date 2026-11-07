@@ -91,6 +91,8 @@ interface Rules {
 	attempts: Rule<number>;
 	loads: Rule<Record<string, number>>;
 	items: number;
+	/** Whether an `of-max` load rule must name its `less`: a rule written before `less` existed subtracted the bodyweight, and would read as subtracting nothing. */
+	namesLess: boolean;
 }
 
 const STORED: Rules = {
@@ -106,6 +108,7 @@ const STORED: Rules = {
 	attempts: NUMBER,
 	loads: { is: recordOf(isNumber), must: "must map exercise keys to numbers" },
 	items: Number.POSITIVE_INFINITY,
+	namesLess: false,
 };
 
 const SENT: Rules = {
@@ -124,6 +127,7 @@ const SENT: Rules = {
 		must: `must map up to ${MAX_SPORT_ITEMS} exercise keys of 1 to ${MAX_SPORT_ID} characters to numbers`,
 	},
 	items: MAX_SPORT_ITEMS,
+	namesLess: true,
 };
 
 type Parse<T> = (value: unknown, path: string, rules: Rules) => T;
@@ -148,6 +152,8 @@ function fieldsOf(value: unknown, path: string, rules: Rules) {
 	return {
 		/** The field through `rule`, `fallback` when it is left out. */
 		one: <T>(key: string, rule: Rule<T>, fallback?: T): T => field(object[key] === undefined ? fallback : object[key], pathTo(path, key), rule),
+		/** The field through `rule`, refused with `leftOut` when it is left out. */
+		required: <T>(key: string, rule: Rule<T>, leftOut: string): T => (object[key] === undefined ? refuse(pathTo(path, key), leftOut) : field(object[key], pathTo(path, key), rule)),
 		/** The object at `key`, read from `fallback` when it is left out. */
 		nested: <T>(key: string, parse: Parse<T>, fallback?: unknown): T => parse(object[key] === undefined ? fallback : object[key], pathTo(path, key), rules),
 		/** The object at `key`, `null` when it is left out or null. */
@@ -161,7 +167,14 @@ const parseLoadRule: Parse<LoadRule> = (value, path, rules) => {
 	const read = fieldsOf(value, path, rules);
 	const kind = read.one("kind", choice(["of-max", "fixed"]));
 	if (kind === "fixed") return { kind, kg: read.one("kg", NUMBER) };
-	return { kind, metric: read.one("metric", rules.id), fraction: read.one("fraction", rules.fraction), offsetKg: read.one("offsetKg", NUMBER, 0), less: read.one("less", orNull(rules.id), null) };
+	const less = orNull(rules.id);
+	return {
+		kind,
+		metric: read.one("metric", rules.id),
+		fraction: read.one("fraction", rules.fraction),
+		offsetKg: read.one("offsetKg", NUMBER, 0),
+		less: rules.namesLess ? read.required("less", less, "is required; use null to subtract nothing") : read.one("less", less, null),
+	};
 };
 
 const parseDemo: Parse<Demo> = (value, path, rules) => {
