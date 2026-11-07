@@ -39,6 +39,8 @@ export const userNotesFile = join(configDir, "notes.json");
 export const userNoteInboxDir = join(configDir, "note-inbox");
 /** The Sport module's plan, measurements, and workout log, beside {@link tokenFile}. */
 export const sportFile = join(configDir, "sport.json");
+/** Where omp's `sport` tool leaves its changes to the Sport module, one JSON file each, so the server stays the only writer of {@link sportFile}. */
+export const sportInboxDir = join(configDir, "sport-inbox");
 /** Where omp's `user_event` tool leaves the reminders it adds and removes, one JSON file each, so the server stays the only writer of {@link localEventsFile}. */
 export const eventInboxDir = join(configDir, "event-inbox");
 /** Where omp's `end_session` tool asks the server to end a session, one `<session id>.json` each, beside {@link tokenFile}. */
