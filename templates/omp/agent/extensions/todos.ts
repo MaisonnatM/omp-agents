@@ -15,7 +15,7 @@ import { type Section, sectionFor } from "./todos/sections";
 
 const TODOS_FILE = join(CONFIG_DIR, "todos.json");
 const INBOX_DIR = join(CONFIG_DIR, "todo-inbox");
-const INBOX = inbox<object>(INBOX_DIR);
+const INBOX = inbox<Change>(INBOX_DIR);
 
 interface Leaf {
 	id: string;
@@ -34,6 +34,16 @@ interface List {
 	categories?: Section[];
 	todos?: Todo[];
 }
+
+type Change =
+	| { op: "add"; id: string; parentId: null; afterId: null; categoryId: string | null; workspace: string | null; text: string; body: string; due: string | null; addedBy: string }
+	| { op: "toggle"; id: string; doneAt: string }
+	| { op: "edit"; id: string; text: string }
+	| { op: "edit-body"; id: string; body: string }
+	| { op: "set-due"; id: string; due: string | null }
+	| { op: "categorize"; id: string; categoryId: string | null }
+	| { op: "set-workspace"; id: string; workspace: string | null }
+	| { op: "remove"; id: string };
 
 const isDone = (todo: Leaf): boolean => (todo.doneAt ?? null) !== null;
 
