@@ -20,14 +20,18 @@ function inboxDir(): string {
 	return join(dir, "sport-inbox");
 }
 
-/** An inbox over `start`, which applies each change to the state it reads the next file against, as the dashboard's sport file does. */
-function inboxOver(dir: string, start: SportState, active?: () => boolean) {
+/**
+ * An inbox over `start`, which applies each change to the state it reads the next file against, as the dashboard's
+ * sport file does, and reports the write as `written` says.
+ */
+function inboxOver(dir: string, start: SportState, { active, written = () => true }: { active?: () => boolean; written?: () => boolean } = {}) {
 	let state = start;
 	const inbox = new SportInbox(
 		dir,
 		() => state,
-		change => {
-			state = applySport(state, change);
+		changes => {
+			for (const change of changes) state = applySport(state, change);
+			return written();
 		},
 		active && { active },
 	);
@@ -101,11 +105,26 @@ describe("SportInbox", () => {
 		expect(readdirSync(dir)).toEqual([]);
 	});
 
+	test("a request whose changes did not reach the file stays, and applies as nothing once the write succeeds", async () => {
+		const dir = inboxDir();
+		leave(dir, "1-x.json", { op: "add-log", log: log("a", "2026-11-17", { addedBy: "s1" }) });
+		let writes = false;
+		const { inbox, state } = inboxOver(dir, STATE, { written: () => writes });
+		await inbox.drain();
+		expect(readdirSync(dir)).toEqual(["1-x.json"]);
+		const applied = state();
+		expect(applied.log).toEqual([log("a", "2026-11-17", { addedBy: "s1" })]);
+		writes = true;
+		await inbox.drain();
+		expect(state()).toBe(applied);
+		expect(readdirSync(dir)).toEqual([]);
+	});
+
 	test("a server that does not own the unattended work leaves the requests for the one that does", async () => {
 		const dir = inboxDir();
 		leave(dir, "1-x.json", { op: "add-log", log: log("a", "2026-11-17", { addedBy: "s1" }) });
 		let owns = false;
-		const { inbox, state } = inboxOver(dir, STATE, () => owns);
+		const { inbox, state } = inboxOver(dir, STATE, { active: () => owns });
 		await inbox.drain();
 		expect(readdirSync(dir)).toEqual(["1-x.json"]);
 		owns = true;

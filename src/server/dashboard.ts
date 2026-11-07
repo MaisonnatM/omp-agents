@@ -375,7 +375,15 @@ export class Dashboard {
 		};
 		this.#todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), workspaceOf, { active: () => ownerLock.held });
 		this.#noteInbox = new NoteInbox(userNoteInboxDir, change => lists.apply("user-notes", change), { active: () => ownerLock.held });
-		this.#sportInbox = new SportInbox(sportInboxDir, () => sport.value, change => lists.apply("sport", change), { active: () => ownerLock.held });
+		this.#sportInbox = new SportInbox(
+			sportInboxDir,
+			() => sport.value,
+			changes => {
+				for (const change of changes) lists.apply("sport", change);
+				return sport.flush();
+			},
+			{ active: () => ownerLock.held },
+		);
 		this.#eventInbox = new EventInbox(eventInboxDir, () => this.#localEvents.value, change => this.#localEvents.apply(change), { active: () => ownerLock.held });
 		this.#signInInbox = new SignInInbox(
 			signInInboxDir,

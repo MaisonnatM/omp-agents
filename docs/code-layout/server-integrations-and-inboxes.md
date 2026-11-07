@@ -56,7 +56,7 @@
   `src/sport-week.ts` derives the week, each exercise's load, the pain flags, the best grades, the records, and the adherence from the state.
   `src/server/sport-file.ts` keeps `sport.json` with `ReducerFile`, registered in `src/server/list-registry.ts` under `sport`.
   `src/sport-agent.ts` holds `agentSportChanges`, which turns a `sport` tool request into the changes an agent may make, and `withAgentChanges`, the state with the requests an inbox still holds.
-  `src/server/sport-inbox.ts` drains the `sport` tool's requests from `sport-inbox/` through `JsonInboxDir` while its server owns the lock.
+  `src/server/sport-inbox.ts` drains the `sport` tool's requests from `sport-inbox/` through `JsonInboxDir` while its server owns the lock, and deletes a file only once the dashboard has written its changes to `sport.json`.
   `src/omp/sport-tool.ts` registers `sport` in personal sessions, reads the state with pending requests, and leaves one request per call without writing `sport.json`.
   `src/sport-fixtures.ts` holds the sample plan and the builders the Sport tests share.
   See [Sport](../architecture/sport.md).

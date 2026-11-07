@@ -52,7 +52,7 @@ It may add a log or a measurement only in a session's name, its `addedBy`, under
 It may never edit what the user wrote, nor remove or restore anything; only the Sport page does.
 The resulting changes must also pass `sportRefusal` in `src/sport.ts`, so a change naming an unknown metric says why rather than vanishing.
 The inbox sets a refused file aside as `.invalid` and logs the reason.
-An add the state already holds as it is applies as nothing, so a file applied once and left behind does no harm when it is read again.
+The inbox deletes a file only once its changes reach `sport.json`, and an add the state already holds as it is applies as nothing, so a file applied once and kept after a failed write does no harm when it is read again.
 See [A sport tool call leaves one request the server resolves](../decisions/2026-11-07-a-sport-tool-call-leaves-one-request-the-server-resolves.md).
 
 ## The week
