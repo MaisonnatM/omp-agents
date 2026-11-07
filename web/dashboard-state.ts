@@ -44,7 +44,7 @@ export interface DashboardState extends PaneNavigation {
 	started: { instanceId: string; workspace: string } | null;
 	/** `null` until the server's first `omp usage` run finishes. */
 	usage: { plans: PlanUsage[]; error: string | null } | null;
-	/** Last model list the server sent for each open live session, by instance id. */
+	/** Last model list the server sent for each live session whose menu asked, a pane's or a Bot page's, by instance id. */
 	models: Map<string, ModelList>;
 	/** The Todo page's list, `null` until the server first sends it; a change shows here before the server answers. */
 	userTodos: UserTodoList | null;
@@ -109,13 +109,14 @@ export type Action =
 
 const liveIds = (layout: Layout): string[] => layout.panes.flatMap(view => (view.kind === "live" ? [view.instanceId] : []));
 
-const pick = <V>(map: Map<string, V>, keys: string[]): Map<string, V> =>
-	new Map(
-		keys.flatMap(key => {
-			const value = map.get(key);
-			return value === undefined ? [] : [[key, value] as const];
-		}),
-	);
+/** `models` without the lists of sessions that left the roster; the same map when none did. */
+function liveModels(models: Map<string, ModelList>, hosts: RosterHost[]): Map<string, ModelList> {
+	const gone = [...models.keys()].filter(id => !hosts.some(host => host.instanceId === id));
+	if (gone.length === 0) return models;
+	const next = new Map(models);
+	for (const id of gone) next.delete(id);
+	return next;
+}
 
 /** Each open live session's current roster row, else the one last seen. */
 function rememberHosts(prev: Map<string, RosterHost>, hosts: RosterHost[], layout: Layout): Map<string, RosterHost> {
@@ -137,7 +138,6 @@ function withLayout(state: DashboardState, next: Layout): DashboardState {
 		...state,
 		layout,
 		lastHosts: rememberHosts(state.lastHosts, state.hosts, layout),
-		models: pick(state.models, liveIds(layout)),
 		starts: dropHidden(state.starts, shown),
 	};
 }
@@ -204,7 +204,7 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, newSessionCompletions: action.completions };
 		case "roster": {
 			const hosts = applyDelta(state.hosts, action.reset, action.hosts, host => host.instanceId, action.removed);
-			return { ...state, hosts, rosterError: action.error, lastHosts: rememberHosts(state.lastHosts, hosts, state.layout) };
+			return { ...state, hosts, rosterError: action.error, lastHosts: rememberHosts(state.lastHosts, hosts, state.layout), models: liveModels(state.models, hosts) };
 		}
 		case "past":
 			return { ...state, past: applyDelta(state.past, action.reset, action.sessions, session => session.sessionId, action.removed).sort(newestPastFirst), listed: true };
@@ -222,7 +222,7 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 		case "usage":
 			return { ...state, usage: { plans: action.plans, error: action.error } };
 		case "models":
-			if (!liveIds(state.layout).includes(action.instanceId)) return state;
+			if (!state.hosts.some(host => host.instanceId === action.instanceId)) return state;
 			return { ...state, models: new Map(state.models).set(action.instanceId, { data: { models: action.models }, error: action.error }) };
 		case "user-todos":
 			return { ...state, userTodos: action.list };

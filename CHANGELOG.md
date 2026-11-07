@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-07
+
+- Fixed: a Bot page's model menu now lists the models, instead of staying on Loading models.
+
 ## 2026-11-06
 
 - Fixed: the composer model menu now lists Anthropic API credits after you save the key, without restarting the dashboard.
