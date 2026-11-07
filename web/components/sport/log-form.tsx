@@ -7,6 +7,7 @@ import { type Climb, CLIMB_KINDS, type ClimbKind, FRENCH_GRADES, type FrenchGrad
 import { applySport } from "../../../src/sport";
 import { PAIN_FLAG_DAYS, PAIN_FLAG_LEVEL, type PlannedExercise, type PlannedWorkout, records } from "../../../src/sport-week";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { amount, ARKOSE_COLORS, beaten, CLIMB_LABEL, dose, effortWord, hardest, longDate, measured, PAIN_PLACE_AT, PAIN_PLACE_LABEL, painWord, sendsText, shortDate, signedKg, testOf } from "../../sport-view";
@@ -285,6 +286,13 @@ function Scale({ label, values, value, word, ends, tone, onPick }: ScaleProps) {
 	);
 }
 
+const KIND_ITEMS = CLIMB_KINDS.map(value => ({ value, label: CLIMB_LABEL[value] }));
+const GRADE_ITEMS = FRENCH_GRADES.map(value => ({ value, label: value }));
+const COLOR_ITEMS: { value: string | null; label: string }[] = [
+	{ value: null, label: "Sans couleur" },
+	...Object.keys(ARKOSE_COLORS).map(color => ({ value: color, label: color.charAt(0).toUpperCase() + color.slice(1) })),
+];
+
 /** The boulders and routes sent, each with its kind, grade, Arkose color, and whether it was on the Kilter board. */
 function Climbs({ climbs, kind, onChange }: { climbs: Climb[]; kind: ClimbKind; onChange: (climbs: Climb[]) => void }) {
 	const update = (index: number, change: Partial<Climb>) => onChange(climbs.with(index, { ...climbs[index]!, ...change }));
@@ -297,18 +305,32 @@ function Climbs({ climbs, kind, onChange }: { climbs: Climb[]; kind: ClimbKind; 
 			<p className="text-xs text-muted-foreground">Blocs et voies réussis</p>
 			{climbs.map((climb, index) => (
 				<div key={index} className="flex flex-wrap items-center gap-2">
-					<select aria-label="Type" className={cn(FIELD, "w-24")} value={climb.kind} onChange={event => update(index, { kind: event.target.value as ClimbKind })}>
-						{CLIMB_KINDS.map(option => <option key={option} value={option}>{CLIMB_LABEL[option]}</option>)}
-					</select>
-					<select aria-label="Cotation" className={cn(FIELD, "w-20")} value={climb.grade} onChange={event => update(index, { grade: event.target.value as FrenchGrade })}>
-						{FRENCH_GRADES.map(grade => <option key={grade} value={grade}>{grade}</option>)}
-					</select>
+					<Select items={KIND_ITEMS} value={climb.kind} onValueChange={next => next && update(index, { kind: next })}>
+						<SelectTrigger aria-label="Type" className="w-24">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							{KIND_ITEMS.map(({ value, label }) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+						</SelectContent>
+					</Select>
+					<Select items={GRADE_ITEMS} value={climb.grade} onValueChange={next => next && update(index, { grade: next })}>
+						<SelectTrigger aria-label="Cotation" className="w-20">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							{GRADE_ITEMS.map(({ value, label }) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+						</SelectContent>
+					</Select>
 					<span className="flex min-w-32 flex-1 items-center gap-1.5">
 						<span aria-hidden className="size-3 shrink-0 rounded-full border border-border" style={{ background: climb.color ? ARKOSE_COLORS[climb.color] : "transparent" }} />
-						<select aria-label="Couleur" className={cn(FIELD, "min-w-0 flex-1")} value={climb.color ?? ""} onChange={event => update(index, { color: event.target.value || null })}>
-							<option value="">Sans couleur</option>
-							{Object.keys(ARKOSE_COLORS).map(color => <option key={color} value={color}>{color.charAt(0).toUpperCase() + color.slice(1)}</option>)}
-						</select>
+						<Select items={COLOR_ITEMS} value={climb.color} onValueChange={next => update(index, { color: next })}>
+							<SelectTrigger aria-label="Couleur" className="min-w-0 flex-1">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{COLOR_ITEMS.map(({ value, label }) => <SelectItem key={label} value={value}>{label}</SelectItem>)}
+							</SelectContent>
+						</Select>
 					</span>
 					<label className="flex items-center gap-1.5 text-sm">
 						<input type="checkbox" checked={climb.kilter} onChange={event => update(index, { kilter: event.target.checked })} />
