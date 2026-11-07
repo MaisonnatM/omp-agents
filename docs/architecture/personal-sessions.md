@@ -26,6 +26,7 @@ No inbox and no server writer stand between `remember` and the file, as with a B
 
 `sportTool` in `src/omp/sport-tool.ts` reads `sport.json` and folds in the requests still waiting in `sportInboxDir`, with `withAgentChanges` from `src/sport-agent.ts`, so a session sees its own change before the dashboard applies it.
 `read` gives that state, `week` gives `weekPlan` with each exercise's load and the day's `painFlags`, and `history` gives a metric's measurements as a `chart` block's JSON.
+These three run on omp's `read` approval and the four that leave a request on `write`, since the kit's `approval` may be worked out from a call's arguments.
 `log` and `measure` add an entry in the session's name, the id omp's `ctx.sessionManager.getSessionId()` gives, or edit one an agent wrote with only the fields given, which the dashboard merges over the entry as it stands when it applies them.
 `set_plan` and `set_targets` replace their part whole, and `set_plan` refuses a plan over `MAX_PLAN_BYTES`, 64 KB as JSON.
 Each takes an optional `metrics` list, merged by id into the state's metrics before the change, since a fresh state holds no metric for a load rule, a target, or a measurement to name.

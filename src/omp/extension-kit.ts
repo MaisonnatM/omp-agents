@@ -16,8 +16,8 @@ export interface ExtensionTool<Params> {
 	description: string;
 	parameters: unknown;
 	loadMode: "essential";
-	/** omp's approval tier: `read` for a tool with no side effect, `write` for one that changes something. */
-	approval: "read" | "write";
+	/** omp's approval tier, `read` for a call with no side effect and `write` for one that changes something, or the one a call's arguments ask for. */
+	approval: "read" | "write" | ((args: unknown) => "read" | "write");
 	/** omp passes every tool the session's context; this reads only its `cwd`, the session's workspace, and its session id. */
 	execute(toolCallId: string, params: Params, signal: AbortSignal | undefined, onUpdate: unknown, ctx: ToolContext): Promise<ToolResult>;
 }

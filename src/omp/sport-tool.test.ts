@@ -7,7 +7,7 @@ import { MAX_PLAN_BYTES } from "../sport-agent";
 import { log, measurement, SEMI, STATE, withLogs } from "../sport-fixtures";
 import { loadFor } from "../sport-week";
 import { loadExtension } from "./fake-extension-api";
-import { readSport, type SportParams, sportTool, todayLine } from "./sport-tool";
+import { MAX_TODAY_LINE, readSport, type SportParams, sportTool, todayLine } from "./sport-tool";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -66,6 +66,13 @@ test("week shows each day's phase, workouts, and loads from the newest test, and
 	expect(semi).toEqual({ key: "semi", name: SEMI.name, sets: 5, reps: null, holdSec: 10, restSec: 180, hang: true, note: "", load: loadFor(STATE, SEMI, "2026-11-17"), removed: false });
 });
 
+test("the reads run on read approval, and every action that leaves a request on write approval", () => {
+	const session = loadExtension(pi => pi.registerTool(sportTool(pi, () => ({ file: "", inbox: "" }))), new Map());
+	const tiers = (["read", "week", "history", "log", "measure", "set_plan", "set_targets"] as const).map(action => session.approval("sport", { action }));
+	expect(tiers).toEqual(["read", "read", "read", "write", "write", "write", "write"]);
+	expect(session.approval("sport", { action: "constructor" })).toBe("write");
+});
+
 test("history draws a metric's measurements as a chart, and an unknown metric names the known ones", async () => {
 	const tool = sport({ ...STATE, measurements: [...STATE.measurements, measurement("m3", "max", 117, "2026-11-17")] });
 	const text = await tool.call({ action: "history", metric: "max" });
@@ -117,6 +124,6 @@ test("today's line names the phase, the deload, each workout and its log, and st
 	expect(todayLine(STATE, "2027-03-01")).toBe("Today 2027-03-01, sport: no phase; rest day; no pain flag.");
 	const flagged = withLogs(STATE, ...Array.from({ length: 20 }, (_, index) => log(`p${index}`, "2026-11-16", { pain: { level: 5, where: "shoulder" } })));
 	const line = todayLine(flagged, "2026-11-17") ?? "";
-	expect(line).toHaveLength(299);
+	expect(line).toHaveLength(MAX_TODAY_LINE);
 	expect(line).toEndWith("…");
 });

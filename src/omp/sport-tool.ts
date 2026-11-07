@@ -23,8 +23,21 @@ export interface SportPaths {
 	inbox: string;
 }
 
+const ACTIONS = ["read", "week", "history", "log", "measure", "set_plan", "set_targets"] as const;
+
+/** The approval tier each action runs on: the reads have no side effect, and the others leave a request. */
+const APPROVAL: Record<(typeof ACTIONS)[number], "read" | "write"> = {
+	read: "read",
+	week: "read",
+	history: "read",
+	log: "write",
+	measure: "write",
+	set_plan: "write",
+	set_targets: "write",
+};
+
 export interface SportParams {
-	action: "read" | "week" | "history" | "log" | "measure" | "set_plan" | "set_targets";
+	action: (typeof ACTIONS)[number];
 	date?: string;
 	metric?: string;
 	log?: unknown;
@@ -34,7 +47,8 @@ export interface SportParams {
 	metrics?: unknown;
 }
 
-const ACTIONS = ["read", "week", "history", "log", "measure", "set_plan", "set_targets"] as const;
+/** The longest line today's training takes in a personal turn's prompt. */
+export const MAX_TODAY_LINE = 299;
 
 const APPLIES = "The dashboard applies it, and while the dashboard is stopped the change waits for it.";
 
@@ -103,7 +117,7 @@ export function todayLine(state: SportState, day: string): string | null {
 		workouts.length === 0 ? "rest day" : workouts.map(({ name, optional, log }) => `${name}${optional ? " (optional)" : ""}${log ? ` (${log.status})` : ""}`).join(", "),
 		flags.length === 0 ? "no pain flag" : `pain flags: ${flags.map(({ where, level, until }) => `${where} ${level}/10 until ${until}`).join(", ")}`,
 	].join("; ");
-	return line.length < 299 ? `${line}.` : `${line.slice(0, 298)}…`;
+	return line.length < MAX_TODAY_LINE ? `${line}.` : `${line.slice(0, MAX_TODAY_LINE - 1)}…`;
 }
 
 /** The `sport` tool; `pathsOf` names the paths for the session calling it, or throws why it has none. */
@@ -128,7 +142,10 @@ export function sportTool(pi: ExtensionApi, pathsOf: (ctx: ToolContext) => Sport
 			metrics: object("set_plan, set_targets, measure: metrics to add or replace by id before the change."),
 		}),
 		loadMode: "essential",
-		approval: "write",
+		approval: args => {
+			const action = (args as Partial<SportParams> | null)?.action;
+			return action !== undefined && Object.hasOwn(APPROVAL, action) ? APPROVAL[action] : "write";
+		},
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 			const paths = pathsOf(ctx);
 			const state = readSport(paths);

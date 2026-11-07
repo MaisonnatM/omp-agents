@@ -24,5 +24,10 @@ export function loadExtension(extension: (pi: ExtensionApi) => void, flags: Read
 		/** The tools the extension registered so far, by name. */
 		tools: () => [...tools.keys()],
 		call: <Params>(name: string, params: Params, at = cwd) => tools.get(name)!.execute("call-1", params, undefined, undefined, { cwd: at, sessionManager: { getSessionId: () => sessionId } }),
+		/** The approval tier omp asks for before it runs tool `name` with `params`. */
+		approval: (name: string, params: unknown) => {
+			const { approval } = tools.get(name)!;
+			return typeof approval === "function" ? approval(params) : approval;
+		},
 	};
 }
