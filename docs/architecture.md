@@ -36,6 +36,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Pins](architecture/pins.md)
 - [Preferences](architecture/preferences.md)
 - [User notes](architecture/user-notes.md)
+- [Sport](architecture/sport.md)
 - [Notifications](architecture/notifications.md)
   - [Session notifications](architecture/notifications.md#session-notifications)
 - [Merges, and the cleanup after one](architecture/merges-and-the-cleanup-after-one.md)
