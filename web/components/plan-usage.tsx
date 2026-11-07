@@ -28,8 +28,9 @@ export function spendLabel({ used, limit, currency = "USD" }: Pick<ExtraUsage, "
 	return limit === null ? format(used) : `${format(used)} / ${format(limit)}`;
 }
 
-/** The API credits amount: dollars spent of the grant, or with no grant, the prepaid dollars left. */
-export const creditLabel = (balance: CreditBalance): string => (balance.kind === "grant" ? spendLabel(balance) : `${dollars(balance.left)} left`);
+/** The API credits amount: dollars spent of the grant, or with no grant, the prepaid dollars left, $0.00 once usage ran past them. */
+export const creditLabel = (balance: CreditBalance): string =>
+	balance.kind === "grant" ? spendLabel(balance) : `${dollars(Math.max(0, balance.left))} left`;
 
 /** What the API credits row's hover says, and how its amount is colored. */
 function creditState(balance: CreditBalance): { tooltip: string; tone: "out" | "low" | "ok" } {
