@@ -9,7 +9,9 @@ A **Workout log** is what the user did on a day: the workout it stands for, if a
 French grades run from 4 to 9a in `FRENCH_GRADES`, and `gradeRank` orders them.
 
 The plan holds workouts, routines, habits, phases, and dated overrides.
-A workout lists blocks of exercises.
+A workout has a kind, one of `hangboard`, `boulder`, `route`, `hip`, or `strength` in `WORKOUT_KINDS`, and lists blocks of exercises.
+The page colors each day of the week by the kinds of its workouts.
+A mixed session takes the kind it leads with, so a hip session with a few light hangs is `hip`, and the page never guesses a kind from the exercises.
 An exercise has a stable key, optional sets, reps, hold and rest, an optional load rule, an optional demo video with three cues, and `hang` when it loads the fingers on a hangboard.
 A load rule is either a fraction of a metric's newest measurement, less the newest measurement of the metric its `less` names, such as the bodyweight, plus an offset, or a fixed number of kilograms.
 A **Phase** spans dated days with the slots of a normal week and of a **Deload week**, and names the Mondays of its deload weeks.
@@ -29,6 +31,7 @@ A missing optional field takes its default and a field the module does not know 
 The file is held to shapes and types alone, so a length limit, a range, or a plan check tightened later never refuses data already saved.
 A change is also held to the length and range limits, a YouTube id of 11 characters, and lists of at most 200 items.
 A change's `of-max` load rule must name its `less`, `null` to subtract nothing, because a rule written before `less` existed subtracted the bodyweight and would otherwise read as subtracting nothing; the file still reads a left-out `less` as `null`.
+A workout's `kind` is required in the file and in a change alike, since no file was written before it existed; a left-out or unknown kind is refused, such as `plan.workouts[0].kind must be one of hangboard, boulder, route, hip, strength`.
 A `set-plan` is refused when its slots, habits, or `opensAs` lists name nothing, its ids or override days repeat, a phase ends before it starts or overlaps another, or a deload Monday is not a Monday of its phase; a `set-targets` or `set-metrics` is refused when its ids repeat.
 A refused change says why, with the path of the first wrong field and the rule it broke, such as `plan.routines[0].items[0].demo.youtubeId must be 11 characters`.
 A file that does not read, or that comes from a newer version, moves aside to `sport.json.invalid` rather than being overwritten.

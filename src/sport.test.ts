@@ -93,7 +93,7 @@ describe("applySport", () => {
 	test("refuses a change that names a metric the state does not hold, and a set-metrics that drops one still named", () => {
 		const bodyweight: Metric = { id: "bodyweight", label: "Poids", unit: "kg", better: "lower" };
 		const rule = { kind: "of-max" as const, metric: "max", fraction: 0.87, offsetKg: 0, less: "bodyweight" };
-		const plan: Plan = { ...PLAN, workouts: [{ id: "mardi", name: "Mardi", place: "gym", minutes: 60, blocks: [{ title: "Poutre", items: [{ ...exercise("semi", "Semi"), load: rule }] }] }] };
+		const plan: Plan = { ...PLAN, workouts: [{ id: "mardi", name: "Mardi", kind: "hangboard", place: "gym", minutes: 60, blocks: [{ title: "Poutre", items: [{ ...exercise("semi", "Semi"), load: rule }] }] }] };
 		expect(applySport(EMPTY_SPORT, { op: "add-measurement", measurement: max("aug", "2026-08-26") })).toBe(EMPTY_SPORT);
 		expect(applySport(EMPTY_SPORT, { op: "set-targets", targets: [{ id: "t", label: "Max", by: null, kind: "metric", metric: "max", value: 119 }] })).toBe(EMPTY_SPORT);
 		expect(applySport(WITH_MAX, { op: "set-plan", plan })).toBe(WITH_MAX);

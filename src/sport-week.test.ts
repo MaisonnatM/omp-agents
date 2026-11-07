@@ -52,7 +52,7 @@ describe("weekPlan", () => {
 	test("dayPlan gives the same day as its week", () => {
 		const state = withLogs(STATE, log("l1", "2026-11-17", { workout: "mardi", pain: { level: 4, where: "fingers" } }));
 		expect(dayPlan(state, "2026-11-21")).toEqual(weekPlan(state, "2026-11-21")[5]!);
-		expect(dayPlan(state, "2026-11-21").workouts[0]).toMatchObject({ id: "samedi", name: "Main ouverte et projet", place: "gym", optional: false, log: null });
+		expect(dayPlan(state, "2026-11-21").workouts[0]).toMatchObject({ id: "samedi", name: "Main ouverte et projet", kind: "hangboard", place: "gym", optional: false, log: null });
 	});
 
 	test("gives each workout the day's log of it", () => {
