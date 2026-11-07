@@ -135,18 +135,22 @@ Other processes wait at most five seconds for a mutation lock, then reject rathe
 
 ## Isolation sandboxes
 
-omp runs a subagent's isolated task in a sandbox under `~/.omp/wt` (`getWorktreesDir`, which `OMP_WORKTREE_DIR` moves): a directory named after the repository and the task, which holds the owner marker `.omp-isolation-owner.json`, naming the omp process and its start time, and the checkout `m`, `merged` in older sandboxes, a full copy of the repository with its own `.git`.
+omp runs a subagent's isolated task in a sandbox under `~/.omp/wt` (`getWorktreesDir`, which `OMP_WORKTREE_DIR` moves): a directory named after the repository and the task, which holds the owner marker `.omp-isolation-owner.json`, naming the omp process and its start time, and the task's checkout.
+In a native sandbox the checkout is `m`, `merged` in older sandboxes, a full copy of the repository with its own `.git`.
+When omp finds ovnfs, the sandbox holds instead the record `.omp-ovnfs-checkout.json`, naming the ovnfs command and the checkout its daemon serves in a folder outside the sandbox.
 omp removes a sandbox when its task ends, but one whose omp exited first stays, often gigabytes, and `omp worktree clear` removes those without looking at their changes.
 `IsolationSweep` in `src/server/isolation-sweep.ts` removes them more carefully, once a day: the owner's minute tick starts a sweep when none ran for 24 hours, the first one a minute after the server starts or takes over, and does not wait for it, since it runs `git status` in every sandbox, four at a time.
 A directory without the marker, such as a pull request's checkout, is no sandbox, and the sweep leaves it alone.
 A sandbox stays while omp's `hasLiveIsolationOwner` says its process runs: a process id that is gone, or that another process now holds with a different start time, has exited.
-It stays while a live session, idle or waiting ones included, or the server runs in it, by `Worktrees.inUse`; while its checkout has a tracked change or an untracked file, by `git status --porcelain --untracked-files=all`; and while its checkout is a linked worktree that Git locked.
+It stays while a live session, idle or waiting ones included, or the server runs in it or in its ovnfs checkout, by `Worktrees.inUse`; while its checkout has a tracked change or an untracked file, by `git status --porcelain --untracked-files=all`; and while its checkout is a linked worktree that Git locked.
 It also stays when the sweep cannot read it: a marker that names no process, a checkout that is not a Git checkout of its own, or a git call that fails, such as a `git status` that takes over two minutes.
+An ovnfs sandbox stays as unreadable when the sweep cannot locate its checkout: a record it cannot read, no running daemon for the record's command, or a daemon that does not answer, since the sweep asks only a running daemon and never starts one.
 Commits that no remote has do not keep a sandbox, since the copy carries every local branch of the repository it copies, so nearly every sandbox has some, and the repository the task ran from keeps those branches.
 A commit the task itself made, which its omp exited before bringing back, goes with the sandbox, as with `omp worktree clear`.
-A sandbox with the marker but no checkout, left by an omp that exited while it made one, holds nothing of a task and goes.
-Just before it removes one, the sweep asks again whether an omp owns it, since a task run again takes the same directory; then it stops a retained native mount through omp's `stopRetainedMount`, renames the sandbox with the suffix `.omp-agents-removing`, and deletes it, so the next sweep finishes a removal cut short instead of reading half a sandbox.
-A mount that will not stop keeps its sandbox.
+A sandbox with the marker but no checkout, left by an omp that exited while it made one, holds nothing of a task and goes, as does an ovnfs sandbox whose running daemon no longer lists its checkout.
+Just before it removes one, the sweep asks again whether an omp owns it, since a task run again takes the same directory; then it runs omp's teardown in the order of `omp worktree clear`: `stopRetainedMount` stops a retained native mount and `releaseOvnfsCheckout` removes the ovnfs checkout, deleting its files.
+Then it renames the sandbox with the suffix `.omp-agents-removing` and deletes it, so the next sweep finishes a removal cut short instead of reading half a sandbox.
+A teardown that fails keeps its sandbox.
 Each sweep logs one line with how many sandboxes it removed and kept, by reason, and one more for each it could not read or remove.
 Storage shares this instance for a read-only `preview()` that measures removable sandboxes and those kept only for changes, and `remove(paths, { discardChanges })` that rechecks each sandbox because the confirmed preview may be old; only `discardChanges` lets a changed one go, and the unattended sweep never sets it.
 Each operation takes one `Worktrees.inUse` snapshot; the unattended sweep judges each sandbox once, then rechecks ownership immediately before removal.

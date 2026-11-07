@@ -21,20 +21,45 @@ function scratch(): string {
 	return dir;
 }
 
+/** A committed Git checkout at `dir`. */
+async function repo(dir: string): Promise<string> {
+	mkdirSync(dir);
+	await git(dir, "init", "-q", "-b", "main");
+	writeFileSync(join(dir, "a.txt"), "a\n");
+	await git(dir, "add", "a.txt");
+	await git(dir, "commit", "-q", "-m", "one");
+	return dir;
+}
+
 /** A sandbox named `name` under `root` as omp leaves it: the owner marker and, unless `checkout` is false, a committed checkout `m`. */
 async function sandbox(root: string, name: string, checkout = true): Promise<string> {
 	const dir = join(root, name);
 	mkdirSync(dir);
 	writeFileSync(join(dir, OWNER_FILE), JSON.stringify({ pid: 4242, id: name, startToken: "Mon Oct 19 09:00:00 2026" }));
-	if (checkout) {
-		const m = join(dir, "m");
-		mkdirSync(m);
-		await git(m, "init", "-q", "-b", "main");
-		writeFileSync(join(m, "a.txt"), "a\n");
-		await git(m, "add", "a.txt");
-		await git(m, "commit", "-q", "-m", "one");
-	}
+	if (checkout) await repo(join(dir, "m"));
 	return dir;
+}
+
+/**
+ * An ovnfs that serves, by sandbox name, a checkout at a path, nothing (`"gone"`), or an error for one it cannot locate.
+ * Releasing a sandbox deletes its checkout's files, as ovnfs's `rm` does, and records the sandbox in `released`.
+ */
+function fakeOvnfs(served: Record<string, string | Error>): Pick<IsolationSweepDeps, "ovnfsCheckout" | "release"> & { released: string[] } {
+	const released: string[] = [];
+	return {
+		released,
+		ovnfsCheckout: async dir => {
+			const entry = served[basename(dir)];
+			if (entry === undefined) return null;
+			if (entry instanceof Error) throw entry;
+			return entry === "gone" ? { kind: "none" } : { kind: "ovnfs", path: entry };
+		},
+		release: async dir => {
+			released.push(basename(dir));
+			const entry = served[basename(dir)];
+			if (typeof entry === "string" && entry !== "gone") rmSync(entry, { recursive: true, force: true });
+		},
+	};
 }
 
 /** A sweep over `root`, where the sandboxes named in `live` have a running owner. */
@@ -44,7 +69,8 @@ function sweepOf(root: string, overrides: Partial<IsolationSweepDeps> & { live?:
 		root,
 		ownerFile: OWNER_FILE,
 		ownerLive: async dir => live.has(basename(dir)),
-		stopMount: async () => {},
+		ovnfsCheckout: async () => null,
+		release: async () => {},
 		inUse: async () => [],
 		now: () => 0,
 		...overrides,
@@ -128,12 +154,51 @@ describe("isolation sweep", () => {
 		let reads = 0;
 		const results = await sweepOf(root, {
 			ownerLive: async dir => basename(dir) === "tclaimed" && ++reads > 1,
-			stopMount: async dir => {
+			release: async dir => {
 				if (basename(dir) === "tmounted") throw new Error("isoStop failed");
 			},
 		}).sweep();
 		expect(results.map(result => [basename(result.path), result.kept]).sort()).toEqual([["tclaimed", "owner-live"], ["tmounted", "failed"]]);
 		expect(existsSync(claimed) && existsSync(mounted)).toBe(true);
+	});
+
+	test("removes an ovnfs sandbox whose omp exited, releasing its clean checkout, and one whose checkout ovnfs no longer has", async () => {
+		const root = scratch();
+		const served = await repo(join(scratch(), "served"));
+		const done = await sandbox(root, "tdone", false);
+		const gone = await sandbox(root, "tgone", false);
+		const ovnfs = fakeOvnfs({ tdone: served, tgone: "gone" });
+		const results = await sweepOf(root, ovnfs).sweep();
+		expect(results.map(result => [basename(result.path), result.kept]).sort()).toEqual([["tdone", null], ["tgone", null]]);
+		expect(existsSync(done) || existsSync(gone) || existsSync(served)).toBe(false);
+		expect(ovnfs.released.sort()).toEqual(["tdone", "tgone"]);
+	});
+
+	test("keeps an ovnfs sandbox whose checkout changed, is in use, or cannot be located, releasing none", async () => {
+		const root = scratch();
+		const edited = await repo(join(scratch(), "edited"));
+		writeFileSync(join(edited, "a.txt"), "edited\n");
+		const used = await repo(join(scratch(), "used"));
+		mkdirSync(join(used, "src"));
+		const sandboxes = [await sandbox(root, "tedited", false), await sandbox(root, "tused", false), await sandbox(root, "tlost", false)];
+		const ovnfs = fakeOvnfs({ tedited: edited, tused: used, tlost: new Error("no ovnfs daemon runs") });
+		const results = await sweepOf(root, { ...ovnfs, inUse: async () => [join(used, "src")] }).sweep();
+		expect(results.map(result => [basename(result.path), result.kept]).sort()).toEqual([["tedited", "changed"], ["tlost", "unreadable"], ["tused", "occupied"]]);
+		expect(results.find(result => basename(result.path) === "tlost")?.detail).toContain("no ovnfs daemon runs");
+		expect(sandboxes.every(dir => existsSync(dir)) && existsSync(edited) && existsSync(used)).toBe(true);
+		expect(ovnfs.released).toEqual([]);
+	});
+
+	test("a removal that discards changes releases a changed ovnfs checkout", async () => {
+		const root = scratch();
+		const edited = await repo(join(scratch(), "edited"));
+		writeFileSync(join(edited, "new.txt"), "new\n");
+		const dir = await sandbox(root, "tedited", false);
+		const ovnfs = fakeOvnfs({ tedited: edited });
+		const [result] = await sweepOf(root, ovnfs).remove([dir], { discardChanges: true });
+		expect(result?.kept).toBeNull();
+		expect(existsSync(dir) || existsSync(edited)).toBe(false);
+		expect(ovnfs.released).toEqual(["tedited"]);
 	});
 
 	test("finishes a removal an earlier sweep began", async () => {

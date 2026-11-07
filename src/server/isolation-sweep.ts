@@ -1,9 +1,11 @@
 /**
  * The daily sweep of omp's isolation sandboxes: the directories under `~/.omp/wt` where omp runs a subagent's isolated
- * task, each a marker naming the omp process that owns it and the checkout `m` (`merged` in older ones), a full copy of
- * the repository. omp removes one when its task ends, but one whose omp exited first stays, gigabytes each.
- * The sweep removes a sandbox only when its omp no longer runs and its checkout is clean, unlocked, and unused; a
- * directory without the marker, such as a pull request's checkout, is not one, and anything it cannot read stays.
+ * task, each a marker naming the omp process that owns it and the task's checkout: `m` (`merged` in older ones), a full
+ * copy of the repository, or, when omp found ovnfs, a record naming an ovnfs checkout that ovnfs's daemon serves elsewhere.
+ * omp removes one when its task ends, but one whose omp exited first stays, gigabytes each.
+ * The sweep removes a sandbox, and releases its ovnfs checkout, only when its omp no longer runs and its checkout is
+ * clean, unlocked, and unused; a directory without the marker, such as a pull request's checkout, is not one, and
+ * anything it cannot read stays, an ovnfs checkout ovnfs cannot locate included.
  * Only Storage, on your confirmation, also removes one whose checkout still holds changes.
  */
 import type { Dirent } from "node:fs";
@@ -24,10 +26,22 @@ const SANDBOX_READS = 4;
 const STATUS_TIMEOUT_MS = 120_000;
 /** A sandbox holds a full checkout with its dependencies, which `du` can take more than ten seconds to walk. */
 const MEASURE_TIMEOUT_MS = 120_000;
-/** The checkout directories omp makes in a sandbox, the current one first. */
+/** The checkout directories omp makes in a native sandbox, the current one first. */
 const CHECKOUT_DIRS = ["m", "merged"];
 /** The suffix a sandbox takes while it is removed, so a removal cut short is finished by the next sweep rather than read as a sandbox again. */
 const REMOVING_SUFFIX = ".omp-agents-removing";
+
+/** Where a sandbox keeps its task's checkout, which the sweep judges before the sandbox may go. */
+export type SandboxCheckout =
+	/** `m` (`merged`) inside the sandbox. */
+	| { kind: "native"; path: string }
+	/** The ovnfs checkout the sandbox's record names, at the path its daemon serves it, outside the sandbox. */
+	| { kind: "ovnfs"; path: string }
+	/** Nothing to lose: omp exited before it made the checkout, or ovnfs no longer has the one recorded. */
+	| { kind: "none" };
+
+/** What a sandbox's ovnfs record comes to: the checkout ovnfs serves, or none when ovnfs no longer has it. */
+export type OvnfsSandboxCheckout = Exclude<SandboxCheckout, { kind: "native" }>;
 
 export interface IsolationSweepDeps {
 	/** omp's directory of sandboxes, `getWorktreesDir`. */
@@ -36,8 +50,13 @@ export interface IsolationSweepDeps {
 	ownerFile: string;
 	/** Whether the omp process the marker in sandbox `dir` names still runs: the same process id, not a reused one. */
 	ownerLive(dir: string): Promise<boolean>;
-	/** Stops the native mount a retained sandbox `dir` records, if any; throws when it cannot, which keeps the sandbox. */
-	stopMount(dir: string): Promise<void>;
+	/** The ovnfs checkout sandbox `dir` records, `null` when it records none; throws when ovnfs cannot say where it is. */
+	ovnfsCheckout(dir: string): Promise<OvnfsSandboxCheckout | null>;
+	/**
+	 * Tears down what sandbox `dir` holds beyond its directory, as `omp worktree clear` does: stops a retained native
+	 * mount, then removes the ovnfs checkout it records, deleting that checkout's files. Throws when it cannot, which keeps the sandbox.
+	 */
+	release(dir: string): Promise<void>;
 	/** The canonical directories live sessions and the server run in, and the paths live sessions' tool calls named, `Worktrees.inUse`. */
 	inUse(): Promise<string[]>;
 	now(): number;
@@ -150,18 +169,26 @@ export class IsolationSweep {
 		// omp reads a marker without a process id as no owner; the sweep keeps what it cannot attribute.
 		if (!isObject(marker) || typeof marker.pid !== "number" || !Number.isInteger(marker.pid) || marker.pid <= 0) return keep(dir, "unreadable", "Its owner marker names no process.");
 		if (await this.#deps.ownerLive(dir)) return keep(dir, "owner-live", `omp process ${marker.pid} still runs.`);
-		const real = await canonical(dir);
-		const user = inUse.find(path => beneath(real, path));
+		let checkout: SandboxCheckout;
+		try {
+			checkout = await this.#checkoutOf(dir);
+		} catch (error) {
+			return keep(dir, "unreadable", `Cannot locate its checkout: ${errorText(error)}`);
+		}
+		// A session in an ovnfs checkout runs outside the sandbox, at the path ovnfs serves it.
+		const occupiable = [await canonical(dir)];
+		if (checkout.kind === "ovnfs") occupiable.push(await canonical(checkout.path));
+		const user = inUse.find(path => occupiable.some(at => beneath(at, path)));
 		if (user) return keep(dir, "occupied", `A live session or the server runs in ${user}.`);
-		const checkout = await checkoutOf(dir);
 		// omp claims a sandbox before it makes the checkout, so one whose omp died in between holds nothing of a task.
-		if (checkout === null) return undefined;
-		const at = await worktreeAt(checkout);
-		if (!at || (await canonical(at.top)) !== (await canonical(checkout))) return keep(dir, "unreadable", `${checkout} is not a Git checkout of its own.`);
+		if (checkout.kind === "none") return undefined;
+		const { path } = checkout;
+		const at = await worktreeAt(path);
+		if (!at || (await canonical(at.top)) !== (await canonical(path))) return keep(dir, "unreadable", `${path} is not a Git checkout of its own.`);
 		if (at.linked) {
 			const top = await canonical(at.top);
 			let own: Registration | undefined;
-			for (const registration of await worktreesOf(checkout)) {
+			for (const registration of await worktreesOf(path)) {
 				if ((await canonical(registration.path)) !== top) continue;
 				own = registration;
 				break;
@@ -169,10 +196,25 @@ export class IsolationSweep {
 			if (!own) return keep(dir, "unreadable", "Its checkout is not registered in its repository.");
 			if (own.locked !== null) return keep(dir, "locked", `Git locked its checkout${own.locked ? `: ${own.locked}` : "."}`);
 		}
-		const status = await run(["git", "-C", checkout, "status", "--porcelain=v1", "-z", "--untracked-files=all"], { timeoutMs: STATUS_TIMEOUT_MS });
+		const status = await run(["git", "-C", path, "status", "--porcelain=v1", "-z", "--untracked-files=all"], { timeoutMs: STATUS_TIMEOUT_MS });
 		if (status.code !== 0) return keep(dir, "unreadable", status.stderr.trim() || "git status failed.");
 		if (status.stdout) return keep(dir, "changed", "Its checkout has tracked modifications or untracked files.");
 		return undefined;
+	}
+
+	/** The checkout of sandbox `dir`: the ovnfs checkout its record names, else its native checkout directory. */
+	async #checkoutOf(dir: string): Promise<SandboxCheckout> {
+		const ovnfs = await this.#deps.ovnfsCheckout(dir);
+		if (ovnfs) return ovnfs;
+		for (const name of CHECKOUT_DIRS) {
+			const path = join(dir, name);
+			try {
+				if ((await lstat(path)).isDirectory()) return { kind: "native", path };
+			} catch (error) {
+				if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+			}
+		}
+		return { kind: "none" };
 	}
 
 	async #removeIfEligible(path: string, inUse: readonly string[], discardChanges: boolean): Promise<SandboxResult | null> {
@@ -186,7 +228,7 @@ export class IsolationSweep {
 		// omp names a sandbox after its repository and task id, so a task run again takes the same directory.
 		if (await this.#deps.ownerLive(dir)) return keep(dir, "owner-live", "A new omp process claimed it.");
 		try {
-			await this.#deps.stopMount(dir);
+			await this.#deps.release(dir);
 			const removing = `${dir}${REMOVING_SUFFIX}`;
 			await rename(dir, removing);
 			await rm(removing, { recursive: true, force: true });
@@ -195,20 +237,6 @@ export class IsolationSweep {
 			return keep(dir, "failed", errorText(error));
 		}
 	}
-}
-
-/** The checkout directory in sandbox `dir`, `null` when it has none. */
-async function checkoutOf(dir: string): Promise<string | null> {
-	for (const name of CHECKOUT_DIRS) {
-		const path = join(dir, name);
-		try {
-			const stat = await lstat(path);
-			if (stat.isDirectory()) return path;
-		} catch (error) {
-			if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-		}
-	}
-	return null;
 }
 
 const KEPT_WHY: Record<SandboxKeepReason, string> = {

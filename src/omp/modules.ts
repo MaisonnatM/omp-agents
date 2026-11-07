@@ -78,7 +78,17 @@ import type {
 	OAuthTerminalModule,
 	ServiceTierModule,
 } from "./module-types/models";
-import type { IsolationOwnershipModule, LaunchClientModule, LaunchPathsModule, PsDataModule, PsTableModule, WorktreeCliModule } from "./module-types/processes";
+import type {
+	IsolationOwnershipModule,
+	LaunchClientModule,
+	LaunchPathsModule,
+	OvnfsClientModule,
+	OvnfsDaemonModule,
+	OvnfsTaskModule,
+	PsDataModule,
+	PsTableModule,
+	WorktreeCliModule,
+} from "./module-types/processes";
 import type { RpcClientModule, RpcFrameModule, UtilsModule } from "./module-types/rpc";
 import type {
 	ExitDiagnosticsModule,
@@ -410,6 +420,9 @@ export const isolationOwnership = await load<IsolationOwnershipModule>(join(srcD
 	hasLiveIsolationOwner: "function",
 });
 export const worktreeCli = await load<WorktreeCliModule>(join(srcDir, "cli", "worktree-cli.ts"), { stopRetainedMount: "function" });
+export const ovnfsTask = await load<OvnfsTaskModule>(join(srcDir, "task", "ovnfs.ts"), { OVNFS_CHECKOUT_FILE: "string", releaseOvnfsCheckout: "function" });
+export const ovnfsDaemon = await load<OvnfsDaemonModule>(join(srcDir, "ovnfs", "daemon.ts"), { runningDaemon: "function", forgetDaemon: "function" });
+export const ovnfsClient = await load<OvnfsClientModule>(join(srcDir, "ovnfs", "client.ts"), { callSocket: "function", OvnfsError: "function" });
 export const psData = await load<PsDataModule>(join(srcDir, "cli", "ps-data.ts"), { collectReports: "function", scopeClient: "function" });
 export const psTable = await load<PsTableModule>(join(dirname(packageDir), "pi-tui", "src", "apps", "ps-data.ts"), { TERMINAL_STATES: "object" });
 export const launchPaths = await load<LaunchPathsModule>(join(srcDir, "launch", "paths.ts"), { canonicalProjectDir: "function" });

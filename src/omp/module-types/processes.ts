@@ -9,6 +9,28 @@ export interface IsolationOwnershipModule {
 export interface WorktreeCliModule {
 	stopRetainedMount(dir: string): Promise<boolean>;
 }
+/** omp's ovnfs-backed isolation (src/task/ovnfs.ts): the record of the ovnfs checkout a sandbox stands for, and its removal, which deletes the checkout's files. */
+export interface OvnfsTaskModule {
+	OVNFS_CHECKOUT_FILE: string;
+	/** Removes the checkout the record in `dir` names, starting its daemon if needed; `false` when `dir` holds no readable record; throws when it cannot. */
+	releaseOvnfsCheckout(dir: string): Promise<boolean>;
+}
+/** The ovnfs daemons omp knows (src/ovnfs/daemon.ts), one per ovnfs command. */
+export interface OvnfsDaemonModule {
+	/** The daemon `command` runs, without starting one; `undefined` when none answers. */
+	runningDaemon(command: string): Promise<{ socket: string; mount: string } | undefined>;
+	/** Forgets `command`'s daemon after its socket stopped answering, so the next call asks the command again. */
+	forgetDaemon(command: string): void;
+}
+/** ovnfs's `api.LsReply`, of which the dashboard reads each live checkout's name and the folder it is served in. */
+export interface OvnfsLsReply {
+	checkouts: { name: string; path: string }[];
+}
+/** ovnfs's admin socket client (src/ovnfs/client.ts): rejects with an `OvnfsError` for an error the daemon reports, with the socket's error when it cannot connect. */
+export interface OvnfsClientModule {
+	callSocket(socket: string, op: "ls", args: Record<string, never>): Promise<OvnfsLsReply>;
+	OvnfsError: abstract new (...args: never[]) => Error;
+}
 /** A daemon broker's scope (pi-tui src/apps/ps-data.ts `PsScope`): a project's runtime directory, or a machine-wide service's. */
 export interface DaemonScope {
 	kind: "project" | "global";
