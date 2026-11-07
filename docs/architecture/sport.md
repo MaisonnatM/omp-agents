@@ -19,7 +19,7 @@ An override replaces one day's slots, as on a test day.
 
 `applySport` in `src/sport.ts` is the pure reducer the server applies to its file.
 `set-plan`, `set-targets`, and `set-metrics` replace their part whole.
-Logs are added, edited, removed, and restored by id, and measurements added, removed, and restored; both stay in date order, a day's entries in the order they came, and a restore puts the entry back at its index when that keeps the order.
+Logs and measurements are added, edited, removed, and restored by id through one dated list; both stay in date order, a day's entries in the order they came, and a restore puts the entry back at its index when that keeps the order.
 A change that changes nothing returns the same state, so the `ListRegistry` resends the state only to the socket that sent it.
 
 `SportFile` uses `ReducerFile` to keep `sport.json` beside the access token.

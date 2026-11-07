@@ -136,6 +136,7 @@ describe("parseSportChange", () => {
 		expect(parseSportChange({ op: "restore-log", log: LOG, index: 2 })).toEqual({ op: "restore-log", log: READ_LOG, index: 2 });
 		expect(parseSportChange({ op: "remove-log", id: "l1" })).toEqual({ op: "remove-log", id: "l1" });
 		expect(parseSportChange({ op: "add-measurement", measurement: { id: "m", metric: "max", value: 117, at: "2026-11-17" } })).toMatchObject({ op: "add-measurement", measurement: { id: "m", note: "" } });
+		expect(parseSportChange({ op: "edit-measurement", measurement: { id: "m", metric: "max", value: 118, at: "2026-11-17" } })).toMatchObject({ op: "edit-measurement", measurement: { id: "m", value: 118 } });
 		expect(parseSportChange({ op: "remove-measurement", id: "m" })).toEqual({ op: "remove-measurement", id: "m" });
 		expect(parseSportChange({ op: "set-plan", plan: null })).toEqual({ op: "set-plan", plan: null });
 		expect(parseSportChange({ op: "set-plan", plan: plan() })).toMatchObject({ op: "set-plan", plan: { title: "" } });

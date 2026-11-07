@@ -78,4 +78,13 @@ describe("applySport", () => {
 		expect(restored.measurements).toEqual(state.measurements);
 		expect(applySport(restored, { op: "restore-measurement", measurement: max("aug", "2026-08-26"), index: 0 })).toBe(restored);
 	});
+
+	test("edits a measurement in place, moves it when its day changes, and changes nothing for an unknown id or the same value", () => {
+		const state = after(EMPTY_SPORT, { op: "add-measurement", measurement: max("aug", "2026-08-26") }, { op: "add-measurement", measurement: max("nov", "2026-11-17", 117) });
+		const fixed = applySport(state, { op: "edit-measurement", measurement: max("nov", "2026-11-17", 118) });
+		expect(fixed.measurements.map(({ value }) => value)).toEqual([112, 118]);
+		expect(measurementIds(applySport(state, { op: "edit-measurement", measurement: max("aug", "2026-12-01") }))).toBe("nov aug");
+		expect(applySport(state, { op: "edit-measurement", measurement: max("aug", "2026-08-26") })).toBe(state);
+		expect(applySport(state, { op: "edit-measurement", measurement: max("sep", "2026-09-01") })).toBe(state);
+	});
 });

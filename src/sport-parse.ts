@@ -250,7 +250,8 @@ export function parseSportChange(value: unknown): SportChange | null {
 			const metrics = parseAll(value.metrics, parseMetric);
 			return metrics && distinct(metrics.map(({ id }) => id)) ? { op, metrics } : null;
 		}
-		case "add-measurement": {
+		case "add-measurement":
+		case "edit-measurement": {
 			const measurement = parseMeasurement(value.measurement);
 			return measurement && { op, measurement };
 		}
