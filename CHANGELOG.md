@@ -7,7 +7,10 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - Fixed: a Bot page's model menu now lists the models, instead of staying on Loading models.
 - The API credits row at the bottom of the window turns red and reads used up when Anthropic refuses requests because the key's credit ran out, and the bell's alert now reads Out of credit: API credits.
-- Fixed: with the new omp fix applied, a session whose Anthropic API key runs out of credit moves to the next model in its fallback list and stays off that key, instead of stopping or going back to it.
+- Fixed: with the new omp 18.18.0 credit patch applied, a session whose Anthropic API key runs out of credit moves to the next model in its fallback list and stays off that key, instead of stopping or going back to it.
+- Fixed: sessions on a Cursor model now find the dashboard's tools, such as landing on main, ending the session, and moving it to another folder, instead of saying they are missing.
+- The API credits row in the bottom bar now shows the dollars left on your Console balance when you have no monthly grant, in red once it runs out, instead of only its name.
+- The paid Cursor fallback patch and the tool documentation patch for omp now apply to omp 18.18.0, together with the Cursor tools patch.
 
 ## 2026-11-06
 

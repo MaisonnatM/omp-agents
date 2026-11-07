@@ -12,13 +12,13 @@ In the context of sessions routed to the Anthropic API key, facing Anthropic's 4
 
 omp classifies the refusal as `{usage: false, retriable: false}`, so turn recovery never marks the credential's limit reached.
 With `retry.fallbackOn: usage-limit` the session stops; with `any` it falls back, but the generic five-minute cooldown restores the dead primary on the next prompt, which is the loop two Hameau sessions hit on 2026-11-07.
-One regular expression, `CREDITS_EXHAUSTED_PATTERN` in `pi-ai/src/error/rate-limit.ts`, feeds the quota reason, the `UsageLimit` flag, and, from 18.18.0, the billing-cap check that skips the sleep.
+One regular expression, `CREDITS_EXHAUSTED_PATTERN` in `pi-ai/src/error/rate-limit.ts`, feeds the quota reason, the `UsageLimit` flag, and the billing-cap check that skips the sleep.
 The dashboard cannot change how a session's runtime classifies its errors; omp-agents keeps runtime changes as patches in `patches/`.
 
 ## Options considered
 
-- Add the wording to `CREDITS_EXHAUSTED_PATTERN` in its own patch: one line, every consumer of the pattern agrees, and it applies to 18.16.0 and 18.18.0 alike. Chosen.
-- Fold it into `patches/omp-18.16.0-paid-cursor-fallback.patch`: that patch is about paying for Cursor, and a user who wants this fix without paid fallback could not take it alone.
+- Add the wording to `CREDITS_EXHAUSTED_PATTERN` in its own patch, `patches/omp-18.18.0-credit-balance-fallback.patch`: one line, every consumer of the pattern agrees, and it applies with or without the other runtime patches. Chosen.
+- Fold it into `patches/omp-18.18.0-paid-cursor-fallback.patch`: that patch is about paying for Cursor, and a user who wants this fix without paid fallback could not take it alone.
 - An omp extension that rewrites the error text into a 402 before turn recovery sees it: it would replace the provider's real message with a made-up one, and it would depend on hook ordering inside turn recovery that the runtime does not promise.
 
 ## Consequences

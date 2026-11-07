@@ -303,7 +303,7 @@ describe("withCreditBalance", () => {
 		extra: null,
 		resetCredits: null,
 	});
-	const grant = { used: 11.13, limit: 200, expiresAt: Date.parse("2026-12-03T00:00:00Z") };
+	const grant = { kind: "grant" as const, used: 11.13, limit: 200, expiresAt: Date.parse("2026-12-03T00:00:00Z") };
 
 	test("puts the grant on the name-only API credits row and leaves the subscription row", () => {
 		const plans = [row("anthropic"), row("anthropic-api")];

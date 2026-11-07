@@ -1,15 +1,40 @@
+From 28e873ad80f5fcdbb71c42a6ace990c8ca4416d7 Mon Sep 17 00:00:00 2001
+From: omp-agents <omp-agents@localhost>
+Date: Sat, 7 Nov 2026 11:57:47 +0100
+Subject: [PATCH] fix(coding-agent): tighten runtime tool contracts for xd
+ devices and seance
+
+List MCP devices per server, accept read selectors on xd:// docs while
+rejecting them on device writes, hint instead of dumping on unknown
+devices, and scope seance session-id lookup to the caller's artifacts
+and current project.
+
+Omp-Session: 01a1b5a7-fbd3-7560-a579-bddf331c93ee
+---
+ .../coding-agent/src/internal-urls/router.ts  |  3 +
+ .../src/internal-urls/xd-protocol.ts          |  2 +-
+ .../src/prompts/system/xdev-mount-notice.md   |  2 +-
+ .../src/prompts/tools/seance-task-guidance.md |  1 +
+ .../coding-agent/src/session/session-tools.ts |  5 +-
+ packages/coding-agent/src/task/seance.ts      |  5 +-
+ packages/coding-agent/src/tools/read.ts       |  5 +-
+ packages/coding-agent/src/tools/xdev.ts       | 32 ++++++++--
+ .../agent-session-tool-rebuild-skip.test.ts   | 23 +++-----
+ .../coding-agent/test/task/seance.test.ts     | 15 +++--
+ .../test/tools/read-repeat-hint.test.ts       |  8 ++-
+ .../test/write-xdev-dispatch.test.ts          | 59 +++++++++++++++++++
+ 12 files changed, 126 insertions(+), 34 deletions(-)
+
 diff --git a/packages/coding-agent/src/internal-urls/router.ts b/packages/coding-agent/src/internal-urls/router.ts
-index 86b6792f17..0df2e28d8d 100644
+index 86b6792f17..2c9f15d05d 100644
 --- a/packages/coding-agent/src/internal-urls/router.ts
 +++ b/packages/coding-agent/src/internal-urls/router.ts
-@@ -276,6 +276,11 @@ export class InternalUrlRouter {
+@@ -276,6 +276,9 @@ export class InternalUrlRouter {
  	 */
  	peelWriteSelector(input: string, tool: string): string {
  		const { path, sel } = this.split(input);
 +		if (sel !== undefined && this.#registered(path)?.handler.spec.write?.scope === "device") {
-+			throw new ToolError(
-+				`${tool} does not accept read selectors on device URLs. Read ${path} for docs.`,
-+			);
++			throw new ToolError(`${tool} does not accept read selectors on device URLs. Read ${path} for docs.`);
 +		}
  		if (sel === undefined || WHOLE_FILE_SELECTOR_RE.test(sel)) return path;
  		throw new ToolError(
@@ -50,7 +75,7 @@ index 6d052bff54..4a3a9218a6 100644
  If the saved model is absent/unavailable, set `model` explicitly.
  When the user points at an earlier session, the consult IS the read: NEVER read, grep, or re-run its `.jsonl` here. Only facts that changed since (an open PR's state) need a live check.
 diff --git a/packages/coding-agent/src/session/session-tools.ts b/packages/coding-agent/src/session/session-tools.ts
-index 059a950ed8..9124c81995 100644
+index aa82d438a1..5feb78ce6b 100644
 --- a/packages/coding-agent/src/session/session-tools.ts
 +++ b/packages/coding-agent/src/session/session-tools.ts
 @@ -48,6 +48,7 @@ import {
@@ -60,8 +85,8 @@ index 059a950ed8..9124c81995 100644
 +	xdevCatalogLines,
  	xdevEntries,
  } from "../tools/xdev";
- import { type EditMode } from "@oh-my-pi/pi-tui/tools/edit";
-@@ -2008,8 +2009,8 @@ export class SessionTools {
+ import type { EditModeSetting } from "../edit/settings";
+@@ -2046,8 +2047,8 @@ export class SessionTools {
  		if (addedNames.length === 0 && removedNames.length === 0) {
  			return { notice: undefined, announcedMounts };
  		}
@@ -88,20 +113,38 @@ index 64b2d52302..5bd1eb9b97 100644
  }
  const modelSelectorInputSchema = type("string | string[]");
  export const seanceTaskSchemaFields = {
+diff --git a/packages/coding-agent/src/tools/read.ts b/packages/coding-agent/src/tools/read.ts
+index 142226db20..925ef13411 100644
+--- a/packages/coding-agent/src/tools/read.ts
++++ b/packages/coding-agent/src/tools/read.ts
+@@ -976,8 +976,9 @@ function appendRepeatReadHint(session: ToolSession, path: string, result: AgentT
+ 
+ /**
+  * Whether `path` takes a trailing `:A-B` line selector: filesystem paths, web
+- * URLs and `lines` schemes do; selector-free devices (`xd://`), opaque MCP
+- * resources and unregistered schemes would read the tail as part of the URL.
++ * URLs and `lines` schemes (`xd://` docs included) do; selector-free devices
++ * (`out://`), opaque MCP resources and unregistered schemes would read the tail
++ * as part of the URL.
+  */
+ function acceptsLineSelector(path: string): boolean {
+ 	const router = InternalUrlRouter.instance();
 diff --git a/packages/coding-agent/src/tools/xdev.ts b/packages/coding-agent/src/tools/xdev.ts
-index 0146853e35..87cb3b538a 100644
+index 0146853e35..5a634f8cbd 100644
 --- a/packages/coding-agent/src/tools/xdev.ts
 +++ b/packages/coding-agent/src/tools/xdev.ts
-@@ -291,7 +291,7 @@ export function listXdevTools(state: XdevState): Tool[] {
+@@ -291,7 +291,9 @@ export function listXdevTools(state: XdevState): Tool[] {
  }
  
  /** `{name, summary, dynamic}` triples for prompt templates and `/tools` display. */
 -export function xdevEntries(state: XdevState): Array<{ name: string; summary: string; dynamic: boolean }> {
-+export function xdevEntries(state: XdevState): Array<{ name: string; summary: string; dynamic: boolean; server?: string }> {
++export function xdevEntries(
++	state: XdevState,
++): Array<{ name: string; summary: string; dynamic: boolean; server?: string }> {
  	return listXdevTools(state).map(tool => {
  		// Built-ins are first-party; anything else carries third-party metadata. One
  		// boolean drives both the description cap and the flag callers present, so
-@@ -301,13 +301,35 @@ export function xdevEntries(state: XdevState): Array<{ name: string; summary: st
+@@ -301,13 +303,35 @@ export function xdevEntries(state: XdevState): Array<{ name: string; summary: st
  			name: tool.name,
  			summary: promptCatalogSummary(tool, dynamic ? XDEV_EXTERNAL_DESCRIPTION_CAP : undefined),
  			dynamic,
@@ -139,7 +182,7 @@ index 0146853e35..87cb3b538a 100644
  	return [
  		`${XD_URL_PREFIX} ${state.mountedNames.size} mounted tool devices.`,
  		...rows,
-@@ -423,7 +445,7 @@ function resolveRequiredXdevTool(state: XdevState, name: string): Tool {
+@@ -423,7 +447,7 @@ function resolveRequiredXdevTool(state: XdevState, name: string): Tool {
  	const inst = resolveXdevTool(state, name);
  	if (!inst) {
  		throw new ToolError(
@@ -149,10 +192,19 @@ index 0146853e35..87cb3b538a 100644
  	}
  	return inst;
 diff --git a/packages/coding-agent/test/agent-session-tool-rebuild-skip.test.ts b/packages/coding-agent/test/agent-session-tool-rebuild-skip.test.ts
-index 05f80dafb9..df60e91364 100644
+index 77deec59cf..9f2902dc99 100644
 --- a/packages/coding-agent/test/agent-session-tool-rebuild-skip.test.ts
 +++ b/packages/coding-agent/test/agent-session-tool-rebuild-skip.test.ts
-@@ -1082,31 +1082,24 @@ describe("AgentSession refreshMCPTools rebuild skipping", () => {
+@@ -17,7 +17,7 @@ import {
+ 	collectMountedMCPToolRoutes,
+ 	projectMountedMCPXdevGuidance,
+ } from "@oh-my-pi/pi-coding-agent/session/session-tools";
+-import { listXdevTools, XDEV_EXTERNAL_DESCRIPTION_CAP, type XdevState } from "@oh-my-pi/pi-coding-agent/tools/xdev";
++import { listXdevTools, type XdevState } from "@oh-my-pi/pi-coding-agent/tools/xdev";
+ import { EvalTool } from "@oh-my-pi/pi-coding-agent/tools/eval";
+ import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools/index";
+ import { logger } from "@oh-my-pi/pi-utils";
+@@ -1092,31 +1092,24 @@ describe("AgentSession refreshMCPTools rebuild skipping", () => {
  		expect(allNotices[0]).not.toContain("Available tools.");
  	});
  
@@ -189,7 +241,16 @@ index 05f80dafb9..df60e91364 100644
  	});
  
  	it("inlines configured late xd:// device docs in mount notices", async () => {
-@@ -1402,7 +1395,7 @@ These tools became available:
+@@ -1378,7 +1371,7 @@ These tools became available:
+ 		expect(evalTool.description).toBe(boundDescription);
+ 		expect(session.systemPrompt).toEqual(boundPrompt);
+ 		expect(session.getToolForEvalBridge("mcp__nucleus_fetch")).toBeDefined();
+-		expect(mountNoticesIn(contexts[1]).join("\n")).toContain("xd://mcp__nucleus_fetch");
++		expect(mountNoticesIn(contexts[1]).join("\n")).toContain("- nucleus (MCP): mcp__nucleus_fetch");
+ 	});
+ 
+ 	it("announces an unmount after a maintenance rebuild delivered the pending addition", async () => {
+@@ -1443,7 +1436,7 @@ These tools became available:
  		expect(systemPrompts[0]).toEqual(replacementPrompt);
  		const notices = mountNoticesIn(contexts[0]);
  		expect(notices).toHaveLength(1);
@@ -199,10 +260,10 @@ index 05f80dafb9..df60e91364 100644
  
  	it("does not emit an unmount notice for a catalog device unmounted before delivery (#7139)", async () => {
 diff --git a/packages/coding-agent/test/task/seance.test.ts b/packages/coding-agent/test/task/seance.test.ts
-index a68a3ab211..4c68cd03eb 100644
+index a68a3ab211..b3d11cda72 100644
 --- a/packages/coding-agent/test/task/seance.test.ts
 +++ b/packages/coding-agent/test/task/seance.test.ts
-@@ -207,14 +207,17 @@ describe("seance source resolution", () => {
+@@ -207,14 +207,19 @@ describe("seance source resolution", () => {
  			const cwd = path.join(tempDir.path(), "project");
  			const otherCwd = path.join(tempDir.path(), "other-project");
  			const foreignFile = path.join(sessionDirForCwd(otherCwd), "foreign.jsonl");
@@ -212,9 +273,10 @@ index a68a3ab211..4c68cd03eb 100644
  
 -			await expect(resolveSeanceSource("foreign-project-id", { cwd })).rejects.toThrow(
 -				'Session "foreign-project-id" was not found.',
--			);
++			await expect(resolveSeanceSource(foreignId, { cwd })).rejects.toThrow(
++				/current project.*\.jsonl path as sourceSession/,
+ 			);
 -			await expect(resolveSeanceSource("foreign-project-id", { cwd, includeGlobal: true })).resolves.toMatchObject({
-+			await expect(resolveSeanceSource(foreignId, { cwd })).rejects.toThrow(/current project.*\.jsonl path as sourceSession/);
 +			await expect(resolveSeanceSource(foreignFile, { cwd })).resolves.toMatchObject({
  				file: foreignFile,
 -				id: "foreign-project-id",
@@ -226,11 +288,35 @@ index a68a3ab211..4c68cd03eb 100644
  			});
  		});
  	});
+diff --git a/packages/coding-agent/test/tools/read-repeat-hint.test.ts b/packages/coding-agent/test/tools/read-repeat-hint.test.ts
+index 2c3420b2c2..ce72b22ec2 100644
+--- a/packages/coding-agent/test/tools/read-repeat-hint.test.ts
++++ b/packages/coding-agent/test/tools/read-repeat-hint.test.ts
+@@ -3,8 +3,8 @@ import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
+ import type { Tool, ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
+ import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
+ 
+-// #17631: the hint advised `path:A-B` on xd:// topics, whose scheme passes the tail into the topic name.
+-it("does not suggest a line selector on a repeated selector-free xd:// read", async () => {
++// #17631: the hint must only advise `path:A-B` where the scheme honors it. xd:// docs take line selectors.
++it("suggests a line selector on a repeated xd:// docs read, and the selector narrows it", async () => {
+ 	const evalTool = { docTopics: () => ({ browser: "line 1\nline 2" }) } as unknown as Tool;
+ 	const session: ToolSession = {
+ 		cwd: process.cwd(),
+@@ -20,5 +20,7 @@ it("does not suggest a line selector on a repeated selector-free xd:// read", as
+ 	const result = await tool.execute("third", { path: "xd://eval/browser" });
+ 	const text = result.content.map(entry => (entry.type === "text" ? entry.text : "")).join("\n");
+ 	expect(text).toContain("identical output 3 times");
+-	expect(text).not.toContain("path:A-B");
++	expect(text).toContain("path:A-B");
++	const narrowed = await tool.execute("narrowed", { path: "xd://eval/browser:2:raw" });
++	expect(narrowed.content.map(entry => (entry.type === "text" ? entry.text : "")).join("\n")).toBe("line 2");
+ });
 diff --git a/packages/coding-agent/test/write-xdev-dispatch.test.ts b/packages/coding-agent/test/write-xdev-dispatch.test.ts
-index d6b5e44850..6da022b6d9 100644
+index d6b5e44850..20d1a8576a 100644
 --- a/packages/coding-agent/test/write-xdev-dispatch.test.ts
 +++ b/packages/coding-agent/test/write-xdev-dispatch.test.ts
-@@ -75,6 +75,53 @@ function createTestXdevState(
+@@ -75,6 +75,55 @@ function createTestXdevState(
  }
  
  describe("read and write route xd:// device URLs", () => {
@@ -263,7 +349,9 @@ index d6b5e44850..6da022b6d9 100644
 +			label: "Device",
 +			description: "Device",
 +			parameters: type({}),
-+			async execute() { return { content: [] }; },
++			async execute() {
++				return { content: [] };
++			},
 +		}));
 +		const state = createTestXdevState(tools);
 +		for (const name of ["missing", "missing".repeat(1_000), "😀".repeat(1_000)]) {
@@ -284,7 +372,7 @@ index d6b5e44850..6da022b6d9 100644
  	it("lists, documents, and dispatches an ast_edit device", async () => {
  		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "write-xdev-"));
  		try {
-@@ -101,6 +148,16 @@ describe("read and write route xd:// device URLs", () => {
+@@ -101,6 +150,16 @@ describe("read and write route xd:// device URLs", () => {
  			const docs = await read!.execute("read-xd-docs", { path: "xd://ast_edit" });
  			expect(docs.content.find(entry => entry.type === "text")?.text).toContain("# ast_edit");
  
@@ -301,3 +389,6 @@ index d6b5e44850..6da022b6d9 100644
  			const content = JSON.stringify({
  				ops: [{ pat: "legacyWrap($A, $B)", out: "modernWrap($A, $B)" }],
  				paths: [filePath],
+-- 
+2.56.0
+

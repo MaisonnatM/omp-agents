@@ -28,80 +28,91 @@ export function spendLabel({ used, limit, currency = "USD" }: Pick<ExtraUsage, "
 	return limit === null ? format(used) : `${format(used)} / ${format(limit)}`;
 }
 
+type Tone = "out" | "low" | "ok";
+
+const TONE_CLASS: Record<Tone, string> = {
+	out: "text-red-600 dark:text-red-400",
+	low: "text-amber-600 dark:text-amber-400",
+	ok: "text-foreground",
+};
+
+/**
+ * How the API credits balance reads in the footer and the model menu: the `amount` beside the name, the `phrase` a
+ * sentence uses, the footer's `tooltip`, and its `tone`. With no grant, the dollars left never read below $0.00.
+ */
+export function creditView(balance: CreditBalance): { amount: string; phrase: string; tooltip: string; tone: Tone } {
+	switch (balance.kind) {
+		case "grant": {
+			const amount = spendLabel(balance);
+			const expires = balance.expiresAt === null ? "" : ` Expires ${DAY_FORMAT.format(balance.expiresAt)}.`;
+			const left = balance.limit > 0 ? (balance.limit - balance.used) / balance.limit : 1;
+			return {
+				amount,
+				phrase: `${amount} spent`,
+				tooltip: `API credits: ${amount} spent.${expires}`,
+				tone: balance.used >= balance.limit ? "out" : left < LOW ? "low" : "ok",
+			};
+		}
+		case "prepaid": {
+			const amount = `${dollars(Math.max(0, balance.left))} left`;
+			return { amount, phrase: amount, tooltip: `API credits: ${amount}. No monthly grant.`, tone: balance.left <= 0 ? "out" : "ok" };
+		}
+		default: {
+			const never: never = balance;
+			return never;
+		}
+	}
+}
+
+/** One footer figure: a muted label, then the value in its tone, with the details on hover or focus. */
+function QuotaChip({ label, value, tooltip, tone }: { label: string; value: string; tooltip: string; tone: Tone }) {
+	return (
+		<Tooltip content={tooltip}>
+			<span
+				tabIndex={0}
+				className={cn("whitespace-nowrap rounded-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring", TONE_CLASS[tone])}
+			>
+				<span className="text-muted-foreground">{label}</span> {value}
+			</span>
+		</Tooltip>
+	);
+}
+
 function WindowLeft({ window }: { window: PlanWindow }) {
 	const percent = Math.round(window.remaining * 100);
 	const reset = window.resetsAt === null ? "" : ` Resets ${new Date(window.resetsAt).toLocaleString()}.`;
 	const spent = window.usd ? ` ${spendLabel(window.usd)} spent.` : "";
 	return (
-		<Tooltip content={`${window.title}: ${window.exhausted ? "used up" : `${percent}% left`}.${spent}${reset}`}>
-			<span
-				tabIndex={0}
-				className={cn(
-					"whitespace-nowrap rounded-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring",
-					window.exhausted
-						? "text-red-600 dark:text-red-400"
-						: window.remaining < LOW
-							? "text-amber-600 dark:text-amber-400"
-							: "text-foreground",
-				)}
-			>
-				<span className="text-muted-foreground">{window.label}</span> {percent}%
-			</span>
-		</Tooltip>
+		<QuotaChip
+			label={window.label}
+			value={`${percent}%`}
+			tooltip={`${window.title}: ${window.exhausted ? "used up" : `${percent}% left`}.${spent}${reset}`}
+			tone={window.exhausted ? "out" : window.remaining < LOW ? "low" : "ok"}
+		/>
 	);
 }
 
 function ExtraSpent({ extra }: { extra: ExtraUsage }) {
 	const low = extra.limit !== null && extra.used / extra.limit > 1 - LOW;
 	return (
-		<Tooltip content={`${extra.title}: ${spendLabel(extra)} spent${extra.exhausted ? ", used up" : ""}.`}>
-			<span
-				tabIndex={0}
-				className={cn(
-					"whitespace-nowrap rounded-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring",
-					extra.exhausted ? "text-red-600 dark:text-red-400" : low ? "text-amber-600 dark:text-amber-400" : "text-foreground",
-				)}
-			>
-				<span className="text-muted-foreground">extra</span> {spendLabel(extra)}
-			</span>
-		</Tooltip>
+		<QuotaChip
+			label="extra"
+			value={spendLabel(extra)}
+			tooltip={`${extra.title}: ${spendLabel(extra)} spent${extra.exhausted ? ", used up" : ""}.`}
+			tone={extra.exhausted ? "out" : low ? "low" : "ok"}
+		/>
 	);
 }
 
-/** The grant, amber below {@link LOW} left and red once spent or once the provider refuses requests for lack of credit. */
-function CreditSpent({ name, balance, outOfCreditSince }: { name: string; balance: CreditBalance; outOfCreditSince?: number }) {
-	const left = balance.limit !== null && balance.limit > 0 ? (balance.limit - balance.used) / balance.limit : 1;
-	const exhausted = (balance.limit !== null && balance.used >= balance.limit) || outOfCreditSince !== undefined;
-	const state = exhausted ? ", used up" : left < LOW ? ", running low" : "";
-	const refused = outOfCreditSince === undefined ? "" : ` Requests refused for lack of credit since ${new Date(outOfCreditSince).toLocaleString()}.`;
-	const expires = balance.expiresAt === null ? "" : ` Expires ${DAY_FORMAT.format(balance.expiresAt)}.`;
-	return (
-		<Tooltip content={`API credits: ${spendLabel(balance)} spent${state}.${refused}${expires}`}>
-			<span
-				tabIndex={0}
-				className={cn(
-					"whitespace-nowrap rounded-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring",
-					exhausted ? "text-red-600 dark:text-red-400" : left < LOW ? "text-amber-600 dark:text-amber-400" : "text-foreground",
-				)}
-			>
-				<span className="text-muted-foreground">{name}</span> {spendLabel(balance)}
-			</span>
-		</Tooltip>
-	);
+/** The balance in its tone, turned red once the provider refuses requests for lack of credit. */
+function CreditAmount({ name, balance, outOfCreditSince }: { name: string; balance: CreditBalance; outOfCreditSince?: number }) {
+	const { amount, tooltip, tone } = creditView(balance);
+	if (outOfCreditSince === undefined) return <QuotaChip label={name} value={amount} tooltip={tooltip} tone={tone} />;
+	return <QuotaChip label={name} value={amount} tooltip={`${tooltip}${refusedSince(outOfCreditSince)}`} tone="out" />;
 }
 
-/** A provider with no balance to show that refuses requests for lack of credit. */
-function CreditRefused({ name, since }: { name: string; since: number }) {
-	return (
-		<Tooltip content={`${name}: used up. Requests refused for lack of credit since ${new Date(since).toLocaleString()}.`}>
-			<span
-				tabIndex={0}
-				className="whitespace-nowrap rounded-sm text-red-600 outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-red-400"
-			>
-				<span className="text-muted-foreground">{name}</span> used up
-			</span>
-		</Tooltip>
-	);
+function refusedSince(since: number): string {
+	return ` Requests refused for lack of credit since ${new Date(since).toLocaleString()}.`;
 }
 
 function creditsLine({ count, nextExpiresAt }: ResetCredits): string {
@@ -124,8 +135,10 @@ function PlanRow({ plan }: { plan: PlanUsage }) {
 				</span>
 			</Tooltip>
 			{nameOnly && !plan.balance && plan.outOfCreditSince === undefined && <span aria-hidden className="whitespace-nowrap text-foreground">{plan.name}</span>}
-			{nameOnly && !plan.balance && plan.outOfCreditSince !== undefined && <CreditRefused name={plan.name} since={plan.outOfCreditSince} />}
-			{nameOnly && plan.balance && <CreditSpent name={plan.name} balance={plan.balance} outOfCreditSince={plan.outOfCreditSince} />}
+			{nameOnly && !plan.balance && plan.outOfCreditSince !== undefined && (
+				<QuotaChip label={plan.name} value="used up" tooltip={`${plan.name}: used up.${refusedSince(plan.outOfCreditSince)}`} tone="out" />
+			)}
+			{nameOnly && plan.balance && <CreditAmount name={plan.name} balance={plan.balance} outOfCreditSince={plan.outOfCreditSince} />}
 			{plan.extra && <ExtraSpent extra={plan.extra} />}
 			{plan.windows.map(window => (
 				<WindowLeft key={window.label} window={window} />
