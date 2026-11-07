@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { dose } from "../../sport-view";
+import { Callout } from "../integrations/integration-row";
 import { DemoThumb } from "./demo-strip";
 import { SportDialog } from "./sport-dialog";
 
@@ -72,10 +73,9 @@ export function DemoDialog({ title, demos, at, onAt, onClose }: DemoDialogProps)
 					))}
 				</ol>
 				{demo.caution && (
-					<p className="flex gap-2 rounded-lg bg-warning-surface px-3 py-2 text-sm text-warning-foreground">
-						<TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
-						<span>{demo.caution}</span>
-					</p>
+					<Callout tone="warning" icon={TriangleAlert}>
+						{demo.caution}
+					</Callout>
 				)}
 				<p className="text-xs text-muted-foreground">
 					Vidéo : {demo.by} ·{" "}

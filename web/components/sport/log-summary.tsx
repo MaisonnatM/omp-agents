@@ -1,9 +1,10 @@
 /** A log's figures as a row of cells, and the dialog that sums a session up once it is logged, with the records it beat. */
-import { Star } from "lucide-react";
+import { Gauge, Star } from "lucide-react";
 import type { Exercise, Measurement, Metric, WorkoutLog } from "../../../src/shared/sport";
 import { Button } from "@/components/ui/button";
 import { hashForSport } from "../../routing";
 import { amount, type Beaten, duration, effortWord, sendsText, shortDate, signedKg } from "../../sport-view";
+import { Callout } from "../integrations/integration-row";
 import { SportDialog } from "./sport-dialog";
 
 /** A row of labelled figures, such as a session's load, sends, pain, and effort. */
@@ -56,10 +57,10 @@ export function SummaryDialog({ saved: { log, minutes, beaten, test }, exercises
 					]}
 				/>
 				{test && (
-					<p className="rounded-lg bg-success/10 px-3 py-2 text-sm">
+					<Callout tone="info" icon={Gauge}>
 						Nouveau {test.metric.label.toLowerCase()} : <span className="font-medium">{amount(test.value, test.metric.unit)}</span>
 						{test.was && `, ${test.value >= test.was.value ? "+" : "−"}${amount(Math.abs(test.value - test.was.value), test.metric.unit)} depuis le test du ${shortDate(test.was.at)}`}. Les charges de la phase sont recalculées.
-					</p>
+					</Callout>
 				)}
 				{beaten.length > 0 && (
 					<ul aria-label="Records" className="flex flex-col gap-1.5">

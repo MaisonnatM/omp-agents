@@ -98,7 +98,7 @@ export function JournalTab({ state, open, disabled, onChange, onEdit, keys }: Jo
 										<span className="min-w-0 flex-1">
 											<span className="flex items-center gap-1.5">
 												<span className="truncate text-sm font-medium">{log.title}</span>
-												{marked.has(log.id) && <Badge size="compact" color="var(--success)">Record</Badge>}
+												{marked.has(log.id) && <Badge variant="dot" size="compact" color="amber">Record</Badge>}
 											</span>
 											<span className="block truncate text-xs text-muted-foreground">{logDetail(log) || "faite"}</span>
 										</span>
@@ -146,8 +146,8 @@ function LogDetail({ state, log, record, disabled, onEdit, onRemove }: { state: 
 					<p className="text-xs text-muted-foreground first-letter:uppercase">{longDate(log.date)} · {log.workout ? "séance du plan" : "séance libre"}</p>
 					<h2 className="text-xl font-semibold">{log.title}</h2>
 					<div className="mt-1.5 flex flex-wrap gap-1.5">
-						{log.status === "done" ? <Badge size="compact" color="var(--success)">✓ Faite</Badge> : <Badge size="compact">Pas faite</Badge>}
-						{record && <Badge size="compact" color="var(--success)">Record</Badge>}
+						{log.status === "done" ? <Badge variant="dot" size="compact" color="green">Faite</Badge> : <Badge variant="dot" size="compact" color="gray">Pas faite</Badge>}
+						{record && <Badge variant="dot" size="compact" color="amber">Record</Badge>}
 						{workout && <Badge size="compact">{PLACE_LABEL[workout.place]}</Badge>}
 					</div>
 				</div>

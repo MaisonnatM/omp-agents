@@ -1,7 +1,7 @@
 /** The Fait dialog, which logs a session's loads, sends, pain, effort, and note, or a test's max and bodyweight; and the Pesée dialog. */
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
-import { Check, Plus, X } from "lucide-react";
+import { Check, Plus, TriangleAlert, X } from "lucide-react";
 import { type KeyboardEvent, useId, useState } from "react";
 import { type Climb, CLIMB_KINDS, type ClimbKind, exercisesOf, FRENCH_GRADES, type Measurement, type Metric, PAIN_PLACES, type PainPlace, type SportChange, type SportState, type WorkoutLog } from "../../../src/shared/sport";
 import { applySport } from "../../../src/sport";
@@ -13,6 +13,7 @@ import { activityControl } from "../../activity";
 import { amount, ARKOSE_COLORS, beaten, CLIMB_LABEL, dose, effortWord, hardest, longDate, measured, PAIN_PLACE_AT, PAIN_PLACE_LABEL, painWord, sendsText, shortDate, signedKg, testOf } from "../../sport-view";
 import { ERROR_TEXT, isSubmitChord } from "../form-dialog";
 import { FIELD, TEXT_AREA } from "../form-field";
+import { Callout } from "../integrations/integration-row";
 import { effortText, heaviest, type Saved, Stats } from "./log-summary";
 import { SportDialog } from "./sport-dialog";
 
@@ -174,7 +175,7 @@ export function LogForm({ state, target: { date, workout, log }, disabled, onCha
 												</span>
 											</td>
 											<td className="py-2 text-right">
-												<button type="button" role="checkbox" aria-checked={done} aria-label={`Fait, ${item.exercise.name}`} onClick={() => update({ done: !done })} className={cn("inline-flex size-7 items-center justify-center rounded-md border outline-none focus-visible:ring-2 focus-visible:ring-ring", done ? "border-success bg-success text-white" : "border-border bg-background")}>
+												<button type="button" role="checkbox" aria-checked={done} aria-label={`Fait, ${item.exercise.name}`} onClick={() => update({ done: !done })} className={cn("inline-flex size-7 items-center justify-center rounded-md border outline-none focus-visible:ring-2 focus-visible:ring-ring", done ? "border-foreground bg-foreground text-background" : "border-border bg-background")}>
 													{done && <Check aria-hidden className="size-4" />}
 												</button>
 											</td>
@@ -197,9 +198,9 @@ export function LogForm({ state, target: { date, workout, log }, disabled, onCha
 							))}
 						</RadioGroup>
 						{pain >= PAIN_FLAG_LEVEL && (
-							<p className="rounded-lg bg-warning-surface px-3 py-2 text-xs text-warning-foreground">
+							<Callout tone="warning" icon={TriangleAlert}>
 								{where === "fingers" ? `Douleur aux doigts à ${PAIN_FLAG_LEVEL} ou plus : la poutre sera retirée ${PAIN_FLAG_DAYS} jours.` : `Douleur ${PAIN_PLACE_AT[where]} à ${PAIN_FLAG_LEVEL} ou plus : elle sera signalée ${PAIN_FLAG_DAYS} jours.`}
-							</p>
+							</Callout>
 						)}
 					</div>
 				)}

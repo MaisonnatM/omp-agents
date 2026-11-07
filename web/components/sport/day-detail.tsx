@@ -69,8 +69,8 @@ function WorkoutCard({ plan, day, kicker, workout, disabled, onDemo, onLog }: Om
 						<Badge size="compact">{duration(workout.minutes)}</Badge>
 						{workout.place === "gym" && EVENING[day.weekday] && <Badge size="compact">Le soir</Badge>}
 						{workout.optional && <Badge size="compact">option</Badge>}
-						{log?.status === "done" && <Badge size="compact" color="var(--success)">✓ Faite</Badge>}
-						{log?.status === "skipped" && <Badge size="compact">Pas faite</Badge>}
+						{log?.status === "done" && <Badge variant="dot" size="compact" color="green">Faite</Badge>}
+						{log?.status === "skipped" && <Badge variant="dot" size="compact" color="gray">Pas faite</Badge>}
 					</div>
 				</div>
 				{log ? (
