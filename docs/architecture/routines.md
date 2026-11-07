@@ -147,12 +147,14 @@ It also stays when the sweep cannot read it: a marker that names no process, a c
 An ovnfs sandbox stays as unreadable when the sweep cannot locate its checkout: a record it cannot read, no running daemon for the record's command, or a daemon that does not answer, since the sweep asks only a running daemon and never starts one.
 Commits that no remote has do not keep a sandbox, since the copy carries every local branch of the repository it copies, so nearly every sandbox has some, and the repository the task ran from keeps those branches.
 A commit the task itself made, which its omp exited before bringing back, goes with the sandbox, as with `omp worktree clear`.
-A sandbox with the marker but no checkout, left by an omp that exited while it made one, holds nothing of a task and goes, as does an ovnfs sandbox whose running daemon no longer lists its checkout.
-Just before it removes one, the sweep asks again whether an omp owns it, since a task run again takes the same directory; then it runs omp's teardown in the order of `omp worktree clear`: `stopRetainedMount` stops a retained native mount and `releaseOvnfsCheckout` removes the ovnfs checkout, deleting its files.
+A sandbox with the marker but no checkout, left by an omp that exited while it made one, holds nothing of a task and goes, as does an ovnfs sandbox whose running daemon no longer lists its checkout, without any request to ovnfs.
+Just before it removes one, the sweep asks again whether an omp owns it, since a task run again takes the same directory; then it runs omp's teardown in the order of `omp worktree clear`: `stopRetainedMount` stops a retained native mount, and for an ovnfs checkout the sweep sends `rm` with the checkout name it judged to the daemon it judged it on, which deletes its files and never starts a daemon.
+A checkout that daemon reports already gone counts as removed, and a daemon that stopped meanwhile fails the teardown.
 Then it renames the sandbox with the suffix `.omp-agents-removing` and deletes it, so the next sweep finishes a removal cut short instead of reading half a sandbox.
 A teardown that fails keeps its sandbox.
 Each sweep logs one line with how many sandboxes it removed and kept, by reason, and one more for each it could not read or remove.
 Storage shares this instance for a read-only `preview()` that measures removable sandboxes and those kept only for changes, and `remove(paths, { discardChanges })` that rechecks each sandbox because the confirmed preview may be old; only `discardChanges` lets a changed one go, and the unattended sweep never sets it.
+An ovnfs sandbox whose checkout its daemon still serves gets no size in the preview, since its folder holds only the record and ovnfs cannot say what removing the checkout frees.
 Each operation takes one `Worktrees.inUse` snapshot; the unattended sweep judges each sandbox once, then rechecks ownership immediately before removal.
 Preview, manual removal, and the unattended sweep share a single-flight guard.
 Manual removal accepts only direct directory children of omp's sandbox root, never symlinks, and the preview does not finish interrupted removals.

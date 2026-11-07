@@ -8,6 +8,7 @@
   Sizes are approximate; cold sessions show a count, and compression shows the files' current disk use rather than promised savings.
   Sandboxes fill in separately, and can take a few minutes when many are left over.
   Their sizes read **Up to**, since a sandbox shares some files with your checkout and the package cache, so they stay out of the **Clean up about** estimate.
+  A sandbox whose copy of your repository omp keeps in ovnfs, outside the sandbox, reads **Size unavailable**, since ovnfs cannot say how much removing that copy frees.
   **Sandboxes of ended tasks with leftover changes** are ones whose task ended with edits still in them; removing them deletes edits omp did not bring back to your checkout.
   **Kept** lists the ones a live owner, a Git lock, or another safety check protects.
   **Package caches** covers the caches of uv, pnpm, and bun, whichever are installed, and runs each tool's own prune: `uv cache prune`, `pnpm store prune`, and `bun pm cache rm`, which empties bun's cache.

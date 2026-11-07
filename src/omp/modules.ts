@@ -420,7 +420,7 @@ export const isolationOwnership = await load<IsolationOwnershipModule>(join(srcD
 	hasLiveIsolationOwner: "function",
 });
 export const worktreeCli = await load<WorktreeCliModule>(join(srcDir, "cli", "worktree-cli.ts"), { stopRetainedMount: "function" });
-export const ovnfsTask = await load<OvnfsTaskModule>(join(srcDir, "task", "ovnfs.ts"), { OVNFS_CHECKOUT_FILE: "string", releaseOvnfsCheckout: "function" });
+export const ovnfsTask = await load<OvnfsTaskModule>(join(srcDir, "task", "ovnfs.ts"), { OVNFS_CHECKOUT_FILE: "string" });
 export const ovnfsDaemon = await load<OvnfsDaemonModule>(join(srcDir, "ovnfs", "daemon.ts"), { runningDaemon: "function", forgetDaemon: "function" });
 export const ovnfsClient = await load<OvnfsClientModule>(join(srcDir, "ovnfs", "client.ts"), { callSocket: "function", OvnfsError: "function" });
 export const psData = await load<PsDataModule>(join(srcDir, "cli", "ps-data.ts"), { collectReports: "function", scopeClient: "function" });

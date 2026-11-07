@@ -5,7 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-07
 
-- Fixed: when omp keeps a subagent's copy of your repository in ovnfs, the daily cleanup and Settings › Storage now check that copy for edits and live sessions before removing a leftover task's folder, then delete the copy too, instead of deleting only the folder and leaving the copy behind.
+- Fixed: the daily cleanup and Settings › Storage now check a subagent's copy of your repository for edits and live sessions even when omp keeps that copy outside the task's folder.
+- Fixed: removing a leftover task's folder now also deletes that outside copy, instead of leaving it behind.
 - Fixed: a Bot page's model menu now lists the models, instead of staying on Loading models.
 - The API credits row at the bottom of the window turns red and reads used up when Anthropic refuses requests because the key's credit ran out, and the bell's alert now reads Out of credit: API credits.
 - Fixed: with the new omp 18.18.0 credit patch applied, a session whose Anthropic API key runs out of credit moves to the next model in its fallback list and stays off that key, instead of stopping or going back to it.
