@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { EMPTY_SPORT, type WorkoutLog } from "./shared/sport";
+import { EMPTY_SPORT } from "./shared/sport";
+import { log } from "./sport-fixtures";
 import { MAX_SPORT_ID, parseSportChange, parseSportState } from "./sport-parse";
 
 const LOG = { id: "l1", date: "2026-11-17", workout: "mardi" };
-const READ_LOG: WorkoutLog = { id: "l1", date: "2026-11-17", workout: "mardi", title: "", status: "done", rpe: null, pain: null, loads: {}, climbs: [], note: "", addedBy: null };
+const READ_LOG = log("l1", "2026-11-17", { workout: "mardi", title: "" });
 
 const plan = (fields: Record<string, unknown> = {}) => ({
 	workouts: [{ id: "mardi", name: "Mardi", place: "gym", blocks: [{ title: "Poutre", items: [{ key: "semi", name: "Semi", hang: true, load: { kind: "of-max", metric: "max", fraction: 0.87 } }] }] }],

@@ -3,7 +3,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { flushJsonFiles } from "../fs";
-import { EMPTY_SPORT, type WorkoutLog } from "../shared/sport";
+import { EMPTY_SPORT } from "../shared/sport";
+import { log, measurement } from "../sport-fixtures";
 import { SportFile } from "./sport-file";
 
 const dirs: string[] = [];
@@ -18,16 +19,17 @@ function sportPath(): string {
 	return join(dir, "sport.json");
 }
 
-const LOG: WorkoutLog = { id: "l1", date: "2026-11-17", workout: "mardi", title: "Mardi", status: "done", rpe: 8, pain: { level: 3, where: "fingers" }, loads: { semi: 15 }, climbs: [{ kind: "boulder", grade: "7b", color: "noir", kilter: false, attempts: 4 }], note: "", addedBy: "s1" };
+const LOG = log("l1", "2026-11-17", { workout: "mardi", title: "Mardi", rpe: 8, pain: { level: 3, where: "fingers" }, loads: { semi: 15 }, climbs: [{ kind: "boulder", grade: "7b", color: "noir", kilter: false, attempts: 4 }], addedBy: "s1" });
+const MAX = measurement("m1", "max", 117, "2026-11-17");
 
 test("another server loads the saved log and measurements", () => {
 	const path = sportPath();
 	const file = new SportFile(path);
 	expect(file.apply({ op: "add-log", log: LOG })).toBe(true);
-	expect(file.apply({ op: "add-measurement", measurement: { id: "m1", metric: "max", value: 117, at: "2026-11-17", note: "", addedBy: null } })).toBe(true);
+	expect(file.apply({ op: "add-measurement", measurement: MAX })).toBe(true);
 	expect(file.apply({ op: "add-log", log: LOG })).toBe(false);
 	flushJsonFiles();
-	expect(new SportFile(path).value).toEqual({ ...EMPTY_SPORT, log: [LOG], measurements: [{ id: "m1", metric: "max", value: 117, at: "2026-11-17", note: "", addedBy: null }] });
+	expect(new SportFile(path).value).toEqual({ ...EMPTY_SPORT, log: [LOG], measurements: [MAX] });
 });
 
 test("an unreadable sport file is preserved rather than overwritten", () => {

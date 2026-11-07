@@ -1,22 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { EMPTY_SPORT, type Measurement, type Plan, type SportChange, type SportState, type WorkoutLog } from "./shared/sport";
+import { EMPTY_SPORT, type Measurement, type Plan, type SportChange, type SportState } from "./shared/sport";
 import { applySport } from "./sport";
+import { log, measurement } from "./sport-fixtures";
 
-const log = (id: string, date: string, fields: Partial<WorkoutLog> = {}): WorkoutLog => ({
-	id,
-	date,
-	workout: null,
-	title: id,
-	status: "done",
-	rpe: null,
-	pain: null,
-	loads: {},
-	climbs: [],
-	note: "",
-	addedBy: null,
-	...fields,
-});
-const measurement = (id: string, at: string, value = 112): Measurement => ({ id, metric: "max", value, at, note: "", addedBy: null });
+const max = (id: string, at: string, value = 112): Measurement => measurement(id, "max", value, at);
 const after = (state: SportState, ...changes: SportChange[]): SportState => changes.reduce(applySport, state);
 const logIds = ({ log }: SportState): string => log.map(({ id }) => id).join(" ");
 const measurementIds = ({ measurements }: SportState): string => measurements.map(({ id }) => id).join(" ");
@@ -79,16 +66,16 @@ describe("applySport", () => {
 	test("keeps measurements ordered by date, removes one, and restores it at its index", () => {
 		const state = after(
 			EMPTY_SPORT,
-			{ op: "add-measurement", measurement: measurement("nov", "2026-11-17", 117) },
-			{ op: "add-measurement", measurement: measurement("aug", "2026-08-26") },
-			{ op: "add-measurement", measurement: measurement("aug", "2026-08-27") },
+			{ op: "add-measurement", measurement: max("nov", "2026-11-17", 117) },
+			{ op: "add-measurement", measurement: max("aug", "2026-08-26") },
+			{ op: "add-measurement", measurement: max("aug", "2026-08-27") },
 		);
 		expect(measurementIds(state)).toBe("aug nov");
 		const removed = applySport(state, { op: "remove-measurement", id: "aug" });
 		expect(measurementIds(removed)).toBe("nov");
 		expect(applySport(removed, { op: "remove-measurement", id: "aug" })).toBe(removed);
-		const restored = applySport(removed, { op: "restore-measurement", measurement: measurement("aug", "2026-08-26"), index: 0 });
+		const restored = applySport(removed, { op: "restore-measurement", measurement: max("aug", "2026-08-26"), index: 0 });
 		expect(restored.measurements).toEqual(state.measurements);
-		expect(applySport(restored, { op: "restore-measurement", measurement: measurement("aug", "2026-08-26"), index: 0 })).toBe(restored);
+		expect(applySport(restored, { op: "restore-measurement", measurement: max("aug", "2026-08-26"), index: 0 })).toBe(restored);
 	});
 });
