@@ -1,5 +1,5 @@
 /** The Sport page's journal: every logged session by week, newest first, beside the open one's figures. */
-import { NotebookPen, Star } from "lucide-react";
+import { NotebookPen } from "lucide-react";
 import type { ReactNode } from "react";
 import { exercisesOf, type SportChange, type SportState, type WorkoutLog } from "../../../src/shared/sport";
 import { records } from "../../../src/sport-week";
@@ -127,11 +127,7 @@ function LogDetail({ state, log, record, disabled, onEdit, onRemove }: { state: 
 					<h2 className="text-xl font-semibold">{log.title}</h2>
 					<div className="mt-1.5 flex flex-wrap gap-1.5">
 						{log.status === "done" ? <Badge size="compact" color="var(--success)">✓ Faite</Badge> : <Badge size="compact">Pas faite</Badge>}
-						{record && (
-							<Badge size="compact" color="var(--success)">
-								<Star aria-hidden className="size-3 fill-current" /> Record
-							</Badge>
-						)}
+						{record && <Badge size="compact" color="var(--success)">Record</Badge>}
 						{workout && <Badge size="compact">{PLACE_LABEL[workout.place]}</Badge>}
 					</div>
 				</div>
