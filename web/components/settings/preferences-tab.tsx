@@ -43,7 +43,7 @@ function SidebarTabs() {
 	return (
 		<Section
 			title="Sidebar tabs"
-			meta={`The tabs the sidebar shows, in order. Notes, Calendar, and Email sit in the header beside the command menu, and ${shortcutKeys("tab1")} goes to the first tab the sidebar's bar draws. A hidden tab's page, command, and links still work. Saved in this app.`}
+			meta={`The tabs the sidebar shows, in order. Notes, Calendar, Email, and Sport sit in the header beside the command menu, and ${shortcutKeys("tab1")} goes to the first tab the sidebar's bar draws. A hidden tab's page, command, and links still work. Saved in this app.`}
 		>
 			<ol className="space-y-1 text-sm">
 				{layout.map(({ tab, hidden }, index) => {

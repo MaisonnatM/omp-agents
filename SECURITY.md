@@ -52,6 +52,7 @@ The dashboard treats it that way:
 - Agent text cannot load remote images: Markdown images in transcripts render as links unless they are `data:` URLs, so a prompt-injected reply cannot send data out through an image URL.
   Text from GitHub keeps images only from GitHub's own image hosts.
   The page's `Content-Security-Policy` limits scripts, connections, and workers to the dashboard itself, and images to the dashboard, `data:`, `blob:`, and those GitHub hosts.
+  Frames load only from the dashboard and from `https://www.youtube-nocookie.com`, for the Sport page's exercise demos, which load only once you press play.
 - The token stops web pages and other user accounts, not a program that runs as you: it can read the token file, and it can read your omp files itself.
   Run the dashboard only on a machine that you alone use, and do not expose the port through a tunnel or a proxy.
   A program of another account that listens on the dashboard's port while the dashboard is down can serve a page that reads the origin's `localStorage`.
