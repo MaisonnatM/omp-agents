@@ -112,6 +112,7 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 								disabled={disabled}
 								onChange={onChange}
 								onEdit={log => setTarget({ date: log.date, workout: dayPlan(state, log.date).workouts.find(({ id }) => id === log.workout) ?? null, log })}
+								keys={!dialogOpen}
 							/>
 						)}
 						{route.tab === "progress" && <ProgressTab state={state} today={today} />}
@@ -139,9 +140,9 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 	);
 }
 
-/** The page's box, which its header and content size against, as a narrow pane and a phone both make it narrow. */
+/** The page's box, which its header and content size against, as a narrow pane and a phone both make it narrow. Its copy is French, so screen readers read it as French. */
 function SportRoot({ children }: { children: ReactNode }) {
-	return <div className="@container/sport flex h-full min-h-0 flex-1 flex-col">{children}</div>;
+	return <div lang="fr" className="@container/sport flex h-full min-h-0 flex-1 flex-col">{children}</div>;
 }
 
 /** The week, journal, and progress tabs; `fill` spreads them over the row they sit in. */

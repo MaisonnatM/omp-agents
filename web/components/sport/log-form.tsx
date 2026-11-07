@@ -1,4 +1,6 @@
 /** The Fait dialog, which logs a session's loads, sends, pain, effort, and note, or a test's max and bodyweight; and the Pesée dialog. */
+import { Radio } from "@base-ui/react/radio";
+import { RadioGroup } from "@base-ui/react/radio-group";
 import { Check, Plus, X } from "lucide-react";
 import { type KeyboardEvent, useId, useState } from "react";
 import { type Climb, CLIMB_KINDS, type ClimbKind, FRENCH_GRADES, type FrenchGrade, type Measurement, type Metric, PAIN_PLACES, type PainPlace, type SportChange, type SportState, type WorkoutLog } from "../../../src/shared/sport";
@@ -8,9 +10,10 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { amount, ARKOSE_COLORS, beaten, CLIMB_LABEL, dose, effortWord, hardest, longDate, measured, PAIN_PLACE_AT, PAIN_PLACE_LABEL, painWord, sendsText, shortDate, signedKg, testOf } from "../../sport-view";
-import { ERROR_TEXT, FormDialog, FormDialogHeader, isSubmitChord } from "../form-dialog";
+import { ERROR_TEXT, isSubmitChord } from "../form-dialog";
 import { FIELD, TEXT_AREA } from "../form-field";
 import { effortText, type Saved, Stats } from "./log-summary";
+import { SportDialog } from "./sport-dialog";
 
 /** What the Fait dialog logs: a planned workout of `date`, or a free session when `workout` is `null`; `log` is the one it edits. */
 export interface LogTarget {
@@ -118,8 +121,7 @@ export function LogForm({ state, target: { date, workout, log }, disabled, onCha
 	const kicker = [longDate(date), log ? null : workout?.name].filter(part => part).join(" · ");
 	const lifted = Object.values(loads);
 	return (
-		<FormDialog busy={false} onClose={onClose} className="top-[4%] w-[min(40rem,calc(100vw-2rem))]">
-			<FormDialogHeader title={log ? "Modifier la séance" : workout ? "Séance faite" : "Séance libre"} busy={false} />
+		<SportDialog title={log ? "Modifier la séance" : workout ? "Séance faite" : "Séance libre"} onClose={onClose} className="top-[4%] w-[min(40rem,calc(100vw-2rem))]">
 			<div className="flex flex-col gap-5 px-5 pt-1 pb-4" onKeyDown={onKeyDown}>
 				<p className="text-xs text-muted-foreground first-letter:uppercase">{kicker}</p>
 				{workout === null && (
@@ -187,13 +189,13 @@ export function LogForm({ state, target: { date, workout, log }, disabled, onCha
 				<Scale label="Douleur" values={range(0, 10)} value={pain} word={painWord} ends={["0 · aucune", "5", "10 · arrête"]} tone="warning" onPick={setPain} />
 				{pain !== null && pain > 0 && (
 					<div className="-mt-2 flex flex-col gap-2">
-						<div role="radiogroup" aria-label="Où" className="flex flex-wrap gap-1.5">
+						<RadioGroup aria-label="Où" value={where} onValueChange={next => setWhere(PAIN_PLACES.find(place => place === next) ?? where)} className="flex flex-wrap gap-1.5">
 							{PAIN_PLACES.map(place => (
-								<button key={place} type="button" role="radio" aria-checked={where === place} onClick={() => setWhere(place)} className={cn("rounded-full border px-2.5 py-0.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring", where === place ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-accent")}>
+								<Radio.Root key={place} value={place} className="cursor-pointer rounded-full border border-border px-2.5 py-0.5 text-xs outline-none not-data-[checked]:hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring data-[checked]:border-primary data-[checked]:bg-primary data-[checked]:text-primary-foreground">
 									{PAIN_PLACE_LABEL[place]}
-								</button>
+								</Radio.Root>
 							))}
-						</div>
+						</RadioGroup>
 						{pain >= PAIN_FLAG_LEVEL && (
 							<p className="rounded-lg bg-warning-surface px-3 py-2 text-xs text-warning-foreground">
 								{where === "fingers" ? `Douleur aux doigts à ${PAIN_FLAG_LEVEL} ou plus : la poutre sera retirée ${PAIN_FLAG_DAYS} jours.` : `Douleur ${PAIN_PLACE_AT[where]} à ${PAIN_FLAG_LEVEL} ou plus : elle sera signalée ${PAIN_FLAG_DAYS} jours.`}
@@ -234,7 +236,7 @@ export function LogForm({ state, target: { date, workout, log }, disabled, onCha
 				<Button variant="tertiary" size="compact" onClick={onClose}>Annuler</Button>
 				<Button size="compact" disabled={disabled} onClick={save} {...activityControl("sport.log.save")}>Enregistrer</Button>
 			</div>
-		</FormDialog>
+		</SportDialog>
 	);
 }
 
@@ -262,23 +264,20 @@ function Scale({ label, values, value, word, ends, tone, onPick }: ScaleProps) {
 					<button type="button" onClick={() => onPick(null)} className="text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">Effacer</button>
 				)}
 			</p>
-			<div role="radiogroup" aria-label={label} className="flex gap-1">
+			<RadioGroup aria-label={label} value={value} onValueChange={next => onPick(values.find(level => level === next) ?? null)} className="flex gap-1">
 				{values.map(level => (
-					<button
+					<Radio.Root
 						key={level}
-						type="button"
-						role="radio"
-						aria-checked={value === level}
-						onClick={() => onPick(level)}
+						value={level}
 						className={cn(
-							"h-8 min-w-0 flex-1 rounded-md border text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring",
-							value === level ? (tone === "warning" ? "border-warning bg-warning font-medium text-black" : "border-primary bg-primary text-primary-foreground") : "border-border bg-background hover:bg-accent",
+							"inline-flex h-8 min-w-0 flex-1 cursor-pointer items-center justify-center rounded-md border border-border bg-background text-sm tabular-nums outline-none not-data-[checked]:hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
+							tone === "warning" ? "data-[checked]:border-warning data-[checked]:bg-warning-surface data-[checked]:font-medium data-[checked]:text-warning-foreground" : "data-[checked]:border-primary data-[checked]:bg-primary data-[checked]:text-primary-foreground",
 						)}
 					>
 						{level}
-					</button>
+					</Radio.Root>
 				))}
-			</div>
+			</RadioGroup>
 			<p className="flex justify-between text-[11px] text-muted-foreground">
 				{ends.map(end => <span key={end}>{end}</span>)}
 			</p>
@@ -350,8 +349,7 @@ export function WeighForm({ state, metric, today, disabled, onChange, onClose }:
 		onClose();
 	}
 	return (
-		<FormDialog busy={false} onClose={onClose} className="top-[15%] w-[min(24rem,calc(100vw-2rem))]">
-			<FormDialogHeader title="Pesée" busy={false} />
+		<SportDialog title="Pesée" onClose={onClose} className="top-[15%] w-[min(24rem,calc(100vw-2rem))]">
 			<div
 				className="flex flex-col gap-3 px-5 pt-2 pb-4"
 				onKeyDown={event => {
@@ -377,6 +375,6 @@ export function WeighForm({ state, metric, today, disabled, onChange, onClose }:
 				<Button variant="tertiary" size="compact" onClick={onClose}>Annuler</Button>
 				<Button size="compact" disabled={disabled} onClick={save} {...activityControl("sport.weigh.save")}>Enregistrer</Button>
 			</div>
-		</FormDialog>
+		</SportDialog>
 	);
 }

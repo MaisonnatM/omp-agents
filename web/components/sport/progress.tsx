@@ -1,10 +1,11 @@
 /** The Sport page's progress: the cards of each figure, the chart of the one picked against its target, and the records. */
+import { Radio } from "@base-ui/react/radio";
+import { RadioGroup } from "@base-ui/react/radio-group";
 import { lazy, Suspense, useState } from "react";
 import { addDays, mondayOf } from "../../../src/shared/days";
 import type { ChartSpec } from "../../../src/shared/session-visuals";
 import { type ClimbKind, exercisesOf, FRENCH_GRADES, gradeRank, type Metric, type SportState } from "../../../src/shared/sport";
 import { adherence, bestGrades, records, type WeekGrades } from "../../../src/sport-week";
-import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { amount, bodyweightOf, CLIMB_LABEL, measured, nextTest, shortDate, signedKg } from "../../sport-view";
 import { SegmentedTab, SegmentedTabs, SegmentedTabsList } from "../segmented-tabs";
@@ -60,18 +61,15 @@ export function ProgressTab({ state, today }: { state: SportState; today: string
 	const chart = chartOf(state, card.figure, from, today, target(card.figure));
 	return (
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 @3xl/sport:px-6">
-			<div role="radiogroup" aria-label="Mesures" className="grid grid-cols-2 gap-3 @4xl/sport:grid-cols-5">
-				{cards.map(entry => {
-					const on = entry === card;
-					return (
-						<button key={figureId(entry.figure)} type="button" role="radio" aria-checked={on} onClick={() => setPicked(figureId(entry.figure))} {...activityControl("sport.progress.card")} className={cn("flex min-w-0 flex-col items-start gap-0.5 rounded-xl border bg-card px-3.5 py-3 text-left outline-none hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring", on ? "border-primary ring-1 ring-primary" : "border-border")}>
-							<span className="truncate text-xs text-muted-foreground">{entry.label}</span>
-							<span className="text-2xl font-semibold tabular-nums">{entry.value}</span>
-							<span className="truncate text-xs text-muted-foreground">{entry.detail}</span>
-						</button>
-					);
-				})}
-			</div>
+			<RadioGroup aria-label="Mesures" value={figureId(card.figure)} onValueChange={next => setPicked(cards.map(entry => figureId(entry.figure)).find(id => id === next) ?? picked)} className="grid grid-cols-2 gap-3 @4xl/sport:grid-cols-5">
+				{cards.map(entry => (
+					<Radio.Root key={figureId(entry.figure)} value={figureId(entry.figure)} {...activityControl("sport.progress.card")} className="flex min-w-0 cursor-pointer flex-col items-start gap-0.5 rounded-xl border border-border bg-card px-3.5 py-3 text-left outline-none hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring data-[checked]:border-primary data-[checked]:ring-1 data-[checked]:ring-primary">
+						<span className="max-w-full truncate text-xs text-muted-foreground">{entry.label}</span>
+						<span className="text-2xl font-semibold tabular-nums">{entry.value}</span>
+						<span className="max-w-full truncate text-xs text-muted-foreground">{entry.detail}</span>
+					</Radio.Root>
+				))}
+			</RadioGroup>
 			<section aria-label={chart.title} className="flex flex-col gap-3 rounded-xl border border-border p-4">
 				<header className="flex flex-wrap items-start justify-between gap-3">
 					<div className="min-w-0">

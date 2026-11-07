@@ -4,7 +4,7 @@ import type { Measurement, Metric, WorkoutLog } from "../../../src/shared/sport"
 import { Button } from "@/components/ui/button";
 import { hashForSport } from "../../routing";
 import { amount, type Beaten, duration, effortWord, sendsText, shortDate, signedKg } from "../../sport-view";
-import { FormDialog, FormDialogHeader } from "../form-dialog";
+import { SportDialog } from "./sport-dialog";
 
 /** A row of labelled figures, such as a session's load, sends, pain, and effort. */
 export function Stats({ cells }: { cells: { label: string; value: string }[] }) {
@@ -39,8 +39,7 @@ export interface Saved {
 
 export function SummaryDialog({ saved: { log, minutes, beaten, test }, onClose }: { saved: Saved; onClose: () => void }) {
 	return (
-		<FormDialog busy={false} onClose={onClose} className="top-[15%] w-[min(32rem,calc(100vw-2rem))]">
-			<FormDialogHeader title="Séance notée" busy={false} />
+		<SportDialog title="Séance notée" onClose={onClose} className="top-[15%] w-[min(32rem,calc(100vw-2rem))]">
 			<div className="flex flex-col gap-4 px-5 pt-3 pb-4">
 				<div>
 					<p className="text-xs text-muted-foreground">{shortDate(log.date)}</p>
@@ -80,6 +79,6 @@ export function SummaryDialog({ saved: { log, minutes, beaten, test }, onClose }
 				</Button>
 				<Button size="compact" className="rounded-full" onClick={onClose}>Fermer</Button>
 			</div>
-		</FormDialog>
+		</SportDialog>
 	);
 }

@@ -8,8 +8,8 @@ import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { dose } from "../../sport-view";
-import { FormDialog, FormDialogHeader } from "../form-dialog";
 import { DemoThumb } from "./demo-strip";
+import { SportDialog } from "./sport-dialog";
 
 interface DemoDialogProps {
 	/** What the demos belong to: a workout's or a routine's name. */
@@ -37,8 +37,7 @@ export function DemoDialog({ title, demos, at, onAt, onClose }: DemoDialogProps)
 	if (!exercise || !demo) return null;
 	const shown = dose(exercise);
 	return (
-		<FormDialog busy={false} onClose={onClose} className="top-[6%] w-[min(40rem,calc(100vw-2rem))]">
-			<FormDialogHeader title={`${title} · ${at + 1} sur ${demos.length}`} busy={false} />
+		<SportDialog title={`${title} · ${at + 1} sur ${demos.length}`} onClose={onClose} className="top-[6%] w-[min(40rem,calc(100vw-2rem))]">
 			<div className="flex flex-col gap-4 px-5 pt-2 pb-4">
 				<div>
 					<h2 className="text-lg font-semibold">{exercise.name}</h2>
@@ -106,6 +105,6 @@ export function DemoDialog({ title, demos, at, onAt, onClose }: DemoDialogProps)
 					</Tooltip>
 				)}
 			</div>
-		</FormDialog>
+		</SportDialog>
 	);
 }

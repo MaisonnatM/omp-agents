@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { hashForSport } from "../../routing";
+import { useShortcuts } from "../../shortcuts";
 import { ARKOSE_COLORS, CLIMB_LABEL, dayOfMonth, duration, journalWeeks, KIND_COLOR, logDetail, longDate, PAIN_PLACE_LABEL, painWord, PLACE_LABEL, recordLogs, sendsText, shortDate, signedKg, weekdayShort } from "../../sport-view";
+import { focusRow, stepRows, useReturnFocus } from "../list-page";
 import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, ListSplit } from "../list-split";
 import { toasts } from "../toaster";
 import { effortText, heaviest, Stats } from "./log-summary";
@@ -20,7 +22,11 @@ interface JournalTabProps {
 	disabled: boolean;
 	onChange: (change: SportChange) => void;
 	onEdit: (log: WorkoutLog) => void;
+	/** `false` while a dialog over the page takes the keys. */
+	keys: boolean;
 }
+
+const logRowId = (id: string): string => `sport-log-${id}`;
 
 /** Minutes as a week's total: `7 h 05`, `2 h`. */
 function hours(minutes: number): string {
@@ -28,7 +34,7 @@ function hours(minutes: number): string {
 	return `${Math.floor(minutes / 60)} h${rest ? ` ${String(rest).padStart(2, "0")}` : ""}`;
 }
 
-export function JournalTab({ state, open, disabled, onChange, onEdit }: JournalTabProps) {
+export function JournalTab({ state, open, disabled, onChange, onEdit, keys }: JournalTabProps) {
 	const weeks = journalWeeks(state);
 	const logs = weeks.flatMap(week => week.logs);
 	const marked = recordLogs(state, records(state));
@@ -37,6 +43,20 @@ export function JournalTab({ state, open, disabled, onChange, onEdit }: JournalT
 	const navigate = (id: string | null) => {
 		location.hash = hashForSport({ tab: "journal", open: id });
 	};
+	const rowOf = (log: WorkoutLog): HTMLElement | null => document.getElementById(logRowId(log.id));
+	useReturnFocus(shown?.id ?? null, id => id, id => document.getElementById(logRowId(id))?.querySelector("a"), state);
+	const step = (by: -1 | 1): void => {
+		if (shown === null) {
+			stepRows(logs, rowOf, by);
+			return;
+		}
+		const next = logs[at + by];
+		if (!next) return;
+		navigate(next.id);
+		const row = rowOf(next);
+		if (row) focusRow(row);
+	};
+	useShortcuts(keys ? { sportJournalNext: () => step(1), sportJournalPrevious: () => step(-1), sportJournalClose: () => { if (shown !== null) navigate(null); } } : {});
 	function remove(log: WorkoutLog) {
 		const index = state.log.findIndex(({ id }) => id === log.id);
 		onChange({ op: "remove-log", id: log.id });
@@ -68,7 +88,7 @@ export function JournalTab({ state, open, disabled, onChange, onEdit }: JournalT
 						{week.logs.map(log => {
 							const kind = state.plan?.workouts.find(({ id }) => id === log.workout)?.kind ?? null;
 							return (
-								<li key={log.id}>
+								<li key={log.id} id={logRowId(log.id)}>
 									<a href={hashForSport({ tab: "journal", open: log.id })} aria-current={log.id === open ? "page" : undefined} className={cn("flex items-center gap-3 rounded-md px-2 py-1.5 outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring", log.id === open && "bg-accent")}>
 										<span aria-hidden className="h-8 w-1 shrink-0 rounded-full" style={{ background: kind && log.status === "done" ? KIND_COLOR[kind] : "var(--border)" }} />
 										<span className="w-8 shrink-0 text-center">
@@ -103,9 +123,9 @@ export function JournalTab({ state, open, disabled, onChange, onEdit }: JournalT
 					<section key={shown.id} aria-label={shown.title}>
 						<DetailBar
 							leading="Journal"
-							previous={{ label: "Séance plus récente", icon: CH_PREVIOUS, onClick: at > 0 ? () => navigate(logs[at - 1]!.id) : undefined }}
-							next={{ label: "Séance plus ancienne", icon: CH_NEXT, onClick: at < logs.length - 1 ? () => navigate(logs[at + 1]!.id) : undefined }}
-							close={{ label: "Fermer la séance", icon: CH_CLOSE, onClick: () => navigate(null) }}
+							previous={{ label: "Séance plus récente", icon: CH_PREVIOUS, shortcut: "sportJournalPrevious", onClick: at > 0 ? () => navigate(logs[at - 1]!.id) : undefined }}
+							next={{ label: "Séance plus ancienne", icon: CH_NEXT, shortcut: "sportJournalNext", onClick: at < logs.length - 1 ? () => navigate(logs[at + 1]!.id) : undefined }}
+							close={{ label: "Fermer la séance", icon: CH_CLOSE, shortcut: "sportJournalClose", onClick: () => navigate(null) }}
 						/>
 						<LogDetail state={state} log={shown} record={marked.has(shown.id)} disabled={disabled} onEdit={() => onEdit(shown)} onRemove={() => remove(shown)} />
 					</section>

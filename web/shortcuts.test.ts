@@ -109,6 +109,7 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 		{ id: "todoClose", scope: "outside-fields", key: 0 },
 		{ id: "notesClose", scope: "outside-fields", key: 0 },
 		{ id: "emailClose", scope: "outside-fields", key: 0 },
+		{ id: "sportJournalClose", scope: "outside-fields", key: 0 },
 	]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true }), null, false)).toEqual([]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true, alt: true }), null, false)).toEqual([{ id: "model", scope: "anywhere", key: 0 }]);
@@ -125,9 +126,9 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 	]);
 });
 
-test("↓ and ↑ step through sessions, pull requests, todos, notes, conversations, and changed files, and ↑ also takes back a queued message", () => {
-	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "notesNext", "emailNext", "nextChangedFile"]);
-	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "notesPrevious", "emailPrevious", "previousChangedFile"]);
+test("↓ and ↑ step through sessions, pull requests, todos, notes, conversations, sport logs, and changed files, and ↑ also takes back a queued message", () => {
+	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "notesNext", "emailNext", "sportJournalNext", "nextChangedFile"]);
+	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "notesPrevious", "emailPrevious", "sportJournalPrevious", "previousChangedFile"]);
 });
 
 test("Cmd+Shift+P starts a personal session, apart from Cmd+Alt+P's directory picker and P's todo priority", () => {
