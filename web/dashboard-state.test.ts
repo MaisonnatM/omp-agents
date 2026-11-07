@@ -37,6 +37,16 @@ describe("dashboard state", () => {
 		expect(again.hosts).toEqual([b]);
 	});
 
+	test("a live session's model list is kept without a pane, as a Bot page's is, and goes when the session leaves the roster", () => {
+		const listed = reduce(blank(), { t: "roster", reset: true, hosts: [host("bot", "/work")], removed: [], error: null });
+		const answered = reduce(listed, { t: "models", instanceId: "bot", models: [], error: null });
+		expect(answered.models.get("bot")).toEqual({ data: { models: [] }, error: null });
+		const stranger = reduce(answered, { t: "models", instanceId: "ended", models: [], error: null });
+		expect(stranger.models.has("ended")).toBe(false);
+		const gone = reduce(answered, { t: "roster", reset: false, hosts: [], removed: ["bot"], error: null });
+		expect(gone.models.has("bot")).toBe(false);
+	});
+
 	test("the same panes stay the same objects, and a layout that names them again changes nothing", () => {
 		const view = live("a");
 		const open = reduce(blank(), { t: "route", route: { kind: "panes", layout: layout([view]) } });
