@@ -366,9 +366,9 @@ function StepView({ plan, steps, step, run, now }: StepViewProps) {
 						</svg>
 						<span className="relative flex flex-col items-center gap-2">
 							{clock === null ? (
-								// A set of reps keeps the ring full and still, its count where the countdown would be.
+								// A set of reps keeps the ring full and still, its count where the countdown would be, drawn smaller to leave room for its label and « En pause ».
 								<>
-									<span className="text-[min(32vw,17dvh,10rem)] leading-none font-semibold tabular-nums">{item.reps ?? "—"}</span>
+									<span className="text-[min(20vw,11dvh,6.5rem)] leading-none font-semibold tabular-nums">{item.reps ?? "—"}</span>
 									<span className="max-w-[min(44vw,21dvh,13rem)] text-center text-xl font-semibold text-balance">
 										{item.reps === null ? "à ton rythme" : "répétitions"}
 										{hold.side && (
