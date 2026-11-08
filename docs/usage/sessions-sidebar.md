@@ -8,6 +8,7 @@
   A finished turn you have read leaves the count, though its session stays idle.
 - The dot before each session shows when it waits on you.
   A running turn shows no dot, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
+  A session waiting on its subagents shows no dot either, even when its turn has ended, and its row's tooltip says **waiting on subagents**.
 - Under **All workspaces**, a session row with a title shows a badge that names its workspace, the last segment of the workspace's directory, on the right before its age.
   With one workspace picked, the rows show no badge.
   A row without a title shows its directory's name as its label, and the badge only when it runs in a linked worktree, whose name is not its workspace's.

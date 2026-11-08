@@ -5,7 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-08
 
-- The Sessions tab has a Waiting on subagents group: a session whose subagents still work while its main agent waits for them moves there, so Idle and Running show only sessions that are done or working.
+- The Sessions tab has a Waiting on subagents group: a session whose subagents still work while its main agent waits for them moves there, without the blue dot that says its work is done, so Idle and Running show only sessions that are done or working.
 - The starter kit now includes the grill-with-docs design interview: type /skill:grill-with-docs and a plan, and the agent asks rounds of numbered questions, each with its recommended answer, writing agreed words to the project's glossary as you go.
 - Decisions settled during that interview go into the project's usual decision records, not a second folder.
 - The starter kit also includes grill-me, the same interview for plans outside a project, such as a trip or a career move: type /skill:grill-me and your plan.

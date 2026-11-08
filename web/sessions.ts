@@ -114,7 +114,7 @@ type LiveList = "running" | "idle" | "awaitingSubagents";
  * waits on work it started, `idle` once its turn ended with no subagent running, and `running` for a turn that works, a question, or a
  * status not known yet.
  */
-function liveList(host: RosterHost): LiveList {
+export function liveList(host: RosterHost): LiveList {
 	const delegating = host.agents.some(agent => agent.status === "running");
 	if (host.status === "idle") return delegating ? "awaitingSubagents" : "idle";
 	return host.status === "working" && host.turnWaits && delegating ? "awaitingSubagents" : "running";

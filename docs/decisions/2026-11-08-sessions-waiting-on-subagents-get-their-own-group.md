@@ -25,6 +25,7 @@ A roster row already lists the subagents with their status, but nothing said whi
 ## Consequences
 
 **Idle** and **Running** now mean done and working, and the user sees at a glance which sessions only wait on their subagents.
+A row in the group, or pinned while it waits, drops the blue idle dot and its tooltip says waiting on subagents, since that dot is the cue that made such a session look done; other places that show a session's dot, such as chips and todo links, keep its plain status.
 `TurnWaits` in `src/server/turn-waits.ts` follows every live session's main-agent tool calls, and the roster pushes again when a turn starts or stops waiting.
 A terminal guest that `follow` creates now emits through the same emitter as `allocate`, so both transports feed it.
 Between two calls a turn keeps its answer until its next tool call or its end, because a smoke run showed a main agent calling `wait` four times with thinking between them, and the row would otherwise have jumped back to **Running** for each gap.
