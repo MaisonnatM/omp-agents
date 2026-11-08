@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { exercise } from "../src/sport-fixtures";
-import { advance, CHANGE_SEC, PREPARE_SEC, startRun, timerSteps } from "./sport-timer";
+import { advance, CHANGE_SEC, freshCue, PREPARE_SEC, startRun, timerNote, timerSteps } from "./sport-timer";
 
 const shape = (items: Parameters<typeof timerSteps>[0]) => timerSteps(items).map(({ kind, sec, hold }) => [kind, sec, hold.item.key, hold.set, hold.side, kind === "hold" && hold.last]);
 
@@ -56,5 +56,15 @@ describe("timerSteps", () => {
 		const { run, ended } = advance(steps, startRun(0), 600_000);
 		expect(ended.map(({ kind }) => kind)).toEqual(["prepare", "hold", "next"]);
 		expect(run).toEqual({ at: 3, ran: 0, since: (PREPARE_SEC + 30 + CHANGE_SEC) * 1000 });
+	});
+});
+
+describe("the hold's text", () => {
+	test("a per-side note drops its « Par côté », and a cue the note already says is left out", () => {
+		expect(timerNote("Par côté, genou au sol.", true)).toBe("Genou au sol.");
+		expect(timerNote("Par côté, genou au sol.", false)).toBe("Par côté, genou au sol.");
+		expect(timerNote("", true)).toBeNull();
+		expect(freshCue("Genou au sol", "Genou au sol, dos droit.")).toBeNull();
+		expect(freshCue("Pousse le bassin", "Genou au sol.")).toBe("Pousse le bassin");
 	});
 });

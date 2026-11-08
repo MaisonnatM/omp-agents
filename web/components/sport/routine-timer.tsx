@@ -10,7 +10,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { shortcutLabels, usePopupShortcuts } from "../../shortcuts";
-import { advance, clockText, goTo, holdText, pauseRun, ranAt, resumeRun, secondsLeft, spanText, spokenCue, startRun, stepTitle, timerSteps, type TimerRun, type TimerStep } from "../../sport-timer";
+import { advance, clockText, freshCue, goTo, holdText, pauseRun, ranAt, resumeRun, secondsLeft, spanText, spokenCue, startRun, stepTitle, timerNote, timerSteps, type TimerRun, type TimerStep } from "../../sport-timer";
 import { rememberSound, soundWanted, type TimerSound } from "../../sport-timer-sound";
 import { demosOf, longDate } from "../../sport-view";
 import { SportDialog } from "./sport-dialog";
@@ -29,17 +29,43 @@ interface RoutineTimerProps {
 	onClose: () => void;
 }
 
-type Phase = "hold" | "between" | "done";
+/** What the screen shows: a hold, the time between two, or the end, celebrated when every item is ticked and plain when the user stopped short. */
+type Phase = "hold" | "between" | "done" | "stopped";
 
-/** Light tints under dark text, and dark ones under light text: each keeps the theme's text at APCA Lc 84 or more. */
-const BACKGROUND: Record<Phase, string> = {
-	hold: "bg-[oklch(0.9_0.08_160)] dark:bg-[oklch(0.33_0.07_160)]",
-	between: "bg-[oklch(0.92_0.08_85)] dark:bg-[oklch(0.35_0.07_70)]",
-	done: "bg-[oklch(0.91_0.045_255)] dark:bg-[oklch(0.31_0.07_260)]",
+/**
+ * Each phase's ink, made the dialog's foreground so its title, buttons, and text follow it.
+ * Every fill below keeps its ink at WCAG 5:1 or more, paused fills included.
+ */
+const INK: Record<Phase, string> = {
+	hold: "[--foreground:white] [--muted-foreground:white]",
+	between: "[--foreground:oklch(0.2_0.01_260)] [--muted-foreground:oklch(0.2_0.01_260)]",
+	done: "[--foreground:white] [--muted-foreground:white]",
+	stopped: "[--foreground:oklch(0.2_0.01_260)] [--muted-foreground:oklch(0.2_0.01_260)] dark:[--foreground:white] dark:[--muted-foreground:white]",
 };
 
-/** The whole screen on a phone, a large panel from `md` up. */
-const FRAME = "inset-0 left-0 h-dvh max-h-none w-full translate-x-0 rounded-none border-0 md:inset-auto md:top-[5vh] md:left-1/2 md:h-[min(48rem,90vh)] md:w-[min(56rem,calc(100vw-4rem))] md:-translate-x-1/2 md:rounded-2xl md:border";
+/** A hold is a deep green and the time between a light amber, 0.3 apart in lightness so they tell apart without their hue; a shade darker in dark mode. */
+const FILL: Record<Phase, string> = {
+	hold: "[--timer-fill:oklch(0.52_0.13_152)] dark:[--timer-fill:oklch(0.45_0.115_152)]",
+	between: "[--timer-fill:oklch(0.82_0.14_78)] dark:[--timer-fill:oklch(0.76_0.14_72)]",
+	done: "[--timer-fill:oklch(0.5_0.14_255)] dark:[--timer-fill:oklch(0.45_0.13_255)]",
+	stopped: "[--timer-fill:oklch(0.88_0.005_260)] dark:[--timer-fill:oklch(0.32_0.01_260)]",
+};
+
+/** The same fills nearly gray while the run is paused. */
+const PAUSED: Record<"hold" | "between", string> = {
+	hold: "[--timer-fill:oklch(0.52_0.035_152)] dark:[--timer-fill:oklch(0.45_0.03_152)]",
+	between: "[--timer-fill:oklch(0.82_0.035_78)] dark:[--timer-fill:oklch(0.76_0.03_72)]",
+};
+
+/** The whole screen on a phone, sized to what it shows even when the page is wider; a large panel from `md` up. */
+const FRAME =
+	"inset-0 left-0 h-dvh max-h-none w-dvw max-w-[100dvw] translate-x-0 rounded-none border-0 bg-(--timer-fill) text-foreground transition-colors duration-300 motion-reduce:transition-none md:inset-auto md:top-[5vh] md:left-1/2 md:h-[min(48rem,90vh)] md:w-[min(56rem,calc(100vw-4rem))] md:-translate-x-1/2 md:rounded-2xl md:border";
+
+/** The header's buttons: a finger's 44 px on a phone. */
+const HEADER_BUTTON = "size-11 [&_svg]:size-5 md:size-7 md:[&_svg]:size-3.5";
+
+/** The phase's ink filled with its fill: the play button and the end's button, standing out on any fill. */
+const INVERTED = "rounded-full bg-foreground text-(--timer-fill) outline-offset-4 outline-foreground focus-visible:outline-2 disabled:opacity-50";
 
 const RADIUS = 46;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
@@ -178,39 +204,40 @@ export function RoutineTimer({ plan, routine, date, ticked, sound, onTick, onClo
 		if (!on) sound.hush();
 	};
 
-	const phase: Phase = step === null ? "done" : step.kind === "hold" ? "hold" : "between";
+	const tickedCount = items.filter(({ key }) => ticked.includes(key) || sent.current.has(key)).length;
+	const phase: Phase = step === null ? (tickedCount === items.length ? "done" : "stopped") : step.kind === "hold" ? "hold" : "between";
+	const fill = step === null || running ? FILL[phase] : PAUSED[step.kind === "hold" ? "hold" : "between"];
 	return (
 		<SportDialog
 			title={`${routine.name} · ${longDate(date)}`}
 			onClose={onClose}
-			className={cn(FRAME, BACKGROUND[phase])}
+			className={cn(FRAME, INK[phase], fill)}
+			closeClassName={HEADER_BUTTON}
 			initialFocus={stage}
 			onKeyDown={keys}
 			actions={
 				<Tooltip content={soundOn ? "Couper le son" : "Remettre le son"} side="bottom">
-					<Button variant="ghost" size="icon-compact" className="text-foreground" aria-label="Son" aria-pressed={soundOn} onClick={toggleSound} {...activityControl("sport.timer.sound")}>
+					<Button variant="ghost" size="icon-compact" className={cn("text-foreground", HEADER_BUTTON)} aria-label="Son" aria-pressed={soundOn} onClick={toggleSound} {...activityControl("sport.timer.sound")}>
 						{soundOn ? <Volume2 /> : <VolumeX />}
 					</Button>
 				</Tooltip>
 			}
 		>
 			{step === null ? (
-				<Done name={routine.name} taken={(finished ?? now) - started} ticked={items.filter(({ key }) => ticked.includes(key) || sent.current.has(key)).length} of={items.length} onClose={onClose} />
+				<Done name={routine.name} taken={(finished ?? now) - started} ticked={tickedCount} of={items.length} onClose={onClose} />
 			) : (
-				<div ref={stage} tabIndex={-1} className="relative flex flex-1 flex-col items-center justify-between gap-4 px-6 pt-3 pb-6 text-center outline-none">
-					{/* A light wash fading out as each step starts, which reduced motion leaves out. */}
-					<span key={run.at} aria-hidden className="pointer-events-none absolute inset-0 bg-white opacity-0 motion-safe:animate-[timer-flash_600ms_ease-out]" />
+				<div ref={stage} tabIndex={-1} className="flex flex-1 flex-col items-center gap-6 px-6 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-center outline-none">
 					<StepView plan={plan} steps={steps} step={step} run={run} now={now} />
-					<div className="relative flex items-center gap-6">
+					<div className="flex items-center gap-6">
 						<Tooltip content="Étape précédente" shortcut={shortcutLabels("sportTimerPrevious")}>
 							<Button variant="ghost" size="icon" className="size-12 rounded-full text-foreground [&_svg]:h-6 [&_svg]:w-6" aria-label="Étape précédente" onClick={previous} {...activityControl("sport.timer.step")}>
 								<SkipBack />
 							</Button>
 						</Tooltip>
 						<Tooltip content={running ? "Pause" : "Reprendre"} shortcut={shortcutLabels("sportTimerPause")}>
-							<Button variant="primary" size="icon" className="size-20 rounded-full [&_svg]:h-8 [&_svg]:w-8" aria-label={running ? "Pause" : "Reprendre"} onClick={toggle} {...activityControl("sport.timer.pause")}>
+							<button type="button" className={cn(INVERTED, "grid size-20 place-items-center [&_svg]:size-8 [&_svg]:fill-current")} aria-label={running ? "Pause" : "Reprendre"} onClick={toggle} {...activityControl("sport.timer.pause")}>
 								{running ? <Pause /> : <Play />}
-							</Button>
+							</button>
 						</Tooltip>
 						<Tooltip content="Étape suivante" shortcut={shortcutLabels("sportTimerNext")}>
 							<Button variant="ghost" size="icon" className="size-12 rounded-full text-foreground [&_svg]:h-6 [&_svg]:w-6" aria-label="Étape suivante" onClick={next} {...activityControl("sport.timer.step")}>
@@ -232,7 +259,10 @@ interface StepViewProps {
 	now: number;
 }
 
-/** The step under way: what it is, its countdown in a ring, the hold it is or leads to, what follows, and what is left. */
+/**
+ * The step under way, in three groups: what it is over its countdown in a ring, then the hold it is or leads to, then what follows and what is left.
+ * A pause shows in the ring as well as in the grayed fill.
+ */
 function StepView({ plan, steps, step, run, now }: StepViewProps) {
 	const { hold } = step;
 	const { item } = hold;
@@ -241,58 +271,67 @@ function StepView({ plan, steps, step, run, now }: StepViewProps) {
 	const left = step.sec === null ? null : Math.max(0, Math.ceil((step.sec * 1000 - ranAt(run, now)) / 1000));
 	// The ring moves with the countdown's seconds; with reduced motion it steps, without it glides between them.
 	const done = step.sec === null || left === null ? 0 : (step.sec - left) / step.sec;
-	const cue = demosOf(plan, [item])[0]?.demo?.cues[0] ?? null;
 	const side = holdText(hold);
+	const note = timerNote(item.note, hold.side !== null);
+	const cue = freshCue(demosOf(plan, [item])[0]?.demo?.cues[0] ?? null, note);
+	const paused = run.since === null;
+	const clock = left === null ? null : clockText(left);
 	return (
 		<>
-			<p aria-live="polite" className="relative text-sm font-semibold tracking-widest uppercase">
-				{stepTitle(step)}
-				{run.since === null && " · En pause"}
-				<span className="sr-only">
-					{" "}
-					: {item.name}
-					{side && `, ${side}`}
-				</span>
-			</p>
-			<div className="relative grid size-[min(64vw,34vh,19rem)] shrink-0 place-items-center">
-				<svg viewBox="0 0 100 100" aria-hidden className="absolute inset-0 -rotate-90">
-					<circle cx={50} cy={50} r={RADIUS} fill="none" stroke="currentColor" strokeWidth={4} className="opacity-15" />
-					<circle
-						key={run.at}
-						cx={50}
-						cy={50}
-						r={RADIUS}
-						fill="none"
-						stroke="currentColor"
-						strokeWidth={4}
-						strokeLinecap="round"
-						strokeDasharray={CIRCUMFERENCE}
-						strokeDashoffset={CIRCUMFERENCE * done}
-						className="transition-[stroke-dashoffset] duration-1000 ease-linear motion-reduce:transition-none"
-					/>
-				</svg>
-				{left === null ? (
-					<span className="flex flex-col items-center">
-						<span className="text-[min(16vw,9vh,5.5rem)] leading-none font-semibold tabular-nums">{item.reps ?? "—"}</span>
-						<span className="text-sm">{item.reps === null ? "à ton rythme" : "répétitions"}</span>
-					</span>
-				) : (
-					<span role="timer" className="text-[min(20vw,11vh,7rem)] leading-none font-semibold tabular-nums">
-						{clockText(left)}
-					</span>
-				)}
+			<div className="flex flex-1 flex-col items-center justify-center gap-6">
+				<div className="flex flex-col items-center gap-3">
+					<p aria-live="polite" className="text-sm font-semibold tracking-widest uppercase">
+						{stepTitle(step)}
+						<span className="sr-only">
+							{paused && ", en pause"} : {item.name}
+							{side && `, ${side}`}
+						</span>
+					</p>
+					<div className="relative grid size-[min(80vw,38dvh,24rem)] shrink-0 place-items-center">
+						<svg viewBox="0 0 100 100" aria-hidden className="absolute inset-0 -rotate-90">
+							<circle cx={50} cy={50} r={RADIUS} fill="none" stroke="currentColor" strokeWidth={4} className="opacity-20" />
+							<circle
+								key={run.at}
+								cx={50}
+								cy={50}
+								r={RADIUS}
+								fill="none"
+								stroke="currentColor"
+								strokeWidth={4}
+								strokeLinecap="round"
+								strokeDasharray={CIRCUMFERENCE}
+								strokeDashoffset={CIRCUMFERENCE * done}
+								className="transition-[stroke-dashoffset] duration-1000 ease-linear motion-reduce:transition-none"
+							/>
+						</svg>
+						<span className="relative flex flex-col items-center gap-2">
+							{clock === null ? (
+								<>
+									<span className="text-[min(32vw,17dvh,10rem)] leading-none font-semibold tabular-nums">{item.reps ?? "—"}</span>
+									<span className="text-sm">{item.reps === null ? "à ton rythme" : "répétitions"}</span>
+								</>
+							) : (
+								// A minute or more takes four characters, drawn smaller to stay inside the ring.
+								<span role="timer" className={cn("leading-none font-semibold tabular-nums", clock.length > 2 ? "text-[min(20vw,11dvh,6.5rem)]" : "text-[min(32vw,17dvh,10rem)]")}>
+									{clock}
+								</span>
+							)}
+							{paused && <span className="text-xl font-semibold tracking-widest uppercase">En pause</span>}
+						</span>
+					</div>
+				</div>
+				<div className="flex max-w-prose flex-col items-center gap-1">
+					<h2 className="text-2xl font-semibold text-balance">{item.name}</h2>
+					{side && <p className="text-base font-medium">{side}</p>}
+					{note && <p className="text-sm text-balance">{note}</p>}
+					{cue && <p className="text-sm text-balance italic">« {cue} »</p>}
+					{step.sec === null && <p className="text-sm">Quand c'est fait, passe à l'étape suivante.</p>}
+				</div>
 			</div>
-			<div className="relative flex max-w-prose flex-col items-center gap-1">
-				<h2 className="text-2xl font-semibold text-balance">{item.name}</h2>
-				{side && <p className="text-base font-medium">{side}</p>}
-				{item.note && <p className="text-sm">{item.note}</p>}
-				{cue && <p className="text-sm italic">« {cue} »</p>}
-				{step.sec === null && <p className="text-sm">Appuie sur Suivant quand c'est fait.</p>}
-			</div>
-			<div className="relative flex flex-col items-center gap-0.5 text-sm">
-				<p>{after ? `Ensuite : ${after.item.name}${holdText(after) && ` · ${holdText(after)}`}` : "Dernière tenue"}</p>
+			<div className="flex flex-col items-center gap-0.5 text-sm">
+				{after && <p className="text-balance">{`Ensuite : ${after.item.name}${holdText(after) && ` · ${holdText(after)}`}`}</p>}
 				<p className="tabular-nums">
-					Tenue {hold.index + 1} / {holds.length} · {spanText(secondsLeft(steps, run, now))} restantes
+					{after ? `Tenue ${hold.index + 1} / ${holds.length}` : "Dernière tenue"} · {spanText(secondsLeft(steps, run, now))} restantes
 				</p>
 			</div>
 		</>
@@ -308,12 +347,14 @@ interface DoneProps {
 	onClose: () => void;
 }
 
+/** The end: celebrated when every item is ticked, a plain « Arrêté » when some were skipped. */
 function Done({ name, taken, ticked, of, onClose }: DoneProps) {
+	const all = ticked === of;
 	return (
-		<div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 pb-10 text-center">
-			<CircleCheck aria-hidden className="size-14" strokeWidth={1.5} />
+		<div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 pb-[max(2.5rem,env(safe-area-inset-bottom))] text-center">
+			{all && <CircleCheck aria-hidden className="size-14" strokeWidth={1.5} />}
 			<h2 aria-live="polite" className="text-4xl font-semibold">
-				Terminé
+				{all ? "Terminé" : "Arrêté"}
 			</h2>
 			<p className="text-base">
 				{name} en {spanText(Math.round(taken / 1000))}
@@ -321,9 +362,9 @@ function Done({ name, taken, ticked, of, onClose }: DoneProps) {
 			<p className="text-sm tabular-nums">
 				{ticked} / {of} cochés
 			</p>
-			<Button variant="primary" className="mt-3" autoFocus onClick={onClose} {...activityControl("sport.timer.close")}>
+			<button type="button" className={cn(INVERTED, "mt-3 h-10 px-6 text-sm font-medium")} autoFocus onClick={onClose} {...activityControl("sport.timer.close")}>
 				Fermer
-			</Button>
+			</button>
 		</div>
 	);
 }

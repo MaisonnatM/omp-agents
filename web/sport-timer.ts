@@ -146,6 +146,19 @@ export function holdText({ set, sets, side }: Hold): string {
 	return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+/** An item's note as the timer shows it, `null` when empty: without a leading « Par côté », which the side line already says. */
+export function timerNote(note: string, side: boolean): string | null {
+	const text = (side ? note.replace(/^par côté\s*[,.:;]?\s*/i, "") : note).trim();
+	return text === "" ? null : text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** A demo's cue, or `null` when the note shown already says it. */
+export function freshCue(cue: string | null, note: string | null): string | null {
+	if (cue === null) return null;
+	const plain = (text: string) => text.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, " ").trim();
+	return note !== null && plain(note).includes(plain(cue)) ? null : cue;
+}
+
 /** What a step shows above its countdown. */
 export function stepTitle({ kind }: TimerStep): string {
 	switch (kind) {

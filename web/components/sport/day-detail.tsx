@@ -1,5 +1,5 @@
 /** The open day of the week: each workout with its demos, blocks, exercises, and loads, then the daily habits with their routines' checklists. */
-import { Check, CirclePlay, Play, Plus } from "lucide-react";
+import { Check, Play, Plus, Timer } from "lucide-react";
 import type { Exercise, Plan, Routine, RoutineCheck } from "../../../src/shared/sport";
 import type { PlannedDay, PlannedExercise, PlannedWorkout } from "../../../src/sport-week";
 import { Badge } from "@/components/ui/badge";
@@ -156,13 +156,14 @@ function RoutineHabit({ plan, label, routine, ticked, disabled, onDemo, onTimer,
 	const demos = demosOf(plan, routine.items);
 	return (
 		<li className="flex flex-col gap-1 py-2 text-sm">
-			<div className="flex items-center justify-between gap-3">
-				<span className="min-w-0">{label}</span>
+			{/* Narrow, the count and buttons wrap under the label rather than squeezing it. */}
+			<div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+				<span className="min-w-0 flex-[1_1_16rem]">{label}</span>
 				<span className="flex shrink-0 items-center gap-2">
 					{routine.items.length > 0 && <span className="text-xs text-muted-foreground tabular-nums">{ticked.length} / {routine.items.length}</span>}
 					{demos.length > 0 && <Button variant="ghost" size="compact" leadingIcon={Play} onClick={() => onDemo(routine.name, demos, 0)} {...activityControl("sport.demo.open")}>Démos</Button>}
 					{routine.items.length > 0 && (
-						<Button variant="ghost" size="compact" leadingIcon={CirclePlay} disabled={disabled} onClick={onTimer} {...activityControl("sport.timer.open")}>
+						<Button variant="secondary" size="compact" leadingIcon={Timer} disabled={disabled} onClick={onTimer} {...activityControl("sport.timer.open")}>
 							Lancer
 						</Button>
 					)}

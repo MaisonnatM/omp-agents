@@ -15,14 +15,16 @@ interface SportDialogProps {
 	actions?: ReactNode;
 	/** What takes the focus as the dialog opens, in place of its first button. */
 	initialFocus?: RefObject<HTMLElement | null>;
+	/** The close button's own size or color. */
+	closeClassName?: string;
 }
 
-export function SportDialog({ title, busy = false, onClose, className, children, onKeyDown, actions, initialFocus }: SportDialogProps) {
+export function SportDialog({ title, busy = false, onClose, className, children, onKeyDown, actions, initialFocus, closeClassName }: SportDialogProps) {
 	return (
 		<FormDialog busy={busy} onClose={onClose} className={className} onKeyDown={onKeyDown} initialFocus={initialFocus}>
 			{/* The dialog renders in a portal, outside the page's `lang`. It fills a popup given a height. */}
 			<div lang="fr" className="flex flex-1 flex-col">
-				<FormDialogHeader title={title} busy={busy} actions={actions} closeLabel="Fermer" />
+				<FormDialogHeader title={title} busy={busy} actions={actions} closeLabel="Fermer" closeClassName={closeClassName} />
 				{children}
 			</div>
 		</FormDialog>

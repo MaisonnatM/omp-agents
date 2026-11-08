@@ -65,6 +65,22 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 	const check = (next: RoutineCheck) => {
 		onChange([{ op: "set-check", check: next }]).catch((err: unknown) => toasts.add({ title: "Rien n'est enregistré", description: errorText(err) }));
 	};
+	const entries = (
+		<>
+			<Tooltip content="Noter une séance hors du plan">
+				<Button variant="ghost" size="compact" leadingIcon={Plus} disabled={disabled} onClick={() => logFor(selected, null)} {...activityControl("sport.log.free")}>
+					<span className="sr-only @3xl/sport:not-sr-only">Séance libre</span>
+				</Button>
+			</Tooltip>
+			{bodyweight && (
+				<Tooltip content="Noter ton poids du jour">
+					<Button variant="ghost" size="compact" leadingIcon={Scale} disabled={disabled} onClick={() => setWeighing(true)} {...activityControl("sport.weigh.open")}>
+						<span className="sr-only @3xl/sport:not-sr-only">Pesée</span>
+					</Button>
+				</Tooltip>
+			)}
+		</>
+	);
 	return (
 		<SportRoot>
 			<PageFrame
@@ -72,25 +88,16 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 				meta={plan === null ? "Aucun plan" : phase ? phaseLabel(phase, selected) : plan.title}
 				actions={
 					<>
-						<Tooltip content="Noter une séance hors du plan">
-							<Button variant="ghost" size="compact" leadingIcon={Plus} disabled={disabled} onClick={() => logFor(selected, null)} {...activityControl("sport.log.free")}>
-								<span className="sr-only @3xl/sport:not-sr-only">Séance libre</span>
-							</Button>
-						</Tooltip>
-						{bodyweight && (
-							<Tooltip content="Noter ton poids du jour">
-								<Button variant="ghost" size="compact" leadingIcon={Scale} disabled={disabled} onClick={() => setWeighing(true)} {...activityControl("sport.weigh.open")}>
-									<span className="sr-only @3xl/sport:not-sr-only">Pesée</span>
-								</Button>
-							</Tooltip>
-						)}
+						<span className="hidden @3xl/sport:contents">{entries}</span>
 						<ViewTabs tab={route.tab} className="hidden @3xl/sport:block" />
 					</>
 				}
 			>
 				<div className="flex h-full min-h-0 flex-col">
-					<div className="shrink-0 border-b border-border px-4 py-2 @3xl/sport:hidden">
-						<ViewTabs tab={route.tab} fill />
+					{/* Narrow, the header keeps only the title and the app's buttons, so the page's own buttons join the tabs under it. */}
+					<div className="flex shrink-0 items-center gap-1 border-b border-border px-4 py-2 @3xl/sport:hidden">
+						<ViewTabs tab={route.tab} className="min-w-0 flex-1" fill />
+						{entries}
 					</div>
 					<div className="min-h-0 flex-1 overflow-y-auto">
 						{route.tab === "week" &&
