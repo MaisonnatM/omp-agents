@@ -21,17 +21,17 @@ The installer only added and updated files, so nothing took them away; [2026-11-
 - Remove every file at a path the kit once shipped: loses a copy you edited, or a file of your own that took a dropped path.
 - Remove only a dropped file whose content matches the record or a version in the kit's history, and keep an edited one even under `--force`: chosen, since `--force` exists to overwrite an edit with the kit's version, and a dropped file has no kit version to overwrite it with.
 
-Get started counts a dropped file waiting for removal as pending, so its starter kit step is not complete while one still loads.
-A path is only removed when it is a regular file inside the agent directory, not through a symlink at its end, and not a case or Unicode variant of a file the kit ships, since on macOS that is the same file.
 ## Consequences
 
 An install and `--files` print each dropped file as `remove` or `keep yours`, remove the unedited ones and the directories they leave empty, and drop their record entries.
 A file under `maintainer/` counts as shipped even for an install without `--maintainer`, so a maintainer file is never removed for being outside the chosen layers.
 The packaged app's kit has no git history, so there only the record names dropped files.
+Get started counts a dropped file waiting for removal as pending, so its starter kit step is not complete while one still loads.
+A path is only removed when it is a regular file inside the agent directory, not through a symlink at its end, and not a case or Unicode variant of a file the kit ships, since on macOS that is the same file.
 
 ## Confirmation
 
-`templates/omp/install.test.ts` checks that a dropped unedited file is removed and an edited one kept with and without `--force`, that a file `maintainer/` still ships stays, and that `--files` removes a recorded dropped file, its empty directory, and its record entry.
+`templates/omp/install.test.ts` checks that a dropped unedited file is removed and an edited one kept with and without `--force`, that a file `maintainer/` still ships stays, that no path outside the agent directory, through a file, or differing from a shipped one only by case is planned, and that `--files` removes a recorded dropped file, its empty directory, and its record entry while it stops at a directory of yours or a symlink.
 
 ## Revisit when
 
