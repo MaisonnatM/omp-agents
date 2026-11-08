@@ -56,12 +56,15 @@ export function fileTree<T extends { path: string } = ChangedEntry>(files: reado
 /** The files in the explorer's order, which ↓ and ↑ walk. */
 export const treeOrder = (dir: TreeDir): ChangedEntry[] => [...dir.dirs.flatMap(treeOrder), ...dir.files];
 
-/** The folder every path in `paths` sits in, ending in `/`; `""` when they share none. */
+/**
+ * The folder every path in `paths` sits in, ending in `/`; `""` when they share none.
+ * Each step drops the folder's trailing `/` before cutting at the previous one, so the folder always shrinks and `/` gives way to `""`.
+ */
 export function commonDir(paths: readonly string[]): string {
 	const [first, ...rest] = paths;
 	if (first === undefined) return "";
 	let dir = first.slice(0, first.lastIndexOf("/") + 1);
-	for (const path of rest) while (dir && !path.startsWith(dir)) dir = dir.slice(0, dir.lastIndexOf("/", dir.length - 2) + 1);
+	for (const path of rest) while (dir && !path.startsWith(dir)) dir = dir.slice(0, dir.slice(0, -1).lastIndexOf("/") + 1);
 	return dir;
 }
 

@@ -14,6 +14,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Settings › Providers now lists a provider's signed-in accounts in the order omp tries them, each with its place number.
 - Up and down arrows beside each account change which one omp uses first, for example your work Anthropic account before your personal one.
 - The new order is saved at once in omp's settings, and omp follows it without a restart.
+- Fixed: the dashboard no longer freezes when your skill and instruction files sit both under your home folder and elsewhere, such as `/tmp`.
 
 ## 2026-11-07
 
