@@ -183,6 +183,37 @@ _Avoid_: Delayed message, routine
 The one server that holds `server.lock` and runs the unattended work.
 _Avoid_: Leader, primary
 
+## Sport
+
+**Workout**:
+One training session the plan schedules on a day, such as a fingerboard and limit-bouldering evening, with its exercises and the load each one calls for; the Sport page shows it as « Séance ».
+_Avoid_: Session (see **Session**), template, training session
+
+**Workout log**:
+What the user actually did on a day, planned or not: the loads used, the boulders and routes climbed with their French grade, and how it felt; the Sport page shows it as « Journal ».
+_Avoid_: Session log, entry, history
+
+**Target**:
+A result the user trains toward, such as a 119 kg total finger max or 8a in bouldering, optionally with a date; the Sport page shows it as « Objectif ».
+_Avoid_: Goal (see **Goal**), objective
+
+**Pain flag**:
+A pain the user rated 3 out of 10 or more, with where it hurts, which changes the coming days' workouts; finger pain drops the fingerboard for 7 days.
+It shows on the Sport page and in the personal session's prompt, never under the bell.
+_Avoid_: Alert, notice (see **Notice**), injury
+
+**Measurement**:
+A dated number for one metric, such as a finger max of 112 kg on a test day or a bodyweight of 82 kg; the newest one up to a day sets that day's loads.
+_Avoid_: Test result, record, value, entry
+
+**Phase**:
+A dated stretch of the plan with its own weekly slots, such as a strength block; phases never overlap, a day between two of them has no workout, and a load logged in one phase never carries into the next.
+_Avoid_: Cycle, block, period, mesocycle
+
+**Deload week**:
+A week inside a phase, named by its Monday, that follows the phase's lighter slots instead of its normal ones.
+_Avoid_: Rest week, recovery week, off week
+
 ## Distribution
 
 **Starter kit**:
