@@ -6,6 +6,7 @@
   The **Bots** tab lists your Bots; the **Sessions** tab lists only their running conversations, in a **Bots** group after the running sessions and the ones waiting on subagents, each under its Bot's name; see [Bots](bots.md).
   The **Sessions** tab counts the sessions of the picked workspace that need you: each that asks you something, or finished a turn you have not looked at since.
   A finished turn you have read leaves the count, though its session stays idle.
+  So does a finished turn of a session waiting on its subagents, until they stop.
 - The dot before each session shows when it waits on you.
   A running turn shows no dot, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
   A session waiting on its subagents shows no dot either, even when its turn has ended, and its row's tooltip says **waiting on subagents**.

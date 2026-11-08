@@ -72,8 +72,13 @@ The file also keeps `heardUntil`, the time of its last save: the server saves ea
 At the first listing, after the session files are indexed, `LiveSessions.restoreListedUnread` leaves the sessions this server started as `reattachAll` settled them, and gives each listed terminal session none while its turn runs, else its session file's last turn when `endedTurn` finds it after the previous server's `heardUntil` and the host reports it idle, else its saved turn, and forgets the saved turns of the sessions the listing leaves out.
 A socket that opens before that listing does not list the registry itself, so nothing follows the registry before `reattachAll` and the restore finish, or before the files it reads are indexed.
 
+A row's `turnWaits` says that the main agent's running turn waits on work it started rather than working itself.
+`Dashboard#onLiveUpdate` hands each main-agent `event` to `LiveSessions.heard`, which feeds `TurnWaits` in `src/server/turn-waits.ts` and answers whether the row's `turnWaits` changed, and the dashboard pushes the roster when it did.
+`TurnWaits` keeps each turn's tool calls in flight from `tool_execution_start` and `tool_execution_end`: a turn waits while every call in flight is a `wait` or `task` call, keeps that answer between two calls, and stops at its next other call or at any `agent_start` or `agent_end`, since a cut-off call never reports its end.
+
 `useAttention` in `web/use-attention.ts`, over the pure rules in `web/attention.ts`, counts the live sessions that need you for the desktop's badge.
 Each session raises at most one alert at a time, for what it waits on: its oldest open question, else a wait with no question relayed, else its unread turn.
+`awaitsSubagents` holds back that unread turn while a subagent the session waits on still runs, its turn ended or its `turnWaits` set: the count leaves it out and its alert raises once the subagent stops, unless the session's next turn reads it first.
 `attend` keeps an episode per live session: the first roster that shows a session hears its wait and raises nothing, so neither a page that loads nor a terminal session that joins after the socket's first roster raises what already waited.
 A wait with no question raises only when it starts after the page saw the session not need you, and a question that follows it in the same wait is the question the host replays after a guest's welcome, so it raises nothing.
 A question, by its request id, or an unread turn, by its time, that the page has not heard raises its alert while **Settings › Preferences › Notifications** is on, and stays heard while the session lives, so a question a reconnect replays raises none again.

@@ -2,7 +2,7 @@
 import { newestPastFirst, type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
 import { inTempDir, type Workspace } from "../src/shared/workspaces";
 import { everyWord } from "../src/shared/every-word";
-import { needsYou } from "./attention";
+import { awaitsSubagents, needsYou } from "./attention";
 
 /** A working directory outside the temp directories, and not one Settings → Workspaces hid. */
 export function discoverableCwd(cwd: string, hidden: ReadonlySet<string>): boolean {
@@ -106,18 +106,17 @@ export interface SidebarSessions {
 	ended: PastSession[];
 }
 
-/** The sessions tab lists an unpinned live session can land in. */
-type LiveList = "running" | "idle" | "awaitingSubagents";
+/** The sessions tab lists an unpinned live session can land in, in the order the sidebar shows them. */
+const LIVE_LISTS = ["idle", "running", "awaitingSubagents"] as const satisfies readonly (keyof SidebarSessions)[];
+type LiveList = (typeof LIVE_LISTS)[number];
 
-/**
- * The list unpinned live session `host` lands in: `awaitingSubagents` while a subagent runs and the main agent's turn ended or only
- * waits on work it started, `idle` once its turn ended with no subagent running, and `running` for a turn that works, a question, or a
- * status not known yet.
- */
-export function liveList(host: RosterHost): LiveList {
-	const delegating = host.agents.some(agent => agent.status === "running");
-	if (host.status === "idle") return delegating ? "awaitingSubagents" : "idle";
-	return host.status === "working" && host.turnWaits && delegating ? "awaitingSubagents" : "running";
+/** Every live session `lists` holds outside pinned and Bots, in the sidebar's order. */
+export const liveHosts = (lists: Pick<SidebarSessions, LiveList>): RosterHost[] => LIVE_LISTS.flatMap(list => lists[list]);
+
+/** The list unpinned live session `host` lands in: `idle` and `running` hold the sessions that wait on no subagent, by its status. */
+function liveList(host: RosterHost): LiveList {
+	if (awaitsSubagents(host)) return "awaitingSubagents";
+	return host.status === "idle" ? "idle" : "running";
 }
 
 export function sidebarSessions(hosts: RosterHost[], past: PastSession[], bots: RosterHost[], workspace: string | null, pinned: ReadonlySet<string>): SidebarSessions {
@@ -158,19 +157,21 @@ export function searchSessions(lists: SidebarSessions, query: string): SidebarSe
 }
 
 /** How many live sessions in `lists` need you: each that asks you something, or finished a turn you have not looked at since, as the Dock badge counts them. */
-export const waitingCount = ({ pinned, running, idle, awaitingSubagents }: SidebarSessions): number => [...pinned.hosts, ...running, ...idle, ...awaitingSubagents].filter(needsYou).length;
+export const waitingCount = (lists: SidebarSessions): number => [...lists.pinned.hosts, ...liveHosts(lists)].filter(needsYou).length;
 
 /** The session the Sessions tab opens when no pane shows one: of the rows `lists` holds, the live one started last, else the past one saved last. */
-export function latestSession({ pinned, running, idle, awaitingSubagents, interrupted, ended }: SidebarSessions): View | null {
-	const live = [...pinned.hosts, ...running, ...idle, ...awaitingSubagents].toSorted(newestFirst)[0];
+export function latestSession(lists: SidebarSessions): View | null {
+	const { pinned, interrupted, ended } = lists;
+	const live = [...pinned.hosts, ...liveHosts(lists)].toSorted(newestFirst)[0];
 	if (live) return { kind: "live", instanceId: live.instanceId, agentId: null };
 	const saved = [...pinned.past, ...interrupted, ...ended].toSorted(newestPastFirst)[0];
 	return saved ? { kind: "past", sessionId: saved.sessionId } : null;
 }
 
 /** Every row of the sessions tab in its order, which the previous and next session keys walk. */
-export function listedViews({ pinned, running, idle, awaitingSubagents, bots, interrupted, ended }: SidebarSessions): View[] {
+export function listedViews(lists: SidebarSessions): View[] {
+	const { pinned, bots, interrupted, ended } = lists;
 	const live = (hosts: RosterHost[]): View[] => hosts.map(({ instanceId }) => ({ kind: "live", instanceId, agentId: null }));
 	const saved = (sessions: PastSession[]): View[] => sessions.map(({ sessionId }) => ({ kind: "past", sessionId }));
-	return [...live(pinned.hosts), ...saved(pinned.past), ...live([...idle, ...running, ...awaitingSubagents, ...bots]), ...saved([...interrupted, ...ended])];
+	return [...live(pinned.hosts), ...saved(pinned.past), ...live([...liveHosts(lists), ...bots]), ...saved([...interrupted, ...ended])];
 }

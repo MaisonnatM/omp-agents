@@ -4,7 +4,7 @@ import type { View } from "../../src/shared/sessions";
 import { SidebarContent, SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { sameView } from "../routing";
-import type { SidebarSessions } from "../sessions";
+import { liveHosts, type SidebarSessions } from "../sessions";
 import { sameDir } from "../labels";
 import { shortcutLabels } from "../shortcuts";
 import { useStoredKeys } from "../stored-state";
@@ -90,7 +90,7 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 				<SidebarSearch label="Filter the sidebar's sessions" placeholder="Search sessions" query={query} onQuery={onQuery} shortcut="sessionSearch" />
 			</SidebarGroup>
 			<SidebarContent>
-				{filtering && pinned.hosts.length + pinned.past.length + idle.length + running.length + awaitingSubagents.length + bots.length + interrupted.length + ended.length === 0 && (
+				{filtering && pinned.hosts.length + pinned.past.length + liveHosts(lists).length + bots.length + interrupted.length + ended.length === 0 && (
 					<p className="px-4 py-2 text-xs text-muted-foreground">{`No sessions match “${query.trim()}”`}</p>
 				)}
 				{!filtering && <ScheduledGroup openId={scheduledOpen} showWorkspace={showWorkspace} open={!collapsed.has("scheduled")} onOpenChange={() => toggleGroup("scheduled")} />}
@@ -112,13 +112,13 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 				{(!filtering || running.length > 0) && (
 					<SidebarGroup collapsible open={!collapsed.has("running")} onOpenChange={() => toggleGroup("running")}>
 						<SidebarGroupLabel icon={Activity}>
-							{running.length > 0 ? `${running.length} running` : pinned.hosts.length + idle.length + awaitingSubagents.length + bots.length > 0 ? "No other sessions running" : "No sessions"}
+							{running.length > 0 ? `${running.length} running` : pinned.hosts.length + liveHosts(lists).length + bots.length > 0 ? "No other sessions running" : "No sessions"}
 						</SidebarGroupLabel>
 						<SidebarMenu aria-label="Running omp sessions">{hostRows(running, false)}</SidebarMenu>
 					</SidebarGroup>
 				)}
 				{awaitingSubagents.length > 0 && (
-					<SidebarGroup collapsible open={!collapsed.has("subagents")} onOpenChange={() => toggleGroup("subagents")}>
+					<SidebarGroup collapsible open={!collapsed.has("awaitingSubagents")} onOpenChange={() => toggleGroup("awaitingSubagents")}>
 						<SidebarGroupLabel icon={Hourglass}>{`${awaitingSubagents.length} waiting on subagents`}</SidebarGroupLabel>
 						<SidebarMenu aria-label="omp sessions waiting on subagents">{hostRows(awaitingSubagents, false)}</SidebarMenu>
 					</SidebarGroup>

@@ -104,15 +104,12 @@ export class LiveSessions {
 	 * reports precedes it; a session a previous server started keeps its `instanceId`.
 	 */
 	allocate(instanceId = newInstanceId()): { instanceId: string; emit: (update: SessionUpdate) => void } {
-		return { instanceId, emit: this.#emitter(instanceId) };
-	}
-
-	/** What session `instanceId` reports through, whether this server started it or joined it from the registry. */
-	#emitter(instanceId: string): (update: SessionUpdate) => void {
-		return update => {
-			if (update.kind === "switched") this.#reindex();
-			this.#onUpdate(instanceId, update);
-			if (update.kind === "event" && this.#turnWaits.heard(instanceId, update.event)) this.#onUpdate(instanceId, { kind: "roster" });
+		return {
+			instanceId,
+			emit: update => {
+				if (update.kind === "switched") this.#reindex();
+				this.#onUpdate(instanceId, update);
+			},
 		};
 	}
 
@@ -170,6 +167,11 @@ export class LiveSessions {
 		if (!this.#unread.delete(instanceId)) return false;
 		this.#saveUnread();
 		return true;
+	}
+
+	/** Session `instanceId`'s main agent reported `event`; whether that changed its row's `turnWaits`. */
+	heard(instanceId: string, event: unknown): boolean {
+		return this.#turnWaits.heard(instanceId, event);
 	}
 
 	/** Session `instanceId` started a turn, which reads its unread turn unless the turn ends quietly; whether it had one. */
@@ -309,7 +311,7 @@ export class LiveSessions {
 		const kept = this.#sessions.size;
 		for (const host of hosts) {
 			if (!this.#sessions.has(host.instanceId)) {
-				this.#sessions.set(host.instanceId, new SessionGuest(host, this.#emitter(host.instanceId)));
+				this.#sessions.set(host.instanceId, new SessionGuest(host, update => this.#onUpdate(host.instanceId, update)));
 			}
 		}
 		this.#reindex();

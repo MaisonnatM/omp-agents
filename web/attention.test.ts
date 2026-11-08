@@ -1,9 +1,14 @@
+import { fromPartial } from "@total-typescript/shoehorn";
 import { describe, expect, test } from "bun:test";
-import type { HostStatus, RosterHost, UnreadTurn, UserRequest } from "../src/shared/sessions";
+import type { AgentRow, HostStatus, RosterHost, UnreadTurn, UserRequest } from "../src/shared/sessions";
 import { type Attention, attend, needsYou, shownViews, unreadShown, waitOf } from "./attention";
 
-const host = (instanceId: string, status: HostStatus, { unread = null, requests = [], sessionName = `Session ${instanceId}` }: { unread?: UnreadTurn | null; requests?: UserRequest[]; sessionName?: string | null } = {}) =>
-	({ instanceId, sessionId: `s-${instanceId}`, sessionName, cwdDisplay: "~/code/webapp", status, unread, requests }) as RosterHost;
+const host = (
+	instanceId: string,
+	status: HostStatus,
+	{ unread = null, requests = [], sessionName = `Session ${instanceId}`, agents = [] }: { unread?: UnreadTurn | null; requests?: UserRequest[]; sessionName?: string | null; agents?: AgentRow[] } = {},
+) => fromPartial<RosterHost>({ instanceId, sessionId: `s-${instanceId}`, sessionName, cwdDisplay: "~/code/webapp", status, unread, requests, agents, turnWaits: false });
+const subagent = (status: AgentRow["status"]) => fromPartial<AgentRow>({ status });
 const ask = (id: string, title: string): UserRequest => ({ id, title, deadline: null, kind: "select", options: [], checked: [] });
 
 describe("needsYou", () => {
@@ -16,6 +21,13 @@ describe("needsYou", () => {
 			host("unknown", "unknown"),
 		];
 		expect(hosts.filter(needsYou).map(row => row.instanceId)).toEqual(["asks", "done"]);
+	});
+
+	test("leaves out a turn ended unseen while a subagent its session waits on still runs, until that subagent stops", () => {
+		const unread = { at: 1, reply: "Spawned." };
+		expect(needsYou(host("waits", "idle", { unread, agents: [subagent("running")] }))).toBe(false);
+		expect(needsYou(host("waits", "idle", { unread, agents: [subagent("idle")] }))).toBe(true);
+		expect(needsYou(host("asks", "needs-input", { requests: [ask("r1", "Which branch?")], agents: [subagent("running")] }))).toBe(true);
 	});
 });
 

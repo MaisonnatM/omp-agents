@@ -173,7 +173,7 @@ describe("sidebarSessions", () => {
 	});
 
 	test("a session whose subagents still run while its main agent's turn ended or only waits on them lists as waiting on subagents", () => {
-		const live = (sessionId: string, status: HostStatus, turnWaits: boolean, agents: AgentRow[]) => ({ ...host(sessionId, "~/a"), status, turnWaits, agents }) as RosterHost;
+		const live = (sessionId: string, status: HostStatus, turnWaits: boolean, agents: AgentRow[]) => fromPartial<RosterHost>({ ...host(sessionId, "~/a"), status, turnWaits, agents });
 		const lists = sidebarSessions(
 			[
 				live("idle-delegating", "idle", false, subagents("running")),
@@ -195,7 +195,7 @@ describe("sidebarSessions", () => {
 		expect(ids(lists.pinned.hosts)).toEqual(["pinned"]);
 	});
 
-	test("the waiting count takes unread turns and open questions in the selected workspace, pinned and waiting on subagents included, and not a turn already read", () => {
+	test("the waiting count takes unread turns and open questions in the selected workspace, pinned ones included, and not a turn already read or one whose session waits on its subagents", () => {
 		const turn = fromPartial<UnreadTurn>({ at: 1, reply: "Done." });
 		const rows = { h1: ["idle", turn], h2: ["needs-input", null], h3: ["working", null], h4: ["idle", turn], h5: ["unknown", null], h7: ["idle", null] } as const;
 		const live = [
@@ -203,11 +203,11 @@ describe("sidebarSessions", () => {
 			{ ...host("h6", "~/b"), status: "idle" as const, unread: turn, requests: [] },
 			{ ...host("h8", "~/a"), status: "idle" as const, unread: turn, requests: [], agents: subagents("running") },
 		];
-		expect(waitingCount(sidebarSessions(live, [], [], "~/a", new Set(["h4"])))).toBe(4);
+		expect(waitingCount(sidebarSessions(live, [], [], "~/a", new Set(["h4"])))).toBe(3);
 	});
 
 	test("the previous and next session keys walk pinned rows first, then idle, running, waiting on subagents, the selected workspace's Bots, interrupted, and past", () => {
-		const delegating = { ...host("h9", "~/a"), status: "idle" as const, agents: subagents("running") } as RosterHost;
+		const delegating = fromPartial<RosterHost>({ ...host("h9", "~/a"), status: "idle", agents: subagents("running") });
 		const live = [delegating, { ...host("h0", "~/a"), status: "idle" as const }, ...hosts];
 		const lists = sidebarSessions(live, sessions, [host("b1", "~/a"), host("b2", "~/b")], "~/a", new Set(["h2", "p3"]));
 		expect(listedViews(lists)).toEqual([

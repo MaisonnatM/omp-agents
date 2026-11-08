@@ -2,8 +2,9 @@
 import type { AgentStatus, HostStatus } from "../../src/shared/sessions";
 import { cn } from "@/lib/utils";
 
-/** A session waiting on its subagents is a status only the sidebar's rows show, from the group it lands in. */
-type Status = HostStatus | AgentStatus | "awaiting-subagents";
+/** A session waiting on its subagents is a status only the sidebar's rows show, from `awaitsSubagents`. */
+export type RowStatus = HostStatus | "awaiting-subagents";
+type Status = RowStatus | AgentStatus;
 
 const DOTS: Record<Status, { label: string; className: string | null }> = {
 	// A running agent needs nothing from you, so it draws no dot and takes no space; only an idle one, waiting on you, lights up.

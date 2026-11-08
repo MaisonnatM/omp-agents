@@ -12,11 +12,12 @@ import type { PaletteAction } from "../command-palette";
 import { hostLabel, modeOf, pastLabel, PRIVATE_NOTE, SOURCE_LABELS, SPLIT_CLICK, workspaceName } from "../labels";
 import type { OpenMode } from "../routing";
 import { sessionActions, type SessionEntry, type SessionRun } from "../session-actions";
-import { isPrivateHost, liveList, workspaceCwd, workspaceOf } from "../sessions";
+import { awaitsSubagents } from "../attention";
+import { isPrivateHost, workspaceCwd, workspaceOf } from "../sessions";
 import { type InlineConfirm, useInlineConfirm } from "../use-inline-confirm";
 import { Age } from "./age";
 import { PersonalContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
-import { StatusDot, statusLabel } from "./status-dot";
+import { type RowStatus, StatusDot, statusLabel } from "./status-dot";
 
 /** The muted facts after a session's name: the parts that apply. */
 function sessionFacts(parts: (string | false)[]): { text: string } | null {
@@ -209,7 +210,7 @@ export const PastRow = memo(function PastRow({ session, pinned, open, showWorksp
 	);
 });
 
-function HostStatus({ host, status }: { host: RosterHost; status: RosterHost["status"] | "awaiting-subagents" }) {
+function HostStatus({ host, status }: { host: RosterHost; status: RowStatus }) {
 	const ending = useDashboardStatus().ending.has(host.instanceId);
 	return ending
 		? <span role="img" aria-label="Ending session" aria-busy className="flex h-4 w-1.5 shrink-0 items-center justify-center"><Loader className="size-3 shrink-0 animate-spin" /></span>
@@ -222,7 +223,7 @@ export const HostRow = memo(function HostRow({ session: host, pinned, open, show
 	const view: View = { kind: "live", instanceId: host.instanceId, agentId: null };
 	const label = hostLabel(host);
 	// A session waiting on its subagents needs nothing from you, so its row drops the idle dot that would say its work is done.
-	const status = liveList(host) === "awaitingSubagents" ? "awaiting-subagents" : host.status;
+	const status = awaitsSubagents(host) ? "awaiting-subagents" : host.status;
 	const isPrivate = isPrivateHost(host);
 	const workspace = showWorkspace && (host.sessionName !== null || workspaceCwd(host) !== host.cwd) ? <WorkspaceBadge cwdDisplay={workspaceOf(host).cwdDisplay} /> : null;
 	return (

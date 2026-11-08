@@ -56,9 +56,8 @@
   The registry indexes its sessions by session id for `bySessionId`, and rebuilds the index when a session joins or leaves or a dashboard session reports `switched`.
   `add` refuses a session whose `finished()` already holds, such as a dashboard session whose omp exited as it spawned, and `start.ts` answers that start with an error.
   After each registry poll, `follow` hands every session the listed hosts and removes the ones that report `finished(now)`; a terminal guest decides there when to rejoin, so the registry reads no result from `follow`.
-  Every session's updates, a dashboard session's through `allocate` and a terminal guest's from `follow`, pass through one emitter that feeds each main-agent event to `TurnWaits` and pushes the roster when a turn starts or stops waiting.
 - `src/server/turn-waits.ts`: `TurnWaits`, the main agent's tool calls in flight per live session, from its `tool_execution_start` and `tool_execution_end` events, cleared at each `agent_start` and `agent_end`, since a cut-off call never ends.
-  `waits` tells whether the turn sits only in `wait` or `task` calls, `WAITING_TOOLS`, which a roster row carries as `turnWaits` for the sidebar's **Waiting on subagents** group.
+  `waits` tells whether the turn sits only in `wait` or `task` calls, `WAITING_TOOLS`, or did at its last call; `LiveSessions.heard` feeds it from `Dashboard#onLiveUpdate`, and a roster row carries it as `turnWaits`; see [Session notifications](../architecture/notifications.md#session-notifications).
 - `src/task-claims.ts`: atomic ownership for one explicit task per repository before checkout/spawn, shared across dashboards through private `task-claims.json` beside the access token.
   `start.ts` binds the owner to the session it spawned, `LiveSessions` releases it on removal, and a released or dead bound owner moves to `saved` by session id; surviving keepers keep ownership after a dashboard crash, and dead unbound launches are reclaimed.
   Inactive session-bound records preserve the identity for resume without retaining ownership, including intentional `taskId` slices and the separate PR-review role.

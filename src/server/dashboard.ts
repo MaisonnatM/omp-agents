@@ -795,6 +795,7 @@ export class Dashboard {
 			case "event":
 				this.#views.applyEvent(instanceId, update.event);
 				this.#moves.heard(instanceId, update.event);
+				if (this.#sessions.heard(instanceId, update.event)) this.#broadcasts.rosterChanged();
 				return;
 			case "starting":
 				this.#views.starting(instanceId);

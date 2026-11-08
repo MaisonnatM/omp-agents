@@ -25,19 +25,20 @@ A roster row already lists the subagents with their status, but nothing said whi
 ## Consequences
 
 **Idle** and **Running** now mean done and working, and the user sees at a glance which sessions only wait on their subagents.
-A row in the group, or pinned while it waits, drops the blue idle dot and its tooltip says waiting on subagents, since that dot is the cue that made such a session look done; other places that show a session's dot, such as chips and todo links, keep its plain status.
-`TurnWaits` in `src/server/turn-waits.ts` follows every live session's main-agent tool calls, and the roster pushes again when a turn starts or stops waiting.
-A terminal guest that `follow` creates now emits through the same emitter as `allocate`, so both transports feed it.
+One rule, `awaitsSubagents` in `web/attention.ts`, decides the group, the row's status, and whether the session needs you.
+Every row it holds, in the group, pinned, or under **Bots**, drops the blue idle dot and its tooltip says waiting on subagents, since that dot is the cue that made such a session look done; other places that show a session's dot, such as chips and todo links, keep its plain status.
+Such a session needs nothing from you, so a turn it ended unseen leaves the Sessions tab's count, the Dock badge, and the Bots' count, and raises its alert only once the subagent stops, unless its next turn reads it first.
+`TurnWaits` in `src/server/turn-waits.ts` follows every live session's main-agent tool calls through `LiveSessions.heard`, which `Dashboard#onLiveUpdate` calls for each event as it does `turnStarted`, and pushes the roster when a turn starts or stops waiting.
 Between two calls a turn keeps its answer until its next tool call or its end, because a smoke run showed a main agent calling `wait` four times with thinking between them, and the row would otherwise have jumped back to **Running** for each gap.
 A main agent that writes a long reply after a `wait`, while a subagent still runs, so stays in the group until its turn ends.
 A server that attaches in the middle of a `wait` never hears its start, so that session stays under **Running** until its main agent's next tool call.
 A `wait` on a background job, not a subagent, counts as waiting while a subagent also runs.
-The waiting count and the previous and next session keys include the new group, walked after **Running** and before **Bots**.
+The previous and next session keys walk the new group after **Running** and before **Bots**.
 
 ## Confirmation
 
-`src/server/turn-waits.test.ts` covers which tool calls make a turn wait, and `web/sessions.test.ts` covers which group each session lands in.
-`src/server/live-sessions.test.ts` covers the row's `turnWaits`, held after a `wait` ends, and the roster update as a `wait` starts and the turn ends.
+`src/server/turn-waits.test.ts` covers which tool calls make a turn wait, and `web/sessions.test.ts` covers which group each session lands in and the waiting count.
+`src/server/live-sessions.test.ts` covers the row's `turnWaits`, held after a `wait` ends, and `web/attention.test.ts` covers holding back the unread turn while a subagent runs.
 
 ## Revisit when
 
