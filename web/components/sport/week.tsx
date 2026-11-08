@@ -57,7 +57,7 @@ export function WeekTab({ state, plan, selected, today, disabled, onDemo, onLog 
 				{planned > 0 && (
 					<div className="mt-2 flex items-center gap-2 px-1">
 						<span aria-hidden className="flex flex-1 gap-0.5">
-							{Array.from({ length: planned }, (_, index) => <span key={index} className={cn("h-1.5 flex-1 rounded-full", index < done ? "bg-success" : "bg-muted")} />)}
+							{Array.from({ length: planned }, (_, index) => <span key={index} className={cn("h-1.5 flex-1 rounded-full", index < done ? "bg-success" : "bg-input")} />)}
 						</span>
 						<span className="text-xs text-muted-foreground tabular-nums">{done} sur {planned} faites</span>
 					</div>

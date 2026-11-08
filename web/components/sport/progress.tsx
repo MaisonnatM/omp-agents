@@ -23,9 +23,9 @@ export function ProgressTab({ state, today }: { state: SportState; today: string
 			<RadioGroup aria-label="Mesures" value={figureId(card.figure)} onValueChange={next => setPicked(cards.map(entry => figureId(entry.figure)).find(id => id === next) ?? picked)} className="grid grid-cols-2 gap-3 @4xl/sport:grid-cols-5">
 				{cards.map(entry => (
 					<Radio.Root key={figureId(entry.figure)} value={figureId(entry.figure)} {...activityControl("sport.progress.card")} className="flex min-w-0 cursor-pointer flex-col items-start gap-0.5 rounded-xl border border-border bg-card px-3.5 py-3 text-left outline-none hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring data-[checked]:border-primary data-[checked]:ring-1 data-[checked]:ring-primary">
-						<span className="max-w-full truncate text-xs text-muted-foreground">{entry.label}</span>
+						<span className="max-w-full text-xs text-pretty text-muted-foreground">{entry.label}</span>
 						<span className="text-2xl font-semibold tabular-nums">{entry.value}</span>
-						<span className="max-w-full truncate text-xs text-muted-foreground">{entry.detail}</span>
+						<span className="max-w-full text-xs text-pretty text-muted-foreground">{entry.detail}</span>
 					</Radio.Root>
 				))}
 			</RadioGroup>

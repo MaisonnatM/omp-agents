@@ -55,12 +55,15 @@ export function DemoDialog({ title, demos, at, onAt, onClose }: DemoDialogProps)
 						/>
 					) : (
 						<button type="button" aria-label={`Lire la vidéo : ${exercise.name}`} onClick={() => setPlaying(at)} {...activityControl("sport.demo.play")} className="group size-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
-							<DemoThumb exercise={exercise} className="size-full" />
-							<span className="absolute inset-0 flex items-center justify-center">
-								<span className="flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform group-hover:scale-105">
-									<Play aria-hidden className="size-6 fill-current" />
-								</span>
-							</span>
+							<DemoThumb
+								exercise={exercise}
+								className="size-full text-sm"
+								badge={
+									<span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform group-hover:scale-105">
+										<Play aria-hidden className="size-6 fill-current" />
+									</span>
+								}
+							/>
 						</button>
 					)}
 				</div>
