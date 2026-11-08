@@ -86,4 +86,5 @@
   `demo-strip.tsx` holds `DemoStrip`, a workout's demo thumbnails, and `demo-dialog.tsx` holds `DemoDialog`, one demo's thumbnail, cues, and caution, which mounts the `youtube-nocookie.com` player only on the play click.
   `log-form.tsx` holds `LogForm`, the `FormDialog` that notes or edits a workout, a free session, or a test, and `WeighForm`, the bodyweight one; `log-summary.tsx` holds `SummaryDialog`, « Séance notée » with the records the log beat.
   `journal.tsx` holds `JournalTab`, the logs by week in a `ListSplit` with the open one in a `DetailBar`, and `progress.tsx` holds `ProgressTab`, the cards, the chart of the chosen one drawn by `ChartView`, and the records.
-  `web/sport-view.ts` holds what the page writes: dates, loads and where they come from, a day's summary, doses, demos, pain and effort words, and the journal's and progress's figures, all read from `src/sport-week.ts`.
+  `web/sport-view.ts` holds what the page writes: dates, loads and where they come from, a day's summary, doses, demos, pain and effort words, and the journal's figures, all read from `src/sport-week.ts`.
+  `web/sport-progress.ts` holds what the progress tab reads: its cards, the chart of the picked one against its target, and how far back the chart reaches.
