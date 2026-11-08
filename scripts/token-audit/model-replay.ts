@@ -7,18 +7,21 @@
  *   gets only new ones. Save them to a file and keep the ones worth replaying.
  * - `run` replays each task on each model in a fresh clone with no remote, so a replay cannot push or land,
  *   prices the run from its session files, saves its diff, and runs the repository's `.omp/land.json` setup and checks.
- * - `judge` shows a judge model the task and two diffs in random order, per task and model pair, and keeps its verdict.
+ *   Every model role and fallback chain points at the replayed model, so its subagents run on it and a usage limit
+ *   fails the replay instead of handing it to another model; `answeredBy` counts the requests per model as proof.
+ * - `judge` shows a judge model the task, the `--baseline` model's diff, and another model's diff in random order,
+ *   per task and model, and keeps its verdict. A replay another model answered part of is not judged.
  * - `summary` prints the comparison per model; `run` and `judge` end with it.
  *
  * Usage:
  *   bun scripts/token-audit/model-replay.ts candidates [--days 14] [--agents poteto-agent,task] [--repo <path>] > tasks.json
  *   bun scripts/token-audit/model-replay.ts run --tasks tasks.json --models anthropic/claude-opus-5-5,anthropic/claude-sonnet-5-5 [--out <dir>]
- *   bun scripts/token-audit/model-replay.ts judge [--out <dir>] [--judge anthropic/claude-opus-5-5]
+ *   bun scripts/token-audit/model-replay.ts judge [--out <dir>] [--judge anthropic/claude-opus-5-5] [--baseline anthropic/claude-opus-5-5:auto]
  * `--out` defaults to `~/.cache/omp-model-replay` and must sit outside every checkout: a replay nested in one read it.
  */
 import { Database } from "bun:sqlite";
 import { spawnSync } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -47,6 +50,8 @@ interface Result {
 	filesChanged: number;
 	linesChanged: number;
 	checks: { command: string; passed: boolean; failures: string[] }[];
+	/** Requests per `provider/model` that answered; any model but the replayed one makes the replay unfair. */
+	answeredBy: Record<string, number>;
 }
 
 interface Verdict {
@@ -69,6 +74,7 @@ const { positionals, values } = parseArgs({
 		"max-cost": { type: "string", default: "15" },
 		"max-time": { type: "string", default: "45m" },
 		judge: { type: "string", default: "anthropic/claude-opus-5-5" },
+		baseline: { type: "string", default: "anthropic/claude-opus-5-5:auto" },
 	},
 });
 const out = resolve(values.out);
@@ -85,6 +91,30 @@ function git(cwd: string, ...args: string[]): string {
 }
 
 const slug = (model: string) => model.replace(/[^\w.-]+/g, "_");
+/** A model selector without its `:level` suffix, as session files name the model that answered. */
+const bare = (model: string) => model.replace(/:[^/]*$/, "");
+const pinned = (result: Result) => Object.keys(result.answeredBy).every(model => model === bare(result.model));
+
+/**
+ * A config overlay that runs every role on `model` with no fallback, written to `dir`, so omp never swaps in
+ * another model on a usage limit or for a subagent. The roles are the ones the user's config names.
+ */
+function pinnedConfig(model: string, dir: string): string {
+	const file = join(homedir(), ".omp", "agent", "config.yml");
+	const config = (existsSync(file) ? Bun.YAML.parse(readFileSync(file, "utf8")) : {}) as {
+		modelRoles?: Record<string, unknown>;
+		retry?: { fallbackChains?: Record<string, unknown> };
+	};
+	const roles = new Set(["default", "task", ...Object.keys(config.modelRoles ?? {}), ...Object.keys(config.retry?.fallbackChains ?? {})]);
+	const overlay = {
+		modelRoles: Object.fromEntries([...roles].map(role => [role, model])),
+		retry: { usageAwareFallback: false, fallbackChains: Object.fromEntries([...roles].map(role => [role, []])) },
+	};
+	mkdirSync(dir, { recursive: true });
+	const path = join(dir, "pinned-config.yml");
+	writeFileSync(path, JSON.stringify(overlay, null, "\t"));
+	return path;
+}
 const jsonLines = (file: string) =>
 	readFileSync(file, "utf8")
 		.split("\n")
@@ -158,21 +188,36 @@ function candidates(): void {
 	console.log(JSON.stringify(tasks, null, "\t"));
 }
 
-/** Sums every request in a replay's session files, its subagents' files included. */
-function price(dir: string): { cost: number; requests: number; outputTokens: number } {
-	const total = { cost: 0, requests: 0, outputTokens: 0 };
+/** Sums every request in a replay's session files, its subagents' files included, and counts who answered each. */
+function price(dir: string): Pick<Result, "cost" | "requests" | "outputTokens" | "answeredBy"> {
+	const total = { cost: 0, requests: 0, outputTokens: 0, answeredBy: {} as Record<string, number> };
 	if (!existsSync(dir)) return total;
 	for (const name of readdirSync(dir, { recursive: true, encoding: "utf8" })) {
 		if (!name.endsWith(".jsonl")) continue;
 		for (const entry of jsonLines(join(dir, name))) {
-			const message = entry.message as { role?: string; usage?: { output?: number; cost?: { total?: number } } } | undefined;
+			const message = entry.message as
+				| { role?: string; provider?: string; model?: string; usage?: { output?: number; cost?: { total?: number } } }
+				| undefined;
 			if (entry.type !== "message" || message?.role !== "assistant" || !message.usage) continue;
 			total.cost += message.usage.cost?.total ?? 0;
 			total.outputTokens += message.usage.output ?? 0;
 			total.requests += 1;
+			const answered = `${message.provider}/${message.model}`;
+			total.answeredBy[answered] = (total.answeredBy[answered] ?? 0) + 1;
 		}
 	}
 	return total;
+}
+
+/** The error a replay's own session ended on, such as a usage limit, or null when the model got to answer. */
+function endedOnError(dir: string): string | null {
+	if (!existsSync(dir)) return "omp left no session";
+	const main = readdirSync(dir).filter(name => name.endsWith(".jsonl"));
+	const last = main
+		.flatMap(name => jsonLines(join(dir, name)))
+		.map(entry => entry.message as { role?: string; stopReason?: string; errorMessage?: string } | undefined)
+		.findLast(message => message?.role === "assistant");
+	return !last ? "the model never answered" : last.stopReason === "error" ? (last.errorMessage ?? "unknown error") : null;
 }
 
 function landConfig(repo: string, base: string): { setup: string[]; checks: string[] } {
@@ -213,13 +258,14 @@ function check(task: Task, clone: string, dir: string): Result["checks"] {
 	return checks;
 }
 
-function replay(task: Task, model: string): Result {
+/** Replays one task on one model; null when the model could not answer, whose folder is removed so the next run retries it. */
+function replay(task: Task, model: string): Result | null {
 	const dir = join(out, task.id, slug(model));
 	const clone = prepare(task, dir);
 	const prompt = task.paths.reduce((text, path) => text.replaceAll(path, clone), task.prompt);
 	writeFileSync(join(dir, "prompt.md"), prompt);
 	const cacheTail = join(homedir(), ".omp", "agent", "extensions", "cache-tail.ts");
-	const args = ["-p", "--model", model, "--session-dir", join(dir, "sessions"), "--no-title", "--no-extensions"];
+	const args = ["-p", "--model", model, "--config", pinnedConfig(model, dir), "--session-dir", join(dir, "sessions"), "--no-title", "--no-extensions"];
 	if (existsSync(cacheTail)) args.push("-e", cacheTail);
 	args.push("--max-cost", values["max-cost"], "--max-time", values["max-time"], prompt);
 	const log = openSync(join(dir, "output.txt"), "w");
@@ -227,6 +273,12 @@ function replay(task: Task, model: string): Result {
 	const run = spawnSync("omp", args, { cwd: clone, stdio: ["ignore", log, log] });
 	closeSync(log);
 	const minutes = (Date.now() - started) / 60_000;
+	const error = endedOnError(join(dir, "sessions"));
+	if (error) {
+		console.error(`  ${model} could not answer, so the next run retries it: ${error}`);
+		rmSync(dir, { recursive: true, force: true });
+		return null;
+	}
 
 	git(clone, "add", "-A");
 	writeFileSync(join(dir, "change.diff"), git(clone, "diff", "--cached", task.base));
@@ -270,7 +322,9 @@ function runAll(): void {
 			if (existsSync(join(out, task.id, slug(model), "result.json"))) continue;
 			console.error(`replaying ${task.id} on ${model}`);
 			const result = replay(task, model);
+			if (!result) continue;
 			console.error(`  $${result.cost.toFixed(2)}, ${result.requests} requests, ${result.minutes} min, exit ${result.exitCode}`);
+			if (!pinned(result)) console.error(`  other models answered too, so this replay is left out: ${JSON.stringify(result.answeredBy)}`);
 		}
 	}
 }
@@ -307,9 +361,11 @@ function judgeAll(): void {
 	const verdicts: Verdict[] = existsSync(join(out, "judge.json")) ? JSON.parse(readFileSync(join(out, "judge.json"), "utf8")) : [];
 	const byTask = Map.groupBy(results(), r => r.task);
 	for (const [id, runs] of byTask) {
-		const [first, ...others] = runs.sort((a, b) => a.model.localeCompare(b.model));
-		for (const other of others) {
-			if (!first || verdicts.some(v => v.task === id && v.models.includes(first.model) && v.models.includes(other.model))) continue;
+		const first = runs.find(r => r.model === values.baseline);
+		if (!first || !pinned(first)) continue;
+		for (const other of runs) {
+			if (other === first || !pinned(other)) continue;
+			if (verdicts.some(v => v.task === id && v.models.includes(first.model) && v.models.includes(other.model))) continue;
 			const pair: [Result, Result] = Math.random() < 0.5 ? [first, other] : [other, first];
 			const [a, b] = pair.map(r => join(out, id, slug(r.model), "change.diff"));
 			const prompt = [
@@ -320,7 +376,8 @@ function judgeAll(): void {
 				'End your reply with one line of JSON and nothing after it: {"winner": "A" | "B" | "tie", "A_defects": ["..."], "B_defects": ["..."]}',
 			].join("\n");
 			console.error(`judging ${id}: ${first.model} vs ${other.model}`);
-			const run = spawnSync("omp", ["-p", "--no-session", "--no-title", "--no-extensions", "--tools", "read", "--model", values.judge, prompt], {
+			const judgeArgs = ["-p", "--no-session", "--no-title", "--no-extensions", "--tools", "read", "--model", values.judge, "--config", pinnedConfig(values.judge, out)];
+			const run = spawnSync("omp", [...judgeArgs, prompt], {
 				cwd: out,
 				encoding: "utf8",
 				maxBuffer: 1 << 28,
@@ -341,11 +398,13 @@ function judgeAll(): void {
 
 function summary(): void {
 	const verdicts: Verdict[] = existsSync(join(out, "judge.json")) ? JSON.parse(readFileSync(join(out, "judge.json"), "utf8")) : [];
-	const rows = [...Map.groupBy(results(), r => r.model)].map(([model, runs]) => {
+	const rows = [...Map.groupBy(results(), r => r.model)].map(([model, all]) => {
+		const runs = all.filter(pinned);
 		const judged = verdicts.filter(v => v.models.includes(model));
 		return {
 			model,
 			tasks: runs.length,
+			"left out, other model answered": all.length - runs.length,
 			"keeps base checks": `${runs.filter(keepsBaseChecks).length}/${runs.length}`,
 			"empty changes": runs.filter(r => r.filesChanged === 0).length,
 			"total $": runs.reduce((s, r) => s + r.cost, 0).toFixed(2),

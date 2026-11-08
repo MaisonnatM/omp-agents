@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-08
 
+- Behind the scenes: the model replay now keeps each model on its own work, so a model that hits its usage limit is retried later instead of being quietly answered by Opus, and a third, cheaper model can join the comparison.
 - Behind the scenes: a replay script reruns real helper-agent tasks on two models side by side, with the project's checks and a blind review of both results, to tell whether a cheaper model does the work as well.
 - Installing the starter kit, or Update dashboard, now removes the kit files the kit stopped shipping, unless you edited them, so old extensions stop running in your sessions.
 - With the starter kit, helper agents that a session starts no longer carry the tools only your own session uses, such as ending the session, landing, and your todos, notes, and reminders, so each of their requests costs less.

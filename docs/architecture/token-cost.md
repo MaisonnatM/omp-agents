@@ -115,8 +115,11 @@ The verdict per block of lines, for the proposal above:
 3. `bun scripts/token-audit/model-replay.ts run --tasks tasks.json --models anthropic/claude-opus-5-5:auto,anthropic/claude-sonnet-5-5:auto --out ~/.cache/omp-model-replay/<name>` runs the repository's `.omp/land.json` checks once at each base, then replays each task on each model in a clone with no remote, under `--max-cost` (15 dollars) and `--max-time` (45 minutes).
    The folder must sit outside every checkout, and `run` refuses one inside: in the first pilot, replays in a clone under a worktree's `tmp/` read that worktree too.
    A replay loads only `cache-tail.ts` of the kit's extensions, so it cannot land, push, or touch the dashboard, and both models get the same prompt and tools.
+   A config overlay points every model role and fallback chain at the replayed model, so its subagents run on it too and a usage limit cannot hand the work to another model: before it, a model over its limit was silently answered by Opus.
+   `answeredBy` in each `result.json` counts the requests per model; a replay another model answered part of is left out of the summary and the judging.
+   A replay whose session ends on a model error, such as a usage limit, is removed, so the next `run` retries it rather than counting an empty change.
    Its session files stay in the run's folder, so they do not count in `~/.omp/stats.db` or `report.ts`.
-4. `bun scripts/token-audit/model-replay.ts judge --out ~/.cache/omp-model-replay/<name>` asks the judge model, Opus by default, to compare each pair of diffs, shown as A and B in random order, and to list each one's defects.
+4. `bun scripts/token-audit/model-replay.ts judge --out ~/.cache/omp-model-replay/<name>` asks the judge model, Opus by default, to compare the `--baseline` model's diff, Opus by default, with each other model's, shown as A and B in random order, and to list each one's defects.
 5. The summary per model shows how many replays break nothing that worked at the base, empty changes, cost, requests, and minutes per task, and judge wins, ties, and losses.
    A test that already failed at the base, often from this computer's setup, is not counted against a replay that still fails it.
    Swap a worker's model only when the cheaper model keeps the checks as often and loses no more judge verdicts than it wins, over at least 20 tasks.
