@@ -16,10 +16,15 @@ export interface ExtensionTool<Params> {
 	description: string;
 	parameters: unknown;
 	loadMode: "essential";
-	/** omp's approval tier: `read` for a tool with no side effect, `write` for one that changes something. */
-	approval: "read" | "write";
-	/** omp passes every tool the session's context; this reads only its `cwd`, the session's workspace. */
-	execute(toolCallId: string, params: Params, signal: AbortSignal | undefined, onUpdate: unknown, ctx: { cwd: string }): Promise<ToolResult>;
+	/** omp's approval tier, `read` for a call with no side effect and `write` for one that changes something, or the one a call's arguments ask for. */
+	approval: "read" | "write" | ((args: unknown) => "read" | "write");
+	/** omp passes every tool the session's context; this reads only its `cwd`, the session's workspace, and its session id. */
+	execute(toolCallId: string, params: Params, signal: AbortSignal | undefined, onUpdate: unknown, ctx: ToolContext): Promise<ToolResult>;
+}
+
+export interface ToolContext {
+	cwd: string;
+	sessionManager: { getSessionId(): string };
 }
 
 interface SchemaOptions {
@@ -44,6 +49,7 @@ export interface ExtensionApi {
 			Union(schemas: unknown[], options?: SchemaOptions): unknown;
 			Array(items: unknown, options: SchemaOptions & { minItems?: number; uniqueItems?: boolean }): unknown;
 			Optional(schema: unknown): unknown;
+			Unknown(options: SchemaOptions): unknown;
 		};
 	};
 }
@@ -83,7 +89,7 @@ export function memoryLines(path: string): string[] {
  * The `remember` tool, the one writer of a Markdown memory: each fact is a dated `- YYYY-MM-DD <fact>` line. `memoryPath`
  * names the file for the session calling it, or throws why it has none.
  */
-export function rememberTool(pi: ExtensionApi, description: string, memoryPath: (ctx: { cwd: string }) => string): ExtensionTool<{ fact: string }> {
+export function rememberTool(pi: ExtensionApi, description: string, memoryPath: (ctx: ToolContext) => string): ExtensionTool<{ fact: string }> {
 	return {
 		name: REMEMBER_TOOL,
 		label: "Remember",

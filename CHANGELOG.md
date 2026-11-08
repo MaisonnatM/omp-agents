@@ -7,6 +7,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - Behind the scenes: a replay script reruns real helper-agent tasks on two models side by side, with the project's checks and a blind review of both results, to tell whether a cheaper model does the work as well.
 - Behind the scenes: the dashboard now keeps your training plan, test results, targets, and workout log together and works out each week's workouts and loads, ready for the coming Sport page.
+- Your personal assistant can now read your training week, with each day's loads.
+- It can log a workout, record a test result, and set your plan and targets. The dashboard saves each change for it.
+- It never changes or deletes a workout or test result you entered yourself.
 - Installing the starter kit, or Update dashboard, now removes the kit files the kit stopped shipping, unless you edited them, so old extensions stop running in your sessions.
 - With the starter kit, helper agents that a session starts no longer carry the tools only your own session uses, such as ending the session, landing, and your todos, notes, and reminders, so each of their requests costs less.
 - Fixed: with the starter kit, helper agents in poteto mode no longer look for a skill under an old name that always failed.

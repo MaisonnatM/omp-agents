@@ -6,9 +6,10 @@
 import { randomUUID } from "node:crypto";
 import { statSync } from "node:fs";
 import { isAbsolute } from "node:path";
+import { inbox } from "../../templates/omp/agent/extensions/inbox/client";
 import { CREATE_TOOL } from "../shared/bot-designer";
-import { BOT_KIND_INFO, BOT_KINDS, type BotId, MAX_JOB_LENGTH, parseBotId } from "../shared/bots";
-import { BOT_FLAGS, leave } from "./bot-extension";
+import { BOT_KIND_INFO, BOT_KINDS, type BotCreateRequest, type BotId, MAX_JOB_LENGTH, parseBotId } from "../shared/bots";
+import { BOT_FLAGS } from "./bot-extension";
 import { type ExtensionApi, flagValue, reply } from "./extension-kit";
 
 export interface CreateBotParams {
@@ -59,8 +60,8 @@ export default function designerExtension(pi: ExtensionApi): void {
 		approval: "write",
 		async execute(_toolCallId, { name, job, kind = "routines", cwd }, _signal, _onUpdate, ctx) {
 			const botId = parseBotId(flagValue(pi, BOT_FLAGS.bot));
-			const inbox = flagValue(pi, BOT_FLAGS.botInbox);
-			if (!botId || !inbox) throw new Error("This session is not an omp-agents Bot designer.");
+			const dir = flagValue(pi, BOT_FLAGS.botInbox);
+			if (!botId || !dir) throw new Error("This session is not an omp-agents Bot designer.");
 			const title = name.trim();
 			const text = job.trim();
 			const type = BOT_KINDS.find(candidate => candidate === kind);
@@ -69,7 +70,7 @@ export default function designerExtension(pi: ExtensionApi): void {
 			if (text.length > MAX_JOB_LENGTH) throw new Error(`job is ${text.length} characters; keep it to at most ${MAX_JOB_LENGTH}.`);
 			if (!type) throw new Error(`kind must be one of ${BOT_KINDS.join(", ")}.`);
 			if (!isAbsolute(workspace) || !isDirectory(workspace)) throw new Error(`cwd ${workspace} is not the absolute path of a directory.`);
-			leave(inbox, { botId, create: { id: randomUUID() as BotId, kind: type, name: title, job: text, cwd: workspace } });
+			inbox<BotCreateRequest>(dir).leave({ botId, create: { id: randomUUID() as BotId, kind: type, name: title, job: text, cwd: workspace } });
 			return reply(`Asked the dashboard to create ${title}, a ${BOT_KIND_INFO[type].label} Bot in ${workspace}. It shows in the Bots tab once the dashboard applies it.`);
 		},
 	});

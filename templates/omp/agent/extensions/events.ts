@@ -5,10 +5,10 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
-import { CONFIG_DIR, leave, readJson, reply, waiting, withoutEmpty } from "./inbox/client";
+import { CONFIG_DIR, inbox, readJson, reply, withoutEmpty } from "./inbox/client";
 
 const EVENTS_FILE = join(CONFIG_DIR, "events.json");
-const INBOX_DIR = join(CONFIG_DIR, "event-inbox");
+const INBOX = inbox<Change>(join(CONFIG_DIR, "event-inbox"));
 
 // The shape of LocalEvent in src/shared/calendar.ts, which this file cannot import: change it with that one.
 type EventWhen = { allDay: true; firstDay: string; lastDay: string } | { allDay: false; start: number; end: number };
@@ -27,7 +27,7 @@ const MINUTE_MS = 60_000;
 /** Pending changes participate in reads so agents see their writes while the dashboard is stopped. */
 function readEvents(): LocalEvent[] {
 	const events = new Map(((readJson(EVENTS_FILE) as { events?: LocalEvent[] } | null)?.events ?? []).map(event => [event.id, event]));
-	for (const change of waiting<Change>(INBOX_DIR)) {
+	for (const change of INBOX.waiting()) {
 		if (change.op === "add" && !events.has(change.event.id)) events.set(change.event.id, change.event);
 		if (change.op === "remove") events.delete(change.id);
 	}
@@ -115,14 +115,14 @@ export default function events(pi: ExtensionAPI) {
 					const same = readEvents().find(event => event.sessionId === sessionId && event.title === line && !event.when.allDay && event.when.start === startMs);
 					if (same) return reply(`This session already added it (id ${same.id}).`);
 					const event: LocalEvent = { id: randomUUID(), title: line, when: { allDay: false, start: startMs, end: startMs + minutes * MINUTE_MS }, sessionId };
-					leave(INBOX_DIR, { op: "add", event });
+					INBOX.leave({ op: "add", event });
 					return reply(`Added to the Calendar page (id ${event.id}), ${whenText(event.when)}; a notice comes 10 minutes before it starts.`);
 				}
 				case "remove": {
 					const event = readEvents().find(entry => entry.id === id);
 					if (!event) return reply(`No event kept on this computer has id ${id ?? "(none given)"}.`, true);
 					if (event.sessionId !== sessionId) return reply(`This session did not add ${JSON.stringify(event.title)}, so it cannot remove it.`, true);
-					leave(INBOX_DIR, { op: "remove", id: event.id, sessionId });
+					INBOX.leave({ op: "remove", id: event.id, sessionId });
 					return reply(`Removed ${JSON.stringify(event.title)} from the Calendar page.`);
 				}
 			}

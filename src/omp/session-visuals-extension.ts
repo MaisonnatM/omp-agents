@@ -24,7 +24,7 @@ const VISUALS_PROMPT = [
 
 /** Cursor hides every tool omp adds, the dashboard's included, behind its dynamic-tool lookup, so the model assumes they are missing. */
 export const CURSOR_TOOLS_PROMPT =
-	"This session runs on a Cursor model, which lists most of your tools, such as land, end_session, move_session, pr_description, user_note, user_todo, project_memory, and ship_stage, only as dynamic tools, not in your function list. Call GetDynamicTools to see them and CallDynamicTool to run one; never decide a tool these instructions name is missing before you look it up.";
+	"This session runs on a Cursor model, which lists most of your tools, such as land, end_session, move_session, pr_description, user_note, user_todo, project_memory, ship_stage, and sport, only as dynamic tools, not in your function list. Call GetDynamicTools to see them and CallDynamicTool to run one; never decide a tool these instructions name is missing before you look it up.";
 
 export default function sessionVisuals(pi: ExtensionApi): void {
 	pi.on("before_agent_start", (event, ctx) => ({

@@ -38,6 +38,25 @@ A file that does not read, or that comes from a newer version, moves aside to `s
 The `ListRegistry` connects `sport-change` client changes to `sport` snapshots on the roster topic.
 The page keeps the latest snapshot in `DashboardState.sport`, `null` until the first one comes.
 
+## The agent
+
+A personal session's `sport` tool never writes `sport.json`; it leaves one request per call as a JSON file in `sportInboxDir`, `<config dir>/sport-inbox`, and the server stays the file's only writer.
+A request holds the id of the session that left it, the metrics the call adds or replaces by id, and one change, and an edit names the entry and only the fields it changes.
+See [Personal sessions](personal-sessions.md) for the tool's actions.
+`SportInbox` in `src/server/sport-inbox.ts` builds on `JsonInboxDir`, so the dashboard that holds the owner lock applies the files oldest first, through the same `ListRegistry` path as the page, and a stopped dashboard leaves them for the next start.
+
+`agentSportChanges` in `src/sport-agent.ts` turns a request into the changes it applies, the same for the tool before it leaves a file and for the inbox before it applies one.
+It resolves the request against the state at hand, so an edit merges its fields over the entry as it stands then, and a request applies whole or not at all.
+An agent may set the plan, at most `MAX_PLAN_BYTES`, 64 KB as JSON, and the targets, and add or replace metrics by id.
+A request with no session id is refused.
+It may add a log or a measurement only in its own session's name, its `addedBy`, under an id no entry holds, and edit one only when its own session wrote it, keeping its id and `addedBy`; another session's edit is refused with `workout log <id> was added by session <id>; an agent may edit only a workout log its own session wrote`.
+It may never edit what the user wrote, nor remove or restore anything; only the Sport page does.
+See [An agent signs Sport changes with its session id](../decisions/2026-11-07-an-agent-signs-sport-changes-with-its-session-id.md).
+The resulting changes must also pass `sportRefusal` in `src/sport.ts`, so a change naming an unknown metric says why rather than vanishing.
+The inbox sets a refused file aside as `.invalid` and logs the reason.
+The inbox deletes a file only once its changes reach `sport.json`, and an add the state already holds as it is applies as nothing, so a file applied once and kept after a failed write does no harm when it is read again.
+See [A sport tool call leaves one request the server resolves](../decisions/2026-11-07-a-sport-tool-call-leaves-one-request-the-server-resolves.md).
+
 ## The week
 
 `src/sport-week.ts` derives everything else, the same for the page and the agent.

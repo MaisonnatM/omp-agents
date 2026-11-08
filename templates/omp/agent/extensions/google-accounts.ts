@@ -9,12 +9,12 @@ import { execFileSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
-import { CONFIG_DIR, leave, readJson } from "./inbox/client";
+import { CONFIG_DIR, inbox, readJson } from "./inbox/client";
 
 const ACCOUNTS_FILE = join(CONFIG_DIR, "google-accounts.json");
 
 /** Where a session reports an account it found signed out, which `src/server/sign-in-inbox.ts` reads. */
-const SIGN_IN_INBOX = join(CONFIG_DIR, "sign-in-inbox");
+const SIGN_IN_INBOX = inbox<{ v: 1; server: string; at: number }>(join(CONFIG_DIR, "sign-in-inbox"));
 
 // The services of `MCP_SERVICES` in `src/shared/accounts.ts` that hold an account per server; change both together.
 const SERVICES = [
@@ -186,7 +186,7 @@ export default function googleAccounts(pi: ExtensionAPI) {
 		if (server === null || label === null) return;
 		if (!reported.has(server)) {
 			reported.add(server);
-			leave(SIGN_IN_INBOX, { v: 1, server, at: Date.now() });
+			SIGN_IN_INBOX.leave({ v: 1, server, at: Date.now() });
 		}
 		return { content: [{ type: "text", text: signedOutText(label, server) }], isError: true };
 	});
