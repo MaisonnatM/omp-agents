@@ -1,5 +1,5 @@
 /** `ChartView`: a session's `chart` fence drawn with `recharts`, a chunk of its own that `SessionVisual` and the Sport page load on first use. */
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ReferenceLine, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ReferenceLine, type TooltipValueType, XAxis, YAxis } from "recharts";
 import type { ChartSpec } from "../../src/shared/session-visuals";
 import { type ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
@@ -13,19 +13,34 @@ const CARTESIAN = {
 
 const chartColor = (index: number): string => `var(--chart-${(index % 5) + 1})`;
 
+/** A level drawn across the chart as a dashed line with its label, such as a target; the value axis stretches to reach it. */
+export interface ChartReference {
+	value: number;
+	label: string;
+}
+
+/** The tooltip's row for a series: its label from `config`, then its value as `format` writes it. */
+function tooltipRow(config: ChartConfig, format: (value: number) => string) {
+	return (value?: TooltipValueType, name?: number | string) => (
+		<>
+			<span className="text-muted-foreground">{config[String(name)]?.label ?? name}</span>
+			<span className="ml-auto font-mono font-medium text-foreground tabular-nums">{format(Number(value))}</span>
+		</>
+	);
+}
+
 interface ChartViewProps {
 	spec: ChartSpec;
 	label: string;
 	expanded: boolean;
-	/** A level drawn across the chart as a dashed line with its label, such as a target; the value axis stretches to reach it. */
-	reference?: { value: number; label: string } | null;
+	reference?: ChartReference;
 	/** How the axis and the tooltip write a value, such as `113,3 kg` or a grade; the default is the number. */
 	format?: (value: number) => string;
 	/** The value axis spans the values instead of starting at zero. */
 	fit?: boolean;
 }
 
-export function ChartView({ spec, label, expanded, reference = null, format, fit = false }: ChartViewProps) {
+export function ChartView({ spec, label, expanded, reference, format, fit = false }: ChartViewProps) {
 	if (spec.type === "pie") {
 		const [series] = spec.series;
 		// Keyed by slice name, which the spec does not limit, so no name reads an inherited property.
@@ -56,7 +71,7 @@ export function ChartView({ spec, label, expanded, reference = null, format, fit
 				<CartesianGrid vertical={false} />
 				<XAxis dataKey={spec.x} tickLine={false} axisLine={false} tickMargin={10} />
 				<YAxis tickLine={false} axisLine={false} tickMargin={8} width="auto" domain={fit ? ["auto", "auto"] : undefined} tickFormatter={format} />
-				<ChartTooltip content={<ChartTooltipContent formatter={format && ((value, name) => <><span className="text-muted-foreground">{config[String(name)]?.label ?? name}</span><span className="ml-auto font-mono font-medium text-foreground tabular-nums">{format(Number(value))}</span></>)} />} />
+				<ChartTooltip content={<ChartTooltipContent formatter={format && tooltipRow(config, format)} />} />
 				{spec.series.length > 1 && <ChartLegend content={<ChartLegendContent />} />}
 				{reference && <ReferenceLine y={reference.value} stroke="var(--muted-foreground)" strokeDasharray="6 4" ifOverflow="extendDomain" label={{ value: reference.label, position: "insideTopRight", fill: "var(--muted-foreground)", fontSize: 12 }} />}
 				{spec.series.map(({ key }) => mark(key, `var(--color-${key})`, spec.data.filter(row => typeof row[key] === "number").length < 2))}

@@ -4,6 +4,7 @@ import type { ChartSpec } from "../src/shared/session-visuals";
 import { type ClimbKind, CLIMB_KINDS, FRENCH_GRADES, gradeRank, type Metric, type Plan, type SportState, type Target } from "../src/shared/sport";
 import { adherence, bestGrades, type WeekGrades } from "../src/sport-week";
 import { amount, BEST_CLIMB_LABEL, bodyweightOf, CLIMB_LABEL, measured, nextTest, shortDate, signedAmount } from "./sport-view";
+import type { ChartReference } from "./components/session-chart";
 
 /** How far back the chart reaches, in weeks; `null` for everything. */
 export const RANGES = [
@@ -76,7 +77,7 @@ export interface Chart {
 	title: string;
 	sentence: string | null;
 	spec: ChartSpec;
-	reference: { value: number; label: string } | null;
+	reference?: ChartReference;
 	format: (value: number) => string;
 	/** What the chart says with nothing to draw. */
 	empty: string;
@@ -105,7 +106,7 @@ export function chartOf(state: SportState, figure: Figure, from: string | null, 
 				title: metric.label,
 				sentence: parts.flatMap(part => (part ? [part.endsWith(".") ? part : `${part}.`] : [])).join(" ") || null,
 				spec: line([{ key: "value", label: metric.label }], rows.map(row => ({ day: shortDate(row.at), value: row.value }))),
-				reference: value === null ? null : { value, label: `Objectif ${amount(value, metric.unit)}` },
+				reference: value === null ? undefined : { value, label: `Objectif ${amount(value, metric.unit)}` },
 				format: kg => amount(kg, metric.unit),
 				empty: `Aucune mesure de ${metric.label.toLowerCase()} sur la période.`,
 			};
@@ -121,7 +122,7 @@ export function chartOf(state: SportState, figure: Figure, from: string | null, 
 				title: `${label} par semaine`,
 				sentence: best === -1 ? null : `${label} sur la période : ${FRENCH_GRADES[best]}${aim ? `, objectif ${aim}` : ""}.`,
 				spec: best === -1 ? line([], []) : line([{ key: "grade", label: CLIMB_LABEL[climb] }], weeks.map(week => ({ day: shortDate(week.monday), ...(week[climb] ? { grade: gradeRank(week[climb]) } : {}) }))),
-				reference: aim ? { value: gradeRank(aim), label: `Objectif ${aim}` } : null,
+				reference: aim ? { value: gradeRank(aim), label: `Objectif ${aim}` } : undefined,
 				format: rank => FRENCH_GRADES[Math.round(rank)] ?? "",
 				empty: climb === "boulder" ? "Aucun bloc réussi sur la période." : "Aucune voie réussie sur la période.",
 			};
@@ -137,7 +138,6 @@ export function chartOf(state: SportState, figure: Figure, from: string | null, 
 				title: "Séances faites par semaine",
 				sentence: null,
 				spec: { type: "bar", title: null, description: null, x: "day", series: [{ key: "planned", label: "Prévues" }, { key: "done", label: "Faites" }], data },
-				reference: null,
 				format: count => String(count),
 				empty: "Le plan n'a pas encore commencé.",
 			};
