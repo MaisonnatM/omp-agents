@@ -39,7 +39,7 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 	const today = localDay();
 	const selected = route.tab === "week" ? (route.day ?? today) : today;
 	const plan = state?.plan ?? null;
-	// FormDialog binds no arrow keys, so the week's and journal's arrows stay live under a dialog unless this turns them off.
+	// A dialog's popup keeps only the arrows, Home, and End from the page, so Esc and keys in a picker outside the popup would still reach the week's and journal's shortcuts.
 	const dialogOpen = demo !== null || target !== null || saved !== null || weighing;
 	const stepDay = (by: -1 | 1) => {
 		location.hash = hashForSport({ tab: "week", day: addDays(selected, by) });

@@ -546,3 +546,18 @@ export function useShortcuts(handlers: ShortcutHandlers): (event: ReactKeyboardE
 		if (!event.nativeEvent.isComposing) dispatch(event, latest.current, scope => scope === "composer", null);
 	}, []);
 }
+
+/**
+ * The key handler for `handlers` that a Base UI dialog's popup attaches, since the popup stops the arrow keys, Home,
+ * and End before they reach the page-wide listener. Nothing registers on the page, so every other key still goes
+ * through {@link useShortcuts}.
+ */
+export function usePopupShortcuts(handlers: ShortcutHandlers): (event: ReactKeyboardEvent) => void {
+	const latest = useRef(handlers);
+	latest.current = handlers;
+	return useCallback((event: ReactKeyboardEvent) => {
+		if (event.nativeEvent.isComposing) return;
+		const outside = !isTypingTarget(event.target);
+		dispatch(event, latest.current, scope => scope === "anywhere" || (scope === "outside-fields" && outside), null);
+	}, []);
+}

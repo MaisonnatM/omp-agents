@@ -63,6 +63,7 @@
   The checkout, the default model's role, and the skills are each one `useRead`.
 - `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read.
   One `keydown` listener on the window serves every `useShortcuts` registration, which `createShortcutStack` orders: the registration that mounted last tries a key first, and the first handler that takes it ends the press, so a page's own bindings come before `web/use-page-shortcuts.ts`'s, which `web/app.tsx` mounts first, and a handler that returns `false` lets the key fall to the one below.
+  A Base UI dialog's popup stops the arrows, Home, and End before they reach the window, so a dialog that binds one of them, as the Sport demo dialog does, passes the handler `usePopupShortcuts` returns as `FormDialog`'s `onKeyDown`.
   A handler gets which of its shortcut's keys was pressed, so the focused pane's `UserRequestCard` binds the one `answer` shortcut, 1 to 9, to its question's options.
   Shortcuts with a `command` title are also the command palette's commands, and `web/app.tsx` hands the palette the same handlers it registers.
 - `web/command-palette.ts`: the command palette's model, which renders nothing: its items and their actions, the reducer over its stack of views and its action panel, and the ranking, which multiplies cmdk's match score by a frecency boost kept in localStorage.

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { shortcutLabels, useShortcuts } from "../../shortcuts";
+import { shortcutLabels, usePopupShortcuts } from "../../shortcuts";
 import { dose } from "../../sport-view";
 import { Callout } from "../integrations/integration-row";
 import { DemoThumb } from "./demo-strip";
@@ -28,7 +28,7 @@ export function DemoDialog({ title, demos, at, onAt, onClose }: DemoDialogProps)
 	const exercise = demos[at];
 	const demo = exercise?.demo ?? null;
 	const last = at === demos.length - 1;
-	useShortcuts({
+	const keys = usePopupShortcuts({
 		sportPreviousDemo: () => { if (at > 0) onAt(at - 1); },
 		sportNextDemo: () => { if (!last) onAt(at + 1); },
 	});
@@ -38,7 +38,7 @@ export function DemoDialog({ title, demos, at, onAt, onClose }: DemoDialogProps)
 	if (!exercise || !demo) return null;
 	const shown = dose(exercise);
 	return (
-		<SportDialog title={`${title} · ${at + 1} sur ${demos.length}`} onClose={onClose} className="top-[6%] w-[min(40rem,calc(100vw-2rem))]">
+		<SportDialog title={`${title} · ${at + 1} sur ${demos.length}`} onClose={onClose} className="top-[6%] w-[min(40rem,calc(100vw-2rem))]" onKeyDown={keys}>
 			<div className="flex flex-col gap-4 px-5 pt-2 pb-4">
 				<div>
 					<h2 className="text-lg font-semibold">{exercise.name}</h2>

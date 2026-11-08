@@ -23,10 +23,12 @@ interface FormDialogProps {
 	className: string;
 	/** The form, which shows a {@link FormDialogHeader} first. */
 	children: ReactNode;
+	/** Keys pressed anywhere in the dialog, including the arrows, Home, and End, which the popup keeps from the page. */
+	onKeyDown?: (event: KeyboardEvent) => void;
 }
 
 /** A dialog over the page that holds one form to fill in and send, such as a new issue or a new event. */
-export function FormDialog({ busy, onClose, className, children }: FormDialogProps) {
+export function FormDialog({ busy, onClose, className, children, onKeyDown }: FormDialogProps) {
 	const popup = useRef<HTMLDivElement>(null);
 	return (
 		<DialogPrimitive.Root
@@ -41,6 +43,7 @@ export function FormDialog({ busy, onClose, className, children }: FormDialogPro
 				<DialogPrimitive.Backdrop className="fixed inset-0 z-40 bg-black/40 dark:bg-black/80" />
 				<DialogPrimitive.Popup
 					ref={popup}
+					onKeyDown={onKeyDown}
 					className={cn("fixed left-1/2 z-50 flex max-h-[calc(100vh-2rem)] -translate-x-1/2 flex-col overflow-y-auto rounded-2xl border bg-popover text-popover-foreground shadow-2xl outline-hidden", className)}
 				>
 					{children}
