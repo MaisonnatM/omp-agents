@@ -8,6 +8,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - On the Sport page, Lancer beside the daily stretches opens a full-screen timer that counts down each stretch, left side then right, with a short break between them, beeps for the last seconds, and a French voice saying what comes next.
 - The timer ticks each stretch off for the day as soon as it is held to the end, so stopping halfway keeps what you did; Space pauses, the arrows skip, and the speaker button turns the sound off.
 - The timer is green while you hold a stretch and amber between stretches, grays out under a large « En pause » when paused, and ends on « Arrêté » with the count ticked when some stretches were skipped.
+- The timer starts on the first stretch not yet ticked that day, and it no longer closes by accident: Esc pauses it, Esc again closes it, and a click beside it does nothing until the end.
 - On a phone, the Sport page header now fits the screen, so the timer's close button is no longer pushed off the edge.
 - A stretch done on each side now reads « par côté » in its dose, such as 2 × 45 s par côté.
 - On the Sport page, the daily stretches now list each stretch with its dose, its note, and its demo, with a box to tick each one off; the ticks are kept for each day, and a count such as 2 / 5 shows how many are done.

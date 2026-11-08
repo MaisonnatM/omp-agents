@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { exercise } from "../src/sport-fixtures";
-import { advance, CHANGE_SEC, freshCue, PREPARE_SEC, startRun, timerNote, timerSteps } from "./sport-timer";
+import { advance, CHANGE_SEC, freshCue, PREPARE_SEC, startHold, startRun, timerNote, timerSteps } from "./sport-timer";
 
 const shape = (items: Parameters<typeof timerSteps>[0]) => timerSteps(items).map(({ kind, sec, hold }) => [kind, sec, hold.item.key, hold.set, hold.side, kind === "hold" && hold.last]);
 
@@ -53,9 +53,33 @@ describe("timerSteps", () => {
 	test("a set of reps waits for the user, and the clock runs every timed step before it out, however late it looks", () => {
 		const steps = timerSteps([exercise("a", "Gainage", { holdSec: 30 }), exercise("b", "Pompes", { sets: 1, reps: 10 })]);
 		expect(steps.map(({ kind, sec }) => [kind, sec])).toEqual([["prepare", PREPARE_SEC], ["hold", 30], ["next", CHANGE_SEC], ["hold", null]]);
-		const { run, ended } = advance(steps, startRun(0), 600_000);
+		const { run, ended } = advance(steps, startRun(steps, 0), 600_000);
 		expect(ended.map(({ kind }) => kind)).toEqual(["prepare", "hold", "next"]);
 		expect(run).toEqual({ at: 3, ran: 0, since: (PREPARE_SEC + 30 + CHANGE_SEC) * 1000 });
+	});
+
+	test("a run starts on the first hold of the first unticked item, after getting ready in place of the step before it", () => {
+		const items = [exercise("a", "Ischios", { holdSec: 45, perSide: true }), exercise("b", "Adducteurs", { holdSec: 45, perSide: true }), exercise("c", "Pectoraux", { holdSec: 45 })];
+		expect(startHold(items, [])).toBe(0);
+		expect(startHold(items, ["a"])).toBe(2);
+		expect(startHold(items, ["a", "c"])).toBe(2);
+		expect(startHold(items, ["b"])).toBe(0);
+		expect(startHold(items, ["a", "b"])).toBe(4);
+		expect(startHold(items, ["a", "b", "c"])).toBe(0);
+		const steps = timerSteps(items, 2);
+		expect(steps.map(({ kind, hold }) => [kind, hold.index])).toEqual([
+			["hold", 0],
+			["side", 1],
+			["hold", 1],
+			["prepare", 2],
+			["hold", 2],
+			["side", 3],
+			["hold", 3],
+			["next", 4],
+			["hold", 4],
+		]);
+		expect(startRun(steps, 7)).toEqual({ at: 3, ran: 0, since: 7 });
+		expect(startRun(timerSteps(items), 7).at).toBe(0);
 	});
 });
 

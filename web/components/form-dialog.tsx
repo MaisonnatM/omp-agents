@@ -12,6 +12,9 @@ export type Submit<Done = never> = { kind: "writing" } | { kind: "creating" } | 
 /** A form's error line. */
 export const ERROR_TEXT = "text-xs text-red-600 dark:text-red-400";
 
+/** Ways to dismiss a dialog besides its close button: Esc, or a click outside it. */
+export type Dismissal = "escape-key" | "outside-press";
+
 /** Cmd+Enter, or Ctrl+Enter, which sends the form. */
 export const isSubmitChord = (event: KeyboardEvent): boolean => event.key === "Enter" && (event.metaKey || event.ctrlKey);
 
@@ -27,10 +30,12 @@ interface FormDialogProps {
 	onKeyDown?: (event: KeyboardEvent) => void;
 	/** What takes the focus as the dialog opens, in place of its first button. */
 	initialFocus?: RefObject<HTMLElement | null>;
+	/** Called on Esc or a click outside before the dialog closes; returns whether it closes. The close button always closes. */
+	onDismiss?: (how: Dismissal) => boolean;
 }
 
 /** A dialog over the page that holds one form to fill in and send, such as a new issue or a new event. */
-export function FormDialog({ busy, onClose, className, children, onKeyDown, initialFocus }: FormDialogProps) {
+export function FormDialog({ busy, onClose, className, children, onKeyDown, initialFocus, onDismiss }: FormDialogProps) {
 	const popup = useRef<HTMLDivElement>(null);
 	return (
 		<DialogPrimitive.Root
@@ -38,6 +43,7 @@ export function FormDialog({ busy, onClose, className, children, onKeyDown, init
 			onOpenChange={(open, details) => {
 				// The form's Radix pickers render outside the popup; Esc there closes only the picker.
 				if (details.reason === "escape-key" && !popup.current?.contains(details.event.target as Node)) return;
+				if ((details.reason === "escape-key" || details.reason === "outside-press") && onDismiss && !onDismiss(details.reason)) return;
 				if (!open && !busy) onClose();
 			}}
 		>

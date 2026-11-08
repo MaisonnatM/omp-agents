@@ -4,7 +4,7 @@
  */
 import type { Exercise } from "../src/shared/sport";
 
-/** The get-ready step before the first hold. */
+/** The get-ready step before the hold a run starts on. */
 export const PREPARE_SEC = 10;
 /** The transition between two holds when the item before has no rest. */
 export const CHANGE_SEC = 5;
@@ -60,20 +60,24 @@ function between(from: Hold, to: Hold): TimerStep | null {
 	return rest > 0 ? { kind: "rest", sec: rest, hold: to } : null;
 }
 
-/**
- * The steps that run `items`: getting ready, then each hold, its own `holdSec` long or ended by the user when it has
- * none, with the step {@link between} each two. A routine with no items has none.
- */
-export function timerSteps(items: readonly Exercise[]): TimerStep[] {
+/** The hold a run starts on: the first of the first item not in `ticked`, or the first of all when every item is. */
+export function startHold(items: readonly Exercise[], ticked: readonly string[]): number {
 	const holds = holdsOf(items);
-	const first = holds[0];
-	if (!first) return [];
-	const steps: TimerStep[] = [{ kind: "prepare", sec: PREPARE_SEC, hold: first }];
+	return Math.max(0, holds.findIndex(({ item }) => !ticked.includes(item.key)));
+}
+
+/**
+ * The steps that run `items`: each hold, its own `holdSec` long or ended by the user when it has none, with the step
+ * {@link between} each two, and getting ready in place of that step before hold `from`, where the run starts.
+ * A routine with no items has none.
+ */
+export function timerSteps(items: readonly Exercise[], from = 0): TimerStep[] {
+	const holds = holdsOf(items);
+	const steps: TimerStep[] = [];
 	holds.forEach((hold, index) => {
+		const before = index === from ? { kind: "prepare" as const, sec: PREPARE_SEC, hold } : index === 0 ? null : between(holds[index - 1]!, hold);
+		if (before) steps.push(before);
 		steps.push({ kind: "hold", sec: hold.item.holdSec, hold });
-		const next = holds[index + 1];
-		const step = next && between(hold, next);
-		if (step) steps.push(step);
 	});
 	return steps;
 }
@@ -88,7 +92,8 @@ export interface TimerRun {
 	since: number | null;
 }
 
-export const startRun = (now: number): TimerRun => ({ at: 0, ran: 0, since: now });
+/** A run of `steps` started at `now` on its getting-ready step. */
+export const startRun = (steps: readonly TimerStep[], now: number): TimerRun => ({ at: Math.max(0, steps.findIndex(({ kind }) => kind === "prepare")), ran: 0, since: now });
 
 /** How long the current step has run at `now`. */
 export const ranAt = ({ ran, since }: TimerRun, now: number): number => ran + (since === null ? 0 : now - since);

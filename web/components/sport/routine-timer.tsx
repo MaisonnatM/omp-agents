@@ -10,9 +10,10 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { shortcutLabels, usePopupShortcuts } from "../../shortcuts";
-import { advance, clockText, freshCue, goTo, holdText, pauseRun, ranAt, resumeRun, secondsLeft, spanText, spokenCue, startRun, stepTitle, timerNote, timerSteps, type TimerRun, type TimerStep } from "../../sport-timer";
+import { advance, clockText, freshCue, goTo, holdText, pauseRun, ranAt, resumeRun, secondsLeft, spanText, spokenCue, startHold, startRun, stepTitle, timerNote, timerSteps, type TimerRun, type TimerStep } from "../../sport-timer";
 import { rememberSound, soundWanted, type TimerSound } from "../../sport-timer-sound";
 import { demosOf, longDate } from "../../sport-view";
+import type { Dismissal } from "../form-dialog";
 import { SportDialog } from "./sport-dialog";
 
 interface RoutineTimerProps {
@@ -29,7 +30,7 @@ interface RoutineTimerProps {
 	onClose: () => void;
 }
 
-/** What the screen shows: a hold, the time between two, or the end, celebrated when every item is ticked and plain when the user stopped short. */
+/** What the screen shows: a hold, the time between two, or the end, celebrated when the run held every hold it reached and every item is ticked, and plain otherwise. */
 type Phase = "hold" | "between" | "done" | "stopped";
 
 /**
@@ -59,7 +60,7 @@ const PAUSED: Record<"hold" | "between", string> = {
 
 /** The whole screen on a phone, sized to what it shows even when the page is wider; a large panel from `md` up. */
 const FRAME =
-	"inset-0 left-0 h-dvh max-h-none w-dvw max-w-[100dvw] translate-x-0 rounded-none border-0 bg-(--timer-fill) text-foreground transition-colors duration-300 motion-reduce:transition-none md:inset-auto md:top-[5vh] md:left-1/2 md:h-[min(48rem,90vh)] md:w-[min(56rem,calc(100vw-4rem))] md:-translate-x-1/2 md:rounded-2xl md:border";
+	"inset-0 left-0 h-dvh max-h-none w-dvw max-w-[100dvw] translate-x-0 rounded-none border-0 bg-(--timer-fill) text-foreground transition-colors duration-300 motion-reduce:transition-none md:inset-auto md:top-[5vh] md:left-1/2 md:h-[min(48rem,90vh)] md:w-[min(56rem,calc(100vw-4rem))] md:-translate-x-1/2 md:rounded-2xl";
 
 /** The header's buttons: a finger's 44 px on a phone. */
 const HEADER_BUTTON = "size-11 [&_svg]:size-5 md:size-7 md:[&_svg]:size-3.5";
@@ -71,9 +72,9 @@ const RADIUS = 46;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 export function RoutineTimer({ plan, routine, date, ticked, sound, onTick, onClose }: RoutineTimerProps) {
-	// The run keeps the routine it started with, so a plan saved meanwhile cannot shift its steps.
-	const [{ items, steps, started }] = useState(() => ({ items: routine.items, steps: timerSteps(routine.items), started: performance.now() }));
-	const [run, setRun] = useState<TimerRun>(() => startRun(started));
+	// The run keeps the routine it started with, so a plan saved meanwhile cannot shift its steps; it starts on the first item not yet ticked.
+	const [{ items, steps, started }] = useState(() => ({ items: routine.items, steps: timerSteps(routine.items, startHold(routine.items, ticked)), started: performance.now() }));
+	const [run, setRun] = useState<TimerRun>(() => startRun(steps, started));
 	const [now, setNow] = useState(started);
 	const [finished, setFinished] = useState<number | null>(null);
 	const [soundOn, setSoundOn] = useState(soundWanted);
@@ -81,6 +82,8 @@ export function RoutineTimer({ plan, routine, date, ticked, sound, onTick, onClo
 	latest.current = { run, ticked, onTick, soundOn };
 	/** The items this run ticked, which a save still on its way has not brought back in `ticked`. */
 	const sent = useRef(new Set<string>());
+	/** The timed holds this run skipped and has not held to their end since. */
+	const skipped = useRef(new Set<number>());
 	/** Takes the focus as the timer opens, so no button shows its tooltip and Space reaches the shortcut. */
 	const stage = useRef<HTMLDivElement>(null);
 	const step = steps[run.at] ?? null;
@@ -100,6 +103,9 @@ export function RoutineTimer({ plan, routine, date, ticked, sound, onTick, onClo
 		};
 		latest.current.onTick(all.sort((a, b) => place(a) - place(b)));
 	};
+
+	/** No timed hold was skipped without being held to its end since, and every item is ticked: the run's end is celebrated. */
+	const complete = () => skipped.current.size === 0 && items.every(({ key }) => latest.current.ticked.includes(key) || sent.current.has(key));
 
 	const move = (next: TimerRun, at: number) => {
 		const over = next.at >= steps.length;
@@ -135,7 +141,25 @@ export function RoutineTimer({ plan, routine, date, ticked, sound, onTick, onClo
 		if (step === null) return false;
 		// A hold the user ends is done when they say so; a timed one skipped is not.
 		if (step.sec === null) tick([step]);
+		else if (step.kind === "hold") skipped.current.add(step.hold.index);
 		go(run.at + 1);
+	};
+
+	/** Esc pauses a run under way and a click outside leaves it, so it closes by the cross, by Esc once paused, or at its end. */
+	const dismiss = (how: Dismissal) => {
+		if (step === null) return true;
+		switch (how) {
+			case "escape-key":
+				if (!running) return true;
+				toggle();
+				return false;
+			case "outside-press":
+				return false;
+			default: {
+				const never: never = how;
+				return never;
+			}
+		}
 	};
 
 	const keys = usePopupShortcuts({ sportTimerPause: toggle, sportTimerPrevious: previous, sportTimerNext: next });
@@ -148,6 +172,7 @@ export function RoutineTimer({ plan, routine, date, ticked, sound, onTick, onClo
 			const { run: next, ended } = advance(steps, latest.current.run, at);
 			setNow(at);
 			if (ended.length === 0) return;
+			for (const { kind, hold } of ended) if (kind === "hold") skipped.current.delete(hold.index);
 			move(next, at);
 			tick(ended);
 		}, 250);
@@ -162,12 +187,11 @@ export function RoutineTimer({ plan, routine, date, ticked, sound, onTick, onClo
 		else sound.plan(sec * 1000 - ranAt(run, performance.now()));
 	}, [sound, soundOn, run, steps]);
 
-	// The voice, as each step starts; the end is celebrated only when every item is ticked.
+	// The voice, as each step starts; the end is celebrated only when the run is complete.
 	useEffect(() => {
 		if (!latest.current.soundOn) return;
 		const entered = steps[run.at];
-		const allTicked = items.every(({ key }) => latest.current.ticked.includes(key) || sent.current.has(key));
-		const cue = entered ? spokenCue(entered) : allTicked ? "Terminé" : "Arrêté";
+		const cue = entered ? spokenCue(entered) : complete() ? "Terminé" : "Arrêté";
 		if (cue) sound.speak(cue);
 	}, [sound, run.at, steps, items]);
 
@@ -206,7 +230,7 @@ export function RoutineTimer({ plan, routine, date, ticked, sound, onTick, onClo
 	};
 
 	const tickedCount = items.filter(({ key }) => ticked.includes(key) || sent.current.has(key)).length;
-	const phase: Phase = step === null ? (tickedCount === items.length ? "done" : "stopped") : step.kind === "hold" ? "hold" : "between";
+	const phase: Phase = step === null ? (complete() ? "done" : "stopped") : step.kind === "hold" ? "hold" : "between";
 	const fill = step === null || running ? FILL[phase] : PAUSED[step.kind === "hold" ? "hold" : "between"];
 	return (
 		<SportDialog
@@ -214,6 +238,7 @@ export function RoutineTimer({ plan, routine, date, ticked, sound, onTick, onClo
 			onClose={onClose}
 			className={cn(FRAME, INK[phase], fill)}
 			closeClassName={HEADER_BUTTON}
+			onDismiss={dismiss}
 			initialFocus={stage}
 			onKeyDown={keys}
 			actions={
@@ -225,7 +250,7 @@ export function RoutineTimer({ plan, routine, date, ticked, sound, onTick, onClo
 			}
 		>
 			{step === null ? (
-				<Done name={routine.name} taken={(finished ?? now) - started} ticked={tickedCount} of={items.length} onClose={onClose} />
+				<Done name={routine.name} taken={(finished ?? now) - started} complete={phase === "done"} ticked={tickedCount} of={items.length} onClose={onClose} />
 			) : (
 				<div ref={stage} tabIndex={-1} className="flex flex-1 flex-col items-center gap-6 px-6 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-center outline-none">
 					<StepView plan={plan} steps={steps} step={step} run={run} now={now} />
@@ -261,15 +286,15 @@ interface StepViewProps {
 }
 
 /**
- * The step under way, in three groups: what it is over its countdown in a ring, then the hold it is or leads to, then the next hold to start and what is left.
+ * The step under way, in three groups: what it is over its countdown in a ring, then the hold it is or leads to, then the hold after that one and what is left.
  * A pause shows in the ring as well as in the grayed fill.
  */
 function StepView({ plan, steps, step, run, now }: StepViewProps) {
 	const { hold } = step;
 	const { item } = hold;
 	const holds = steps.filter(({ kind }) => kind === "hold");
-	// A hold leads to the hold after it; a break or the « Prêt » leads to the hold it comes before.
-	const after = step.kind === "hold" ? (holds[hold.index + 1]?.hold ?? null) : hold;
+	// The middle shows the hold under way or coming, so « Ensuite » names the one after it.
+	const after = holds[hold.index + 1]?.hold ?? null;
 	const left = step.sec === null ? null : Math.max(0, Math.ceil((step.sec * 1000 - ranAt(run, now)) / 1000));
 	// The ring moves with the countdown's seconds; with reduced motion it steps, without it glides between them.
 	const done = step.sec === null || left === null ? 0 : (step.sec - left) / step.sec;
@@ -289,7 +314,8 @@ function StepView({ plan, steps, step, run, now }: StepViewProps) {
 							{side && `, ${side}`}
 						</span>
 					</p>
-					<div className="relative grid size-[min(80vw,38dvh,24rem)] shrink-0 place-items-center">
+					{/* The panel from `md` up is shorter than the screen, so the ring takes a smaller share of its height. */}
+					<div className="relative grid size-[min(80vw,38dvh,24rem)] shrink-0 place-items-center md:size-[min(36dvh,24rem)]">
 						<svg viewBox="0 0 100 100" aria-hidden className="absolute inset-0 -rotate-90">
 							<circle cx={50} cy={50} r={RADIUS} fill="none" stroke="currentColor" strokeWidth={4} className="opacity-20" />
 							<circle
@@ -318,7 +344,8 @@ function StepView({ plan, steps, step, run, now }: StepViewProps) {
 									{clock}
 								</span>
 							)}
-							{paused && <span className="text-xl font-semibold tracking-widest uppercase">En pause</span>}
+							{/* Below the digits without moving them. */}
+							{paused && <span className="absolute top-full mt-2 text-xl font-semibold tracking-widest whitespace-nowrap uppercase">En pause</span>}
 						</span>
 					</div>
 				</div>
@@ -331,9 +358,17 @@ function StepView({ plan, steps, step, run, now }: StepViewProps) {
 				</div>
 			</div>
 			<div className="flex flex-col items-center gap-0.5 text-sm">
-				{after && <p className="text-balance">{`Ensuite : ${after.item.name}${holdText(after) && ` · ${holdText(after)}`}`}</p>}
+				{/* The line keeps its height on the last hold, so the screen does not shift. */}
+				{after ? (
+					<p className="text-balance">{`Ensuite : ${after.item.name}${holdText(after) && ` · ${holdText(after)}`}`}</p>
+				) : (
+					<p aria-hidden className="invisible">
+						{"\u00a0"}
+					</p>
+				)}
 				<p className="tabular-nums">
-					{after ? `Tenue ${hold.index + 1} / ${holds.length}` : "Dernière tenue"} · {spanText(secondsLeft(steps, run, now))} restantes
+					{/* On the last hold the time left is its countdown. */}
+					{after ? `Tenue ${hold.index + 1} / ${holds.length} · ${spanText(secondsLeft(steps, run, now))} restantes` : step.kind === "hold" ? "Dernière tenue" : `Dernière tenue · ${spanText(secondsLeft(steps, run, now))} restantes`}
 				</p>
 			</div>
 		</>
@@ -344,23 +379,26 @@ interface DoneProps {
 	name: string;
 	/** Milliseconds from the start to the end, pauses included. */
 	taken: number;
+	/** The run held each hold it reached to its end and every item is ticked. */
+	complete: boolean;
 	ticked: number;
 	of: number;
 	onClose: () => void;
 }
 
-/** The end: celebrated when every item is ticked, a plain « Arrêté » when some were skipped. */
-function Done({ name, taken, ticked, of, onClose }: DoneProps) {
-	const all = ticked === of;
+/** The end: celebrated with the time taken when the run is complete, a plain « Arrêté » with the count ticked when it is not. */
+function Done({ name, taken, complete, ticked, of, onClose }: DoneProps) {
 	return (
 		<div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 pb-[max(2.5rem,env(safe-area-inset-bottom))] text-center">
-			{all && <CircleCheck aria-hidden className="size-14" strokeWidth={1.5} />}
+			{complete && <CircleCheck aria-hidden className="size-14" strokeWidth={1.5} />}
 			<h2 aria-live="polite" className="text-4xl font-semibold">
-				{all ? "Terminé" : "Arrêté"}
+				{complete ? "Terminé" : "Arrêté"}
 			</h2>
-			<p className="text-base">
-				{name} en {spanText(Math.round(taken / 1000))}
-			</p>
+			{complete && (
+				<p className="text-base">
+					{name} en {spanText(Math.round(taken / 1000))}
+				</p>
+			)}
 			<p className="text-sm tabular-nums">
 				{ticked} / {of} cochés
 			</p>
