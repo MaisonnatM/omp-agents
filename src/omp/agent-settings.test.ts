@@ -43,6 +43,15 @@ describe("readAgentSettings", () => {
 		expect(rowOf(settings, "hindsight.apiToken")?.control).toEqual({ kind: "text", secret: true });
 	});
 
+	test("the dictation language, which omp's panel leaves out, is a row of the Speech group with a choice of languages", async () => {
+		const settings = await read(null);
+		const speech = settings.tabs.find(tab => tab.id === "interaction")?.groups.find(group => group.label === "Speech");
+		expect(speech?.rows.map(row => row.id)).toContain("stt.language");
+		const control = rowOf(settings, "stt.language")?.control;
+		expect(control?.kind === "select" && control.options.find(option => option.value === "fr")).toEqual({ value: "fr", label: "French" });
+		expect(settings.unlisted).not.toContain("stt.language");
+	});
+
 	test("a credential reaches the page only as whether it is set", async () => {
 		writeFileSync(join(agentDir, "config.yml"), "hindsight:\n  apiToken: very-secret-token\n");
 		const settings = await read(null);

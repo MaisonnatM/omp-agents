@@ -71,6 +71,7 @@ The main ones:
   `config/registry.ts`'s `all` supplies known setting IDs for the installer-owned readiness plan.
   Settings › omp settings reads omp's settings panel through `src/omp/agent-settings.ts`: `orderedSettings` from `config/all-settings.ts`, the panel's entries before it groups them, and `SETTING_TABS`, `TAB_METADATA`, `getSettingsForTab`, and `numericOption` from `pi-tui/src/overlays/settings-defs.ts`, which turn them into tabs, groups, and controls.
   It reads each row's handle from `config/registry.ts`: its type, default, `ui`, `isCredential`, `envName`, and `provenance`, with `getGlobalSettings` and `getProjectSettings` from `config/settings.ts` for the user's and the workspace's values, and writes one with the handle's `set` or `unset`.
+  `ADDED_UI` there gives panel metadata to a setting omp's panel leaves without a control, `stt.language` from `stt/settings.ts`, which `stt/stt-controller.ts` passes to Whisper and cloud transcription but not to Parakeet; its choices are Whisper's language codes.
   `createSettingsHost` in `config/settings-ui.ts` is not used, since it reads omp's global `settings` instance, not one loaded for a workspace.
 
   Settings › omp memory reads omp's memory through `src/omp/memory.ts`; its settings are rows of omp settings.

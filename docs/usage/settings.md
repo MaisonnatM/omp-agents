@@ -117,6 +117,8 @@
   When an environment variable sets a value, the row names the variable, which overrides what you save.
   The settings **Models**, **Agents**, and **Storage** edit show as lines linking to those sections instead of a second editor.
   Settings omp gives no control to are counted under the tabs, with a link that opens `config.yml` in **Files**.
+  One of them gets a row here anyway: **Speech-to-Text Language**, in **Interaction › Speech**, picks the language you dictate in, such as French.
+  Whisper and cloud models transcribe in that language; Parakeet, omp's default local model, recognizes the language on its own.
   If `config.yml` changed on disk since the page read it, the save is refused and the page reloads the setting.
   Running sessions pick up most changes; some apply only to sessions started after the change.
 - **omp memory** shows what omp itself remembers across sessions in the workspace, and the settings that decide it.

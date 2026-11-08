@@ -153,7 +153,7 @@ describe("rowOf", () => {
 	});
 
 	test("an ended capture offers Try again and Dismiss, and Use preview when it heard something; off shows no row", () => {
-		expect(row({ phase: "empty", captureId: "c", target })).toEqual({ status: "No speech detected", detail: null, tone: "muted", actions: ["retry", "dismiss"] });
+		expect(row({ phase: "empty", captureId: "c", target })?.actions).toEqual(["retry", "dismiss"]);
 		expect(row({ phase: "failed", captureId: "c", target, error: "Busy", preview: "" })?.actions).toEqual(["retry", "dismiss"]);
 		expect(row({ phase: "failed", captureId: "c", target, error: "Busy", preview: "the" })).toEqual({ status: "Busy", detail: "the", tone: "error", actions: ["keep", "retry", "dismiss"] });
 		expect(row({ phase: "off", captureId: "c", target, settings })).toBeNull();

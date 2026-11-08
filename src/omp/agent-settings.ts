@@ -3,7 +3,7 @@
  * and one setting's write to the user's `config.yml` through omp's handle.
  */
 import type { AgentSettingControl, AgentSettingEdit, AgentSettingOption, AgentSettingRow, AgentSettings, AgentSettingTab } from "../shared/agent-settings";
-import type { OmpSettingsInstance, SettingDef, SettingHandle, SettingOption, SettingsDisplayEntry } from "./module-types/config";
+import type { OmpSettingsInstance, SettingDef, SettingHandle, SettingOption, SettingsDisplayEntry, SettingUi } from "./module-types/config";
 import { allSettings, settingsDefs, settingsRegistry } from "./modules";
 
 const TERMINAL_PREFIXES = ["tui.", "statusLine.", "display.", "theme.", "composer.", "terminal."];
@@ -16,6 +16,26 @@ function terminalOnly(handle: SettingHandle): boolean {
 	const condition = handle.ui?.condition;
 	return TERMINAL_IDS.has(handle.id) || TERMINAL_PREFIXES.some(prefix => handle.id.startsWith(prefix)) || (condition !== undefined && TERMINAL_CONDITIONS.has(condition));
 }
+
+/** The codes Whisper takes for the language it transcribes, which omp's local Whisper models and cloud transcription read from `stt.language`. */
+const WHISPER_LANGUAGES = "af am ar as az ba be bg bn bo br bs ca cs cy da de el en es et eu fa fi fo fr gl gu ha haw he hi hr ht hu hy id is it ja jw ka kk km kn ko la lb ln lo lt lv mg mi mk ml mn mr ms mt my ne nl nn no oc pa pl ps pt ro ru sa sd si sk sl sn so sq sr su sv sw ta te tg th tk tl tr tt uk ur uz vi yi yo yue zh";
+const LANGUAGE_NAMES = new Intl.DisplayNames(["en"], { type: "language" });
+
+/**
+ * Panel metadata for settings a session reads that omp's panel gives no control, so they show in the tab and group of
+ * their siblings rather than only in `config.yml`.
+ */
+const ADDED_UI: Readonly<Record<string, SettingUi>> = {
+	"stt.language": {
+		tab: "interaction",
+		group: "Speech",
+		label: "Speech-to-Text Language",
+		description: "The language you dictate in, for Whisper and cloud models; Parakeet recognizes it on its own",
+		options: WHISPER_LANGUAGES.split(" ")
+			.map(code => ({ value: code, label: LANGUAGE_NAMES.of(code) ?? code }))
+			.sort((a, b) => a.label.localeCompare(b.label)),
+	},
+};
 
 /** The setting `id` names, `undefined` when omp has none or it only changes how omp's terminal draws. */
 export function agentSetting(id: string): SettingHandle | undefined {
@@ -84,8 +104,9 @@ function panel(): Panel {
 			.map(handle => [handle.id, handle]),
 	);
 	const entries: SettingsDisplayEntry[] = [...handles.values()]
-		.filter(handle => handle.ui !== undefined)
-		.map(handle => ({ path: handle.id, type: handle.type, defaultValue: handle.default, ui: handle.ui, enumValues: handle.enumValues, credential: handle.isCredential }));
+		.map(handle => ({ handle, ui: handle.ui ?? ADDED_UI[handle.id] }))
+		.filter(({ ui }) => ui !== undefined)
+		.map(({ handle, ui }) => ({ path: handle.id, type: handle.type, defaultValue: handle.default, ui, enumValues: handle.enumValues, credential: handle.isCredential }));
 	const listed = new Set<string>();
 	const tabs = settingsDefs.SETTING_TABS.flatMap((tab): Panel["tabs"] => {
 		const groups: Panel["tabs"][number]["groups"] = [];
