@@ -102,6 +102,7 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 									disabled={disabled}
 									onDemo={(title, demos, at) => setDemo({ title, demos, at })}
 									onLog={logFor}
+									onChange={onChange}
 								/>
 							))}
 						{route.tab === "journal" && (

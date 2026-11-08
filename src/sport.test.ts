@@ -11,6 +11,8 @@ const measurementIds = ({ measurements }: SportState): string => measurements.ma
 const PLAN: Plan = { title: "Grimpe", habits: [], routines: [], workouts: [], phases: [], overrides: [] };
 const MAX_METRIC: Metric = { id: "max", label: "Max", unit: "kg", better: "higher" };
 const WITH_MAX: SportState = { ...EMPTY_SPORT, metrics: [MAX_METRIC] };
+const STRETCHED: Plan = { ...PLAN, routines: [{ id: "etirements", name: "Étirements", minutes: 10, items: ["s1", "s2", "s3"].map(key => exercise(key, key)) }] };
+const tick = (date: string, ...items: string[]): SportChange => ({ op: "set-check", check: { date, routine: "etirements", items } });
 
 describe("applySport", () => {
 	test("sets the plan, the targets, and the metrics, and changes nothing when they are the same", () => {
@@ -104,6 +106,27 @@ describe("applySport", () => {
 		expect(applySport(measured, { op: "edit-measurement", measurement: measurement("aug", "poids", 82, "2026-08-26") })).toBe(measured);
 		expect(applySport(measured, { op: "set-metrics", metrics: [bodyweight] })).toBe(measured);
 		expect(applySport(WITH_MAX, { op: "set-metrics", metrics: [bodyweight] }).metrics).toEqual([bodyweight]);
+	});
+
+	test("sets a day's ticks of a routine in the routine's order, replaces them, and an empty list removes them", () => {
+		const start = { ...EMPTY_SPORT, plan: STRETCHED };
+		const ticked = after(start, tick("2026-11-17", "s3", "s1", "s3"), tick("2026-11-16", "s2"));
+		expect(ticked.checks).toEqual([
+			{ date: "2026-11-16", routine: "etirements", items: ["s2"] },
+			{ date: "2026-11-17", routine: "etirements", items: ["s1", "s3"] },
+		]);
+		expect(applySport(ticked, tick("2026-11-17", "s1", "s3"))).toBe(ticked);
+		expect(after(ticked, tick("2026-11-17", "s2", "s1")).checks[1]?.items).toEqual(["s1", "s2"]);
+		expect(after(ticked, tick("2026-11-17")).checks.map(({ date }) => date)).toEqual(["2026-11-16"]);
+		expect(applySport(start, tick("2026-11-17"))).toBe(start);
+	});
+
+	test("refuses ticks of a routine or an item the plan does not hold, with the path of the field", () => {
+		const start = { ...EMPTY_SPORT, plan: STRETCHED };
+		expect(applySportChanges(EMPTY_SPORT, [tick("2026-11-17", "s1")])).toEqual({ error: "check.routine must name a routine of the plan, not etirements" });
+		expect(applySportChanges(start, [{ op: "set-check", check: { date: "2026-11-17", routine: "hanche", items: [] } }])).toEqual({ error: "check.routine must name a routine of the plan, not hanche" });
+		expect(applySportChanges(start, [tick("2026-11-17", "s1", "h1")])).toEqual({ error: "check.items[1] must name an item of routine etirements, not h1" });
+		expect(applySportChanges(start, [tick("17/11/2026", "s1")])).toEqual({ error: "check.date must be a YYYY-MM-DD day" });
 	});
 });
 

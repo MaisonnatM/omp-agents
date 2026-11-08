@@ -21,6 +21,8 @@
   A load reads where it comes from: the test it was worked out from, such as « D'après le test du 26 août », or the session it was last lifted in, such as « Dernière fois +13 kg · 21 nov. ».
   A load with no measurement to work from reads « charge à tester ».
   Below the workouts, **Chaque jour** lists the daily habits, with **Démos** for one that follows a routine.
+  A habit that follows a routine, such as the stretches, lists the routine's exercises with a box each, its dose and note, and a play mark when it has a demo; its count, such as `2 / 5`, says how many are ticked.
+  Tick a box with a click, or with Tab then Space; the ticks are saved for that day, so another day shows its own.
 - When you noted pain of 3 out of 10 or more in the last 7 days, a banner says where and when.
   Finger pain removes the fingerboard and every hang for the next 7 days; the open day shows them struck through.
 - On a narrow page, while the open day has a workout not noted yet, a **Séance faite…** button stays at the bottom of the day.
@@ -61,6 +63,5 @@
 ## What the page leaves out
 
 - No minutes per block: the plan gives a workout's length, not its blocks', so the page shows the whole workout's length alone.
-- No check-off for the daily habits: nothing stores a habit as done, so the page lists them without a box.
 - One **Fait…** per workout: a note belongs to one workout, so a day with two workouts has two buttons.
 - The week's address is `#sport`, not `#sport/week`, as the Notes page's first list is `#notes`.

@@ -24,6 +24,7 @@ import {
 	PLACES,
 	type Plan,
 	type Routine,
+	type RoutineCheck,
 	type Slot,
 	SPORT_VERSION,
 	type SportChange,
@@ -330,6 +331,11 @@ const parseLog: Parse<WorkoutLog> = (value, path, rules) => {
 	};
 };
 
+const parseCheck: Parse<RoutineCheck> = (value, path, rules) => {
+	const read = fieldsOf(value, path, rules);
+	return { date: read.one("date", DAY), routine: read.one("routine", rules.id), items: read.list("items", ruled(rules.id)) };
+};
+
 function unique<T>(items: T[], path: string, idOf: (item: T) => string): void {
 	const seen = new Set<string>();
 	for (const item of items) {
@@ -391,6 +397,7 @@ export function parseSportState(value: unknown): SportState | null {
 			targets: read.list("targets", parseTarget),
 			plan: read.maybe("plan", parsePlan),
 			log: read.list("log", parseLog).toSorted((a, b) => a.date.localeCompare(b.date)),
+			checks: read.list("checks", parseCheck).toSorted((a, b) => a.date.localeCompare(b.date)),
 		};
 	} catch (err) {
 		if (err instanceof Refused) return null;
@@ -428,6 +435,8 @@ function readChange(value: unknown): SportChange {
 		case "remove-measurement":
 		case "remove-log":
 			return { op, id: read.one("id", SENT_ID) };
+		case "set-check":
+			return { op, check: read.nested("check", parseCheck) };
 		default:
 			return refuse("op", "must name a Sport change");
 	}

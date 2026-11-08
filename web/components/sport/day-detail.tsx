@@ -1,6 +1,6 @@
-/** The open day of the week: each workout with its demos, blocks, exercises, and loads, then the daily habits. */
+/** The open day of the week: each workout with its demos, blocks, exercises, and loads, then the daily habits with their routines' checklists. */
 import { Check, Play, Plus } from "lucide-react";
-import type { Exercise, Plan } from "../../../src/shared/sport";
+import type { Exercise, Plan, Routine, RoutineCheck } from "../../../src/shared/sport";
 import type { PlannedDay, PlannedExercise, PlannedWorkout } from "../../../src/sport-week";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,12 +17,16 @@ interface DayDetailProps {
 	day: PlannedDay;
 	today: string;
 	disabled: boolean;
+	/** Every day's ticks of the routines; the day's own show. */
+	checks: RoutineCheck[];
 	onDemo: OpenDemo;
 	/** Opens the log form for `workout`, `null` for a free session. */
 	onLog: (workout: PlannedWorkout | null) => void;
+	/** Saves a day's ticks of one routine. */
+	onCheck: (check: RoutineCheck) => void;
 }
 
-export function DayDetail({ plan, day, today, disabled, onDemo, onLog }: DayDetailProps) {
+export function DayDetail({ plan, day, today, disabled, checks, onDemo, onLog, onCheck }: DayDetailProps) {
 	const kicker = `${day.date === today ? "Aujourd'hui · " : ""}${longDate(day.date)}${day.deload ? " · semaine allégée" : ""}`;
 	return (
 		<div className="flex flex-col gap-4">
@@ -36,12 +40,12 @@ export function DayDetail({ plan, day, today, disabled, onDemo, onLog }: DayDeta
 			) : (
 				day.workouts.map(workout => <WorkoutCard key={workout.id} plan={plan} kicker={kicker} workout={workout} disabled={disabled} onDemo={onDemo} onLog={onLog} />)
 			)}
-			<Habits plan={plan} date={day.date} today={today} onDemo={onDemo} />
+			<Habits plan={plan} date={day.date} today={today} disabled={disabled} checks={checks} onDemo={onDemo} onCheck={onCheck} />
 		</div>
 	);
 }
 
-function WorkoutCard({ plan, kicker, workout, disabled, onDemo, onLog }: Omit<DayDetailProps, "today" | "day"> & { kicker: string; workout: PlannedWorkout }) {
+function WorkoutCard({ plan, kicker, workout, disabled, onDemo, onLog }: Omit<DayDetailProps, "today" | "day" | "checks" | "onCheck"> & { kicker: string; workout: PlannedWorkout }) {
 	const { demos, blocks } = workoutDemos(plan, workout);
 	const log = workout.log;
 	return (
@@ -102,7 +106,17 @@ function ExerciseRow({ item: { exercise, load, removed }, onDemo }: { item: Plan
 	);
 }
 
-function Habits({ plan, date, today, onDemo }: { plan: Plan; date: string; today: string; onDemo: OpenDemo }) {
+interface HabitsProps {
+	plan: Plan;
+	date: string;
+	today: string;
+	disabled: boolean;
+	checks: RoutineCheck[];
+	onDemo: OpenDemo;
+	onCheck: (check: RoutineCheck) => void;
+}
+
+function Habits({ plan, date, today, disabled, checks, onDemo, onCheck }: HabitsProps) {
 	if (plan.habits.length === 0) return null;
 	return (
 		<section aria-label="Chaque jour" className="rounded-xl border border-border p-5">
@@ -110,17 +124,87 @@ function Habits({ plan, date, today, onDemo }: { plan: Plan; date: string; today
 			<ul className="mt-2 divide-y divide-border">
 				{plan.habits.map(habit => {
 					const routine = plan.routines.find(({ id }) => id === habit.routine) ?? null;
-					const demos = routine ? demosOf(plan, routine.items) : [];
-					return (
-						<li key={habit.label} className="flex items-center justify-between gap-3 py-2 text-sm">
-							<span>{habit.label}</span>
-							{routine && demos.length > 0 && (
-								<Button variant="ghost" size="compact" leadingIcon={Play} onClick={() => onDemo(routine.name, demos, 0)} {...activityControl("sport.demo.open")}>Démos</Button>
-							)}
-						</li>
-					);
+					if (routine === null) return <li key={habit.label} className="py-2 text-sm">{habit.label}</li>;
+					const saved = checks.find(check => check.date === date && check.routine === routine.id)?.items ?? [];
+					return <RoutineHabit key={habit.label} plan={plan} label={habit.label} routine={routine} ticked={routine.items.map(({ key }) => key).filter(key => saved.includes(key))} disabled={disabled} onDemo={onDemo} onTick={items => onCheck({ date, routine: routine.id, items })} />;
 				})}
 			</ul>
 		</section>
+	);
+}
+
+interface RoutineHabitProps {
+	plan: Plan;
+	label: string;
+	routine: Routine;
+	/** The keys of the routine's items ticked on the day, in the routine's order; a key the plan no longer holds is left out. */
+	ticked: string[];
+	disabled: boolean;
+	onDemo: OpenDemo;
+	onTick: (items: string[]) => void;
+}
+
+/** A habit that follows a routine: its label with how many items are ticked, then the routine's items as a checklist. */
+function RoutineHabit({ plan, label, routine, ticked, disabled, onDemo, onTick }: RoutineHabitProps) {
+	const demos = demosOf(plan, routine.items);
+	return (
+		<li className="flex flex-col gap-1 py-2 text-sm">
+			<div className="flex items-center justify-between gap-3">
+				<span className="min-w-0">{label}</span>
+				<span className="flex shrink-0 items-center gap-2">
+					{routine.items.length > 0 && <span className="text-xs text-muted-foreground tabular-nums">{ticked.length} / {routine.items.length}</span>}
+					{demos.length > 0 && <Button variant="ghost" size="compact" leadingIcon={Play} onClick={() => onDemo(routine.name, demos, 0)} {...activityControl("sport.demo.open")}>Démos</Button>}
+				</span>
+			</div>
+			{routine.items.length > 0 && (
+				<ul aria-label={routine.name} className="flex flex-col">
+					{routine.items.map(exercise => {
+						const done = ticked.includes(exercise.key);
+						const own = demosOf(plan, [exercise])[0];
+						const at = own ? demos.indexOf(own) : -1;
+						return (
+							<CheckRow
+								key={exercise.key}
+								exercise={exercise}
+								done={done}
+								disabled={disabled}
+								onDemo={at === -1 ? null : () => onDemo(routine.name, demos, at)}
+								onToggle={() => onTick(done ? ticked.filter(key => key !== exercise.key) : [...ticked, exercise.key])}
+							/>
+						);
+					})}
+				</ul>
+			)}
+		</li>
+	);
+}
+
+function CheckRow({ exercise, done, disabled, onDemo, onToggle }: { exercise: Exercise; done: boolean; disabled: boolean; onDemo: (() => void) | null; onToggle: () => void }) {
+	const side = [dose(exercise), exercise.note].filter(Boolean).join(" · ");
+	return (
+		<li className="flex items-start gap-3 py-1.5">
+			<button
+				type="button"
+				role="checkbox"
+				aria-checked={done}
+				aria-label={`Fait, ${exercise.name}`}
+				disabled={disabled}
+				onClick={onToggle}
+				className={cn("mt-px inline-flex size-5 shrink-0 items-center justify-center rounded-md border outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50", done ? "border-foreground bg-foreground text-background" : "border-border bg-background hover:bg-accent")}
+			>
+				{done && <Check aria-hidden className="size-3.5" />}
+			</button>
+			<div className="flex min-w-0 flex-1 flex-col gap-0.5 @md/sport:flex-row @md/sport:items-start @md/sport:justify-between @md/sport:gap-4">
+				{onDemo ? (
+					<button type="button" onClick={onDemo} {...activityControl("sport.demo.open")} className={cn("inline-flex items-center gap-1 self-start rounded-sm text-left underline decoration-dotted underline-offset-4 outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-ring", done && "text-muted-foreground")}>
+						{exercise.name}
+						<Play aria-label="démo" className="size-3 fill-current text-muted-foreground" />
+					</button>
+				) : (
+					<span className={cn(done && "text-muted-foreground")}>{exercise.name}</span>
+				)}
+				{side && <p className="min-w-0 text-muted-foreground @md/sport:max-w-[50%] @md/sport:text-right">{side}</p>}
+			</div>
+		</li>
 	);
 }
