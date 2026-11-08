@@ -26,6 +26,7 @@ import { BotPage, NewBot } from "./bots/bot-page";
 import { BotsGallery } from "./bots/bots-gallery";
 import { SettingsPage } from "./settings/settings-page";
 import { ScheduledSession } from "./scheduled-session";
+import { SportPage } from "./sport/page";
 import { useScheduleSend } from "./scheduled";
 import { TICKETS_META, TICKETS_TITLE, TicketsPage } from "./tickets/tickets-page";
 import { TodoPage } from "./todo/page";
@@ -49,7 +50,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "sport" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -89,6 +90,7 @@ export const PageSwitch = memo(function PageSwitch({
 	models,
 	userTodos,
 	userNotes,
+	sport,
 	routines,
 	bots,
 	botLasts,
@@ -114,7 +116,7 @@ export const PageSwitch = memo(function PageSwitch({
 	resize,
 	toggleSidebar,
 }: PageSwitchProps) {
-	const { send, start, dismissStart, changeTodo, changeNote } = useDashboardActions();
+	const { send, start, dismissStart, changeTodo, changeNote, changeSport } = useDashboardActions();
 	const scheduleSend = useScheduleSend();
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
 	switch (page?.kind) {
@@ -212,6 +214,8 @@ export const PageSwitch = memo(function PageSwitch({
 			return <CalendarPage routines={routines} todos={userTodos} ticketsShown={linearCallable} workspace={workspace} />;
 		case "email":
 			return <EmailPage target={page.target} workspace={workspace} />;
+		case "sport":
+			return <SportPage state={sport} route={page} disabled={!connected} onChange={changeSport} />;
 		// Get started is a dialog over the home, which `GetStarted` in `web/app.tsx` draws.
 		case "get-started":
 		case undefined:

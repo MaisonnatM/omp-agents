@@ -24,6 +24,7 @@ export interface DashboardActions {
 	openNewSession: Dashboard["openNewSession"];
 	changeTodo: Dashboard["changeTodo"];
 	changeNote: Dashboard["changeNote"];
+	changeSport: Dashboard["changeSport"];
 	changeBot: Dashboard["changeBot"];
 	/**
 	 * End running session `instanceId`, then move its panes along once the server ended it; a failure shows as a toast.

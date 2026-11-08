@@ -16,7 +16,7 @@ import type { Peer } from "./request-ledger";
 interface ListChanges {
 	"user-todos": UserTodoChange;
 	"user-notes": UserNoteChange;
-	sport: SportChange;
+	sport: SportChange[];
 	routines: Exclude<RoutineChange, { op: "run-now" }>;
 	scheduled: Exclude<ScheduledChange, { op: "send-now" }>;
 	workspaces: WorkspaceChange;
@@ -55,10 +55,16 @@ export class ListRegistry {
 		for (const entry of this.#snapshots) yield entry.msg();
 	}
 
-	/** Publish a changed list; a no-op instead resends the current list to the requesting page alone. */
+	/** Publish a changed list; a no-op instead resends the current list to the requesting page alone, and so does a refused change before it throws, so the page drops what it already shows. */
 	apply<T extends keyof ListChanges>(kind: T, change: ListChanges[T], peer?: Pick<Peer, "send">): boolean {
 		const entries: EditableEntries = this.#entries;
-		const changed = entries[kind].apply(change);
+		let changed: boolean;
+		try {
+			changed = entries[kind].apply(change);
+		} catch (error) {
+			peer?.send(this.message(kind));
+			throw error;
+		}
 		if (changed) this.#push(kind);
 		else peer?.send(this.message(kind));
 		return changed;

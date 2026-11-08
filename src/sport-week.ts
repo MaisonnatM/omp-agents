@@ -4,13 +4,16 @@
  * Every date is a `YYYY-MM-DD` day, counted on the calendar alone. A skipped log adds no load, climb, or record.
  */
 import { addDays, DAY_KEYS, type DayKey, daysBetween, mondayOf, weekdayOf } from "./shared/days";
-import { type ClimbKind, type Exercise, type FrenchGrade, gradeRank, type Measurement, type PainPlace, type Phase, type Plan, type Slot, type SportState, type Workout, type WorkoutLog } from "./shared/sport";
+import { type ClimbKind, type Exercise, exercisesOf, type FrenchGrade, gradeRank, type Measurement, type Metric, type PainPlace, type Phase, type Plan, type Slot, type SportState, type Workout, type WorkoutLog } from "./shared/sport";
 
 /** The pain, out of 10, from which a log flags it. */
 export const PAIN_FLAG_LEVEL = 3;
 
-/** The days a pain flag holds after its log, during which a finger flag removes the hangs. */
+/** The days a pain flag holds after its log, during which a flag {@link removesHangs} names removes the hangs. */
 export const PAIN_FLAG_DAYS = 7;
+
+/** Whether a pain flag at `where` removes the hangs while it holds: a finger flag does, any other is only watched. */
+export const removesHangs = (where: PainPlace): boolean => where === "fingers";
 
 /** Kilograms added and where they come from: the log that lifted them, or the rule with the day of the max it read, `null` for a fixed rule. */
 export type Load = { kg: number; from: "log"; logId: string; date: string } | { kg: number; from: "rule"; measuredAt: string | null };
@@ -19,7 +22,7 @@ export interface PlannedExercise {
 	exercise: Exercise;
 	/** From {@link loadFor}. */
 	load: Load | null;
-	/** A hang a recent finger pain flag removes. */
+	/** A hang a recent pain flag {@link removesHangs} names removes. */
 	removed: boolean;
 }
 
@@ -58,10 +61,10 @@ export interface WeekGrades {
 export interface SportRecords {
 	/** The best value of each metric measured, by the metric's `better`, first reached on `at`. */
 	metrics: { metric: string; value: number; at: string }[];
-	/** The heaviest load logged for each exercise key, first reached on `date`. */
-	loads: { key: string; kg: number; date: string }[];
-	/** The hardest grade sent, first on `date`. */
-	grades: Record<ClimbKind, { grade: FrenchGrade; date: string } | null>;
+	/** The heaviest load logged for each exercise key, first reached on `date` by log `logId`. */
+	loads: { key: string; kg: number; date: string; logId: string }[];
+	/** The hardest grade sent, first on `date` by log `logId`. */
+	grades: Record<ClimbKind, { grade: FrenchGrade; date: string; logId: string } | null>;
 }
 
 export interface Adherence {
@@ -119,24 +122,24 @@ function flagsBetween(state: SportState, from: string, to: string): PainFlag[] {
 /** The pain flags that hold on `date`: those of the logs from {@link PAIN_FLAG_DAYS} days before it to that day, oldest first. */
 export const painFlags = (state: SportState, date: string): PainFlag[] => flagsBetween(state, addDays(date, -PAIN_FLAG_DAYS), date);
 
-/** `date` with its workouts, their loads, and the hangs a finger pain flag among `flags` removes. */
+/** `date` with its workouts, their loads, and the hangs a pain flag among `flags` removes. */
 function planDay(state: SportState, date: string, flags: PainFlag[]): PlannedDay {
 	const { plan } = state;
 	const { phase, deload, override, slots } = slotsOn(plan, date);
-	const fingersRest = flags.some(flag => flag.where === "fingers" && flag.date < date && date <= flag.until);
+	const hangsRest = flags.some(flag => removesHangs(flag.where) && flag.date < date && date <= flag.until);
 	const workouts = slots.flatMap(({ workout: id, optional }) => {
 		const workout = plan?.workouts.find(entry => entry.id === id);
 		if (!workout) return [];
 		const blocks = workout.blocks.map(({ title, items }) => ({
 			title,
-			items: items.map(exercise => ({ exercise, load: loadFor(state, exercise, date), removed: exercise.hang && fingersRest })),
+			items: items.map(exercise => ({ exercise, load: loadFor(state, exercise, date), removed: exercise.hang && hangsRest })),
 		}));
 		return [{ ...workout, optional, blocks, log: logOf(state, date, id) }];
 	});
 	return { date, weekday: weekdayOf(date), phase, deload, override, workouts };
 }
 
-/** One day of the plan, with its workouts, their loads, and the hangs a finger pain flag removes. */
+/** One day of the plan, with its workouts, their loads, and the hangs a pain flag removes. */
 export const dayPlan = (state: SportState, date: string): PlannedDay => planDay(state, date, painFlags(state, date));
 
 /** The seven days of the week `day` falls in, Monday first, each as {@link dayPlan} gives it. */
@@ -169,20 +172,35 @@ export function records(state: SportState): SportRecords {
 		const best = metrics.get(metric);
 		if (!best || (lower.has(metric) ? value < best.value : value > best.value)) metrics.set(metric, { metric, value, at });
 	}
-	const loads = new Map<string, { key: string; kg: number; date: string }>();
+	const loads = new Map<string, SportRecords["loads"][number]>();
 	const grades: SportRecords["grades"] = { boulder: null, route: null };
-	for (const { date, status, loads: logged, climbs } of state.log) {
+	for (const { id: logId, date, status, loads: logged, climbs } of state.log) {
 		if (status !== "done") continue;
 		for (const [key, kg] of Object.entries(logged)) {
 			const best = loads.get(key);
-			if (!best || kg > best.kg) loads.set(key, { key, kg, date });
+			if (!best || kg > best.kg) loads.set(key, { key, kg, date, logId });
 		}
 		for (const { kind, grade } of climbs) {
 			const best = grades[kind];
-			if (!best || gradeRank(grade) > gradeRank(best.grade)) grades[kind] = { grade, date };
+			if (!best || gradeRank(grade) > gradeRank(best.grade)) grades[kind] = { grade, date, logId };
 		}
 	}
 	return { metrics: [...metrics.values()], loads: [...loads.values()], grades };
+}
+
+/** The test `workout` holds: its first exercise keyed by a metric of `state`, with that metric; `null` when none is. */
+export function testedMetric(state: SportState, workout: Workout): { exercise: Exercise; metric: Metric } | null {
+	for (const exercise of workout.blocks.flatMap(({ items }) => items)) {
+		const metric = state.metrics.find(({ id }) => id === exercise.key);
+		if (metric) return { exercise, metric };
+	}
+	return null;
+}
+
+/** The bodyweight's metric id: the one an of-max load rule of `plan` subtracts, `null` when no rule subtracts one. */
+export function bodyweightMetric(plan: Plan | null): string | null {
+	for (const { load } of plan ? exercisesOf(plan) : []) if (load?.kind === "of-max" && load.less !== null) return load.less;
+	return null;
 }
 
 /** How many workouts were planned from `from` to `to` and how many of them were done; an optional one counts only once done. */

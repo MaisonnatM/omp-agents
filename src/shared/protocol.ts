@@ -142,8 +142,8 @@ export type ClientMsg =
 	| { t: "user-todo"; change: UserTodoChange }
 	/** Change the Notes page's list; every socket then gets the list as it is after. */
 	| { t: "user-note"; change: UserNoteChange }
-	/** Change the Sport module's state; every socket then gets the state as it is after. */
-	| { t: "sport-change"; change: SportChange }
+	/** Change the Sport module's state by all of `changes` or, when one is refused, none; every socket then gets the state as it is after. */
+	| { t: "sport-changes"; changes: SportChange[] }
 	/** Change the routines, or run one now; every socket then gets the routines as they are after. */
 	| { t: "routine"; change: RoutineChange }
 	/** Create, edit, or remove a Bot, or send one a message; every socket then gets the Bots as they are after. */

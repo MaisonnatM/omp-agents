@@ -1,5 +1,5 @@
 /** Applying changes to the Sport module's state, which the server does to `sport.json` and the page to the state it shows. */
-import { canonicalJson } from "./json";
+import { canonicalJson, type Parsed } from "./json";
 import { exercisesOf, type Measurement, type Metric, type Plan, type SportChange, type SportState, type Target, type WorkoutLog } from "./shared/sport";
 
 const same = (a: unknown, b: unknown): boolean => canonicalJson(a) === canonicalJson(b);
@@ -115,4 +115,15 @@ export function applySport(state: SportState, change: SportChange): SportState {
 			return never;
 		}
 	}
+}
+
+/** `state` after every change of `changes` in order, each checked by `sportRefusal` against the state the ones before it leave, or why the first refused one refuses them all. */
+export function applySportChanges(state: SportState, changes: SportChange[]): Parsed<SportState, { error: string }> {
+	let next = state;
+	for (const change of changes) {
+		const why = sportRefusal(next, change);
+		if (why !== null) return { error: why };
+		next = applySport(next, change);
+	}
+	return { ok: next };
 }

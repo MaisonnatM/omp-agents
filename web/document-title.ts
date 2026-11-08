@@ -31,6 +31,8 @@ function contextOf(page: Page | null, view: View | null, host: RosterHost | null
 			return "Calendar";
 		case "email":
 			return "Email";
+		case "sport":
+			return "Sport";
 		case undefined: {
 			if (view?.kind === "past") return past ? pastLabel(past) : null;
 			if (view?.kind !== "live") return null;

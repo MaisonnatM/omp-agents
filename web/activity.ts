@@ -199,6 +199,10 @@ export const VIEWS = [
 	{ key: "email/item", label: "A mail conversation", tab: "email" },
 	{ key: "scheduled", label: "Scheduled sends" },
 	{ key: "scheduled/item", label: "A scheduled send" },
+	{ key: "sport", label: "Sport week" },
+	{ key: "sport/journal", label: "Sport journal" },
+	{ key: "sport/journal/item", label: "A workout log" },
+	{ key: "sport/progress", label: "Sport progress" },
 	{ key: "new", label: "New session" },
 ] as const satisfies readonly { key: string; label: string; tab?: SidebarTab }[];
 
@@ -225,6 +229,10 @@ function pageView(page: Page): ViewKey {
 			return page.target === null ? "email" : page.target === "new" ? "email/new" : "email/item";
 		case "scheduled":
 			return page.id === null ? "scheduled" : "scheduled/item";
+		case "sport":
+			if (page.tab === "week") return "sport";
+			if (page.tab === "progress") return "sport/progress";
+			return page.open === null ? "sport/journal" : "sport/journal/item";
 		case "calendar":
 		case "get-started":
 		case "new":

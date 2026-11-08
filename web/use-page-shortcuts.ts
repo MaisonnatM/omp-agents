@@ -87,6 +87,7 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			notes: goToTab("notes"),
 			calendar: goToTab("calendar"),
 			email: goToTab("email"),
+			sport: goToTab("sport"),
 		};
 		const positions = positionHandlers(() => latest.current.tabs, goTo);
 		return {
@@ -132,6 +133,7 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			notes: goTo.notes,
 			calendar: goTo.calendar,
 			email: goTo.email,
+			sport: goTo.sport,
 			...positions,
 			restore: () => {
 				const { page, maximized, layout, show } = latest.current;

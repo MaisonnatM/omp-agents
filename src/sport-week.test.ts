@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mondayOf } from "./shared/days";
+import { daysApart, mondayOf } from "./shared/days";
 import { FRENCH_GRADES, gradeRank, type SportState } from "./shared/sport";
 import { ABRAHANGS, log, measurement, OPEN, PULLS, SEMI, STATE, withLogs, withMeasurements } from "./sport-fixtures";
 import { parseSportState } from "./sport-parse";
@@ -154,7 +154,7 @@ describe("grades", () => {
 			{ monday: "2026-11-23", boulder: null, route: null },
 			{ monday: "2026-11-30", boulder: null, route: "7c" },
 		]);
-		expect(records(state).grades).toEqual({ boulder: { grade: "7b+", date: "2026-11-21" }, route: { grade: "7c", date: "2026-12-01" } });
+		expect(records(state).grades).toEqual({ boulder: { grade: "7b+", date: "2026-11-21", logId: "l2" }, route: { grade: "7c", date: "2026-12-01", logId: "l3" } });
 	});
 });
 
@@ -172,8 +172,8 @@ describe("records", () => {
 				{ metric: "bodyweight", value: 82, at: "2026-08-26" },
 			],
 			loads: [
-				{ key: "open", kg: 13, date: "2026-11-21" },
-				{ key: "tractions", kg: 37.5, date: "2026-11-28" },
+				{ key: "open", kg: 13, date: "2026-11-21", logId: "l1" },
+				{ key: "tractions", kg: 37.5, date: "2026-11-28", logId: "l2" },
 			],
 			grades: { boulder: null, route: null },
 		});
@@ -206,6 +206,8 @@ describe("days", () => {
 		expect(weekPlan(STATE, "2026-11-16").map(({ date }) => date)).toEqual(["2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20", "2026-11-21", "2026-11-22"]);
 		expect(mondayOf("2026-11-01")).toBe("2026-10-26");
 		expect(mondayOf("2027-03-28")).toBe("2027-03-22");
+		expect(daysApart("2026-10-26", "2026-11-23")).toBe(28);
+		expect(daysApart("2027-03-29", "2027-03-22")).toBe(-7);
 		expect(dayItems(STATE, "2026-11-17").semi?.load?.kg).toBe(15);
 		expect(adherence(STATE, "2026-10-26", "2026-11-22").planned).toBe(7);
 	});

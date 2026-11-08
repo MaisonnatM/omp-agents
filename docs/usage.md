@@ -33,6 +33,7 @@ For which file draws each part of the screen, see the [Interface map](code-layou
   - [Notes from agents](usage/notes.md#notes-from-agents)
 - [Calendar](usage/calendar.md)
 - [Email](usage/email.md)
+- [Sport](usage/sport.md)
 - [Routines](usage/routines.md)
 - [Bots](usage/bots.md)
 - [Settings](usage/settings.md)

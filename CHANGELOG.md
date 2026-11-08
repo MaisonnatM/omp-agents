@@ -7,9 +7,17 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - Behind the scenes: a replay script reruns real helper-agent tasks on two models side by side, with the project's checks and a blind review of both results, to tell whether a cheaper model does the work as well.
 - Behind the scenes: the dashboard now keeps your training plan, test results, targets, and workout log together and works out each week's workouts and loads, ready for the coming Sport page.
+- Behind the scenes: the dashboard now keeps your training plan, test results, targets, and workout log together and works out each week's workouts and loads, which the Sport page shows.
 - Your personal assistant can now read your training week, with each day's loads.
 - It can log a workout, record a test result, and set your plan and targets. The dashboard saves each change for it.
 - It never changes or deletes a workout or test result you entered yourself.
+- New Sport page, from the Sport button in the header: your training week day by day, with each exercise's load worked out from your last test or your last session.
+- Click an exercise to watch its demo video with three tips; the video loads only when you press play.
+- Press Fait… on a workout to note your loads, sends, effort, and any pain; the next sessions start from what you noted, and pain in your fingers takes the fingerboard out for a week.
+- The Journal tab lists every session you noted, week by week, and the Progrès tab charts your tests and best grades against your targets, with your records.
+- In the Journal tab, ↓ and ↑ step through your sessions and Esc closes the open one.
+- Behind the scenes: the dashboard keeps each demo's preview picture on your computer after loading it once, and YouTube's player comes from its privacy-enhanced address.
+- On the Sport page, a session that fails to save now says so in its dialog, and nothing of it is kept, so a test result is never saved without its session.
 - Installing the starter kit, or Update dashboard, now removes the kit files the kit stopped shipping, unless you edited them, so old extensions stop running in your sessions.
 - With the starter kit, helper agents that a session starts no longer carry the tools only your own session uses, such as ending the session, landing, and your todos, notes, and reminders, so each of their requests costs less.
 - Fixed: with the starter kit, helper agents in poteto mode no longer look for a skill under an old name that always failed.

@@ -25,3 +25,7 @@ Add one when a mistake cost a retry and the docs did not prevent it.
 - Search for the exact text you see on screen, such as `xd://:` rather than `mounted`; a common word across `src`, `web`, and omp's source returns hundreds of unrelated lines.
 - End a browser eval with an explicit `print` of the fields you need; a bare trailing `globalThis.tab = tab` prints the whole tab object, about 120 lines.
 - For a smoke check of something that should disappear, use `scripts/smoke-proof.ts --expect-absent`, which also proves the server serves your checkout; see [docs/agent-smoke.md](docs/agent-smoke.md).
+
+## Shortcuts in dialogs
+
+- A Base UI dialog's popup stops the arrows, Home, and End from bubbling, so a `useShortcuts` binding on one of them never fires while the dialog has focus, and no test catches it; bind it with `usePopupShortcuts` on the popup and press the key in a browser smoke.

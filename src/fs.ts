@@ -10,15 +10,15 @@ import { OwnerLock } from "../templates/omp/agent/extensions/github/owner-lock";
 const stagingFor = (path: string): string => join(dirname(path), `.${basename(path)}.${randomBytes(8).toString("hex")}.tmp`);
 
 /**
- * Replaces `path` with `text` through a temporary file beside it, so a reader sees the old file or the new one, never
- * part of either. The temporary file is created with `mode`, and removed when the write fails.
+ * Replaces `path` with `data`, text or bytes, through a temporary file beside it, so a reader sees the old file or the
+ * new one, never part of either. The temporary file is created with `mode`, and removed when the write fails.
  */
-export async function atomicWriteText(path: string, text: string, mode?: number): Promise<void> {
+export async function atomicWriteText(path: string, data: string | Uint8Array, mode?: number): Promise<void> {
 	const temp = stagingFor(path);
 	const handle = await open(temp, "wx", mode);
 	try {
 		try {
-			await handle.writeFile(text);
+			await handle.writeFile(data);
 		} finally {
 			await handle.close();
 		}
