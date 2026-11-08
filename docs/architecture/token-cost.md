@@ -96,12 +96,30 @@ The verdict per block of lines, for the proposal above:
 
 ### Test plan for each proposal
 
-- **Worker model.** Replay 20 landed tasks from `archive` on both models in isolated worktrees; compare the same checks passing, the `land` checks, and reviewer findings per change, then cost per task from `report.ts --since`.
+- **Worker model.** Replay past worker prompts on both models with `scripts/token-audit/model-replay.ts`, as [Worker model replay](#worker-model-replay) says; compare checks kept, judge verdicts, and cost per task.
 - **Worker turns.** Set `task.agentCompactionThresholdOverrides` to 90000 for one week and 150000 the next; compare subagent cost per run and the compaction row, and reject a setting whose runs fail their checks more often.
 - **Edit paths.** Count edit errors whose text says "is not from this session" before and after the omp change; they should fall to zero.
 - **Skill allow-list.** Give the scout and reviewer agents an allow-list, then check in 10 runs that each answers its brief without reading a skill it lost.
 - **Main-session devices.** Behind an environment flag, run 20 prompts that need each tool on Opus and on a Cursor model; the tool must be called as often as without the flag.
 - **`APPEND_SYSTEM.md` move.** Run 10 PR-shaped prompts with the trimmed file; each must still state the review decision before the PR, as the current rule requires.
+
+### Worker model replay
+
+`scripts/token-audit/model-replay.ts` replays real worker prompts so a model swap is judged on the work workers did.
+
+1. `bun scripts/token-audit/model-replay.ts candidates --repo <repository> > tasks.json` lists `poteto-agent` and `task` subagent prompts of the last 14 days in that repository.
+   Each entry's base is the commit the prompt names, else the target branch at the time the worker started, and its `paths` are the checkouts the prompt names, which a replay points at its own clone.
+   Prompts that point at `local://` or `agent://` files are left out, since those files lived in the parent session.
+2. Keep the entries worth replaying: ones that change code, whose base is the state the worker saw.
+   A worker on a feature branch saw commits main did not have yet; replayed from main, it cannot do the part that needs them, as the pilot's replays of `760ccfb8` reported.
+3. `bun scripts/token-audit/model-replay.ts run --tasks tasks.json --models anthropic/claude-opus-5-5:auto,anthropic/claude-sonnet-5-5:auto --out ~/.cache/omp-model-replay/<name>` runs the repository's `.omp/land.json` checks once at each base, then replays each task on each model in a clone with no remote, under `--max-cost` (15 dollars) and `--max-time` (45 minutes).
+   The folder must sit outside every checkout, and `run` refuses one inside: in the first pilot, replays in a clone under a worktree's `tmp/` read that worktree too.
+   A replay loads only `cache-tail.ts` of the kit's extensions, so it cannot land, push, or touch the dashboard, and both models get the same prompt and tools.
+   Its session files stay in the run's folder, so they do not count in `~/.omp/stats.db` or `report.ts`.
+4. `bun scripts/token-audit/model-replay.ts judge --out ~/.cache/omp-model-replay/<name>` asks the judge model, Opus by default, to compare each pair of diffs, shown as A and B in random order, and to list each one's defects.
+5. The summary per model shows how many replays break nothing that worked at the base, empty changes, cost, requests, and minutes per task, and judge wins, ties, and losses.
+   A test that already failed at the base, often from this computer's setup, is not counted against a replay that still fails it.
+   Swap a worker's model only when the cheaper model keeps the checks as often and loses no more judge verdicts than it wins, over at least 20 tasks.
 
 ## Gaps
 
