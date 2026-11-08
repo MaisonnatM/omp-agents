@@ -25,6 +25,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Plan quota](architecture/plan-quota.md)
 - [Analytics](architecture/analytics.md)
   - [Context sources](architecture/analytics.md#context-sources)
+- [Token cost](architecture/token-cost.md)
 - [Activity](architecture/activity.md)
 - [Routines](architecture/routines.md)
   - [Routines from before Bots](architecture/routines.md#routines-from-before-bots)
