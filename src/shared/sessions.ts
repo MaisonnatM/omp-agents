@@ -129,6 +129,11 @@ interface RosterHostBase extends SessionFacts {
 	queue: MessageQueue;
 	/** The main agent's turn that ended since you last looked at the session; `null` once you did, or while a turn runs. */
 	unread: UnreadTurn | null;
+	/**
+	 * Whether the main agent's running turn waits on work it started instead of working itself: its tool calls in flight are only `wait`
+	 * or `task` calls, or, between calls, its last ones were; `false` once it starts any other tool or its turn ends.
+	 */
+	turnWaits: boolean;
 }
 
 /** The tool a session calls in a turn that found nothing for the user, such as a Bot's routine run; that turn ends without marking the session unread. */

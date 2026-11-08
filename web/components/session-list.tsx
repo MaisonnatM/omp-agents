@@ -1,4 +1,4 @@
-import { Activity, Bot, CircleAlert, CirclePause, History, ListRestart, Loader, Pin, Plus, UserRound } from "lucide-react";
+import { Activity, Bot, CircleAlert, CirclePause, History, Hourglass, ListRestart, Loader, Pin, Plus, UserRound } from "lucide-react";
 import { useContext, useState } from "react";
 import type { View } from "../../src/shared/sessions";
 import { SidebarContent, SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
@@ -38,7 +38,7 @@ interface SessionListProps {
 	newSessionLabel: string;
 }
 
-/** The Sessions tab: New session, the search field, then the scheduled sends, and the pinned, idle, running, Bots, interrupted, and past groups. */
+/** The Sessions tab: New session, the search field, then the scheduled sends, and the pinned, idle, running, waiting on subagents, Bots, interrupted, and past groups. */
 export function SessionList({ lists, query, onQuery, onTogglePin, open, showWorkspace, newSessionOpen, scheduledOpen, newSessionLabel }: SessionListProps) {
 	const { start, dismissStart, openNewSession } = useDashboardActions();
 	const personal = useContext(PersonalContext);
@@ -46,7 +46,7 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 	const { connected, starts: { resumeAll } } = useDashboardStatus();
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
 	const [pastShown, setPastShown] = useState(PAST_PAGE);
-	const { pinned, running, idle, bots, interrupted, ended } = lists;
+	const { pinned, running, idle, awaitingSubagents, bots, interrupted, ended } = lists;
 	const resumingAll = resumeAll?.phase === "starting";
 	const isOpen = (view: View): boolean => open.some(pane => sameView(pane, view));
 	/** The search field narrows the lists, so a group left empty hides rather than saying it has no sessions. */
@@ -90,7 +90,7 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 				<SidebarSearch label="Filter the sidebar's sessions" placeholder="Search sessions" query={query} onQuery={onQuery} shortcut="sessionSearch" />
 			</SidebarGroup>
 			<SidebarContent>
-				{filtering && pinned.hosts.length + pinned.past.length + idle.length + running.length + bots.length + interrupted.length + ended.length === 0 && (
+				{filtering && pinned.hosts.length + pinned.past.length + idle.length + running.length + awaitingSubagents.length + bots.length + interrupted.length + ended.length === 0 && (
 					<p className="px-4 py-2 text-xs text-muted-foreground">{`No sessions match “${query.trim()}”`}</p>
 				)}
 				{!filtering && <ScheduledGroup openId={scheduledOpen} showWorkspace={showWorkspace} open={!collapsed.has("scheduled")} onOpenChange={() => toggleGroup("scheduled")} />}
@@ -112,9 +112,15 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 				{(!filtering || running.length > 0) && (
 					<SidebarGroup collapsible open={!collapsed.has("running")} onOpenChange={() => toggleGroup("running")}>
 						<SidebarGroupLabel icon={Activity}>
-							{running.length > 0 ? `${running.length} running` : pinned.hosts.length + idle.length + bots.length > 0 ? "No other sessions running" : "No sessions"}
+							{running.length > 0 ? `${running.length} running` : pinned.hosts.length + idle.length + awaitingSubagents.length + bots.length > 0 ? "No other sessions running" : "No sessions"}
 						</SidebarGroupLabel>
 						<SidebarMenu aria-label="Running omp sessions">{hostRows(running, false)}</SidebarMenu>
+					</SidebarGroup>
+				)}
+				{awaitingSubagents.length > 0 && (
+					<SidebarGroup collapsible open={!collapsed.has("subagents")} onOpenChange={() => toggleGroup("subagents")}>
+						<SidebarGroupLabel icon={Hourglass}>{`${awaitingSubagents.length} waiting on subagents`}</SidebarGroupLabel>
+						<SidebarMenu aria-label="omp sessions waiting on subagents">{hostRows(awaitingSubagents, false)}</SidebarMenu>
 					</SidebarGroup>
 				)}
 				{bots.length > 0 && (

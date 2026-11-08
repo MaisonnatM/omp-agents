@@ -79,6 +79,7 @@
   A `storage` event carries a change made in another page of the same origin to the same store, and `onStoredChange` calls a listener after each write of a key.
   A changed key from `PORTABLE_PREFERENCES` also goes to the server through the sender `web/use-dashboard.ts` registers with `sendPreferencesThrough`; `storedPreferences` reads them to seed a server that holds none, and `adoptPreferences` takes the server's without sending them back; see [Preferences](../architecture/preferences.md).
   The page state owns the split ratios rather than a component, so `web/use-dashboard.ts` reads and stores them through the same file's `storedNumber` and `storeOrRemove`.
-  `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's pinned, running, interrupted, and past lists, which the page also walks for the previous and next session keys.
+  `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's pinned, idle, running, waiting on subagents, Bots, interrupted, and past lists, which the page also walks for the previous and next session keys.
+  `liveList` there picks the list of an unpinned live session from its status, its running subagents, and its row's `turnWaits`.
   `waitsOnYou` there tells a live session that waits on you, for the waiting count.
   `discoverableSessions` leaves sessions under `/tmp` out of those lists and the workspace picker, and `workspaceSwitch` keeps a started session's workspace only when that directory is discoverable.

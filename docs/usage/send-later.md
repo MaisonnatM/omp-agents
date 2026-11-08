@@ -14,7 +14,7 @@
 - A scheduled new session starts as the draft's **Start session** would: in the same directory, on the same branch choice, model, thinking level, and skill, and linked to the draft's todo.
   It opens in no pane; it shows in the sidebar once it starts.
 - The sidebar's **Scheduled** group, such as **2 scheduled**, sits at the top of the list and lists every scheduled send, new sessions too, in the session rows' look: the message and its time on the right; under all workspaces a new session's row also shows its workspace badge. It hides while nothing is scheduled.
-  Each sessions-sidebar group title starts with its own icon: an alarm clock for scheduled, then pinned, idle, running, interrupted, and past.
+  Each sessions-sidebar group title starts with its own icon: an alarm clock for scheduled, then pinned, idle, running, an hourglass for waiting on subagents, then interrupted, and past.
   A message's row opens its session, and each row's menu has **Send now**, **Edit**, and **Cancel**.
 - A scheduled new session's row, or its **Edit**, opens it as the new-session draft it was scheduled from, at `#scheduled/<id>`: its message, directory, branch, model, thinking level, and skill.
   The header shows its time, with **Start now** and **Cancel**. Sending the message saves the edits and keeps the time, and the clock button moves it to another time.

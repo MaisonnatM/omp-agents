@@ -122,6 +122,26 @@ describe("LiveSessions", () => {
 		expect(sessions.bySessionId("s1")).toBeUndefined();
 	});
 
+	test("a row says its turn waits while the main agent sits in wait calls, and the roster updates as that starts and the turn ends", () => {
+		const updates: string[] = [];
+		const sessions = new LiveSessions((_instanceId, update) => updates.push(update.kind), undefined, unreadIn());
+		const { instanceId, emit } = sessions.allocate("i1");
+		sessions.add(liveSession(instanceId), null);
+		const turnWaits = () => sessions.rows(() => facts)[0]?.turnWaits;
+		expect(turnWaits()).toBe(false);
+
+		emit({ kind: "event", event: { type: "tool_execution_start", toolCallId: "c1", toolName: "wait" } });
+		expect(turnWaits()).toBe(true);
+		expect(updates).toEqual(["event", "roster"]);
+
+		emit({ kind: "event", event: { type: "tool_execution_end", toolCallId: "c1", toolName: "wait" } });
+		emit({ kind: "event", event: { type: "message_update" } });
+		expect(turnWaits()).toBe(true);
+		emit({ kind: "event", event: { type: "agent_end" } });
+		expect(turnWaits()).toBe(false);
+		expect(updates).toEqual(["event", "roster", "event", "event", "event", "roster"]);
+	});
+
 	test("a row carries the turn its session ended unseen, with its reply's first line, until a look, the next turn, or the session leaving reads it", () => {
 		const sessions = registry(unreadIn(), "i1");
 		const unread = () => sessions.rows(() => facts)[0]?.unread;

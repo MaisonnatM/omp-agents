@@ -3,7 +3,7 @@
 - The content header and both sidebar header rows are 48 px tall at the default font size, each with a hairline under it.
 - The sidebar's tab bar shows **Pull requests**, **Tickets**, **Bots**, **Sessions**, and **Todo**, above the list of the one open.
   **Notes**, **Calendar**, and **Email** are buttons in the header, right after the command menu button, between two dividers; each opens its page and shows its list in the sidebar below the tab bar, with no tab selected, and the open one's button stays pressed.
-  The **Bots** tab lists your Bots; the **Sessions** tab lists only their running conversations, in a **Bots** group after the running sessions, each under its Bot's name; see [Bots](bots.md).
+  The **Bots** tab lists your Bots; the **Sessions** tab lists only their running conversations, in a **Bots** group after the running sessions and the ones waiting on subagents, each under its Bot's name; see [Bots](bots.md).
   The **Sessions** tab counts the sessions of the picked workspace that need you: each that asks you something, or finished a turn you have not looked at since.
   A finished turn you have read leaves the count, though its session stays idle.
 - The dot before each session shows when it waits on you.
@@ -11,7 +11,7 @@
 - Under **All workspaces**, a session row with a title shows a badge that names its workspace, the last segment of the workspace's directory, on the right before its age.
   With one workspace picked, the rows show no badge.
   A row without a title shows its directory's name as its label, and the badge only when it runs in a linked worktree, whose name is not its workspace's.
-- The workspace picker in the sidebar header shows only the running, idle, interrupted, and past sessions from one workspace.
+- The workspace picker in the sidebar header shows only the running, idle, waiting on subagents, interrupted, and past sessions from one workspace.
   A workspace is a repository's main checkout, or a directory outside git: a session in a linked git worktree, such as `~/code/yampa-review-triage-3935ff7b`, counts in its repository's workspace, `~/code/yampa`, and still runs in its worktree.
   A session whose worktree was removed counts in the repository whose main checkout's path, followed by `-`, starts its directory, such as `~/code/yampa-wt/fix` in `~/code/yampa`, else in the only repository whose main checkout has its directory's name, such as Codex's `~/.codex/worktrees/f5e7/yampa`.
   The picker lists the workspaces that a live or saved session ran in, live sessions' first, then the ones added in **Settings › Workspaces**, except temporary directories and hidden workspaces.
@@ -40,7 +40,12 @@
 - A live session whose turn ended, the blue dot, leaves **Running** for the **Idle** group above it, and moves back when its next turn starts.
   A session waiting on a question stays under **Running**, and a pinned session stays under **Pinned** whatever its state.
   The group shows only while it has a row.
-- Click the **Pinned**, **Idle**, **Running**, **Interrupted**, or **Past** group label to collapse or expand its rows.
+- A live session whose subagents still run while its main agent's turn has ended, or sits only in a `wait` or `task` call waiting on them, moves to the **Waiting on subagents** group after **Running**, such as **2 waiting on subagents**.
+  It moves back to **Idle** once its turn ends with no subagent running, and to **Running** once its main agent runs another tool or asks a question, or its last subagent finishes while its turn still runs.
+  Thinking or writing between two `wait` calls keeps it in the group.
+  A session whose server started watching it in the middle of a `wait` call stays under **Running** until its main agent's next tool call.
+  The group shows only while it has a row.
+- Click the **Pinned**, **Idle**, **Running**, **Waiting on subagents**, **Interrupted**, or **Past** group label to collapse or expand its rows.
   The app keeps each group's choice across workspaces, navigation, and reloads, even while the group has no rows.
 - The past sessions list every saved session that has no live host, newest first, with its title (else its first prompt) and how long ago it last changed; hover a row to see its working directory.
   Select one to read its transcript.
