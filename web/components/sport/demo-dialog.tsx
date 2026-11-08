@@ -95,13 +95,13 @@ export function DemoDialog({ title, demos, at, onAt, onClose }: DemoDialogProps)
 			</div>
 			<div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
 				<Tooltip content="Démo précédente" shortcut={shortcutLabels("sportPreviousDay")} side="top" disabled={at === 0}>
-					<Button variant="tertiary" size="compact" leadingIcon={ChevronLeft} disabled={at === 0} onClick={() => onAt(at - 1)}>Précédent</Button>
+					<Button variant="tertiary" size="compact" leadingIcon={ChevronLeft} disabled={at === 0} onClick={() => onAt(at - 1)} {...activityControl("sport.demo.step")}>Précédent</Button>
 				</Tooltip>
 				{last ? (
 					<Button size="compact" onClick={onClose}>Terminé</Button>
 				) : (
 					<Tooltip content="Démo suivante" shortcut={shortcutLabels("sportNextDay")} side="top">
-						<Button size="compact" trailingIcon={ChevronRight} onClick={() => onAt(at + 1)}>Suivant</Button>
+						<Button size="compact" trailingIcon={ChevronRight} onClick={() => onAt(at + 1)} {...activityControl("sport.demo.step")}>Suivant</Button>
 					</Tooltip>
 				)}
 			</div>

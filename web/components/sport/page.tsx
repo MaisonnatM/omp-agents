@@ -28,8 +28,6 @@ interface SportPageProps {
 	onChange: (changes: SportChange[]) => Promise<void>;
 }
 
-const TAB_CONTROL = { week: "sport.tab.week", journal: "sport.tab.journal", progress: "sport.tab.progress" } as const;
-
 /** What to ask the personal agent for when there is no plan yet. */
 const ASK_FOR_PLAN = "Crée-moi un plan d'escalade de 4 semaines : poutre, bloc et routine hanche, avec mes charges de départ.";
 
@@ -41,6 +39,7 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 	const today = localDay();
 	const selected = route.tab === "week" ? (route.day ?? today) : today;
 	const plan = state?.plan ?? null;
+	// FormDialog binds no arrow keys, so the week's and journal's arrows stay live under a dialog unless this turns them off.
 	const dialogOpen = demo !== null || target !== null || saved !== null || weighing;
 	const stepDay = (by: -1 | 1) => {
 		location.hash = hashForSport({ tab: "week", day: addDays(selected, by) });
@@ -158,8 +157,8 @@ function ViewTabs({ tab, className, fill = false }: { tab: SportRoute["tab"]; cl
 			className={className}
 		>
 			<SegmentedTabsList aria-label="Vue" className={fill ? "w-full" : undefined}>
-				{SPORT_TABS.map(({ route, name }) => (
-					<SegmentedTab key={route.tab} value={route.tab} className={fill ? "flex-1" : undefined} {...activityControl(TAB_CONTROL[route.tab])}>
+				{SPORT_TABS.map(({ route, name, control }) => (
+					<SegmentedTab key={route.tab} value={route.tab} className={fill ? "flex-1" : undefined} {...activityControl(control)}>
 						{name}
 					</SegmentedTab>
 				))}

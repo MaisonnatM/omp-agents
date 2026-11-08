@@ -35,7 +35,7 @@ export function DayDetail({ plan, day, today, disabled, onDemo, onLog }: DayDeta
 					<p className="text-xs text-muted-foreground first-letter:uppercase">{kicker}</p>
 					<h2 className="text-xl font-semibold">Repos</h2>
 					<p className="mt-1 text-sm text-muted-foreground">Rien de prévu ce jour.</p>
-					<Button variant="tertiary" size="compact" leadingIcon={Plus} className="mt-3" disabled={disabled} onClick={() => onLog(null)}>Séance libre</Button>
+					<Button variant="tertiary" size="compact" leadingIcon={Plus} className="mt-3" disabled={disabled} onClick={() => onLog(null)} {...activityControl("sport.log.free")}>Séance libre</Button>
 				</section>
 			) : (
 				day.workouts.map(workout => <WorkoutCard key={workout.id} plan={plan} day={day} kicker={kicker} workout={workout} disabled={disabled} onDemo={onDemo} onLog={onLog} />)
@@ -64,7 +64,7 @@ function WorkoutCard({ plan, day, kicker, workout, disabled, onDemo, onLog }: Om
 					</div>
 				</div>
 				{log ? (
-					<Button variant="tertiary" size="compact" disabled={disabled} onClick={() => onLog(workout)}>Modifier…</Button>
+					<Button variant="tertiary" size="compact" disabled={disabled} onClick={() => onLog(workout)} {...activityControl("sport.day.edit")}>Modifier…</Button>
 				) : (
 					<Button size="compact" leadingIcon={Check} disabled={disabled} onClick={() => onLog(workout)} {...activityControl("sport.log.open")}>Fait…</Button>
 				)}
