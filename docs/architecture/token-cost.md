@@ -112,9 +112,13 @@ The verdict per block of lines, for the proposal above:
    Prompts that point at `local://` or `agent://` files are left out, since those files lived in the parent session.
 2. Keep the entries worth replaying: ones that change code, whose base is the state the worker saw.
    A worker on a feature branch saw commits main did not have yet; replayed from main, it cannot do the part that needs them, as the pilot's replays of `760ccfb8` reported.
-3. `bun scripts/token-audit/model-replay.ts run --tasks tasks.json --models anthropic/claude-opus-5-5:auto,anthropic/claude-sonnet-5-5:auto --out ~/.cache/omp-model-replay/<name>` runs the repository's `.omp/land.json` checks once at each base, then replays each task on each model in a clone with no remote, under `--max-cost` (15 dollars) and `--max-time` (45 minutes).
+3. `bun scripts/token-audit/model-replay.ts run --tasks tasks.json --models anthropic/claude-opus-5-5:auto,anthropic/claude-sonnet-5-5:auto --out ~/.cache/omp-model-replay/<name>` runs the repository's `.omp/land.json` checks once at each base, then replays each task on each model under `--max-cost` (15 dollars) and `--max-time` (45 minutes).
    The folder must sit outside every checkout, and `run` refuses one inside: in the first pilot, replays in a clone under a worktree's `tmp/` read that worktree too.
-   A replay loads only `cache-tail.ts` of the kit's extensions, so it cannot land, push, or touch the dashboard, and both models get the same prompt and tools.
+   Each replay works in a new repository that holds the base's history and nothing after it: no branch, no tag, no remote, and no commit from later work.
+   omp runs under macOS's `sandbox-exec`, which hides the task's repository, every folder whose name starts with it, such as `<repository>-wt/`, and their omp session folders, where the original worker's change and transcript sit; `run` works only on macOS.
+   git rewrites every `https://`, `http://`, `ssh://`, `git://`, and `git@` address to a missing folder, and gh starts with no sign-in, so a replay can neither fetch later work nor push; a task that needs GitHub, such as reading a pull request, cannot do that part.
+   In the second week, before these limits, Composer copied the original change on three of five tasks, from a worktree, from a later `main` the clone held, and with `git cherry-pick`, and force-pushed a branch of the real repository.
+   A replay loads only `cache-tail.ts` of the kit's extensions, so it cannot land or touch the dashboard, and every model gets the same prompt and tools.
    A config overlay points every model role and fallback chain at the replayed model, so its subagents run on it too and a usage limit cannot hand the work to another model: before it, a model over its limit was silently answered by Opus.
    `answeredBy` in each `result.json` counts the requests per model; a replay another model answered part of is left out of the summary and the judging.
    A replay whose session ends on a model error, such as a usage limit, is removed, so the next `run` retries it rather than counting an empty change.

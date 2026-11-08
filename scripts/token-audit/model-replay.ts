@@ -5,8 +5,10 @@
  * - `candidates` lists recent worker subagent sessions as task entries: the prompt they got, the repository,
  *   and the main commit at that time as the base, leaving out tasks `--out` already holds, so a weekly run
  *   gets only new ones. Save them to a file and keep the ones worth replaying.
- * - `run` replays each task on each model in a fresh clone with no remote, so a replay cannot push or land,
- *   prices the run from its session files, saves its diff, and runs the repository's `.omp/land.json` setup and checks.
+ * - `run` replays each task on each model in a fresh repository holding only the base's history, with no remote,
+ *   in a macOS sandbox that hides the task's checkouts and their sessions and leaves git and gh no way to reach a remote,
+ *   so a replay cannot copy later work, push, or land. It prices the run from its session files, saves its diff, and
+ *   runs the repository's `.omp/land.json` setup and checks.
  *   Every model role and fallback chain points at the replayed model, so its subagents run on it and a usage limit
  *   fails the replay instead of handing it to another model; `answeredBy` counts the requests per model as proof.
  * - `judge` shows a judge model the task, the `--baseline` model's diff, and another model's diff in random order,
@@ -25,6 +27,7 @@ import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, 
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { sessionPaths } from "../../src/omp/modules";
 
 interface Task {
 	id: string;
@@ -229,14 +232,18 @@ function landConfig(repo: string, base: string): { setup: string[]; checks: stri
 	}
 }
 
-/** A clone of the task's repository at its base, with no remote, after the repository's land setup. */
+/**
+ * A repository at the task's base, after the repository's land setup: it holds the base's history and nothing after it,
+ * no branch, no tag, and no remote, so neither `git log --all` nor a commit's hash leads to the work that followed.
+ */
 function prepare(task: Task, dir: string): string {
 	const clone = join(dir, "repo");
 	mkdirSync(dir, { recursive: true });
 	if (!existsSync(clone)) {
-		git(dir, "clone", "--quiet", "--shared", "--no-checkout", task.repo, clone);
-		git(clone, "checkout", "--quiet", "--detach", task.base);
-		git(clone, "remote", "remove", "origin");
+		git(dir, "init", "--quiet", clone);
+		git(clone, "fetch", "--quiet", "--no-tags", task.repo, git(task.repo, "rev-parse", "--verify", `${task.base}^{commit}`).trim());
+		git(clone, "checkout", "--quiet", "--detach", "FETCH_HEAD");
+		rmSync(join(clone, ".git", "FETCH_HEAD"));
 	}
 	for (const command of landConfig(task.repo, task.base).setup) {
 		const step = sh(command, clone);
@@ -258,6 +265,36 @@ function check(task: Task, clone: string, dir: string): Result["checks"] {
 	return checks;
 }
 
+/**
+ * The `sandbox-exec` arguments and environment that run a replay's omp so it sees only its own repository: the sandbox
+ * hides the task's repository, its worktrees, and their omp session folders, where the original worker's change and
+ * transcript sit; git rewrites every remote address to a missing folder, and gh has no sign-in.
+ * Without them, replays copied the original change from a worktree and force-pushed a branch of the real repository.
+ */
+function confined(task: Task, dir: string, args: string[]): { sandboxArgs: string[]; env: Record<string, string | undefined> } {
+	if (process.platform !== "darwin") throw new Error("run needs macOS's sandbox-exec to hide the task's checkouts from a replay");
+	const startingWith = (path: string) => `(regex #"^${path.replace(/[.*+?^$()|[\]{}\\"]/g, "\\$&")}($|[-/])")`;
+	const sessions = sessionPaths.sessionDirForCwd(task.repo, join(homedir(), ".omp", "agent", "sessions"));
+	const profile = `(version 1)(allow default)(deny file-read* file-write* ${startingWith(task.repo)} ${startingWith(sessions)})`;
+	const remotes = ["https://", "http://", "ssh://", "git://", "git@"];
+	const gh = join(dir, "gh");
+	mkdirSync(gh, { recursive: true });
+	const env: Record<string, string | undefined> = {
+		...process.env,
+		GH_CONFIG_DIR: gh,
+		GH_TOKEN: undefined,
+		GITHUB_TOKEN: undefined,
+		GH_ENTERPRISE_TOKEN: undefined,
+		GITHUB_ENTERPRISE_TOKEN: undefined,
+		GIT_CONFIG_COUNT: String(remotes.length),
+	};
+	for (const [index, prefix] of remotes.entries()) {
+		env[`GIT_CONFIG_KEY_${index}`] = "url./nonexistent/model-replay-has-no-remote/.insteadOf";
+		env[`GIT_CONFIG_VALUE_${index}`] = prefix;
+	}
+	return { sandboxArgs: ["-p", profile, "omp", ...args], env };
+}
+
 /** Replays one task on one model; null when the model could not answer, whose folder is removed so the next run retries it. */
 function replay(task: Task, model: string): Result | null {
 	const dir = join(out, task.id, slug(model));
@@ -270,7 +307,8 @@ function replay(task: Task, model: string): Result | null {
 	args.push("--max-cost", values["max-cost"], "--max-time", values["max-time"], prompt);
 	const log = openSync(join(dir, "output.txt"), "w");
 	const started = Date.now();
-	const run = spawnSync("omp", args, { cwd: clone, stdio: ["ignore", log, log] });
+	const { sandboxArgs, env } = confined(task, dir, args);
+	const run = spawnSync("sandbox-exec", sandboxArgs, { cwd: clone, env, stdio: ["ignore", log, log] });
 	closeSync(log);
 	const minutes = (Date.now() - started) / 60_000;
 	const error = endedOnError(join(dir, "sessions"));
