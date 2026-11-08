@@ -5,6 +5,10 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-08
 
+- On the Sport page, a session that fails to save now says so in its dialog, and nothing of it is kept, so a test result is never saved without its session.
+
+## 2026-11-07
+
 - Behind the scenes: the dashboard now keeps your training plan, test results, targets, and workout log together and works out each week's workouts and loads, ready for the coming Sport page.
 - Your personal assistant can now read your training week, with each day's loads.
 - It can log a workout, record a test result, and set your plan and targets. The dashboard saves each change for it.

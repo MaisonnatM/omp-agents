@@ -9,7 +9,7 @@ import type { ReviewDraft } from "../src/shared/review-drafts";
 import { applyPins, type PinChange } from "../src/shared/pins";
 import type { ScheduledSend } from "../src/shared/scheduled";
 import type { SportChange, SportState } from "../src/shared/sport";
-import { applySport } from "../src/sport";
+import { applySportChanges } from "../src/sport";
 import { newestPastFirst, type PastSession, type RosterHost, type View } from "../src/shared/sessions";
 import type { Workspace, WorkspaceList } from "../src/shared/workspaces";
 import type { Routine } from "../src/routines";
@@ -105,7 +105,7 @@ export type Action =
 	| { t: "new-session-completions"; completions: Completions }
 	| { t: "user-todo"; change: UserTodoChange }
 	| { t: "user-note"; change: UserNoteChange }
-	| { t: "sport-change"; change: SportChange }
+	| { t: "sport-changes"; changes: SportChange[] }
 	| { t: "pin"; change: PinChange }
 	| { t: "bot"; change: Exclude<BotChange, { op: "message" }>; now: string }
 	/** The trust dialog of start `reqId` closed, by trusting or by **Cancel**. */
@@ -265,8 +265,10 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return state.userTodos ? { ...state, userTodos: applyUserTodo(state.userTodos, action.change) } : state;
 		case "user-note":
 			return state.userNotes ? { ...state, userNotes: applyUserNote(state.userNotes, action.change) } : state;
-		case "sport-change":
-			return state.sport ? { ...state, sport: applySport(state.sport, action.change) } : state;
+		case "sport-changes": {
+			const applied = state.sport && applySportChanges(state.sport, action.changes);
+			return applied && "ok" in applied ? { ...state, sport: applied.ok } : state;
+		}
 		case "pin": {
 			const pins = applyPins(state.pins, action.change);
 			return pins === state.pins ? state : { ...state, pins };

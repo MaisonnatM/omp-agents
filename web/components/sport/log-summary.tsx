@@ -1,9 +1,9 @@
 /** A log's figures as a row of cells, and the dialog that sums a session up once it is logged, with the records it beat. */
 import { Gauge, Star } from "lucide-react";
-import type { Exercise, Measurement, Metric, WorkoutLog } from "../../../src/shared/sport";
+import type { Exercise } from "../../../src/shared/sport";
 import { Button } from "@/components/ui/button";
 import { hashForSport } from "../../routing";
-import { amount, type Beaten, duration, effortWord, sendsText, shortDate, signedKg } from "../../sport-view";
+import { amount, duration, effortWord, type Saved, sendsText, shortDate, signedKg } from "../../sport-view";
 import { Callout } from "../integrations/integration-row";
 import { SportDialog } from "./sport-dialog";
 
@@ -30,14 +30,6 @@ export function heaviest(loads: Record<string, number>, exercises: Exercise[]): 
 	if (top === null) return "—";
 	const name = exercises.find(({ key }) => key === top[0])?.name;
 	return name ? `${signedKg(top[1])} · ${name}` : signedKg(top[1]);
-}
-
-/** What a save sums up: the log, the minutes its workout planned, the records it beat, and the max a test measured. */
-export interface Saved {
-	log: WorkoutLog;
-	minutes: number | null;
-	beaten: Beaten[];
-	test: { metric: Metric; value: number; was: Measurement | null } | null;
 }
 
 export function SummaryDialog({ saved: { log, minutes, beaten, test }, exercises, onClose }: { saved: Saved; exercises: Exercise[]; onClose: () => void }) {

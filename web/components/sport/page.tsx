@@ -9,13 +9,13 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../../activity";
 import { hashForSport, type SportRoute } from "../../routing";
 import { useShortcuts } from "../../shortcuts";
-import { bodyweightOf, phaseLabel } from "../../sport-view";
+import { bodyweightOf, type LogTarget, phaseLabel, type Saved } from "../../sport-view";
 import { PageFrame } from "../list-page";
 import { SegmentedTab, SegmentedTabs, SegmentedTabsList } from "../segmented-tabs";
 import { DemoDialog } from "./demo-dialog";
 import { JournalTab } from "./journal";
-import { LogForm, type LogTarget, WeighForm } from "./log-form";
-import { type Saved, SummaryDialog } from "./log-summary";
+import { LogForm, WeighForm } from "./log-form";
+import { SummaryDialog } from "./log-summary";
 import { SPORT_TABS } from "./nav";
 import { ProgressTab } from "./progress";
 import { WeekTab } from "./week";
@@ -25,7 +25,7 @@ interface SportPageProps {
 	state: SportState | null;
 	route: SportRoute;
 	disabled: boolean;
-	onChange: (change: SportChange) => Promise<void>;
+	onChange: (changes: SportChange[]) => Promise<void>;
 }
 
 const TAB_CONTROL = { week: "sport.tab.week", journal: "sport.tab.journal", progress: "sport.tab.progress" } as const;

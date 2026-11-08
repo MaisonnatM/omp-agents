@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { EMPTY_SPORT, type Measurement, type Metric, type Plan, type SportChange, type SportState } from "./shared/sport";
-import { applySport } from "./sport";
+import { applySport, applySportChanges } from "./sport";
 import { exercise, log, measurement } from "./sport-fixtures";
 
 const max = (id: string, at: string, value = 112): Measurement => measurement(id, "max", value, at);
@@ -104,5 +104,17 @@ describe("applySport", () => {
 		expect(applySport(measured, { op: "edit-measurement", measurement: measurement("aug", "poids", 82, "2026-08-26") })).toBe(measured);
 		expect(applySport(measured, { op: "set-metrics", metrics: [bodyweight] })).toBe(measured);
 		expect(applySport(WITH_MAX, { op: "set-metrics", metrics: [bodyweight] }).metrics).toEqual([bodyweight]);
+	});
+});
+
+describe("applySportChanges", () => {
+	test("applies every change in order, each checked against what the ones before it leave", () => {
+		const changes: SportChange[] = [{ op: "set-metrics", metrics: [MAX_METRIC] }, { op: "add-measurement", measurement: max("aug", "2026-08-26") }, { op: "add-log", log: log("a", "2026-08-26") }];
+		expect(applySportChanges(EMPTY_SPORT, changes)).toEqual({ ok: after(EMPTY_SPORT, ...changes) });
+	});
+
+	test("one refused change refuses the whole batch, with its reason", () => {
+		const refused = applySportChanges(EMPTY_SPORT, [{ op: "add-log", log: log("a", "2026-08-26") }, { op: "add-measurement", measurement: max("aug", "2026-08-26") }]);
+		expect(refused).toEqual({ error: expect.stringContaining("max") });
 	});
 });

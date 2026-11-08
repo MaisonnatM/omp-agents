@@ -313,7 +313,7 @@ export class Dashboard {
 		const lists = (this.#lists = new ListRegistry({
 			"user-todos": { msg: () => ({ t: "user-todos", list: todos.value }), apply: change => todos.apply(change) },
 			"user-notes": { msg: () => ({ t: "user-notes", list: notes.value }), apply: change => notes.apply(change) },
-			sport: { msg: () => ({ t: "sport", state: sport.value }), apply: change => sport.apply(change) },
+			sport: { msg: () => ({ t: "sport", state: sport.value }), apply: changes => sport.apply(changes) },
 			// Every routine belongs to a Bot, so a save for a Bot that is gone saves nothing.
 			routines: {
 				msg: () => ({ t: "routines", routines: routines.value }),
@@ -374,7 +374,7 @@ export class Dashboard {
 			sportInboxDir,
 			() => sport.value,
 			changes => {
-				for (const change of changes) lists.apply("sport", change);
+				lists.apply("sport", changes);
 				return sport.flush();
 			},
 			{ active: () => ownerLock.held },

@@ -26,12 +26,20 @@ const METRICS = [{ id: "max", label: "Max", unit: "kg", better: "higher" as cons
 test("another server loads the saved log and measurements", () => {
 	const path = sportPath();
 	const file = new SportFile(path);
-	expect(file.apply({ op: "add-log", log: LOG })).toBe(true);
-	expect(file.apply({ op: "set-metrics", metrics: METRICS })).toBe(true);
-	expect(file.apply({ op: "add-measurement", measurement: MAX })).toBe(true);
-	expect(file.apply({ op: "add-log", log: LOG })).toBe(false);
+	expect(file.apply([{ op: "add-log", log: LOG }])).toBe(true);
+	expect(file.apply([{ op: "set-metrics", metrics: METRICS }, { op: "add-measurement", measurement: MAX }])).toBe(true);
+	expect(file.apply([{ op: "add-log", log: LOG }])).toBe(false);
 	flushJsonFiles();
 	expect(new SportFile(path).value).toEqual({ ...EMPTY_SPORT, metrics: METRICS, log: [LOG], measurements: [MAX] });
+});
+
+test("a batch with one refused change keeps none of it, and says why", () => {
+	const path = sportPath();
+	const file = new SportFile(path);
+	expect(() => file.apply([{ op: "add-log", log: LOG }, { op: "add-measurement", measurement: MAX }])).toThrow("max");
+	expect(file.value).toEqual(EMPTY_SPORT);
+	flushJsonFiles();
+	expect(new SportFile(path).value).toEqual(EMPTY_SPORT);
 });
 
 test("an unreadable sport file is preserved rather than overwritten", () => {

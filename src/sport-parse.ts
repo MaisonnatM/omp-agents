@@ -1,5 +1,5 @@
 /**
- * Reading the Sport module's state and its changes from untyped JSON: `sport.json` and the `sport-change` messages of
+ * Reading the Sport module's state and its changes from untyped JSON: `sport.json` and the `sport-changes` messages of
  * the page and the agent. A field left out reads as its default, so a file from an older version still reads, and fields
  * the module does not know drop. The file is held to shapes and types alone, so a rule tightened later never refuses
  * data already saved; a change is also held to the length and range limits and to a plan whose names point somewhere.

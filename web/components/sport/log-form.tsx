@@ -3,32 +3,26 @@ import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import { Check, Plus, TriangleAlert, X } from "lucide-react";
 import { type KeyboardEvent, useId, useState } from "react";
+import { errorText } from "../../../src/json";
 import { type Climb, CLIMB_KINDS, type ClimbKind, exercisesOf, FRENCH_GRADES, type Measurement, type Metric, PAIN_PLACES, type PainPlace, type SportChange, type SportState, type WorkoutLog } from "../../../src/shared/sport";
-import { applySport } from "../../../src/sport";
-import { PAIN_FLAG_LEVEL, type PlannedExercise, type PlannedWorkout, records } from "../../../src/sport-week";
+import { PAIN_FLAG_LEVEL, type PlannedExercise } from "../../../src/sport-week";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { amount, ARKOSE_COLORS, beaten, CLIMB_LABEL, dose, effortWord, hardest, longDate, measured, PAIN_PLACE_LABEL, painRule, painWord, sendsText, shortDate, signedKg, testOf } from "../../sport-view";
-import { ERROR_TEXT, isSubmitChord } from "../form-dialog";
+import { amount, ARKOSE_COLORS, CLIMB_LABEL, dose, effortWord, hardest, type LogTarget, logSave, longDate, measured, measurementChange, PAIN_PLACE_LABEL, painRule, painWord, type Saved, sendsText, shortDate, signedKg, testOf } from "../../sport-view";
+import { ERROR_TEXT, isSubmitChord, type Submit } from "../form-dialog";
 import { FIELD, TEXT_AREA } from "../form-field";
 import { Callout } from "../integrations/integration-row";
-import { effortText, heaviest, type Saved, Stats } from "./log-summary";
+import { effortText, heaviest, Stats } from "./log-summary";
 import { SportDialog } from "./sport-dialog";
-
-/** What the Fait dialog logs: a planned workout of `date`, or a free session when `workout` is `null`; `log` is the one it edits. */
-export interface LogTarget {
-	date: string;
-	workout: PlannedWorkout | null;
-	log: WorkoutLog | null;
-}
 
 interface LogFormProps {
 	state: SportState;
 	target: LogTarget;
 	disabled: boolean;
-	onChange: (change: SportChange) => void;
+	/** Saves `changes` all together or none; rejects with why the server refused them. */
+	onChange: (changes: SportChange[]) => Promise<void>;
 	/** The session was logged done, with what its summary shows. */
 	onSaved: (saved: Saved) => void;
 	onClose: () => void;
@@ -48,7 +42,26 @@ interface LoadRow {
 	done: boolean;
 }
 
-export function LogForm({ state, target: { date, workout, log }, disabled, onChange, onSaved, onClose }: LogFormProps) {
+/** A dialog's write: busy while the server handles the changes, then the reason it refused them, which also words a field typed wrong. */
+function useWrite(onChange: (changes: SportChange[]) => Promise<void>) {
+	const [submit, setSubmit] = useState<Submit>({ kind: "writing" });
+	const fail = (error: string) => setSubmit({ kind: "failed", error });
+	/** Sends `changes` as one write, then `done`; a refusal leaves the dialog open with its reason. */
+	const write = async (changes: SportChange[], done: () => void): Promise<void> => {
+		setSubmit({ kind: "creating" });
+		try {
+			await onChange(changes);
+		} catch (err) {
+			fail(`Rien n'est enregistré : ${errorText(err)}`);
+			return;
+		}
+		done();
+	};
+	return { submit, saving: submit.kind === "creating", fail, write };
+}
+
+export function LogForm({ state, target, disabled, onChange, onSaved, onClose }: LogFormProps) {
+	const { date, workout, log } = target;
 	const id = useId();
 	const test = workout && testOf(state, workout);
 	const onDay = (metric: Metric | null): Measurement | undefined => (metric ? measured(state, metric.id).find(({ at }) => at === date) : undefined);
@@ -65,7 +78,7 @@ export function LogForm({ state, target: { date, workout, log }, disabled, onCha
 	const [where, setWhere] = useState<PainPlace>(log?.pain?.where ?? "fingers");
 	const [rpe, setRpe] = useState<number | null>(log?.rpe ?? null);
 	const [note, setNote] = useState(log?.note ?? "");
-	const [error, setError] = useState<string | null>(null);
+	const { submit, saving, fail, write } = useWrite(onChange);
 
 	const loads = Object.fromEntries(rows.flatMap(({ item, kg, done }) => {
 		const value = parsed(kg);
@@ -84,45 +97,29 @@ export function LogForm({ state, target: { date, workout, log }, disabled, onCha
 		note: note.trim(),
 		addedBy: log?.addedBy ?? null,
 	});
-	const measurement = (metric: Metric, value: number): SportChange => {
-		const existing = onDay(metric);
-		return existing ? { op: "edit-measurement", measurement: { ...existing, value } } : { op: "add-measurement", measurement: { id: crypto.randomUUID(), metric: metric.id, value, at: date, note: "", addedBy: null } };
-	};
 
 	function save() {
 		const maxValue = parsed(max);
-		const weightValue = parsed(weight);
 		if (test && maxValue === null) {
-			setError(`Indique ton ${test.metric.label.toLowerCase()} en ${test.metric.unit}.`);
+			fail(`Indique ton ${test.metric.label.toLowerCase()} en ${test.metric.unit}.`);
 			return;
 		}
 		if (rows.some(({ kg, done }) => done && kg.trim() !== "" && parsed(kg) === null)) {
-			setError("Une charge n'est pas un nombre.");
+			fail("Une charge n'est pas un nombre.");
 			return;
 		}
-		const done = entry("done");
-		const changes: SportChange[] = [{ op: log ? "edit-log" : "add-log", log: done }];
-		if (test && maxValue !== null) changes.push(measurement(test.metric, maxValue));
-		if (test?.bodyweight && weightValue !== null) changes.push(measurement(test.bodyweight, weightValue));
-		const after = changes.reduce(applySport, state);
-		const was = test ? (measured(state, test.metric.id).findLast(({ at }) => at < date) ?? null) : null;
-		for (const change of changes) onChange(change);
-		onSaved({
-			log: done,
-			minutes: workout?.minutes ?? null,
-			beaten: beaten(after, records(state), records(after)).filter(({ label }) => label !== test?.metric.label),
-			test: test && maxValue !== null ? { metric: test.metric, value: maxValue, was } : null,
-		});
+		const { changes, saved } = logSave(state, target, { log: entry("done"), max: maxValue, weight: parsed(weight) });
+		void write(changes, () => onSaved(saved));
 	}
 
 	const onKeyDown = (event: KeyboardEvent) => {
-		if (!isSubmitChord(event) || disabled) return;
+		if (!isSubmitChord(event) || disabled || saving) return;
 		event.preventDefault();
 		save();
 	};
 	const kicker = [longDate(date), log ? null : workout?.name].filter(part => part).join(" · ");
 	return (
-		<SportDialog title={log ? "Modifier la séance" : workout ? "Séance faite" : "Séance libre"} onClose={onClose} className="top-[4%] w-[min(40rem,calc(100vw-2rem))]">
+		<SportDialog title={log ? "Modifier la séance" : workout ? "Séance faite" : "Séance libre"} busy={saving} onClose={onClose} className="top-[4%] w-[min(40rem,calc(100vw-2rem))]">
 			<div className="flex flex-col gap-5 px-5 pt-1 pb-4" onKeyDown={onKeyDown}>
 				<p className="text-xs text-muted-foreground first-letter:uppercase">{kicker}</p>
 				{workout === null && (
@@ -217,25 +214,22 @@ export function LogForm({ state, target: { date, workout, log }, disabled, onCha
 						{ label: "Effort", value: effortText(rpe) },
 					]}
 				/>
-				{error && <p role="alert" className={ERROR_TEXT}>{error}</p>}
+				{submit.kind === "failed" && <p role="alert" className={ERROR_TEXT}>{submit.error}</p>}
 			</div>
 			<div className="flex items-center gap-3 border-t border-border px-4 py-3">
 				{workout && log?.status !== "skipped" && (
 					<Button
 						variant="ghost"
 						size="compact"
-						disabled={disabled}
-						onClick={() => {
-							onChange({ op: log ? "edit-log" : "add-log", log: entry("skipped") });
-							onClose();
-						}}
+						disabled={disabled || saving}
+						onClick={() => void write([{ op: log ? "edit-log" : "add-log", log: entry("skipped") }], onClose)}
 					>
 						Pas faite
 					</Button>
 				)}
 				<span className="flex-1" />
-				<Button variant="tertiary" size="compact" onClick={onClose}>Annuler</Button>
-				<Button size="compact" disabled={disabled} onClick={save} {...activityControl("sport.log.save")}>Enregistrer</Button>
+				<Button variant="tertiary" size="compact" disabled={saving} onClick={onClose}>Annuler</Button>
+				<Button size="compact" loading={saving} disabled={disabled || saving} onClick={save} {...activityControl("sport.log.save")}>Enregistrer</Button>
 			</div>
 		</SportDialog>
 	);
@@ -349,7 +343,7 @@ interface WeighFormProps {
 	metric: Metric;
 	today: string;
 	disabled: boolean;
-	onChange: (change: SportChange) => void;
+	onChange: (changes: SportChange[]) => Promise<void>;
 	onClose: () => void;
 }
 
@@ -358,24 +352,22 @@ export function WeighForm({ state, metric, today, disabled, onChange, onClose }:
 	const rows = measured(state, metric.id);
 	const [date, setDate] = useState(today);
 	const [value, setValue] = useState("");
-	const [error, setError] = useState<string | null>(null);
+	const { submit, saving, fail, write } = useWrite(onChange);
 	const last = rows.at(-1);
 	function save() {
 		const kg = parsed(value);
 		if (kg === null || kg <= 0) {
-			setError(`Indique ton ${metric.label.toLowerCase()} en ${metric.unit}.`);
+			fail(`Indique ton ${metric.label.toLowerCase()} en ${metric.unit}.`);
 			return;
 		}
-		const existing = rows.find(({ at }) => at === date);
-		onChange(existing ? { op: "edit-measurement", measurement: { ...existing, value: kg } } : { op: "add-measurement", measurement: { id: crypto.randomUUID(), metric: metric.id, value: kg, at: date, note: "", addedBy: null } });
-		onClose();
+		void write([measurementChange(state, metric.id, date, kg)], onClose);
 	}
 	return (
-		<SportDialog title="Pesée" onClose={onClose} className="top-[15%] w-[min(24rem,calc(100vw-2rem))]">
+		<SportDialog title="Pesée" busy={saving} onClose={onClose} className="top-[15%] w-[min(24rem,calc(100vw-2rem))]">
 			<div
 				className="flex flex-col gap-3 px-5 pt-2 pb-4"
 				onKeyDown={event => {
-					if (!isSubmitChord(event) || disabled) return;
+					if (!isSubmitChord(event) || disabled || saving) return;
 					event.preventDefault();
 					save();
 				}}
@@ -391,11 +383,11 @@ export function WeighForm({ state, metric, today, disabled, onChange, onClose }:
 					</label>
 				</div>
 				{last && <p className="text-xs text-muted-foreground">Dernière pesée : {amount(last.value, metric.unit)} le {shortDate(last.at)}</p>}
-				{error && <p role="alert" className={ERROR_TEXT}>{error}</p>}
+				{submit.kind === "failed" && <p role="alert" className={ERROR_TEXT}>{submit.error}</p>}
 			</div>
 			<div className="flex items-center justify-end gap-3 border-t border-border px-4 py-3">
-				<Button variant="tertiary" size="compact" onClick={onClose}>Annuler</Button>
-				<Button size="compact" disabled={disabled} onClick={save} {...activityControl("sport.weigh.save")}>Enregistrer</Button>
+				<Button variant="tertiary" size="compact" disabled={saving} onClick={onClose}>Annuler</Button>
+				<Button size="compact" loading={saving} disabled={disabled || saving} onClick={save} {...activityControl("sport.weigh.save")}>Enregistrer</Button>
 			</div>
 		</SportDialog>
 	);

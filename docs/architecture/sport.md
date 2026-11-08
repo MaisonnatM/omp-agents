@@ -23,7 +23,8 @@ An override replaces one day's slots, as on a test day.
 `set-plan`, `set-targets`, and `set-metrics` replace their part whole.
 Logs and measurements are added, edited, removed, and restored by id through one dated list; both stay in date order, a day's entries in the order they came, and a restore puts the entry back at its index when that keeps the order.
 Every metric id in the state names one of its metrics: a change that names a metric the state does not hold is refused, and so is a `set-metrics` that drops a metric a measurement, a target, or a load rule still names, so the metrics come first.
-A change that changes nothing or is refused returns the same state, so the `ListRegistry` resends the state only to the socket that sent it.
+A change that changes nothing or is refused returns the same state.
+`applySportChanges` applies a list of changes in order, each checked by `sportRefusal` against the state the ones before it leave, and refuses the whole list with the first refusal's reason, so a list is kept whole or not at all.
 
 `SportFile` uses `ReducerFile` to keep `sport.json` beside the access token.
 `parseSportState` and `parseSportChange` in `src/sport-parse.ts` read the file and the socket's changes with the same field parsers under two rule tables.
@@ -35,7 +36,7 @@ A workout's `kind` is required in the file and in a change alike, since no file 
 A `set-plan` is refused when its slots, habits, or `opensAs` lists name nothing, its ids or override days repeat, a phase ends before it starts or overlaps another, or a deload Monday is not a Monday of its phase; a `set-targets` or `set-metrics` is refused when its ids repeat.
 A refused change says why, with the path of the first wrong field and the rule it broke, such as `plan.routines[0].items[0].demo.youtubeId must be 11 characters`.
 A file that does not read, or that comes from a newer version, moves aside to `sport.json.invalid` rather than being overwritten.
-The `ListRegistry` connects `sport-change` client changes to `sport` snapshots on the roster topic.
+The `ListRegistry` connects `sport-changes` client messages to `sport` snapshots on the roster topic; `SportFile` applies each message's list through `applySportChanges` and throws its refusal, so the registry resends the state to the page that sent it and the page's request fails with the reason.
 The page keeps the latest snapshot in `DashboardState.sport`, `null` until the first one comes.
 
 ## The agent
@@ -82,7 +83,8 @@ A finger pain flag removes every `hang` exercise for the 7 days after its log; `
 The Sport page, `SportPage` in `web/components/sport/page.tsx`, draws `DashboardState.sport` and reads every date, load, flag, and record from `src/sport-week.ts`; `web/sport-view.ts` only words them.
 Its route is a `SportRoute` from `web/routing.ts`: `#sport` and `#sport?day=<YYYY-MM-DD>` for the week, `#sport/journal` and `#sport/journal?open=<log id>` for the journal, and `#sport/progress`.
 A change the page makes is a `SportChange`, the same the agent's tool sends.
-The page dispatches it as a `sport-change` action, which applies `applySport` to the state at once, then sends `{ t: "sport-change", change }` on the socket; the server applies it to the file through its shared lists, and every socket then gets the state as it is after.
+The page dispatches a list of them as a `sport-changes` action, which applies `applySportChanges` to the state at once and keeps the state as it was when the list is refused, then sends `{ t: "sport-changes", changes }` on the socket; the server applies the list to the file whole or not at all, and every socket then gets the state as it is after.
+The Fait dialog saves the log, a test's max, and its weigh-in as one list built by `logSave` in `web/sport-view.ts`, stays open and busy until the server answers, and shows a refusal's reason without closing; the Pesée dialog does the same with its one measurement.
 
 A demo shows its YouTube thumbnail from `GET /api/sport/thumb?id=<video id>`, in `src/server/sport-thumbs.ts`, which fetches `hqdefault.jpg` from `i.ytimg.com` the first time and keeps it as `<id>.jpg` in `sportThumbsDir`, so the page's `img-src` stays `'self'`.
 The player is an iframe on `https://www.youtube-nocookie.com/embed/<id>?autoplay=1&rel=0&playsinline=1` that `DemoDialog` mounts only after the play click, which the CSP's `frame-src` allows; see [the decision](../decisions/2026-11-07-play-exercise-demos-from-youtube-nocookie.md).

@@ -64,6 +64,7 @@ import type { AckedFrame, ClientFrame, ClientMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
 import type { AskReply, CompletionScope, LiveView, StartRequest, UserAnswer, View } from "../shared/sessions";
 import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues, TodoTicketRequest } from "../shared/tickets";
+import type { SportChange } from "../shared/sport";
 import type { TrustChange } from "../shared/project-trust";
 import type { WorkspaceChange } from "../shared/workspaces";
 import { parseSportChange } from "../sport-parse";
@@ -364,9 +365,15 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 		const change = parseNoteChange(value.change);
 		return change && { ok: { t: "user-note", change } };
 	},
-	"sport-change"(value) {
-		const change = parseSportChange(value.change);
-		return "ok" in change ? { ok: { t: "sport-change", change: change.ok } } : null;
+	"sport-changes"({ changes }) {
+		if (!Array.isArray(changes) || changes.length === 0) return null;
+		const parsed: SportChange[] = [];
+		for (const value of changes) {
+			const change = parseSportChange(value);
+			if (!("ok" in change)) return null;
+			parsed.push(change.ok);
+		}
+		return { ok: { t: "sport-changes", changes: parsed } };
 	},
 	routine(value) {
 		const change = parseRoutineChange(value.change);

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { TrustAsk } from "../src/shared/project-trust";
 import { EMPTY_SPORT } from "../src/shared/sport";
+import { log, measurement } from "../src/sport-fixtures";
 import type { LiveView, RosterHost, View } from "../src/shared/sessions";
 import { type DashboardState, initialState, reduce } from "./dashboard-state";
 import type { Layout } from "./routing";
@@ -108,5 +109,12 @@ describe("dashboard state", () => {
 		expect(blank().sport).toBeNull();
 		const sent = { ...EMPTY_SPORT, metrics: [{ id: "max", label: "Max", unit: "kg", better: "higher" as const }] };
 		expect(reduce(blank(), { t: "sport", state: sent }).sport).toBe(sent);
+	});
+
+	test("a Sport batch shows at once whole, and a refused one shows none of it", () => {
+		const loaded = reduce(blank(), { t: "sport", state: EMPTY_SPORT });
+		const done = log("a", "2026-11-17");
+		expect(reduce(loaded, { t: "sport-changes", changes: [{ op: "add-log", log: done }] }).sport?.log).toEqual([done]);
+		expect(reduce(loaded, { t: "sport-changes", changes: [{ op: "add-log", log: done }, { op: "add-measurement", measurement: measurement("m", "max", 117, "2026-11-17") }] })).toBe(loaded);
 	});
 });

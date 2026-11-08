@@ -16,7 +16,7 @@
   It also owns the `ForeignUsage` index that each Analytics read refreshes.
   Nothing follows the registry, watches a directory, or publishes before `start(server)`; `stop()` first stops the loops and both inboxes, so no tick publishes while the rest shuts down, then ends the sessions started here, hangs up on the shells, stops omp-stats, flushes the stores, and aborts the routine commands still running.
 - `src/server/list-registry.ts`: `ListRegistry`, the authoritative builders for the whole-list socket messages, registered beside their store apply functions in `Dashboard`.
-  An edit publishes its list when it changes; a no-op resends the current list only to its requesting peer.
+  An edit publishes its list when it changes; a no-op or a refused edit resends the current list only to its requesting peer.
   Routines and scheduled sends register only edits: their run-now and send-now actions stay with their runners, and notices and the queued merges keep their own action handlers.
 - `src/server/broadcasts.ts`: `Broadcasts`, what every socket hears on the `roster` topic: the roster, the past list, plan usage, and the whole lists from `ListRegistry`.
   Opening sockets get every registered list; `pushList` publishes only a message that changed, while roster and past messages keep their row-level deltas.

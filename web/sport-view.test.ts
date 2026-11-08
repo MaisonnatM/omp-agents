@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { exercise, log, measurement, SEMI, STATE, withLogs, withMeasurements } from "../src/sport-fixtures";
 import type { Climb, FrenchGrade, Plan } from "../src/shared/sport";
 import { dayPlan, loadFor, records } from "../src/sport-week";
-import { amount, beaten, bodyweightOf, daySummary, demosOf, dose, effortWord, hardest, journalWeeks, loadSource, loadText, logDetail, measured, nextTest, opening, painRule, painWord, phaseLabel, recordLogs, recordRows, REMOVED_TEXT, sendsText, testOf, weekTitle } from "./sport-view";
+import { amount, beaten, bodyweightOf, daySummary, demosOf, dose, effortWord, hardest, journalWeeks, loadSource, loadText, logDetail, logSave, measured, nextTest, opening, painRule, painWord, phaseLabel, recordLogs, recordRows, REMOVED_TEXT, sendsText, testOf, weekTitle } from "./sport-view";
 
 const plan = STATE.plan!;
 const demo = (youtubeId: string) => ({ youtubeId, by: "Lattice", cues: ["a", "b", "c"] as [string, string, string], caution: null });
@@ -162,5 +162,44 @@ describe("journal and progress", () => {
 		expect(painRule("fingers")).toEqual({ warning: "Douleur aux doigts à 3 ou plus : la poutre sera retirée 7 jours.", effect: "Poutre et suspensions retirées" });
 		expect(painRule("elbow")).toEqual({ warning: "Douleur au coude à 3 ou plus : elle sera signalée 7 jours.", effect: "À surveiller" });
 		expect(REMOVED_TEXT).toBe("retiré · douleur aux doigts");
+	});
+});
+
+describe("a Fait save", () => {
+	const max = STATE.metrics[0]!;
+	const testDay = dayPlan(STATE, "2026-12-29").workouts[0]!;
+
+	test("a plain day saves its log alone, and sums up the load it beat", () => {
+		const done = log("n1", "2026-11-17", { workout: "mardi", loads: { semi: 20 } });
+		const { changes, saved } = logSave(STATE, { date: "2026-11-17", workout: dayPlan(STATE, "2026-11-17").workouts[0]!, log: null }, { log: done, max: null, weight: null });
+		expect(changes).toEqual([{ op: "add-log", log: done }]);
+		expect(saved).toEqual({ log: done, minutes: 120, beaten: [{ label: "Semi-arquée", now: "+20 kg", was: null }], test: null });
+	});
+
+	test("a test day saves its log, the new max, and the weigh-in in one batch, and leaves the max out of the records it beat", () => {
+		const done = log("t1", "2026-12-29", { workout: "test" });
+		const { changes, saved } = logSave(STATE, { date: "2026-12-29", workout: testDay, log: null }, { log: done, max: 118, weight: 81 });
+		expect(changes).toEqual([
+			{ op: "add-log", log: done },
+			{ op: "add-measurement", measurement: { id: expect.any(String), metric: "max", value: 118, at: "2026-12-29", note: "", addedBy: null } },
+			{ op: "add-measurement", measurement: { id: expect.any(String), metric: "bodyweight", value: 81, at: "2026-12-29", note: "", addedBy: null } },
+		]);
+		expect(saved.test).toEqual({ metric: max, value: 118, was: STATE.measurements[0]! });
+		expect(saved.beaten.map(({ label }) => label)).not.toContain(max.label);
+	});
+
+	test("an edit replaces the log and that day's measurements rather than adding to them", () => {
+		const existing = log("t1", "2026-12-29", { workout: "test" });
+		const tested = measurement("m3", "max", 115, "2026-12-29");
+		const weighed = measurement("m4", "bodyweight", 82, "2026-12-29");
+		const state = withMeasurements(withLogs(STATE, existing), tested, weighed);
+		const done = { ...existing, note: "Mieux" };
+		const { changes, saved } = logSave(state, { date: "2026-12-29", workout: testDay, log: existing }, { log: done, max: 118, weight: 81 });
+		expect(changes).toEqual([
+			{ op: "edit-log", log: done },
+			{ op: "edit-measurement", measurement: { ...tested, value: 118 } },
+			{ op: "edit-measurement", measurement: { ...weighed, value: 81 } },
+		]);
+		expect(saved.test).toEqual({ metric: max, value: 118, was: STATE.measurements[0]! });
 	});
 });

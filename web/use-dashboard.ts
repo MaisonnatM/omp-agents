@@ -98,8 +98,8 @@ export interface Dashboard {
 	changeTodo: (change: UserTodoChange) => Promise<void>;
 	/** Change the Notes page's list, as {@link Dashboard.changeTodo} does the Todo page's. */
 	changeNote: (change: UserNoteChange) => Promise<void>;
-	/** Change the Sport page's state, as {@link Dashboard.changeTodo} does the Todo page's list. */
-	changeSport: (change: SportChange) => Promise<void>;
+	/** Change the Sport page's state by all of `changes` or none, as {@link Dashboard.changeTodo} does the Todo page's list. */
+	changeSport: (changes: SportChange[]) => Promise<void>;
 	/** Pin or unpin sessions, which shows at once and reaches the server, on the next socket while none is open, and every other window. */
 	changePins: (change: PinChange) => void;
 	/** Add, change, or delete a Bot, which shows at once and reaches the server, on the next socket while none is open, and every other window. */
@@ -363,9 +363,9 @@ export function useDashboard(): Dashboard {
 		[write],
 	);
 	const changeSport = useCallback(
-		(change: SportChange) => {
-			dispatch({ t: "sport-change", change });
-			return write({ t: "sport-change", change });
+		(changes: SportChange[]) => {
+			dispatch({ t: "sport-changes", changes });
+			return write({ t: "sport-changes", changes });
 		},
 		[write],
 	);

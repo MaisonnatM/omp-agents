@@ -171,7 +171,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 	answer: ({ sessions }, _peer, { instanceId, requestId, answer }) => sessions.get(instanceId)?.answer(requestId, answer),
 	"user-todo": ({ lists }, peer, { change }) => void lists.apply("user-todos", change, peer),
 	"user-note": ({ lists }, peer, { change }) => void lists.apply("user-notes", change, peer),
-	"sport-change": ({ lists }, peer, { change }) => void lists.apply("sport", change, peer),
+	"sport-changes": ({ lists }, peer, { changes }) => void lists.apply("sport", changes, peer),
 	routine: ({ lists, runRoutine }, peer, { change }) => (change.op === "run-now" ? runRoutine(change.id) : void lists.apply("routines", change, peer)),
 	bot: ({ lists, messageBot }, peer, { change }) => (change.op === "message" ? messageBot(change.id, change.text) : void lists.apply("bots", change, peer)),
 	schedule: ({ lists, sendScheduledNow }, peer, { change }) => (change.op === "send-now" ? sendScheduledNow(change.id) : void lists.apply("scheduled", change, peer)),

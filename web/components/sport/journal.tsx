@@ -20,7 +20,7 @@ interface JournalTabProps {
 	/** The open log's id. */
 	open: string | null;
 	disabled: boolean;
-	onChange: (change: SportChange) => void;
+	onChange: (changes: SportChange[]) => Promise<void>;
 	onEdit: (log: WorkoutLog) => void;
 	/** `false` while a dialog over the page takes the keys. */
 	keys: boolean;
@@ -59,7 +59,7 @@ export function JournalTab({ state, open, disabled, onChange, onEdit, keys }: Jo
 	useShortcuts(keys ? { sportJournalNext: () => step(1), sportJournalPrevious: () => step(-1), sportJournalClose: () => { if (shown !== null) navigate(null); } } : {});
 	function remove(log: WorkoutLog) {
 		const index = state.log.findIndex(({ id }) => id === log.id);
-		onChange({ op: "remove-log", id: log.id });
+		void onChange([{ op: "remove-log", id: log.id }]);
 		navigate(null);
 		toasts.add({
 			id: "sport-log-undo",
@@ -68,7 +68,7 @@ export function JournalTab({ state, open, disabled, onChange, onEdit, keys }: Jo
 			actionProps: {
 				children: "Annuler",
 				onClick: () => {
-					onChange({ op: "restore-log", log, index });
+					void onChange([{ op: "restore-log", log, index }]);
 					navigate(log.id);
 					toasts.close("sport-log-undo");
 				},

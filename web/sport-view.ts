@@ -1,7 +1,8 @@
 /** How the Sport page words and colors what `src/sport-week.ts` computes: scale words, workout colors, loads, doses, and the exercises a demo opens. */
 import { addDays, daysBetween, mondayOf } from "../src/shared/days";
-import { type Climb, CLIMB_KINDS, type ClimbKind, type Exercise, exercisesOf, gradeRank, type Measurement, type Metric, PAIN_PLACES, type PainPlace, type Phase, type Place, type Plan, type SportState, type Workout, type WorkoutLog } from "../src/shared/sport";
-import { bodyweightMetric, type Load, PAIN_FLAG_DAYS, PAIN_FLAG_LEVEL, type PlannedDay, type PlannedWorkout, removesHangs, type SportRecords, testedMetric } from "../src/sport-week";
+import { type Climb, CLIMB_KINDS, type ClimbKind, type Exercise, exercisesOf, gradeRank, type Measurement, type Metric, PAIN_PLACES, type PainPlace, type Phase, type Place, type Plan, type SportChange, type SportState, type Workout, type WorkoutLog } from "../src/shared/sport";
+import { applySport } from "../src/sport";
+import { bodyweightMetric, type Load, PAIN_FLAG_DAYS, PAIN_FLAG_LEVEL, type PlannedDay, type PlannedWorkout, records, removesHangs, type SportRecords, testedMetric } from "../src/sport-week";
 
 /** The word under a pain level, 0 to 10. */
 export function painWord(level: number): string {
@@ -260,6 +261,52 @@ export function beaten(state: SportState, before: SportRecords, after: SportReco
 	return recordRows(state, after)
 		.filter(row => improved.has(row.key))
 		.map(row => ({ label: row.label, now: row.value, was: was.get(row.key) ?? null }));
+}
+
+/** What the Fait dialog logs: a planned workout of `date`, or a free session when `workout` is `null`; `log` is the one it edits. */
+export interface LogTarget {
+	date: string;
+	workout: PlannedWorkout | null;
+	log: WorkoutLog | null;
+}
+
+/** What a save sums up: the log, the minutes its workout planned, the records it beat, and the max a test measured. */
+export interface Saved {
+	log: WorkoutLog;
+	minutes: number | null;
+	beaten: Beaten[];
+	test: { metric: Metric; value: number; was: Measurement | null } | null;
+}
+
+/** The change that puts `value` for `metric` on `date`: an edit of that day's measurement when there is one, else a new one. */
+export function measurementChange(state: SportState, metric: string, date: string, value: number): SportChange {
+	const existing = state.measurements.find(row => row.metric === metric && row.at === date);
+	return existing ? { op: "edit-measurement", measurement: { ...existing, value } } : { op: "add-measurement", measurement: { id: crypto.randomUUID(), metric, value, at: date, note: "", addedBy: null } };
+}
+
+/** What the Fait dialog read for a done session: its log, and on a test day the max and the bodyweight typed. */
+export interface LogFields {
+	log: WorkoutLog;
+	max: number | null;
+	weight: number | null;
+}
+
+/** The changes a done session saves in one write, and what its summary shows; the tested metric's record is left out, since the test's own line words it. */
+export function logSave(state: SportState, { date, workout, log: editing }: LogTarget, { log, max, weight }: LogFields): { changes: SportChange[]; saved: Saved } {
+	const test = workout && testOf(state, workout);
+	const changes: SportChange[] = [{ op: editing ? "edit-log" : "add-log", log }];
+	if (test && max !== null) changes.push(measurementChange(state, test.metric.id, date, max));
+	if (test?.bodyweight && weight !== null) changes.push(measurementChange(state, test.bodyweight.id, date, weight));
+	const after = changes.reduce(applySport, state);
+	return {
+		changes,
+		saved: {
+			log,
+			minutes: workout?.minutes ?? null,
+			beaten: beaten(after, records(state), records(after)).filter(({ label }) => label !== test?.metric.label),
+			test: test && max !== null ? { metric: test.metric, value: max, was: measured(state, test.metric.id).findLast(({ at }) => at < date) ?? null } : null,
+		},
+	};
 }
 
 /** The metric of `state` whose id is `id`, `null` for none. */
