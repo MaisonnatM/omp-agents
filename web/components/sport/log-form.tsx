@@ -5,12 +5,12 @@ import { Check, Plus, TriangleAlert, X } from "lucide-react";
 import { type KeyboardEvent, useId, useState } from "react";
 import { type Climb, CLIMB_KINDS, type ClimbKind, exercisesOf, FRENCH_GRADES, type Measurement, type Metric, PAIN_PLACES, type PainPlace, type SportChange, type SportState, type WorkoutLog } from "../../../src/shared/sport";
 import { applySport } from "../../../src/sport";
-import { PAIN_FLAG_DAYS, PAIN_FLAG_LEVEL, type PlannedExercise, type PlannedWorkout, records } from "../../../src/sport-week";
+import { PAIN_FLAG_LEVEL, type PlannedExercise, type PlannedWorkout, records } from "../../../src/sport-week";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { amount, ARKOSE_COLORS, beaten, CLIMB_LABEL, dose, effortWord, hardest, longDate, measured, PAIN_PLACE_AT, PAIN_PLACE_LABEL, painWord, sendsText, shortDate, signedKg, testOf } from "../../sport-view";
+import { amount, ARKOSE_COLORS, beaten, CLIMB_LABEL, dose, effortWord, hardest, longDate, measured, PAIN_PLACE_LABEL, painRule, painWord, sendsText, shortDate, signedKg, testOf } from "../../sport-view";
 import { ERROR_TEXT, isSubmitChord } from "../form-dialog";
 import { FIELD, TEXT_AREA } from "../form-field";
 import { Callout } from "../integrations/integration-row";
@@ -199,7 +199,7 @@ export function LogForm({ state, target: { date, workout, log }, disabled, onCha
 						</RadioGroup>
 						{pain >= PAIN_FLAG_LEVEL && (
 							<Callout tone="warning" icon={TriangleAlert}>
-								{where === "fingers" ? `Douleur aux doigts à ${PAIN_FLAG_LEVEL} ou plus : la poutre sera retirée ${PAIN_FLAG_DAYS} jours.` : `Douleur ${PAIN_PLACE_AT[where]} à ${PAIN_FLAG_LEVEL} ou plus : elle sera signalée ${PAIN_FLAG_DAYS} jours.`}
+								{painRule(where).warning}
 							</Callout>
 						)}
 					</div>

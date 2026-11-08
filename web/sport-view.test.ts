@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { exercise, log, measurement, SEMI, STATE, withLogs, withMeasurements } from "../src/sport-fixtures";
 import type { Climb, FrenchGrade, Plan } from "../src/shared/sport";
 import { dayPlan, loadFor, records } from "../src/sport-week";
-import { amount, beaten, bodyweightOf, daySummary, demosOf, dose, effortWord, hardest, journalWeeks, loadSource, loadText, logDetail, measured, nextTest, opening, painWord, phaseLabel, recordLogs, recordRows, sendsText, testOf, weekTitle } from "./sport-view";
+import { amount, beaten, bodyweightOf, daySummary, demosOf, dose, effortWord, hardest, journalWeeks, loadSource, loadText, logDetail, measured, nextTest, opening, painRule, painWord, phaseLabel, recordLogs, recordRows, REMOVED_TEXT, sendsText, testOf, weekTitle } from "./sport-view";
 
 const plan = STATE.plan!;
 const demo = (youtubeId: string) => ({ youtubeId, by: "Lattice", cues: ["a", "b", "c"] as [string, string, string], caution: null });
@@ -141,7 +141,7 @@ describe("journal and progress", () => {
 
 	test("only the log that first reached a record is marked", () => {
 		const state = withLogs(STATE, log("l1", "2026-11-17", { workout: "mardi", loads: { semi: 15 } }), log("l2", "2026-11-24", { workout: "mardi", loads: { semi: 17 }, climbs: [climb("7a")] }), log("l3", "2026-12-01", { workout: "mardi", loads: { semi: 16 } }));
-		expect([...recordLogs(state, records(state))]).toEqual(["l2"]);
+		expect([...recordLogs(records(state))]).toEqual(["l2"]);
 	});
 
 	test("the journal groups logs by week, newest first, and counts the done ones and their planned minutes", () => {
@@ -156,5 +156,11 @@ describe("journal and progress", () => {
 		expect(nextTest(STATE, "max", "2026-11-17")).toBe("2026-12-29");
 		expect(nextTest(STATE, "max", "2026-12-30")).toBeNull();
 		expect(nextTest(STATE, "bodyweight", "2026-11-17")).toBeNull();
+	});
+
+	test("a finger pain words the hangs removed, any other pain words it watched", () => {
+		expect(painRule("fingers")).toEqual({ warning: "Douleur aux doigts à 3 ou plus : la poutre sera retirée 7 jours.", effect: "Poutre et suspensions retirées" });
+		expect(painRule("elbow")).toEqual({ warning: "Douleur au coude à 3 ou plus : elle sera signalée 7 jours.", effect: "À surveiller" });
+		expect(REMOVED_TEXT).toBe("retiré · douleur aux doigts");
 	});
 });

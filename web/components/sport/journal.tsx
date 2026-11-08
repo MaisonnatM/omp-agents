@@ -37,7 +37,7 @@ function hours(minutes: number): string {
 export function JournalTab({ state, open, disabled, onChange, onEdit, keys }: JournalTabProps) {
 	const weeks = journalWeeks(state);
 	const logs = weeks.flatMap(week => week.logs);
-	const marked = recordLogs(state, records(state));
+	const marked = recordLogs(records(state));
 	const at = logs.findIndex(({ id }) => id === open);
 	const shown = at === -1 ? null : logs[at]!;
 	const navigate = (id: string | null) => {

@@ -154,7 +154,7 @@ describe("grades", () => {
 			{ monday: "2026-11-23", boulder: null, route: null },
 			{ monday: "2026-11-30", boulder: null, route: "7c" },
 		]);
-		expect(records(state).grades).toEqual({ boulder: { grade: "7b+", date: "2026-11-21" }, route: { grade: "7c", date: "2026-12-01" } });
+		expect(records(state).grades).toEqual({ boulder: { grade: "7b+", date: "2026-11-21", logId: "l2" }, route: { grade: "7c", date: "2026-12-01", logId: "l3" } });
 	});
 });
 
@@ -172,8 +172,8 @@ describe("records", () => {
 				{ metric: "bodyweight", value: 82, at: "2026-08-26" },
 			],
 			loads: [
-				{ key: "open", kg: 13, date: "2026-11-21" },
-				{ key: "tractions", kg: 37.5, date: "2026-11-28" },
+				{ key: "open", kg: 13, date: "2026-11-21", logId: "l1" },
+				{ key: "tractions", kg: 37.5, date: "2026-11-28", logId: "l2" },
 			],
 			grades: { boulder: null, route: null },
 		});

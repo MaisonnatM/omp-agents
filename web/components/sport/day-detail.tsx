@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { demosOf, dose, duration, loadSource, loadText, longDate, PLACE_LABEL, shortDate, workoutDemos } from "../../sport-view";
+import { demosOf, dose, duration, loadSource, loadText, longDate, PLACE_LABEL, REMOVED_TEXT, shortDate, workoutDemos } from "../../sport-view";
 import { DemoStrip } from "./demo-strip";
 
 /** Opens the demo dialog on `demos`, at `at`, titled by what they belong to. */
@@ -94,7 +94,7 @@ function WorkoutCard({ plan, day, kicker, workout, disabled, onDemo, onLog }: Om
 
 function ExerciseRow({ item: { exercise, load, removed }, onDemo }: { item: PlannedExercise; onDemo: (() => void) | null }) {
 	const kg = loadText(exercise, load);
-	const source = removed ? "retiré · douleur aux doigts" : loadSource(load);
+	const source = removed ? REMOVED_TEXT : loadSource(load);
 	const side = [dose(exercise), exercise.note].filter(Boolean).join(" · ");
 	return (
 		<li className="flex flex-col gap-0.5 py-2 text-sm @md/sport:flex-row @md/sport:items-start @md/sport:justify-between @md/sport:gap-4">

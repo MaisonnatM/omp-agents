@@ -73,8 +73,9 @@ Otherwise the rule gives it from the newest measurements on or before that day, 
 An exercise without a rule takes its last logged load within the phase and has none after.
 
 `painFlags` lists the logs of the last 7 days whose pain is 3 out of 10 or more.
-A finger pain flag removes every `hang` exercise for the 7 days after its log.
-`bestGrades` gives the hardest boulder and route per week, `records` the best of each metric, logged load, and grade with the day it was first reached, and `adherence` the share of planned workouts done, an optional one counting only once done.
+A finger pain flag removes every `hang` exercise for the 7 days after its log; `removesHangs` says which places do, and the page words its rule with `painRule`.
+`bestGrades` gives the hardest boulder and route per week, `records` the best of each metric, logged load, and grade with the day it was first reached and the log that reached it, and `adherence` the share of planned workouts done, an optional one counting only once done.
+`testedMetric` gives the test a workout holds, its first exercise keyed by a metric, and `bodyweightMetric` the metric an `of-max` rule subtracts.
 
 ## The page
 

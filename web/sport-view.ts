@@ -1,7 +1,7 @@
 /** How the Sport page words and colors what `src/sport-week.ts` computes: scale words, workout colors, loads, doses, and the exercises a demo opens. */
 import { addDays, daysBetween, mondayOf } from "../src/shared/days";
-import { type Climb, CLIMB_KINDS, type ClimbKind, type Exercise, exercisesOf, gradeRank, type Measurement, type Metric, type PainPlace, type Phase, type Place, type Plan, type SportState, type Workout, type WorkoutLog } from "../src/shared/sport";
-import type { Load, PlannedDay, PlannedWorkout, SportRecords } from "../src/sport-week";
+import { type Climb, CLIMB_KINDS, type ClimbKind, type Exercise, exercisesOf, gradeRank, type Measurement, type Metric, PAIN_PLACES, type PainPlace, type Phase, type Place, type Plan, type SportState, type Workout, type WorkoutLog } from "../src/shared/sport";
+import { bodyweightMetric, type Load, PAIN_FLAG_DAYS, PAIN_FLAG_LEVEL, type PlannedDay, type PlannedWorkout, removesHangs, type SportRecords, testedMetric } from "../src/sport-week";
 
 /** The word under a pain level, 0 to 10. */
 export function painWord(level: number): string {
@@ -38,6 +38,17 @@ export const PAIN_PLACE_LABEL: Record<PainPlace, string> = { fingers: "Doigts", 
 
 /** A pain place after « douleur », as in « douleur aux doigts ». */
 export const PAIN_PLACE_AT: Record<PainPlace, string> = { fingers: "aux doigts", elbow: "au coude", shoulder: "à l'épaule", hip: "à la hanche", other: "ailleurs" };
+
+/** How the page words the pain rule {@link removesHangs} decides for a flag at `where`: the warning before it is logged, and what it does while it holds. */
+export function painRule(where: PainPlace): { warning: string; effect: string } {
+	const at = `Douleur ${PAIN_PLACE_AT[where]} à ${PAIN_FLAG_LEVEL} ou plus`;
+	return removesHangs(where)
+		? { warning: `${at} : la poutre sera retirée ${PAIN_FLAG_DAYS} jours.`, effect: "Poutre et suspensions retirées" }
+		: { warning: `${at} : elle sera signalée ${PAIN_FLAG_DAYS} jours.`, effect: "À surveiller" };
+}
+
+/** Under a hang a pain flag removed: `retiré · douleur aux doigts`. */
+export const REMOVED_TEXT = `retiré · douleur ${PAIN_PLACES.filter(removesHangs).map(where => PAIN_PLACE_AT[where]).join(" ou ")}`;
 
 export const CLIMB_LABEL: Record<ClimbKind, string> = { boulder: "Bloc", route: "Voie" };
 
@@ -182,15 +193,11 @@ export interface TestOf {
 	bodyweight: Metric | null;
 }
 
-/** The test `workout` holds, `null` when none of its exercises is keyed by a metric. */
+/** The test `workout` holds, as {@link testedMetric} finds it, `null` when it holds none. */
 export function testOf(state: SportState, workout: PlannedWorkout): TestOf | null {
-	for (const { items } of workout.blocks) {
-		for (const { exercise } of items) {
-			const metric = state.metrics.find(({ id }) => id === exercise.key);
-			if (metric) return { exercise, metric, bodyweight: bodyweightOf(state) };
-		}
-	}
-	return null;
+	const planned = state.plan?.workouts.find(({ id }) => id === workout.id);
+	const tested = planned ? testedMetric(state, planned) : null;
+	return tested && { ...tested, bodyweight: bodyweightOf(state) };
 }
 
 /** A record a save beat, with the best before it. */
@@ -255,11 +262,11 @@ export function beaten(state: SportState, before: SportRecords, after: SportReco
 		.map(row => ({ label: row.label, now: row.value, was: was.get(row.key) ?? null }));
 }
 
-/** The bodyweight: the metric an of-max load rule subtracts, `null` when no rule subtracts one. */
-export function bodyweightOf(state: SportState): Metric | null {
-	const rule = state.plan ? exercisesOf(state.plan).find(({ load }) => load?.kind === "of-max" && load.less !== null)?.load : undefined;
-	return rule?.kind === "of-max" ? (state.metrics.find(({ id }) => id === rule.less) ?? null) : null;
-}
+/** The metric of `state` whose id is `id`, `null` for none. */
+export const metricOf = (state: SportState, id: string | null): Metric | null => state.metrics.find(metric => metric.id === id) ?? null;
+
+/** The bodyweight's metric, as {@link bodyweightMetric} names it. */
+export const bodyweightOf = (state: SportState): Metric | null => metricOf(state, bodyweightMetric(state.plan));
 
 /** The measurements of `metric`, oldest first. */
 export const measured = (state: SportState, metric: string): Measurement[] => state.measurements.filter(row => row.metric === metric).sort((a, b) => a.at.localeCompare(b.at));
@@ -286,17 +293,8 @@ export function logDetail(log: WorkoutLog): string {
 	return parts.filter(part => part !== null).join(" · ");
 }
 
-/** The ids of the logs that reached a record of `best` first: a heaviest load or a hardest grade. */
-export function recordLogs(state: SportState, best: SportRecords): Set<string> {
-	const ids = new Set<string>();
-	for (const log of state.log) {
-		if (log.status !== "done") continue;
-		const load = best.loads.some(({ key, kg, date }) => date === log.date && log.loads[key] === kg);
-		const grade = log.climbs.some(({ kind, grade }) => best.grades[kind]?.date === log.date && best.grades[kind]?.grade === grade);
-		if (load || grade) ids.add(log.id);
-	}
-	return ids;
-}
+/** The ids of the logs that first reached a record of `best`: a heaviest load or a hardest grade. */
+export const recordLogs = (best: SportRecords): Set<string> => new Set([...best.loads.map(({ logId }) => logId), ...CLIMB_KINDS.flatMap(kind => best.grades[kind]?.logId ?? [])]);
 
 /** One week of the journal: its logs, newest first, how many were done, and the minutes the done ones planned. */
 export interface JournalWeek {
@@ -321,11 +319,9 @@ export function journalWeeks(state: SportState): JournalWeek[] {
 	return [...weeks.values()];
 }
 
-/** The first override day from `today` whose workout tests `metric`, `null` when none is planned. */
+/** The first override day from `today` whose workout tests `metric`, as {@link testedMetric} finds it, `null` when none is planned. */
 export function nextTest(state: SportState, metric: string, today: string): string | null {
-	const plan = state.plan;
-	if (!plan) return null;
-	const tests = (workout: string): boolean => plan.workouts.some(({ id, blocks }) => id === workout && blocks.some(({ items }) => items.some(({ key }) => key === metric)));
-	const days = plan.overrides.filter(({ date, slots }) => date >= today && slots.some(slot => tests(slot.workout))).map(({ date }) => date);
+	const tests = new Set(state.plan?.workouts.flatMap(workout => (testedMetric(state, workout)?.metric.id === metric ? [workout.id] : [])));
+	const days = state.plan?.overrides.filter(({ date, slots }) => date >= today && slots.some(slot => tests.has(slot.workout))).map(({ date }) => date) ?? [];
 	return days.sort()[0] ?? null;
 }
