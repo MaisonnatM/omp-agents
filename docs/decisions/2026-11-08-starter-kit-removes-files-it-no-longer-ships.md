@@ -21,6 +21,8 @@ The installer only added and updated files, so nothing took them away; [2026-11-
 - Remove every file at a path the kit once shipped: loses a copy you edited, or a file of your own that took a dropped path.
 - Remove only a dropped file whose content matches the record or a version in the kit's history, and keep an edited one even under `--force`: chosen, since `--force` exists to overwrite an edit with the kit's version, and a dropped file has no kit version to overwrite it with.
 
+Get started counts a dropped file waiting for removal as pending, so its starter kit step is not complete while one still loads.
+A path is only removed when it is a regular file inside the agent directory, not through a symlink at its end, and not a case or Unicode variant of a file the kit ships, since on macOS that is the same file.
 ## Consequences
 
 An install and `--files` print each dropped file as `remove` or `keep yours`, remove the unedited ones and the directories they leave empty, and drop their record entries.
