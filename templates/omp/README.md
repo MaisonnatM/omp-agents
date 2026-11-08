@@ -23,6 +23,7 @@ The installer:
 A setting that you already have keeps your value, and the installer lists it as `keep yours`.
 A file that you already have is replaced, listed as `overwrite`, only when you never edited it: it matches what the last install wrote, which the installer records in `starter-kit-installed.json` in the agent directory, or a version the kit shipped before, which the kit's git history holds.
 A file you edited keeps your version and is listed as `keep yours`; merge the kit's changes into it by hand, or pass `--force` to overwrite it and every other `keep yours` with the kit's version.
+A file an earlier kit shipped and this one no longer does is removed, listed as `remove`, when you never edited it, by the same test; one you edited stays, listed as `keep yours`, even with `--force`.
 Running the installer again changes nothing that already matches.
 After one install with `--maintainer`, later installs copy `maintainer/` too.
 

@@ -107,4 +107,4 @@ flowchart TD
 ```
 
 [Starter kit and docs](../code-layout/starter-kit-and-docs.md) covers the installer, [Updating the dashboard](updating-the-dashboard.md) the update, and [Settings sync](settings-sync.md) the sync repository.
-A file the kit stops shipping stays in `~/.omp/agent` until the user deletes it, since the installer only adds and updates files.
+A file the kit stops shipping leaves `~/.omp/agent` at the next install or update when the user never edited it, and stays when they did.

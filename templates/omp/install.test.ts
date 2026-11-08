@@ -132,6 +132,25 @@ describe("planKitFiles", () => {
 		record(agentDir, { maintainer: true, files: { "AGENTS.md": blobId("maintainer") } });
 		expect(planKitFiles(kit, agentDir)).toMatchObject({ maintainer: true, files: [{ rel: "AGENTS.md", action: "same" }] });
 	});
+
+	test("removes a file the kit's history held and no longer ships, keeps one you edited even with --force, and leaves one maintainer/ still ships", () => {
+		const repo = scratch();
+		const kit = join(repo, "templates", "omp");
+		git(repo, "init", "--quiet");
+		put(kit, { "agent/a.md": "v1", "agent/old.md": "v1", "agent/edited.md": "v1", "maintainer/m.md": "v1" });
+		git(repo, "add", ".");
+		git(repo, "commit", "--quiet", "-m", "v1");
+		git(repo, "rm", "--quiet", "templates/omp/agent/old.md", "templates/omp/agent/edited.md");
+		git(repo, "commit", "--quiet", "-m", "v2");
+		const agentDir = scratch();
+		put(agentDir, { "a.md": "v1", "old.md": "v1", "edited.md": "v1 edited", "m.md": "v1", "mine.md": "mine" });
+		const obsolete = (force: boolean) => planKitFiles(kit, agentDir, { force }).obsolete.map(file => [file.rel, file.action]);
+		expect(obsolete(false)).toEqual([
+			["edited.md", "keep"],
+			["old.md", "remove"],
+		]);
+		expect(obsolete(true)).toEqual(obsolete(false));
+	});
 });
 
 describe("omp-template --files", () => {
@@ -161,6 +180,17 @@ describe("omp-template --files", () => {
 		const after = readInstalledRecord(agentDir);
 		expect(after?.files["extensions/ship.ts"]).toBe(blobId(kitShip));
 		expect(after?.files["extensions/land.ts"]).toBe(blobId("installed before"));
+	});
+
+	test("removes a recorded file the kit no longer ships, the directory it leaves empty, and its record entry", () => {
+		const agentDir = scratch();
+		put(agentDir, { "extensions/gone/old.ts": "installed before" });
+		record(agentDir, { maintainer: false, files: { "extensions/gone/old.ts": blobId("installed before") } });
+		const proc = files(agentDir);
+		expect(proc.exitCode).toBe(0);
+		expect(existsSync(join(agentDir, "extensions/gone"))).toBe(false);
+		expect(existsSync(join(agentDir, "extensions"))).toBe(true);
+		expect(readInstalledRecord(agentDir)?.files).not.toHaveProperty(["extensions/gone/old.ts"]);
 	});
 });
 

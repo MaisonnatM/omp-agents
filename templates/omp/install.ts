@@ -5,14 +5,16 @@
  * matches what the last install wrote, as `starter-kit-installed.json` records, or a version the kit shipped before, as
  * the kit's git history holds; one you edited keeps your version unless you pass `--force`. `--maintainer` copies
  * `maintainer/` on top, and a file there replaces the `agent/` file with the same relative path; later installs
- * remember it. `mcp.json` gains each kit MCP server you lack; one you already list keeps your entry. `--files` only
- * brings the files up to date, never adds back one you deleted, and needs no omp; the dashboard's Update runs it.
+ * remember it. `mcp.json` gains each kit MCP server you lack; one you already list keeps your entry. A file an earlier
+ * kit shipped and this one no longer does is removed when you never edited it, and kept when you did, even with
+ * `--force`. `--files` only brings the files up to date, never adds back one you deleted, and needs no omp; the
+ * dashboard's Update runs it.
  *
  *   bun run omp-template [--dry-run] [--force] [--maintainer]
  *   bun run omp-template --files [--dry-run]
  */
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { deepEquals, Glob } from "bun";
@@ -85,10 +87,11 @@ export function readInstalledRecord(agentDir: string): InstalledRecord | null {
 	return { maintainer: parsed.maintainer, files };
 }
 
-/** Records the files an install wrote or found already matching, keeping the entries of the files it left alone. */
-function writeInstalledRecord(agentDir: string, previous: InstalledRecord | null, maintainer: boolean, files: readonly (KitFile & { action: Action })[]): void {
+/** Records the files an install wrote or found already matching, keeping the entries of the files it left alone and dropping those it removed. */
+function writeInstalledRecord(agentDir: string, previous: InstalledRecord | null, maintainer: boolean, files: readonly (KitFile & { action: Action })[], obsolete: readonly ObsoleteFile[]): void {
 	const recorded = { ...previous?.files };
 	for (const file of files) if (file.action !== "keep") recorded[file.rel] = blobId(file.text);
+	for (const file of obsolete) if (file.action === "remove") delete recorded[file.rel];
 	const record: InstalledRecord = { maintainer, files: recorded };
 	writeFileSync(join(agentDir, INSTALLED_RECORD), `${JSON.stringify(record, null, "\t")}\n`);
 }
@@ -205,10 +208,19 @@ function layerFiles(root: string): KitFile[] {
 
 export type FileStep = KitFile & { dest: string; action: Action };
 
+/** A file an earlier kit shipped, as the record or the kit's history holds, that neither `agent/` nor `maintainer/` ships now. */
+export interface ObsoleteFile {
+	rel: string;
+	dest: string;
+	/** `remove` when you never edited it, else `keep`. */
+	action: "remove" | "keep";
+}
+
 export interface KitFilesPlan {
 	/** Whether `maintainer/` is copied: as asked, else as the last install did. */
 	maintainer: boolean;
 	files: FileStep[];
+	obsolete: ObsoleteFile[];
 }
 
 export interface StarterKitPlan extends KitFilesPlan {
@@ -232,36 +244,46 @@ export interface PlanOptions {
 
 /**
  * Read-only. A file you have is replaced when it differs and you never edited it: it matches what the last install
- * recorded, or a version in the kit's history.
+ * recorded, or a version in the kit's history. A file the kit no longer ships is removed on the same test.
  */
 export function planKitFiles(kit: string, agentDir: string, { force = false, maintainer }: PlanOptions = {}): KitFilesPlan {
 	if (!existsSync(join(kit, "agent"))) throw new Error(`Starter kit files are missing from ${kit}`);
 	const record = readInstalledRecord(agentDir);
 	const withMaintainer = maintainer ?? record?.maintainer ?? false;
-	const layers = [layerFiles(join(kit, "agent"))];
-	if (withMaintainer) layers.push(layerFiles(join(kit, "maintainer")));
+	const agentLayer = layerFiles(join(kit, "agent"));
+	const maintainerLayer = layerFiles(join(kit, "maintainer"));
 	const untouched = (rel: string, current: string): boolean => {
 		const id = blobId(current);
 		return record?.files[rel] === id || kitHistory(kit).get(rel)?.has(id) === true;
 	};
-	const files = overlayFiles(layers).map(file => {
+	const files = overlayFiles(withMaintainer ? [agentLayer, maintainerLayer] : [agentLayer]).map(file => {
 		const dest = join(agentDir, file.rel);
 		const current = existsSync(dest) ? readFileSync(dest, "utf8") : undefined;
 		const replace = force || (current !== undefined && current !== file.text && untouched(file.rel, current));
 		return { ...file, dest, action: planValue(current, file.text, replace) };
 	});
-	return { maintainer: withMaintainer, files };
+	const shipped = new Set([...agentLayer, ...maintainerLayer].map(file => file.rel));
+	const shippedBefore = new Set([...Object.keys(record?.files ?? {}), ...kitHistory(kit).keys()]);
+	const obsolete = [...shippedBefore]
+		.filter(rel => !shipped.has(rel) && statSync(join(agentDir, rel), { throwIfNoEntry: false })?.isFile() === true)
+		.sort()
+		.map((rel): ObsoleteFile => {
+			const dest = join(agentDir, rel);
+			return { rel, dest, action: untouched(rel, readFileSync(dest, "utf8")) ? "remove" : "keep" };
+		});
+	return { maintainer: withMaintainer, files, obsolete };
 }
 
 /** Read-only, including settings and plugins. Callers supply native or CLI reads, never config initialization here. */
 export function planStarterKit(kit: string, agentDir: string, snapshot: StarterKitSnapshot, options: PlanOptions = {}): StarterKitPlan {
-	const { maintainer, files } = planKitFiles(kit, agentDir, options);
+	const { maintainer, files, obsolete } = planKitFiles(kit, agentDir, options);
 	const userConfigPath = join(agentDir, "config.yml");
 	const user = existsSync(userConfigPath) ? readYamlMapping(userConfigPath) : {};
 	const settings = planSettings(settingsOf(readYamlMapping(join(kit, "config.yml")), snapshot.knownSettings), user, options.force ?? false);
 	return {
 		maintainer,
 		files,
+		obsolete,
 		settings,
 		marketplace: { source: STARTER_KIT_MARKETPLACE.source, action: snapshot.hasMarketplace ? "same" : "create" },
 		plugins: PLUGINS.map(id => ({ id, action: snapshot.plugins.has(id) ? "same" : "create" })),
@@ -278,6 +300,14 @@ function writeFiles(files: readonly FileStep[]): void {
 	}
 }
 
+/** Removes each obsolete file you never edited, then each directory that leaves empty, up to the agent directory. */
+function removeObsolete(agentDir: string, obsolete: readonly ObsoleteFile[]): void {
+	for (const file of obsolete.filter(f => f.action === "remove")) {
+		rmSync(file.dest);
+		for (let dir = dirname(file.dest); dir.startsWith(`${agentDir}/`) && readdirSync(dir).length === 0; dir = dirname(dir)) rmdirSync(dir);
+	}
+}
+
 /** `--files`: the kit's files only, as the last install chose them, never adding back one you deleted since. */
 function updateFiles(kit: string, agentDir: string, dryRun: boolean): void {
 	const record = readInstalledRecord(agentDir);
@@ -289,12 +319,14 @@ function updateFiles(kit: string, agentDir: string, dryRun: boolean): void {
 	const plan = planKitFiles(kit, agentDir, { maintainer: record.maintainer });
 	const files = plan.files.map(file => (file.action === "create" && file.rel in record.files ? { ...file, action: "keep" as const } : file));
 	for (const file of files) if (file.action !== "same") print(file.action, `file ${file.rel}`);
+	for (const file of plan.obsolete) console.log(`  ${(file.action === "remove" ? "remove" : LABEL.keep).padEnd(10)} file ${file.rel}, which the kit no longer ships`);
 	if (dryRun) {
 		console.log("Dry run, nothing written.");
 		return;
 	}
 	writeFiles(files);
-	writeInstalledRecord(agentDir, record, plan.maintainer, files);
+	removeObsolete(agentDir, plan.obsolete);
+	writeInstalledRecord(agentDir, record, plan.maintainer, files, plan.obsolete);
 	console.log("Done.");
 }
 
@@ -322,10 +354,11 @@ async function main(argv: string[]): Promise<void> {
 	};
 	const previous = readInstalledRecord(agentDir);
 	const plan = planStarterKit(kit, agentDir, snapshot, { force, maintainer: argv.includes("--maintainer") || undefined });
-	const { maintainer, files, settings, marketplace, plugins, mcpServers } = plan;
+	const { maintainer, files, obsolete, settings, marketplace, plugins, mcpServers } = plan;
 	const profile = maintainer ? " and the maintainer git profile" : "";
 	console.log(`${dryRun ? "Would install" : "Installing"} the omp starter kit${profile} into ${agentDir}${force ? ", overwriting your versions" : ""}`);
 	for (const file of files) print(file.action, `file ${file.rel}`);
+	for (const file of obsolete) console.log(`  ${(file.action === "remove" ? "remove" : LABEL.keep).padEnd(10)} file ${file.rel}, which the kit no longer ships`);
 	for (const setting of settings) print(setting.action, `setting ${setting.target}`);
 	print(marketplace.action, `marketplace ${marketplace.source}`);
 	for (const plugin of plugins) print(plugin.action, `plugin ${plugin.id}`);
@@ -339,7 +372,8 @@ async function main(argv: string[]): Promise<void> {
 	}
 
 	writeFiles(files);
-	writeInstalledRecord(agentDir, previous, maintainer, files);
+	removeObsolete(agentDir, obsolete);
+	writeInstalledRecord(agentDir, previous, maintainer, files, obsolete);
 	writeMcpServers(join(agentDir, "mcp.json"), mcpServers);
 	for (const { target, value } of settings.filter(s => writes(s.action))) {
 		await omp(ompCommand, ["config", "set", target, typeof value === "object" ? JSON.stringify(value) : String(value)]);
