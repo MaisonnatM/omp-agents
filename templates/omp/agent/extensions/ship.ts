@@ -540,6 +540,8 @@ export default function ship(pi: ExtensionAPI) {
 	}
 
 	pi.on("session_start", async (_event, ctx) => {
+		// The session that runs /ship records its stages, so a subagent's requests leave out this tool's schema.
+		if (ctx.agent.kind === "sub") await pi.setActiveTools(pi.getActiveTools().filter(name => name !== "ship_stage"));
 		restore(ctx);
 		ctx.setInterval(() => refresh(ctx), POLL_MS);
 		await refresh(ctx);

@@ -11,6 +11,10 @@ import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 const INBOX_DIR = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "omp-agents", "end-inbox");
 
 export default function endSession(pi: ExtensionAPI) {
+	// A subagent cannot end the session, so its requests leave out this tool's schema.
+	pi.on("session_start", async (_event, ctx) => {
+		if (ctx.agent.kind === "sub") await pi.setActiveTools(pi.getActiveTools().filter(name => name !== "end_session"));
+	});
 	const z = pi.zod;
 	const params = z.object({});
 	/** Whether this turn asked to end the session, which happens once it ends. */
