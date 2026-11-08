@@ -59,7 +59,7 @@ test("sport routes open the week on a day, the journal on a log, and the progres
 		expect(hashForSport(route)).toBe(hash);
 		expect(routeFromHash(hash)).toEqual({ kind: "page", page: { kind: "sport", ...route } });
 	}
-	expect(routeFromHash("#sport?day=17-11-2026")).toEqual({ kind: "page", page: { kind: "sport", tab: "week", day: null } });
+	for (const day of ["17-11-2026", "2026-02-30", "2026-13-01"]) expect(routeFromHash(`#sport?day=${day}`)).toEqual({ kind: "page", page: { kind: "sport", tab: "week", day: null } });
 	expect(routeFromHash("#sport/week")).toEqual({ kind: "page", page: { kind: "sport", tab: "week", day: null } });
 });
 

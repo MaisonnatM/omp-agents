@@ -1,5 +1,6 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
 import { BarChart3, Blocks, Brain, FileText, Folders, GitBranch, GitMerge, HardDrive, KeyRound, type LucideIcon, MousePointerClick, Plug, RefreshCcw, Route as RouteIcon, Scale, Settings2, SlidersHorizontal, Workflow } from "lucide-react";
+import { isDay } from "../src/json";
 import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
 import { hashForSession, type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
@@ -179,8 +180,6 @@ export interface ScheduledRoute {
  */
 export type SportRoute = { tab: "week"; day: string | null } | { tab: "journal"; open: string | null } | { tab: "progress" };
 
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
-
 /** A page that covers the panes. */
 export type Page =
 	| { kind: "get-started" }
@@ -285,7 +284,7 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		if (rest === "journal") return { kind: "sport", tab: "journal", open: query.get("open") || null };
 		if (rest === "progress") return { kind: "sport", tab: "progress" };
 		const day = query.get("day");
-		return { kind: "sport", tab: "week", day: day !== null && DAY.test(day) ? day : null };
+		return { kind: "sport", tab: "week", day: isDay(day) ? day : null };
 	},
 };
 
