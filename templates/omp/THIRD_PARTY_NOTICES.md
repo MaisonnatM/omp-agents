@@ -104,6 +104,7 @@ SOFTWARE.
 
 Source: <https://github.com/mattpocock/skills>
 
+- `agent/skills/grill-me/SKILL.md`
 - `agent/skills/grill-with-docs/SKILL.md`
 - `agent/skills/grilling/SKILL.md`
 - `agent/skills/domain-modeling/`, whose decision section now points at `decision-records`

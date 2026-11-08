@@ -134,7 +134,7 @@ Files, in `agent/`:
 - `skills/`: `apple-design`, `emil-design-eng`, and `beautiful-shadows` for interface work; `thermo-nuclear-code-quality-review` for the reviewer; `app-consistency-review`, which the interface reviewer autoloads to check a PR against the app's shared components, tokens, and sibling screens; `decision-records`, which keeps each choice made in a project as one dated file in its `docs/decisions/`, with a `check.ts` that checks them; `ship`, the `/ship` workflow above; and `poteto-mode`, a typeable alias for pstack's `Poteto Mode` skill.
   The alias maps Cursor-only cleanup and runtime-control instructions to omp's available tools without editing the plugin cache.
 - `skills/interface-review/` and `skills/better-*/`: Jakub Krehel's change-scoped interface review, the `better-interface` review it hands off to, and the six discipline skills that one routes to: accessibility, colors, layout, typography, UI, and writing.
-- `skills/grill-with-docs/`, `skills/grilling/`, and `skills/domain-modeling/`: Matt Pocock's design interview, which you start with `/skill:grill-with-docs`; it asks rounds of numbered questions, each with a recommended answer, and writes settled terms to the project's `GLOSSARY.md` as they resolve.
+- `skills/grill-with-docs/`, `skills/grill-me/`, `skills/grilling/`, and `skills/domain-modeling/`: Matt Pocock's design interview, which you start with `/skill:grill-with-docs` in a repository or `/skill:grill-me` anywhere; it asks rounds of numbered questions, each with a recommended answer, and `grill-with-docs` also writes settled terms to the project's `GLOSSARY.md` as they resolve.
   The kit's `domain-modeling` records decisions with `decision-records` instead of upstream's numbered ADRs in `docs/adr/`.
 
 ## Requirements
@@ -173,4 +173,4 @@ Before the dashboard starts a session that would run the project's extensions, h
 ## Licenses
 
 The kit is MIT-licensed with the rest of the repository.
-The `apple-design`, `emil-design-eng`, `beautiful-shadows`, `thermo-nuclear-code-quality-review`, `interface-review`, `better-*`, `grill-with-docs`, `grilling`, and `domain-modeling` skills are copies of MIT-licensed skills by their authors; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The `apple-design`, `emil-design-eng`, `beautiful-shadows`, `thermo-nuclear-code-quality-review`, `interface-review`, `better-*`, `grill-with-docs`, `grill-me`, `grilling`, and `domain-modeling` skills are copies of MIT-licensed skills by their authors; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
