@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import type { Notice, StoppedSession } from "../src/shared/notices";
 import { hashForSession } from "../src/shared/sessions";
 import { presentNotice, TOAST_MS } from "./notice-model";
-import { hashForCalendar } from "./routing";
+import { hashForCalendar, hashForSettings } from "./routing";
 
 const NOW = 1791000000000;
 const flags = { at: NOW, seen: false, read: false };
@@ -26,6 +26,23 @@ test("an event stays toasted and opens the Calendar page when kept on this compu
 	expect(shown.link).toEqual({ href: hashForCalendar(), external: false });
 	expect(shown.toast).toEqual({ kind: "news", timeout: 0 });
 	expect(presentNotice({ ...event, sessionId: "s1" }, NOW).link).toEqual({ href: hashForSession("s1"), external: false });
+});
+
+test("a signed-out Google account asks to sign in again in Settings › Integrations and stays toasted", () => {
+	const signIn = { id: "g", ...flags, kind: "sign-in", service: "google-calendar", account: "google-calendar", address: "me@example.com" } as const;
+	expect(presentNotice(signIn, NOW)).toMatchObject({
+		source: "integrations",
+		headline: "Google Calendar is signed out",
+		preview: "me@example.com: sign in again in Settings › Integrations. Sessions cannot use it until then.",
+		link: { href: hashForSettings("integrations"), external: false },
+		face: { kind: "sign-in", service: "google-calendar" },
+		action: { kind: "none" },
+		toast: { kind: "news", timeout: 0 },
+	});
+	expect(presentNotice({ ...signIn, service: "gmail", account: "gmail-2", address: null }, NOW)).toMatchObject({
+		headline: "Gmail is signed out",
+		preview: "Account gmail-2: sign in again in Settings › Integrations. Sessions cannot use it until then.",
+	});
 });
 
 test("an update's action, failure, and toast follow its status", () => {

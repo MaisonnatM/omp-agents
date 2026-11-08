@@ -3,6 +3,7 @@
  * read, or cleared, which `notices.json` keeps across restarts. Each kind has its own check.
  */
 import { JsonFile } from "../fs";
+import type { SignedOutAccount } from "../google-accounts";
 import { errorText, isObject } from "../json";
 import { type PullRequestList, prKey, repoKey } from "../shared/github";
 import { type AgentOn, yourMoves } from "../shared/moves";
@@ -48,6 +49,8 @@ export interface NoticeSources {
 	googleEvents(from: number, to: number): Promise<AccountFoundEvents[]>;
 	/** The interrupted dashboard sessions that stopped while their turn ran. */
 	stoppedSessions(): StoppedSession[];
+	/** The Google accounts sessions reported signed out that still do not work. */
+	signedOut(): Promise<SignedOutAccount[]>;
 	now(): number;
 }
 
@@ -63,6 +66,8 @@ export const PROVIDER_KINDS = ["plan", "credits"] as const satisfies readonly No
 export const EVENT_KINDS = ["event"] as const satisfies readonly NoticeKind[];
 /** The kinds the stopped-sessions check looks for. */
 export const STOPPED_KINDS = ["stopped"] as const satisfies readonly NoticeKind[];
+/** The kinds the sign-in check looks for, which lists each reported account's tools. */
+export const SIGN_IN_KINDS = ["sign-in"] as const satisfies readonly NoticeKind[];
 
 const MARKS = ["seen", "read", "cleared"] as const;
 type Mark = (typeof MARKS)[number];
@@ -112,6 +117,7 @@ const LOOKED_FOR: Record<NoticeKind, string> = {
 	credits: "providers out of credits",
 	event: "calendar events",
 	stopped: "sessions that stopped mid-turn",
+	"sign-in": "signed-out Google accounts",
 };
 
 /**
@@ -340,6 +346,11 @@ export class Notices {
 			}
 			case "stopped":
 				return all(stoppedNotices(this.#sources.stoppedSessions(), this.#sources.now()), false);
+			case "sign-in":
+				return all(
+					(await this.#sources.signedOut()).map(({ since, ...account }) => ({ id: `sign-in:${account.account}:${since}`, at: since, kind: "sign-in", ...account })),
+					true,
+				);
 		}
 	}
 

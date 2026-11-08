@@ -3,6 +3,12 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-08
+
+- Fixed: with the starter kit, telling the ship tracker a pull request was merged now works for each pull request you name, even right after another one was marked merged, and it still refuses one that is not merged yet.
+- With the starter kit, a session whose Google Calendar or Gmail sign-in has run out now tells you to sign in again in Settings › Integrations, instead of trying again.
+- The bell now shows a notice when Google Calendar or Gmail is signed out, under a new Integrations tab, and opening it takes you to Settings › Integrations; it goes away once you sign in again.
+
 ## 2026-11-07
 
 - Fixed: the daily cleanup and Settings › Storage now check a subagent's copy of your repository for edits and live sessions even when omp keeps that copy outside the task's folder.

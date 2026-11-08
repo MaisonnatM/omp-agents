@@ -41,6 +41,8 @@ export const userNoteInboxDir = join(configDir, "note-inbox");
 export const eventInboxDir = join(configDir, "event-inbox");
 /** Where omp's `end_session` tool asks the server to end a session, one `<session id>.json` each, beside {@link tokenFile}. */
 export const sessionEndInboxDir = join(configDir, "end-inbox");
+/** Where the starter kit's `google-accounts` extension reports a Gmail or Google Calendar account that answered a session with HTTP 401, one JSON file each. */
+export const signInInboxDir = join(configDir, "sign-in-inbox");
 /** The routines, their runs, and the pull request heads their sessions took, beside {@link tokenFile}. */
 export const routinesFile = join(configDir, "routines.json");
 /** Where a Bot's `save_routine` and `delete_routine` tools leave their changes to its routines, one JSON file each, so the server stays the only writer of {@link routinesFile}. */

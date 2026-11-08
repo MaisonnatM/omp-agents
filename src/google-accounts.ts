@@ -28,22 +28,31 @@ import {
 	writeMcpServer,
 } from "./omp/mcp";
 import { type AccountId, type AccountsService, type GoogleAccount, type GoogleLinks, MCP_SERVICES, serverConnection } from "./shared/accounts";
+import type { SignInSubject } from "./shared/notices";
 import { type SignedFetch, signedFetch } from "./signed-fetch";
 
 /**
- * What the dashboard keeps about Google accounts: each account's address, lowercased, by its server's name, and each
- * lowercased address's linked workspaces.
+ * What the dashboard keeps about Google accounts: each account's address, lowercased, by its server's name, each
+ * lowercased address's linked workspaces, and since when each account a session found signed out has been reported so,
+ * by its server's name, until it works again or the user signs it out.
  */
 export interface GoogleAccountsState {
 	addresses: ReadonlyMap<AccountId, string>;
 	links: ReadonlyMap<string, readonly string[]>;
+	signedOut: ReadonlyMap<AccountId, number>;
 }
 
-/** A change to {@link GoogleAccountsState}: an account's address learned, accounts whose servers are gone, or an address's links replaced. */
+/**
+ * A change to {@link GoogleAccountsState}: an account's address learned, accounts whose servers are gone, an address's
+ * links replaced, an account a session found signed out at `at`, or an account whose report is settled because it signed
+ * in again or the user signed it out.
+ */
 export type GoogleAccountsChange =
 	| { kind: "learn"; account: AccountId; address: string }
 	| { kind: "forget"; accounts: readonly AccountId[] }
-	| { kind: "link"; address: string; workspaces: readonly string[] };
+	| { kind: "link"; address: string; workspaces: readonly string[] }
+	| { kind: "signed-out"; account: AccountId; at: number }
+	| { kind: "settle"; account: AccountId };
 
 /** Where {@link GoogleAccountsState} is kept: `google-accounts.json`, through `src/server/google-accounts-file.ts`. */
 export interface GoogleAccountsStore {
@@ -53,7 +62,8 @@ export interface GoogleAccountsStore {
 
 /**
  * `state` after `change`, or `state` itself when it changes nothing. Forgetting an account keeps its address's links,
- * so an account added again as the same address is linked as before.
+ * so an account added again as the same address is linked as before. A second report of an account already reported
+ * signed out keeps the first one's time, so the bell does not tell of it again.
  */
 export function applyGoogleAccounts(state: GoogleAccountsState, change: GoogleAccountsChange): GoogleAccountsState {
 	switch (change.kind) {
@@ -62,11 +72,15 @@ export function applyGoogleAccounts(state: GoogleAccountsState, change: GoogleAc
 			return { ...state, addresses: new Map(state.addresses).set(change.account, change.address) };
 		}
 		case "forget": {
-			const gone = change.accounts.filter(account => state.addresses.has(account));
+			const gone = change.accounts.filter(account => state.addresses.has(account) || state.signedOut.has(account));
 			if (gone.length === 0) return state;
 			const addresses = new Map(state.addresses);
-			for (const account of gone) addresses.delete(account);
-			return { ...state, addresses };
+			const signedOut = new Map(state.signedOut);
+			for (const account of gone) {
+				addresses.delete(account);
+				signedOut.delete(account);
+			}
+			return { ...state, addresses, signedOut };
 		}
 		case "link": {
 			const workspaces = [...new Set(change.workspaces)];
@@ -76,6 +90,16 @@ export function applyGoogleAccounts(state: GoogleAccountsState, change: GoogleAc
 			if (workspaces.length === 0) links.delete(change.address);
 			else links.set(change.address, workspaces);
 			return { ...state, links };
+		}
+		case "signed-out": {
+			if (state.signedOut.has(change.account)) return state;
+			return { ...state, signedOut: new Map(state.signedOut).set(change.account, change.at) };
+		}
+		case "settle": {
+			if (!state.signedOut.has(change.account)) return state;
+			const signedOut = new Map(state.signedOut);
+			signedOut.delete(change.account);
+			return { ...state, signedOut };
 		}
 		default: {
 			const never: never = change;
@@ -92,6 +116,9 @@ const ACCOUNT_ID_PREFIX = "mcp_oauth_omp_agents_";
 
 /** How each service learns which address an account signs in as. */
 const ADDRESS_OF: Record<AccountsService, (fetch: SignedFetch) => Promise<string>> = { gmail: gmailAddress, "google-calendar": calendarAddress };
+
+/** The services that hold an account per server. */
+const ACCOUNTS_SERVICES = Object.keys(ADDRESS_OF) as AccountsService[];
 
 const serversOf = (id: AccountsService): Promise<McpServer[]> => findMcpServers(MCP_SERVICES[id].host);
 
@@ -139,18 +166,31 @@ async function freeName(base: string): Promise<string> {
 	}
 }
 
+/** An account a session reported signed out, as the bell tells of it, `since` it was first reported. */
+export type SignedOutAccount = Omit<SignInSubject, "kind"> & { since: number };
+
 /** The accounts of Gmail and Google Calendar. */
 export interface GoogleAccounts {
 	/** Service `id`'s accounts, as Settings › Integrations lists, signs in to, adds, and removes them. */
 	of(id: AccountsService): IntegrationKind<{ accounts: GoogleAccount[] }>;
-	/** Forgets the addresses of the accounts not in `live`, whose servers are gone. */
+	/** Forgets the addresses and reports of the accounts not in `live`, whose servers are gone. */
 	forgetGone(live: ReadonlySet<AccountId>): void;
 	/** Links Google address `address`'s accounts, Gmail's and Google Calendar's, to `workspaces`. */
 	link(links: GoogleLinks): void;
+	/** Keeps that a session found account `account` signed out at `at`; whether it is a Gmail or Google Calendar account whose report is new. */
+	reportSignedOut(account: AccountId, at: number): Promise<boolean>;
+	/**
+	 * The reported accounts that still do not work. A report settles once its account works again, as a sign-in through omp
+	 * rather than Settings makes it, or once its server is gone.
+	 */
+	signedOut(): Promise<SignedOutAccount[]>;
 }
 
-/** The Google accounts kept in `store`; `grant` is the browser sign-in, omp's `/mcp reauth` flow outside tests. */
-export function createGoogleAccounts(store: GoogleAccountsStore, grant: typeof signInMcp = signInMcp): GoogleAccounts {
+/**
+ * The Google accounts kept in `store`; `grant` is the browser sign-in, omp's `/mcp reauth` flow outside tests, and
+ * `status` reads where omp stands with an account's server.
+ */
+export function createGoogleAccounts(store: GoogleAccountsStore, grant: typeof signInMcp = signInMcp, status: typeof remoteStatusOf = remoteStatusOf): GoogleAccounts {
 	const addressOf = async (id: AccountsService, server: McpServer): Promise<string> => (await ADDRESS_OF[id](serverFetch(server))).toLowerCase();
 
 	const learnAddress = async (id: AccountsService, server: McpServer): Promise<string> => {
@@ -213,6 +253,16 @@ export function createGoogleAccounts(store: GoogleAccountsStore, grant: typeof s
 			throw err;
 		}
 		if (existing) await signOutMcp(existing);
+		store.apply({ kind: "settle", account: name });
+	};
+
+	/** The service and server of account `account`, `null` while no Gmail or Google Calendar server has its name. */
+	const findAccount = async (account: AccountId): Promise<{ id: AccountsService; server: McpServer } | null> => {
+		for (const id of ACCOUNTS_SERVICES) {
+			const server = (await serversOf(id)).find(candidate => candidate.name === account);
+			if (server) return { id, server };
+		}
+		return null;
 	};
 
 	/** Removes `server` and its sign-in, the server first, so omp never loads it without its sign-in and falls back to the one filed under the URL. */
@@ -229,38 +279,61 @@ export function createGoogleAccounts(store: GoogleAccountsStore, grant: typeof s
 				const held = await mcpSignedInIds(servers.map(server => server.credentialId));
 				const accounts = servers.map(async server => {
 					const signedIn = held.has(server.credentialId);
-					const status = await signIn.hold(server.name, () => remoteStatusOf(server, { signedIn, signInRequired: true }, fresh));
-					return accountOf(id, server, signedIn, serverConnection(server, status));
+					const remote = await signIn.hold(server.name, () => status(server, { signedIn, signInRequired: true }, fresh));
+					return accountOf(id, server, signedIn, serverConnection(server, remote));
 				});
 				return { accounts: await Promise.all(accounts) };
 			},
 
 			signIn: (account, signal, waiting) => signInAccount(id, account, signal, waiting),
 
-			/** The last account on the host keeps its server, which holds the OAuth client, and is signed out. */
+			/** The last account on the host keeps its server, which holds the OAuth client, and is signed out, which settles its report. */
 			async remove(account) {
 				if (account === null) throw new Error(`Name the ${MCP_SERVICES[id].label} account to remove.`);
 				const servers = await serversOf(id);
 				const server = await accountServer(id, account);
 				if (servers.length > 1) await removeAccountServer(server);
-				else await signOutMcp(server);
+				else {
+					await signOutMcp(server);
+					store.apply({ kind: "settle", account: server.name });
+				}
 			},
 
 			/** Every account but the first goes with its sign-in, and the first, which keeps the OAuth client, is signed out. */
 			async dropSignIns() {
 				const [kept, ...rest] = await serversOf(id);
 				for (const server of rest) await removeAccountServer(server);
-				if (kept) await signOutMcp(kept);
+				if (!kept) return;
+				await signOutMcp(kept);
+				store.apply({ kind: "settle", account: kept.name });
 			},
 		}),
 
 		forgetGone(live) {
-			const gone = [...store.value.addresses.keys()].filter(account => !live.has(account));
+			const gone = [...new Set([...store.value.addresses.keys(), ...store.value.signedOut.keys()])].filter(account => !live.has(account));
 			if (gone.length > 0) store.apply({ kind: "forget", accounts: gone });
 		},
 
 		link({ address, workspaces }) {
 			store.apply({ kind: "link", address: address.toLowerCase(), workspaces });
+		},
+
+		async reportSignedOut(account, at) {
+			return (await findAccount(account)) !== null && store.apply({ kind: "signed-out", account, at });
+		},
+
+		// Lists the tools afresh: a list from before the session's 401 would read as working.
+		async signedOut() {
+			const reported = [...store.value.signedOut].map(async ([account, since]): Promise<SignedOutAccount[]> => {
+				const found = await findAccount(account);
+				const remote = found && (await status(found.server, { signedIn: await mcpSignedIn(found.server), signInRequired: true }, true));
+				if (!found || remote?.kind === "ready") {
+					store.apply({ kind: "settle", account });
+					return [];
+				}
+				return [{ service: found.id, account, address: store.value.addresses.get(account) ?? null, since }];
+			});
+			return (await Promise.all(reported)).flat();
 		},
 	};
 }

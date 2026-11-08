@@ -2,12 +2,15 @@ import { afterEach, beforeEach, expect, mock, spyOn, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { accountClients, createGoogleAccounts } from "./google-accounts";
+import { flushJsonFiles } from "./fs";
+import { accountClients, createGoogleAccounts, type GoogleAccounts, type SignedOutAccount } from "./google-accounts";
 import { createIntegrations, type Integrations } from "./integrations";
+import type { remoteStatusOf } from "./mcp-status";
 import { auth, mcpCredentials } from "./omp/modules";
 import { type McpServerConfig, type McpSignInTarget, userMcpConfigPath, writeMcpServer } from "./omp/mcp";
 import { GoogleAccountsFile } from "./server/google-accounts-file";
 import type { McpIntegration } from "./shared/accounts";
+import type { McpRemoteStatus } from "./shared/mcp-status";
 
 const GMAIL = "https://gmailmcp.googleapis.com/mcp/v1";
 const CALENDAR = "https://calendarmcp.googleapis.com/mcp/v1";
@@ -76,15 +79,22 @@ async function configure(servers: Record<string, object>): Promise<void> {
 	for (const [name, server] of Object.entries(servers)) await writeMcpServer(userMcpConfigPath(), name, server as McpServerConfig);
 }
 
-/** The integrations with the Google accounts kept in a scratch `google-accounts.json` holding `addresses`, signing in as {@link browser} says. */
-function integrationsWith(addresses: Record<string, string>): { integrations: Integrations; store: GoogleAccountsFile } {
+/**
+ * The integrations with the Google accounts kept in a scratch `google-accounts.json` holding `addresses`, signing in as
+ * {@link browser} says, and reading where omp stands with a server through `status`.
+ */
+function integrationsWith(
+	addresses: Record<string, string>,
+	status?: typeof remoteStatusOf,
+): { integrations: Integrations; accounts: GoogleAccounts; store: GoogleAccountsFile; path: string } {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-google-accounts-"));
 	dirs.push(dir);
 	const path = join(dir, "google-accounts.json");
 	writeFileSync(path, JSON.stringify({ addresses, links: {} }));
 	const store = new GoogleAccountsFile(path);
 	const grant = async (target: McpSignInTarget): Promise<void> => signIn(target.credentialId as string, browser.shift() as string);
-	return { integrations: createIntegrations(createGoogleAccounts(store, grant)), store };
+	const accounts = createGoogleAccounts(store, grant, status);
+	return { integrations: createIntegrations(accounts), accounts, store, path };
 }
 
 const accountsOf = (integration: McpIntegration) => ("accounts" in integration ? integration.accounts : []);
@@ -203,4 +213,29 @@ test("a Gmail and a Google Calendar account whose addresses differ only in case 
 		{ name: "gmail", address: "ana@example.com", workspaces: ["/work"] },
 		{ name: "google-calendar", address: "ana@example.com", workspaces: ["/work"] },
 	]);
+});
+
+test("a session's sign-out report of a Google account stands, at its first time, until the account signs in again or works again", async () => {
+	await configure({ "google-calendar": { type: "http", url: CALENDAR, oauth: OAUTH } });
+	await signIn(mcpCredentials.mcpOAuthCredentialIdsForServerUrl(CALENDAR)[0] as string, "ana@example.com");
+	let remote: McpRemoteStatus = { kind: "refused", error: "The server refused omp's sign-in." };
+	const { integrations, accounts, store, path } = integrationsWith({ "google-calendar": "ana@example.com" }, async () => remote);
+	expect(await accounts.reportSignedOut("linear", 5)).toBe(false);
+	expect(await accounts.reportSignedOut("google-calendar", 5)).toBe(true);
+	expect(await accounts.reportSignedOut("google-calendar", 9)).toBe(false);
+	const reported: SignedOutAccount = { service: "google-calendar", account: "google-calendar", address: "ana@example.com", since: 5 };
+	expect(await accounts.signedOut()).toEqual([reported]);
+	await flushJsonFiles();
+	expect(JSON.parse(readFileSync(path, "utf8")).signedOut).toEqual({ "google-calendar": 5 });
+
+	browser.push("ana@example.com");
+	await integrations.startSignIn({ id: "google-calendar", account: "google-calendar" });
+	signedInIds.add(config()["google-calendar"]?.auth?.credentialId as string);
+	expect(await accounts.signedOut()).toEqual([]);
+
+	await accounts.reportSignedOut("google-calendar", 20);
+	expect(await accounts.signedOut()).toEqual([{ ...reported, since: 20 }]);
+	remote = { kind: "ready", tools: [] };
+	expect(await accounts.signedOut()).toEqual([]);
+	expect(store.value.signedOut.size).toBe(0);
 });

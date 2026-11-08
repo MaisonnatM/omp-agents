@@ -28,7 +28,7 @@ import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, personalDir, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, personalDir, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, signInInboxDir, sourceControlFile, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -65,10 +65,11 @@ import { LiveSessions, type SessionUpdate } from "./live-sessions";
 import { Loops, repeat } from "./loops";
 import { MergeCleanup } from "./merge-cleanup";
 import { MergeQueue } from "./merge-queue";
-import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, Notices, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
+import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, Notices, PROVIDER_KINDS, SIGN_IN_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
 import { OwnerLock } from "../../templates/omp/agent/extensions/github/owner-lock";
 import { isPersonalDir, personalJoin, personalMessage } from "./personal";
 import { PinsFile } from "./pins-file";
+import { SignInInbox } from "./sign-in-inbox";
 import { PrivateSessions } from "./private-sessions";
 import { PreferencesFile } from "./preferences-file";
 import { ProcessSettingsFile } from "./process-settings-file";
@@ -152,7 +153,8 @@ export class Dashboard {
 	readonly #sourceControl = new SourceControl(sourceControlFile);
 	readonly #settingsSync: SettingsSync;
 	readonly #calendars = new CalendarsFile(calendarsFile);
-	readonly #integrations: Integrations = createIntegrations(createGoogleAccounts(new GoogleAccountsFile(googleAccountsFile)));
+	readonly #googleAccounts = createGoogleAccounts(new GoogleAccountsFile(googleAccountsFile));
+	readonly #integrations: Integrations = createIntegrations(this.#googleAccounts);
 	readonly #localEvents = new LocalEventsFile(localEventsFile);
 	/** The terminal panel's shells, which the server's `/ws/terminal` upgrades open and attach to. */
 	readonly terminals = new Terminals();
@@ -170,6 +172,7 @@ export class Dashboard {
 	readonly #todoInbox: TodoInbox;
 	readonly #noteInbox: NoteInbox;
 	readonly #eventInbox: EventInbox;
+	readonly #signInInbox: SignInInbox;
 	readonly #routineInbox: RoutineInbox;
 	readonly #botInbox: BotInbox;
 	readonly #shepherdInbox: ShepherdInbox;
@@ -302,6 +305,7 @@ export class Dashboard {
 						const saved = files.savedOf(sessionId);
 						return { sessionId, title: saved?.title ?? null, cwdDisplay: saved ? displayPath(saved.cwd) : null };
 					}),
+				signedOut: () => this.#googleAccounts.signedOut(),
 				now: Date.now,
 			},
 			() => this.#broadcasts.pushList("notices"),
@@ -366,6 +370,15 @@ export class Dashboard {
 		this.#todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), workspaceOf, { active: () => ownerLock.held });
 		this.#noteInbox = new NoteInbox(userNoteInboxDir, change => lists.apply("user-notes", change), { active: () => ownerLock.held });
 		this.#eventInbox = new EventInbox(eventInboxDir, () => this.#localEvents.value, change => this.#localEvents.apply(change), { active: () => ownerLock.held });
+		this.#signInInbox = new SignInInbox(
+			signInInboxDir,
+			{
+				report: async ({ account, at }) => {
+					if (await this.#googleAccounts.reportSignedOut(account, at)) await notices.check(SIGN_IN_KINDS);
+				},
+			},
+			{ active: () => ownerLock.held },
+		);
 		this.#routineInbox = new RoutineInbox(routineInboxDir, () => routines.value, change => lists.apply("routines", change), { active: () => ownerLock.held });
 		this.#botInbox = new BotInbox(
 			botInboxDir,
@@ -533,7 +546,7 @@ export class Dashboard {
 				// Every server shows the sends, and the one that owns the unattended work sends them and saves what it did.
 				scheduled.reload();
 				broadcasts.pushList("scheduled");
-				await notices.check([...EVENT_KINDS, ...STOPPED_KINDS]);
+				await notices.check([...EVENT_KINDS, ...STOPPED_KINDS, ...SIGN_IN_KINDS]);
 				this.#fireTriggers();
 				if (!this.#claimUnattendedWork()) return;
 				this.#clearOldDone();
@@ -704,6 +717,7 @@ export class Dashboard {
 		this.#todoInbox.watch();
 		this.#noteInbox.watch();
 		this.#eventInbox.watch();
+		this.#signInInbox.watch();
 		this.#routineInbox.watch();
 		this.#botInbox.watch();
 		this.#shepherdInbox.watch();
@@ -733,6 +747,7 @@ export class Dashboard {
 		this.#todoInbox.stop();
 		this.#noteInbox.stop();
 		this.#eventInbox.stop();
+		this.#signInInbox.stop();
 		this.#routineInbox.stop();
 		this.#botInbox.stop();
 		this.#shepherdInbox.stop();
@@ -930,6 +945,7 @@ export class Dashboard {
 			void this.#todoInbox.drain();
 			void this.#noteInbox.drain();
 			void this.#eventInbox.drain();
+			void this.#signInInbox.drain();
 			void this.#routineInbox.drain();
 			void this.#botInbox.drain();
 			void this.#shepherdInbox.drain();

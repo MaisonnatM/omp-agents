@@ -9,7 +9,8 @@ import type { AgentState } from "../shared/moves";
 import type { CreditsSubject, ModelUpdate, Notice } from "../shared/notices";
 import type { SlackFound } from "../slack-messages";
 import { InterruptedSessions } from "./interrupted";
-import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, type FoundEvent, Notices, type NoticeSources, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
+import type { SignedOutAccount } from "../google-accounts";
+import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, type FoundEvent, Notices, type NoticeSources, PROVIDER_KINDS, SIGN_IN_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -79,6 +80,8 @@ interface State {
 	dashboardRefusal?: string;
 	/** How many times the dashboard check fetched omp-agents' branch. */
 	dashboardFetches?: number;
+	/** The Google accounts sessions reported signed out that still do not work. */
+	signedOut?: SignedOutAccount[];
 	/** The dashboard sessions the server tracks, whose mid-turn stops the stopped check lists. */
 	interrupted?: InterruptedSessions;
 	/** What each listed session file gives the stopped check. */
@@ -130,7 +133,8 @@ function sources(state: State): NoticeSources {
 			return [{ account: "google-calendar", events: state.googleEvents ?? [] }];
 		},
 		stoppedSessions: () => (state.interrupted?.midTurn() ?? []).map(sessionId => ({ sessionId, title: state.listed?.[sessionId]?.title ?? null, cwdDisplay: state.listed?.[sessionId]?.cwdDisplay ?? null })),
-	now: () => state.now ?? 0,
+		signedOut: async () => state.signedOut ?? [],
+		now: () => state.now ?? 0,
 	};
 }
 
@@ -373,6 +377,20 @@ describe("Notices", () => {
 		state.plans = [cursor(false)];
 		state.creditRuns = [];
 		await notices.check(PROVIDER_KINDS);
+		expect(notices.list).toEqual([]);
+	});
+
+	test("a Google account a session found signed out is a notice dated its report, until it works again", async () => {
+		const calendar: SignedOutAccount = { service: "google-calendar", account: "google-calendar", address: "me@example.com", since: 3 * MINUTE };
+		const state: State = { latest: null, installed: "18.8.0", models: [], signedOut: [calendar], now: 10 * MINUTE };
+		const notices = new Notices(noticesPath(), sources(state), () => {});
+		await notices.check(SIGN_IN_KINDS);
+		expect(notices.list).toEqual([
+			{ id: "sign-in:google-calendar:180000", at: 3 * MINUTE, seen: false, read: false, kind: "sign-in", service: "google-calendar", account: "google-calendar", address: "me@example.com" },
+		]);
+
+		state.signedOut = [];
+		await notices.check(SIGN_IN_KINDS);
 		expect(notices.list).toEqual([]);
 	});
 

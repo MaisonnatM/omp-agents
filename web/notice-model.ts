@@ -1,4 +1,5 @@
 /** How the bell words, pictures, links, acts on, and toasts each notice: {@link presentNotice}, the one place that tells notice kinds apart. */
+import { type AccountsService, MCP_SERVICES } from "../src/shared/accounts";
 import type { PullRequestSummary } from "../src/shared/github";
 import type { YourMove } from "../src/shared/moves";
 import { type Notice, type UpdateSubject, usesClause } from "../src/shared/notices";
@@ -9,7 +10,7 @@ import type { PullRequestActionId } from "../src/pull-request-actions";
 import { hashForCalendar, hashForPullRequests, hashForSettings } from "./routing";
 
 /** The bell's filters, each a source of notices. */
-export type NoticeSource = "github" | "slack" | "providers" | "calendar" | "sessions" | "updates";
+export type NoticeSource = "github" | "slack" | "providers" | "integrations" | "calendar" | "sessions" | "updates";
 
 /** Where a notice leads: a dashboard hash, or a page outside the dashboard that opens in a new tab. */
 export type NoticeLink = { href: string; external: boolean };
@@ -25,6 +26,7 @@ export type NoticeFace =
 	| { kind: "update" }
 	| { kind: "event"; color: string | null }
 	| { kind: "stopped" }
+	| { kind: "sign-in"; service: AccountsService }
 	| { kind: "provider"; provider: string; window: "plan" | "credits" }
 	| { kind: "move"; move: YourMove; person: { name: string; avatarUrl: string | null } | null }
 	| { kind: "slack"; person: { name: string; avatarUrl: string | null } };
@@ -173,6 +175,17 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 				toast: { kind: "news", timeout: 0 },
 			};
 		}
+		case "sign-in":
+			return {
+				...NEWS,
+				source: "integrations",
+				headline: `${MCP_SERVICES[notice.service].label} is signed out`,
+				preview: `${notice.address ?? `Account ${notice.account}`}: sign in again in Settings › Integrations. Sessions cannot use it until then.`,
+				link: { href: hashForSettings("integrations"), external: false },
+				face: { kind: "sign-in", service: notice.service },
+				// Every session that needs the account fails until you sign in again.
+				toast: { kind: "news", timeout: 0 },
+			};
 		case "omp":
 		case "model":
 		case "dashboard": {

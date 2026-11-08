@@ -2,13 +2,19 @@
 // tells a session at every prompt which server signs in as which address, and which addresses the user linked to the
 // session's workspace in Settings › Integrations. The dashboard keeps `google-accounts.json`; this only reads it and
 // omp's user `mcp.json`. It restricts no tool: a session may still use any account the user names.
+// When a Gmail or Google Calendar server answers a tool call with HTTP 401, it tells the session the account is signed
+// out and to ask the user to sign in again rather than retry, and reports the account once to the dashboard's
+// `sign-in-inbox`, whose bell asks the user to sign in again. It never signs in itself.
 import { execFileSync } from "node:child_process";
-import { readFileSync, realpathSync } from "node:fs";
-import { homedir } from "node:os";
+import { realpathSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import { CONFIG_DIR, leave, readJson } from "./inbox/client";
 
-const ACCOUNTS_FILE = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "omp-agents", "google-accounts.json");
+const ACCOUNTS_FILE = join(CONFIG_DIR, "google-accounts.json");
+
+/** Where a session reports an account it found signed out, which `src/server/sign-in-inbox.ts` reads. */
+const SIGN_IN_INBOX = join(CONFIG_DIR, "sign-in-inbox");
 
 // The services of `MCP_SERVICES` in `src/shared/accounts.ts` that hold an account per server; change both together.
 const SERVICES = [
@@ -65,14 +71,6 @@ const realOf = (path: string): string => {
 	}
 };
 
-function readJson<T>(path: string, empty: T): T {
-	try {
-		return JSON.parse(readFileSync(path, "utf8")) as T;
-	} catch {
-		return empty;
-	}
-}
-
 /** Each Google service's accounts: the enabled servers of `mcp` on its host, each with the address `accounts` learned for it. */
 export function servicesOf(mcp: McpFile, accounts: AccountsFile): ServiceAccounts[] {
 	const disabled = new Set(Array.isArray(mcp.disabledServers) ? mcp.disabledServers : []);
@@ -83,6 +81,28 @@ export function servicesOf(mcp: McpFile, accounts: AccountsFile): ServiceAccount
 			.filter(([, { url }]) => typeof url === "string" && URL.canParse(url) && new URL(url).host === host)
 			.map(([server]) => ({ server, address: accounts.addresses[server] ?? null })),
 	}));
+}
+
+/**
+ * The server whose tool call failed with HTTP 401, as omp's `formatMCPToolFailure` (src/mcp/errors.ts) words the
+ * failure in `text`; `null` for any other result. Keep it in step with omp's.
+ */
+export function unauthorizedServer(text: string): string | null {
+	if (!/^MCP failure$/m.test(text) || !/^code: 401$/m.test(text)) return null;
+	return /^server: (.+)$/m.exec(text)?.[1] ?? null;
+}
+
+/** The label of the Google service whose host server `server` of `mcp` is on, enabled or not; `null` for none. */
+export function serviceOf(mcp: McpFile, server: string): string | null {
+	const url = mcp.mcpServers?.[server]?.url;
+	if (typeof url !== "string" || !URL.canParse(url)) return null;
+	const { host } = new URL(url);
+	return SERVICES.find(service => service.host === host)?.label ?? null;
+}
+
+/** What a session is told instead of the 401 of `label`'s server `server`. */
+export function signedOutText(label: string, server: string): string {
+	return `${label} is signed out: its MCP server ${server} answered HTTP 401. Do not retry this tool or any other ${label} tool, and do not try to sign in yourself. Tell the user ${label} is signed out and ask them to sign in to it again in the omp-agents dashboard, under Settings › Integrations.`;
 }
 
 /** `cwd` as a {@link Place}; the main checkout is the parent of the repository's common `.git` directory, which a linked worktree shares. */
@@ -138,11 +158,12 @@ export function accountsText(services: readonly ServiceAccounts[], workspace: { 
 
 export default function googleAccounts(pi: ExtensionAPI) {
 	const places = new Map<string, Place>();
+	// omp's `getMCPConfigPath("user")`.
+	const mcpFile = (): McpFile => (readJson(join(pi.pi.getAgentDir(), "mcp.json")) ?? {}) as McpFile;
 	// Read on every prompt, so an account added or linked mid-session shows in the next turn.
 	pi.on("before_agent_start", (event, ctx) => {
-		const { addresses = {}, links = {} } = readJson<Partial<AccountsFile>>(ACCOUNTS_FILE, {});
-		// omp's `getMCPConfigPath("user")`.
-		const services = servicesOf(readJson<McpFile>(join(pi.pi.getAgentDir(), "mcp.json"), {}), { addresses, links });
+		const { addresses = {}, links = {} } = (readJson(ACCOUNTS_FILE) ?? {}) as Partial<AccountsFile>;
+		const services = servicesOf(mcpFile(), { addresses, links });
 		if (services.every(service => service.accounts.length < 2)) return;
 		let place = places.get(ctx.cwd);
 		if (!place) {
@@ -154,5 +175,19 @@ export default function googleAccounts(pi: ExtensionAPI) {
 		const text = accountsText(services, dir === null ? null : { dir, addresses: linked });
 		if (text === null) return;
 		return { systemPrompt: [...event.systemPrompt, text] };
+	});
+
+	// Each account is reported once a session: the dashboard keeps the first report until the account works again.
+	const reported = new Set<string>();
+	pi.on("tool_result", event => {
+		if (!event.isError) return;
+		const server = unauthorizedServer(event.content.map(part => (part.type === "text" ? part.text : "")).join("\n"));
+		const label = server === null ? null : serviceOf(mcpFile(), server);
+		if (server === null || label === null) return;
+		if (!reported.has(server)) {
+			reported.add(server);
+			leave(SIGN_IN_INBOX, { v: 1, server, at: Date.now() });
+		}
+		return { content: [{ type: "text", text: signedOutText(label, server) }], isError: true };
 	});
 }
