@@ -2,7 +2,7 @@
 import { addDays, daysBetween, mondayOf } from "../src/shared/days";
 import { type Climb, CLIMB_KINDS, type ClimbKind, type Exercise, exercisesOf, gradeRank, type Measurement, type Metric, PAIN_PLACES, type PainPlace, type Phase, type Place, type Plan, type SportChange, type SportState, type Workout, type WorkoutLog } from "../src/shared/sport";
 import { applySport } from "../src/sport";
-import { bodyweightMetric, type Load, PAIN_FLAG_DAYS, PAIN_FLAG_LEVEL, type PlannedDay, type PlannedWorkout, records, removesHangs, type SportRecords, testedMetric } from "../src/sport-week";
+import { bodyweightMetric, type Load, PAIN_FLAG_DAYS, PAIN_FLAG_LEVEL, type PlannedDay, type PlannedExercise, type PlannedWorkout, records, removesHangs, type SportRecords, testedMetric } from "../src/sport-week";
 
 /** The word under a pain level, 0 to 10. */
 export function painWord(level: number): string {
@@ -98,11 +98,11 @@ const NUMBER = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
 /** A value with its unit, French style: `113,3 kg`. */
 export const amount = (value: number, unit: string): string => `${NUMBER.format(value)} ${unit}`.trim();
 
+/** A difference with its sign: `+7 kg`, `−1,5 kg`. */
+export const signedAmount = (delta: number, unit: string): string => `${delta >= 0 ? "+" : "−"}${amount(Math.abs(delta), unit)}`;
+
 /** Kilograms added to the body: `+15 kg`, `−5 kg` with a pulley, `poids du corps` at zero. */
-export function signedKg(kg: number): string {
-	if (kg === 0) return "poids du corps";
-	return kg > 0 ? `+${amount(kg, "kg")}` : `−${amount(-kg, "kg")}`;
-}
+export const signedKg = (kg: number): string => (kg === 0 ? "poids du corps" : signedAmount(kg, "kg"));
 
 /** The load an exercise shows: the kilograms, « charge à tester » when its rule lacks a measurement, nothing when it takes no load. */
 export function loadText(exercise: Exercise, load: Load | null): string | null {
@@ -138,8 +138,26 @@ export function opening(plan: Plan, exercise: Exercise): Exercise[] {
 /** The exercises of `items` that have a demo, each opened as {@link opening} gives it, in order. */
 export const demosOf = (plan: Plan, items: Exercise[]): Exercise[] => items.flatMap(item => opening(plan, item)).filter(exercise => exercise.demo !== null);
 
-/** The demos of a workout, every block in order. */
-export const workoutDemos = (plan: Plan, workout: PlannedWorkout): Exercise[] => demosOf(plan, workout.blocks.flatMap(({ items }) => items.map(({ exercise }) => exercise)));
+/** A workout's blocks as the day shows them: each row with where its first demo sits in `demos`, `null` for none. */
+export interface WorkoutDemos {
+	demos: Exercise[];
+	blocks: { title: string; rows: { item: PlannedExercise; at: number | null }[] }[];
+}
+
+/** The demos of a workout, every block in order, and its blocks with each row's place among them. */
+export function workoutDemos(plan: Plan, workout: PlannedWorkout): WorkoutDemos {
+	const demos: Exercise[] = [];
+	const blocks = workout.blocks.map(({ title, items }) => ({
+		title,
+		rows: items.map(item => {
+			const own = demosOf(plan, [item.exercise]);
+			const at = own.length > 0 ? demos.length : null;
+			demos.push(...own);
+			return { item, at };
+		}),
+	}));
+	return { demos, blocks };
+}
 
 /** Where a phase's week falls: its number, the phase's count of weeks, and whether it is a deload week. */
 export function phaseWeek(phase: Phase, date: string): { week: number; weeks: number; deload: boolean } {
@@ -196,7 +214,7 @@ export interface TestOf {
 
 /** The test `workout` holds, as {@link testedMetric} finds it, `null` when it holds none. */
 export function testOf(state: SportState, workout: PlannedWorkout): TestOf | null {
-	const planned = state.plan?.workouts.find(({ id }) => id === workout.id);
+	const planned = workoutOf(state.plan, workout.id);
 	const tested = planned ? testedMetric(state, planned) : null;
 	return tested && { ...tested, bodyweight: bodyweightOf(state) };
 }
@@ -223,17 +241,16 @@ const loadRow = (key: string): string => `load-${key}`;
 
 /** The records of `best`, each worded: metrics, then the hardest grade of each kind of climb, then loads. */
 export function recordRows(state: SportState, best: SportRecords): RecordRow[] {
-	const names = state.plan ? exercisesOf(state.plan) : [];
 	return [
 		...best.metrics.map(({ metric, value, at }) => {
-			const found = state.metrics.find(({ id }) => id === metric);
+			const found = metricOf(state, metric);
 			return { key: metricRow(metric), label: found?.label ?? metric, value: amount(value, found?.unit ?? ""), date: at };
 		}),
 		...CLIMB_KINDS.flatMap(kind => {
 			const grade = best.grades[kind];
 			return grade ? [{ key: kind, label: BEST_CLIMB_LABEL[kind], value: grade.grade, date: grade.date }] : [];
 		}),
-		...best.loads.map(({ key, kg, date }) => ({ key: loadRow(key), label: names.find(exercise => exercise.key === key)?.name ?? key, value: signedKg(kg), date })),
+		...best.loads.map(({ key, kg, date }) => ({ key: loadRow(key), label: exerciseName(state.plan, key), value: signedKg(kg), date })),
 	];
 }
 
@@ -312,6 +329,12 @@ export function logSave(state: SportState, { date, workout, log: editing }: LogT
 /** The metric of `state` whose id is `id`, `null` for none. */
 export const metricOf = (state: SportState, id: string | null): Metric | null => state.metrics.find(metric => metric.id === id) ?? null;
 
+/** The workout of `plan` whose id is `id`, `null` for none, such as a free session's. */
+export const workoutOf = (plan: Plan | null, id: string | null): Workout | null => plan?.workouts.find(workout => workout.id === id) ?? null;
+
+/** The name of the exercise of `plan` whose key is `key`, the key itself when the plan has none. */
+export const exerciseName = (plan: Plan | null, key: string): string => (plan ? exercisesOf(plan) : []).find(exercise => exercise.key === key)?.name ?? key;
+
 /** The bodyweight's metric, as {@link bodyweightMetric} names it. */
 export const bodyweightOf = (state: SportState): Metric | null => metricOf(state, bodyweightMetric(state.plan));
 
@@ -361,7 +384,7 @@ export function journalWeeks(state: SportState): JournalWeek[] {
 		week.logs.push(log);
 		if (log.status !== "done") continue;
 		week.done += 1;
-		week.minutes += state.plan?.workouts.find(({ id }) => id === log.workout)?.minutes ?? 0;
+		week.minutes += workoutOf(state.plan, log.workout)?.minutes ?? 0;
 	}
 	return [...weeks.values()];
 }

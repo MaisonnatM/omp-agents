@@ -2,7 +2,7 @@
 import { Plus, Scale } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { addDays, localDay } from "../../../src/shared/days";
-import { type Exercise, exercisesOf, type SportChange, type SportState } from "../../../src/shared/sport";
+import type { Exercise, SportChange, SportState } from "../../../src/shared/sport";
 import { dayPlan, phaseOn } from "../../../src/sport-week";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -133,7 +133,7 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 						onClose={() => setTarget(null)}
 					/>
 				)}
-				{saved && <SummaryDialog saved={saved} exercises={plan ? exercisesOf(plan) : []} onClose={() => setSaved(null)} />}
+				{saved && <SummaryDialog saved={saved} plan={plan} onClose={() => setSaved(null)} />}
 				{weighing && bodyweight && <WeighForm state={state} metric={bodyweight} today={today} disabled={disabled} onChange={onChange} onClose={() => setWeighing(false)} />}
 			</PageFrame>
 		</SportRoot>

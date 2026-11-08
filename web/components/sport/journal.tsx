@@ -1,7 +1,7 @@
 /** The Sport page's journal: every logged session by week, newest first, beside the open one's figures. */
 import { NotebookPen } from "lucide-react";
 import type { ReactNode } from "react";
-import { exercisesOf, type SportChange, type SportState, type WorkoutLog } from "../../../src/shared/sport";
+import type { SportChange, SportState, WorkoutLog } from "../../../src/shared/sport";
 import { records } from "../../../src/sport-week";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { hashForSport } from "../../routing";
 import { useShortcuts } from "../../shortcuts";
-import { ARKOSE_COLORS, CLIMB_LABEL, dayOfMonth, duration, journalWeeks, KIND_COLOR, logDetail, longDate, PAIN_PLACE_LABEL, painWord, PLACE_LABEL, recordLogs, sendsText, shortDate, signedKg, weekdayShort } from "../../sport-view";
+import { ARKOSE_COLORS, CLIMB_LABEL, dayOfMonth, duration, exerciseName, journalWeeks, KIND_COLOR, logDetail, longDate, PAIN_PLACE_LABEL, painWord, PLACE_LABEL, recordLogs, sendsText, shortDate, signedKg, weekdayShort, workoutOf } from "../../sport-view";
 import { focusRow, stepRows, useReturnFocus } from "../list-page";
 import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, ListSplit } from "../list-split";
 import { toasts } from "../toaster";
@@ -86,7 +86,7 @@ export function JournalTab({ state, open, disabled, onChange, onEdit, keys }: Jo
 					</h3>
 					<ul className="flex flex-col gap-0.5">
 						{week.logs.map(log => {
-							const kind = state.plan?.workouts.find(({ id }) => id === log.workout)?.kind ?? null;
+							const kind = workoutOf(state.plan, log.workout)?.kind ?? null;
 							return (
 								<li key={log.id} id={logRowId(log.id)}>
 									<a href={hashForSport({ tab: "journal", open: log.id })} aria-current={log.id === open ? "page" : undefined} className={cn("flex items-center gap-3 rounded-md px-2 py-1.5 outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring", log.id === open && "bg-accent")}>
@@ -136,8 +136,7 @@ export function JournalTab({ state, open, disabled, onChange, onEdit, keys }: Jo
 }
 
 function LogDetail({ state, log, record, disabled, onEdit, onRemove }: { state: SportState; log: WorkoutLog; record: boolean; disabled: boolean; onEdit: () => void; onRemove: () => void }) {
-	const workout = state.plan?.workouts.find(({ id }) => id === log.workout) ?? null;
-	const names = state.plan ? exercisesOf(state.plan) : [];
+	const workout = workoutOf(state.plan, log.workout);
 	const loads = Object.entries(log.loads);
 	return (
 		<div className="flex flex-col gap-5 px-6 py-5">
@@ -160,7 +159,7 @@ function LogDetail({ state, log, record, disabled, onEdit, onRemove }: { state: 
 				<Stats
 					cells={[
 						{ label: "Durée prévue", value: workout ? duration(workout.minutes) : "—" },
-						{ label: "Charge max", value: heaviest(log.loads, names) },
+						{ label: "Charge max", value: heaviest(log.loads, state.plan) },
 						{ label: "Réussites", value: sendsText(log.climbs) },
 						{ label: "Effort", value: effortText(log.rpe) },
 					]}
@@ -170,7 +169,7 @@ function LogDetail({ state, log, record, disabled, onEdit, onRemove }: { state: 
 				<Section title="Charges">
 					{loads.map(([key, kg]) => (
 						<li key={key} className="flex justify-between gap-3 py-1.5 text-sm">
-							<span>{names.find(exercise => exercise.key === key)?.name ?? key}</span>
+							<span>{exerciseName(state.plan, key)}</span>
 							<span className="font-medium tabular-nums">{signedKg(kg)}</span>
 						</li>
 					))}

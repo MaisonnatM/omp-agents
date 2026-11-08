@@ -1,9 +1,9 @@
 /** A log's figures as a row of cells, and the dialog that sums a session up once it is logged, with the records it beat. */
 import { Gauge, Star } from "lucide-react";
-import type { Exercise } from "../../../src/shared/sport";
+import type { Plan } from "../../../src/shared/sport";
 import { Button } from "@/components/ui/button";
 import { hashForSport } from "../../routing";
-import { amount, duration, effortWord, type Saved, sendsText, shortDate, signedKg } from "../../sport-view";
+import { amount, duration, effortWord, exerciseName, type Saved, sendsText, shortDate, signedAmount, signedKg } from "../../sport-view";
 import { Callout } from "../integrations/integration-row";
 import { SportDialog } from "./sport-dialog";
 
@@ -24,15 +24,13 @@ export function Stats({ cells }: { cells: { label: string; value: string }[] }) 
 /** A log's effort as its figures show it: `8/10 · dur`, `—` without one. */
 export const effortText = (rpe: number | null): string => (rpe === null ? "—" : `${rpe}/10 · ${effortWord(rpe).toLowerCase()}`);
 
-/** The heaviest of `loads` with its exercise's name from `exercises`, `+35 kg · Tractions lestées`, `—` without one. */
-export function heaviest(loads: Record<string, number>, exercises: Exercise[]): string {
+/** The heaviest of `loads` with its exercise's name in `plan`, `+35 kg · Tractions lestées`, `—` without one. */
+export function heaviest(loads: Record<string, number>, plan: Plan | null): string {
 	const top = Object.entries(loads).reduce<[string, number] | null>((best, entry) => (best === null || entry[1] > best[1] ? entry : best), null);
-	if (top === null) return "—";
-	const name = exercises.find(({ key }) => key === top[0])?.name;
-	return name ? `${signedKg(top[1])} · ${name}` : signedKg(top[1]);
+	return top === null ? "—" : `${signedKg(top[1])} · ${exerciseName(plan, top[0])}`;
 }
 
-export function SummaryDialog({ saved: { log, minutes, beaten, test }, exercises, onClose }: { saved: Saved; exercises: Exercise[]; onClose: () => void }) {
+export function SummaryDialog({ saved: { log, minutes, beaten, test }, plan, onClose }: { saved: Saved; plan: Plan | null; onClose: () => void }) {
 	return (
 		<SportDialog title="Séance notée" onClose={onClose} className="top-[15%] w-[min(32rem,calc(100vw-2rem))]">
 			<div className="flex flex-col gap-4 px-5 pt-3 pb-4">
@@ -43,7 +41,7 @@ export function SummaryDialog({ saved: { log, minutes, beaten, test }, exercises
 				<Stats
 					cells={[
 						{ label: "Durée prévue", value: minutes === null ? "—" : duration(minutes) },
-						{ label: "Charge max", value: heaviest(log.loads, exercises) },
+						{ label: "Charge max", value: heaviest(log.loads, plan) },
 						{ label: "Réussites", value: sendsText(log.climbs) },
 						{ label: "Effort", value: effortText(log.rpe) },
 					]}
@@ -51,7 +49,7 @@ export function SummaryDialog({ saved: { log, minutes, beaten, test }, exercises
 				{test && (
 					<Callout tone="info" icon={Gauge}>
 						Nouveau {test.metric.label.toLowerCase()} : <span className="font-medium">{amount(test.value, test.metric.unit)}</span>
-						{test.was && `, ${test.value >= test.was.value ? "+" : "−"}${amount(Math.abs(test.value - test.was.value), test.metric.unit)} depuis le test du ${shortDate(test.was.at)}`}. Les charges de la phase sont recalculées.
+						{test.was && `, ${signedAmount(test.value - test.was.value, test.metric.unit)} depuis le test du ${shortDate(test.was.at)}`}. Les charges de la phase sont recalculées.
 					</Callout>
 				)}
 				{beaten.length > 0 && (

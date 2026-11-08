@@ -46,17 +46,7 @@ export function DayDetail({ plan, day, today, disabled, onDemo, onLog }: DayDeta
 }
 
 function WorkoutCard({ plan, day, kicker, workout, disabled, onDemo, onLog }: Omit<DayDetailProps, "today"> & { kicker: string; workout: PlannedWorkout }) {
-	const demos = workoutDemos(plan, workout);
-	let next = 0;
-	const blocks = workout.blocks.map(({ title, items }) => ({
-		title,
-		rows: items.map(item => {
-			const count = demosOf(plan, [item.exercise]).length;
-			const at = count ? next : null;
-			next += count;
-			return { item, at };
-		}),
-	}));
+	const { demos, blocks } = workoutDemos(plan, workout);
 	const log = workout.log;
 	return (
 		<section aria-label={workout.name} className="flex flex-col gap-4 rounded-xl border border-border p-5">

@@ -4,7 +4,7 @@ import { RadioGroup } from "@base-ui/react/radio-group";
 import { Check, Plus, TriangleAlert, X } from "lucide-react";
 import { type KeyboardEvent, useId, useState } from "react";
 import { errorText } from "../../../src/json";
-import { type Climb, CLIMB_KINDS, type ClimbKind, exercisesOf, FRENCH_GRADES, type Measurement, type Metric, PAIN_PLACES, type PainPlace, type SportChange, type SportState, type WorkoutLog } from "../../../src/shared/sport";
+import { type Climb, CLIMB_KINDS, type ClimbKind, FRENCH_GRADES, type Measurement, type Metric, PAIN_PLACES, type PainPlace, type SportChange, type SportState, type WorkoutLog } from "../../../src/shared/sport";
 import { PAIN_FLAG_LEVEL, type PlannedExercise } from "../../../src/sport-week";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -208,7 +208,7 @@ export function LogForm({ state, target, disabled, onChange, onSaved, onClose }:
 				</label>
 				<Stats
 					cells={[
-						rows.length > 0 ? { label: "Charges", value: `${rows.filter(({ done }) => done).length} sur ${rows.length}` } : { label: "Charge max", value: heaviest(loads, state.plan ? exercisesOf(state.plan) : []) },
+						rows.length > 0 ? { label: "Charges", value: `${rows.filter(({ done }) => done).length} sur ${rows.length}` } : { label: "Charge max", value: heaviest(loads, state.plan) },
 						{ label: "Réussites", value: sendsText(climbs) },
 						{ label: "Douleur", value: pain === null || pain === 0 ? "aucune" : `${pain}/10 · ${PAIN_PLACE_LABEL[where].toLowerCase()}` },
 						{ label: "Effort", value: effortText(rpe) },

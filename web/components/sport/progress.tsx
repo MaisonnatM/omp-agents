@@ -7,7 +7,7 @@ import type { ChartSpec } from "../../../src/shared/session-visuals";
 import { type ClimbKind, CLIMB_KINDS, FRENCH_GRADES, gradeRank, type Metric, type SportState } from "../../../src/shared/sport";
 import { adherence, bestGrades, records, type WeekGrades } from "../../../src/sport-week";
 import { activityControl } from "../../activity";
-import { amount, BEST_CLIMB_LABEL, bodyweightOf, CLIMB_LABEL, measured, nextTest, recordRows, shortDate } from "../../sport-view";
+import { amount, BEST_CLIMB_LABEL, bodyweightOf, CLIMB_LABEL, measured, nextTest, recordRows, shortDate, signedAmount } from "../../sport-view";
 import { SegmentedTab, SegmentedTabs, SegmentedTabsList } from "../segmented-tabs";
 
 // `recharts` is a chunk of its own, loaded when the first chart draws.
@@ -108,7 +108,7 @@ function metricCard(state: SportState, metric: Metric, today: string, average: b
 		: average
 			? month.length ? `moyenne 4 sem. ${amount(month.reduce((sum, { value }) => sum + value, 0) / month.length, metric.unit)}` : `le ${shortDate(last.at)}`
 			: first && first !== last
-				? `${last.value >= first.value ? "+" : "−"}${amount(Math.abs(last.value - first.value), metric.unit)} depuis ${shortDate(first.at)}`
+				? `${signedAmount(last.value - first.value, metric.unit)} depuis ${shortDate(first.at)}`
 				: `le ${shortDate(last.at)}`;
 	return { figure: { kind: "metric", metric }, label: metric.label, value: last ? amount(last.value, metric.unit) : "—", detail };
 }
@@ -138,7 +138,7 @@ function chartOf(state: SportState, figure: Figure, from: string | null, today: 
 			const first = all[0];
 			const test = nextTest(state, metric.id, today);
 			const parts = [
-				last && first && first !== last ? `${last.value >= first.value ? "+" : "−"}${amount(Math.abs(last.value - first.value), metric.unit)} depuis le ${shortDate(first.at)}` : null,
+				last && first && first !== last ? `${signedAmount(last.value - first.value, metric.unit)} depuis le ${shortDate(first.at)}` : null,
 				last && value !== null ? (metric.better === "higher" ? last.value >= value : last.value <= value) ? "Objectif atteint" : `Il te reste ${amount(Math.abs(value - last.value), metric.unit)} pour atteindre ${amount(value, metric.unit)}${goal?.by ? ` d'ici le ${shortDate(goal.by)}` : ""}` : null,
 				test ? `Prochain test le ${shortDate(test)}` : null,
 			];

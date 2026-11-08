@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { exercise, log, measurement, SEMI, STATE, withLogs, withMeasurements } from "../src/sport-fixtures";
 import type { Climb, FrenchGrade, Plan } from "../src/shared/sport";
 import { dayPlan, loadFor, records } from "../src/sport-week";
-import { amount, beaten, bodyweightOf, daySummary, demosOf, dose, effortWord, hardest, journalWeeks, loadSource, loadText, logDetail, logSave, measured, nextTest, opening, painRule, painWord, phaseLabel, recordLogs, recordRows, REMOVED_TEXT, sendsText, testOf, weekTitle } from "./sport-view";
+import { amount, beaten, bodyweightOf, daySummary, demosOf, dose, effortWord, exerciseName, hardest, journalWeeks, loadSource, loadText, logDetail, logSave, measured, nextTest, opening, painRule, painWord, phaseLabel, recordLogs, recordRows, REMOVED_TEXT, sendsText, signedAmount, signedKg, testOf, weekTitle, workoutDemos, workoutOf } from "./sport-view";
 
 const plan = STATE.plan!;
 const demo = (youtubeId: string) => ({ youtubeId, by: "Lattice", cues: ["a", "b", "c"] as [string, string, string], caution: null });
@@ -78,6 +78,20 @@ describe("demos", () => {
 		expect(demosOf(withDemos, [exercise("limit", "Blocs"), SEMI]).map(({ key }) => key)).toEqual(["semi"]);
 	});
 
+	test("a workout's rows point at their first demo among the workout's, in block order", () => {
+		const mardi = dayPlan(STATE, "2026-11-17").workouts[0]!;
+		const chauffe = mardi.blocks[0]!.items[0]!;
+		const workout = { ...mardi, blocks: [{ title: "Hanche", items: [{ ...chauffe, exercise: mobilite }] }, ...mardi.blocks] };
+		const { demos, blocks } = workoutDemos(withDemos, workout);
+		expect(demos.map(({ key }) => key)).toEqual(["h1", "h2", "h3", "semi"]);
+		expect(blocks.map(({ title, rows }) => [title, rows.map(({ item, at }) => [item.exercise.key, at])])).toEqual([
+			["Hanche", [["mobilite", 0]]],
+			["Chauffe", [["chauffe", null]]],
+			["Poutre", [["semi", 3]]],
+			["Bloc", [["limit", null]]],
+		]);
+	});
+
 	test("a dose reads sets, hold, and rest", () => {
 		expect(dose(SEMI)).toBe("5 × 10 s · 3 min de repos");
 		expect(dose(exercise("pulls", "Tractions", { sets: 3, reps: 3 }))).toBe("3 × 3");
@@ -118,6 +132,20 @@ describe("journal and progress", () => {
 	test("an amount reads the French way", () => {
 		expect(amount(113.3, "kg")).toBe("113,3 kg");
 		expect(amount(5, "")).toBe("5");
+	});
+
+	test("a difference reads with its sign, and a load of zero is the bodyweight alone", () => {
+		expect(signedAmount(1.5, "kg")).toBe("+1,5 kg");
+		expect(signedAmount(-2, "kg")).toBe("−2 kg");
+		expect(signedKg(-5)).toBe("−5 kg");
+		expect(signedKg(0)).toBe("poids du corps");
+	});
+
+	test("an exercise reads by its name, or its key when the plan has none, and a log finds its workout", () => {
+		expect(exerciseName(plan, "semi")).toBe("Semi-arquée");
+		expect(exerciseName(null, "semi")).toBe("semi");
+		expect(workoutOf(plan, "mardi")?.minutes).toBe(120);
+		expect(workoutOf(plan, null)).toBeNull();
 	});
 
 	test("the bodyweight is the metric a max rule subtracts, and measurements come oldest first", () => {
