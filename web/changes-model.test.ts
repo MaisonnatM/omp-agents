@@ -128,6 +128,12 @@ describe("commonDir", () => {
 		expect(commonDir(["a.md", "b.md"])).toBe("");
 		expect(commonDir([])).toBe("");
 	});
+
+	test("ends when an absolute path meets a relative one", () => {
+		expect(commonDir(["/tmp/agent/skills/ship", "~/.agents/skills/x"])).toBe("");
+		expect(commonDir(["/a.md", "b.md"])).toBe("");
+		expect(commonDir(["/a/b.md", "/c.md"])).toBe("/");
+	});
 });
 describe("changesPathOf", () => {
 	const files = [entry("web/app.tsx"), entry("~/notes/plan.md"), entry("app.tsx")];

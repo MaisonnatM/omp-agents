@@ -9,7 +9,7 @@ import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, type PullRequestChange } from "../shared/github";
 import type { ReviewDraftEdit } from "../shared/review-drafts";
-import { MAX_QUEUED_STACK, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parseProcessStop, parsePromptDocument, parsePullRequestAttachment, parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestRebase, parsePullRequestViewedEdit, parseRepoQuery, parseReviewDraftEdit, parseReviewDraftPost, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseTrustChange, parseWorkspaceChange } from "./wire";
+import { MAX_QUEUED_STACK, parseAccountOrder, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parseProcessStop, parsePromptDocument, parsePullRequestAttachment, parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestRebase, parsePullRequestViewedEdit, parseRepoQuery, parseReviewDraftEdit, parseReviewDraftPost, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseTrustChange, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientFrame | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -693,6 +693,16 @@ describe("parseIntegrationTarget", () => {
 		expect(parseIntegrationTarget({ id: "google" })).toBeNull();
 		expect(parseIntegrationTarget("linear")).toBeNull();
 		expect(parseIntegrationTarget(null)).toBeNull();
+	});
+});
+
+describe("parseAccountOrder", () => {
+	test("takes a provider and its accounts' emails, and refuses a missing provider or an email that is not text", () => {
+		expect(parseAccountOrder({ provider: "anthropic", emails: ["maxence@maisonnat.com", "maisonnatmax@gmail.com"], extra: 1 })?.ok).toEqual({ provider: "anthropic", emails: ["maxence@maisonnat.com", "maisonnatmax@gmail.com"] });
+		expect(parseAccountOrder({ emails: ["maxence@maisonnat.com"] })).toBeNull();
+		expect(parseAccountOrder({ provider: "anthropic", emails: ["maxence@maisonnat.com", ""] })).toBeNull();
+		expect(parseAccountOrder({ provider: "anthropic", emails: [7] })).toBeNull();
+		expect(parseAccountOrder({ provider: "anthropic", emails: "maxence@maisonnat.com" })).toBeNull();
 	});
 });
 
