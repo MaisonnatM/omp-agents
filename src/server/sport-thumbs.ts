@@ -1,6 +1,7 @@
 /** The Sport page's demo thumbnails, fetched once from YouTube and kept on disk, so the page's `img-src` stays `'self'`. */
-import { mkdir, rename, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { atomicWriteText } from "../fs";
 import { fail } from "./http";
 import type { RouteKit, Routes } from "./route-kit";
 
@@ -21,16 +22,15 @@ export function sportThumbRoutes({ media }: RouteKit, env: SportThumbsEnv): Rout
 	const thumb = media(async params => {
 		const id = params.get("id") ?? "";
 		if (!VIDEO_ID.test(id)) return fail(400, "Expected ?id= an 11-character YouTube video id");
-		const kept = Bun.file(join(env.dir, `${id}.jpg`));
+		const path = join(env.dir, `${id}.jpg`);
+		const kept = Bun.file(path);
 		if (await kept.exists()) return new Response(kept, { headers: IMAGE_HEADERS });
 		const fetched = await env.fetch(`https://i.ytimg.com/vi/${id}/hqdefault.jpg`).catch(() => null);
 		if (!fetched) return fail(502, "YouTube's image server did not answer");
 		if (!fetched.ok) return fail(404, "YouTube has no thumbnail for this video");
 		const bytes = new Uint8Array(await fetched.arrayBuffer());
 		await mkdir(env.dir, { recursive: true });
-		const partial = join(env.dir, `${id}.${crypto.randomUUID()}.part`);
-		await writeFile(partial, bytes);
-		await rename(partial, kept.name!);
+		await atomicWriteText(path, bytes);
 		return new Response(bytes, { headers: IMAGE_HEADERS });
 	});
 	return { "/api/sport/thumb": { GET: thumb } };
