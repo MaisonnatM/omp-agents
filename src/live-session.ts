@@ -8,8 +8,8 @@ import { isUserPrompt, splitSuggestions } from "./transcript";
 
 type WithoutKeys<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
-/** A roster row before the server adds the session's `cwdDisplay`, its unread turn, and its {@link SessionFacts}. */
-export type LiveRow = WithoutKeys<RosterHost, "cwdDisplay" | "unread" | keyof SessionFacts>;
+/** A roster row before the server adds the session's `cwdDisplay`, its unread turn, whether its turn waits, and its {@link SessionFacts}. */
+export type LiveRow = WithoutKeys<RosterHost, "cwdDisplay" | "unread" | "turnWaits" | keyof SessionFacts>;
 
 /** What a live session reports as it runs. */
 export type LiveUpdate =

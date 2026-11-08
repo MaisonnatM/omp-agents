@@ -10,6 +10,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Fixed: with the starter kit, helper agents in poteto mode no longer look for a skill under an old name that always failed.
 - Behind the scenes: a token cost report prices recent omp requests by agent, cache use, and tool, and the developer docs map where the money goes, with ranked proposals to spend less.
 - Behind the scenes: the developer docs gain a harness map, five diagrams of how the dashboard, omp, and the starter kit fit together, so contributors find their way faster.
+- The Sessions tab has a Waiting on subagents group for sessions whose subagents still work while the main agent waits for them.
+- Rows in it show no blue dot, so Idle lists only sessions that are done and Running only sessions that work.
+- A turn that ends while its session's subagents still work no longer counts on the Dock badge, and notifies once they stop.
 - The starter kit now includes the grill-with-docs design interview: type /skill:grill-with-docs and a plan, and the agent asks rounds of numbered questions, each with its recommended answer, writing agreed words to the project's glossary as you go.
 - Decisions settled during that interview go into the project's usual decision records, not a second folder.
 - The starter kit also includes grill-me, the same interview for plans outside a project, such as a trip or a career move: type /skill:grill-me and your plan.

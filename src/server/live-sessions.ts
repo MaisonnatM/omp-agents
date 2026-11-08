@@ -12,6 +12,7 @@ import { oneLine } from "../session-entries";
 import { type RosterHost, type SessionFacts, type UnreadTurn, type WorkItem, worksOn } from "../shared/sessions";
 import { pullRequestTask, TaskClaims, ticketTask } from "../task-claims";
 import { portFromEnv } from "./address";
+import { TurnWaits } from "./turn-waits";
 
 export type SessionUpdate = LiveUpdate | DashboardUpdate;
 
@@ -56,6 +57,8 @@ export class LiveSessions {
 	readonly #unreadFile: JsonFile<SavedUnread>;
 	/** The unread turn each session's running turn read as it started, by instance id, which a quiet end gives back. */
 	readonly #readByTurn = new Map<string, UnreadTurn>();
+	/** Whether each session's main agent waits on work it started, which its row's `turnWaits` shows. */
+	readonly #turnWaits = new TurnWaits();
 	/**
 	 * The turns the previous server saved unread, with its `heardUntil`: `unrestored` until {@link restoreUnread} takes back
 	 * those of the sessions this server attached to, then `listing` until the first registry listing after it, which
@@ -166,6 +169,11 @@ export class LiveSessions {
 		return true;
 	}
 
+	/** Session `instanceId`'s main agent reported `event`; whether that changed its row's `turnWaits`. */
+	heard(instanceId: string, event: unknown): boolean {
+		return this.#turnWaits.heard(instanceId, event);
+	}
+
 	/** Session `instanceId` started a turn, which reads its unread turn unless the turn ends quietly; whether it had one. */
 	turnStarted(instanceId: string): boolean {
 		const turn = this.#unread.get(instanceId);
@@ -243,6 +251,7 @@ export class LiveSessions {
 		if (!this.#sessions.delete(instanceId)) return;
 		this.#subjects.delete(instanceId);
 		this.#readByTurn.delete(instanceId);
+		this.#turnWaits.forget(instanceId);
 		if (this.#unread.delete(instanceId)) this.#saveUnread();
 		this.#reindex();
 		forgetSession(instanceId);
@@ -262,12 +271,13 @@ export class LiveSessions {
 		this.#unreadFile.save({ turns: [...turns].map(([instanceId, turn]) => ({ instanceId, ...turn })), heardUntil });
 	}
 
-	/** Each session's roster row, with its `cwdDisplay`, its unread turn, and what the session files' index knows of it, asked with the directory it runs in now. */
+	/** Each session's roster row, with its `cwdDisplay`, its unread turn, whether its turn waits, and what the session files' index knows of it, asked with the directory it runs in now. */
 	rows(factsOf: (sessionId: string, cwd: string) => SessionFacts): RosterHost[] {
 		return [...this.#sessions.values()].map(session => ({
 			...session.row(),
 			cwdDisplay: displayPath(session.cwd),
 			unread: this.#unread.get(session.instanceId) ?? null,
+			turnWaits: this.#turnWaits.waits(session.instanceId),
 			...withSubject(factsOf(session.sessionId, session.cwd), this.#subjects.get(session.instanceId)),
 		}));
 	}
