@@ -1,8 +1,9 @@
 /** The Sport page: the plan's week, the journal of logged sessions, and the progress charts, under one header. */
 import { Plus, Scale } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { errorText } from "../../../src/json";
 import { addDays, localDay } from "../../../src/shared/days";
-import type { Exercise, SportChange, SportState } from "../../../src/shared/sport";
+import type { Exercise, Routine, RoutineCheck, SportChange, SportState } from "../../../src/shared/sport";
 import { dayPlan, phaseOn } from "../../../src/sport-week";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -10,14 +11,17 @@ import { activityControl } from "../../activity";
 import { hashForSport, type SportRoute } from "../../routing";
 import { useShortcuts } from "../../shortcuts";
 import { bodyweightOf, type LogTarget, phaseLabel, type Saved } from "../../sport-view";
+import { TimerSound } from "../../sport-timer-sound";
 import { PageFrame } from "../list-page";
 import { SegmentedTab, SegmentedTabs, SegmentedTabsList } from "../segmented-tabs";
+import { toasts } from "../toaster";
 import { DemoDialog } from "./demo-dialog";
 import { JournalTab } from "./journal";
 import { LogForm, WeighForm } from "./log-form";
 import { SummaryDialog } from "./log-summary";
 import { SPORT_TABS } from "./nav";
 import { ProgressTab } from "./progress";
+import { RoutineTimer } from "./routine-timer";
 import { WeekTab } from "./week";
 
 interface SportPageProps {
@@ -33,6 +37,7 @@ const ASK_FOR_PLAN = "Crée-moi un plan d'escalade de 4 semaines : poutre, bloc 
 
 export function SportPage({ state, route, disabled, onChange }: SportPageProps) {
 	const [demo, setDemo] = useState<{ title: string; demos: Exercise[]; at: number } | null>(null);
+	const [timer, setTimer] = useState<{ date: string; routine: Routine; sound: TimerSound } | null>(null);
 	const [target, setTarget] = useState<LogTarget | null>(null);
 	const [saved, setSaved] = useState<Saved | null>(null);
 	const [weighing, setWeighing] = useState(false);
@@ -40,7 +45,7 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 	const selected = route.tab === "week" ? (route.day ?? today) : today;
 	const plan = state?.plan ?? null;
 	// A dialog's popup keeps only the arrows, Home, and End from the page, so Esc and keys in a picker outside the popup would still reach the week's and journal's shortcuts.
-	const dialogOpen = demo !== null || target !== null || saved !== null || weighing;
+	const dialogOpen = demo !== null || timer !== null || target !== null || saved !== null || weighing;
 	const stepDay = (by: -1 | 1) => {
 		location.hash = hashForSport({ tab: "week", day: addDays(selected, by) });
 	};
@@ -57,6 +62,9 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 	const phase = plan && phaseOn(plan, selected);
 	const bodyweight = bodyweightOf(state);
 	const logFor = (date: string, workout: LogTarget["workout"]) => setTarget({ date, workout, log: workout?.log ?? null });
+	const check = (next: RoutineCheck) => {
+		onChange([{ op: "set-check", check: next }]).catch((err: unknown) => toasts.add({ title: "Rien n'est enregistré", description: errorText(err) }));
+	};
 	return (
 		<SportRoot>
 			<PageFrame
@@ -101,8 +109,9 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 									today={today}
 									disabled={disabled}
 									onDemo={(title, demos, at) => setDemo({ title, demos, at })}
+									onTimer={(date, routine) => setTimer({ date, routine, sound: new TimerSound() })}
 									onLog={logFor}
-									onChange={onChange}
+									onCheck={check}
 								/>
 							))}
 						{route.tab === "journal" && (
@@ -119,6 +128,17 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 					</div>
 				</div>
 				{demo && <DemoDialog title={demo.title} demos={demo.demos} at={demo.at} onAt={at => setDemo({ ...demo, at })} onClose={() => setDemo(null)} />}
+				{timer && plan && (
+					<RoutineTimer
+						plan={plan}
+						routine={timer.routine}
+						date={timer.date}
+						ticked={state.checks.find(({ date, routine }) => date === timer.date && routine === timer.routine.id)?.items ?? []}
+						sound={timer.sound}
+						onTick={items => check({ date: timer.date, routine: timer.routine.id, items })}
+						onClose={() => setTimer(null)}
+					/>
+				)}
 				{target && (
 					<LogForm
 						key={`${target.date}-${target.workout?.id ?? "libre"}-${target.log?.id ?? "new"}`}

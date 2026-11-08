@@ -1,5 +1,5 @@
 /** The open day of the week: each workout with its demos, blocks, exercises, and loads, then the daily habits with their routines' checklists. */
-import { Check, Play, Plus } from "lucide-react";
+import { Check, CirclePlay, Play, Plus } from "lucide-react";
 import type { Exercise, Plan, Routine, RoutineCheck } from "../../../src/shared/sport";
 import type { PlannedDay, PlannedExercise, PlannedWorkout } from "../../../src/sport-week";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,9 @@ import { DemoStrip } from "./demo-strip";
 /** Opens the demo dialog on `demos`, at `at`, titled by what they belong to. */
 export type OpenDemo = (title: string, demos: Exercise[], at: number) => void;
 
+/** Opens the timer on `routine`, ticking its items on `date`; called in the click, which lets the timer play sound. */
+export type OpenTimer = (date: string, routine: Routine) => void;
+
 interface DayDetailProps {
 	plan: Plan;
 	day: PlannedDay;
@@ -20,13 +23,14 @@ interface DayDetailProps {
 	/** Every day's ticks of the routines; the day's own show. */
 	checks: RoutineCheck[];
 	onDemo: OpenDemo;
+	onTimer: OpenTimer;
 	/** Opens the log form for `workout`, `null` for a free session. */
 	onLog: (workout: PlannedWorkout | null) => void;
 	/** Saves a day's ticks of one routine. */
 	onCheck: (check: RoutineCheck) => void;
 }
 
-export function DayDetail({ plan, day, today, disabled, checks, onDemo, onLog, onCheck }: DayDetailProps) {
+export function DayDetail({ plan, day, today, disabled, checks, onDemo, onTimer, onLog, onCheck }: DayDetailProps) {
 	const kicker = `${day.date === today ? "Aujourd'hui · " : ""}${longDate(day.date)}${day.deload ? " · semaine allégée" : ""}`;
 	return (
 		<div className="flex flex-col gap-4">
@@ -40,12 +44,12 @@ export function DayDetail({ plan, day, today, disabled, checks, onDemo, onLog, o
 			) : (
 				day.workouts.map(workout => <WorkoutCard key={workout.id} plan={plan} kicker={kicker} workout={workout} disabled={disabled} onDemo={onDemo} onLog={onLog} />)
 			)}
-			<Habits plan={plan} date={day.date} today={today} disabled={disabled} checks={checks} onDemo={onDemo} onCheck={onCheck} />
+			<Habits plan={plan} date={day.date} today={today} disabled={disabled} checks={checks} onDemo={onDemo} onTimer={onTimer} onCheck={onCheck} />
 		</div>
 	);
 }
 
-function WorkoutCard({ plan, kicker, workout, disabled, onDemo, onLog }: Omit<DayDetailProps, "today" | "day" | "checks" | "onCheck"> & { kicker: string; workout: PlannedWorkout }) {
+function WorkoutCard({ plan, kicker, workout, disabled, onDemo, onLog }: Omit<DayDetailProps, "today" | "day" | "checks" | "onCheck" | "onTimer"> & { kicker: string; workout: PlannedWorkout }) {
 	const { demos, blocks } = workoutDemos(plan, workout);
 	const log = workout.log;
 	return (
@@ -113,10 +117,11 @@ interface HabitsProps {
 	disabled: boolean;
 	checks: RoutineCheck[];
 	onDemo: OpenDemo;
+	onTimer: OpenTimer;
 	onCheck: (check: RoutineCheck) => void;
 }
 
-function Habits({ plan, date, today, disabled, checks, onDemo, onCheck }: HabitsProps) {
+function Habits({ plan, date, today, disabled, checks, onDemo, onTimer, onCheck }: HabitsProps) {
 	if (plan.habits.length === 0) return null;
 	return (
 		<section aria-label="Chaque jour" className="rounded-xl border border-border p-5">
@@ -126,7 +131,7 @@ function Habits({ plan, date, today, disabled, checks, onDemo, onCheck }: Habits
 					const routine = plan.routines.find(({ id }) => id === habit.routine) ?? null;
 					if (routine === null) return <li key={habit.label} className="py-2 text-sm">{habit.label}</li>;
 					const saved = checks.find(check => check.date === date && check.routine === routine.id)?.items ?? [];
-					return <RoutineHabit key={habit.label} plan={plan} label={habit.label} routine={routine} ticked={routine.items.map(({ key }) => key).filter(key => saved.includes(key))} disabled={disabled} onDemo={onDemo} onTick={items => onCheck({ date, routine: routine.id, items })} />;
+					return <RoutineHabit key={habit.label} plan={plan} label={habit.label} routine={routine} ticked={routine.items.map(({ key }) => key).filter(key => saved.includes(key))} disabled={disabled} onDemo={onDemo} onTimer={() => onTimer(date, routine)} onTick={items => onCheck({ date, routine: routine.id, items })} />;
 				})}
 			</ul>
 		</section>
@@ -141,11 +146,13 @@ interface RoutineHabitProps {
 	ticked: string[];
 	disabled: boolean;
 	onDemo: OpenDemo;
+	/** Opens the timer on the routine. */
+	onTimer: () => void;
 	onTick: (items: string[]) => void;
 }
 
 /** A habit that follows a routine: its label with how many items are ticked, then the routine's items as a checklist. */
-function RoutineHabit({ plan, label, routine, ticked, disabled, onDemo, onTick }: RoutineHabitProps) {
+function RoutineHabit({ plan, label, routine, ticked, disabled, onDemo, onTimer, onTick }: RoutineHabitProps) {
 	const demos = demosOf(plan, routine.items);
 	return (
 		<li className="flex flex-col gap-1 py-2 text-sm">
@@ -154,6 +161,11 @@ function RoutineHabit({ plan, label, routine, ticked, disabled, onDemo, onTick }
 				<span className="flex shrink-0 items-center gap-2">
 					{routine.items.length > 0 && <span className="text-xs text-muted-foreground tabular-nums">{ticked.length} / {routine.items.length}</span>}
 					{demos.length > 0 && <Button variant="ghost" size="compact" leadingIcon={Play} onClick={() => onDemo(routine.name, demos, 0)} {...activityControl("sport.demo.open")}>Démos</Button>}
+					{routine.items.length > 0 && (
+						<Button variant="ghost" size="compact" leadingIcon={CirclePlay} disabled={disabled} onClick={onTimer} {...activityControl("sport.timer.open")}>
+							Lancer
+						</Button>
+					)}
 				</span>
 			</div>
 			{routine.items.length > 0 && (

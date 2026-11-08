@@ -1,7 +1,7 @@
 /** `FormDialog`, the dialog shell the dashboard's forms share, with its header, error line, and Cmd+Enter submit chord. */
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { X } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useRef } from "react";
+import { type KeyboardEvent, type ReactNode, type RefObject, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -25,10 +25,12 @@ interface FormDialogProps {
 	children: ReactNode;
 	/** Keys pressed anywhere in the dialog, including the arrows, Home, and End, which the popup keeps from the page. */
 	onKeyDown?: (event: KeyboardEvent) => void;
+	/** What takes the focus as the dialog opens, in place of its first button. */
+	initialFocus?: RefObject<HTMLElement | null>;
 }
 
 /** A dialog over the page that holds one form to fill in and send, such as a new issue or a new event. */
-export function FormDialog({ busy, onClose, className, children, onKeyDown }: FormDialogProps) {
+export function FormDialog({ busy, onClose, className, children, onKeyDown, initialFocus }: FormDialogProps) {
 	const popup = useRef<HTMLDivElement>(null);
 	return (
 		<DialogPrimitive.Root
@@ -44,6 +46,7 @@ export function FormDialog({ busy, onClose, className, children, onKeyDown }: Fo
 				<DialogPrimitive.Popup
 					ref={popup}
 					onKeyDown={onKeyDown}
+					initialFocus={initialFocus}
 					className={cn("fixed left-1/2 z-50 flex max-h-[calc(100vh-2rem)] -translate-x-1/2 flex-col overflow-y-auto rounded-2xl border bg-popover text-popover-foreground shadow-2xl outline-hidden", className)}
 				>
 					{children}

@@ -332,6 +332,15 @@
     transform: translateX(300%);
   }
 }
+/* The Sport timer's flash as a step changes, fading from a light wash; outside @theme for the same reason. */
+@keyframes timer-flash {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 0;
+  }
+}
 
 /* The conversation column, centered at the conversation's width. */
 @utility conversation-lane {

@@ -1,9 +1,8 @@
 /** The Sport page's week: the day list of this week and the next, beside the open day, under a pain flag that holds today. */
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect } from "react";
-import { errorText } from "../../../src/json";
 import { addDays, mondayOf } from "../../../src/shared/days";
-import type { Plan, RoutineCheck, SportChange, SportState } from "../../../src/shared/sport";
+import type { Plan, RoutineCheck, SportState } from "../../../src/shared/sport";
 import { adherence, painFlags, type PlannedWorkout, weekPlan } from "../../../src/sport-week";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -11,8 +10,7 @@ import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { hashForSport } from "../../routing";
 import { daySummary, dayOfMonth, KIND_COLOR, phaseLabel, weekdayShort, weekTitle } from "../../sport-view";
-import { toasts } from "../toaster";
-import { DayDetail, type OpenDemo } from "./day-detail";
+import { DayDetail, type OpenDemo, type OpenTimer } from "./day-detail";
 import { PainBanner } from "./pain-banner";
 
 interface WeekTabProps {
@@ -23,14 +21,16 @@ interface WeekTabProps {
 	today: string;
 	disabled: boolean;
 	onDemo: OpenDemo;
+	onTimer: OpenTimer;
 	onLog: (date: string, workout: PlannedWorkout | null) => void;
-	onChange: (changes: SportChange[]) => Promise<void>;
+	/** Saves a day's ticks of one routine. */
+	onCheck: (check: RoutineCheck) => void;
 }
 
 /** The id of a day's row in the list, which the arrow keys focus. */
 export const dayRowId = (date: string): string => `sport-day-${date}`;
 
-export function WeekTab({ state, plan, selected, today, disabled, onDemo, onLog, onChange }: WeekTabProps) {
+export function WeekTab({ state, plan, selected, today, disabled, onDemo, onTimer, onLog, onCheck }: WeekTabProps) {
 	const monday = mondayOf(selected);
 	const weeks = [weekPlan(state, monday), weekPlan(state, addDays(monday, 7))];
 	const day = weeks[0]!.find(({ date }) => date === selected)!;
@@ -41,9 +41,6 @@ export function WeekTab({ state, plan, selected, today, disabled, onDemo, onLog,
 		document.getElementById(dayRowId(selected))?.scrollIntoView({ block: "nearest" });
 	}, [selected]);
 	const step = (days: number) => hashForSport({ tab: "week", day: addDays(selected, days) });
-	const check = (next: RoutineCheck) => {
-		onChange([{ op: "set-check", check: next }]).catch((err: unknown) => toasts.add({ title: "Rien n'est enregistré", description: errorText(err) }));
-	};
 	return (
 		<div className="flex h-full min-h-0 flex-col @3xl/sport:flex-row">
 			<nav aria-label="Jours" className="min-h-0 shrink-0 basis-[40%] overflow-y-auto border-b border-border px-3 py-3 @3xl/sport:w-80 @3xl/sport:basis-auto @3xl/sport:border-r @3xl/sport:border-b-0">
@@ -102,7 +99,7 @@ export function WeekTab({ state, plan, selected, today, disabled, onDemo, onLog,
 			<div className="min-h-0 flex-1 overflow-y-auto">
 				<div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 @3xl/sport:px-6">
 					{flag && <PainBanner flag={flag} today={today} />}
-					<DayDetail plan={plan} day={day} today={today} disabled={disabled} checks={state.checks} onDemo={onDemo} onLog={workout => onLog(day.date, workout)} onCheck={check} />
+					<DayDetail plan={plan} day={day} today={today} disabled={disabled} checks={state.checks} onDemo={onDemo} onTimer={onTimer} onLog={workout => onLog(day.date, workout)} onCheck={onCheck} />
 				</div>
 				{pending && (
 					<div className="sticky bottom-0 px-4 pb-4 @3xl/sport:hidden">
