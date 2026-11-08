@@ -6,8 +6,10 @@ import type { Exercise } from "../src/shared/sport";
 
 /** The get-ready step before the hold a run starts on. */
 export const PREPARE_SEC = 10;
-/** The transition between two holds when the item before has no rest. */
-export const CHANGE_SEC = 5;
+/** The change of side between the two holds of one set. */
+export const SIDE_SEC = 5;
+/** The break before the next set or item when the item before has no rest. */
+export const NEXT_SEC = 10;
 
 export type Side = "gauche" | "droit";
 
@@ -52,11 +54,11 @@ export function holdsOf(items: readonly Exercise[]): Hold[] {
 	return holds;
 }
 
-/** The step between `from` and the hold after it: the item's rest after its set, else a change of side, else the next hold. */
+/** The step between `from` and the hold after it: a change of side within a set, else the item's rest after its set, else the break before the next hold. */
 function between(from: Hold, to: Hold): TimerStep | null {
-	if (to.item === from.item && to.set === from.set) return { kind: "side", sec: CHANGE_SEC, hold: to };
+	if (to.item === from.item && to.set === from.set) return { kind: "side", sec: SIDE_SEC, hold: to };
 	const rest = from.item.restSec;
-	if (rest === null) return { kind: "next", sec: CHANGE_SEC, hold: to };
+	if (rest === null) return { kind: "next", sec: NEXT_SEC, hold: to };
 	return rest > 0 ? { kind: "rest", sec: rest, hold: to } : null;
 }
 

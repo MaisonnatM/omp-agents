@@ -5,6 +5,10 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-08
 
+- On the Sport page, Routine hanche and Mobilité hanche in a workout now have their own Lancer, which runs their exercises in the timer from the first one without ticking anything, and ends on « Terminé » or « Arrêté » with how many holds you did, such as 21 / 21 tenues.
+- In the timer, an exercise counted in reps shows its count in the ring, such as « 8 répétitions · côté gauche », and the big button reads Fait to go on once they are done; Space still pauses.
+- The timer's break before the next exercise, « Suivant », now lasts 10 seconds; « Change de côté » stays at 5.
+- On a phone, every page's title and the line under it now read in full, with the header's buttons on a row under them, and the Notes and Todo headers no longer push the page sideways.
 - On the Sport page, Lancer beside the daily stretches opens a full-screen timer that counts down each stretch, left side then right, with a short break between them, beeps for the last seconds, and a French voice saying what comes next.
 - The timer ticks each stretch off for the day as soon as it is held to the end, so stopping halfway keeps what you did; Space pauses, the arrows skip, and the speaker button turns the sound off.
 - The timer is green while you hold a stretch and amber between stretches, grays out under a large « En pause » when paused, and ends on « Arrêté » with the count ticked when some stretches were skipped.
