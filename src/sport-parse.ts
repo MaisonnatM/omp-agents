@@ -203,6 +203,7 @@ const parseExercise: Parse<Exercise> = (value, path, rules) => {
 		demo: read.maybe("demo", parseDemo),
 		opensAs: read.list("opensAs", ruled(rules.id)),
 		hang: read.one("hang", BOOLEAN, false),
+		perSide: read.one("perSide", BOOLEAN, false),
 	};
 };
 

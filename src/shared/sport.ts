@@ -81,6 +81,8 @@ export interface Exercise {
 	opensAs: string[];
 	/** A hang on the fingers, which a finger pain flag removes. */
 	hang: boolean;
+	/** Each set is done once per side, left then right, such as a stretch held on each leg. */
+	perSide: boolean;
 }
 
 export interface Workout {

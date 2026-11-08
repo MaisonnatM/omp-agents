@@ -92,9 +92,10 @@ describe("demos", () => {
 		]);
 	});
 
-	test("a dose reads sets, hold, and rest", () => {
+	test("a dose reads sets, hold, side, and rest", () => {
 		expect(dose(SEMI)).toBe("5 × 10 s · 3 min de repos");
 		expect(dose(exercise("pulls", "Tractions", { sets: 3, reps: 3 }))).toBe("3 × 3");
+		expect(dose(exercise("s1", "Ischios", { sets: 2, holdSec: 45, perSide: true }))).toBe("2 × 45 s par côté");
 	});
 });
 

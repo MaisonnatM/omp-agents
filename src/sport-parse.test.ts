@@ -58,6 +58,7 @@ describe("parseSportState", () => {
 			demo: null,
 			opensAs: [],
 			hang: true,
+			perSide: false,
 		});
 		expect(state?.plan?.workouts[0]?.kind).toBe("hangboard");
 		expect(state?.plan?.phases[0]?.week).toEqual({ mon: [], tue: [{ workout: "mardi", optional: false }], wed: [], thu: [], fri: [], sat: [], sun: [] });

@@ -13,6 +13,9 @@ A workout has a kind, one of `hangboard`, `boulder`, `route`, `hip`, or `strengt
 The page colors each day of the week by the kinds of its workouts.
 A mixed session takes the kind it leads with, so a hip session with a few light hangs is `hip`, and the page never guesses a kind from the exercises.
 An exercise has a stable key, optional sets, reps, hold and rest, an optional load rule, an optional demo video with three cues, and `hang` when it loads the fingers on a hangboard.
+`perSide` marks an exercise done once per side, left then right, such as a stretch held on each leg; its sets and hold then count one side, the page's dose reads « par côté », and the routine timer runs each set's two sides.
+A file written before `perSide` reads it as false, so the file kept its version.
+See [Mark an exercise done per side with a perSide field](../decisions/2026-11-08-mark-an-exercise-done-per-side-with-a-perside-field.md).
 A load rule is either a fraction of a metric's newest measurement, less the newest measurement of the metric its `less` names, such as the bodyweight, plus an offset, or a fixed number of kilograms.
 A **Phase** spans dated days with the slots of a normal week and of a **Deload week**, and names the Mondays of its deload weeks.
 An override replaces one day's slots, as on a test day.

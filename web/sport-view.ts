@@ -129,11 +129,12 @@ export function loadSource(load: Load | null): string | null {
 
 const seconds = (sec: number): string => (sec >= 60 && sec % 60 === 0 ? `${sec / 60} min` : `${sec} s`);
 
-/** An exercise's sets, reps or hold, and rest: `5 × 10 s · 3 min de repos`. */
+/** An exercise's sets, reps or hold, its side, and rest: `5 × 10 s · 3 min de repos`, `2 × 45 s par côté`. */
 export function dose(exercise: Exercise): string {
-	const { sets, reps, holdSec, restSec } = exercise;
+	const { sets, reps, holdSec, restSec, perSide } = exercise;
 	const each = reps !== null ? String(reps) : holdSec !== null ? seconds(holdSec) : null;
-	const parts = [sets !== null && each !== null ? `${sets} × ${each}` : sets !== null ? `${sets} séries` : each];
+	const amount = sets !== null && each !== null ? `${sets} × ${each}` : sets !== null ? `${sets} séries` : each;
+	const parts = [amount !== null && perSide ? `${amount} par côté` : amount];
 	if (restSec !== null) parts.push(`${seconds(restSec)} de repos`);
 	return parts.filter(part => part !== null).join(" · ");
 }
