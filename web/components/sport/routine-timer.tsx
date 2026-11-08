@@ -369,15 +369,7 @@ function StepView({ plan, steps, step, run, now }: StepViewProps) {
 								// A set of reps keeps the ring full and still, its count where the countdown would be, drawn smaller to leave room for its label and « En pause ».
 								<>
 									<span className="text-[min(20vw,11dvh,6.5rem)] leading-none font-semibold tabular-nums">{item.reps ?? "—"}</span>
-									<span className="max-w-[min(44vw,21dvh,13rem)] text-center text-xl font-semibold text-balance">
-										{item.reps === null ? "à ton rythme" : "répétitions"}
-										{hold.side && (
-											<>
-												{" · "}
-												<span className="whitespace-nowrap">côté {hold.side}</span>
-											</>
-										)}
-									</span>
+									<span className="text-center text-xl font-semibold">{item.reps === null ? "à ton rythme" : "répétitions"}</span>
 								</>
 							) : (
 								// A minute or more takes four characters, drawn smaller to stay inside the ring.
