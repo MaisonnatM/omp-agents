@@ -6,14 +6,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { demosOf, dose, duration, loadSource, loadText, longDate, PLACE_LABEL, REMOVED_TEXT, shortDate, workoutDemos } from "../../sport-view";
+import { demosOf, dose, duration, loadSource, loadText, longDate, opening, PLACE_LABEL, REMOVED_TEXT, shortDate, workoutDemos } from "../../sport-view";
 import { DemoStrip } from "./demo-strip";
 
 /** Opens the demo dialog on `demos`, at `at`, titled by what they belong to. */
 export type OpenDemo = (title: string, demos: Exercise[], at: number) => void;
 
-/** Opens the timer on `routine`, ticking its items on `date`; called in the click, which lets the timer play sound. */
-export type OpenTimer = (date: string, routine: Routine) => void;
+/** The day and routine whose checklist a timer run ticks. */
+export interface TimerTarget {
+	date: string;
+	routine: string;
+}
+
+/** Opens the timer on `items` under `name`, ticking them in `target`'s checklist, or nothing when `null`; called in the click, which lets the timer play sound. */
+export type OpenTimer = (name: string, items: Exercise[], target: TimerTarget | null) => void;
 
 interface DayDetailProps {
 	plan: Plan;
@@ -42,14 +48,14 @@ export function DayDetail({ plan, day, today, disabled, checks, onDemo, onTimer,
 					<Button variant="tertiary" size="compact" leadingIcon={Plus} className="mt-3" disabled={disabled} onClick={() => onLog(null)} {...activityControl("sport.log.free")}>Séance libre</Button>
 				</section>
 			) : (
-				day.workouts.map(workout => <WorkoutCard key={workout.id} plan={plan} kicker={kicker} workout={workout} disabled={disabled} onDemo={onDemo} onLog={onLog} />)
+				day.workouts.map(workout => <WorkoutCard key={workout.id} plan={plan} kicker={kicker} workout={workout} disabled={disabled} onDemo={onDemo} onTimer={onTimer} onLog={onLog} />)
 			)}
 			<Habits plan={plan} date={day.date} today={today} disabled={disabled} checks={checks} onDemo={onDemo} onTimer={onTimer} onCheck={onCheck} />
 		</div>
 	);
 }
 
-function WorkoutCard({ plan, kicker, workout, disabled, onDemo, onLog }: Omit<DayDetailProps, "today" | "day" | "checks" | "onCheck" | "onTimer"> & { kicker: string; workout: PlannedWorkout }) {
+function WorkoutCard({ plan, kicker, workout, disabled, onDemo, onTimer, onLog }: Omit<DayDetailProps, "today" | "day" | "checks" | "onCheck"> & { kicker: string; workout: PlannedWorkout }) {
 	const { demos, blocks } = workoutDemos(plan, workout);
 	const log = workout.log;
 	return (
@@ -77,7 +83,18 @@ function WorkoutCard({ plan, kicker, workout, disabled, onDemo, onLog }: Omit<Da
 				<div key={`${title}-${index}`} className="flex flex-col gap-1">
 					<h3 className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{title}</h3>
 					<ul className="divide-y divide-border">
-						{rows.map(({ item, at }, row) => <ExerciseRow key={`${item.exercise.key}-${row}`} item={item} onDemo={at === null ? null : () => onDemo(workout.name, demos, at)} />)}
+						{rows.map(({ item, at }, row) => {
+							// An exercise that opens as others, such as « Routine hanche », runs them in the timer, with no checklist to tick.
+							const items = item.exercise.opensAs.length > 0 && !item.removed ? opening(plan, item.exercise) : [];
+							return (
+								<ExerciseRow
+									key={`${item.exercise.key}-${row}`}
+									item={item}
+									onDemo={at === null ? null : () => onDemo(workout.name, demos, at)}
+									onTimer={items.length === 0 ? null : () => onTimer(item.exercise.name, items, null)}
+								/>
+							);
+						})}
 					</ul>
 				</div>
 			))}
@@ -85,27 +102,34 @@ function WorkoutCard({ plan, kicker, workout, disabled, onDemo, onLog }: Omit<Da
 	);
 }
 
-function ExerciseRow({ item: { exercise, load, removed }, onDemo }: { item: PlannedExercise; onDemo: (() => void) | null }) {
+function ExerciseRow({ item: { exercise, load, removed }, onDemo, onTimer }: { item: PlannedExercise; onDemo: (() => void) | null; onTimer: (() => void) | null }) {
 	const kg = loadText(exercise, load);
 	const source = removed ? REMOVED_TEXT : loadSource(load);
 	const side = [dose(exercise), exercise.note].filter(Boolean).join(" · ");
 	return (
-		<li className="flex flex-col gap-0.5 py-2 text-sm @md/sport:flex-row @md/sport:items-start @md/sport:justify-between @md/sport:gap-4">
-			<div className="min-w-0">
-				{onDemo && !removed ? (
-					<button type="button" onClick={onDemo} {...activityControl("sport.demo.open")} className="inline-flex items-center gap-1 rounded-sm text-left underline decoration-dotted underline-offset-4 outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">
-						{exercise.name}
-						<Play aria-label="démo" className="size-3 fill-current text-muted-foreground" />
-					</button>
-				) : (
-					<span className={removed ? "text-muted-foreground line-through" : undefined}>{exercise.name}</span>
-				)}
-				{source && <p className="text-xs text-muted-foreground">{source}</p>}
+		<li className="flex items-start gap-3 py-2 text-sm">
+			<div className="flex min-w-0 flex-1 flex-col gap-0.5 @md/sport:flex-row @md/sport:items-start @md/sport:justify-between @md/sport:gap-4">
+				<div className="min-w-0">
+					{onDemo && !removed ? (
+						<button type="button" onClick={onDemo} {...activityControl("sport.demo.open")} className="inline-flex items-center gap-1 rounded-sm text-left underline decoration-dotted underline-offset-4 outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">
+							{exercise.name}
+							<Play aria-label="démo" className="size-3 fill-current text-muted-foreground" />
+						</button>
+					) : (
+						<span className={removed ? "text-muted-foreground line-through" : undefined}>{exercise.name}</span>
+					)}
+					{source && <p className="text-xs text-muted-foreground">{source}</p>}
+				</div>
+				<div className={cn("min-w-0 @md/sport:max-w-[50%] @md/sport:text-right", removed && "text-muted-foreground line-through")}>
+					{side && <p className="text-muted-foreground">{side}</p>}
+					{kg && !removed && <p className="font-medium tabular-nums">{kg}</p>}
+				</div>
 			</div>
-			<div className={cn("min-w-0 @md/sport:max-w-[50%] @md/sport:text-right", removed && "text-muted-foreground line-through")}>
-				{side && <p className="text-muted-foreground">{side}</p>}
-				{kg && !removed && <p className="font-medium tabular-nums">{kg}</p>}
-			</div>
+			{onTimer && (
+				<Button variant="secondary" size="compact" leadingIcon={Timer} className="shrink-0" onClick={onTimer} {...activityControl("sport.timer.open")}>
+					Lancer
+				</Button>
+			)}
 		</li>
 	);
 }
@@ -131,7 +155,7 @@ function Habits({ plan, date, today, disabled, checks, onDemo, onTimer, onCheck 
 					const routine = plan.routines.find(({ id }) => id === habit.routine) ?? null;
 					if (routine === null) return <li key={habit.label} className="py-2 text-sm">{habit.label}</li>;
 					const saved = checks.find(check => check.date === date && check.routine === routine.id)?.items ?? [];
-					return <RoutineHabit key={habit.label} plan={plan} label={habit.label} routine={routine} ticked={routine.items.map(({ key }) => key).filter(key => saved.includes(key))} disabled={disabled} onDemo={onDemo} onTimer={() => onTimer(date, routine)} onTick={items => onCheck({ date, routine: routine.id, items })} />;
+					return <RoutineHabit key={habit.label} plan={plan} label={habit.label} routine={routine} ticked={routine.items.map(({ key }) => key).filter(key => saved.includes(key))} disabled={disabled} onDemo={onDemo} onTimer={() => onTimer(routine.name, routine.items, { date, routine: routine.id })} onTick={items => onCheck({ date, routine: routine.id, items })} />;
 				})}
 			</ul>
 		</section>

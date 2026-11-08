@@ -3,7 +3,7 @@ import { Plus, Scale } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { errorText } from "../../../src/json";
 import { addDays, localDay } from "../../../src/shared/days";
-import type { Exercise, Routine, RoutineCheck, SportChange, SportState } from "../../../src/shared/sport";
+import type { Exercise, RoutineCheck, SportChange, SportState } from "../../../src/shared/sport";
 import { dayPlan, phaseOn } from "../../../src/sport-week";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -15,13 +15,14 @@ import { TimerSound } from "../../sport-timer-sound";
 import { PageFrame } from "../list-page";
 import { SegmentedTab, SegmentedTabs, SegmentedTabsList } from "../segmented-tabs";
 import { toasts } from "../toaster";
+import type { TimerTarget } from "./day-detail";
 import { DemoDialog } from "./demo-dialog";
 import { JournalTab } from "./journal";
 import { LogForm, WeighForm } from "./log-form";
 import { SummaryDialog } from "./log-summary";
 import { SPORT_TABS } from "./nav";
 import { ProgressTab } from "./progress";
-import { RoutineTimer } from "./routine-timer";
+import { RoutineTimer, type TimerChecklist } from "./routine-timer";
 import { WeekTab } from "./week";
 
 interface SportPageProps {
@@ -37,7 +38,7 @@ const ASK_FOR_PLAN = "Crée-moi un plan d'escalade de 4 semaines : poutre, bloc 
 
 export function SportPage({ state, route, disabled, onChange }: SportPageProps) {
 	const [demo, setDemo] = useState<{ title: string; demos: Exercise[]; at: number } | null>(null);
-	const [timer, setTimer] = useState<{ date: string; routine: Routine; sound: TimerSound } | null>(null);
+	const [timer, setTimer] = useState<{ name: string; items: Exercise[]; target: TimerTarget | null; sound: TimerSound } | null>(null);
 	const [target, setTarget] = useState<LogTarget | null>(null);
 	const [saved, setSaved] = useState<Saved | null>(null);
 	const [weighing, setWeighing] = useState(false);
@@ -65,6 +66,11 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 	const check = (next: RoutineCheck) => {
 		onChange([{ op: "set-check", check: next }]).catch((err: unknown) => toasts.add({ title: "Rien n'est enregistré", description: errorText(err) }));
 	};
+	const checklistOf = (to: TimerTarget): TimerChecklist => ({
+		date: to.date,
+		ticked: state.checks.find(({ date, routine }) => date === to.date && routine === to.routine)?.items ?? [],
+		onTick: items => check({ ...to, items }),
+	});
 	const entries = (
 		<>
 			<Tooltip content="Noter une séance hors du plan">
@@ -116,7 +122,7 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 									today={today}
 									disabled={disabled}
 									onDemo={(title, demos, at) => setDemo({ title, demos, at })}
-									onTimer={(date, routine) => setTimer({ date, routine, sound: new TimerSound() })}
+									onTimer={(name, items, to) => setTimer({ name, items, target: to, sound: new TimerSound() })}
 									onLog={logFor}
 									onCheck={check}
 								/>
@@ -136,15 +142,7 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 				</div>
 				{demo && <DemoDialog title={demo.title} demos={demo.demos} at={demo.at} onAt={at => setDemo({ ...demo, at })} onClose={() => setDemo(null)} />}
 				{timer && plan && (
-					<RoutineTimer
-						plan={plan}
-						routine={timer.routine}
-						date={timer.date}
-						ticked={state.checks.find(({ date, routine }) => date === timer.date && routine === timer.routine.id)?.items ?? []}
-						sound={timer.sound}
-						onTick={items => check({ date: timer.date, routine: timer.routine.id, items })}
-						onClose={() => setTimer(null)}
-					/>
+					<RoutineTimer plan={plan} name={timer.name} items={timer.items} checklist={timer.target && checklistOf(timer.target)} sound={timer.sound} onClose={() => setTimer(null)} />
 				)}
 				{target && (
 					<LogForm

@@ -1,22 +1,22 @@
 import { describe, expect, test } from "bun:test";
 import { exercise } from "../src/sport-fixtures";
-import { advance, CHANGE_SEC, freshCue, PREPARE_SEC, startHold, startRun, timerNote, timerSteps } from "./sport-timer";
+import { advance, freshCue, NEXT_SEC, PREPARE_SEC, SIDE_SEC, startHold, startRun, timerNote, timerSteps } from "./sport-timer";
 
 const shape = (items: Parameters<typeof timerSteps>[0]) => timerSteps(items).map(({ kind, sec, hold }) => [kind, sec, hold.item.key, hold.set, hold.side, kind === "hold" && hold.last]);
 
 describe("timerSteps", () => {
-	test("a per-side item holds each set left then right, changing side in between, and ends on its last hold", () => {
+	test("a per-side item holds each set left then right, with 5 s to change side and 10 s before the next set or item, and ends on its last hold", () => {
 		const items = [exercise("s1", "Ischios", { sets: 2, holdSec: 45, perSide: true }), exercise("s5", "Pectoraux", { sets: 1, holdSec: 45 })];
 		expect(shape(items)).toEqual([
 			["prepare", PREPARE_SEC, "s1", 1, "gauche", false],
 			["hold", 45, "s1", 1, "gauche", false],
-			["side", CHANGE_SEC, "s1", 1, "droit", false],
+			["side", 5, "s1", 1, "droit", false],
 			["hold", 45, "s1", 1, "droit", false],
-			["next", CHANGE_SEC, "s1", 2, "gauche", false],
+			["next", 10, "s1", 2, "gauche", false],
 			["hold", 45, "s1", 2, "gauche", false],
-			["side", CHANGE_SEC, "s1", 2, "droit", false],
+			["side", 5, "s1", 2, "droit", false],
 			["hold", 45, "s1", 2, "droit", true],
-			["next", CHANGE_SEC, "s5", 1, null, false],
+			["next", 10, "s5", 1, null, false],
 			["hold", 45, "s5", 1, null, true],
 		]);
 	});
@@ -26,11 +26,11 @@ describe("timerSteps", () => {
 		expect(shape(items).map(([kind, sec]) => [kind, sec])).toEqual([
 			["prepare", PREPARE_SEC],
 			["hold", 30],
-			["side", CHANGE_SEC],
+			["side", SIDE_SEC],
 			["hold", 30],
 			["rest", 60],
 			["hold", 30],
-			["side", CHANGE_SEC],
+			["side", SIDE_SEC],
 			["hold", 30],
 			["rest", 60],
 			["hold", 20],
@@ -52,10 +52,10 @@ describe("timerSteps", () => {
 
 	test("a set of reps waits for the user, and the clock runs every timed step before it out, however late it looks", () => {
 		const steps = timerSteps([exercise("a", "Gainage", { holdSec: 30 }), exercise("b", "Pompes", { sets: 1, reps: 10 })]);
-		expect(steps.map(({ kind, sec }) => [kind, sec])).toEqual([["prepare", PREPARE_SEC], ["hold", 30], ["next", CHANGE_SEC], ["hold", null]]);
+		expect(steps.map(({ kind, sec }) => [kind, sec])).toEqual([["prepare", PREPARE_SEC], ["hold", 30], ["next", NEXT_SEC], ["hold", null]]);
 		const { run, ended } = advance(steps, startRun(steps, 0), 600_000);
 		expect(ended.map(({ kind }) => kind)).toEqual(["prepare", "hold", "next"]);
-		expect(run).toEqual({ at: 3, ran: 0, since: (PREPARE_SEC + 30 + CHANGE_SEC) * 1000 });
+		expect(run).toEqual({ at: 3, ran: 0, since: (PREPARE_SEC + 30 + NEXT_SEC) * 1000 });
 	});
 
 	test("a run starts on the first hold of the first unticked item, after getting ready in place of the step before it", () => {

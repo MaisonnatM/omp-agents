@@ -8,6 +8,7 @@
   `session-goal.tsx` holds the goal pill, its popover, and `GoalDialog`; `App` owns the dialog state and its `editGoal` action, shared by the header and the focused-session command in `shortcuts.ts` and `use-page-shortcuts.ts`.
   `context-ring.tsx` holds the terminal session's read-only meter and the dashboard session's context menu.
   `composer.tsx` holds `blockedShortcut`, `ComposerNote`, and `EmptyConversation`, which the new-session draft and the pages share, and `page-header.tsx` the `Header` every page uses, which shows the controls after its title only while the pointer is over the title or one of them has focus, and always on a touch screen.
+  Below `sm`, the `Header` keeps its title's full width and wraps its buttons to a right-aligned row under it; see [Wrap the page header's controls under the title on a phone](../decisions/2026-11-08-wrap-the-page-header-controls-under-the-title-on-a-phone.md).
   `composer-queue.tsx` holds the queued rows and `useQueue`, and `composer-suggestions.tsx` the suggested prompts and their keys; `InputMessage` renders them through its `beforeEditor` and `afterActions` slots.
   `user-request.tsx` shows the open question above the composer through `question-card.tsx`, and binds its number keys while its pane is focused; the card itself handles only its own clicks and keys.
   `prompt-attachments.tsx` holds the composer's attached files, which the new-session draft shares: it reads each as an image, as text, or as a document omp converts, and sends a prompt's text files after its text and its images apart.
