@@ -223,6 +223,14 @@ _Avoid_: Program, circuit
 One day's ticks of a routine's exercises, which the Sport page sets under **Chaque jour** and keeps in `sport.json`; only the page sets one, never an agent.
 _Avoid_: Habit log, done mark
 
+**Per side**:
+An exercise done once on the left then once on the right in each set, such as a stretch held on each leg, whose sets and hold count one side; the Sport page writes its dose « par côté ».
+_Avoid_: Each leg, both sides, bilateral
+
+**Hold (timer)**:
+One timed effort in the routine timer, one set of one side of an exercise, between the 5 s changes or the exercise's rest.
+_Avoid_: Rep, round, interval
+
 **Demo**:
 An exercise's YouTube video with three cues and an optional caution, which the Sport page shows as a thumbnail and loads only when the user clicks play.
 _Avoid_: Tutorial, clip, embed

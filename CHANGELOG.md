@@ -5,6 +5,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-08
 
+- On the Sport page, Lancer beside the daily stretches opens a full-screen timer that counts down each stretch, left side then right, with a short break between them, beeps for the last seconds, and a French voice saying what comes next.
+- The timer ticks each stretch off for the day as soon as it is held to the end, so stopping halfway keeps what you did; Space pauses, the arrows skip, and the speaker button turns the sound off.
+- A stretch done on each side now reads « par côté » in its dose, such as 2 × 45 s par côté.
 - On the Sport page, the daily stretches now list each stretch with its dose, its note, and its demo, with a box to tick each one off; the ticks are kept for each day, and a count such as 2 / 5 shows how many are done.
 - Behind the scenes: the model replay now keeps each model on its own work, so a model that hits its usage limit is retried later instead of being quietly answered by Opus, and a third, cheaper model can join the comparison.
 - Behind the scenes: a replay script reruns real helper-agent tasks on two models side by side, with the project's checks and a blind review of both results, to tell whether a cheaper model does the work as well.
