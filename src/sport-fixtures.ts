@@ -82,6 +82,7 @@ export const STATE: SportState = {
 		overrides: [{ date: "2026-12-29", slots: slots("test") }],
 	},
 	log: [],
+	checks: [],
 };
 
 export const withLogs = (state: SportState, ...logs: WorkoutLog[]): SportState => ({ ...state, log: [...state.log, ...logs].toSorted((a, b) => a.date.localeCompare(b.date)) });

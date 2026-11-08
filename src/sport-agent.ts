@@ -4,7 +4,7 @@
  * the server's sport inbox checks again against the state it applies to. An agent sets the targets and the plan, adds
  * measurements and workout logs in its session's name, and edits only the ones its session wrote; an edit names the
  * entry and the fields it changes, so the server merges them over the entry as it stands then. An agent never changes
- * one the user wrote, and never removes or restores one, which only the page does.
+ * one the user wrote, never removes or restores one, and never ticks a routine's items, which only the page does.
  */
 import { canonicalJson, isObject, type Parsed } from "./json";
 import type { Measurement, Metric, SportChange, SportState, WorkoutLog } from "./shared/sport";
@@ -41,6 +41,7 @@ const PAGE_ONLY: Record<Exclude<SportChange["op"], AgentSportChange["op"]>, stri
 	"remove-log": "an agent may not remove a log; only the Sport page removes or restores one",
 	"restore-measurement": "an agent may not restore a measurement; only the Sport page removes or restores one",
 	"restore-log": "an agent may not restore a log; only the Sport page removes or restores one",
+	"set-check": "an agent may not tick a routine's items; only the Sport page does",
 };
 
 /**
@@ -115,6 +116,7 @@ function agentChange(state: SportState, sessionId: string, value: unknown): Pars
 		case "remove-log":
 		case "restore-measurement":
 		case "restore-log":
+		case "set-check":
 			return { error: PAGE_ONLY[change.op] };
 		default: {
 			const never: never = change;

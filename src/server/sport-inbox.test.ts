@@ -90,10 +90,11 @@ describe("SportInbox", () => {
 		leave(dir, "9-x.json", { op: "set-plan", plan });
 		writeFileSync(join(dir, "10-x.json"), "{not json");
 		writeFileSync(join(dir, "11-x.json"), JSON.stringify({ metrics: [], change: { op: "set-plan", plan: null } }));
+		leave(dir, "12-x.json", { op: "set-check", check: { date: "2026-11-16", routine: "etirements", items: ["s1"] } });
 		const { inbox, state } = inboxOver(dir, start);
 		await inbox.drain();
 		expect(state()).toEqual(start);
-		const names = Array.from({ length: 11 }, (_, i) => `${i + 1}-x.json`);
+		const names = Array.from({ length: 12 }, (_, i) => `${i + 1}-x.json`);
 		expect(readdirSync(dir).toSorted()).toEqual(names.map(name => `${name}.invalid`).toSorted());
 		const reasons = Object.fromEntries(errors.mock.calls.map(([line]) => String(line).match(/(\d+-x\.json): (.*)$/)?.slice(1) ?? []));
 		errors.mockRestore();
@@ -108,6 +109,7 @@ describe("SportInbox", () => {
 			"8-x.json": "an agent's workout log must name the session that sent it, s1, as addedBy",
 			"9-x.json": `the plan is ${Buffer.byteLength(JSON.stringify(plan))} bytes as JSON; keep it to at most ${MAX_PLAN_BYTES}`,
 			"11-x.json": "a sport request must name the session that left it",
+			"12-x.json": "an agent may not tick a routine's items; only the Sport page does",
 		});
 		expect(Object.keys(reasons).toSorted()).toEqual(names.toSorted());
 	});

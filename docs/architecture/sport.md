@@ -22,6 +22,11 @@ An override replaces one day's slots, as on a test day.
 `applySport` in `src/sport.ts` is the pure reducer the server applies to its file.
 `set-plan`, `set-targets`, and `set-metrics` replace their part whole.
 Logs and measurements are added, edited, removed, and restored by id through one dated list; both stay in date order, a day's entries in the order they came, and a restore puts the entry back at its index when that keeps the order.
+`set-check` sets one day's ticks of one routine, a `RoutineCheck` of its date, its routine id, and the keys of the items ticked; it replaces that day's entry for the routine, an empty list removes it, and the items are kept in the routine's order and once each.
+`checks` holds one entry per day and routine with at least one tick, in date order; a file without it reads as none, so it needed no new version.
+A `set-check` is refused when its date is not a day, its routine is not in the plan, or an item is not in the routine, such as `check.items[1] must name an item of routine etirements, not h1`.
+A `set-plan` keeps the ticks of routines or items it drops, and the page ignores a key the plan no longer holds, so a routine put back finds its ticks again.
+See [Store routine ticks in sport.json through a page-only change](../decisions/2026-11-08-store-routine-ticks-in-sport-json-through-a-page-only-change.md).
 Every metric id in the state names one of its metrics: a change that names a metric the state does not hold is refused, and so is a `set-metrics` that drops a metric a measurement, a target, or a load rule still names, so the metrics come first.
 A change that changes nothing or is refused returns the same state.
 `applySportChanges` applies a list of changes in order, each checked by `sportRefusal` against the state the ones before it leave, and refuses the whole list with the first refusal's reason, so a list is kept whole or not at all.
@@ -51,7 +56,8 @@ It resolves the request against the state at hand, so an edit merges its fields 
 An agent may set the plan, at most `MAX_PLAN_BYTES`, 64 KB as JSON, and the targets, and add or replace metrics by id.
 A request with no session id is refused.
 It may add a log or a measurement only in its own session's name, its `addedBy`, under an id no entry holds, and edit one only when its own session wrote it, keeping its id and `addedBy`; another session's edit is refused with `workout log <id> was added by session <id>; an agent may edit only a workout log its own session wrote`.
-It may never edit what the user wrote, nor remove or restore anything; only the Sport page does.
+It may never edit what the user wrote, nor remove or restore anything, nor tick a routine's items; only the Sport page does.
+The tool's `read` returns the whole state, the ticks with it.
 See [An agent signs Sport changes with its session id](../decisions/2026-11-07-an-agent-signs-sport-changes-with-its-session-id.md).
 The resulting changes must also pass `sportRefusal` in `src/sport.ts`, so a change naming an unknown metric says why rather than vanishing.
 The inbox sets a refused file aside as `.invalid` and logs the reason.
@@ -86,6 +92,7 @@ Its route is a `SportRoute` from `web/routing.ts`: `#sport` and `#sport?day=<YYY
 A change the page makes is a `SportChange`, the same the agent's tool sends.
 The page dispatches a list of them as a `sport-changes` action, which applies `applySportChanges` to the state at once and keeps the state as it was when the list is refused, then sends `{ t: "sport-changes", changes }` on the socket; the server applies the list to the file whole or not at all, and every socket then gets the state as it is after.
 The Fait dialog saves the log, a test's max, and its weigh-in as one list built by `logSave` in `web/sport-view.ts`, stays open and busy until the server answers, and shows a refusal's reason without closing; the Pesée dialog does the same with its one measurement.
+A routine tick sends one `set-check` with the day's ticks of that routine, applied at once like the others, and a refusal shows in a toast.
 
 A demo shows its YouTube thumbnail from `GET /api/sport/thumb?id=<video id>`, in `src/server/sport-thumbs.ts`, which fetches `hqdefault.jpg` from `i.ytimg.com` the first time and keeps it as `<id>.jpg` in `sportThumbsDir`, so the page's `img-src` stays `'self'`.
 The player is an iframe on `https://www.youtube-nocookie.com/embed/<id>?autoplay=1&rel=0&playsinline=1` that `DemoDialog` mounts only after the play click, which the CSP's `frame-src` allows; see [the decision](../decisions/2026-11-07-play-exercise-demos-from-youtube-nocookie.md).

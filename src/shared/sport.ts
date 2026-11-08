@@ -171,6 +171,18 @@ export interface WorkoutLog {
 	addedBy: string | null;
 }
 
+/**
+ * The exercises of one routine the user ticked off on one day, by key in the routine's order. A key the plan no longer
+ * holds stays in the file, and the page leaves it out.
+ */
+export interface RoutineCheck {
+	/** `YYYY-MM-DD`. */
+	date: string;
+	/** A routine's id. */
+	routine: string;
+	items: string[];
+}
+
 export interface SportState {
 	v: typeof SPORT_VERSION;
 	metrics: Metric[];
@@ -179,11 +191,13 @@ export interface SportState {
 	plan: Plan | null;
 	/** Oldest first. */
 	log: WorkoutLog[];
+	/** One per day and routine with at least one item ticked, oldest first. */
+	checks: RoutineCheck[];
 }
 
-export const EMPTY_SPORT: SportState = { v: SPORT_VERSION, metrics: [], measurements: [], targets: [], plan: null, log: [] };
+export const EMPTY_SPORT: SportState = { v: SPORT_VERSION, metrics: [], measurements: [], targets: [], plan: null, log: [], checks: [] };
 
-/** One change to the state; a restore puts an item back at the index it was removed from. */
+/** One change to the state; a restore puts an item back at the index it was removed from, and a `set-check` replaces a day's ticks of one routine. */
 export type SportChange =
 	| { op: "set-plan"; plan: Plan | null }
 	| { op: "set-targets"; targets: Target[] }
@@ -195,7 +209,8 @@ export type SportChange =
 	| { op: "add-log"; log: WorkoutLog }
 	| { op: "edit-log"; log: WorkoutLog }
 	| { op: "remove-log"; id: string }
-	| { op: "restore-log"; log: WorkoutLog; index: number };
+	| { op: "restore-log"; log: WorkoutLog; index: number }
+	| { op: "set-check"; check: RoutineCheck };
 
 /** Every exercise of `plan`'s workouts and routines. */
 export const exercisesOf = (plan: Plan): Exercise[] => [...plan.workouts.flatMap(({ blocks }) => blocks.flatMap(({ items }) => items)), ...plan.routines.flatMap(({ items }) => items)];

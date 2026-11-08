@@ -1,6 +1,6 @@
 /** Applying changes to the Sport module's state, which the server does to `sport.json` and the page to the state it shows. */
-import { canonicalJson, type Parsed } from "./json";
-import { exercisesOf, type Measurement, type Metric, type Plan, type SportChange, type SportState, type Target, type WorkoutLog } from "./shared/sport";
+import { canonicalJson, isDay, type Parsed } from "./json";
+import { exercisesOf, type Measurement, type Metric, type Plan, type RoutineCheck, type SportChange, type SportState, type Target, type WorkoutLog } from "./shared/sport";
 
 const same = (a: unknown, b: unknown): boolean => canonicalJson(a) === canonicalJson(b);
 
@@ -52,10 +52,34 @@ const unknownMetrics = (state: SportState, ids: string[]): string | null => {
 	return unknown.length === 0 ? null : `it names ${unknown.length === 1 ? "a metric" : "metrics"} not in the metrics list, ${unknown.join(", ")}; add ${unknown.length === 1 ? "it" : "them"} to the metrics first`;
 };
 
+/** Why `plan` refuses `check`: a date that is not a day, a routine the plan lacks, or an item that is not one of the routine's. */
+function checkRefusal(plan: Plan | null, { date, routine, items }: RoutineCheck): string | null {
+	if (!isDay(date)) return "check.date must be a YYYY-MM-DD day";
+	const found = plan?.routines.find(({ id }) => id === routine);
+	if (!found) return `check.routine must name a routine of the plan, not ${routine}`;
+	const at = items.findIndex(key => !found.items.some(item => item.key === key));
+	return at === -1 ? null : `check.items[${at}] must name an item of routine ${routine}, not ${items[at]}`;
+}
+
+/**
+ * `state` with `check` as the day's ticks of its routine, in the routine's order and each once, after every check of
+ * an earlier or the same day; an empty list removes the entry.
+ */
+function withCheck(state: SportState, check: RoutineCheck): SportState {
+	const routine = state.plan?.routines.find(({ id }) => id === check.routine);
+	const items = (routine?.items ?? []).map(({ key }) => key).filter(key => check.items.includes(key));
+	const at = state.checks.findIndex(other => other.date === check.date && other.routine === check.routine);
+	const kept = at === -1 ? state.checks : state.checks.toSpliced(at, 1);
+	if (items.length === 0) return at === -1 ? state : { ...state, checks: kept };
+	const next = { date: check.date, routine: check.routine, items };
+	if (at !== -1 && same(state.checks[at], next)) return state;
+	return { ...state, checks: kept.toSpliced(kept.findLastIndex(other => other.date <= next.date) + 1, 0, next) };
+}
+
 /**
  * Why `state` refuses `change`, or `null` when it takes it: a change that names a metric the state does not hold, or a
  * `set-metrics` that drops one a measurement, a target, or a load rule still names, so every metric id in the state names
- * one of its metrics.
+ * one of its metrics; or a `set-check` that names a routine or an item the plan does not hold.
  */
 export function sportRefusal(state: SportState, change: SportChange): string | null {
 	switch (change.op) {
@@ -77,6 +101,8 @@ export function sportRefusal(state: SportState, change: SportChange): string | n
 		case "remove-log":
 		case "restore-log":
 			return null;
+		case "set-check":
+			return checkRefusal(state.plan, change.check);
 		default: {
 			const never: never = change;
 			return never;
@@ -110,6 +136,8 @@ export function applySport(state: SportState, change: SportChange): SportState {
 			return withLog(state, LOGS.remove(state.log, change.id));
 		case "restore-log":
 			return withLog(state, LOGS.restore(state.log, change.log, change.index));
+		case "set-check":
+			return withCheck(state, change.check);
 		default: {
 			const never: never = change;
 			return never;

@@ -219,6 +219,10 @@ A named list of exercises the plan repeats outside the workouts, such as « Mobi
 It is not a Bot's routine (see **Routine**).
 _Avoid_: Program, circuit
 
+**Routine check**:
+One day's ticks of a routine's exercises, which the Sport page sets under **Chaque jour** and keeps in `sport.json`; only the page sets one, never an agent.
+_Avoid_: Habit log, done mark
+
 **Demo**:
 An exercise's YouTube video with three cues and an optional caution, which the Sport page shows as a thumbnail and loads only when the user clicks play.
 _Avoid_: Tutorial, clip, embed

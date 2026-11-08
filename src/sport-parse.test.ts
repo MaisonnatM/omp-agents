@@ -20,6 +20,15 @@ describe("parseSportState", () => {
 		expect(parseSportState({ v: 0 })).toEqual(EMPTY_SPORT);
 	});
 
+	test("reads a file from before the routine ticks with none, and orders them by date", () => {
+		expect(parseSportState({ v: 1, log: [LOG] })?.checks).toEqual([]);
+		const checks = [
+			{ date: "2026-11-17", routine: "hanche", items: ["h1"] },
+			{ date: "2026-11-16", routine: "hanche", items: ["h1"] },
+		];
+		expect(parseSportState({ v: 1, checks })?.checks).toEqual(checks.toReversed());
+	});
+
 	test("fills the defaults, drops unknown fields, and orders the log and the measurements by date", () => {
 		const state = parseSportState({
 			v: 1,
@@ -118,6 +127,7 @@ describe("parseSportChange", () => {
 		expect(parseSportChange(withItem({ demo: { youtubeId: "3IdQnBtnGjQ", cues: ["a", "b", "c"] } }))).toMatchObject({ ok: { op: "set-plan" } });
 		expect(parseSportChange({ op: "set-targets", targets: [{ id: "t", label: "Bloc", kind: "boulder", grade: "8a" }] })).toEqual({ ok: { op: "set-targets", targets: [{ id: "t", label: "Bloc", by: null, kind: "boulder", grade: "8a" }] } });
 		expect(parseSportChange({ op: "set-metrics", metrics: [{ id: "max", label: "Max" }] })).toEqual({ ok: { op: "set-metrics", metrics: [{ id: "max", label: "Max", unit: "", better: "higher" }] } });
+		expect(parseSportChange({ op: "set-check", check: { date: "2026-11-16", routine: "hanche", items: ["h1"] } })).toEqual({ ok: { op: "set-check", check: { date: "2026-11-16", routine: "hanche", items: ["h1"] } } });
 	});
 
 	test("refuses an unknown op or a wrong part with the path of the field and the rule it broke", () => {
@@ -137,6 +147,7 @@ describe("parseSportChange", () => {
 		expect(refusal({ op: "set-targets", targets: "t" })).toBe("targets must be a list");
 		expect(refusal({ op: "set-targets", targets: Array.from({ length: MAX_SPORT_ITEMS + 1 }, (_, i) => ({ id: `t${i}`, label: "Bloc", kind: "boulder", grade: "7a" })) })).toBe(`targets must hold at most ${MAX_SPORT_ITEMS} items`);
 		expect(refusal({ op: "set-metrics", metrics: [{ id: "max", label: "Max" }, { id: "max", label: "Max" }] })).toBe("metrics must not repeat max");
+		expect(refusal({ op: "set-check", check: { date: "16/11/2026", routine: "hanche", items: [] } })).toStartWith("check.date must");
 	});
 
 	test("refuses a wrong exercise", () => {
