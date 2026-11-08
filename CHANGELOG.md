@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-08
 
+- Behind the scenes: the dashboard now keeps your training plan, test results, targets, and workout log together and works out each week's workouts and loads, ready for the coming Sport page.
 - Installing the starter kit, or Update dashboard, now removes the kit files the kit stopped shipping, unless you edited them, so old extensions stop running in your sessions.
 - With the starter kit, helper agents that a session starts no longer carry the tools only your own session uses, such as ending the session, landing, and your todos, notes, and reminders, so each of their requests costs less.
 - Fixed: with the starter kit, helper agents in poteto mode no longer look for a skill under an old name that always failed.
@@ -28,7 +29,6 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-07
 
-- Behind the scenes: the dashboard now keeps your training plan, test results, targets, and workout log together and works out each week's workouts and loads, ready for the coming Sport page.
 - Fixed: the daily cleanup and Settings › Storage now check a subagent's copy of your repository for edits and live sessions even when omp keeps that copy outside the task's folder.
 - Fixed: removing a leftover task's folder now also deletes that outside copy, instead of leaving it behind.
 - Fixed: a Bot page's model menu now lists the models, instead of staying on Loading models.
