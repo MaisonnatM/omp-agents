@@ -4,6 +4,7 @@
 
 - It fast-forwards the checkout's branch to its branch on origin, and runs `bun install --frozen-lockfile` when `bun.lock` changed.
 - It brings the omp starter kit's files in `~/.omp/agent` up to date when you never edited them since you installed the kit, so new omp sessions get the landed kit; a file you edited keeps your version.
+  A file the kit no longer ships goes the same way: removed when you never edited it, kept when you did.
   It needs one run of `bun run omp-template` that records the install first.
 - It never stashes, resets, or merges: a checkout on another branch than the server started on, with changes to tracked files, or with commits origin lacks stays as it was, and the notice or a toast says why.
   Untracked files do not block it.

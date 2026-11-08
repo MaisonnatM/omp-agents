@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-08
 
+- Installing the starter kit, or Update dashboard, now removes the kit files the kit stopped shipping, unless you edited them, so old extensions stop running in your sessions.
 - Behind the scenes: the developer docs gain a harness map, five diagrams of how the dashboard, omp, and the starter kit fit together, so contributors find their way faster.
 - The starter kit now includes the grill-with-docs design interview: type /skill:grill-with-docs and a plan, and the agent asks rounds of numbered questions, each with its recommended answer, writing agreed words to the project's glossary as you go.
 - Decisions settled during that interview go into the project's usual decision records, not a second folder.
