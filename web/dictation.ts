@@ -174,7 +174,12 @@ export function rowOf(dictation: Dictation): DictationRow | null {
 		case "transcribing":
 			return { status: "Transcribing…", detail: dictation.preview || null, tone: "active", actions: ["discard"] };
 		case "empty":
-			return { status: "No speech detected", detail: null, tone: "muted", actions: ["retry", "dismiss"] };
+			return {
+				status: "No speech detected",
+				detail: "Nothing was loud enough to count as speech. Speak closer to the microphone, or raise its input level in your sound settings.",
+				tone: "muted",
+				actions: ["retry", "dismiss"],
+			};
 		case "failed":
 			return {
 				status: dictation.error,

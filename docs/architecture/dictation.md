@@ -17,6 +17,7 @@ The microphone is the one of the computer that runs the dashboard, which in the 
 A second `dictation-start` while one runs ends at once with the error that dictation is busy.
 `dictation-stop` ends the recording and keeps what it heard, `dictation-discard` closes the microphone and keeps nothing, and both act only for the owning socket and capture id.
 A socket's close disposes its capture, and the page marks it failed with "Lost the connection to the server.", keeping its last preview for **Use preview**.
+A capture ends with no text when omp's endpointer in `stt/endpointer.ts` never hears a frame above its speech floor, so a microphone whose input level is low ends every capture as no speech, which the page's row explains.
 
 ## The page
 
