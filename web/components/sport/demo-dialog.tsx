@@ -29,8 +29,8 @@ export function DemoDialog({ title, demos, at, onAt, onClose }: DemoDialogProps)
 	const demo = exercise?.demo ?? null;
 	const last = at === demos.length - 1;
 	useShortcuts({
-		sportPreviousDay: () => { if (at > 0) onAt(at - 1); },
-		sportNextDay: () => { if (!last) onAt(at + 1); },
+		sportPreviousDemo: () => { if (at > 0) onAt(at - 1); },
+		sportNextDemo: () => { if (!last) onAt(at + 1); },
 	});
 	useEffect(() => {
 		strip.current?.children[at]?.scrollIntoView({ block: "nearest", inline: "center" });
@@ -94,13 +94,13 @@ export function DemoDialog({ title, demos, at, onAt, onClose }: DemoDialogProps)
 				)}
 			</div>
 			<div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
-				<Tooltip content="Démo précédente" shortcut={shortcutLabels("sportPreviousDay")} side="top" disabled={at === 0}>
+				<Tooltip content="Démo précédente" shortcut={shortcutLabels("sportPreviousDemo")} side="top" disabled={at === 0}>
 					<Button variant="tertiary" size="compact" leadingIcon={ChevronLeft} disabled={at === 0} onClick={() => onAt(at - 1)} {...activityControl("sport.demo.step")}>Précédent</Button>
 				</Tooltip>
 				{last ? (
 					<Button size="compact" onClick={onClose}>Terminé</Button>
 				) : (
-					<Tooltip content="Démo suivante" shortcut={shortcutLabels("sportNextDay")} side="top">
+					<Tooltip content="Démo suivante" shortcut={shortcutLabels("sportNextDemo")} side="top">
 						<Button size="compact" trailingIcon={ChevronRight} onClick={() => onAt(at + 1)} {...activityControl("sport.demo.step")}>Suivant</Button>
 					</Tooltip>
 				)}

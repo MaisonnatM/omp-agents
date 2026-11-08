@@ -90,6 +90,8 @@ export type ShortcutId =
 	| "emailCompose"
 	| "sportPreviousDay"
 	| "sportNextDay"
+	| "sportPreviousDemo"
+	| "sportNextDemo"
 	| "sportJournalNext"
 	| "sportJournalPrevious"
 	| "sportJournalClose"
@@ -317,6 +319,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "emailCompose", category: "email", label: "Email: write a new mail", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "sportPreviousDay", category: "sport", label: "Sport week: open the day before", keys: [{ chord: { key: "ArrowLeft" }, scope: "outside-fields" }] },
 	{ id: "sportNextDay", category: "sport", label: "Sport week: open the day after", keys: [{ chord: { key: "ArrowRight" }, scope: "outside-fields" }] },
+	{ id: "sportPreviousDemo", category: "sport", label: "Sport demo: show the workout's previous demo", keys: [{ chord: { key: "ArrowLeft" }, scope: "outside-fields" }] },
+	{ id: "sportNextDemo", category: "sport", label: "Sport demo: show the workout's next demo", keys: [{ chord: { key: "ArrowRight" }, scope: "outside-fields" }] },
 	{ id: "sportJournalNext", category: "sport", label: "Sport journal: focus the next, older session, or open it while a session is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "sportJournalPrevious", category: "sport", label: "Sport journal: focus the previous, newer session, or open it while a session is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "sportJournalClose", category: "sport", label: "Sport journal: close the open session", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },

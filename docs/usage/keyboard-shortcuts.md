@@ -65,6 +65,7 @@ Alt is Option on macOS.
 | # | Email page, outside text fields | Move the open conversation to Gmail's Trash |
 | C | Email page, outside text fields | Write a new mail |
 | ← / → | Sport page's week, outside text fields | Open the day before or after |
+| ← / → | Sport page's demo dialog, outside text fields | Show the workout's previous or next demo |
 | ↓ / ↑ | Sport page's journal, outside text fields | Focus the next or previous session, or open it while one is open |
 | Esc | Sport page's journal, outside text fields | Close the open session |
 | Alt+Shift+↑ / Alt+Shift+↓ | Todo page or Pull requests page | Move the focused todo, or the Pull requests page's focused pull request, section, or repository, up or down |
@@ -74,7 +75,7 @@ Alt is Option on macOS.
   The dialog groups them in tabs by category: General, Sessions, Pull requests, Todo, Notes, Email, Calendar, Sport, and Changes.
   Its header states the rule for where a key works: chords with Cmd, Alt, or Ctrl work anywhere, even while you type, and single keys and G pairs work outside text fields; a **Composer only** tag marks the keys that work only in the composer.
   Each tab's column headings stay pinned while its list scrolls, and rows fade in under them.
-  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the header's **Notes** and **Email** buttons, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the open Sport journal session's ↑, ↓, and **×**, the Calendar page's **New event**, and an Email conversation's **Reply**, **Reply all**, **Delete**, and **Open in Gmail**.
+  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the header's **Notes** and **Email** buttons, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the open Sport journal session's ↑, ↓, and **×**, the Sport demo dialog's **Précédent** and **Suivant**, the Calendar page's **New event**, and an Email conversation's **Reply**, **Reply all**, **Delete**, and **Open in Gmail**.
 - Cmd+1 through Cmd+5 go to the first through fifth tab the sidebar's bar draws, even while typing.
   The numbers count only the bar's tabs, in the order **Settings › Preferences** sets: a tab you hide, or Tickets without a Linear sign-in, takes no number, and the tabs after it move up one.
   A number with no tab is left to the window.
