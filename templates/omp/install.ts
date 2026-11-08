@@ -154,7 +154,7 @@ function pluginIds(listing: unknown): Set<string> {
 }
 
 export const STARTER_KIT_MARKETPLACE = { name: "cursor-plugins", source: "cursor/plugins" };
-/** pstack provides the `Poteto Mode` skill that `poteto-mode` points at, and the `poteto-agent` that `/ship` delegates to. */
+/** pstack provides the `poteto-mode` skill, which the kit's alias of the same name points at, and the `poteto-agent` that `/ship` delegates to. */
 const PLUGINS = ["pstack@cursor-plugins"];
 /** `chrome-devtools` drives headless Chrome on a throwaway profile, which the kit's `design-critic` and browser checks use. */
 const MCP_SERVERS: Record<string, Json> = {

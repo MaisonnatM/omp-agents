@@ -6,6 +6,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-11-08
 
 - With the starter kit, helper agents that a session starts no longer carry the tools only your own session uses, such as ending the session, landing, and your todos, notes, and reminders, so each of their requests costs less.
+- Fixed: with the starter kit, helper agents in poteto mode no longer look for a skill under an old name that always failed.
 - Behind the scenes: a token cost report prices recent omp requests by agent, cache use, and tool, and the developer docs map where the money goes, with ranked proposals to spend less.
 - Behind the scenes: the developer docs gain a harness map, five diagrams of how the dashboard, omp, and the starter kit fit together, so contributors find their way faster.
 - The starter kit now includes the grill-with-docs design interview: type /skill:grill-with-docs and a plan, and the agent asks rounds of numbered questions, each with its recommended answer, writing agreed words to the project's glossary as you go.
