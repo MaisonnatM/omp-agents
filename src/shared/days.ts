@@ -43,6 +43,9 @@ export type DayKey = (typeof DAY_KEYS)[number];
 /** `day` moved by `days` on the calendar alone, so no time zone or daylight saving change shifts it. */
 export const addDays = (day: string, days: number): string => new Date(Date.parse(day) + days * DAY_MS).toISOString().slice(0, 10);
 
+/** The days from `first` to `last` on the calendar alone, negative when `last` comes first. */
+export const daysApart = (first: string, last: string): number => (Date.parse(last) - Date.parse(first)) / DAY_MS;
+
 export const weekdayOf = (day: string): DayKey => DAY_KEYS[(new Date(Date.parse(day)).getUTCDay() + 6) % 7]!;
 
 export const mondayOf = (day: string): string => addDays(day, -DAY_KEYS.indexOf(weekdayOf(day)));

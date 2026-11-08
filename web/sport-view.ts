@@ -1,5 +1,5 @@
 /** How the Sport page words and colors what `src/sport-week.ts` computes: scale words, workout colors, loads, doses, and the exercises a demo opens. */
-import { addDays, daysBetween, mondayOf } from "../src/shared/days";
+import { addDays, daysApart, mondayOf } from "../src/shared/days";
 import { type Climb, CLIMB_KINDS, type ClimbKind, type Exercise, exercisesOf, gradeRank, type Measurement, type Metric, PAIN_PLACES, type PainPlace, type Phase, type Place, type Plan, type SportChange, type SportState, type Workout, type WorkoutLog } from "../src/shared/sport";
 import { applySport } from "../src/sport";
 import { bodyweightMetric, type Load, PAIN_FLAG_DAYS, PAIN_FLAG_LEVEL, type PlannedDay, type PlannedExercise, type PlannedWorkout, records, removesHangs, type SportRecords, testedMetric } from "../src/sport-week";
@@ -173,8 +173,8 @@ export function workoutDemos(plan: Plan, workout: PlannedWorkout): WorkoutDemos 
 export function phaseWeek(phase: Phase, date: string): { week: number; weeks: number; deload: boolean } {
 	const first = mondayOf(phase.start);
 	return {
-		week: (daysBetween(first, mondayOf(date)).length - 1) / 7 + 1,
-		weeks: Math.ceil(daysBetween(first, phase.end).length / 7),
+		week: daysApart(first, mondayOf(date)) / 7 + 1,
+		weeks: Math.ceil((daysApart(first, phase.end) + 1) / 7),
 		deload: phase.deloadMondays.includes(mondayOf(date)),
 	};
 }

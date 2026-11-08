@@ -1,11 +1,11 @@
 /** The banner over the day while a pain flag holds: the pain, what it removes until when, and the days left. */
-import { daysBetween } from "../../../src/shared/days";
+import { daysApart } from "../../../src/shared/days";
 import { PAIN_FLAG_DAYS, type PainFlag } from "../../../src/sport-week";
 import { cn } from "@/lib/utils";
 import { longDate, PAIN_PLACE_AT, painRule, painWord } from "../../sport-view";
 
 export function PainBanner({ flag, today }: { flag: PainFlag; today: string }) {
-	const left = daysBetween(today, flag.until).length - 1;
+	const left = daysApart(today, flag.until);
 	const { effect } = painRule(flag.where);
 	return (
 		<section aria-label="Douleur notée" className="flex items-start gap-4 rounded-xl border border-warning/40 bg-warning-surface px-4 py-3">
