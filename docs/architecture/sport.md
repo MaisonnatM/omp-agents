@@ -80,7 +80,8 @@ A finger pain flag removes every `hang` exercise for the 7 days after its log; `
 
 ## The page
 
-The Sport page, `SportPage` in `web/components/sport/page.tsx`, draws `DashboardState.sport` and reads every date, load, flag, and record from `src/sport-week.ts`; `web/sport-view.ts` only words them.
+The Sport page, `SportPage` in `web/components/sport/page.tsx`, draws `DashboardState.sport` and reads from `src/sport-week.ts` every date, load, pain flag and the hangs it removes, tested and bodyweight metric, and record with the log that set it.
+`web/sport-view.ts` words them and builds the lists of changes the page sends, and `web/sport-progress.ts` turns them into the progress tab's cards and chart.
 Its route is a `SportRoute` from `web/routing.ts`: `#sport` and `#sport?day=<YYYY-MM-DD>` for the week, `#sport/journal` and `#sport/journal?open=<log id>` for the journal, and `#sport/progress`.
 A change the page makes is a `SportChange`, the same the agent's tool sends.
 The page dispatches a list of them as a `sport-changes` action, which applies `applySportChanges` to the state at once and keeps the state as it was when the list is refused, then sends `{ t: "sport-changes", changes }` on the socket; the server applies the list to the file whole or not at all, and every socket then gets the state as it is after.
@@ -89,4 +90,4 @@ The Fait dialog saves the log, a test's max, and its weigh-in as one list built 
 A demo shows its YouTube thumbnail from `GET /api/sport/thumb?id=<video id>`, in `src/server/sport-thumbs.ts`, which fetches `hqdefault.jpg` from `i.ytimg.com` the first time and keeps it as `<id>.jpg` in `sportThumbsDir`, so the page's `img-src` stays `'self'`.
 The player is an iframe on `https://www.youtube-nocookie.com/embed/<id>?autoplay=1&rel=0&playsinline=1` that `DemoDialog` mounts only after the play click, which the CSP's `frame-src` allows; see [the decision](../decisions/2026-11-07-play-exercise-demos-from-youtube-nocookie.md).
 
-The progress chart is `ChartView` from `web/components/session-chart.tsx`, loaded with `React.lazy`, with `dashed` naming the target's series, `format` writing the axis and tooltip values, and `fit` fitting the axis to the values instead of starting at zero.
+The progress chart is `ChartView` from `web/components/session-chart.tsx`, loaded with `React.lazy`, with `reference` drawing the target as a dashed line labelled with its value, `format` writing the axis and tooltip values, and `fit` fitting the axis to the values instead of starting at zero.
