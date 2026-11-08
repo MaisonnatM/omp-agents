@@ -1,12 +1,12 @@
 ---
 name: poteto-mode
-description: Invoke poteto's agent style. Alias for the Poteto Mode skill, whose own frontmatter name contains a space and so cannot be typed as a slash command in omp.
+description: Invoke poteto's agent style on omp. Says where pstack's own poteto-mode skill file is, and maps its Cursor routes to omp.
 disable-model-invocation: true
 ---
 
 # poteto-mode
 
-The mode lives in pstack's own skill file, which omp refuses because its name `Poteto Mode` is not lowercase, so `skill://Poteto Mode` always fails. Find it with one `glob` of `~/.omp/plugins/cache/plugins/cursor-plugins___pstack___*/skills/poteto-mode/SKILL.md`, then `read` the highest version's file in full, including its inline Principles index, and work in that style for the rest of the session.
+The mode lives in pstack's own skill file, also named `poteto-mode`, which `skill://poteto-mode` opens instead of this one when both are installed. Reached here, find it with one `glob` of `~/.omp/plugins/cache/plugins/cursor-plugins___pstack___*/skills/poteto-mode/SKILL.md`, then `read` the highest version's file in full, including its inline Principles index, and work in that style for the rest of the session.
 Its material sits in the same directory: `playbooks/<name>.md`, `references/<name>.md`, and `scripts/<file>`. Each principle or routed skill is at `skill://<name>`.
 
 pstack is written for Cursor. On omp, the routes below replace every Cursor tool, path, and model name in the mode, its playbooks, and its routed skills. Translate as you read, and open each skill through its exact `skill://` URI, not a plugin cache path.

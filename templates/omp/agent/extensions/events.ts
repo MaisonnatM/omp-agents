@@ -62,6 +62,10 @@ function listText(sessionId: string): string {
 }
 
 export default function events(pi: ExtensionAPI) {
+	// Reminders belong to the user's session, so a subagent's requests leave out this tool's schema.
+	pi.on("session_start", async (_event, ctx) => {
+		if (ctx.agent.kind === "sub") await pi.setActiveTools(pi.getActiveTools().filter(name => name !== "user_event"));
+	});
 	const z = pi.zod;
 	const params = z.object({
 		action: z.enum(["list", "add", "remove"]).describe("list the upcoming events, add a reminder, or remove one this session added"),

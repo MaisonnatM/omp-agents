@@ -91,6 +91,10 @@ function workspaceNamed(value: string, cwd: string): { workspace: string | null 
 }
 
 export default function todos(pi: ExtensionAPI) {
+	// The user's todos belong to the user's session, so a subagent's requests leave out this tool's schema.
+	pi.on("session_start", async (_event, ctx) => {
+		if (ctx.agent.kind === "sub") await pi.setActiveTools(pi.getActiveTools().filter(name => name !== "user_todo"));
+	});
 	const z = pi.zod;
 	const params = z.object({
 		action: z
