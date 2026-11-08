@@ -3,7 +3,8 @@
  * so a cheaper model for `poteto-agent` and `task` workers is chosen on evidence.
  *
  * - `candidates` lists recent worker subagent sessions as task entries: the prompt they got, the repository,
- *   and the main commit at that time as the base. Save them to a file and keep the ones worth replaying.
+ *   and the main commit at that time as the base, leaving out tasks `--out` already holds, so a weekly run
+ *   gets only new ones. Save them to a file and keep the ones worth replaying.
  * - `run` replays each task on each model in a fresh clone with no remote, so a replay cannot push or land,
  *   prices the run from its session files, saves its diff, and runs the repository's `.omp/land.json` setup and checks.
  * - `judge` shows a judge model the task and two diffs in random order, per task and model pair, and keeps its verdict.
@@ -107,6 +108,8 @@ function candidates(): void {
 		const header = entries.find(e => e.type === "session");
 		const init = entries.find(e => e.type === "session_init");
 		if (!header || !init || !agents.has(String(init.agent)) || typeof init.task !== "string") continue;
+		const id = String(header.id).slice(-8);
+		if (existsSync(join(out, id))) continue;
 		const prompt = init.task;
 		if (/\b(local|agent):\/\//.test(prompt)) {
 			unreadable += 1;
@@ -140,7 +143,7 @@ function candidates(): void {
 		const checkout = new RegExp(`${escape(dirname(repo))}/${escape(basename(repo))}(?:-wt/[\\w.-]*\\w|[\\w.-]*\\w)?`, "g");
 		const paths = [...new Set(prompt.match(checkout) ?? [])].sort((a, b) => b.length - a.length);
 		tasks.push({
-			id: String(header.id).slice(-8),
+			id,
 			agent: String(init.agent),
 			repo,
 			base,
