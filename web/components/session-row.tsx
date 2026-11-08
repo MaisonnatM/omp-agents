@@ -12,11 +12,12 @@ import type { PaletteAction } from "../command-palette";
 import { hostLabel, modeOf, pastLabel, PRIVATE_NOTE, SOURCE_LABELS, SPLIT_CLICK, workspaceName } from "../labels";
 import type { OpenMode } from "../routing";
 import { sessionActions, type SessionEntry, type SessionRun } from "../session-actions";
+import { awaitsSubagents } from "../attention";
 import { isPrivateHost, workspaceCwd, workspaceOf } from "../sessions";
 import { type InlineConfirm, useInlineConfirm } from "../use-inline-confirm";
 import { Age } from "./age";
 import { PersonalContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
-import { StatusDot, statusLabel } from "./status-dot";
+import { type RowStatus, StatusDot, statusLabel } from "./status-dot";
 
 /** The muted facts after a session's name: the parts that apply. */
 function sessionFacts(parts: (string | false)[]): { text: string } | null {
@@ -209,11 +210,11 @@ export const PastRow = memo(function PastRow({ session, pinned, open, showWorksp
 	);
 });
 
-function HostStatus({ host }: { host: RosterHost }) {
+function HostStatus({ host, status }: { host: RosterHost; status: RowStatus }) {
 	const ending = useDashboardStatus().ending.has(host.instanceId);
 	return ending
 		? <span role="img" aria-label="Ending session" aria-busy className="flex h-4 w-1.5 shrink-0 items-center justify-center"><Loader className="size-3 shrink-0 animate-spin" /></span>
-		: <StatusDot status={host.status} />;
+		: <StatusDot status={status} />;
 }
 
 /** A running session's row, with its status dot, and End session where the server controls it. */
@@ -221,6 +222,8 @@ export const HostRow = memo(function HostRow({ session: host, pinned, open, show
 	const { open: onOpen } = useDashboardActions();
 	const view: View = { kind: "live", instanceId: host.instanceId, agentId: null };
 	const label = hostLabel(host);
+	// A session waiting on its subagents needs nothing from you, so its row drops the idle dot that would say its work is done.
+	const status = awaitsSubagents(host) ? "awaiting-subagents" : host.status;
 	const isPrivate = isPrivateHost(host);
 	const workspace = showWorkspace && (host.sessionName !== null || workspaceCwd(host) !== host.cwd) ? <WorkspaceBadge cwdDisplay={workspaceOf(host).cwdDisplay} /> : null;
 	return (
@@ -228,7 +231,7 @@ export const HostRow = memo(function HostRow({ session: host, pinned, open, show
 			<SessionButton
 				view={view}
 				label={label}
-				title={`${statusLabel(host.status)}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}${isPrivate ? `\n${PRIVATE_NOTE}` : ""}`}
+				title={`${statusLabel(status)}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}${isPrivate ? `\n${PRIVATE_NOTE}` : ""}`}
 				badge={
 					isPrivate ? (
 						<span className="flex items-center gap-1.5">
@@ -241,7 +244,7 @@ export const HostRow = memo(function HostRow({ session: host, pinned, open, show
 				}
 				facts={sessionFacts([host.source === "terminal" && !host.relayConnected && "relay offline"])}
 				when={host.startedAt}
-				dot={<HostStatus host={host} />}
+				dot={<HostStatus host={host} status={status} />}
 				open={open}
 				onOpen={onOpen}
 			/>

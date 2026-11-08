@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { blobId, INSTALLED_RECORD, type InstalledRecord, overlayFiles, planKitFiles, planMcpServers, planSettings, readInstalledRecord, settingsOf, writeMcpServers } from "./install";
@@ -132,6 +132,35 @@ describe("planKitFiles", () => {
 		record(agentDir, { maintainer: true, files: { "AGENTS.md": blobId("maintainer") } });
 		expect(planKitFiles(kit, agentDir)).toMatchObject({ maintainer: true, files: [{ rel: "AGENTS.md", action: "same" }] });
 	});
+
+	test("removes a file the kit's history held and no longer ships, keeps one you edited even with --force, and leaves one maintainer/ still ships", () => {
+		const repo = scratch();
+		const kit = join(repo, "templates", "omp");
+		git(repo, "init", "--quiet");
+		put(kit, { "agent/a.md": "v1", "agent/old.md": "v1", "agent/edited.md": "v1", "maintainer/m.md": "v1" });
+		git(repo, "add", ".");
+		git(repo, "commit", "--quiet", "-m", "v1");
+		git(repo, "rm", "--quiet", "templates/omp/agent/old.md", "templates/omp/agent/edited.md");
+		git(repo, "commit", "--quiet", "-m", "v2");
+		const agentDir = scratch();
+		put(agentDir, { "a.md": "v1", "old.md": "v1", "edited.md": "v1 edited", "m.md": "v1", "mine.md": "mine" });
+		const obsolete = (force: boolean) => planKitFiles(kit, agentDir, { force }).obsolete.map(file => [file.rel, file.action]);
+		expect(obsolete(false)).toEqual([
+			["edited.md", "keep"],
+			["old.md", "remove"],
+		]);
+		expect(obsolete(true)).toEqual(obsolete(false));
+	});
+
+	test("never plans a path outside the agent directory, one through a file, or one a shipped file matches but for case", () => {
+		const kit = scratch();
+		const parent = scratch();
+		const agentDir = join(parent, "agent");
+		put(kit, { "agent/foo.md": "v1" });
+		put(parent, { "outside.md": "x", "agent/foo.md": "v1", "agent/x": "a file" });
+		record(agentDir, { maintainer: false, files: { "Foo.md": blobId("v1"), "../outside.md": blobId("x"), "x/y.md": blobId("y") } });
+		expect(planKitFiles(kit, agentDir).obsolete).toEqual([]);
+	});
 });
 
 describe("omp-template --files", () => {
@@ -161,6 +190,24 @@ describe("omp-template --files", () => {
 		const after = readInstalledRecord(agentDir);
 		expect(after?.files["extensions/ship.ts"]).toBe(blobId(kitShip));
 		expect(after?.files["extensions/land.ts"]).toBe(blobId("installed before"));
+	});
+
+	test("removes a recorded file the kit no longer ships, the directory it leaves empty, and its record entry, and stops at a directory of yours or a symlink", () => {
+		const agentDir = scratch();
+		const linked = scratch();
+		put(agentDir, { "extensions/gone/old.ts": "installed before", "extensions/kept/old.ts": "installed before", "extensions/kept/mine.ts": "mine" });
+		put(linked, { "old.ts": "installed before" });
+		symlinkSync(linked, join(agentDir, "extensions/linked"));
+		const old = blobId("installed before");
+		record(agentDir, { maintainer: false, files: { "extensions/gone/old.ts": old, "extensions/kept/old.ts": old, "extensions/linked/old.ts": old } });
+		const proc = files(agentDir);
+		expect(proc.exitCode).toBe(0);
+		expect(proc.stdout.toString()).toContain("remove     file extensions/gone/old.ts, which the kit no longer ships");
+		expect(existsSync(join(agentDir, "extensions/gone"))).toBe(false);
+		expect(readdirSync(join(agentDir, "extensions/kept"))).toEqual(["mine.ts"]);
+		expect(lstatSync(join(agentDir, "extensions/linked")).isSymbolicLink()).toBe(true);
+		expect(readdirSync(linked)).toEqual([]);
+		expect(Object.keys(readInstalledRecord(agentDir)?.files ?? {}).filter(rel => rel.endsWith("old.ts"))).toEqual([]);
 	});
 });
 

@@ -105,7 +105,7 @@ Alt is Option on macOS.
   You stay on the page you were on.
   The title can end with a due day or a `#category`, as in [Todo list](todo-list.md).
   With Linear connected, it also offers **Create ticket**, which opens the new-ticket dialog with what you typed as the title; see [Linear tickets](linear-tickets.md).
-  Cmd+Alt+↑ and Cmd+Alt+↓ walk the sidebar's list, pinned sessions, then idle ones, then running ones, then interrupted ones, then past ones, in the focused pane, skipping the rows that the sidebar's search hides.
+  Cmd+Alt+↑ and Cmd+Alt+↓ walk the sidebar's list, pinned sessions, then idle ones, then running ones, then the ones waiting on subagents, then Bots, then interrupted ones, then past ones, in the focused pane, skipping the rows that the sidebar's search hides.
   ↓ and ↑ do the same while the panes show and no text field has focus, instead of scrolling the conversation; a page, the changed files, or a focused sidebar row keeps them.
   From a subagent they step from its session's row.
 - Cmd+N opens the new-session draft, as **New session** at the top of the session list does; on the tickets page it opens the new-issue dialog instead.

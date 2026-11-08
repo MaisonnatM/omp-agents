@@ -8,6 +8,10 @@ import { CONFIG_FILE, describe, land } from "./land/lander";
 import { located } from "./shell/commands";
 
 export default function landTool(pi: ExtensionAPI) {
+	// A subagent cannot land, so its requests leave out this tool's schema.
+	pi.on("session_start", async (_event, ctx) => {
+		if (ctx.agent.kind === "sub") await pi.setActiveTools(pi.getActiveTools().filter(name => name !== "land"));
+	});
 	const z = pi.zod;
 	const params = z.object({
 		divergence: z.string().describe("How the result differs from what was asked: new agreements, another approach, changed scope. Write None when it matches."),

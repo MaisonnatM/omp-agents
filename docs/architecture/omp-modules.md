@@ -118,6 +118,7 @@ The main ones:
   Upsert matches an API key by its value, so a different key is removed after the new one is stored.
   Replacing the provider's whole credential set is not used: a broker snapshot does not hold the real OAuth refresh token.
   `oauth.login` stores a string result under the method id, not under `storeCredentialsAs`, so this entry does not register a second OAuth provider.
+  The account order uses `matchesAuthAccountSelector` from `pi-ai/src/auth/policy.ts` (`accountPolicy`), so a policy matches the same sign-in as in omp.
 - Plan billing: `AuthStorage.usage.reports` in `pi-ai/src/auth-storage.ts`, opened through `discoverAuthStorage` and called by `src/omp/usage.ts`.
   Its options are `{ provider?: string, signal?: AbortSignal }`, and its result is `Promise<UsageReport[] | null>`.
   The narrow contract lives in `src/omp/module-types/models.ts`; every native value still comes through `modules.ts`.

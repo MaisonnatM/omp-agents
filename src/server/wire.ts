@@ -53,7 +53,7 @@ import { NOTICE_OPS } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
 import { isPortablePreference, parsePagePreferences, type PreferenceChange } from "../shared/preferences";
 import { parseScheduledSpec, type ScheduledChange } from "../shared/scheduled";
-import { MAX_LOGIN_ANSWER } from "../shared/providers";
+import { type AccountOrderEdit, MAX_LOGIN_ANSWER } from "../shared/providers";
 import type { MergeQueueChange } from "../shared/merge-queue";
 import { canSubmitReview, FINDING_STATES, REVIEW_VERDICTS, type ReviewDraftEdit, type ReviewFinding, type ReviewSubmit } from "../shared/review-drafts";
 import { MERGE_METHODS, type SourceControlChange } from "../shared/source-control";
@@ -677,6 +677,10 @@ export const parseLoginAnswer = (body: unknown): Parsed<{ prompt: number; value:
 /** The body of `PUT /api/providers/sign-out`: `{ provider, credentialId }`, one stored credential of that provider. */
 export const parseProviderSignOut = (body: unknown): Parsed<{ provider: string; credentialId: number }> =>
 	isObject(body) && isNonEmpty(body.provider) && isSafeInteger(body.credentialId) ? { ok: { provider: body.provider, credentialId: body.credentialId } } : null;
+
+/** The body of `PUT /api/providers/account-order`: `{ provider, emails }`, that provider's accounts by email, the one omp tries first first. */
+export const parseAccountOrder = (body: unknown): Parsed<AccountOrderEdit> =>
+	isObject(body) && isNonEmpty(body.provider) && isTexts(body.emails) && body.emails.every(isNonEmpty) ? { ok: { provider: body.provider, emails: body.emails } } : null;
 
 /** The body of `PUT /api/google/calendars`: `{ account, id, shown }`, a Google calendar's account and id and whether the Calendar page shows it. */
 export const parseCalendarShown = (body: unknown): Parsed<CalendarShownInput> =>

@@ -4,6 +4,7 @@ The server's design, its protocols, and its HTTP API, one file per subsystem in 
 Read this list, then only the file for the subsystem you need.
 For installation, see the [README](../README.md); for the interface, see [Using omp-agents](usage.md); for where each file lives and what it does, see [Code layout](code-layout.md).
 
+- [Harness map](architecture/harness-map.md)
 - [omp modules](architecture/omp-modules.md)
 - [Extensions library](architecture/extensions.md)
 - [Get started](architecture/get-started.md)
@@ -24,6 +25,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Plan quota](architecture/plan-quota.md)
 - [Analytics](architecture/analytics.md)
   - [Context sources](architecture/analytics.md#context-sources)
+- [Token cost](architecture/token-cost.md)
 - [Activity](architecture/activity.md)
 - [Routines](architecture/routines.md)
   - [Routines from before Bots](architecture/routines.md#routines-from-before-bots)

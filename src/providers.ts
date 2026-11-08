@@ -1,8 +1,8 @@
-/** Settings › Providers on the server: the providers omp signs in to, the one sign-in under way, and sign-outs. */
-import { listProviders, loginProvider, logoutProvider } from "./omp/providers";
+/** Settings › Providers on the server: the providers omp signs in to, the one sign-in under way, sign-outs, and the account order. */
+import { listProviders, loginProvider, logoutProvider, orderProviderAccounts } from "./omp/providers";
 import { createProviderLogins } from "./provider-logins";
 import { Rejected } from "./settings";
-import type { ProviderLogin, ProvidersAnswer } from "./shared/providers";
+import type { AccountOrderEdit, ProviderLogin, ProvidersAnswer } from "./shared/providers";
 
 const logins = createProviderLogins(loginProvider);
 
@@ -33,5 +33,11 @@ export async function cancelProviderLogin(): Promise<null> {
 /** Removes `provider`'s stored credential `credentialId`, if it is still there, and answers the providers after. */
 export async function signOutProvider({ provider, credentialId }: { provider: string; credentialId: number }): Promise<ProvidersAnswer> {
 	await logoutProvider(provider, credentialId);
+	return loadProviders();
+}
+
+/** Saves the order omp tries `provider`'s accounts in, `emails` the first tried first, and answers the providers after. */
+export async function setAccountOrder({ provider, emails }: AccountOrderEdit): Promise<ProvidersAnswer> {
+	if (!(await orderProviderAccounts(provider, emails))) throw new Rejected(409, "The signed-in accounts changed. Refresh Providers and try again.");
 	return loadProviders();
 }

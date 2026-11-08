@@ -1,9 +1,10 @@
 import { fromPartial } from "@total-typescript/shoehorn";
 import { describe, expect, test } from "bun:test";
-import type { PastSession, RosterHost, UnreadTurn } from "../src/shared/sessions";
+import type { AgentRow, AgentStatus, HostStatus, PastSession, RosterHost, UnreadTurn } from "../src/shared/sessions";
 import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, searchSessions, sidebarSessions, waitingCount, workspaceSession, workspaceSwitch } from "./sessions";
 
-const host = (sessionId: string, cwd: string) => ({ instanceId: `i-${sessionId}`, sessionId, cwd }) as RosterHost;
+const host = (sessionId: string, cwd: string) => fromPartial<RosterHost>({ instanceId: `i-${sessionId}`, sessionId, cwd, agents: [], turnWaits: false });
+const subagents = (...statuses: AgentStatus[]): AgentRow[] => statuses.map(status => fromPartial<AgentRow>({ status }));
 const past = (sessionId: string, cwd: string, interrupted: boolean) => ({ sessionId, cwd, interrupted }) as PastSession;
 const ids = (rows: { sessionId: string }[]) => rows.map(row => row.sessionId);
 const none = new Set<string>();
@@ -171,24 +172,50 @@ describe("sidebarSessions", () => {
 		expect(ids(lists.idle)).toEqual(["h1"]);
 	});
 
-	test("the waiting count takes unread turns and open questions in the selected workspace, pinned ones included, and not a turn already read", () => {
+	test("a session whose subagents still run while its main agent's turn ended or only waits on them lists as waiting on subagents", () => {
+		const live = (sessionId: string, status: HostStatus, turnWaits: boolean, agents: AgentRow[]) => fromPartial<RosterHost>({ ...host(sessionId, "~/a"), status, turnWaits, agents });
+		const lists = sidebarSessions(
+			[
+				live("idle-delegating", "idle", false, subagents("running")),
+				live("waits-on-subagent", "working", true, subagents("idle", "running")),
+				live("waits-on-bash-job", "working", true, []),
+				live("works-beside-subagent", "working", false, subagents("running")),
+				live("done", "idle", false, subagents("idle", "aborted")),
+				live("asks", "needs-input", true, subagents("running")),
+				live("pinned", "idle", false, subagents("running")),
+			],
+			[],
+			[],
+			null,
+			new Set(["pinned"]),
+		);
+		expect(ids(lists.awaitingSubagents)).toEqual(["idle-delegating", "waits-on-subagent"]);
+		expect(ids(lists.running)).toEqual(["waits-on-bash-job", "works-beside-subagent", "asks"]);
+		expect(ids(lists.idle)).toEqual(["done"]);
+		expect(ids(lists.pinned.hosts)).toEqual(["pinned"]);
+	});
+
+	test("the waiting count takes unread turns and open questions in the selected workspace, pinned ones included, and not a turn already read or one whose session waits on its subagents", () => {
 		const turn = fromPartial<UnreadTurn>({ at: 1, reply: "Done." });
 		const rows = { h1: ["idle", turn], h2: ["needs-input", null], h3: ["working", null], h4: ["idle", turn], h5: ["unknown", null], h7: ["idle", null] } as const;
 		const live = [
 			...Object.entries(rows).map(([id, [status, unread]]) => ({ ...host(id, "~/a"), status, unread, requests: [] })),
 			{ ...host("h6", "~/b"), status: "idle" as const, unread: turn, requests: [] },
+			{ ...host("h8", "~/a"), status: "idle" as const, unread: turn, requests: [], agents: subagents("running") },
 		];
 		expect(waitingCount(sidebarSessions(live, [], [], "~/a", new Set(["h4"])))).toBe(3);
 	});
 
-	test("the previous and next session keys walk pinned rows first, then idle, running, the selected workspace's Bots, interrupted, and past", () => {
-		const live = [{ ...host("h0", "~/a"), status: "idle" as const }, ...hosts];
+	test("the previous and next session keys walk pinned rows first, then idle, running, waiting on subagents, the selected workspace's Bots, interrupted, and past", () => {
+		const delegating = fromPartial<RosterHost>({ ...host("h9", "~/a"), status: "idle", agents: subagents("running") });
+		const live = [delegating, { ...host("h0", "~/a"), status: "idle" as const }, ...hosts];
 		const lists = sidebarSessions(live, sessions, [host("b1", "~/a"), host("b2", "~/b")], "~/a", new Set(["h2", "p3"]));
 		expect(listedViews(lists)).toEqual([
 			{ kind: "live", instanceId: "i-h2", agentId: null },
 			{ kind: "past", sessionId: "p3" },
 			{ kind: "live", instanceId: "i-h0", agentId: null },
 			{ kind: "live", instanceId: "i-h1", agentId: null },
+			{ kind: "live", instanceId: "i-h9", agentId: null },
 			{ kind: "live", instanceId: "i-b1", agentId: null },
 			{ kind: "past", sessionId: "p2" },
 			{ kind: "past", sessionId: "p1" },
@@ -209,8 +236,8 @@ describe("sidebarSessions", () => {
 
 describe("a session in a linked worktree", () => {
 	const app = { cwd: "/code/app", cwdDisplay: "~/code/app" };
-	const inWorktree = { instanceId: "i-w", sessionId: "w", cwd: "/code/app-fix", cwdDisplay: "~/code/app-fix", workspace: app, startedAt: 2 } as RosterHost;
-	const inMain = { instanceId: "i-m", sessionId: "m", cwd: "/code/app", cwdDisplay: "~/code/app", workspace: null, startedAt: 1 } as RosterHost;
+	const inWorktree = fromPartial<RosterHost>({ instanceId: "i-w", sessionId: "w", cwd: "/code/app-fix", cwdDisplay: "~/code/app-fix", workspace: app, startedAt: 2, agents: [] });
+	const inMain = fromPartial<RosterHost>({ instanceId: "i-m", sessionId: "m", cwd: "/code/app", cwdDisplay: "~/code/app", workspace: null, startedAt: 1, agents: [] });
 
 	test("counts in its repository's workspace, which lists it, while its directory is no workspace", () => {
 		expect(listWorkspaces([inWorktree], [], [])).toEqual([app]);

@@ -3,12 +3,13 @@
  * credentials are filed under, the sign-in itself, and removing one stored credential. The credential store opens and
  * closes on each call, so a sign-in from a terminal shows at the next read.
  */
+import { rankAccounts, readAccountPolicies, writeAccountOrder } from "./account-order";
 import { addApiCreditsProvider, removeApiCreditsProvider, replaceAnthropicApiKey, settleApiCredits } from "./api-credits";
 import { dropModelList } from "./models";
-import type { AuthStorage, CredentialOrigin, OAuthLoginController } from "./module-types/models";
+import type { AccountSelector, AuthStorage, CredentialOrigin, OAuthLoginController } from "./module-types/models";
 import { auth, browserSession, logout, modelRegistry, oauth, oauthTerminal } from "./modules";
 import { API_CREDITS_PROVIDER, PROVIDER_NAMES } from "../shared/models";
-import { ANTHROPIC_API_KEY_METHOD, MAX_LOGIN_ANSWER, type ModelProvider } from "../shared/providers";
+import { ANTHROPIC_API_KEY_METHOD, MAX_LOGIN_ANSWER, type ModelProvider, orderableAccounts, type ProviderAccount } from "../shared/providers";
 
 /** The callbacks a sign-in reports through; omp adds the isolated browser that a cookie sign-in opens. */
 export type LoginHooks = Omit<OAuthLoginController, "onBrowserSession">;
@@ -25,9 +26,19 @@ async function anthropicModelIds(storage: AuthStorage): Promise<string[]> {
 	return registry.getAll().flatMap(model => (model.provider === "anthropic" ? [model.id] : []));
 }
 
+/** `provider`'s stored credentials as `/logout` lists them, in the order omp tries them under `policies`. */
+function accountsOf(storage: AuthStorage, provider: string, policies: readonly unknown[]): ProviderAccount[] {
+	const rows = storage.credentials.list(provider);
+	const identities = new Map(rows.map(({ id, credential }) => [id, credential.type === "oauth" ? credential : null]));
+	const accounts = logout
+		.toLogoutAccounts(provider, rows)
+		.map(({ credentialId, label, detail, type }) => ({ credentialId, label, detail, kind: type, email: identities.get(credentialId)?.email || null }));
+	return rankAccounts(accounts, provider, policies, ({ credentialId }) => identities.get(credentialId) ?? null);
+}
+
 /** Settings' API credits row: the Anthropic Console key that `anthropic-api` models bill. */
-function apiCreditsRow(storage: AuthStorage): ModelProvider {
-	const accounts = logout.toLogoutAccounts(API_CREDITS_PROVIDER, storage.credentials.list(API_CREDITS_PROVIDER)).map(({ credentialId, label, detail, type }) => ({ credentialId, label, detail, kind: type }));
+function apiCreditsRow(storage: AuthStorage, policies: readonly unknown[]): ModelProvider {
+	const accounts = accountsOf(storage, API_CREDITS_PROVIDER, policies);
 	return { id: API_CREDITS_PROVIDER, name: `Anthropic ${PROVIDER_NAMES[API_CREDITS_PROVIDER]}`, methods: [{ id: ANTHROPIC_API_KEY_METHOD, name: "API key" }], accounts, envKey: null };
 }
 
@@ -49,6 +60,7 @@ export async function adoptLegacyApiCredits(): Promise<void> {
 
 /** Every available `/login` entry, grouped by the provider its credentials are filed under, in omp's order. */
 export async function listProviders(): Promise<ModelProvider[]> {
+	const policies = await readAccountPolicies();
 	const storage = await auth.discoverAuthStorage();
 	try {
 		const providers = new Map<string, ModelProvider>();
@@ -61,11 +73,10 @@ export async function listProviders(): Promise<ModelProvider[]> {
 				if (id === key) known.name = name;
 				continue;
 			}
-			const accounts = logout.toLogoutAccounts(key, storage.credentials.list(key)).map(({ credentialId, label, detail, type }) => ({ credentialId, label, detail, kind: type }));
-			providers.set(key, { id: key, name, methods: [{ id, name }], accounts, envKey: envKeyOf(storage.keys.source(key)) });
+			providers.set(key, { id: key, name, methods: [{ id, name }], accounts: accountsOf(storage, key, policies), envKey: envKeyOf(storage.keys.source(key)) });
 		}
 		const rows = [...providers.values()];
-		rows.splice(rows.findIndex(({ id }) => id === "anthropic") + 1, 0, apiCreditsRow(storage));
+		rows.splice(rows.findIndex(({ id }) => id === "anthropic") + 1, 0, apiCreditsRow(storage, policies));
 		return rows;
 	} finally {
 		storage.close();
@@ -131,4 +142,23 @@ export async function logoutProvider(provider: string, credentialId: number): Pr
 	} finally {
 		storage.close();
 	}
+}
+
+/**
+ * Saves `emails`, `provider`'s orderable sign-ins the one omp tries first first, as their `auth.accountPolicies`
+ * priorities. False, writing nothing, when they are no longer exactly the sign-ins Settings can order.
+ */
+export async function orderProviderAccounts(provider: string, emails: readonly string[]): Promise<boolean> {
+	const storage = await auth.discoverAuthStorage();
+	let identities: AccountSelector[];
+	try {
+		identities = storage.credentials.list(provider).flatMap(({ credential }) => (credential.type === "oauth" ? [credential] : []));
+	} finally {
+		storage.close();
+	}
+	const byEmail = new Map(orderableAccounts(identities.map(identity => ({ ...identity, email: identity.email || null }))).map(identity => [identity.email, identity]));
+	const ordered = emails.flatMap(email => byEmail.get(email) ?? []);
+	if (new Set(emails).size !== byEmail.size || ordered.length !== byEmail.size) return false;
+	await writeAccountOrder(provider, ordered);
+	return true;
 }

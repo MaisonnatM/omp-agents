@@ -3,7 +3,7 @@ import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MenuItem } from "@/components/ui/menu";
-import { ANTHROPIC_API_KEY_METHOD, type LoginPrompt, type ModelProvider, type ProviderAccount, type ProviderLogin, type ProvidersAnswer, providerConnected } from "../../../src/shared/providers";
+import { ANTHROPIC_API_KEY_METHOD, type LoginPrompt, type ModelProvider, orderableAccounts, type ProviderAccount, type ProviderLogin, type ProvidersAnswer, providerConnected } from "../../../src/shared/providers";
 import { putJson } from "../../api";
 import { readTime } from "../../labels";
 import { providersStore } from "../../reads";
@@ -12,7 +12,7 @@ import { MoreActionsMenu } from "../more-actions-menu";
 import { LoadNote } from "../sheet-details";
 import { Callout, IntegrationList, MetaDot } from "../integrations/integration-row";
 import { Confirm } from "../integrations/mcp-connection-controls";
-import { Section } from "./editor";
+import { OrderButton, Section } from "./editor";
 import { ProviderLogo } from "./provider-logos";
 
 /** How often the page asks again while a sign-in runs, so its page, code, and question show soon after the provider names them. */
@@ -133,8 +133,18 @@ function LoginCallout({ login }: { login: ProviderLogin }) {
 	);
 }
 
-/** One stored credential, and the question that signs omp out of it. */
-function AccountLine({ provider, account }: { provider: ModelProvider; account: ProviderAccount }) {
+/** Where an account sits among the ones Settings orders, and the move that saves a new place. */
+interface AccountPlace {
+	index: number;
+	count: number;
+	move: (index: number, by: -1 | 1) => void;
+}
+
+/**
+ * One stored credential, and the question that signs omp out of it. While the provider's accounts are ordered, `numbered`
+ * keeps the place column, and `place` numbers this one and moves it.
+ */
+function AccountLine({ provider, account, numbered, place }: { provider: ModelProvider; account: ProviderAccount; numbered: boolean; place: AccountPlace | null }) {
 	const [confirming, setConfirming] = useState(false);
 	if (confirming) {
 		// The sign-out lives in the question, so Cancel drops a failure with it.
@@ -154,10 +164,17 @@ function AccountLine({ provider, account }: { provider: ModelProvider; account: 
 	}
 	return (
 		<div className="flex items-center gap-3 text-[13px]">
+			{numbered && <span className="w-4 shrink-0 text-xs tabular-nums text-muted-foreground">{place && place.index + 1}</span>}
 			<div className="min-w-0 flex-1">
 				<span className="truncate">{account.label}</span>
 				<span className="ms-2 text-xs text-muted-foreground">{account.kind === "oauth" ? "Sign-in" : "API key"}</span>
 			</div>
+			{place && (
+				<div className="flex shrink-0 items-center">
+					<OrderButton label={account.label} direction="up" disabled={place.index === 0} onClick={() => place.move(place.index, -1)} />
+					<OrderButton label={account.label} direction="down" disabled={place.index === place.count - 1} onClick={() => place.move(place.index, 1)} />
+				</div>
+			)}
 			<Button variant="ghost" size="compact" leadingIcon={LogOut} onClick={() => setConfirming(true)}>
 				Sign out
 			</Button>
@@ -173,6 +190,17 @@ function ProviderRow({ provider, login }: { provider: ModelProvider; login: Prov
 	}, null);
 	const starting = start.pending;
 	const startError = start.error;
+	const orderable = orderableAccounts(provider.accounts);
+	const reorder = useAction(async (emails: string[]) => {
+		const answer = await putJson<ProvidersAnswer>("/api/providers/account-order", { provider: provider.id, emails });
+		providersStore.update(() => answer);
+	}, null);
+	const moveAccount = (index: number, by: -1 | 1): void => {
+		const emails = orderable.map(({ email }) => email);
+		emails.splice(index + by, 0, ...emails.splice(index, 1));
+		reorder.run(emails);
+	};
+	const ordering = orderable.length > 1;
 	const connected = providerConnected(provider);
 	const running = login?.phase === "running";
 	const [first, ...others] = provider.methods;
@@ -231,9 +259,17 @@ function ProviderRow({ provider, login }: { provider: ModelProvider; login: Prov
 			</div>
 			{hasDetails && (
 				<div className="mt-2.5 space-y-2.5 ps-11">
-					{provider.accounts.map(account => (
-						<AccountLine key={account.credentialId} provider={provider} account={account} />
-					))}
+					{provider.accounts.map(account => {
+						const index = orderable.findIndex(({ credentialId }) => credentialId === account.credentialId);
+						const place = ordering && index >= 0 ? { index, count: orderable.length, move: moveAccount } : null;
+						return <AccountLine key={account.credentialId} provider={provider} account={account} numbered={ordering} place={place} />;
+					})}
+					{ordering && <p className="text-xs text-muted-foreground">omp tries these accounts from the top, and moves to the next when one nears its usage limit or fails.</p>}
+					{reorder.error && (
+						<Callout tone="danger" icon={CircleAlert} role="alert">
+							Cannot save the account order: {reorder.error}
+						</Callout>
+					)}
 					{provider.envKey && (
 						<p className="text-xs text-muted-foreground">
 							omp reads its key from <code className="font-mono text-foreground">{provider.envKey}</code>; unset it there to sign out. A sign-in here takes precedence over it.

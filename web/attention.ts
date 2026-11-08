@@ -4,10 +4,14 @@ import { hashForSession, type RosterHost, type UnreadTurn, type UserRequest, typ
 import type { DashboardState } from "./dashboard-state";
 import { hostLabel } from "./labels";
 
+/** Whether `host`'s main agent only waits on a subagent that still runs: its turn ended, or sits only in `wait` or `task` calls. */
+export const awaitsSubagents = (host: RosterHost): boolean =>
+	(host.status === "idle" || (host.status === "working" && host.turnWaits)) && host.agents.some(agent => agent.status === "running");
+
 /**
  * What a session waits on you for now: its oldest open question, else a wait with no question relayed (a terminal
  * session's own dialog, or the placeholder a terminal session shows until its host replays the question), else its
- * unread turn; `null` while it does not need you.
+ * unread turn once no subagent it waits on still runs; `null` while it does not need you.
  */
 type Wait = { kind: "ask"; request: UserRequest } | { kind: "input" } | { kind: "turn"; turn: UnreadTurn };
 
@@ -15,11 +19,11 @@ export function waitOf(host: RosterHost): Wait | null {
 	const [request] = host.requests;
 	if (request) return { kind: "ask", request };
 	if (host.status === "needs-input") return { kind: "input" };
-	if (host.unread) return { kind: "turn", turn: host.unread };
+	if (host.unread && !awaitsSubagents(host)) return { kind: "turn", turn: host.unread };
 	return null;
 }
 
-/** Whether live session `host` needs you: it asks you something, or it ended a turn you have not looked at since. */
+/** Whether live session `host` needs you: it asks you something, or it ended a turn you have not looked at since and waits on no subagent. */
 export const needsYou = (host: RosterHost): boolean => waitOf(host) !== null;
 
 /** A session's {@link Wait} as an alert tells it. A question and a turn carry a key that names them across roster pushes; the bare wait has none. */

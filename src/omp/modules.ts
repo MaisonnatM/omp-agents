@@ -66,6 +66,7 @@ import type {
 	SharpshooterTypesModule,
 } from "./module-types/memory";
 import type {
+	AccountPolicyModule,
 	AuthModule,
 	BrowserSessionModule,
 	CatalogModule,
@@ -293,6 +294,7 @@ export const advisorConfig = await load<AdvisorConfigModule>(join(srcDir, "advis
 export const modelCompactionSettings = await load<ModelCompactionSettingsModule>(join(srcDir, "session", "model-compaction-threshold.ts"), { resolveModelCompactionSettings: "function" });
 export const compaction = await load<CompactionModule>(join(dirname(packageDir), "pi-agent-core", "src", "compaction", "compaction.ts"), { resolveThresholdTokens: "function" });
 export const auth = await load<AuthModule>(join(srcDir, "session", "auth-broker-config.ts"), { discoverAuthStorage: "function" });
+export const accountPolicy = await load<AccountPolicyModule>(join(dirname(packageDir), "pi-ai", "src", "auth", "policy.ts"), { matchesAuthAccountSelector: "function" });
 export const oauth = await load<OAuthModule>(join(dirname(packageDir), "pi-ai", "src", "registry", "oauth", "index.ts"), {
 	getOAuthProviders: "function",
 });

@@ -2,7 +2,7 @@
 import { newestPastFirst, type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
 import { inTempDir, type Workspace } from "../src/shared/workspaces";
 import { everyWord } from "../src/shared/every-word";
-import { needsYou } from "./attention";
+import { awaitsSubagents, needsYou } from "./attention";
 
 /** A working directory outside the temp directories, and not one Settings → Workspaces hid. */
 export function discoverableCwd(cwd: string, hidden: ReadonlySet<string>): boolean {
@@ -98,25 +98,40 @@ export interface SidebarSessions {
 	running: RosterHost[];
 	/** Live sessions that finished their turn: the blue dot. */
 	idle: RosterHost[];
+	/** Live sessions whose subagents still run while the main agent's turn has ended or only waits on them. */
+	awaitingSubagents: RosterHost[];
 	/** Live Bot conversations, titled with their Bot's name. */
 	bots: RosterHost[];
 	interrupted: PastSession[];
 	ended: PastSession[];
 }
 
+/** The sessions tab lists an unpinned live session can land in, in the order the sidebar shows them. */
+const LIVE_LISTS = ["idle", "running", "awaitingSubagents"] as const satisfies readonly (keyof SidebarSessions)[];
+type LiveList = (typeof LIVE_LISTS)[number];
+
+/** Every live session `lists` holds outside pinned and Bots, in the sidebar's order. */
+export const liveHosts = (lists: Pick<SidebarSessions, LiveList>): RosterHost[] => LIVE_LISTS.flatMap(list => lists[list]);
+
+/** The list unpinned live session `host` lands in: `idle` and `running` hold the sessions that wait on no subagent, by its status. */
+function liveList(host: RosterHost): LiveList {
+	if (awaitsSubagents(host)) return "awaitingSubagents";
+	return host.status === "idle" ? "idle" : "running";
+}
+
 export function sidebarSessions(hosts: RosterHost[], past: PastSession[], bots: RosterHost[], workspace: string | null, pinned: ReadonlySet<string>): SidebarSessions {
 	const listed = (row: RosterHost | PastSession): boolean => workspace === null || workspaceCwd(row) === workspace;
 	const isPinned = (row: { sessionId: string }): boolean => pinned.has(row.sessionId);
 	const shownHosts = hosts.filter(listed);
-	const unpinnedHosts = shownHosts.filter(host => !isPinned(host));
 	const shownPast = past.filter(listed);
+	const live: Record<LiveList, RosterHost[]> = { running: [], idle: [], awaitingSubagents: [] };
+	for (const host of shownHosts) if (!isPinned(host)) live[liveList(host)].push(host);
 	return {
 		pinned: {
 			hosts: shownHosts.filter(isPinned),
 			past: shownPast.filter(isPinned).toSorted((a, b) => Number(b.interrupted) - Number(a.interrupted)),
 		},
-		running: unpinnedHosts.filter(host => host.status !== "idle"),
-		idle: unpinnedHosts.filter(host => host.status === "idle"),
+		...live,
 		bots: bots.filter(listed),
 		interrupted: shownPast.filter(session => session.interrupted && !isPinned(session)),
 		ended: shownPast.filter(session => !session.interrupted && !isPinned(session)),
@@ -134,6 +149,7 @@ export function searchSessions(lists: SidebarSessions, query: string): SidebarSe
 		pinned: { hosts: hosts(lists.pinned.hosts), past: past(lists.pinned.past) },
 		running: hosts(lists.running),
 		idle: hosts(lists.idle),
+		awaitingSubagents: hosts(lists.awaitingSubagents),
 		bots: hosts(lists.bots),
 		interrupted: past(lists.interrupted),
 		ended: past(lists.ended),
@@ -141,19 +157,21 @@ export function searchSessions(lists: SidebarSessions, query: string): SidebarSe
 }
 
 /** How many live sessions in `lists` need you: each that asks you something, or finished a turn you have not looked at since, as the Dock badge counts them. */
-export const waitingCount = ({ pinned, running, idle }: SidebarSessions): number => [...pinned.hosts, ...running, ...idle].filter(needsYou).length;
+export const waitingCount = (lists: SidebarSessions): number => [...lists.pinned.hosts, ...liveHosts(lists)].filter(needsYou).length;
 
 /** The session the Sessions tab opens when no pane shows one: of the rows `lists` holds, the live one started last, else the past one saved last. */
-export function latestSession({ pinned, running, idle, interrupted, ended }: SidebarSessions): View | null {
-	const live = [...pinned.hosts, ...running, ...idle].toSorted(newestFirst)[0];
+export function latestSession(lists: SidebarSessions): View | null {
+	const { pinned, interrupted, ended } = lists;
+	const live = [...pinned.hosts, ...liveHosts(lists)].toSorted(newestFirst)[0];
 	if (live) return { kind: "live", instanceId: live.instanceId, agentId: null };
 	const saved = [...pinned.past, ...interrupted, ...ended].toSorted(newestPastFirst)[0];
 	return saved ? { kind: "past", sessionId: saved.sessionId } : null;
 }
 
 /** Every row of the sessions tab in its order, which the previous and next session keys walk. */
-export function listedViews({ pinned, running, idle, bots, interrupted, ended }: SidebarSessions): View[] {
+export function listedViews(lists: SidebarSessions): View[] {
+	const { pinned, bots, interrupted, ended } = lists;
 	const live = (hosts: RosterHost[]): View[] => hosts.map(({ instanceId }) => ({ kind: "live", instanceId, agentId: null }));
 	const saved = (sessions: PastSession[]): View[] => sessions.map(({ sessionId }) => ({ kind: "past", sessionId }));
-	return [...live(pinned.hosts), ...saved(pinned.past), ...live([...idle, ...running, ...bots]), ...saved([...interrupted, ...ended])];
+	return [...live(pinned.hosts), ...saved(pinned.past), ...live([...liveHosts(lists), ...bots]), ...saved([...interrupted, ...ended])];
 }

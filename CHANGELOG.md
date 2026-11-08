@@ -5,6 +5,14 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-08
 
+- Installing the starter kit, or Update dashboard, now removes the kit files the kit stopped shipping, unless you edited them, so old extensions stop running in your sessions.
+- With the starter kit, helper agents that a session starts no longer carry the tools only your own session uses, such as ending the session, landing, and your todos, notes, and reminders, so each of their requests costs less.
+- Fixed: with the starter kit, helper agents in poteto mode no longer look for a skill under an old name that always failed.
+- Behind the scenes: a token cost report prices recent omp requests by agent, cache use, and tool, and the developer docs map where the money goes, with ranked proposals to spend less.
+- Behind the scenes: the developer docs gain a harness map, five diagrams of how the dashboard, omp, and the starter kit fit together, so contributors find their way faster.
+- The Sessions tab has a Waiting on subagents group for sessions whose subagents still work while the main agent waits for them.
+- Rows in it show no blue dot, so Idle lists only sessions that are done and Running only sessions that work.
+- A turn that ends while its session's subagents still work no longer counts on the Dock badge, and notifies once they stop.
 - The starter kit now includes the grill-with-docs design interview: type /skill:grill-with-docs and a plan, and the agent asks rounds of numbered questions, each with its recommended answer, writing agreed words to the project's glossary as you go.
 - Decisions settled during that interview go into the project's usual decision records, not a second folder.
 - The starter kit also includes grill-me, the same interview for plans outside a project, such as a trip or a career move: type /skill:grill-me and your plan.
@@ -13,6 +21,10 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The bell now shows a notice when Google Calendar or Gmail is signed out, under a new Integrations tab, and opening it takes you to Settings › Integrations; it goes away once you sign in again.
 - The four omp patches, paid Cursor fallback, tool documentation, Cursor tools, and the credit patch, now apply to omp 18.18.1, and the credit patch now applies on its own.
 - omp-agents is now tested with omp 18.18.1.
+- Settings › Providers now lists a provider's signed-in accounts in the order omp tries them, each with its place number.
+- Up and down arrows beside each account change which one omp uses first, for example your work Anthropic account before your personal one.
+- The new order is saved at once in omp's settings, and omp follows it without a restart.
+- Fixed: the dashboard no longer freezes when your skill and instruction files sit both under your home folder and elsewhere, such as `/tmp`.
 
 ## 2026-11-07
 
