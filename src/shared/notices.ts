@@ -1,8 +1,9 @@
 /**
  * What the bell lists: a newer omp, routed model, or omp-agents build, a pull request whose next move is yours, a Slack message that
  * waits on you, a provider that stopped serving (a used-up plan window or prepaid credits that ran out), a calendar
- * event that starts soon, and the dashboard sessions that stopped mid-turn.
+ * event that starts soon, the dashboard sessions that stopped mid-turn, and a Google account a session found signed out.
  */
+import type { AccountId, AccountsService } from "./accounts";
 import type { PullRequestSummary } from "./github";
 import type { YourMove } from "./moves";
 
@@ -115,10 +116,21 @@ export interface StoppedSubject {
 	sessions: StoppedSession[];
 }
 
+/**
+ * A Gmail or Google Calendar account a session found signed out: its server, `account` in omp's MCP config, answered a
+ * tool call with HTTP 401, and it does not work yet. `address` is the address it signed in as, `null` while unknown.
+ */
+export interface SignInSubject {
+	kind: "sign-in";
+	service: AccountsService;
+	account: AccountId;
+	address: string | null;
+}
+
 /** How long before an event starts its notice comes. */
 export const EVENT_LEAD_MS = 10 * 60_000;
 
-export type NoticeSubject = UpdateSubject | PullRequestSubject | SlackSubject | ProviderSubject | EventSubject | StoppedSubject;
+export type NoticeSubject = UpdateSubject | PullRequestSubject | SlackSubject | ProviderSubject | EventSubject | StoppedSubject | SignInSubject;
 
 export type NoticeKind = NoticeSubject["kind"];
 
@@ -135,6 +147,7 @@ export type Notice = { id: string; at: number; seen: boolean; read: boolean } & 
 	| ProviderSubject
 	| EventSubject
 	| StoppedSubject
+	| SignInSubject
 );
 
 /** `update` installs the release, rewrites the routing, or pulls omp-agents and restarts it; `seen` stops its toast; `read` takes it out of the unread count; `clear` hides it until its state changes. */

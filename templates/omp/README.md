@@ -94,6 +94,7 @@ Files, in `agent/`:
 - `extensions/google-accounts.ts`: when omp is signed in to two or more Gmail or Google Calendar accounts, one MCP server each, tells a session at every prompt each account's server, address, and tool prefix.
   When you linked addresses to the session's workspace in the dashboard's Settings › Integrations, it also tells the session to use those for the workspace's mail and calendar unless you name another account.
   A session in a linked worktree outside every linked workspace takes the links of its repository's main checkout, and no tool is blocked.
+  When a Gmail or Google Calendar server answers a tool call with HTTP 401, the session is told the account is signed out, not to retry or sign in itself, and to ask you to sign in again in the dashboard's Settings › Integrations, and the dashboard's bell shows a sign-in notice.
 - `extensions/headless-mark.ts`: adds an `omp-agents.headless` entry to a session that `omp -p` or `omp --mode json` runs, so the omp-agents dashboard leaves those one-shot runs out of its past sessions.
 - `extensions/project-memory.ts`: gives the omp sessions of one git repository a shared memory and news of each other's work.
   Before a session's first prompt it gets a brief: the repository's memory index and the last 10 landings on its default branch, each with the session that made it and that session's first prompt.

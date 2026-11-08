@@ -17,6 +17,8 @@
   While the sidebar picks a workspace, the Email page, the Calendar, and the `@` menu show the accounts linked to it and those linked to none; with **All workspaces** they show every account.
   With the starter kit's `extensions/google-accounts.ts` installed (`bun run omp-template`), an omp session whose service has two or more accounts is told at each prompt each account's address and tool prefix, and, when its workspace has linked addresses, to use those for its mail and calendar unless you name another account.
   A session in a linked worktree counts as in its repository's main checkout when its own directory is in no linked workspace; every account's tools stay available to it.
+- With the same extension, a session whose Gmail or Google Calendar tool call fails with HTTP 401 stops using that service and asks you to sign in again here, and the bell shows a sign-in notice that opens this page; see [Notifications](notifications.md).
+  The dashboard never signs in for you: **Connect** or **Reconnect** on the account's row does, and the notice goes once the account works again.
 - omp's own `/mcp reauth` or `/mcp unauth` on an added account writes it back under its URL and can merge two accounts into one; reconnect it from this page instead.
 - **Connect** signs in the way omp's `/mcp reauth` does, saves the sign-in in omp's credentials, and adds the service's MCP server, such as `https://mcp.linear.app/mcp`, `https://mcp.slack.com/mcp`, `https://calendarmcp.googleapis.com/mcp/v1`, or `https://gmailmcp.googleapis.com/mcp/v1`, to `~/.omp/agent/mcp.json` when omp has none, so new omp sessions can use its tools too.
   Linear sends the browser back to `localhost:3000`, so that port must be free while you sign in.

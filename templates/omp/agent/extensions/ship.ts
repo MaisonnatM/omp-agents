@@ -435,7 +435,7 @@ export default function ship(pi: ExtensionAPI) {
 			}
 		}
 		lastSummary = state?.prStatus ? liveSummary(state.prStatus) : "";
-		refreshFailure = state?.prStatus && state.stage !== "merged" ? "Status restored from the session; awaiting a fresh GitHub read." : undefined;
+		refreshFailure = state?.prStatus && state.prStatus.state !== "MERGED" ? "Status restored from the session; awaiting a fresh GitHub read." : undefined;
 		render(ctx);
 	}
 
@@ -461,9 +461,13 @@ export default function ship(pi: ExtensionAPI) {
 
 	async function pollPr(ctx: ExtensionContext) {
 		lastRefresh = Date.now();
-		if (!state?.pr || !state.repo || state.stage === "merged") return render(ctx);
-		const [owner, name] = state.repo.split("/");
-		const r = await gh(["api", "graphql", "-f", `query=${PR_QUERY}`, "-F", `owner=${owner}`, "-F", `name=${name}`, "-F", `n=${state.pr}`], ctx.cwd);
+		// Only a merged status is final: the stage can say merged for the PR before, while the PR named since has no status yet.
+		if (!state?.pr || !state.repo || state.prStatus?.state === "MERGED") return render(ctx);
+		const { pr, repo } = state;
+		const [owner, name] = repo.split("/");
+		const r = await gh(["api", "graphql", "-f", `query=${PR_QUERY}`, "-F", `owner=${owner}`, "-F", `name=${name}`, "-F", `n=${pr}`], ctx.cwd);
+		// The session named another PR while GitHub answered, so this answer is not the status of the PR it now follows.
+		if (state?.pr !== pr || state.repo !== repo) return render(ctx);
 		if (r.code !== 0) {
 			refreshFailure = r.stderr.trim() || "GitHub status read failed.";
 			return render(ctx);
@@ -600,6 +604,8 @@ export default function ship(pi: ExtensionAPI) {
 		note: z.string().optional().describe("One-line status note; empty string clears it"),
 		stop: z.boolean().optional().describe("End the workflow in this session, as when the user says 'no ship'"),
 	});
+	/** The `ship_stage` call under way, which the next one waits for. */
+	let calls: Promise<unknown> = Promise.resolve();
 	pi.registerTool({
 		loadMode: "essential",
 		name: "ship_stage",
@@ -611,63 +617,68 @@ export default function ship(pi: ExtensionAPI) {
 			"Call with stop: true when the user says 'no ship'; the widget, the gates, and the dashboard's Ship card then drop the run.",
 		].join(" "),
 		parameters: toolParamsSchema,
-		async execute(_id, params, _signal, _onUpdate, ctx) {
-			const parsed = toolParamsSchema.safeParse(params);
-			if (!parsed.success) return { content: [{ type: "text", text: "Invalid ship stage input." }], isError: true };
-			const { stage, issue, pr, repo, note, stop } = parsed.data;
-			if (stop) {
-				state = undefined;
-				pi.appendEntry(ENTRY, { stopped: true });
-				render(ctx);
-				return { content: [{ type: "text", text: "Stopped the /ship workflow in this session." }] };
-			}
-			const base: ShipState = state ?? { stage: "ticket", updatedAt: "" };
-			const newPr = pr !== undefined && pr !== base.pr;
-			if (newPr || (repo !== undefined && repo !== base.repo)) {
-				// Record the PR before polling, so the gates below read this PR's body rather than none or another PR's.
-				const prRepo = repo ?? base.repo ?? (pr ? await resolveRepo(ctx.cwd) : undefined);
-				save(ctx, { ...base, pr: pr ?? base.pr, repo: prRepo, prStatus: newPr ? undefined : base.prStatus });
-			}
-			await refreshNow(ctx);
-			if (refreshFailure && stage && NEEDS_CURRENT_STATUS.includes(stage)) {
-				return { content: [{ type: "text", text: `Cannot advance using stale GitHub status: ${refreshFailure}` }], isError: true };
-			}
-			if (stage || issue || pr || repo || note !== undefined) {
-				if (stage === "ready_gate" || (stage !== undefined && isReviewStage(stage))) {
-					const reviews = state?.prStatus?.reviews;
-					if (!reviews && reviewsBefore(stage).length > 0) {
-						return { content: [{ type: "text", text: `GitHub has reported no status for this PR, so ${stage} cannot check its review boxes. Name the PR with ship_stage({pr}).` }], isError: true };
-					}
-					let missing = reviews && missingReview(reviews, stage);
-					if (missing) {
-						// GitHub can still answer with the body from before an edit made seconds ago, such as the box pr_description just added.
-						await Bun.sleep(BOX_REPOLL_MS);
-						await refreshNow(ctx);
-						const fresh = state?.prStatus?.reviews;
-						missing = fresh && missingReview(fresh, stage);
-					}
-					if (missing) {
-						const { label, box, pathsFile, withoutPaths } = REVIEWS[missing];
-						return { content: [{ type: "text", text: `The PR must have \`${box}\` after the ${label} fixes are pushed, since a changed file matches \`${pathsFile}\`${withoutPaths ? ` or the repository has no \`${pathsFile}\`` : ""}.` }], isError: true };
-					}
+		execute(_id, params, _signal, _onUpdate, ctx) {
+			// One call at a time: the session follows one PR, so parallel calls naming different PRs would each check whichever PR the last one named.
+			const call = calls.then(async () => {
+				const parsed = toolParamsSchema.safeParse(params);
+				if (!parsed.success) return { content: [{ type: "text" as const, text: "Invalid ship stage input." }], isError: true };
+				const { stage, issue, pr, repo, note, stop } = parsed.data;
+				if (stop) {
+					state = undefined;
+					pi.appendEntry(ENTRY, { stopped: true });
+					render(ctx);
+					return { content: [{ type: "text" as const, text: "Stopped the /ship workflow in this session." }] };
 				}
-				if ((stage === "live" || stage === "rebase" || stage === "fix_comments" || stage === "fix_ci") && (!state?.prStatus || state.prStatus.draft || state.prStatus.state !== "OPEN")) {
-					return { content: [{ type: "text", text: "The PR must be open and ready for review before recording live work." }], isError: true };
+				const base: ShipState = state ?? { stage: "ticket", updatedAt: "" };
+				const newPr = (pr !== undefined && pr !== base.pr) || (repo !== undefined && repo !== base.repo);
+				if (newPr) {
+					// Record the PR before polling, so the gates below read this PR's body rather than none or another PR's.
+					const prRepo = repo ?? base.repo ?? (pr ? await resolveRepo(ctx.cwd) : undefined);
+					save(ctx, { ...base, pr: pr ?? base.pr, repo: prRepo, prStatus: undefined });
 				}
-				if (stage === "merged" && state?.prStatus?.state !== "MERGED") {
-					return { content: [{ type: "text", text: "GitHub has not reported this PR merged." }], isError: true };
+				await refreshNow(ctx);
+				if (refreshFailure && stage && NEEDS_CURRENT_STATUS.includes(stage)) {
+					return { content: [{ type: "text" as const, text: `Cannot advance using stale GitHub status: ${refreshFailure}` }], isError: true };
 				}
-				const current = state ?? base;
-				const isWork = stage === "rebase" || stage === "fix_comments" || stage === "fix_ci";
-				save(ctx, {
-					...current,
-					stage: stage ? (isWork ? "live" : stage) : current.stage,
-					work: stage ? (isWork ? stage : undefined) : current.work,
-					issue: issue ?? current.issue,
-					note: note === undefined ? current.note : note || undefined,
-				});
-			}
-			return { content: [{ type: "text", text: `${report(state)}${refreshFailure ? `\nGitHub status unavailable; previous status is stale: ${refreshFailure}` : ""}` }], details: { state, ...(refreshFailure ? { stale: true, error: refreshFailure } : {}) } };
+				if (stage || issue || pr || repo || note !== undefined) {
+					if (stage === "ready_gate" || (stage !== undefined && isReviewStage(stage))) {
+						const reviews = state?.prStatus?.reviews;
+						if (!reviews && reviewsBefore(stage).length > 0) {
+							return { content: [{ type: "text" as const, text: `GitHub has reported no status for this PR, so ${stage} cannot check its review boxes. Name the PR with ship_stage({pr}).` }], isError: true };
+						}
+						let missing = reviews && missingReview(reviews, stage);
+						if (missing) {
+							// GitHub can still answer with the body from before an edit made seconds ago, such as the box pr_description just added.
+							await Bun.sleep(BOX_REPOLL_MS);
+							await refreshNow(ctx);
+							const fresh = state?.prStatus?.reviews;
+							missing = fresh && missingReview(fresh, stage);
+						}
+						if (missing) {
+							const { label, box, pathsFile, withoutPaths } = REVIEWS[missing];
+							return { content: [{ type: "text" as const, text: `The PR must have \`${box}\` after the ${label} fixes are pushed, since a changed file matches \`${pathsFile}\`${withoutPaths ? ` or the repository has no \`${pathsFile}\`` : ""}.` }], isError: true };
+						}
+					}
+					if ((stage === "live" || stage === "rebase" || stage === "fix_comments" || stage === "fix_ci") && (!state?.prStatus || state.prStatus.draft || state.prStatus.state !== "OPEN")) {
+						return { content: [{ type: "text" as const, text: "The PR must be open and ready for review before recording live work." }], isError: true };
+					}
+					if (stage === "merged" && state?.prStatus?.state !== "MERGED") {
+						return { content: [{ type: "text" as const, text: "GitHub has not reported this PR merged." }], isError: true };
+					}
+					const current = state ?? base;
+					const isWork = stage === "rebase" || stage === "fix_comments" || stage === "fix_ci";
+					save(ctx, {
+						...current,
+						stage: stage ? (isWork ? "live" : stage) : current.stage,
+						work: stage ? (isWork ? stage : undefined) : current.work,
+						issue: issue ?? current.issue,
+						note: note === undefined ? current.note : note || undefined,
+					});
+				}
+				return { content: [{ type: "text" as const, text: `${report(state)}${refreshFailure ? `\nGitHub status unavailable; previous status is stale: ${refreshFailure}` : ""}` }], details: { state, ...(refreshFailure ? { stale: true, error: refreshFailure } : {}) } };
+			});
+			calls = call.catch(() => undefined);
+			return call;
 		},
 	});
 }

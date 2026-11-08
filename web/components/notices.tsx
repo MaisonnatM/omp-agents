@@ -1,6 +1,7 @@
-/** The header's notices bell: pull request, Slack, provider, calendar, stopped-session, and update notices in a popover, filtered by source, each drawn from its {@link presentNotice} projection. */
-import { Bell, CalendarClock, CheckCheck, CircleAlert, CircleX, Eye, Gauge, GitCompareArrows, GitMerge, ListRestart, type LucideIcon, MessageSquare, Sparkles, Wallet, X } from "lucide-react";
+/** The header's notices bell: pull request, Slack, provider, sign-in, calendar, stopped-session, and update notices in a popover, filtered by source, each drawn from its {@link presentNotice} projection. */
+import { Bell, CalendarClock, CheckCheck, CircleAlert, CircleX, Eye, Gauge, GitCompareArrows, GitMerge, KeyRound, ListRestart, type LucideIcon, MessageSquare, Plug, Sparkles, Wallet, X } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
+import { type AccountsService, MCP_SERVICES } from "../../src/shared/accounts";
 import type { PullRequestSummary } from "../../src/shared/github";
 import type { YourMove } from "../../src/shared/moves";
 import type { Notice } from "../../src/shared/notices";
@@ -16,7 +17,7 @@ import { pendingOf, pullRequestStart, QUICK_ACTIONS } from "../quick-actions";
 import { providerLabel, providerOrg } from "../labels";
 import { Age } from "./age";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
-import { BrandMark, GOOGLE_CALENDAR_LOGO, SLACK_LOGO } from "./integrations/brand-logos";
+import { BrandMark, type BrandLogo, GMAIL_LOGO, GOOGLE_CALENDAR_LOGO, SLACK_LOGO } from "./integrations/brand-logos";
 import { OrgIcon } from "./org-icon";
 import { MergePopover, useMergeTarget } from "./pull-requests/merge-popover";
 
@@ -30,6 +31,7 @@ const FILTERS: [NoticeSource | "all", string, ReactNode][] = [
 	["github", "GitHub", <OrgIcon key="github" org="github" className={TAB_LOGO} />],
 	["slack", "Slack", <BrandMark key="slack" logo={SLACK_LOGO} className={TAB_LOGO} />],
 	["providers", "Providers", <Gauge key="providers" aria-hidden className={TAB_LOGO} />],
+	["integrations", "Integrations", <Plug key="integrations" aria-hidden className={TAB_LOGO} />],
 	["calendar", "Calendar", <CalendarClock key="calendar" aria-hidden className={TAB_LOGO} />],
 	["sessions", "Sessions", <CircleAlert key="sessions" aria-hidden className={TAB_LOGO} />],
 	["updates", "Updates", <Sparkles key="updates" aria-hidden className={cn(TAB_LOGO, "text-violet-600 dark:text-violet-400")} />],
@@ -44,7 +46,10 @@ const MOVE_BADGE: Record<YourMove, { icon: LucideIcon; tone: string }> = {
 	reply: { icon: MessageSquare, tone: "bg-amber-500 text-white" },
 };
 
-/** Where a notice came from, as a logo and a name: GitHub, Slack, the provider, Google Calendar or this computer's calendar, omp, or omp-agents. */
+/** Each Google service's logo, which its sign-in notice shows. */
+const SERVICE_LOGO: Record<AccountsService, BrandLogo> = { gmail: GMAIL_LOGO, "google-calendar": GOOGLE_CALENDAR_LOGO };
+
+/** Where a notice came from, as a logo and a name: GitHub, Slack, the provider, the Google service, Google Calendar or this computer's calendar, omp, or omp-agents. */
 function originOf(notice: Notice): { logo: ReactNode; label: string } {
 	const mark = "size-3.5 shrink-0";
 	const sparkles = <Sparkles aria-hidden className={cn(mark, "text-violet-600 dark:text-violet-400")} />;
@@ -69,6 +74,8 @@ function originOf(notice: Notice): { logo: ReactNode; label: string } {
 			return { logo: sparkles, label: "omp-agents" };
 		case "stopped":
 			return { logo: <CircleAlert aria-hidden className={cn(mark, "text-amber-600 dark:text-amber-400")} />, label: "omp-agents" };
+		case "sign-in":
+			return { logo: <BrandMark logo={SERVICE_LOGO[notice.service]} className={mark} />, label: MCP_SERVICES[notice.service].label };
 		default: {
 			const unhandled: never = notice;
 			return unhandled;
@@ -88,7 +95,7 @@ export function NoticeOrigin({ notice }: { notice: Notice }) {
 }
 const BADGE = "absolute -right-1 -bottom-1 flex size-4 items-center justify-center rounded-full ring-2 ring-popover";
 
-/** A notice's picture: who it comes from with a badge for its source; an update's, a stopped session's, or a move nobody made's source tile; or a provider's logo with a warning badge. */
+/** A notice's picture: who it comes from with a badge for its source; an update's, a stopped session's, or a move nobody made's source tile; or a provider's or Google service's logo with a warning badge. */
 function Face({ face }: { face: NoticeFace }) {
 	switch (face.kind) {
 		case "update":
@@ -120,6 +127,15 @@ function Face({ face }: { face: NoticeFace }) {
 				</span>
 			);
 		}
+		case "sign-in":
+			return (
+				<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-muted">
+					<BrandMark logo={SERVICE_LOGO[face.service]} className="m-auto size-4" />
+					<span className={cn(BADGE, "bg-red-500 text-white")}>
+						<KeyRound aria-hidden className="size-2.5" strokeWidth={2.5} />
+					</span>
+				</span>
+			);
 		case "move": {
 			const { icon: Icon, tone } = MOVE_BADGE[face.move];
 			if (!face.person) {

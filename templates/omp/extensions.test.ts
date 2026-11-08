@@ -28,7 +28,7 @@ function load(extension) {
 		on(name, handler) { hooks[name] = handler; },
 		registerTool(registered) { tool = registered; },
 		appendEntry(customType, data) { entries.push({ type: "custom", customType, data }); },
-		// input.responses answers by subcommand, such as "pr view" or "repo view", or "env -u GITHUB_TOKEN pr view" for gh run without that variable; input.at answers by directory first; input.response answers the rest.
+		// input.byArg answers by an argument anywhere in the call, such as "n=53" for one PR's read; input.responses answers by subcommand, such as "pr view" or "repo view", or "env -u GITHUB_TOKEN pr view" for gh run without that variable; input.at answers by directory first; input.response answers the rest.
 		async exec(command, args, options) {
 			// gh run as "env -u NAME… gh args" is recorded as "env -u NAME… args".
 			const unset = [];
@@ -43,7 +43,8 @@ function load(extension) {
 			const prefix = unset.length ? ["env", ...unset] : [];
 			executed.push([...prefix, ...rest]);
 			const key = [...prefix, ...rest.slice(0, 2)].join(" ");
-			return input.sequence?.shift() ?? input.at?.[options.cwd]?.[key] ?? input.responses?.[key] ?? input.response;
+			const byArg = Object.entries(input.byArg ?? {}).find(([arg]) => rest.includes(arg))?.[1];
+			return byArg ?? input.sequence?.shift() ?? input.at?.[options.cwd]?.[key] ?? input.responses?.[key] ?? input.response;
 		},
 	});
 	return hooks;
@@ -99,6 +100,21 @@ if (input.command) {
 } else if (input.agentStart) {
 	const result = await hooks.before_agent_start({ systemPrompt: ["base"] }, { cwd: input.cwd ?? process.cwd(), sessionManager, agent: { kind: "main" } });
 	console.log(JSON.stringify({ prompt: result?.systemPrompt ?? null }));
+} else if (input.toolResults) {
+	// Each result as omp hands it to tool_result handlers after the call; null where the handler leaves it alone.
+	const results = [];
+	for (const [i, result] of input.toolResults.entries()) {
+		const changed = await hooks.tool_result({ type: "tool_result", toolCallId: String(i), input: {}, details: undefined, ...result }, { cwd: process.cwd(), hasUI: false, sessionManager });
+		results.push(changed ? { isError: changed.isError ?? false, text: changed.content.map(part => part.text).join("\\n") } : null);
+	}
+	console.log(JSON.stringify({ toolResults: results }));
+} else if (input.runs) {
+	// Several calls in one session, one after another, or all at once with parallel, as an agent's parallel tool calls run.
+	const call = params => tool.execute("call", params, undefined, undefined, { cwd: input.cwd ?? process.cwd(), hasUI: false, sessionManager });
+	const results = [];
+	if (input.parallel) results.push(...(await Promise.all(input.runs.map(call))));
+	else for (const params of input.runs) results.push(await call(params));
+	console.log(JSON.stringify({ runs: results.map(result => ({ isError: result.isError ?? false, text: result.content?.[0]?.text ?? null })), executed }));
 } else if (input.run) {
 	const result = await tool.execute("call", input.params, undefined, undefined, { cwd: input.cwd ?? process.cwd(), hasUI: false, sessionManager });
 	console.log(JSON.stringify({ run: { isError: result.isError ?? false, stage: result.details?.state?.stage ?? null }, text: result.content?.[0]?.text ?? null, executed }));
@@ -113,8 +129,10 @@ function exercise(name: "ship" | "todos" | "notes" | "events" | "worktree-guard"
 	confirmations: number;
 	valid: boolean;
 	run: { isError: boolean; stage: string | null };
+	runs: { isError: boolean; text: string | null }[];
 	text: string | null;
 	prompt: string[] | null;
+	toolResults: ({ isError: boolean; text: string } | null)[];
 	results: (string | null)[];
 	executed: string[][];
 	entries: { customType: string; data: unknown }[];
@@ -486,6 +504,40 @@ describe("ship_stage review gates", () => {
 		expect(result.text).toContain("GraphQL quota exhausted");
 		expect(result.executed).toHaveLength(2);
 		expect(result.executed[1]).toEqual(["api", "rate_limit"]);
+	});
+});
+
+describe("ship_stage merged", () => {
+	// GitHub's answer to a read of a PR in `state`.
+	const prIn = (state: "OPEN" | "MERGED") => {
+		const pullRequest = {
+			state, isDraft: false, mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN", reviewDecision: null, body: "",
+			changedFiles: 1, files: { nodes: [{ path: "README.md" }] },
+			reviewThreads: { nodes: [], pageInfo: { hasNextPage: false } },
+			commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
+		};
+		return { code: 0, stderr: "", stdout: JSON.stringify({ data: { repository: { pullRequest } } }) };
+	};
+	const byArg = { "n=53": prIn("MERGED"), "n=54": prIn("OPEN"), "n=55": prIn("MERGED") };
+	const merged = (pr: number) => ({ stage: "merged", pr, repo: "owner/name" });
+	const reads = (executed: string[][], pr: number) => executed.filter(args => args.includes(`n=${pr}`)).length;
+
+	test("each merged PR named after another merged one records merged, reading its own status", () => {
+		const result = exercise("ship", { runs: [merged(55), merged(53)], byArg });
+		expect(result.runs.map(run => run.isError)).toEqual([false, false]);
+		expect(reads(result.executed, 53)).toBe(1);
+	});
+
+	test("an open PR named after a merged one is refused", () => {
+		const result = exercise("ship", { runs: [merged(55), merged(54)], byArg });
+		expect(result.runs.map(run => run.isError)).toEqual([false, true]);
+		expect(result.runs[1]!.text).toBe("GitHub has not reported this PR merged.");
+		expect(reads(result.executed, 54)).toBe(1);
+	});
+
+	test("parallel calls each check the PR they name", () => {
+		const result = exercise("ship", { runs: [merged(55), merged(54), merged(53)], parallel: true, byArg });
+		expect(result.runs.map(run => run.isError)).toEqual([false, true, false]);
 	});
 });
 
@@ -961,6 +1013,57 @@ describe("google accounts", () => {
 		]);
 		servers(["gmail"]);
 		expect(exercise("google-accounts", { agentStart: true, omp: true, cwd: join(work, "app") }, env).prompt).toBeNull();
+	});
+
+	test("a Google server's 401 tells the session to ask the user to sign in again, and reports the account once; other failures pass", () => {
+		writeFileSync(
+			join(root, "agent", "mcp.json"),
+			JSON.stringify({
+				mcpServers: {
+					"google-calendar": { type: "http", url: "https://calendarmcp.googleapis.com/mcp/v1", enabled: false },
+					gmail: { type: "http", url: "https://gmailmcp.googleapis.com/mcp/v1" },
+					linear: { type: "http", url: "https://mcp.linear.app/mcp" },
+				},
+			}),
+		);
+		// As omp's formatMCPToolFailure words a failed MCP call.
+		const failure = (server: string, code: number) =>
+			[
+				"MCP failure",
+				`server: ${server}`,
+				"tool: list_events",
+				"transport: http",
+				"stage: request",
+				"failure: http_status",
+				"retryable: no",
+				`message: HTTP ${code}: Unauthorized`,
+				`code: ${code}`,
+				"next: Check the MCP endpoint and authentication configuration.",
+			].join("\n");
+		const result = (toolName: string, text: string, isError = true) => ({ toolName, content: [{ type: "text", text }], isError });
+		const signedOut =
+			"Google Calendar is signed out: its MCP server google-calendar answered HTTP 401. Do not retry this tool or any other Google Calendar tool, and do not try to sign in yourself. Tell the user Google Calendar is signed out and ask them to sign in to it again in the omp-agents dashboard, under Settings › Integrations.";
+		const before = Date.now();
+		const { toolResults } = exercise(
+			"google-accounts",
+			{
+				omp: true,
+				toolResults: [
+					result("mcp__google_calendar_list_events", failure("google-calendar", 401)),
+					// The same call made through an xd:// device, whose write hands on the device's result.
+					result("write", failure("google-calendar", 401)),
+					result("mcp__linear_list_issues", failure("linear", 401)),
+					result("mcp__gmail_search_threads", failure("gmail", 500)),
+					result("mcp__gmail_search_threads", failure("gmail", 401), false),
+				],
+			},
+			env,
+		);
+		expect(toolResults).toEqual([{ isError: true, text: signedOut }, { isError: true, text: signedOut }, null, null, null]);
+		const inbox = join(root, "config", "omp-agents", "sign-in-inbox");
+		const reports = readdirSync(inbox).map(name => JSON.parse(readFileSync(join(inbox, name), "utf8")));
+		expect(reports).toEqual([{ v: 1, server: "google-calendar", at: expect.any(Number) }]);
+		expect(reports[0].at).toBeGreaterThanOrEqual(before);
 	});
 });
 
