@@ -7,11 +7,31 @@ export interface CredentialOrigin {
 	/** The variable's name when `kind` is `env` and one variable holds the key. */
 	envVar?: string;
 }
+/** The identity fields of an OAuth sign-in that an account policy matches (pi-ai src/auth/types.ts `AuthAccountSelector`). */
+export interface AccountSelector {
+	email?: string;
+	accountId?: string;
+	projectId?: string;
+	/** The organization or workspace the sign-in is scoped to; never an identity by itself. */
+	orgId?: string;
+}
+/** One `auth.accountPolicies` entry (pi-ai src/auth/types.ts `AuthAccountPolicy`); a higher `priority` is tried first, unset counting as 0. */
+export interface AccountPolicy {
+	provider: string;
+	account: AccountSelector;
+	priority?: number;
+	reservePct?: number;
+	reclaimAbovePct?: number;
+}
+/** How omp matches a policy's selector to a sign-in (pi-ai src/auth/policy.ts): every field the selector sets must be equal. */
+export interface AccountPolicyModule {
+	matchesAuthAccountSelector(selector: AccountSelector, identity: AccountSelector): boolean;
+}
 /** One stored credential row (pi-ai src/auth/types.ts `StoredAuthCredential`); the credential's fields stay omp's. */
 export interface StoredCredential {
 	id: number;
 	provider: string;
-	credential: { type: "oauth" } | { type: "api_key"; key: string };
+	credential: ({ type: "oauth" } & AccountSelector) | { type: "api_key"; key: string };
 }
 /** What a provider's sign-in asks the page for (pi-ai src/registry/oauth/types.ts `OAuthPrompt`). */
 export interface OAuthPrompt {

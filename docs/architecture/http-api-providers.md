@@ -2,7 +2,9 @@
 
 `GET /api/providers` answers `ProvidersAnswer` from `src/shared/providers.ts`: `providers`, one `ModelProvider` for each provider omp files `/login` credentials under, and `login`, the sign-in the page last started.
 `listProviders` in `src/omp/providers.ts` groups omp's available `getOAuthProviders` entries by `storeCredentialsAs ?? id`, so `openai-codex-device` joins `openai-codex` and `zai-coding-plan` joins `zai` as further `methods`.
-Each provider's `accounts` are its stored credential rows as `/logout` lists them, and `envKey` names the environment variable omp reads its key from when `keys.source` finds nothing stored.
+Each provider's `accounts` are its stored credential rows as `/logout` lists them, each with its sign-in's `email` when it has one, sorted by `rankAccounts` in `src/omp/account-order.ts` into the order omp tries them.
+That order is the `priority` of the `auth.accountPolicies` entry in the user's `config.yml` that matches the account through omp's `matchesAuthAccountSelector`, highest first, with no entry counting as 0 and ties in stored order.
+`envKey` names the environment variable omp reads its key from when `keys.source` finds nothing stored.
 The store opens and closes on each read, so a `/login` in a terminal shows at the next one; the page reads every minute, and every second while a sign-in runs.
 
 `PUT /api/providers/login`, with `{ method }`, the `/login` entry, starts that sign-in on the server and answers the providers and the new `login`.
@@ -20,4 +22,9 @@ Key-save failures use fixed messages, and the native error stays on `cause`, so 
 This method does not change model-role or fallback settings.
 
 `PUT /api/providers/sign-out`, with `{ provider, credentialId }`, removes that row through omp's `logoutCredential`, which refreshes the provider's models, and answers the providers after.
-`parseLoginMethod`, `parseLoginAnswer`, and `parseProviderSignOut` in `src/server/wire.ts` check the bodies.
+
+`PUT /api/providers/account-order`, with `{ provider, emails }`, saves the order of that provider's signed-in accounts, the first tried first, and answers the providers after.
+`emails` must name exactly the accounts `orderableAccounts` in `src/shared/providers.ts` keeps, those with an email no other account shares, since one policy naming a shared email would match two sign-ins, which omp refuses; otherwise the route answers 409.
+`writeAccountOrder` gives those accounts priorities from their count down to 1, setting only `priority` on the entry that already matches each one and adding `{ provider, account: { email }, priority }` for the rest.
+It leaves every other entry and field, such as `reservePct` and `reclaimAbovePct`, and reads the setting again inside `configWrites`, the queue of the dashboard's `config.yml` writes, so an edit saved just before it is kept rather than overwritten.
+`parseLoginMethod`, `parseLoginAnswer`, `parseProviderSignOut`, and `parseAccountOrder` in `src/server/wire.ts` check the bodies.

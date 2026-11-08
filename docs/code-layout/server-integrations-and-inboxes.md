@@ -11,8 +11,9 @@
   `src/signed-fetch.ts` holds that HTTP call without anything of omp: `signedFetch` over a `Bearer`, `SignedFetch`, `ApiWrite`, and `ApiError`; `mcpBearer` in `src/omp/mcp.ts` supplies omp's token and its refusal.
   `src/mcp-servers.ts` lists every MCP server omp loads with where omp stands with each, and runs the adds, sign-ins, sign-outs, enables, disables, and removals that Settings › MCP servers starts; see [MCP servers](../architecture/http-api-mcp-servers.md).
   `src/mcp-status.ts` has `remoteStatusOf`, the one reading of a remote server's tool list into its status that both files use.
-  `src/providers.ts` lists the model providers and runs the sign-ins and sign-outs that Settings › Providers starts, with `src/provider-logins.ts` holding the one sign-in under way, and `src/omp/providers.ts` calling omp for them.
+  `src/providers.ts` lists the model providers and runs the sign-ins, sign-outs, and account orders that Settings › Providers starts, with `src/provider-logins.ts` holding the one sign-in under way, and `src/omp/providers.ts` calling omp for them.
   `src/omp/providers.test.ts` checks that a new Anthropic API key replaces older keys and leaves subscription sign-ins in place.
+  `src/omp/account-order.ts` ranks a provider's accounts by the priorities of omp's `auth.accountPolicies` and writes a new order back into that setting; `src/omp/account-order.test.ts` checks the ranking, that a new order keeps other entries and fields, and the write into `config.yml`.
   `src/omp/api-credits.ts` writes the API credits provider into `models.yml` and moves a key that was stored beside the Anthropic sign-in. The server calls that move once as it starts.
   `src/shared/providers.ts` holds the shapes the page shares.
   See [Providers](../architecture/http-api-providers.md).
