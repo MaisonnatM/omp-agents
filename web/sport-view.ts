@@ -1,6 +1,6 @@
 /** How the Sport page words and colors what `src/sport-week.ts` computes: scale words, workout colors, loads, doses, and the exercises a demo opens. */
 import { addDays, daysBetween, mondayOf } from "../src/shared/days";
-import { type Climb, type ClimbKind, type Exercise, exercisesOf, gradeRank, type Measurement, type Metric, type PainPlace, type Phase, type Place, type Plan, type SportState, type Workout, type WorkoutLog } from "../src/shared/sport";
+import { type Climb, CLIMB_KINDS, type ClimbKind, type Exercise, exercisesOf, gradeRank, type Measurement, type Metric, type PainPlace, type Phase, type Place, type Plan, type SportState, type Workout, type WorkoutLog } from "../src/shared/sport";
 import type { Load, PlannedDay, PlannedWorkout, SportRecords } from "../src/sport-week";
 
 /** The word under a pain level, 0 to 10. */
@@ -40,6 +40,9 @@ export const PAIN_PLACE_LABEL: Record<PainPlace, string> = { fingers: "Doigts", 
 export const PAIN_PLACE_AT: Record<PainPlace, string> = { fingers: "aux doigts", elbow: "au coude", shoulder: "à l'épaule", hip: "à la hanche", other: "ailleurs" };
 
 export const CLIMB_LABEL: Record<ClimbKind, string> = { boulder: "Bloc", route: "Voie" };
+
+/** A kind of climb's best, as a record or a progress card names it. */
+export const BEST_CLIMB_LABEL: Record<ClimbKind, string> = { boulder: "Meilleur bloc", route: "Meilleure voie" };
 
 /** The hold colors of the Arkose gyms, which tag a boulder and never a workout, each with the dot that draws it. */
 export const ARKOSE_COLORS: Record<string, string> = { vert: "green", bleu: "blue", rouge: "red", noir: "#262626", violet: "violet", blanc: "#e5e5e5" };
@@ -198,28 +201,58 @@ export interface Beaten {
 	was: string | null;
 }
 
-/** The records `after` holds that beat `before`'s: metrics, loads, and grades, each worded. */
-export function beaten(state: SportState, before: SportRecords, after: SportRecords): Beaten[] {
-	const out: Beaten[] = [];
-	for (const best of after.metrics) {
-		const old = before.metrics.find(({ metric }) => metric === best.metric);
-		if (old?.value === best.value && old.at === best.at) continue;
-		const metric = state.metrics.find(({ id }) => id === best.metric);
-		out.push({ label: metric?.label ?? best.metric, now: amount(best.value, metric?.unit ?? ""), was: old ? amount(old.value, metric?.unit ?? "") : null });
-	}
+/** One record as the progress table and the summary word it, keyed by what it measures. */
+export interface RecordRow {
+	key: string;
+	label: string;
+	value: string;
+	/** The day it was first reached. */
+	date: string;
+}
+
+const metricRow = (metric: string): string => `metric-${metric}`;
+const loadRow = (key: string): string => `load-${key}`;
+
+/** The records of `best`, each worded: metrics, then the hardest grade of each kind of climb, then loads. */
+export function recordRows(state: SportState, best: SportRecords): RecordRow[] {
 	const names = state.plan ? exercisesOf(state.plan) : [];
-	for (const best of after.loads) {
-		const old = before.loads.find(({ key }) => key === best.key);
-		if (old && old.kg >= best.kg) continue;
-		out.push({ label: names.find(({ key }) => key === best.key)?.name ?? best.key, now: signedKg(best.kg), was: old ? signedKg(old.kg) : null });
-	}
-	for (const kind of ["boulder", "route"] as const) {
-		const best = after.grades[kind];
-		const old = before.grades[kind];
-		if (!best || (old && old.grade === best.grade)) continue;
-		out.push({ label: `Meilleur ${CLIMB_LABEL[kind].toLowerCase()}`, now: best.grade, was: old?.grade ?? null });
-	}
-	return out;
+	return [
+		...best.metrics.map(({ metric, value, at }) => {
+			const found = state.metrics.find(({ id }) => id === metric);
+			return { key: metricRow(metric), label: found?.label ?? metric, value: amount(value, found?.unit ?? ""), date: at };
+		}),
+		...CLIMB_KINDS.flatMap(kind => {
+			const grade = best.grades[kind];
+			return grade ? [{ key: kind, label: BEST_CLIMB_LABEL[kind], value: grade.grade, date: grade.date }] : [];
+		}),
+		...best.loads.map(({ key, kg, date }) => ({ key: loadRow(key), label: names.find(exercise => exercise.key === key)?.name ?? key, value: signedKg(kg), date })),
+	];
+}
+
+/** The records `after` holds that beat `before`'s: a metric measured anew, a harder grade, or a heavier load. */
+export function beaten(state: SportState, before: SportRecords, after: SportRecords): Beaten[] {
+	const improved = new Set<string>([
+		...after.metrics
+			.filter(best => {
+				const old = before.metrics.find(({ metric }) => metric === best.metric);
+				return !old || old.value !== best.value || old.at !== best.at;
+			})
+			.map(({ metric }) => metricRow(metric)),
+		...CLIMB_KINDS.filter(kind => {
+			const best = after.grades[kind];
+			return best !== null && before.grades[kind]?.grade !== best.grade;
+		}),
+		...after.loads
+			.filter(best => {
+				const old = before.loads.find(({ key }) => key === best.key);
+				return !old || old.kg < best.kg;
+			})
+			.map(({ key }) => loadRow(key)),
+	]);
+	const was = new Map(recordRows(state, before).map(row => [row.key, row.value]));
+	return recordRows(state, after)
+		.filter(row => improved.has(row.key))
+		.map(row => ({ label: row.label, now: row.value, was: was.get(row.key) ?? null }));
 }
 
 /** The bodyweight: the metric an of-max load rule subtracts, `null` when no rule subtracts one. */

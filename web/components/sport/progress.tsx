@@ -4,10 +4,10 @@ import { RadioGroup } from "@base-ui/react/radio-group";
 import { lazy, Suspense, useState } from "react";
 import { addDays, mondayOf } from "../../../src/shared/days";
 import type { ChartSpec } from "../../../src/shared/session-visuals";
-import { type ClimbKind, exercisesOf, FRENCH_GRADES, gradeRank, type Metric, type SportState } from "../../../src/shared/sport";
+import { type ClimbKind, CLIMB_KINDS, FRENCH_GRADES, gradeRank, type Metric, type SportState } from "../../../src/shared/sport";
 import { adherence, bestGrades, records, type WeekGrades } from "../../../src/sport-week";
 import { activityControl } from "../../activity";
-import { amount, bodyweightOf, CLIMB_LABEL, measured, nextTest, shortDate, signedKg } from "../../sport-view";
+import { amount, BEST_CLIMB_LABEL, bodyweightOf, CLIMB_LABEL, measured, nextTest, recordRows, shortDate } from "../../sport-view";
 import { SegmentedTab, SegmentedTabs, SegmentedTabsList } from "../segmented-tabs";
 
 // `recharts` is a chunk of its own, loaded when the first chart draws.
@@ -47,10 +47,10 @@ export function ProgressTab({ state, today }: { state: SportState; today: string
 
 	const cards: Card[] = [
 		...state.metrics.filter(metric => metric.id !== bodyweight?.id).map(metric => metricCard(state, metric, today, false)),
-		...(["boulder", "route"] as const).map((climb): Card => {
+		...CLIMB_KINDS.map((climb): Card => {
 			const best = bestRank(recent, climb);
 			const goal = target({ kind: "grade", climb });
-			return { figure: { kind: "grade", climb }, label: `${climb === "boulder" ? "Meilleur bloc" : "Meilleure voie"} · 8 sem.`, value: best === -1 ? "—" : FRENCH_GRADES[best]!, detail: goal && goal.kind !== "metric" ? `objectif ${goal.grade}` : "aucun objectif" };
+			return { figure: { kind: "grade", climb }, label: `${BEST_CLIMB_LABEL[climb]} · 8 sem.`, value: best === -1 ? "—" : FRENCH_GRADES[best]!, detail: goal && goal.kind !== "metric" ? `objectif ${goal.grade}` : "aucun objectif" };
 		}),
 		...(bodyweight ? [metricCard(state, bodyweight, today, true)] : []),
 		{ figure: { kind: "plan" }, label: "Plan suivi", value: followed?.ratio == null ? "—" : `${Math.round(followed.ratio * 100)} %`, detail: followed ? `${followed.done} séances sur ${followed.planned}` : "le plan n'a pas commencé" },
@@ -157,7 +157,7 @@ function chartOf(state: SportState, figure: Figure, from: string | null, today: 
 			const weeks = bestGrades(state, from ?? first, today);
 			const aim = goal && goal.kind === climb ? goal.grade : null;
 			const best = bestRank(weeks, climb);
-			const label = climb === "boulder" ? "Meilleur bloc" : "Meilleure voie";
+			const label = BEST_CLIMB_LABEL[climb];
 			return {
 				title: `${label} par semaine`,
 				sentence: best === -1 ? null : `${label} sur la période : ${FRENCH_GRADES[best]}${aim ? `, objectif ${aim}` : ""}.`,
@@ -192,19 +192,7 @@ function chartOf(state: SportState, figure: Figure, from: string | null, today: 
 
 /** The best of each metric, each kind of climb, and each load, with the day it was first reached. */
 function Records({ state }: { state: SportState }) {
-	const best = records(state);
-	const names = state.plan ? exercisesOf(state.plan) : [];
-	const rows = [
-		...best.metrics.map(({ metric, value, at }) => {
-			const found = state.metrics.find(({ id }) => id === metric);
-			return { key: `metric-${metric}`, label: found?.label ?? metric, date: at, value: amount(value, found?.unit ?? "") };
-		}),
-		...(["boulder", "route"] as const).flatMap(kind => {
-			const grade = best.grades[kind];
-			return grade ? [{ key: kind, label: CLIMB_LABEL[kind], date: grade.date, value: grade.grade }] : [];
-		}),
-		...best.loads.map(({ key, kg, date }) => ({ key: `load-${key}`, label: names.find(exercise => exercise.key === key)?.name ?? key, date, value: signedKg(kg) })),
-	];
+	const rows = recordRows(state, records(state));
 	return (
 		<section aria-label="Records" className="rounded-xl border border-border p-4">
 			<h2 className="text-sm font-semibold">Records</h2>

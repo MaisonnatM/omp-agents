@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { exercise, log, measurement, SEMI, STATE, withLogs, withMeasurements } from "../src/sport-fixtures";
 import type { Climb, FrenchGrade, Plan } from "../src/shared/sport";
 import { dayPlan, loadFor, records } from "../src/sport-week";
-import { amount, beaten, bodyweightOf, daySummary, demosOf, dose, effortWord, hardest, journalWeeks, loadSource, loadText, logDetail, measured, nextTest, opening, painWord, phaseLabel, recordLogs, sendsText, testOf, weekTitle } from "./sport-view";
+import { amount, beaten, bodyweightOf, daySummary, demosOf, dose, effortWord, hardest, journalWeeks, loadSource, loadText, logDetail, measured, nextTest, opening, painWord, phaseLabel, recordLogs, recordRows, sendsText, testOf, weekTitle } from "./sport-view";
 
 const plan = STATE.plan!;
 const demo = (youtubeId: string) => ({ youtubeId, by: "Lattice", cues: ["a", "b", "c"] as [string, string, string], caution: null });
@@ -98,9 +98,17 @@ describe("tests and records", () => {
 		const after = withMeasurements(withLogs(before, log("l2", "2026-11-24", { workout: "mardi", loads: { semi: 17 }, climbs: [{ kind: "boulder", grade: "7a+", color: "noir", kilter: false, attempts: null }] })), measurement("m3", "max", 117, "2026-11-24"));
 		expect(beaten(after, records(before), records(after))).toEqual([
 			{ label: "Max total", now: "117 kg", was: "112 kg" },
-			{ label: "Semi-arquée", now: "+17 kg", was: "+15 kg" },
 			{ label: "Meilleur bloc", now: "7a+", was: null },
+			{ label: "Semi-arquée", now: "+17 kg", was: "+15 kg" },
 		]);
+	});
+
+	test("a harder route is the best route beaten, and the records table words it the same", () => {
+		const route = (grade: FrenchGrade): Climb => ({ kind: "route", grade, color: null, kilter: false, attempts: null });
+		const before = withLogs(STATE, log("l1", "2026-11-22", { climbs: [route("7a")] }));
+		const after = withLogs(before, log("l2", "2026-11-29", { climbs: [route("7b")] }));
+		expect(beaten(after, records(before), records(after))).toEqual([{ label: "Meilleure voie", now: "7b", was: "7a" }]);
+		expect(recordRows(after, records(after)).find(({ key }) => key === "route")).toEqual({ key: "route", label: "Meilleure voie", value: "7b", date: "2026-11-29" });
 	});
 });
 
