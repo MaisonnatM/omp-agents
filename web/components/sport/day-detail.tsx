@@ -1,6 +1,5 @@
 /** The open day of the week: each workout with its demos, blocks, exercises, and loads, then the daily habits. */
 import { Check, Play, Plus } from "lucide-react";
-import type { DayKey } from "../../../src/shared/days";
 import type { Exercise, Plan } from "../../../src/shared/sport";
 import type { PlannedDay, PlannedExercise, PlannedWorkout } from "../../../src/sport-week";
 import { Badge } from "@/components/ui/badge";
@@ -23,9 +22,6 @@ interface DayDetailProps {
 	onLog: (workout: PlannedWorkout | null) => void;
 }
 
-/** The days a gym session falls after work, which the day shows as « Le soir ». */
-const EVENING: Record<DayKey, boolean> = { mon: true, tue: true, wed: true, thu: true, fri: true, sat: false, sun: false };
-
 export function DayDetail({ plan, day, today, disabled, onDemo, onLog }: DayDetailProps) {
 	const kicker = `${day.date === today ? "Aujourd'hui · " : ""}${longDate(day.date)}${day.deload ? " · semaine allégée" : ""}`;
 	return (
@@ -38,14 +34,14 @@ export function DayDetail({ plan, day, today, disabled, onDemo, onLog }: DayDeta
 					<Button variant="tertiary" size="compact" leadingIcon={Plus} className="mt-3" disabled={disabled} onClick={() => onLog(null)} {...activityControl("sport.log.free")}>Séance libre</Button>
 				</section>
 			) : (
-				day.workouts.map(workout => <WorkoutCard key={workout.id} plan={plan} day={day} kicker={kicker} workout={workout} disabled={disabled} onDemo={onDemo} onLog={onLog} />)
+				day.workouts.map(workout => <WorkoutCard key={workout.id} plan={plan} kicker={kicker} workout={workout} disabled={disabled} onDemo={onDemo} onLog={onLog} />)
 			)}
 			<Habits plan={plan} date={day.date} today={today} onDemo={onDemo} />
 		</div>
 	);
 }
 
-function WorkoutCard({ plan, day, kicker, workout, disabled, onDemo, onLog }: Omit<DayDetailProps, "today"> & { kicker: string; workout: PlannedWorkout }) {
+function WorkoutCard({ plan, kicker, workout, disabled, onDemo, onLog }: Omit<DayDetailProps, "today" | "day"> & { kicker: string; workout: PlannedWorkout }) {
 	const { demos, blocks } = workoutDemos(plan, workout);
 	const log = workout.log;
 	return (
@@ -57,7 +53,6 @@ function WorkoutCard({ plan, day, kicker, workout, disabled, onDemo, onLog }: Om
 					<div className="mt-1.5 flex flex-wrap gap-1.5">
 						<Badge size="compact">{PLACE_LABEL[workout.place]}</Badge>
 						<Badge size="compact">{duration(workout.minutes)}</Badge>
-						{workout.place === "gym" && EVENING[day.weekday] && <Badge size="compact">Le soir</Badge>}
 						{workout.optional && <Badge size="compact">option</Badge>}
 						{log?.status === "done" && <Badge variant="dot" size="compact" color="green">Faite</Badge>}
 						{log?.status === "skipped" && <Badge variant="dot" size="compact" color="gray">Pas faite</Badge>}

@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { hashForSport } from "../../routing";
 import { useShortcuts } from "../../shortcuts";
-import { ARKOSE_COLORS, CLIMB_LABEL, dayOfMonth, duration, exerciseName, journalWeeks, KIND_COLOR, logDetail, longDate, PAIN_PLACE_LABEL, painWord, PLACE_LABEL, recordLogs, sendsText, shortDate, signedKg, weekdayShort, workoutOf } from "../../sport-view";
+import { arkoseColor, CLIMB_LABEL, dayOfMonth, duration, exerciseName, journalWeeks, KIND_COLOR, logDetail, longDate, PAIN_PLACE_LABEL, painWord, PLACE_LABEL, recordLogs, sendsText, shortDate, signedKg, weekdayShort, workoutOf } from "../../sport-view";
 import { focusRow, stepRows, useReturnFocus } from "../list-page";
 import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, ListSplit } from "../list-split";
 import { toasts } from "../toaster";
@@ -180,8 +180,8 @@ function LogDetail({ state, log, record, disabled, onEdit, onRemove }: { state: 
 					{log.climbs.map((climb, index) => (
 						<li key={index} className="flex items-center justify-between gap-3 py-1.5 text-sm">
 							<span className="flex items-center gap-2">
-								{climb.color && <span aria-hidden className="size-2.5 rounded-full border border-border" style={{ background: ARKOSE_COLORS[climb.color] }} />}
-								{[CLIMB_LABEL[climb.kind], climb.color && climb.color.charAt(0).toUpperCase() + climb.color.slice(1), climb.kilter ? "Kilter" : null].filter(part => part).join(" · ")}
+								{climb.color && <span aria-hidden className="size-2.5 rounded-full border border-border" style={{ background: arkoseColor(climb.color)?.dot }} />}
+								{[CLIMB_LABEL[climb.kind], climb.color && (arkoseColor(climb.color)?.label ?? climb.color), climb.kilter ? "Kilter" : null].filter(part => part).join(" · ")}
 							</span>
 							<span className="font-medium tabular-nums">{climb.grade}</span>
 						</li>

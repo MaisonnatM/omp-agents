@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { amount, ARKOSE_COLORS, CLIMB_LABEL, dose, effortWord, hardest, type LogTarget, logSave, longDate, measured, measurementChange, PAIN_PLACE_LABEL, painRule, painWord, type Saved, sendsText, shortDate, signedKg, testOf } from "../../sport-view";
+import { amount, ARKOSE_COLORS, arkoseColor, CLIMB_LABEL, dose, effortWord, hardest, type LogTarget, logSave, longDate, measured, measurementChange, PAIN_PLACE_LABEL, painRule, painWord, type Saved, sendsText, shortDate, signedKg, testOf } from "../../sport-view";
 import { ERROR_TEXT, isSubmitChord, type Submit } from "../form-dialog";
 import { FIELD, TEXT_AREA } from "../form-field";
 import { Callout } from "../integrations/integration-row";
@@ -282,10 +282,7 @@ function Scale({ label, values, value, word, ends, tone, onPick }: ScaleProps) {
 
 const KIND_ITEMS = CLIMB_KINDS.map(value => ({ value, label: CLIMB_LABEL[value] }));
 const GRADE_ITEMS = FRENCH_GRADES.map(value => ({ value, label: value }));
-const COLOR_ITEMS: { value: string | null; label: string }[] = [
-	{ value: null, label: "Sans couleur" },
-	...Object.keys(ARKOSE_COLORS).map(color => ({ value: color, label: color.charAt(0).toUpperCase() + color.slice(1) })),
-];
+const COLOR_ITEMS: { value: string | null; label: string }[] = [{ value: null, label: "Sans couleur" }, ...ARKOSE_COLORS];
 
 /** The boulders and routes sent, each with its kind, grade, Arkose color, and whether it was on the Kilter board. */
 function Climbs({ climbs, kind, onChange }: { climbs: Climb[]; kind: ClimbKind; onChange: (climbs: Climb[]) => void }) {
@@ -316,7 +313,7 @@ function Climbs({ climbs, kind, onChange }: { climbs: Climb[]; kind: ClimbKind; 
 						</SelectContent>
 					</Select>
 					<span className="flex min-w-32 flex-1 items-center gap-1.5">
-						<span aria-hidden className="size-3 shrink-0 rounded-full border border-border" style={{ background: climb.color ? ARKOSE_COLORS[climb.color] : "transparent" }} />
+						<span aria-hidden className="size-3 shrink-0 rounded-full border border-border" style={{ background: arkoseColor(climb.color)?.dot ?? "transparent" }} />
 						<Select items={COLOR_ITEMS} value={climb.color} onValueChange={next => update(index, { color: next })}>
 							<SelectTrigger aria-label="Couleur" className="min-w-0 flex-1">
 								<SelectValue />

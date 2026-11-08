@@ -56,8 +56,18 @@ export const CLIMB_LABEL: Record<ClimbKind, string> = { boulder: "Bloc", route: 
 /** A kind of climb's best, as a record or a progress card names it. */
 export const BEST_CLIMB_LABEL: Record<ClimbKind, string> = { boulder: "Meilleur bloc", route: "Meilleure voie" };
 
-/** The hold colors of the Arkose gyms, which tag a boulder and never a workout, each with the dot that draws it. */
-export const ARKOSE_COLORS: Record<string, string> = { vert: "green", bleu: "blue", rouge: "red", noir: "#262626", violet: "violet", blanc: "#e5e5e5" };
+/** The hold colors of the Arkose gyms, which tag a boulder and never a workout: the word a climb keeps, its label, and the dot that draws it. */
+export const ARKOSE_COLORS = [
+	{ value: "vert", label: "Vert", dot: "green" },
+	{ value: "bleu", label: "Bleu", dot: "blue" },
+	{ value: "rouge", label: "Rouge", dot: "red" },
+	{ value: "noir", label: "Noir", dot: "#262626" },
+	{ value: "violet", label: "Violet", dot: "violet" },
+	{ value: "blanc", label: "Blanc", dot: "#e5e5e5" },
+] as const satisfies readonly { value: string; label: string; dot: string }[];
+
+/** The Arkose color a climb is tagged with; `undefined` for none, or for a word the agent wrote that the list lacks. */
+export const arkoseColor = (value: string | null) => ARKOSE_COLORS.find(color => color.value === value);
 
 const SHORT_DATE = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" });
 const LONG_DATE = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" });
