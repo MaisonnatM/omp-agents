@@ -17,8 +17,8 @@ The dashboard cannot change how a session's runtime classifies its errors; omp-a
 
 ## Options considered
 
-- Add the wording to `CREDITS_EXHAUSTED_PATTERN` in its own patch, `patches/omp-18.18.0-credit-balance-fallback.patch`: one line, every consumer of the pattern agrees, and it applies with or without the other runtime patches. Chosen.
-- Fold it into `patches/omp-18.18.0-paid-cursor-fallback.patch`: that patch is about paying for Cursor, and a user who wants this fix without paid fallback could not take it alone.
+- Add the wording to `CREDITS_EXHAUSTED_PATTERN` in its own patch, `patches/omp-18.18.1-credit-balance-fallback.patch`: one line, every consumer of the pattern agrees, and it applies with or without the other runtime patches. Chosen.
+- Fold it into `patches/omp-18.18.1-paid-cursor-fallback.patch`: that patch is about paying for Cursor, and a user who wants this fix without paid fallback could not take it alone.
 - An omp extension that rewrites the error text into a 402 before turn recovery sees it: it would replace the provider's real message with a made-up one, and it would depend on hook ordering inside turn recovery that the runtime does not promise.
 
 ## Consequences

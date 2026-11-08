@@ -7,12 +7,12 @@ Those files hold only types, so the app imports a type from them directly and ev
 It finds the package through `omp` on `PATH`, or `OMP_PACKAGE_DIR` when set; with a Bun global install that is `~/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent`.
 `bun run omp-release` checks a new omp release against these modules and the files listed below; the [omp release skill](../../.agents/skills/omp-release/SKILL.md) says how to read its report.
 
-Four runtime patches change omp itself, each kept in `patches/` with its regression tests against upstream tag `v18.18.0`, commit `b5a6b2f7e5b6606b6562e678ead83f21738f34a0`; do not apply them to another release without porting and verifying them.
+Four runtime patches change omp itself, each kept in `patches/` with its regression tests against upstream tag `v18.18.1`, commit `24439066040e006eb08da7b204f0ac41c79d2de9`; do not apply them to another release without porting and verifying them.
 The dashboard applies none of them, so installing or upgrading stock omp removes them all.
 From a clean checkout of that release, apply all four, run their tests, and build the CLI:
 
 ```sh
-for p in paid-cursor-fallback runtime-tool-contracts cursor-dynamic-tools-rule credit-balance-fallback; do git apply /absolute/path/to/omp-agents/patches/omp-18.18.0-$p.patch; done
+for p in paid-cursor-fallback runtime-tool-contracts cursor-dynamic-tools-rule credit-balance-fallback; do git apply /absolute/path/to/omp-agents/patches/omp-18.18.1-$p.patch; done
 bun install --frozen-lockfile
 bun --cwd=packages/ai test test/auth-storage-model-usage-health.test.ts test/cursor-usage.test.ts test/cursor-system-prompt-history.test.ts test/rate-limit-utils.test.ts test/anthropic-stream-envelope.test.ts
 bun --cwd=packages/coding-agent test test/paid-cursor-routing.test.ts test/write-xdev-dispatch.test.ts test/task/seance.test.ts test/agent-session-tool-rebuild-skip.test.ts test/tools/read-repeat-hint.test.ts test/agent-session-retry-fallback.test.ts
@@ -21,17 +21,18 @@ bun --cwd=packages/coding-agent run gen:bundle
 
 A source checkout needs the matching pi-natives addon in `packages/natives/native/` before those tests.
 Build once with all four applied, since a CLI built without one of them drops it.
-Install the rebuilt `dist/cli.js`, then copy each source file the patches change, as `git diff --name-only v18.18.0 -- packages/ai/src packages/coding-agent/src` lists them, over the installed one in `pi-ai/src/` or `pi-coding-agent/src/`, keeping a rollback copy of everything replaced.
+Install the rebuilt `dist/cli.js` together with the files `gen:bundle` writes beside it, the `CHANGELOG-*.md`, `docs-index.generated.txt`, and data files the bundle loads by name, over the installed `pi-coding-agent/dist/`.
+Then copy each source file the patches change, as `git diff --name-only v18.18.1 -- packages/ai/src packages/coding-agent/src` lists them, over the installed one in `pi-ai/src/` or `pi-coding-agent/src/`, keeping a rollback copy of everything replaced.
 Already-running sessions keep their loaded code until restarted.
 
-- `omp-18.18.0-paid-cursor-fallback.patch` adds the opt-in `retry.paidFallback` setting, which the [routing policy](../../templates/omp/agent/docs/model-routing.md) describes with its billing limits.
-- `omp-18.18.0-runtime-tool-contracts.patch` lists MCP devices by name per server in `read xd://` and mount notices, in `pi-coding-agent/src/internal-urls/router.ts`, `pi-coding-agent/src/internal-urls/xd-protocol.ts`, and `pi-coding-agent/src/tools/xdev.ts`.
+- `omp-18.18.1-paid-cursor-fallback.patch` adds the opt-in `retry.paidFallback` setting, which the [routing policy](../../templates/omp/agent/docs/model-routing.md) describes with its billing limits.
+- `omp-18.18.1-runtime-tool-contracts.patch` lists MCP devices by name per server in `read xd://` and mount notices, in `pi-coding-agent/src/internal-urls/router.ts`, `pi-coding-agent/src/internal-urls/xd-protocol.ts`, and `pi-coding-agent/src/tools/xdev.ts`.
   The read router applies ordinary line and raw selectors to `xd://` documentation; device writes reject those suffixes instead of executing the bare device.
   Missing-device errors give a short discovery hint rather than dumping the mounted inventory.
   Historical task consults, in `pi-coding-agent/src/task/seance.ts` with guidance in `pi-coding-agent/src/prompts/tools/seance-task-guidance.md`, search session IDs only in the caller's artifacts and current project, including when given a full UUID.
   Cross-project callers pass the exact `file` returned by eval's archive as `sourceSession`; the Memory curator's saved job follows that handoff.
-- `omp-18.18.0-cursor-dynamic-tools-rule.patch` adds `cursorDynamicToolsRule` to `pi-ai/src/providers/cursor.ts`: a system-prompt entry naming the tools Cursor hides behind `GetDynamicTools`, all but its native ones; the dashboard's own [Cursor paragraph](front-end-components.md#session-visuals) still reaches its sessions without it.
-- `omp-18.18.0-credit-balance-fallback.patch` adds Anthropic's 400 `credit balance is too low` to `CREDITS_EXHAUSTED_PATTERN` in `pi-ai/src/error/rate-limit.ts`, so a spent API key is a usage limit that moves the session to the next fallback entry and keeps the key skipped until its backoff ends; [its record](../decisions/2026-11-07-a-spent-api-key-is-a-usage-limit-in-a-runtime-patch.md) says why.
+- `omp-18.18.1-cursor-dynamic-tools-rule.patch` adds `cursorDynamicToolsRule` to `pi-ai/src/providers/cursor.ts`: a system-prompt entry naming the tools Cursor hides behind `GetDynamicTools`, all but its native ones; the dashboard's own [Cursor paragraph](front-end-components.md#session-visuals) still reaches its sessions without it.
+- `omp-18.18.1-credit-balance-fallback.patch` adds Anthropic's 400 `credit balance is too low` to `CREDITS_EXHAUSTED_PATTERN` in `pi-ai/src/error/rate-limit.ts`, so a spent API key is a usage limit that moves the session to the next fallback entry and keeps the key skipped until its backoff ends; [its record](../decisions/2026-11-07-a-spent-api-key-is-a-usage-limit-in-a-runtime-patch.md) says why.
 
 Paths in this document that start with `pi-coding-agent/`, `pi-ai/`, `pi-catalog/`, `pi-tui/`, `pi-utils/`, or `omp-stats/` are inside that install, in `@oh-my-pi/`.
 They are not in this repository.
