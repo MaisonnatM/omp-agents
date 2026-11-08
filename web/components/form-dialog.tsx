@@ -1,7 +1,7 @@
 /** `FormDialog`, the dialog shell the dashboard's forms share, with its header, error line, and Cmd+Enter submit chord. */
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { X } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useRef } from "react";
+import { type KeyboardEvent, type ReactNode, type RefObject, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,9 @@ export type Submit<Done = never> = { kind: "writing" } | { kind: "creating" } | 
 
 /** A form's error line. */
 export const ERROR_TEXT = "text-xs text-red-600 dark:text-red-400";
+
+/** Ways to dismiss a dialog besides its close button: Esc, or a click outside it. */
+export type Dismissal = "escape-key" | "outside-press";
 
 /** Cmd+Enter, or Ctrl+Enter, which sends the form. */
 export const isSubmitChord = (event: KeyboardEvent): boolean => event.key === "Enter" && (event.metaKey || event.ctrlKey);
@@ -25,10 +28,14 @@ interface FormDialogProps {
 	children: ReactNode;
 	/** Keys pressed anywhere in the dialog, including the arrows, Home, and End, which the popup keeps from the page. */
 	onKeyDown?: (event: KeyboardEvent) => void;
+	/** What takes the focus as the dialog opens, in place of its first button. */
+	initialFocus?: RefObject<HTMLElement | null>;
+	/** Called on Esc or a click outside before the dialog closes; returns whether it closes. The close button always closes. */
+	onDismiss?: (how: Dismissal) => boolean;
 }
 
 /** A dialog over the page that holds one form to fill in and send, such as a new issue or a new event. */
-export function FormDialog({ busy, onClose, className, children, onKeyDown }: FormDialogProps) {
+export function FormDialog({ busy, onClose, className, children, onKeyDown, initialFocus, onDismiss }: FormDialogProps) {
 	const popup = useRef<HTMLDivElement>(null);
 	return (
 		<DialogPrimitive.Root
@@ -36,6 +43,7 @@ export function FormDialog({ busy, onClose, className, children, onKeyDown }: Fo
 			onOpenChange={(open, details) => {
 				// The form's Radix pickers render outside the popup; Esc there closes only the picker.
 				if (details.reason === "escape-key" && !popup.current?.contains(details.event.target as Node)) return;
+				if ((details.reason === "escape-key" || details.reason === "outside-press") && onDismiss && !onDismiss(details.reason)) return;
 				if (!open && !busy) onClose();
 			}}
 		>
@@ -44,6 +52,7 @@ export function FormDialog({ busy, onClose, className, children, onKeyDown }: Fo
 				<DialogPrimitive.Popup
 					ref={popup}
 					onKeyDown={onKeyDown}
+					initialFocus={initialFocus}
 					className={cn("fixed left-1/2 z-50 flex max-h-[calc(100vh-2rem)] -translate-x-1/2 flex-col overflow-y-auto rounded-2xl border bg-popover text-popover-foreground shadow-2xl outline-hidden", className)}
 				>
 					{children}
@@ -63,10 +72,12 @@ interface FormDialogHeaderProps {
 	actions?: ReactNode;
 	/** The close button's tooltip and accessible name, for a dialog in another language. */
 	closeLabel?: string;
+	/** The close button's own size or color, for a dialog drawn on its own fill. */
+	closeClassName?: string;
 }
 
 /** A {@link FormDialog}'s header: its title, and its actions and close button at its end. */
-export function FormDialogHeader({ title, busy, lead, actions, closeLabel = "Close" }: FormDialogHeaderProps) {
+export function FormDialogHeader({ title, busy, lead, actions, closeLabel = "Close", closeClassName }: FormDialogHeaderProps) {
 	return (
 		<div className="flex items-center gap-1.5 px-4 pt-3.5 text-[13px]">
 			{lead}
@@ -74,7 +85,7 @@ export function FormDialogHeader({ title, busy, lead, actions, closeLabel = "Clo
 			<div className="ml-auto flex items-center gap-0.5">
 				{actions}
 				<Tooltip content={closeLabel} shortcut={["Esc"]} side="bottom">
-					<DialogPrimitive.Close render={<Button variant="ghost" size="icon-compact" aria-label={closeLabel} disabled={busy} />}>
+					<DialogPrimitive.Close render={<Button variant="ghost" size="icon-compact" className={closeClassName} aria-label={closeLabel} disabled={busy} />}>
 						<X />
 					</DialogPrimitive.Close>
 				</Tooltip>

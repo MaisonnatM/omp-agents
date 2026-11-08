@@ -64,7 +64,7 @@ test("week shows each day's phase, workouts, and loads from the newest test, and
 	expect(days.map(({ date, phase }: { date: string; phase: string }) => [date, phase])).toEqual(["16", "17", "18", "19", "20", "21", "22"].map(day => [`2026-11-${day}`, "transition"]));
 	expect(days[1].workouts.map(({ id, kind }: { id: string; kind: string }) => [id, kind])).toEqual([["mardi", "hangboard"]]);
 	const semi = days[1].workouts[0].blocks[1].items[0];
-	expect(semi).toEqual({ key: "semi", name: SEMI.name, sets: 5, reps: null, holdSec: 10, restSec: 180, hang: true, note: "", load: loadFor(STATE, SEMI, "2026-11-17"), removed: false });
+	expect(semi).toEqual({ key: "semi", name: SEMI.name, sets: 5, reps: null, holdSec: 10, restSec: 180, hang: true, perSide: false, note: "", load: loadFor(STATE, SEMI, "2026-11-17"), removed: false });
 });
 
 test("the reads run on read approval, and every action that leaves a request on write approval", () => {

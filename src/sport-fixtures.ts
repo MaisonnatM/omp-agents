@@ -13,6 +13,7 @@ export const exercise = (key: string, name: string, fields: Partial<Exercise> = 
 	demo: null,
 	opensAs: [],
 	hang: false,
+	perSide: false,
 	...fields,
 });
 

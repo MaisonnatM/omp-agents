@@ -171,6 +171,11 @@ export const CONTROLS = [
 	{ id: "sport.weigh.save", label: "Sport Pesée Enregistrer button", area: "Sport" },
 	{ id: "sport.progress.card", label: "Sport progress card", area: "Sport" },
 	{ id: "sport.progress.range", label: "Sport progress range tabs", area: "Sport" },
+	{ id: "sport.timer.open", label: "Sport routine Lancer button", area: "Sport" },
+	{ id: "sport.timer.pause", label: "Sport timer pause and resume button", area: "Sport" },
+	{ id: "sport.timer.step", label: "Sport timer previous and next step buttons", area: "Sport" },
+	{ id: "sport.timer.sound", label: "Sport timer sound toggle", area: "Sport" },
+	{ id: "sport.timer.close", label: "Sport timer Fermer button on the done screen", area: "Sport" },
 ] as const satisfies readonly { id: string; label: string; area: string }[];
 
 export type ControlId = (typeof CONTROLS)[number]["id"];

@@ -95,6 +95,9 @@ export type ShortcutId =
 	| "sportJournalNext"
 	| "sportJournalPrevious"
 	| "sportJournalClose"
+	| "sportTimerPause"
+	| "sportTimerPrevious"
+	| "sportTimerNext"
 	| "nextChangedFile"
 	| "previousChangedFile"
 	| "moveUp"
@@ -324,6 +327,9 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "sportJournalNext", category: "sport", label: "Sport journal: focus the next, older session, or open it while a session is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "sportJournalPrevious", category: "sport", label: "Sport journal: focus the previous, newer session, or open it while a session is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "sportJournalClose", category: "sport", label: "Sport journal: close the open session", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
+	{ id: "sportTimerPause", category: "sport", label: "Sport timer: pause or resume the routine", keys: [{ chord: { key: " " }, scope: "outside-fields" }] },
+	{ id: "sportTimerPrevious", category: "sport", label: "Sport timer: go back to the previous step", keys: [{ chord: { key: "ArrowLeft" }, scope: "outside-fields" }] },
+	{ id: "sportTimerNext", category: "sport", label: "Sport timer: end this step and go to the next", keys: [{ chord: { key: "ArrowRight" }, scope: "outside-fields" }] },
 	{ id: "nextChangedFile", category: "changes", label: "Changes: open the next changed file", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "previousChangedFile", category: "changes", label: "Changes: open the previous changed file", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "moveUp", category: "todo", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
