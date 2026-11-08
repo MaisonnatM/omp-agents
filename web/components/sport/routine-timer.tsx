@@ -162,13 +162,14 @@ export function RoutineTimer({ plan, routine, date, ticked, sound, onTick, onClo
 		else sound.plan(sec * 1000 - ranAt(run, performance.now()));
 	}, [sound, soundOn, run, steps]);
 
-	// The voice, as each step starts.
+	// The voice, as each step starts; the end is celebrated only when every item is ticked.
 	useEffect(() => {
 		if (!latest.current.soundOn) return;
 		const entered = steps[run.at];
-		const cue = entered ? spokenCue(entered) : "Terminé";
+		const allTicked = items.every(({ key }) => latest.current.ticked.includes(key) || sent.current.has(key));
+		const cue = entered ? spokenCue(entered) : allTicked ? "Terminé" : "Arrêté";
 		if (cue) sound.speak(cue);
-	}, [sound, run.at, steps]);
+	}, [sound, run.at, steps, items]);
 
 	useEffect(() => () => sound.close(), [sound]);
 
@@ -260,14 +261,15 @@ interface StepViewProps {
 }
 
 /**
- * The step under way, in three groups: what it is over its countdown in a ring, then the hold it is or leads to, then what follows and what is left.
+ * The step under way, in three groups: what it is over its countdown in a ring, then the hold it is or leads to, then the next hold to start and what is left.
  * A pause shows in the ring as well as in the grayed fill.
  */
 function StepView({ plan, steps, step, run, now }: StepViewProps) {
 	const { hold } = step;
 	const { item } = hold;
 	const holds = steps.filter(({ kind }) => kind === "hold");
-	const after = holds[hold.index + 1]?.hold ?? null;
+	// A hold leads to the hold after it; a break or the « Prêt » leads to the hold it comes before.
+	const after = step.kind === "hold" ? (holds[hold.index + 1]?.hold ?? null) : hold;
 	const left = step.sec === null ? null : Math.max(0, Math.ceil((step.sec * 1000 - ranAt(run, now)) / 1000));
 	// The ring moves with the countdown's seconds; with reduced motion it steps, without it glides between them.
 	const done = step.sec === null || left === null ? 0 : (step.sec - left) / step.sec;

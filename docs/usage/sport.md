@@ -37,7 +37,7 @@
   An exercise counted in reps rather than seconds waits for you: press the next-step button once its reps are done.
 - The color says what is under way: a deep green for a hold, a light amber for getting ready and the time between holds, and blue once every exercise is ticked.
   Paused, the color turns nearly gray and the ring says « En pause ».
-  The countdown sits in a ring; under it come the exercise's name, its set and side, its note, and the first cue of its demo when the note does not already say it; below, « Ensuite » names the hold that follows, with the hold's number and the time left.
+  The countdown sits in a ring; under it come the exercise's name, its set and side, its note, and the first cue of its demo when the note does not already say it; below, « Ensuite » names the next hold to start, which during « Prêt » or a break is the one shown above, with the hold's number and the time left.
 - The big button pauses and resumes, and the buttons beside it go back a step or skip to the next; Space, ←, and → do the same, and Esc or the cross closes the timer.
 - It beeps on each of the last three seconds of a step and plays a rising tone as the next starts, and a French voice names what comes next and says « change de côté », when the browser can speak.
   The speaker button turns the sound off or on, and the timer remembers it for next time.
@@ -45,7 +45,7 @@
 - When an exercise's last hold ends, its box is ticked for the open day, alongside what was ticked already; skipping a hold does not tick it, and closing the timer early keeps what it ticked.
   An exercise counted in reps is ticked when you press the next-step button on its last set.
 - At the end, « Terminé » shows how long the routine took and how many boxes are ticked, and **Fermer** closes the timer.
-  When some exercises were skipped, it says « Arrêté » on gray instead.
+  When some exercises were skipped, it says « Arrêté » on gray instead, and so does the voice.
 - With reduced motion turned on, the color changes at once and the ring moves a second at a time.
 
 ## Demos
