@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-08
 
+- Behind the scenes: the model replay now keeps each model on its own work, so a model that hits its usage limit is retried later instead of being quietly answered by Opus, and a third, cheaper model can join the comparison.
 - Behind the scenes: a replay script reruns real helper-agent tasks on two models side by side, with the project's checks and a blind review of both results, to tell whether a cheaper model does the work as well.
 - Behind the scenes: the dashboard now keeps your training plan, test results, targets, and workout log together and works out each week's workouts and loads, ready for the coming Sport page.
 - Behind the scenes: the dashboard now keeps your training plan, test results, targets, and workout log together and works out each week's workouts and loads, which the Sport page shows.
