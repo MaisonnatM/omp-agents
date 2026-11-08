@@ -1,10 +1,11 @@
-From f5c6f6e7a11b2511e4859933bc3568b8a4386635 Mon Sep 17 00:00:00 2001
+From c19f68a679439ce70d3466628a58f6f86b5fc827 Mon Sep 17 00:00:00 2001
 From: omp-agents <omp-agents@local>
 Date: Sat, 7 Nov 2026 11:57:44 +0100
 Subject: [PATCH] feat: opt-in paid Cursor last-resort fallback
  (retry.paidFallback)
 
 Omp-Session: 01a1b5a7-fbb9-7478-b73b-0e376931db3c
+Omp-Session: 01a1ba72-9521-7781-a636-0140dd04a053
 ---
  docs/non-compaction-retry-policy.md           |  33 ++
  docs/settings.md                              |   1 +
@@ -84,10 +85,10 @@ index 1ead7f6d71..9b8070dc42 100644
 +
 +Cursor uses the same completion transport for included and on-demand requests. This policy controls deliberate local routing using reported quota. It does not disable Cursor's server-side automatic billing or guarantee zero incidental overage when reports are stale or unknown.
 diff --git a/docs/settings.md b/docs/settings.md
-index a0ab336f88..1538ecf648 100644
+index 01927d8dcc..a62064abef 100644
 --- a/docs/settings.md
 +++ b/docs/settings.md
-@@ -601,6 +601,7 @@ providers:
+@@ -603,6 +603,7 @@ providers:
  | `retry.fallbackRevertPolicy`             | enum    | `cooldown-expiry` | `cooldown-expiry` returns to the primary model once its suppression window ends; `never` stays on the fallback until switched manually.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
  | `retry.waitForUsageReset`                | boolean | `false`           | Allow provider-stated usage-limit waits past `retry.maxDelayMs` when a reset hint or complete usage report supplies authoritative timing. Waits are abortable but can also hold subagents.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
  | `retry.usageAwareFallback`               | boolean | `false`           | Before a turn, use reliable coding-plan quota reports to prefer healthy same-provider accounts and then configured fallback models. Unknown usage keeps the current model; ordinary API keys are excluded.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
@@ -96,7 +97,7 @@ index a0ab336f88..1538ecf648 100644
  | `retry.usageReservePolicy`               | enum    | `confirm`         | `confirm`, `auto`, `fail-closed`. At reserve, `confirm` asks when an interactive confirmer is available and otherwise auto-falls back; exhausted quota can fall back without confirmation. `fail-closed` blocks known reserve/depleted quota rather than spending it.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
  | `providers.anthropic.serverSideFallback` | boolean | `false`           | Opt in to Anthropic's `server-side-fallback-2026-06-01` beta for eligible direct Claude Fable/Mythos requests. The catalog-owned server-side chain currently targets `claude-opus-5`, not `claude-opus-5-5`; unsupported models and hosts have no chain.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 diff --git a/packages/ai/CHANGELOG.md b/packages/ai/CHANGELOG.md
-index 60d4b8313f..9f098736ce 100644
+index 2bda8da629..b69eab4173 100644
 --- a/packages/ai/CHANGELOG.md
 +++ b/packages/ai/CHANGELOG.md
 @@ -2,6 +2,14 @@
@@ -111,9 +112,9 @@ index 60d4b8313f..9f098736ce 100644
 +
 +- Treat numerically exhausted included-plan windows as depleted even when the provider labels them `ok`, preserving their reset time instead of routing through zero reserve.
 +
- ## [18.17.0] - 2026-11-06
+ ## [18.18.1] - 2026-11-08
  
- ### Added
+ ### Fixed
 diff --git a/packages/ai/src/auth/cascade.ts b/packages/ai/src/auth/cascade.ts
 index cf4e827bf6..7b08cc2e8d 100644
 --- a/packages/ai/src/auth/cascade.ts
@@ -596,7 +597,7 @@ index 5fd5710827..b45a4dd731 100644
  			if (options?.recordAffinity !== false) {
  				this.#deps.affinity.record(provider, sessionId, "oauth", selection.index);
 diff --git a/packages/ai/src/auth/types.ts b/packages/ai/src/auth/types.ts
-index b937153793..7a0912375a 100644
+index 1d10accccb..412c3e44f3 100644
 --- a/packages/ai/src/auth/types.ts
 +++ b/packages/ai/src/auth/types.ts
 @@ -12,6 +12,7 @@ import type {
@@ -1079,7 +1080,7 @@ index 6b1cc0777f..3902514d18 100644
  		it("does not let an exhausted Other Models pool block Grok or Composer", () => {
  			const report = parseCursorIndividualUsage({
 diff --git a/packages/coding-agent/CHANGELOG.md b/packages/coding-agent/CHANGELOG.md
-index f449a29d6a..de8aa8e2a8 100644
+index 5f2decf66a..3a67749c97 100644
 --- a/packages/coding-agent/CHANGELOG.md
 +++ b/packages/coding-agent/CHANGELOG.md
 @@ -2,6 +2,10 @@
@@ -1090,9 +1091,9 @@ index f449a29d6a..de8aa8e2a8 100644
 +
 +- Added opt-in `retry.paidFallback` for session routing after all eligible configured included plans are depleted or unavailable, with automatic included-plan recovery on later prompts. Usage preflight preserves automatic thinking and defers interactive reserve confirmation until the first prompt.
 +
- ## [18.18.0] - 2026-11-07
+ ## [18.18.1] - 2026-11-08
  
- ### Added
+ ### Breaking Changes
 diff --git a/packages/coding-agent/src/config/account-pools.ts b/packages/coding-agent/src/config/account-pools.ts
 index ed6d34b462..cb64845f9f 100644
 --- a/packages/coding-agent/src/config/account-pools.ts
@@ -1140,7 +1141,7 @@ index 97dce40d71..dceafff650 100644
  				apiKey: previousKey,
  			});
 diff --git a/packages/coding-agent/src/config/model-registry.ts b/packages/coding-agent/src/config/model-registry.ts
-index 3f8a25f5ac..6c184c1445 100644
+index 4c4dff4772..260c12fa8d 100644
 --- a/packages/coding-agent/src/config/model-registry.ts
 +++ b/packages/coding-agent/src/config/model-registry.ts
 @@ -3667,19 +3667,20 @@ export class ModelRegistry {
@@ -1184,10 +1185,10 @@ index 3f8a25f5ac..6c184c1445 100644
  	}
  
 diff --git a/packages/coding-agent/src/sdk.ts b/packages/coding-agent/src/sdk.ts
-index 64e5d68a44..3b9c4850a2 100644
+index 243c42254c..0315181fc1 100644
 --- a/packages/coding-agent/src/sdk.ts
 +++ b/packages/coding-agent/src/sdk.ts
-@@ -234,6 +234,15 @@ import {
+@@ -235,6 +235,15 @@ import {
  	type RetryFallbackResolutionContext,
  	resolveRetryFallbackChainKey,
  } from "./session/retry-fallback-chains";
@@ -1203,7 +1204,7 @@ index 64e5d68a44..3b9c4850a2 100644
  import { describeUsageFallback } from "./session/retry-fallback-reason";
  import { getRestorableSessionModels } from "./session/session-context";
  import { SessionManager } from "./session/session-manager";
-@@ -273,10 +282,12 @@ import {
+@@ -274,10 +283,12 @@ import {
  	AUTO_THINKING,
  	type ConfiguredThinkingLevel,
  	concreteThinkingLevel,
@@ -1216,7 +1217,7 @@ index 64e5d68a44..3b9c4850a2 100644
  	shouldDisableReasoning,
  	toReasoningEffort,
  } from "@oh-my-pi/pi-tui/thinking";
-@@ -378,6 +389,7 @@ import {
+@@ -379,6 +390,7 @@ import {
  	cfgProvidersKimiApiFormat,
  	cfgRetryFallbackChains,
  	cfgRetryModelFallback,
@@ -1224,7 +1225,7 @@ index 64e5d68a44..3b9c4850a2 100644
  	cfgRetryUsageAwareFallback,
  	cfgRetryUsageReservePct,
  	cfgRetryUsageReservePolicy,
-@@ -2471,9 +2483,16 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
+@@ -2472,9 +2484,16 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
  	let contextFiles = initialContextFiles;
  
  	let agent: Agent;
@@ -1243,7 +1244,7 @@ index 64e5d68a44..3b9c4850a2 100644
  	let hasSession = false;
  	let hasRegistered = false;
  	const restrictToolNames = options.restrictToolNames === true;
-@@ -3348,7 +3367,8 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
+@@ -3349,7 +3368,8 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
  				if (
  					((modelFallbackEnabled && (hasUsageFallbackCandidate || usageFallbackTriggered)) ||
  						usageReservePolicy === "fail-closed") &&
@@ -1253,7 +1254,7 @@ index 64e5d68a44..3b9c4850a2 100644
  				) {
  					let usageHealth: ModelUsageHealth | undefined;
  					try {
-@@ -3707,6 +3727,69 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
+@@ -3708,6 +3728,69 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
  				adoptThinkingForModel(refreshedModel);
  			}
  		}
@@ -1323,7 +1324,7 @@ index 64e5d68a44..3b9c4850a2 100644
  
  		// A first-turn user tail has no assistant metadata to copy. Once startup
  		// has selected its final model, use that model to terminate the
-@@ -5103,6 +5186,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
+@@ -5104,6 +5187,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
  			thinkingLevelCeiling: options.thinkingLevelCeiling,
  			disableModelFallback: options.disableModelFallback,
  			initialRetryFallback,
@@ -1332,7 +1333,7 @@ index 64e5d68a44..3b9c4850a2 100644
  			prewalk,
  			suppressAutoPrewalk: options.suppressAutoPrewalk,
 diff --git a/packages/coding-agent/src/session/agent-session-types.ts b/packages/coding-agent/src/session/agent-session-types.ts
-index 8728626367..4daef6d01c 100644
+index 2aca7735ce..c116e67b6b 100644
 --- a/packages/coding-agent/src/session/agent-session-types.ts
 +++ b/packages/coding-agent/src/session/agent-session-types.ts
 @@ -15,6 +15,7 @@ import type {
@@ -1343,7 +1344,7 @@ index 8728626367..4daef6d01c 100644
  	ServiceTierByFamily,
  	SimpleStreamOptions,
  	ToolChoice,
-@@ -166,6 +167,7 @@ export interface InitialRetryFallbackState {
+@@ -168,6 +169,7 @@ export interface InitialRetryFallbackState {
  	originalThinkingLevel: ConfiguredThinkingLevel | undefined;
  	/** Prevent cooldown restoration when startup selected this fallback from live usage health. */
  	pinned?: boolean;
@@ -1351,7 +1352,7 @@ index 8728626367..4daef6d01c 100644
  }
  
  /** Dependencies and initial state used to construct an AgentSession. */
-@@ -219,6 +221,8 @@ export interface AgentSessionConfig {
+@@ -221,6 +223,8 @@ export interface AgentSessionConfig {
  	disableModelFallback?: boolean;
  	/** Retry chain ownership when startup selected one of its fallback entries. */
  	initialRetryFallback?: InitialRetryFallbackState;
@@ -1361,10 +1362,10 @@ index 8728626367..4daef6d01c 100644
  	deferRetryFallbackValidation?: boolean;
  	/**
 diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/coding-agent/src/session/agent-session.ts
-index e07b344ddf..4ee5cc21e3 100644
+index 3188c8448f..5ab52b1235 100644
 --- a/packages/coding-agent/src/session/agent-session.ts
 +++ b/packages/coding-agent/src/session/agent-session.ts
-@@ -2358,6 +2358,7 @@ export class AgentSession implements SettingsScope, AgentViewSession {
+@@ -2359,6 +2359,7 @@ export class AgentSession implements SettingsScope, AgentViewSession {
  		this.#fallbackChainValidationDeferred = config.deferRetryFallbackValidation === true;
  		this.#recovery = new TurnRecovery(recoveryHost, {
  			initialRetryFallback: config.initialRetryFallback,
@@ -1372,7 +1373,7 @@ index e07b344ddf..4ee5cc21e3 100644
  			deferFallbackChainValidation: this.#fallbackChainValidationDeferred,
  			unexpectedStopJudgeTimeoutMs: config.unexpectedStopJudgeTimeoutMs,
  		});
-@@ -7069,6 +7070,10 @@ export class AgentSession implements SettingsScope, AgentViewSession {
+@@ -7074,6 +7075,10 @@ export class AgentSession implements SettingsScope, AgentViewSession {
  		return allowed;
  	}
  
@@ -1383,7 +1384,7 @@ index e07b344ddf..4ee5cc21e3 100644
  	async #runUsageAwarePreflight(signal?: AbortSignal): Promise<boolean> {
  		if (signal?.aborted) return false;
  		const generation = this.#promptGeneration;
-@@ -9173,7 +9178,9 @@ export class AgentSession implements SettingsScope, AgentViewSession {
+@@ -9178,7 +9183,9 @@ export class AgentSession implements SettingsScope, AgentViewSession {
  			}
  
  			// Validate API key; a provider without one walks the retry fallback chain first.

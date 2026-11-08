@@ -19,6 +19,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Fixed: with the starter kit, telling the ship tracker a pull request was merged now works for each pull request you name, even right after another one was marked merged, and it still refuses one that is not merged yet.
 - With the starter kit, a session whose Google Calendar or Gmail sign-in has run out now tells you to sign in again in Settings › Integrations, instead of trying again.
 - The bell now shows a notice when Google Calendar or Gmail is signed out, under a new Integrations tab, and opening it takes you to Settings › Integrations; it goes away once you sign in again.
+- The four omp patches, paid Cursor fallback, tool documentation, Cursor tools, and the credit patch, now apply to omp 18.18.1, and the credit patch now applies on its own.
+- omp-agents is now tested with omp 18.18.1.
 - Settings › Providers now lists a provider's signed-in accounts in the order omp tries them, each with its place number.
 - Up and down arrows beside each account change which one omp uses first, for example your work Anthropic account before your personal one.
 - The new order is saved at once in omp's settings, and omp follows it without a restart.
