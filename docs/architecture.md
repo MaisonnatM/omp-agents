@@ -6,6 +6,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 
 - [Harness map](architecture/harness-map.md)
 - [omp modules](architecture/omp-modules.md)
+  - [omp runtime patches](architecture/omp-runtime-patches.md)
 - [Extensions library](architecture/extensions.md)
 - [Get started](architecture/get-started.md)
 - [Transcripts](architecture/transcripts.md)

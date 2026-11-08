@@ -9,21 +9,7 @@ It finds the package through `omp` on `PATH`, or `OMP_PACKAGE_DIR` when set; wit
 
 Four runtime patches change omp itself, each kept in `patches/` with its regression tests against upstream tag `v18.18.1`, commit `24439066040e006eb08da7b204f0ac41c79d2de9`; do not apply them to another release without porting and verifying them.
 The dashboard applies none of them, so installing or upgrading stock omp removes them all.
-From a clean checkout of that release, apply all four, run their tests, and build the CLI:
-
-```sh
-for p in paid-cursor-fallback runtime-tool-contracts cursor-dynamic-tools-rule credit-balance-fallback; do git apply /absolute/path/to/omp-agents/patches/omp-18.18.1-$p.patch; done
-bun install --frozen-lockfile
-bun --cwd=packages/ai test test/auth-storage-model-usage-health.test.ts test/cursor-usage.test.ts test/cursor-system-prompt-history.test.ts test/rate-limit-utils.test.ts test/anthropic-stream-envelope.test.ts
-bun --cwd=packages/coding-agent test test/paid-cursor-routing.test.ts test/write-xdev-dispatch.test.ts test/task/seance.test.ts test/agent-session-tool-rebuild-skip.test.ts test/tools/read-repeat-hint.test.ts test/agent-session-retry-fallback.test.ts
-bun --cwd=packages/coding-agent run gen:bundle
-```
-
-A source checkout needs the matching pi-natives addon in `packages/natives/native/` before those tests.
-Build once with all four applied, since a CLI built without one of them drops it.
-Install the rebuilt `dist/cli.js` together with the files `gen:bundle` writes beside it, the `CHANGELOG-*.md`, `docs-index.generated.txt`, and data files the bundle loads by name, over the installed `pi-coding-agent/dist/`.
-Then copy each source file the patches change, as `git diff --name-only v18.18.1 -- packages/ai/src packages/coding-agent/src` lists them, over the installed one in `pi-ai/src/` or `pi-coding-agent/src/`, keeping a rollback copy of everything replaced.
-Already-running sessions keep their loaded code until restarted.
+[omp runtime patches](omp-runtime-patches.md) says how to apply, test, build, and install all four.
 
 - `omp-18.18.1-paid-cursor-fallback.patch` adds the opt-in `retry.paidFallback` setting, which the [routing policy](../../templates/omp/agent/docs/model-routing.md) describes with its billing limits.
 - `omp-18.18.1-runtime-tool-contracts.patch` lists MCP devices by name per server in `read xd://` and mount notices, in `pi-coding-agent/src/internal-urls/router.ts`, `pi-coding-agent/src/internal-urls/xd-protocol.ts`, and `pi-coding-agent/src/tools/xdev.ts`.
