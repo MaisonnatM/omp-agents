@@ -2,7 +2,8 @@ import { fromPartial } from "@total-typescript/shoehorn";
 import { describe, expect, test } from "bun:test";
 import type { AgentRow, AgentStatus, HostStatus, PastSession, RosterHost, UnreadTurn } from "../src/shared/sessions";
 import { spaces } from "../src/shared/workspaces";
-import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, searchSessions, sessionsIn, sidebarSessions, spaceSession, waitingCount, workspaceSession, workspacesIn, workspaceSwitch } from "./sessions";
+import { needsYou } from "./attention";
+import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, searchSessions, sessionsIn, sidebarSessions, spaceSession, waitingCount, waitingIn, workspaceSession, workspacesIn, workspaceSwitch } from "./sessions";
 
 const host = (sessionId: string, cwd: string) => fromPartial<RosterHost>({ instanceId: `i-${sessionId}`, sessionId, cwd, agents: [], turnWaits: false });
 const subagents = (...statuses: AgentStatus[]): AgentRow[] => statuses.map(status => fromPartial<AgentRow>({ status }));
@@ -140,6 +141,20 @@ describe("spaces", () => {
 		expect(spaceSession("personal", hosts, placed)).toEqual({ kind: "live", instanceId: "i-new", agentId: null });
 		expect(spaceSession("work", hosts, placed)).toEqual({ kind: "live", instanceId: "i-job", agentId: null });
 		expect(spaceSession("personal", [running("job", "/code/app", 9)], placed)).toBeNull();
+	});
+
+	test("each space counts its sessions that need you, the two counts adding up to the Dock badge's count of every one", () => {
+		const turn = fromPartial<UnreadTurn>({ at: 1, reply: "Done." });
+		const asks = (sessionId: string, cwd: string) => ({ ...running(sessionId, cwd, 1), status: "needs-input" as const, unread: null, requests: [] });
+		const hosts = [
+			asks("life", "/home/me/personal"),
+			{ ...running("garden", "/code/garden", 2), status: "idle" as const, unread: turn, requests: [] },
+			asks("job", "/code/app"),
+			{ ...running("busy", "/code/app", 3), status: "working" as const, unread: null, requests: [] },
+		];
+		expect(waitingIn(hosts, "personal", placed)).toBe(2);
+		expect(waitingIn(hosts, "work", placed)).toBe(1);
+		expect(waitingIn(hosts, "personal", placed) + waitingIn(hosts, "work", placed)).toBe(hosts.filter(needsYou).length);
 	});
 });
 

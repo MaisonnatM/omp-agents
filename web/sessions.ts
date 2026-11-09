@@ -193,6 +193,9 @@ export function searchSessions(lists: SidebarSessions, query: string): SidebarSe
 /** How many live sessions in `lists` need you: each that asks you something, or finished a turn you have not looked at since, as the Dock badge counts them. */
 export const waitingCount = (lists: SidebarSessions): number => [...lists.pinned.hosts, ...liveHosts(lists)].filter(needsYou).length;
 
+/** How many live sessions of `hosts` count in `space` and need you; the two spaces' counts add up to the Dock badge's. */
+export const waitingIn = (hosts: RosterHost[], space: Space, spaces: Spaces): number => hosts.filter(host => needsYou(host) && spaceOf(host, spaces) === space).length;
+
 /** The session the Sessions tab opens when no pane shows one: of the rows `lists` holds, the live one started last, else the past one saved last. */
 export function latestSession(lists: SidebarSessions): View | null {
 	const { pinned, interrupted, ended } = lists;
