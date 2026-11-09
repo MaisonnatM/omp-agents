@@ -1,8 +1,8 @@
 /** The left sidebar's tabbed roster: sessions, pull requests, tickets, todos, notes, and more, under the workspace picker. */
-import { Folder, Keyboard } from "lucide-react";
+import { ArrowLeftRight, Folder, Keyboard } from "lucide-react";
 import { type ReactNode, useContext, useState } from "react";
 import type { RosterHost, View } from "../../src/shared/sessions";
-import type { Workspace } from "../../src/shared/workspaces";
+import { otherSpace, type Space, type Workspace } from "../../src/shared/workspaces";
 import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
@@ -12,10 +12,11 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { agentOn } from "../../src/shared/moves";
+import { errorText } from "../../src/json";
 import { activityControl } from "../activity";
 import { yourMoveCount } from "../pull-requests-model";
-import { sameDir, workspaceName } from "../labels";
-import { pullRequestsStore, ticketsStore } from "../reads";
+import { ALL_OF_SPACE, SPACE_LABELS, workspaceName } from "../labels";
+import { pullRequestsStore, ticketsStore, writeWorkspace } from "../reads";
 import { hashForTickets, type NotesListView, type SettingsRoute, type SidebarPanel, type SidebarTab, type SportRoute, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SidebarSessions } from "../sessions";
@@ -33,34 +34,72 @@ import { NotesNav } from "./notes/nav";
 import { SessionList } from "./session-list";
 import { SportNav } from "./sport/nav";
 import { SettingsNav } from "./settings/settings-nav";
+import { toasts } from "./toaster";
 import { workspaceItems } from "./workspace-picker";
 import { TodoCategories } from "./todo/categories";
 import type { KnownSessions } from "./todo/links";
 
 interface SidebarWorkspacePickerProps {
-	/** The workspaces, as {@link listWorkspaces} lists them. */
+	/** The space's workspaces, as {@link workspacesIn} lists them. */
 	workspaces: Workspace[];
-	/** The selected workspace's `cwd`, or `null` for all workspaces. */
-	current: string | null;
 	onPick: (cwd: string | null) => void;
 }
 
-/** Scopes the roster to one directory's running and past sessions. */
-function SidebarWorkspacePicker({ workspaces, current, onPick }: SidebarWorkspacePickerProps) {
+/** How long **Undo** stays after a workspace moves to the other space. */
+const UNDO_MS = 8000;
+const MOVE_TOAST = "workspace-move";
+
+/**
+ * Moves workspace `cwd`, called `name`, from space `from` to `to`, with **Undo** to move it back. Every page hears the list
+ * after it over its socket, and the sidebar then leaves the workspace and its sessions out of this space.
+ */
+async function moveWorkspace(name: string, cwd: string, from: Space, to: Space): Promise<void> {
+	try {
+		await writeWorkspace({ op: "space", cwd, space: to });
+	} catch (error) {
+		toasts.add({ title: `Could not move ${name} to ${SPACE_LABELS[to]}`, description: errorText(error) });
+		return;
+	}
+	toasts.add({
+		id: MOVE_TOAST,
+		title: `Moved ${name} to ${SPACE_LABELS[to]}`,
+		timeout: UNDO_MS,
+		actionProps: {
+			children: "Undo",
+			onClick: () => {
+				toasts.close(MOVE_TOAST);
+				void moveWorkspace(name, cwd, to, from);
+			},
+		},
+	});
+}
+
+/** Scopes the roster to one directory's running and past sessions, or to all of the space's, and moves the selected workspace to the other space. */
+function SidebarWorkspacePicker({ workspaces, onPick }: SidebarWorkspacePickerProps) {
 	const [open, setOpen] = useState(false);
 	const personal = useContext(PersonalContext);
+	const { workspace: current, space, spaces } = useDashboardStatus().scope;
 	useShortcuts({ workspace: () => setOpen(shown => !shown) });
 	const selected = workspaces.find(workspace => workspace.cwd === current);
-	const label = selected ? (workspaceName(selected.cwdDisplay, personal) ?? selected.cwdDisplay) : "All workspaces";
+	const allLabel = ALL_OF_SPACE[space];
+	const label = selected ? (workspaceName(selected.cwdDisplay, personal) ?? selected.cwdDisplay) : allLabel;
 	const pick = (cwd: string | null) => (): void => {
 		if (cwd !== current) onPick(cwd);
+	};
+	const other = otherSpace(space);
+	// The personal directory is Personal's home, so it never moves.
+	const moveItem = selected && !spaces.isPersonalDir(selected.cwd) && {
+		value: `Move to ${SPACE_LABELS[other]}`,
+		icon: ArrowLeftRight,
+		label: <span className="truncate">Move {label} to {SPACE_LABELS[other]}</span>,
+		onSelect: () => void moveWorkspace(label, selected.cwd, space, other),
 	};
 	return (
 		<CommandPicker
 			trigger={label}
 			icon={Folder}
 			control="sidebar.workspace"
-			tooltip={selected?.cwdDisplay ?? "All workspaces"}
+			tooltip={selected?.cwdDisplay ?? allLabel}
 			shortcut="workspace"
 			ariaLabel={`Show sessions from: ${label}`}
 			className="min-w-0 font-semibold"
@@ -71,12 +110,13 @@ function SidebarWorkspacePicker({ workspaces, current, onPick }: SidebarWorkspac
 			list={{
 				kind: "ready",
 				groups: [
-					{ key: "all", items: [{ value: "All workspaces", label: "All workspaces", selected: current === null, onSelect: pick(null) }] },
+					{ key: "all", items: [{ value: allLabel, label: allLabel, selected: current === null, onSelect: pick(null) }] },
 					{
 						key: "workspaces",
 						heading: "Workspaces",
-						items: workspaceItems(workspaces.filter(workspace => !sameDir(workspace.cwd, personal)), current, personal, workspace => pick(workspace.cwd)()),
+						items: workspaceItems(workspaces, current, personal, workspace => pick(workspace.cwd)()),
 					},
+					{ key: "move", items: moveItem ? [moveItem] : [] },
 				],
 			}}
 			empty="No workspace matches."
@@ -131,7 +171,7 @@ const SIDEBAR_TAB_FIT = {
 };
 
 interface RosterProps {
-	/** The workspaces, as {@link listWorkspaces} lists them. */
+	/** The space's workspaces, as {@link workspacesIn} lists them. */
 	workspaces: Workspace[];
 	/** The sessions tab's lists, under the selected workspace and matching `query`. */
 	lists: SidebarSessions;
@@ -180,8 +220,6 @@ interface RosterProps {
 	pullRequestsTab: ReactNode;
 	/** The live sessions, which take a pull request's move while they work on it or ask about it. */
 	hosts: RosterHost[];
-	/** The selected workspace's `cwd`, or `null` for all workspaces. */
-	workspace: string | null;
 	onPickWorkspace: (cwd: string | null) => void;
 	onShowShortcuts: () => void;
 }
@@ -213,14 +251,13 @@ export function Roster({
 	onSectionTarget,
 	pullRequestsTab,
 	hosts,
-	workspace,
 	onPickWorkspace,
 	onShowShortcuts,
 }: RosterProps) {
 	const { changeTodo: onTodoChange } = useDashboardActions();
-	const { connected } = useDashboardStatus();
+	const { connected, pullRequestsScope, scope: { workspace, space } } = useDashboardStatus();
 	const personal = useContext(PersonalContext);
-	const pullRequestRead = pullRequestsStore.use(workspace).read;
+	const pullRequestRead = pullRequestsStore.use(pullRequestsScope).read;
 	/** The count after a tab's label, and what it counts, for its accessible name. */
 	const tabCounts: Partial<Record<SidebarTab, { count: number; meaning: string }>> = {
 		sessions: { count: waiting, meaning: "waiting on you" },
@@ -228,12 +265,14 @@ export function Roster({
 		"pull-requests": { count: pullRequestRead ? yourMoveCount(pullRequestRead.data, agentOn(hosts)) : 0, meaning: "your move" },
 	};
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
-	const newSessionLabel = selectedWorkspace ? `New session in ${workspaceName(selectedWorkspace.cwdDisplay, personal) ?? selectedWorkspace.cwdDisplay}` : "New session";
+	const newSessionLabel = selectedWorkspace
+		? `New session in ${workspaceName(selectedWorkspace.cwdDisplay, personal) ?? selectedWorkspace.cwdDisplay}`
+		: space === "personal" ? `New session in ${SPACE_LABELS.personal}` : "New session";
 	return (
 		<Tabs value={tab} onValueChange={value => onTab(value as SidebarTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="h-(--page-header-height) flex-row items-center justify-between gap-2 border-b border-border px-2 py-0">
 				<h1 className="sr-only">omp sessions</h1>
-				<SidebarWorkspacePicker workspaces={workspaces} current={workspace} onPick={onPickWorkspace} />
+				<SidebarWorkspacePicker workspaces={workspaces} onPick={onPickWorkspace} />
 				<Tooltip content="Keyboard shortcuts" shortcut={shortcutLabels("help")} side="bottom">
 					<Button {...activityControl("shortcuts.open")} variant="ghost" size="icon-compact" className="ml-auto shrink-0 text-muted-foreground" aria-label="Keyboard shortcuts" onClick={onShowShortcuts}>
 						<Keyboard />
@@ -299,7 +338,7 @@ export function Roster({
 			</TabPanel>
 			<TabPanel value="todo" asChild>
 				<SidebarContent>
-					<TodoCategories list={userTodos} view={todoView} workspace={workspace} disabled={!connected} onChange={onTodoChange} sessions={todoSessions} />
+					<TodoCategories list={userTodos} view={todoView} disabled={!connected} onChange={onTodoChange} sessions={todoSessions} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="notes" asChild>

@@ -16,11 +16,23 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Settings sync now carries each Bot's routines too, and each routine runs on one computer only: the others show which computer runs it, with its switch off.
 - Turning a routine on moves it to that computer, and the old one stops running it at its next sync; each computer keeps its own run history.
 - When an agent grills you about a plan, it now asks each round of questions as clickable choices with its recommended answer first, so you no longer have to ask it to.
-- In Settings › Workspaces, each workspace now has a space, Work or Personal; every workspace starts in Work, and hiding a workspace then showing it again keeps its space.
+- In Settings › Workspaces, each workspace now has a space, Personal or Work, listed in that order as in the switch; every workspace starts in Work, and hiding a workspace then showing it again keeps its space.
 - The personal folder's row in Settings › Workspaces shows a Personal tag instead of a menu, since it is always Personal.
 - A session in a Personal workspace, or in a second copy of one checked out on another branch, is now a personal session: it knows what you told personal sessions about yourself, can remember more, can log your sport, and shows the Memory tab, while keeping the agent's usual coding tools.
 - Behind the scenes: the server, the agents, and the page now decide a folder's space with one shared rule.
 - Your other machines get the spaces you pick through Settings › Sync, with the workspaces.
+- A Personal and Work switch now sits at the top of the window, beside Back and Forward in the desktop app, so opening the dashboard for your own life shows no work: Personal shows only your Personal workspaces with their sessions, todos, and pull requests, and Work only the rest.
+- Cmd+Shift+P now switches between Personal and Work; each window keeps its own space, and a new window opens in the last one you used.
+- The sidebar's workspace picker lists the space's workspaces, with your personal folder first in Personal, and its first entry reads All of Personal or All of Work.
+- The sidebar's workspace picker can move the picked workspace to the other space, then shows a message saying where it went, with Undo to move it back, or why the move failed.
+- The Personal and Work switch also shows at the top right of the empty home, so you can change space before opening anything.
+- In a narrow window the switch shows only its two icons, so the bell and Settings stay on screen; hover an icon to see its name.
+- When a page's header is too narrow for its title and buttons, the buttons move to a second row under the title, as on a phone, so the title stays readable.
+- In the desktop app, the window title in the title bar no longer runs under the switch.
+- The outline that shows which tab has the keyboard is now thicker and easier to see.
+- The sidebar's Personal item is gone: in Personal, New session starts in your personal folder unless you pick another workspace.
+- Opening a link to a session from the other space switches to that space.
+- Behind the scenes: the pull request list can ask for one space's repositories.
 
 ## 2026-11-08
 

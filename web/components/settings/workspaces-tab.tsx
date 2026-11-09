@@ -4,9 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { TrustChange, TrustedProject } from "../../../src/shared/project-trust";
-import { type Space, spaces, type Workspace, type WorkspaceChange, type WorkspaceList } from "../../../src/shared/workspaces";
+import { type Space, SPACES, spaces, type Workspace, type WorkspaceChange, type WorkspaceList } from "../../../src/shared/workspaces";
 import { putJson } from "../../api";
-import { folderName } from "../../labels";
+import { folderName, SPACE_LABELS } from "../../labels";
+import { writeWorkspace } from "../../reads";
 import { useAction } from "../../use-action";
 import { IntegrationList } from "../integrations/integration-row";
 import { Section } from "./editor";
@@ -14,20 +15,17 @@ import { Section } from "./editor";
 /** The desktop app's bridge, whose folder dialog picks a workspace; absent in a browser, which keeps the typed path alone. */
 const desktop = typeof window === "undefined" ? undefined : window.ompDesktop;
 
-const SPACES: { value: Space; label: string }[] = [
-	{ value: "work", label: "Work" },
-	{ value: "personal", label: "Personal" },
-];
+const SPACE_ITEMS = SPACES.map(value => ({ value, label: SPACE_LABELS[value] }));
 
 /** The space a workspace is in, which a session started there takes: Work, or Personal with the personal memory and its tools. */
 function SpacePicker({ workspace, space, disabled, onPick }: { workspace: Workspace; space: Space; disabled: boolean; onPick: (space: Space) => void }) {
 	return (
-		<Select<Space> items={SPACES} value={space} disabled={disabled} onValueChange={next => next && next !== space && onPick(next)}>
+		<Select<Space> items={SPACE_ITEMS} value={space} disabled={disabled} onValueChange={next => next && next !== space && onPick(next)}>
 			<SelectTrigger aria-label={`Space of ${folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay}`} className="w-fit">
 				<SelectValue />
 			</SelectTrigger>
 			<SelectContent>
-				{SPACES.map(({ value, label }) => (
+				{SPACE_ITEMS.map(({ value, label }) => (
 					<SelectItem key={value} value={value}>
 						{label}
 					</SelectItem>
@@ -61,10 +59,10 @@ interface WorkspacesTabProps {
 	trustedProjects: TrustedProject[];
 }
 
-/** Sends changes to `url` one at a time: the change under way, and why the last one failed. Every page then hears the list after it over its socket. */
-function useChanges<C>(url: string) {
+/** Sends changes through `write` one at a time: the change under way, and why the last one failed. Every page then hears the list after it over its socket. */
+function useChanges<C>(write: (change: C) => Promise<unknown>) {
 	const action = useAction(async (next: C, done: () => void) => {
-		await putJson(url, next);
+		await write(next);
 		done();
 	}, null);
 	const pending = action.state.kind === "pending" ? action.state.args[0] : null;
@@ -84,7 +82,7 @@ function ChangeError({ error }: { error: string | null }) {
 
 /** The projects whose agent code a start asked about and the user trusted, each a click from asking again. */
 function TrustedProjects({ projects }: { projects: TrustedProject[] }) {
-	const { pending, error, change } = useChanges<TrustChange>("/api/project-trust");
+	const { pending, error, change } = useChanges<TrustChange>(next => putJson("/api/project-trust", next));
 	return (
 		<Section title="Trusted projects" meta="Projects whose own agent code, such as extensions, tools, MCP servers, and settings, you trusted when a session started there. A piece that changes asks again.">
 			<ChangeError error={error} />
@@ -115,7 +113,7 @@ export function WorkspacesTab({ workspaces, list: { added, hidden, personal }, p
 	const addedCwds = new Set(added.map(entry => entry.cwd));
 	const inSpaces = personalDir && spaces(personal.map(entry => entry.cwd), personalDir);
 	const [path, setPath] = useState("");
-	const { pending, error, change } = useChanges<WorkspaceChange>("/api/workspaces");
+	const { pending, error, change } = useChanges<WorkspaceChange>(writeWorkspace);
 	const add = (event: FormEvent): void => {
 		event.preventDefault();
 		change({ op: "add", cwd: path }, () => setPath(""));

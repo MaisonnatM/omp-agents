@@ -3,9 +3,15 @@ import type { MouseEvent } from "react";
 import type { PullRequestLink } from "../src/shared/github";
 import { PROVIDER_NAMES } from "../src/shared/models";
 import type { PastSession, RosterHost, SessionSource } from "../src/shared/sessions";
-import type { Workspace } from "../src/shared/workspaces";
+import type { Space, Workspace } from "../src/shared/workspaces";
 import { IS_MAC, modHeld } from "./shortcuts";
 import type { OpenMode } from "./routing";
+
+/** The name of each space. */
+export const SPACE_LABELS: Record<Space, string> = { personal: "Personal", work: "Work" };
+
+/** What a workspace picker calls choosing no workspace: every workspace of the space. */
+export const ALL_OF_SPACE: Record<Space, string> = { personal: "All of Personal", work: "All of Work" };
 
 /** Words that keep their own casing in a label. */
 const BRAND_WORDS: Record<string, string> = {

@@ -32,6 +32,7 @@ import type { McpServersAnswer } from "../src/shared/mcp-servers";
 import type { DevServerRequest, DevServerStart, LiveSessionProcesses, ProcessStop } from "../src/shared/processes";
 import type { CollabAutoStart, StarterKitStatus, TerminalAccess } from "../src/shared/readiness";
 import type { SourceControlAnswer } from "../src/shared/source-control";
+import type { Space, WorkspaceChange } from "../src/shared/workspaces";
 import { errorText } from "../src/json";
 import { getJson, putJson } from "./api";
 import { createPolledStore, type PolledEntry } from "./polled-store";
@@ -93,12 +94,19 @@ export async function setTerminalAccess(access: TerminalAccess): Promise<void> {
 	terminalSessionsStore.update(() => answer);
 }
 
-/** The open pull requests by workspace `cwd`, which the sidebar and the Pull requests page share; `null` reads every workspace. */
+/** Adds, hides, shows, or places in a space the workspace `change` names; every page then hears the list after it over its socket. */
+export async function writeWorkspace(change: WorkspaceChange): Promise<void> {
+	await putJson("/api/workspaces", change);
+}
+
+/** The scope {@link pullRequestsStore} keys a window's pull requests by: the query reading the selected `workspace`, else every workspace of `space`. */
+export const pullRequestsScope = ({ space, workspace }: { space: Space; workspace: string | null }): string => new URLSearchParams(workspace !== null ? { cwd: workspace } : { space }).toString();
+
+/** The open pull requests by scope, as {@link pullRequestsScope} builds it, which the sidebar and the Pull requests page share. */
 export const pullRequestsStore = createPolledStore<PullRequestList>({
 	// Keeps its name from before the page was called Pull requests, so the browser's cached list survives.
-	url: (cwd, fresh) => {
-		const params = new URLSearchParams();
-		if (cwd !== null) params.set("cwd", cwd);
+	url: (scope, fresh) => {
+		const params = new URLSearchParams(scope ?? "");
 		if (fresh) params.set("fresh", "");
 		return `/api/pull-requests${params.size ? `?${params}` : ""}`;
 	},
@@ -107,16 +115,16 @@ export const pullRequestsStore = createPolledStore<PullRequestList>({
 
 /**
  * Makes `change` on GitHub and answers the pull request as GitHub has it after. A state change or a review request shows
- * in `workspace`'s list at once, so the rows and the details that read it agree, and the list is read again either way.
+ * in `scope`'s list at once, so the rows and the details that read it agree, and the list is read again either way.
  */
-export async function writePullRequest(workspace: string | null, pr: PullRequest, change: PullRequestChange): Promise<PullRequestDetail> {
+export async function writePullRequest(scope: string, pr: PullRequest, change: PullRequestChange): Promise<PullRequestDetail> {
 	const detail = await putJson<PullRequestDetail>("/api/pull-request", { owner: pr.owner, repo: pr.repo, number: pr.number, change } satisfies PullRequestEdit);
-	if (change.field === "state") pullRequestsStore.update(list => withPullRequestState(list, pr, change.state, Date.now()), workspace);
+	if (change.field === "state") pullRequestsStore.update(list => withPullRequestState(list, pr, change.state, Date.now()), scope);
 	if (change.field === "reviewer") {
 		const avatarUrl = detail.reviewers.find(reviewer => reviewer.login === change.login)?.avatarUrl ?? null;
-		pullRequestsStore.update(list => withPullRequestReviewers(list, pr, change.login, change.on, avatarUrl), workspace);
+		pullRequestsStore.update(list => withPullRequestReviewers(list, pr, change.login, change.on, avatarUrl), scope);
 	}
-	void pullRequestsStore.refresh(workspace, { fresh: true });
+	void pullRequestsStore.refresh(scope, { fresh: true });
 	return detail;
 }
 
@@ -127,14 +135,14 @@ export async function writeViewedFile(pr: PullRequest, path: string, on: boolean
 
 /**
  * Queues a merge, which the server makes at once when GitHub allows it, or cancels one. A pull request it merged on the
- * way shows as merged in `workspace`'s list at once, as {@link writePullRequest} shows a state change, and the list is read again.
+ * way shows as merged in `scope`'s list at once, as {@link writePullRequest} shows a state change, and the list is read again.
  */
-export async function writeMergeQueue(workspace: string | null, change: MergeQueueChange): Promise<MergeQueueAnswer> {
+export async function writeMergeQueue(scope: string, change: MergeQueueChange): Promise<MergeQueueAnswer> {
 	const answer = await putJson<MergeQueueAnswer>("/api/merge-queue", change);
 	if (answer.merged.length === 0) return answer;
 	const at = Date.now();
-	pullRequestsStore.update(list => answer.merged.reduce((changed, pr) => withPullRequestState(changed, pr, "merged", at), list), workspace);
-	void pullRequestsStore.refresh(workspace, { fresh: true });
+	pullRequestsStore.update(list => answer.merged.reduce((changed, pr) => withPullRequestState(changed, pr, "merged", at), list), scope);
+	void pullRequestsStore.refresh(scope, { fresh: true });
 	return answer;
 }
 
@@ -165,10 +173,10 @@ const NO_REPOS: RepoPullRequests[] = [];
 
 /**
  * What the `@` menu and the command palette search besides the page's lists: the Linear issues assigned to you, read
- * only while `ticketsWanted`, and the pull requests of workspace `scope`. That is the entry `App` polls; the unscoped
- * read would ask GitHub about every repository.
+ * only while `ticketsWanted`, and the pull requests of `scope`, a workspace or a space, as {@link pullRequestsStore} keys them.
+ * That is the entry `App` polls; the unscoped read would ask GitHub about every repository.
  */
-export function useSearchSources(ticketsWanted: boolean, scope: string | null): { tickets: Ticket[]; pullRequestRepos: RepoPullRequests[] } {
+export function useSearchSources(ticketsWanted: boolean, scope: string): { tickets: Ticket[]; pullRequestRepos: RepoPullRequests[] } {
 	const tickets = ticketsStore.usePolling(null, ticketsWanted).read?.data.tickets;
 	const pullRequestRepos = pullRequestsStore.use(scope).read?.data.repos ?? NO_REPOS;
 	return { tickets: (ticketsWanted && tickets) || NO_TICKETS, pullRequestRepos };

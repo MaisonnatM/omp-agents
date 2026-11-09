@@ -10,9 +10,9 @@
   Pressing a starter's number, or clicking it, puts its full prompt in the composer without sending it, so you can edit it first; 0 or **All of them** puts the starters there as a list. With no issue to name, **Ship a Linear issue** puts `/ship ` there for you to paste the issue's or the view's link after.
   A personal draft lists none, and a private draft shows what ending it deletes there instead, as **Private** below says.
   A scheduled start keeps its pickers inside the composer and lists no starters.
-  The directory is the selected workspace, else the open session's workspace, else the newest live session's, else the newest past session's, so a session in a linked worktree hands its repository's main checkout to the draft, where the branch picker can pick a worktree.
-  To start in another directory, under **All workspaces** or not, pick it in the directory picker, or press Cmd+Alt+P.
-  It lists the workspaces the sidebar lists, and **Use** takes any directory typed into its search field.
+  The directory is the selected workspace, else in Personal the personal directory, else the open session's workspace, else the newest live session's, else the newest past session's, so a session in a linked worktree hands its repository's main checkout to the draft, where the branch picker can pick a worktree.
+  To start in another directory, under **All of Personal**, **All of Work**, or a workspace, pick it in the directory picker, or press Cmd+Alt+P.
+  It lists the workspaces of the space the window shows, as the sidebar does, and **Use** takes any directory typed into its search field.
   The message you typed stays in the composer.
   Sending the first message starts omp there and sends it the message.
   The message stays in the composer while omp starts, and also if the start fails, with the error above it.

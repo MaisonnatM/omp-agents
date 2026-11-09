@@ -2,6 +2,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Command as CommandPrimitive } from "cmdk";
 import {
 	ArrowDown,
+	ArrowLeftRight,
 	ArrowLeft,
 	ArrowRight,
 	ArrowUp,
@@ -21,7 +22,6 @@ import {
 	SquareTerminal,
 	Wrench,
 	Target,
-	UserRound,
 } from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { DashboardUpdateStatus } from "../../../src/shared/dashboard-update";
@@ -50,7 +50,7 @@ import {
 	topFrame,
 } from "../../command-palette";
 import { localDay } from "../../../src/shared/days";
-import { age, hostLabel, pastLabel, workspaceName } from "../../labels";
+import { age, ALL_OF_SPACE, hostLabel, pastLabel, workspaceName } from "../../labels";
 import { PAGE_ICON } from "../../page-icons";
 import { conversationItems, recordItems } from "../../palette-records";
 import { useConversationHits, useRead, useSearchSources } from "../../reads";
@@ -72,7 +72,7 @@ import { commandKey, record } from "../../activity";
 
 const COMMAND_ICON: Partial<Record<ShortcutId, LucideIcon>> = {
 	newSession: Plus,
-	personalSession: UserRound,
+	switchSpace: ArrowLeftRight,
 	previousSession: ArrowUp,
 	nextSession: ArrowDown,
 	back: ArrowLeft,
@@ -103,9 +103,9 @@ interface CommandPaletteProps {
 	dispatch: (event: PaletteEvent) => void;
 	hosts: RosterHost[];
 	past: PastSession[];
-	/** The workspaces, as the sidebar's workspace picker lists them. */
+	/** The space's workspaces, as the sidebar's workspace picker lists them. */
 	workspaces: Workspace[];
-	/** The sidebar's workspace, or `null` for all workspaces. */
+	/** The sidebar's workspace, or `null` for all of the space's. */
 	workspace: string | null;
 	/** Open `view`, whose session counts in workspace `workspace`, and keep it listed by switching the sidebar to that workspace. */
 	onOpenSession: (view: View, workspace: string, mode: OpenMode) => void;
@@ -155,7 +155,7 @@ const SETTINGS_ITEMS: readonly PaletteItem[] = SETTINGS_SECTIONS.map(({ value, l
 
 function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, tabs, todoCategories, todos, notes, linearConnected, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
 	const { send, start, end, changeTodo, changeNote, workspaceSettings } = useDashboardActions();
-	const { starts, ending, pullRequestsScope, connected } = useDashboardStatus();
+	const { starts, ending, pullRequestsScope, connected, scope: { space } } = useDashboardStatus();
 	const personal = useContext(PersonalContext);
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -294,10 +294,10 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 			actions: [[{ id: "pick", title: "Show its sessions", icon, run: { kind: "do", fn: () => pickWorkspace(cwd) } }]],
 		});
 		return [
-			workspaceItem("workspace:all", "All workspaces", undefined, Layers, null),
+			workspaceItem("workspace:all", ALL_OF_SPACE[space], undefined, Layers, null),
 			...workspaces.map(({ cwd, cwdDisplay }) => workspaceItem(`workspace:${cwd}`, workspaceName(cwdDisplay, personal) ?? cwdDisplay, cwdDisplay, Folder, cwd)),
 		];
-	}, [workspaces, workspace, personal, onPickWorkspace]);
+	}, [workspaces, workspace, space, personal, onPickWorkspace]);
 
 	const records = useMemo((): PaletteItem[] => recordItems({ todos, notes: notes ?? [], tickets, pullRequestRepos }), [todos, notes, tickets, pullRequestRepos]);
 	const conversations = useMemo(

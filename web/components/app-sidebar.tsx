@@ -52,7 +52,7 @@ interface AppSidebarProps {
  * message that changes nothing the sidebar shows leaves it alone.
  */
 export const AppSidebar = memo(function AppSidebar({
-	scope: { visible, workspaces, workspace },
+	scope: { visible, workspaces },
 	sessions: { lists, waiting, query, setQuery, togglePin },
 	page,
 	newDraftDir,
@@ -83,10 +83,10 @@ export const AppSidebar = memo(function AppSidebar({
 		// The Pull requests page lists the pull requests itself, so the sidebar's Pull requests tab links to its sections or
 		// columns then, and lists them only beside a pull request's page or another page.
 		const shows = page?.kind === "pull-requests" ? pullRequestsPageShows(pullRequestsView, detailsPlacement, page) : "details";
-		if (shows === "list") return <PullRequestsIndex workspace={workspace} hosts={visible.hosts} target={sectionTarget} onTarget={onSectionTarget} />;
-		if (shows === "board") return <PullRequestsBoardIndex workspace={workspace} hosts={visible.hosts} target={sectionTarget} onTarget={onSectionTarget} />;
-		return <PullRequestsNav workspace={workspace} hosts={visible.hosts} past={visible.past} route={page?.kind === "pull-requests" ? page : NO_PULL_REQUESTS_ROUTE} />;
-	}, [listed, page, pullRequestsView, detailsPlacement, workspace, visible, sectionTarget, onSectionTarget]);
+		if (shows === "list") return <PullRequestsIndex hosts={visible.hosts} target={sectionTarget} onTarget={onSectionTarget} />;
+		if (shows === "board") return <PullRequestsBoardIndex hosts={visible.hosts} target={sectionTarget} onTarget={onSectionTarget} />;
+		return <PullRequestsNav hosts={visible.hosts} past={visible.past} route={page?.kind === "pull-requests" ? page : NO_PULL_REQUESTS_ROUTE} />;
+	}, [listed, page, pullRequestsView, detailsPlacement, visible, sectionTarget, onSectionTarget]);
 	const todoSessions = useMemo(() => ({ hosts, past }), [hosts, past]);
 	const botList = useMemo(() => (bots === null ? null : botRows(bots, hosts, botLasts)), [bots, hosts, botLasts]);
 	const onShowShortcuts = useCallback(() => setShortcutsOpen(true), [setShortcutsOpen]);
@@ -118,7 +118,6 @@ export const AppSidebar = memo(function AppSidebar({
 			onSectionTarget={onSectionTarget}
 			pullRequestsTab={pullRequestsTab}
 			hosts={visible.hosts}
-			workspace={workspace}
 			onPickWorkspace={onPickWorkspace}
 			onShowShortcuts={onShowShortcuts}
 		/>

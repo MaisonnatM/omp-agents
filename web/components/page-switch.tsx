@@ -119,7 +119,7 @@ export const PageSwitch = memo(function PageSwitch({
 }: PageSwitchProps) {
 	const { send, start, dismissStart, changeTodo, changeNote, changeSport } = useDashboardActions();
 	const scheduleSend = useScheduleSend();
-	const { visible, workspaces, workspace, pickWorkspace } = scope;
+	const { visible, workspaces, allWorkspaces, workspace, pickWorkspace } = scope;
 	switch (page?.kind) {
 		case "new": {
 			const seed = todoSeed(userTodos, page.todoId);
@@ -150,7 +150,7 @@ export const PageSwitch = memo(function PageSwitch({
 			);
 		}
 		case "scheduled":
-			return <ScheduledSession id={page.id} workspaces={workspaces} connected={connected} completions={newSessionCompletions} todoOf={todoId => todoSeed(userTodos, todoId)} />;
+			return <ScheduledSession id={page.id} workspaces={allWorkspaces} connected={connected} completions={newSessionCompletions} todoOf={todoId => todoSeed(userTodos, todoId)} />;
 		case "settings":
 			return (
 				<SettingsPage
@@ -158,13 +158,14 @@ export const PageSwitch = memo(function PageSwitch({
 					cwd={workspace}
 					onPickWorkspace={pickWorkspace}
 					workspaces={workspaces}
+					allWorkspaces={allWorkspaces}
 					workspaceList={workspaceList}
 					personal={personal}
 					trustedProjects={trustedProjects}
 				/>
 			);
 		case "pull-requests":
-			return <PullRequestsPage workspace={workspace} hosts={visible.hosts} past={visible.past} section={sectionTarget} route={page} />;
+			return <PullRequestsPage hosts={visible.hosts} past={visible.past} section={sectionTarget} route={page} />;
 		case "tickets":
 			if (linear && !linearCallable) return <DisconnectedPage title={TICKETS_TITLE} meta={TICKETS_META} integration={linear} />;
 			// Until the sessions are listed, the workspace a quick action starts in is not known yet.
@@ -182,7 +183,6 @@ export const PageSwitch = memo(function PageSwitch({
 					disabled={!connected}
 					onChange={changeTodo}
 					newSessionCwd={defaultWorkspace}
-					workspace={workspace}
 					workspaces={workspaces}
 					linearConnected={linearCallable}
 				/>
@@ -191,7 +191,7 @@ export const PageSwitch = memo(function PageSwitch({
 			return <NotesPage list={userNotes} todos={userTodos} view={page.list} openId={page.open} hosts={hosts} past={past} disabled={!connected} onChange={changeNote} />;
 		case "bots": {
 			if (page.target === null) {
-				if (page.adding) return <NewBot workspaces={workspaces} defaultCwd={defaultWorkspace} connected={connected} />;
+				if (page.adding) return <NewBot workspaces={allWorkspaces} defaultCwd={defaultWorkspace} connected={connected} />;
 				return <BotsGallery rows={bots === null ? null : botRows(bots, hosts, botLasts)} routines={routines} />;
 			}
 			if (!openBot) return <p className="m-auto text-sm text-muted-foreground">{bots === null ? "Loading the Bots…" : "No Bot has this address. It may have been deleted."}</p>;
@@ -206,7 +206,7 @@ export const PageSwitch = memo(function PageSwitch({
 					past={past}
 					lastHosts={lastHosts}
 					models={models}
-					workspaces={workspaces}
+					workspaces={allWorkspaces}
 					connected={connected}
 					completions={newSessionCompletions}
 				/>

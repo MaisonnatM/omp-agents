@@ -31,8 +31,6 @@ export interface DetailContentProps {
 	path?: string | null;
 	/** Shows another pull request of its stack or of the session in place; without it, each of its stack links to its page. */
 	onPick?: (pr: PullRequest) => void;
-	/** The workspace whose pull request list a change here shows in at once. */
-	workspace: string | null;
 	/** A checkout of its repository, where copying its branch removes the linked worktree that has it checked out; `null` when none is known. */
 	cwd: string | null;
 }

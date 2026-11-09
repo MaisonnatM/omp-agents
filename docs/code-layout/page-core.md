@@ -2,8 +2,8 @@
 
 - `web/app.tsx`: the page shell.
   It builds the two dashboard contexts and lays out the sidebars, the page, the command palette, and the dialogs, and leaves each slice of state to a hook of its own.
-  `web/use-workspace-scope.ts` holds the visible sessions, the workspaces, the selected workspace, which localStorage keeps, and its pull request poll.
-  `web/use-focused-session.ts` holds the focused pane's session, the document title, and the sidebar following a `/move`.
+  `web/use-workspace-scope.ts` holds the window's space, which localStorage keeps as the last one picked on this computer, the sessions and workspaces of that space, the selected workspace, which it drops when the space does not hold it, and its pull request poll, scoped to the workspace, else to the space.
+  `web/use-focused-session.ts` holds the focused pane's session, the document title, the sidebar following a `/move`, and the space following a session that opens from the other space.
   `web/use-session-lists.ts` holds the Sessions tab's lists and search, the session `latestSession` from `web/sessions.ts` picks from the selected workspace's rows, and pins and unpins through the server's pins, and `web/use-sidebar-tab.ts` the tab and `showTab`, whose Sessions tab opens that session when no pane shows one.
   `web/use-overlays.ts` holds the shortcuts dialog, the command palette, the file dialog, and the new-ticket dialog.
   `web/use-transcript-display.ts` holds how transcripts show tool calls and thinking, and `web/use-page-shortcuts.ts` the page-wide shortcuts and the commands the palette runs.
@@ -15,7 +15,7 @@
   `web/get-started-model.ts` holds what it decides without React: `Observation` and `observation()`, `firstSessionFact`, which reads the roster into the first-session fact `web/app.tsx` passes it, and `getStartedSurface`, which picks the dialog, the bubble, or nothing.
   It derives completion from the providers, terminal-session, starter-kit, and source-control reads and the existing global session/integration stores; only dismissal, the closed dialog, and the step on screen are stored locally, never portable completion ticks.
   `#get-started` and the command menu always open the dialog over the home or panes `PageSwitch` draws.
-- `web/components/empty-home.tsx`: `EmptyHome`, the neutral home `PageSwitch` draws when no session or page shows, with New session / Get started and any registry error.
+- `web/components/empty-home.tsx`: `EmptyHome`, the neutral home `PageSwitch` draws when no session or page shows, with New session / Get started, any registry error, and, outside the desktop app's title bar, the header's controls at its top right, the space switch among them.
 - `web/use-dashboard.ts`: the socket, the page state, and the URL hash.
   One exhaustive switch in the socket's `onmessage` sends each server message to the pane store or the reducer, and the hash is read once into a `Route` (a page, a `#session/<id>` link, or the panes).
   `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request, a Linear issue, or a todo, which runs in the background.
@@ -38,6 +38,8 @@
   `startDictation`, `stopDictation`, and `discardDictation` send `dictation-start`, `dictation-stop`, and `dictation-discard`, and `applyDictationMessage` applies a `dictation` message, which `web/use-dashboard.ts` routes there with the socket's close; an ended capture's text lands at its saved selection through `replaceInComposer` in `web/composer-drafts.ts`.
 - `web/dashboard-state.ts`: the page state and its reducer, which `web/use-dashboard.ts` runs.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/pull-requests-model.ts`, `web/tickets-model.ts`, `web/routines-model.ts`, `web/calendar-model.ts`, `web/email-model.ts`, and `web/transcript-view.ts`, and `web/document-title.ts` (the tab and window title): the pure transforms from server messages to what the page renders, and the hash routes.
-  `workspaceName` in `web/labels.ts` names the personal directory **Personal** wherever a workspace shows, from the directory as shown, and `isPrivateHost` in `web/sessions.ts` tells a private session wherever the page marks one.
+  `workspaceName` in `web/labels.ts` names the personal directory **Personal** wherever a workspace shows, from the directory as shown, and `ALL_OF_SPACE` there names choosing no workspace, **All of Personal** or **All of Work**; `isPrivateHost` in `web/sessions.ts` tells a private session wherever the page marks one.
+  `spaceOf`, `sessionsIn`, and `workspacesIn` in `web/sessions.ts` apply `spaces` to the roster and the workspace list, an unknown workspace counting as Work, and `spaceSession` picks the session the panes open on a switch.
+  `WindowScope` there is the window's space, its `Spaces`, the selected workspace, and `home`, the personal directory in Personal, which `defaultCwd`, the Todo page, and the sidebar read through `scope` in the dashboard context.
   `web/email-model.ts` folds a conversation's messages into open, closed, and stacked rows with `foldMessages` and `foldsAfter`, words its recipients and lists who wrote in it with `participants`, picks an avatar's letter past a leading English article with `initialOf` and the avatar's colour from the address with `colorIndex`, cuts plain text into links, and builds a message's sandboxed document.
   `src/shared/every-word.ts` holds `everyWord` and `searchWords`, the search rule the sidebar's sessions, the Todo page, the model search, the `@` menu, the command palette's todos, tickets, and pull requests, and the server's conversation search share: every word typed, in any order and any case.

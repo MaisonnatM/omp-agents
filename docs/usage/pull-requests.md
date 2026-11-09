@@ -55,7 +55,7 @@
   The **Your move** count stands out in bold.
   The **Pull requests** tab counts the pull requests that wait on your move, for the workspace that the sidebar's picker shows, and reads GitHub every minute on every page so the count stays current.
   A `#pull-requests` address opens the Pull requests page.
-  The pull request list covers the GitHub repository of the workspace that the sidebar's picker shows, or under **All workspaces** every repository that a session ran in, one section per repository.
+  The pull request list covers the GitHub repository of the workspace that the sidebar's picker shows, or under **All of Personal** or **All of Work** every repository of that space that a session ran in, one section per repository.
   A workspace's repository is the one its `origin` remote names.
   A directory removed since its sessions ran, such as a deleted worktree, is no longer a workspace, so quick actions start in a workspace that still exists.
   Each repository lists your open pull requests, your merges from the last seven days, and the open pull requests that ask you for a review.

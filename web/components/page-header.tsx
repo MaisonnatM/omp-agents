@@ -19,33 +19,35 @@ interface HeaderProps {
 
 /**
  * The title, an optional meta line, and controls that head a pane or a page, ending with the command menu and the bell.
- * On a phone the title keeps its width, so when the controls leave it too little they wrap to a row of their own under it.
+ * In a header under 40rem, as on a phone, the title keeps its width, so when the controls leave it too little they wrap to a row of their own under it.
  */
 export function Header({ title, meta, status, alert = false, leading, trailing, children, end }: HeaderProps) {
 	const controls = useHeaderControls();
 	return (
-		<header className="flex h-(--page-header-height) shrink-0 items-center justify-between gap-4 border-b border-border px-6 max-sm:h-auto max-sm:min-h-(--page-header-height) max-sm:flex-wrap max-sm:gap-x-4 max-sm:gap-y-0">
-			<div className="group/title flex min-w-0 items-center gap-2 max-sm:min-h-(--page-header-height) max-sm:max-w-full max-sm:shrink-0">
-				{leading}
-				<div className="min-w-0">
-					<h2 className="truncate text-sm font-semibold">{title}</h2>
-					{meta !== undefined && <p className="truncate text-xs text-muted-foreground">{meta}</p>}
-				</div>
-				{trailing !== undefined && (
-					<div className="pointer-events-none flex shrink-0 items-center gap-2 opacity-0 group-focus-within/title:pointer-events-auto group-focus-within/title:opacity-100 group-hover/title:pointer-events-auto group-hover/title:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100">
-						{trailing}
+		<header className="@container/header shrink-0 border-b border-border">
+			<div className="flex h-(--page-header-height) items-center justify-between gap-4 px-6 @max-[40rem]/header:h-auto @max-[40rem]/header:min-h-(--page-header-height) @max-[40rem]/header:flex-wrap @max-[40rem]/header:gap-x-4 @max-[40rem]/header:gap-y-0">
+				<div className="group/title flex min-w-0 items-center gap-2 @max-[40rem]/header:min-h-(--page-header-height) @max-[40rem]/header:max-w-full @max-[40rem]/header:shrink-0">
+					{leading}
+					<div className="min-w-0">
+						<h2 className="truncate text-sm font-semibold">{title}</h2>
+						{meta !== undefined && <p className="truncate text-xs text-muted-foreground">{meta}</p>}
 					</div>
-				)}
-			</div>
-			<div className="flex shrink-0 items-center gap-3 max-sm:ml-auto max-sm:min-h-10 max-sm:max-w-full max-sm:flex-wrap max-sm:justify-end max-sm:gap-y-2 max-sm:py-1.5">
-				{status !== undefined && (
-					<span className={cn("text-xs", alert ? "text-red-600 dark:text-red-400" : "text-muted-foreground")} data-status>
-						{status}
-					</span>
-				)}
-				{children}
-				{controls}
-				{end}
+					{trailing !== undefined && (
+						<div className="pointer-events-none flex shrink-0 items-center gap-2 opacity-0 group-focus-within/title:pointer-events-auto group-focus-within/title:opacity-100 group-hover/title:pointer-events-auto group-hover/title:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100">
+							{trailing}
+						</div>
+					)}
+				</div>
+				<div className="flex shrink-0 items-center gap-3 @max-[40rem]/header:ml-auto @max-[40rem]/header:min-h-10 @max-[40rem]/header:max-w-full @max-[40rem]/header:flex-wrap @max-[40rem]/header:justify-end @max-[40rem]/header:gap-y-2 @max-[40rem]/header:py-1.5">
+					{status !== undefined && (
+						<span className={cn("text-xs", alert ? "text-red-600 dark:text-red-400" : "text-muted-foreground")} data-status>
+							{status}
+						</span>
+					)}
+					{children}
+					{controls}
+					{end}
+				</div>
 			</div>
 		</header>
 	);

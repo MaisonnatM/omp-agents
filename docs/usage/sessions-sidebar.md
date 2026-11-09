@@ -1,5 +1,13 @@
 # Sessions sidebar
 
+- The **Personal** and **Work** switch at the top of the window picks the space the dashboard shows: in the desktop app it sits beside Back and Forward in the title bar, and in a browser at the right of the page header, or at the top right of the empty home.
+  In a page header narrower than 56rem the switch shows its two icons alone, and hovering one names its space.
+  Personal holds the personal directory and the workspaces Settings › Workspaces placed in Personal; every other workspace is in Work, a workspace the page cannot place yet included.
+  The sidebar's sessions, its counts, the session search, the Todo page, the pull requests, the command palette's sessions and workspaces, Settings' workspace pickers, and New session's directory picker then hold only the space's.
+  Switching keeps the page you are on; on the panes it opens the space's most recently started running session, or the empty home when none runs there.
+  Cmd+Shift+P (Ctrl+Shift+P elsewhere) switches too.
+  Each window keeps its own space, and a new window or a reload opens in the last space picked on this computer, Work the first time.
+  Opening a link to a session of the other space, from a notification or another window, switches the window to that space.
 - The content header and both sidebar header rows are 48 px tall at the default font size, each with a hairline under it.
 - The sidebar's tab bar shows **Pull requests**, **Tickets**, **Bots**, **Sessions**, and **Todo**, above the list of the one open.
   **Notes**, **Calendar**, **Email**, and **Sport** are buttons in the header, right after the command menu button, between two dividers; each opens its page and shows its list in the sidebar below the tab bar, with no tab selected, and the open one's button stays pressed.
@@ -10,25 +18,28 @@
 - The dot before each session shows when it waits on you.
   A running turn shows no dot, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
   A session waiting on its subagents shows no dot either, even when its turn has ended, and its row's tooltip says **waiting on subagents**.
-- Under **All workspaces**, a session row with a title shows a badge that names its workspace, the last segment of the workspace's directory, on the right before its age.
+- Under **All of Personal** or **All of Work**, a session row with a title shows a badge that names its workspace, the last segment of the workspace's directory, on the right before its age.
   With one workspace picked, the rows show no badge.
   A row without a title shows its directory's name as its label, and the badge only when it runs in a linked worktree, whose name is not its workspace's.
 - The workspace picker in the sidebar header shows only the running, idle, waiting on subagents, interrupted, and past sessions from one workspace.
   A workspace is a repository's main checkout, or a directory outside git: a session in a linked git worktree, such as `~/code/yampa-review-triage-3935ff7b`, counts in its repository's workspace, `~/code/yampa`, and still runs in its worktree.
   A session whose worktree was removed counts in the repository whose main checkout's path, followed by `-`, starts its directory, such as `~/code/yampa-wt/fix` in `~/code/yampa`, else in the only repository whose main checkout has its directory's name, such as Codex's `~/.codex/worktrees/f5e7/yampa`.
-  The picker lists the workspaces that a live or saved session ran in, live sessions' first, then the ones added in **Settings › Workspaces**, except temporary directories and hidden workspaces.
+  The picker lists the space's workspaces that a live or saved session ran in, live sessions' first, then the ones added in **Settings › Workspaces**, except temporary directories and hidden workspaces; in Personal the personal directory comes first, named **Personal**.
   The session counts then count that workspace's sessions only, such as `2 running` and `9 past`.
   Picking a workspace also opens its most recently started running session in the focused pane, unless that pane already shows a session from the workspace or a page such as a pull request, Settings, or the new-session draft covers the panes.
-  Choose **All workspaces** to list every session again.
+  Choose **All of Personal** or **All of Work**, the first entry, to list every session of the space again.
+  With a workspace picked other than the personal directory, the picker's **Move <workspace> to Personal** or **Move <workspace> to Work** moves it to the other space, as the space picker in Settings › Workspaces does; it then leaves the space on screen, and the sidebar lists every session of the space.
   The app keeps the choice.
-  If no session from the saved workspace is left, the sidebar lists every session.
+  If no session from the saved workspace is left, or it is not in the space on screen, the sidebar lists every session of the space.
+  Moving a workspace shows a toast that says where it went, with **Undo** for 8 seconds to move it back, or says the move failed and why.
 - **New session** at the top of the **Sessions** tab opens the new-session draft, in the selected workspace when there is one, and stays highlighted while the draft is open.
+  In Personal with no workspace picked, it reads **New session in Personal** and starts in the personal directory.
   It shows its key, Cmd+N, on its right.
 - The search field under it narrows every group to the sessions whose title or working directory holds every word typed, in any order and any case, within the selected workspace.
   A group left without a match hides, and `No sessions match` shows when none is left; Esc clears the field.
   While empty, it shows its key, Cmd+F, on its right.
   Cmd+F puts the cursor in it while the **Sessions** tab shows; elsewhere, and while the sidebar is hidden, Cmd+F does nothing.
-  Cmd+K opens the command menu, which searches every workspace instead.
+  Cmd+K opens the command menu, which searches every workspace of the space instead.
 - Sessions in `/tmp`, `/private/tmp`, or macOS's temp folders under `/var/folders` (where `mktemp -d` puts its directories), including their subdirectories, are hidden from the workspace pickers, session lists and counts, and session search.
   Starting or opening one does not replace the saved workspace.
   Their saved transcripts remain available through a direct session link.

@@ -6,11 +6,11 @@
   To place a repository there, open Settings › Workspaces and pick **Personal** beside it; every workspace starts in **Work**, and a directory you open inside a Personal workspace, rather than a worktree of it, stays in **Work**.
   The dashboard creates the personal directory when it starts; it is not a git repository and holds no agent code, so starting there never asks you to [trust project code](per-project-agent-setup.md#trusting-a-projects-code).
 - A session takes its space from where it runs, so a resumed or forked session in a Personal workspace is personal too, and placing a workspace back in **Work** turns its sessions back into work sessions from their next turn.
-- To start one in the personal directory, click **Personal** under **New session** in the sidebar, or press Cmd+Shift+P (Ctrl+Shift+P elsewhere).
+- To start one in the personal directory, switch to **Personal** with the switch at the top of the window, or press Cmd+Shift+P (Ctrl+Shift+P elsewhere), then click **New session in Personal**, or press Cmd+N, with no workspace picked in the sidebar; see [Sessions sidebar](sessions-sidebar.md).
   A personal draft's page asks "What can I help with?" and lists no starters under the composer; its composer asks about meals, plans, and errands.
-  Neither the directory pickers, on a new session, a conversation's move, and a Bot's workspace, nor the sidebar's workspace picker list the personal directory.
-  To start one on a Personal repository, start a session in that workspace as usual.
-- The page calls that directory **Personal** wherever it names a workspace: the badge on a row under all workspaces, a directory picker's button on a personal session, and the command palette.
+  In Personal the directory pickers, on a new session and a conversation's move, and the sidebar's workspace picker list the personal directory first, then the Personal workspaces.
+  To start one on a Personal repository, pick that workspace in Personal, or in the new session's directory picker, and start a session as usual.
+- The page calls that directory **Personal** wherever it names a workspace: the badge on a row under **All of Personal**, a directory picker's button on a personal session, and the command palette.
   An untitled session's row still reads as its directory's name, `personal`, until omp titles it.
 - Every turn of a personal session's main agent starts with a framing and what it remembers about you; its subagents get neither.
   In the personal directory the framing makes it your assistant for everyday life; in a Personal repository it tells the agent the project is part of your own life, not your job.

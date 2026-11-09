@@ -28,6 +28,7 @@
   `src/shared/access.ts` holds the storage keys and socket subprotocol that the page and the server share.
   `src/server/socket.test.ts` runs the start and Resume all handlers over a stub env and checks the refusal the page reads: a project's untrusted code tells whoever sent the start to trust it, and Resume all carries that ask.
   `src/server/application-socket.test.ts` boots this actual application in a subprocess with isolated config and data and checks denied handshakes, authenticated roster delivery, and credential-free protocol negotiation.
+  `src/server/session-routes.test.ts` checks `GET /api/pull-requests`'s scope: a space's directories, and the 400 for an unknown space or for both `cwd` and `space`.
 - `src/server/routes.ts` composes the `/api/` endpoints and keeps `RouteEnv`, handing each group only its part.
   `src/server/route-kit.ts` holds `RouteKit`, `Routes`, and `SessionRoutesEnv`, which the route groups import, so a group does not import `routes.ts`.
   `src/server/session-routes.ts`, `src/server/integration-routes.ts`, `src/server/provider-routes.ts`, `src/server/gmail-routes.ts`, `src/server/pull-request-routes.ts`, `src/server/file-routes.ts`, `src/server/todo-routes.ts`, `src/server/dashboard-routes.ts`, `src/server/sync-routes.ts`, and `src/server/process-routes.ts` each hold one of those groups.

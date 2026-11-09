@@ -9,8 +9,6 @@ import { PullRequestDetails } from "./pull-requests/pr-page";
 interface PullRequestsTabProps {
 	/** What the session and its subagents submitted or worked on, the session's own first. */
 	pullRequests: LinkedPullRequest[];
-	/** The sidebar's workspace `cwd`, or `null` for every workspace, whose pull request list offers the quick actions. */
-	workspace: string | null;
 	hosts: RosterHost[];
 	/** A change reads the shown pull request from GitHub again. */
 	version?: unknown;
@@ -23,7 +21,7 @@ interface PullRequestsTabProps {
  * is picked from its stack or from the session's other pull requests in the header's stack menu. Callers key it by session, so a
  * pick lasts only while the sidebar shows that session.
  */
-export function SessionPullRequestsTab({ pullRequests, workspace, hosts, version, current }: PullRequestsTabProps) {
+export function SessionPullRequestsTab({ pullRequests, hosts, version, current }: PullRequestsTabProps) {
 	const [picked, setPicked] = useState<PullRequest | null>(null);
 	const [tab, setTab] = useState<PullRequestDetailTab>("summary");
 	const shown = picked ?? pullRequests[0];
@@ -34,7 +32,7 @@ export function SessionPullRequestsTab({ pullRequests, workspace, hosts, version
 	};
 	return (
 		<div className="flex min-h-0 flex-1 flex-col">
-			<PullRequestDetails workspace={workspace} hosts={hosts} target={shown} placement="sidebar" version={version} tab={tab} onTab={setTab} onPick={pick} session={pullRequests} current={current} />
+			<PullRequestDetails hosts={hosts} target={shown} placement="sidebar" version={version} tab={tab} onTab={setTab} onPick={pick} session={pullRequests} current={current} />
 		</div>
 	);
 }
