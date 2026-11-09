@@ -19,6 +19,10 @@
   --popover-foreground: var(--color-zinc-800);
   --primary: oklch(0.488 0.217 264);
   --primary-foreground: var(--color-white);
+  --dither-ink: var(--primary);
+  --dither-paper: var(--background);
+  --dither-cell: 3px;
+  --dither-bloom: 0.6;
   --secondary: var(--color-zinc-50);
   --secondary-foreground: var(--color-zinc-800);
   --muted: var(--color-zinc-50);
@@ -91,6 +95,7 @@
   --popover: color-mix(in srgb, var(--color-neutral-950) 97%, var(--color-white));
   --popover-foreground: var(--color-neutral-100);
   --primary: oklch(0.571 0.21 264);
+  --dither-bloom: 1;
   --secondary: color-mix(in oklab, var(--color-white) 3%, transparent);
   --secondary-foreground: var(--color-neutral-100);
   --muted: color-mix(in oklab, var(--color-white) 3%, transparent);
