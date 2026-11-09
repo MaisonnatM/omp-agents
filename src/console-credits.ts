@@ -14,14 +14,28 @@ const CONSOLE = "https://platform.claude.com";
 const SESSION_HOSTS = ["platform.claude.com", ".platform.claude.com"];
 
 /** Profile roots whose `cookies.sqlite` stores the Console session in plaintext. Chrome's store is encrypted. */
-function cookieRoots(): string[] {
-	const home = homedir();
+export function cookieRootsFor(platform: string, home: string): string[] {
+	if (platform === "darwin") {
+		return [
+			join(home, "Library/Application Support/zen/Profiles"),
+			join(home, "Library/Application Support/Firefox/Profiles"),
+			join(home, "Library/Application Support/LibreWolf/Profiles"),
+			join(home, ".mozilla/firefox"),
+		];
+	}
 	return [
-		join(home, "Library/Application Support/zen/Profiles"),
-		join(home, "Library/Application Support/Firefox/Profiles"),
-		join(home, "Library/Application Support/LibreWolf/Profiles"),
+		join(home, ".zen"),
+		join(home, ".var/app/app.zen_browser.zen/.zen"),
+		join(home, ".librewolf"),
+		join(home, ".var/app/io.gitlab.librewolf-community/.librewolf"),
 		join(home, ".mozilla/firefox"),
+		join(home, "snap/firefox/common/.mozilla/firefox"),
+		join(home, ".var/app/org.mozilla.firefox/.mozilla/firefox"),
 	];
+}
+
+function cookieRoots(): string[] {
+	return cookieRootsFor(process.platform, homedir());
 }
 
 /** `cookies.sqlite` files under the Firefox-family profile roots. */

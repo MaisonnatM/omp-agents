@@ -3,7 +3,7 @@
  * (the server bundled, the page prebuilt, the shell's main process), a Bun runtime per architecture,
  * then electron-builder for a DMG and a zip, the zip and `latest-mac.yml` being what electron-updater reads.
  *
- *   bun scripts/build-desktop-artifact.ts [--arch arm64,x64] [--mock-update-port <port>]
+ *   bun scripts/build-desktop-artifact.ts [--os darwin|linux] [--arch arm64,x64] [--mock-update-port <port>]
  *
  * Signing is detected from the environment: with `CSC_LINK` set, electron-builder signs with that Developer ID and
  * notarizes through `APPLE_API_KEY`, `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER`; without it, the app is signed ad hoc,
@@ -25,7 +25,15 @@ const KIT = join(ROOT, "templates", "omp");
 const BUN_ARCH: Record<string, string> = { arm64: "aarch64", x64: "x64" };
 const REPOSITORY = { owner: "MaisonnatM", repo: "omp-agents" };
 
-const { values: args } = parseArgs({ options: { arch: { type: "string", default: process.arch }, "mock-update-port": { type: "string" } } });
+const { values: args } = parseArgs({
+	options: {
+		os: { type: "string", default: process.platform === "linux" ? "linux" : "darwin" },
+		arch: { type: "string", default: process.arch },
+		"mock-update-port": { type: "string" },
+	},
+});
+const targetOs = args.os ?? "darwin";
+if (targetOs !== "darwin" && targetOs !== "linux") throw new Error(`unsupported --os ${targetOs}; use darwin or linux`);
 const arches = (args.arch ?? process.arch).split(",");
 for (const arch of arches) if (!BUN_ARCH[arch]) throw new Error(`unsupported --arch ${arch}; use arm64, x64, or both`);
 
@@ -59,16 +67,18 @@ async function buildResources(): Promise<void> {
 async function bunRuntime(arch: string): Promise<void> {
 	const dir = join(DIST, `bun-${arch}`);
 	const binary = join(dir, "bun");
-	if (existsSync(binary) && (await $`${binary} --version`.nothrow().text()).trim() === Bun.version) return;
+	const sameOs = targetOs === (process.platform === "linux" ? "linux" : "darwin");
+	if (sameOs && existsSync(binary) && (await $`${binary} --version`.nothrow().text()).trim() === Bun.version) return;
 	rmSync(dir, { recursive: true, force: true });
 	mkdirSync(dir, { recursive: true });
-	const name = `bun-darwin-${BUN_ARCH[arch]}`;
+	const name = `bun-${targetOs === "linux" ? "linux" : "darwin"}-${BUN_ARCH[arch]}`;
 	const url = `https://github.com/oven-sh/bun/releases/download/bun-v${Bun.version}/${name}.zip`;
 	const response = await fetch(url);
 	if (!response.ok) throw new Error(`cannot download ${url}: HTTP ${response.status}`);
 	const zip = join(dir, `${name}.zip`);
 	await Bun.write(zip, response);
-	await $`ditto -x -k ${zip} ${dir}`.quiet();
+	if (process.platform === "darwin") await $`ditto -x -k ${zip} ${dir}`.quiet();
+	else await $`unzip -q ${zip} -d ${dir}`.quiet();
 	await $`mv ${join(dir, name, "bun")} ${binary}`.quiet();
 	rmSync(zip);
 	rmSync(join(dir, name), { recursive: true });
@@ -90,7 +100,8 @@ function builderConfig(): Record<string, unknown> {
 			{ from: join(DIST, "bun-${arch}"), to: "server/bin" },
 		],
 		electronLanguages: ["en"],
-		mac: {
+		linux: targetOs === "linux" ? { target: [{ target: "AppImage", arch: arches }], icon: join(DESKTOP, "icon.png"), category: "Development" } : undefined,
+		mac: targetOs === "darwin" ? {
 			target: [
 				{ target: "dmg", arch: arches },
 				{ target: "zip", arch: arches },
@@ -105,7 +116,7 @@ function builderConfig(): Record<string, unknown> {
 			// Dictation records in the bundled server, which macOS asks about in the app's name.
 			extendInfo: { NSMicrophoneUsageDescription: "omp-agents records your voice when you dictate a prompt, and turns it into text in the composer." },
 			identity: signed ? undefined : "-",
-		},
+		} : undefined,
 		publish: mockPort ? { provider: "generic", url: `http://127.0.0.1:${mockPort}` } : { provider: "github", ...REPOSITORY },
 	};
 }
@@ -116,5 +127,5 @@ for (const arch of arches) await bunRuntime(arch);
 const configFile = join(DIST, "electron-builder.json");
 await Bun.write(configFile, JSON.stringify(builderConfig(), null, "\t"));
 rmSync(join(DESKTOP, "release"), { recursive: true, force: true });
-await $`${join(DESKTOP, "node_modules", ".bin", "electron-builder")} --mac --config ${configFile} --publish never`.cwd(DESKTOP);
+await $`${join(DESKTOP, "node_modules", ".bin", "electron-builder")} ${targetOs === "linux" ? "--linux" : "--mac"} --config ${configFile} --publish never`.cwd(DESKTOP);
 console.log(`Built ${join(DESKTOP, "release")}`);

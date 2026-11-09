@@ -3,6 +3,7 @@ import { link, lstat, mkdir, readdir, readlink, realpath, rename, rm, symlink } 
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { errorText } from "../json";
+import { openPathsIn } from "../process-census";
 import { run } from "../proc";
 import { CleanupBusy, PACKAGE_TOOLS, type CachePlan, type CacheResult, type PackageTool } from "../shared/storage";
 import { allocatedUsage } from "../worktrees";
@@ -45,16 +46,26 @@ export async function previewCaches(): Promise<CachePlan[]> {
  */
 async function openEntries(cache: string): Promise<string[]> {
 	const root = await realpath(cache);
-	const prefix = `n${root}/`;
-	const { code, stdout } = await run(["lsof", "-nP", "-w", "-Fn"], { timeoutMs: 60_000 });
-	if (code > 1 || !stdout) throw new Error("Cannot list the files running tools have open, so uv's cache was not pruned.");
+	const listed = await openCachePaths(root);
+	const prefix = `${root}/`;
 	const entries = new Set<string>();
-	for (const line of stdout.split("\n")) {
-		if (!line.startsWith(prefix)) continue;
-		const [bucket, entry] = line.slice(prefix.length).split("/");
+	for (const path of listed) {
+		if (!path.startsWith(prefix)) continue;
+		const [bucket, entry] = path.slice(prefix.length).split("/");
 		if (bucket && entry) entries.add(join(root, bucket, entry));
 	}
 	return [...entries];
+}
+
+async function openCachePaths(root: string): Promise<string[]> {
+	try {
+		const { code, stdout } = await run(["lsof", "-nP", "-w", "-Fn"], { timeoutMs: 60_000 });
+		if (code <= 1 && stdout) return stdout.split("\n").filter(line => line.startsWith("n")).map(line => line.slice(1));
+	} catch {
+		// `lsof` is not installed.
+	}
+	if (process.platform === "linux") return openPathsIn("/proc").filter(path => path.startsWith(`${root}/`));
+	throw new Error("Cannot list the files running tools have open, so uv's cache was not pruned.");
 }
 
 async function linkTree(source: string, target: string): Promise<void> {

@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { run } from "../proc";
 
 /** Where the CLI lives, the first that exists: the desktop app's PATH may lack `/usr/local/bin`. */
-const CANDIDATES = ["/usr/local/bin/tailscale", "/Applications/Tailscale.app/Contents/MacOS/Tailscale", "tailscale"];
+const CANDIDATES = ["/usr/local/bin/tailscale", "/usr/bin/tailscale", "/Applications/Tailscale.app/Contents/MacOS/Tailscale", "tailscale"];
 
 const found = (): string | null => CANDIDATES.find(candidate => candidate === "tailscale" || existsSync(candidate)) ?? null;
 

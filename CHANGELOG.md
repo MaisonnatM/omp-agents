@@ -7,6 +7,10 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - **Fix CI**, **Resolve conflicts**, and **Address comments** sessions now record their work in the PR's ship status, so its widget shows the rebase, CI fix, or comment fix in progress.
 - **Work on it** on a ticket or todo now runs the ship workflow, starting with its questions and plan, and still stops before pushing or opening a pull request.
+- On Linux, session ports and the uv cache cleanup work even when lsof is not installed.
+- On Linux, the app menu has About, Check for Updates, Install omp Starter Kit, and Quit.
+- On Linux, the dashboard can read a Claude Console sign-in from Zen, LibreWolf, or Firefox, including Flatpak and Snap copies.
+- Behind the scenes: the desktop app can be packaged as a Linux AppImage as well as a Mac app.
 - A Bot's details have a **Restart conversation** button: after you confirm, its session ends and is archived, and its next message starts a fresh conversation. Its job, memory, and routines stay.
 - A routine that runs a command can now post its output to its Bot only when the command fails: check **Post the output to … only when it fails** in the routine's form. A run that succeeds keeps its output in the routine's history without waking the Bot.
 - On a phone, the header holds one menu named after the page you are on, listing every tab, Personal and Work, and Settings, beside search and the bell.

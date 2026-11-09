@@ -29,6 +29,7 @@ A job stops through `terminate`: SIGTERM to each member, then SIGKILL after 3 se
 A `ps` that fails fails the sample rather than reading as nothing running.
 The same sample runs one `lsof` over every TCP listener of the user's processes (`LISTENERS_ARGV` and `parseListeners` in `src/process-census.ts`), beside `ps`, and each job and service gets the ports its processes listen on, which the [Browser](../usage/browser.md) offers as dev servers.
 `lsof` exits with 1 when none listens, which reads as no ports; an `lsof` that fails or is missing leaves every port list empty and the rest of the sample stands.
+On Linux, a missing `lsof` is read from `/proc` instead, for the ports, the working directories, and the files a uv prune must keep.
 
 ## HTTP
 
