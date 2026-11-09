@@ -1,6 +1,6 @@
 /** Which live sessions need you, and the alerts they raise, for the desktop app's Dock badge and the session notifications. */
 import type { SessionAlert } from "../src/shared/desktop-bridge";
-import { hashForSession, type RosterHost, type Stop, stopOf, type UnreadTurn, type View } from "../src/shared/sessions";
+import { awaitsSubagents, hashForSession, type RosterHost, type Stop, stopOf, type UnreadTurn, type View } from "../src/shared/sessions";
 import type { DashboardState } from "./dashboard-state";
 import { hostLabel } from "./labels";
 
@@ -9,8 +9,9 @@ type Wait = Exclude<Stop, { kind: "turn-ended" }> | { kind: "turn"; turn: Unread
 
 export function waitOf(host: RosterHost): Wait | null {
 	const stop = stopOf(host);
-	if (stop?.kind !== "turn-ended") return stop;
-	return host.unread ? { kind: "turn", turn: host.unread } : null;
+	if (stop && stop.kind !== "turn-ended") return stop;
+	// An unread turn counts even while omp has not said it is idle, as for a terminal session that reports no busy state.
+	return host.unread && !awaitsSubagents(host) ? { kind: "turn", turn: host.unread } : null;
 }
 
 /** Whether live session `host` needs you: it asks you something, or it ended a turn you have not looked at since and waits on no subagent. */
