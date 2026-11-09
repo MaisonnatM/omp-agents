@@ -37,7 +37,7 @@ function useCountdown(expiresAt: number | null): number {
 
 /** The QR of `url`, as SVG. */
 function Qr({ url }: { url: string }) {
-	return <span aria-label="Pairing code" role="img" className="inline-block rounded-md bg-white p-2" dangerouslySetInnerHTML={{ __html: renderSVG(url, { ecc: "M" }) }} />;
+	return <span aria-label="Pairing code" role="img" className="inline-block size-48 shrink-0 rounded-md bg-white p-2 [&>svg]:size-full" dangerouslySetInnerHTML={{ __html: renderSVG(url, { ecc: "M" }) }} />;
 }
 
 /** Phone access: off until the switch turns it on, then the address, a pairing code, and the phones. */

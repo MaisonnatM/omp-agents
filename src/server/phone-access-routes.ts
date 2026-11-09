@@ -46,7 +46,7 @@ export function phoneAccessRoutes(guards: Guards, { phones, tailscale, port }: P
 				}),
 		},
 		"/api/phone-access/pairing": {
-			POST: req =>
+			PUT: req =>
 				desktop(req, async () => {
 					if (!phones.enabled()) return fail(409, "Turn on Phone access before pairing a phone.");
 					const { code, expiresAt } = phones.createCode();

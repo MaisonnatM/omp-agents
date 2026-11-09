@@ -102,12 +102,6 @@ export interface Guards {
 	hello(req: Request): Response;
 }
 
-/**
- * Only the page this app served on `port`, signed in with `token`, may open the socket or read omp's files.
- * DNS rebinding cannot pass the Host check, and a cross-site page cannot pass the `Sec-Fetch-Site` or Origin checks.
- * No request carries the token by itself: the page sends it from its own localStorage, which no other port can read.
- * A local program must hold the token, which only the user can read.
- */
 /** What a request proves, once its host is this server's: the desktop window's token, or a paired phone's. */
 interface Presented {
 	kind: "main" | "phone";
@@ -133,6 +127,13 @@ export function guardsFor(port: number, token: string, phones?: PhoneAccess): Gu
 		if (!fetchSiteAllowed(req.headers.get("sec-fetch-site"), false)) return fail(403, "forbidden origin");
 		return null;
 	};
+	/** The token a browser's socket offers as the `bearer.<token>` subprotocol, since it can send no header. */
+	const socketToken = (req: Request): string | undefined =>
+		(req.headers.get("sec-websocket-protocol") ?? "")
+			.split(",")
+			.map(protocol => protocol.trim())
+			.find(protocol => protocol.startsWith(SOCKET_TOKEN_PREFIX))
+			?.slice(SOCKET_TOKEN_PREFIX.length);
 	const presented = (req: Request, subprotocol?: string): Presented | null => {
 		const given = bearerToken(req.headers.get("authorization")) ?? subprotocol ?? null;
 		if (tokenMatches(token, given)) return { kind: "main", phoneId: null, token: given };
@@ -170,9 +171,7 @@ export function guardsFor(port: number, token: string, phones?: PhoneAccess): Gu
 			const refused = outside(req);
 			if (refused) return refused;
 			if (!sameOrigin(req)) return fail(403, "forbidden origin");
-			const offered = (req.headers.get("sec-websocket-protocol") ?? "").split(",").map(protocol => protocol.trim());
-			const subprotocol = offered.find(protocol => protocol.startsWith(SOCKET_TOKEN_PREFIX))?.slice(SOCKET_TOKEN_PREFIX.length);
-			const who = presented(req, subprotocol);
+			const who = presented(req, socketToken(req));
 			if (!who) return fail(401, NOT_SIGNED_IN);
 			if (who.token) phones?.seen(who.token);
 			return null;
@@ -192,7 +191,7 @@ export function guardsFor(port: number, token: string, phones?: PhoneAccess): Gu
 			return jsonBody(req);
 		},
 		signer(req) {
-			const who = presented(req);
+			const who = presented(req, socketToken(req));
 			if (!who) return null;
 			return who.kind === "phone" && who.phoneId ? { kind: "phone", id: who.phoneId } : { kind: "main" };
 		},

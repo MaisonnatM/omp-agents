@@ -18,5 +18,5 @@ A wrong, used, or expired code answers the same 401, and a host that tries eight
 `guardsFor` in `src/server/http.ts` accepts the tailnet host, and `https://` as its origin, only while Phone access is on, and a phone's token only while that phone is still paired.
 A phone's request updates `lastSeenAt`, at most once a minute.
 The state, enable, pairing, and removal routes go through `writeBodyLocal`, which takes the main token on a loopback host and answers 403 to a phone's token.
-Removing a phone closes the dashboard and terminal sockets it signed in on, which the server tracks by the phone id stamped on each socket at upgrade.
-With Phone access off, the tailnet host is a forbidden host and every phone's token is refused.
+Removing a phone closes the dashboard and terminal sockets it signed in on, which the server tracks by the phone id stamped on each socket at upgrade, read from the `bearer.<token>` subprotocol a browser socket signs in with.
+With Phone access off, the tailnet host is a forbidden host, every phone's token is refused, and every phone's open sockets close.

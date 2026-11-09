@@ -38,6 +38,17 @@ test("the tailnet host and a phone's token pass only while Phone access is on", 
 	expect(phones.phoneFor(paired.token)).toBeNull();
 });
 
+test("a browser socket that signs in through its subprotocol is known as its phone, so removing the phone can close it", () => {
+	const phones = fresh();
+	const dns = "mac.tailnet.ts.net";
+	phones.setEnabled(true, dns);
+	const guards = guardsFor(4317, TOKEN, phones);
+	const paired = phones.exchange(phones.createCode().code, "Pixel", dns)!;
+	const socket = new Request(`http://${dns}/ws`, { headers: { host: dns, origin: `https://${dns}`, "sec-websocket-protocol": `omp-agents, bearer.${paired.token}` } });
+	expect(guards.admitSocket(socket)).toBeNull();
+	expect(guards.signer(socket)).toEqual({ kind: "phone", id: paired.phone.id });
+});
+
 test("a phone's token is refused on the Phone access routes, which take the main token on loopback only", async () => {
 	const phones = fresh();
 	phones.setEnabled(true, "mac.tailnet.ts.net");

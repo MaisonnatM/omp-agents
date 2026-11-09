@@ -95,10 +95,11 @@ export class PhoneAccess {
 		return this.#state.enabled && this.#state.dnsName ? this.#state.dnsName : null;
 	}
 
-	/** Turns Phone access on for `dnsName`, or off. */
+	/** Turns Phone access on for `dnsName`, or off, which also closes every phone's open sockets. */
 	setEnabled(enabled: boolean, dnsName: string | null): void {
 		this.#state = { ...this.#state, enabled, dnsName: enabled ? dnsName : this.#state.dnsName };
 		this.#file.save(this.#state);
+		if (!enabled) for (const phone of this.#state.phones) for (const revoke of this.#revoke) revoke(phone.id);
 	}
 
 	/** Remembers the tailnet name Tailscale reports now, which a rename of the Mac changes. */
@@ -110,6 +111,7 @@ export class PhoneAccess {
 
 	/** A pairing code that works once, for {@link PAIRING_TTL_MS}, and the moment it stops working. */
 	createCode(now = Date.now()): { code: string; expiresAt: number } {
+		for (const [code, entry] of this.#codes) if (entry.used || entry.expiresAt <= now) this.#codes.delete(code);
 		const code = randomBytes(32).toString("base64url");
 		const expiresAt = now + PAIRING_TTL_MS;
 		this.#codes.set(code, { hash: sha256(code), expiresAt, used: false });
