@@ -13,6 +13,7 @@ Alt is Option on macOS.
 | Cmd+K | Anywhere | Open the command menu |
 | Cmd+[ / Cmd+] | Anywhere | Go back or forward, as the title bar's Back and Forward buttons do |
 | Cmd+N / S | Anywhere / outside text fields | Start a new session; on the tickets page, Cmd+N creates a Linear ticket |
+| Cmd+Shift+P | Anywhere but the command menu | Switch between the Personal and Work spaces |
 | Cmd+F | Anywhere | Put the cursor in the sidebar's session search |
 | Cmd+W | Anywhere | End the focused session |
 | Cmd+Alt+↑ | Anywhere | Open the previous session in the sidebar |
@@ -117,6 +118,8 @@ Alt is Option on macOS.
   Cmd+W ends the focused session, as **End session** in its header does, with no confirmation; **Resume** continues it from the past sessions.
   It does nothing in a subagent, a read-only room, or a past session.
   `/` or Cmd+I puts the cursor in the focused pane's composer.
+- Cmd+Shift+P switches the window between the Personal and Work spaces, as the switch at the top of the window does; see [Sessions sidebar](sessions-sidebar.md).
+  Inside the command menu it pins or unpins the highlighted session instead.
 - Cmd+Alt+/ opens the model picker, and Shift+Tab in a composer moves to the next thinking level, in sessions that the dashboard started and in the new-session draft.
   Cmd+Alt+P (Option+Cmd+P on macOS) opens the directory picker in the new-session draft and, between turns, in sessions that the dashboard started.
   Choosing a model, an effort, a directory, or a branch in a composer's picker puts the cursor back in that composer, and so does a click on its send or Stop button; Esc leaves the focus on the picker's button.

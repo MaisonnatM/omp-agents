@@ -13,6 +13,13 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - A session in a Personal workspace, or in a second copy of one checked out on another branch, is now a personal session: it knows what you told personal sessions about yourself, can remember more, can log your sport, and shows the Memory tab, while keeping the agent's usual coding tools.
 - Behind the scenes: the server, the agents, and the page now decide a folder's space with one shared rule.
 - Your other machines get the spaces you pick through Settings › Sync, with the workspaces.
+- A Personal and Work switch now sits at the top of the window, beside Back and Forward in the desktop app, so opening the dashboard for your own life shows no work: Personal shows only your Personal workspaces with their sessions, todos, and pull requests, and Work only the rest.
+- Cmd+Shift+P now switches between Personal and Work; each window keeps its own space, and a new window opens in the last one you used.
+- The sidebar's workspace picker lists the space's workspaces, with your personal folder first in Personal, and its first entry reads All of Personal or All of Work.
+- The sidebar's workspace picker can move the picked workspace to the other space.
+- The sidebar's Personal item is gone: in Personal, New session starts in your personal folder unless you pick another workspace.
+- Opening a link to a session from the other space switches to that space.
+- Behind the scenes: the pull request list can ask for one space's repositories.
 
 ## 2026-11-08
 

@@ -2,7 +2,7 @@
 
 - The **Todo** tab, or a `#todo` address, opens todos of your own, not tied to a session, in place of the panes; a top-level todo can name the workspace it is about.
   The sidebar then lists **All**, **Today**, **Needs you**, **From agents**, and **Archive**, then your categories, each with how many top-level todos are open in it.
-  With a workspace picked at the top of the sidebar, every list, the archive too, and every count holds only the todos that name that workspace; **All workspaces** shows every todo, those that name none included.
+  With a workspace picked at the top of the sidebar, every list, the archive too, and every count holds only the todos that name that workspace; **All of Personal** holds the todos that name a Personal workspace, and **All of Work** those that name a Work workspace or none.
   Each category has a color checkbox, and its todos carry a badge of that color.
   Click one to show its todos alone; `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/archive`, and `#todo/<category id>` address them.
   Uncheck a category to keep its todos out of **All**, **Today**, **Needs you**, and **From agents**, and out of their counts; its own list still shows them, and the app keeps the choice, on every machine through Settings › Sync.
@@ -12,7 +12,7 @@
   **From agents** lists the todos that an agent added; see [Todos from agents](#todos-from-agents).
 - The **+** beside **Categories** adds a category; type its name and press Enter, and the page opens it.
   A category's **⋯** menu renames it or deletes it; deleting a category keeps its todos, in no category.
-- **Add a todo** at the end of a list's **Todo** group, or C outside a text field, starts a new todo in that list's category, in the sidebar's selected workspace, or in none under **All workspaces**; type its title and press Enter.
+- **Add a todo** at the end of a list's **Todo** group, or C outside a text field, starts a new todo in that list's category, in the sidebar's selected workspace, under **All of Personal** in the personal directory, or in none under **All of Work**; type its title and press Enter.
   The **+** in a group's header starts one of that group's status instead.
   Enter then starts the next todo below it, of the same status, and Enter on an empty one, Esc, or a click elsewhere stops.
 - A new todo's title, here or in the command menu's **Create todo**, can end with a due day: `today`, `tomorrow`, a weekday such as `fri` or `friday`, or a `YYYY-MM-DD` date.
@@ -66,7 +66,7 @@
 - An open todo shows its title, which you edit in place, with Enter or a click elsewhere saving and Esc undoing.
   Under it, buttons show its status, its priority, its assignee, its category and its **Workspace** for a top-level todo, and its due day, each opening a menu to change it; the due day's menu also clears it.
   The **Workspace** menu lists **No workspace** and the workspaces the sidebar lists, each by folder name and path.
-  Under **All workspaces**, a top-level todo with a workspace shows its folder name as a badge in the list, as a session row does; under a picked workspace, a list with no todo naming it says so and points to **All workspaces**, and a todo you open keeps showing after you give it another workspace.
+  Under **All of Personal** or **All of Work**, a top-level todo with a workspace shows its folder name as a badge in the list, as a session row does; under a picked workspace, a list with no todo naming it says so and points to the space's whole list, and a todo you open keeps showing after you give it another workspace.
   A todo due today reads **Today**, and one whose day has passed reads **Overdue** in red.
   Its notes follow, always formatted.
   Click into them and type: markdown at the start of a line formats it as you type, `# ` a heading, `- ` a bullet, `1. ` a numbered list, `[ ] ` or `[x] ` a check item, `> ` a quote, and ```` ``` ```` a code block.

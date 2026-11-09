@@ -187,19 +187,21 @@
   A session still working when its pull request merges, or waiting to continue after a usage limit or a connection error, ends once it is idle with no continue waiting; one whose other pull request closes later ends then, and one the dashboard could not end is tried again two minutes later.
   Ending it removes its linked worktree as **End session** does, so a worktree with changes stays, then deletes the local branch of the merged pull request, but only when the merge took every commit of the branch and no worktree has it checked out.
   **Default merge method** picks the method a pull request's merge button starts with; **Last selected** reuses the method of your last confirmed merge in the app, and a method the repository does not allow falls back to the first one it does.
-- **Workspaces** lists the directories that the sidebar's workspace picker and the directory pickers offer.
+- **Workspaces** lists the directories that the sidebar's workspace picker and the directory pickers offer, those of both spaces.
   Type a path in **Directory** and choose **Add workspace** to offer a directory no session ran in yet; `~` works, and a path that is not a directory shows an error.
   In the desktop app, **Choose folder…** opens the system's folder picker and adds the folder you pick.
   **Hide** drops a workspace and its sessions from the pickers, the session lists and counts, and session search, as for `/tmp`; a direct session link still opens them.
   Hidden workspaces list under **Hidden**, and **Show** offers one again.
   Each workspace has a space, **Work** or **Personal**, picked beside it; a session in a Personal workspace, or in a worktree of one, is a [personal session](personal-sessions.md) with your personal memory, `remember`, and `sport`.
+  The sidebar's workspace picker moves the picked workspace to the other space too; see [Sessions sidebar](sessions-sidebar.md).
   The personal directory is always **Personal**, so its row shows a **Personal** badge instead of the picker.
   Hiding a workspace and showing it again keeps its space.
   The server keeps the list and the spaces in `workspaces.json` beside its access token, so every window of the app shows the same workspaces.
   **Trusted projects** lists the projects whose own agent code you trusted, with **Stop trusting** to ask again; see [Per-project agent setup](per-project-agent-setup.md#stop-trusting).
 - **Sync** carries your omp settings and files to your other machines through a Git repository of yours; see [Settings sync](settings-sync.md).
 - Settings follows the workspace picked in the sidebar header, so it includes that workspace's project files and its `.omp/config.yml` overrides.
-  With **All workspaces**, **Models**, **Agents**, **omp settings**, **Files**, **Extensions**, **Workflows**, and the **New sessions** skill picker show user files and packages only, **omp memory** shows only its settings, and **Worktrees** lists every repository.
+  With no workspace picked, which the header's picker reads as **All workspaces**, **Models**, **Agents**, **omp settings**, **Files**, **Extensions**, **Workflows**, and the **New sessions** skill picker show user files and packages only, **omp memory** shows only its settings, and **Worktrees** lists every repository.
+  That header picker lists the workspaces of the space the window shows.
   The picker in the header of a Workspace section is the same choice: picking a workspace there switches the sidebar to it too.
   Pressing the gear button while Settings is open closes it, so pick a section from the sidebar to change sections.
   A session's **Workspace settings** switches the sidebar to that session's workspace and opens **Models**; a session in `/tmp` or a hidden workspace does not offer it.

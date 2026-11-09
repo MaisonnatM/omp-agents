@@ -64,6 +64,6 @@ The dashboard pushes it again after a personal session's turn ends and when one 
 ## The page
 
 `web/dashboard-state.ts` keeps the directory as `personal`, one object while it stays the same, and the memory text as `personalMemory`.
-`PersonalContext` in `web/components/dashboard-context.tsx` provides the directory, and `workspaceName` in `web/labels.ts` names it **Personal**, from the directory as shown, for the workspace pickers, the roster's new-session button, a row's workspace badge, and the command palette.
-`DirectoryPicker` lists it first.
+`PersonalContext` in `web/components/dashboard-context.tsx` provides the directory, and `workspaceName` in `web/labels.ts` names it **Personal**, from the directory as shown, for the workspace pickers, a row's workspace badge, and the command palette.
+The window shows one space at a time, which `useSpace` in `web/use-workspace-scope.ts` keeps and `SpaceSwitch` in `web/components/header-controls.tsx` switches; in Personal, `workspacesIn` in `web/sessions.ts` lists the directory first, `DirectoryPicker` and the sidebar's workspace picker with it, and `defaultCwd` starts a new session there while no workspace is picked.
 `SessionDetails` adds a **Memory** tab for a session `spaces` places in the Personal space, given the focused session's directory, its workspace from the roster, and the `personal` list of the `workspaces` message, with `MemoryList` from `web/components/memory-list.tsx`, which a Bot's details also use.

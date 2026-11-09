@@ -14,7 +14,7 @@
   **Remove** takes the account's server and sign-in out of omp; the last account on a service stays as a signed-out server, since it keeps the OAuth client.
   A new OAuth client ID or secret removes every added account and signs out the remaining one, since Google ties sign-ins to the client.
 - Each Google account's workspace picker links its address to workspaces, which covers that address's Gmail and Google Calendar accounts; a pick made before the one before it is saved adds to it rather than replacing it.
-  While the sidebar picks a workspace, the Email page, the Calendar, and the `@` menu show the accounts linked to it and those linked to none; with **All workspaces** they show every account.
+  While the sidebar picks a workspace, the Email page, the Calendar, and the `@` menu show the accounts linked to it and those linked to none; with none picked, under **All of Personal** or **All of Work**, they show every account.
   With the starter kit's `extensions/google-accounts.ts` installed (`bun run omp-template`), an omp session whose service has two or more accounts is told at each prompt each account's address and tool prefix, and, when its workspace has linked addresses, to use those for its mail and calendar unless you name another account.
   A session in a linked worktree counts as in its repository's main checkout when its own directory is in no linked workspace; every account's tools stay available to it.
 - With the same extension, a session whose Gmail or Google Calendar tool call fails with HTTP 401 stops using that service and asks you to sign in again here, and the bell shows a sign-in notice that opens this page; see [Notifications](notifications.md).
