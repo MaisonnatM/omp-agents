@@ -929,7 +929,7 @@ export const parseBranchRelease = (body: unknown): Parsed<{ cwd: string; branch:
 	isObject(body) && isNonEmpty(body.cwd) && body.cwd.startsWith("/") && isNonEmpty(body.branch) ? { ok: { cwd: body.cwd, branch: body.branch } } : null;
 
 const isWorkspaceOp = oneOf(["add", "hide", "show", "space"] as const);
-const isSpace = oneOf(["personal", "work"] as const);
+export const isSpace = oneOf(["personal", "work"] as const);
 
 /**
  * The body of `PUT /api/workspaces`: `{ op, cwd }`, or `{ op: "space", cwd, space }`. Adding takes any path a new session
