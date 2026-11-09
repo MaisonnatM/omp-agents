@@ -4,6 +4,7 @@
   The sidebar then lists **Calendar**, then, once Google Calendar is connected, your Google calendars under **My calendars** and **Other calendars**, then **Show routines**.
 - Each day lists its routine runs, the todos due on it, the events you keep on this computer in the space on screen, and, once connected, the Linear tickets due on it and events of the Google calendars you added.
   Routine runs show only for the Bots of the space on screen, and todos only for those whose workspace is in it; a todo with no workspace is in Work, as on the Todo page.
+  Linear tickets show only in Work, as the Tickets tab does.
   Google calendars show only for the accounts placed in the space on screen; see [Integrations](integrations.md).
   A green dot is a run that went through, a red one a run that failed, and a hollow one a run still to come.
   A violet dot is a todo, an amber one a ticket, a timed Google event uses its calendar's color, and an event on this computer is slate gray; an all-day event is a band in that color; a done or canceled todo or ticket is struck through.
