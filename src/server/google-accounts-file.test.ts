@@ -15,26 +15,35 @@ const accountsPath = (): string => {
 	return join(dir, "google-accounts.json");
 };
 
-test("learned addresses, forgotten accounts, and workspace links persist as the extension reads them, and a change that changes nothing saves nothing", () => {
+test("learned addresses, forgotten accounts, and Personal addresses persist as the extension reads them, and a change that changes nothing saves nothing", () => {
 	const path = accountsPath();
 	const file = new GoogleAccountsFile(path);
 	expect(file.apply({ kind: "learn", account: "gmail", address: "max@example.com" })).toBe(true);
 	expect(file.apply({ kind: "learn", account: "gmail", address: "max@example.com" })).toBe(false);
 	expect(file.apply({ kind: "learn", account: "gmail-2", address: "max@acme.com" })).toBe(true);
-	expect(file.apply({ kind: "link", address: "max@acme.com", workspaces: ["/code/acme", "/code/acme"] })).toBe(true);
-	expect(file.apply({ kind: "link", address: "max@acme.com", workspaces: ["/code/acme"] })).toBe(false);
+	expect(file.apply({ kind: "place", address: "max@example.com", space: "work" })).toBe(false);
+	expect(file.apply({ kind: "place", address: "max@example.com", space: "personal" })).toBe(true);
+	expect(file.apply({ kind: "place", address: "max@example.com", space: "personal" })).toBe(false);
 	expect(file.apply({ kind: "forget", accounts: ["gmail", "gone"] })).toBe(true);
 	expect(file.apply({ kind: "forget", accounts: ["gone"] })).toBe(false);
 	file.flush();
-	expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({ addresses: { "gmail-2": "max@acme.com" }, links: { "max@acme.com": ["/code/acme"] }, signedOut: {} });
-	expect(file.apply({ kind: "link", address: "max@acme.com", workspaces: [] })).toBe(true);
+	expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({ addresses: { "gmail-2": "max@acme.com" }, personal: ["max@example.com"], signedOut: {} });
+	expect(file.apply({ kind: "place", address: "max@example.com", space: "work" })).toBe(true);
 	file.flush();
-	expect(new GoogleAccountsFile(path).value.links.size).toBe(0);
+	expect(new GoogleAccountsFile(path).value.personal.size).toBe(0);
+});
+
+test("a file from before spaces reads with every address in Work, its workspace links dropped", () => {
+	const path = accountsPath();
+	writeFileSync(path, JSON.stringify({ addresses: { gmail: "max@example.com" }, links: { "max@example.com": ["/code/home"] } }));
+	const file = new GoogleAccountsFile(path);
+	expect([...file.value.addresses]).toEqual([["gmail", "max@example.com"]]);
+	expect(file.value.personal.size).toBe(0);
 });
 
 test("a sign-out report keeps its first time until it settles or its account is forgotten, and a file from before reports reads as none", () => {
 	const path = accountsPath();
-	writeFileSync(path, JSON.stringify({ addresses: { gmail: "max@example.com" }, links: {} }));
+	writeFileSync(path, JSON.stringify({ addresses: { gmail: "max@example.com" } }));
 	const file = new GoogleAccountsFile(path);
 	expect(file.value.signedOut.size).toBe(0);
 	expect(file.apply({ kind: "signed-out", account: "gmail", at: 5 })).toBe(true);

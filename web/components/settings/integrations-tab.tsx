@@ -3,7 +3,6 @@ import { Fragment, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { anyCallable, callable, connectionsOf, type IntegrationsAnswer, MCP_INTEGRATIONS, signedIn } from "../../../src/shared/accounts";
 import type { GoogleStatus } from "../../../src/shared/calendar";
-import type { Workspace } from "../../../src/shared/workspaces";
 import { readTime } from "../../labels";
 import type { PolledEntry } from "../../polled-store";
 import { googleStore, integrationsStore } from "../../reads";
@@ -38,14 +37,14 @@ function Group({ title, entries }: { title: string; entries: Entry[] }) {
 }
 
 /** The integrations a sign-in holds, then the rest, then where their credentials live. */
-function Groups({ answer, google, workspaces }: { answer: IntegrationsAnswer; google: PolledEntry<GoogleStatus>; workspaces: Workspace[] }) {
+function Groups({ answer, google }: { answer: IntegrationsAnswer; google: PolledEntry<GoogleStatus> }) {
 	const entries: Entry[] = MCP_INTEGRATIONS.map(id => answer.integrations[id]).map(integration => ({
 		key: integration.id,
 		connected: connectionsOf(integration).some(signedIn),
 		row: (
 			<McpIntegrationRow
 				integration={integration}
-				workspaces={workspaces}
+				placeable
 				notice={integration.id === "google-calendar" && <GoogleCalendarsError entry={google} />}
 				details={account => integration.id === "google-calendar" && callable(account.connection) && <GoogleCalendarList entry={google} account={account.name} />}
 			/>
@@ -57,14 +56,14 @@ function Groups({ answer, google, workspaces }: { answer: IntegrationsAnswer; go
 			<Group title="Available" entries={entries.filter(entry => !entry.connected)} />
 			<p className="px-1 text-xs text-pretty text-muted-foreground">
 				omp keeps its MCP sign-ins in its own credential store, so every omp session can use them. The Calendar page reads Google Calendar, and the Email page reads Gmail, with omp's
-				sign-in to each account. A Google account linked to workspaces shows on those pages only while the sidebar picks one of them, and sessions in them are told to use it.
+				sign-in to each account. Each Google account is in one space, Work until you move it. Its mail and events show only in that space, and sessions there are told to use it.
 			</p>
 		</div>
 	);
 }
 
-/** The services omp connects to through its MCP servers, each checked by listing its tools, with the calendars each Google Calendar account reads, and the workspaces a Google account may be linked to. */
-export function IntegrationsTab({ active, workspaces }: { active: boolean; workspaces: Workspace[] }) {
+/** The services omp connects to through its MCP servers, each checked by listing its tools, with the calendars each Google Calendar account reads and the space each Google account is in. */
+export function IntegrationsTab({ active }: { active: boolean }) {
 	const poll = integrationsStore.usePolling(null, active);
 	const calendarAccounts = poll.read?.data.integrations["google-calendar"].accounts;
 	const google = googleStore.usePolling(null, active && calendarAccounts !== undefined && anyCallable(calendarAccounts));
@@ -91,7 +90,7 @@ export function IntegrationsTab({ active, workspaces }: { active: boolean; works
 			{read ? (
 				<>
 					{error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">Cannot refresh the integrations: {error}</p>}
-					<Groups answer={read.data} google={google} workspaces={workspaces} />
+					<Groups answer={read.data} google={google} />
 				</>
 			) : (
 				<LoadNote loading="Checking omp's MCP servers…" error={error && `Cannot load the integrations: ${error}`} />

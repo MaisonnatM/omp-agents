@@ -24,7 +24,7 @@ Canceled events, events you declined, working-location events, and events with n
 An event carries its `account`, its calendar's id, Google's event id, which differs for each repeat, and its calendar's `writable` flag, and it links to the event in Google Calendar.
 One calendar that cannot be read keeps its error for the Integrations row while the others still answer; only when none of an account's can is that account's read an error.
 The Calendar page reads the open month's events through `calendarEventsStore` in `web/reads.ts` every minute while any Google Calendar account's connection is `ready` or `failing`, and puts a multi-day event on each day it covers.
-It shows the calendars and events of the accounts `visibleAccounts` keeps for the sidebar's workspace, grouped in its sidebar under each account's address.
+It shows the calendars and events of the accounts `visibleAccounts` keeps for the space on screen, grouped in its sidebar under each account's address.
 The Calendar tab's sidebar reads the calendars through `googleStore`, and a checkbox's `PUT` reads both stores again, so the open month changes at once.
 Each successful calendar save merges that calendar's confirmed visibility into `googleStore` before rereading, so an aborted or failed refresh cannot undo it.
 The server deletes the `google.json` that an older version kept the calendars' secret iCal addresses in when it starts.

@@ -68,7 +68,10 @@ export function applyWorkspace(list: WorkspaceList, change: WorkspaceChange): Wo
 	return next.added.length === list.added.length && next.hidden.length === list.hidden.length && next.personal.length === list.personal.length ? list : next;
 }
 
-/** Which space each directory is in, from the `personal` list and the personal directory, the one rule the server, the personal extension, and the page share. */
+/**
+ * Which space each directory is in, from the `personal` list and the personal directory, the one rule the server, the personal extension, and the page share.
+ * The starter kit's `google-accounts` extension cannot import it and keeps a copy in its `spaceOf`; change both together.
+ */
 export interface Spaces {
 	/**
 	 * Whether `cwd` is the personal directory itself, named as omp names it or as the page shows it, `~` included, with any

@@ -1,9 +1,9 @@
 # Email
 
-- The **Email** tab, G then M, or an `#email` address shows the latest 50 conversations of each Gmail inbox the sidebar's workspace shows, merged newest first, in place of the panes.
+- The **Email** tab, G then M, or an `#email` address shows the latest 50 conversations of each Gmail inbox in the space on screen, merged newest first, in place of the panes.
   The tab and its shortcut show only once a Gmail account is connected in **Settings › Integrations**; see [Integrations](integrations.md).
   The sidebar then shows your Gmail address over one **Inbox** row with how many conversations are unread; with several accounts it shows **All inboxes** and a row for each address, each with its unread count, and picking one narrows the list to that account and leaves an open conversation open, a choice the app keeps.
-  While the workspace shows one account, the list shows it whatever was picked, and the pick comes back in a workspace that shows that account among others.
+  While the space shows one account, the list shows it whatever was picked, and the pick comes back in a space that shows that account among others.
   While the list holds several accounts, each conversation is tagged with its inbox's address, and a new mail picks the address it is sent **From**.
   A conversation opens at `#email/<account>/<thread id>`, and opening such an address while the picker narrows to another account picks the conversation's own; an account that cannot be read says why above the list while the others still show.
 - Each row shows, on three lines, who sent the conversation's last message, how many messages it holds when more than one, and when its last message arrived: the time today, the day earlier this year, and the full date before; then its subject; then a snippet.

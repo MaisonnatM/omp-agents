@@ -8,7 +8,7 @@ const account = (name: string): GoogleAccount => ({
 	address: `${name}@example.com`,
 	addressError: null,
 	connection: { kind: "ready", tools: [], server: { name, url: "https://gmailmcp.googleapis.com/mcp/v1", host: "gmailmcp.googleapis.com" } },
-	workspaces: [],
+	space: "work",
 });
 
 test("the Email picker keeps an account it shows among several, and reads as every account once one account or none is shown", () => {

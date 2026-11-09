@@ -344,14 +344,12 @@ interface CalendarPageProps {
 	todos: UserTodoList | null;
 	/** The dashboard can read Linear, so tickets with a due date show. */
 	ticketsShown: boolean;
-	/** The sidebar's workspace, whose Google Calendar accounts the page shows; `null` for all workspaces. */
-	workspace: string | null;
-	/** The space on screen, whose events kept on this computer the page shows and a new one goes in. */
+	/** The space on screen, whose Google Calendar accounts and events kept on this computer the page shows, and which a new event kept here goes in. */
 	space: Space;
 }
 
-/** A month of Google events of the accounts `workspace` shows and events of `space` kept on this computer, routine runs, and due todos and Linear tickets, with one day's list beside it. */
-export function CalendarPage({ routines, todos, ticketsShown, workspace, space }: CalendarPageProps) {
+/** A month of the Google events and the events kept on this computer of `space`, routine runs, and due todos and Linear tickets, with one day's list beside it. */
+export function CalendarPage({ routines, todos, ticketsShown, space }: CalendarPageProps) {
 	const now = useMinute();
 	const [showRoutines] = useCalendarRoutines();
 	const [month, setMonth] = useCalendarMonth();
@@ -360,7 +358,7 @@ export function CalendarPage({ routines, todos, ticketsShown, workspace, space }
 	/** The day the new-event dialog opened on, while it is open. */
 	const [newEventDay, setNewEventDay] = useState<string | null>(null);
 	const tickets = ticketsStore.usePolling(null, ticketsShown).read?.data.tickets ?? null;
-	const { connected, accounts } = useGoogleCalendars(workspace);
+	const { connected, accounts } = useGoogleCalendars(space);
 	const span = monthSpan(year, month);
 	const eventsRead = calendarEventsStore.usePolling(span, connected);
 	const read = eventsRead.read?.data.events;
@@ -478,7 +476,7 @@ export function CalendarPage({ routines, todos, ticketsShown, workspace, space }
 				</CalendarProvider>
 				<DayList day={shownDay === null ? null : selected} entries={shownDay === null ? [] : (byDay.get(shownDay) ?? [])} actions={{ remove, move, to }} />
 			</div>
-			{newEventDay !== null && <NewEventDialog day={newEventDay} workspace={workspace} space={space} onClose={() => setNewEventDay(null)} onCreated={created} />}
+			{newEventDay !== null && <NewEventDialog day={newEventDay} space={space} onClose={() => setNewEventDay(null)} onCreated={created} />}
 		</PageFrame>
 	);
 }

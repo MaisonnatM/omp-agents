@@ -54,7 +54,7 @@ export interface WorkspaceScope extends WindowScope {
 	hiddenCwds: ReadonlySet<string>;
 	/** The space's workspaces, as {@link listWorkspaces} lists them, Personal's from the personal directory. */
 	workspaces: Workspace[];
-	/** Every space's workspaces, for what a workspace's space does not scope: Settings › Workspaces, Bots, scheduled sends, and Google accounts. */
+	/** Every space's workspaces, for what a workspace's space does not scope: Settings › Workspaces, Bots, and scheduled sends. */
 	allWorkspaces: Workspace[];
 	pickWorkspace: (cwd: string | null) => void;
 	/** The pull requests' scope, as {@link scopeOf} builds it from the workspace, else the space. */

@@ -199,11 +199,11 @@ const startOf = (when: EventWhen): number => (when.allDay ? new Date(`${when.fir
 const endOf = (when: EventWhen): number => (when.allDay ? new Date(`${when.lastDay}T00:00`).getTime() + 86_400_000 : when.end);
 
 /**
- * What the `@` menu offers from your email and calendars, of the accounts `workspace` shows: their inboxes' latest
- * conversations while `mailWanted` and Gmail is callable, and the events from today's midnight over the next
- * {@link MENTION_EVENT_DAYS} days while `eventsWanted`, earliest first: Google's while Google Calendar is callable, and this computer's.
+ * What the `@` menu offers from your email and calendars in `space`: the inboxes' latest conversations of its accounts
+ * while `mailWanted` and Gmail is callable, and the events from today's midnight over the next
+ * {@link MENTION_EVENT_DAYS} days while `eventsWanted`, earliest first: its Google accounts' while Google Calendar is callable, and its events on this computer.
  */
-export function useMailAndEvents(mailWanted: boolean, eventsWanted: boolean, workspace: string | null): { threads: MailThread[]; events: MentionEvent[] } {
+export function useMailAndEvents(mailWanted: boolean, eventsWanted: boolean, space: Space): { threads: MailThread[]; events: MentionEvent[] } {
 	const integrations = integrationsStore.usePolling().read?.data.integrations;
 	const mailAccounts = integrations?.gmail.accounts ?? NO_ACCOUNTS;
 	const calendarAccounts = integrations?.["google-calendar"].accounts ?? NO_ACCOUNTS;
@@ -214,19 +214,19 @@ export function useMailAndEvents(mailWanted: boolean, eventsWanted: boolean, wor
 	const span = new URLSearchParams({ from: new Date(from).toISOString(), to: new Date(to).toISOString() }).toString();
 	const googleEvents = calendarEventsStore.usePolling(span, eventsWanted && anyCallable(calendarAccounts)).read?.data.events;
 	const localEvents = localEventsStore.usePolling(null, eventsWanted).read?.data.events;
-	const shownMail = useMemo(() => visibleAccounts(mailAccounts, workspace), [mailAccounts, workspace]);
-	const shownCalendars = useMemo(() => visibleAccounts(calendarAccounts, workspace), [calendarAccounts, workspace]);
+	const shownMail = useMemo(() => visibleAccounts(mailAccounts, space), [mailAccounts, space]);
+	const shownCalendars = useMemo(() => visibleAccounts(calendarAccounts, space), [calendarAccounts, space]);
 	const events = useMemo(
 		() =>
 			eventsWanted
 				? [
 						...(googleEvents ?? []).filter(event => shownCalendars.has(event.account)).map(({ title, when, calendar, url }) => ({ title, when, calendar, url })),
-						...(localEvents ?? []).map(({ title, when }) => ({ title, when, calendar: "This computer", url: null })),
+						...(localEvents ?? []).filter(event => event.space === space).map(({ title, when }) => ({ title, when, calendar: "This computer", url: null })),
 					]
 						.filter(({ when }) => startOf(when) < to && endOf(when) > from)
 						.sort((a, b) => startOf(a.when) - startOf(b.when))
 				: [],
-		[eventsWanted, googleEvents, localEvents, shownCalendars, from, to],
+		[eventsWanted, googleEvents, localEvents, shownCalendars, space, from, to],
 	);
 	const shownThreads = useMemo(() => (threads ?? NO_THREADS).filter(thread => shownMail.has(thread.account)), [threads, shownMail]);
 	return { threads: mailWanted ? shownThreads : NO_THREADS, events };
@@ -298,15 +298,15 @@ export interface GoogleCalendars {
 	calendars: GoogleCalendar[] | null;
 }
 
-/** The Google Calendar accounts `workspace` shows, `null` for all workspaces, and their calendars. */
-export function useGoogleCalendars(workspace: string | null): GoogleCalendars {
+/** The Google Calendar accounts `space` shows, and their calendars. */
+export function useGoogleCalendars(space: Space): GoogleCalendars {
 	const all = integrationsStore.usePolling().read?.data.integrations["google-calendar"].accounts ?? NO_ACCOUNTS;
 	const connected = anyCallable(all);
 	const read = googleStore.usePolling(null, connected).read?.data.calendars ?? null;
 	return useMemo(() => {
-		const shown = visibleAccounts(all, workspace);
+		const shown = visibleAccounts(all, space);
 		return { connected, accounts: all.filter(account => shown.has(account.name)), calendars: connected && read ? read.filter(calendar => shown.has(calendar.account)) : null };
-	}, [all, connected, read, workspace]);
+	}, [all, connected, read, space]);
 }
 
 /** Every signed-in Gmail account's inbox, merged, which the Email page and its sidebar tab share. */
@@ -321,12 +321,12 @@ const EMAIL_ACCOUNT_KEY = "omp-agents.gmail-account";
 const decodeAccount = (raw: string | null): AccountId | null => raw || null;
 const encodeAccount = (account: AccountId | null): string => account ?? "";
 
-/** The Email page as a workspace shows it. */
+/** The Email page as a space shows it. */
 export interface Email {
 	/** Gmail's integration, `null` before the first read. */
 	gmail: McpIntegration<"gmail"> | null;
 	poll: PolledEntry<EmailAnswer>;
-	/** The Gmail accounts the workspace shows. */
+	/** The Gmail accounts the space shows. */
 	accounts: GoogleAccount[];
 	/** The account the picker narrows to, as {@link pickedAccount} reads the stored choice; `null` for every shown account. */
 	picked: AccountId | null;
@@ -336,19 +336,19 @@ export interface Email {
 	threads: MailThread[];
 }
 
-/** The inboxes of the Gmail accounts `workspace` shows, `null` for all workspaces, read every minute while one is callable, and the Email page's account picker. */
-export function useEmail(workspace: string | null): Email {
+/** The inboxes of the Gmail accounts `space` shows, read every minute while one is callable, and the Email page's account picker. */
+export function useEmail(space: Space): Email {
 	const gmail = integrationsStore.usePolling().read?.data.integrations.gmail ?? null;
 	const all = gmail?.accounts ?? NO_ACCOUNTS;
 	const poll = gmailStore.usePolling(null, anyCallable(all));
 	const [stored, pick] = useStoredState(EMAIL_ACCOUNT_KEY, decodeAccount, encodeAccount);
 	const listed = poll.read?.data.threads;
 	return useMemo(() => {
-		const shown = visibleAccounts(all, workspace);
+		const shown = visibleAccounts(all, space);
 		const accounts = all.filter(account => shown.has(account.name));
 		const threads = (listed ?? NO_THREADS).filter(thread => shown.has(thread.account));
 		return { gmail, poll, accounts, picked: pickedAccount(stored, accounts), pick, threads };
-	}, [gmail, all, poll, stored, pick, listed, workspace]);
+	}, [gmail, all, poll, stored, pick, listed, space]);
 }
 
 /** The {@link mailThreadStore} scope of conversation `id` of Gmail account `account`. */

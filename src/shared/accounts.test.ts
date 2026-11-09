@@ -1,14 +1,13 @@
 import { expect, test } from "bun:test";
 import { type GoogleAccount, GOOGLE_SERVICES, googleMcpEnableUrl, MCP_INTEGRATIONS, MCP_SERVICES, visibleAccounts } from "./accounts";
+import type { Space } from "./workspaces";
 
-test("a workspace shows the accounts linked to it and those linked to none; all workspaces show every account", () => {
+test("a space shows the accounts placed in it", () => {
 	const server = { name: "gmail", url: "https://gmailmcp.googleapis.com/mcp/v1", host: "gmailmcp.googleapis.com" };
-	const account = (name: string, workspaces: string[]): GoogleAccount => ({ name, address: `${name}@example.com`, addressError: null, connection: { kind: "ready", server, tools: [] }, workspaces });
-	const accounts = [account("gmail", []), account("gmail-2", ["/code/work"]), account("gmail-3", ["/code/home", "/code/side"])];
-	expect([...visibleAccounts(accounts, "/code/work")]).toEqual(["gmail", "gmail-2"]);
-	expect([...visibleAccounts(accounts, "/code/side")]).toEqual(["gmail", "gmail-3"]);
-	expect([...visibleAccounts(accounts, "/elsewhere")]).toEqual(["gmail"]);
-	expect([...visibleAccounts(accounts, null)]).toEqual(["gmail", "gmail-2", "gmail-3"]);
+	const account = (name: string, space: Space): GoogleAccount => ({ name, address: `${name}@example.com`, addressError: null, connection: { kind: "ready", server, tools: [] }, space });
+	const accounts = [account("gmail", "work"), account("gmail-2", "personal"), account("gmail-3", "work")];
+	expect([...visibleAccounts(accounts, "work")]).toEqual(["gmail", "gmail-3"]);
+	expect([...visibleAccounts(accounts, "personal")]).toEqual(["gmail-2"]);
 });
 
 test("Google's enable page names the MCP server's API and the project number the OAuth client ID starts with", () => {

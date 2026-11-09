@@ -94,8 +94,8 @@ Files, in `agent/`:
 - `extensions/end-session.ts`: the `end_session` tool, with which an agent ends its own session once its turn is over, and the omp-agents dashboard removes its worktree as **End session** does, so a prompt such as "Merge on main, then end the session" runs to the end.
 - In a task subagent, `end-session.ts`, `land.ts`, `ship.ts`, `todos.ts`, `notes.ts`, and `events.ts` remove their tools when its session starts, since those tools act for the session you talk to; each subagent request then carries about 2,600 fewer tokens of tool schemas.
 - `extensions/google-accounts.ts`: when omp is signed in to two or more Gmail or Google Calendar accounts, one MCP server each, tells a session at every prompt each account's server, address, and tool prefix.
-  When you linked addresses to the session's workspace in the dashboard's Settings › Integrations, it also tells the session to use those for the workspace's mail and calendar unless you name another account.
-  A session in a linked worktree outside every linked workspace takes the links of its repository's main checkout, and no tool is blocked.
+  When you put only some of the addresses in the session's space, Personal or Work, in the dashboard's Settings › Integrations, it also tells the session to use those for its mail and calendar unless you name another account.
+  A session's space is its workspace's, where a linked worktree counts as its repository's main checkout, and no tool is blocked.
   When a Gmail or Google Calendar server answers a tool call with HTTP 401, the session is told the account is signed out, not to retry or sign in itself, and to ask you to sign in again in the dashboard's Settings › Integrations, and the dashboard's bell shows a sign-in notice.
 - `extensions/headless-mark.ts`: adds an `omp-agents.headless` entry to a session that `omp -p` or `omp --mode json` runs, so the omp-agents dashboard leaves those one-shot runs out of its past sessions.
 - `extensions/project-memory.ts`: gives the omp sessions of one git repository a shared memory and news of each other's work.

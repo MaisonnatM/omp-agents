@@ -11,7 +11,7 @@ import { parseBotChange } from "../shared/bots";
 import {
 	GOOGLE_CLIENT_ID,
 	type GoogleClientInput,
-	type GoogleLinks,
+	type GoogleSpace,
 	holdsAccounts,
 	type IntegrationTarget,
 	MCP_INTEGRATIONS,
@@ -632,11 +632,9 @@ export function parseIntegrationTarget(body: unknown): Parsed<IntegrationTarget>
 	return holdsAccounts(body.id) && isNonEmpty(account) ? { ok: { id: body.id, account } } : null;
 }
 
-/** The body of `PUT /api/integrations/google-links`: `{ address, workspaces }`, an address and the absolute workspace directories its accounts are linked to. */
-export const parseGoogleLinks = (body: unknown): Parsed<GoogleLinks> =>
-	isObject(body) && isNonEmpty(body.address) && body.address.includes("@") && isTexts(body.workspaces) && body.workspaces.every(cwd => cwd.startsWith("/"))
-		? { ok: { address: body.address, workspaces: body.workspaces } }
-		: null;
+/** The body of `PUT /api/integrations/google-space`: `{ address, space }`, an address and the space its accounts go in. */
+export const parseGoogleSpace = (body: unknown): Parsed<GoogleSpace> =>
+	isObject(body) && isNonEmpty(body.address) && body.address.includes("@") && isSpace(body.space) ? { ok: { address: body.address, space: body.space } } : null;
 
 /** The body of `PUT /api/mcp-servers/sign-in`, `/sign-out`, and `/remove`: `{ name }` naming a server omp loads. */
 export const parseMcpServerName = (body: unknown): Parsed<string> => (isObject(body) && isNonEmpty(body.name) ? { ok: body.name } : null);

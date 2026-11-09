@@ -152,7 +152,7 @@ export function SettingsPage({
 	onPickWorkspace: (cwd: string | null) => void;
 	/** The space's workspaces, which the header's picker offers. */
 	workspaces: Workspace[];
-	/** Every space's workspaces, which Settings › Workspaces moves between spaces and Integrations binds accounts to. */
+	/** Every space's workspaces, which Settings › Workspaces moves between spaces. */
 	allWorkspaces: Workspace[];
 	workspaceList: WorkspaceList<Workspace>;
 	/** The dashboard's personal directory, for Settings › Workspaces; `null` until the server sends it. */
@@ -192,7 +192,7 @@ export function SettingsPage({
 		activity: <ActivityTab active={section === "activity"} />,
 		providers: <ProvidersTab active={section === "providers"} />,
 		preferences: <PreferencesTab cwd={cwd} workspace={cwd === null ? null : workspaceLabel(cwd, workspaces)} />,
-		integrations: <IntegrationsTab active={section === "integrations"} workspaces={allWorkspaces} />,
+		integrations: <IntegrationsTab active={section === "integrations"} />,
 		"mcp-servers": <McpServersTab active={section === "mcp-servers"} />,
 		"source-control": <SourceControlTab active={section === "source-control"} />,
 		workspaces: <WorkspacesTab workspaces={allWorkspaces} list={workspaceList} personalDir={personal} trustedProjects={trustedProjects} />,

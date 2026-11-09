@@ -52,9 +52,7 @@ function eventWhen(allDay: boolean, { day, lastDay, start, end }: Times): EventW
 interface NewEventDialogProps {
 	/** The day the event starts on, `YYYY-MM-DD`, until another is picked. */
 	day: string;
-	/** The sidebar's workspace, whose Google Calendar accounts the picker offers; `null` for all workspaces. */
-	workspace: string | null;
-	/** The space on screen, which an event kept on this computer goes in. */
+	/** The space on screen, whose Google Calendar accounts the picker offers and which an event kept on this computer goes in. */
 	space: Space;
 	onClose: () => void;
 	/** The event was added: its first day, and the event as kept on this computer, or `null` for one added to a Google calendar. */
@@ -65,8 +63,8 @@ interface NewEventDialogProps {
  * The Calendar page's new-event dialog: a title, all day or a start and end time, and the calendar it goes in, a Google
  * calendar you may write to or this computer, the last one used first.
  */
-export function NewEventDialog({ day: initialDay, workspace, space, onClose, onCreated }: NewEventDialogProps) {
-	const { calendars, accounts } = useGoogleCalendars(workspace);
+export function NewEventDialog({ day: initialDay, space, onClose, onCreated }: NewEventDialogProps) {
+	const { calendars, accounts } = useGoogleCalendars(space);
 	const [title, setTitle] = useState("");
 	const [allDay, setAllDay] = useState(false);
 	const [times, setTimes] = useState<Times>(() => {

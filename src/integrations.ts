@@ -14,8 +14,8 @@ import {
 	type ClientService,
 	type GoogleAccount,
 	type GoogleClientInput,
-	type GoogleLinks,
 	type GoogleService,
+	type GoogleSpace,
 	hasAccounts,
 	holdsAccounts,
 	type IntegrationSignIn,
@@ -97,8 +97,8 @@ export interface Integrations {
 	remove(target: IntegrationTarget): Promise<McpIntegration>;
 	saveSlackClient(input: SlackClientInput): Promise<McpIntegration>;
 	saveGoogleClient(id: GoogleService, input: GoogleClientInput): Promise<McpIntegration>;
-	/** Links Google address `address`'s accounts to `workspaces`, and answers every integration. */
-	linkGoogleAccount(links: GoogleLinks): Promise<IntegrationsAnswer>;
+	/** Places Google address `address`'s accounts in `space`, and answers every integration. */
+	placeGoogleAccount(placed: GoogleSpace): Promise<IntegrationsAnswer>;
 }
 
 /** The integrations, Gmail's and Google Calendar's as `googleAccounts` keeps them. */
@@ -157,8 +157,8 @@ export function createIntegrations(googleAccounts: GoogleAccounts): Integrations
 
 		saveGoogleClient: (id, input) => saveClient(id, path => planGoogleSave(path, id, input)),
 
-		async linkGoogleAccount(links) {
-			googleAccounts.link(links);
+		async placeGoogleAccount(placed) {
+			googleAccounts.place(placed);
 			return integrations.load(false);
 		},
 	};

@@ -213,9 +213,9 @@ export const PageSwitch = memo(function PageSwitch({
 			);
 		}
 		case "calendar":
-			return <CalendarPage routines={routines} todos={userTodos} ticketsShown={linearCallable} workspace={workspace} space={scope.space} />;
+			return <CalendarPage routines={routines} todos={userTodos} ticketsShown={linearCallable} space={scope.space} />;
 		case "email":
-			return <EmailPage target={page.target} workspace={workspace} />;
+			return <EmailPage target={page.target} space={scope.space} />;
 		case "sport":
 			return <SportPage state={sport} route={page} disabled={!connected} onChange={changeSport} />;
 		// Get started is a dialog over the home, which `GetStarted` in `web/app.tsx` draws.

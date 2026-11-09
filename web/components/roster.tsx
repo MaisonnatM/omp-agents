@@ -348,12 +348,12 @@ export function Roster({
 			</TabPanel>
 			<TabPanel value="calendar" asChild>
 				<SidebarContent>
-					<CalendarNav open={calendarOpen} workspace={workspace} />
+					<CalendarNav open={calendarOpen} space={space} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="email" asChild>
 				<SidebarContent>
-					<EmailNav workspace={workspace} />
+					<EmailNav space={space} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="sport" asChild>
