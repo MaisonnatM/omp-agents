@@ -15,7 +15,9 @@ function SignedOut() {
 			) : (
 				<>
 					<h1 className="mb-2 text-lg font-semibold">Open the omp agents app</h1>
-					<p className="text-muted-foreground">The dashboard runs in the omp agents desktop app. A browser tab cannot sign in to it.</p>
+					<p className="text-muted-foreground">
+						The dashboard runs in the omp agents desktop app. A browser tab cannot sign in to it. On your phone, scan the code from Settings › Phone access in the desktop app.
+					</p>
 				</>
 			)}
 		</main>

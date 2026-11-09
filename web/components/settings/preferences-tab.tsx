@@ -6,7 +6,9 @@ import { useContext } from "react";
 import { MCP_SERVICES } from "../../../src/shared/accounts";
 import { usePinnedSkill } from "../../pinned-skill";
 import { type ShortcutId, shortcutKeys } from "../../shortcuts";
-import { hideTab, moveTab, placedTabs, positionKey, TAB_ROWS, useSidebarTabs } from "../../sidebar-tabs";
+import { hideTab, moveTab, placedTabs, positionKey, TAB_ROWS, tabSpace, useSidebarTabs } from "../../sidebar-tabs";
+import { SPACE_LABELS } from "../../labels";
+import { useDashboardStatus } from "../dashboard-context";
 import { type Theme, THEMES, useTheme } from "../../theme";
 import { playSound, useSessionNotifications } from "../../use-attention";
 import { useSkills } from "../../use-skills";
@@ -38,7 +40,8 @@ function ActivitySwitch({ label, shortcut, checked, onToggle }: { label: string;
 
 /** The sidebar's tabs in the order they show, each with the key it takes now, a switch to hide it, and buttons to move it. */
 function SidebarTabs() {
-	const { layout, setLayout, signedOut, shown } = useSidebarTabs();
+	const { space } = useDashboardStatus().scope;
+	const { layout, setLayout, signedOut, shown } = useSidebarTabs(space);
 	const barTabs = placedTabs(shown, "bar");
 	return (
 		<Section
@@ -48,6 +51,7 @@ function SidebarTabs() {
 			<ol className="space-y-1 text-sm">
 				{layout.map(({ tab, hidden }, index) => {
 					const row = TAB_ROWS[tab];
+					const only = tabSpace(tab);
 					const position = positionKey(tab, barTabs);
 					return (
 						<li key={tab} className="flex items-center gap-2">
@@ -58,6 +62,7 @@ function SidebarTabs() {
 								{"integration" in row && signedOut.has(tab) && (
 									<p className="text-xs text-muted-foreground">Shows only while {MCP_SERVICES[row.integration].label} is connected.</p>
 								)}
+								{only !== null && <p className="text-xs text-muted-foreground">Shows only in {SPACE_LABELS[only]}.</p>}
 							</div>
 							<span className="w-12 shrink-0 text-right text-xs text-muted-foreground">{position === undefined ? null : shortcutKeys(position)}</span>
 							<ToggleSwitch

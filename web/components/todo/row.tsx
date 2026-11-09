@@ -59,7 +59,7 @@ export function TodoRow({ section, entry, siblings, category, workspace, day, se
 						{...rowProps}
 						draggable={rowProps.draggable && !isEditing}
 						className={cn(
-							"group/todo relative flex h-8 items-center gap-1.5 rounded-md px-2 text-sm hover:bg-accent/50",
+							"group/todo relative flex h-8 items-center gap-1.5 rounded-md px-2 text-sm hover:bg-accent/50 max-phone:h-auto max-phone:min-h-11 max-phone:flex-wrap max-phone:gap-y-1 max-phone:py-1.5",
 							!top && "ml-6",
 							open && "bg-accent",
 							drag.draggingId === todo.id && "opacity-50",
@@ -92,9 +92,9 @@ export function TodoRow({ section, entry, siblings, category, workspace, day, se
 						onKeyDown={event => {
 							if (event.key === "Escape") event.currentTarget.blur();
 						}}
-						className="flex min-w-0 flex-1 items-center gap-2 self-stretch rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+						className="flex min-w-0 flex-1 items-center gap-2 self-stretch rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring max-phone:order-first max-phone:basis-full"
 					>
-						<span className={cn("truncate", closed ? "text-muted-foreground line-through" : "text-foreground")}>{todo.text}</span>
+						<span className={cn("truncate max-phone:line-clamp-2 max-phone:whitespace-normal", closed ? "text-muted-foreground line-through" : "text-foreground")}>{todo.text}</span>
 						{children.length > 0 && (
 							<span className="shrink-0 text-xs tabular-nums text-muted-foreground" aria-label={`${childrenDone} of ${children.length} done`}>
 								{childrenDone}/{children.length}

@@ -11,6 +11,8 @@
   color-scheme: light;
   --radius: 0.625rem;
   --page-header-height: 3rem;
+  /* How far past a header's own padding its content starts on a phone, where the floating Sessions sidebar's toggle sits over its left corner. */
+  --sidebar-toggle-clearance: 2.25rem;
   --background: var(--color-zinc-25);
   --foreground: var(--color-zinc-800);
   --card: var(--color-white);
@@ -19,6 +21,10 @@
   --popover-foreground: var(--color-zinc-800);
   --primary: oklch(0.488 0.217 264);
   --primary-foreground: var(--color-white);
+  --dither-ink: var(--primary);
+  --dither-paper: var(--background);
+  --dither-cell: 3px;
+  --dither-bloom: 0.6;
   --secondary: var(--color-zinc-50);
   --secondary-foreground: var(--color-zinc-800);
   --muted: var(--color-zinc-50);
@@ -91,6 +97,7 @@
   --popover: color-mix(in srgb, var(--color-neutral-950) 97%, var(--color-white));
   --popover-foreground: var(--color-neutral-100);
   --primary: oklch(0.571 0.21 264);
+  --dither-bloom: 1;
   --secondary: color-mix(in oklab, var(--color-white) 3%, transparent);
   --secondary-foreground: var(--color-neutral-100);
   --muted: color-mix(in oklab, var(--color-white) 3%, transparent);
@@ -151,6 +158,8 @@
 @theme inline {
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --container-conversation: 48rem;
+  /* A phone's width, under which the sidebars float: their least width plus the session pane's, `PHONE_MAX_WIDTH` in `web/components/sidebar-panel.tsx`. */
+  --breakpoint-phone: 45rem;
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: calc(1 / 0.6875);
   --text-3xs: 0.625rem;
@@ -364,6 +373,17 @@
   }
   a:focus-visible {
     border-radius: 2px;
+  }
+}
+
+/*
+ * Safari on a phone zooms the page into any field whose text is under 16px when it takes focus, and leaves it zoomed.
+ * `!important`, since fields set their size with utilities such as `text-sm`, which win over a plain rule. It reaches
+ * every field on a touch screen, a tablet's too, the terminal's hidden textarea and the editors included.
+ */
+@media (hover: none) and (pointer: coarse) {
+  input, textarea, select, [contenteditable="true"], [contenteditable=""] {
+    font-size: max(16px, 1em) !important;
   }
 }
 

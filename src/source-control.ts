@@ -1,16 +1,14 @@
 /**
- * Settings › Source control on the server: whether `gh` and `gt` are signed in, the automatic pulls that
+ * Settings › Source control on the server: whether `gh` is signed in, the automatic pulls that
  * keep each workspace repository's default branch current while it has no local changes or commits, and whether a
  * merge cleans up after itself.
  */
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { canonical, git, worktreesOf } from "./git";
 import { JsonFile } from "./fs";
 import { errorText, isObject } from "./json";
-import { displayPath, HOME } from "./paths";
+import { displayPath } from "./paths";
 import { run, runChecked } from "./proc";
-import { applySourceControl, DEFAULT_SOURCE_CONTROL, type ProviderStatus, type PullOutcome, type PullRepo, type SourceControlAnswer, type SourceControlChange, type SourceControlSettings } from "./shared/source-control";
+import { applySourceControl, DEFAULT_SOURCE_CONTROL, type GithubStatus, type PullOutcome, type PullRepo, type SourceControlAnswer, type SourceControlChange, type SourceControlSettings } from "./shared/source-control";
 import { inTempDir } from "./shared/workspaces";
 import { SerialLane } from "./serial-lane";
 
@@ -63,29 +61,10 @@ export async function repositoriesOf(cwds: readonly string[]): Promise<string[]>
 /** Whether `bin` is on the current `PATH`; `Bun.which` alone searches the one this process started with. */
 const installed = (bin: string): boolean => Bun.which(bin, { PATH: process.env.PATH }) !== null;
 
-export async function githubStatus(): Promise<ProviderStatus> {
-	if (!installed("gh")) return { provider: "github", state: "missing", account: null };
+export async function githubStatus(): Promise<GithubStatus> {
+	if (!installed("gh")) return { state: "missing", account: null };
 	const { stdout, code } = await run(["gh", "api", "user", "--jq", ".login"]);
-	return code === 0 && stdout.trim() ? { provider: "github", state: "signed-in", account: stdout.trim() } : { provider: "github", state: "signed-out", account: null };
-}
-
-/** `gt auth --token` saves the token in Graphite's user config. */
-async function graphiteStatus(): Promise<ProviderStatus> {
-	if (!installed("gt")) return { provider: "graphite", state: "missing", account: null };
-	const config = await readFile(join(process.env.XDG_CONFIG_HOME || join(HOME, ".config"), "graphite", "user_config"), "utf8").then(
-		text => JSON.parse(text) as unknown,
-		() => null,
-	);
-	const signedIn = isObject(config) && typeof config.authToken === "string" && config.authToken !== "";
-	return { provider: "graphite", state: signedIn ? "signed-in" : "signed-out", account: null };
-}
-
-/** Signs `gt` in with `token`, as `gt auth --token` does; an error never holds the token. */
-export async function signInGraphite(token: string): Promise<void> {
-	if (!installed("gt")) throw new Error("gt is not installed");
-	await runChecked(["gt", "auth", "--no-interactive", "--token", token], { timeoutMs: FETCH_TIMEOUT_MS }).catch((err: unknown) => {
-		throw new Error(errorText(err).replaceAll(token, "<token>"));
-	});
+	return code === 0 && stdout.trim() ? { state: "signed-in", account: stdout.trim() } : { state: "signed-out", account: null };
 }
 
 /** A file from before the cleanup setting reads with it on. */
@@ -145,9 +124,9 @@ export class SourceControl {
 	}
 
 	async answer(cwds: readonly string[]): Promise<SourceControlAnswer> {
-		const [providers, repos] = await Promise.all([Promise.all([githubStatus(), graphiteStatus()]), repositoriesOf(cwds)]);
+		const [github, repos] = await Promise.all([githubStatus(), repositoriesOf(cwds)]);
 		return {
-			providers,
+			github,
 			autoPull: { on: this.#settings.on, repos: this.#settings.repos },
 			cleanUp: this.#settings.cleanUp,
 			repos: repos.map(path => ({ path, pathDisplay: displayPath(path), on: this.#settings.repos[path] ?? null, last: this.#last.get(path) ?? null })),

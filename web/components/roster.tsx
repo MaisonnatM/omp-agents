@@ -16,7 +16,7 @@ import { agentOn } from "../../src/shared/moves";
 import { errorText } from "../../src/json";
 import { activityControl } from "../activity";
 import { yourMoveCount } from "../pull-requests-model";
-import { ALL_OF_SPACE, SPACE_LABELS, workspaceName } from "../labels";
+import { ALL_OF_SPACE, SPACE_LABELS, sessionsWaiting, workspaceName } from "../labels";
 import { pullRequestsStore, ticketsStore, writeWorkspace } from "../reads";
 import { hashForTickets, type NotesListView, type SettingsRoute, type SidebarPanel, type SidebarTab, type SportRoute, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
@@ -247,11 +247,11 @@ export function Roster({
 	const { connected, pullRequestsScope, scope: { workspace, space } } = useDashboardStatus();
 	const personal = useContext(PersonalContext);
 	const pullRequestRead = pullRequestsStore.use(pullRequestsScope).read;
-	/** The count after a tab's label, and what it counts, for its accessible name. */
-	const tabCounts: Partial<Record<SidebarTab, { count: number; meaning: string }>> = {
-		sessions: { count: waiting, meaning: "waiting on you" },
-		bots: { count: bots ? botsNeedingYou(bots) : 0, meaning: "waiting on you" },
-		"pull-requests": { count: pullRequestRead ? yourMoveCount(pullRequestRead.data, agentOn(hosts)) : 0, meaning: "your move" },
+	/** The count after a tab's label, and how its accessible name says it. */
+	const tabCounts: Partial<Record<SidebarTab, { count: number; says: (count: number) => string }>> = {
+		sessions: { count: waiting, says: sessionsWaiting },
+		bots: { count: bots ? botsNeedingYou(bots) : 0, says: sessionsWaiting },
+		"pull-requests": { count: pullRequestRead ? yourMoveCount(pullRequestRead.data, agentOn(hosts)) : 0, says: count => `${count} your move` },
 	};
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
 	const newSessionLabel = selectedWorkspace
@@ -284,7 +284,7 @@ export function Roster({
 									label={label}
 									icon={icon}
 									badge={badge?.count}
-									aria-label={badge && `${label}, ${badge.count} ${badge.meaning}`}
+									aria-label={badge && `${label}, ${badge.says(badge.count)}`}
 									className={cn("px-2", SIDEBAR_TAB_FIT.tab)}
 									labelClassName={SIDEBAR_TAB_FIT.label}
 									shortcut={tabShortcutLabels(value, tabs)}

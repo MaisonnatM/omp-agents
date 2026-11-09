@@ -54,6 +54,7 @@ import { age, ALL_OF_SPACE, hostLabel, pastLabel, workspaceName } from "../../la
 import { PAGE_ICON } from "../../page-icons";
 import { conversationItems, recordItems } from "../../palette-records";
 import { useConversationHits, useRead, useSearchSources } from "../../reads";
+import { isPhonePage } from "../../api";
 import { DASHBOARD_UPDATE_URL, updateDashboard } from "../../dashboard-update";
 import { hashForNotes, hashForSettings, type OpenMode, SETTINGS_GROUP_LABEL, SETTINGS_SECTIONS, type SidebarTab } from "../../routing";
 import { revealMessage } from "../../message-reveal";
@@ -125,9 +126,9 @@ interface CommandPaletteProps {
 	todos: readonly UserTodo[];
 	/** The notes of the space on screen, which a search lists; `null` before the first read. */
 	notes: readonly UserNote[] | null;
-	/** Linear answers, so a search lists the tickets assigned to you. */
-	linearConnected: boolean;
-	/** Open the new-ticket dialog with a title, which a search offers while Linear answers. */
+	/** Linear answers and the space shows Tickets, Work, so a search lists the tickets assigned to you. */
+	ticketsCallable: boolean;
+	/** Open the new-ticket dialog with a title, which a search offers while tickets are callable. */
 	onCreateTicket: (title: string) => void;
 }
 
@@ -142,7 +143,7 @@ export const CommandPalette = memo(function CommandPalette({ state, ...props }: 
 });
 
 /** One item per settings section, opening it; the subtitle names the sidebar group that lists it. */
-const SETTINGS_ITEMS: readonly PaletteItem[] = SETTINGS_SECTIONS.map(({ value, label, icon, group, keywords }): PaletteItem => ({
+const SETTINGS_ITEMS: readonly PaletteItem[] = SETTINGS_SECTIONS.filter(({ value }) => !(isPhonePage() && value === "phone")).map(({ value, label, icon, group, keywords }): PaletteItem => ({
 	id: `settings:${value}`,
 	section: "settings",
 	title: label,
@@ -154,14 +155,14 @@ const SETTINGS_ITEMS: readonly PaletteItem[] = SETTINGS_SECTIONS.map(({ value, l
 	actions: [[{ id: "open", title: "Open", icon, run: { kind: "link", href: hashForSettings(value) } }]],
 }));
 
-function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, tabs, todoCategories, todos, notes, linearConnected, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
+function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, tabs, todoCategories, todos, notes, ticketsCallable, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
 	const { send, start, end, changeTodo, changeNote, workspaceSettings } = useDashboardActions();
 	const { starts, ending, pullRequestsScope, connected, scope: { space } } = useDashboardStatus();
 	const personal = useContext(PersonalContext);
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const focusInput = useCallback(() => inputRef.current?.focus(), []);
-	const { tickets, pullRequestRepos } = useSearchSources(linearConnected, pullRequestsScope);
+	const { tickets, pullRequestRepos } = useSearchSources(ticketsCallable, pullRequestsScope);
 	// One clock for as long as the palette is open, so a row's frecency does not decay and reorder the list under the pointer.
 	const [now] = useState(() => Date.now());
 	const frame = topFrame(state);
@@ -333,7 +334,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 				: [];
 		/** What you typed, as the title of a new Linear issue in the dialog that opens it. */
 		const ticketItem = (): PaletteItem[] =>
-			linearConnected && search
+			ticketsCallable && search
 				? [
 						{
 							id: "fallback:create-ticket",
@@ -361,7 +362,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 			createTodo: () => todoItem("fallback:create-todo", "createTodo", "Create todo", search),
 		};
 		return itemsOf[viewId]();
-	}, [viewId, sessionItems, records, conversations, commandItems, workspaceItems, search, todoCategories, workspace, changeTodo, connected, notes, changeNote, space, linearConnected, onCreateTicket]);
+	}, [viewId, sessionItems, records, conversations, commandItems, workspaceItems, search, todoCategories, workspace, changeTodo, connected, notes, changeNote, space, ticketsCallable, onCreateTicket]);
 	const sections = useMemo(() => paletteSections(items, query, frecency, now, view.suggestions), [items, query, frecency, now, view.suggestions]);
 	const selected = sections.flatMap(section => section.items).find(item => item.id === frame.selected) ?? null;
 	const panelItem = state.panel && selected?.id === state.panel.itemId ? selected : null;

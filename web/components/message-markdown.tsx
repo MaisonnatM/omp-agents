@@ -103,7 +103,7 @@ const mediaFigure: Components["figure"] = ({ node }) => {
 };
 
 function ExternalLink({ href, children, ...props }: ComponentProps<"a">) {
-	let service: "linear" | "github" | "graphite" | "slack" | null = null;
+	let service: "linear" | "github" | "slack" | null = null;
 	let label = "";
 	let web = false;
 	let titleUrl: string | null = null;
@@ -122,11 +122,6 @@ function ExternalLink({ href, children, ...props }: ComponentProps<"a">) {
 				label = pr ? `${pr[1]}/${pr[2]} #${pr[3]}` : url.pathname.split("/").filter(Boolean).slice(0, 2).join("/") || "GitHub";
 				const pull = url.pathname.match(/^\/([^/]+)\/([^/]+)\/pull\/(\d+)(?:\/|$)/);
 				if (pull) titleUrl = `/api/pull-request/title?${new URLSearchParams({ owner: pull[1]!, repo: pull[2]!, number: pull[3]! })}`;
-			} else if (host === "app.graphite.com" || host === "app.graphite.dev") {
-				service = "graphite";
-				const pr = url.pathname.match(/^\/github\/pr\/([^/]+)\/([^/]+)\/(\d+)/);
-				label = pr ? `${pr[1]}/${pr[2]} #${pr[3]}` : "Graphite";
-				if (pr) titleUrl = `/api/pull-request/title?${new URLSearchParams({ owner: pr[1]!, repo: pr[2]!, number: pr[3]! })}`;
 			} else if (host === "slack.com" || host.endsWith(".slack.com")) {
 				service = "slack";
 				label = url.pathname.includes("/archives/") ? "Slack message" : "Slack";

@@ -6,7 +6,6 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { connectionsOf, signedIn } from "../../src/shared/accounts";
 import { providerConnected } from "../../src/shared/providers";
-import type { ProviderStatus, SourceControlAnswer } from "../../src/shared/source-control";
 import { activityControl } from "../activity";
 import { getStartedSurface, known, mapKnown, type Observation, observation } from "../get-started-model";
 import { integrationsStore, providersStore, sourceControlStore, starterKitStore, terminalSessionsStore } from "../reads";
@@ -37,11 +36,6 @@ type Place = "welcome" | StepId;
 
 const isPlace = (raw: string | null): raw is Place => raw === "welcome" || STEPS.some(step => step.id === raw);
 const REQUIRED_COUNT = STEPS.filter(item => item.need === "required").length;
-
-function githubOf({ providers }: SourceControlAnswer): Observation<ProviderStatus> {
-	const github = providers.find(({ provider }) => provider === "github");
-	return github ? { kind: "known", value: github } : { kind: "unavailable", message: "Source control does not report the GitHub CLI." };
-}
 
 /** The app's mark, as `web/favicon.svg` draws it. */
 function AppMark({ className }: { className: string }) {
@@ -199,7 +193,7 @@ export function GetStarted({ route, vacantHome, firstSession, rosterError, onClo
 	useProviders(open || pending);
 	const terminal = observation(terminalSessionsStore.usePolling(null, open));
 	const sourceControl = observation(sourceControlStore.usePolling(null, open));
-	const github = sourceControl.kind === "known" ? githubOf(sourceControl.value) : sourceControl;
+	const github = mapKnown(sourceControl, answer => answer.github);
 	const kit = observation(starterKitStore.usePolling(null, open));
 	const integrations = mapKnown(observation(integrationsStore.usePolling(null, open)), answer => Object.values(answer.integrations).filter(item => connectionsOf(item).some(signedIn)).length);
 

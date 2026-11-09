@@ -6,7 +6,7 @@
  */
 import type { DaemonReport, DaemonScope } from "../omp/module-types/processes";
 import { run } from "../proc";
-import { cwdsArgv, descendants, LISTENERS_ARGV, parseCwds, parseListeners, type Processes, type ProcessRow, type ProcessTable, sessionGroups, terminate } from "../process-census";
+import { cwdsArgv, cwdsIn, descendants, LISTENERS_ARGV, listeningPortsIn, parseCwds, parseListeners, type Processes, type ProcessRow, type ProcessTable, sessionGroups, terminate } from "../process-census";
 import { SerialLane } from "../serial-lane";
 import type { LiveSessionProcesses, SessionProcess, SessionProcesses } from "../shared/processes";
 import type { HostStatus } from "../shared/sessions";
@@ -302,7 +302,13 @@ export async function readListeningPorts(): Promise<Map<number, number[]> | null
 	try {
 		const lsof = await run(LISTENERS_ARGV, { timeoutMs: 10_000 });
 		// lsof exits 1 when it finds no listener.
-		return lsof.code === 0 || lsof.code === 1 ? parseListeners(lsof.stdout) : null;
+		if (lsof.code === 0 || lsof.code === 1) return parseListeners(lsof.stdout);
+	} catch {
+		// `lsof` is not installed. Linux still has the sockets in /proc.
+	}
+	if (process.platform !== "linux") return null;
+	try {
+		return listeningPortsIn("/proc");
 	} catch {
 		return null;
 	}
@@ -314,7 +320,13 @@ export async function readCwds(pids: readonly number[]): Promise<Map<number, str
 	try {
 		const lsof = await run(cwdsArgv(pids), { timeoutMs: 10_000 });
 		// lsof exits 1 when one of the pids has exited since.
-		return lsof.code === 0 || lsof.code === 1 ? parseCwds(lsof.stdout) : new Map();
+		if (lsof.code === 0 || lsof.code === 1) return parseCwds(lsof.stdout);
+	} catch {
+		// `lsof` is not installed.
+	}
+	if (process.platform !== "linux") return new Map();
+	try {
+		return cwdsIn("/proc", pids);
 	} catch {
 		return new Map();
 	}

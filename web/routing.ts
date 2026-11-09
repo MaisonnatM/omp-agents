@@ -1,10 +1,11 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { BarChart3, Blocks, Brain, FileText, Folders, GitBranch, GitMerge, HardDrive, KeyRound, type LucideIcon, MousePointerClick, Plug, RefreshCcw, Route as RouteIcon, Scale, Settings2, SlidersHorizontal, Workflow } from "lucide-react";
+import { BarChart3, Blocks, Brain, FileText, Folders, GitBranch, GitMerge, HardDrive, KeyRound, type LucideIcon, MousePointerClick, Plug, RefreshCcw, Route as RouteIcon, Scale, Settings2, SlidersHorizontal, Smartphone, Workflow } from "lucide-react";
 import { isDay } from "../src/json";
 import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
 import { hashForSession, type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
 import { TICKET_ID } from "../src/shared/tickets";
+import type { Space } from "../src/shared/workspaces";
 import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import type { StartOp } from "./starts";
 import { PAGE_ICON } from "./page-icons";
@@ -15,19 +16,20 @@ export type TabPlace = "bar" | "header";
 /**
  * The sidebar's tabs, in order, each at the `place` that draws its trigger. A tab with an `integration` shows, and its
  * shortcut applies, only while omp holds a sign-in to that service, even one the service refuses, which the page then
- * offers to reconnect. Settings is no tab: the header's button opens it.
+ * offers to reconnect. A tab with a `space` shows, and its page and shortcut apply, only in that space: Tickets in Work,
+ * Sport in Personal. Settings is no tab: the header's button opens it.
  */
 export const SIDEBAR_TABS = [
 	{ value: "pull-requests", label: "Pull requests", icon: PAGE_ICON["pull-requests"], place: "bar" },
-	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, place: "bar", integration: "linear" },
+	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, place: "bar", integration: "linear", space: "work" },
 	{ value: "bots", label: "Bots", icon: PAGE_ICON.bots, place: "bar" },
 	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions, place: "bar" },
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo, place: "bar" },
 	{ value: "notes", label: "Notes", icon: PAGE_ICON.notes, place: "header" },
 	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar, place: "header" },
 	{ value: "email", label: "Email", icon: PAGE_ICON.email, place: "header", integration: "gmail" },
-	{ value: "sport", label: "Sport", icon: PAGE_ICON.sport, place: "header" },
-] as const satisfies readonly { value: string; label: string; icon: LucideIcon; place: TabPlace; integration?: McpIntegrationId }[];
+	{ value: "sport", label: "Sport", icon: PAGE_ICON.sport, place: "header", space: "personal" },
+] as const satisfies readonly { value: string; label: string; icon: LucideIcon; place: TabPlace; integration?: McpIntegrationId; space?: Space }[];
 
 /** A sidebar tab, whose trigger sits in the bar or the header; the tickets, Bots, todo, notes, calendar, email, and sport tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
@@ -89,11 +91,12 @@ export const SETTINGS_SECTIONS = [
 	{ value: "preferences", label: "Preferences", icon: SlidersHorizontal, group: "general", keywords: ["theme", "dark mode", "notifications", "sound", "sidebar tabs", "transcript", "idle processes"] },
 	{ value: "workspaces", label: "Workspaces", icon: Folders, group: "general", keywords: ["directories", "folders", "hide"] },
 	{ value: "sync", label: "Sync", icon: RefreshCcw, group: "general", keywords: ["git", "remote", "machines"] },
+	{ value: "phone", label: "Phone access", icon: Smartphone, group: "general", keywords: ["tailscale", "mobile", "pair", "qr"] },
 	{ value: "storage", label: "Storage", icon: HardDrive, group: "general", keywords: ["disk", "space", "gc", "cleanup", "archive", "compress", "sandboxes"] },
 	{ value: "providers", label: "Providers", icon: KeyRound, group: "connections", keywords: ["login", "sign in", "accounts", "api key", "quota"] },
 	{ value: "integrations", label: "Integrations", icon: Plug, group: "connections", keywords: ["linear", "slack", "github", "gmail", "calendar", "connect"] },
 	{ value: "mcp-servers", label: "MCP servers", icon: Blocks, group: "connections", keywords: ["mcp", "tools"] },
-	{ value: "source-control", label: "Source control", icon: GitMerge, group: "connections", keywords: ["github", "graphite", "gh", "gt", "pull", "merge"] },
+	{ value: "source-control", label: "Source control", icon: GitMerge, group: "connections", keywords: ["github", "gh", "pull", "merge"] },
 	{ value: "models", label: "Models", icon: RouteIcon, group: "workspace", keywords: ["roles", "fallback", "retry"], meta: AS_LOADED },
 	{ value: "agents", label: "Agents", icon: PAGE_ICON.bots, group: "workspace", keywords: ["subagents", "delegation", "concurrency", "isolation"], meta: { workspace: "Preview of a new session in this workspace", none: "Preview of a new session with user defaults only" } },
 	{ value: "omp", label: "omp settings", icon: Settings2, group: "workspace", keywords: ["config", "thinking", "compaction", "advisor", "bash", "lsp", "tools"], meta: AS_LOADED },
@@ -101,7 +104,7 @@ export const SETTINGS_SECTIONS = [
 	{ value: "files", label: "Files", icon: FileText, group: "workspace", keywords: ["AGENTS.md", "config", "skills", "rules"], meta: AS_LOADED },
 	{ value: "extensions", label: "Extensions", icon: Blocks, group: "workspace", meta: { none: "Packages installed for your user, all workspaces", workspace: "As a session in this workspace discovers them" }, keywords: ["plugins", "marketplaces", "registry skills", "contributions", "install"] },
 	{ value: "workflows", label: "Workflows", icon: Workflow, group: "workspace", keywords: ["workflow"], meta: { ...AS_LOADED, none: "Your user skills only, for all workspaces" } },
-	{ value: "decisions", label: "Decisions", icon: Scale, group: "workspace", keywords: ["records", "adr"], meta: { workspace: "The repository's decision records, read-only", none: "Pick a workspace" } },
+	{ value: "decisions", label: "Decisions", icon: Scale, group: "workspace", keywords: ["records", "adr"], meta: { workspace: "The repository's decision records, read-only", none: "Every workspace in this space, grouped by workspace" } },
 	{ value: "worktrees", label: "Worktrees", icon: GitBranch, group: "workspace", keywords: ["branches", "cleanup"], meta: AS_LOADED },
 ] as const satisfies readonly { value: string; label: string; icon: LucideIcon; group: SettingsGroup; keywords: readonly string[]; meta?: { workspace: string; none: string } }[];
 

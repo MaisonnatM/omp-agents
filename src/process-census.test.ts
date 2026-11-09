@@ -1,7 +1,7 @@
 import { afterEach, expect, mock, spyOn, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { descendants, ProcessCensus, parseListeners, parsePs, sessionGroups, stopTree } from "./process-census";
+import { cwdsIn, descendants, listeningPortsIn, openPathsIn, ProcessCensus, parseListeners, parsePs, sessionGroups, stopTree } from "./process-census";
 
 /** omp (100) with an MCP server in its process group, two jobs, and a shared worker it spawned, which has a child of its own. */
 const PS = `
@@ -107,4 +107,18 @@ test("a note once the reap started adds nothing to what the reap stops", async (
 	process.kill(child, "SIGKILL");
 	root.kill("SIGKILL");
 	await root.exited;
+});
+
+test("a Linux proc tree names the listening port, the working directory, and an open file", () => {
+	const dir = mkdtempSync(join(process.env.TMPDIR ?? "/tmp", "proc-census-"));
+	dirs.push(dir);
+	mkdirSync(join(dir, "net"), { recursive: true });
+	mkdirSync(join(dir, "42", "fd"), { recursive: true });
+	writeFileSync(join(dir, "net", "tcp"), "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   0: 0100007F:1F90 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 99\n");
+	symlinkSync("socket:[99]", join(dir, "42", "fd", "3"));
+	symlinkSync("/srv/app", join(dir, "42", "cwd"));
+	symlinkSync("/cache/archive-v0/abc/tool", join(dir, "42", "fd", "4"));
+	expect(listeningPortsIn(dir).get(42)).toEqual([8080]);
+	expect(cwdsIn(dir, [42, 7]).get(42)).toBe("/srv/app");
+	expect(openPathsIn(dir)).toEqual(["/cache/archive-v0/abc/tool"]);
 });

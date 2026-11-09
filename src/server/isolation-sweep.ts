@@ -37,6 +37,8 @@ export interface OvnfsRecord {
 	command: string;
 	/** Its name in ovnfs. */
 	checkout: string;
+	/** The checkout omp opened on the same capture to read a branch commit's baseline from, while it exists. */
+	start?: string;
 	/** The admin socket of the daemon that was asked. */
 	socket: string;
 	/** The folder that daemon serves it in, `null` when the daemon no longer lists it. */

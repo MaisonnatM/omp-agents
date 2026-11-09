@@ -51,6 +51,14 @@ describe("parseRoutineSpec", () => {
 		expect(parseRoutineSpec({ ...spec, task: { kind: "bot", botId: "scout", prompt: "Post the standup." } })).toBeNull();
 	});
 
+	test("a command task keeps posting only its failures, and refuses another post value", () => {
+		const quiet = { kind: "command", command: "./clean.sh", post: "failures" } as const;
+		expect(parseRoutineSpec({ ...spec, task: quiet })?.ok.task).toEqual(quiet);
+		expect(parseRoutineSpec(parseRoutineSpec({ ...spec, task: quiet })?.ok)?.ok.task).toEqual(quiet);
+		expect(parseRoutineSpec({ ...spec, task: { ...quiet, post: "always" } })).toBeNull();
+		expect(parseRoutineSpec({ ...spec, task: { ...quiet, post: true } })).toBeNull();
+	});
+
 	test("takes triggers in place of schedules, but refuses neither, an unknown kind, and a kind twice", () => {
 		expect(parseRoutineSpec({ ...spec, schedules: [], triggers: [{ kind: "slack" }, { kind: "pull-request" }] })?.ok).toMatchObject({ schedules: [], triggers: [{ kind: "slack" }, { kind: "pull-request" }] });
 		expect(parseRoutineSpec({ ...spec, schedules: [] })).toBeNull();

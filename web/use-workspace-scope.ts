@@ -47,12 +47,12 @@ function useSpace(): [Space, (space: Space) => void] {
 /** The directories the sidebar, the palette, and the pages list, and the space and workspace they are scoped to. */
 export interface WorkspaceScope extends WindowScope {
 	/**
-	 * The sessions of the space in neither a temporary nor a hidden directory, and no Bot's conversation, with the space's live Bot
-	 * conversations apart, titled with their Bot's name. The raw lists keep the others for what links to them.
+	 * The sessions of the space in neither a temporary nor a hidden directory, and no Bot's conversation.
+	 * The raw lists keep the others for what links to them.
 	 */
-	visible: { hosts: RosterHost[]; past: PastSession[]; bots: RosterHost[] };
+	visible: { hosts: RosterHost[]; past: PastSession[] };
 	/** {@link visible} of every space, which a switch of space picks the panes' session from. */
-	everySpace: { hosts: RosterHost[]; past: PastSession[]; bots: RosterHost[] };
+	everySpace: { hosts: RosterHost[]; past: PastSession[] };
 	hiddenCwds: ReadonlySet<string>;
 	/** The space's workspaces, as {@link listWorkspaces} lists them, Personal's from the personal directory. */
 	workspaces: Workspace[];
@@ -66,6 +66,8 @@ export interface WorkspaceScope extends WindowScope {
 	/** The pull requests' scope, as {@link scopeOf} builds it from the workspace, else the space. */
 	pullRequestsScope: string;
 	pickSpace: (space: Space) => void;
+	/** The server named the personal directory; until then {@link WindowScope.spaces} reads every session as Work. */
+	spacesKnown: boolean;
 }
 
 /**
@@ -79,8 +81,8 @@ export function useWorkspaceScope(state: DashboardState): WorkspaceScope {
 	const placement = useMemo(() => spaces(personalCwds, personalDir), [personalCwds, personalDir]);
 	// Temporary and hidden workspaces, and Bots' conversations, remain in the raw sessions; only discoverable sessions enter the workspace list and sidebar view.
 	const hiddenCwds = useMemo(() => new Set(state.workspaceList.hidden.map(hidden => hidden.cwd)), [state.workspaceList.hidden]);
-	const botNames = useMemo(() => new Map((state.bots ?? []).flatMap(bot => (bot.sessionId === null ? [] : [[bot.sessionId, bot.name] as const]))), [state.bots]);
-	const discoverable = useMemo(() => discoverableSessions(state.hosts, state.past, hiddenCwds, botNames), [state.hosts, state.past, hiddenCwds, botNames]);
+	const botSessions = useMemo(() => new Set((state.bots ?? []).flatMap(bot => bot.sessionId ?? [])), [state.bots]);
+	const discoverable = useMemo(() => discoverableSessions(state.hosts, state.past, hiddenCwds, botSessions), [state.hosts, state.past, hiddenCwds, botSessions]);
 	const visible = useMemo(() => sessionsIn(discoverable, space, placement), [discoverable, space, placement]);
 	const allWorkspaces = useMemo(
 		// A Personal workspace is offered even before a session runs there.
@@ -109,8 +111,9 @@ export function useWorkspaceScope(state: DashboardState): WorkspaceScope {
 		if (next !== null) pickWorkspace(next);
 	}, [started]);
 	const home = space === "personal" ? personalDir : null;
+	const spacesKnown = personalDir !== null;
 	return useMemo(
-		() => ({ visible, everySpace: discoverable, hiddenCwds, workspaces, allWorkspaces, bots, scheduled, workspace, pickWorkspace, pullRequestsScope, space, pickSpace, spaces: placement, home }),
-		[visible, discoverable, hiddenCwds, workspaces, allWorkspaces, bots, scheduled, workspace, pickWorkspace, pullRequestsScope, space, pickSpace, placement, home],
+		() => ({ visible, everySpace: discoverable, hiddenCwds, workspaces, allWorkspaces, bots, scheduled, workspace, pickWorkspace, pullRequestsScope, space, pickSpace, spaces: placement, spacesKnown, home }),
+		[visible, discoverable, hiddenCwds, workspaces, allWorkspaces, bots, scheduled, workspace, pickWorkspace, pullRequestsScope, space, pickSpace, placement, spacesKnown, home],
 	);
 }

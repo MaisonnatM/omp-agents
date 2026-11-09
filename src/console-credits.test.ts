@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, test } from "bun:test";
-import { apiOrganizationIds, consoleSessionKey, creditBalanceOf, fetchConsoleCreditBalance, sessionKeyIn } from "./console-credits";
+import { apiOrganizationIds, consoleSessionKey, cookieRootsFor, creditBalanceOf, fetchConsoleCreditBalance, sessionKeyIn } from "./console-credits";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -67,6 +67,20 @@ describe("apiOrganizationIds", () => {
 				{ uuid: "api-org", capabilities: ["api", "api_individual"] },
 			]),
 		).toEqual(["api-org"]);
+	});
+});
+
+describe("cookieRootsFor", () => {
+	test("Linux looks in the home-directory layouts Zen, LibreWolf, and Firefox use", () => {
+		expect(cookieRootsFor("linux", "/home/dev")).toEqual([
+			"/home/dev/.zen",
+			"/home/dev/.var/app/app.zen_browser.zen/.zen",
+			"/home/dev/.librewolf",
+			"/home/dev/.var/app/io.gitlab.librewolf-community/.librewolf",
+			"/home/dev/.mozilla/firefox",
+			"/home/dev/snap/firefox/common/.mozilla/firefox",
+			"/home/dev/.var/app/org.mozilla.firefox/.mozilla/firefox",
+		]);
 	});
 });
 

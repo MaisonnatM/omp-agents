@@ -1,13 +1,13 @@
 /**
- * The dashboard's share of GitHub's GraphQL budget. Every `gh` call runs on the user's own token, which each agent's
- * `gh` and `gt` share, so the reads the dashboard makes on its own stop while the hour's budget runs low, and the
+ * The dashboard's share of GitHub's GraphQL budget. Every `gh` call runs on the user's own token, which the agents
+ * share, so the reads the dashboard makes on its own stop while the hour's budget runs low, and the
  * agents keep what is left.
  */
 import { createCache } from "./cache";
 import { isObject, num } from "./json";
 
 /**
- * The GraphQL points the dashboard's own reads leave to agents, of GitHub's 5000 an hour: a `gh pr` or `gt` command
+ * The GraphQL points the dashboard's own reads leave to agents, of GitHub's 5000 an hour: a `gh pr` command
  * costs a point or a few, so a fifth of the hour carries a busy hour of agents' submits and edits to the reset.
  */
 export const GRAPHQL_RESERVE = 1000;

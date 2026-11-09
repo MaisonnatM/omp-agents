@@ -10,7 +10,7 @@ import type { ClientMsg } from "../../src/shared/protocol";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
-import { putJson } from "../api";
+import { isPhonePage, putJson } from "../api";
 import { useComposerReplacements } from "../composer-drafts";
 import {
 	capturing,
@@ -128,7 +128,7 @@ export function useDictation({ composer, text, editorRef, send, connected }: Dic
 	};
 
 	return {
-		available: composer !== null,
+		available: composer !== null && !isPhonePage(),
 		own,
 		elsewhere: capturing(dictation) && own === null,
 		locked: capturing(own),

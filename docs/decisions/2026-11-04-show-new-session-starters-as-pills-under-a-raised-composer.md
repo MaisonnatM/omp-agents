@@ -28,7 +28,7 @@ A first cut listed the starters with the composer's numbered suggestion list und
 
 A new session shows the directory and branch pickers above the composer, the composer about a fifth of the way down the page, and the starters under it while the draft is empty; a scheduled start keeps the docked composer and its note.
 A click on a pill puts its full prompt in the composer unsent, with the caret after it.
-The starters keep Composer chips' ranking, short labels, and filled-in blanks, from `rankedStarters` in `web/starters.ts`.
+The starters keep Composer chips' ranking, short labels, and filled-in blanks, from `rankedStarters`, which a later decision removed.
 They have no number keys, since pills carry no numbers and digits type in an empty composer, and no hide button, filtering as you type, or saving the draft as a starter, since the row hides once the draft holds text.
 The raised composer leaves too little room above it for the `/` and `@` list, so `useCompletion` takes `below` and opens that list under a new session's composer, over the starters.
 

@@ -37,7 +37,7 @@ export function useSessionLists(
 		[changePins],
 	);
 	const [query, setQuery] = useState("");
-	const workspaceLists = useMemo(() => sidebarSessions(visible.hosts, visible.past, visible.bots, workspace, pinned), [visible, workspace, pinned]);
+	const workspaceLists = useMemo(() => sidebarSessions(visible.hosts, visible.past, workspace, pinned), [visible, workspace, pinned]);
 	const lists = useMemo(() => searchSessions(workspaceLists, query), [workspaceLists, query]);
 	const listed = useMemo(() => listedViews(lists), [lists]);
 	const waiting = useMemo(() => waitingCount(workspaceLists), [workspaceLists]);

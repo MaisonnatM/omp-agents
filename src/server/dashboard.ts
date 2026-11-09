@@ -7,6 +7,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { mkdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import type { Server } from "bun";
 import { ForeignUsage } from "../foreign/usage";
 import { flushJsonFiles } from "../fs";
@@ -90,6 +91,8 @@ import { ScheduledFile } from "./scheduled-file";
 import { AutoContinue, occupiedBy } from "./auto-continue";
 import { ScheduledRunner } from "./scheduled-runner";
 import type { Routes } from "./route-kit";
+import type { PhoneAccess } from "./phone-access";
+import type { PhoneAccessRoutesEnv } from "./phone-access-routes";
 import { createRoutes } from "./routes";
 import type { SelfUpdate } from "./self-update";
 import { endSession } from "./session-end";
@@ -465,7 +468,7 @@ export class Dashboard {
 			live: sessionId => sessions.bySessionId(sessionId),
 			session: instanceId => sessions.get(instanceId),
 			savedFile: files.pathOf,
-			paths: { extension: botExtension, botsFile, botInboxDir, botsDir, routinesFile, routineInboxDir, shepherdExtension, shepherdInboxDir, designerExtension },
+			paths: { extension: botExtension, botsFile, botInboxDir, botsDir, routinesFile, routineInboxDir, shepherdExtension, shepherdInboxDir, designerExtension, sessionArchiveDir: join(agentDir, "session-archive") },
 			now: () => new Date().toISOString(),
 			onChange: () => broadcasts.pushList("bots"),
 		});
@@ -632,6 +635,10 @@ export class Dashboard {
 			sendScheduledNow: id => scheduledRunner.sendNow(id),
 			runRoutine: id => runner.runNow(id),
 			messageBot: async (id, text) => void (await this.#bots.message(id, text)),
+			restartBot: async id => {
+				await this.#bots.restart(id);
+				if (await files.refresh()) this.#onFilesChanged();
+			},
 			changeNotices: (ids, op) => notices.apply(ids, op),
 			dictation: this.#dictation,
 			activity: { owner: () => ownerLock.held, store: this.#activity },
@@ -641,7 +648,7 @@ export class Dashboard {
 	}
 
 	/** The HTTP API over this dashboard, admitted by `guards`; `build` is what the server serves. */
-	routes(guards: Guards, build: ServedBuild): Routes {
+	routes(guards: Guards, build: ServedBuild, phoneAccess: PhoneAccessRoutesEnv): Routes {
 		const files = this.#files;
 		const sessions = this.#sessions;
 		const broadcasts = this.#broadcasts;
@@ -714,6 +721,7 @@ export class Dashboard {
 				},
 			},
 			sportThumbs: { dir: sportThumbsDir, fetch: url => fetch(url) },
+			phoneAccess,
 		});
 	}
 

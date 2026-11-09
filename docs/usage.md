@@ -39,6 +39,7 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 - [Settings](usage/settings.md)
   - [Extensions](usage/extensions.md)
 - [Settings sync](usage/settings-sync.md)
+- [Phone access](usage/phone-access.md)
 - [Storage](usage/storage.md)
 - [Notifications](usage/notifications.md)
   - [Session notifications](usage/notifications.md#session-notifications)

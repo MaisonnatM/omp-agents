@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { providerConnected, type ProvidersAnswer } from "../../src/shared/providers";
-import type { ProviderStatus } from "../../src/shared/source-control";
+import type { GithubStatus } from "../../src/shared/source-control";
 import type { StarterKitInstallResult } from "../../src/shared/desktop-bridge";
 import type { CollabAutoStart, StarterKitStatus, TerminalAccess } from "../../src/shared/readiness";
 import { activityControl, record } from "../activity";
@@ -215,7 +215,7 @@ export function KitStep({ kit }: { kit: Observation<StarterKitStatus> }) {
 	);
 }
 
-function githubMeta(github: Observation<ProviderStatus>): string | null {
+function githubMeta(github: Observation<GithubStatus>): string | null {
 	if (github.kind === "checking") return "Checking this computer…";
 	if (github.kind === "unavailable") return null;
 	const { state, account } = github.value;
@@ -225,7 +225,7 @@ function githubMeta(github: Observation<ProviderStatus>): string | null {
 }
 
 /** GitHub through its CLI, and the services in Integrations, each checked again when the window regains focus. */
-export function ToolsStep({ github, integrations, onRefresh, refreshing }: { github: Observation<ProviderStatus>; integrations: Observation<number>; onRefresh: () => void; refreshing: boolean }) {
+export function ToolsStep({ github, integrations, onRefresh, refreshing }: { github: Observation<GithubStatus>; integrations: Observation<number>; onRefresh: () => void; refreshing: boolean }) {
 	const signedIn = github.kind === "known" && github.value.state === "signed-in";
 	const connected = integrations.kind === "known" ? integrations.value : 0;
 	return (

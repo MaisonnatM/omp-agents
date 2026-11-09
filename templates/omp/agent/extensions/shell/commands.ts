@@ -4,7 +4,7 @@ import { isAbsolute, join, resolve } from "node:path";
 /**
  * The commands of a bash line, each as its words: split on `&&`, `||`, `;`, `|`, `&`, parentheses, and newlines outside quotes,
  * with quotes removed and leading `NAME=value` assignments and `env` prefixes dropped, so `cd x && gh pr ready 4` is two commands,
- * `env -u GITHUB_TOKEN gt submit` runs `gt submit`, and `rg "gh pr ready" f` is one `rg`.
+ * `env -u GITHUB_TOKEN gh pr ready 4` runs `gh pr ready 4`, and `rg "gh pr ready" f` is one `rg`.
  */
 export function commands(line: string): string[][] {
 	return split(line).flatMap(w => {

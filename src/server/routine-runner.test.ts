@@ -241,6 +241,23 @@ describe("RoutineRunner", () => {
 			expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + HOUR, [], { kind: "command", command: "git worktree prune", run })]);
 		});
 
+		test("posting only failures, a command that exits 0 keeps its output on the run and posts nothing, and one that fails posts", async () => {
+			const file = fileWith(routinesPath(), { ...command, post: "failures" });
+			const { runner, fake } = harness(file);
+			await runner.tick();
+			fake.execs[0]!.end({ exitCode: 0, output: "clean\n" });
+			await settled();
+			expect(file.value[0]?.runs[0]).toMatchObject({ errors: [], outcome: { kind: "command", run: { phase: "exited", code: 0, output: "clean\n" } } });
+			expect(fake.messages).toEqual([]);
+
+			fake.now += HOUR;
+			await runner.tick();
+			fake.execs[1]!.end({ exitCode: 2, output: "boom\n" });
+			await settled();
+			const run = { phase: "exited", code: 2, output: "boom\n", startedAt: T0 + 2 * HOUR, endedAt: T0 + 2 * HOUR } as const;
+			expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + 2 * HOUR, [], { kind: "command", command: "git worktree prune", run })]);
+		});
+
 		test("runs no second command while its last one runs, and a failure or a stop goes to the run's errors", async () => {
 			const file = fileWith(routinesPath(), command);
 			const { runner, fake } = harness(file);

@@ -141,11 +141,6 @@ It is separate from a todo's notes field.
 What the page records of how its user uses the dashboard, by registry id only, which Settings › Activity reports.
 _Avoid_: Usage (omp's requests, in Analytics), analytics, telemetry
 
-**Starter**:
-A short-labelled button under a new session's composer while the draft is empty, whose click puts its full prompt in the composer without sending it.
-It is not the **Starter kit**.
-_Avoid_: Template, preset, suggestion (the replies' **Suggestions:**)
-
 ## Unattended work
 
 **Routine**:
@@ -238,6 +233,20 @@ _Avoid_: Rep, round, interval
 **Demo**:
 An exercise's YouTube video with three cues and an optional caution, which the Sport page shows as a thumbnail and loads only when the user clicks play.
 _Avoid_: Tutorial, clip, embed
+
+## Phone access
+
+**Phone access**:
+The dashboard served to the user's own phone through Tailscale, turned on in Settings › Phone access.
+_Avoid_: Remote access, mobile app
+
+**Paired phone**:
+A phone that scanned a pairing code and holds its own device key, listed in Settings › Phone access.
+_Avoid_: Device, client
+
+**Pairing code**:
+The one-time code, shown as a QR and a link, that signs a phone in. It works once and expires after five minutes.
+_Avoid_: QR code, invite
 
 ## Distribution
 

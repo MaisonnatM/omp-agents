@@ -85,7 +85,7 @@ export function TicketRow({ ticket, nested = false, open = false, pending, onQui
 				href={hashForTickets(ticket.id)}
 				aria-current={open ? "true" : undefined}
 				className={cn(
-					"@container flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-md px-3 text-sm outline-none",
+					"@container flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-md px-3 text-sm outline-none max-phone:h-auto max-phone:min-h-11 max-phone:flex-wrap max-phone:gap-y-0.5 max-phone:py-2",
 					// The open row looks selected, so its focus needs no ring of its own.
 					!open && "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
 					nested && "pl-10",
@@ -94,7 +94,7 @@ export function TicketRow({ ticket, nested = false, open = false, pending, onQui
 				<IconTip icon={[...PRIORITY_ICON[ticket.priority], PRIORITY_LABEL[ticket.priority]]} />
 				<span className="min-w-[4.75rem] shrink-0 whitespace-nowrap tabular-nums text-muted-foreground">{ticket.id}</span>
 				<IconTip icon={[...statusIcon(ticket), ticket.status]} />
-				<span className="min-w-0 truncate">
+				<span className="min-w-0 truncate max-phone:order-first max-phone:line-clamp-2 max-phone:basis-full max-phone:whitespace-normal">
 					{ticket.title}
 					{nested && ticket.parentId && <span className="sr-only">, sub-issue of {ticket.parentId}</span>}
 				</span>

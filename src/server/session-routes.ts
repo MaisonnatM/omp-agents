@@ -20,8 +20,7 @@ import { isAnalyticsRange } from "../shared/analytics";
 import type { ConversationSearchAnswer } from "../shared/sessions";
 import { isSpace, type WorkspaceChange } from "../shared/workspaces";
 import { answer, checked, fail } from "./http";
-import { parseGraphiteToken, parseSourceControlChange, parseTrustChange, parseWorkspaceChange } from "./wire";
-import { signInGraphite } from "../source-control";
+import { parseSourceControlChange, parseTrustChange, parseWorkspaceChange } from "./wire";
 import type { Handler, RouteKit, Routes, SessionRoutesEnv } from "./route-kit";
 import { dirParam } from "./dir-param";
 
@@ -194,7 +193,7 @@ export function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): 
 		},
 	);
 
-	/** `GET /api/source-control`: GitHub's and Graphite's CLIs, the automatic pull setting, and the workspaces' repositories. */
+	/** `GET /api/source-control`: the GitHub CLI's sign-in, the automatic pull setting, and the workspaces' repositories. */
 	const sourceControl = get(() => answer(() => env.sourceControl()));
 
 	/** `PUT /api/source-control` `{ op, on, repo? }`: turn automatic pulls on or off by default, or for one repository, or the cleanup after a merge. */
@@ -206,15 +205,6 @@ export function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): 
 			),
 		async (change) => {
 			env.changeSourceControl(change);
-			return env.sourceControl();
-		},
-	);
-
-	/** `PUT /api/source-control/graphite-sign-in` `{ token }`: signs `gt` in with the token, then answers the same as the `GET`. */
-	const graphiteSignIn = write(
-		(body) => checked(parseGraphiteToken(body), "Expected { token } holding a Graphite token"),
-		async (token) => {
-			await signInGraphite(token);
 			return env.sourceControl();
 		},
 	);
@@ -282,7 +272,6 @@ export function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): 
 		"/api/workspaces": { PUT: workspaceChange },
 		"/api/project-trust": { PUT: trustChange },
 		"/api/source-control": { GET: sourceControl, PUT: sourceControlChange },
-		"/api/source-control/graphite-sign-in": { PUT: graphiteSignIn },
 		"/api/changes": { GET: changes },
 		"/api/changes/file": { GET: changedFile },
 		"/api/conversations": { GET: conversations },

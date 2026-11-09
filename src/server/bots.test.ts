@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import type { LiveRow } from "../live-session";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -73,6 +73,7 @@ function harness() {
 			shepherdExtension: "/ext/shepherd.ts",
 			shepherdInboxDir: join(dir, "shepherd-inbox"),
 			designerExtension: "/ext/designer.ts",
+			sessionArchiveDir: join(dir, "session-archive"),
 		},
 		now: () => "2026-05-02T09:00:00.000Z",
 		onChange: () => {},
@@ -158,6 +159,27 @@ describe("Bots", () => {
 		expect(requests[1]).toEqual({ kind: "resume", sessionId: "s1" });
 		expect(sessions[1]?.args).toContain("--omp-agents-bot");
 		expect(sessions[1]?.heard).toEqual(["followUp Still there?"]);
+	});
+
+	test("a restart ends the live conversation, archives its file, and unbinds the Bot, so its next message starts a new conversation", async () => {
+		const { bots, file, sessions, requests, dir } = harness();
+		await bots.message(scout.id, "Hello.");
+		writeFileSync(join(dir, "s1.jsonl"), "{}\n");
+		await bots.restart(scout.id);
+		expect(sessions[0]?.ended).toBe(true);
+		expect(file.value[0]?.sessionId).toBeNull();
+		expect(existsSync(join(dir, "s1.jsonl"))).toBe(false);
+		expect(existsSync(join(dir, "session-archive", "s1.jsonl"))).toBe(true);
+		expect(await bots.message(scout.id, "Fresh start.")).toBe("s2");
+		expect(requests[1]).toMatchObject({ kind: "new", prompt: "Fresh start.", bot: scout.id });
+		expect(sessions[1]?.heard).toEqual(["steer Fresh start."]);
+	});
+
+	test("a restart of a Bot whose conversation has not begun changes nothing", async () => {
+		const { bots, file, requests } = harness();
+		await bots.restart(scout.id);
+		expect(file.value[0]?.sessionId).toBeNull();
+		expect(requests).toHaveLength(0);
 	});
 
 	test("two messages at once start one conversation, in the order they were sent", async () => {

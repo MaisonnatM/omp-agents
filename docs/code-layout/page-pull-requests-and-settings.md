@@ -1,8 +1,8 @@
 # Page: pull requests, tickets, settings, integrations, and primitives
 
 - `web/components/pull-requests/`, `web/components/tickets/`, `web/components/settings/`, `web/components/integrations/`, and `web/components/new-session.tsx`: the other pages.
-  `web/starters.ts` holds the New session page's starters, `rankedStarters`, which gives each a short label and its prompt with the blanks filled, ranked from the draft's branch, your Linear issues, and your pull requests; `useStarters` in `web/components/new-session.tsx` reads those, and the page lists their labels in the composer's numbered suggestion list, where a key or click puts the prompt in the composer unsent.
-  `web/components/new-session-modes.tsx` holds what the page shows in the starters' place: `PrivateFacts`, a private draft's facts of what ending it deletes and what stays.
+  `web/components/new-session-modes.tsx` holds what the page shows under a private draft's composer: `PrivateFacts`, the facts of what ending it deletes and what stays.
+  `web/components/dithercn/retro-grid.tsx` is the dithered retro grid behind the New session page, drawn by the dithercn engine copied into `web/lib/dither/`, whose colors are the `--dither-*` tokens in `web/globals.css`.
   `web/components/new-session.tsx` holds `PrivatePill`, the header's **Private** pill, whose tooltip is `PRIVATE_NOTE` from `web/labels.ts`, the one every private session's chip repeats.
   `web/components/tickets/tickets-page.tsx` is the tickets page, its list and the open issue beside it in a `ListSplit`, `ticket-row.tsx` an issue's row with its state and priority glyphs and chips, and `ticket-details.tsx` one issue laid out as a pull request's **Summary** is, with a header that condenses through `pull-requests/pr-details/use-condensed-header.ts` above the issue's own scroller, its fields as `MetaRow`s, and `SummarySection`s from `pull-requests/pr-details/section.tsx`.
   `web/components/pull-requests/avatars.tsx` holds the state icons, the avatars, and the reviewers' pictures that a pull request's rows and details share, and `PersonPicture`, the picture beside each person in the **Reviewers** pickers and submenu.

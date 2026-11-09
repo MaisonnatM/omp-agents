@@ -6,7 +6,7 @@
   The sidebar lists nineteen sections in four groups.
   **Usage** holds **Analytics** and **Activity**, **General** holds **Preferences**, **Workspaces**, **Sync**, and **Storage**, and **Connections** holds **Providers**, **Integrations**, **MCP servers**, and **Source control**; these are the same whatever the workspace.
   **This workspace** holds **Models**, **Agents**, **omp settings**, **omp memory**, **Files**, **Extensions**, **Workflows**, **Decisions**, and **Worktrees**, which show omp's config and files, package discovery, and the repository's records and worktrees, as a session in the sidebar's workspace sees them; only these sections show the workspace picker.
-  The command menu finds a section by its name or by what it holds, such as "theme" or "graphite", under **Settings**.
+  The command menu finds a section by its name or by what it holds, such as "theme" or "github", under **Settings**.
   The gear button and G then , reopen the section you last had open in this app, **Analytics** the first time, and the header names the open section.
   Switching sections keeps an unsaved edit and opens the new section at its top, and the selected section stays when you change workspace.
 - **Analytics** shows request usage for the last 24 hours.
@@ -70,7 +70,7 @@
   The page cannot see every shell or editor, so close other tools using a checkout before you delete it.
   Disk use is approximate, and removing a checkout may free less than the number shown.
   A row whose work has merged says **Merged** after its branch, with the pull request's number when GitHub's newest pull request from that branch merged.
-  A worktree counts as merged when `origin`'s default branch contains its commit, which also covers a detached checkout, or when its branch's newest pull request merged and the branch has no commit made after the merge, which covers squash merges such as Graphite's.
+  A worktree counts as merged when `origin`'s default branch contains its commit, which also covers a detached checkout, or when its branch's newest pull request merged and the branch has no commit made after the merge, which covers squash merges.
   The main checkout is never flagged, and repositories GitHub cannot answer for share one warning above the list, while the default branch still flags what it contains.
   **Remove N merged** shows while N merged rows that the search and filter show have no blocker badge, and reads **Confirm removal of N?** after the first click; a second click within three seconds queues them as **Delete** does.
   It keeps a worktree with unsaved changes, one a live session uses, one whose work it cannot show merged, and everything **Delete** refuses, and counts those in its last toast.
@@ -162,7 +162,8 @@
   Records are the files the starter kit's `decision-records` skill writes in `docs/decisions/`; a repository that keeps them in an ADR directory, docs/adr or doc/adr, shows those instead.
   **In force** hides superseded, deprecated, and rejected records, and **All** shows them, struck through; **Search** narrows the list by title, file name, status, or text.
   A record's **Supersedes** and **Superseded by** open and scroll to the records they name, and a link to another file in the repository opens it in the file dialog.
-  The section only reads the records, since a record changes in the same commit as the code it covers; with **All workspaces** it asks you to pick one.
+  The section only reads the records, since a record changes in the same commit as the code it covers.
+  With **All workspaces**, the same timeline is grouped by workspace, one section per repository that keeps records, and a record's links stay inside its own repository. A workspace with no records is left out of the list.
 - **Preferences** holds the dashboard's own choices, saved in the app, not in omp's files.
   The server keeps them too, so every window you open shows the same, and **Sync** carries them to your other machines; **Stop idle processes** is the server's own and stays on this machine.
   The width of a sidebar or a split, a folded section, and what you last picked in a menu stay with the browser that set them.
@@ -172,6 +173,7 @@
   **Notes**, **Calendar**, **Email**, and **Sport** say **Header**: they sit in the header beside the command menu and take no number, and Cmd+1 goes to the first tab the sidebar's bar draws.
   A hidden tab only leaves the sidebar's bar or the header and loses its number: its page, its command in the command menu, its G pair, and links to it still work.
   While omp holds no sign-in to Linear or Gmail, the **Tickets** or **Email** row says that tab shows only once the service is connected.
+  **Tickets** shows only in Work and **Sport** only in Personal, and their rows say so in both spaces.
   Putting every tab back in its default order and shown forgets the choice, so the sidebar follows the default again.
   **Notifications** turns the [session notifications](notifications.md#session-notifications) on or off, picks whether finished turns notify too, and picks their sound and whether it plays while the window is focused.
   **Stop idle processes** picks when the server stops the dev servers, watchers, and services that sessions start besides omp: **Off**, or after 15 minutes, 30 minutes, 1 hour, or 2 hours, 30 minutes by default.
@@ -184,8 +186,7 @@
 - **Providers** signs omp in to the model providers its sessions call, as `/login` and `omp login` do; see [Providers](providers.md).
 - **Integrations** connects omp to Linear and Slack and the dashboard to Google Calendar and Gmail; see [Integrations](integrations.md).
 - **MCP servers** lists every MCP server omp loads and adds more from a catalog or by address; see [MCP servers](mcp-servers.md).
-- **Source control** shows whether the `gh` and `gt` command-line tools are installed and signed in, under **Command-line tools**; **Check again** reads them again.
-  While Graphite is signed out, paste a token from **Get a token** and choose **Sign in**, which runs `gt auth` for you.
+- **Source control** shows whether the `gh` command-line tool is installed and signed in, under **Command-line tools**; **Check again** reads it again.
   **Automatically pull** keeps the default branch current when the checkout has no local changes or commits; it is off by default, and the server checks every five minutes and right after a change.
   Each repository your workspaces use lists its last pull and an override, **Default**, **On**, or **Off**; the server keeps both in `source-control.json` beside its access token.
   Repositories show their path from your home folder, and repositories in temporary folders are left out.

@@ -14,10 +14,7 @@ Per repository:
      out (including a branch mid-rebase) only when its work is on the trunk:
      its tip is an ancestor of origin/<trunk>, `git cherry` finds every commit
      upstream, or GitHub has a merged PR from that branch whose head contains the
-     local tip or the same patches. Graphite-tracked branches go through `gt delete`
-     (children first; `gt untrack` + `git branch -D` when Graphite calls the metadata
-     orphaned or diverged) so Graphite's metadata is cleaned; a tracked branch with a kept child
-     is kept.
+     local tip or the same patches. Such a branch goes through `git branch -D`.
      Everything else is kept and listed with the reason.
 """
 
@@ -26,7 +23,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sqlite3
 import subprocess
 import sys
 from collections import defaultdict
@@ -35,8 +31,6 @@ from datetime import datetime
 from pathlib import Path
 
 DEFAULT_REPOS = [Path.home() / "code" / "yampa", Path.home() / "code" / "omp-agents"]
-# omp-agents never uses Graphite, even if a config file appears there.
-NO_GRAPHITE_REPOS = {"omp-agents"}
 IN_PROGRESS_MARKERS = (
     "MERGE_HEAD",
     "rebase-merge",
@@ -169,51 +163,6 @@ def fetch_pr_heads(repo: Path, numbers: list[int]) -> None:
                 fetch([refspec])
 
 
-def gt_error(result: subprocess.CompletedProcess[str]) -> str:
-    lines = (result.stderr + result.stdout).splitlines()
-    return next((line for line in lines if line.startswith("ERROR")), lines[-1] if lines else "no output")[:200]
-
-
-def delete_branch(repo: Path, name: str, tracked: bool) -> tuple[str, str | None]:
-    """Delete `name`, cleaning Graphite metadata first when it has any. Returns (method, error)."""
-    method = "git branch -D"
-    if tracked:
-        result = run(["gt", "delete", name, "--force", "--quiet", "--no-interactive"], repo, check=False)
-        if result.returncode == 0:
-            return "gt delete", None
-        # Graphite refuses metadata whose parent is gone ("untracked") or whose recorded
-        # parent revision no longer matches ("diverged"); untrack those, then delete.
-        if not any(state in gt_error(result) for state in ("untracked branch", "diverged branch")):
-            return "gt delete", f"gt delete failed: {gt_error(result)}"
-        result = run(["gt", "untrack", name, "--force", "--quiet", "--no-interactive"], repo, check=False)
-        if result.returncode != 0:
-            return "gt untrack", f"gt untrack failed: {gt_error(result)}"
-        method = "gt untrack + git branch -D"
-    result = run(["git", "branch", "-D", name], repo, check=False)
-    if result.returncode != 0:
-        return method, f"git branch -D failed: {result.stderr.strip()}"
-    return method, None
-
-
-
-def graphite_parents(common_dir: Path) -> dict[str, str | None] | None:
-    db = common_dir / ".graphite_metadata.db"
-    if not (common_dir / ".graphite_repo_config").is_file() or not db.is_file():
-        return None
-    with sqlite3.connect(f"file:{db}?mode=ro", uri=True) as conn:
-        return dict(conn.execute("select branch_name, parent_branch_name from branch_metadata"))
-
-
-def trunk_ref(repo: Path, common_dir: Path) -> str:
-    config = common_dir / ".graphite_repo_config"
-    if config.is_file():
-        trunk = json.loads(config.read_text()).get("trunk")
-        if trunk:
-            return f"origin/{trunk}"
-    head = run(["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], repo, check=False)
-    return head.stdout.strip() if head.returncode == 0 else "origin/main"
-
-
 def prune_repo(repo: Path, apply: bool) -> bool:
     mode = "APPLY" if apply else "DRY RUN"
     print(f"\n== {repo} [{mode}] {datetime.now().isoformat(timespec='seconds')}")
@@ -221,10 +170,9 @@ def prune_repo(repo: Path, apply: bool) -> bool:
     if fetch.returncode != 0:
         print(f"fetch failed, skipping repository: {fetch.stderr.strip()}")
         return False
-    common_dir = Path(git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir").strip())
-    trunk = trunk_ref(repo, common_dir)
-    parents = None if repo.name in NO_GRAPHITE_REPOS else graphite_parents(common_dir)
-    print(f"trunk {trunk}; graphite {'yes' if parents is not None else 'no'}")
+    head = run(["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], repo, check=False)
+    trunk = head.stdout.strip() if head.returncode == 0 else "origin/main"
+    print(f"trunk {trunk}")
 
     def read_branches() -> dict[str, dict]:
         fmt = "%(refname:short)%00%(objectname)%00%(upstream)%00%(upstream:track)"
@@ -303,43 +251,14 @@ def prune_repo(repo: Path, apply: bool) -> bool:
             numbers = ", ".join(f"#{pr['number']}" for pr in found)
             kept[name] = f"local commits beyond merged PR {numbers}"
 
-    # Graphite: delete children before parents; keep a tracked parent of any kept branch.
-    tracked = parents or {}
-    children: dict[str, set[str]] = defaultdict(set)
-    for child, parent in tracked.items():
-        if parent and child in branches:
-            children[parent].add(child)
-    changed = True
-    while changed:
-        changed = False
-        for name in sorted(merged):
-            if name in tracked:
-                blocker = next((c for c in sorted(children[name]) if c not in merged), None)
-                if blocker:
-                    kept[name] = f"Graphite parent of kept branch {blocker}"
-                    del merged[name]
-                    changed = True
-
-    order: list[str] = []
-    pending = set(merged)
-    while pending:
-        ready = sorted(n for n in pending if not (children[n] & pending))
-        order.extend(ready)
-        pending -= set(ready)
-
     deleted: dict[str, str] = {}
-    for name in order:
-        if blocker := next(iter(sorted(children[name] & kept.keys())), None):
-            kept[name] = f"Graphite parent of kept branch {blocker}"
-            continue
+    for name in sorted(merged):
         if apply:
-            method, error = delete_branch(repo, name, name in tracked)
-            if error:
-                kept[name] = error
+            result = run(["git", "branch", "-D", name], repo, check=False)
+            if result.returncode != 0:
+                kept[name] = f"git branch -D failed: {result.stderr.strip()}"
                 continue
-        else:
-            method = "gt delete/untrack" if name in tracked else "git branch -D"
-        deleted[name] = f"{method} ({merged[name]})"
+        deleted[name] = merged[name]
 
     if apply:
         branches_after, worktrees_after = len(read_branches()), len(list_worktrees(repo))
@@ -354,17 +273,13 @@ def prune_repo(repo: Path, apply: bool) -> bool:
     for path, reason in kept_worktrees:
         print(f"  kept: {path} ({reason})")
 
-    by_method: dict[str, int] = defaultdict(int)
-    for detail in deleted.values():
-        by_method[detail.split(" (")[0]] += 1
     verb = "deleted" if apply else "would delete"
-    methods = ", ".join(f"{count} via {method}" for method, count in sorted(by_method.items()))
-    print(f"branches: {verb} {len(deleted)} ({methods or 'none'}), kept {len(kept)} (upstream gone)")
+    print(f"branches: {verb} {len(deleted)}, kept {len(kept)} (upstream gone)")
     for name, detail in sorted(deleted.items()):
-        print(f"    {verb}: {name} {branches[name]['tip'][:12]} via {detail}")
+        print(f"    {verb}: {name} {branches[name]['tip'][:12]} ({detail})")
     by_reason: dict[str, list[str]] = defaultdict(list)
     for name, reason in kept.items():
-        groups = ("local commits beyond merged PR", "Graphite parent of kept branch", "gh pr list failed")
+        groups = ("local commits beyond merged PR", "gh pr list failed")
         key = next((group for group in groups if reason.startswith(group)), reason)
         by_reason[key].append(name if key == reason else f"{name} ({reason})")
     for reason, names in sorted(by_reason.items(), key=lambda item: -len(item[1])):

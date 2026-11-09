@@ -45,7 +45,7 @@ import { useOpenPullRequest } from "./open-pull-request";
 import { integrationsStore } from "./reads";
 import { EMPTY_LAYOUT, hashForLayout, hashForPage, hashForRoute, hashForView, type NotesListView, type OpenMode, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
-import { defaultCwd, spaceSession, type WindowScope, workspaceSession, workspaceSwitch } from "./sessions";
+import { defaultCwd, spaceSwitchPanes, type WindowScope, waitingIn, workspaceSession, workspaceSwitch } from "./sessions";
 import { placedTabs, useSidebarTabs } from "./sidebar-tabs";
 import { refusedStart, startOf } from "./starts";
 import { useAttention } from "./use-attention";
@@ -80,6 +80,11 @@ export function App() {
 	const terminal = useTerminalPanel();
 	useNoticeToasts(state.notices, state.connected, send, start);
 	useAttention(state, openBot?.view ?? null, send);
+	/** How many sessions the space off screen lists need you, which the switch counts on its side; none until the spaces are known. */
+	const otherWaiting = useMemo(
+		() => (state.connected && scope.spacesKnown ? waitingIn(scope.everySpace, otherSpace(space), spaces) : 0),
+		[state.connected, scope.spacesKnown, scope.everySpace, space, spaces],
+	);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
 	const [goalEditor, setGoalEditor] = useState<{ instanceId: string; focus: "objective" | "budget" } | null>(null);
 	const editGoal = useCallback((instanceId: string, focus: "objective" | "budget") => setGoalEditor({ instanceId, focus }), []);
@@ -87,12 +92,14 @@ export function App() {
 	const editedGoal = goalHost?.source === "dashboard" && goalHost.goal.kind !== "off" && goalHost.control.phase === "live" && !goalHost.control.readOnly ? goalHost : null;
 	const integrations = integrationsStore.usePolling().read?.data.integrations;
 	const linear = integrations?.linear ?? null;
-	const { signedOut: signedOutTabs, shown: tabs } = useSidebarTabs();
+	const { absent: absentTabs, shown: tabs } = useSidebarTabs(space);
 	/** The dashboard reads and writes Linear: the tickets page lists issues, the Todo page creates them, and the Calendar shows their due days. */
 	const linearCallable = linear !== null && callable(linear.connection);
+	/** Linear answers and the space shows Tickets: the new-ticket shortcut and the palette's tickets apply. */
+	const ticketsCallable = linearCallable && !absentTabs.has("tickets");
 	const settings = useSettingsRoute(page);
 	const latestBot = useMemo(() => (bots === null ? null : (botRows(bots, state.hosts, state.botLasts)[0]?.bot.id ?? null)), [bots, state.hosts, state.botLasts]);
-	const { tab, showTab } = useSidebarTab({ page, signedOutTabs, layout, latestSession: sessions.latest, latestBot, navigate, show });
+	const { tab, showTab } = useSidebarTab({ page, absentTabs, layout, latestSession: sessions.latest, latestBot, navigate, show });
 	/** The tabs the bar draws, which Cmd+1 onward go to in order. */
 	const barTabs = useMemo(() => placedTabs(tabs, "bar"), [tabs]);
 	const headerTabs = useMemo(() => placedTabs(tabs, "header"), [tabs]);
@@ -138,11 +145,10 @@ export function App() {
 			const { page, layout, scope } = latest.current;
 			if (next === scope.space) return;
 			pickSpace(next);
-			// The panes follow the space the user picks; `useFocusedSession` follows the panes into a session's space the other way. A page stays; the panes leave the other space's sessions for the newest running in this one, else show none.
-			if (page || layout.panes.length === 0) return;
-			const session = spaceSession(next, scope.everySpace.hosts, scope.spaces);
-			if (session) open(session, "replace");
-			else show(EMPTY_LAYOUT);
+			// The route follows the space the user picks; `useFocusedSession` follows the route into its space the other way.
+			const panes = spaceSwitchPanes(page, layout, scope.space, next, scope.everySpace.hosts, scope.spaces);
+			if (panes === "empty") show(EMPTY_LAYOUT);
+			else if (panes !== "stay") open(panes, "replace");
 		},
 		[pickSpace, open, show],
 	);
@@ -179,9 +185,9 @@ export function App() {
 		settings,
 		listed: sessions.listed,
 		view: focused.view,
-		signedOutTabs,
+		absentTabs,
 		tabs: barTabs,
-		linearCallable,
+		ticketsCallable,
 		hasDetails: detailsView !== null || openBot !== null,
 		openPullRequest: openPullRequest.state.kind === "ready" ? openPullRequest.run : null,
 		setGoal: focusedGoal ? () => editGoal(focusedGoal.instanceId, "objective") : null,
@@ -235,15 +241,17 @@ export function App() {
 				notices={state.notices}
 				onShowSearch={showSearch}
 				tabs={headerTabs}
+				allTabs={tabs}
 				tab={tab}
 				onTab={showTab}
 				settingsOpen={page?.kind === "settings"}
 				onToggleSettings={toggleSettings}
 				space={space}
 				onSpace={switchSpace}
+				otherWaiting={otherWaiting}
 			/>
 		),
-		[state.notices, showSearch, headerTabs, tab, showTab, page?.kind, toggleSettings, space, switchSpace],
+		[state.notices, showSearch, headerTabs, tab, showTab, page?.kind, toggleSettings, space, switchSpace, otherWaiting],
 	);
 
 	return (
@@ -254,7 +262,7 @@ export function App() {
 						<UserNotesContext.Provider value={state.userNotes}>
 							<PersonalContext.Provider value={state.personal}>
 								<div className="flex h-svh flex-col">
-									{DESKTOP_TITLE_BAR && <DesktopTitleBar title={focused.title} space={space} onSpace={switchSpace} controls={headerControls} />}
+									{DESKTOP_TITLE_BAR && <DesktopTitleBar title={focused.title} space={space} onSpace={switchSpace} otherWaiting={otherWaiting} controls={headerControls} />}
 									<SidebarProvider className="min-h-0 flex-1">
 										<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")} address={address}>
 											<AppSidebar
@@ -397,7 +405,7 @@ export function App() {
 											todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
 											todos={mentionLists.todos}
 											notes={spaceNotes}
-											linearConnected={linearCallable}
+											ticketsCallable={ticketsCallable}
 											onCreateTicket={setNewTicket}
 										/>
 									</SidebarProvider>

@@ -42,6 +42,7 @@
   It stops after 10 minutes, not counting the time the Mac sleeps, and its run keeps the last 64 KB of what it printed, stdout and stderr together.
   When it ends, the dashboard posts into the Bot's conversation which routine ran what, how it ended, how long the Mac slept while it ran, if it did, and its output, which the Bot reads as data rather than as instructions.
   A command that ends while the Mac sleeps posts once the Mac fully wakes.
+  With **Post the output to the Bot only when it fails** checked, a command that exits 0 keeps its output on the run, in the routine's open row, and posts nothing, so it starts no turn; a non-zero exit, a stop, or a failure to start still posts.
   If the Bot cannot take that message, the run keeps the output anyway and lists why among its errors.
   A command routine whose last command still runs records an error instead of running a second one.
   Its runs read **Running…**, **Succeeded**, **Failed (exit n)**, **Stopped at the time limit**, **Stopped with the dashboard**, or **Could not start**, and anything but a success also counts as an error.

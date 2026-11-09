@@ -80,7 +80,7 @@ export function useRead<T>(url: string | null, version?: unknown): Refreshable<T
 /** Setup checks stay in memory and poll only while Get started is visible. Optional processes never delay local facts. */
 export const terminalSessionsStore = createPolledStore<CollabAutoStart>({ url: () => "/api/readiness/terminal-sessions", pollMs: 5_000 });
 export const starterKitStore = createPolledStore<StarterKitStatus>({ url: () => "/api/readiness/starter-kit" });
-/** GitHub's and Graphite's CLIs, the pull settings, and the workspaces' repositories, as Settings' Source control tab shows them. */
+/** The GitHub CLI's sign-in, the pull settings, and the workspaces' repositories, as Settings' Source control tab shows them. */
 export const sourceControlStore = createPolledStore<SourceControlAnswer>({ url: () => "/api/source-control" });
 /** What one session used over all time, its subagents folded in, by session id; `null` before its first request. */
 export const sessionUsageStore = createPolledStore<AnalyticsSession | null>({

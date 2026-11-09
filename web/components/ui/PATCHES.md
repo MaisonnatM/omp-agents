@@ -108,6 +108,7 @@ The registry file uses shadcn's `button`, `command`, and `popover`; the dashboar
 - `CalendarBody`, `CalendarHeader`, `CalendarItem`, `Feature`, and `Status` are removed, along with the provider's `startDay` and the `date-fns` import.
   `web/components/calendar/calendar-page.tsx` draws the month from its own entries, so it needs no generic feature list.
 - The month arrows have `aria-label`s, **Previous month** and **Next month**.
+- `CalendarDate` takes a `className`, as `CalendarDatePagination` does, so the Calendar page's row can wrap on a phone and drop its buttons under the month.
 
 ## `arc/stepper.tsx`
 

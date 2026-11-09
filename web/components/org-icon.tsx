@@ -65,19 +65,6 @@ const LOGOS: Record<string, Logo> = {
 			</g>
 		),
 	},
-	graphite: {
-		name: "Graphite",
-		// graphite.dev's pinned-tab mark, cropped to the hexagon.
-		viewBox: "49 49 602 602",
-		paths: (
-			<path
-				fill="currentColor"
-				fillRule="evenodd"
-				transform="translate(0 700) scale(0.1 -0.1)"
-				d="M1976 6088c-7-13-345-598-751-1301-433-753-735-1286-732-1295 2-10 340-597 749-1307l745-1290h3026l748 1295c411 712 748 1302 748 1310 0 8-336 598-748 1310l-747 1295-1512 3-1511 2-15-22zm2088-572c626-168 1140-307 1142-309 2-2 144-527 315-1166l311-1164-855-855-855-855-1163 312c-639 171-1164 313-1166 314-1 2-143 527-314 1166l-311 1164 853 854c754 754 857 853 879 849 14-3 537-142 1164-310z"
-			/>
-		),
-	},
 	github: {
 		name: "GitHub",
 		// Primer's mark-github octicon.

@@ -20,6 +20,8 @@ import { Separator, useDragSeparator } from "./drag-separator";
 const MIN_WIDTH = 240;
 /** What the session pane keeps between the sidebars, in px, however wide the right one is dragged. */
 const PANE_MIN_WIDTH = 480;
+/** A phone's width, in px: a window narrower than this has no room for a sidebar beside a usable pane, so its sidebars float. `--breakpoint-phone` in `web/globals.css` draws the same line for `max-phone:`. */
+export const PHONE_MAX_WIDTH = MIN_WIDTH + PANE_MIN_WIDTH;
 const STEP = 16;
 /** The show and hide motion: a drawer's curve, fast out of the gate and settling without overshoot. */
 const MOTION_MS = 260;
@@ -107,6 +109,13 @@ function useStoredPanel(side: SidebarSide): StoredPanel {
 	return { open, width, setWidth, setOpen };
 }
 
+/** `side`'s panel; a floating one covers the page, as on a phone, so it opens only when asked and keeps that in memory, out of what the window stores. */
+function usePanel(side: SidebarSide, floating: boolean): StoredPanel {
+	const stored = useStoredPanel(side);
+	const [open, setOpen] = useState(false);
+	return floating ? { ...stored, open, setOpen } : stored;
+}
+
 const subscribeResize = (onChange: () => void): (() => void) => {
 	window.addEventListener("resize", onChange);
 	return () => window.removeEventListener("resize", onChange);
@@ -120,12 +129,12 @@ export interface SidebarPanels {
 }
 
 export function useSidebarPanels(): SidebarPanels {
-	const sides: Record<SidebarSide, StoredPanel> = { left: useStoredPanel("left"), right: useStoredPanel("right") };
 	const windowWidth = useSyncExternalStore(subscribeResize, () => window.innerWidth);
-	const floating = windowWidth < MIN_WIDTH + PANE_MIN_WIDTH;
-	const panel = (side: SidebarSide, max: number): SidebarPanel => ({ open: sides[side].open, width: clamp(sides[side].width, max), max, floating });
-	// A floating sidebar leaves the left rail uncovered, so its toggle stays in reach.
+	const floating = windowWidth < PHONE_MAX_WIDTH;
+	const sides: Record<SidebarSide, StoredPanel> = { left: usePanel("left", floating), right: usePanel("right", floating) };
+	// A floating sidebar takes the whole window but a rail's width, which a tap closes it on, since its rows and the Details tabs cut to nothing in a desktop sidebar's width.
 	const floatingMax = Math.max(MIN_WIDTH, windowWidth - SIDEBARS.left.rail);
+	const panel = (side: SidebarSide, max: number): SidebarPanel => ({ open: sides[side].open, width: floating ? max : clamp(sides[side].width, max), max, floating });
 	const left = panel("left", floating ? floatingMax : SIDEBARS.left.maxWidth);
 	const leftShown = left.open ? left.width : SIDEBARS.left.rail;
 	const panels = { left, right: panel("right", floating ? floatingMax : Math.max(MIN_WIDTH, Math.min(SIDEBARS.right.maxWidth, windowWidth - leftShown - PANE_MIN_WIDTH))) };
@@ -158,7 +167,8 @@ export function SidebarToggle({ side, open, onToggle }: SidebarToggleProps) {
 				{...activityControl(side === "left" ? "sidebar.left.toggle" : "sidebar.right.toggle")}
 				variant="ghost"
 				size="icon-compact"
-				className="shrink-0 text-muted-foreground"
+				// On a touch screen the left toggle, alone in its corner, also takes taps up to 8px outside its 28px box, the 44px a finger needs; the right one sits among the header's buttons, whose taps that margin would take.
+				className={cn("shrink-0 text-muted-foreground", side === "left" && "pointer-coarse:after:absolute pointer-coarse:after:-inset-2")}
 				aria-label={`${name} sidebar`}
 				aria-expanded={open}
 				aria-controls={id}
@@ -260,6 +270,8 @@ export function DashboardSidebar({ side, panel, onResize, onToggle, address, chi
 	// While a resize drag runs: a page in a `<webview>`, the Browser's, would take the pointer from the handle's capture once it crosses into it.
 	const [dragging, setDragging] = useState(false);
 	const sliding = !panel.floating && moving;
+	// A floating sidebar leaves no rail: its toggle floats over the page header's corner, which `Header` keeps clear, so the page gets the whole width.
+	const shownRail = panel.floating ? 0 : rail;
 	return (
 		<div
 			className={cn(
@@ -267,9 +279,9 @@ export function DashboardSidebar({ side, panel, onResize, onToggle, address, chi
 				frame,
 				!panel.floating && (!panel.open || moving) && "overflow-hidden",
 				sliding && cn("transition-[width]", MOTION),
-				rail > 0 && (!panel.open || panel.floating) && "border-r border-border",
+				shownRail > 0 && !panel.open && "border-r border-border",
 			)}
-			style={{ width: panel.open && !panel.floating ? panel.width : rail, transitionDuration: `${MOTION_MS}ms` }}
+			style={{ width: panel.open && !panel.floating ? panel.width : shownRail, transitionDuration: `${MOTION_MS}ms` }}
 		>
 			{floatingOpen && <button type="button" aria-label={`Hide the ${SIDEBARS[side].name.toLowerCase()} sidebar`} className="fixed inset-0 z-30 cursor-default bg-black/20" onClick={onToggle} />}
 			{/* Closing, it turns inert at once so focus and clicks leave it, and hidden once the width has slid shut. */}
@@ -286,7 +298,7 @@ export function DashboardSidebar({ side, panel, onResize, onToggle, address, chi
 			</Sidebar>
 			{rail > 0 && (
 				<div
-					className={cn("absolute top-[calc((var(--page-header-height)-1.75rem)/2)]", floatingOpen ? "z-50" : "right-[9px] z-10")}
+					className={cn("absolute top-[calc((var(--page-header-height)-1.75rem)/2)]", floatingOpen ? "z-50" : panel.floating ? "left-[9px] z-20" : "right-[9px] z-10")}
 					style={floatingOpen ? { left: panel.width - 9 - 28 } : undefined}
 				>
 					<SidebarToggle side={side} open={panel.open} onToggle={onToggle} />

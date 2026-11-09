@@ -2,6 +2,7 @@
 
 - The **Sport** button in the header, a `#sport` address, or **Go to sport** in the command menu shows your training week in place of the panes.
   The sidebar then lists **Semaine**, **Journal**, and **Progrès**, the same three tabs the page's header shows.
+  Sport shows only in the Personal space: in Work the button and the command leave, and a `#sport` link switches the window to Personal; see [Sessions sidebar](sessions-sidebar.md).
   On a page narrower than 768 pixels, such as a phone's or a narrow window's, the tabs move to a row under the header, and **Séance libre** and **Pesée** show their icon alone.
   The page's words are in French, as the plan is.
 - The header names the open day's phase and week, such as « transition · semaine 1 sur 3 ».

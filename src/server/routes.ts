@@ -23,6 +23,7 @@ import { providerRoutes } from "./provider-routes";
 import { pullRequestRoutes, type PullRequestRoutesEnv } from "./pull-request-routes";
 import { sessionRoutes } from "./session-routes";
 import { sportThumbRoutes, type SportThumbsEnv } from "./sport-thumbs";
+import { phoneAccessRoutes, type PhoneAccessRoutesEnv } from "./phone-access-routes";
 import { syncRoutes, type SyncRoutesEnv } from "./sync-routes";
 import { todoRoutes, type TodoRoutesEnv } from "./todo-routes";
 
@@ -44,6 +45,7 @@ export interface RouteEnv {
 	processes: ProcessRoutesEnv;
 	storage: StorageRoutesEnv;
 	sportThumbs: SportThumbsEnv;
+	phoneAccess: PhoneAccessRoutesEnv;
 }
 
 /** Every `/api/*` route, by path and method. */
@@ -74,6 +76,7 @@ export function createRoutes(env: RouteEnv): Routes {
 		...processRoutes(kit, env.processes),
 		...storageRoutes(kit, env.storage, env.sessions),
 		...sportThumbRoutes(kit, env.sportThumbs),
+		...phoneAccessRoutes(env.guards, env.phoneAccess),
 	};
 	return { ...routes, ...activityRoutes(kit, env.activity, routes) };
 }
