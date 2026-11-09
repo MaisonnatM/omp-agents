@@ -31,6 +31,7 @@ const routine = (fields: Partial<Routine>): Routine => ({
 	triggers: [],
 	task: { kind: "prompt", prompt: "Summarize yesterday's commits." },
 	enabled: true,
+	machine: null,
 	createdAt: at("2026-09-01T08:00:00+02:00"),
 	runs: [],
 	scheduledAt: fields.runs?.[0]?.at ?? null,

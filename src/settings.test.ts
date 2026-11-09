@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readlinkSync, rmSync, statSync, symlinkSync, wr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { agentDir } from "./omp/config";
-import { loadOmpSettings, parseAgentSettingEdit, parseRoutingEdit, Rejected, routeRoles, saveAgentSetting, saveOmpFile } from "./settings";
+import { editModelProfile, loadOmpSettings, parseAgentSettingEdit, parseRoutingEdit, Rejected, routeRoles, saveAgentSetting, saveOmpFile } from "./settings";
 import type { AgentSettingRow } from "./shared/agent-settings";
 import type { CatalogModel, OmpSettings, RoutingEdit } from "./shared/models";
 
@@ -226,5 +226,58 @@ describe("saveAgentSetting", () => {
 		} finally {
 			rmSync(cwd, { recursive: true, force: true });
 		}
+	});
+});
+
+describe("editModelProfile", () => {
+	const path = join(agentDir, "config.yml");
+	const profiles = (settings: OmpSettings) => ("error" in settings.routing ? settings.routing : settings.routing.profiles);
+	const fullPower = [
+		"# My routing",
+		"modelRoles:",
+		"  default: anthropic/claude-opus-5-5:high",
+		"  smol: anthropic/claude-haiku-4-5",
+		"retry:",
+		"  maxRetries: 5",
+		"  fallbackChains:",
+		"    default:",
+		"      - cursor/grok-4.7-high",
+		"modelProviderOrder:",
+		"  - anthropic",
+		"  - cursor",
+		"compaction:",
+		"  enabled: false",
+		"",
+	].join("\n");
+
+	test("applying a profile puts back its roles, chains, and provider order, and leaves every other key", async () => {
+		writeFileSync(path, fullPower);
+		await editModelProfile(null, { kind: "save", name: "Full power" });
+		writeFileSync(path, ["modelRoles:", "  default: anthropic/claude-haiku-4-5", "  plan: cursor/grok-4.7-high", "retry:", "  maxRetries: 5", "modelProviderOrder:", "  - cursor", "compaction:", "  enabled: false", ""].join("\n"));
+		const credits = await editModelProfile(null, { kind: "save", name: "Save credits" });
+		expect(profiles(credits)).toEqual([
+			{ name: "Full power", active: false },
+			{ name: "Save credits", active: true },
+		]);
+
+		const applied = await editModelProfile(null, { kind: "apply", name: "Full power" });
+		expect(Bun.YAML.parse(await Bun.file(path).text())).toEqual(Bun.YAML.parse(fullPower));
+		expect(profiles(applied)).toEqual([
+			{ name: "Full power", active: true },
+			{ name: "Save credits", active: false },
+		]);
+		expect(await editModelProfile(null, { kind: "apply", name: "No such profile" }).catch((err: Rejected) => err)).toMatchObject({ status: 404 });
+		await editModelProfile(null, { kind: "delete", name: "Full power" });
+		await editModelProfile(null, { kind: "delete", name: "Save credits" });
+	});
+
+	test("a profile is active while config.yml routes as it does, whatever order its keys are written in", async () => {
+		writeFileSync(path, fullPower);
+		await editModelProfile(null, { kind: "save", name: "Ordered" });
+		writeFileSync(path, ["modelProviderOrder: [anthropic, cursor]", "retry:", "  fallbackChains:", "    default: [cursor/grok-4.7-high]", "modelRoles:", "  smol: anthropic/claude-haiku-4-5", "  default: anthropic/claude-opus-5-5:high", ""].join("\n"));
+		expect(profiles(await loadOmpSettings(null))).toEqual([{ name: "Ordered", active: true }]);
+		writeFileSync(path, fullPower.replace("  - anthropic\n  - cursor", "  - cursor\n  - anthropic"));
+		expect(profiles(await loadOmpSettings(null))).toEqual([{ name: "Ordered", active: false }]);
+		await editModelProfile(null, { kind: "delete", name: "Ordered" });
 	});
 });

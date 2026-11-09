@@ -48,6 +48,7 @@
 - The routines card lists every routine of the Bot under how many of them are on schedule, with **New routine** at the top.
   Each row shows the routine's name, **Run now** while you point at the row or tab into it, and a switch that pauses or resumes the routine.
   Under the name are its schedules and its next run, counting down by the second in its last hour, or **Paused**, and its last run's mark and time.
+  A routine another machine runs, as [Settings sync](settings-sync.md) carries it, reads **Runs on** and that machine's name, with its switch off; turning the switch on moves it to this machine, and its schedules count from then.
   The last line shows the logos of its triggers, its message or command, and its last 10 runs as ticks, oldest on the left; pointing at a tick, or focusing it, shows how the run went, when, how long its command took, and what started it.
   The mark and the tick are green when the run went fine, red when it had an error, blue while its command runs, and amber while it waits to start.
   While a run is under way, the row reads **Running…** over a moving line, which holds still when your system asks to reduce motion.

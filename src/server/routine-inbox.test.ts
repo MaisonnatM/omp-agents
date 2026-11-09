@@ -22,7 +22,7 @@ const SCOUT = "scout" as BotId;
 const RELAY = "relay" as BotId;
 const T0 = 1_000;
 const spec = (id: string, botId: BotId, name: string): RoutineSpec => ({ id, botId, name, schedules: [{ kind: "every", minutes: 60 }], triggers: [], task: { kind: "prompt", prompt: "Check in." }, enabled: true });
-const stored = (routine: RoutineSpec): Routine => ({ ...routine, createdAt: T0, scheduledAt: null, runs: [] });
+const stored = (routine: RoutineSpec): Routine => ({ ...routine, machine: null, createdAt: T0, scheduledAt: null, runs: [] });
 
 /** An inbox over routines that start as `initial`, which each change it applies edits as the dashboard's would, refusing a save for a Bot other than Scout and Relay. */
 function harness(dir: string, initial: Routine[], active = () => true) {

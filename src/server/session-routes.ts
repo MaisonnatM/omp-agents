@@ -13,7 +13,7 @@ import { sessionsDir } from "../omp/sessions";
 import { readSessionRows, readStats, windowOf } from "../omp/stats";
 import { directoryOf } from "../paths";
 import { clearMemory, editMemoryEntry, loadOmpMemory, rebuildMemory, saveMemoryFile } from "../memory";
-import { loadOmpSettings, Rejected, saveAgentSetting, saveOmpFile, saveRouting } from "../settings";
+import { editModelProfile, loadOmpSettings, Rejected, saveAgentSetting, saveOmpFile, saveRouting } from "../settings";
 import { answerExtensionApproval, readExtensionContribution, readExtensionOperation, startExtensionChange } from "../extensions";
 import { discoverExtensions, loadExtensions } from "../omp/extensions";
 import { isAnalyticsRange } from "../shared/analytics";
@@ -37,8 +37,8 @@ export function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): 
 	}
 
 	/**
-	 * A write whose refusals are `Rejected`: a settings write, `PUT /api/settings/routing`, `/api/settings/agent`, or
-	 * `/api/settings/file`, `?cwd=` as for reading; and an omp memory edit, `PUT /api/omp-memory/file`, `/entry`, `/clear`,
+	 * A write whose refusals are `Rejected`: a settings write, `PUT /api/settings/routing`, `/api/settings/model-profiles`,
+	 * `/api/settings/agent`, or `/api/settings/file`, `?cwd=` as for reading; and an omp memory edit, `PUT /api/omp-memory/file`, `/entry`, `/clear`,
 	 * or `/rebuild`, which need `?cwd=`. The answer is what the write's section loads after it, or the refusal with its status.
 	 */
 	const settingsWrite = (save: (cwd: string | null, body: unknown) => Promise<unknown>): Handler =>
@@ -252,6 +252,7 @@ export function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): 
 	return {
 		"/api/settings": { GET: settingsRead(loadOmpSettings) },
 		"/api/settings/routing": { PUT: settingsWrite(saveRouting) },
+		"/api/settings/model-profiles": { PUT: settingsWrite(editModelProfile) },
 		"/api/settings/agent": { PUT: settingsWrite(saveAgentSetting) },
 		"/api/settings/file": { PUT: settingsWrite(saveOmpFile) },
 		"/api/settings/extensions": { GET: settingsRead((cwd) => loadExtensions(cwd)), PUT: settingsWrite(async (cwd, body) => startExtensionChange(cwd, body)) },

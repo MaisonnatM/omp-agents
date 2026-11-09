@@ -1,7 +1,7 @@
 /** A Bot's routines as one card in place of its conversation, as Arc's Agent routines: a header, then a row per routine, one open at a time. */
 import { ArrowLeft, Plus } from "lucide-react";
 import type { KeyboardEvent } from "react";
-import type { Routine } from "../../../src/routines";
+import { type Routine, runsHere } from "../../../src/routines";
 import type { Bot } from "../../../src/shared/bots";
 import { Button } from "@/components/ui/button";
 import { activityControl } from "../../activity";
@@ -30,7 +30,7 @@ interface RoutinesCardProps {
 
 export function RoutinesCard({ bot, routines, openId, connected }: RoutinesCardProps) {
 	const now = useMinute();
-	const enabled = routines.filter(routine => routine.enabled).length;
+	const runningHere = routines.filter(runsHere).length;
 	return (
 		<PageFrame
 			title={bot.name}
@@ -49,7 +49,7 @@ export function RoutinesCard({ bot, routines, openId, connected }: RoutinesCardP
 								Routines
 							</h2>
 							<p className="text-xs text-muted-foreground tabular-nums">
-								{enabled} of {routines.length} on schedule
+								{runningHere} of {routines.length} on schedule
 							</p>
 						</div>
 						<Button {...activityControl("bots.routine.new")} asChild variant="outline" size="compact" leadingIcon={Plus}>

@@ -2,7 +2,7 @@
  * What the Calendar page shows on each day of a month: Google events and events kept on this computer, routine runs,
  * past and planned, and todos and tickets on the day they are due. Also the calendars a new event may go in.
  */
-import { nextDueAt, type Routine, type RoutineRun } from "../src/routines";
+import { nextDueAt, type Routine, type RoutineRun, runsHere } from "../src/routines";
 import type { GoogleAccount } from "../src/shared/accounts";
 import type { BotId } from "../src/shared/bots";
 import { type CalendarEvent, calendarKey, type EventWhen, type GoogleCalendar, type GoogleEventRef, type LocalEvent, type LocalEventRef, type NewEventCalendar } from "../src/shared/calendar";
@@ -66,20 +66,20 @@ function runState(run: RoutineRun): "ran" | "failed" {
 /**
  * `routine`'s runs and slots from `from` up to `to`. A slot that passed without a run runs at the next minute's check,
  * so it shows at `now`; each later slot counts from the one before, as the schedule counts from its last run. A routine
- * with only triggers plans no slot.
+ * with only triggers plans no slot, and neither does one paused or run by another computer.
  */
 function routineEntries(routine: Routine, from: number, to: number, now: number): CalendarEntry[] {
 	const { id: routineId, botId, name } = routine;
 	const intervals = routine.schedules.flatMap(schedule => (schedule.kind === "every" && schedule.minutes < DAY_MINUTES ? [schedule.minutes] : []));
 	if (intervals.length > 0) {
-		if (!routine.enabled) return [];
+		if (!runsHere(routine)) return [];
 		const minutes = Math.min(...intervals);
 		return daysBetween(localDay(Math.max(from, now)), localDay(to - 1)).map(day => ({ kind: "routine-interval", day, at: null, botId, routineId, name, minutes }));
 	}
 	const entries: CalendarEntry[] = routine.runs
 		.filter(run => run.at >= from && run.at < to)
 		.map(run => ({ kind: "routine", day: localDay(run.at), at: run.at, botId, routineId, name, state: runState(run) }));
-	if (!routine.enabled) return entries;
+	if (!runsHere(routine)) return entries;
 	for (let after = routine.scheduledAt ?? routine.createdAt; ; ) {
 		const at = Math.max(nextDueAt(routine.schedules, after), now);
 		if (at >= to) break;

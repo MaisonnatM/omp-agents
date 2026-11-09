@@ -127,7 +127,7 @@ export async function putSteps<S, T>(url: string, body: unknown, onStep: (step: 
 }
 
 /** The settings route `part` for `cwd`, or for the user's own files when `cwd` is `null`. */
-export function settingsUrl(part: "" | "/routing" | "/agent" | "/file" | "/extensions" | "/extensions/catalog" | "/extensions/contribution" | "/extensions/operation" | "/extensions/approval", cwd: string | null, extra: Record<string, string> = {}): string {
+export function settingsUrl(part: "" | "/routing" | "/model-profiles" | "/agent" | "/file" | "/extensions" | "/extensions/catalog" | "/extensions/contribution" | "/extensions/operation" | "/extensions/approval", cwd: string | null, extra: Record<string, string> = {}): string {
 	const query = new URLSearchParams(extra);
 	if (cwd !== null) query.set("cwd", cwd);
 	return `/api/settings${part}${query.size ? `?${query}` : ""}`;

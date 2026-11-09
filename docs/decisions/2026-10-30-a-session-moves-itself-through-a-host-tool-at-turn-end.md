@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-09-a-session-move-tool-knows-its-caller-from-its-join
 date: 2026-10-30
 decision-makers: agent
 ---

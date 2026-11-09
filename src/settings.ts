@@ -2,7 +2,7 @@
 import { mkdir, realpath, stat } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
 import { atomicWriteText } from "./fs";
-import { errorText, isObject } from "./json";
+import { errorText, isNonEmpty, isObject } from "./json";
 import { agentSetting, readAgentSettings, userValue, writeAgentSetting } from "./omp/agent-settings";
 import { readAgentCatalog } from "./omp/agents";
 import {
@@ -18,17 +18,20 @@ import {
 	resolveSelector,
 	retryChoices,
 	routedSelectors,
+	userRoutingOf,
 	writeRouting,
+	writeUserRouting,
 } from "./omp/config";
 import { discoverOmpFiles, type FoundFile } from "./omp/discovery";
 import { findModelUpdates, upgradeEdits } from "./omp/model-updates";
+import { ModelProfilesFile } from "./model-profiles-file";
 import { connectedProviders, listModels } from "./omp/models";
 import { workflowsOf } from "./omp/workflows";
-import { displayPath, HOME } from "./paths";
+import { displayPath, HOME, modelProfilesFile } from "./paths";
 import type { AgentOverrideEntryEdit, AgentSettingEdit } from "./shared/agent-settings";
 import { frontmatterOf } from "./frontmatter";
 import { AGENT_SETTINGS, isAgentModelOverride } from "./shared/agents";
-import type { CatalogModel, FileEdit, ModelChain, OmpFile, OmpSettings, RetrySettings, RoleRoute, RoutingEdit } from "./shared/models";
+import type { CatalogModel, FileEdit, ModelChain, ModelProfileEdit, OmpFile, OmpSettings, RetrySettings, RoleRoute, RoutingEdit } from "./shared/models";
 import type { ModelUpdate } from "./shared/notices";
 
 /**
@@ -112,6 +115,7 @@ async function loadSession(
 				}),
 			),
 			modelProviderOrder: config.modelProviderOrder,
+			profiles: modelProfiles.summaries(userRoutingOf(settings)),
 		};
 		agentSettings = readAgentSettings(settings, cwd !== null);
 		agents = await readAgentCatalog(cwd, settings).catch((err: unknown) => ({ error: errorText(err) }));
@@ -218,6 +222,14 @@ export function serialized<T>(save: () => Promise<T>): Promise<T> {
 /** A config omp cannot load is one it would move aside to write, so a write waits until the user fixes it. */
 const cannotLoad = (err: unknown): Rejected => new Rejected(409, `omp cannot load its settings, so it cannot write them: ${errorText(err)}`);
 
+/** The user's global config loaded for a write in `cwd`, refused as {@link cannotLoad} while omp cannot load it. */
+const loadForWrite = (cwd: string) =>
+	loadGlobalForWrite(cwd).catch((err: unknown) => {
+		throw cannotLoad(err);
+	});
+
+const modelProfiles = new ModelProfilesFile(modelProfilesFile);
+
 /** Applies a routing edit to the user's `config.yml` and answers with the settings as they now load. */
 export function saveRouting(cwd: string | null, raw: unknown): Promise<OmpSettings> {
 	return configWrites.run(async () => {
@@ -230,6 +242,42 @@ export function saveRouting(cwd: string | null, raw: unknown): Promise<OmpSettin
 		}
 		const edit = parseRoutingEdit(raw, { catalog: await listModels(), config });
 		await writeRouting(sessionCwd, edit);
+		return loadOmpSettings(cwd);
+	});
+}
+
+export function parseModelProfileEdit(raw: unknown): ModelProfileEdit {
+	if (!isObject(raw) || (raw.kind !== "save" && raw.kind !== "apply" && raw.kind !== "delete") || !isNonEmpty(raw.name)) {
+		throw new Rejected(400, "Expected { kind: save, apply, or delete, name }");
+	}
+	return { kind: raw.kind, name: raw.name.trim() };
+}
+
+/**
+ * Saves the user's routing as a model profile, applies one to the user's `config.yml` through omp, or deletes one, and
+ * answers with the settings as they now load. A profile is the dashboard's, so omp's config never holds it.
+ */
+export function editModelProfile(cwd: string | null, raw: unknown): Promise<OmpSettings> {
+	return configWrites.run(async () => {
+		const edit = parseModelProfileEdit(raw);
+		switch (edit.kind) {
+			case "save":
+				modelProfiles.save(edit.name, userRoutingOf(await loadForWrite(HOME)));
+				break;
+			case "apply": {
+				const profile = modelProfiles.named(edit.name);
+				if (!profile) throw new Rejected(404, `No model profile is named ${edit.name}`);
+				await writeUserRouting(await loadForWrite(HOME), profile);
+				break;
+			}
+			case "delete":
+				modelProfiles.delete(edit.name);
+				break;
+			default: {
+				const unhandled: never = edit.kind;
+				return unhandled;
+			}
+		}
 		return loadOmpSettings(cwd);
 	});
 }
@@ -273,9 +321,7 @@ export function saveAgentSetting(cwd: string | null, raw: unknown): Promise<OmpS
 				throw new Rejected(400, errorText(err));
 			}
 		}
-		const settings = await loadGlobalForWrite(cwd ?? HOME).catch((err: unknown) => {
-			throw cannotLoad(err);
-		});
+		const settings = await loadForWrite(cwd ?? HOME);
 		if (!Bun.deepEquals(userValue(handle, settings, edit), edit.expected)) {
 			throw new Rejected(409, `${edit.entry === undefined ? edit.id : `Model override for ${edit.entry}`} changed in config.yml since this page read it`, true);
 		}

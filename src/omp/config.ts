@@ -2,7 +2,7 @@
 import { homedir } from "node:os";
 import { isObject } from "../json";
 import type { CollabAutoStart, TerminalAccess } from "../shared/readiness";
-import { type RetrySettings, type RoutingEdit, selectorOf } from "../shared/models";
+import { type ProfileRouting, type RetrySettings, type RoutingEdit, selectorOf } from "../shared/models";
 import { ompVersion } from "./install";
 import { advisorConfig, advisorSettings, collabSettings, compaction, config, dirs, extensionSettings, fallbackChains, goalSettings, modelCompactionSettings, modelSettings, sessionSettings, settingsRegistry } from "./modules";
 import type { OmpSettingsInstance, SettingHandle } from "./module-types/config";
@@ -144,6 +144,24 @@ export async function writeRouting(cwd: string, edit: RoutingEdit): Promise<void
 			setting("modelProviderOrder").set(settings, edit.providers.length > 0 ? edit.providers : undefined);
 			break;
 	}
+	await settings.flush();
+}
+
+/** The routing the user's `config.yml` itself sets, read as omp reads it but without a workspace's layer. */
+export function userRoutingOf(settings: OmpSettingsInstance): ProfileRouting {
+	const { modelRoles, fallbackChains, modelProviderOrder } = ompConfigOf(config.Settings.isolated(settings.getGlobalSettings()));
+	return { modelRoles, fallbackChains, modelProviderOrder };
+}
+
+/**
+ * Makes `settings`' global `config.yml` route as `routing` does, through omp's write path like {@link writeRouting}:
+ * omp writes a setting's whole value at its path, so each map replaces the one on disk and drops each role and chain
+ * `routing` leaves out, while every key outside the routing survives.
+ */
+export async function writeUserRouting(settings: OmpSettingsInstance, { modelRoles, fallbackChains, modelProviderOrder }: ProfileRouting): Promise<void> {
+	setting("modelRoles").set(settings, Object.keys(modelRoles).length > 0 ? modelRoles : undefined);
+	setting("retry.fallbackChains").set(settings, Object.keys(fallbackChains).length > 0 ? fallbackChains : undefined);
+	setting("modelProviderOrder").set(settings, modelProviderOrder.length > 0 ? modelProviderOrder : undefined);
 	await settings.flush();
 }
 

@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-09-settings-sync-carries-each-bots-routines-to-run-on-one-machine
 date: 2026-11-09
 decision-makers: Maxence Maisonnat
 ---

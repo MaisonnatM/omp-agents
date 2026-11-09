@@ -5,8 +5,16 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-09
 
+- You can now save your model setup as a profile, such as Full power or Save credits, under Settings › Models › Model profiles.
+- One click on a saved profile switches your model setup back to it, and new sessions use it.
+- The profile your model setup matches now shows a check.
+- A session you start from the dashboard can now wait for another running session: mention that session and ask it to wait, for example to review a branch once the session building it finishes.
+- A waiting session picks up as soon as the other session finishes its turn, asks you a question, or ends.
+- Behind the scenes: the record of why a session can move itself to another folder now gives today's reason, since its tools now know which session they belong to.
 - Settings sync now carries your Bots to your other computers, with their name, job, look, workspace, pin, section, and memory.
 - Each computer keeps its own conversation with a Bot, and a Bot you delete on one computer goes on the others with its routines.
+- Settings sync now carries each Bot's routines too, and each routine runs on one computer only: the others show which computer runs it, with its switch off.
+- Turning a routine on moves it to that computer, and the old one stops running it at its next sync; each computer keeps its own run history.
 - When an agent grills you about a plan, it now asks each round of questions as clickable choices with its recommended answer first, so you no longer have to ask it to.
 - In Settings › Workspaces, each workspace now has a space, Personal or Work, listed in that order as in the switch; every workspace starts in Work, and hiding a workspace then showing it again keeps its space.
 - The personal folder's row in Settings › Workspaces shows a Personal tag instead of a menu, since it is always Personal.

@@ -28,7 +28,7 @@ import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, personalDir, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, signInInboxDir, sourceControlFile, sportFile, sportInboxDir, sportThumbsDir, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, machineFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, personalDir, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, signInInboxDir, sourceControlFile, sportFile, sportInboxDir, sportThumbsDir, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -37,7 +37,7 @@ import { worktreeAt } from "../git";
 import { runShell } from "../proc";
 import type { ServedBuild } from "../served-build";
 import { SourceControl } from "../source-control";
-import { SettingsSync, syncStores } from "../settings-sync";
+import { SettingsSync, syncStores, thisMachine } from "../settings-sync";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT, watchedKinds } from "../routines";
 import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
@@ -95,6 +95,7 @@ import type { SelfUpdate } from "./self-update";
 import { endSession } from "./session-end";
 import { ProjectTrustFile } from "./project-trust-file";
 import { SessionMoves } from "./session-moves";
+import { SessionWaits } from "./session-waits";
 import { SessionFiles } from "./session-files";
 import { RequestLedger } from "./request-ledger";
 import { ACTIVITY_KEPT_DAYS, ActivityStore } from "./activity-store";
@@ -156,6 +157,11 @@ export class Dashboard {
 			return this.#bots.botOf(request) !== null || (cwd !== undefined && this.#spaces().isPersonalDir(cwd));
 		},
 		admit: this.#admit,
+	});
+	readonly #waits = new SessionWaits({
+		hosts: () => this.#sessions.rows(this.#files.factsOf),
+		reply: sessionId => this.#sessions.lastReply(sessionId, this.#files.pathOf),
+		isBot: request => this.#bots.botOf(request) !== null,
 	});
 	readonly #personalJoin = personalJoin(request => this.#bots.botOf(request) !== null);
 	readonly #sourceControl = new SourceControl(sourceControlFile);
@@ -223,10 +229,11 @@ export class Dashboard {
 		const workspaces = (this.#workspaces = new WorkspacesFile(workspacesFile));
 		// A sync, which runs only once the server listens, tells the pages that show a list it rewrote.
 		const stores = syncStores(
-			{ sourceControl: this.#sourceControl, notes: this.#notes, todos: this.#todos, preferences: this.#preferences, processes: this.#processSettings, workspaces, calendars: this.#calendars, bots: this.#botsFile, botsDir },
+			{ sourceControl: this.#sourceControl, notes: this.#notes, todos: this.#todos, preferences: this.#preferences, processes: this.#processSettings, workspaces, calendars: this.#calendars, bots: this.#botsFile, botsDir, routines: this.#routines, machine: thisMachine(machineFile) },
 			HOME,
 			list => {
-				if (list === "bots") this.#botsSynced();
+				// Every Bot memory is read again, since a sync may have rewritten them.
+				if (list === "bots") this.#bots.forgetRead();
 				this.#broadcasts.pushList(list);
 			},
 		);
@@ -367,6 +374,7 @@ export class Dashboard {
 					if (placed) broadcasts.pushAll();
 				});
 			},
+			onRosterChange: () => this.#waits.check(),
 			saveRunning: () => interrupted.setRunning(sessions.startedHere()),
 		}));
 		this.#usage = new UsagePoll({ refresh: () => broadcasts.refreshUsage(), checkNotices: () => notices.check(PROVIDER_KINDS) });
@@ -408,7 +416,7 @@ export class Dashboard {
 			linkTodo: (todoId, sessionId) => {
 				for (const change of startChanges(todos.value, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
 			},
-			joinFor: request => this.#joinFor(request),
+			joinFor: (request, instanceId) => this.#joinFor(request, instanceId),
 			admit: this.#admit,
 			privateSessions: this.#privateSessions,
 		});
@@ -719,7 +727,7 @@ export class Dashboard {
 		this.#publisher = publisher;
 		mkdirSync(personalDir, { recursive: true });
 		// Before the runners recover, so a session that survived counts as neither interrupted nor stopped with the server.
-		await reattachAll(this.#sessions, request => this.#joinFor(request), instanceId => this.#privateSessions.has(instanceId), survived => this.#interrupted.recover(survived));
+		await reattachAll(this.#sessions, (request, instanceId) => this.#joinFor(request, instanceId), instanceId => this.#privateSessions.has(instanceId), survived => this.#interrupted.recover(survived));
 		// A private session whose omp exited while no server ran is deleted, as its exit would have; one this server could not attach to runs on.
 		const kept = new Set(keptSessions());
 		await this.#privateSessions.sweep(instanceId => kept.has(instanceId) || this.#sessions.get(instanceId) !== undefined);
@@ -813,7 +821,7 @@ export class Dashboard {
 				return;
 			case "event":
 				this.#views.applyEvent(instanceId, update.event);
-				this.#moves.heard(instanceId, update.event);
+				this.#moves.heard(update.event);
 				if (this.#sessions.heard(instanceId, update.event)) this.#broadcasts.rosterChanged();
 				return;
 			case "starting":
@@ -833,6 +841,7 @@ export class Dashboard {
 				this.#bots.exited(instanceId);
 				void this.#personalTurnEnded(this.#sessions.get(instanceId)?.cwd);
 				this.#sessions.remove(instanceId);
+				this.#waits.exited(instanceId);
 				// A private session lives exactly as long as its omp, so it is deleted rather than interrupted; the next server's sweep finishes a purge cut short.
 				if (isPrivate) void this.#privateSessions.purge(instanceId).catch((err: unknown) => console.error(`omp-agents: deleting private session ${instanceId} failed: ${errorText(err)}`));
 				else if (sessionId && !update.ended) this.#interrupted.interrupt(sessionId);
@@ -905,9 +914,9 @@ export class Dashboard {
 		this.#activity.prune(Date.now() - ACTIVITY_KEPT_DAYS * DAY_MS);
 	}
 
-	/** How `request` joins the server: as a Review session, as a Bot's conversation, both, or plain; any but a Bot's loads the personal extension, and any but a Bot's or one started in the personal directory can move itself. */
-	#joinFor(request: StartRequest): SessionJoin {
-		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#moves.join(request), this.#personalJoin(request)];
+	/** How `request` joins the server as session `instanceId`: as a Review session, as a Bot's conversation, both, or plain; any but a Bot's loads the personal extension and can wait on another session, and any but a Bot's or one started in the personal directory can move itself. */
+	#joinFor(request: StartRequest, instanceId: string): SessionJoin {
+		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#moves.join(request, instanceId), this.#waits.join(request, instanceId), this.#personalJoin(request)];
 		return {
 			rpc: { args: joins.flatMap(join => join.rpc.args), tools: joins.flatMap(join => join.rpc.tools) },
 			attach: session => {
@@ -972,14 +981,6 @@ export class Dashboard {
 		this.#routines.migrate(bot => {
 			if (!this.#botsFile.value.some(({ id }) => id === bot.id)) this.#lists.apply("bots", { op: "save", bot });
 		});
-	}
-
-	/** After a sync rewrote the Bots or their memories: a Bot it removed takes its routines along, and every memory is read again. */
-	#botsSynced(): void {
-		const kept = new Set(this.#botsFile.value.map(({ id }) => id));
-		const gone = new Set(this.#routines.value.map(({ botId }) => botId).filter(id => !kept.has(id)));
-		if ([...gone].map(id => this.#routines.removeBot(id)).some(Boolean)) this.#broadcasts.pushList("routines");
-		this.#bots.forgetRead();
 	}
 
 	/** Starts the runs of the routines whose triggers the last check saw news for, on the server that runs routines; another server drops the news. */
