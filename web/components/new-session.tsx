@@ -334,7 +334,7 @@ function NewSessionWelcome({ folder, personal, isPrivate }: { folder: string; pe
 	return (
 		<div className="m-auto flex w-full max-w-conversation flex-col items-center px-6 py-10 text-center" data-empty-conversation>
 			{isPrivate ? <Lock aria-hidden="true" className="size-7" /> : <OmpMark className="size-8" />}
-			<h2 className="mt-5 max-w-lg font-serif text-[2rem] leading-tight font-normal tracking-tight text-balance">
+			<h2 className="mt-5 mb-4 max-w-lg font-serif text-[2rem] leading-tight font-normal tracking-tight text-balance">
 				{personal ? (
 					"What can I help with?"
 				) : (
