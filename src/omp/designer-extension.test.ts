@@ -58,14 +58,14 @@ test("an empty name, an unknown kind, a workspace that is no absolute directory,
 	const plain = loaded([BOT_FLAGS.bot]);
 	await expect(plain.create({ name: "Watcher", job: "Watch the build." })).rejects.toThrow("This session is not an omp-agents Bot designer.");
 	expect(plain.left()).toEqual([]);
-	expect(plain.prompt()).toBeUndefined();
+	expect(await plain.prompt()).toBeUndefined();
 });
 
-test("a designer's main agent hears what create_bot does and that it cannot edit other Bots, and its subagents do not", () => {
+test("a designer's main agent hears what create_bot does and that it cannot edit other Bots, and its subagents do not", async () => {
 	const { prompt } = loaded();
-	const lines = prompt()!;
+	const lines = (await prompt())!;
 	expect(lines[0]).toBe("base");
 	expect(lines[1]).toContain(`\`${CREATE_TOOL}\` asks the dashboard to create one new Bot`);
 	expect(lines[1]).toContain("You cannot edit or delete any Bot");
-	expect(prompt("sub")).toBeUndefined();
+	expect(await prompt("sub")).toBeUndefined();
 });

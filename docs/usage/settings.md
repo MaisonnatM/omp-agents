@@ -192,7 +192,10 @@
   In the desktop app, **Choose folder…** opens the system's folder picker and adds the folder you pick.
   **Hide** drops a workspace and its sessions from the pickers, the session lists and counts, and session search, as for `/tmp`; a direct session link still opens them.
   Hidden workspaces list under **Hidden**, and **Show** offers one again.
-  The server keeps the list in `workspaces.json` beside its access token, so every window of the app shows the same workspaces.
+  Each workspace has a space, **Work** or **Personal**, picked beside it; a session in a Personal workspace, or in a worktree of one, is a [personal session](personal-sessions.md) with your personal memory, `remember`, and `sport`.
+  The personal directory is always **Personal**, so its row shows a **Personal** badge instead of the picker.
+  Hiding a workspace and showing it again keeps its space.
+  The server keeps the list and the spaces in `workspaces.json` beside its access token, so every window of the app shows the same workspaces.
   **Trusted projects** lists the projects whose own agent code you trusted, with **Stop trusting** to ask again; see [Per-project agent setup](per-project-agent-setup.md#stop-trusting).
 - **Sync** carries your omp settings and files to your other machines through a Git repository of yours; see [Settings sync](settings-sync.md).
 - Settings follows the workspace picked in the sidebar header, so it includes that workspace's project files and its `.omp/config.yml` overrides.

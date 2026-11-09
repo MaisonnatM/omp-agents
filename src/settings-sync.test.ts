@@ -323,7 +323,7 @@ describe("SettingsSync", () => {
 		expect([a.bots.value[0]?.sessionId, b.bots.value[0]?.sessionId]).toEqual(["session-a", "session-b"]);
 	});
 
-	test("keeps the todos and notes two machines each added, carries the preferences, workspaces, and each todo's Workspace, and settles both on one list", async () => {
+	test("keeps the todos and notes two machines each added, carries the preferences, workspaces and their spaces, and each todo's Workspace, and settles both on one list", async () => {
 		const { remote, a, b } = await pair();
 		const [notes, preferences, todos, workspaces] = ["notes", "preferences", "todos", "workspaces"].map(name => `dashboard/${name}.json`);
 		await a.sync.sync();
@@ -332,6 +332,7 @@ describe("SettingsSync", () => {
 		a.notes.apply(addNote("note-a"));
 		a.preferences.apply({ op: "set", key: "omp-agents.theme", value: "dark" });
 		a.workspaces.apply({ op: "add", cwd: join(a.home, "code", "app") });
+		a.workspaces.apply({ op: "space", cwd: join(a.home, "code", "app"), space: "personal" });
 		b.todos.apply(addTodo({ id: "from-b", text: "From B", status: "done" }));
 		b.notes.apply(addNote("note-b"));
 
@@ -347,6 +348,7 @@ describe("SettingsSync", () => {
 		}
 		expect(b.preferences.value).toEqual({ "omp-agents.theme": "dark" });
 		expect(b.workspaces.value.added).toEqual([join(b.home, "code", "app")]);
+		expect(b.workspaces.value.personal).toEqual([join(b.home, "code", "app")]);
 		expect(b.todos.value.todos.map(todo => todo.workspace)).toEqual([join(b.home, "code", "app"), null]);
 		expect([...b.changed].sort()).toEqual(["preferences", "user-notes", "user-todos", "workspaces"]);
 		expect([...a.changed].sort()).toEqual(["user-notes", "user-todos"]);

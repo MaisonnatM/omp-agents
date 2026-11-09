@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { callable } from "../src/shared/accounts";
 import type { View } from "../src/shared/sessions";
+import { spaces } from "../src/shared/workspaces";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { errorText } from "../src/json";
 import { AppSidebar } from "./components/app-sidebar";
@@ -286,6 +287,7 @@ export function App() {
 																		botLasts={state.botLasts}
 																		openBot={openBot}
 																		workspaceList={state.workspaceList}
+																		personal={state.personal}
 																		trustedProjects={state.trustedProjects}
 																		newSessionCompletions={state.newSessionCompletions}
 																		connected={state.connected}
@@ -322,7 +324,13 @@ export function App() {
 														view={detailsView}
 														working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
 														cwd={focused.cwd ?? null}
-														personalMemory={focused.cwd !== undefined && focused.cwd === state.personal?.cwd ? state.personalMemory : null}
+														personalMemory={
+															focused.cwd !== undefined &&
+															state.personal !== null &&
+															spaces(state.workspaceList.personal.map(({ cwd }) => cwd), state.personal).of(focused.cwd, focused.workspace ?? focused.cwd) === "personal"
+																? state.personalMemory
+																: null
+														}
 														pullRequests={focused.row?.pullRequests ?? []}
 														tickets={focused.row?.tickets ?? []}
 														workspace={workspace}

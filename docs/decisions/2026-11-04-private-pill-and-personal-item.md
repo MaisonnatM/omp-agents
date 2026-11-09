@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-09-split-the-dashboard-into-a-personal-and-a-work-space
 date: 2026-11-04
 decision-makers: Maxence, agent
 ---

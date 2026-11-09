@@ -23,7 +23,7 @@
   - your notes;
   - your todos, with their categories and archive;
   - your preferences: the theme, what transcripts hide, the sidebar tabs, the pinned skill, notifications, the merge method, the diff view, calendar routines, and the idle stop;
-  - the workspaces Settings › Workspaces added and hid;
+  - the workspaces Settings › Workspaces added, hid, and placed in Personal;
   - the Google calendars the Calendar page hides;
   - your Bots, each with its name, job, type, look, model, skill, workspace, pin, section, and memory.
   A Bot's conversation stays on the machine that had it, so a Bot from another machine starts a new one here; facts each machine's Bot remembered arrive on both, and a Bot one machine deleted goes on the other with its routines.
