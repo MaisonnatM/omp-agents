@@ -163,7 +163,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	// A private draft lists what ending it deletes and what stays under the composer.
 	const panel = scheduled || !isPrivate ? null : <PrivateFacts personal={personalDraft} />;
 	// The grid fills the page's lower half and fades out under the title, its sun on the horizon.
-	const backdrop = <RetroGrid aria-hidden horizon={0.62} sun={0.42} className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[52%] opacity-70 [mask-image:linear-gradient(to_bottom,transparent,black_35%)]" />;
+	const backdrop = <RetroGrid aria-hidden horizon={0.62} sun={0.42} className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[46%] opacity-70 [mask-image:linear-gradient(to_bottom,transparent,black_35%)]" />;
 	const pickers = (
 		<>
 			<DirectoryPicker
@@ -334,7 +334,7 @@ function NewSessionWelcome({ folder, personal, isPrivate }: { folder: string; pe
 	return (
 		<div className="m-auto flex w-full max-w-conversation flex-col items-center px-6 py-10 text-center" data-empty-conversation>
 			{isPrivate ? <Lock aria-hidden="true" className="size-7" /> : <OmpMark className="size-8" />}
-			<h2 className="mt-5 mb-4 max-w-lg font-serif text-[2rem] leading-tight font-normal tracking-tight text-balance">
+			<h2 className="mt-5 max-w-lg font-serif text-[2rem] leading-tight font-normal tracking-tight text-balance">
 				{personal ? (
 					"What can I help with?"
 				) : (
