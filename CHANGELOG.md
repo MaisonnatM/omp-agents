@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-09
 
+- Settings sync now carries your Bots to your other computers, with their name, job, look, workspace, pin, section, and memory.
+- Each computer keeps its own conversation with a Bot, and a Bot you delete on one computer goes on the others with its routines.
 - When an agent grills you about a plan, it now asks each round of questions as clickable choices with its recommended answer first, so you no longer have to ask it to.
 
 ## 2026-11-08
