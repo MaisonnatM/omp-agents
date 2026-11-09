@@ -76,7 +76,7 @@ test("a fact the Bot remembers lands in its memory as a dated line, and the next
 	expect(await bot.remember("  The user prefers\nshort answers. ")).toEqual({ content: [{ type: "text", text: "Remembered: The user prefers short answers." }], details: undefined });
 	expect(readFileSync(bot.memory, "utf8")).toBe("- 2026-05-03 The user prefers short answers.\n");
 
-	expect(bot.prompt()).toEqual([
+	expect(await bot.prompt()).toEqual([
 		"base",
 		[
 			"You are Scout, an omp-agents Bot: a teammate the user keeps, with this one conversation they come back to.",
@@ -97,18 +97,18 @@ test("a fact the Bot remembers lands in its memory as a dated line, and the next
 	]);
 });
 
-test("before the Bot remembers anything or has a routine its prompt says so, and a subagent it spawns gets no Bot prompt", () => {
+test("before the Bot remembers anything or has a routine its prompt says so, and a subagent it spawns gets no Bot prompt", async () => {
 	const bot = loadedBot({ routines: false, others: [] });
-	expect(bot.prompt()?.[1]).toContain("What you remember from earlier turns:\nNothing yet.");
-	expect(bot.prompt()?.[1]).toContain("cut at 80 characters:\nNone yet.\n");
-	expect(bot.prompt()?.[1]).toContain("then its job's first sentence:\nNone yet.\n");
-	expect(bot.prompt("sub")).toBeUndefined();
+	expect((await bot.prompt())?.[1]).toContain("What you remember from earlier turns:\nNothing yet.");
+	expect((await bot.prompt())?.[1]).toContain("cut at 80 characters:\nNone yet.\n");
+	expect((await bot.prompt())?.[1]).toContain("then its job's first sentence:\nNone yet.\n");
+	expect(await bot.prompt("sub")).toBeUndefined();
 });
 
 test("a session the dashboard named no routine files for still gets its name, job, and memory, with no routines, and its routine tools refuse", async () => {
 	const bot = loadedBot({ unset: [BOT_FLAGS.routines, BOT_FLAGS.routineInbox] });
 	await bot.remember("The user prefers short answers.");
-	const prompt = bot.prompt()?.[1] ?? "";
+	const prompt = (await bot.prompt())?.[1] ?? "";
 	expect(prompt).toStartWith("You are Scout, an omp-agents Bot");
 	expect(prompt).toContain("Your job, and what you ask before doing:\nWatch the build.\nAsk before merging.\n");
 	expect(prompt).toContain(" The user prefers short answers.\nWhen the user tells you");
@@ -124,18 +124,18 @@ test("a fact longer than one short sentence is refused and the memory keeps noth
 	expect(readFileSync(bot.memory, "utf8")).not.toContain("y");
 });
 
-test("a memory past the cap reaches the prompt as its newest facts with a note that older ones were cut, and a short one whole", () => {
+test("a memory past the cap reaches the prompt as its newest facts with a note that older ones were cut, and a short one whole", async () => {
 	const bot = loadedBot();
 	mkdirSync(dirname(bot.memory), { recursive: true });
 	const lines = Array.from({ length: 1000 }, (_, index) => `- 2026-05-03 Fact number ${index}.`);
 	writeFileSync(bot.memory, `${lines.join("\n")}\n`);
-	const prompt = bot.prompt()?.[1] ?? "";
+	const prompt = (await bot.prompt())?.[1] ?? "";
 	expect(prompt).toContain("What you remember from earlier turns:\n(Older memory was cut to keep this prompt short; only the newest facts follow.)\n- 2026-05-03 Fact number");
 	expect(prompt).toContain("- 2026-05-03 Fact number 999.\nWhen the user tells you");
 	expect(prompt).not.toContain("Fact number 0.");
 
 	writeFileSync(bot.memory, `${lines.slice(0, 2).join("\n")}\n`);
-	expect(bot.prompt()?.[1]).toContain(`What you remember from earlier turns:\n${lines.slice(0, 2).join("\n")}\nWhen the user tells you`);
+	expect((await bot.prompt())?.[1]).toContain(`What you remember from earlier turns:\n${lines.slice(0, 2).join("\n")}\nWhen the user tells you`);
 });
 
 test("save_routine leaves the dashboard one request per call: a new routine of this Bot, enabled, then edits that keep every field they leave out", async () => {
@@ -190,10 +190,10 @@ test("the routine tools refuse another Bot's routine, an id no routine has, a ne
 
 test("set_job leaves the dashboard one request with this Bot's new job, and the next prompt still reads the job from bots.json, which only the dashboard saves", async () => {
 	const bot = loadedBot({ job: "" });
-	expect(bot.prompt()?.[1]).toContain("Your job, and what you ask before doing:\nNo job yet. Ask the user what it is, and what you should ask before doing, then call `set_job` with what they say.\n");
+	expect((await bot.prompt())?.[1]).toContain("Your job, and what you ask before doing:\nNo job yet. Ask the user what it is, and what you should ask before doing, then call `set_job` with what they say.\n");
 	expect((await bot.setJob("  Triage the inbox.\nAsk before replying.\n")).content[0]?.text).toBe("Saved your job. The dashboard applies it, and while the dashboard is stopped the change waits for it.");
 	expect(bot.jobRequests()).toEqual([{ botId: "scout", job: "Triage the inbox.\nAsk before replying." }]);
-	expect(bot.prompt()?.[1]).toContain("Your job, and what you ask before doing:\nNo job yet.");
+	expect((await bot.prompt())?.[1]).toContain("Your job, and what you ask before doing:\nNo job yet.");
 });
 
 test("set_job with an empty job asks to clear it, and refuses a job past the page's limit or a session with no bot inbox, leaving nothing", async () => {

@@ -10,6 +10,11 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Settings sync now carries each Bot's routines too, and each routine runs on one computer only: the others show which computer runs it, with its switch off.
 - Turning a routine on moves it to that computer, and the old one stops running it at its next sync; each computer keeps its own run history.
 - When an agent grills you about a plan, it now asks each round of questions as clickable choices with its recommended answer first, so you no longer have to ask it to.
+- In Settings › Workspaces, each workspace now has a space, Work or Personal; every workspace starts in Work, and hiding a workspace then showing it again keeps its space.
+- The personal folder's row in Settings › Workspaces shows a Personal tag instead of a menu, since it is always Personal.
+- A session in a Personal workspace, or in a second copy of one checked out on another branch, is now a personal session: it knows what you told personal sessions about yourself, can remember more, can log your sport, and shows the Memory tab, while keeping the agent's usual coding tools.
+- Behind the scenes: the server, the agents, and the page now decide a folder's space with one shared rule.
+- Your other machines get the spaces you pick through Settings › Sync, with the workspaces.
 
 ## 2026-11-08
 

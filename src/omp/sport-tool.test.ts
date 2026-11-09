@@ -21,7 +21,7 @@ function sport(state: SportState | null = STATE) {
 	dirs.push(root);
 	const paths = { file: join(root, "sport.json"), inbox: join(root, "sport-inbox") };
 	if (state) writeFileSync(paths.file, JSON.stringify(state));
-	const session = loadExtension(pi => pi.registerTool(sportTool(pi, () => paths)), new Map());
+	const session = loadExtension(pi => pi.registerTool(sportTool(pi, async () => paths)), new Map());
 	const call = async (params: SportParams) => (await session.call("sport", params)).content.map(({ text }) => text).join("\n");
 	const left = () => readdirSync(paths.inbox).sort().map(name => JSON.parse(readFileSync(join(paths.inbox, name), "utf8")));
 	return { paths, call, left, state: () => readSport(paths) };
@@ -68,7 +68,7 @@ test("week shows each day's phase, workouts, and loads from the newest test, and
 });
 
 test("the reads run on read approval, and every action that leaves a request on write approval", () => {
-	const session = loadExtension(pi => pi.registerTool(sportTool(pi, () => ({ file: "", inbox: "" }))), new Map());
+	const session = loadExtension(pi => pi.registerTool(sportTool(pi, async () => ({ file: "", inbox: "" }))), new Map());
 	const tiers = (["read", "week", "history", "log", "measure", "set_plan", "set_targets"] as const).map(action => session.approval("sport", { action }));
 	expect(tiers).toEqual(["read", "read", "read", "write", "write", "write", "write"]);
 	expect(session.approval("sport", { action: "constructor" })).toBe("write");
