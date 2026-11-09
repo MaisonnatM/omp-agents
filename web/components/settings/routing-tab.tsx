@@ -3,7 +3,6 @@ import { type ReactNode, useState } from "react";
 import { type ModelChain, type ModelProfileEdit, type ModelRouting, type OmpSettings, type RetrySettings, type RoleRoute, type RoutingEdit } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { putJson, settingsUrl } from "../../api";
 import { providerOrg } from "../../labels";
@@ -343,42 +342,37 @@ function ProfilesSection({ profiles, editing }: { profiles: ModelRouting["profil
 				</form>
 			)}
 			{profiles.length === 0 ? (
-				<p className="text-sm text-muted-foreground">No profiles yet. Save the routing below as one to switch back to it in one click.</p>
+				<p className="text-sm text-muted-foreground">No profiles yet. Save the routing below to switch back to it in one click.</p>
 			) : (
 				<ul className="flex flex-wrap gap-2">
-					{profiles.map(profile => {
-						const armed = confirm.isArmed(`delete:${profile.name}`);
-						return (
-							<li key={profile.name} className="flex items-center gap-0.5">
-								<Button
-									variant="tertiary"
-									size="compact"
-									active={profile.active}
-									aria-pressed={profile.active}
-									leadingIcon={profile.active ? Check : undefined}
-									loading={saving.saving === `apply:${profile.name}`}
-									disabled={busy}
-									onClick={() => {
-										if (!profile.active) send({ kind: "apply", name: profile.name });
-									}}
-								>
-									{profile.name}
-								</Button>
-								<Tooltip content={`Delete ${profile.name}`} forceOpen={armed ? false : undefined}>
-									<Button
-										variant={armed ? "destructive-outline" : "ghost"}
-										size={armed ? "compact" : "icon-compact"}
-										aria-label={armed ? `Confirm delete ${profile.name}` : `Delete ${profile.name}`}
-										loading={saving.saving === `delete:${profile.name}`}
-										disabled={busy}
-										{...confirm.props(`delete:${profile.name}`, () => send({ kind: "delete", name: profile.name }))}
-									>
-										{armed ? "Delete?" : <X />}
-									</Button>
-								</Tooltip>
-							</li>
-						);
-					})}
+					{profiles.map(profile => (
+						<li key={profile.name} className="flex items-center gap-1">
+							<Button
+								variant="ghost"
+								size="compact"
+								active={profile.active}
+								aria-current={profile.active || undefined}
+								leadingIcon={profile.active ? Check : undefined}
+								loading={saving.saving === `apply:${profile.name}`}
+								disabled={busy}
+								onClick={() => {
+									if (!profile.active) send({ kind: "apply", name: profile.name });
+								}}
+							>
+								{profile.name}
+							</Button>
+							<Button
+								variant="destructive-outline"
+								size="compact"
+								aria-label={`Delete ${profile.name}`}
+								loading={saving.saving === `delete:${profile.name}`}
+								disabled={busy}
+								{...confirm.props(`delete:${profile.name}`, () => send({ kind: "delete", name: profile.name }))}
+							>
+								{confirm.isArmed(`delete:${profile.name}`) ? "Confirm delete?" : "Delete"}
+							</Button>
+						</li>
+					))}
 				</ul>
 			)}
 			{saving.error && <ErrorText>{saving.error}</ErrorText>}

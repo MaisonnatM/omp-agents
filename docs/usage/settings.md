@@ -92,7 +92,7 @@
   Click a profile to write its routing to `config.yml` in one step; every other key stays as it was.
   The profile that matches `config.yml` shows as active, whether you applied it or edited the routing back to it.
   Running sessions keep their model, and new sessions use the profile.
-  The **×** beside a profile deletes it after a second click.
+  **Delete** beside a profile reads **Confirm delete?** after the first click, and a second click deletes it.
   A profile leaves out the other `retry.*` settings and agent model overrides, and a workspace's `.omp/config.yml` still overrides it.
   The dashboard keeps profiles in `model-profiles.json` beside its access token, apart from omp's own `/modelpreset` presets.
 - **Agents** previews the agents a new session in this workspace discovers, alphabetically, with their descriptions, scopes, read-only classification, and effective models.
