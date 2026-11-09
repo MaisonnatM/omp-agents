@@ -84,6 +84,17 @@ describe("WorkspacePlacement", () => {
 		expect(placement.at(shared)).toBeNull();
 	});
 
+	test("counts a directory a removed worktree left behind in its main checkout, but not a folder that only shares its name", async () => {
+		const parent = tempDir();
+		const main = await repoWithWorktree(parent);
+		const [leftover, namesake] = [join(parent, "app-wt", "done"), join(parent, "elsewhere", "app")];
+		for (const dir of [leftover, namesake]) mkdirSync(dir, { recursive: true });
+		const placement = new WorkspacePlacement();
+
+		expect(await placement.place([leftover, namesake, main], worktreeAt)).toBe(true);
+		expect([leftover, namesake].map(placement.cwdOf)).toEqual([main, namesake]);
+	});
+
 	test("a turn ending in a worktree of a Personal workspace git had not placed yet counts as Personal", async () => {
 		const parent = tempDir();
 		const main = await repoWithWorktree(parent);
