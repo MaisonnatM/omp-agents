@@ -15,7 +15,7 @@ pstack is written for Cursor. On omp, the routes below replace every Cursor tool
 
 - The user's final-answer format (bold answer first, optional Needs you / Not verified / Done lines) is the shape of every reply. Poteto's **Writing the reply** rules apply to the sentences inside it.
 - A session that `/ship` owns keeps its stages, `ship_stage` calls, draft-only PR, and thermonuclear gate. Pstack playbooks run inside those stages and never mark a PR ready or merge it on their own.
-- The git-safety rules in `~/.omp/agent/AGENTS.md` apply too: on `main`, work in a dedicated worktree and spawn every subagent that touches a repo with `isolated: true`; on any other local branch, the session and its editing subagents work in place.
+- The git-safety rules in `~/.omp/agent/AGENTS.md` apply too: on `main`, work in a dedicated worktree and spawn editing subagents without `isolated`, naming that worktree's absolute path in each task; on any other local branch, the session and its editing subagents work in place.
 
 ## Subagents and models
 
@@ -30,7 +30,7 @@ omp's `task` call has no per-spawn `model`, `readonly`, `environment`, or `run_i
 
 - **Panels.** Panel lines (arena runners, architect runners, interrogate reviewers) use one subagent per entry. Alternate `poteto-agent` and `poteto-agent-codex`, so that a two-entry panel spans both model families. If a spawn of `poteto-agent-codex` fails because Codex has no quota left, run that slot on `poteto-agent` and say that the panel ran on a single model family.
 - **`readonly: true`.** Write "read-only: report findings, edit nothing" into the assignment, and keep the spawn on `poteto-agent` so that it runs at full model strength.
-- **`environment: "cloud"`.** omp has no cloud agents. Use `isolated: true`, which gives each worker its own worktree. `task.maxConcurrency` is 2, so wider fan-outs queue, and nothing is wrong when they do.
+- **`environment: "cloud"`.** omp has no cloud agents. Give each worker its own worktree: `isolated: true` from a session that sits in a worktree, or a worktree per worker named by absolute path when the session is on `main`. `task.maxConcurrency` is 2, so wider fan-outs queue, and nothing is wrong when they do.
 - **`run_in_background: true`.** omp spawns in the background by default, and results arrive by themselves. Block only with `wait`.
 - **Resume or message an agent.** Use `write agent://<id>`, or the Agent Hub (`Alt+A`) for a parked agent. Check on a running agent by reading `agent://<id>` without resuming it.
 - **`pstack-models.mdc` and `/setup-pstack`.** omp does not read Cursor rules, so ignore every `pstack-models.mdc` line and its Cursor default slugs. To change a role's model on omp, first read `~/.omp/agent/docs/model-routing.md`. Then set `task.agentModelOverrides` for `poteto-agent` or `poteto-agent-codex` with `omp config set`, using a selector that `omp models --json` lists, and read the setting back.
