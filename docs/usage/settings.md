@@ -87,6 +87,14 @@
   Removing every fallback of a role removes its own chain, so it walks the `default` chain again.
   The retry settings and the provider order save the same way.
   A workspace's `.omp/config.yml` still overrides what you save there.
+- **Model profiles**, first on the Models page, are named snapshots of your routing: each role's model with its thinking level, the fallback chains, and the provider order.
+  **Save current as…** names one from what your `~/.omp/agent/config.yml` routes now, and saving under a name already used replaces that profile.
+  Click a profile to write its routing to `config.yml` in one step; every other key stays as it was.
+  The profile that matches `config.yml` shows as active, whether you applied it or edited the routing back to it.
+  Running sessions keep their model, and new sessions use the profile.
+  The **×** beside a profile deletes it after a second click.
+  A profile leaves out the other `retry.*` settings and agent model overrides, and a workspace's `.omp/config.yml` still overrides it.
+  The dashboard keeps profiles in `model-profiles.json` beside its access token, apart from omp's own `/modelpreset` presets.
 - **Agents** previews the agents a new session in this workspace discovers, alphabetically, with their descriptions, scopes, read-only classification, and effective models.
   With **All workspaces**, the preview includes user and bundled definitions and user plugins, not project or session-local agents.
   Search by name, description, scope, source path, tools, or model; Escape clears the search and leaves the field.

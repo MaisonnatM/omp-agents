@@ -2,7 +2,7 @@
 import { homedir } from "node:os";
 import { isObject } from "../json";
 import type { CollabAutoStart, TerminalAccess } from "../shared/readiness";
-import { type RetrySettings, type RoutingEdit, selectorOf } from "../shared/models";
+import { type ProfileRouting, type RetrySettings, type RoutingEdit, selectorOf } from "../shared/models";
 import { ompVersion } from "./install";
 import { advisorConfig, advisorSettings, collabSettings, compaction, config, dirs, extensionSettings, fallbackChains, goalSettings, modelCompactionSettings, modelSettings, sessionSettings, settingsRegistry } from "./modules";
 import type { OmpSettingsInstance, SettingHandle } from "./module-types/config";
@@ -144,6 +144,29 @@ export async function writeRouting(cwd: string, edit: RoutingEdit): Promise<void
 			setting("modelProviderOrder").set(settings, edit.providers.length > 0 ? edit.providers : undefined);
 			break;
 	}
+	await settings.flush();
+}
+
+/** The routing the user's `config.yml` itself sets, read as omp reads it but without a workspace's layer. */
+export function userRoutingOf(settings: OmpSettingsInstance): ProfileRouting {
+	const { modelRoles, fallbackChains, modelProviderOrder } = ompConfigOf(config.Settings.isolated(settings.getGlobalSettings()));
+	return { modelRoles, fallbackChains, modelProviderOrder };
+}
+
+/**
+ * Makes `settings`' global `config.yml` route as `routing` does, through omp's write path like {@link writeRouting}:
+ * each role and chain `routing` leaves out is removed, and every key outside the routing survives.
+ */
+export async function writeUserRouting(settings: OmpSettingsInstance, routing: ProfileRouting): Promise<void> {
+	const current = userRoutingOf(settings);
+	for (const role of new Set([...Object.keys(current.modelRoles), ...Object.keys(routing.modelRoles)])) {
+		settings.setModelRole(role, Object.hasOwn(routing.modelRoles, role) ? routing.modelRoles[role] : undefined);
+	}
+	const chains = setting("retry.fallbackChains");
+	for (const key of new Set([...Object.keys(current.fallbackChains), ...Object.keys(routing.fallbackChains)])) {
+		chains.setEntry(settings, key, Object.hasOwn(routing.fallbackChains, key) ? routing.fallbackChains[key] : undefined);
+	}
+	setting("modelProviderOrder").set(settings, routing.modelProviderOrder.length > 0 ? routing.modelProviderOrder : undefined);
 	await settings.flush();
 }
 

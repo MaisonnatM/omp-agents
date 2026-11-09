@@ -1,12 +1,8 @@
 /** Which live sessions need you, and the alerts they raise, for the desktop app's Dock badge and the session notifications. */
 import type { SessionAlert } from "../src/shared/desktop-bridge";
-import { hashForSession, type RosterHost, type UnreadTurn, type UserRequest, type View } from "../src/shared/sessions";
+import { awaitsSubagents, hashForSession, type RosterHost, type UnreadTurn, type UserRequest, type View } from "../src/shared/sessions";
 import type { DashboardState } from "./dashboard-state";
 import { hostLabel } from "./labels";
-
-/** Whether `host`'s main agent only waits on a subagent that still runs: its turn ended, or sits only in `wait` or `task` calls. */
-export const awaitsSubagents = (host: RosterHost): boolean =>
-	(host.status === "idle" || (host.status === "working" && host.turnWaits)) && host.agents.some(agent => agent.status === "running");
 
 /**
  * What a session waits on you for now: its oldest open question, else a wait with no question relayed (a terminal

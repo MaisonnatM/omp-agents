@@ -60,7 +60,7 @@ Storage uses omp settings' `SettingRow`: toggles save on change, whole-number fi
 After a conflict, the row reloads the current value and asks the user to review it before another change.
 No daily native cleanup or dashboard-triggered automatic compression is added.
 
-Edits go through three endpoints, each taking the same `?cwd=` and answering with the settings as they load after the write:
+Edits go through four endpoints, each taking the same `?cwd=` and answering with the settings as they load after the write:
 
 - `PUT /api/settings/routing` takes one change: a role's model or fallbacks, a model-keyed chain, some `retry.*` values, or the provider order.
   The server writes it through omp's own write path, the one `omp config set` uses: `Settings.loadIsolated`, the setting's `set` or `setEntry`, and `flush`.
@@ -69,6 +69,11 @@ Edits go through three endpoints, each taking the same `?cwd=` and answering wit
   A selector that the config already names passes as it is, so keeping an entry never blocks a save.
   omp checks each retry value against the setting's type and allowed values.
   If omp cannot load `config.yml`, the write is refused, because omp would move the broken file aside before it writes.
+- `PUT /api/settings/model-profiles` takes `{ kind, name }`, where `kind` is `save`, `apply`, or `delete`, and edits the model profiles that the routing's `profiles` lists.
+  `save` keeps the `modelRoles`, `retry.fallbackChains`, and `modelProviderOrder` of the user's `config.yml` under `name` in the dashboard's `model-profiles.json`, replacing a profile with that name, and `delete` removes one.
+  `apply` writes a profile's three settings to `config.yml` through the same omp write path as routing, removing each role and chain that the profile lacks, and answers 404 for a name that no profile has.
+  A profile is `active` while the user's `config.yml` holds the same three settings in any key order, so nothing records which profile was applied last.
+  If omp cannot load `config.yml`, `save` and `apply` are refused as routing writes are.
 - `PUT /api/settings/agent` takes `{ id, value, expected }` or `{ id, reset: true, expected }` for one of omp's settings, any id `agentSettings` could list, whether or not this page gives it a control.
   `expected` is the `user` value the page showed, `null` when unset; when `config.yml` holds another value, the server answers 409 with `conflict: true` and writes nothing.
   The server checks the value with the setting's `assertWritable`, then writes through the same path as routing: `Settings.loadIsolated`, the handle's `set`, or `unset` for a reset, and `flush`.

@@ -2,7 +2,7 @@
 import { mkdir, realpath, stat } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
 import { atomicWriteText } from "./fs";
-import { errorText, isObject } from "./json";
+import { errorText, isNonEmpty, isObject } from "./json";
 import { agentSetting, readAgentSettings, userValue, writeAgentSetting } from "./omp/agent-settings";
 import { readAgentCatalog } from "./omp/agents";
 import {
@@ -18,17 +18,20 @@ import {
 	resolveSelector,
 	retryChoices,
 	routedSelectors,
+	userRoutingOf,
 	writeRouting,
+	writeUserRouting,
 } from "./omp/config";
 import { discoverOmpFiles, type FoundFile } from "./omp/discovery";
 import { findModelUpdates, upgradeEdits } from "./omp/model-updates";
+import { deleteModelProfile, modelProfile, profilesFor, saveModelProfile } from "./model-profiles";
 import { connectedProviders, listModels } from "./omp/models";
 import { workflowsOf } from "./omp/workflows";
 import { displayPath, HOME } from "./paths";
 import type { AgentOverrideEntryEdit, AgentSettingEdit } from "./shared/agent-settings";
 import { frontmatterOf } from "./frontmatter";
 import { AGENT_SETTINGS, isAgentModelOverride } from "./shared/agents";
-import type { CatalogModel, FileEdit, ModelChain, OmpFile, OmpSettings, RetrySettings, RoleRoute, RoutingEdit } from "./shared/models";
+import type { CatalogModel, FileEdit, ModelChain, ModelProfileEdit, OmpFile, OmpSettings, RetrySettings, RoleRoute, RoutingEdit } from "./shared/models";
 import type { ModelUpdate } from "./shared/notices";
 
 /**
@@ -112,6 +115,7 @@ async function loadSession(
 				}),
 			),
 			modelProviderOrder: config.modelProviderOrder,
+			profiles: profilesFor(userRoutingOf(settings)),
 		};
 		agentSettings = readAgentSettings(settings, cwd !== null);
 		agents = await readAgentCatalog(cwd, settings).catch((err: unknown) => ({ error: errorText(err) }));
@@ -230,6 +234,45 @@ export function saveRouting(cwd: string | null, raw: unknown): Promise<OmpSettin
 		}
 		const edit = parseRoutingEdit(raw, { catalog: await listModels(), config });
 		await writeRouting(sessionCwd, edit);
+		return loadOmpSettings(cwd);
+	});
+}
+
+/**
+ * Saves the user's routing as a model profile, applies one to the user's `config.yml` through omp, or deletes one, and
+ * answers with the settings as they now load. A profile is the dashboard's, so omp's config never holds it.
+ */
+export function editModelProfile(cwd: string | null, raw: unknown): Promise<OmpSettings> {
+	return configWrites.run(async () => {
+		if (!isObject(raw) || (raw.kind !== "save" && raw.kind !== "apply" && raw.kind !== "delete") || !isNonEmpty(raw.name)) {
+			throw new Rejected(400, "Expected { kind: save, apply, or delete, name }");
+		}
+		const edit: ModelProfileEdit = { kind: raw.kind, name: raw.name.trim() };
+		switch (edit.kind) {
+			case "save": {
+				const settings = await loadGlobalForWrite(HOME).catch((err: unknown) => {
+					throw cannotLoad(err);
+				});
+				saveModelProfile(edit.name, userRoutingOf(settings));
+				break;
+			}
+			case "apply": {
+				const profile = modelProfile(edit.name);
+				if (!profile) throw new Rejected(404, `No model profile is named ${edit.name}`);
+				const settings = await loadGlobalForWrite(HOME).catch((err: unknown) => {
+					throw cannotLoad(err);
+				});
+				await writeUserRouting(settings, profile);
+				break;
+			}
+			case "delete":
+				deleteModelProfile(edit.name);
+				break;
+			default: {
+				const unhandled: never = edit.kind;
+				return unhandled;
+			}
+		}
 		return loadOmpSettings(cwd);
 	});
 }

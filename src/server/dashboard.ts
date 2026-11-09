@@ -17,7 +17,7 @@ import { GoogleCalendarClient, GoogleCalendars } from "../google-calendar";
 import { loadPullRequests, mergedPullRequests, repoOf } from "../pull-requests";
 import { createIntegrations, type Integrations, integrationFetch, integrationSignedIn } from "../integrations";
 import { errorText } from "../json";
-import type { LiveSession } from "../live-session";
+import { endedTurn, type LiveSession } from "../live-session";
 import { startDictation } from "../omp/dictation";
 import { agentDir } from "../omp/config";
 import { type HostSnapshot, listHosts } from "../omp/collab";
@@ -94,6 +94,7 @@ import type { SelfUpdate } from "./self-update";
 import { endSession } from "./session-end";
 import { ProjectTrustFile } from "./project-trust-file";
 import { SessionMoves } from "./session-moves";
+import { SessionWaits } from "./session-waits";
 import { SessionFiles } from "./session-files";
 import { RequestLedger } from "./request-ledger";
 import { ACTIVITY_KEPT_DAYS, ActivityStore } from "./activity-store";
@@ -152,6 +153,14 @@ export class Dashboard {
 		session: instanceId => this.#sessions.started(instanceId),
 		staysPut: request => this.#bots.botOf(request) !== null || isPersonalDir(this.#cwdOf(request)),
 		admit: this.#admit,
+	});
+	readonly #waits = new SessionWaits({
+		hosts: () => this.#sessions.rows(this.#files.factsOf),
+		reply: sessionId => {
+			const file = this.#sessions.bySessionId(sessionId)?.transcriptPath(null, this.#files.pathOf) ?? this.#files.pathOf(sessionId);
+			return file ? (endedTurn(file)?.reply ?? null) : null;
+		},
+		isBot: request => this.#bots.botOf(request) !== null,
 	});
 	readonly #personalJoin = personalJoin(request => this.#bots.botOf(request) !== null);
 	readonly #sourceControl = new SourceControl(sourceControlFile);
@@ -806,10 +815,12 @@ export class Dashboard {
 		switch (update.kind) {
 			case "roster":
 				this.#broadcasts.rosterChanged();
+				this.#waits.check();
 				return;
 			case "event":
 				this.#views.applyEvent(instanceId, update.event);
 				this.#moves.heard(instanceId, update.event);
+				this.#waits.heard(instanceId, update.event);
 				if (this.#sessions.heard(instanceId, update.event)) this.#broadcasts.rosterChanged();
 				return;
 			case "starting":
@@ -829,6 +840,7 @@ export class Dashboard {
 				this.#bots.exited(instanceId);
 				this.#personalTurnEnded(instanceId);
 				this.#sessions.remove(instanceId);
+				this.#waits.exited(instanceId);
 				// A private session lives exactly as long as its omp, so it is deleted rather than interrupted; the next server's sweep finishes a purge cut short.
 				if (isPrivate) void this.#privateSessions.purge(instanceId).catch((err: unknown) => console.error(`omp-agents: deleting private session ${instanceId} failed: ${errorText(err)}`));
 				else if (sessionId && !update.ended) this.#interrupted.interrupt(sessionId);
@@ -892,9 +904,9 @@ export class Dashboard {
 		this.#activity.prune(Date.now() - ACTIVITY_KEPT_DAYS * DAY_MS);
 	}
 
-	/** How `request` joins the server: as a Review session, as a Bot's conversation, both, or plain; any but a Bot's loads the personal extension, and any but a Bot's or a personal session can move itself. */
+	/** How `request` joins the server: as a Review session, as a Bot's conversation, both, or plain; any but a Bot's loads the personal extension and can wait on another session, and any but a Bot's or a personal session can move itself. */
 	#joinFor(request: StartRequest): SessionJoin {
-		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#moves.join(request), this.#personalJoin(request)];
+		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#moves.join(request), this.#waits.join(request), this.#personalJoin(request)];
 		return {
 			rpc: { args: joins.flatMap(join => join.rpc.args), tools: joins.flatMap(join => join.rpc.tools) },
 			attach: session => {
@@ -1007,6 +1019,7 @@ export class Dashboard {
 		}
 		this.#registry = "fresh";
 		const joinedOrLeft = this.#sessions.follow(hosts);
+		this.#waits.check();
 		// Only a listing that worked knows which terminal sessions still run.
 		if (this.#rosterError === null) this.#sessions.restoreListedUnread(hosts, this.#files.pathOf);
 		// A terminal session that asked to end before the registry listed it.

@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-09
 
+- You can now save your model setup as a profile under Settings › Models › Model profiles, such as Full power or Save credits, and switch back to it in one click. The profile in use shows a check, and new sessions use it.
+- A session you start from the dashboard can now wait for another running session: mention that session and ask it to wait, for example to review a branch once the session building it finishes. It picks up as soon as the other session finishes its turn, asks you a question, or ends.
 - When an agent grills you about a plan, it now asks each round of questions as clickable choices with its recommended answer first, so you no longer have to ask it to.
 
 ## 2026-11-08

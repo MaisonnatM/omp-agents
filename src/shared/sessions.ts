@@ -152,6 +152,10 @@ export type RosterHost = RosterHostBase &
 		| { source: "dashboard"; thinkingLevels: string[]; switching: boolean; fast: FastMode | null; compaction: CompactionState; advisor: AdvisorState | null; goal: GoalSlot; private: boolean }
 	);
 
+/** Whether `host`'s main agent only waits on a subagent that still runs: its turn ended, or sits only in `wait` or `task` calls. */
+export const awaitsSubagents = (host: Pick<RosterHost, "status" | "turnWaits" | "agents">): boolean =>
+	(host.status === "idle" || (host.status === "working" && host.turnWaits)) && host.agents.some(agent => agent.status === "running");
+
 /** omp's `/fast` for the session's model: whether you turned it on, and whether requests go out on the priority tier. */
 export interface FastMode {
 	enabled: boolean;
