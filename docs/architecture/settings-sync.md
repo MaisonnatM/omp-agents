@@ -2,7 +2,9 @@
 
 `SettingsSync` in `src/settings-sync.ts` keeps the portable settings the same on several machines through one branch of a Git remote.
 What is portable is data, `SYNC_ITEMS` in `src/shared/settings-sync.ts`: omp's `config.yml`, `AGENTS.md`, and `APPEND_SYSTEM.md`, the `skills`, `rules`, `agents`, and `commands` trees of omp's agent directory, and the dashboard's stores, each under its path in the repository (`omp/…` and `dashboard/…`).
-The stores are the source control settings, the notes, the todos with their categories and archive, the preferences, the workspace list, and the hidden calendars, each a `SyncStore` that `syncStores` builds over the server's own file.
+The stores are the source control settings, the notes, the todos with their categories and archive, the preferences, the workspace list, the hidden calendars, and the Bots, each a `SyncStore` that `syncStores` builds over the server's own file.
+The Bots store carries each Bot of `bots.json` without its `sessionId`, with its `cwd` as a `~` path and its `memory.md` as `memory`, one entry per line, so facts two machines remembered merge entry by entry; a Bot arriving keeps this machine's session id for it, else none.
+A sync that rewrote the Bots makes the `Dashboard` delete the routines of each Bot gone, as deleting a Bot does, and read every Bot's memory again.
 The preferences store holds two parts: `page`, the page's portable `localStorage` values that `preferences.json` keeps, and `processes`, the idle stop of `processes.json`.
 `NEVER_SYNCED` lists, as patterns on those paths, what never syncs even inside a synced tree: databases such as `agent.db`, `mcp.json`, `secrets.yml`, key and credential files, session files, lock files, the dashboard's token, `interrupted.json`, and `merges.json`, and `.git` and `node_modules` directories.
 `readLocal` also leaves a link inside a tree, a file over 1 MB, a file that is not UTF-8 text, and a file or store whose text matches a credential's shape (`CREDENTIAL_SHAPES`: private keys and GitHub, GitLab, Anthropic, OpenAI, Slack, AWS, Google, Linear, and npm tokens) on the machine, and reports each as skipped.

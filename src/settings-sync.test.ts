@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { canonicalJson } from "./json";
 import { runChecked } from "./proc";
+import { BotsFile } from "./server/bots-file";
 import { CalendarsFile } from "./server/calendars-file";
 import type { ListKind } from "./server/list-registry";
 import { PreferencesFile } from "./server/preferences-file";
@@ -13,6 +14,7 @@ import { UserTodosFile } from "./server/user-todos-file";
 import { WorkspacesFile } from "./server/workspaces-file";
 import { applyLocal, localPath, mergeFile, mergeJson, planSync, portablePath, portableText, readLocal, SettingsSync, type SyncStore, sourceControlStore, syncStores } from "./settings-sync";
 import { missingGithubRepo, neverSynced, parseSyncSettings, SYNC_ITEMS, type SyncStoreId } from "./shared/settings-sync";
+import { type BotId, parseBotId } from "./shared/bots";
 import { SourceControl } from "./source-control";
 import type { UserNoteChange } from "./user-notes-shared";
 import { addTodo } from "./user-todos";
@@ -38,7 +40,7 @@ const text = (value: string) => ({ text: value, executable: false });
 /** Stores that read `values`, `{}` for the rest, and take whatever sync writes. */
 const fixedStores = (values: Partial<Record<SyncStoreId, unknown>> = {}): Record<SyncStoreId, SyncStore> => {
 	const store = (id: SyncStoreId): SyncStore => ({ read: () => values[id] ?? {}, parse: value => ({ ok: value }), write: () => {} });
-	return { "source-control": store("source-control"), notes: store("notes"), todos: store("todos"), preferences: store("preferences"), workspaces: store("workspaces"), calendars: store("calendars") };
+	return { "source-control": store("source-control"), notes: store("notes"), todos: store("todos"), preferences: store("preferences"), workspaces: store("workspaces"), calendars: store("calendars"), bots: store("bots") };
 };
 
 describe("what syncs", () => {
@@ -80,6 +82,7 @@ describe("what syncs", () => {
 			"dashboard/todos.json": text("{}\n"),
 			"dashboard/preferences.json": text("{}\n"),
 			"dashboard/workspaces.json": text("{}\n"),
+			"dashboard/bots.json": text("{}\n"),
 			"dashboard/calendars.json": text("{}\n"),
 		});
 		expect(skipped.sort((a, b) => a.path.localeCompare(b.path))).toEqual([
@@ -217,6 +220,8 @@ function machine(root: string, remote: string) {
 		processes: new ProcessSettingsFile(config("processes.json")),
 		workspaces: new WorkspacesFile(config("workspaces.json")),
 		calendars: new CalendarsFile(config("calendars.json")),
+		bots: new BotsFile(config("bots.json")),
+		botsDir: join(root, "data", "bots"),
 	};
 	const changed = new Set<ListKind>();
 	const places = { omp, home, stores: syncStores(files, home, list => changed.add(list)) };
@@ -256,7 +261,7 @@ describe("SettingsSync", () => {
 		put(agentsMd(a), `Notes live in ${a.home}/notes.\n`);
 		put(join(a.omp, "skills", "alpha", "SKILL.md"), "# Alpha\n");
 		a.sourceControl.apply({ op: "repo", repo: join(a.home, "code", "app"), on: true });
-		const sent = ["calendars", "notes", "preferences", "source-control", "todos", "workspaces"].map(name => `dashboard/${name}.json`);
+		const sent = ["bots", "calendars", "notes", "preferences", "source-control", "todos", "workspaces"].map(name => `dashboard/${name}.json`);
 		expect((await a.sync.sync()).last).toMatchObject({ kind: "synced", received: [], sent: [...sent, "omp/AGENTS.md", "omp/skills/alpha/SKILL.md"] });
 		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: ["dashboard/source-control.json", "omp/AGENTS.md", "omp/skills/alpha/SKILL.md"], sent: [] });
 		expect(readFileSync(agentsMd(b), "utf8")).toBe("Notes live in ~/notes.\n");
@@ -294,6 +299,28 @@ describe("SettingsSync", () => {
 		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: [], sent: [] });
 		expect(readFileSync(join(b.omp, "AGENTS.md"), "utf8")).toBe("From B.\n");
 		expect(await runChecked(["git", "--git-dir", remote, "show", "main:omp/AGENTS.md"])).toBe("From A.\n");
+	});
+
+	test("carries each Bot, its workspace under the other home, and the facts both machines remembered, but not its conversation", async () => {
+		const { a, b } = await pair();
+		const memory = (side: { botsDir: string }) => join(side.botsDir, "ann", "memory.md");
+		const bot = { id: parseBotId("ann") as BotId, kind: "routines", name: "Ann", job: "Triage.", cwd: join(a.home, "code"), model: null, skill: null, shape: "circle", hue: 25 } as const;
+		a.bots.apply({ op: "save", bot }, "2026-01-01T00:00:00.000Z");
+		a.bots.apply({ op: "bind", id: bot.id, sessionId: "session-a" }, "2026-01-01T00:00:00.000Z");
+		put(memory(a), "- 2026-01-01 likes tea\n");
+		await a.sync.sync();
+		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: ["dashboard/bots.json"] });
+		expect(b.bots.value).toEqual([{ ...bot, cwd: join(b.home, "code"), sessionId: null, createdAt: "2026-01-01T00:00:00.000Z", pinned: false, section: null }]);
+		expect(b.changed.has("bots")).toBe(true);
+
+		put(memory(a), "- 2026-01-01 likes tea\n- 2026-01-02 from A\n");
+		put(memory(b), "- 2026-01-01 likes tea\n- 2026-01-02 from B\n");
+		b.bots.apply({ op: "bind", id: bot.id, sessionId: "session-b" }, "2026-01-02T00:00:00.000Z");
+		await a.sync.sync();
+		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced" });
+		await a.sync.sync();
+		for (const side of [a, b]) expect(readFileSync(memory(side), "utf8")).toBe("- 2026-01-01 likes tea\n- 2026-01-02 from B\n- 2026-01-02 from A\n");
+		expect([a.bots.value[0]?.sessionId, b.bots.value[0]?.sessionId]).toEqual(["session-a", "session-b"]);
 	});
 
 	test("keeps the todos and notes two machines each added, carries the preferences, workspaces and their spaces, and each todo's Workspace, and settles both on one list", async () => {

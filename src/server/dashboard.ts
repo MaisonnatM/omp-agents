@@ -223,9 +223,12 @@ export class Dashboard {
 		const workspaces = (this.#workspaces = new WorkspacesFile(workspacesFile));
 		// A sync, which runs only once the server listens, tells the pages that show a list it rewrote.
 		const stores = syncStores(
-			{ sourceControl: this.#sourceControl, notes: this.#notes, todos: this.#todos, preferences: this.#preferences, processes: this.#processSettings, workspaces, calendars: this.#calendars },
+			{ sourceControl: this.#sourceControl, notes: this.#notes, todos: this.#todos, preferences: this.#preferences, processes: this.#processSettings, workspaces, calendars: this.#calendars, bots: this.#botsFile, botsDir },
 			HOME,
-			list => this.#broadcasts.pushList(list),
+			list => {
+				if (list === "bots") this.#botsSynced();
+				this.#broadcasts.pushList(list);
+			},
 		);
 		this.#settingsSync = new SettingsSync(settingsSyncFile, settingsSyncRepo, { omp: agentDir, home: HOME, stores });
 		const files = this.#files;
@@ -969,6 +972,14 @@ export class Dashboard {
 		this.#routines.migrate(bot => {
 			if (!this.#botsFile.value.some(({ id }) => id === bot.id)) this.#lists.apply("bots", { op: "save", bot });
 		});
+	}
+
+	/** After a sync rewrote the Bots or their memories: a Bot it removed takes its routines along, and every memory is read again. */
+	#botsSynced(): void {
+		const kept = new Set(this.#botsFile.value.map(({ id }) => id));
+		const gone = new Set(this.#routines.value.map(({ botId }) => botId).filter(id => !kept.has(id)));
+		if ([...gone].map(id => this.#routines.removeBot(id)).some(Boolean)) this.#broadcasts.pushList("routines");
+		this.#bots.forgetRead();
 	}
 
 	/** Starts the runs of the routines whose triggers the last check saw news for, on the server that runs routines; another server drops the news. */
