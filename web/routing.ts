@@ -5,6 +5,7 @@ import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
 import { hashForSession, type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
 import { TICKET_ID } from "../src/shared/tickets";
+import type { Space } from "../src/shared/workspaces";
 import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import type { StartOp } from "./starts";
 import { PAGE_ICON } from "./page-icons";
@@ -15,19 +16,20 @@ export type TabPlace = "bar" | "header";
 /**
  * The sidebar's tabs, in order, each at the `place` that draws its trigger. A tab with an `integration` shows, and its
  * shortcut applies, only while omp holds a sign-in to that service, even one the service refuses, which the page then
- * offers to reconnect. Settings is no tab: the header's button opens it.
+ * offers to reconnect. A tab with a `space` shows, and its page and shortcut apply, only in that space: Tickets in Work,
+ * Sport in Personal. Settings is no tab: the header's button opens it.
  */
 export const SIDEBAR_TABS = [
 	{ value: "pull-requests", label: "Pull requests", icon: PAGE_ICON["pull-requests"], place: "bar" },
-	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, place: "bar", integration: "linear" },
+	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, place: "bar", integration: "linear", space: "work" },
 	{ value: "bots", label: "Bots", icon: PAGE_ICON.bots, place: "bar" },
 	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions, place: "bar" },
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo, place: "bar" },
 	{ value: "notes", label: "Notes", icon: PAGE_ICON.notes, place: "header" },
 	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar, place: "header" },
 	{ value: "email", label: "Email", icon: PAGE_ICON.email, place: "header", integration: "gmail" },
-	{ value: "sport", label: "Sport", icon: PAGE_ICON.sport, place: "header" },
-] as const satisfies readonly { value: string; label: string; icon: LucideIcon; place: TabPlace; integration?: McpIntegrationId }[];
+	{ value: "sport", label: "Sport", icon: PAGE_ICON.sport, place: "header", space: "personal" },
+] as const satisfies readonly { value: string; label: string; icon: LucideIcon; place: TabPlace; integration?: McpIntegrationId; space?: Space }[];
 
 /** A sidebar tab, whose trigger sits in the bar or the header; the tickets, Bots, todo, notes, calendar, email, and sport tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];

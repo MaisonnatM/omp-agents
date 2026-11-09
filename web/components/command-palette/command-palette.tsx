@@ -124,7 +124,7 @@ interface CommandPaletteProps {
 	/** The todo list's top-level todos, which a search lists. */
 	todos: readonly UserTodo[];
 	notes: readonly UserNote[] | null;
-	/** Linear answers, so a search lists the tickets assigned to you. */
+	/** Linear answers and the space shows Tickets, Work, so a search lists the tickets assigned to you. */
 	linearConnected: boolean;
 	/** Open the new-ticket dialog with a title, which a search offers while Linear answers. */
 	onCreateTicket: (title: string) => void;

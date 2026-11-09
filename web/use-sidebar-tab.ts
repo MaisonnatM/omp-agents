@@ -1,10 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { View } from "../src/shared/sessions";
+import type { Space } from "../src/shared/workspaces";
 import { type Layout, openView, type Page, type SettingsRoute, settingsSection, type SidebarPanel, type SidebarTab } from "./routing";
+import { tabSpace } from "./sidebar-tabs";
 import { useStoredState } from "./stored-state";
 
 /** The sidebar panel that goes with each page; the panes keep the tab you chose. A session's changes go with the sessions. */
 const PAGE_TAB: Partial<Record<Page["kind"], SidebarPanel>> = { "pull-requests": "pull-requests", tickets: "tickets", todo: "todo", bots: "bots", notes: "notes", calendar: "calendar", email: "email", sport: "sport", settings: "settings" };
+
+/** The space page `page` shows in alone, its tab's {@link tabSpace}: Work for Tickets, Personal for Sport; `null` for a page of both. */
+export function pageSpace(page: Page): Space | null {
+	const tab = PAGE_TAB[page.kind];
+	return tab === undefined || tab === "settings" ? null : tabSpace(tab);
+}
+
+/**
+ * Takes the window to the space of a page that shows in one alone, such as Sport opened from a link in Work, as `useFocusedSession`
+ * takes it to a session's. Keyed on the page's space alone, so a switch the user makes off such a page, which leaves it, is not undone.
+ */
+export function useSpaceFollowsPage(page: Page | null, space: Space, pickSpace: (space: Space) => void): void {
+	const followed = page ? pageSpace(page) : null;
+	useEffect(() => {
+		if (followed !== null && followed !== space) pickSpace(followed);
+	}, [followed]);
+}
 
 /** The page each tab shows, but for Sessions, which shows the panes, and Bots while it has one to open. */
 const TAB_PAGE: Record<Exclude<SidebarTab, "sessions">, Page> = {
@@ -31,8 +50,8 @@ export function useSettingsRoute(page: Page | null): SettingsRoute {
 
 interface SidebarTabInput {
 	page: Page | null;
-	/** The tabs whose service omp holds no sign-in to; a page of one keeps the tab the panes had. */
-	signedOutTabs: ReadonlySet<SidebarTab>;
+	/** The tabs that neither show nor apply, signed out or of the other space; a page of one keeps the tab the panes had. */
+	absentTabs: ReadonlySet<SidebarTab>;
 	layout: Layout;
 	/** The session the Sessions tab opens when no pane shows one; `null` for none. */
 	latestSession: View | null;
@@ -47,9 +66,9 @@ interface SidebarTabInput {
  * Pull requests tab, which stays while you work in the panes until you choose Sessions. Sessions keeps the panes, or
  * opens the latest session when no pane shows one; Bots opens the latest Bot's page. `showTab` keeps its identity across renders.
  * A page whose tab the user hid in Preferences still selects that tab, so its panel shows with no tab of the bar selected,
- * and a page whose trigger sits in the header shows its panel, such as the Notes nav, with no bar; a page whose service is signed out keeps the tab the panes had.
+ * and a page whose trigger sits in the header shows its panel, such as the Notes nav, with no bar; a page whose tab is absent keeps the tab the panes had.
  */
-export function useSidebarTab({ page, signedOutTabs, layout, latestSession, latestBot, navigate, show }: SidebarTabInput): {
+export function useSidebarTab({ page, absentTabs, layout, latestSession, latestBot, navigate, show }: SidebarTabInput): {
 	tab: SidebarPanel;
 	showTab: (tab: SidebarTab) => void;
 } {
@@ -61,7 +80,7 @@ export function useSidebarTab({ page, signedOutTabs, layout, latestSession, late
 		if (onPullRequests) setPaneTab("pull-requests");
 	}
 	const pageTab = page ? PAGE_TAB[page.kind] : undefined;
-	const tab: SidebarPanel = pageTab && (pageTab === "settings" || !signedOutTabs.has(pageTab)) ? pageTab : paneTab;
+	const tab: SidebarPanel = pageTab && (pageTab === "settings" || !absentTabs.has(pageTab)) ? pageTab : paneTab;
 	const latest = useRef({ layout, latestSession, latestBot });
 	latest.current = { layout, latestSession, latestBot };
 	const showTab = useCallback(

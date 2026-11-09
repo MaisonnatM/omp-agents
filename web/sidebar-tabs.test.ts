@@ -10,6 +10,8 @@ import {
 	positionKey,
 	shortcutRows,
 	shownTabs,
+	tabSpace,
+	tabsOutOfSpace,
 	tabsSignedOut,
 	tabShortcutLabels,
 	type TabLayout,
@@ -126,6 +128,22 @@ test("placedTabs keeps the shown tabs at one place, in their order: Notes, Calen
 
 test("until the integrations answer, the tabs that wait on one are signed out", () => {
 	expect(tabsSignedOut(undefined)).toEqual(["tickets", "email"]);
+});
+
+test("Tickets shows only in Work and Sport only in Personal; every other tab shows in both", () => {
+	expect(tabsOutOfSpace("personal")).toEqual(["tickets"]);
+	expect(tabsOutOfSpace("work")).toEqual(["sport"]);
+	expect(DEFAULT_TAB_LAYOUT.map(({ tab }) => tabSpace(tab))).toEqual([null, "work", null, null, null, null, null, null, "personal"]);
+});
+
+test("in Personal the bar closes up over the absent Tickets tab, so Cmd+1 onward still go to the tabs it draws in order", () => {
+	const personal = shownTabs(DEFAULT_TAB_LAYOUT, new Set(tabsOutOfSpace("personal")));
+	const bar = placedTabs(personal, "bar");
+	expect(bar).toEqual(["pull-requests", "bots", "sessions", "todo"]);
+	expect(bar.map(tab => positionKey(tab, bar))).toEqual(["tab1", "tab2", "tab3", "tab4"]);
+	expect(positionKey("tickets", bar)).toBeUndefined();
+	expect(placedTabs(personal, "header")).toContain("sport");
+	expect(placedTabs(shownTabs(DEFAULT_TAB_LAYOUT, new Set(tabsOutOfSpace("work"))), "header")).toEqual(["notes", "calendar", "email"]);
 });
 
 test("every tab of the bar takes a position key while every tab shows", () => {
