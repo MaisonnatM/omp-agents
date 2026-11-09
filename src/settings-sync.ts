@@ -3,13 +3,15 @@
  * with the remote's against the last commit this machine applied, pushes the result, and writes what changed here. It
  * can also point sync at a private GitHub repository, which `ensurePrivateRepo` in `github.ts` creates through `gh`.
  */
-import { mkdirSync, readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { mkdir, readdir, readFile, realpath, rm, rmdir, stat } from "node:fs/promises";
 import { hostname } from "node:os";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { atomicWriteText, atomicWriteTextSync, JsonFile, type ReducerFile } from "./fs";
 import { ensurePrivateRepo } from "./github";
-import { canonicalJson, errorText, isObject, isTexts, type Parsed, parseJson } from "./json";
+import { canonicalJson, errorText, isNonEmpty, isObject, isSafeInteger, isTexts, type Parsed, parseAll, parseJson } from "./json";
+import { isRoutineMachine, parseRoutineSpec, type Routine, type RoutineMachine } from "./routines";
 import { SerialLane } from "./serial-lane";
 import type { HiddenCalendars } from "./server/calendars-file";
 import type { ListKind } from "./server/list-registry";
@@ -326,34 +328,77 @@ function memoryLines(path: string): string[] {
 	}
 }
 
+/** A routine as sync carries it: not its runs nor when its schedules last ran, which stay with the computer that ran them. */
+type CarriedRoutine = Omit<Routine, "runs" | "scheduledAt">;
+
 /**
- * The Bots with their memories, each a list of facts so two machines' new facts merge. A Bot's conversation stays on the
- * machine that ran it, so a Bot arriving from another machine starts one here; its workspace is named from `home`.
+ * The Bots with their memories and routines. Each memory is a list of facts so two machines' new facts merge. A Bot's
+ * conversation stays on the machine that ran it, so a Bot arriving from another machine starts one here; its workspace
+ * is named from `home`. Each routine says which computer runs it, `runsOn`, `null` while paused, so the travelling form
+ * cannot hold a routine enabled on no computer, and two computers enabling it at once conflict.
  */
-function botsStore(file: SyncedFile<Bot[]>, botsDir: string, home: string, changed: () => void): SyncStore {
+function botsStore(files: SyncedFiles, home: string, changed: (list: ListKind) => void): SyncStore {
+	const { bots: file, botsDir, routines: routinesFile, machine: here } = files;
 	const memoryPath = (id: string): string => join(botsDir, id, "memory.md");
 	const current = (): Bot[] => file.parse(file.json()) ?? [];
-	const portable = (bots: Bot[], memory: (id: string) => string[]): unknown =>
-		bots.map(({ sessionId: _, ...bot }) => ({ ...bot, cwd: portablePath(bot.cwd, home), memory: memory(bot.id) }));
-	const parse = (value: unknown): { bots: Bot[]; memories: Map<string, string[]> } | null => {
+	const localRoutines = (): CarriedRoutine[] => routinesFile.value.map(({ runs: _, scheduledAt: _at, ...routine }) => routine);
+	const portableRoutine = ({ botId: _, enabled, machine, ...routine }: CarriedRoutine): unknown => ({ ...routine, runsOn: enabled ? (machine ?? here) : null });
+	const portable = (bots: Bot[], memory: (id: string) => string[], routines: readonly CarriedRoutine[]): unknown =>
+		bots.map(({ sessionId: _, ...bot }) => ({
+			...bot,
+			cwd: portablePath(bot.cwd, home),
+			memory: memory(bot.id),
+			routines: routines.filter(routine => routine.botId === bot.id).map(portableRoutine),
+		}));
+	const parseRoutine = (value: unknown, botId: unknown): CarriedRoutine | null => {
+		if (!isPlainObject(value)) return null;
+		const { runsOn = null, createdAt, ...fields } = value;
+		if (!(runsOn === null || isRoutineMachine(runsOn)) || !isSafeInteger(createdAt)) return null;
+		const spec = parseRoutineSpec({ ...fields, botId, enabled: runsOn !== null });
+		return spec && { ...spec.ok, machine: runsOn === null || runsOn.id === here.id ? null : runsOn, createdAt };
+	};
+	const parse = (value: unknown): { bots: Bot[]; memories: Map<string, string[]>; routines: CarriedRoutine[] } | null => {
 		if (!Array.isArray(value)) return null;
 		const sessions = new Map(current().map(bot => [bot.id, bot.sessionId]));
+		const kept = localRoutines();
 		const memories = new Map<string, string[]>();
+		const routines: CarriedRoutine[] = [];
 		const local: unknown[] = [];
 		for (const entry of value) {
 			if (!isPlainObject(entry) || typeof entry.id !== "string" || typeof entry.cwd !== "string" || !isTexts(entry.memory)) return null;
-			const { memory, ...bot } = entry;
+			const { memory, routines: carried, ...bot } = entry;
+			if (carried === undefined) {
+				// A machine on the version before routines synced sends none and may drop them from the remote, so this machine keeps its own.
+				routines.push(...kept.filter(routine => routine.botId === entry.id));
+			} else {
+				const parsed = parseAll(carried, routine => parseRoutine(routine, entry.id));
+				if (!parsed) return null;
+				routines.push(...parsed);
+			}
 			memories.set(entry.id, memory);
 			local.push({ ...bot, cwd: localPath(entry.cwd, home), sessionId: sessions.get(entry.id as Bot["id"]) ?? null });
 		}
 		const bots = file.parse({ bots: local });
-		return bots && bots.length === value.length ? { bots, memories } : null;
+		return bots && bots.length === value.length ? { bots, memories, routines } : null;
+	};
+	/** The routines file after `incoming`, in its own order with new routines last; each keeps the runs and schedule this computer ran. */
+	const nextRoutines = (incoming: readonly CarriedRoutine[]): Routine[] => {
+		const stored = routinesFile.value;
+		const byId = new Map(incoming.map(routine => [routine.id, routine]));
+		const storedIds = new Set(stored.map(routine => routine.id));
+		return [
+			...stored.flatMap(({ id, runs, scheduledAt }) => {
+				const routine = byId.get(id);
+				return routine ? [{ ...routine, scheduledAt, runs }] : [];
+			}),
+			...incoming.filter(routine => !storedIds.has(routine.id)).map(routine => ({ ...routine, scheduledAt: null, runs: [] })),
+		];
 	};
 	return {
-		read: () => portable(current(), id => memoryLines(memoryPath(id))),
+		read: () => portable(current(), id => memoryLines(memoryPath(id)), localRoutines()),
 		parse: value => {
 			const parsed = parse(value);
-			return parsed && { ok: portable(parsed.bots, id => parsed.memories.get(id) ?? []) };
+			return parsed && { ok: portable(parsed.bots, id => parsed.memories.get(id) ?? [], parsed.routines) };
 		},
 		write: value => {
 			const parsed = parse(value);
@@ -369,7 +414,13 @@ function botsStore(file: SyncedFile<Bot[]>, botsDir: string, home: string, chang
 				file.replace(parsed.bots);
 				wrote = true;
 			}
-			if (wrote) changed();
+			if (wrote) changed("bots");
+			// After the Bots, since a routine belongs to one.
+			const routines = nextRoutines(parsed.routines);
+			if (!Bun.deepEquals(routines, routinesFile.value)) {
+				routinesFile.replace(routines);
+				changed("routines");
+			}
 		},
 	};
 }
@@ -386,6 +437,21 @@ export interface SyncedFiles {
 	bots: SyncedFile<Bot[]>;
 	/** Where each Bot's memory directory is. */
 	botsDir: string;
+	/** The routines, which travel inside their Bots; the runs stay here. */
+	routines: Pick<ReducerFile<Routine[], never>, "value" | "replace">;
+	/** This computer, as the routines it runs name it to the others. */
+	machine: RoutineMachine;
+}
+
+/** This computer as Settings sync names it to the others: an id kept in `path`, made on first use since a Mac's name can change, and its name now. */
+export function thisMachine(path: string): RoutineMachine {
+	const name = hostname().replace(/\.local$/, "");
+	const saved = existsSync(path) ? parseJson(readFileSync(path, "utf8")) : undefined;
+	if (isObject(saved) && isNonEmpty(saved.id)) return { id: saved.id, name };
+	const id = randomUUID();
+	mkdirSync(dirname(path), { recursive: true });
+	atomicWriteTextSync(path, `${JSON.stringify({ id })}\n`);
+	return { id, name };
 }
 
 /** Every store sync carries, over `files`; `changed` hears each list a sync rewrote, for the pages that show it. */
@@ -398,7 +464,7 @@ export function syncStores(files: SyncedFiles, home: string, changed: (list: Lis
 		workspaces: fileStore(files.workspaces, () => changed("workspaces"), homePaths(home)),
 		// The Calendar page asks for its calendars again, and the server reads which are hidden as it answers.
 		calendars: fileStore(files.calendars),
-		bots: botsStore(files.bots, files.botsDir, home, () => changed("bots")),
+		bots: botsStore(files, home, changed),
 	};
 }
 

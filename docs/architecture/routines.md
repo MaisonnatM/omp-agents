@@ -7,6 +7,10 @@ Two intervals share that last scheduled run, so the shorter one decides.
 The routine keeps that run's time in `scheduledAt`, which a slot's or **Run now**'s claim sets and a trigger's leaves alone, so a busy Slack moves no schedule; a file from before triggers reads it as its newest run's time.
 Its task is a `prompt`, a message that goes into the Bot's conversation, or a `command`, a shell command that runs in the Bot's workspace.
 A routine has no workspace, skill, or pin of its own: the Bot's workspace, job, and conversation stand in for them.
+A routine runs only where `runsHere` in `src/routines.ts` holds: it is `enabled` and its `machine` is `null`, as it is for every routine made, edited on, or turned on here.
+Settings sync carries routines inside their Bots and sets `machine` to the other machine that runs one, `{ id, name }`; see [Settings sync](settings-sync.md).
+`applyRoutine` keeps `machine` through an edit, clears it when a routine is paused, and clears it when **enable** turns on a routine another machine runs, setting `scheduledAt` to now so a slot that machine ran does not run again here at once.
+`isDue` and `isTriggeredBy` check `runsHere`, so the runner, the triggers, and `watchedKinds` skip a routine another machine runs, and the page shows **Runs on** and that machine's name with its switch off.
 
 `src/server/routines-file.ts` keeps the routines in `routines.json` beside the access token, and saves every change at once.
 A file from before `schedules` reads its `schedule` as a one-element list, and drops, with a log line, a routine whose task was pull requests or a project, kinds an older version ran.

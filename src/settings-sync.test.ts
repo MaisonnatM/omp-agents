@@ -1,14 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { canonicalJson } from "./json";
 import { runChecked } from "./proc";
+import { isDue, type RoutineSpec } from "./routines";
 import { BotsFile } from "./server/bots-file";
 import { CalendarsFile } from "./server/calendars-file";
 import type { ListKind } from "./server/list-registry";
 import { PreferencesFile } from "./server/preferences-file";
 import { ProcessSettingsFile } from "./server/process-settings-file";
+import { RoutinesFile } from "./server/routines-file";
 import { UserNotesFile } from "./server/user-notes-file";
 import { UserTodosFile } from "./server/user-todos-file";
 import { WorkspacesFile } from "./server/workspaces-file";
@@ -222,6 +224,8 @@ function machine(root: string, remote: string) {
 		calendars: new CalendarsFile(config("calendars.json")),
 		bots: new BotsFile(config("bots.json")),
 		botsDir: join(root, "data", "bots"),
+		routines: new RoutinesFile(config("routines.json")),
+		machine: { id: `machine-${basename(root)}`, name: basename(root) },
 	};
 	const changed = new Set<ListKind>();
 	const places = { omp, home, stores: syncStores(files, home, list => changed.add(list)) };
@@ -321,6 +325,42 @@ describe("SettingsSync", () => {
 		await a.sync.sync();
 		for (const side of [a, b]) expect(readFileSync(memory(side), "utf8")).toBe("- 2026-01-01 likes tea\n- 2026-01-02 from B\n- 2026-01-02 from A\n");
 		expect([a.bots.value[0]?.sessionId, b.bots.value[0]?.sessionId]).toEqual(["session-a", "session-b"]);
+	});
+
+	test("runs each routine on one computer: it arrives on the other without running there, and enabling it there moves it", async () => {
+		const { a, b } = await pair();
+		const bot = { id: parseBotId("ann") as BotId, kind: "routines", name: "Ann", job: "Triage.", cwd: join(a.home, "code"), model: null, skill: null, shape: "circle", hue: 25 } as const;
+		const routine: RoutineSpec = { id: "r1", botId: bot.id, name: "Standup", schedules: [{ kind: "every", minutes: 60 }], triggers: [], task: { kind: "prompt", prompt: "Post the standup." }, enabled: true };
+		const hour = 60 * 60_000;
+		const t0 = Date.parse("2026-01-01T09:00:00Z");
+		a.bots.apply({ op: "save", bot }, "2026-01-01T00:00:00.000Z");
+		a.routines.apply({ op: "save", routine }, t0);
+		a.routines.claim("r1", t0 + hour, []);
+		await a.sync.sync();
+		await b.sync.sync();
+		expect(b.routines.value).toEqual([{ ...routine, machine: { id: "machine-a", name: "a" }, createdAt: t0, scheduledAt: null, runs: [] }]);
+		expect(b.changed.has("routines")).toBe(true);
+		expect([isDue(a.routines.value[0]!, t0 + 3 * hour), isDue(b.routines.value[0]!, t0 + 3 * hour)]).toEqual([true, false]);
+
+		b.routines.apply({ op: "enable", id: "r1", enabled: true }, t0 + 2 * hour);
+		await b.sync.sync();
+		await a.sync.sync();
+		expect(a.routines.value[0]).toMatchObject({ enabled: true, machine: { id: "machine-b", name: "b" }, scheduledAt: t0 + hour });
+		expect(a.routines.value[0]?.runs).toHaveLength(1);
+		expect([isDue(a.routines.value[0]!, t0 + 3 * hour), isDue(b.routines.value[0]!, t0 + 3 * hour)]).toEqual([false, true]);
+
+		// Both computers changing where it runs conflict, so it never lands on both.
+		a.routines.apply({ op: "enable", id: "r1", enabled: true }, t0 + 4 * hour);
+		b.routines.apply({ op: "enable", id: "r1", enabled: false }, t0 + 4 * hour);
+		await a.sync.sync();
+		expect((await b.sync.sync()).last).toMatchObject({ kind: "conflict", conflicts: [{ path: "dashboard/bots.json", item: "bots" }] });
+		await b.sync.sync({ "dashboard/bots.json": "remote" });
+		expect(b.routines.value[0]).toMatchObject({ enabled: true, machine: { id: "machine-a", name: "a" } });
+
+		// A computer on the version before routines synced sends Bots without them, which leaves this computer's routines alone.
+		const bots = b.places.stores.bots;
+		bots.write((bots.read() as Record<string, unknown>[]).map(({ routines: _, ...entry }) => entry));
+		expect(b.routines.value.map(({ id }) => id)).toEqual(["r1"]);
 	});
 
 	test("keeps the todos and notes two machines each added, carries the preferences, workspaces and their spaces, and each todo's Workspace, and settles both on one list", async () => {

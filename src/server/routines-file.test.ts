@@ -88,6 +88,7 @@ test("an older file keeps its other routines, reads one schedule as a list, and 
 			botId: ROUTINES_BOT_ID,
 			schedules: [schedule],
 			triggers: [],
+			machine: null,
 			// Before triggers, the schedules counted from the newest run.
 			scheduledAt: 4,
 			runs: [
