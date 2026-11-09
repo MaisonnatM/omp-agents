@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-09
 
+- New session's retro sun now sits lower, leaving more room under the title.
 - Buttons now have tighter corners, matching yampa's.
 - Landing a branch that adds a package now works: `land` installs packages after merging the branch, not before.
 - You can open the dashboard on your phone from anywhere: turn on Settings › Phone access and scan the code.
