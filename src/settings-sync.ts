@@ -3,15 +3,17 @@
  * with the remote's against the last commit this machine applied, pushes the result, and writes what changed here. It
  * can also point sync at a private GitHub repository, which `ensurePrivateRepo` in `github.ts` creates through `gh`.
  */
+import { mkdirSync, readFileSync } from "node:fs";
 import { mkdir, readdir, readFile, realpath, rm, rmdir, stat } from "node:fs/promises";
 import { hostname } from "node:os";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
-import { atomicWriteText, JsonFile, type ReducerFile } from "./fs";
+import { atomicWriteText, atomicWriteTextSync, JsonFile, type ReducerFile } from "./fs";
 import { ensurePrivateRepo } from "./github";
-import { canonicalJson, errorText, isObject, type Parsed, parseJson } from "./json";
+import { canonicalJson, errorText, isObject, isTexts, type Parsed, parseJson } from "./json";
 import { SerialLane } from "./serial-lane";
 import type { HiddenCalendars } from "./server/calendars-file";
 import type { ListKind } from "./server/list-registry";
+import type { Bot } from "./shared/bots";
 import type { PagePreferences } from "./shared/preferences";
 import type { ProcessSettings } from "./shared/processes";
 import { DEFAULT_SYNC_SETTINGS, isSyncOutcome, neverSynced, parseSyncSettings, SYNC_ITEMS, type SyncAnswer, type SyncConflict, type SyncItem, type SyncOutcome, type SyncSettings, type SyncSide, type SyncSkip, type SyncStoreId } from "./shared/settings-sync";
@@ -315,6 +317,63 @@ function homePaths(home: string): Carriage {
 	return { portable: json => each(json, portablePath), local: json => each(json, localPath) };
 }
 
+/** A Bot's memory, one line per fact; empty while it has none. */
+function memoryLines(path: string): string[] {
+	try {
+		return readFileSync(path, "utf8").split("\n").filter(line => line.trim() !== "");
+	} catch {
+		return [];
+	}
+}
+
+/**
+ * The Bots with their memories, each a list of facts so two machines' new facts merge. A Bot's conversation stays on the
+ * machine that ran it, so a Bot arriving from another machine starts one here; its workspace is named from `home`.
+ */
+function botsStore(file: SyncedFile<Bot[]>, botsDir: string, home: string, changed: () => void): SyncStore {
+	const memoryPath = (id: string): string => join(botsDir, id, "memory.md");
+	const current = (): Bot[] => file.parse(file.json()) ?? [];
+	const portable = (bots: Bot[], memory: (id: string) => string[]): unknown =>
+		bots.map(({ sessionId: _, ...bot }) => ({ ...bot, cwd: portablePath(bot.cwd, home), memory: memory(bot.id) }));
+	const parse = (value: unknown): { bots: Bot[]; memories: Map<string, string[]> } | null => {
+		if (!Array.isArray(value)) return null;
+		const sessions = new Map(current().map(bot => [bot.id, bot.sessionId]));
+		const memories = new Map<string, string[]>();
+		const local: unknown[] = [];
+		for (const entry of value) {
+			if (!isPlainObject(entry) || typeof entry.id !== "string" || typeof entry.cwd !== "string" || !isTexts(entry.memory)) return null;
+			const { memory, ...bot } = entry;
+			memories.set(entry.id, memory);
+			local.push({ ...bot, cwd: localPath(entry.cwd, home), sessionId: sessions.get(entry.id as Bot["id"]) ?? null });
+		}
+		const bots = file.parse({ bots: local });
+		return bots && bots.length === value.length ? { bots, memories } : null;
+	};
+	return {
+		read: () => portable(current(), id => memoryLines(memoryPath(id))),
+		parse: value => {
+			const parsed = parse(value);
+			return parsed && { ok: portable(parsed.bots, id => parsed.memories.get(id) ?? []) };
+		},
+		write: value => {
+			const parsed = parse(value);
+			if (!parsed) throw new Error("Sync cannot write Bots their store does not keep");
+			let wrote = false;
+			for (const [id, lines] of parsed.memories) {
+				if (Bun.deepEquals(lines, memoryLines(memoryPath(id)))) continue;
+				mkdirSync(join(botsDir, id), { recursive: true });
+				atomicWriteTextSync(memoryPath(id), lines.length > 0 ? `${lines.join("\n")}\n` : "");
+				wrote = true;
+			}
+			if (!Bun.deepEquals(parsed.bots, current())) {
+				file.replace(parsed.bots);
+				wrote = true;
+			}
+			if (wrote) changed();
+		},
+	};
+}
+
 /** The files sync carries beside omp's. */
 export interface SyncedFiles {
 	sourceControl: SourceControl;
@@ -324,6 +383,9 @@ export interface SyncedFiles {
 	processes: SyncedFile<ProcessSettings>;
 	workspaces: SyncedFile<WorkspaceList>;
 	calendars: SyncedFile<HiddenCalendars>;
+	bots: SyncedFile<Bot[]>;
+	/** Where each Bot's memory directory is. */
+	botsDir: string;
 }
 
 /** Every store sync carries, over `files`; `changed` hears each list a sync rewrote, for the pages that show it. */
@@ -336,6 +398,7 @@ export function syncStores(files: SyncedFiles, home: string, changed: (list: Lis
 		workspaces: fileStore(files.workspaces, () => changed("workspaces"), homePaths(home)),
 		// The Calendar page asks for its calendars again, and the server reads which are hidden as it answers.
 		calendars: fileStore(files.calendars),
+		bots: botsStore(files.bots, files.botsDir, home, () => changed("bots")),
 	};
 }
 

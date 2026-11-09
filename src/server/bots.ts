@@ -191,6 +191,11 @@ export class Bots {
 		this.#read.clear();
 	}
 
+	/** Forgets every Bot's files as read, after a sync wrote its memories. */
+	forgetRead(): void {
+		this.#read.clear();
+	}
+
 	#memoryPath(id: BotId): string {
 		return join(this.#deps.paths.botsDir, id, "memory.md");
 	}
