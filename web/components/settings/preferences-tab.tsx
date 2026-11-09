@@ -46,7 +46,7 @@ function SidebarTabs() {
 	return (
 		<Section
 			title="Sidebar tabs"
-			meta={`The tabs the sidebar shows, in order. Notes, Calendar, Email, and Sport sit in the header beside the command menu, and ${shortcutKeys("tab1")} goes to the first tab the sidebar's bar draws. A hidden tab's page, command, and links still work. Tickets shows only in Work and Sport only in Personal. Saved in this app.`}
+			meta={`The tabs the sidebar shows, in order. Notes, Calendar, Email, and Sport sit in the header beside the command menu, and ${shortcutKeys("tab1")} goes to the first tab the sidebar's bar draws. A hidden tab's page, command, and links still work. Saved in this app.`}
 		>
 			<ol className="space-y-1 text-sm">
 				{layout.map(({ tab, hidden }, index) => {
@@ -62,7 +62,7 @@ function SidebarTabs() {
 								{"integration" in row && signedOut.has(tab) && (
 									<p className="text-xs text-muted-foreground">Shows only while {MCP_SERVICES[row.integration].label} is connected.</p>
 								)}
-								{only !== null && only !== space && <p className="text-xs text-muted-foreground">Shows only in {SPACE_LABELS[only]}.</p>}
+								{only !== null && <p className="text-xs text-muted-foreground">Shows only in {SPACE_LABELS[only]}.</p>}
 							</div>
 							<span className="w-12 shrink-0 text-right text-xs text-muted-foreground">{position === undefined ? null : shortcutKeys(position)}</span>
 							<ToggleSwitch

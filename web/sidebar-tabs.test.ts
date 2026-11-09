@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { type Page, routeFromHash } from "./routing";
 import { bindingLabel, IS_MAC } from "./shortcuts";
 import {
 	DEFAULT_TAB_LAYOUT,
@@ -6,6 +7,7 @@ import {
 	encodeTabLayout,
 	hideTab,
 	moveTab,
+	pageSpace,
 	placedTabs,
 	positionKey,
 	shortcutRows,
@@ -134,6 +136,23 @@ test("Tickets shows only in Work and Sport only in Personal; every other tab sho
 	expect(tabsOutOfSpace("personal")).toEqual(["tickets"]);
 	expect(tabsOutOfSpace("work")).toEqual(["sport"]);
 	expect(DEFAULT_TAB_LAYOUT.map(({ tab }) => tabSpace(tab))).toEqual([null, "work", null, null, null, null, null, null, "personal"]);
+});
+
+const pageAt = (hash: string): Page => {
+	const route = routeFromHash(hash);
+	if (route.kind !== "page") throw new Error(`${hash} names no page`);
+	return route.page;
+};
+
+test("a link to Sport takes the window to Personal and a link to Tickets to Work, whichever of their pages it opens", () => {
+	expect(pageSpace(pageAt("#sport"))).toBe("personal");
+	expect(pageSpace(pageAt("#sport/journal"))).toBe("personal");
+	expect(pageSpace(pageAt("#tickets"))).toBe("work");
+	expect(pageSpace(pageAt("#tickets/ENG-12"))).toBe("work");
+});
+
+test("every other page shows in both spaces and leaves the window's space as it is", () => {
+	for (const hash of ["#todo", "#notes", "#calendar", "#pull-requests", "#bots", "#settings/models", "#get-started", "#scheduled"]) expect(pageSpace(pageAt(hash))).toBeNull();
 });
 
 test("in Personal the bar closes up over the absent Tickets tab, so Cmd+1 onward still go to the tabs it draws in order", () => {

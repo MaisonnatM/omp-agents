@@ -8,7 +8,7 @@ import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { SizeProvider } from "@/lib/size-context";
 import { activityControl } from "../activity";
-import { SPACE_LABELS } from "../labels";
+import { SPACE_LABELS, sessionsWaiting } from "../labels";
 import { PAGE_ICON } from "../page-icons";
 import type { SidebarPanel, SidebarTab } from "../routing";
 import { shortcutLabels } from "../shortcuts";
@@ -74,10 +74,10 @@ function SpaceSwitch({ space, onSpace, otherWaiting }: SpaceSwitchProps) {
 								icon={SPACE_ICONS[value]}
 								label={SPACE_LABELS[value]}
 								labelClassName="@max-[56rem]/header:sr-only"
-								tooltip={SPACE_LABELS[value]}
+								tooltip={waiting > 0 ? `${SPACE_LABELS[value]} · ${sessionsWaiting(waiting)}` : SPACE_LABELS[value]}
 								shortcut={value === space ? undefined : shortcutLabels("switchSpace")}
 								badge={waiting > 0 ? waiting : undefined}
-								aria-label={waiting > 0 ? `${SPACE_LABELS[value]}, ${waiting} waiting on you` : undefined}
+								aria-label={waiting > 0 ? `${SPACE_LABELS[value]}, ${sessionsWaiting(waiting)}` : undefined}
 							/>
 						);
 					})}

@@ -10,7 +10,7 @@
   Each window keeps its own space, and a new window or a reload opens in the last space picked on this computer, Work the first time.
   Opening a link to a session of the other space, from a notification or another window, switches the window to that space.
   So does a link to Sport, which shows only in Personal, or to Tickets, which shows only in Work.
-- The side of the switch for the space not shown counts that space's sessions that need you, each that asks you something or finished a turn you have not looked at, so they do not wait unseen; a screen reader reads the count with the space's name.
+- The side of the switch for the space not shown counts that space's sessions that need you, each that asks you something or finished a turn you have not looked at, so they do not wait unseen; hovering the side, or a screen reader, says how many sessions wait on you.
   Their notifications still show while you work in the other space, and clicking one switches to its space; the Dock badge counts both spaces.
 - The content header and both sidebar header rows are 48 px tall at the default font size, each with a hairline under it.
 - The sidebar's tab bar shows **Pull requests**, **Tickets**, **Bots**, **Sessions**, and **Todo**, above the list of the one open; **Tickets** shows only in Work.

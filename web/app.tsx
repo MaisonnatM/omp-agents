@@ -45,7 +45,7 @@ import { useOpenPullRequest } from "./open-pull-request";
 import { integrationsStore } from "./reads";
 import { EMPTY_LAYOUT, hashForLayout, hashForPage, hashForRoute, hashForView, type NotesListView, type OpenMode, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
-import { defaultCwd, spaceSession, type WindowScope, waitingIn, workspaceSession, workspaceSwitch } from "./sessions";
+import { defaultCwd, spaceSwitchPanes, type WindowScope, waitingIn, workspaceSession, workspaceSwitch } from "./sessions";
 import { placedTabs, useSidebarTabs } from "./sidebar-tabs";
 import { refusedStart, startOf } from "./starts";
 import { useAttention } from "./use-attention";
@@ -54,7 +54,7 @@ import { useFocusedSession } from "./use-focused-session";
 import { useOverlays } from "./use-overlays";
 import { usePageShortcuts } from "./use-page-shortcuts";
 import { useSessionLists } from "./use-session-lists";
-import { pageSpace, useSettingsRoute, useSidebarTab, useSpaceFollowsPage } from "./use-sidebar-tab";
+import { useSettingsRoute, useSidebarTab } from "./use-sidebar-tab";
 import { useTranscriptDisplay } from "./use-transcript-display";
 import { useWorkspaceScope } from "./use-workspace-scope";
 
@@ -80,10 +80,10 @@ export function App() {
 	const terminal = useTerminalPanel();
 	useNoticeToasts(state.notices, state.connected, send, start);
 	useAttention(state, openBot?.view ?? null, send);
-	/** How many sessions of the space off screen need you, which the switch counts on its side; none until the server names the personal directory, before which every session reads as Work. */
+	/** How many sessions the space off screen lists need you, which the switch counts on its side; none until the spaces are known. */
 	const otherWaiting = useMemo(
-		() => (state.connected && state.personal !== null ? waitingIn(state.hosts, otherSpace(space), spaces) : 0),
-		[state.connected, state.personal, state.hosts, space, spaces],
+		() => (state.connected && scope.spacesKnown ? waitingIn(scope.everySpace, otherSpace(space), spaces) : 0),
+		[state.connected, scope.spacesKnown, scope.everySpace, space, spaces],
 	);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
 	const [goalEditor, setGoalEditor] = useState<{ instanceId: string; focus: "objective" | "budget" } | null>(null);
@@ -100,7 +100,6 @@ export function App() {
 	const settings = useSettingsRoute(page);
 	const latestBot = useMemo(() => (state.bots === null ? null : (botRows(state.bots, state.hosts, state.botLasts)[0]?.bot.id ?? null)), [state.bots, state.hosts, state.botLasts]);
 	const { tab, showTab } = useSidebarTab({ page, absentTabs, layout, latestSession: sessions.latest, latestBot, navigate, show });
-	useSpaceFollowsPage(page, space, pickSpace);
 	/** The tabs the bar draws, which Cmd+1 onward go to in order. */
 	const barTabs = useMemo(() => placedTabs(tabs, "bar"), [tabs]);
 	const headerTabs = useMemo(() => placedTabs(tabs, "header"), [tabs]);
@@ -146,17 +145,10 @@ export function App() {
 			const { page, layout, scope } = latest.current;
 			if (next === scope.space) return;
 			pickSpace(next);
-			// The panes follow the space the user picks; `useFocusedSession` follows the panes into a session's space the other way, and `useSpaceFollowsPage` a page into its space.
-			// A page stays, but for one of the space left alone, such as Sport, which gives way to the panes. The panes leave the other space's sessions for the newest running in this one, else show none.
-			const leaving = page !== null && pageSpace(page) === scope.space;
-			if (page && !leaving) return;
-			if (layout.panes.length === 0) {
-				if (leaving) show(layout);
-				return;
-			}
-			const session = spaceSession(next, scope.everySpace.hosts, scope.spaces);
-			if (session) open(session, "replace");
-			else show(EMPTY_LAYOUT);
+			// The route follows the space the user picks; `useFocusedSession` follows the route into its space the other way.
+			const panes = spaceSwitchPanes(page, layout, scope.space, next, scope.everySpace.hosts, scope.spaces);
+			if (panes === "empty") show(EMPTY_LAYOUT);
+			else if (panes !== "stay") open(panes, "replace");
 		},
 		[pickSpace, open, show],
 	);
@@ -412,7 +404,7 @@ export function App() {
 											todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
 											todos={mentionLists.todos}
 											notes={state.userNotes?.notes ?? null}
-											linearConnected={ticketsCallable}
+											ticketsCallable={ticketsCallable}
 											onCreateTicket={setNewTicket}
 										/>
 									</SidebarProvider>

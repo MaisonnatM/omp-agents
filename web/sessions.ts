@@ -3,6 +3,8 @@ import { awaitsSubagents, newestPastFirst, type PastSession, type RosterHost, ty
 import { inTempDir, type Space, type Spaces, type Workspace } from "../src/shared/workspaces";
 import { everyWord } from "../src/shared/every-word";
 import { needsYou } from "./attention";
+import type { Layout, Page } from "./routing";
+import { pageSpace } from "./sidebar-tabs";
 
 /** A working directory outside the temp directories, and not one Settings → Workspaces hid. */
 export function discoverableCwd(cwd: string, hidden: ReadonlySet<string>): boolean {
@@ -89,6 +91,16 @@ export function workspaceSession(cwd: string | null, hosts: RosterHost[], shownW
 	if (cwd === null || shownWorkspace === cwd) return null;
 	const newest = hosts.filter(host => workspaceCwd(host) === cwd).toSorted(newestFirst)[0];
 	return newest ? { kind: "live", instanceId: newest.instanceId, agentId: null } : null;
+}
+
+/**
+ * What a switch from space `from` to `to` does to the panes under `page`: a page of both spaces, or of `to`, stays; otherwise the
+ * panes leave, or a page of `from` such as Sport gives way to them, for the newest session running in `to`, else show none.
+ */
+export function spaceSwitchPanes(page: Page | null, layout: Layout, from: Space, to: Space, hosts: RosterHost[], spaces: Spaces): View | "empty" | "stay" {
+	if (page && pageSpace(page) !== from) return "stay";
+	const session = layout.panes.length === 0 ? null : spaceSession(to, hosts, spaces);
+	return session ?? "empty";
 }
 
 /** The session the panes follow a switch to `space` into: its most recently started running one; `null` when none runs there. */
@@ -193,8 +205,11 @@ export function searchSessions(lists: SidebarSessions, query: string): SidebarSe
 /** How many live sessions in `lists` need you: each that asks you something, or finished a turn you have not looked at since, as the Dock badge counts them. */
 export const waitingCount = (lists: SidebarSessions): number => [...lists.pinned.hosts, ...liveHosts(lists)].filter(needsYou).length;
 
-/** How many live sessions of `hosts` count in `space` and need you; the two spaces' counts add up to the Dock badge's. */
-export const waitingIn = (hosts: RosterHost[], space: Space, spaces: Spaces): number => hosts.filter(host => needsYou(host) && spaceOf(host, spaces) === space).length;
+/** How many of `everySpace`'s live sessions and Bot conversations listed in `space` need you, as its Sessions and Bots tabs count them. */
+export function waitingIn(everySpace: { hosts: RosterHost[]; past: PastSession[]; bots: RosterHost[] }, space: Space, spaces: Spaces): number {
+	const { hosts, bots } = sessionsIn(everySpace, space, spaces);
+	return [...hosts, ...bots].filter(needsYou).length;
+}
 
 /** The session the Sessions tab opens when no pane shows one: of the rows `lists` holds, the live one started last, else the past one saved last. */
 export function latestSession(lists: SidebarSessions): View | null {

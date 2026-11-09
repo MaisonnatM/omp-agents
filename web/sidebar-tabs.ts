@@ -2,9 +2,9 @@
 import { useEffect, useMemo } from "react";
 import { isObject } from "../src/json";
 import { connectionsOf, type IntegrationsAnswer, signedIn } from "../src/shared/accounts";
-import { otherSpace, type Space } from "../src/shared/workspaces";
+import type { Space } from "../src/shared/workspaces";
 import { integrationsStore } from "./reads";
-import { SIDEBAR_TABS, type SidebarTab, type TabPlace } from "./routing";
+import { type Page, SIDEBAR_TABS, type SidebarTab, type TabPlace } from "./routing";
 import { type Binding, bindingLabel, SHORTCUTS, type ShortcutCategory, type ShortcutHandler, type ShortcutId, shortcutBindings, TAB_SHORTCUTS, type TabShortcut } from "./shortcuts";
 import { useStoredState } from "./stored-state";
 
@@ -29,6 +29,11 @@ export function tabSpace(tab: SidebarTab): Space | null {
 	const row = TAB_ROWS[tab];
 	return "space" in row ? row.space : null;
 }
+
+const isSidebarTab = (kind: string): kind is SidebarTab => kind in TAB_ROWS;
+
+/** The space page `page` shows in alone, its tab's {@link tabSpace}: Work for Tickets, Personal for Sport; `null` for a page of both. */
+export const pageSpace = (page: Page): Space | null => (isSidebarTab(page.kind) ? tabSpace(page.kind) : null);
 
 /**
  * The layout stored as `raw`. It keeps each known tab once, so a stored Settings tab from before the header's button drops out,
@@ -83,13 +88,19 @@ export const placedTabs = (shown: readonly SidebarTab[], place: TabPlace): Sideb
 export const tabsSignedOut = (integrations: IntegrationsAnswer["integrations"] | undefined): SidebarTab[] =>
 	SIDEBAR_TABS.flatMap(row => ("integration" in row && !(integrations && connectionsOf(integrations[row.integration]).some(signedIn)) ? [row.value] : []));
 
-/** The tabs of the space other than `space`, which then neither show nor take their shortcuts, and whose page takes the window to their space. */
-export const tabsOutOfSpace = (space: Space): SidebarTab[] => SIDEBAR_TABS.flatMap(({ value }) => (tabSpace(value) === otherSpace(space) ? [value] : []));
+/** The tabs of the space other than `space`, which then neither show nor take their shortcuts. */
+export const tabsOutOfSpace = (space: Space): SidebarTab[] => SIDEBAR_TABS.flatMap(row => ("space" in row && row.space !== space ? [row.value] : []));
+
+/** The tabs whose service omp holds no sign-in to, as {@link tabsSignedOut} names them; the same set until one signs in or out, whatever the integrations' polls answer. */
+export function useSignedOutTabs(): ReadonlySet<SidebarTab> {
+	const names = tabsSignedOut(integrationsStore.usePolling().read?.data.integrations);
+	const namesKey = names.join();
+	return useMemo((): ReadonlySet<SidebarTab> => new Set(names), [namesKey]);
+}
 
 /**
  * The tab layout, kept in this browser, and the tabs it shows in `space`; every component that holds it sees a change at once.
- * `signedOut` stays the same set until a tab's service signs in or out, whatever the integrations' polls answer; `absent`,
- * those and the other space's tabs, stays with it and the space; and `shown` stays with them until the layout changes.
+ * `absent`, the {@link useSignedOutTabs} and the other space's tabs, stays the same set until one of those changes; and `shown` stays with them until the layout changes.
  * A stored layout that still names {@link LEGACY_EMAIL_TAB} is stored again as it decodes, so the old id leaves this browser and Settings › Sync.
  */
 export function useSidebarTabs(space: Space): {
@@ -104,9 +115,7 @@ export function useSidebarTabs(space: Space): {
 	useEffect(() => {
 		if (localStorage.getItem(KEY)?.includes(`"tab":"${LEGACY_EMAIL_TAB}"`)) setLayout(layout);
 	}, [layout, setLayout]);
-	const names = tabsSignedOut(integrationsStore.usePolling().read?.data.integrations);
-	const namesKey = names.join();
-	const signedOut = useMemo((): ReadonlySet<SidebarTab> => new Set(names), [namesKey]);
+	const signedOut = useSignedOutTabs();
 	const absent = useMemo((): ReadonlySet<SidebarTab> => new Set([...signedOut, ...tabsOutOfSpace(space)]), [signedOut, space]);
 	const shown = useMemo(() => shownTabs(layout, absent), [layout, absent]);
 	return { layout, setLayout, signedOut, absent, shown };

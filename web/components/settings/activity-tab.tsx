@@ -6,8 +6,7 @@ import { inventory, report, type UsedFeature } from "../../activity-report";
 import { readTime } from "../../labels";
 import { activityStore } from "../../reads";
 import type { SidebarTab } from "../../routing";
-import { useSidebarTabs } from "../../sidebar-tabs";
-import { useDashboardStatus } from "../dashboard-context";
+import { useSignedOutTabs } from "../../sidebar-tabs";
 import { LoadNote } from "../sheet-details";
 import { full } from "./analytics-format";
 import { RangePicker, useRangedRead } from "./range";
@@ -110,7 +109,7 @@ function ActivityBody({ data, signedOut }: { data: ActivityRead; signedOut: Read
 /** Activity over the chosen range, read while the tab shows. */
 export function ActivityTab({ active }: { active: boolean }) {
 	const { range, setRange, data, error, switching } = useRangedRead(activityStore, "30d", active);
-	const { signedOut } = useSidebarTabs(useDashboardStatus().scope.space);
+	const signedOut = useSignedOutTabs();
 	return (
 		<div className="space-y-7">
 			<RangePicker range={range} onChange={setRange} />

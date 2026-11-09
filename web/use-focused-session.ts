@@ -1,9 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import type { PastSession, RosterHost, View } from "../src/shared/sessions";
 import type { DashboardState } from "./dashboard-state";
 import { documentTitle } from "./document-title";
 import { focusedView, type Page } from "./routing";
 import { spaceOf, workspaceCwd, workspaceSwitch } from "./sessions";
+import { pageSpace } from "./sidebar-tabs";
 import type { WorkspaceScope } from "./use-workspace-scope";
 
 /** The session the focused pane shows, as the sidebar, the title, and the details read it. */
@@ -31,10 +32,10 @@ export interface FocusedSession {
 
 /**
  * The focused pane's session. It keeps the document title on it, and when a `/move` takes a live session to another
- * workspace, the sidebar follows it there. When the panes open a session of the other space, from a link, Back, or a `/move`,
- * the window switches to that space, so the sidebar lists it.
+ * workspace, the sidebar follows it there. When the route shows the other space, the window switches to it: a page of one space,
+ * such as Sport, takes it there, and else the panes' session does, opened from a link, Back, or a `/move`, so the sidebar lists it.
  */
-export function useFocusedSession(state: DashboardState, page: Page | null, { workspace, hiddenCwds, pickWorkspace, space, pickSpace, spaces }: WorkspaceScope): FocusedSession {
+export function useFocusedSession(state: DashboardState, page: Page | null, { workspace, hiddenCwds, pickWorkspace, space, pickSpace, spaces, spacesKnown }: WorkspaceScope): FocusedSession {
 	const view = focusedView(state.layout);
 	const host = view?.kind === "live" ? state.hosts.find(h => h.instanceId === view.instanceId) : undefined;
 	const past = view?.kind === "past" ? state.past.find(s => s.sessionId === view.sessionId) : undefined;
@@ -54,12 +55,13 @@ export function useFocusedSession(state: DashboardState, page: Page | null, { wo
 		if (next !== null) pickWorkspace(next);
 	}, [live?.instanceId, live?.sessionWorkspace, workspace]);
 	const session = host ?? past;
-	// Until the server names the personal directory, every session reads as Work, so the follow waits for it; once named, a focused Personal session takes the window to Personal.
-	const sessionSpace = session && state.personal !== null ? spaceOf(session, spaces) : null;
-	// The one follower from the panes to the space; `switchSpace` moves the panes the other way. Keyed on the session and its space alone, so a switch the user makes while the panes show a session is not undone.
-	useEffect(() => {
-		if (sessionSpace !== null && sessionSpace !== space) pickSpace(sessionSpace);
-	}, [session?.sessionId, sessionSpace]);
+	const sessionSpace = session && spacesKnown ? spaceOf(session, spaces) : null;
+	const routeSpace = page ? pageSpace(page) : sessionSpace;
+	// The one follower from the route to the space; `switchSpace` moves the route the other way. Keyed on the route alone, so a switch the user makes is not undone,
+	// and a layout effect, so a page of the other space never paints in this one.
+	useLayoutEffect(() => {
+		if (routeSpace !== null && routeSpace !== space) pickSpace(routeSpace);
+	}, [page?.kind ?? null, session?.sessionId, routeSpace]);
 	const sessionId = view?.kind === "past" ? view.sessionId : view?.kind === "live" && view.agentId === null ? ((host ?? lastHost)?.sessionId ?? null) : null;
 	return {
 		view, host, past, lastHost, sessionId, row: host ?? lastHost ?? past, cwd: session?.cwd, workspace: session && workspaceCwd(session),

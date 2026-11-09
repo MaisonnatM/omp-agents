@@ -1,29 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { View } from "../src/shared/sessions";
-import type { Space } from "../src/shared/workspaces";
 import { type Layout, openView, type Page, type SettingsRoute, settingsSection, type SidebarPanel, type SidebarTab } from "./routing";
-import { tabSpace } from "./sidebar-tabs";
 import { useStoredState } from "./stored-state";
 
 /** The sidebar panel that goes with each page; the panes keep the tab you chose. A session's changes go with the sessions. */
 const PAGE_TAB: Partial<Record<Page["kind"], SidebarPanel>> = { "pull-requests": "pull-requests", tickets: "tickets", todo: "todo", bots: "bots", notes: "notes", calendar: "calendar", email: "email", sport: "sport", settings: "settings" };
-
-/** The space page `page` shows in alone, its tab's {@link tabSpace}: Work for Tickets, Personal for Sport; `null` for a page of both. */
-export function pageSpace(page: Page): Space | null {
-	const tab = PAGE_TAB[page.kind];
-	return tab === undefined || tab === "settings" ? null : tabSpace(tab);
-}
-
-/**
- * Takes the window to the space of a page that shows in one alone, such as Sport opened from a link in Work, as `useFocusedSession`
- * takes it to a session's. Keyed on the page's space alone, so a switch the user makes off such a page, which leaves it, is not undone.
- */
-export function useSpaceFollowsPage(page: Page | null, space: Space, pickSpace: (space: Space) => void): void {
-	const followed = page ? pageSpace(page) : null;
-	useEffect(() => {
-		if (followed !== null && followed !== space) pickSpace(followed);
-	}, [followed]);
-}
 
 /** The page each tab shows, but for Sessions, which shows the panes, and Bots while it has one to open. */
 const TAB_PAGE: Record<Exclude<SidebarTab, "sessions">, Page> = {

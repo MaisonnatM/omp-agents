@@ -60,6 +60,8 @@ export interface WorkspaceScope extends WindowScope {
 	/** The pull requests' scope, as {@link scopeOf} builds it from the workspace, else the space. */
 	pullRequestsScope: string;
 	pickSpace: (space: Space) => void;
+	/** The server named the personal directory; until then {@link WindowScope.spaces} reads every session as Work. */
+	spacesKnown: boolean;
 }
 
 /**
@@ -101,8 +103,9 @@ export function useWorkspaceScope(state: DashboardState): WorkspaceScope {
 		if (next !== null) pickWorkspace(next);
 	}, [started]);
 	const home = space === "personal" ? personalDir : null;
+	const spacesKnown = personalDir !== null;
 	return useMemo(
-		() => ({ visible, everySpace: discoverable, hiddenCwds, workspaces, allWorkspaces, workspace, pickWorkspace, pullRequestsScope, space, pickSpace, spaces: placement, home }),
-		[visible, discoverable, hiddenCwds, workspaces, allWorkspaces, workspace, pickWorkspace, pullRequestsScope, space, pickSpace, placement, home],
+		() => ({ visible, everySpace: discoverable, hiddenCwds, workspaces, allWorkspaces, workspace, pickWorkspace, pullRequestsScope, space, pickSpace, spaces: placement, spacesKnown, home }),
+		[visible, discoverable, hiddenCwds, workspaces, allWorkspaces, workspace, pickWorkspace, pullRequestsScope, space, pickSpace, placement, spacesKnown, home],
 	);
 }
