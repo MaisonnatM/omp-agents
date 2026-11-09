@@ -1,7 +1,7 @@
 /** `BotDetails`, the right sidebar on a Bot's page: its Details tab with its look and name, both editable in place, where it works, its job, memory, and its conversation's token usage, then Delete; its Routines tab; and its conversation's Tickets tab once it worked on any. */
 import { Plus, Repeat, Trash2 } from "lucide-react";
 import { type ReactNode, useEffect, useId, useState } from "react";
-import type { Routine } from "../../../src/routines";
+import { type Routine, runsHere } from "../../../src/routines";
 import { type Bot, BOT_KIND_INFO, type BotLook, type BotSpec, MAX_JOB_LENGTH } from "../../../src/shared/bots";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { PAGE_ICON } from "../../page-icons";
 import { hashForBotRoutine, hashForBots } from "../../routing";
 import { age } from "../../labels";
 import { sessionUsageStore } from "../../reads";
-import { runWords, startsWords } from "../../routines-model";
+import { notHereWords, runWords, startsWords } from "../../routines-model";
 import { useDashboardActions } from "../dashboard-context";
 import { DetailsEmpty, DetailsSidebarFrame } from "../details-sidebar-frame";
 import { MemoryList } from "../memory-list";
@@ -188,7 +188,7 @@ function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: r
 			) : (
 				<ul className="space-y-1.5">
 					{routines.map(routine => {
-						const starts = routine.enabled ? startsWords(routine) : "Paused";
+						const starts = notHereWords(routine) ?? startsWords(routine);
 						const last = routine.runs[0];
 						return (
 							<li key={routine.id}>
@@ -199,7 +199,7 @@ function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: r
 								>
 									<RunDot run={last} />
 									<span className="min-w-0">
-										<span className={cn("block truncate font-medium", !routine.enabled && "text-muted-foreground")}>{routine.name}</span>
+										<span className={cn("block truncate font-medium", !runsHere(routine) && "text-muted-foreground")}>{routine.name}</span>
 										<span className="block truncate text-xs text-muted-foreground" title={starts}>
 											{starts}
 										</span>

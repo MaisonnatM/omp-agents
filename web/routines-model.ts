@@ -3,6 +3,7 @@ import {
 	MAX_COMMAND_LENGTH,
 	MAX_ROUTINE_RUNS,
 	nextDueAt,
+	runsHere,
 	TRIGGER_KINDS,
 	type CommandRun,
 	type Routine,
@@ -131,16 +132,23 @@ export function pastRunWords(at: number, now: number): string {
 	return `${dayName(date.getDay() as Weekday)} ${date.getDate()} ${MONTH_NAMES[date.getMonth()]}, ${time}`;
 }
 
-/** When `routine`'s schedules run it next, `null` while it is paused or has no schedule. */
+/** When `routine`'s schedules run it next on this computer, `null` while it is paused, runs on another computer, or has no schedule. */
 export const scheduledRunAt = (routine: Routine): number | null =>
-	routine.enabled && routine.schedules.length > 0 ? nextDueAt(routine.schedules, routine.scheduledAt ?? routine.createdAt) : null;
+	runsHere(routine) && routine.schedules.length > 0 ? nextDueAt(routine.schedules, routine.scheduledAt ?? routine.createdAt) : null;
+
+/** Why `routine` does not run on this computer: `Paused` while it is off, `Runs on Studio` while another computer runs it; `null` while it runs here. */
+export function notHereWords(routine: Pick<Routine, "enabled" | "machine">): string | null {
+	if (!routine.enabled) return "Paused";
+	return routine.machine && `Runs on ${routine.machine.name}`;
+}
 
 /**
- * When `routine` runs next: `Paused` while it is off, `Due now` once its slot passed, which the next minute's check runs,
- * `On a trigger` when it has no schedule, else `Next run in 2 h 14 min`.
+ * When `routine` runs next: {@link notHereWords} while it runs elsewhere or not at all, `Due now` once its slot passed,
+ * which the next minute's check runs, `On a trigger` when it has no schedule, else `Next run in 2 h 14 min`.
  */
 export function nextRunWords(routine: Routine, now: number): string {
-	if (!routine.enabled) return "Paused";
+	const notHere = notHereWords(routine);
+	if (notHere) return notHere;
 	const at = scheduledRunAt(routine);
 	if (at === null) return "On a trigger";
 	return at <= now ? "Due now" : `Next run ${countdownWords(at, now)}`;

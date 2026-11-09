@@ -28,7 +28,7 @@ import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, personalDir, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, signInInboxDir, sourceControlFile, sportFile, sportInboxDir, sportThumbsDir, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, machineFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, personalDir, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, signInInboxDir, sourceControlFile, sportFile, sportInboxDir, sportThumbsDir, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -37,7 +37,7 @@ import { worktreeAt } from "../git";
 import { runShell } from "../proc";
 import type { ServedBuild } from "../served-build";
 import { SourceControl } from "../source-control";
-import { SettingsSync, syncStores } from "../settings-sync";
+import { SettingsSync, syncStores, thisMachine } from "../settings-sync";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT, watchedKinds } from "../routines";
 import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
@@ -219,10 +219,11 @@ export class Dashboard {
 		const workspaces = (this.#workspaces = new WorkspacesFile(workspacesFile));
 		// A sync, which runs only once the server listens, tells the pages that show a list it rewrote.
 		const stores = syncStores(
-			{ sourceControl: this.#sourceControl, notes: this.#notes, todos: this.#todos, preferences: this.#preferences, processes: this.#processSettings, workspaces, calendars: this.#calendars, bots: this.#botsFile, botsDir },
+			{ sourceControl: this.#sourceControl, notes: this.#notes, todos: this.#todos, preferences: this.#preferences, processes: this.#processSettings, workspaces, calendars: this.#calendars, bots: this.#botsFile, botsDir, routines: this.#routines, machine: thisMachine(machineFile) },
 			HOME,
 			list => {
-				if (list === "bots") this.#botsSynced();
+				// Every Bot memory is read again, since a sync may have rewritten them.
+				if (list === "bots") this.#bots.forgetRead();
 				this.#broadcasts.pushList(list);
 			},
 		);
@@ -962,14 +963,6 @@ export class Dashboard {
 		this.#routines.migrate(bot => {
 			if (!this.#botsFile.value.some(({ id }) => id === bot.id)) this.#lists.apply("bots", { op: "save", bot });
 		});
-	}
-
-	/** After a sync rewrote the Bots or their memories: a Bot it removed takes its routines along, and every memory is read again. */
-	#botsSynced(): void {
-		const kept = new Set(this.#botsFile.value.map(({ id }) => id));
-		const gone = new Set(this.#routines.value.map(({ botId }) => botId).filter(id => !kept.has(id)));
-		if ([...gone].map(id => this.#routines.removeBot(id)).some(Boolean)) this.#broadcasts.pushList("routines");
-		this.#bots.forgetRead();
 	}
 
 	/** Starts the runs of the routines whose triggers the last check saw news for, on the server that runs routines; another server drops the news. */

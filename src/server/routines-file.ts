@@ -11,6 +11,7 @@ import {
 	applyRoutine,
 	MAX_ROUTINE_RUNS,
 	MAX_TRIGGER_EVENTS,
+	isRoutineMachine,
 	parseCommandRun,
 	parseRoutineSpec,
 	parseTriggerEvent,
@@ -145,10 +146,12 @@ function parseRoutine(value: unknown): Routine | { dropped: string } | null {
 	if (!spec) return null;
 	const { createdAt } = value;
 	const runs = parseAll(value.runs, parseRun);
-	if (typeof createdAt !== "number" || !runs) return null;
+	// Before Settings sync carried routines, every routine ran on this computer.
+	const machine = value.machine ?? null;
+	if (typeof createdAt !== "number" || !runs || !(machine === null || isRoutineMachine(machine))) return null;
 	// Before triggers, every run was a schedule's or Run now's, and the schedules counted from the newest.
 	const scheduledAt = "scheduledAt" in value ? value.scheduledAt : (runs[0]?.at ?? null);
-	return scheduledAt === null || isSafeInteger(scheduledAt) ? { ...spec.ok, createdAt, scheduledAt, runs } : null;
+	return scheduledAt === null || isSafeInteger(scheduledAt) ? { ...spec.ok, machine: spec.ok.enabled ? machine : null, createdAt, scheduledAt, runs } : null;
 }
 
 /** `routines.json`'s list, recording in `migration` what moved from the shape before every routine had a Bot. */

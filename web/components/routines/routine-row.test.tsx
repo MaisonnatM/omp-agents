@@ -17,6 +17,7 @@ function runNowButton(outcome: RoutineOutcome): string {
 		triggers: [],
 		task: { kind: "command", command: "git fetch" },
 		enabled: true,
+		machine: null,
 		createdAt: NOW - 60_000,
 		scheduledAt: NOW - 1_000,
 		runs: [{ at: NOW - 1_000, outcome, errors: [], triggeredBy: [] }],

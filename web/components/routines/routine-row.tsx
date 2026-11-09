@@ -2,7 +2,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, ChevronRight, Play } from "lucide-react";
 import { type KeyboardEvent, type MouseEvent, useId, useState } from "react";
-import type { Routine, RoutineRun } from "../../../src/routines";
+import { type Routine, type RoutineRun, runsHere } from "../../../src/routines";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -144,7 +144,8 @@ export function RoutineRow({ routine, botName, open, connected, now }: RoutineRo
 	const { request, send } = useDashboardActions();
 	const runNow = useAction(() => request({ t: "routine", change: { op: "run-now", id: routine.id } }), "Could not run the routine");
 	const [pickedAt, setPickedAt] = useState<number | null>(null);
-	const { id, botId, name, enabled, runs, task, triggers } = routine;
+	const { id, botId, name, machine, runs, task, triggers } = routine;
+	const here = runsHere(routine);
 	const latest = runs[0];
 	const picked = runs.find(({ at }) => at === pickedAt) ?? latest;
 	const health = latest && runHealth(latest);
@@ -191,14 +192,14 @@ export function RoutineRow({ routine, botName, open, connected, now }: RoutineRo
 							<span className="@max-[420px]/card:hidden">Run now</span>
 						</Button>
 						<ToggleSwitch
-							aria-label={`Enable ${name}`}
-							checked={enabled}
+							aria-label={machine ? `Run ${name} on this computer instead of ${machine.name}` : `Enable ${name}`}
+							checked={here}
 							disabled={!connected}
 							onCheckedChange={next => send({ t: "routine", change: { op: "enable", id, enabled: next } })}
 						/>
 					</div>
 				</div>
-				<div className={cn("flex min-w-0 items-center gap-3 text-xs text-muted-foreground", !enabled && "opacity-60")}>
+				<div className={cn("flex min-w-0 items-center gap-3 text-xs text-muted-foreground", !here && "opacity-60")}>
 					<p className="min-w-0 flex-1 truncate">
 						{schedulesWords(routine)}
 						{running ? (
@@ -207,7 +208,7 @@ export function RoutineRow({ routine, botName, open, connected, now }: RoutineRo
 								<span className={cn(!reduceMotion && "shimmer-text")}>Running…</span>
 							</>
 						) : (
-							(!enabled || routine.schedules.length > 0) && (
+							(!here || routine.schedules.length > 0) && (
 								<>
 									{" · "}
 									<NextRun routine={routine} />
@@ -222,7 +223,7 @@ export function RoutineRow({ routine, botName, open, connected, now }: RoutineRo
 						</p>
 					)}
 				</div>
-				<div className={cn("flex min-w-0 items-center gap-3 text-xs text-muted-foreground", !enabled && "opacity-60")}>
+				<div className={cn("flex min-w-0 items-center gap-3 text-xs text-muted-foreground", !here && "opacity-60")}>
 					<p className="flex min-w-0 flex-1 items-center gap-1.5">
 						{triggers.length > 0 && (
 							<span aria-hidden className="flex shrink-0 items-center gap-1">

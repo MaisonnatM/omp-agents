@@ -83,6 +83,8 @@ export interface Routine {
 	triggers: Trigger[];
 	task: RoutineTask;
 	enabled: boolean;
+	/** The other computer it runs on while enabled, as Settings sync carried it; `null` while it runs on this one or is off. */
+	machine: RoutineMachine | null;
 	createdAt: number;
 	/** When the last run a schedule or **Run now** started was claimed, `null` before any; every schedule counts from it, so a triggered run moves no schedule. */
 	scheduledAt: number | null;
@@ -90,8 +92,16 @@ export interface Routine {
 	runs: RoutineRun[];
 }
 
-/** What the page edits of a routine: all but its runs and the times the server keeps. */
-export type RoutineSpec = Omit<Routine, "runs" | "createdAt" | "scheduledAt">;
+/** A computer a routine runs on: Settings sync's stable id for it and its name as its owner sees it. */
+export interface RoutineMachine {
+	id: string;
+	name: string;
+}
+
+export const isRoutineMachine = fields<RoutineMachine>({ id: isString, name: isString });
+
+/** What the page edits of a routine: all but its runs, the times the server keeps, and the computer it runs on. */
+export type RoutineSpec = Omit<Routine, "runs" | "createdAt" | "scheduledAt" | "machine">;
 
 /** One edit of the routines; the page picks a new routine's `id`, so a save sent twice saves once. */
 export type RoutineChange =
@@ -146,12 +156,15 @@ export function nextRunAt(schedule: Schedule, after: number): number {
  */
 export const nextDueAt = (schedules: readonly Schedule[], after: number): number => Math.min(...schedules.map(schedule => nextRunAt(schedule, after)));
 
+/** Whether `routine` runs on this computer: enabled, and not on another one. */
+export const runsHere = (routine: Pick<Routine, "enabled" | "machine">): boolean => routine.enabled && routine.machine === null;
+
 /** Missed slots coalesce into one run: a dashboard closed all weekend runs once on Monday. */
 export const isDue = (routine: Routine, now: number): boolean =>
-	routine.enabled && nextDueAt(routine.schedules, routine.scheduledAt ?? routine.createdAt) <= now;
+	runsHere(routine) && nextDueAt(routine.schedules, routine.scheduledAt ?? routine.createdAt) <= now;
 
 /** Whether `routine` runs when a trigger of `kind` sees something happen. */
-export const isTriggeredBy = (routine: Routine, kind: TriggerKind): boolean => routine.enabled && routine.triggers.some(trigger => trigger.kind === kind);
+export const isTriggeredBy = (routine: Routine, kind: TriggerKind): boolean => runsHere(routine) && routine.triggers.some(trigger => trigger.kind === kind);
 
 /**
  * Whether `routine`'s triggers fire on the local day of `now`: every day for a routine with no schedule or an interval
@@ -176,15 +189,19 @@ export function isSameSpec(routine: Routine, spec: RoutineSpec): boolean {
 	);
 }
 
-/** `routines` after `change`, or `routines` itself when the change changes nothing. An edit keeps the routine's runs. */
+/**
+ * `routines` after `change`, or `routines` itself when the change changes nothing. An edit keeps the routine's runs and
+ * the computer it runs on; enabling a routine that runs on another computer moves it here, its schedules counting from now.
+ */
 export function applyRoutine(routines: Routine[], change: Exclude<RoutineChange, { op: "run-now" }>, now: number): Routine[] {
 	switch (change.op) {
 		case "save": {
 			const index = routines.findIndex(routine => routine.id === change.routine.id);
-			if (index === -1) return [...routines, { ...change.routine, createdAt: now, scheduledAt: null, runs: [] }];
+			if (index === -1) return [...routines, { ...change.routine, machine: null, createdAt: now, scheduledAt: null, runs: [] }];
 			const stored = routines[index]!;
 			if (isSameSpec(stored, change.routine)) return routines;
-			return routines.with(index, { ...change.routine, createdAt: stored.createdAt, scheduledAt: stored.scheduledAt, runs: stored.runs });
+			const machine = change.routine.enabled ? stored.machine : null;
+			return routines.with(index, { ...change.routine, machine, createdAt: stored.createdAt, scheduledAt: stored.scheduledAt, runs: stored.runs });
 		}
 		case "remove": {
 			const kept = routines.filter(routine => routine.id !== change.id);
@@ -193,7 +210,8 @@ export function applyRoutine(routines: Routine[], change: Exclude<RoutineChange,
 		case "enable": {
 			const index = routines.findIndex(routine => routine.id === change.id);
 			const routine = routines[index];
-			return routine === undefined || routine.enabled === change.enabled ? routines : routines.with(index, { ...routine, enabled: change.enabled });
+			if (routine === undefined || (routine.enabled === change.enabled && routine.machine === null)) return routines;
+			return routines.with(index, { ...routine, enabled: change.enabled, machine: null, scheduledAt: routine.machine === null ? routine.scheduledAt : now });
 		}
 		default: {
 			const unhandled: never = change;

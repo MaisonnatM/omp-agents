@@ -26,7 +26,7 @@ const spec: RoutineSpec = {
 	enabled: true,
 };
 
-const routine = (fields: Partial<Routine>): Routine => ({ ...spec, createdAt: at("2026-10-01T08:00:00+02:00"), scheduledAt: null, runs: [], ...fields });
+const routine = (fields: Partial<Routine>): Routine => ({ ...spec, machine: null, createdAt: at("2026-10-01T08:00:00+02:00"), scheduledAt: null, runs: [], ...fields });
 
 describe("parseRoutineSpec", () => {
 	test("keeps a routine's edited fields and drops the runs and creation time the server keeps", () => {
@@ -143,7 +143,7 @@ describe("applyRoutine", () => {
 	const now = at("2026-10-05T12:00:00+02:00");
 
 	test("a new routine starts with no runs, created now", () => {
-		expect(applyRoutine([], { op: "save", routine: spec }, now)).toEqual([{ ...spec, createdAt: now, scheduledAt: null, runs: [] }]);
+		expect(applyRoutine([], { op: "save", routine: spec }, now)).toEqual([{ ...spec, machine: null, createdAt: now, scheduledAt: null, runs: [] }]);
 	});
 
 	test("an edit keeps the routine's creation, schedule clock, and runs", () => {
@@ -168,5 +168,18 @@ describe("applyRoutine", () => {
 		expect(applyRoutine(list, { op: "enable", id: "r2", enabled: false }, now).map(({ enabled }) => enabled)).toEqual([true, false]);
 		expect(applyRoutine(list, { op: "remove", id: "gone" }, now)).toBe(list);
 		expect(applyRoutine(list, { op: "enable", id: "r1", enabled: true }, now)).toBe(list);
+	});
+
+	test("a routine another computer runs stays there through an edit, moves here when enabled here, and runs nowhere once paused", () => {
+		const elsewhere = routine({ machine: { id: "m2", name: "Studio" }, scheduledAt: at("2026-10-01T09:00:00+02:00") });
+		expect(isDue(elsewhere, now)).toBe(false);
+		expect(applyRoutine([elsewhere], { op: "save", routine: { ...spec, name: "Morning notes" } }, now)[0]?.machine).toEqual({ id: "m2", name: "Studio" });
+		const moved = applyRoutine([elsewhere], { op: "enable", id: "r1", enabled: true }, now)[0]!;
+		// Its schedules count from the move, so a slot the other computer ran does not run again here at once.
+		expect(moved).toMatchObject({ enabled: true, machine: null, scheduledAt: now });
+		expect(isDue(moved, now)).toBe(false);
+		for (const paused of [applyRoutine([elsewhere], { op: "enable", id: "r1", enabled: false }, now), applyRoutine([elsewhere], { op: "save", routine: { ...spec, enabled: false } }, now)]) {
+			expect(paused[0]).toMatchObject({ enabled: false, machine: null });
+		}
 	});
 });

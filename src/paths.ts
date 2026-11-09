@@ -53,6 +53,8 @@ export const signInInboxDir = join(configDir, "sign-in-inbox");
 export const routinesFile = join(configDir, "routines.json");
 /** Where a Bot's `save_routine` and `delete_routine` tools leave their changes to its routines, one JSON file each, so the server stays the only writer of {@link routinesFile}. */
 export const routineInboxDir = join(configDir, "routine-inbox");
+/** The id Settings sync gives this computer, so a routine another computer runs names it apart from this one, beside {@link tokenFile}. */
+export const machineFile = join(configDir, "machine.json");
 /** The Bots: each one's name, job, workspace, and conversation, beside {@link tokenFile}. */
 export const botsFile = join(configDir, "bots.json");
 /** Where a Bot's `set_job` tool leaves the job it gives itself, one JSON file each, so the server stays the only writer of {@link botsFile}. */
