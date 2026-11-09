@@ -43,7 +43,7 @@ A dashboard session deleted with everything omp wrote for it once its omp stops,
 _Avoid_: Incognito session, temporary session, ephemeral session
 
 **Personal session**:
-A session that runs in the dashboard's personal directory instead of a workspace, for the user's own life, such as meals or plans, and reads and writes the **Personal memory**.
+A session whose workspace is in the Personal space, such as the dashboard's personal directory or a personal repository, for the user's own life, which reads and writes the **Personal memory**.
 _Avoid_: User session, assistant session, private session (see **Private session**)
 
 **Subagent**:
