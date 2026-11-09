@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-09
 
+- The dashboard now ships a small QR code library, which the coming Phone access settings use to show a pairing code you can scan.
 - In Settings, Decisions, All workspaces now lists each workspace's decision records, grouped by workspace, instead of asking you to pick one.
 - `/ship` now grills you on the change before it plans it, asking rounds of questions with a recommended answer each, and saves the settled terms and choices in the project's glossary and decision records.
 - Agents read a slightly shorter set of instructions: the subagent worktree rules now appear once, and poteto-mode no longer tells agents on `main` to use a setting the worktree guard rejects.
