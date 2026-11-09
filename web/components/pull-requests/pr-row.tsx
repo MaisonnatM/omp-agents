@@ -604,7 +604,7 @@ export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, st
  * and size columns drop out when the page is too narrow for them; on a phone the title takes a line of its own above the rest.
  */
 const TABLE_COLUMNS =
-	"grid grid-cols-[4rem_minmax(0,1fr)_1.25rem_3.5rem_2rem_1.75rem] items-center gap-x-3 @3xl/pull-requests:grid-cols-[4rem_minmax(0,1fr)_10rem_3.5rem_1.25rem_3.5rem_6rem_2rem_1.75rem] max-sm:grid-cols-[4rem_1.25rem_3.5rem_minmax(0,1fr)_1.75rem] max-sm:gap-y-1.5";
+	"grid grid-cols-[4rem_minmax(0,1fr)_1.25rem_3.5rem_2rem_1.75rem] items-center gap-x-3 @3xl/pull-requests:grid-cols-[4rem_minmax(0,1fr)_10rem_3.5rem_1.25rem_3.5rem_6rem_2rem_1.75rem] max-phone:grid-cols-[4rem_1.25rem_3.5rem_minmax(0,1fr)_1.75rem] max-phone:gap-y-1.5";
 
 const WIDE = "hidden @3xl/pull-requests:flex";
 
@@ -631,19 +631,19 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 			}
 		>
 			<RowMoveBadge pr={pr} move={move} {...actions} />
-			<div className="min-w-0 max-sm:order-first max-sm:col-span-full">
+			<div className="min-w-0 max-phone:order-first max-phone:col-span-full">
 				<TitleLink pr={pr} targeted={targeted} className="block truncate" />
-				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground max-sm:flex-wrap max-sm:gap-x-2 max-sm:gap-y-0.5">
+				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground max-phone:flex-wrap max-phone:gap-x-2 max-phone:gap-y-0.5">
 					<Avatar person={pr.author} label={`Opened by ${pr.author.login}`} className="size-4 ring-0" />
 					<span className="shrink-0">{pr.author.login}</span>
-					<span aria-hidden className="max-sm:hidden">·</span>
+					<span aria-hidden className="max-phone:hidden">·</span>
 					<StateTag pr={pr} move={move} />
 					<ReviewDraftTag pr={pr} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
 					<ConversationCount pr={pr} />
 					{why && (
 						<>
-							<span aria-hidden className="max-sm:hidden">·</span>
+							<span aria-hidden className="max-phone:hidden">·</span>
 							<span className="min-w-0 truncate">{why}</span>
 							<ThreadStartersTag pr={pr} move={move} />
 						</>

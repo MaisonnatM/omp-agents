@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { type ShortcutId, shortcutLabels } from "../shortcuts";
 import { useStoredState } from "../stored-state";
-import { usePhoneWidth } from "../use-phone-width";
 import { Separator, useDragSeparator } from "./drag-separator";
 
 /**
@@ -21,6 +20,8 @@ import { Separator, useDragSeparator } from "./drag-separator";
 const MIN_WIDTH = 240;
 /** What the session pane keeps between the sidebars, in px, however wide the right one is dragged. */
 const PANE_MIN_WIDTH = 480;
+/** A phone's width, in px: a window narrower than this has no room for a sidebar beside a usable pane, so its sidebars float. `--breakpoint-phone` in `web/globals.css` draws the same line for `max-phone:`. */
+export const PHONE_MAX_WIDTH = MIN_WIDTH + PANE_MIN_WIDTH;
 const STEP = 16;
 /** The show and hide motion: a drawer's curve, fast out of the gate and settling without overshoot. */
 const MOTION_MS = 260;
@@ -108,6 +109,13 @@ function useStoredPanel(side: SidebarSide): StoredPanel {
 	return { open, width, setWidth, setOpen };
 }
 
+/** `side`'s panel; a floating one covers the page, as on a phone, so it opens only when asked and keeps that in memory, out of what the window stores. */
+function usePanel(side: SidebarSide, floating: boolean): StoredPanel {
+	const stored = useStoredPanel(side);
+	const [open, setOpen] = useState(false);
+	return floating ? { ...stored, open, setOpen } : stored;
+}
+
 const subscribeResize = (onChange: () => void): (() => void) => {
 	window.addEventListener("resize", onChange);
 	return () => window.removeEventListener("resize", onChange);
@@ -121,27 +129,18 @@ export interface SidebarPanels {
 }
 
 export function useSidebarPanels(): SidebarPanels {
-	const stored: Record<SidebarSide, StoredPanel> = { left: useStoredPanel("left"), right: useStoredPanel("right") };
 	const windowWidth = useSyncExternalStore(subscribeResize, () => window.innerWidth);
-	const floating = windowWidth < MIN_WIDTH + PANE_MIN_WIDTH;
-	// A floating sidebar covers the page, as on a phone, so it opens only when asked and stays out of what this window stores.
-	const [floatingOpen, setFloatingOpen] = useState<Record<SidebarSide, boolean>>({ left: false, right: false });
-	const sides: Record<SidebarSide, Pick<StoredPanel, "open" | "setOpen">> = floating
-		? {
-				left: { open: floatingOpen.left, setOpen: open => setFloatingOpen(shown => ({ ...shown, left: open })) },
-				right: { open: floatingOpen.right, setOpen: open => setFloatingOpen(shown => ({ ...shown, right: open })) },
-			}
-		: stored;
-	// A floating sidebar leaves a rail's width of the page uncovered, which a tap closes it on; on a phone it takes all the rest, since its rows and the Details tabs cut to nothing in a desktop sidebar's width.
+	const floating = windowWidth < PHONE_MAX_WIDTH;
+	const sides: Record<SidebarSide, StoredPanel> = { left: usePanel("left", floating), right: usePanel("right", floating) };
+	// A floating sidebar takes the whole window but a rail's width, which a tap closes it on, since its rows and the Details tabs cut to nothing in a desktop sidebar's width.
 	const floatingMax = Math.max(MIN_WIDTH, windowWidth - SIDEBARS.left.rail);
-	const phone = usePhoneWidth();
-	const panel = (side: SidebarSide, max: number): SidebarPanel => ({ open: sides[side].open, width: phone ? max : clamp(stored[side].width, max), max, floating });
+	const panel = (side: SidebarSide, max: number): SidebarPanel => ({ open: sides[side].open, width: floating ? max : clamp(sides[side].width, max), max, floating });
 	const left = panel("left", floating ? floatingMax : SIDEBARS.left.maxWidth);
 	const leftShown = left.open ? left.width : SIDEBARS.left.rail;
 	const panels = { left, right: panel("right", floating ? floatingMax : Math.max(MIN_WIDTH, Math.min(SIDEBARS.right.maxWidth, windowWidth - leftShown - PANE_MIN_WIDTH))) };
 	return {
 		panels,
-		resize: (side, width) => stored[side].setWidth(clamp(width, panels[side].max)),
+		resize: (side, width) => sides[side].setWidth(clamp(width, panels[side].max)),
 		setOpen: (side, open) => {
 			if (open === sides[side].open) return;
 			const { id } = SIDEBARS[side];

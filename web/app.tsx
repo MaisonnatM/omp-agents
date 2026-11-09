@@ -252,7 +252,7 @@ export function App() {
 					<UserTodosContext.Provider value={state.userTodos}>
 						<UserNotesContext.Provider value={state.userNotes}>
 							<PersonalContext.Provider value={state.personal}>
-								<div className="flex h-svh flex-col" data-floating-sidebars={sidebars.panels.left.floating || undefined}>
+								<div className="flex h-svh flex-col">
 									{DESKTOP_TITLE_BAR && <DesktopTitleBar title={focused.title} space={space} onSpace={switchSpace} controls={headerControls} />}
 									<SidebarProvider className="min-h-0 flex-1">
 										<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")} address={address}>

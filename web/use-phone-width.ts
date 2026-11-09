@@ -1,8 +1,6 @@
-/** `usePhoneWidth`: whether the window is a phone's width, the same line Tailwind's `max-sm:` classes draw. */
+/** `usePhoneWidth`: whether the window is a phone's width, the line the floating sidebars and the `max-phone:` classes draw. */
 import { useSyncExternalStore } from "react";
-
-/** Tailwind's `sm`, in px: a window narrower than this is a phone's. */
-export const PHONE_MAX_WIDTH = 640;
+import { PHONE_MAX_WIDTH } from "./components/sidebar-panel";
 
 const PHONE_WIDTH = `(width < ${PHONE_MAX_WIDTH}px)`;
 

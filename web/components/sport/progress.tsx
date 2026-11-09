@@ -19,7 +19,7 @@ export function ProgressTab({ state, today }: { state: SportState; today: string
 	const card = cards.find(entry => figureId(entry.figure) === picked) ?? cards[0]!;
 	const chart = chartOf(state, card.figure, rangeStart(range, today), today);
 	return (
-		<div className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 max-sm:px-6 @3xl/sport:px-6">
+		<div className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 max-phone:px-6 @3xl/sport:px-6">
 			<RadioGroup aria-label="Mesures" value={figureId(card.figure)} onValueChange={next => setPicked(cards.map(entry => figureId(entry.figure)).find(id => id === next) ?? picked)} className="grid grid-cols-2 gap-3 @4xl/sport:grid-cols-5">
 				{cards.map(entry => (
 					<Radio.Root key={figureId(entry.figure)} value={figureId(entry.figure)} {...activityControl("sport.progress.card")} className="flex min-w-0 cursor-pointer flex-col items-start gap-0.5 rounded-xl border border-border bg-card px-3.5 py-3 text-left outline-none hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring data-[checked]:border-primary data-[checked]:ring-1 data-[checked]:ring-primary">

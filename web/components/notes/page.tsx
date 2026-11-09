@@ -181,7 +181,7 @@ function NoteTodo({ note, todos, disabled, onChange }: { note: UserNote; todos: 
 	const current = todo?.text ?? (note.todoId ? "Deleted todo" : "No todo");
 	const href = todos && note.todoId ? hashForTodoId(todos, note.todoId) : null;
 	return <div className="flex min-w-0 flex-wrap items-center gap-2">
-		<FieldPicker field="Todo" current={current} className={cn(FIELD_BUTTON, "max-sm:-ms-2")} trigger={<><PAGE_ICON.todo aria-hidden className="size-3.5 shrink-0 text-muted-foreground" /><span className="truncate">{current}</span></>} choices={[{ value: "", label: "No todo" }, ...choices.map(row => ({ value: row.id, label: row.text }))]} selected={[note.todoId ?? ""]} disabled={disabled || todos === null} onPick={value => { if ((value || null) !== note.todoId) onChange({ op: "set-todo", id: note.id, todoId: value || null }); }} />
+		<FieldPicker field="Todo" current={current} className={cn(FIELD_BUTTON, "max-phone:-ms-2")} trigger={<><PAGE_ICON.todo aria-hidden className="size-3.5 shrink-0 text-muted-foreground" /><span className="truncate">{current}</span></>} choices={[{ value: "", label: "No todo" }, ...choices.map(row => ({ value: row.id, label: row.text }))]} selected={[note.todoId ?? ""]} disabled={disabled || todos === null} onPick={value => { if ((value || null) !== note.todoId) onChange({ op: "set-todo", id: note.id, todoId: value || null }); }} />
 		{href && <a href={href} className="text-xs text-muted-foreground underline underline-offset-2">Open todo</a>}
 	</div>;
 }

@@ -168,7 +168,7 @@ function CellEntry({ entry }: { entry: CalendarEntry }) {
 		return (
 			<EntryLink
 				entry={entry}
-				className="flex h-5 items-center rounded-sm bg-[color-mix(in_oklab,var(--event)_16%,transparent)] px-1.5 text-[11px] font-medium text-foreground hover:bg-[color-mix(in_oklab,var(--event)_26%,transparent)] max-sm:hidden"
+				className="flex h-5 items-center rounded-sm bg-[color-mix(in_oklab,var(--event)_16%,transparent)] px-1.5 text-[11px] font-medium text-foreground hover:bg-[color-mix(in_oklab,var(--event)_26%,transparent)] max-phone:hidden"
 				style={{ "--event": entry.event.color } as CSSProperties}
 			>
 				<span className="truncate">{entry.event.title}</span>
@@ -176,7 +176,7 @@ function CellEntry({ entry }: { entry: CalendarEntry }) {
 		);
 	}
 	return (
-		<EntryLink entry={entry} className="flex h-5 items-center gap-1.5 rounded-sm px-1 text-[11px] hover:bg-hover max-sm:hidden">
+		<EntryLink entry={entry} className="flex h-5 items-center gap-1.5 rounded-sm px-1 text-[11px] hover:bg-hover max-phone:hidden">
 			<EntryDot entry={entry} />
 			<EntryText entry={entry} />
 		</EntryLink>
@@ -288,12 +288,12 @@ function DayCell({ date, entries, today, selected, onSelect, className }: DayCel
 				<CellEntry key={entryKey(entry)} entry={entry} />
 			))}
 			{entries.length > CELL_ENTRIES && (
-				<span className="self-start rounded-sm px-1 text-[11px] text-muted-foreground hover:bg-hover hover:text-foreground max-sm:hidden">
+				<span className="self-start rounded-sm px-1 text-[11px] text-muted-foreground hover:bg-hover hover:text-foreground max-phone:hidden">
 					+{entries.length - CELL_ENTRIES} more
 				</span>
 			)}
 			{entries.length > 0 && (
-				<span aria-hidden className="flex flex-wrap items-center gap-0.5 px-0.5 text-2xs leading-none text-muted-foreground tabular-nums sm:hidden">
+				<span aria-hidden className="flex flex-wrap items-center gap-0.5 px-0.5 text-2xs leading-none text-muted-foreground tabular-nums phone:hidden">
 					{entries.slice(0, CELL_ENTRIES).map(entry => (
 						<EntryDot key={entryKey(entry)} entry={entry} />
 					))}
@@ -411,33 +411,33 @@ export function CalendarPage({ routines, todos, ticketsShown, workspace }: Calen
 					{failure}
 				</p>
 			))}
-			<div className="grid gap-6 px-6 py-6 max-sm:grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_19rem]">
+			<div className="grid gap-6 px-6 py-6 max-phone:grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_19rem]">
 				<CalendarProvider className="overflow-hidden rounded-xl border border-border bg-background">
-					<CalendarDate className="max-sm:flex-wrap max-sm:gap-y-1">
+					<CalendarDate className="max-phone:flex-wrap max-phone:gap-y-1">
 						<CalendarDatePicker className="gap-0">
 							<CalendarMonthPicker />
 							<CalendarYearPicker start={today.getFullYear() - 1} end={today.getFullYear() + 2} />
 						</CalendarDatePicker>
-						<div className="flex items-center gap-1 max-sm:ms-auto">
+						<div className="flex items-center gap-1 max-phone:ms-auto">
 							<Tooltip content="Add an event to Google Calendar or this computer" shortcut={shortcutLabels("calendarNewEvent")} side="bottom">
-								<Button variant="tertiary" leadingIcon={Plus} onClick={openNewEvent} className="max-sm:size-11 max-sm:px-0">
-									<span className="max-sm:sr-only">New event</span>
+								<Button variant="tertiary" leadingIcon={Plus} onClick={openNewEvent} className="max-phone:size-11 max-phone:px-0">
+									<span className="max-phone:sr-only">New event</span>
 								</Button>
 							</Tooltip>
-							<Button variant="tertiary" onClick={() => show(today)} className="max-sm:h-11">
+							<Button variant="tertiary" onClick={() => show(today)} className="max-phone:h-11">
 								Today
 							</Button>
-							<CalendarDatePagination className="gap-0 max-sm:[&_button]:size-11" />
+							<CalendarDatePagination className="gap-0 max-phone:[&_button]:size-11" />
 						</div>
 					</CalendarDate>
 					<div className="grid grid-cols-7 border-y border-border">
 						{WEEKDAYS.map(weekday => (
-							<div key={weekday} className="px-3 py-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase max-sm:px-0 max-sm:text-center">
+							<div key={weekday} className="px-3 py-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase max-phone:px-0 max-phone:text-center">
 								{weekday}
 							</div>
 						))}
 					</div>
-					<div className="grid auto-rows-[minmax(7.5rem,auto)] grid-cols-7 max-sm:auto-rows-[minmax(3.5rem,auto)]">
+					<div className="grid auto-rows-[minmax(7.5rem,auto)] grid-cols-7 max-phone:auto-rows-[minmax(3.5rem,auto)]">
 						{days.map((date, index) => {
 							const day = localDay(date);
 							const edges = cn(index % 7 !== 6 && "border-r", index < days.length - 7 && "border-b", "border-border");

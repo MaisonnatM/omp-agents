@@ -11,7 +11,7 @@
   color-scheme: light;
   --radius: 0.625rem;
   --page-header-height: 3rem;
-  /* How far past a header's own padding its content starts while the floating Sessions sidebar's toggle sits over its left corner. */
+  /* How far past a header's own padding its content starts on a phone, where the floating Sessions sidebar's toggle sits over its left corner. */
   --sidebar-toggle-clearance: 2.25rem;
   --background: var(--color-zinc-25);
   --foreground: var(--color-zinc-800);
@@ -158,6 +158,8 @@
 @theme inline {
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --container-conversation: 48rem;
+  /* A phone's width, under which the sidebars float: their least width plus the session pane's, `PHONE_MAX_WIDTH` in `web/components/sidebar-panel.tsx`. */
+  --breakpoint-phone: 45rem;
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: calc(1 / 0.6875);
   --text-3xs: 0.625rem;
@@ -374,7 +376,11 @@
   }
 }
 
-/* Safari on a phone zooms the page into any field whose text is under 16px when it takes focus, and leaves it zoomed. */
+/*
+ * Safari on a phone zooms the page into any field whose text is under 16px when it takes focus, and leaves it zoomed.
+ * `!important`, since fields set their size with utilities such as `text-sm`, which win over a plain rule. It reaches
+ * every field on a touch screen, a tablet's too, the terminal's hidden textarea and the editors included.
+ */
 @media (hover: none) and (pointer: coarse) {
   input, textarea, select, [contenteditable="true"], [contenteditable=""] {
     font-size: max(16px, 1em) !important;

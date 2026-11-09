@@ -17,7 +17,6 @@ import { hashForSettings } from "../routing";
 import { shortcutLabels } from "../shortcuts";
 import { useAction } from "../use-action";
 import { useHoverPopover } from "../use-hover-popover";
-import { usePhoneWidth } from "../use-phone-width";
 import { PlanUsageList } from "./plan-usage";
 import { LoadNote } from "./sheet-details";
 
@@ -200,11 +199,10 @@ export function StatusBar({ usage, hosts, bots, terminalOpen, onToggleTerminal }
 			return [host.instanceId, botName === undefined ? hostLabel(host) : `${botName} · Bot`];
 		}));
 	}, [hosts, bots]);
-	const oneRow = usePhoneWidth();
 	const pairedPhone = isPhonePage();
 	return (
 		<footer className="flex min-h-7 shrink-0 items-center gap-4 border-t border-border px-3 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] text-xs">
-			<PlanUsageList usage={usage} oneRow={oneRow} />
+			<PlanUsageList usage={usage} />
 			{!pairedPhone && (
 				<div className="ml-auto flex min-w-0 shrink-0 items-center gap-3 text-muted-foreground">
 					<Tooltip content={terminalOpen ? "Hide the terminal" : "Show the terminal"} shortcut={shortcutLabels("terminal")} side="top">

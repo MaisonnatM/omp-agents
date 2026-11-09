@@ -71,9 +71,9 @@ export function Toaster() {
 	return (
 		<Toast.Provider toastManager={toasts} limit={phone ? 1 : undefined}>
 			<Toast.Portal>
-				<div className="pointer-events-none fixed right-4 bottom-10 z-50 flex w-96 max-w-[calc(100vw-2rem)] flex-col items-end gap-2 *:pointer-events-auto max-sm:top-[max(calc(var(--page-header-height)+0.5rem),calc(env(safe-area-inset-top)+2.75rem))] max-sm:right-2 max-sm:bottom-auto max-sm:max-w-[calc(100vw-1rem)]">
+				<div className="pointer-events-none fixed right-4 bottom-10 z-50 flex w-96 max-w-[calc(100vw-2rem)] flex-col items-end gap-2 *:pointer-events-auto max-phone:top-[max(calc(var(--page-header-height)+0.5rem),calc(env(safe-area-inset-top)+2.75rem))] max-phone:right-2 max-phone:bottom-auto max-phone:max-w-[calc(100vw-1rem)]">
 					<Toast.Viewport className="flex w-full flex-col-reverse gap-2">
-						<ToastList phone={phone} />
+						<ToastList />
 					</Toast.Viewport>
 					<div ref={setCorner} className="contents" />
 				</div>
@@ -95,7 +95,8 @@ function Elapsed({ since }: { since: number }) {
 }
 
 /** Each toast; on a phone, where they sit at the top, a swipe up or right puts one away, and it follows the finger. */
-function ToastList({ phone }: { phone: boolean }) {
+function ToastList() {
+	const phone = usePhoneWidth();
 	return Toast.useToastManager<ToastData>().toasts.map(toast => {
 		const loading = toast.type === "loading";
 		const startedAt = loading ? toast.data?.startedAt : undefined;
@@ -104,10 +105,10 @@ function ToastList({ phone }: { phone: boolean }) {
 				key={toast.id}
 				toast={toast}
 				swipeDirection={phone ? ["up", "right"] : undefined}
-				className="rounded-lg border border-border bg-popover px-4 py-2 text-sm shadow-lg data-limited:hidden max-sm:translate-x-(--toast-swipe-movement-x) max-sm:translate-y-(--toast-swipe-movement-y)"
+				className="rounded-lg border border-border bg-popover px-4 py-2 text-sm shadow-lg data-limited:hidden max-phone:translate-x-(--toast-swipe-movement-x) max-phone:translate-y-(--toast-swipe-movement-y)"
 			>
-				<Toast.Content className="flex items-center gap-3 max-sm:flex-wrap max-sm:gap-y-1">
-					<div className="flex min-w-0 flex-1 flex-col max-sm:basis-full">
+				<Toast.Content className="flex items-center gap-3 max-phone:flex-wrap max-phone:gap-y-1">
+					<div className="flex min-w-0 flex-1 flex-col max-phone:basis-full">
 						{toast.data?.source && <div className="mb-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">{toast.data.source}</div>}
 						<div className="flex min-w-0 items-center gap-2">
 							{loading && <Spinner className="size-4" />}
@@ -116,7 +117,7 @@ function ToastList({ phone }: { phone: boolean }) {
 						</div>
 						<Toast.Description className="text-muted-foreground" />
 					</div>
-					<div className="contents max-sm:ms-auto max-sm:flex max-sm:gap-2">
+					<div className="contents max-phone:ms-auto max-phone:flex max-phone:gap-2">
 						<Toast.Action render={<Button variant="secondary" size="compact" />} />
 						{toast.timeout === 0 && <Toast.Close render={<Button variant="ghost" size="compact" />}>Dismiss</Toast.Close>}
 					</div>
