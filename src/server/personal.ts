@@ -5,7 +5,7 @@
  */
 import { PERSONAL_FLAGS } from "../omp/personal-extension";
 import { PLAIN_LAUNCH } from "../omp/rpc";
-import { absoluteDir, displayPath, personalDir, personalMemoryFile, sportFile, sportInboxDir, workspacesFile } from "../paths";
+import { personalDir, personalMemoryFile, sportFile, sportInboxDir, workspaceFor, workspacesFile } from "../paths";
 import { readTail } from "../read-tail";
 import { MAX_MEMORY_BYTES } from "../shared/bots";
 import type { ServerMsg } from "../shared/protocol";
@@ -36,9 +36,9 @@ export const personalJoin =
 	(isBot: (request: StartRequest) => boolean) =>
 	(request: StartRequest): SessionJoin => ({ rpc: isBot(request) ? PLAIN_LAUNCH : PERSONAL_LAUNCH, attach() {} });
 
-/** Whether `cwd`, as omp or the page names it, `~` included, is the personal directory itself; `undefined` for a session that is gone. */
-export const isPersonalDir = (cwd: string | undefined): boolean => cwd !== undefined && absoluteDir(cwd) === personalDir;
+/** The personal directory as the page shows it, which `spaces` takes so a `~` path names it too. */
+export const personalWorkspace = workspaceFor(personalDir);
 
 export function personalMessage(): Extract<ServerMsg, { t: "personal" }> {
-	return { t: "personal", cwd: personalDir, cwdDisplay: displayPath(personalDir), memory: readTail(personalMemoryFile, MAX_MEMORY_BYTES)?.text ?? "" };
+	return { t: "personal", ...personalWorkspace, memory: readTail(personalMemoryFile, MAX_MEMORY_BYTES)?.text ?? "" };
 }

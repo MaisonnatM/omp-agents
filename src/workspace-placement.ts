@@ -59,6 +59,12 @@ export class WorkspacePlacement {
 		return this.#claimGone() || placed;
 	}
 
+	/** {@link cwdOf} once `worktreeAt` placed `cwd`, so a worktree not asked about yet counts in its main checkout too. */
+	async workspaceOf(cwd: string, worktreeAt: (dir: string) => Promise<WorktreeAt | null>): Promise<string> {
+		await this.place([cwd], worktreeAt);
+		return this.cwdOf(cwd);
+	}
+
 	/** Count each gone directory that a known main checkout claims in that checkout; returns whether any was claimed. */
 	#claimGone(): boolean {
 		let claimed = false;

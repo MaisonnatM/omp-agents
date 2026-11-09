@@ -33,7 +33,10 @@ export const inTempDir = (dir: string): boolean => TEMP_ROOTS.some(root => dir =
 const withEntry = (entries: string[], entry: string): string[] => (entries.includes(entry) ? entries : [...entries, entry]);
 const withoutEntry = (entries: string[], entry: string): string[] => entries.filter(other => other !== entry);
 
-/** `list` after `change`, or `list` itself when it changes nothing. Adding also shows a hidden directory. */
+/**
+ * `list` after `change`, or `list` itself when it changes nothing. Adding also shows a hidden directory. Hiding or showing a
+ * workspace keeps its space, so a Personal workspace hidden and shown again is still Personal.
+ */
 export function applyWorkspace(list: WorkspaceList, change: WorkspaceChange): WorkspaceList {
 	const { cwd } = change;
 	let next: WorkspaceList;
@@ -59,9 +62,26 @@ export function applyWorkspace(list: WorkspaceList, change: WorkspaceChange): Wo
 	return next.added.length === list.added.length && next.hidden.length === list.hidden.length && next.personal.length === list.personal.length ? list : next;
 }
 
-/**
- * The space of a session in `cwd` that counts in `workspace`, the main checkout of a linked worktree as `WorkspacePlacement`
- * places it, else `cwd` itself: Personal in the personal directory or in a workspace `personal` lists, else Work.
- */
-export const spaceOf = ({ cwd, workspace }: { cwd: string; workspace: string }, personal: readonly string[], personalDir: string): Space =>
-	cwd === personalDir || personal.includes(workspace) ? "personal" : "work";
+/** Which space each directory is in, from the `personal` list and the personal directory, the one rule the server, the personal extension, and the page share. */
+export interface Spaces {
+	/**
+	 * Whether `cwd` is the personal directory itself, named as omp names it or as the page shows it, `~` included, with any
+	 * trailing `/`. It is always Personal, so the server refuses to move it to Work and Settings › Workspaces offers no picker for it.
+	 */
+	isPersonalDir(cwd: string): boolean;
+	/**
+	 * The space of a session in `cwd` that counts in `workspace`, the main checkout of a linked worktree as `WorkspacePlacement`
+	 * places it, else `cwd` itself: Personal in the personal directory or in a workspace `personal` lists, else Work.
+	 */
+	of(cwd: string, workspace: string): Space;
+}
+
+/** The {@link Spaces} of the workspaces `personal` lists and `personalDir`, whose `cwdDisplay` is how a `~` path names it. */
+export function spaces(personal: readonly string[], personalDir: Workspace): Spaces {
+	const isPersonalDir = (cwd: string): boolean => {
+		// The root keeps its `/`.
+		const dir = cwd.trim().replace(/(?<=.)\/+$/, "");
+		return dir === personalDir.cwd || dir === personalDir.cwdDisplay;
+	};
+	return { isPersonalDir, of: (cwd, workspace) => (isPersonalDir(cwd) || personal.includes(workspace) ? "personal" : "work") };
+}

@@ -3,13 +3,14 @@
 // one writer of that memory, and, when the dashboard names the Sport module's files, the `sport` tool and today's
 // training on every turn; in the personal directory itself it turns from a coding agent into the user's personal
 // assistant. The dashboard loads it with `omp -e` and the flags in `PERSONAL_FLAGS` into every session it starts that is
-// not a Bot's (`personalJoin` in src/server/personal.ts); it reads the space each turn, so a session that moves in or
+// not a Bot's (the server's `personalJoin`); it reads the space each turn, so a session that moves in or
 // out, or whose workspace changes space, follows.
 import { worktreeAt } from "../git";
-import { readWorkspaces } from "../server/workspaces-file";
+import { workspaceFor } from "../paths";
 import { MAX_FACT_LENGTH } from "../shared/bots";
 import { localDay } from "../shared/days";
-import { spaceOf } from "../shared/workspaces";
+import { spaces, type Workspace } from "../shared/workspaces";
+import { readWorkspaces } from "../workspace-list";
 import { WorkspacePlacement } from "../workspace-placement";
 import { type ExtensionApi, flagValue, memoryLines, rememberTool } from "./extension-kit";
 import { readSport, type SportPaths, sportTool, todayLine } from "./sport-tool";
@@ -32,11 +33,19 @@ const PROJECT = "This project is in the user's Personal space: part of their own
 const MEMORY =
 	"What you know about the user follows; a later fact overrides an earlier one. When the user tells you something about themselves worth keeping, such as a preference, an allergy, or a household fact, call `remember` with one short sentence. Never remember secrets such as passwords or card numbers.";
 
-/** What a personal session reads and writes: the memory, and the Sport module's paths when the dashboard named them; `assistant` in the personal directory itself. */
+/** What the dashboard's flags name: the personal directory, the workspaces file when it named one, the memory, and the Sport module's paths when it named them. */
+interface Flags {
+	dir: Workspace;
+	workspaces: string | null;
+	memory: string;
+	sport: SportPaths | null;
+}
+
+/** What a personal session reads and writes, and the framing its prompt opens with: the assistant's in the personal directory itself, a Personal project's elsewhere. */
 interface Personal {
 	memory: string;
 	sport: SportPaths | null;
-	assistant: boolean;
+	framing: string;
 }
 
 export default function personalExtension(pi: ExtensionApi): void {
@@ -48,22 +57,30 @@ export default function personalExtension(pi: ExtensionApi): void {
 
 	const placement = new WorkspacePlacement();
 
+	// Read once omp has set them, which can be after the first `session_start`; until then every session is plain.
+	let flags: Flags | null = null;
+	const flagsOf = (): Flags | null => {
+		if (flags !== null) return flags;
+		const memory = flagValue(pi, PERSONAL_FLAGS.memory);
+		const dir = flagValue(pi, PERSONAL_FLAGS.dir);
+		if (memory === null || dir === null) return null;
+		const file = flagValue(pi, PERSONAL_FLAGS.sport);
+		const inbox = flagValue(pi, PERSONAL_FLAGS.sportInbox);
+		flags = { dir: workspaceFor(dir), workspaces: flagValue(pi, PERSONAL_FLAGS.workspaces), memory, sport: file !== null && inbox !== null ? { file, inbox } : null };
+		return flags;
+	};
+
 	/**
 	 * What a session in `cwd` reads and writes as a personal session; `null` when `cwd` is in the Work space or the dashboard
 	 * named no memory. The workspaces file is read each time, so a workspace Settings › Workspaces moves follows.
 	 */
 	const personalIn = async (cwd: string): Promise<Personal | null> => {
-		const memory = flagValue(pi, PERSONAL_FLAGS.memory);
-		const dir = flagValue(pi, PERSONAL_FLAGS.dir);
-		if (memory === null || dir === null) return null;
-		const workspaces = flagValue(pi, PERSONAL_FLAGS.workspaces);
-		const personal = (workspaces !== null ? readWorkspaces(workspaces)?.personal : undefined) ?? [];
-		// Git is asked which workspace `cwd` counts in only while some workspace is Personal, and once per directory.
-		if (cwd !== dir && personal.length > 0) await placement.place([cwd], worktreeAt);
-		if (spaceOf({ cwd, workspace: placement.cwdOf(cwd) }, personal, dir) === "work") return null;
-		const file = flagValue(pi, PERSONAL_FLAGS.sport);
-		const inbox = flagValue(pi, PERSONAL_FLAGS.sportInbox);
-		return { memory, sport: file !== null && inbox !== null ? { file, inbox } : null, assistant: cwd === dir };
+		const named = flagsOf();
+		if (named === null) return null;
+		const workspace = await placement.workspaceOf(cwd, worktreeAt);
+		const space = spaces((named.workspaces !== null ? readWorkspaces(named.workspaces)?.personal : undefined) ?? [], named.dir);
+		if (space.of(cwd, workspace) === "work") return null;
+		return { memory: named.memory, sport: named.sport, framing: space.isPersonalDir(cwd) ? ASSISTANT : PROJECT };
 	};
 
 	const notPersonal = (what: string): never => {
@@ -94,7 +111,6 @@ export default function personalExtension(pi: ExtensionApi): void {
 		if (personal === null) return undefined;
 		mount(personal);
 		const today = personal.sport && todayLine(readSport(personal.sport), localDay());
-		const framing = personal.assistant ? ASSISTANT : PROJECT;
-		return { systemPrompt: [...event.systemPrompt, [`${framing} ${MEMORY}`, ...memoryLines(personal.memory), ...(today ? [today] : [])].join("\n")] };
+		return { systemPrompt: [...event.systemPrompt, [`${personal.framing} ${MEMORY}`, ...memoryLines(personal.memory), ...(today ? [today] : [])].join("\n")] };
 	});
 }

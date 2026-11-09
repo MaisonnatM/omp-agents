@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { callable } from "../src/shared/accounts";
 import type { View } from "../src/shared/sessions";
-import { spaceOf } from "../src/shared/workspaces";
+import { spaces } from "../src/shared/workspaces";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { errorText } from "../src/json";
 import { AppSidebar } from "./components/app-sidebar";
@@ -327,7 +327,7 @@ export function App() {
 														personalMemory={
 															focused.cwd !== undefined &&
 															state.personal !== null &&
-															spaceOf({ cwd: focused.cwd, workspace: focused.workspace ?? focused.cwd }, state.workspaceList.personal.map(({ cwd }) => cwd), state.personal.cwd) === "personal"
+															spaces(state.workspaceList.personal.map(({ cwd }) => cwd), state.personal).of(focused.cwd, focused.workspace ?? focused.cwd) === "personal"
 																? state.personalMemory
 																: null
 														}

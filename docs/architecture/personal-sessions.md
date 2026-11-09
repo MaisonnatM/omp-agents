@@ -1,8 +1,11 @@
 # Personal sessions
 
-A personal session has no field of its own: a session is personal exactly when its directory is in the Personal space, as `spaceOf` in `src/shared/workspaces.ts` answers.
-`spaceOf` takes a directory and the workspace it counts in, the main checkout for a linked worktree as `WorkspacePlacement` in `src/workspace-placement.ts` finds it, else the directory itself.
-The directory is Personal when it is `personalDir` in `src/paths.ts`, `<data dir>/personal`, exactly, or when its workspace is in the `personal` list of `workspaces.json`, which Settings › Workspaces sets; every other directory is Work, a subdirectory of either included.
+A personal session has no field of its own: a session is personal exactly when its directory is in the Personal space, as `spaces` in `src/shared/workspaces.ts` answers, the one rule the server, the personal extension, and the page share.
+`spaces` takes the `personal` list of `workspaces.json`, which Settings › Workspaces sets, and the personal directory as a `Workspace`, and returns `isPersonalDir` and `of`.
+`of` takes a directory and the workspace it counts in, the main checkout for a linked worktree as `WorkspacePlacement` in `src/workspace-placement.ts` finds it, else the directory itself.
+The directory is Personal when `isPersonalDir` holds for it, or when its workspace is in the `personal` list; every other directory is Work, a subdirectory of either included.
+`isPersonalDir` holds for `personalDir` in `src/paths.ts`, `<data dir>/personal`, named by its path or by its `cwdDisplay`, the `~` path the page shows and may send, with any trailing `/`.
+The personal directory is always Personal, so the workspaces route refuses to move it to Work and Settings › Workspaces offers no picker for it; both read `isPersonalDir`.
 See [Workspaces](http-api-workspaces.md) for the list.
 Its memory is `personalMemoryFile`, `<data dir>/personal-memory.md`, a plain Markdown file shaped as a Bot's `memory.md`, beside the directory so omp never reads it as one of that directory's files.
 For what the user sees, see [Personal sessions](../usage/personal-sessions.md).
@@ -14,11 +17,12 @@ A Bot's session launches without it, so a Bot whose workspace is in the Personal
 A private session loads it as any other, so a private personal session reads and writes the shared memory.
 
 The extension decides per turn from the hook's `ctx.cwd`, not at load, so a session that moves in or out, or whose workspace Settings › Workspaces moves to the other space, follows.
-`personalIn` reads `workspaces.json` with `readWorkspaces` from `src/server/workspaces-file.ts` each time, and asks git which workspace `ctx.cwd` counts in through its own `WorkspacePlacement`, once per directory and only while some workspace is Personal, so a Work-only setup never runs git.
+`personalIn` reads the flags once omp has set them, reads `workspaces.json` with `readWorkspaces` from `src/workspace-list.ts` each time, asks git which workspace `ctx.cwd` counts in through its own `WorkspacePlacement`, once per directory, and then applies `spaces`.
+The extension imports nothing from `src/server/`, since it runs inside omp, not in the dashboard.
 Its `before_agent_start` returns nothing for a subagent or a directory in the Work space; otherwise it appends a framing and `memoryLines` of the memory file, the file's newest whole lines within `MAX_MEMORY_BYTES`, as a Bot's prompt carries its memory.
 The framing makes the agent the user's personal assistant in the personal directory itself, and tells it a Personal repository is part of the user's own life, not their job, anywhere else.
 When the Sport module has a plan, it then appends one line for today, under 300 characters, from `todayLine` in `src/omp/sport-tool.ts`: the phase and whether it is a deload week, the day's workouts with their log status, and the pain flags that hold.
-Both the personal directory and the `personal` list are compared by exact string equality with the paths the dashboard keeps, as omp reports `ctx.cwd`.
+The `personal` list is compared by exact string equality with the paths the dashboard keeps, as omp reports `ctx.cwd`.
 
 `remember`, and `sport` when the dashboard passed both sport flags, are registered only once a session is personal, the first time `session_start` or `before_agent_start` sees it in the Personal space, so every other session's tool list stays as it was.
 `session_start` alone is not enough: omp sets extension flags only after every extension loads (see [omp modules](omp-modules.md)), and a session can move in later.
@@ -51,15 +55,15 @@ Their tools reach their inboxes through `inbox` in `templates/omp/agent/extensio
 
 The dashboard creates `personalDir` in `start()`.
 It is outside git and holds no agent code, so `ProjectTrustFile.admit` passes for it without a trust; see [Project trust](project-trust.md).
-`isPersonalDir` in `src/server/personal.ts` resolves a `~` path through `absoluteDir` in `src/paths.ts` before comparing, since the page sends directories as shown.
+The server builds `spaces` from its workspaces and `personalWorkspace` in `src/server/personal.ts`, the personal directory as the page shows it.
 `SessionMoves` takes `staysPut`, true for a Bot's conversation or a session started in the personal directory itself, and gives neither the `move_session` tool; the join is decided at launch, so a session that moves into the directory keeps the tool, and a session on a Personal repository keeps it too.
 
 The page learns the directory and the memory from the read-only list message `personal`, `{ cwd, cwdDisplay, memory }`, which `personalMessage` builds and every socket gets on open.
-The dashboard pushes it again after a personal session's turn ends and when one exits, since that turn may have remembered something, as it pushes `bots` for a Bot's memory; it tells a personal session with `spaceOf` and the placement its session list already holds.
+The dashboard pushes it again after a personal session's turn ends and when one exits, since that turn may have remembered something, as it pushes `bots` for a Bot's memory; it tells a personal session with `spaces` once `WorkspacePlacement.workspaceOf` has placed the session's directory, so a worktree git had not placed yet counts in its Personal workspace.
 
 ## The page
 
 `web/dashboard-state.ts` keeps the directory as `personal`, one object while it stays the same, and the memory text as `personalMemory`.
 `PersonalContext` in `web/components/dashboard-context.tsx` provides the directory, and `workspaceName` in `web/labels.ts` names it **Personal**, from the directory as shown, for the workspace pickers, the roster's new-session button, a row's workspace badge, and the command palette.
 `DirectoryPicker` lists it first.
-`SessionDetails` adds a **Memory** tab for a session `spaceOf` places in the Personal space, given the focused session's directory, its workspace from the roster, and the `personal` list of the `workspaces` message, with `MemoryList` from `web/components/memory-list.tsx`, which a Bot's details also use.
+`SessionDetails` adds a **Memory** tab for a session `spaces` places in the Personal space, given the focused session's directory, its workspace from the roster, and the `personal` list of the `workspaces` message, with `MemoryList` from `web/components/memory-list.tsx`, which a Bot's details also use.

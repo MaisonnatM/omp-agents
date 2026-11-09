@@ -1,26 +1,9 @@
 /** The directories Settings → Workspaces added, hid, and placed in the Personal space, saved in `workspaces.json`. */
-import { linkSync, readFileSync, unlinkSync } from "node:fs";
+import { linkSync, unlinkSync } from "node:fs";
 import { ReducerFile } from "../fs";
 import { errorText, isObject } from "../json";
 import { applyWorkspace, NO_WORKSPACES, type WorkspaceChange, type WorkspaceList } from "../shared/workspaces";
-
-const isPaths = (value: unknown): value is string[] => Array.isArray(value) && value.every(entry => typeof entry === "string" && entry.startsWith("/"));
-
-/** The list `value` holds; a file an older version wrote has no `personal`, so every workspace in it is Work. */
-export function parseWorkspaces(value: unknown): WorkspaceList | null {
-	if (!isObject(value) || !isPaths(value.added) || !isPaths(value.hidden)) return null;
-	const personal = value.personal ?? [];
-	return isPaths(personal) ? { added: value.added, hidden: value.hidden, personal } : null;
-}
-
-/** The list the file at `path` holds; `null` when it is missing, unreadable, or holds anything else. */
-export function readWorkspaces(path: string): WorkspaceList | null {
-	try {
-		return parseWorkspaces(JSON.parse(readFileSync(path, "utf8")));
-	} catch {
-		return null;
-	}
-}
+import { parseWorkspaces, readWorkspaces } from "../workspace-list";
 
 /**
  * Moves `oldPath`, where an older version saved the list, to `path`, when it holds a workspace list; a file there in any

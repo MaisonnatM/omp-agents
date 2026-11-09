@@ -44,7 +44,7 @@ import { modelUpdates, upgradeModel } from "../settings";
 import { MCP_SERVICES } from "../shared/accounts";
 import { agentOn } from "../shared/moves";
 import type { StartRequest, StartResult, View } from "../shared/sessions";
-import { spaceOf } from "../shared/workspaces";
+import { type Spaces, spaces } from "../shared/workspaces";
 import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
 import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
@@ -68,7 +68,7 @@ import { MergeCleanup } from "./merge-cleanup";
 import { MergeQueue } from "./merge-queue";
 import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, Notices, PROVIDER_KINDS, SIGN_IN_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
 import { OwnerLock } from "../../templates/omp/agent/extensions/github/owner-lock";
-import { isPersonalDir, personalJoin, personalMessage } from "./personal";
+import { personalJoin, personalMessage, personalWorkspace } from "./personal";
 import { PinsFile } from "./pins-file";
 import { SignInInbox } from "./sign-in-inbox";
 import { PrivateSessions } from "./private-sessions";
@@ -151,7 +151,10 @@ export class Dashboard {
 	readonly #admit = (dir: string): Promise<void> => this.#projectTrust.admit(dir);
 	readonly #moves = new SessionMoves({
 		session: instanceId => this.#sessions.started(instanceId),
-		staysPut: request => this.#bots.botOf(request) !== null || isPersonalDir(this.#cwdOf(request)),
+		staysPut: request => {
+			const cwd = this.#cwdOf(request);
+			return this.#bots.botOf(request) !== null || (cwd !== undefined && this.#spaces().isPersonalDir(cwd));
+		},
 		admit: this.#admit,
 	});
 	readonly #personalJoin = personalJoin(request => this.#bots.botOf(request) !== null);
@@ -364,11 +367,7 @@ export class Dashboard {
 			saveRunning: () => interrupted.setRunning(sessions.startedHere()),
 		}));
 		this.#usage = new UsagePoll({ refresh: () => broadcasts.refreshUsage(), checkNotices: () => notices.check(PROVIDER_KINDS) });
-		/** The workspace directory `cwd` counts in, asking git when it was not asked about yet. */
-		const workspaceOf = async (cwd: string): Promise<string> => {
-			await placement.place([cwd], worktreeAt);
-			return placement.cwdOf(cwd);
-		};
+		const workspaceOf = (cwd: string): Promise<string> => placement.workspaceOf(cwd, worktreeAt);
 		const todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), workspaceOf, { active: () => ownerLock.held });
 		const noteInbox = new NoteInbox(userNoteInboxDir, change => lists.apply("user-notes", change), { active: () => ownerLock.held });
 		const sportInbox = new SportInbox(
@@ -636,6 +635,7 @@ export class Dashboard {
 			sessions: {
 				knownWorkspaces: () => this.knownWorkspaces(),
 				addedCwds: () => this.#workspaces.value.added,
+				spaces: () => this.#spaces(),
 				changeWorkspaces: change => void this.#lists.apply("workspaces", change),
 				changeProjectTrust: change => void this.#lists.apply("project-trust", change),
 				summaryOf(sessionId) {
@@ -828,7 +828,7 @@ export class Dashboard {
 				// Its last turn may have remembered something.
 				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
 				this.#bots.exited(instanceId);
-				this.#personalTurnEnded(instanceId);
+				void this.#personalTurnEnded(this.#sessions.get(instanceId)?.cwd);
 				this.#sessions.remove(instanceId);
 				// A private session lives exactly as long as its omp, so it is deleted rather than interrupted; the next server's sweep finishes a purge cut short.
 				if (isPrivate) void this.#privateSessions.purge(instanceId).catch((err: unknown) => console.error(`omp-agents: deleting private session ${instanceId} failed: ${errorText(err)}`));
@@ -868,7 +868,7 @@ export class Dashboard {
 				if (sessionId) this.#autoContinue.turnEnded(sessionId, update.failure);
 				this.#broadcasts.rosterChanged();
 				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
-				this.#personalTurnEnded(instanceId);
+				void this.#personalTurnEnded(this.#sessions.get(instanceId)?.cwd);
 				return;
 			}
 			default: {
@@ -878,11 +878,18 @@ export class Dashboard {
 		}
 	}
 
-	/** Tells the page the personal memory may have changed when session `instanceId`, which ended a turn, runs in the Personal space. */
-	#personalTurnEnded(instanceId: string): void {
-		const cwd = this.#sessions.get(instanceId)?.cwd;
+	/** The space each directory is in, as Settings › Workspaces places them now. */
+	#spaces(): Spaces {
+		return spaces(this.#workspaces.value.personal, personalWorkspace);
+	}
+
+	/**
+	 * Tells the page the personal memory may have changed when a session in `cwd`, which ended a turn, runs in the Personal
+	 * space; it waits for git to place `cwd`, so a worktree of a Personal workspace not placed yet counts.
+	 */
+	async #personalTurnEnded(cwd: string | undefined): Promise<void> {
 		if (cwd === undefined) return;
-		if (spaceOf({ cwd, workspace: this.#files.facts.placement.cwdOf(cwd) }, this.#workspaces.value.personal, personalDir) === "personal") this.#broadcasts.pushList("personal");
+		if (this.#spaces().of(cwd, await this.#files.facts.placement.workspaceOf(cwd, worktreeAt)) === "personal") this.#broadcasts.pushList("personal");
 	}
 
 	/** Moves todos checked over {@link DONE_KEPT_HOURS} ago to the archive. */

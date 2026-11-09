@@ -54,10 +54,10 @@ The page sends it when you copy a session header's branch or a pull request deta
 
 `PUT /api/workspaces` takes a `WorkspaceChange`, `{ op, cwd }` with `op` one of `add`, `hide`, and `show`, or `{ op: "space", cwd, space }` with `space` `personal` or `work`, checked by `parseWorkspaceChange` in `src/server/wire.ts`.
 `add` resolves `cwd` through `directoryOf` in `src/paths.ts`, which expands `~`, and answers 400 when it is not a directory; `hide`, `show`, and `space` take an absolute path.
-`space` answers 400 for `personalDir`, which is always Personal and never stored.
+`space` answers 400 for `personalDir`, named by its path or as the page shows it, since it is always Personal and never stored.
 `applyWorkspace` in `src/shared/workspaces.ts` applies one change: adding also shows a hidden directory, and a directory in both lists is hidden, so **Show** offers an added one again.
-`space` lists the directory in `personal` or takes it out and leaves `added` and `hidden` as they are, so a directory sessions ran in can be Personal without being added; a file from before `personal` reads with every workspace in Work.
-`spaceOf` answers the space of any directory from that list, as [Personal sessions](personal-sessions.md) describes; the server, the personal extension, and the page all use it.
+`space` lists the directory in `personal` or takes it out and leaves `added` and `hidden` as they are, so a directory sessions ran in can be Personal without being added; hiding or showing a directory leaves its space as it is; a file from before `personal` reads with every workspace in Work.
+`spaces` answers the space of any directory from that list, as [Personal sessions](personal-sessions.md) describes; the server, the personal extension, and the page all use it.
 A change that changes the list saves `workspaces.json` and sends every socket a `workspaces` message, its `list` of added, hidden, and Personal directories, each with its `cwdDisplay`, also sent when a socket opens.
 Sync carries the whole file, `personal` with it, as the **Workspaces** item; see [Settings sync](../usage/settings-sync.md).
 A request's `?cwd=` may name an added directory, as the settings under **This workspace** and a workspace's pull request list do; the every-workspace pull request list and the worktrees inventory read only the directories sessions ran in.

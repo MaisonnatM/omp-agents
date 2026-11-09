@@ -36,7 +36,13 @@ export interface PromptChange {
 	systemPrompt: string[];
 }
 
-/** The part of omp's `ExtensionAPI` the extensions use, by hand: `tsc` cannot resolve omp's own package here. Each hook's `cwd` is the session's directory as it is now, after any `/move`. */
+/**
+ * The part of omp's `ExtensionAPI` the extensions use, by hand: `tsc` cannot resolve omp's own package here. Each hook's `cwd`
+ * is the session's directory as it is now, after any `/move`. omp awaits every `session_start` and `before_agent_start`
+ * handler, each for up to 30 seconds, before the session or the turn goes on, and awaits a tool's `execute` before the turn
+ * reads its result (`ExtensionRunner.emit` and `emitBeforeAgentStart` in its `extensibility/extensions/runner.ts`, and
+ * `ExtensionToolWrapper` in `wrapper.ts`), so a hook may wait on git or a file.
+ */
 export interface ExtensionApi {
 	registerFlag(name: string, options: { type: "string"; description: string }): void;
 	getFlag(name: string): boolean | string | undefined;
@@ -97,7 +103,7 @@ export function memoryLines(path: string): string[] {
  * The `remember` tool, the one writer of a Markdown memory: each fact is a dated `- YYYY-MM-DD <fact>` line. `memoryPath`
  * names the file for the session calling it, or throws why it has none.
  */
-export function rememberTool(pi: ExtensionApi, description: string, memoryPath: (ctx: ToolContext) => string | Promise<string>): ExtensionTool<{ fact: string }> {
+export function rememberTool(pi: ExtensionApi, description: string, memoryPath: (ctx: ToolContext) => Promise<string>): ExtensionTool<{ fact: string }> {
 	return {
 		name: REMEMBER_TOOL,
 		label: "Remember",

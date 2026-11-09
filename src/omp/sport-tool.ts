@@ -121,7 +121,7 @@ export function todayLine(state: SportState, day: string): string | null {
 }
 
 /** The `sport` tool; `pathsOf` names the paths for the session calling it, or throws why it has none. */
-export function sportTool(pi: ExtensionApi, pathsOf: (ctx: ToolContext) => SportPaths | Promise<SportPaths>): ExtensionTool<SportParams> {
+export function sportTool(pi: ExtensionApi, pathsOf: (ctx: ToolContext) => Promise<SportPaths>): ExtensionTool<SportParams> {
 	const { Type } = pi.typebox;
 	const object = (description: string) => Type.Optional(Type.Unknown({ description }));
 	return {
