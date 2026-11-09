@@ -59,17 +59,28 @@ export function UnderToasts({ children }: { children: ReactNode }) {
 	return element && createPortal(children, element);
 }
 
+/** A phone's width, where a second toast would bury the page: only the newest shows, at the top, clear of the composer, and the next one waits under it. */
+const PHONE_WIDTH = "(max-width: 639px)";
+
+const subscribePhoneWidth = (onChange: () => void): (() => void) => {
+	const query = window.matchMedia(PHONE_WIDTH);
+	query.addEventListener("change", onChange);
+	return () => query.removeEventListener("change", onChange);
+};
+
 /**
- * Every toast of the page, stacked at the bottom right, the newest last, each under its source when it has one. A toast
- * that never times out gets **Dismiss**. What {@link UnderToasts} draws sits below them, outside their live region.
+ * Every toast of the page, stacked at the bottom right, the newest last, each under its source when it has one; on a
+ * phone, only the newest. A toast that never times out gets **Dismiss**. What {@link UnderToasts} draws sits below them,
+ * outside their live region.
  */
 export function Toaster() {
+	const phone = useSyncExternalStore(subscribePhoneWidth, () => window.matchMedia(PHONE_WIDTH).matches);
 	return (
-		<Toast.Provider toastManager={toasts}>
+		<Toast.Provider toastManager={toasts} limit={phone ? 1 : undefined}>
 			<Toast.Portal>
-				<div className="pointer-events-none fixed right-4 bottom-10 z-50 flex w-96 max-w-[calc(100vw-2rem)] flex-col items-end gap-2 *:pointer-events-auto">
+				<div className="pointer-events-none fixed right-4 bottom-10 z-50 flex w-96 max-w-[calc(100vw-2rem)] flex-col items-end gap-2 *:pointer-events-auto max-sm:top-[max(0.5rem,env(safe-area-inset-top))] max-sm:right-2 max-sm:bottom-auto max-sm:max-w-[calc(100vw-1rem)]">
 					<Toast.Viewport className="flex w-full flex-col-reverse gap-2">
-						<ToastList />
+						<ToastList phone={phone} />
 					</Toast.Viewport>
 					<div ref={setCorner} className="contents" />
 				</div>
@@ -90,24 +101,32 @@ function Elapsed({ since }: { since: number }) {
 	return <span aria-hidden className="shrink-0 text-xs tabular-nums text-muted-foreground">{clockWords(now - since)}</span>;
 }
 
-function ToastList() {
+/** Each toast; on a phone, where they sit at the top, a swipe up or right puts one away, and it follows the finger. */
+function ToastList({ phone }: { phone: boolean }) {
 	return Toast.useToastManager<ToastData>().toasts.map(toast => {
 		const loading = toast.type === "loading";
 		const startedAt = loading ? toast.data?.startedAt : undefined;
 		return (
-			<Toast.Root key={toast.id} toast={toast} className="rounded-lg border border-border bg-popover px-4 py-2 text-sm shadow-lg data-limited:hidden">
-				<Toast.Content className="flex items-center gap-3">
-					<div className="flex min-w-0 flex-1 flex-col">
+			<Toast.Root
+				key={toast.id}
+				toast={toast}
+				swipeDirection={phone ? ["up", "right"] : undefined}
+				className="rounded-lg border border-border bg-popover px-4 py-2 text-sm shadow-lg data-limited:hidden max-sm:translate-x-(--toast-swipe-movement-x) max-sm:translate-y-(--toast-swipe-movement-y)"
+			>
+				<Toast.Content className="flex items-center gap-3 max-sm:flex-wrap max-sm:gap-y-1">
+					<div className="flex min-w-0 flex-1 flex-col max-sm:basis-full">
 						{toast.data?.source && <div className="mb-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">{toast.data.source}</div>}
 						<div className="flex min-w-0 items-center gap-2">
 							{loading && <Spinner className="size-4" />}
 							<Toast.Title className="min-w-0 flex-1 truncate" />
 							{startedAt !== undefined && <Elapsed since={startedAt} />}
 						</div>
-						<Toast.Description className="text-muted-foreground" />
+						<Toast.Description className="text-muted-foreground max-sm:line-clamp-2" />
 					</div>
-					<Toast.Action render={<Button variant="secondary" size="compact" />} />
-					{toast.timeout === 0 && <Toast.Close render={<Button variant="ghost" size="compact" />}>Dismiss</Toast.Close>}
+					<div className="contents max-sm:ms-auto max-sm:flex max-sm:gap-2">
+						<Toast.Action render={<Button variant="secondary" size="compact" />} />
+						{toast.timeout === 0 && <Toast.Close render={<Button variant="ghost" size="compact" />}>Dismiss</Toast.Close>}
+					</div>
 				</Toast.Content>
 			</Toast.Root>
 		);
