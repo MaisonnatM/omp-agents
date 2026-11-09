@@ -19,6 +19,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The sidebar's workspace picker can move the picked workspace to the other space, then shows a message saying where it went, with Undo to move it back, or why the move failed.
 - The Personal and Work switch also shows at the top right of the empty home, so you can change space before opening anything.
 - In a narrow window the switch shows only its two icons, so the bell and Settings stay on screen; hover an icon to see its name.
+- When a page's header is too narrow for its title and buttons, the buttons move to a second row under the title, as on a phone, so the title stays readable.
 - In the desktop app, the window title in the title bar no longer runs under the switch.
 - The outline that shows which tab has the keyboard is now thicker and easier to see.
 - The sidebar's Personal item is gone: in Personal, New session starts in your personal folder unless you pick another workspace.
