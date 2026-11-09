@@ -17,12 +17,12 @@ export interface PageShortcutInput {
 	/** The views of the Sessions tab, in order, and the focused one: what the session shortcuts step through. */
 	listed: View[];
 	view: View | null;
-	/** The sidebar tabs whose service omp holds no sign-in to; their shortcuts and commands do not apply. */
-	signedOutTabs: ReadonlySet<SidebarTab>;
+	/** The sidebar tabs whose service omp holds no sign-in to, or that belong to the other space; their shortcuts and commands do not apply. */
+	absentTabs: ReadonlySet<SidebarTab>;
 	/** The shown tabs the sidebar's bar draws, in order: Cmd+1 goes to the first. */
 	tabs: readonly SidebarTab[];
-	/** The dashboard can create Linear issues, so the new-ticket shortcut applies. */
-	linearCallable: boolean;
+	/** The dashboard can create Linear issues, and the space shows Tickets, so the new-ticket shortcut applies. */
+	ticketsCallable: boolean;
 	/** The right sidebar has a session to show. */
 	hasDetails: boolean;
 	/** Sends the focused session **Open PR**'s prompt, or `null` while its header offers no **Open PR** to press. */
@@ -63,8 +63,8 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			else if (!listed.length) return false;
 		};
 		const goToTab = (tab: Exclude<SidebarTab, "sessions" | "pull-requests">): ShortcutHandler => () => {
-			const { signedOutTabs, page, showTab } = latest.current;
-			if (signedOutTabs.has(tab)) return false;
+			const { absentTabs, page, showTab } = latest.current;
+			if (absentTabs.has(tab)) return false;
 			if (page?.kind === tab) return;
 			showTab(tab);
 		};
@@ -118,8 +118,8 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			"pull-requests": goTo["pull-requests"],
 			tickets: goTo.tickets,
 			newTicket: () => {
-				const { linearCallable, setNewTicket } = latest.current;
-				if (!linearCallable) return false;
+				const { ticketsCallable, setNewTicket } = latest.current;
+				if (!ticketsCallable) return false;
 				setNewTicket(current => current ?? "");
 			},
 			bots: goTo.bots,
@@ -154,7 +154,7 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 		};
 	}, []);
 	useShortcuts(handlers);
-	const { signedOutTabs, linearCallable, hasDetails } = input;
+	const { absentTabs, ticketsCallable, hasDetails } = input;
 	const canOpenPullRequest = input.openPullRequest !== null;
 	const canSetGoal = input.setGoal !== null;
 	const { canGoBack, canGoForward } = useHistoryPosition();
@@ -163,15 +163,15 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 		() =>
 			new Set<ShortcutId>([
 				// A sidebar tab's shortcut has the tab's id.
-				...(signedOutTabs satisfies ReadonlySet<ShortcutId>),
-				...(linearCallable ? [] : ["newTicket" as const]),
+				...(absentTabs satisfies ReadonlySet<ShortcutId>),
+				...(ticketsCallable ? [] : ["newTicket" as const]),
 				...(hasDetails ? [] : ["detailsSidebar" as const]),
 				...(canOpenPullRequest ? [] : ["openPullRequest" as const]),
 				...(canSetGoal ? [] : ["setGoal" as const]),
 				...(canGoBack ? [] : ["back" as const]),
 				...(canGoForward ? [] : ["forward" as const]),
 			]),
-		[signedOutTabs, linearCallable, hasDetails, canOpenPullRequest, canSetGoal, canGoBack, canGoForward],
+		[absentTabs, ticketsCallable, hasDetails, canOpenPullRequest, canSetGoal, canGoBack, canGoForward],
 	);
 	return { handlers, unavailable };
 }

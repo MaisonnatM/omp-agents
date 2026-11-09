@@ -2,7 +2,8 @@ import { fromPartial } from "@total-typescript/shoehorn";
 import { describe, expect, test } from "bun:test";
 import type { AgentRow, AgentStatus, HostStatus, PastSession, RosterHost, UnreadTurn } from "../src/shared/sessions";
 import { spaces } from "../src/shared/workspaces";
-import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, searchSessions, sessionsIn, sidebarSessions, spaceSession, waitingCount, workspaceSession, workspacesIn, workspaceSwitch } from "./sessions";
+import type { Layout, Page } from "./routing";
+import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, searchSessions, sessionsIn, sidebarSessions, spaceSession, spaceSwitchPanes, waitingCount, waitingIn, workspaceSession, workspacesIn, workspaceSwitch } from "./sessions";
 
 const host = (sessionId: string, cwd: string) => fromPartial<RosterHost>({ instanceId: `i-${sessionId}`, sessionId, cwd, agents: [], turnWaits: false });
 const subagents = (...statuses: AgentStatus[]): AgentRow[] => statuses.map(status => fromPartial<AgentRow>({ status }));
@@ -136,6 +137,37 @@ describe("spaces", () => {
 		expect(spaceSession("personal", hosts, placed)).toEqual({ kind: "live", instanceId: "i-new", agentId: null });
 		expect(spaceSession("work", hosts, placed)).toEqual({ kind: "live", instanceId: "i-job", agentId: null });
 		expect(spaceSession("personal", [running("job", "/code/app", 9)], placed)).toBeNull();
+	});
+
+	test("a space counts the sessions it lists that need you, not those of a hidden workspace or a Bot", () => {
+		const turn = fromPartial<UnreadTurn>({ at: 1, reply: "Done." });
+		const asks = (sessionId: string, cwd: string) => ({ ...running(sessionId, cwd, 1), status: "needs-input" as const, unread: null, requests: [] });
+		const hosts = [
+			asks("life", "/home/me/personal"),
+			{ ...running("garden", "/code/garden", 2), status: "idle" as const, unread: turn, requests: [] },
+			asks("secret", "/home/me/personal/hidden"),
+			asks("bot", "/home/me/personal"),
+			asks("job", "/code/app"),
+			{ ...running("busy", "/code/app", 3), status: "working" as const, unread: null, requests: [] },
+		];
+		const everySpace = discoverableSessions(hosts, [], new Set(["/home/me/personal/hidden"]), new Set(["bot"]));
+		expect(waitingIn(everySpace, "personal", placed)).toBe(2);
+		expect(waitingIn(everySpace, "work", placed)).toBe(1);
+	});
+
+	test("a switch of space keeps a page of both spaces, and otherwise opens the newest session of the space it goes to", () => {
+		const hosts = [running("life", "/home/me/personal", 5), running("job", "/code/app", 9)];
+		const panes = fromPartial<Layout>({ panes: [{}] });
+		const empty = fromPartial<Layout>({ panes: [] });
+		const sport: Page = { kind: "sport", tab: "week", day: null };
+		const todo: Page = { kind: "todo", list: { kind: "all" }, open: null };
+		expect(spaceSwitchPanes(todo, panes, "work", "personal", hosts, placed)).toBe("stay");
+		expect(spaceSwitchPanes(sport, panes, "work", "personal", hosts, placed)).toBe("stay");
+		expect(spaceSwitchPanes(null, panes, "work", "personal", hosts, placed)).toEqual({ kind: "live", instanceId: "i-life", agentId: null });
+		expect(spaceSwitchPanes(sport, panes, "personal", "work", hosts, placed)).toEqual({ kind: "live", instanceId: "i-job", agentId: null });
+		expect(spaceSwitchPanes(null, panes, "personal", "work", [hosts[0]!], placed)).toBe("empty");
+		expect(spaceSwitchPanes(sport, empty, "personal", "work", hosts, placed)).toBe("empty");
+		expect(spaceSwitchPanes(null, empty, "work", "personal", hosts, placed)).toBe("empty");
 	});
 });
 

@@ -31,8 +31,8 @@ export function useSettingsRoute(page: Page | null): SettingsRoute {
 
 interface SidebarTabInput {
 	page: Page | null;
-	/** The tabs whose service omp holds no sign-in to; a page of one keeps the tab the panes had. */
-	signedOutTabs: ReadonlySet<SidebarTab>;
+	/** The tabs that neither show nor apply, signed out or of the other space; a page of one keeps the tab the panes had. */
+	absentTabs: ReadonlySet<SidebarTab>;
 	layout: Layout;
 	/** The session the Sessions tab opens when no pane shows one; `null` for none. */
 	latestSession: View | null;
@@ -47,9 +47,9 @@ interface SidebarTabInput {
  * Pull requests tab, which stays while you work in the panes until you choose Sessions. Sessions keeps the panes, or
  * opens the latest session when no pane shows one; Bots opens the latest Bot's page. `showTab` keeps its identity across renders.
  * A page whose tab the user hid in Preferences still selects that tab, so its panel shows with no tab of the bar selected,
- * and a page whose trigger sits in the header shows its panel, such as the Notes nav, with no bar; a page whose service is signed out keeps the tab the panes had.
+ * and a page whose trigger sits in the header shows its panel, such as the Notes nav, with no bar; a page whose tab is absent keeps the tab the panes had.
  */
-export function useSidebarTab({ page, signedOutTabs, layout, latestSession, latestBot, navigate, show }: SidebarTabInput): {
+export function useSidebarTab({ page, absentTabs, layout, latestSession, latestBot, navigate, show }: SidebarTabInput): {
 	tab: SidebarPanel;
 	showTab: (tab: SidebarTab) => void;
 } {
@@ -61,7 +61,7 @@ export function useSidebarTab({ page, signedOutTabs, layout, latestSession, late
 		if (onPullRequests) setPaneTab("pull-requests");
 	}
 	const pageTab = page ? PAGE_TAB[page.kind] : undefined;
-	const tab: SidebarPanel = pageTab && (pageTab === "settings" || !signedOutTabs.has(pageTab)) ? pageTab : paneTab;
+	const tab: SidebarPanel = pageTab && (pageTab === "settings" || !absentTabs.has(pageTab)) ? pageTab : paneTab;
 	const latest = useRef({ layout, latestSession, latestBot });
 	latest.current = { layout, latestSession, latestBot };
 	const showTab = useCallback(

@@ -11,6 +11,9 @@ import type { OpenMode } from "./routing";
 export const SPACE_LABELS: Record<Space, string> = { personal: "Personal", work: "Work" };
 
 /** What a workspace picker calls choosing no workspace: every workspace of the space. */
+/** A count of sessions that need you, as a badge's accessible name and tooltip say it: "1 session waiting on you". */
+export const sessionsWaiting = (count: number): string => `${count} ${count === 1 ? "session" : "sessions"} waiting on you`;
+
 export const ALL_OF_SPACE: Record<Space, string> = { personal: "All of Personal", work: "All of Work" };
 
 /** Words that keep their own casing in a label. */

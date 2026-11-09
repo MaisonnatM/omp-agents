@@ -70,6 +70,18 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The sidebar's Personal item is gone: in Personal, New session starts in your personal folder unless you pick another workspace.
 - Opening a link to a session from the other space switches to that space.
 - Behind the scenes: the pull request list can ask for one space's repositories.
+- Sport now shows only in Personal, so in Work its header button and its command leave.
+- A link to Sport switches the window to Personal.
+- Linear tickets now show only in Work, so in Personal the Tickets tab and its command leave.
+- In Personal, the command menu lists no tickets and the new-ticket shortcut does nothing.
+- In Personal, the sidebar tabs after Tickets move up one Cmd+number.
+- A link to Tickets switches the window to Work.
+- Switching space while on Sport or Tickets takes you back to your sessions.
+- Going Back from Sport or Tickets to a session of the other space switches the window back to that space.
+- The side of the Personal and Work switch for the space not on screen now shows how many sessions it lists need you.
+- Hovering that count says what it counts.
+- The Dock badge still counts both spaces.
+- Settings › Preferences › Sidebar tabs now marks Tickets as shown only in Work and Sport as shown only in Personal.
 
 ## 2026-11-08
 

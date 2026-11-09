@@ -5,12 +5,16 @@
   Personal holds the personal directory and the workspaces Settings › Workspaces placed in Personal; every other workspace is in Work, a workspace the page cannot place yet included.
   The sidebar's sessions, its counts, the session search, the Todo page, the pull requests, the command palette's sessions and workspaces, Settings' workspace pickers, and New session's directory picker then hold only the space's.
   Switching keeps the page you are on; on the panes it opens the space's most recently started running session, or the empty home when none runs there.
+  A page of the space you leave, Sport leaving Personal or Tickets leaving Work, gives way to the panes.
   Cmd+Shift+P (Ctrl+Shift+P elsewhere) switches too.
   Each window keeps its own space, and a new window or a reload opens in the last space picked on this computer, Work the first time.
   Opening a link to a session of the other space, from a notification or another window, switches the window to that space.
+  So does a link to Sport, which shows only in Personal, or to Tickets, which shows only in Work.
+- The side of the switch for the space not shown counts that space's sessions that need you, each that asks you something or finished a turn you have not looked at, so they do not wait unseen; hovering the side, or a screen reader, says how many sessions wait on you.
+  Their notifications still show while you work in the other space, and clicking one switches to its space; the Dock badge counts both spaces.
 - The content header and both sidebar header rows are 48 px tall at the default font size, each with a hairline under it.
-- The sidebar's tab bar shows **Pull requests**, **Tickets**, **Bots**, **Sessions**, and **Todo**, above the list of the one open.
-  **Notes**, **Calendar**, **Email**, and **Sport** are buttons in the header, right after the command menu button, between two dividers; each opens its page and shows its list in the sidebar below the tab bar, with no tab selected, and the open one's button stays pressed.
+- The sidebar's tab bar shows **Pull requests**, **Tickets**, **Bots**, **Sessions**, and **Todo**, above the list of the one open; **Tickets** shows only in Work.
+  **Notes**, **Calendar**, **Email**, and **Sport** are buttons in the header, right after the command menu button, between two dividers; each opens its page and shows its list in the sidebar below the tab bar, with no tab selected, and the open one's button stays pressed; **Sport** shows only in Personal.
   The **Bots** tab lists your Bots and opens their conversations, which stay out of the **Sessions** tab.
   See [Bots](bots.md).
   The **Sessions** tab counts the sessions of the picked workspace that need you: each that asks you something, or finished a turn you have not looked at since.
