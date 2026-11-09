@@ -14,7 +14,11 @@ export function EmptyHome({ live, rosterError }: { live: boolean; rosterError: s
 	const controls = useHeaderControls();
 	return (
 		<>
-			{controls && <div className="flex h-(--page-header-height) shrink-0 items-center justify-end px-6">{controls}</div>}
+			{controls && (
+				<div className="@container/header shrink-0">
+					<div className="flex h-(--page-header-height) items-center justify-end px-6 @max-[40rem]/header:px-3 in-data-[floating-sidebars]:pl-12!">{controls}</div>
+				</div>
+			)}
 			<Empty className="m-auto max-w-lg flex-none">
 				<EmptyHeader>
 					<EmptyTitle>{live ? "Select a session" : "No sessions are running"}</EmptyTitle>
