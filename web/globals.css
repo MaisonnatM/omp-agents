@@ -11,6 +11,8 @@
   color-scheme: light;
   --radius: 0.625rem;
   --page-header-height: 3rem;
+  /* How far past a header's own padding its content starts while the floating Sessions sidebar's toggle sits over its left corner. */
+  --sidebar-toggle-clearance: 2.25rem;
   --background: var(--color-zinc-25);
   --foreground: var(--color-zinc-800);
   --card: var(--color-white);

@@ -166,7 +166,7 @@ function AccountLine({ provider, account, numbered, place }: { provider: ModelPr
 	return (
 		<div className="flex items-center gap-3 text-[13px] max-sm:flex-wrap max-sm:justify-end max-sm:gap-y-1">
 			{numbered && <span className="w-4 shrink-0 text-xs tabular-nums text-muted-foreground">{place && place.index + 1}</span>}
-			<div className="min-w-0 flex-1 max-sm:flex max-sm:min-w-[75%] max-sm:items-baseline">
+			<div className="min-w-0 flex-1 max-sm:flex max-sm:min-w-3/4 max-sm:items-baseline">
 				<span className="truncate max-sm:min-w-0">{account.label}</span>
 				<span className="ms-2 text-xs text-muted-foreground max-sm:shrink-0">{account.kind === "oauth" ? "Sign-in" : "API key"}</span>
 			</div>
@@ -257,7 +257,7 @@ function ProviderRow({ provider, login }: { provider: ModelProvider; login: Prov
 					</div>
 				</div>
 				{/* On a phone, a lone Connect keeps the ⋯ button's room, so it lines up with the Connect of rows that have one. */}
-				<div className={cn("flex shrink-0 items-center gap-1.5", !running && !connected && others.length === 0 && "max-sm:pe-[2.125rem]")}>{actions}</div>
+				<div className={cn("flex shrink-0 items-center gap-1.5", !running && !connected && others.length === 0 && "max-sm:pe-8.5")}>{actions}</div>
 			</div>
 			{hasDetails && (
 				<div className="mt-2.5 space-y-2.5 ps-11">

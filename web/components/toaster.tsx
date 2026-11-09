@@ -4,6 +4,7 @@ import { type ReactNode, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { useSecond } from "../use-minute";
+import { usePhoneWidth } from "../use-phone-width";
 import { Spinner } from "./spinner";
 
 /**
@@ -59,26 +60,18 @@ export function UnderToasts({ children }: { children: ReactNode }) {
 	return element && createPortal(children, element);
 }
 
-/** A phone's width, where a second toast would bury the page: only the newest shows, at the top, clear of the composer, and the next one waits under it. */
-const PHONE_WIDTH = "(max-width: 639px)";
-
-const subscribePhoneWidth = (onChange: () => void): (() => void) => {
-	const query = window.matchMedia(PHONE_WIDTH);
-	query.addEventListener("change", onChange);
-	return () => query.removeEventListener("change", onChange);
-};
-
 /**
  * Every toast of the page, stacked at the bottom right, the newest last, each under its source when it has one; on a
- * phone, only the newest. A toast that never times out gets **Dismiss**. What {@link UnderToasts} draws sits below them,
+ * phone, where a second toast would bury the page, only the newest, at the top, clear of the composer, and the next
+ * one waits under it. A toast that never times out gets **Dismiss**. What {@link UnderToasts} draws sits below them,
  * outside their live region.
  */
 export function Toaster() {
-	const phone = useSyncExternalStore(subscribePhoneWidth, () => window.matchMedia(PHONE_WIDTH).matches);
+	const phone = usePhoneWidth();
 	return (
 		<Toast.Provider toastManager={toasts} limit={phone ? 1 : undefined}>
 			<Toast.Portal>
-				<div className="pointer-events-none fixed right-4 bottom-10 z-50 flex w-96 max-w-[calc(100vw-2rem)] flex-col items-end gap-2 *:pointer-events-auto max-sm:top-[max(3.5rem,calc(env(safe-area-inset-top)+2.75rem))] max-sm:right-2 max-sm:bottom-auto max-sm:max-w-[calc(100vw-1rem)]">
+				<div className="pointer-events-none fixed right-4 bottom-10 z-50 flex w-96 max-w-[calc(100vw-2rem)] flex-col items-end gap-2 *:pointer-events-auto max-sm:top-[max(calc(var(--page-header-height)+0.5rem),calc(env(safe-area-inset-top)+2.75rem))] max-sm:right-2 max-sm:bottom-auto max-sm:max-w-[calc(100vw-1rem)]">
 					<Toast.Viewport className="flex w-full flex-col-reverse gap-2">
 						<ToastList phone={phone} />
 					</Toast.Viewport>
@@ -121,7 +114,7 @@ function ToastList({ phone }: { phone: boolean }) {
 							<Toast.Title className="min-w-0 flex-1 truncate" />
 							{startedAt !== undefined && <Elapsed since={startedAt} />}
 						</div>
-						<Toast.Description className="text-muted-foreground max-sm:line-clamp-2" />
+						<Toast.Description className="text-muted-foreground" />
 					</div>
 					<div className="contents max-sm:ms-auto max-sm:flex max-sm:gap-2">
 						<Toast.Action render={<Button variant="secondary" size="compact" />} />

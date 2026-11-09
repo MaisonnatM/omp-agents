@@ -17,6 +17,7 @@ import { hashForSettings } from "../routing";
 import { shortcutLabels } from "../shortcuts";
 import { useAction } from "../use-action";
 import { useHoverPopover } from "../use-hover-popover";
+import { usePhoneWidth } from "../use-phone-width";
 import { PlanUsageList } from "./plan-usage";
 import { LoadNote } from "./sheet-details";
 
@@ -190,7 +191,7 @@ interface StatusBarProps {
 	onToggleTerminal: () => void;
 }
 
-/** The window's bottom strip: plan quota on the left; the terminal's toggle and the machine's load on the right, left out on a paired phone, where they act on the Mac. */
+/** The window's bottom strip: plan quota on the left, on one row at a phone's width; the terminal's toggle and the machine's load on the right, left out on a paired phone, where they act on the Mac. */
 export function StatusBar({ usage, hosts, bots, terminalOpen, onToggleTerminal }: StatusBarProps) {
 	const titles = useMemo(() => {
 		const botNames = new Map((bots ?? []).flatMap(bot => (bot.sessionId === null ? [] : [[bot.sessionId, bot.name] as const])));
@@ -199,11 +200,12 @@ export function StatusBar({ usage, hosts, bots, terminalOpen, onToggleTerminal }
 			return [host.instanceId, botName === undefined ? hostLabel(host) : `${botName} · Bot`];
 		}));
 	}, [hosts, bots]);
-	const phone = isPhonePage();
+	const oneRow = usePhoneWidth();
+	const pairedPhone = isPhonePage();
 	return (
 		<footer className="flex min-h-7 shrink-0 items-center gap-4 border-t border-border px-3 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] text-xs">
-			<PlanUsageList usage={usage} oneRow={phone} />
-			{!phone && (
+			<PlanUsageList usage={usage} oneRow={oneRow} />
+			{!pairedPhone && (
 				<div className="ml-auto flex min-w-0 shrink-0 items-center gap-3 text-muted-foreground">
 					<Tooltip content={terminalOpen ? "Hide the terminal" : "Show the terminal"} shortcut={shortcutLabels("terminal")} side="top">
 						<button {...activityControl("status-bar.terminal")} type="button" aria-pressed={terminalOpen} onClick={onToggleTerminal} className={cn(FACT, "hover:text-foreground", terminalOpen && "text-foreground")}>

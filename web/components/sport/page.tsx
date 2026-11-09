@@ -81,7 +81,7 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 			{bodyweight && (
 				<Tooltip content="Noter ton poids du jour">
 					<Button variant="ghost" size="compact" leadingIcon={Scale} disabled={disabled} onClick={() => setWeighing(true)} {...activityControl("sport.weigh.open")}>
-						<span className="sr-only @3xl/sport:not-sr-only">Pesée</span>
+						<span className="sr-only max-sm:not-sr-only @3xl/sport:not-sr-only">Pesée</span>
 					</Button>
 				</Tooltip>
 			)}

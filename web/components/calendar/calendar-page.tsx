@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Tooltip } from "@/components/ui/tooltip";
 import {
+	CalendarDate,
 	CalendarDatePagination,
 	CalendarDatePicker,
 	CalendarMonthPicker,
@@ -231,12 +232,15 @@ function DayEntries({ entries, remove }: { entries: CalendarEntry[]; remove?: Ev
 	);
 }
 
+/** `1 item`, `3 items`: how many entries a day holds. */
+const itemsWords = (count: number): string => (count === 1 ? "1 item" : `${count} items`);
+
 /** The day's name, `Tuesday, October 6`, and how many entries it holds. */
 function DayHeading({ day, count, className }: { day: Date; count: number; className?: string }) {
 	return (
 		<div className={cn("flex items-baseline justify-between gap-3", className)}>
 			<h2 className="text-sm font-semibold">{day.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</h2>
-			{count > 0 && <span className="text-xs text-muted-foreground tabular-nums">{count === 1 ? "1 item" : `${count} items`}</span>}
+			{count > 0 && <span className="text-xs text-muted-foreground tabular-nums">{itemsWords(count)}</span>}
 		</div>
 	);
 }
@@ -270,7 +274,7 @@ function DayCell({ date, entries, today, selected, onSelect, className }: DayCel
 		>
 			<button
 				type="button"
-				aria-label={date.toDateString()}
+				aria-label={entries.length === 0 ? date.toDateString() : `${date.toDateString()}, ${itemsWords(entries.length)}`}
 				aria-pressed={selected}
 				aria-current={today ? "date" : undefined}
 				className={cn(
@@ -289,7 +293,7 @@ function DayCell({ date, entries, today, selected, onSelect, className }: DayCel
 				</span>
 			)}
 			{entries.length > 0 && (
-				<span aria-hidden className="flex flex-wrap items-center gap-0.5 px-0.5 text-[10px] leading-none text-muted-foreground tabular-nums sm:hidden">
+				<span aria-hidden className="flex flex-wrap items-center gap-0.5 px-0.5 text-2xs leading-none text-muted-foreground tabular-nums sm:hidden">
 					{entries.slice(0, CELL_ENTRIES).map(entry => (
 						<EntryDot key={entryKey(entry)} entry={entry} />
 					))}
@@ -409,24 +413,23 @@ export function CalendarPage({ routines, todos, ticketsShown, workspace }: Calen
 			))}
 			<div className="grid gap-6 px-6 py-6 max-sm:grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_19rem]">
 				<CalendarProvider className="overflow-hidden rounded-xl border border-border bg-background">
-					{/* Kibo's `CalendarDate` row, which wraps on a phone so the buttons drop under the month. */}
-					<div className="flex items-center justify-between p-3 max-sm:flex-wrap max-sm:gap-y-1">
+					<CalendarDate className="max-sm:flex-wrap max-sm:gap-y-1">
 						<CalendarDatePicker className="gap-0">
 							<CalendarMonthPicker />
 							<CalendarYearPicker start={today.getFullYear() - 1} end={today.getFullYear() + 2} />
 						</CalendarDatePicker>
 						<div className="flex items-center gap-1 max-sm:ms-auto">
 							<Tooltip content="Add an event to Google Calendar or this computer" shortcut={shortcutLabels("calendarNewEvent")} side="bottom">
-								<Button variant="tertiary" leadingIcon={Plus} onClick={openNewEvent} className="max-sm:size-10 max-sm:px-0">
+								<Button variant="tertiary" leadingIcon={Plus} onClick={openNewEvent} className="max-sm:size-11 max-sm:px-0">
 									<span className="max-sm:sr-only">New event</span>
 								</Button>
 							</Tooltip>
-							<Button variant="tertiary" onClick={() => show(today)} className="max-sm:h-10">
+							<Button variant="tertiary" onClick={() => show(today)} className="max-sm:h-11">
 								Today
 							</Button>
-							<CalendarDatePagination className="gap-0 max-sm:[&_button]:size-10" />
+							<CalendarDatePagination className="gap-0 max-sm:[&_button]:size-11" />
 						</div>
-					</div>
+					</CalendarDate>
 					<div className="grid grid-cols-7 border-y border-border">
 						{WEEKDAYS.map(weekday => (
 							<div key={weekday} className="px-3 py-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase max-sm:px-0 max-sm:text-center">

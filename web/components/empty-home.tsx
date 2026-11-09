@@ -16,7 +16,7 @@ export function EmptyHome({ live, rosterError }: { live: boolean; rosterError: s
 		<>
 			{controls && (
 				<div className="@container/header shrink-0">
-					<div className="flex h-(--page-header-height) items-center justify-end px-6 @max-[40rem]/header:px-3 in-data-[floating-sidebars]:pl-12!">{controls}</div>
+					<div className="flex h-(--page-header-height) items-center justify-end px-6 @max-[40rem]/header:px-3 in-data-[floating-sidebars]:ml-(--sidebar-toggle-clearance)">{controls}</div>
 				</div>
 			)}
 			<Empty className="m-auto max-w-lg flex-none">

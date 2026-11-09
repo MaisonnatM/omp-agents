@@ -158,7 +158,7 @@ export function PlanUsageList({ usage, oneRow = false }: { usage: DashboardState
 			</p>
 		);
 	return (
-		<ul aria-label="Plan usage" className={cn("flex min-w-0 items-center gap-x-2.5 gap-y-0.5", oneRow ? "-my-1 overflow-x-auto py-1 [mask-image:linear-gradient(to_right,black_calc(100%-1.5rem),transparent)] pe-6 [scrollbar-width:none] *:shrink-0" : "flex-wrap")}>
+		<ul aria-label="Plan usage" className={cn("flex min-w-0 items-center gap-x-2.5 gap-y-0.5", oneRow ? "-my-1 overflow-x-auto py-1 scroll-fade-x scrollbar-none *:shrink-0" : "flex-wrap")}>
 			{usage.plans.map((plan, index) => (
 				<PlanRow key={`${plan.provider}:${plan.account ?? index}`} plan={plan} />
 			))}

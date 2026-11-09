@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { type ShortcutId, shortcutLabels } from "../shortcuts";
 import { useStoredState } from "../stored-state";
+import { usePhoneWidth } from "../use-phone-width";
 import { Separator, useDragSeparator } from "./drag-separator";
 
 /**
@@ -21,8 +22,6 @@ const MIN_WIDTH = 240;
 /** What the session pane keeps between the sidebars, in px, however wide the right one is dragged. */
 const PANE_MIN_WIDTH = 480;
 const STEP = 16;
-/** Tailwind's `sm`: below it, a floating sidebar takes the screen up to {@link SIDEBARS}' rail. */
-const PHONE_MAX_WIDTH = 640;
 /** The show and hide motion: a drawer's curve, fast out of the gate and settling without overshoot. */
 const MOTION_MS = 260;
 const MOTION = "ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none";
@@ -135,7 +134,7 @@ export function useSidebarPanels(): SidebarPanels {
 		: stored;
 	// A floating sidebar leaves a rail's width of the page uncovered, which a tap closes it on; on a phone it takes all the rest, since its rows and the Details tabs cut to nothing in a desktop sidebar's width.
 	const floatingMax = Math.max(MIN_WIDTH, windowWidth - SIDEBARS.left.rail);
-	const phone = windowWidth < PHONE_MAX_WIDTH;
+	const phone = usePhoneWidth();
 	const panel = (side: SidebarSide, max: number): SidebarPanel => ({ open: sides[side].open, width: phone ? max : clamp(stored[side].width, max), max, floating });
 	const left = panel("left", floating ? floatingMax : SIDEBARS.left.maxWidth);
 	const leftShown = left.open ? left.width : SIDEBARS.left.rail;
@@ -169,7 +168,7 @@ export function SidebarToggle({ side, open, onToggle }: SidebarToggleProps) {
 				{...activityControl(side === "left" ? "sidebar.left.toggle" : "sidebar.right.toggle")}
 				variant="ghost"
 				size="icon-compact"
-				// On a touch screen the left toggle, alone in its corner, takes taps 8px around its 28px, the 44px a finger needs; the right one sits among the header's buttons.
+				// On a touch screen the left toggle, alone in its corner, also takes taps up to 8px outside its 28px box, the 44px a finger needs; the right one sits among the header's buttons, whose taps that margin would take.
 				className={cn("shrink-0 text-muted-foreground", side === "left" && "pointer-coarse:after:absolute pointer-coarse:after:-inset-2")}
 				aria-label={`${name} sidebar`}
 				aria-expanded={open}

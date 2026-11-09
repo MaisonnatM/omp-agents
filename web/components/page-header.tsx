@@ -27,7 +27,7 @@ export function Header({ title, meta, status, alert = false, leading, trailing, 
 		<header className="@container/header shrink-0 border-b border-border">
 			<div className="flex h-(--page-header-height) items-center justify-between gap-4 px-6 @max-[40rem]/header:h-auto @max-[40rem]/header:min-h-(--page-header-height) @max-[40rem]/header:flex-wrap @max-[40rem]/header:gap-x-4 @max-[40rem]/header:gap-y-0 @max-[40rem]/header:px-3">
 				{/* The floating Sessions sidebar's toggle sits over the header's left corner, so the title starts after it while the rows the controls wrap to keep the full width. */}
-				<div className="group/title flex min-w-0 items-center gap-2 in-data-[floating-sidebars]:pl-9 @max-[40rem]/header:min-h-(--page-header-height) @max-[40rem]/header:max-w-full @max-[40rem]/header:shrink-0">
+				<div className="group/title flex min-w-0 items-center gap-2 in-data-[floating-sidebars]:pl-(--sidebar-toggle-clearance) @max-[40rem]/header:min-h-(--page-header-height) @max-[40rem]/header:max-w-full @max-[40rem]/header:shrink-0">
 					{leading}
 					<div className="min-w-0">
 						<h2 className="truncate text-sm font-semibold">{title}</h2>

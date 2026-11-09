@@ -13,7 +13,7 @@ The model, thinking, and workspace pickers use shadcn's `popover` and `command` 
 Fluid's sidebar rail, mobile drawer, cookie, and toggle shortcut are removed from the vendored sidebar, which keeps only the bordered panel.
 The dashboard sizes and toggles each sidebar in `web/components/sidebar-panel.tsx`, which gives each its own width and open state, because Fluid's provider held only one of each.
 In a window narrower than 720 px, the sidebar's least width plus the session pane's, an open sidebar floats over the page with a dimmed backdrop instead of taking width from it, and closes on a tap on the backdrop or once the address `App` passes it changes.
-A floating sidebar starts closed on each load and keeps its open state in memory only, and the Sessions sidebar leaves no rail: its toggle floats over the header's left corner, which `Header` clears through the `data-floating-sidebars` attribute `App` sets; see [On a phone, the sidebars float closed and leave no rail](../decisions/2026-11-09-on-a-phone-the-sidebars-float-closed-and-leave-no-rail.md).
+A floating sidebar starts closed on each load and keeps its open state in memory only, and the Sessions sidebar leaves no rail: its toggle floats over the header's left corner, which `Header` and the empty home clear by `--sidebar-toggle-clearance` from `web/globals.css` while `App` sets the `data-floating-sidebars` attribute; see [On a phone, the sidebars float closed and leave no rail](../decisions/2026-11-09-on-a-phone-the-sidebars-float-closed-and-leave-no-rail.md).
 Sidebar widths and the split between panes share `web/components/drag-separator.tsx`: `useDragSeparator` owns the pointer capture, arrow keys, and double-click reset, and `Separator` is the element.
 Each call site still clamps its own domain, pixels for a sidebar and a ratio for a split.
 While a sidebar's width is dragged, `DashboardSidebar` turns off pointer events on any `<webview>` inside it, the Preview's, since a guest page takes the pointer from the handle's capture once the pointer crosses into it.
@@ -36,6 +36,7 @@ Every fixed list of choices uses shadcn's Base UI `select`, vendored as `web/com
 `FormDialog` is Base UI's `Dialog`, so a `Select` in its form opens and takes focus there; Esc in one of the form's Radix pickers closes only the picker.
 
 Toasts use Base UI's `Toast` through one manager in `web/components/toaster.tsx`, since the page has no Fluid or shadcn toast; they stack at the bottom right in the `popover` look.
+Below Tailwind's `sm` width, which `usePhoneWidth` in `web/use-phone-width.ts` reads, only the newest shows, at the top under the header, and a swipe up or right puts it away.
 
 Questions use `web/components/question-card.tsx`, the dashboard's own card in the look of Fluid's `ask-user-questions`, which `web/components/user-request.tsx` fills from omp's request.
 A select is one row per omp option, and a confirm is **Yes** and **No** rows, both in `question-options.tsx`, which reuses Fluid's hover highlight and merged selection backgrounds; an input or an editor is a free-text field.

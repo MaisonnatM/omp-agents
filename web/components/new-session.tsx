@@ -300,10 +300,10 @@ function SkillToggle({ name, state, onToggle, disabled }: { name: string; state:
 				aria-label={`Skill ${name}`}
 				onClick={onToggle}
 				disabled={off}
-				// When the composer's row runs short, as on a phone, the skill's name truncates first, but stays a tappable chip.
-				className="min-h-7 min-w-16 max-w-28 shrink"
+				// On a phone, where the composer's row runs short, the skill's name truncates first, its ellipsis styled with it, but stays a tappable chip.
+				className="max-sm:max-w-28 max-sm:min-w-16"
 			>
-				<span className={cn("block max-w-40 truncate", state !== "on" && "text-muted-foreground line-through")}>{name}</span>
+				<span className={cn("max-sm:block max-sm:truncate", state !== "on" && "text-muted-foreground line-through")}>{name}</span>
 			</Button>
 		</Tooltip>
 	);
