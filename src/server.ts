@@ -8,6 +8,8 @@ import { displayPath, tokenFile } from "./paths";
 import { HOSTNAME, listeningLine, portFromEnv } from "./server/address";
 import { loadToken } from "./server/auth";
 import { Dashboard } from "./server/dashboard";
+import { PhoneAccess } from "./server/phone-access";
+import { tailscaleOver } from "./server/tailscale";
 import { fail, guardsFor, refuseUntil } from "./server/http";
 import { loadPage, pageBuild, servePage } from "./server/page";
 import { prebuiltPageDir, sourceDir } from "./server/resources";
@@ -20,7 +22,8 @@ import { parsePageId } from "./server/wire";
 
 const PORT = portFromEnv();
 const token = loadToken(tokenFile);
-const guards = guardsFor(PORT, token);
+const phones = new PhoneAccess();
+const guards = guardsFor(PORT, token, phones);
 // Read before the page builds, so an edit landing during the build leaves the record older than the page, which reads as stale, never newer.
 const startedAt = new Date().toISOString();
 const source = prebuiltPageDir
@@ -48,7 +51,8 @@ function upgrade(req: Request, srv: Server<AnySocketData>): Response | undefined
 	if (refused) return refused;
 	// A page loaded before page ids connects with none; its views still update, and its tagged requests, which carry no `floor`, are dropped until it reloads.
 	const pageId = parsePageId(new URL(req.url).searchParams.get("page")) ?? crypto.randomUUID();
-	return srv.upgrade(req, { data: { views: new Map(), trajectories: new Map(), pageId }, headers: guards.socketHeaders(req) }) ? undefined : NOT_A_WEBSOCKET();
+	const signed = guards.signer(req);
+	return srv.upgrade(req, { data: { views: new Map(), trajectories: new Map(), pageId, phoneId: signed?.kind === "phone" ? signed.id : undefined }, headers: guards.socketHeaders(req) }) ? undefined : NOT_A_WEBSOCKET();
 }
 
 async function upgradeTerminal(req: Request, srv: Server<AnySocketData>): Promise<Response | undefined> {
@@ -57,7 +61,8 @@ async function upgradeTerminal(req: Request, srv: Server<AnySocketData>): Promis
 	const params = new URL(req.url).searchParams;
 	const terminal = await terminalFor(dashboard.terminals, params);
 	if (terminal instanceof Response) return terminal;
-	if (srv.upgrade(req, { data: { terminal, detach: null }, headers: guards.socketHeaders(req) })) return undefined;
+	const signed = guards.signer(req);
+	if (srv.upgrade(req, { data: { terminal, detach: null, phoneId: signed?.kind === "phone" ? signed.id : undefined }, headers: guards.socketHeaders(req) })) return undefined;
 	// A shell this request opened, which no page would ever show.
 	if (!params.has("id")) terminal.kill();
 	return NOT_A_WEBSOCKET();
@@ -69,7 +74,7 @@ try {
 		hostname: HOSTNAME,
 		port: PORT,
 		development: false,
-		routes: dashboard.routes(guards, served),
+		routes: dashboard.routes(guards, served, { phones, tailscale: tailscaleOver(), port: PORT }),
 		fetch(req, srv) {
 			const { pathname } = new URL(req.url);
 			if (pathname === "/ws") return upgrade(req, srv);
@@ -82,6 +87,7 @@ try {
 			// A prompt's images travel as base64 in one message: MAX_PROMPT_IMAGE_BYTES of them, a third more as base64.
 			maxPayloadLength: 64 * 1024 * 1024,
 			open(ws) {
+				openSockets.add(ws);
 				if (isTerminalSocket(ws)) return terminalSocket.open(ws);
 				ws.send(buildMsg);
 				dashboard.open(ws as Socket);
@@ -91,6 +97,7 @@ try {
 				dashboard.message(ws as Socket, raw);
 			},
 			close(ws) {
+				openSockets.delete(ws);
 				if (isTerminalSocket(ws)) return terminalSocket.close(ws);
 				dashboard.close(ws as Socket);
 			},
@@ -101,6 +108,12 @@ try {
 	console.error("Set PORT to use another port.");
 	process.exit(1);
 }
+
+// Removing a phone closes the sockets it holds open, so its page stops at once rather than at its next request.
+const openSockets = new Set<ServerWebSocket<AnySocketData>>();
+phones.onRemove(phoneId => {
+	for (const ws of openSockets) if (ws.data.phoneId === phoneId) ws.close(4001, "phone removed");
+});
 
 // Also on a crash or `process.exit`, so a server that exits unannounced leaves no lock and no unwritten store; a killed one leaves a stale lock that the next server takes over.
 process.on("exit", () => dashboard.exited());

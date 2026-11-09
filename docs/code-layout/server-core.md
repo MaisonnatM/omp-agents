@@ -31,7 +31,8 @@
   `src/server/session-routes.test.ts` checks `GET /api/pull-requests`'s scope: a space's directories, and the 400 for an unknown space or for both `cwd` and `space`.
 - `src/server/routes.ts` composes the `/api/` endpoints and keeps `RouteEnv`, handing each group only its part.
   `src/server/route-kit.ts` holds `RouteKit`, `Routes`, and `SessionRoutesEnv`, which the route groups import, so a group does not import `routes.ts`.
-  `src/server/session-routes.ts`, `src/server/integration-routes.ts`, `src/server/provider-routes.ts`, `src/server/gmail-routes.ts`, `src/server/pull-request-routes.ts`, `src/server/file-routes.ts`, `src/server/todo-routes.ts`, `src/server/dashboard-routes.ts`, `src/server/sync-routes.ts`, and `src/server/process-routes.ts` each hold one of those groups.
+  `src/server/session-routes.ts`, `src/server/integration-routes.ts`, `src/server/provider-routes.ts`, `src/server/gmail-routes.ts`, `src/server/pull-request-routes.ts`, `src/server/file-routes.ts`, `src/server/todo-routes.ts`, `src/server/dashboard-routes.ts`, `src/server/sync-routes.ts`, `src/server/process-routes.ts`, and `src/server/phone-access-routes.ts` each hold one of those groups.
+  `src/server/phone-access.ts` keeps the paired phones and the one-time pairing codes, and `src/server/tailscale.ts` runs Tailscale Serve through an injectable runner; see [Phone access](../architecture/phone-access.md).
   `src/server/dir-param.ts` reads the `?cwd=` directory the session and file groups both take.
   Every read goes through `get`, and every write through `write(parse, run, refuse?)`, which checks the origin and the JSON body, answers a body `parse` refuses with its response, and maps an error `run` throws through `refuse`, else to a 500.
   A route that an image, a video, or a mail frame loads goes through `media` instead of `get`, which also takes the media key as `?key=`, since such a tag sends no header.
