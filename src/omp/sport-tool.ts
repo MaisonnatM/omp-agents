@@ -121,7 +121,7 @@ export function todayLine(state: SportState, day: string): string | null {
 }
 
 /** The `sport` tool; `pathsOf` names the paths for the session calling it, or throws why it has none. */
-export function sportTool(pi: ExtensionApi, pathsOf: (ctx: ToolContext) => SportPaths): ExtensionTool<SportParams> {
+export function sportTool(pi: ExtensionApi, pathsOf: (ctx: ToolContext) => SportPaths | Promise<SportPaths>): ExtensionTool<SportParams> {
 	const { Type } = pi.typebox;
 	const object = (description: string) => Type.Optional(Type.Unknown({ description }));
 	return {
@@ -147,7 +147,7 @@ export function sportTool(pi: ExtensionApi, pathsOf: (ctx: ToolContext) => Sport
 			return action !== undefined && Object.hasOwn(APPROVAL, action) ? APPROVAL[action] : "write";
 		},
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-			const paths = pathsOf(ctx);
+			const paths = await pathsOf(ctx);
 			const state = readSport(paths);
 			const sessionId = ctx.sessionManager.getSessionId();
 			const leave = (change: Record<string, unknown>): void => {

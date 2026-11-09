@@ -44,6 +44,7 @@ import { modelUpdates, upgradeModel } from "../settings";
 import { MCP_SERVICES } from "../shared/accounts";
 import { agentOn } from "../shared/moves";
 import type { StartRequest, StartResult, View } from "../shared/sessions";
+import { spaceOf } from "../shared/workspaces";
 import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
 import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
@@ -322,8 +323,8 @@ export class Dashboard {
 			scheduled: { msg: () => ({ t: "scheduled", sends: scheduled.value }), apply: change => scheduled.apply(change, Date.now()) },
 			workspaces: {
 				msg: () => {
-					const [added, hidden] = [workspaces.value.added, workspaces.value.hidden].map(cwds => cwds.map(workspaceFor));
-					return { t: "workspaces", list: { added, hidden } };
+					const [added, hidden, personal] = [workspaces.value.added, workspaces.value.hidden, workspaces.value.personal].map(cwds => cwds.map(workspaceFor));
+					return { t: "workspaces", list: { added, hidden, personal } };
 				},
 				apply: change => workspaces.apply(change),
 			},
@@ -877,9 +878,11 @@ export class Dashboard {
 		}
 	}
 
-	/** Tells the page the personal memory may have changed when session `instanceId`, which ended a turn, runs in the personal directory. */
+	/** Tells the page the personal memory may have changed when session `instanceId`, which ended a turn, runs in the Personal space. */
 	#personalTurnEnded(instanceId: string): void {
-		if (isPersonalDir(this.#sessions.get(instanceId)?.cwd)) this.#broadcasts.pushList("personal");
+		const cwd = this.#sessions.get(instanceId)?.cwd;
+		if (cwd === undefined) return;
+		if (spaceOf({ cwd, workspace: this.#files.facts.placement.cwdOf(cwd) }, this.#workspaces.value.personal, personalDir) === "personal") this.#broadcasts.pushList("personal");
 	}
 
 	/** Moves todos checked over {@link DONE_KEPT_HOURS} ago to the archive. */
@@ -892,7 +895,7 @@ export class Dashboard {
 		this.#activity.prune(Date.now() - ACTIVITY_KEPT_DAYS * DAY_MS);
 	}
 
-	/** How `request` joins the server: as a Review session, as a Bot's conversation, both, or plain; any but a Bot's loads the personal extension, and any but a Bot's or a personal session can move itself. */
+	/** How `request` joins the server: as a Review session, as a Bot's conversation, both, or plain; any but a Bot's loads the personal extension, and any but a Bot's or one started in the personal directory can move itself. */
 	#joinFor(request: StartRequest): SessionJoin {
 		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#moves.join(request), this.#personalJoin(request)];
 		return {

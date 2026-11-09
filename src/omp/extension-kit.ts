@@ -31,12 +31,20 @@ interface SchemaOptions {
 	description?: string;
 }
 
+/** What a `before_agent_start` hook hands back: the system prompt the turn starts with. */
+export interface PromptChange {
+	systemPrompt: string[];
+}
+
 /** The part of omp's `ExtensionAPI` the extensions use, by hand: `tsc` cannot resolve omp's own package here. Each hook's `cwd` is the session's directory as it is now, after any `/move`. */
 export interface ExtensionApi {
 	registerFlag(name: string, options: { type: "string"; description: string }): void;
 	getFlag(name: string): boolean | string | undefined;
-	on(event: "session_start", handler: (event: unknown, ctx: { cwd: string }) => void): void;
-	on(event: "before_agent_start", handler: (event: { systemPrompt: string[] }, ctx: { cwd: string; agent: { kind: "main" | "sub" } }) => { systemPrompt: string[] } | undefined): void;
+	on(event: "session_start", handler: (event: unknown, ctx: { cwd: string }) => void | Promise<void>): void;
+	on(
+		event: "before_agent_start",
+		handler: (event: { systemPrompt: string[] }, ctx: { cwd: string; agent: { kind: "main" | "sub" } }) => PromptChange | undefined | Promise<PromptChange | undefined>,
+	): void;
 	registerTool<Params>(tool: ExtensionTool<Params>): void;
 	/** omptype's TypeBox shim, `@oh-my-pi/omptype/typebox`. */
 	typebox: {
@@ -89,7 +97,7 @@ export function memoryLines(path: string): string[] {
  * The `remember` tool, the one writer of a Markdown memory: each fact is a dated `- YYYY-MM-DD <fact>` line. `memoryPath`
  * names the file for the session calling it, or throws why it has none.
  */
-export function rememberTool(pi: ExtensionApi, description: string, memoryPath: (ctx: ToolContext) => string): ExtensionTool<{ fact: string }> {
+export function rememberTool(pi: ExtensionApi, description: string, memoryPath: (ctx: ToolContext) => string | Promise<string>): ExtensionTool<{ fact: string }> {
 	return {
 		name: REMEMBER_TOOL,
 		label: "Remember",
@@ -98,7 +106,7 @@ export function rememberTool(pi: ExtensionApi, description: string, memoryPath: 
 		loadMode: "essential",
 		approval: "write",
 		async execute(_toolCallId, { fact }, _signal, _onUpdate, ctx) {
-			const path = memoryPath(ctx);
+			const path = await memoryPath(ctx);
 			const line = fact.replace(/\s+/g, " ").trim();
 			if (!line) throw new Error("fact is empty.");
 			if (line.length > MAX_FACT_LENGTH) throw new Error(`fact is ${line.length} characters; keep it to one short sentence of at most ${MAX_FACT_LENGTH}.`);
