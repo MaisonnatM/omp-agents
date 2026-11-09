@@ -280,10 +280,13 @@ export const CalendarDatePagination = ({
 
 export type CalendarDateProps = {
   children: ReactNode;
+  className?: string;
 };
 
-export const CalendarDate = ({ children }: CalendarDateProps) => (
-  <div className="flex items-center justify-between p-3">{children}</div>
+export const CalendarDate = ({ children, className }: CalendarDateProps) => (
+  <div className={cn("flex items-center justify-between p-3", className)}>
+    {children}
+  </div>
 );
 
 export type CalendarProviderProps = {

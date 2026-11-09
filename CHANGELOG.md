@@ -5,6 +5,14 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-09
 
+- On a phone, the sidebars stay closed until you open them, and the page uses the full width of the screen.
+- On a phone, the status bar shows plan quota on one line you can swipe, without the Mac's terminal and load.
+- On a phone, toasts show one at a time under the top bar, so they no longer cover the composer or the sidebar button.
+- On a phone, tapping a text field no longer zooms the page in.
+- On a phone, Calendar, Pull requests, Tickets, and Todo fit the screen, and long titles wrap instead of running off the edge.
+- On a phone, a new session's skill name shrinks before the project name does.
+- On a phone, a toast shows its whole message, the calendar's buttons are easier to tap, and a screen reader says how many items each day holds.
+- The phone layout now also applies to desktop windows narrower than 720 pixels.
 - New session's retro sun now sits lower, leaving more room under the title.
 - Buttons now have tighter corners, matching yampa's.
 - Landing a branch that adds a package now works: `land` installs packages after merging the branch, not before.

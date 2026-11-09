@@ -163,11 +163,11 @@ function AccountLine({ provider, account, numbered, place }: { provider: ModelPr
 		);
 	}
 	return (
-		<div className="flex items-center gap-3 text-[13px]">
+		<div className="flex items-center gap-3 text-[13px] max-phone:flex-wrap max-phone:justify-end max-phone:gap-y-1">
 			{numbered && <span className="w-4 shrink-0 text-xs tabular-nums text-muted-foreground">{place && place.index + 1}</span>}
-			<div className="min-w-0 flex-1">
-				<span className="truncate">{account.label}</span>
-				<span className="ms-2 text-xs text-muted-foreground">{account.kind === "oauth" ? "Sign-in" : "API key"}</span>
+			<div className="min-w-0 flex-1 max-phone:flex max-phone:min-w-3/4 max-phone:items-baseline">
+				<span className="truncate max-phone:min-w-0">{account.label}</span>
+				<span className="ms-2 text-xs text-muted-foreground max-phone:shrink-0">{account.kind === "oauth" ? "Sign-in" : "API key"}</span>
 			</div>
 			{place && (
 				<div className="flex shrink-0 items-center">
@@ -212,7 +212,7 @@ function ProviderRow({ provider, login }: { provider: ModelProvider; login: Prov
 					Connect
 				</Button>
 			)}
-			{(connected || others.length > 0) && (
+			{connected || others.length > 0 ? (
 				<MoreActionsMenu name={provider.name} disabled={starting}>
 					{(connected ? provider.methods : others).map(method => (
 						<MenuItem key={method.id} onClick={() => start.run(method.id)}>
@@ -221,6 +221,9 @@ function ProviderRow({ provider, login }: { provider: ModelProvider; login: Prov
 						</MenuItem>
 					))}
 				</MoreActionsMenu>
+			) : (
+				// On a phone, a lone Connect keeps the ⋯ button's place, so it lines up with the Connect of rows that have one.
+				<span aria-hidden className="hidden max-phone:block max-phone:size-7" />
 			)}
 		</>
 	);
@@ -292,7 +295,7 @@ function Group({ title, count, providers, login, filter }: { title: string; coun
 	if (count === 0) return null;
 	return (
 		<section className="space-y-2.5">
-			<div className="flex items-center justify-between gap-3 px-1">
+			<div className="flex items-center justify-between gap-3 px-1 max-phone:px-0">
 				<h4 className="flex items-baseline gap-2 text-[13px] font-medium">
 					{title}
 					<span className="text-muted-foreground tabular-nums">{count}</span>
@@ -306,7 +309,7 @@ function Group({ title, count, providers, login, filter }: { title: string; coun
 					))}
 				</IntegrationList>
 			) : (
-				<p className="px-1 text-xs text-muted-foreground">No provider matches.</p>
+				<p className="px-1 text-xs text-muted-foreground max-phone:px-0">No provider matches.</p>
 			)}
 		</section>
 	);
@@ -338,7 +341,7 @@ export function ProviderGroups({ answer: { providers, login } }: { answer: Provi
 					</label>
 				}
 			/>
-			<p className="px-1 text-xs text-pretty text-muted-foreground">
+			<p className="px-1 text-xs text-pretty text-muted-foreground max-phone:px-0">
 				omp keeps these credentials in its own store, as <code className="font-mono">omp login</code> does, so every omp session can use them.
 			</p>
 		</div>

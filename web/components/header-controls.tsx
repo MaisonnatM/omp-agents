@@ -88,7 +88,7 @@ export const HeaderControls = memo(function HeaderControls({ notices, onShowSear
 			</Tooltip>
 			{tabs.length > 0 && (
 				<>
-					<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border" />
+					<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border max-phone:hidden" />
 					{tabs.map(value => {
 						const { label, icon: Icon } = TAB_ROWS[value];
 						return (
@@ -107,7 +107,7 @@ export const HeaderControls = memo(function HeaderControls({ notices, onShowSear
 							</Tooltip>
 						);
 					})}
-					<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border" />
+					<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border max-phone:hidden" />
 				</>
 			)}
 			<WhatsNew />
