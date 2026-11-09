@@ -22,7 +22,7 @@ import { focusRow, PageFrame, stepRows, useReturnFocus } from "../list-page";
 import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, ListSplit } from "../list-split";
 import { NotesEditor } from "../notes-editor";
 import { SearchField } from "../search-field";
-import { toasts } from "../toaster";
+import { offerUndo } from "../toaster";
 import { AddedByChip } from "../todo/links";
 
 interface NotesPageProps {
@@ -88,11 +88,10 @@ function LoadedNotesPage({ list, todos, view, openId, disabled, onChange, hosts,
 		const index = list.notes.findIndex(row => row.id === note.id);
 		onChange({ op: "remove", id: note.id });
 		navigate(null);
-		toasts.add({ id: "note-undo", title: `Deleted “${note.title || "Untitled"}”`, timeout: 8000, actionProps: { children: "Undo", onClick: () => {
+		offerUndo("note-undo", `Deleted “${note.title || "Untitled"}”`, () => {
 			onChange({ op: "restore", note, index });
 			location.hash = hashForNotes(view, note.id);
-			toasts.close("note-undo");
-		} } });
+		});
 	};
 	const rename = (note: UserNote): void => {
 		setNaming(note.id);
@@ -103,11 +102,10 @@ function LoadedNotesPage({ list, todos, view, openId, disabled, onChange, hosts,
 	const move = (note: UserNote): void => {
 		onChange({ op: "set-space", id: note.id, space: to });
 		navigate(null);
-		toasts.add({ id: "note-move", title: `Moved “${note.title || "Untitled"}” to ${SPACE_LABELS[to]}`, timeout: 8000, actionProps: { children: "Undo", onClick: () => {
+		offerUndo("note-move", `Moved “${note.title || "Untitled"}” to ${SPACE_LABELS[to]}`, () => {
 			onChange({ op: "set-space", id: note.id, space });
 			location.hash = hashForNotes(view, note.id);
-			toasts.close("note-move");
-		} } });
+		});
 	};
 	return (
 		<PageFrame title={view.kind === "all" ? "Notes" : text.name} meta={`${listed.length} ${listed.length === 1 ? "note" : "notes"}`} actions={<>

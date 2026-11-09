@@ -1,6 +1,6 @@
 /** The Notes page's lists: what each shows, its name and icon in the sidebar, and what it says while empty. */
 import { Bot, type LucideIcon, NotebookPen } from "lucide-react";
-import type { Space } from "../src/shared/workspaces";
+import { type Space, spaceIs } from "../src/shared/workspaces";
 import type { UserNote, UserNoteList } from "../src/user-notes-shared";
 import type { NotesListView } from "./routing";
 
@@ -11,7 +11,7 @@ export const NOTES_LISTS: { view: NotesListView; name: string; icon: LucideIcon;
 
 /** The notes of `space` that `view` lists, most recently updated first. */
 export function notesIn({ notes }: UserNoteList, view: NotesListView, space: Space): readonly UserNote[] {
-	const ofSpace = notes.filter(note => note.space === space);
+	const ofSpace = notes.filter(spaceIs(space));
 	switch (view.kind) {
 		case "all":
 			return ofSpace;

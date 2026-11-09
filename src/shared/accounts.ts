@@ -241,10 +241,6 @@ export interface GoogleAccount {
 	space: Space;
 }
 
-/** The accounts a page in `space` shows. */
-export const visibleAccounts = (accounts: readonly GoogleAccount[], space: Space): ReadonlySet<AccountId> =>
-	new Set(accounts.filter(account => account.space === space).map(account => account.name));
-
 /** `PUT /api/integrations/sign-in` and `/remove`: the service, and the account, `null` to add one; a service with one server takes `null`. */
 export interface IntegrationTarget {
 	id: McpIntegrationId;

@@ -2,7 +2,7 @@ import { FolderOpen } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
 import type { TrustedProject } from "../../../src/shared/project-trust";
-import type { Workspace, WorkspaceList } from "../../../src/shared/workspaces";
+import type { Spaces, Workspace, WorkspaceList } from "../../../src/shared/workspaces";
 import { settingsUrl } from "../../api";
 import { useEditableRead } from "../../editable-read";
 import { type ReadState, useRead } from "../../reads";
@@ -143,7 +143,7 @@ export function SettingsPage({
 	workspaces,
 	allWorkspaces,
 	workspaceList,
-	personal,
+	spaces,
 	trustedProjects,
 }: {
 	section: SettingsSection;
@@ -155,8 +155,8 @@ export function SettingsPage({
 	/** Every space's workspaces, which Settings › Workspaces moves between spaces. */
 	allWorkspaces: Workspace[];
 	workspaceList: WorkspaceList<Workspace>;
-	/** The dashboard's personal directory, for Settings › Workspaces; `null` until the server sends it. */
-	personal: Workspace | null;
+	/** The window's spaces, for Settings › Workspaces; `null` until the server sends the personal directory. */
+	spaces: Spaces | null;
 	/** The projects whose agent code the user trusted, for Settings › Workspaces. */
 	trustedProjects: TrustedProject[];
 }) {
@@ -195,7 +195,7 @@ export function SettingsPage({
 		integrations: <IntegrationsTab active={section === "integrations"} />,
 		"mcp-servers": <McpServersTab active={section === "mcp-servers"} />,
 		"source-control": <SourceControlTab active={section === "source-control"} />,
-		workspaces: <WorkspacesTab workspaces={allWorkspaces} list={workspaceList} personalDir={personal} trustedProjects={trustedProjects} />,
+		workspaces: <WorkspacesTab workspaces={allWorkspaces} list={workspaceList} spaces={spaces} trustedProjects={trustedProjects} />,
 		sync: <SyncTab active={section === "sync"} />,
 		storage: <StorageTab cwd={cwd} active={section === "storage"} onSaved={settings.reload} />,
 		worktrees: <WorktreesTab cwd={cwd} active={section === "worktrees"} />,

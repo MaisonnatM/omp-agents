@@ -7,7 +7,6 @@ import {
 	type GoogleAccount,
 	type IntegrationsAnswer,
 	type McpIntegration,
-	visibleAccounts,
 } from "../src/shared/accounts";
 import {
 	type CalendarEventsAnswer,
@@ -32,7 +31,7 @@ import type { McpServersAnswer } from "../src/shared/mcp-servers";
 import type { DevServerRequest, DevServerStart, LiveSessionProcesses, ProcessStop } from "../src/shared/processes";
 import type { CollabAutoStart, StarterKitStatus, TerminalAccess } from "../src/shared/readiness";
 import type { SourceControlAnswer } from "../src/shared/source-control";
-import type { Space, WorkspaceChange } from "../src/shared/workspaces";
+import { type Space, spaceIs, type WorkspaceChange } from "../src/shared/workspaces";
 import { errorText } from "../src/json";
 import { getJson, putJson } from "./api";
 import { createPolledStore, type PolledEntry } from "./polled-store";
@@ -214,14 +213,14 @@ export function useMailAndEvents(mailWanted: boolean, eventsWanted: boolean, spa
 	const span = new URLSearchParams({ from: new Date(from).toISOString(), to: new Date(to).toISOString() }).toString();
 	const googleEvents = calendarEventsStore.usePolling(span, eventsWanted && anyCallable(calendarAccounts)).read?.data.events;
 	const localEvents = localEventsStore.usePolling(null, eventsWanted).read?.data.events;
-	const shownMail = useMemo(() => visibleAccounts(mailAccounts, space), [mailAccounts, space]);
-	const shownCalendars = useMemo(() => visibleAccounts(calendarAccounts, space), [calendarAccounts, space]);
+	const shownMail = useMemo(() => new Set(mailAccounts.filter(spaceIs(space)).map(({ name }) => name)), [mailAccounts, space]);
+	const shownCalendars = useMemo(() => new Set(calendarAccounts.filter(spaceIs(space)).map(({ name }) => name)), [calendarAccounts, space]);
 	const events = useMemo(
 		() =>
 			eventsWanted
 				? [
 						...(googleEvents ?? []).filter(event => shownCalendars.has(event.account)).map(({ title, when, calendar, url }) => ({ title, when, calendar, url })),
-						...(localEvents ?? []).filter(event => event.space === space).map(({ title, when }) => ({ title, when, calendar: "This computer", url: null })),
+						...(localEvents ?? []).filter(spaceIs(space)).map(({ title, when }) => ({ title, when, calendar: "This computer", url: null })),
 					]
 						.filter(({ when }) => startOf(when) < to && endOf(when) > from)
 						.sort((a, b) => startOf(a.when) - startOf(b.when))
@@ -304,8 +303,9 @@ export function useGoogleCalendars(space: Space): GoogleCalendars {
 	const connected = anyCallable(all);
 	const read = googleStore.usePolling(null, connected).read?.data.calendars ?? null;
 	return useMemo(() => {
-		const shown = visibleAccounts(all, space);
-		return { connected, accounts: all.filter(account => shown.has(account.name)), calendars: connected && read ? read.filter(calendar => shown.has(calendar.account)) : null };
+		const accounts = all.filter(spaceIs(space));
+		const shown = new Set(accounts.map(({ name }) => name));
+		return { connected, accounts, calendars: connected && read ? read.filter(calendar => shown.has(calendar.account)) : null };
 	}, [all, connected, read, space]);
 }
 
@@ -344,8 +344,8 @@ export function useEmail(space: Space): Email {
 	const [stored, pick] = useStoredState(EMAIL_ACCOUNT_KEY, decodeAccount, encodeAccount);
 	const listed = poll.read?.data.threads;
 	return useMemo(() => {
-		const shown = visibleAccounts(all, space);
-		const accounts = all.filter(account => shown.has(account.name));
+		const accounts = all.filter(spaceIs(space));
+		const shown = new Set(accounts.map(({ name }) => name));
 		const threads = (listed ?? NO_THREADS).filter(thread => shown.has(thread.account));
 		return { gmail, poll, accounts, picked: pickedAccount(stored, accounts), pick, threads };
 	}, [gmail, all, poll, stored, pick, listed, space]);

@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { callable } from "../src/shared/accounts";
 import type { View } from "../src/shared/sessions";
-import { otherSpace, type Space } from "../src/shared/workspaces";
+import { otherSpace, type Space, spaceIs } from "../src/shared/workspaces";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { errorText } from "../src/json";
 import { AppSidebar } from "./components/app-sidebar";
@@ -217,7 +217,7 @@ export function App() {
 		[state.connected, fork, resume, quick, resumeAll, state.ending, pullRequestsScope, windowScope, state.merges, state.reviewDrafts],
 	);
 	const mentionLists = useMemo(() => ({ todos: state.userTodos?.todos ?? [], hosts: visible.hosts, past: visible.past }), [state.userTodos, visible]);
-	const spaceNotes = useMemo(() => state.userNotes?.notes.filter(note => note.space === space) ?? null, [state.userNotes, space]);
+	const spaceNotes = useMemo(() => state.userNotes?.notes.filter(spaceIs(space)) ?? null, [state.userNotes, space]);
 
 	const routedTodoList = page?.kind === "todo" ? page.list : null;
 	const categories = state.userTodos?.categories;

@@ -2,8 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { SpaceOfSession } from "../shared/workspaces";
 import { EventInbox } from "./event-inbox";
-import type { SpaceOfSession } from "./note-inbox";
 import { LocalEventsFile } from "./local-events-file";
 
 const dirs: string[] = [];

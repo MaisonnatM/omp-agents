@@ -5,7 +5,7 @@ import { hashForSession } from "../../../src/shared/sessions";
 import type { TicketChoice, TodoTicketAnswer, TodoTicketRequest } from "../../../src/shared/tickets";
 import { addTodo } from "../../../src/user-todos";
 import { addNote } from "../../../src/user-notes";
-import type { Workspace } from "../../../src/shared/workspaces";
+import { spaceIs, type Workspace } from "../../../src/shared/workspaces";
 import type { UserTodo, UserTodoChange, UserTodoList } from "../../../src/user-todos-shared";
 import { badgeColors } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -291,7 +291,7 @@ function LinkedNotes({ todo }: { todo: UserTodo }) {
 	const list = useContext(UserNotesContext);
 	const { changeNote } = useDashboardActions();
 	const { connected, scope: { space } } = useDashboardStatus();
-	const notes = list?.notes.filter(note => note.todoId === todo.id && note.space === space) ?? [];
+	const notes = list?.notes.filter(spaceIs(space)).filter(note => note.todoId === todo.id) ?? [];
 	return (
 		<section className="flex flex-col gap-2" aria-label="Linked notes">
 			<div className="flex items-center justify-between">

@@ -5,13 +5,10 @@
  * you wrote. An added note goes into the space of the session that added it, whatever space the file names.
  */
 import { errorText } from "../json";
-import type { Space } from "../shared/workspaces";
+import type { SpaceOfSession } from "../shared/workspaces";
 import { parseNoteChange } from "../user-notes-parse";
 import type { UserNoteChange } from "../user-notes-shared";
 import { type InboxEntry, type InboxOptions, JsonInboxDir } from "./json-inbox";
-
-/** The space of omp session `sessionId`'s directory, Work for a session the dashboard does not know. */
-export type SpaceOfSession = (sessionId: string) => Promise<Space>;
 
 /** `value` as a change an agent may make, or why not. */
 function parseAgentNoteChange(value: unknown): InboxEntry<UserNoteChange> {
@@ -27,6 +24,12 @@ function parseAgentNoteChange(value: unknown): InboxEntry<UserNoteChange> {
 	return change.note.addedBy === null ? { invalid: "an agent's note must name the session that added it" } : { item: change };
 }
 
+/** `change` with an added note in the space of the session that added it, whatever space the file named. */
+async function inSessionSpace(change: UserNoteChange, spaceOf: SpaceOfSession): Promise<UserNoteChange> {
+	if (change.op !== "add" || change.note.addedBy === null) return change;
+	return { ...change, note: { ...change.note, space: await spaceOf(change.note.addedBy) } };
+}
+
 export class NoteInbox extends JsonInboxDir<UserNoteChange> {
 	constructor(dir: string, apply: (change: UserNoteChange) => void, spaceOf: SpaceOfSession, options?: InboxOptions) {
 		super(
@@ -34,7 +37,7 @@ export class NoteInbox extends JsonInboxDir<UserNoteChange> {
 			{
 				parse: (_name, value) => parseAgentNoteChange(value),
 				async apply(change) {
-					apply(change.op === "add" && change.note.addedBy !== null ? { ...change, note: { ...change.note, space: await spaceOf(change.note.addedBy) } } : change);
+					apply(await inSessionSpace(change, spaceOf));
 					return true;
 				},
 			},

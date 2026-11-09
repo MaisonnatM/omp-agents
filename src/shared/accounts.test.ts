@@ -1,14 +1,5 @@
 import { expect, test } from "bun:test";
-import { type GoogleAccount, GOOGLE_SERVICES, googleMcpEnableUrl, MCP_INTEGRATIONS, MCP_SERVICES, visibleAccounts } from "./accounts";
-import type { Space } from "./workspaces";
-
-test("a space shows the accounts placed in it", () => {
-	const server = { name: "gmail", url: "https://gmailmcp.googleapis.com/mcp/v1", host: "gmailmcp.googleapis.com" };
-	const account = (name: string, space: Space): GoogleAccount => ({ name, address: `${name}@example.com`, addressError: null, connection: { kind: "ready", server, tools: [] }, space });
-	const accounts = [account("gmail", "work"), account("gmail-2", "personal"), account("gmail-3", "work")];
-	expect([...visibleAccounts(accounts, "work")]).toEqual(["gmail", "gmail-3"]);
-	expect([...visibleAccounts(accounts, "personal")]).toEqual(["gmail-2"]);
-});
+import { GOOGLE_SERVICES, googleMcpEnableUrl, MCP_INTEGRATIONS, MCP_SERVICES } from "./accounts";
 
 test("Google's enable page names the MCP server's API and the project number the OAuth client ID starts with", () => {
 	expect(googleMcpEnableUrl("calendarmcp.googleapis.com", "30887206948-fot6diel47j76ceoft65e8sjojbstop1.apps.googleusercontent.com")).toBe(

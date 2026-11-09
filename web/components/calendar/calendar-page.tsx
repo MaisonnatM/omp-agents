@@ -2,7 +2,7 @@ import { ArrowLeftRight, Plus, Trash2 } from "lucide-react";
 import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 import type { Routine } from "../../../src/routines";
 import type { EventRef, LocalEvent, LocalEventSpace } from "../../../src/shared/calendar";
-import { otherSpace, type Space } from "../../../src/shared/workspaces";
+import { otherSpace, type Space, spaceIs } from "../../../src/shared/workspaces";
 import type { UserTodoList } from "../../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -33,6 +33,7 @@ import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { useMinute } from "../../use-minute";
 import { useCalendarRoutines } from "../../use-calendar-display";
 import { PageFrame } from "../list-page";
+import { offerUndo } from "../toaster";
 import { NewEventDialog } from "./new-event";
 
 const WEEKDAYS = daysForLocale("en-US", 1);
@@ -211,15 +212,15 @@ function DeleteEvent({ eventRef, title, remove }: { eventRef: EventRef; title: s
 	);
 }
 
-/** Moves the event kept on this computer that `id` names, named `title` in what it says when it cannot, to the other space. */
-type EventMove = Action<[id: string, title: string]>;
+/** Moves the event kept on this computer that `id` names, named `title` in what it says, to space `target`. */
+type EventMove = Action<[id: string, title: string, target: Space]>;
 
 /** The button that moves an event kept on this computer to space `to`, busy while it is the one moving. */
 function MoveEvent({ id, title, to, move }: { id: string; title: string; to: Space; move: EventMove }) {
 	const moving = move.state.kind === "pending" && move.state.args[0] === id;
 	return (
 		<Tooltip content={`Move to ${SPACE_LABELS[to]}`} side="left">
-			<Button variant="ghost" size="icon-compact" className="mt-0.5 shrink-0" aria-label={`Move ${title} to ${SPACE_LABELS[to]}`} loading={moving} disabled={move.pending && !moving} onClick={() => move.run(id, title)}>
+			<Button variant="ghost" size="icon-compact" className="mt-0.5 shrink-0" aria-label={`Move ${title} to ${SPACE_LABELS[to]}`} loading={moving} disabled={move.pending && !moving} onClick={() => move.run(id, title, to)}>
 				<ArrowLeftRight />
 			</Button>
 		</Tooltip>
@@ -368,7 +369,7 @@ export function CalendarPage({ routines, todos, ticketsShown, space }: CalendarP
 	}, [connected, read, accounts]);
 	const localRead = localEventsStore.usePolling();
 	const allLocal = localRead.read?.data.events;
-	const localEvents = useMemo(() => allLocal?.filter(event => event.space === space) ?? null, [allLocal, space]);
+	const localEvents = useMemo(() => allLocal?.filter(spaceIs(space)) ?? null, [allLocal, space]);
 	const byDay = useMemo(() => {
 		const days = new Map<string, CalendarEntry[]>();
 		for (const entry of calendarEntries({ routines: showRoutines ? routines : [], todos, tickets: ticketsShown ? tickets : null, events, localEvents }, year, month, now)) {
@@ -408,10 +409,11 @@ export function CalendarPage({ routines, todos, ticketsShown, space }: CalendarP
 		}
 	}, null);
 	const to = otherSpace(space);
-	/** Moves the event kept on this computer that `id` names to the other space, which leaves it off this page at once. */
-	const move = useAction(async (id: string, _title: string) => {
-		await putJson<object>("/api/calendar/events/space", { id, space: to } satisfies LocalEventSpace);
-		localEventsStore.update(answer => ({ events: answer.events.map(event => (event.id === id ? { ...event, space: to } : event)) }));
+	/** Moves the event kept on this computer that `id` names to space `target`, which leaves it off the other space's page at once, with **Undo** to move it back. */
+	const move = useAction(async (id: string, title: string, target: Space): Promise<void> => {
+		await putJson<object>("/api/calendar/events/space", { id, space: target } satisfies LocalEventSpace);
+		localEventsStore.update(answer => ({ events: answer.events.map(event => (event.id === id ? { ...event, space: target } : event)) }));
+		offerUndo("event-move", `Moved “${title}” to ${SPACE_LABELS[target]}`, () => move.run(id, title, otherSpace(target)));
 	}, null);
 	/** Shows a new event, which starts on `day`: one kept on this computer at once, and one added to Google Calendar once its month is read again. */
 	const created = (day: string, kept: LocalEvent | null): void => {
@@ -426,7 +428,7 @@ export function CalendarPage({ routines, todos, ticketsShown, space }: CalendarP
 	if (connected && eventsRead.error) failures.push(`Cannot read Google Calendar: ${eventsRead.error}`);
 	if (localRead.error) failures.push(`Cannot read the events on this computer: ${localRead.error}`);
 	if (remove.state.kind === "failed") failures.push(`Cannot delete ${remove.state.args[1]}: ${remove.state.error}`);
-	if (move.state.kind === "failed") failures.push(`Cannot move ${move.state.args[1]} to ${SPACE_LABELS[to]}: ${move.state.error}`);
+	if (move.state.kind === "failed") failures.push(`Cannot move ${move.state.args[1]} to ${SPACE_LABELS[move.state.args[2]]}: ${move.state.error}`);
 	return (
 		<PageFrame title="Calendar" meta={[showRoutines && "Routine runs", connected && "Google events", "events on this computer", "due todos", ticketsShown && "Linear tickets"].filter(Boolean).join(", ")}>
 			{failures.map(failure => (

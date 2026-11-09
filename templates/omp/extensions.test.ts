@@ -987,36 +987,29 @@ describe("user_event", () => {
 describe("google accounts", () => {
 	const root = mkdtempSync(join(tmpdir(), "google-accounts-extension-"));
 	afterAll(() => rmSync(root, { recursive: true, force: true }));
-	const env = { XDG_CONFIG_HOME: join(root, "config"), XDG_DATA_HOME: join(root, "data"), PI_CODING_AGENT_DIR: join(root, "agent") };
-	const home = join(root, "home");
+	const env = { XDG_CONFIG_HOME: join(root, "config"), PI_CODING_AGENT_DIR: join(root, "agent") };
 	mkdirSync(join(root, "config", "omp-agents"), { recursive: true });
 	mkdirSync(join(root, "agent"));
-	mkdirSync(home);
-	mkdirSync(join(root, "work"));
-	mkdirSync(join(root, "data", "omp-agents", "personal"), { recursive: true });
 	writeFileSync(
 		join(root, "config", "omp-agents", "google-accounts.json"),
 		JSON.stringify({ addresses: { gmail: "ana@example.com", "gmail-2": "ana@work.example" }, personal: ["ana@example.com"] }),
 	);
-	writeFileSync(join(root, "config", "omp-agents", "workspaces.json"), JSON.stringify({ added: [], hidden: [], personal: [home] }));
 	const servers = (names: string[]) =>
 		writeFileSync(join(root, "agent", "mcp.json"), JSON.stringify({ mcpServers: Object.fromEntries(names.map(name => [name, { type: "http", url: "https://gmailmcp.googleapis.com/mcp/v1" }])) }));
-	const told = (space: string, address: string) =>
-		[
-			"omp is signed in to several Google accounts, one MCP server each, and each server's tools start with its prefix.",
-			"Gmail:",
-			"- gmail: ana@example.com, tools `mcp__gmail_`",
-			"- gmail-2: ana@work.example, tools `mcp__gmail_2_`",
-			`This session is in the user's ${space} space, and the user placed ${address} in it: use that account for this session's mail and calendar unless the user names another account.`,
-		].join("\n");
 
-	test("a session hears each account of omp's mcp.json and the ones placed in its space; one account tells nothing", () => {
+	test("a session hears each account of omp's mcp.json, whatever its space; one account tells nothing", () => {
 		servers(["gmail", "gmail-2"]);
-		expect(exercise("google-accounts", { agentStart: true, omp: true, cwd: home }, env).prompt).toEqual(["base", told("Personal", "ana@example.com")]);
-		expect(exercise("google-accounts", { agentStart: true, omp: true, cwd: join(root, "data", "omp-agents", "personal") }, env).prompt).toEqual(["base", told("Personal", "ana@example.com")]);
-		expect(exercise("google-accounts", { agentStart: true, omp: true, cwd: join(root, "work") }, env).prompt).toEqual(["base", told("Work", "ana@work.example")]);
+		expect(exercise("google-accounts", { agentStart: true, omp: true }, env).prompt).toEqual([
+			"base",
+			[
+				"omp is signed in to several Google accounts, one MCP server each, and each server's tools start with its prefix.",
+				"Gmail:",
+				"- gmail: ana@example.com, tools `mcp__gmail_`",
+				"- gmail-2: ana@work.example, tools `mcp__gmail_2_`",
+			].join("\n"),
+		]);
 		servers(["gmail"]);
-		expect(exercise("google-accounts", { agentStart: true, omp: true, cwd: home }, env).prompt).toBeNull();
+		expect(exercise("google-accounts", { agentStart: true, omp: true }, env).prompt).toBeNull();
 	});
 
 	test("a Google server's 401 tells the session to ask the user to sign in again, and reports the account once; other failures pass", () => {

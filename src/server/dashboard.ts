@@ -44,7 +44,7 @@ import { modelUpdates, upgradeModel } from "../settings";
 import { MCP_SERVICES } from "../shared/accounts";
 import { agentOn } from "../shared/moves";
 import type { StartRequest, StartResult, View } from "../shared/sessions";
-import { type Spaces, spaces } from "../shared/workspaces";
+import { type Space, type SpaceOfSession, type Spaces, spaces } from "../shared/workspaces";
 import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
 import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
@@ -105,7 +105,7 @@ import { createClientHandler } from "./socket";
 import { botExtension, designerExtension, shepherdExtension } from "./resources";
 import { createStarter, reattachAll, type SessionJoin } from "./start";
 import { EventInbox } from "./event-inbox";
-import { NoteInbox, type SpaceOfSession } from "./note-inbox";
+import { NoteInbox } from "./note-inbox";
 import { TodoInbox } from "./todo-inbox";
 import { SportFile } from "./sport-file";
 import type { JsonInboxDir } from "./json-inbox";
@@ -381,7 +381,7 @@ export class Dashboard {
 		const workspaceOf = (cwd: string): Promise<string> => placement.workspaceOf(cwd, worktreeAt);
 		const spaceOfSession: SpaceOfSession = async sessionId => {
 			const cwd = sessions.bySessionId(sessionId)?.cwd ?? files.savedOf(sessionId)?.cwd;
-			return cwd === undefined ? "work" : this.#spaces().of(cwd, await workspaceOf(cwd));
+			return cwd === undefined ? "work" : this.#spaceOf(cwd);
 		};
 		const todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), workspaceOf, { active: () => ownerLock.held });
 		const noteInbox = new NoteInbox(userNoteInboxDir, change => lists.apply("user-notes", change), spaceOfSession, { active: () => ownerLock.held });
@@ -899,13 +899,14 @@ export class Dashboard {
 		return spaces(this.#workspaces.value.personal, personalWorkspace);
 	}
 
-	/**
-	 * Tells the page the personal memory may have changed when a session in `cwd`, which ended a turn, runs in the Personal
-	 * space; it waits for git to place `cwd`, so a worktree of a Personal workspace not placed yet counts.
-	 */
+	/** The space of a session in `cwd`, once git has placed `cwd`, so a worktree of a Personal workspace not placed yet counts. */
+	async #spaceOf(cwd: string): Promise<Space> {
+		return this.#spaces().of(cwd, await this.#files.facts.placement.workspaceOf(cwd, worktreeAt));
+	}
+
+	/** Tells the page the personal memory may have changed when a session in `cwd`, which ended a turn, runs in the Personal space. */
 	async #personalTurnEnded(cwd: string | undefined): Promise<void> {
-		if (cwd === undefined) return;
-		if (this.#spaces().of(cwd, await this.#files.facts.placement.workspaceOf(cwd, worktreeAt)) === "personal") this.#broadcasts.pushList("personal");
+		if (cwd !== undefined && (await this.#spaceOf(cwd)) === "personal") this.#broadcasts.pushList("personal");
 	}
 
 	/** Moves todos checked over {@link DONE_KEPT_HOURS} ago to the archive. */
@@ -918,7 +919,7 @@ export class Dashboard {
 		this.#activity.prune(Date.now() - ACTIVITY_KEPT_DAYS * DAY_MS);
 	}
 
-	/** How `request` joins the server as session `instanceId`: as a Review session, as a Bot's conversation, both, or plain; any but a Bot's loads the personal extension and can wait on another session, and any but a Bot's or one started in the personal directory can move itself. */
+	/** How `request` joins the server as session `instanceId`: as a Review session, as a Bot's conversation, both, or plain; any loads the personal extension, a Bot's without the personal memory, any but a Bot's can wait on another session, and any but a Bot's or one started in the personal directory can move itself. */
 	#joinFor(request: StartRequest, instanceId: string): SessionJoin {
 		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#moves.join(request, instanceId), this.#waits.join(request, instanceId), this.#personalJoin(request)];
 		return {

@@ -11,17 +11,15 @@ import {
 	type SignInState,
 	signedIn,
 } from "../../../src/shared/accounts";
-import { type Space, SPACES } from "../../../src/shared/workspaces";
+import type { Space } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
 import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
-import { SPACE_LABELS } from "../../labels";
-import { SPACE_ICONS } from "../../page-icons";
 import { integrationsStore } from "../../reads";
 import { useSignIn } from "../../use-sign-in";
-import { CommandPicker } from "../command-picker";
 import { MoreActionsMenu } from "../more-actions-menu";
+import { SpacePicker } from "../space-picker";
 import { GoogleClientForm } from "./google-client-form";
 import { IntegrationRow, MarkTile, MetaDot } from "./integration-row";
 import { Confirm, ConnectionCallout, Reconnecting, ReconnectItem, StatusBadge, type StatusLabel, useToolList, WAITING_STATUS } from "./mcp-connection-controls";
@@ -33,7 +31,7 @@ const startSignIn = async (id: AccountsService, account: string | null): Promise
 	(await putJson<McpIntegration>("/api/integrations/sign-in", { id, account })).signIn;
 
 /** The space Google address `address`'s accounts are in, whose Calendar and Email pages show them; one pick moves them. */
-function SpacePicker({ address, space }: { address: string; space: Space }) {
+function AccountSpace({ address, space }: { address: string; space: Space }) {
 	const [error, setError] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
 	const place = async (to: Space): Promise<void> => {
@@ -49,30 +47,14 @@ function SpacePicker({ address, space }: { address: string; space: Space }) {
 		}
 	};
 	return (
-		<span className="inline-flex items-center gap-1.5">
-			<CommandPicker
-				trigger={SPACE_LABELS[space]}
-				icon={SPACE_ICONS[space]}
-				ariaLabel={`Space of ${address}: ${SPACE_LABELS[space]}`}
-				tooltip="The Calendar and Email pages of this space show this account"
-				disabled={saving}
-				width="sm"
-				list={{
-					kind: "ready",
-					groups: [
-						{
-							key: "spaces",
-							items: SPACES.map(value => ({ value, label: SPACE_LABELS[value], icon: SPACE_ICONS[value], selected: value === space, onSelect: () => void (value !== space && place(value)) })),
-						},
-					],
-				}}
-			/>
+		<>
 			{error && (
-				<span role="alert" className="text-red-600 dark:text-red-400">
+				<span role="alert" className="text-xs text-red-600 dark:text-red-400">
 					{error}
 				</span>
 			)}
-		</span>
+			<SpacePicker label={`Space of ${address}`} space={space} disabled={saving} onPick={to => void place(to)} />
+		</>
 	);
 }
 
@@ -112,12 +94,6 @@ function AccountRow({ integration, account, last, placeable, children }: Account
 						<span className="font-mono" title="Its server in omp's mcp.json">
 							{name}
 						</span>
-						{placeable && address && (
-							<>
-								<MetaDot />
-								<SpacePicker address={address} space={account.space} />
-							</>
-						)}
 						{addressError && (
 							<>
 								<MetaDot />
@@ -134,6 +110,7 @@ function AccountRow({ integration, account, last, placeable, children }: Account
 				</div>
 				{!signIn.waitingUrl && !removing && (
 					<div className="flex shrink-0 items-center gap-1.5">
+						{placeable && address && <AccountSpace address={address} space={account.space} />}
 						<Reconnecting signIn={signIn} />
 						<MoreActionsMenu name={shown} disabled={signIn.starting}>
 							<ReconnectItem signIn={signIn} />

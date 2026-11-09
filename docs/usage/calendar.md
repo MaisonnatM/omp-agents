@@ -32,6 +32,7 @@
 - An event on **This computer** stays in `events.json` beside the server's access token, so every window of the app shows it, and nothing leaves this computer.
   It belongs to the space on screen when you add it, and an event added before the spaces existed is in Work.
   In the day's list, its **Move to Personal** or **Move to Work** button moves it to the other space, and it leaves the list.
+  A toast then says where it went, with **Undo** for eight seconds to move it back.
 - An agent can add a reminder on **This computer** with its `user_event` tool, such as when you ask for one or when its work can only be checked later, like a performance change or a deploy.
   The reminder shows on this page like an event you added, in the space of the session's workspace, and its notice comes 10 minutes before it starts.
   Clicking the reminder, here or in its notice, opens the session that added it.

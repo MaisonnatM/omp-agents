@@ -160,7 +160,7 @@ export const PageSwitch = memo(function PageSwitch({
 					workspaces={workspaces}
 					allWorkspaces={allWorkspaces}
 					workspaceList={workspaceList}
-					personal={personal}
+					spaces={personal && scope.spaces}
 					trustedProjects={trustedProjects}
 				/>
 			);

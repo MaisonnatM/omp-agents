@@ -5,28 +5,8 @@ import type { TodoStatus, UserTodoChange, UserTodoLeaf, UserTodoList } from "../
 import { hashForNewSession } from "../../routing";
 import { quickAddTodo } from "../../todo-quick-add";
 import { type ListKind, lastOf, restoreOf, type Section, todoCwd } from "../../todo-views";
-import { toasts } from "../toaster";
+import { offerUndo } from "../toaster";
 import type { TodoKey } from "./input";
-
-/** How long **Undo** stays after a todo is deleted. */
-const UNDO_MS = 8000;
-const UNDO_TOAST = "todo-undo";
-
-/** **Undo** for the last delete, for {@link UNDO_MS}; a later delete takes its place. */
-function offerUndo(text: string, undo: () => void): void {
-	toasts.add({
-		id: UNDO_TOAST,
-		title: `Deleted “${text}”`,
-		timeout: UNDO_MS,
-		actionProps: {
-			children: "Undo",
-			onClick: () => {
-				undo();
-				toasts.close(UNDO_TOAST);
-			},
-		},
-	});
-}
 
 /** What the Todo page types into: a todo's title, or a todo not added yet, at its place in the list, with what it holds so far. */
 type Editing =
@@ -97,7 +77,7 @@ export function useTodoEditing({ list, kind, day, frozen, onChange, onRemoved, n
 		const restore = restoreOf(list, id);
 		onChange({ op: "remove", id });
 		onRemoved(id);
-		if (restore) offerUndo(text, () => onChange(restore));
+		if (restore) offerUndo("todo-undo", `Deleted “${text}”`, () => onChange(restore));
 	};
 	/** Saves `text` as todo `todo`'s title; an empty one removes the todo. */
 	const commit = (todo: UserTodoLeaf, text: string): void => {

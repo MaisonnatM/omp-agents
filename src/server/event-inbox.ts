@@ -7,9 +7,9 @@
  */
 import { isObject, nonEmptyStr } from "../json";
 import { type LocalEvent, MAX_EVENT_TITLE } from "../shared/calendar";
+import type { SpaceOfSession } from "../shared/workspaces";
 import { type InboxEntry, type InboxOptions, JsonInboxDir } from "./json-inbox";
 import { type LocalEventChange, parseLocalEvent } from "./local-events-file";
-import type { SpaceOfSession } from "./note-inbox";
 
 /** `value` as a change an agent may make to `events`, or why not. */
 function parseAgentEventChange(value: unknown, events: readonly LocalEvent[]): InboxEntry<LocalEventChange> {
@@ -31,6 +31,12 @@ function parseAgentEventChange(value: unknown, events: readonly LocalEvent[]): I
 	return { invalid: `an agent may only add or remove an event, not ${String(value.op)}` };
 }
 
+/** `change` with an added event in the space of the session that added it, whatever space the file named. */
+async function inSessionSpace(change: LocalEventChange, spaceOf: SpaceOfSession): Promise<LocalEventChange> {
+	if (change.op !== "add" || change.event.sessionId === null) return change;
+	return { ...change, event: { ...change.event, space: await spaceOf(change.event.sessionId) } };
+}
+
 export class EventInbox extends JsonInboxDir<LocalEventChange> {
 	constructor(dir: string, events: () => readonly LocalEvent[], apply: (change: LocalEventChange) => void, spaceOf: SpaceOfSession, options?: InboxOptions) {
 		super(
@@ -38,7 +44,7 @@ export class EventInbox extends JsonInboxDir<LocalEventChange> {
 			{
 				parse: (_name, value) => parseAgentEventChange(value, events()),
 				async apply(change) {
-					apply(change.op === "add" && change.event.sessionId !== null ? { ...change, event: { ...change.event, space: await spaceOf(change.event.sessionId) } } : change);
+					apply(await inSessionSpace(change, spaceOf));
 					return true;
 				},
 			},

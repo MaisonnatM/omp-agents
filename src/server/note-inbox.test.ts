@@ -2,8 +2,9 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { SpaceOfSession } from "../shared/workspaces";
 import type { UserNoteChange } from "../user-notes-shared";
-import { NoteInbox, type SpaceOfSession } from "./note-inbox";
+import { NoteInbox } from "./note-inbox";
 
 const dirs: string[] = [];
 afterEach(() => {

@@ -24,7 +24,7 @@ Canceled events, events you declined, working-location events, and events with n
 An event carries its `account`, its calendar's id, Google's event id, which differs for each repeat, and its calendar's `writable` flag, and it links to the event in Google Calendar.
 One calendar that cannot be read keeps its error for the Integrations row while the others still answer; only when none of an account's can is that account's read an error.
 The Calendar page reads the open month's events through `calendarEventsStore` in `web/reads.ts` every minute while any Google Calendar account's connection is `ready` or `failing`, and puts a multi-day event on each day it covers.
-It shows the calendars and events of the accounts `visibleAccounts` keeps for the space on screen, grouped in its sidebar under each account's address.
+It shows the calendars and events of the accounts placed in the space on screen, kept with `spaceIs` from `src/shared/workspaces.ts`, grouped in its sidebar under each account's address.
 The Calendar tab's sidebar reads the calendars through `googleStore`, and a checkbox's `PUT` reads both stores again, so the open month changes at once.
 Each successful calendar save merges that calendar's confirmed visibility into `googleStore` before rereading, so an aborted or failed refresh cannot undo it.
 The server deletes the `google.json` that an older version kept the calendars' secret iCal addresses in when it starts.
@@ -40,6 +40,7 @@ This computer adds the event to `events.json` beside the access token, through `
 `parseEventWhen` in `src/shared/calendar.ts` checks an event's `when` both for `parseNewEvent` and for each event that file keeps.
 `GET /api/calendar/local` answers every kept event whatever its space, since only what you typed by hand is there, and the page keeps those of the window's space and lays out the days of the month it shows.
 `PUT /api/calendar/events/space` takes a `LocalEventSpace`, `{ id, space }`, checked by `parseLocalEventSpace`, and applies `set-space` to that kept event; it answers `{}`.
+The page then offers **Undo** through `offerUndo` in `web/components/toaster.tsx`, which sends the same request with the other space.
 A `LocalEvent` whose `space` is missing or names none loads in Work.
 `PUT /api/calendar/events/delete` takes an `EventRef`, checked by `parseEventRef`: `{ kind: "local", id }` deletes that kept event if it is still there, and `{ kind: "google", account, calendarId, eventId }` goes through that account's `GoogleCalendarClient.delete`; it answers `{}`.
 `GoogleCalendarClient.delete` refuses a calendar not checked in your Google Calendar's list or not `writable` before asking Google, as `create` does, and otherwise sends a DELETE to the event's address under the calendar's `events`, without `sendUpdates`.
@@ -51,7 +52,7 @@ The page owns what a write changes: it adds the kept event that `PUT /api/calend
 ### Agent reminders
 
 A `LocalEvent`'s `sessionId` names the omp session that added it, and is `null` for an event you added; one whose `sessionId` is missing or not a nonempty string loads with `null`, so older files read as before.
-`EventInbox` files an added reminder in its session's space through the same `SpaceOfSession` as `NoteInbox`, whatever space the change names.
+`EventInbox` files an added reminder in its session's space through `inSessionSpace` and the same `SpaceOfSession` as `NoteInbox`; the change names no space, and any it carried is replaced.
 The starter kit's `user_event` extension lists the upcoming events of `events.json`, adds a timed reminder in its session's name, and removes one that session added.
 It reads the file but never writes it, and atomically renames each `{ op: "add", event }` or `{ op: "remove", id, sessionId }` into `event-inbox/` beside it.
 It also reads the pending changes, so a session sees its own reminders while the dashboard is stopped.

@@ -18,23 +18,55 @@ const git = (cwd: string, ...args: string[]): Promise<string> => runChecked(["gi
 
 /**
  * The extension loaded as the dashboard loads it into every session, with a personal directory, and a workspaces file, a
- * memory file and a sport file that do not exist yet; `flags` leaves out the sport flags, or every flag.
+ * Google accounts file, a memory file and a sport file that do not exist yet; `flags` leaves out the sport flags, the
+ * memory and sport flags as for a Bot's conversation, or every flag.
  */
-function loadedPersonal(flags: "all" | "memory" | "none" = "all") {
+function loadedPersonal(flags: "all" | "memory" | "bot" | "none" = "all") {
 	const root = realpathSync(mkdtempSync(join(tmpdir(), "omp-agents-personal-")));
 	dirs.push(root);
 	const personal = join(root, "personal");
 	const workspaces = join(root, "workspaces.json");
+	const googleAccounts = join(root, "google-accounts.json");
 	const memory = join(root, "personal-memory.md");
 	const sport = join(root, "sport.json");
 	const sportInbox = join(root, "sport-inbox");
-	const memoryFlags: [string, string][] = [[PERSONAL_FLAGS.dir, personal], [PERSONAL_FLAGS.workspaces, workspaces], [PERSONAL_FLAGS.memory, memory]];
+	const placeFlags: [string, string][] = [[PERSONAL_FLAGS.dir, personal], [PERSONAL_FLAGS.workspaces, workspaces], [PERSONAL_FLAGS.googleAccounts, googleAccounts]];
+	const memoryFlags: [string, string][] = [...placeFlags, [PERSONAL_FLAGS.memory, memory]];
 	const sportFlags: [string, string][] = [[PERSONAL_FLAGS.sport, sport], [PERSONAL_FLAGS.sportInbox, sportInbox]];
-	const named = new Map<string, string>(flags === "all" ? [...memoryFlags, ...sportFlags] : flags === "memory" ? memoryFlags : []);
+	const named = new Map<string, string>({ all: [...memoryFlags, ...sportFlags], memory: memoryFlags, bot: placeFlags, none: [] }[flags]);
 	/** Saves `workspaces.json` as Settings › Workspaces would, with `personal` placed in the Personal space. */
 	const place = (personal: string[]) => writeFileSync(workspaces, JSON.stringify({ added: [], hidden: [], personal }));
-	return { root, personal, workspaces, memory, sport, place, ...loadExtension(personalExtension, named, "/work/app") };
+	/** Saves `google-accounts.json` as Settings › Integrations would: each account's address by server, and the addresses placed in the Personal space. */
+	const placeAccounts = (addresses: Record<string, string>, personal: string[]) => writeFileSync(googleAccounts, JSON.stringify({ addresses, personal, signedOut: {} }));
+	return { root, personal, workspaces, memory, sport, place, placeAccounts, ...loadExtension(personalExtension, named, "/work/app") };
 }
+
+const told = (space: string, address: string): string =>
+	`This session is in the user's ${space} space, and the user placed ${address} in it: use that account for this session's mail and calendar unless the user names another account.`;
+
+test("a Bot's conversation and its subagents hear which Google account the user placed in their space, with no memory, and nothing when every account is in one space", async () => {
+	const session = loadedPersonal("bot");
+	session.placeAccounts({ gmail: "ana@example.com", "gmail-2": "ana@work.example", "google-calendar": "ana@example.com" }, ["ana@example.com"]);
+	await session.start(session.personal);
+	expect(session.tools()).toEqual([]);
+	expect(await session.prompt("main", session.personal)).toEqual(["base", told("Personal", "ana@example.com")]);
+	expect(await session.prompt("sub", "/work/app")).toEqual(["base", told("Work", "ana@work.example")]);
+	session.placeAccounts({ gmail: "ana@example.com", "gmail-2": "ana@work.example", "gmail-3": "bo@example.com" }, ["ana@example.com"]);
+	expect(await session.prompt("main", "/work/app")).toEqual([
+		"base",
+		"This session is in the user's Work space, and the user placed ana@work.example, bo@example.com in it: use those accounts for this session's mail and calendar unless the user names another account.",
+	]);
+	session.placeAccounts({ gmail: "ana@example.com", "gmail-2": "ana@work.example" }, []);
+	expect(await session.prompt("main", "/work/app")).toEqual(undefined);
+});
+
+test("a personal session's prompt carries the memory, then the Google account its space uses", async () => {
+	const session = loadedPersonal("memory");
+	session.placeAccounts({ gmail: "ana@example.com", "gmail-2": "ana@work.example" }, ["ana@example.com"]);
+	const [, personal, accounts] = (await session.prompt("main", session.personal)) ?? [];
+	expect(personal).toStartWith("You are the user's personal assistant");
+	expect(accounts).toBe(told("Personal", "ana@example.com"));
+});
 
 /** A repository at `<parent>/home` on `main`, with `wip` checked out in the linked worktree `home-wip`. */
 async function repoWithWorktree(parent: string): Promise<{ main: string; worktree: string }> {

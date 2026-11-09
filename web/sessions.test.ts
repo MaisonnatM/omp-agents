@@ -144,7 +144,7 @@ describe("spaces", () => {
 	});
 
 	test("a scheduled start is in its directory's space, a message or a continue in its session's, and one for a session no list holds in Work", () => {
-		const byPage = spaces(["/code/garden", "~/garden"], personalDir);
+		const byPage = spaces([{ cwd: "/code/garden", cwdDisplay: "~/garden" }], personalDir);
 		const send = (id: string, target: ScheduledSend["target"]) => fromPartial<ScheduledSend>({ id, target });
 		const sends = [
 			send("home", fromPartial({ kind: "start", request: { cwd: "~/personal" } })),

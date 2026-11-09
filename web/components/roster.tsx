@@ -35,7 +35,7 @@ import { NotesNav } from "./notes/nav";
 import { SessionList } from "./session-list";
 import { SportNav } from "./sport/nav";
 import { SettingsNav } from "./settings/settings-nav";
-import { toasts } from "./toaster";
+import { offerUndo, toasts } from "./toaster";
 import { workspaceItems } from "./workspace-picker";
 import { TodoCategories } from "./todo/categories";
 import type { KnownSessions } from "./todo/links";
@@ -45,10 +45,6 @@ interface SidebarWorkspacePickerProps {
 	workspaces: Workspace[];
 	onPick: (cwd: string | null) => void;
 }
-
-/** How long **Undo** stays after a workspace moves to the other space. */
-const UNDO_MS = 8000;
-const MOVE_TOAST = "workspace-move";
 
 /**
  * Moves workspace `cwd`, called `name`, from space `from` to `to`, with **Undo** to move it back. Every page hears the list
@@ -61,18 +57,7 @@ async function moveWorkspace(name: string, cwd: string, from: Space, to: Space):
 		toasts.add({ title: `Could not move ${name} to ${SPACE_LABELS[to]}`, description: errorText(error) });
 		return;
 	}
-	toasts.add({
-		id: MOVE_TOAST,
-		title: `Moved ${name} to ${SPACE_LABELS[to]}`,
-		timeout: UNDO_MS,
-		actionProps: {
-			children: "Undo",
-			onClick: () => {
-				toasts.close(MOVE_TOAST);
-				void moveWorkspace(name, cwd, to, from);
-			},
-		},
-	});
+	offerUndo("workspace-move", `Moved ${name} to ${SPACE_LABELS[to]}`, () => void moveWorkspace(name, cwd, to, from));
 }
 
 /** Scopes the roster to one directory's running and past sessions, or to all of the space's, and moves the selected workspace to the other space. */

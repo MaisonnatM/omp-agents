@@ -42,7 +42,7 @@ describe("McpIntegrationRow", () => {
 
 	test("Settings places each account in a space, and a page that offers to connect does not", () => {
 		const ready = calendar({ kind: "ready", server, tools: [] });
-		expect(row(ready, true)).toContain('aria-label="Space of me0@example.com: Work"');
+		expect(row(ready, true)).toContain('aria-label="Space of me0@example.com"');
 		expect(row(ready)).not.toContain("Space of");
 	});
 

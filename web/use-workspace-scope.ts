@@ -4,7 +4,6 @@ import { prKey } from "../src/shared/github";
 import type { ScheduledSend } from "../src/shared/scheduled";
 import type { PastSession, RosterHost } from "../src/shared/sessions";
 import { isSpace, type Space, spaces, type Workspace } from "../src/shared/workspaces";
-import { botsIn } from "./bots-model";
 import type { DashboardState } from "./dashboard-state";
 import { pullRequestsScope as scopeOf, pullRequestsStore } from "./reads";
 import { discoverableSessions, listWorkspaces, scheduledIn, sessionsIn, type WindowScope, workspacesIn, workspaceSwitch } from "./sessions";
@@ -77,8 +76,7 @@ export function useWorkspaceScope(state: DashboardState): WorkspaceScope {
 	const [space, pickSpace] = useSpace();
 	const { personal: personalDir } = state;
 	const personalCwds = state.workspaceList.personal;
-	// A Bot or a scheduled start names its directory as the page shows it, `~` included, so a Personal workspace is listed both ways.
-	const placement = useMemo(() => spaces(personalCwds.flatMap(({ cwd, cwdDisplay }) => [cwd, cwdDisplay]), personalDir), [personalCwds, personalDir]);
+	const placement = useMemo(() => spaces(personalCwds, personalDir), [personalCwds, personalDir]);
 	// Temporary and hidden workspaces, and Bots' conversations, remain in the raw sessions; only discoverable sessions enter the workspace list and sidebar view.
 	const hiddenCwds = useMemo(() => new Set(state.workspaceList.hidden.map(hidden => hidden.cwd)), [state.workspaceList.hidden]);
 	const botNames = useMemo(() => new Map((state.bots ?? []).flatMap(bot => (bot.sessionId === null ? [] : [[bot.sessionId, bot.name] as const]))), [state.bots]);
@@ -90,7 +88,7 @@ export function useWorkspaceScope(state: DashboardState): WorkspaceScope {
 		[discoverable, state.workspaceList.added, personalCwds, hiddenCwds],
 	);
 	const workspaces = useMemo(() => workspacesIn(allWorkspaces, space, placement, personalDir), [allWorkspaces, space, placement, personalDir]);
-	const bots = useMemo(() => state.bots && botsIn(state.bots, space, placement), [state.bots, space, placement]);
+	const bots = useMemo(() => state.bots && placement.inSpace(state.bots, space), [state.bots, space, placement]);
 	const scheduled = useMemo(() => scheduledIn(state.scheduled, space, { hosts: state.hosts, past: state.past }, placement), [state.scheduled, space, state.hosts, state.past, placement]);
 	const [workspace, pickWorkspace] = useSelectedWorkspace(workspaces);
 	// Until the sessions are listed, the saved workspace reads as all of the space's.

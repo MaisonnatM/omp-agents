@@ -17,7 +17,7 @@ Every page receives the same persisted list.
 The `user_note` extension reads the file but never writes it.
 It atomically renames each add or append request into `note-inbox/`.
 `NoteInbox` uses `JsonInboxDir` to apply those requests in filename order.
-It files an add in the space of the session that sent it, through the `SpaceOfSession` the dashboard passes, which places the session's directory with `spaces().of` and answers Work for a session it does not know.
+It files an add in the space of the session that sent it, through `inSessionSpace` and the `SpaceOfSession` from `src/shared/workspaces.ts` the dashboard passes, which places the session's directory with `spaces().of` and answers Work for a session it does not know.
 Only the server holding `OwnerLock` drains the inbox, and it reloads the notes file before taking ownership.
 Invalid requests move aside with the inbox's logged reason.
 The extension also reads pending adds and appends, so agents see their own changes while the dashboard is stopped.

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { applyWorkspace, NO_WORKSPACES, spaces } from "./workspaces";
+import { applyWorkspace, NO_WORKSPACES, spaceIs, spaces } from "./workspaces";
 
 describe("spaces", () => {
 	const personalDir = { cwd: "/home/u/.local/share/omp-agents/personal", cwdDisplay: "~/.local/share/omp-agents/personal" };
@@ -37,6 +37,20 @@ describe("spaces", () => {
 		expect(placed.isPersonalDir(personalDir.cwd)).toBe(false);
 		expect(placed.of(personalDir.cwd, personalDir.cwd)).toBe("work");
 		expect(placed.of("/home/u/code/garden", "/home/u/code/garden")).toBe("personal");
+	});
+
+	test("the page's rows name a Personal workspace both ways, so a Bot or a scheduled start at its `~` path is Personal too", () => {
+		const placed = spaces([{ cwd: "/home/u/code/garden", cwdDisplay: "~/code/garden" }], personalDir);
+		expect(placed.of("~/code/garden", "~/code/garden")).toBe("personal");
+		expect(placed.of("/home/u/code/garden", "/home/u/code/garden")).toBe("personal");
+		const bots = [{ name: "Home", cwd: personalDir.cwdDisplay }, { name: "Garden", cwd: "~/code/garden" }, { name: "Webapp", cwd: "~/code/webapp" }];
+		expect(placed.inSpace(bots, "personal").map(({ name }) => name)).toEqual(["Home", "Garden"]);
+		expect(placed.inSpace(bots, "work").map(({ name }) => name)).toEqual(["Webapp"]);
+	});
+
+	test("an item that carries its own space is in that space only", () => {
+		const notes = [{ id: "a", space: "personal" as const }, { id: "b", space: "work" as const }];
+		expect(notes.filter(spaceIs("personal")).map(({ id }) => id)).toEqual(["a"]);
 	});
 });
 
