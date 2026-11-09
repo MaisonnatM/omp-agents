@@ -1,12 +1,12 @@
 /** omp's task-isolation sandboxes: where they live, which omp process owns each, the ovnfs checkout an ovnfs-backed one records, and their teardown. */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { arrayOf, fields, isNonEmpty, isString } from "../json";
+import { arrayOf, fields, isNonEmpty, isString, optional } from "../json";
 import type { IsolationSweepDeps, OvnfsRecord } from "../server/isolation-sweep";
 import { dirs, isolationOwnership, ovnfsClient, ovnfsDaemon, ovnfsTask, worktreeCli } from "./modules";
 
-/** omp's `CheckoutRecord`: the ovnfs executable that opened a sandbox's checkout, and the checkout's name. */
-const isRecord = fields<{ command: string; checkout: string }>({ command: isNonEmpty, checkout: isNonEmpty });
+/** omp's `CheckoutRecord`: the ovnfs executable that opened a sandbox's checkout, the checkout's name, and its baseline checkout while one exists. */
+const isRecord = fields<{ command: string; checkout: string; start?: string }>({ command: isNonEmpty, checkout: isNonEmpty, start: optional(isNonEmpty) });
 /** The part of ovnfs's `api.LsReply` the sweep reads: every live checkout, by name, and the folder it is served in. */
 const isLsReply = fields<{ checkouts: { name: string; path: string }[] }>({ checkouts: arrayOf(fields({ name: isString, path: isString })) });
 
@@ -24,11 +24,12 @@ export function ompSandboxes(): Pick<IsolationSweepDeps, "root" | "ownerFile" | 
 	};
 }
 
-/** The ovnfs command and checkout name in the text of an ovnfs sandbox's record; throws when it names neither. */
-export function parseOvnfsRecord(text: string): { command: string; checkout: string } {
+/** The ovnfs command, checkout name, and baseline checkout, if any, in the text of an ovnfs sandbox's record; throws when it names no checkout. */
+export function parseOvnfsRecord(text: string): { command: string; checkout: string; start?: string } {
 	const record: unknown = JSON.parse(text);
 	if (!isRecord(record)) throw new Error(`${ovnfsTask.OVNFS_CHECKOUT_FILE} names no ovnfs checkout.`);
-	return { command: record.command, checkout: record.checkout };
+	const { command, checkout, start } = record;
+	return start === undefined ? { command, checkout } : { command, checkout, start };
 }
 
 /** The folder ovnfs's `ls` `reply` serves `checkout` in, `null` when it lists no checkout by that name; throws on any other reply. */
@@ -46,19 +47,21 @@ async function ovnfsRecord(dir: string): Promise<OvnfsRecord | null> {
 		if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
 		throw error;
 	}
-	const { command, checkout } = parseOvnfsRecord(text);
+	const { command, checkout, start } = parseOvnfsRecord(text);
 	const daemon = await ovnfsDaemon.runningDaemon(command);
 	if (!daemon) throw new Error(`no ovnfs daemon of ${command} runs to say where ${checkout} is.`);
 	const reply = await call(command, daemon.socket, "ls");
-	return { command, checkout, socket: daemon.socket, served: servedPath(reply, checkout) };
+	return { command, checkout, start, socket: daemon.socket, served: servedPath(reply, checkout) };
 }
 
-/** Removes the judged checkout on the daemon that listed it, as omp's `removeCheckout` does but never starting a daemon; one already gone counts as removed. */
-async function releaseOvnfs({ command, checkout, socket }: OvnfsRecord): Promise<void> {
-	try {
-		await call(command, socket, "rm", { checkout });
-	} catch (error) {
-		if (!(error instanceof ovnfsClient.OvnfsError && error.code === "not_found")) throw error;
+/** Removes the judged checkout, after its baseline checkout as omp's `releaseOvnfsCheckout` does, on the daemon that listed it, never starting a daemon; one already gone counts as removed. */
+async function releaseOvnfs({ command, checkout, start, socket }: OvnfsRecord): Promise<void> {
+	for (const name of start === undefined ? [checkout] : [start, checkout]) {
+		try {
+			await call(command, socket, "rm", { checkout: name });
+		} catch (error) {
+			if (!(error instanceof ovnfsClient.OvnfsError && error.code === "not_found")) throw error;
+		}
 	}
 }
 

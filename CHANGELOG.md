@@ -6,6 +6,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-11-09
 
 - Fixed: signing out of a provider account or API key in Settings › Providers failed with an error after the latest omp update.
+- Fixed: cleaning up old subagent sandboxes now also removes the extra copy omp keeps for some of them, so none are left taking disk space.
 - You can now save your model setup as a profile, such as Full power or Save credits, under Settings › Models › Model profiles.
 - One click on a saved profile switches your model setup back to it, and new sessions use it.
 - The profile your model setup matches now shows a check.
