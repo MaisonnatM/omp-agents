@@ -15,7 +15,7 @@ export type CheckEntry = string | string[];
 export interface LandConfig {
 	target: string;
 	remote: string;
-	/** Commands run in the fresh worktree before the merge, such as installing dependencies. */
+	/** Commands run in the fresh worktree after the merge and before the checks, such as installing dependencies, so a branch's new packages are installed. */
 	setup: string[];
 	checks: CheckEntry[];
 }
@@ -230,11 +230,6 @@ export async function land(options: LandOptions): Promise<LandResult> {
 		try {
 			const added = await git(top, ["worktree", "add", "--quiet", "--detach", dir, base]);
 			if (added.code !== 0) return { kind: "refused", reason: `Could not make a worktree to land in: ${tail(added.out)}` };
-			for (const command of config.setup) {
-				options.progress?.(`Setting up: ${command}`);
-				const done = await run("sh", ["-c", command], dir, env, limits, options.signal);
-				if (done.code !== 0 || done.stopped) return { kind: "failed", command, why: done.stopped ? `setup was stopped: ${done.stopped}` : `setup exited with code ${done.code}`, failures: done.failures, tail: tail(done.out) };
-			}
 			options.progress?.(`Merging ${branch} into ${remote}/${target}`);
 			const message = `Land ${branch}\n\nDivergence: ${options.divergence.trim()}`;
 			const merged = await git(dir, ["merge", "--no-ff", "--no-edit", "-m", message, tip], env);
@@ -243,6 +238,11 @@ export async function land(options: LandOptions): Promise<LandResult> {
 				await git(dir, ["merge", "--abort"]);
 				if (paths.length > 0) return { kind: "conflict", paths };
 				return { kind: "refused", reason: `The merge failed: ${tail(merged.out)}` };
+			}
+			for (const command of config.setup) {
+				options.progress?.(`Setting up: ${command}`);
+				const done = await run("sh", ["-c", command], dir, env, limits, options.signal);
+				if (done.code !== 0 || done.stopped) return { kind: "failed", command, why: done.stopped ? `setup was stopped: ${done.stopped}` : `setup exited with code ${done.code}`, failures: done.failures, tail: tail(done.out) };
 			}
 			const sha = (await gitOut(dir, ["rev-parse", "HEAD"]))!;
 			const checkEnv = { ...env, LAND_BASE: base, LAND_TIP: tip };
