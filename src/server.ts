@@ -68,6 +68,12 @@ async function upgradeTerminal(req: Request, srv: Server<AnySocketData>): Promis
 	return NOT_A_WEBSOCKET();
 }
 
+// Removing a phone closes the sockets it holds open, so its page stops at once rather than at its next request.
+const openSockets = new Set<ServerWebSocket<AnySocketData>>();
+phones.onRemove(phoneId => {
+	for (const ws of openSockets) if (ws.data.phoneId === phoneId) ws.close(4001, "phone removed");
+});
+
 let server: Server<AnySocketData>;
 try {
 	server = Bun.serve<AnySocketData>({
@@ -108,12 +114,6 @@ try {
 	console.error("Set PORT to use another port.");
 	process.exit(1);
 }
-
-// Removing a phone closes the sockets it holds open, so its page stops at once rather than at its next request.
-const openSockets = new Set<ServerWebSocket<AnySocketData>>();
-phones.onRemove(phoneId => {
-	for (const ws of openSockets) if (ws.data.phoneId === phoneId) ws.close(4001, "phone removed");
-});
 
 // Also on a crash or `process.exit`, so a server that exits unannounced leaves no lock and no unwritten store; a killed one leaves a stale lock that the next server takes over.
 process.on("exit", () => dashboard.exited());
