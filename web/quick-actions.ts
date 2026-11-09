@@ -98,7 +98,7 @@ const TICKET_RULES: Record<WorkActionId, WorkRule<Ticket>> = {
 			const where = ticket.branch
 				? `The dashboard starts this session in a git worktree on \`${ticket.branch}\`, Linear's name for the branch, so that Linear links the work to the issue; when the session's directory is not in a git repository, create that worktree yourself.`
 				: `Work on it in a git worktree on a new branch named after ${ticket.id}.`;
-			return `${ticketContext(ticket)} ${where} When a branch or pull request for it exists already, continue from there. Implement what the issue asks, add tests for the behavior you change, run the project's checks, and commit. Report what you changed and what is left open. Do not push, open a pull request, or update the issue on Linear.`;
+			return `${ticketContext(ticket)} ${where} When a branch or pull request for it exists already, continue from there. Run it through \`skill://ship\` from its first step, including the grill and plan before any code, and stop before its Draft PR step. Report what you changed and what is left open. Do not push, open a pull request, or update the issue on Linear.`;
 		},
 		branch: ticket => ticket.branch,
 	},
@@ -122,7 +122,7 @@ const TODO_RULES: Record<WorkActionId, WorkRule<UserTodo>> = {
 	work: {
 		applies: todo => todo.doneAt === null,
 		prompt: todo =>
-			`${todoContext(todo)}\n\nDo what it asks. When it changes code, work in a git worktree on a new branch named after it, add tests for the behavior you change, run the project's checks, and commit. Report what you did and what is left open. Do not push or open a pull request.`,
+			`${todoContext(todo)}\n\nDo what it asks. When it changes code, work in a git worktree on a new branch named after it and run it through \`skill://ship\` from its first step, including the grill and plan before any code, stopping before its Draft PR step. Report what you did and what is left open. Do not push or open a pull request.`,
 		branch: () => null,
 	},
 	plan: {
