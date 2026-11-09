@@ -7,6 +7,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - You can open the dashboard on your phone from anywhere: turn on Settings › Phone access and scan the code.
 - Each phone signs in with its own key, and Remove signs that phone out at once.
+- In Settings, Decisions, All workspaces now lists each workspace's decision records, grouped by workspace, instead of asking you to pick one.
 - `/ship` now grills you on the change before it plans it, asking rounds of questions with a recommended answer each, and saves the settled terms and choices in the project's glossary and decision records.
 - Agents read a slightly shorter set of instructions: the subagent worktree rules now appear once, and poteto-mode no longer tells agents on `main` to use a setting the worktree guard rejects.
 - The Sessions sidebar no longer shows Bot conversations, which remain in Bots.

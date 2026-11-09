@@ -79,7 +79,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - The Todos card's **Files** section, a session's changed files: `ChangedFileList` in `web/components/changed-files-section.tsx`.
   - The session changes dialog that a file or **Review** opens: `web/components/changes/session-changes-dialog.tsx`, with its explorer in `changes-explorer.tsx` and tree in `file-tree.tsx` beside it.
   - Settings › Files, omp's own config files: `Files` in `web/components/settings/files-tab.tsx`.
-  - Settings › Decisions, a workspace repository's decision records: `DecisionsTab` in `web/components/settings/decisions-tab.tsx`.
+  - Settings › Decisions, a workspace repository's decision records, and every workspace in the space when All workspaces is selected: `DecisionsTab` in `web/components/settings/decisions-tab.tsx`, grouped by `decisionGroups` in `web/components/settings/decision-groups.ts`.
 - A file opened from a path in agent text: `web/components/file-dialog.tsx`.
 - Dictation, the composer's microphone and the status row above its text field: `DictationButton` and `DictationRow` in `web/components/composer-dictation.tsx`, which `conversation.tsx` and `new-session.tsx` mount, over the page's one capture in `web/dictation.ts`.
 - Command palette (Cmd+K): `web/components/command-palette/`, over `web/command-palette.ts`.
