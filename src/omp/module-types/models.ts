@@ -109,7 +109,11 @@ export interface ModelRegistryModule {
 export interface LogoutModule {
 	toLogoutAccounts(provider: string, credentials: StoredCredential[]): { credentialId: number; label: string; detail: string; type: "oauth" | "api_key" }[];
 	/** Removes credential row `credentialId` of `loginProvider` and refreshes its models; `removed` is false when it was already gone. */
-	logoutCredential(registry: InstanceType<ModelRegistryModule["ModelRegistry"]>, loginProvider: string, credentialId: number, sessionId: string): Promise<{ removed: boolean }>;
+	logoutCredential(
+		session: { modelRegistry: InstanceType<ModelRegistryModule["ModelRegistry"]>; sessionId: string; refreshScopedModels(): Promise<void> },
+		loginProvider: string,
+		credentialId: number,
+	): Promise<{ removed: boolean }>;
 }
 export interface OAuthTerminalModule {
 	/** `email (org)`, `email`, or `org` for an OAuth sign-in; `undefined` for an API key or a sign-in that named no account. */

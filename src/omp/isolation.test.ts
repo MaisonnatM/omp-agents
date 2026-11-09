@@ -117,6 +117,15 @@ describe("ovnfs record", () => {
 		});
 	});
 
+	test("names the baseline checkout omp records while one exists", () => {
+		expect(parseOvnfsRecord(JSON.stringify({ command: "ovnfs", checkout: "omp-task-a1b2c3", start: "omp-task-a1b2c3-start" }))).toEqual({
+			command: "ovnfs",
+			checkout: "omp-task-a1b2c3",
+			start: "omp-task-a1b2c3-start",
+		});
+		expect(() => parseOvnfsRecord(JSON.stringify({ command: "ovnfs", checkout: "omp-task-a1b2c3", start: "" }))).toThrow("names no ovnfs checkout");
+	});
+
 	test("throws for a record that is not JSON or names no checkout", () => {
 		expect(() => parseOvnfsRecord("{")).toThrow();
 		expect(() => parseOvnfsRecord(JSON.stringify({ command: "ovnfs" }))).toThrow("names no ovnfs checkout");
@@ -156,6 +165,15 @@ describe("omp sandboxes over a running ovnfs daemon", () => {
 		expect(daemon.removed).toEqual(["omp-task-a1b2c3"]);
 		expect(existsSync(served)).toBe(false);
 		expect(verbs()).toEqual(["status"]);
+	});
+
+	test("releases the baseline checkout the record names before the checkout itself", async () => {
+		const { daemon, sandbox } = await ovnfsSetup("omp-task-a1b2c3");
+		const file = join(sandbox, ovnfsTask.OVNFS_CHECKOUT_FILE);
+		writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, "utf8")), start: "omp-other-000000" }));
+		const sandboxes = ompSandboxes();
+		await sandboxes.releaseOvnfs((await sandboxes.ovnfsRecord(sandbox))!);
+		expect(daemon.removed).toEqual(["omp-other-000000", "omp-task-a1b2c3"]);
 	});
 
 	test("a checkout the daemon no longer lists is not served, and releasing one already gone counts as released", async () => {

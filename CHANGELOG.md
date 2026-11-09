@@ -10,6 +10,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Graphite is gone from the dashboard: Settings › Source control no longer has a Graphite sign-in, and pull requests no longer offer Open on Graphite.
 - Graphite links in conversations now show as ordinary links.
 - Sessions now open and publish pull requests with the GitHub CLI only.
+- Fixed: signing out of a provider account or API key in Settings › Providers failed with an error after the latest omp update.
+- Fixed: cleaning up old subagent sandboxes now also removes the extra copy omp keeps for some of them, so none are left taking disk space.
 - You can now save your model setup as a profile, such as Full power or Save credits, under Settings › Models › Model profiles.
 - One click on a saved profile switches your model setup back to it, and new sessions use it.
 - The profile your model setup matches now shows a check.
