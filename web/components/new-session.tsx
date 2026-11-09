@@ -300,9 +300,10 @@ function SkillToggle({ name, state, onToggle, disabled }: { name: string; state:
 				aria-label={`Skill ${name}`}
 				onClick={onToggle}
 				disabled={off}
+				// When the composer's row runs short, as on a phone, the skill's name gives way first, so the project picker keeps its folder's name.
+				className="min-w-0 shrink-[9]"
 			>
-				{/* On a phone the skill's name gives way first, so the project picker keeps its folder's name. */}
-				<span className={cn("max-w-40 truncate max-sm:max-w-14", state !== "on" && "text-muted-foreground line-through")}>{name}</span>
+				<span className={cn("block max-w-40 truncate", state !== "on" && "text-muted-foreground line-through")}>{name}</span>
 			</Button>
 		</Tooltip>
 	);

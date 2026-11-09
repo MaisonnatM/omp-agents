@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Tooltip } from "@/components/ui/tooltip";
 import {
-	CalendarDate,
 	CalendarDatePagination,
 	CalendarDatePicker,
 	CalendarMonthPicker,
@@ -162,13 +161,13 @@ function EntryText({ entry, className }: { entry: CalendarEntry; className?: str
 	);
 }
 
-/** One line of a day cell: an all-day event as a band in its color, anything else as a dot and its text. */
+/** One line of a day cell: an all-day event as a band in its color, anything else as a dot and its text; a phone's cell shows dots instead. */
 function CellEntry({ entry }: { entry: CalendarEntry }) {
 	if (entry.kind === "event" && entry.event.when.allDay) {
 		return (
 			<EntryLink
 				entry={entry}
-				className="flex h-5 items-center rounded-sm bg-[color-mix(in_oklab,var(--event)_16%,transparent)] px-1.5 text-[11px] font-medium text-foreground hover:bg-[color-mix(in_oklab,var(--event)_26%,transparent)]"
+				className="flex h-5 items-center rounded-sm bg-[color-mix(in_oklab,var(--event)_16%,transparent)] px-1.5 text-[11px] font-medium text-foreground hover:bg-[color-mix(in_oklab,var(--event)_26%,transparent)] max-sm:hidden"
 				style={{ "--event": entry.event.color } as CSSProperties}
 			>
 				<span className="truncate">{entry.event.title}</span>
@@ -176,7 +175,7 @@ function CellEntry({ entry }: { entry: CalendarEntry }) {
 		);
 	}
 	return (
-		<EntryLink entry={entry} className="flex h-5 items-center gap-1.5 rounded-sm px-1 text-[11px] hover:bg-hover">
+		<EntryLink entry={entry} className="flex h-5 items-center gap-1.5 rounded-sm px-1 text-[11px] hover:bg-hover max-sm:hidden">
 			<EntryDot entry={entry} />
 			<EntryText entry={entry} />
 		</EntryLink>
@@ -262,7 +261,7 @@ interface DayCellProps {
 	className: string;
 }
 
-/** One day of the month: its number, its first entries and **+N more**, and, while hovered, a card with all of them. */
+/** One day of the month: its number, its first entries and **+N more**, or on a phone their dots, and, while hovered, a card with all of them. */
 function DayCell({ date, entries, today, selected, onSelect, className }: DayCellProps) {
 	const cell = (
 		<div
@@ -285,8 +284,16 @@ function DayCell({ date, entries, today, selected, onSelect, className }: DayCel
 				<CellEntry key={entryKey(entry)} entry={entry} />
 			))}
 			{entries.length > CELL_ENTRIES && (
-				<span className="self-start rounded-sm px-1 text-[11px] text-muted-foreground hover:bg-hover hover:text-foreground">
+				<span className="self-start rounded-sm px-1 text-[11px] text-muted-foreground hover:bg-hover hover:text-foreground max-sm:hidden">
 					+{entries.length - CELL_ENTRIES} more
+				</span>
+			)}
+			{entries.length > 0 && (
+				<span aria-hidden className="flex flex-wrap items-center gap-0.5 px-0.5 text-[10px] leading-none text-muted-foreground tabular-nums sm:hidden">
+					{entries.slice(0, CELL_ENTRIES).map(entry => (
+						<EntryDot key={entryKey(entry)} entry={entry} />
+					))}
+					{entries.length > CELL_ENTRIES && `+${entries.length - CELL_ENTRIES}`}
 				</span>
 			)}
 		</div>
@@ -400,33 +407,34 @@ export function CalendarPage({ routines, todos, ticketsShown, workspace }: Calen
 					{failure}
 				</p>
 			))}
-			<div className="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
+			<div className="grid gap-6 px-6 py-6 max-sm:grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_19rem]">
 				<CalendarProvider className="overflow-hidden rounded-xl border border-border bg-background">
-					<CalendarDate>
+					{/* Kibo's `CalendarDate` row, which wraps on a phone so the buttons drop under the month. */}
+					<div className="flex items-center justify-between p-3 max-sm:flex-wrap max-sm:gap-y-1">
 						<CalendarDatePicker className="gap-0">
 							<CalendarMonthPicker />
 							<CalendarYearPicker start={today.getFullYear() - 1} end={today.getFullYear() + 2} />
 						</CalendarDatePicker>
-						<div className="flex items-center gap-1">
+						<div className="flex items-center gap-1 max-sm:ms-auto">
 							<Tooltip content="Add an event to Google Calendar or this computer" shortcut={shortcutLabels("calendarNewEvent")} side="bottom">
-								<Button variant="tertiary" leadingIcon={Plus} onClick={openNewEvent}>
-									New event
+								<Button variant="tertiary" leadingIcon={Plus} onClick={openNewEvent} className="max-sm:size-10 max-sm:px-0">
+									<span className="max-sm:sr-only">New event</span>
 								</Button>
 							</Tooltip>
-							<Button variant="tertiary" onClick={() => show(today)}>
+							<Button variant="tertiary" onClick={() => show(today)} className="max-sm:h-10">
 								Today
 							</Button>
-							<CalendarDatePagination className="gap-0" />
+							<CalendarDatePagination className="gap-0 max-sm:[&_button]:size-10" />
 						</div>
-					</CalendarDate>
+					</div>
 					<div className="grid grid-cols-7 border-y border-border">
 						{WEEKDAYS.map(weekday => (
-							<div key={weekday} className="px-3 py-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+							<div key={weekday} className="px-3 py-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase max-sm:px-0 max-sm:text-center">
 								{weekday}
 							</div>
 						))}
 					</div>
-					<div className="grid auto-rows-[minmax(7.5rem,auto)] grid-cols-7">
+					<div className="grid auto-rows-[minmax(7.5rem,auto)] grid-cols-7 max-sm:auto-rows-[minmax(3.5rem,auto)]">
 						{days.map((date, index) => {
 							const day = localDay(date);
 							const edges = cn(index % 7 !== 6 && "border-r", index < days.length - 7 && "border-b", "border-border");

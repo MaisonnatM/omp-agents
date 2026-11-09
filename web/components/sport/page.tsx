@@ -75,7 +75,7 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 		<>
 			<Tooltip content="Noter une séance hors du plan">
 				<Button variant="ghost" size="compact" leadingIcon={Plus} disabled={disabled} onClick={() => logFor(selected, null)} {...activityControl("sport.log.free")}>
-					<span className="sr-only @3xl/sport:not-sr-only">Séance libre</span>
+					<span className="sr-only max-sm:not-sr-only @3xl/sport:not-sr-only">Séance libre</span>
 				</Button>
 			</Tooltip>
 			{bodyweight && (
