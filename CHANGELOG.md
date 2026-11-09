@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-09
+
+- When an agent grills you about a plan, it now asks each round of questions as clickable choices with its recommended answer first, so you no longer have to ask it to.
+
 ## 2026-11-08
 
 - The bell's Out of credit alert now also comes up when DeepSeek says Insufficient Balance, OpenRouter says Insufficient credits, or a monthly spend limit is reached, not only when a provider refuses a request with a payment error.
