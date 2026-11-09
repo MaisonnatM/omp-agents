@@ -1,4 +1,4 @@
-/** Settings › Source control: the CLIs the dashboard reads GitHub and Graphite through, automatic pulls, the cleanup after a merge, and merge methods. */
+/** Settings › Source control: the GitHub CLI the dashboard reads GitHub through, automatic pulls, the cleanup after a merge, and merge methods. */
 
 /** GitHub's merge methods, in the order its merge button lists them. */
 export const MERGE_METHODS = ["merge", "squash", "rebase"] as const;
@@ -69,19 +69,15 @@ export interface PullRepo {
 	last: { at: number; outcome: PullOutcome } | null;
 }
 
-export const SOURCE_CONTROL_PROVIDERS = ["github", "graphite"] as const;
-export type SourceControlProvider = (typeof SOURCE_CONTROL_PROVIDERS)[number];
-
-/** Whether a provider's CLI is installed and signed in, and as whom when it says. */
-export interface ProviderStatus {
-	provider: SourceControlProvider;
+/** Whether the GitHub CLI is installed and signed in, and as whom when it says. */
+export interface GithubStatus {
 	state: "missing" | "signed-out" | "signed-in";
 	account: string | null;
 }
 
 /** `GET /api/source-control`. */
 export interface SourceControlAnswer {
-	providers: ProviderStatus[];
+	github: GithubStatus;
 	autoPull: AutoPull;
 	/** Whether a merge ends the idle sessions it leaves with every pull request merged or closed, with their worktrees and branches. */
 	cleanUp: boolean;

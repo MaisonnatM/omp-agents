@@ -3,22 +3,18 @@
 - A session lists the pull requests it submitted or worked on as `#<number>` after its title in the sidebar, and on the pull request button in its header.
   In the sidebar, a session with several shows the first number and `+N` for the rest, for example `#6535 +2`; hover it to read them all, or find each in the row's menu.
   Its subagents' pull requests count as its own.
-  A submission is a `gt submit` line (`<branch>: https://app.graphite.com/github/pr/<owner>/<repo>/<number> (created)` or `(updated)`) or the URL a `gh pr create` call printed, both from bash output, including bash run as a background job.
-  A stack submit lists every PR it created or updated.
-  A `gt submit` or `gt ss` call is a submission too, even when it printed nothing, as with `-q`: of the branch it names with `--branch`, else of the branch checked out where it ran, at the time it ran, in the main checkout too, but not of a `--dry-run`.
-  Where it ran follows the bash call's `cwd`, a `cd` earlier in the same command, and `--cwd`; when it ran picks the branch from that worktree's HEAD reflog, so a later switch leaves the link alone.
+  A submission is the URL a `gh pr create` call printed from bash output, including bash run as a background job.
   Work is one of the session's own tool calls: `gh pr checkout`, `edit`, `comment`, `review`, `merge`, or `ready` with a PR number or URL; a `git push` whose output shows that it updated a PR's head branch; or an omp `pr://` read of a PR that the session's own prompt names in its repository, as `#7049`, `PR 7049`, or `PR#7049`.
   A pull request link in the session's own prompt is work too; a subagent's prompt, its assignment, does not count.
   Work is also the branch the session works on when a PR heads it: the branch checked out in the linked worktree the session works in, its own directory or the worktree its bash calls last ran in, or in a repository's main checkout a branch other than the default one that `origin/HEAD` names; a switch to another branch links that branch's PR at the session's next write.
   A main checkout's default branch links no PR, since every session started there shares it.
   A bare number belongs to the repository that `origin` names in the session's working directory, unless the command passes `-R` or `--repo`.
-  A push, a submit, or a worktree's branch links once the Pull requests page has listed the PR that the branch heads, a `gt submit` line has named it, or GitHub has answered which PR the branch heads, which the dashboard asks when the session names a new PR or finishes a `gt submit`, and else at most once a minute.
-  A submit links only while the directory it ran in exists.
+  A push or a worktree's branch links once the Pull requests page has listed the PR that the branch heads or GitHub has answered which PR the branch heads, which the dashboard asks when the session names a new PR, and else at most once a minute.
   A PR the session only read, quoted, listed with `gh pr list`, or looked up with `gh pr view` does not count, unless its prompt names it or it heads the session's worktree branch.
   A PR that a session submitted counts as submitted, even when it also worked on it.
-- In a session's header, the pull request button opens a popover with one row per pull request: the row opens its details on the Pull requests page, and the GitHub and Graphite icons at its end open it there.
-  When two or more of the session's open pull requests stack on each other, as a ticket's `gt submit` stack does, the button reads **Stack · 3** and the popover draws the stack on a rail, top first, down to the branch it merges into, as a pull request's **Stack** does.
-  The session's other pull requests follow under **Also on this session**, and **Open stack on Graphite** ends the popover.
+- In a session's header, the pull request button opens a popover with one row per pull request: the row opens its details on the Pull requests page, and the GitHub icon at its end opens it there.
+  When two or more of the session's open pull requests stack on each other by base branch, the button reads **Stack · 3** and the popover draws the stack on a rail, top first, down to the branch it merges into, as a pull request's **Stack** does.
+  The session's other pull requests follow under **Also on this session**.
   **Merge stack**, under the rail, merges the whole stack into the bottom one's base, bottom first, after a confirmation with the merge methods the repository allows.
   The dashboard's server merges each one once the one below it merged, retargeting it onto that base, marking a draft ready, and updating its branch as GitHub requires, as a merge that waits until it is ready does; the line under the rail says which one it is on and what it waits on, with **Cancel**.
   It stops at the first one that fails, with the reason, and leaves the ones above it as they are.
@@ -48,7 +44,7 @@
   **Calendar** opens a month of Google events, routine runs, and due todos and tickets; see [Calendar](calendar.md).
   The tabs show their names, and when the sidebar is too narrow for every name, their icons alone, the row only as wide as its tabs; hover an icon for its name.
   The tabs never spill past the sidebar.
-  **Pull requests** opens the Pull requests page, a table of your pull requests like Graphite's inbox, and lists its sections in the sidebar, each with its count; click one to unfold its card on the page and scroll to it.
+  **Pull requests** opens the Pull requests page, a table of your pull requests, and lists its sections in the sidebar, each with its count; click one to unfold its card on the page and scroll to it.
   Once you open a session from the Pull requests page, or a pull request's details as a page, the sidebar lists the pull requests instead, beside the details or the session panes.
   In the board view, the sidebar lists the board's columns instead, each with its count; click one to unfold the column and scroll to it, while a pull request's details stay docked beside the board.
   The tab stays on **Pull requests** while you open sessions from it, until you choose **Sessions**.
@@ -96,7 +92,7 @@
   A **Reply** row or card also shows who started its open threads: a sparkles icon with how many a bot started, such as Cursor Bugbot, CodeRabbit, or Copilot, and a person icon with how many people started.
   Its tooltip says so in words, and adds that it counts only the threads GitHub listed when it listed only the first 100.
   The row's `⋯` menu is always visible in the table; in the sidebar it shows while you hover or focus the row, while a session starts on it, or while a change goes to GitHub.
-  It holds the quick actions that apply, then **Approve** on an open or draft pull request you did not open, **Convert to draft** on an open pull request or **Ready for review** on a draft, the **Reviewers** submenu, and **Close pull request**, then **Open on GitHub** and **Open on Graphite**; a merged pull request offers no state change and no **Reviewers**.
+  It holds the quick actions that apply, then **Approve** on an open or draft pull request you did not open, **Convert to draft** on an open pull request or **Ready for review** on a draft, the **Reviewers** submenu, and **Close pull request**, then **Open on GitHub**; a merged pull request offers no state change and no **Reviewers**.
   **Approve** posts an approval with no summary at once, and the list is read again after GitHub takes it; it is gone while your latest review approves the pull request.
   **Reviewers** lists the repository's people, read from GitHub when it first opens, each with their picture and name as the details' **Reviewers** field shows them, with a check on each one asked for a review; choose one to ask them or withdraw the request.
   Right-click a row or a card, or focus its title and press the context-menu key or Shift+F10, for the same menu.
@@ -124,7 +120,7 @@
   The dashboard reads GitHub through `gh` when it loads and every minute after, on every page, so the **Pull requests** tab's count stays current.
   Reopening the Pull requests page, even after a reload, shows the last pull request list read for the chosen workspace at once; the top of the list says when that list was read, and the app keeps the last one of each workspace.
   The server keeps each repository's answer for 30 seconds, and the refresh button asks GitHub again at once.
-  While fewer than 1000 of your GitHub token's hourly GraphQL points are left, which your agents' `gh` and `gt` share, the list stops asking GitHub and says `Cannot refresh pull requests: GitHub quota low until HH:MM`, keeping the list it has until the quota resets; details you open, and every change you make, still go to GitHub until the quota is spent.
+  While fewer than 1000 of your GitHub token's hourly GraphQL points are left, which your agents' `gh` calls share, the list stops asking GitHub and says `Cannot refresh pull requests: GitHub quota low until HH:MM`, keeping the list it has until the quota resets; details you open, and every change you make, still go to GitHub until the quota is spent.
   A pull request's details open on **Summary**.
   A session's **PRs** sidebar shows the session's first pull request, and its **Summary** and stack menu show another there in its place, without changing the page.
   While the Pull requests page shows a PR, Cmd+Shift+K copies its `#N` and Cmd+Shift+C copies its GitHub link.

@@ -5,6 +5,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-09
 
+- Graphite is gone from the dashboard: Settings › Source control no longer has a Graphite sign-in, and pull requests no longer offer Open on Graphite.
+- Graphite links in conversations now show as ordinary links.
+- Sessions now open and publish pull requests with the GitHub CLI only.
 - You can now save your model setup as a profile, such as Full power or Save credits, under Settings › Models › Model profiles.
 - One click on a saved profile switches your model setup back to it, and new sessions use it.
 - The profile your model setup matches now shows a check.
@@ -193,25 +196,3 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The starter kit now sends agents to the review steps before they mark a pull request ready or merge it, so they stop running into the review check first.
 - A key or password you paste into a session no longer stays in the saved session. Once the agent finishes its turn, the starter kit replaces it with a note saying what kind of secret it was, so save it where it belongs in that same turn.
 - The starter kit now tells agents to write out the full address of any server they start for you, ready to click, instead of only its port number.
-
-## 2026-11-03
-
-- /ship no longer holds back a pull request over an unchecked Browser proof box when the change touches none of the project's interface files. Projects that list their interface files still need the box checked for changes to them, and a worktree reads that list from the main checkout, so you can keep it out of a shared repository.
-- The starter kit tells agents how to sign in the omp browser with saved cookies, and that its page object is Puppeteer, not Playwright.
-- When Rebase on main stops at a conflict, its message now names the first conflicting files. Resolve conflicts and Fix CI and conflicts sessions also get clear steps for each commit that stops, so they no longer retry a step that a project's own setup rejects.
-- Update dashboard now also updates the omp starter kit files you never changed, so new omp sessions get the kit's latest fixes. Files you edited keep your version, and installing the starter kit again works the same way.
-- Sessions started by Fix CI, Fix CI and conflicts, Resolve conflicts, and Address comments now end themselves once the fix is pushed. A session that could not finish stays open and says what is left.
-- The starter kit tells agents to present a plan as a short decision card: what you asked, their answer, and what you decide, then at most three bullets, with a flow diagram when the plan changes a workflow. The card is the whole reply, with no summary or evidence list around it.
-- /ship plans now list the existing code they reuse, and a large change gets a pass that swaps rebuilt pieces for the ones the project already has before the draft PR opens.
-- New session can start a private session: turn on Private, the lock beside the skill toggle, and the session is deleted with everything it wrote when it ends. It never shows in Past sessions or History, and omp memory does not learn from it.
-- Pick Personal in a new session's directory menu for help with your own life, such as meals or plans. Personal sessions share a memory: tell one something about yourself and every later personal session knows it. The session's details show what it remembers.
-- The paid Cursor fallback patch for omp now applies to omp 18.16.0.
-- omp-agents is now tested with omp 18.16.0.
-- Context sources in Analytics recount their tokens from the session files after each omp update, since a new omp may count tokens differently.
-- The Todos card now lists a session's subagents with their status, so you can open or stop one without scrolling back to where it started.
-- Fixed: a session that replied while a background job it started was still running no longer shows as working until the job ends. It shows idle and tells you it replied, and shows working again when the job's result wakes it.
-- You can hide or show the todos card with the checklist toggle in a session's header, between Open PR and End session; it hides the whole card, its files, images, and sources too, as Show todos card in Settings → Preferences now does.
-- The checklist toggle looks pressed while the todos card shows, and appears only while the card has something to show, such as todos, ship steps, subagents, files, images, or sources.
-- Agents can now run git in a throwaway folder they just made with `mktemp`, such as `d=$(mktemp -d); cd $d`, without being told to spell out its path.
-- Fixed: images you send with a skill, such as the first message of a new session with a pinned skill, now stay in the conversation instead of disappearing once the agent starts. Past sessions show them again too.
-- Images you send now show as smaller thumbnails in the conversation, the same size as the agent's screenshots. Click one to open it full size, as with screenshots.

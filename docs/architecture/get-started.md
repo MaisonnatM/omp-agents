@@ -27,7 +27,7 @@ The first-session step appends a suggested prompt to the new-session draft with 
   It reads native marketplace and user/project plugin registries through `src/omp/modules.ts`, takes known setting IDs from the loaded setting registry, and passes that snapshot to the installer's read-only `planStarterKit`.
   It never runs `omp config list`, whose `Settings.init` can migrate or write, nor a plugin command or installation.
   `keep` and `same` count as complete; every pending `create`, `update`, or `remove`, including an outdated file you never edited, a dropped kit file you never edited, settings, marketplace, and plugins, prevents completion.
-- GitHub comes from `GET /api/source-control`, the answer Settings' Source control tab reads, through `sourceControlStore`; Graphite's status in it is ignored.
+- GitHub comes from the `github` field of `GET /api/source-control`, the answer Settings' Source control tab reads, through `sourceControlStore`.
 
 `firstSessionFact` in `web/get-started-model.ts` reads the global socket `hosts`/`past` arrays: any row is positive evidence even before `listed`.
 An empty array is negative only after listing, with a connected socket and no roster error; otherwise it is checking or unavailable.

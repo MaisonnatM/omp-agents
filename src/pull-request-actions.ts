@@ -40,7 +40,7 @@ const ON_BRANCH = "This session runs in a git worktree on the PR's branch, which
  * (pre-commit's, for one) fails `git checkout --ours <file>` with `Unmerged files` after it took that side.
  */
 const CONFLICT_STEPS =
-	"At each stop, list the conflicted files with `git diff --name-only --diff-filter=U`, `read` a file's `:conflicts` before writing `conflict://`, and `git add` each file once it is resolved and formatted. During a rebase `--ours` is the base and `--theirs` is the branch's commit; take a whole side with `git -c core.hooksPath=/dev/null checkout --theirs -- <file>`, since a post-checkout hook can fail the plain command after it took that side. Then continue with `GIT_EDITOR=true gt continue` (or `GIT_EDITOR=true git rebase --continue`) until no commit stops.";
+	"At each stop, list the conflicted files with `git diff --name-only --diff-filter=U`, `read` a file's `:conflicts` before writing `conflict://`, and `git add` each file once it is resolved and formatted. During a rebase `--ours` is the base and `--theirs` is the branch's commit; take a whole side with `git -c core.hooksPath=/dev/null checkout --theirs -- <file>`, since a post-checkout hook can fail the plain command after it took that side. Then continue with `GIT_EDITOR=true git rebase --continue` until no commit stops.";
 /** How a session that repairs the PR's branch ends: by itself once the repair is pushed, open while something waits on the user. */
 const END_WHEN_DONE = "Once that is done, end this session with the `end_session` tool, then give your final reply. If anything is left for the user, such as a failure you could not fix or a push that failed, leave the session open and say what.";
 
@@ -55,7 +55,7 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 		description: "Start a session that rebases the branch, resolves its merge conflicts, then fixes the failing checks",
 		applies: pr => ownOpen(pr) && pr.conflicts && pr.checks === "failing",
 		prompt: pr =>
-			`${pullRequestContext(pr)} It has merge conflicts with its base branch (${baseOf(pr)}) and the checks on its latest commit fail. ${ON_BRANCH} First rebase it onto the latest base (restack with \`gt\` when the repository uses Graphite) and resolve every conflict keeping the intent of both sides. ${CONFLICT_STEPS} Then find the failing checks and read their logs ${checkLogs(pr)}. Fix the root cause of each failure that still applies after the rebase, and rerun a failure that is flaky or unrelated to this pull request instead of changing code, saying so. Run the project's checks, then push the branch with \`--force-with-lease\` (or \`gt submit\`). ${END_WHEN_DONE}`,
+			`${pullRequestContext(pr)} It has merge conflicts with its base branch (${baseOf(pr)}) and the checks on its latest commit fail. ${ON_BRANCH} First rebase it onto the latest base and resolve every conflict keeping the intent of both sides. ${CONFLICT_STEPS} Then find the failing checks and read their logs ${checkLogs(pr)}. Fix the root cause of each failure that still applies after the rebase, and rerun a failure that is flaky or unrelated to this pull request instead of changing code, saying so. Run the project's checks, then push the branch with \`--force-with-lease\`. ${END_WHEN_DONE}`,
 		branch: pr => pr.head,
 	},
 	"fix-ci": {
@@ -71,7 +71,7 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 		description: "Start a session that rebases the branch and resolves its merge conflicts",
 		applies: pr => ownOpen(pr) && pr.conflicts,
 		prompt: pr =>
-			`${pullRequestContext(pr)} It has merge conflicts with its base branch (${baseOf(pr)}). ${ON_BRANCH} Rebase it onto the latest base (restack with \`gt\` when the repository uses Graphite) and resolve every conflict keeping the intent of both sides. ${CONFLICT_STEPS} Run the project's checks, and push the branch with \`--force-with-lease\` (or \`gt submit\`). ${END_WHEN_DONE}`,
+			`${pullRequestContext(pr)} It has merge conflicts with its base branch (${baseOf(pr)}). ${ON_BRANCH} Rebase it onto the latest base and resolve every conflict keeping the intent of both sides. ${CONFLICT_STEPS} Run the project's checks, and push the branch with \`--force-with-lease\`. ${END_WHEN_DONE}`,
 		branch: pr => pr.head,
 	},
 	"address-comments": {

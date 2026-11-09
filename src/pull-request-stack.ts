@@ -1,5 +1,5 @@
 /**
- * The stack a pull request's details show, live from `gh`: as Graphite does, every open pull request of its repository
+ * The stack a pull request's details show, live from `gh`: every open pull request of its repository
  * chained to it by base branches, whoever opened them, not only those the Pull requests page lists.
  */
 import { createCache } from "./cache";

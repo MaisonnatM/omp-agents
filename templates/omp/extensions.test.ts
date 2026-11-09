@@ -188,27 +188,26 @@ function answers(view: object, { checkoutOf = "github.com/me/app", pr = "github.
 describe("ship publication gate", () => {
 	test("a branch without a PR is blocked with draft-first recovery", () => {
 		const { result } = exercise("ship", {
-			command: "gt submit --publish",
+			command: "gh pr ready",
 			response: { code: 1, stdout: "", stderr: 'no pull requests found for branch "feature"' },
 		});
 		expect(result?.block).toBe(true);
-		expect(result?.reason).toContain("gt submit --draft");
 		expect(result?.reason).toContain("gh pr create --draft");
 	});
 
 	test("authentication failure does not recommend creating another PR", () => {
 		const { result } = exercise("ship", {
-			command: "gt submit --publish",
+			command: "gh pr ready",
 			response: { code: 1, stdout: "", stderr: "HTTP 401: Bad credentials" },
 		});
 		expect(result?.block).toBe(true);
 		expect(result?.reason).toContain("HTTP 401: Bad credentials");
-		expect(result?.reason).not.toContain("gt submit --draft");
+		expect(result?.reason).not.toContain("gh pr create --draft");
 	});
 
 	test("an unreviewed PR cannot reach operator approval", () => {
 		const { result, confirmations } = exercise("ship", {
-			command: "gt submit --publish", approve: true, cwd: checkout(),
+			command: "gh pr ready", approve: true, cwd: checkout(),
 			responses: answers(prView("Unreviewed PR", ["README.md"])),
 		});
 		expect(result?.block).toBe(true);
@@ -226,7 +225,7 @@ describe("ship publication gate", () => {
 
 	test.each([false, true])("a reviewed PR requires operator approval (%s)", approve => {
 		const { result, confirmations } = exercise("ship", {
-			command: "gt submit --publish", approve, cwd: checkout(),
+			command: "gh pr ready", approve, cwd: checkout(),
 			responses: answers(prView("- [x] Thermo-nuclear code quality review")),
 		});
 		expect(result?.block ?? false).toBe(!approve);
@@ -293,7 +292,6 @@ describe("ship publication gate", () => {
 		["cd", dir => ({ command: `cd ${dir} && gh pr ready 7` })],
 		["env -C", dir => ({ command: `env -C ${dir} gh pr ready 7` })],
 		["bash -c", dir => ({ command: `bash -c 'cd ${dir} && gh pr ready 7'` })],
-		["gt --cwd", dir => ({ command: `gt --cwd ${dir} submit --publish` })],
 		["the bash call's cwd", dir => ({ command: "gh pr ready 7", bashCwd: dir })],
 	])("a publish run in another repository's checkout through %s reads the PR there", (_, call) => {
 		const session = checkout();
@@ -331,7 +329,7 @@ describe("ship publication gate", () => {
 
 	test("a publish run through `env` is gated", () => {
 		const { result, confirmations } = exercise("ship", {
-			command: "env -u GITHUB_TOKEN gt submit --publish", approve: true, cwd: checkout(),
+			command: "env -u GITHUB_TOKEN gh pr ready", approve: true, cwd: checkout(),
 			responses: answers(prView("Unreviewed PR")),
 		});
 		expect(result?.block).toBe(true);
@@ -345,7 +343,7 @@ describe("ship publication gate", () => {
 
 	test("a rejected GITHUB_TOKEN ahead of a working login is dropped, and the gate reads the PR with that login", () => {
 		const { result, confirmations, executed } = exercise("ship", {
-			command: "gt submit --publish", approve: true, cwd: checkout(),
+			command: "gh pr ready", approve: true, cwd: checkout(),
 			responses: {
 				"pr view": unauthorized,
 				"auth status": authStatus([rejectedToken, keyringLogin]),
@@ -370,7 +368,7 @@ describe("ship publication gate", () => {
 		const token = "ghp_rejectedTokenForTest0000000000000000";
 		writeFileSync(join(project, ".env"), `GITHUB_TOKEN=${fileValue === "the token" ? token : fileValue}\n`);
 		const { result, executed } = exercise("ship", {
-			command: "gt submit --publish", cwd: project,
+			command: "gh pr ready", cwd: project,
 			responses: { "pr view": unauthorized, "auth status": authStatus([rejectedToken]) },
 		}, { GITHUB_TOKEN: token });
 		rmSync(project, { recursive: true, force: true });
@@ -724,13 +722,13 @@ describe("checkout ownership", () => {
 	test("after another process switches the checkout, switches pass and every other change waits", () => {
 		const dir = repo();
 		const blocked = {
-			"git checkout feat": false, "git checkout feat 2>/dev/null": false, "git switch feat": false, "gt co feat": false, "gh pr checkout 7": false,
+			"git checkout feat": false, "git checkout feat 2>/dev/null": false, "git switch feat": false, "gh pr checkout 7": false,
 			"git checkout -b x": true, "git checkout -- file.txt": true, "git checkout .": true, "git checkout feat file.txt": true, "git switch -c x": true,
-			"gt create x": true, "gt m -a": true, "git stash": true, "git stash pop": true, "git reset --hard": true, "git branch -m x": true,
+			"git stash": true, "git stash pop": true, "git reset --hard": true, "git branch -m x": true,
 			"git -c core.pager=cat commit": true, "git switch feat; git commit": true,
 			"env GIT_EDITOR=true git rebase --continue": true, "env -u GIT_DIR git commit": true, "nohup env -i git commit": true,
 			"command git commit": true, 'bash -c "git commit -qam x"': true, "sh -c 'git checkout feat'": false,
-			"git status": false, "git stash list": false, "git branch x": false, "git worktree list": false, "gt log": false, "gt submit": false,
+			"git status": false, "git stash list": false, "git branch x": false, "git worktree list": false,
 			"gh pr view": false, "echo git commit": false, "git constructor": false, "bash -lc 'git status'": false,
 		};
 		const commands = Object.keys(blocked);
@@ -773,7 +771,7 @@ describe("checkout ownership", () => {
 		expect(existsSync(claimFile(dir))).toBe(kept);
 	});
 
-	test("a command changes the checkout its cd, -C, or --cwd names, one named through a variable waits, and one in a fresh mktemp directory passes", () => {
+	test("a command changes the checkout its cd or -C names, one named through a variable waits, and one in a fresh mktemp directory passes", () => {
 		const dir = repo();
 		writeFileSync(join(dir, "file.txt"), "theirs\n");
 		claimByAnother(dir);
@@ -782,8 +780,6 @@ describe("checkout ownership", () => {
 			[`cd ${name} && git commit -qam x`]: "held",
 			[`git -C ${name} commit -qam x`]: "held",
 			[`git -C ${dir}/.. -C ${name} stash`]: "held",
-			[`gt --cwd ${dir} modify -a`]: "held",
-			[`gt --cwd=${dir} modify -a`]: "held",
 			[`cd ${name}; cd ..; git commit -qam x`]: null,
 			[`cd -P ${name} && git commit -qam x`]: "held",
 			[`bash -c "cd ${name} && git commit -qam x"`]: "held",

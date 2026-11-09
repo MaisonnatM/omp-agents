@@ -32,7 +32,7 @@ When another live session has uncommitted work in that checkout, make a worktree
 Read-only subagents, such as a scout or the thermonuclear reviewer, run without `isolated`; competing attempts at the same change, such as several runners given one task to compare, always use it.
 Isolation fails when the session's cwd is not a Git repository: create a worktree for the subagent instead and name its path in the task.
 Read-only investigation needs no worktree; a request to work in place on `main` still needs a branch, which `git switch -c <branch>` in the main checkout gives.
-Before opening or adopting a PR, auditing Graphite registration, branching in a Graphite repository, or rebasing or restacking a branch, read `~/.omp/agent/docs/git-workflow.md`.
+Before opening or adopting a PR, or rebasing a branch, read `~/.omp/agent/docs/git-workflow.md`.
 
 In a repository that commits `.omp/land.json`, "merge on main" means calling the `land` tool from the branch's checkout once its work is committed; it merges into a fresh copy of `origin/main`, runs the file's checks on the merged result, and pushes, and merging or pushing into `main` yourself is blocked there.
 In any other repository, after merging or committing into local `main`, immediately run `git push origin main` and confirm `git status -sb` has no ahead count.

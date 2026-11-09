@@ -31,7 +31,7 @@ end, best first.
     omp-agents: "Merge on main, then end the session"; "Merge on main" next.
   - Merged or pushed, nothing left: "End the session".
   - A repository that ships through pull requests: the PR step itself, such as
-    "Commit and update the draft PR" or "Push it with gt submit".
+    "Commit and update the draft PR" or "Mark the PR ready for review".
   - A UI change the user has not approved yet: the likeliest design follow-up,
     with merging second; the user usually answers a merge offer here with
     another tweak.

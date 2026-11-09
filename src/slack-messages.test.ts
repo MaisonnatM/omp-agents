@@ -55,7 +55,7 @@ describe("waitingOnYou", () => {
 			dms: [
 				message({ message_ts: "300.0", content: "are you there?", permalink: "https://acme.slack.com/p300" }),
 				message({ message_ts: "290.0", content: "ping" }),
-				message({ message_ts: "280.0", author_name: "Graphite", author_user_id: "U0BOT", is_author_bot: true, content: "" }),
+				message({ message_ts: "280.0", author_name: "Deploy Bot", author_user_id: "U0BOT", is_author_bot: true, content: "" }),
 				message({ message_ts: "270.0", author_name: "Max", author_user_id: ME, content: "on it" }),
 				message({ message_ts: "260.0", content: "can you look?" }),
 				message({ channel_id: "D0BO", message_ts: "250.0", author_name: "Max", author_user_id: ME, content: "done" }),

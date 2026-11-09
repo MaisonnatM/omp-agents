@@ -98,8 +98,8 @@
   omp's own `/` commands, such as `/model` or `/rename`, show no dimmed prompt; a `/skill:` prompt does.
 - User and assistant messages render GitHub-flavored Markdown, including tables, task lists, fenced code, and links.
   Images in agent text show as links rather than loading remote images; only inline `data:` images show in place.
-  Linear, GitHub, Graphite, and Slack links show only their title and service icon, in conversations and rendered GitHub or Linear text.
-  Bare GitHub and Graphite pull request URLs resolve to the PR's actual title through your signed-in GitHub CLI.
+  Linear, GitHub, and Slack links show only their title and service icon, in conversations and rendered GitHub or Linear text.
+  Bare GitHub pull request URLs resolve to the PR's actual title through your signed-in GitHub CLI.
   Explicit Markdown labels and link titles stay as written.
   While a PR title loads, or if GitHub cannot read it, its repository and number stay visible; other bare service links use an issue identifier or **Slack message**.
   The link still opens its original address in your default browser.
@@ -140,7 +140,7 @@
 - On the right of a session's header, the ticket button names the first Linear issue the session worked on, such as `ENG-2508`, with `+N` for the others.
   Its menu opens each one on Linear, once your assigned issues have loaded and so name your Linear workspace, or in its details on the tickets page; the button shows only for a session with a Linear issue.
 - Next to it, the pull request button names the first pull request the session submitted or worked on, such as `#6595`, with `+N` for the others.
-  Its menu opens each one on GitHub, on Graphite, or in its details on the Pull requests page; the button shows only for a session with a pull request.
+  Its menu opens each one on GitHub or in its details on the Pull requests page; the button shows only for a session with a pull request.
   Past sessions show both before **Resume**.
 - Next, before **End session**, a running session that the dashboard can prompt shows **Open PR** while it works on a branch other than its repository's default branch and GitHub names no pull request from that branch.
   The default branch is the one `origin/HEAD` names, so a repository whose clone never recorded it shows no **Open PR** until `git remote set-head origin --auto` records it, which a session there notices at its next write.

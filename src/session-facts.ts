@@ -1,13 +1,11 @@
 /**
  * The pull requests each session submitted or worked on, read from its own tool calls and its subagents'.
- * A submission is a per-branch line `gt submit` prints, the URL a `gh pr create` call prints, or the branch a
- * `gt submit` call submitted, which links even when the call printed nothing (`-q`). Work is a
+ * A submission is the URL a `gh pr create` call prints. Work is a
  * `gh pr checkout|edit|comment|review|merge|ready` call that names a PR, a `git push` that updated a PR's head
  * branch, a PR link in the session's own prompt, an omp `pr://` read of a PR its own prompt names (`#7049`, `PR 7049`)
  * in its repository, or the branch the session works on, when a PR heads it: the one checked out in its linked
  * worktree, or in a main checkout one other than the default branch. A PR a session only read, quoted, listed, or
  * was handed is not linked to it; nor is the main checkout's default branch, which every session started there shares.
- * The branch a `gt submit` line names heads the PR it prints, before the pull request list names it.
  *
  * The same scan collects the Linear issues a session worked on: the ones omp's Linear MCP tools changed or opened
  * (`save_issue`) or commented on (`save_comment`), the issue a /ship run records, and the one a Linear link in the
@@ -39,18 +37,12 @@ import { messageItemsOf } from "./transcript";
 import { WorkspacePlacement } from "./workspace-placement";
 import { changedPaths } from "./work";
 
-/** `me/fe-trust-7: https://app.graphite.com/github/pr/acme/webapp/6596 (created)`: the branch, then its PR. */
-const GT_SUBMITTED = /^(\S+): https:\/\/app\.graphite\.com\/github\/pr\/([\w.-]+)\/([\w.-]+)\/(\d+)\S* \((?:created|updated)\)[ \t\r]*$/gm;
 /** The line `gh pr create` ends with. */
 const GH_CREATED = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)[ \t\r]*$/gm;
 const GH_PR_CREATE = /\bgh\s+pr\s+create\b/;
 /** A `gh pr` call that acts on one PR, with its arguments up to the end of that shell command; not one quoted in another command. */
 const GH_PR_ACTION = /(?:^|[;&|(\n])\s*gh\s+pr\s+(?:checkout|co|edit|comment|review|merge|ready)\b([^\n;&|)]*)/g;
 const GIT_PUSH = /\bgit\s+(?:-C\s+\S+\s+)?push\b/;
-/** A `gt submit` call, or `gt ss`, with its arguments up to the end of that shell command. */
-const GT_SUBMIT = /(?:^|[;&|(\n])\s*gt\s+(?:submit|ss)\b([^\n;&|)]*)/g;
-/** A `cd` in a shell command, which moves where the commands after it run. */
-const CD = /(?:^|[;&|(\n])\s*cd\s+([^\s;&|)]+)/g;
 const OWNER_REPO = /^([\w.-]+)\/([\w.-]+)$/;
 /** omp's `pr://<n>` or `pr://<owner>/<repo>/<n>`, with or without `/diff/…` or `?comments=1` after it. */
 const PR_URI = /^pr:\/\/(?:([\w.-]+)\/([\w.-]+)\/)?(\d+)(?:[/?#]|$)/;
@@ -69,7 +61,7 @@ const PUSH_REMOTE = /^To (\S+)\s*$/;
 /** `   1a2b..3c4d  HEAD -> me/b`, ` * [new branch]  me/b -> me/b`, or ` + 1a2b...3c4d … (forced update)`; rejected and deleted refs do not match. */
 const PUSHED_REF = /^\s*[+*]?\s*(?:\[new branch\]|[0-9a-f]{4,}\.\.\.?[0-9a-f]{4,})\s+\S+\s+->\s+(\S+)/;
 /** Lines that can matter hold one of these; skipping the rest before `JSON.parse` is most of the startup scan. */
-const MARKERS = ["github", "gh pr", "push", "gt submit", "gt ss", "pr://", "omp-ship.state", "omp-agents.headless", "mcp__linear_", '"cwd"', '"toolName":"edit"', '"toolName":"write"', "cd ", "-C "];
+const MARKERS = ["github", "gh pr", "push", "pr://", "omp-ship.state", "omp-agents.headless", "mcp__linear_", '"cwd"', '"toolName":"edit"', '"toolName":"write"', "cd ", "-C "];
 /**
  * Where `located` starts a bash call that names no absolute `cwd`, so a relative `cd` keeps its path relative to the
  * session's directory, which the scan does not know: no real directory starts with a NUL.
@@ -90,24 +82,13 @@ const isShipWork = oneOf(SHIP_WORK);
 
 /**
  * One pull request a transcript links to. `number` is a PR in the session's own repository, the one `origin`
- * names in its working directory. `branch` is a branch a push updated or a submit submitted; it links to the PR whose head it is.
+ * names in its working directory. `branch` is a branch a push updated; it links to the PR whose head it is.
  * `named` marks a PR the session's own prompt links or names, as opposed to one a call worked on.
  */
 export type PullRequestRef =
 	| ({ kind: "pr"; link: PullRequestLink; named?: true } & PullRequest)
 	| { kind: "number"; number: number; named?: true }
 	| ({ kind: "branch"; branch: string; link: PullRequestLink } & Repo);
-
-/**
- * A `gt submit` call: the branch it names with `--branch`, else the one checked out at `at`, in ms, in the directory
- * `dirs` lead to from the session's, each relative to the one before. The index resolves it into a `branch` ref.
- */
-interface SubmitRef {
-	kind: "submit";
-	dirs: string[];
-	branch: string | null;
-	at: number;
-}
 
 /** An omp `pr://` read of a PR in `repository`, or in the session's own when it names none; it links only a PR the session's own prompt names. */
 interface ReadRef {
@@ -116,7 +97,7 @@ interface ReadRef {
 	number: number;
 }
 
-type FoundRef = PullRequestRef | SubmitRef | ReadRef;
+type FoundRef = PullRequestRef | ReadRef;
 
 /**
  * What names a Linear issue in a transcript: work on it, a `save_issue`, a `save_comment`, a /ship run's issue, or a Linear link
@@ -124,38 +105,19 @@ type FoundRef = PullRequestRef | SubmitRef | ReadRef;
  */
 export type TicketEvidence = "worked" | "read" | "named";
 
-/** What a bash call's output can prove: the URL `gh pr create` prints, the branches `git push` updated, and a `gt submit` that finished. */
+/** What a bash call's output can prove: the URL `gh pr create` prints, and the branches `git push` updated. */
 interface Expected {
 	created: boolean;
 	pushed: boolean;
-	submitted: boolean;
 }
 
 function refKey(ref: FoundRef): string {
 	if (ref.kind === "pr") return prKey(ref);
-	if (ref.kind === "submit") return `submit:${ref.at}:${ref.dirs.join("\0")}:${ref.branch ?? ""}`;
 	if (ref.kind === "read") return `read:${ref.repository ? repoKey(ref.repository) : ""}#${ref.number}`;
 	return ref.kind === "number" ? `#${ref.number}` : headKey(ref, ref.branch);
 }
 
 const unquoted = (token: string): string => token.replace(/^["']|["']$/g, "");
-
-/** The `gt submit` calls in a bash `command` run in `cwd` at `at`, other than a `--dry-run`. */
-function* submits(command: string, cwd: string | null, at: number): Generator<SubmitRef> {
-	for (const match of command.matchAll(GT_SUBMIT)) {
-		const tokens = match[1]!.trim().split(/\s+/).map(unquoted);
-		if (tokens.includes("--dry-run")) continue;
-		const option = (name: string): string | null => {
-			const i = tokens.indexOf(name);
-			if (i >= 0) return tokens[i + 1] ?? null;
-			return tokens.find(token => token.startsWith(`${name}=`))?.slice(name.length + 1) ?? null;
-		};
-		const cd = [...command.slice(0, match.index).matchAll(CD)].at(-1)?.[1];
-		const dirs = [cwd, cd === undefined ? null : unquoted(cd), option("--cwd")].filter((dir): dir is string => Boolean(dir));
-		yield { kind: "submit", dirs, branch: option("--branch"), at };
-	}
-}
-
 /** The PR a `gh pr` action names by number or URL, in its `-R`/`--repo` repository or else the session's. */
 function actedOn(args: string): PullRequestRef | null {
 	const tokens = args.trim().split(/\s+/).map(unquoted);
@@ -227,10 +189,6 @@ export class SessionFactsScan {
 	readonly tickets = new Map<string, Set<TicketEvidence>>();
 	/** The PR numbers the session's own prompts name, `#7049` or `PR 7049`. */
 	readonly named = new Set<number>();
-	/** The PR each branch heads, by `owner/repo:branch`, as a `gt submit` line printed it since the index last took them. */
-	readonly heads = new Map<string, PullRequest>();
-	/** How many `gt submit` calls finished: a quiet one prints no PR, yet its branch may head a new one. */
-	submitsFinished = 0;
 	ship: ShipProgress | null = null;
 	/** omp ran the session as `omp -p` or `--mode json`, as the `headless-mark` extension records. */
 	headless = false;
@@ -257,7 +215,7 @@ export class SessionFactsScan {
 
 	applyLine(line: string): void {
 		const backgrounding = this.#pending.size > 0 && line.includes('"jobId"');
-		// A call's result can matter even when it printed nothing: a `save_issue` names the issue it opened, and a quiet `gt submit` finished.
+		// A call's result can matter even when it holds none of the markers: a `save_issue` names the issue it opened.
 		const answering = (this.#pending.size > 0 || this.#opening.size > 0) && line.includes('"toolResult"');
 		if (!backgrounding && !answering && !MARKERS.some(marker => line.includes(marker)) && !line.includes('"role":"user"') && !line.includes("skill-prompt")) return;
 		let entry: unknown;
@@ -286,11 +244,11 @@ export class SessionFactsScan {
 			return;
 		}
 		if (entry.type === "custom_message" && entry.customType === "async-result" && typeof entry.content === "string") {
-			// One notice carries the output of every job it delivers; only a bash job's is what `gt`, `gh`, or `git` printed.
+			// One notice carries the output of every job it delivers; only a bash job's is what `gh` or `git` printed.
 			const jobs = isObject(entry.details) && Array.isArray(entry.details.jobs) ? entry.details.jobs : [];
 			if (jobs.length === 0 || !jobs.every(job => isObject(job) && job.type === "bash")) return;
 			const expected = jobs.map(job => this.#take(String(job.jobId)));
-			this.#finished(entry.content, { created: expected.some(e => e?.created), pushed: expected.some(e => e?.pushed), submitted: expected.some(e => e?.submitted) });
+			this.#output(entry.content, { created: expected.some(e => e?.created), pushed: expected.some(e => e?.pushed) });
 			return;
 		}
 		if (this.#prompts && (entry.type === "message" ? isObject(entry.message) && entry.message.role === "user" : entry.type === "custom_message" && entry.customType === "skill-prompt")) {
@@ -310,7 +268,7 @@ export class SessionFactsScan {
 		for (const call of toolCallsOf(entry.message)) {
 			const cwd = call.name === "bash" && typeof call.args.cwd === "string" && call.args.cwd ? call.args.cwd : null;
 			if (call.name === "bash" && typeof call.args.command === "string") {
-				this.#command(call.id, call.args.command, cwd, Date.parse(String(entry.timestamp)));
+				this.#command(call.id, call.args.command);
 				const from = cwd === null ? null : within(SESSION_DIR, cwd);
 				for (const { dir } of located(call.args.command, from ?? SESSION_DIR)) {
 					if (dir !== null && dir !== SESSION_DIR) this.#movedTo(dir.startsWith(`${SESSION_DIR}/`) ? dir.slice(SESSION_DIR.length + 1) : dir);
@@ -340,14 +298,12 @@ export class SessionFactsScan {
 			const expected = callId === undefined ? undefined : this.#take(callId);
 			const job = isObject(details.async) ? details.async.jobId : undefined;
 			// A call omp moved to the background finishes once its job does.
-			if (expected && typeof job === "string") {
-				this.#pending.set(job, expected);
-				this.#output(textOf(result.content), expected);
-			} else this.#finished(textOf(result.content), expected);
+			if (expected && typeof job === "string") this.#pending.set(job, expected);
+			this.#output(textOf(result.content), expected);
 		} else if (result.toolName === "wait" && Array.isArray(details.jobs)) {
 			for (const job of details.jobs) {
 				if (!isObject(job) || job.type !== "bash" || typeof job.resultText !== "string") continue;
-				this.#finished(job.resultText, this.#take(String(job.id)));
+				this.#output(job.resultText, this.#take(String(job.id)));
 			}
 		}
 	}
@@ -369,16 +325,13 @@ export class SessionFactsScan {
 		return expected;
 	}
 
-	/** `cwd`: the bash call's own, raw. `at`: when it ran, `NaN` when the entry has no time, which leaves its `gt submit` out. */
-	#command(id: string, command: string, cwd: string | null, at: number): void {
+	#command(id: string, command: string): void {
 		for (const [, args] of command.matchAll(GH_PR_ACTION)) {
 			const ref = actedOn(args!);
 			if (ref) this.#add(ref);
 		}
-		const submitting = [...submits(command, cwd, at)];
-		if (!Number.isNaN(at)) for (const ref of submitting) this.#add(ref);
-		const expected = { created: GH_PR_CREATE.test(command), pushed: GIT_PUSH.test(command), submitted: submitting.length > 0 };
-		if (expected.created || expected.pushed || expected.submitted) this.#pending.set(id, expected);
+		const expected = { created: GH_PR_CREATE.test(command), pushed: GIT_PUSH.test(command) };
+		if (expected.created || expected.pushed) this.#pending.set(id, expected);
 	}
 
 	#read(path: string): void {
@@ -422,19 +375,8 @@ export class SessionFactsScan {
 		else this.tickets.set(id, new Set([evidence]));
 	}
 
-	/** What a bash command that finished printed: a `gt submit` among them counts. */
-	#finished(text: string, expected: Expected | undefined): void {
-		if (expected?.submitted) this.submitsFinished++;
-		this.#output(text, expected);
-	}
-
 	/** What a bash command printed, and what its command said the output can prove. */
 	#output(text: string, expected: Expected | undefined): void {
-		for (const [, branch, owner, repo, number] of text.matchAll(GT_SUBMITTED)) {
-			const pr = { owner: owner!, repo: repo!, number: Number(number) };
-			this.#add({ kind: "pr", link: "submitted", ...pr });
-			this.heads.set(headKey(pr, branch!), pr);
-		}
 		if (expected?.created) for (const [, owner, repo, number] of text.matchAll(GH_CREATED)) this.#add({ kind: "pr", link: "submitted", owner: owner!, repo: repo!, number: Number(number) });
 		if (expected?.pushed) for (const ref of pushedBranches(text)) this.#add(ref);
 	}
@@ -511,8 +453,6 @@ interface SessionScan {
 	subagents: Map<string, FoldedFile<TranscriptFold>>;
 	/** Every transcript's refs, in transcript order. */
 	refs: FoundRef[];
-	/** The branch each of `refs`' `gt submit` calls submitted, by its `refKey`, once found. */
-	submitted: Map<string, PullRequestRef>;
 	/** The repository `origin` names in `cwd`, looked up once a bare PR number or `branch` needs it; `null` until found. */
 	repo: Repo | null;
 	/** The PR numbers the session's own prompts name, which link a `pr://` read of one. */
@@ -522,8 +462,6 @@ interface SessionScan {
 	evidence: Map<string, Set<TicketEvidence>>;
 	/** The Linear issues of `evidence` that link to the session, with its branch's. */
 	tickets: string[];
-	/** How many `gt submit` calls its transcripts finished. */
-	submitsFinished: number;
 	/** The `cwd` arguments of the session's own bash calls and the directories of the files its `edit` and `write` calls changed, absolute, the most recently used first. */
 	workDirs: string[];
 	/** The linked worktree it works in, when that is not the checkout `cwd` is in. */
@@ -592,19 +530,6 @@ function linkingBranch(branch: GitBranch | null, defaultBranch: string | null): 
 	return branch && (branch.linked || (defaultBranch !== null && branch.name !== defaultBranch)) ? branch.name : null;
 }
 
-/** The branch a `gt submit` from session directory `cwd` submitted, in the repository `origin` names where it ran; `null` once that directory is gone. */
-async function submittedBranch(
-	ref: SubmitRef,
-	cwd: string,
-	repoOf: (dir: string) => Promise<Repo | null>,
-	historyOf: (dir: string) => Promise<HeadHistory | null>,
-): Promise<PullRequestRef | null> {
-	const dir = ref.dirs.reduce(absolute, cwd);
-	if (!(await exists(dir))) return null;
-	const [repo, branch] = await Promise.all([repoOf(dir), ref.branch ?? historyOf(dir).then(history => history && branchAt(history, ref.at))]);
-	return repo && branch ? { kind: "branch", ...repo, branch, link: "submitted" } : null;
-}
-
 /**
  * The linked worktree of `cwd`'s repository, other than the one `cwd` is in, that the most recent of `workDirs` in
  * one is in. Directories in `cwd`'s own checkout, outside git, or in another repository are passed over; a directory
@@ -641,7 +566,7 @@ export class SessionFactsIndex {
 	/** The PRs the pull request list holds, by `owner/repo:branch` of their head. */
 	readonly #heads = new Map<string, PullRequest>();
 	/**
-	 * What GitHub answered, or a `gt submit` printed, for a branch the list did not name yet, by the same key: search indexes a new PR
+	 * What GitHub answered for a branch the list did not name yet, by the same key: search indexes a new PR
 	 * some seconds late, and the list may not load at all once GitHub's GraphQL budget runs out, so it outlives list reads until one names the branch.
 	 * It is provisional: GitHub is asked again about its branch, and its answer replaces it, or removes it when the branch heads no open or merged PR.
 	 */
@@ -787,10 +712,6 @@ export class SessionFactsIndex {
 		const ticketsChanged = tickets.length !== session.tickets.length || tickets.some((id, i) => id !== session.tickets[i]);
 		if (ticketsChanged) session.tickets = tickets;
 		const refs = session.refs.flatMap((ref): PullRequestRef[] => {
-			if (ref.kind === "submit") {
-				const submitted = session.submitted.get(refKey(ref));
-				return submitted ? [submitted] : [];
-			}
 			if (ref.kind !== "read") return [ref];
 			if (!session.named.has(ref.number)) return [];
 			if (!ref.repository) return [{ kind: "number", number: ref.number, named: true }];
@@ -803,8 +724,8 @@ export class SessionFactsIndex {
 		return branchChanged || ticketsChanged || !same;
 	}
 
-	/** Collect every transcript's refs, Linear issues, and finished `gt submit` calls into the session; returns whether one of those finished since. */
-	#gather(session: SessionScan, own: SessionFactsScan): boolean {
+	/** Collect every transcript's refs and Linear issues into the session. */
+	#gather(session: SessionScan, own: SessionFactsScan): void {
 		const scans = transcriptsOf(session).map(transcript => transcript.fold.scan);
 		session.refs = scans.flatMap(scan => [...scan.found.values()]);
 		session.named = own.named;
@@ -816,10 +737,6 @@ export class SessionFactsIndex {
 				else session.evidence.set(id, new Set(evidence));
 			}
 		}
-		const finished = scans.reduce((sum, scan) => sum + scan.submitsFinished, 0);
-		const submitted = finished > session.submitsFinished;
-		session.submitsFinished = finished;
-		return submitted;
 	}
 
 	async #refresh(sessions: readonly ListedSession[]): Promise<boolean> {
@@ -878,32 +795,11 @@ export class SessionFactsIndex {
 		await mapLimit(unknownRepo, SCAN_PARALLEL, async session => {
 			session.repo = await repoOf(session.cwd);
 		});
-		// A submit's branch stays what it was at its time, so each is looked up once: one `git` call for its repository and two for its HEAD reflog per directory.
-		const submits = touched.flatMap(session => session.refs.flatMap(ref => (ref.kind === "submit" && !session.submitted.has(refKey(ref)) ? [{ session, ref }] : [])));
-		await mapLimit(submits, SCAN_PARALLEL, async ({ session, ref }) => {
-			const submitted = await submittedBranch(ref, session.cwd, repoOf, historyOf);
-			if (submitted) session.submitted.set(refKey(ref), submitted);
-		});
-		// The branch a `gt submit` line named heads the PR it printed until the list or GitHub names another; each line counts once, so a later answer stays.
-		let printed = false;
-		for (const session of touched) {
-			for (const transcript of transcriptsOf(session)) {
-				const { heads } = transcript.fold.scan;
-				for (const [key, pr] of heads) {
-					if (this.#heads.has(key) && !this.#answered.has(key)) continue;
-					this.#heads.set(key, pr);
-					this.#answered.set(key, pr);
-					printed = true;
-				}
-				heads.clear();
-			}
-		}
 		const before = new Map([...resolving].map(session => [session, session.pullRequests]));
 		for (const session of resolving) if (this.#resolve(session, gitOf(session))) changed = true;
 		// The pull request list names a new PR only at the page's next read, up to a minute later, once GitHub's search has indexed it, and not at all
-		// once GitHub's GraphQL budget runs out. A branch the list names no PR for is asked about at once when its session named a new PR or finished a
-		// `gt submit`, which may have opened one without printing it, and else at most once a minute, as a printed PR may have closed since; one ask per branch.
-		const submitted = new Set(scans.filter(scan => scan.submitted).map(scan => scan.session));
+		// once GitHub's GraphQL budget runs out. A branch the list names no PR for is asked about at once when its session named a new PR,
+		// and else at most once a minute, as an answered PR may have closed since; one ask per branch.
 		const now = Date.now();
 		const unlisted = new Map<string, { repo: Repo; branch: string }>();
 		for (const session of resolving) {
@@ -912,7 +808,7 @@ export class SessionFactsIndex {
 			const key = headKey(session.repo, linking);
 			if (session.branch?.pullRequest !== null && !this.#answered.has(key)) continue;
 			const known = new Set(before.get(session)!.map(prKey));
-			const named = submitted.has(session) || session.pullRequests.some(pr => !known.has(prKey(pr)));
+			const named = session.pullRequests.some(pr => !known.has(prKey(pr)));
 			if (named || now - (this.#asked.get(key) ?? Number.NEGATIVE_INFINITY) >= ASK_AGAIN_MS) unlisted.set(key, { repo: session.repo, branch: linking });
 		}
 		for (const key of unlisted.keys()) this.#asked.set(key, now);
@@ -931,21 +827,21 @@ export class SessionFactsIndex {
 			}
 			answered = true;
 		});
-		if (printed || answered) for (const session of this.#sessions.values()) if (this.#resolve(session)) changed = true;
+		if (answered) for (const session of this.#sessions.values()) if (this.#resolve(session)) changed = true;
 		return changed;
 	}
 
 	/**
-	 * Read what session `path` and its subagents appended: whether its /ship stage changed, whether a `gt submit` finished, whether
+	 * Read what session `path` and its subagents appended: whether its /ship stage changed, whether
 	 * its worktree needs asking again, and `writtenAt`, its listed last write, in ms.
 	 * `changedPathsOf` reads the session's own file between refreshes, so each of these compares the scan with what the session
 	 * last reported, kept on its `SessionScan`, never with the scan as it was before this read: a change that read folded first still reports here.
 	 */
-	async #scan({ path, cwd, modifiedAt }: ListedSession): Promise<{ session: SessionScan; changed: boolean; submitted: boolean; moved: boolean; writtenAt: number }> {
+	async #scan({ path, cwd, modifiedAt }: ListedSession): Promise<{ session: SessionScan; changed: boolean; moved: boolean; writtenAt: number }> {
 		let session = this.#sessions.get(path);
 		session ??= {
 			modifiedAt: Number.NaN, cwd, own: new FoldedFile(path, () => new TranscriptFold(new SessionFactsScan(true), this.#ownFileFolds.map(folds => folds.start(path)))), subagents: new Map(),
-			refs: [], submitted: new Map(), repo: null, named: new Set(), pullRequests: [], evidence: new Map(), tickets: [], submitsFinished: 0, workDirs: [], worktree: null, branch: null,
+			refs: [], repo: null, named: new Set(), pullRequests: [], evidence: new Map(), tickets: [], workDirs: [], worktree: null, branch: null,
 			ship: null, headless: false,
 		};
 		this.#sessions.set(path, session);
@@ -964,6 +860,7 @@ export class SessionFactsIndex {
 		const same = workDirs.length === dirsBefore.length && workDirs.every((dir, i) => dir === dirsBefore[i]);
 		const moved = !same || (session.worktree !== null && !(await exists(session.worktree)));
 		session.workDirs = workDirs;
-		return { session, changed, submitted: this.#gather(session, own), moved, writtenAt: modifiedAt };
+		this.#gather(session, own);
+		return { session, changed, moved, writtenAt: modifiedAt };
 	}
 }
