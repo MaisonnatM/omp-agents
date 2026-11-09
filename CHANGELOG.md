@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-09
 
+- A Bot's details have a **Restart conversation** button: after you confirm, its session ends and is archived, and its next message starts a fresh conversation. Its job, memory, and routines stay.
 - A routine that runs a command can now post its output to its Bot only when the command fails: check **Post the output to … only when it fails** in the routine's form. A run that succeeds keeps its output in the routine's history without waking the Bot.
 - On a phone, the header holds one menu named after the page you are on, listing every tab, Personal and Work, and Settings, beside search and the bell.
 - On a phone, the sidebars stay closed until you open them, and the page uses the full width of the screen.
@@ -181,44 +182,3 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Settings › Providers can add or replace an Anthropic API key in a masked field, so you do not paste it into a conversation.
 - Saving that key keeps your subscription sign-ins.
 - Fallback routing stays as it is.
-
-## 2026-11-04
-
-- Behind the scenes: `/ship` plans now open with how the code works today and end with what is out of scope, and the chosen plan goes to a fresh critic on a different model, which has not seen the conversation and must back each finding with evidence, before any code is written.
-- Picking a project for a new session from the keyboard now puts the cursor back in the message box, so you can type right away.
-- Fixed: ending a session whose folder holds many installed packages no longer leaves a half-deleted folder behind, which made Resolve conflicts and other starts on that branch fail with "already exists".
-- Behind the scenes: agents checking the dashboard page now use Chrome DevTools' tools, which also show page errors, failed requests, and load times.
-- Settings › Storage can now prune the uv, pnpm, and bun package caches. Packages no project needs are deleted and download again when a project installs them, while the files running tools such as MCP servers use are kept.
-- Behind the scenes: agents now run the interface review alongside the thermonuclear one when a pull request changes UI files, attach PR screenshots without the body edit the guard refuses, and open the test browser with the right call shape.
-- A Bot can now end a run quietly when it found nothing for you, so a routine run with nothing new no longer notifies you or marks the Bot unread. The PR shepherd's starting job asks for this; add "When a run finds nothing for me, call stay_quiet." to an existing Bot's job.
-- Deleting worktrees in Settings › Worktrees now works like Rebase behind on Pull requests: click Delete, Delete N worktrees, or Remove N merged twice instead of going through a dialog, and they are removed one at a time in the background while one toast counts them, even after you leave the page. Each row says Queued, then Removing, and leaves the list once it is gone.
-- Behind the scenes: the design reviewer agent now checks that a page's title and header buttons stay visible at every width with the sidebars open.
-- The Todos card is now one line above the messages, such as Live review · step 8 of 9 · 7 Files · 1 Image · 1 Source, or the task the agent is on when there is no /ship. Click it to open the whole card over the messages, and click outside or press Escape to close it. The messages keep their full width, and the counts drop off as the pane narrows.
-- Closing a file's changes or an image you opened puts the focus back on the row or thumbnail you opened it from, instead of the top of the page.
-- Bots can now message each other: one Bot hands work to another, which wakes up, does it, and can answer back. The message shows as a card with the sender's face in the other Bot's conversation, and as Messaged and the other Bot's name in the sender's. One Bot can send another at most 20 messages an hour, so two Bots cannot keep answering each other forever.
-- A new personal session no longer shows Your assistant under the composer, with what it remembers and your recent personal sessions. Its memory stays in a personal session's Memory tab, and past personal sessions stay in Past sessions.
-- The starter kit sends every interface change through a design workflow: agents look at your app's own screens and at reference designs before the first edit, offer five structurally different options for a redesign, and have a separate reviewer screenshot and measure the result before you see it.
-- Replay from here and Compare replay are gone from the trajectory and the pane header.
-- Behind the scenes: the starter kit no longer includes the request log, which saved every request sent to a model so a turn could be replayed.
-- Ask about this is gone. Selecting text in a conversation, a past session, or a pull request's code no longer offers a side discussion.
-- Bots no longer offer the Router type or its Tasks tab. A Router you saved before this update no longer shows, and your other Bots load as before.
-- Settings › Files now lists your omp files as folders, the way they sit on disk, so skills from different places no longer look alike and big folders such as commands and skills stay closed until you open them. Each skill shows the start of its description under its name. omp memory's stored files use the same folders.
-- Settings › Files now shows Markdown files such as skills and AGENTS.md formatted, with their name, description, and other header values listed on top; Source shows the raw text. Config files show with line numbers and colors, and long lines wrap instead of running off the edge.
-- The starter kit's project memory tool can now read and write another repository's memory, so one session, such as a Bot that reviews every project's sessions, keeps each repository's memory up to date.
-- When updating omp from its notice installs omp's standalone app but leaves behind the copy your sessions run, the notice now says so and names the command that updates that copy, instead of omp's own success message.
-- Personal no longer shows up among your workspaces, in the directory picker or in the sidebar's workspace picker. Open a personal session from **Personal** in the sidebar or with Cmd+Shift+P.
-- New session now keeps the composer at the bottom of the page, as in a running session, under the omp logo and a question naming the folder you work in. Starters for work you start often, such as Run the dev server, Ship ENG-2722, or Shepherd my PRs, show inside the composer as the same numbered list a session suggests after a reply. Press a starter's number or click it to put its prompt in the composer, where you can edit it before you send.
-- Agents can now add reminders to the Calendar page, such as a time to check how a change performed, and you get a notice 10 minutes before each one. Clicking a reminder, on the Calendar page or in its notice, opens the session that added it.
-- New session now puts the composer near the top of the page, with the directory and branch just above it, and a row of starters under it for work you start often, such as **Run the dev server**, **Ship ENG-2722**, or **Shepherd my PRs**, the best fit for now first. Hover a starter to see its full prompt, and click it to put that prompt in the composer, where you can edit it before you send.
-- The New session page no longer shows the board of todos, past sessions, and pull requests. Your todos stay on the Todo page, past sessions in the sidebar, and pull requests on the Pull requests page.
-- The starter kit now has agents open each reply with the answer in bold, then add a Needs you, Not verified, or Done line only when it has something to say, instead of fixed sections that often read "None".
-- Settings › Storage now lists sandboxes of ended tasks with leftover changes, with the most space they can take, and can remove them.
-- Their row starts unchecked, and Clean up warns that edits omp did not bring back to your checkout are lost.
-- You can zoom an image opened large, an expanded chart or diagram, and an image opened from a file path, as you zoom a web page: the − and + buttons or keys, a pinch, or Cmd or Ctrl with the scroll wheel. Click the zoom level or press 0 to fit it again, and drag to move around.
-- The images in a message, in place or as thumbnails under it, now open large, and the arrows or the Left and Right keys step through the message's other images.
-- Private is now a pill at the top right of the New session page. Turned on, it fills dark and the page says what ending the session deletes and what stays.
-- A private session's sidebar row and header now show a dark Private chip, easier to spot than the old lock.
-- The sidebar has a Personal item under New session, also on Cmd+Shift+P. It opens a page that shows what your assistant remembers and your recent personal sessions.
-- The starter kit now sends agents to the review steps before they mark a pull request ready or merge it, so they stop running into the review check first.
-- A key or password you paste into a session no longer stays in the saved session. Once the agent finishes its turn, the starter kit replaces it with a note saying what kind of secret it was, so save it where it belongs in that same turn.
-- The starter kit now tells agents to write out the full address of any server they start for you, ready to click, instead of only its port number.

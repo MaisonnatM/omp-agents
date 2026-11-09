@@ -1,5 +1,5 @@
-/** `BotDetails`, the right sidebar on a Bot's page: its Details tab with its look and name, both editable in place, where it works, its job, memory, and its conversation's token usage, then Delete; its Routines tab; and its conversation's Tickets tab once it worked on any. */
-import { Plus, Repeat, Trash2 } from "lucide-react";
+/** `BotDetails`, the right sidebar on a Bot's page: its Details tab with its look and name, both editable in place, where it works, its job, memory, and its conversation's token usage, then Restart conversation and Delete; its Routines tab; and its conversation's Tickets tab once it worked on any. */
+import { Plus, Repeat, RotateCcw, Trash2 } from "lucide-react";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { type Routine, runsHere } from "../../../src/routines";
 import { type Bot, BOT_KIND_INFO, type BotLook, type BotSpec, MAX_JOB_LENGTH } from "../../../src/shared/bots";
@@ -14,6 +14,7 @@ import { hashForBotRoutine, hashForBots } from "../../routing";
 import { age } from "../../labels";
 import { sessionUsageStore } from "../../reads";
 import { notHereWords, runWords, startsWords } from "../../routines-model";
+import { useAction } from "../../use-action";
 import { useDashboardActions } from "../dashboard-context";
 import { DetailsEmpty, DetailsSidebarFrame } from "../details-sidebar-frame";
 import { MemoryList } from "../memory-list";
@@ -29,6 +30,36 @@ const botSpec = ({ id, kind, name, job, cwd, model, skill, shape, hue }: Bot): B
 
 /** The sidebar's tab, kept across Bots apart from a session's. */
 const TAB_KEY = "omp-agents.bot-details-tab";
+
+/** **Restart conversation**, which asks first in its place; the server ends the live session, archives its file, and the Bot's next message starts a new conversation. */
+function RestartConversation({ bot, connected }: { bot: Bot; connected: boolean }) {
+	const { request } = useDashboardActions();
+	const [confirming, setConfirming] = useState(false);
+	const restart = useAction(async () => {
+		await request({ t: "bot", change: { op: "restart", id: bot.id } });
+		setConfirming(false);
+	}, `Could not restart ${bot.name}'s conversation`);
+	if (confirming) {
+		return (
+			<div role="group" aria-label={`Restart ${bot.name}'s conversation?`} className="space-y-2 text-xs">
+				<p>Restart {bot.name}'s conversation? Its session ends and is archived, and its next message starts a new one. Its job, memory, and routines stay.</p>
+				<div className="flex items-center gap-2">
+					<Button variant="outline" size="compact" disabled={!connected || restart.pending} onClick={() => restart.run()}>
+						Restart conversation
+					</Button>
+					<Button variant="ghost" size="compact" autoFocus onClick={() => setConfirming(false)}>
+						Cancel
+					</Button>
+				</div>
+			</div>
+		);
+	}
+	return (
+		<Button {...activityControl("bots.restart")} variant="outline" size="compact" leadingIcon={RotateCcw} disabled={!connected} onClick={() => setConfirming(true)}>
+			Restart conversation
+		</Button>
+	);
+}
 
 /** **Delete**, which asks first in its place; the Bot's routines go with it, and its conversation stays a session of yours. */
 function DeleteBot({ bot, connected }: { bot: Bot; connected: boolean }) {
@@ -298,7 +329,8 @@ export function BotDetails({ open: { bot, host, routines, routine, status }, ses
 							<JobEditor key={bot.job} bot={bot} connected={connected} />
 							<MemoryList path={`bots/${bot.id}/memory.md`} memory={memory} empty={`Nothing yet. Tell ${bot.name} something worth keeping, and it remembers it.`} />
 							<BotUsage bot={bot} host={host} />
-							<div className="border-t border-border pt-4">
+							<div className="flex flex-wrap items-start gap-2 border-t border-border pt-4">
+								{bot.sessionId !== null && <RestartConversation bot={bot} connected={connected} />}
 								<DeleteBot bot={bot} connected={connected} />
 							</div>
 						</div>

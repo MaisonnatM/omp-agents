@@ -99,6 +99,7 @@ export const CONTROLS = [
 	{ id: "shortcuts.tab", label: "Keyboard shortcuts category tab", area: "Sidebar" },
 	{ id: "calendar.routines.toggle", label: "Calendar routine visibility", area: "Calendar" },
 	{ id: "bots.delete", label: "Bot Delete, before it is confirmed", area: "Bots" },
+	{ id: "bots.restart", label: "Bot Restart conversation, before it is confirmed", area: "Bots" },
 	{ id: "bots.details", label: "Bot details sidebar, shown or hidden from its name", area: "Bots" },
 	{ id: "bots.job.revert", label: "Bot job edit reverted", area: "Bots" },
 	{ id: "bots.kind", label: "New Bot type", area: "Bots" },
