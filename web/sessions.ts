@@ -37,30 +37,22 @@ export const isPrivateHost = (host: RosterHost | null | undefined): boolean => h
 
 /**
  * The sessions the sidebar, the palette, and the pages list: none in a temporary directory, none counting in a hidden workspace,
- * and none that is a Bot's conversation, which only its Bot's page and the Sessions tab's Bots group show. `bots` holds the
- * live Bot conversations outside those directories, each titled with its Bot's name from `botNames`, by session id.
+ * and none in `botSessions`, a Bot's conversation, which only its Bot's page shows.
  */
 export function discoverableSessions(
 	hosts: RosterHost[],
 	past: PastSession[],
 	hidden: ReadonlySet<string>,
-	botNames: ReadonlyMap<string, string>,
-): { hosts: RosterHost[]; past: PastSession[]; bots: RosterHost[] } {
-	const shown = (row: RosterHost | PastSession): boolean => discoverableCwd(row.cwd, hidden) && !hidden.has(workspaceCwd(row));
-	return {
-		hosts: hosts.filter(host => shown(host) && !botNames.has(host.sessionId)),
-		past: past.filter(session => shown(session) && !botNames.has(session.sessionId)),
-		bots: hosts.flatMap(host => {
-			const name = botNames.get(host.sessionId);
-			return name !== undefined && shown(host) ? [{ ...host, sessionName: name }] : [];
-		}),
-	};
+	botSessions: ReadonlySet<string>,
+): { hosts: RosterHost[]; past: PastSession[] } {
+	const shown = (row: RosterHost | PastSession): boolean => discoverableCwd(row.cwd, hidden) && !hidden.has(workspaceCwd(row)) && !botSessions.has(row.sessionId);
+	return { hosts: hosts.filter(shown), past: past.filter(shown) };
 }
 
 /** The sessions of `lists` that count in `space`. */
-export function sessionsIn(lists: { hosts: RosterHost[]; past: PastSession[]; bots: RosterHost[] }, space: Space, spaces: Spaces): { hosts: RosterHost[]; past: PastSession[]; bots: RosterHost[] } {
+export function sessionsIn(lists: { hosts: RosterHost[]; past: PastSession[] }, space: Space, spaces: Spaces): { hosts: RosterHost[]; past: PastSession[] } {
 	const inSpace = (row: RosterHost | PastSession): boolean => spaceOf(row, spaces) === space;
-	return { hosts: lists.hosts.filter(inSpace), past: lists.past.filter(inSpace), bots: lists.bots.filter(inSpace) };
+	return { hosts: lists.hosts.filter(inSpace), past: lists.past.filter(inSpace) };
 }
 
 /** The workspaces of `workspaces` in `space`, with Personal's starting at the personal directory, where its new sessions start. */
@@ -134,8 +126,6 @@ export interface SidebarSessions {
 	idle: RosterHost[];
 	/** Live sessions whose subagents still run while the main agent's turn has ended or only waits on them. */
 	awaitingSubagents: RosterHost[];
-	/** Live Bot conversations, titled with their Bot's name. */
-	bots: RosterHost[];
 	interrupted: PastSession[];
 	ended: PastSession[];
 }
@@ -144,7 +134,7 @@ export interface SidebarSessions {
 const LIVE_LISTS = ["idle", "running", "awaitingSubagents"] as const satisfies readonly (keyof SidebarSessions)[];
 type LiveList = (typeof LIVE_LISTS)[number];
 
-/** Every live session `lists` holds outside pinned and Bots, in the sidebar's order. */
+/** Every live session `lists` holds outside pinned, in the sidebar's order. */
 export const liveHosts = (lists: Pick<SidebarSessions, LiveList>): RosterHost[] => LIVE_LISTS.flatMap(list => lists[list]);
 
 /** The list unpinned live session `host` lands in: `idle` and `running` hold the sessions that wait on no subagent, by its status. */
@@ -153,7 +143,7 @@ function liveList(host: RosterHost): LiveList {
 	return host.status === "idle" ? "idle" : "running";
 }
 
-export function sidebarSessions(hosts: RosterHost[], past: PastSession[], bots: RosterHost[], workspace: string | null, pinned: ReadonlySet<string>): SidebarSessions {
+export function sidebarSessions(hosts: RosterHost[], past: PastSession[], workspace: string | null, pinned: ReadonlySet<string>): SidebarSessions {
 	const listed = (row: RosterHost | PastSession): boolean => workspace === null || workspaceCwd(row) === workspace;
 	const isPinned = (row: { sessionId: string }): boolean => pinned.has(row.sessionId);
 	const shownHosts = hosts.filter(listed);
@@ -166,7 +156,6 @@ export function sidebarSessions(hosts: RosterHost[], past: PastSession[], bots: 
 			past: shownPast.filter(isPinned).toSorted((a, b) => Number(b.interrupted) - Number(a.interrupted)),
 		},
 		...live,
-		bots: bots.filter(listed),
 		interrupted: shownPast.filter(session => session.interrupted && !isPinned(session)),
 		ended: shownPast.filter(session => !session.interrupted && !isPinned(session)),
 	};
@@ -184,7 +173,6 @@ export function searchSessions(lists: SidebarSessions, query: string): SidebarSe
 		running: hosts(lists.running),
 		idle: hosts(lists.idle),
 		awaitingSubagents: hosts(lists.awaitingSubagents),
-		bots: hosts(lists.bots),
 		interrupted: past(lists.interrupted),
 		ended: past(lists.ended),
 	};
@@ -204,8 +192,8 @@ export function latestSession(lists: SidebarSessions): View | null {
 
 /** Every row of the sessions tab in its order, which the previous and next session keys walk. */
 export function listedViews(lists: SidebarSessions): View[] {
-	const { pinned, bots, interrupted, ended } = lists;
+	const { pinned, interrupted, ended } = lists;
 	const live = (hosts: RosterHost[]): View[] => hosts.map(({ instanceId }) => ({ kind: "live", instanceId, agentId: null }));
 	const saved = (sessions: PastSession[]): View[] => sessions.map(({ sessionId }) => ({ kind: "past", sessionId }));
-	return [...live(pinned.hosts), ...saved(pinned.past), ...live([...liveHosts(lists), ...bots]), ...saved([...interrupted, ...ended])];
+	return [...live(pinned.hosts), ...saved(pinned.past), ...live(liveHosts(lists)), ...saved([...interrupted, ...ended])];
 }

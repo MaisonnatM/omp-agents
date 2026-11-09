@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 date: 2026-11-08
 decision-makers: agent
+superseded-by: 2026-11-09-bot-conversations-stay-out-of-the-sessions-sidebar
 ---
 
 # Sessions waiting on subagents get their own group
