@@ -22,6 +22,22 @@ describe("spaces", () => {
 		expect(of(`${personalDir.cwd}/recipes`, `${personalDir.cwd}/recipes`)).toBe("work");
 		expect(of("/home/u/code/garden/beds", "/home/u/code/garden/beds")).toBe("work");
 	});
+
+	test("a space's workspaces keep their order and their shape, directories or rows", () => {
+		const placed = spaces(["/home/u/code/garden"], personalDir);
+		const dirs = ["/home/u/code/app", personalDir.cwd, "/home/u/code/garden"];
+		expect(placed.inSpace(dirs, "personal")).toEqual([personalDir.cwd, "/home/u/code/garden"]);
+		expect(placed.inSpace(dirs, "work")).toEqual(["/home/u/code/app"]);
+		const rows = dirs.map(cwd => ({ cwd, cwdDisplay: cwd }));
+		expect(placed.inSpace(rows, "work")).toEqual([rows[0]]);
+	});
+
+	test("before the personal directory is known, only the listed workspaces are Personal", () => {
+		const placed = spaces(["/home/u/code/garden"], null);
+		expect(placed.isPersonalDir(personalDir.cwd)).toBe(false);
+		expect(placed.of(personalDir.cwd, personalDir.cwd)).toBe("work");
+		expect(placed.of("/home/u/code/garden", "/home/u/code/garden")).toBe("personal");
+	});
 });
 
 describe("applyWorkspace", () => {

@@ -39,6 +39,7 @@
   `writePullRequest` there sends every `PullRequestChange`, from a pull request's row or its details: it sends `PUT /api/pull-request`, shows a state change or a review request in the workspace's pull request list at once through `withPullRequestState` or `withPullRequestReviewers`, and reads the list again.
   `writeViewedFile` beside it sends the **Code** tab's **Viewed** checkbox to `PUT /api/pull-request/viewed`, which no list shows, so it reads nothing again.
   `writeMergeQueue` is the one write of a merge, from every merge button: it sends `PUT /api/merge-queue` and, for each pull request the server merged on the way, shows it merged in the list at once and reads the list again; `web/use-workspace-scope.ts` reads the list again when a pull request leaves the queue later.
+  `writeWorkspace` is the one write of the Settings › Workspaces list, from Settings and the sidebar's move, and `pullRequestsScope` builds the pull request poll's query from the window's workspace, else its space.
   The details read the pull request again when its state in the list changes, so a change from its row shows in its open details too.
   The Email page's conversations are not a polled store: `readMailThread` and `useMailThread` keep them in memory by thread id, one read each, and a later read supersedes one in flight.
   `web/app.tsx` polls the pull requests instead, on every page once the sessions are listed, for the Pull requests tab's count, and the sidebar's pull request list reads that entry.
@@ -59,7 +60,7 @@
   Its `attachToComposer` hands a mounted live composer a file, which `useComposerFiles` adds to its attachments, as the Browser's captures do.
   Its `replaceInComposer` puts dictated text over a draft's saved selection, through its composer when one is mounted, else in the kept draft.
   `web/components/skill-picker.tsx` is the skill picker of the settings' pinned skill.
-  `web/components/command-picker.tsx` holds `CommandPicker`, the searchable grouped list behind the branch, workspace, and skill pickers, with `CommandResults`, which the model menu's search shares.
+  `web/components/command-picker.tsx` holds `CommandPicker`, the searchable grouped list behind the branch, workspace, and skill pickers, whose items may lead with an `icon`, with `CommandResults`, which the model menu's search shares.
   The checkout, the default model's role, and the skills are each one `useRead`.
 - `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read.
   One `keydown` listener on the window serves every `useShortcuts` registration, which `createShortcutStack` orders: the registration that mounted last tries a key first, and the first handler that takes it ends the press, so a page's own bindings come before `web/use-page-shortcuts.ts`'s, which `web/app.tsx` mounts first, and a handler that returns `false` lets the key fall to the one below.

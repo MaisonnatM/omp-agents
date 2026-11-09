@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { prKey } from "../src/shared/github";
 import type { PastSession, RosterHost } from "../src/shared/sessions";
-import { type Space, type Spaces, spaces, type Workspace } from "../src/shared/workspaces";
+import { isSpace, type Space, spaces, type Workspace } from "../src/shared/workspaces";
 import type { DashboardState } from "./dashboard-state";
-import { pullRequestsStore } from "./reads";
-import { discoverableSessions, listWorkspaces, sessionsIn, workspacesIn, workspaceSwitch } from "./sessions";
+import { pullRequestsScope as scopeOf, pullRequestsStore } from "./reads";
+import { discoverableSessions, listWorkspaces, sessionsIn, type WindowScope, workspacesIn, workspaceSwitch } from "./sessions";
 import { storeOrRemove, useStoredState } from "./stored-state";
 
 /**
@@ -31,7 +31,10 @@ function useSelectedWorkspace(workspaces: Workspace[]): [string | null, (cwd: st
  * switch, as `useStoredState` would, so each window switches on its own.
  */
 function useSpace(): [Space, (space: Space) => void] {
-	const [space, setSpace] = useState<Space>(() => (localStorage.getItem(SPACE_KEY) === "personal" ? "personal" : "work"));
+	const [space, setSpace] = useState<Space>(() => {
+		const stored = localStorage.getItem(SPACE_KEY);
+		return isSpace(stored) ? stored : "work";
+	});
 	const pick = useCallback((next: Space): void => {
 		storeOrRemove(SPACE_KEY, next, "work");
 		setSpace(next);
@@ -40,7 +43,7 @@ function useSpace(): [Space, (space: Space) => void] {
 }
 
 /** The directories the sidebar, the palette, and the pages list, and the space and workspace they are scoped to. */
-export interface WorkspaceScope {
+export interface WorkspaceScope extends WindowScope {
 	/**
 	 * The sessions of the space in neither a temporary nor a hidden directory, and no Bot's conversation, with the space's live Bot
 	 * conversations apart, titled with their Bot's name. The raw lists keep the others for what links to them.
@@ -53,16 +56,10 @@ export interface WorkspaceScope {
 	workspaces: Workspace[];
 	/** Every space's workspaces, for what a workspace's space does not scope: Settings › Workspaces, Bots, scheduled sends, and Google accounts. */
 	allWorkspaces: Workspace[];
-	/** The workspace `cwd` the sidebar and the Pull requests page show, `null` for all of the space's workspaces. */
-	workspace: string | null;
 	pickWorkspace: (cwd: string | null) => void;
-	/** The pull requests' scope, as {@link pullRequestsStore} keys it: the workspace, else the space. */
+	/** The pull requests' scope, as {@link scopeOf} builds it from the workspace, else the space. */
 	pullRequestsScope: string;
-	/** The space this window shows. */
-	space: Space;
 	pickSpace: (space: Space) => void;
-	/** Which space each directory is in; `null` until the server names the personal directory, while everything counts as Work. */
-	spaces: Spaces | null;
 }
 
 /**
@@ -73,7 +70,7 @@ export function useWorkspaceScope(state: DashboardState): WorkspaceScope {
 	const [space, pickSpace] = useSpace();
 	const { personal: personalDir } = state;
 	const personalCwds = state.workspaceList.personal;
-	const placement = useMemo(() => (personalDir ? spaces(personalCwds.map(({ cwd }) => cwd), personalDir) : null), [personalCwds, personalDir]);
+	const placement = useMemo(() => spaces(personalCwds.map(({ cwd }) => cwd), personalDir), [personalCwds, personalDir]);
 	// Temporary and hidden workspaces, and Bots' conversations, remain in the raw sessions; only discoverable sessions enter the workspace list and sidebar view.
 	const hiddenCwds = useMemo(() => new Set(state.workspaceList.hidden.map(hidden => hidden.cwd)), [state.workspaceList.hidden]);
 	const botNames = useMemo(() => new Map((state.bots ?? []).flatMap(bot => (bot.sessionId === null ? [] : [[bot.sessionId, bot.name] as const]))), [state.bots]);
@@ -87,7 +84,7 @@ export function useWorkspaceScope(state: DashboardState): WorkspaceScope {
 	const workspaces = useMemo(() => workspacesIn(allWorkspaces, space, placement, personalDir), [allWorkspaces, space, placement, personalDir]);
 	const [workspace, pickWorkspace] = useSelectedWorkspace(workspaces);
 	// Until the sessions are listed, the saved workspace reads as all of the space's.
-	const pullRequestsScope = workspace ?? space;
+	const pullRequestsScope = scopeOf({ space, workspace });
 	pullRequestsStore.usePolling(pullRequestsScope, state.listed);
 	// A pull request that leaves the queue, merged by the server while the page waited, or cancelled, changes what GitHub lists before the next poll would show it; before the sessions are listed, the first poll reads it.
 	const queued = useMemo(() => state.merges.flatMap(merge => merge.prs.map(prKey)), [state.merges]);
@@ -103,8 +100,9 @@ export function useWorkspaceScope(state: DashboardState): WorkspaceScope {
 		const next = workspaceSwitch(workspace, started.workspace, hiddenCwds);
 		if (next !== null) pickWorkspace(next);
 	}, [started]);
+	const home = space === "personal" ? personalDir : null;
 	return useMemo(
-		() => ({ visible, everySpace: discoverable, hiddenCwds, workspaces, allWorkspaces, workspace, pickWorkspace, pullRequestsScope, space, pickSpace, spaces: placement }),
-		[visible, discoverable, hiddenCwds, workspaces, allWorkspaces, workspace, pickWorkspace, pullRequestsScope, space, pickSpace, placement],
+		() => ({ visible, everySpace: discoverable, hiddenCwds, workspaces, allWorkspaces, workspace, pickWorkspace, pullRequestsScope, space, pickSpace, spaces: placement, home }),
+		[visible, discoverable, hiddenCwds, workspaces, allWorkspaces, workspace, pickWorkspace, pullRequestsScope, space, pickSpace, placement, home],
 	);
 }

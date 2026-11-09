@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { callable } from "../src/shared/accounts";
 import type { View } from "../src/shared/sessions";
-import type { Space } from "../src/shared/workspaces";
+import { otherSpace, type Space } from "../src/shared/workspaces";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { errorText } from "../src/json";
 import { AppSidebar } from "./components/app-sidebar";
@@ -45,7 +45,7 @@ import { useOpenPullRequest } from "./open-pull-request";
 import { integrationsStore } from "./reads";
 import { EMPTY_LAYOUT, hashForLayout, hashForPage, hashForRoute, hashForView, type NotesListView, type OpenMode, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
-import { defaultCwd, spaceSession, workspaceSession, workspaceSwitch } from "./sessions";
+import { defaultCwd, spaceSession, type WindowScope, workspaceSession, workspaceSwitch } from "./sessions";
 import { placedTabs, useSidebarTabs } from "./sidebar-tabs";
 import { refusedStart, startOf } from "./starts";
 import { useAttention } from "./use-attention";
@@ -71,7 +71,8 @@ export function App() {
 	const { layout } = state;
 	const sidebars = useSidebarPanels();
 	const scope = useWorkspaceScope(state);
-	const { visible, workspaces, workspace, pickWorkspace, hiddenCwds, space, pickSpace, pullRequestsScope } = scope;
+	const { visible, workspaces, workspace, pickWorkspace, hiddenCwds, space, pickSpace, pullRequestsScope, spaces, home } = scope;
+	const windowScope = useMemo((): WindowScope => ({ space, spaces, workspace, home }), [space, spaces, workspace, home]);
 	const focused = useFocusedSession(state, page, scope);
 	const sessions = useSessionLists(scope, state.pins, changePins);
 	const overlays = useOverlays();
@@ -99,7 +100,7 @@ export function App() {
 	const address = page ? hashForPage(page) : hashForLayout(layout);
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
 	const detailsView = page || (layout.panes.length > 1 && !maximized) ? null : focused.view;
-	const defaultWorkspace = defaultCwd(focused.view, visible.hosts, visible.past, workspace, space === "personal" && state.personal ? state.personal.cwdDisplay : null);
+	const defaultWorkspace = defaultCwd(focused.view, visible.hosts, visible.past, windowScope);
 	// The live rows of the sessions list, whose order ending a session moves its panes along.
 	const listedHosts = sessions.listed.flatMap(view => (view.kind === "live" ? view.instanceId : []));
 	const latest = useRef({ layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, shownWorkspace: focused.workspace, scope });
@@ -137,7 +138,7 @@ export function App() {
 			const { page, layout, scope } = latest.current;
 			if (next === scope.space) return;
 			pickSpace(next);
-			// A page stays; the panes leave the other space's sessions for the newest running in this one, else show none.
+			// The panes follow the space the user picks; `useFocusedSession` follows the panes into a session's space the other way. A page stays; the panes leave the other space's sessions for the newest running in this one, else show none.
 			if (page || layout.panes.length === 0) return;
 			const session = spaceSession(next, scope.everySpace.hosts, scope.spaces);
 			if (session) open(session, "replace");
@@ -145,7 +146,7 @@ export function App() {
 		},
 		[pickSpace, open, show],
 	);
-	const toggleSpace = useCallback(() => switchSpace(latest.current.scope.space === "work" ? "personal" : "work"), [switchSpace]);
+	const toggleSpace = useCallback(() => switchSpace(otherSpace(latest.current.scope.space)), [switchSpace]);
 	/** The palette opens a session from any workspace, so the sidebar switches to that workspace to keep it listed. */
 	const openFromPalette = useCallback(
 		(picked: View, sessionWorkspace: string, mode: OpenMode): void => {
@@ -212,8 +213,8 @@ export function App() {
 	const refused = refusedStart(state.starts);
 	// The scope whose pull requests `useWorkspaceScope` polls, so the `@` menu reads the entry the page keeps current.
 	const status = useMemo(
-		(): DashboardStatus => ({ connected: state.connected, starts: { fork, resume, quick, resumeAll }, ending: state.ending, pullRequestsScope, workspace, space, merges: state.merges, reviewDrafts: state.reviewDrafts }),
-		[state.connected, fork, resume, quick, resumeAll, state.ending, pullRequestsScope, workspace, space, state.merges, state.reviewDrafts],
+		(): DashboardStatus => ({ connected: state.connected, starts: { fork, resume, quick, resumeAll }, ending: state.ending, pullRequestsScope, scope: windowScope, merges: state.merges, reviewDrafts: state.reviewDrafts }),
+		[state.connected, fork, resume, quick, resumeAll, state.ending, pullRequestsScope, windowScope, state.merges, state.reviewDrafts],
 	);
 	const mentionLists = useMemo(() => ({ todos: state.userTodos?.todos ?? [], hosts: visible.hosts, past: visible.past }), [state.userTodos, visible]);
 
@@ -340,7 +341,7 @@ export function App() {
 														view={detailsView}
 														working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
 														cwd={focused.cwd ?? null}
-														personalMemory={focused.cwd !== undefined && scope.spaces?.of(focused.cwd, focused.workspace ?? focused.cwd) === "personal" ? state.personalMemory : null}
+														personalMemory={focused.cwd !== undefined && spaces.of(focused.cwd, focused.workspace ?? focused.cwd) === "personal" ? state.personalMemory : null}
 														pullRequests={focused.row?.pullRequests ?? []}
 														tickets={focused.row?.tickets ?? []}
 														hosts={visible.hosts}

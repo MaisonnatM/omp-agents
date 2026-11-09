@@ -66,7 +66,7 @@ import type { AskReply, CompletionScope, LiveView, StartRequest, UserAnswer, Vie
 import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues, TodoTicketRequest } from "../shared/tickets";
 import type { SportChange } from "../shared/sport";
 import type { TrustChange } from "../shared/project-trust";
-import type { WorkspaceChange } from "../shared/workspaces";
+import { isSpace, type WorkspaceChange } from "../shared/workspaces";
 import { parseSportChange } from "../sport-parse";
 import { MAX_TICKET_DESCRIPTION, MAX_TICKET_TITLE } from "../tickets";
 import { parseNoteChange } from "../user-notes-parse";
@@ -929,7 +929,6 @@ export const parseBranchRelease = (body: unknown): Parsed<{ cwd: string; branch:
 	isObject(body) && isNonEmpty(body.cwd) && body.cwd.startsWith("/") && isNonEmpty(body.branch) ? { ok: { cwd: body.cwd, branch: body.branch } } : null;
 
 const isWorkspaceOp = oneOf(["add", "hide", "show", "space"] as const);
-export const isSpace = oneOf(["personal", "work"] as const);
 
 /**
  * The body of `PUT /api/workspaces`: `{ op, cwd }`, or `{ op: "space", cwd, space }`. Adding takes any path a new session

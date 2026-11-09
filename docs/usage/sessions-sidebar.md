@@ -1,6 +1,7 @@
 # Sessions sidebar
 
-- The **Personal** and **Work** switch at the top of the window picks the space the dashboard shows: in the desktop app it sits beside Back and Forward in the title bar, and in a browser at the right of the page header.
+- The **Personal** and **Work** switch at the top of the window picks the space the dashboard shows: in the desktop app it sits beside Back and Forward in the title bar, and in a browser at the right of the page header, or at the top right of the empty home.
+  In a page header narrower than 56rem the switch shows its two icons alone, and hovering one names its space.
   Personal holds the personal directory and the workspaces Settings › Workspaces placed in Personal; every other workspace is in Work, a workspace the page cannot place yet included.
   The sidebar's sessions, its counts, the session search, the Todo page, the pull requests, the command palette's sessions and workspaces, Settings' workspace pickers, and New session's directory picker then hold only the space's.
   Switching keeps the page you are on; on the panes it opens the space's most recently started running session, or the empty home when none runs there.
@@ -30,6 +31,7 @@
   With a workspace picked other than the personal directory, the picker's **Move <workspace> to Personal** or **Move <workspace> to Work** moves it to the other space, as the space picker in Settings › Workspaces does; it then leaves the space on screen, and the sidebar lists every session of the space.
   The app keeps the choice.
   If no session from the saved workspace is left, or it is not in the space on screen, the sidebar lists every session of the space.
+  Moving a workspace shows a toast that says where it went, with **Undo** for 8 seconds to move it back, or says the move failed and why.
 - **New session** at the top of the **Sessions** tab opens the new-session draft, in the selected workspace when there is one, and stays highlighted while the draft is open.
   In Personal with no workspace picked, it reads **New session in Personal** and starts in the personal directory.
   It shows its key, Cmd+N, on its right.

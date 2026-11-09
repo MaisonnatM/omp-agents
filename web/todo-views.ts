@@ -4,8 +4,9 @@ import type { TodoStatus, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList }
 import { everyWord } from "../src/shared/every-word";
 import type { BadgeColor } from "@/components/ui/badge";
 import { localDay } from "../src/shared/days";
-import type { Space, Spaces } from "../src/shared/workspaces";
+import type { Space } from "../src/shared/workspaces";
 import { DAY_FORMAT } from "./labels";
+import type { WindowScope } from "./sessions";
 import type { TodoListView } from "./routing";
 import type { StatusKind } from "./tickets-model";
 import { workStateOf, type TodoSessions } from "./todo-work-state";
@@ -86,17 +87,14 @@ export function earliestDue(todo: UserTodo): string | null {
 /** Where a session for top-level `todo` starts: its Workspace, else `fallback`, the directory a new session would start in anyway. */
 export const todoCwd = (todo: Pick<UserTodo, "workspace">, fallback: string): string => todo.workspace ?? fallback;
 
-/** What the sidebar narrows the todos to: its workspace, else its space, where a todo naming no workspace counts as Work. */
-export interface TodoScope {
-	workspace: string | null;
-	space: Space;
-	spaces: Spaces | null;
-}
+/** What the sidebar narrows the todos to: its workspace, else its space. */
+export type TodoScope = Pick<WindowScope, "workspace" | "space" | "spaces">;
 
-/** The top-level `todos` in `scope`: those naming its workspace, else those whose workspace is in its space. */
+/** The top-level `todos` in `scope`: those naming its workspace, else those whose workspace is in its space, where a todo naming no workspace counts as Work. */
 export function inScope(todos: UserTodo[], { workspace, space, spaces }: TodoScope): UserTodo[] {
 	if (workspace !== null) return todos.filter(todo => todo.workspace === workspace);
-	return todos.filter(todo => (todo.workspace === null ? "work" : (spaces?.of(todo.workspace, todo.workspace) ?? "work")) === space);
+	const spaceOfTodo = ({ workspace }: UserTodo): Space => (workspace === null ? "work" : spaces.of(workspace, workspace));
+	return todos.filter(todo => spaceOfTodo(todo) === space);
 }
 
 /**

@@ -192,7 +192,7 @@
   In the desktop app, **Choose folder…** opens the system's folder picker and adds the folder you pick.
   **Hide** drops a workspace and its sessions from the pickers, the session lists and counts, and session search, as for `/tmp`; a direct session link still opens them.
   Hidden workspaces list under **Hidden**, and **Show** offers one again.
-  Each workspace has a space, **Work** or **Personal**, picked beside it; a session in a Personal workspace, or in a worktree of one, is a [personal session](personal-sessions.md) with your personal memory, `remember`, and `sport`.
+  Each workspace has a space, **Personal** or **Work**, picked beside it; a session in a Personal workspace, or in a worktree of one, is a [personal session](personal-sessions.md) with your personal memory, `remember`, and `sport`.
   The sidebar's workspace picker moves the picked workspace to the other space too; see [Sessions sidebar](sessions-sidebar.md).
   The personal directory is always **Personal**, so its row shows a **Personal** badge instead of the picker.
   Hiding a workspace and showing it again keeps its space.

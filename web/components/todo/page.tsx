@@ -10,11 +10,12 @@ import { localDay } from "../../../src/shared/days";
 import { ALL_OF_SPACE, folderName } from "../../labels";
 import { hashForTodo, type TodoListView } from "../../routing";
 import { shortcutKeys } from "../../shortcuts";
-import { byStatus, inScope, LIST_KINDS, lastOf, leftIn, placeIn, type Section, TODO_STATUS, type TodoEntry, type TodoScope, titleOf, todoMatcher, todosOf } from "../../todo-views";
+import { byStatus, inScope, LIST_KINDS, lastOf, leftIn, placeIn, type Section, TODO_STATUS, type TodoEntry, titleOf, todoMatcher, todosOf } from "../../todo-views";
 import { useHiddenTodoCategories } from "../../use-hidden-todo-categories";
 import { useOpenLatest } from "../../use-open-latest";
 import { useTodoDrag } from "../../use-todo-drag";
 import { type OpenPicker, useTodoKeys } from "../../use-todo-keys";
+import { useDashboardStatus } from "../dashboard-context";
 import { FoldButton, useFolds } from "../fold";
 import { PageFrame } from "../list-page";
 import { ListSplit } from "../list-split";
@@ -39,10 +40,6 @@ interface TodoPageProps {
 	past: PastSession[];
 	/** Where **Start session** opens the new-session draft of a todo with no Workspace. */
 	newSessionCwd: string;
-	/** The sidebar's workspace, else its space, which narrow the list. */
-	scope: TodoScope;
-	/** The Workspace a todo added here names, which its sessions start in: the sidebar's, else the personal directory in Personal; `null` for none. */
-	workspace: string | null;
 	/** The Workspaces a todo's Workspace picker offers. */
 	workspaces: Workspace[];
 	linearConnected: boolean;
@@ -64,7 +61,11 @@ export function TodoPage({ list, ...props }: TodoPageProps) {
 	return <LoadedTodoPage list={list} {...props} />;
 }
 
-function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, newSessionCwd, scope, workspace, workspaces, linearConnected }: TodoPageProps & { list: UserTodoList }) {
+function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, newSessionCwd, workspaces, linearConnected }: TodoPageProps & { list: UserTodoList }) {
+	// The sidebar's workspace, else its space, narrows the list.
+	const { scope } = useDashboardStatus();
+	/** The Workspace a todo added here names, which its sessions start in: the sidebar's, else Personal's home; `null` for none. */
+	const workspace = scope.workspace ?? scope.home?.cwd ?? null;
 	const openTodo = (id: string | null): void => {
 		location.hash = hashForTodo(view, id);
 	};

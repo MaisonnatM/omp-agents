@@ -18,9 +18,9 @@ import { answerExtensionApproval, readExtensionContribution, readExtensionOperat
 import { discoverExtensions, loadExtensions } from "../omp/extensions";
 import { isAnalyticsRange } from "../shared/analytics";
 import type { ConversationSearchAnswer } from "../shared/sessions";
-import type { WorkspaceChange } from "../shared/workspaces";
+import { isSpace, type WorkspaceChange } from "../shared/workspaces";
 import { answer, checked, fail } from "./http";
-import { isSpace, parseGraphiteToken, parseSourceControlChange, parseTrustChange, parseWorkspaceChange } from "./wire";
+import { parseGraphiteToken, parseSourceControlChange, parseTrustChange, parseWorkspaceChange } from "./wire";
 import { signInGraphite } from "../source-control";
 import type { Handler, RouteKit, Routes, SessionRoutesEnv } from "./route-kit";
 import { dirParam } from "./dir-param";
@@ -147,8 +147,8 @@ export function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): 
 	});
 
 	/**
-	 * `GET /api/pull-requests[?cwd=<dir>|?space=personal|work][&fresh]`: the pull requests of that workspace's repository, else of the
-	 * repositories of the space's workspaces, else of every workspace's.
+	 * `GET /api/pull-requests[?cwd=<dir>|?space=personal|work][&fresh]`: the pull requests of that workspace's repository, or of the
+	 * repositories of the space's workspaces, else of every workspace's; `cwd` and `space` together are a 400.
 	 * Each answer also tells the pull-request index which branch heads which PR, which links the sessions that pushed them.
 	 */
 	const pullRequests = get((params) => {
@@ -156,10 +156,11 @@ export function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): 
 		if (cwd instanceof Response) return cwd;
 		const space = params.get("space");
 		if (space !== null && !isSpace(space)) return fail(400, "Expected space personal or work");
+		if (cwd !== null && space !== null) return fail(400, "Expected cwd or space, not both");
 		const fresh = params.has("fresh");
 		return answer(async () => {
-			const inSpace = space === null ? env.knownWorkspaces() : env.knownWorkspaces().filter((dir) => env.spaces().of(dir, dir) === space);
-			const loaded = await loadPullRequests(cwd === null ? inSpace : [cwd], fresh);
+			const dirs = cwd !== null ? [cwd] : space !== null ? env.spaces().inSpace(env.knownWorkspaces(), space) : env.knownWorkspaces();
+			const loaded = await loadPullRequests(dirs, fresh);
 			for (const repo of loaded.repos) if ("pullRequests" in repo) env.learnHeads(repo, repo.pullRequests);
 			return loaded;
 		});

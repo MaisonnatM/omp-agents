@@ -17,8 +17,9 @@ import {
 } from "@/components/ui/sidebar";
 import { localDay } from "../../../src/shared/days";
 import { hashForTodo, type TodoListView } from "../../routing";
-import { categoryColor, leftIn, SIDEBAR_LISTS, sameTodoView, type TodoScope } from "../../todo-views";
+import { categoryColor, leftIn, SIDEBAR_LISTS, sameTodoView } from "../../todo-views";
 import { useHiddenTodoCategories } from "../../use-hidden-todo-categories";
+import { useDashboardStatus } from "../dashboard-context";
 import type { KnownSessions } from "./links";
 
 interface NameInputProps {
@@ -63,8 +64,6 @@ interface TodoCategoriesProps {
 	sessions: KnownSessions;
 	/** The list the Todo page shows. */
 	view: TodoListView;
-	/** The sidebar's workspace, else its space, which narrow every count. */
-	scope: TodoScope;
 	/** Changes would not reach the server. */
 	disabled: boolean;
 	onChange: (change: UserTodoChange) => void;
@@ -116,9 +115,11 @@ function ShownCheckbox({ id, name, shown, onToggle }: { id: string; name: string
 	);
 }
 
-export function TodoCategories({ list, view, scope, disabled, onChange, sessions }: TodoCategoriesProps) {
+export function TodoCategories({ list, view, disabled, onChange, sessions }: TodoCategoriesProps) {
 	const [naming, setNaming] = useState<Naming>({ kind: "none" });
 	const [hidden, toggleHidden] = useHiddenTodoCategories();
+	// The sidebar's workspace, else its space, narrows every count.
+	const { scope } = useDashboardStatus();
 	if (list === null) return <SidebarGroup><p className="px-2 py-1 text-xs text-muted-foreground">Loading your todos…</p></SidebarGroup>;
 	const day = localDay();
 	const link = (target: TodoListView, name: string, icon: ReactNode) => {

@@ -1,8 +1,8 @@
 /** The Personal and Work switch, the Notes, Calendar, Email, and Sport buttons, the command menu button, the notices' bell, and Settings: in the desktop app's title bar, else at the end of the page's header; and the title bar's Back and Forward buttons. */
-import { Briefcase, ChevronLeft, ChevronRight, Search, UserRound } from "lucide-react";
+import { Briefcase, ChevronLeft, ChevronRight, type LucideIcon, Search, UserRound } from "lucide-react";
 import { createContext, memo, type ReactNode, useContext } from "react";
 import type { Notice } from "../../src/shared/notices";
-import type { Space } from "../../src/shared/workspaces";
+import { isSpace, type Space, SPACES } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -42,14 +42,35 @@ interface HeaderControlsProps {
 
 const SettingsIcon = PAGE_ICON.settings;
 
-/** Which space the window shows, Personal or Work; the switch shortcut's keys show on the space it goes to. */
+const SPACE_ICONS: Record<Space, LucideIcon> = { personal: UserRound, work: Briefcase };
+
+/**
+ * Which space the window shows, Personal or Work; the switch shortcut's keys show on the space it goes to. Each tab keeps its
+ * tooltip whichever space is on, so switching leaves the tab mounted and the keyboard focus on it. In a page's header narrower
+ * than 56rem the labels leave the icons alone, their names kept in the tooltip and for screen readers.
+ */
 function SpaceSwitch({ space, onSpace }: { space: Space; onSpace: (space: Space) => void }) {
 	return (
 		<SizeProvider size="compact">
-			<Tabs value={space} onValueChange={value => onSpace(value === "personal" ? "personal" : "work")}>
+			<Tabs
+				value={space}
+				onValueChange={value => {
+					if (isSpace(value)) onSpace(value);
+				}}
+			>
 				<TabsList aria-label="Space">
-					<TabItem {...activityControl("header.space.personal")} value="personal" icon={UserRound} label={SPACE_LABELS.personal} shortcut={space === "personal" ? undefined : shortcutLabels("switchSpace")} />
-					<TabItem {...activityControl("header.space.work")} value="work" icon={Briefcase} label={SPACE_LABELS.work} shortcut={space === "work" ? undefined : shortcutLabels("switchSpace")} />
+					{SPACES.map(value => (
+						<TabItem
+							key={value}
+							{...activityControl(`header.space.${value}` as const)}
+							value={value}
+							icon={SPACE_ICONS[value]}
+							label={SPACE_LABELS[value]}
+							labelClassName="@max-[56rem]/header:sr-only"
+							tooltip={SPACE_LABELS[value]}
+							shortcut={value === space ? undefined : shortcutLabels("switchSpace")}
+						/>
+					))}
 				</TabsList>
 			</Tabs>
 		</SizeProvider>
@@ -59,12 +80,7 @@ function SpaceSwitch({ space, onSpace }: { space: Space; onSpace: (space: Space)
 export const HeaderControls = memo(function HeaderControls({ notices, onShowSearch, tabs, tab, onTab, settingsOpen, onToggleSettings, space, onSpace }: HeaderControlsProps) {
 	return (
 		<div className="flex shrink-0 items-center gap-1">
-			{!DESKTOP_TITLE_BAR && (
-				<>
-					<SpaceSwitch space={space} onSpace={onSpace} />
-					<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border" />
-				</>
-			)}
+			{!DESKTOP_TITLE_BAR && <SpaceSwitch space={space} onSpace={onSpace} />}
 			<Tooltip content="Command menu" shortcut={shortcutLabels("switcher")} side="bottom">
 				<Button {...activityControl("header.command-menu")} variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Command menu" onClick={onShowSearch}>
 					<Search />
@@ -132,20 +148,20 @@ function HistoryButtons() {
 	);
 }
 
-/** The window's title bar: a drag strip with the window's buttons inset at its left, then Back and Forward and the space switch, the document title centered, and the controls at its right. */
+/** The window's title bar: a drag strip with the window's buttons inset at its left, then Back and Forward and the space switch, the document title centered between them and the controls at its right. */
 export function DesktopTitleBar({ title, space, onSpace, controls }: { title: string; space: Space; onSpace: (space: Space) => void; controls: ReactNode }) {
 	// `env(titlebar-area-x)` is where the window's buttons end, with a gap as wide as their inset; desktop/main.ts turns it on with `titleBarOverlay`.
 	// h-9 is also the `top-9` a maximized Browser leaves for it in browser-panel.tsx.
 	return (
-		<div className="relative flex h-9 shrink-0 items-center justify-between border-b border-border bg-sidebar pr-3 pl-[env(titlebar-area-x)] select-none [-webkit-app-region:drag]">
-			<p className="pointer-events-none absolute inset-x-72 truncate text-center text-[13px] font-medium text-muted-foreground">{title}</p>
-			<div className="flex items-center gap-2">
+		<div className="flex h-9 shrink-0 items-center gap-3 border-b border-border bg-sidebar pr-3 pl-[env(titlebar-area-x)] select-none [-webkit-app-region:drag]">
+			<div className="flex shrink-0 items-center gap-2">
 				<HistoryButtons />
 				<div className="[-webkit-app-region:no-drag]">
 					<SpaceSwitch space={space} onSpace={onSpace} />
 				</div>
 			</div>
-			<div className="[-webkit-app-region:no-drag]">{controls}</div>
+			<p className="pointer-events-none min-w-0 flex-1 truncate text-center text-[13px] font-medium text-muted-foreground">{title}</p>
+			<div className="shrink-0 [-webkit-app-region:no-drag]">{controls}</div>
 		</div>
 	);
 }

@@ -17,6 +17,8 @@ export interface PickerItem {
 	/** What cmdk filters and keys on; unique across the picker. */
 	value: string;
 	label: ReactNode;
+	/** Drawn before the label, as for an action such as moving the workspace. */
+	icon?: IconComponent;
 	keywords?: string[];
 	title?: string;
 	ariaLabel?: string;
@@ -94,7 +96,10 @@ export function CommandResults({ search, list, empty, disabled, selectionDisable
 												item.onSelect();
 											}}
 										>
-											<span className="flex min-w-0 flex-1 items-center gap-2">{item.label}</span>
+											<span className="flex min-w-0 flex-1 items-center gap-2">
+												{item.icon && <item.icon />}
+												{item.label}
+											</span>
 											{item.selected !== undefined && <Check className={item.selected ? "opacity-100" : "opacity-0"} />}
 										</CommandItem>
 									))}

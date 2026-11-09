@@ -24,7 +24,7 @@ interface HeaderProps {
 export function Header({ title, meta, status, alert = false, leading, trailing, children, end }: HeaderProps) {
 	const controls = useHeaderControls();
 	return (
-		<header className="flex h-(--page-header-height) shrink-0 items-center justify-between gap-4 border-b border-border px-6 max-sm:h-auto max-sm:min-h-(--page-header-height) max-sm:flex-wrap max-sm:gap-x-4 max-sm:gap-y-0">
+		<header className="@container/header flex h-(--page-header-height) shrink-0 items-center justify-between gap-4 border-b border-border px-6 max-sm:h-auto max-sm:min-h-(--page-header-height) max-sm:flex-wrap max-sm:gap-x-4 max-sm:gap-y-0">
 			<div className="group/title flex min-w-0 items-center gap-2 max-sm:min-h-(--page-header-height) max-sm:max-w-full max-sm:shrink-0">
 				{leading}
 				<div className="min-w-0">

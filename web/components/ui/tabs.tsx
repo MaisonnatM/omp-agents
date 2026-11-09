@@ -42,6 +42,10 @@ interface TabsValueOrderContextValue {
   valueOrder: string[];
   setValueOrder: (order: string[]) => void;
   selectedValue: string | undefined;
+  /** The values a TabPanel shows, so a tab with none leaves out the `aria-controls` that would name a missing element. */
+  panels: ReadonlySet<string>;
+  /** Records a TabPanel for `value`; the returned cleanup removes it. */
+  registerPanel: (value: string) => () => void;
 }
 
 const TabsValueOrderContext = createContext<TabsValueOrderContextValue | null>(null);
@@ -115,6 +119,16 @@ const Tabs = forwardRef<HTMLDivElement, TabsProps>(
         return order;
       });
     }, []);
+    const [panels, setPanels] = useState<ReadonlySet<string>>(() => new Set());
+    const registerPanel = useCallback((panel: string) => {
+      setPanels((current) => new Set(current).add(panel));
+      return () =>
+        setPanels((current) => {
+          const next = new Set(current);
+          next.delete(panel);
+          return next;
+        });
+    }, []);
 
     // Resolve value: explicit value > selectedIndex lookup > uncontrolled state.
     // Uncontrolled with no defaultValue falls back to the first tab so the
@@ -148,6 +162,8 @@ const Tabs = forwardRef<HTMLDivElement, TabsProps>(
           valueOrder,
           setValueOrder: updateValueOrder,
           selectedValue: resolvedValue,
+          panels,
+          registerPanel,
         }}
       >
         {/*
@@ -440,7 +456,7 @@ const TabsList = forwardRef<HTMLDivElement, TabsListProps>(
             {focusRect && (
               <motion.div
                 className={cn(
-                  "absolute pointer-events-none z-20 border border-[color:var(--focus-ring,#6B97FF)]",
+                  "absolute pointer-events-none z-20 border-2 border-[color:var(--focus-ring,#6B97FF)]",
                   shape.focusRing
                 )}
                 initial={false}
@@ -494,6 +510,7 @@ const TabItem = forwardRef<HTMLButtonElement, TabItemProps>(
     const internalRef = useRef<HTMLButtonElement>(null);
     const sizeClasses = useSize();
     const { registerTab, hoveredIndex, selectedValue, setOptimisticIdx } = useTabsList();
+    const panels = useContext(TabsValueOrderContext)?.panels;
 
     // Register the button so the list can measure its rect; the cleanup
     // unregisters it so no pill aims at a tab that has gone.
@@ -537,6 +554,8 @@ const TabItem = forwardRef<HTMLButtonElement, TabItemProps>(
           sizeClasses.gap,
           className
         )}
+        // A tab that switches no TabPanel, such as a mode switch, names no panel; Radix would point it at one that is never rendered.
+        {...(panels?.has(value) ? {} : { "aria-controls": undefined })}
         {...props}
         // Keeps Radix's tab `data-state` contract under a shortcut Tooltip trigger, which stamps its own.
         data-state={isSelected ? "active" : "inactive"}
@@ -612,10 +631,13 @@ interface TabPanelProps
 }
 
 const TabPanel = forwardRef<HTMLDivElement, TabPanelProps>(
-  ({ className, ...props }, ref) => {
+  ({ className, value, ...props }, ref) => {
+    const registerPanel = useContext(TabsValueOrderContext)?.registerPanel;
+    useEffect(() => registerPanel?.(value), [registerPanel, value]);
     return (
       <TabsPrimitive.Content
         ref={ref}
+        value={value}
         className={cn("outline-none", className)}
         {...props}
       />

@@ -52,7 +52,7 @@ interface AppSidebarProps {
  * message that changes nothing the sidebar shows leaves it alone.
  */
 export const AppSidebar = memo(function AppSidebar({
-	scope: { visible, workspaces, workspace, space, spaces },
+	scope: { visible, workspaces },
 	sessions: { lists, waiting, query, setQuery, togglePin },
 	page,
 	newDraftDir,
@@ -118,9 +118,6 @@ export const AppSidebar = memo(function AppSidebar({
 			onSectionTarget={onSectionTarget}
 			pullRequestsTab={pullRequestsTab}
 			hosts={visible.hosts}
-			workspace={workspace}
-			space={space}
-			spaces={spaces}
 			onPickWorkspace={onPickWorkspace}
 			onShowShortcuts={onShowShortcuts}
 		/>

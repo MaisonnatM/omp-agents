@@ -18,8 +18,19 @@ export const workspaceOf = (row: { cwd: string; cwdDisplay: string; workspace: W
 /** The directory of the workspace a session counts in, {@link workspaceOf}'s `cwd`. */
 export const workspaceCwd = (row: { cwd: string; workspace: Workspace | null }): string => row.workspace?.cwd ?? row.cwd;
 
-/** The space session `row` counts in, as `spaces` places its workspace; a session the page cannot place yet counts as Work. */
-export const spaceOf = (row: { cwd: string; workspace: Workspace | null }, spaces: Spaces | null): Space => spaces?.of(row.cwd, workspaceCwd(row)) ?? "work";
+/** The space session `row` counts in, as `spaces` places its workspace. */
+export const spaceOf = (row: { cwd: string; workspace: Workspace | null }, spaces: Spaces): Space => spaces.of(row.cwd, workspaceCwd(row));
+
+/** What a window shows: its space, the workspace selected in it, and where a session or todo of All of the space starts. */
+export interface WindowScope {
+	space: Space;
+	/** Which space each directory is in. */
+	spaces: Spaces;
+	/** The workspace `cwd` the sidebar and the Pull requests page show, `null` for all of the space's workspaces. */
+	workspace: string | null;
+	/** Where All of the space starts a new session or todo: the personal directory in Personal; `null` in Work, and before the server names it. */
+	home: Workspace | null;
+}
 
 /** Ending session `host` deletes it with everything it wrote, as for a private session this dashboard started. */
 export const isPrivateHost = (host: RosterHost | null | undefined): boolean => host?.source === "dashboard" && host.private;
@@ -47,15 +58,15 @@ export function discoverableSessions(
 }
 
 /** The sessions of `lists` that count in `space`. */
-export function sessionsIn(lists: { hosts: RosterHost[]; past: PastSession[]; bots: RosterHost[] }, space: Space, spaces: Spaces | null): { hosts: RosterHost[]; past: PastSession[]; bots: RosterHost[] } {
+export function sessionsIn(lists: { hosts: RosterHost[]; past: PastSession[]; bots: RosterHost[] }, space: Space, spaces: Spaces): { hosts: RosterHost[]; past: PastSession[]; bots: RosterHost[] } {
 	const inSpace = (row: RosterHost | PastSession): boolean => spaceOf(row, spaces) === space;
 	return { hosts: lists.hosts.filter(inSpace), past: lists.past.filter(inSpace), bots: lists.bots.filter(inSpace) };
 }
 
 /** The workspaces of `workspaces` in `space`, with Personal's starting at the personal directory, where its new sessions start. */
-export function workspacesIn(workspaces: Workspace[], space: Space, spaces: Spaces | null, personalDir: Workspace | null): Workspace[] {
-	const inSpace = workspaces.filter(({ cwd }) => (spaces?.of(cwd, cwd) ?? "work") === space);
-	if (space === "work" || !spaces || !personalDir) return inSpace;
+export function workspacesIn(workspaces: Workspace[], space: Space, spaces: Spaces, personalDir: Workspace | null): Workspace[] {
+	const inSpace = spaces.inSpace(workspaces, space);
+	if (space === "work" || !personalDir) return inSpace;
 	return [personalDir, ...inSpace.filter(({ cwd }) => !spaces.isPersonalDir(cwd))];
 }
 
@@ -81,18 +92,18 @@ export function workspaceSession(cwd: string | null, hosts: RosterHost[], shownW
 }
 
 /** The session the panes follow a switch to `space` into: its most recently started running one; `null` when none runs there. */
-export function spaceSession(space: Space, hosts: RosterHost[], spaces: Spaces | null): View | null {
+export function spaceSession(space: Space, hosts: RosterHost[], spaces: Spaces): View | null {
 	const newest = hosts.filter(host => spaceOf(host, spaces) === space).toSorted(newestFirst)[0];
 	return newest ? { kind: "live", instanceId: newest.instanceId, agentId: null } : null;
 }
 
 /**
- * Where a new session starts unless the user picks another directory: `workspace` when one is selected, else `spaceHome`, the
- * personal directory in Personal, else the workspace of the open session, of the newest live one, or of the newest past one.
+ * Where a new session starts unless the user picks another directory: `workspace` when one is selected, else `home`, the personal
+ * directory in Personal, else the workspace of the open session, of the newest live one, or of the newest past one.
  * With `workspace` selected, it is the directory of one of its sessions, so a linked worktree hands on its repository's main checkout.
  */
-export function defaultCwd(view: View | null, hosts: RosterHost[], past: PastSession[], workspace: string | null, spaceHome: string | null): string {
-	if (workspace === null && spaceHome !== null) return spaceHome;
+export function defaultCwd(view: View | null, hosts: RosterHost[], past: PastSession[], { workspace, home }: Pick<WindowScope, "workspace" | "home">): string {
+	if (workspace === null && home !== null) return home.cwdDisplay;
 	const open =
 		view?.kind === "live"
 			? hosts.find(host => host.instanceId === view.instanceId)

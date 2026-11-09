@@ -54,8 +54,9 @@ export function useFocusedSession(state: DashboardState, page: Page | null, { wo
 		if (next !== null) pickWorkspace(next);
 	}, [live?.instanceId, live?.sessionWorkspace, workspace]);
 	const session = host ?? past;
-	const sessionSpace = session && spaces ? spaceOf(session, spaces) : null;
-	// Keyed on the session and its space alone, so a switch the user makes while the panes show a session is not undone.
+	// Until the server names the personal directory, every session reads as Work, so the follow waits for it; once named, a focused Personal session takes the window to Personal.
+	const sessionSpace = session && state.personal !== null ? spaceOf(session, spaces) : null;
+	// The one follower from the panes to the space; `switchSpace` moves the panes the other way. Keyed on the session and its space alone, so a switch the user makes while the panes show a session is not undone.
 	useEffect(() => {
 		if (sessionSpace !== null && sessionSpace !== space) pickSpace(sessionSpace);
 	}, [session?.sessionId, sessionSpace]);

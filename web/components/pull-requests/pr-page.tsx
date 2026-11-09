@@ -3,7 +3,6 @@ import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import { type PullRequestList, type LinkedPullRequest, type PullRequest, pullRequestUrl, repoKey } from "../../../src/shared/github";
 import type { RosterHost, WorkItem } from "../../../src/shared/sessions";
-import type { Space } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -15,15 +14,15 @@ import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, pullRequestStart, quickOn } from "../../quick-actions";
 import { pullRequestsStore } from "../../reads";
 import { hashForPullRequestFiles, hashForPullRequests } from "../../routing";
-import { sessionsOn } from "../../sessions";
+import { sessionsOn, type WindowScope } from "../../sessions";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { Header } from "../page-header";
 import { QuickStartNotice } from "../quick-actions";
 import { type Placement, PullRequestDetailContent, type PullRequestDetailTab } from "./pr-details";
 import { rowId } from "./pr-row";
 
-/** Why the pull request list does not hold the PR a link named, when the sidebar shows all of `space`'s workspaces, or `workspace` alone. */
-function whyMissing(target: PullRequest, list: PullRequestList, space: Space, workspace: string | null): string {
+/** Why the pull request list does not hold the PR a link named, when the sidebar shows all of the space's workspaces, or one alone. */
+function whyMissing(target: PullRequest, list: PullRequestList, { space, workspace }: Pick<WindowScope, "space" | "workspace">): string {
 	const repo = `${target.owner}/${target.repo}`;
 	const covered = list.repos.some(other => repoKey(other) === repoKey(target));
 	if (covered) {
@@ -58,7 +57,7 @@ interface PullRequestDetailsProps {
  */
 export function PullRequestDetails({ hosts, target, placement, version, tab, onTab, path, onPick, session, current = null }: PullRequestDetailsProps) {
 	const { open, start, dismissStart } = useDashboardActions();
-	const { starts: { quick }, pullRequestsScope, space, workspace } = useDashboardStatus();
+	const { starts: { quick }, pullRequestsScope, scope } = useDashboardStatus();
 	const { read } = pullRequestsStore.use(pullRequestsScope);
 	const listed = read && listedPullRequest(read.data, target);
 	const item: WorkItem = { kind: "pull-request", pr: target };
@@ -71,7 +70,7 @@ export function PullRequestDetails({ hosts, target, placement, version, tab, onT
 				<div className={cn("space-y-2", placement === "page" ? "px-6 pt-4" : "px-4 pt-3")}>
 					{missing && (
 						<p role="status" className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
-							{whyMissing(target, read.data, space, workspace)}
+							{whyMissing(target, read.data, scope)}
 						</p>
 					)}
 					{started && <QuickStartNotice quick={started} onDismiss={() => dismissStart("quick")} />}

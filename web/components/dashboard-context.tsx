@@ -4,9 +4,10 @@ import type { QueuedMerge } from "../../src/shared/merge-queue";
 import type { ReviewDraft } from "../../src/shared/review-drafts";
 import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
-import type { Space, Workspace } from "../../src/shared/workspaces";
+import type { Workspace } from "../../src/shared/workspaces";
 import type { FileTarget } from "../file-paths";
 import type { MentionLists } from "../mentions";
+import type { WindowScope } from "../sessions";
 import type { StartOf } from "../starts";
 import type { Dashboard } from "../use-dashboard";
 
@@ -62,14 +63,12 @@ export interface DashboardStatus {
 	/** The live sessions the page asked the server to end, by instance id, with the session each ran, until it answers. */
 	ending: ReadonlyMap<string, string | null>;
 	/**
-	 * The scope whose pull request entry `App` polls: the sidebar's workspace `cwd`, else its space. A component that wants the pull
+	 * The scope whose pull request entry `App` polls, as `pullRequestsScope` builds it from {@link DashboardStatus.scope}. A component that wants the pull
 	 * requests reads that entry, never another scope's: the unscoped entry asks GitHub about every repository.
 	 */
 	pullRequestsScope: string;
-	/** The sidebar's workspace `cwd`, `null` for all of the space's, which picks the Google accounts the `@` menu reads mail and events of. */
-	workspace: string | null;
-	/** The space this window shows. */
-	space: Space;
+	/** What this window shows: its space, the sidebar's workspace, which picks the Google accounts the `@` menu reads mail and events of, and Personal's home. */
+	scope: WindowScope;
 	/** The merges the server waits to make until GitHub allows them, which a pull request's row, its details, and a session's stack show. */
 	merges: readonly QueuedMerge[];
 	/** The review drafts the server keeps, which a pull request's row and its details show. */

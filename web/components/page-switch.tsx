@@ -183,8 +183,6 @@ export const PageSwitch = memo(function PageSwitch({
 					disabled={!connected}
 					onChange={changeTodo}
 					newSessionCwd={defaultWorkspace}
-					scope={scope}
-					workspace={workspace ?? (scope.space === "personal" ? (personal?.cwd ?? null) : null)}
 					workspaces={workspaces}
 					linearConnected={linearCallable}
 				/>

@@ -32,6 +32,7 @@ import type { McpServersAnswer } from "../src/shared/mcp-servers";
 import type { DevServerRequest, DevServerStart, LiveSessionProcesses, ProcessStop } from "../src/shared/processes";
 import type { CollabAutoStart, StarterKitStatus, TerminalAccess } from "../src/shared/readiness";
 import type { SourceControlAnswer } from "../src/shared/source-control";
+import type { Space, WorkspaceChange } from "../src/shared/workspaces";
 import { errorText } from "../src/json";
 import { getJson, putJson } from "./api";
 import { createPolledStore, type PolledEntry } from "./polled-store";
@@ -93,16 +94,19 @@ export async function setTerminalAccess(access: TerminalAccess): Promise<void> {
 	terminalSessionsStore.update(() => answer);
 }
 
-/**
- * The open pull requests by scope, which the sidebar and the Pull requests page share: a workspace `cwd`, or a space, `personal` or
- * `work`, for the workspaces in it, which no absolute `cwd` can be; `null` reads every workspace.
- */
+/** Adds, hides, shows, or places in a space the workspace `change` names; every page then hears the list after it over its socket. */
+export async function writeWorkspace(change: WorkspaceChange): Promise<void> {
+	await putJson("/api/workspaces", change);
+}
+
+/** The scope {@link pullRequestsStore} keys a window's pull requests by: the query reading the selected `workspace`, else every workspace of `space`. */
+export const pullRequestsScope = ({ space, workspace }: { space: Space; workspace: string | null }): string => new URLSearchParams(workspace !== null ? { cwd: workspace } : { space }).toString();
+
+/** The open pull requests by scope, as {@link pullRequestsScope} builds it, which the sidebar and the Pull requests page share. */
 export const pullRequestsStore = createPolledStore<PullRequestList>({
 	// Keeps its name from before the page was called Pull requests, so the browser's cached list survives.
 	url: (scope, fresh) => {
-		const params = new URLSearchParams();
-		if (scope === "personal" || scope === "work") params.set("space", scope);
-		else if (scope !== null) params.set("cwd", scope);
+		const params = new URLSearchParams(scope ?? "");
 		if (fresh) params.set("fresh", "");
 		return `/api/pull-requests${params.size ? `?${params}` : ""}`;
 	},

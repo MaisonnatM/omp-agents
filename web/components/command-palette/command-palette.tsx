@@ -155,7 +155,7 @@ const SETTINGS_ITEMS: readonly PaletteItem[] = SETTINGS_SECTIONS.map(({ value, l
 
 function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, tabs, todoCategories, todos, notes, linearConnected, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
 	const { send, start, end, changeTodo, changeNote, workspaceSettings } = useDashboardActions();
-	const { starts, ending, pullRequestsScope, connected, space } = useDashboardStatus();
+	const { starts, ending, pullRequestsScope, connected, scope: { space } } = useDashboardStatus();
 	const personal = useContext(PersonalContext);
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
 	const inputRef = useRef<HTMLInputElement>(null);

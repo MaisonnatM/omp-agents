@@ -121,10 +121,11 @@ describe("spaces", () => {
 		expect(ids(sessionsIn(lists, "work", placed).hosts)).toEqual(["job"]);
 	});
 
-	test("before the server names the personal directory, every session counts as Work", () => {
+	test("before the server names the personal directory, a session there counts as Work", () => {
 		const lists = { hosts: [running("life", "/home/me/personal", 1)], past: [], bots: [] };
-		expect(ids(sessionsIn(lists, "work", null).hosts)).toEqual(["life"]);
-		expect(sessionsIn(lists, "personal", null).hosts).toEqual([]);
+		const unnamed = spaces(["/code/garden"], null);
+		expect(ids(sessionsIn(lists, "work", unnamed).hosts)).toEqual(["life"]);
+		expect(sessionsIn(lists, "personal", unnamed).hosts).toEqual([]);
 	});
 
 	test("Personal's workspaces start at the personal directory, even before a session ran there", () => {
@@ -164,23 +165,25 @@ describe("defaultCwd", () => {
 	const past = (sessionId: string, cwdDisplay: string) => ({ sessionId, cwd: cwdDisplay, cwdDisplay }) as PastSession;
 	const hosts = [host("a", "~/old", 1), host("b", "~/new", 2)];
 	const sessions = [past("s1", ""), past("s2", "~/saved")];
+	const all = { workspace: null, home: null };
+	const personal = { cwd: "/home/me/personal", cwdDisplay: "~/personal" };
 
 	test("prefers the open session, then the newest live one, then the newest past one with a directory", () => {
-		expect(defaultCwd({ kind: "live", instanceId: "a", agentId: null }, hosts, sessions, null, null)).toBe("~/old");
-		expect(defaultCwd({ kind: "past", sessionId: "s2" }, hosts, sessions, null, null)).toBe("~/saved");
-		expect(defaultCwd(null, hosts, sessions, null, null)).toBe("~/new");
-		expect(defaultCwd({ kind: "past", sessionId: "s1" }, [], sessions, null, null)).toBe("~/saved");
-		expect(defaultCwd(null, [], [], null, null)).toBe("~");
+		expect(defaultCwd({ kind: "live", instanceId: "a", agentId: null }, hosts, sessions, all)).toBe("~/old");
+		expect(defaultCwd({ kind: "past", sessionId: "s2" }, hosts, sessions, all)).toBe("~/saved");
+		expect(defaultCwd(null, hosts, sessions, all)).toBe("~/new");
+		expect(defaultCwd({ kind: "past", sessionId: "s1" }, [], sessions, all)).toBe("~/saved");
+		expect(defaultCwd(null, [], [], all)).toBe("~");
 	});
 
 	test("stays in the selected workspace, so the new session is listed under it", () => {
-		expect(defaultCwd({ kind: "live", instanceId: "b", agentId: null }, hosts, sessions, "~/old", null)).toBe("~/old");
-		expect(defaultCwd(null, hosts, sessions, "~/saved", null)).toBe("~/saved");
+		expect(defaultCwd({ kind: "live", instanceId: "b", agentId: null }, hosts, sessions, { workspace: "~/old", home: null })).toBe("~/old");
+		expect(defaultCwd(null, hosts, sessions, { workspace: "~/saved", home: null })).toBe("~/saved");
 	});
 
 	test("in Personal with no workspace picked, starts in the personal directory whatever session is open", () => {
-		expect(defaultCwd({ kind: "live", instanceId: "a", agentId: null }, hosts, sessions, null, "~/personal")).toBe("~/personal");
-		expect(defaultCwd(null, hosts, sessions, "~/saved", "~/personal")).toBe("~/saved");
+		expect(defaultCwd({ kind: "live", instanceId: "a", agentId: null }, hosts, sessions, { workspace: null, home: personal })).toBe("~/personal");
+		expect(defaultCwd(null, hosts, sessions, { workspace: "~/saved", home: personal })).toBe("~/saved");
 	});
 });
 
@@ -283,7 +286,7 @@ describe("a session in a linked worktree", () => {
 	test("counts in its repository's workspace, which lists it, while its directory is no workspace", () => {
 		expect(listWorkspaces([inWorktree], [], [])).toEqual([app]);
 		expect(ids(sidebarSessions([inWorktree, inMain], [], [], "/code/app", new Set()).running)).toEqual(["w", "m"]);
-		expect(defaultCwd({ kind: "live", instanceId: "i-w", agentId: null }, [inWorktree], [], "/code/app", null)).toBe("~/code/app");
+		expect(defaultCwd({ kind: "live", instanceId: "i-w", agentId: null }, [inWorktree], [], { workspace: "/code/app", home: null })).toBe("~/code/app");
 	});
 
 	test("leaves the lists with its hidden workspace", () => {

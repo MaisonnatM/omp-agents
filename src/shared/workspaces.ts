@@ -1,7 +1,13 @@
 /** The directories Settings → Workspaces adds to the ones sessions ran in, the ones it hides, and the ones it places in the Personal space. */
+import { oneOf } from "../json";
 
-/** The two halves of the dashboard: the user's own life, and their job. */
-export type Space = "personal" | "work";
+/** The two halves of the dashboard, in the order the page lists them: the user's own life, and their job. */
+export const SPACES = ["personal", "work"] as const;
+export type Space = (typeof SPACES)[number];
+
+export const isSpace = oneOf(SPACES);
+
+export const otherSpace = (space: Space): Space => (space === "personal" ? "work" : "personal");
 
 /** Absolute directories, or the page's rows for them; one in both lists is hidden, and showing it offers it again as added. */
 export interface WorkspaceList<Entry = string> {
@@ -74,14 +80,29 @@ export interface Spaces {
 	 * places it, else `cwd` itself: Personal in the personal directory or in a workspace `personal` lists, else Work.
 	 */
 	of(cwd: string, workspace: string): Space;
+	/** The workspaces of `workspaces` in `space`, each a directory or a row for one. */
+	inSpace<W extends string | Workspace>(workspaces: readonly W[], space: Space): W[];
 }
 
-/** The {@link Spaces} of the workspaces `personal` lists and `personalDir`, whose `cwdDisplay` is how a `~` path names it. */
-export function spaces(personal: readonly string[], personalDir: Workspace): Spaces {
+/**
+ * The {@link Spaces} of the workspaces `personal` lists and `personalDir`, whose `cwdDisplay` is how a `~` path names it. Until the page
+ * hears the personal directory, `personalDir` is `null` and only the listed workspaces are Personal.
+ */
+export function spaces(personal: readonly string[], personalDir: Workspace | null): Spaces {
 	const isPersonalDir = (cwd: string): boolean => {
+		if (!personalDir) return false;
 		// The root keeps its `/`.
 		const dir = cwd.trim().replace(/(?<=.)\/+$/, "");
 		return dir === personalDir.cwd || dir === personalDir.cwdDisplay;
 	};
-	return { isPersonalDir, of: (cwd, workspace) => (isPersonalDir(cwd) || personal.includes(workspace) ? "personal" : "work") };
+	const of = (cwd: string, workspace: string): Space => (isPersonalDir(cwd) || personal.includes(workspace) ? "personal" : "work");
+	return {
+		isPersonalDir,
+		of,
+		inSpace: (workspaces, space) =>
+			workspaces.filter(workspace => {
+				const cwd = typeof workspace === "string" ? workspace : workspace.cwd;
+				return of(cwd, cwd) === space;
+			}),
+	};
 }
