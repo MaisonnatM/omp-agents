@@ -4,6 +4,7 @@ import type { LinkedPullRequest } from "../../src/shared/github";
 import type { LiveView, RosterHost, View } from "../../src/shared/sessions";
 import { PAGE_ICON } from "../page-icons";
 import { type DetailsTab, DetailsSidebarFrame } from "./details-sidebar-frame";
+import { isPhonePage } from "../api";
 import { BROWSER_AVAILABLE, BrowserPanel } from "./browser-panel";
 import { MemoryList } from "./memory-list";
 import { SessionPullRequestsTab } from "./session-pull-requests-tab";
@@ -46,7 +47,7 @@ export function sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, 
 			content: <SessionPullRequestsTab key={scope} pullRequests={pullRequests} hosts={hosts} version={working} current={live?.instanceId ?? null} />,
 		},
 		...ticketsTabs(tickets, working),
-		...(BROWSER_AVAILABLE && live !== null
+		...(BROWSER_AVAILABLE && live !== null && !isPhonePage()
 			? [
 					{
 						value: "browser",

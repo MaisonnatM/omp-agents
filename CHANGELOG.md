@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-09
 
+- You can open the dashboard on your phone from anywhere: turn on Settings › Phone access and scan the code.
+- Each phone signs in with its own key, and Remove signs that phone out at once.
 - The dashboard now ships a small QR code library, which the coming Phone access settings use to show a pairing code you can scan.
 - In Settings, Decisions, All workspaces now lists each workspace's decision records, grouped by workspace, instead of asking you to pick one.
 - `/ship` now grills you on the change before it plans it, asking rounds of questions with a recommended answer each, and saves the settled terms and choices in the project's glossary and decision records.

@@ -90,6 +90,8 @@ import { ScheduledFile } from "./scheduled-file";
 import { AutoContinue, occupiedBy } from "./auto-continue";
 import { ScheduledRunner } from "./scheduled-runner";
 import type { Routes } from "./route-kit";
+import type { PhoneAccess } from "./phone-access";
+import type { PhoneAccessRoutesEnv } from "./phone-access-routes";
 import { createRoutes } from "./routes";
 import type { SelfUpdate } from "./self-update";
 import { endSession } from "./session-end";
@@ -637,7 +639,7 @@ export class Dashboard {
 	}
 
 	/** The HTTP API over this dashboard, admitted by `guards`; `build` is what the server serves. */
-	routes(guards: Guards, build: ServedBuild): Routes {
+	routes(guards: Guards, build: ServedBuild, phoneAccess: PhoneAccessRoutesEnv): Routes {
 		const files = this.#files;
 		const sessions = this.#sessions;
 		const broadcasts = this.#broadcasts;
@@ -710,6 +712,7 @@ export class Dashboard {
 				},
 			},
 			sportThumbs: { dir: sportThumbsDir, fetch: url => fetch(url) },
+			phoneAccess,
 		});
 	}
 

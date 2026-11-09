@@ -19,6 +19,8 @@ export interface SocketData {
 	trajectories: Map<string, View>;
 	/** The id of the page load this socket belongs to, the same across its reconnects. */
 	pageId: string;
+	/** The paired phone this socket signed in as, when it did; removing that phone closes it. */
+	phoneId?: string;
 }
 export type Socket = ServerWebSocket<SocketData>;
 

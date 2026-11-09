@@ -69,6 +69,8 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
   Edit omp's model roles, fallback chains, retry settings, and context files (`AGENTS.md`, `config.yml`, skills, rules) in place, edit your workflows, the skills tagged `workflow` such as `/ship`'s, and pin a skill that every new session starts through.
 - **Plan quota.**
   Remaining quota per provider plan, from `omp usage`.
+- **Phone access.**
+  Open the dashboard on your phone from anywhere: turn on **Settings › Phone access** and scan the code, which signs that phone in through Tailscale with its own key.
 - **Keyboard-first.**
   Shortcuts that follow omp's terminal keys; press `?` to list them.
 - **omp starter kit.**
