@@ -1,9 +1,10 @@
-/** The Personal and Work switch, the Notes, Calendar, Email, and Sport buttons, the command menu button, the notices' bell, and Settings: in the desktop app's title bar, else at the end of the page's header; and the title bar's Back and Forward buttons. */
-import { Briefcase, ChevronLeft, ChevronRight, type LucideIcon, Search, UserRound } from "lucide-react";
+/** The Personal and Work switch, the Notes, Calendar, Email, and Sport buttons, the command menu button, the notices' bell, and Settings: in the desktop app's title bar, else at the end of the page's header, where a phone gets one menu of every tab instead; and the title bar's Back and Forward buttons. */
+import { Briefcase, ChevronDown, ChevronLeft, ChevronRight, type LucideIcon, Search, UserRound } from "lucide-react";
 import { createContext, memo, type ReactNode, useContext } from "react";
 import type { Notice } from "../../src/shared/notices";
 import { isSpace, type Space, SPACES } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuRadioGroup, MenuRadioItem, MenuSeparator } from "@/components/ui/menu";
 import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { SizeProvider } from "@/lib/size-context";
@@ -14,6 +15,7 @@ import type { SidebarPanel, SidebarTab } from "../routing";
 import { shortcutLabels } from "../shortcuts";
 import { TAB_ROWS } from "../sidebar-tabs";
 import { useHistoryPosition } from "../use-history-position";
+import { usePhoneWidth } from "../use-phone-width";
 import { NoticesBell } from "./notices";
 import { WhatsNew } from "./whats-new";
 
@@ -30,6 +32,8 @@ interface HeaderControlsProps {
 	onShowSearch: () => void;
 	/** The shown tabs whose triggers sit here, after the command menu button between two dividers, in order. */
 	tabs: readonly SidebarTab[];
+	/** Every shown tab, in order, which a phone lists in one menu in place of the sidebar's bar and the header's buttons. */
+	allTabs: readonly SidebarTab[];
 	/** The panel the sidebar shows, whose button is pressed. */
 	tab: SidebarPanel;
 	onTab: (tab: SidebarTab) => void;
@@ -77,18 +81,85 @@ function SpaceSwitch({ space, onSpace }: { space: Space; onSpace: (space: Space)
 	);
 }
 
-export const HeaderControls = memo(function HeaderControls({ notices, onShowSearch, tabs, tab, onTab, settingsOpen, onToggleSettings, space, onSpace }: HeaderControlsProps) {
+/**
+ * A phone's one way to every tab: the button names the tab on, and its menu lists every shown tab, then the space and Settings,
+ * so the header holds this menu, the command menu, and the bell.
+ */
+function PhoneTabMenu({ tabs, tab, onTab, settingsOpen, onToggleSettings, space, onSpace }: Omit<HeaderControlsProps, "notices" | "onShowSearch" | "allTabs">) {
+	const current = tab === "settings" ? { label: "Settings", icon: SettingsIcon } : TAB_ROWS[tab];
+	const CurrentIcon = current.icon;
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={<Button {...activityControl("header.tab-menu")} variant="ghost" size="compact" className="min-w-0 gap-1.5 px-2 font-medium text-foreground [&_svg]:size-3.5" aria-label={`${current.label}. Go to another tab`} />}
+			>
+				<CurrentIcon />
+				<span className="truncate">{current.label}</span>
+				<ChevronDown className="text-muted-foreground" />
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end" className="w-56">
+				<MenuRadioGroup value={tab} onValueChange={(value: SidebarTab) => onTab(value)}>
+					{tabs.map(value => {
+						const { label, icon: Icon } = TAB_ROWS[value];
+						return (
+							<MenuRadioItem key={value} value={value} closeOnClick>
+								<Icon />
+								{label}
+							</MenuRadioItem>
+						);
+					})}
+				</MenuRadioGroup>
+				<MenuSeparator />
+				<MenuRadioGroup
+					value={space}
+					onValueChange={(value: string) => {
+						if (isSpace(value)) onSpace(value);
+					}}
+				>
+					{SPACES.map(value => {
+						const Icon = SPACE_ICONS[value];
+						return (
+							<MenuRadioItem key={value} value={value} closeOnClick>
+								<Icon />
+								{SPACE_LABELS[value]}
+							</MenuRadioItem>
+						);
+					})}
+				</MenuRadioGroup>
+				<MenuSeparator />
+				<MenuItem onClick={onToggleSettings}>
+					<SettingsIcon />
+					{settingsOpen ? "Close settings" : "Settings"}
+				</MenuItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+export const HeaderControls = memo(function HeaderControls({ notices, onShowSearch, tabs, allTabs, tab, onTab, settingsOpen, onToggleSettings, space, onSpace }: HeaderControlsProps) {
+	const phone = usePhoneWidth();
+	const commandMenu = (
+		<Tooltip content="Command menu" shortcut={shortcutLabels("switcher")} side="bottom">
+			<Button {...activityControl("header.command-menu")} variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Command menu" onClick={onShowSearch}>
+				<Search />
+			</Button>
+		</Tooltip>
+	);
+	if (phone)
+		return (
+			<div className="flex min-w-0 items-center gap-1">
+				<PhoneTabMenu tabs={allTabs} tab={tab} onTab={onTab} settingsOpen={settingsOpen} onToggleSettings={onToggleSettings} space={space} onSpace={onSpace} />
+				{commandMenu}
+				<NoticesBell notices={notices} />
+			</div>
+		);
 	return (
 		<div className="flex shrink-0 items-center gap-1">
 			{!DESKTOP_TITLE_BAR && <SpaceSwitch space={space} onSpace={onSpace} />}
-			<Tooltip content="Command menu" shortcut={shortcutLabels("switcher")} side="bottom">
-				<Button {...activityControl("header.command-menu")} variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Command menu" onClick={onShowSearch}>
-					<Search />
-				</Button>
-			</Tooltip>
+			{commandMenu}
 			{tabs.length > 0 && (
 				<>
-					<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border max-phone:hidden" />
+					<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border" />
 					{tabs.map(value => {
 						const { label, icon: Icon } = TAB_ROWS[value];
 						return (
@@ -107,7 +178,7 @@ export const HeaderControls = memo(function HeaderControls({ notices, onShowSear
 							</Tooltip>
 						);
 					})}
-					<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border max-phone:hidden" />
+					<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border" />
 				</>
 			)}
 			<WhatsNew />

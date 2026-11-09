@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-09
 
+- On a phone, the header holds one menu named after the page you are on, listing every tab, Personal and Work, and Settings, beside search and the bell.
 - On a phone, the sidebars stay closed until you open them, and the page uses the full width of the screen.
 - On a phone, the status bar shows plan quota on one line you can swipe, without the Mac's terminal and load.
 - On a phone, toasts show one at a time under the top bar, so they no longer cover the composer or the sidebar button.
