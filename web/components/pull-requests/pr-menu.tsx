@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuLinkItem, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuSubmenu, MenuSubmenuContent, MenuSubmenuTrigger } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { graphiteUrl, rebaseApplies } from "../../pull-requests-model";
+import { rebaseApplies } from "../../pull-requests-model";
 import { useRebaseState } from "../../pull-request-rebases";
 import { QUICK_ACTIONS } from "../../quick-actions";
 import { useAction } from "../../use-action";
@@ -134,7 +134,6 @@ export function PullRequestMenuItems({ pr, state, quick, onState, onApprove, mer
 			{merge?.queued && <MenuItem disabled={pending} onClick={merge.onCancel}><X />{merge.queued.state.kind === "failed" ? "Dismiss stopped merge" : "Cancel merge when ready"}</MenuItem>}
 			{(changesState || merge?.queued) && <MenuSeparator />}
 			<MenuLinkItem href={pullRequestUrl(pr)} target="_blank" rel="noreferrer"><OrgIcon org="github" className="size-4" />Open on GitHub</MenuLinkItem>
-			<MenuLinkItem href={graphiteUrl(pr)} target="_blank" rel="noreferrer"><OrgIcon org="graphite" className="size-4" />Open on Graphite</MenuLinkItem>
 			<MenuItem onClick={() => clipboard.run(pullRequestUrl(pr))}><Link />Copy link</MenuItem>
 			<MenuItem onClick={() => clipboard.run(`#${pr.number}`)}><Copy />Copy PR number</MenuItem>
 			{state && state !== "merged" && <>

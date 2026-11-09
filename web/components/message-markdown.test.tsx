@@ -26,7 +26,6 @@ test("service links keep their titles and icons without displaying bare URLs", (
 	const destinations = [
 		["https://linear.app/team/issue/ENG-42/fix-login", "ENG-42"],
 		["https://github.com/org/repo/pull/42", "org/repo #42"],
-		["https://app.graphite.com/github/pr/org/repo/42", "org/repo #42"],
 		["https://team.slack.com/archives/C123/p123", "Slack message"],
 	];
 	for (const github of [false, true]) {

@@ -47,7 +47,7 @@ Append it under an existing checklist; otherwise add a `## Checks` section befor
 ## Proof boxes
 
 A repository's PR template can declare `- [ ] Browser proof`.
-The ship extension blocks `gh pr ready` and `gt submit --publish` while the PR body has that box unchecked and the interface review applies, that is, the repository commits `.omp/ui-paths` and a changed file matches it.
+The ship extension blocks `gh pr ready` while the PR body has that box unchecked and the interface review applies, that is, the repository commits `.omp/ui-paths` and a changed file matches it.
 It checks the box, not a screenshot: do what the box and the repository's instructions ask, such as attaching a screenshot as [PR screenshots](#pr-screenshots) describes, then change it to `- [x] Browser proof`.
 When the interface review does not apply, the box does not block, and you may delete the line.
 Edit the box with `pr_description`'s `replace-text` change, using the exact unchecked line as `oldText` and its checked line as `newText`, keeping the rest of the description.
@@ -64,6 +64,5 @@ Attach screenshots and videos with `gh pr edit <N> --attach './shot.png#Alt text
 It uploads to `github.com/user-attachments/assets/…`, which keeps the repository's visibility, and appends the image to the body.
 Never pass `--body`, `--body-file`, `-b`, or `-F` to `gh pr edit`: the pr-description guard refuses every such command. To place or caption the appended image, read the body with `pr_description` and move its `user-attachments` URL with a `replace-text` change.
 When the cwd is not the PR's repository, pass `-R owner/repo`, or `gh` looks for the PR in the cwd's repository.
-In a Graphite repository, run `gt submit --draft` first, then attach: `gt submit` leaves an existing PR's description alone unless given `--edit-description`.
 Never commit images to an assets branch or link Linear upload URLs, which expire after five minutes.
 For a sized or side-by-side layout, attach first, then use `pr_description` to put the appended `user-attachments` URLs into `<img>` tags and remove the appended lines.

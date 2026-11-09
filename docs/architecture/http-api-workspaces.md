@@ -1,9 +1,8 @@
 # HTTP API: source control, sync, worktrees, and workspaces
 
-`GET /api/source-control` answers a `SourceControlAnswer` from `SourceControl` in `src/source-control.ts`: whether `gh` and `gt` are installed and signed in, the automatic pull setting, whether the cleanup after a merge is on (`cleanUp`), and each repository the visible workspaces are in, keyed by its main checkout with `pathDisplay` naming it with `~`, with its own choice and its last pull since the server started.
+`GET /api/source-control` answers a `SourceControlAnswer` from `SourceControl` in `src/source-control.ts`: whether `gh` is installed and signed in under `github`, the automatic pull setting, whether the cleanup after a merge is on (`cleanUp`), and each repository the visible workspaces are in, keyed by its main checkout with `pathDisplay` naming it with `~`, with its own choice and its last pull since the server started.
 A repository whose main checkout is in a temp directory, as `inTempDir` in `src/shared/workspaces.ts` reads it, is left out of the answer and of the pulls.
-`gh` is signed in when `gh api user` answers a login, and `gt` when Graphite's `user_config` holds an `authToken`.
-`PUT /api/source-control/graphite-sign-in` takes `{ token }`, checked by `parseGraphiteToken`, runs `gt auth --no-interactive --token` with it as an argument, never through a shell, and answers the same as the `GET`; an error it answers has the token replaced, and activity records the path alone.
+`gh` is signed in when `gh api user` answers a login.
 `PUT /api/source-control` takes a `SourceControlChange`, `{ op: "default", on }`, `{ op: "repo", repo, on }` with `on: null` dropping a repository's own choice, or `{ op: "clean-up", on }`, checked by `parseSourceControlChange` in `src/server/wire.ts`, and answers the same as the `GET`.
 A change that changes the settings saves `source-control.json` beside the access token and, for a change of the pulls on the server that holds the owner lock, pulls at once; a file from before `cleanUp` reads with it on.
 A pull, from that change or from the pull loop every five minutes, waits for the one under way, then runs `pullDefaultBranch` on each repository whose pulls are on.

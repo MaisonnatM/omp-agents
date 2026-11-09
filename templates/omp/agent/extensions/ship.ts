@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
-import { commands, located, within } from "./shell/commands";
+import { commands, located } from "./shell/commands";
 import { quotaExhausted } from "./github/access";
 import { type GhCredential, GhRunner, rejectedCredential, TOKEN_VARIABLE } from "./github/runner";
 
@@ -72,10 +72,10 @@ const NEXT: Record<Stage, string> = {
 	ticket: "Link the Linear issue the user named, or an open one that clearly matches the work, then record ship_stage({stage: 'plan', issue}); with no issue, record ship_stage({stage: 'plan'}).",
 	plan: "Choose how to build the change as the ship skill's Plan step says, then record ship_stage({stage: 'implement'}).",
 	implement: "Implement the plan and commit on the work's branch. Do not open a PR in this stage.",
-	draft_pr: "Create a draft with `gt submit --draft` for a Graphite repository, or push and run `gh pr create --draft` otherwise. Reference the issue, or put the plan in the body without one, as the ship skill's Draft PR step says.",
+	draft_pr: "Push the branch and run `gh pr create --draft`. Reference the issue, or put the plan in the body without one, as the ship skill's Draft PR step says.",
 	interface_review: `If the status says the ${REVIEWS.interface_review.label} is not needed because \`${REVIEWS.interface_review.pathsFile}\` lists no changed file, record ship_stage({stage: 'thermonuclear'}) and move on. Otherwise wait until the user approves the direction, then spawn \`task\` with \`agent: "interface-reviewer"\` on the PR, apply the findings in a fresh agent, push, then add \`${REVIEWS.interface_review.box}\` to the PR body.`,
 	thermonuclear: `If the status says the ${REVIEWS.thermonuclear.label} is not needed because \`${REVIEWS.thermonuclear.pathsFile}\` lists no changed file, skip the review. Otherwise wait until the user approves the direction, then run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${REVIEWS.thermonuclear.box}\` to the PR body. If the ${REVIEWS.interface_review.label} was needed and the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
-	ready_gate: `When the ${REVIEWS.interface_review.label} was needed, make sure the PR body has no unchecked \`${PROOF_BOX}\` box. Then run \`gt submit --publish\` for a Graphite repository or \`gh pr ready <N>\` otherwise, without asking first: the command itself asks the user to approve.`,
+	ready_gate: `When the ${REVIEWS.interface_review.label} was needed, make sure the PR body has no unchecked \`${PROOF_BOX}\` box. Then run \`gh pr ready <N>\` without asking first: the command itself asks the user to approve.`,
 	live: "Work the first need below. Stop when the forge reports merge-ready or while waiting for review. Never merge without an explicit request.",
 	merged: "Done.",
 };
@@ -214,17 +214,6 @@ export function ghPr(words: string[], sub: "create" | "ready"): string[] | undef
 	let i = 2;
 	while (/^(?:-R|--repo(?:=|$))/.test(words[i] ?? "")) i += words[i] === "-R" || words[i] === "--repo" ? 2 : 1;
 	return words[i] === sub ? [...words.slice(2, i), ...words.slice(i + 1)] : undefined;
-}
-
-/** The PR a `gt submit --publish` (or `gt ss -p`) puts live, the branch's, with an empty selector, and the directory it runs in from `dir` after gt's own flags such as `--cwd`; `undefined` when the words publish nothing. */
-function gtPublish(words: string[], dir: string | null): { selector: string[]; dir: string | null } | undefined {
-	if (words[0] !== "gt") return undefined;
-	let i = 1;
-	for (; words[i]?.startsWith("-"); i++) {
-		if (words[i] === "--cwd") dir = within(dir, words[++i]);
-		else if (words[i].startsWith("--cwd=")) dir = within(dir, words[i].slice(6));
-	}
-	return (words[i] === "submit" || words[i] === "ss") && words.slice(i + 1).some(a => a === "--publish" || a === "-p") ? { selector: [], dir } : undefined;
 }
 
 /** The `gh pr view` selector for `gh pr ready <args>`: its first positional (number, URL, or branch) and `--repo`; redirections and other flags drop. */
@@ -509,7 +498,7 @@ export default function ship(pi: ExtensionAPI) {
 		if (r.code !== 0) {
 			const error = r.stderr.trim() || r.stdout.trim();
 			if (/^no pull requests found for branch\b/i.test(error)) {
-				return { kind: "block", reason: "Blocked: this branch has no PR yet. Create a draft with `gt submit --draft` for Graphite, or `gh pr create --draft` otherwise. Then run each review stage the change needs, commit and push its fixes, add its box, and pass the ready gate before publishing." };
+				return { kind: "block", reason: "Blocked: this branch has no PR yet. Push it and create a draft with `gh pr create --draft`. Then run each review stage the change needs, commit and push its fixes, add its box, and pass the ready gate before publishing." };
 			}
 			const held = quotaExhausted(error) ? undefined : await runner.credentials(sessionDir);
 			const auth = held && authDiagnosis(held, dotenvFiles(sessionDir));
@@ -562,19 +551,18 @@ export default function ship(pi: ExtensionAPI) {
 				return { block: true, reason: "Blocked: open PRs as drafts (`gh pr create --draft`). A PR goes live only after the ready gate, and after each review its changed files call for." };
 			}
 			const ready = ghPr(words, "ready");
-			const live = ready && !ready.includes("--undo") ? { selector: prSelector(ready), dir } : gtPublish(words, dir);
-			if (!live) continue;
+			if (!ready || ready.includes("--undo")) continue;
 			const command = `\`${words.join(" ")}\``;
 			if (/\bGH_(?:REPO|HOST)=/.test(input.command)) {
 				return { block: true, reason: `Blocked: this command sets GH_REPO or GH_HOST, which this gate cannot apply to its own read of the PR ${command} puts live. Name the repository with \`-R owner/name\` or a PR URL instead, then retry.` };
 			}
-			if (live.dir === null) {
+			if (dir === null) {
 				return { block: true, reason: `Blocked: ${command} puts a PR live from a directory this gate cannot locate, because a variable, a command substitution, or \`cd -\` names it. Write the directory out, as in \`cd /absolute/path && ...\`, or set the bash call's cwd, then retry.` };
 			}
-			const verdict = await publishCheck(live.selector, live.dir, command, ctx.cwd);
+			const verdict = await publishCheck(prSelector(ready), dir, command, ctx.cwd);
 			if (verdict.kind === "theirs") continue;
 			if (verdict.kind === "block") return { block: true, reason: verdict.reason };
-			if (!ctx.hasUI || !(await ctx.ui.confirm("Put PR live for review?", `The PR passed the ship gate. ${ready ? "Mark this draft ready" : "Publish it"} for human review?`))) {
+			if (!ctx.hasUI || !(await ctx.ui.confirm("Put PR live for review?", "The PR passed the ship gate. Mark this draft ready for human review?"))) {
 				return { block: true, reason: "The PR remains a draft until the operator approves putting it live." };
 			}
 		}

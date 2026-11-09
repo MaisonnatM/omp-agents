@@ -29,7 +29,7 @@ const waited = (jobs: { id: string; type: string; resultText: string }[]) =>
 	});
 const delivered = (jobId: string, content: string) =>
 	JSON.stringify({ type: "custom_message", customType: "async-result", content, details: { jobs: [{ jobId, type: "bash" }] } });
-const gtLine = (n: number) => `me/b${n}: https://app.graphite.com/github/pr/o/r/${n} (created)`;
+const prCreated = (id: string, number: number) => [bashCall(id, "gh pr create --fill"), result(id, `https://github.com/o/r/pull/${number}`)];
 const pushed = (branch: string) => `To github.com:acme/webapp.git\n   1a2b3c4d..5e6f7a8b  HEAD -> ${branch}\n`;
 const submitted = (owner: string, repo: string, number: number) => ({ kind: "pr", link: "submitted", owner, repo, number }) as const;
 const worked = (owner: string, repo: string, number: number) => ({ kind: "pr", link: "worked", owner, repo, number }) as const;
@@ -46,18 +46,6 @@ const scanOf = (lines: string[], prompts = true) => {
 const scanned = (lines: string[]) => [...scanOf(lines).found.values()];
 
 describe("SessionFactsScan", () => {
-	test("every branch a gt submit created or updated, once each", () => {
-		const output = [
-			"🥞 Pushing to remote and creating/updating PRs for stack...",
-			"me/a: https://app.graphite.com/github/pr/acme/webapp/6595 (updated)",
-			"me/b: https://app.graphite.com/github/pr/acme/webapp/6596 (created)",
-		].join("\n");
-		expect(scanned([bashCall("c1", "gt submit --stack"), result("c1", output), result("c2", output)])).toEqual([
-			submitted("acme", "webapp", 6595),
-			submitted("acme", "webapp", 6596),
-		]);
-	});
-
 	test("the URL gh pr create prints, but not a URL another command prints", () => {
 		const created = "Creating pull request for me/c into main\n\nhttps://github.com/acme/webapp/pull/6600\n";
 		expect(
@@ -70,26 +58,23 @@ describe("SessionFactsScan", () => {
 		).toEqual([submitted("acme", "webapp", 6600)]);
 	});
 
-	test("a background gt submit's output, whether delivered or waited for", () => {
-		expect(scanned([delivered("bg_1", `Background job bg_1 has completed.\n${gtLine(1)}`), waited([{ id: "bg_2", type: "bash", resultText: gtLine(2) }])])).toEqual([
-			submitted("o", "r", 1),
-			submitted("o", "r", 2),
-		]);
-	});
-
-	test("a background gh pr create's URL arrives with its job", () => {
+	test("a background gh pr create's URL arrives with its job, whether delivered or waited for", () => {
+		const backgrounded = (id: string, jobId: string) => result(id, `Backgrounded as job ${jobId}`, { async: { state: "running", jobId, type: "bash" } });
 		expect(
 			scanned([
 				bashCall("create", "gh pr create --fill"),
-				result("create", "Backgrounded as job bg_3", { async: { state: "running", jobId: "bg_3", type: "bash" } }),
+				backgrounded("create", "bg_3"),
 				delivered("bg_9", "https://github.com/o/r/pull/9"),
 				delivered("bg_3", "https://github.com/o/r/pull/3"),
+				bashCall("again", "gh pr create --fill"),
+				backgrounded("again", "bg_4"),
+				waited([{ id: "bg_4", type: "bash", resultText: "https://github.com/o/r/pull/4" }]),
 			]),
-		).toEqual([submitted("o", "r", 3)]);
+		).toEqual([submitted("o", "r", 3), submitted("o", "r", 4)]);
 	});
 
-	test("a gt submit line a subagent's report quotes is a mention, not a submission", () => {
-		expect(scanned([waited([{ id: "Reviewer", type: "task", resultText: `e.g.\n${gtLine(4)}` }])])).toEqual([]);
+	test("a PR URL a subagent's report quotes is a mention, not a submission", () => {
+		expect(scanned([waited([{ id: "Reviewer", type: "task", resultText: "e.g.\nhttps://github.com/o/r/pull/4" }])])).toEqual([]);
 	});
 
 	test("a gh pr action names its PR by number, URL, or --repo; a list, a view, or a quoted command does not", () => {
@@ -166,8 +151,7 @@ describe("SessionFactsScan", () => {
 			scanned([
 				bashCall("a", "gh pr checkout -R o/r 1"),
 				bashCall("b", "gh pr checkout -R o/r 2"),
-				bashCall("s", "gt submit"),
-				result("s", gtLine(1)),
+				...prCreated("s", 1),
 			]),
 		).toEqual([submitted("o", "r", 1), worked("o", "r", 2)]);
 	});
@@ -279,7 +263,7 @@ describe("SessionFactsIndex", () => {
 	test("folds in subagents' submissions and picks up appends once the session file changes", async () => {
 		const dir = sessionDir();
 		const session = join(dir, "2026-10-01T00-00-00-000Z_s1.jsonl");
-		const line = (n: number) => result(`r${n}`, gtLine(n));
+		const line = (n: number) => prCreated(`r${n}`, n).join("\n");
 		writeFileSync(session, `${line(1)}\n`);
 		mkdirSync(join(dir, "2026-10-01T00-00-00-000Z_s1", "Child"), { recursive: true });
 		writeFileSync(join(dir, "2026-10-01T00-00-00-000Z_s1", "Child", "Grandchild.jsonl"), `${line(2)}\n`);
@@ -596,32 +580,13 @@ describe("SessionFactsIndex", () => {
 		expect(index.factsOf(session).branch?.pullRequest).toBeNull();
 	});
 
-	test("the PR a gt submit printed for the session's branch heads it at once, and through list reads that do not name the branch, until one does", async () => {
+	test("GitHub's answer for the session's branch stands until the next ask a minute later, which removes it when the branch heads no open or merged PR", async () => {
 		const parent = realpathSync(sessionDir());
 		const main = await repoWithWorktrees(parent);
 		await git(main, "update-ref", "refs/remotes/origin/main", "HEAD");
 		await git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
 		const session = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
-		writeFileSync(session, `${bashCall("s", "gt submit --no-edit")}\n${result("s", "wip: https://app.graphite.com/github/pr/acme/webapp/9 (created)")}\n`);
-		const repo = { owner: "acme", repo: "webapp" };
-		const index = new SessionFactsIndex(async () => repo, new CachedCheckouts(), [], async () => ({ ...repo, number: 9 }));
-
-		await index.refresh([{ path: session, cwd: join(parent, "app-wip"), modifiedAt: 1 }]);
-		expect(index.factsOf(session).branch).toEqual({ name: "wip", linked: true, defaultBranch: "main", pullRequest: { ...repo, number: 9 } });
-		expect(index.factsOf(session).pullRequests).toEqual([{ ...repo, number: 9, link: "submitted" }]);
-		expect(index.learnHeads(repo, [])).toBe(false);
-		expect(index.factsOf(session).branch?.pullRequest).toEqual({ ...repo, number: 9 });
-		expect(index.learnHeads(repo, [{ ...repo, number: 11, head: "wip" }])).toBe(true);
-		expect(index.factsOf(session).branch?.pullRequest).toEqual({ ...repo, number: 11 });
-	});
-
-	test("GitHub's answer replaces the PR a gt submit printed for the session's branch, or removes it when the branch heads no open or merged PR, and a later write does not bring the printed one back", async () => {
-		const parent = realpathSync(sessionDir());
-		const main = await repoWithWorktrees(parent);
-		await git(main, "update-ref", "refs/remotes/origin/main", "HEAD");
-		await git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
-		const session = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
-		writeFileSync(session, `${bashCall("s", "gt submit --no-edit")}\n${result("s", "wip: https://app.graphite.com/github/pr/acme/webapp/9 (created)")}\n`);
+		writeFileSync(session, `${bashCall("s", "gh pr create --fill")}\n${result("s", "https://github.com/acme/webapp/pull/9")}\n`);
 		const repo = { owner: "acme", repo: "webapp" };
 		let heading: { owner: string; repo: string; number: number } | null = null;
 		const asked: string[] = [];
@@ -659,7 +624,7 @@ describe("SessionFactsIndex", () => {
 		}
 	});
 
-	test("asks GitHub which PR a branch the list names none for heads once per branch, again a minute after the last ask even when it failed or answered, and when a gt submit finishes", async () => {
+	test("asks GitHub which PR a branch the list names none for heads once per branch, again a minute after the last ask even when it failed or answered, and when its session names a new PR", async () => {
 		const parent = realpathSync(sessionDir());
 		await repoWithWorktrees(parent);
 		const first = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
@@ -698,9 +663,9 @@ describe("SessionFactsIndex", () => {
 			await writeAt(60, bashCall("t", "bun test"));
 			expect(asked).toEqual(["wip", "wip"]);
 			answer = async () => ({ ...repo, number: 9 });
-			await writeAt(70, bashCall("s", "gt submit --no-edit -q"));
+			await writeAt(70, bashCall("s", "gh pr create --fill"));
 			expect(asked).toEqual(["wip", "wip"]);
-			await writeAt(80, result("s", ""));
+			await writeAt(80, result("s", "https://github.com/acme/webapp/pull/9"));
 			expect(asked).toEqual(["wip", "wip", "wip"]);
 			expect(index.factsOf(first).branch?.pullRequest).toEqual({ ...repo, number: 9 });
 			expect(index.factsOf(second).branch?.pullRequest).toEqual({ ...repo, number: 9 });
@@ -822,38 +787,6 @@ describe("SessionFactsIndex", () => {
 		gate.resolve(null);
 		expect(await refreshed).toBe(true);
 		expect(index.factsOf(session).branch).toEqual({ name: "next", linked: true, defaultBranch: "main", pullRequest: null });
-	});
-
-	test("links the PR of the branch each gt submit submitted, printed or not, as checked out where and when it ran, and no dry run", async () => {
-		const parent = realpathSync(sessionDir());
-		const main = await repoWithWorktrees(parent);
-		const start = Math.floor(Date.now() / 1000);
-		const switchAt = (seconds: number, ...args: string[]) =>
-			runChecked(["git", "-C", main, "switch", "-q", ...args], { env: { ...IDENTITY, GIT_COMMITTER_DATE: `${start + seconds} +0000` } });
-		const submit = (id: string, seconds: number, command: string) =>
-			JSON.stringify({
-				type: "message",
-				timestamp: new Date((start + seconds) * 1000).toISOString(),
-				message: { role: "assistant", content: [{ type: "toolCall", id, name: "bash", arguments: { command } }] },
-			});
-		await switchAt(10, "-c", "feature");
-		await switchAt(30, "main");
-		const session = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
-		writeFileSync(
-			session,
-			`${[
-				submit("quiet", 20, "gt submit --no-edit --no-stack -q 2>&1 | grep -v WARNING"),
-				submit("elsewhere", 20, "cd ../app-wip && gt submit -q"),
-				submit("dry", 40, "gt submit --dry-run"),
-				submit("named", 40, "gt ss --branch done"),
-			].join("\n")}\n`,
-		);
-		const repo = { owner: "acme", repo: "webapp" };
-		const index = new SessionFactsIndex(async () => repo, new CachedCheckouts());
-
-		await index.refresh([{ path: session, cwd: main, modifiedAt: 1 }]);
-		index.learnHeads(repo, ["feature", "wip", "main", "done"].map((head, i) => ({ ...repo, number: i + 1, head })));
-		expect(index.factsOf(session).pullRequests).toEqual([1, 2, 4].map(number => ({ ...repo, number, link: "submitted" })));
 	});
 
 	test("counts a session in its directory's workspace, a live one in the directory it runs in now, and reuses what the server placed", async () => {

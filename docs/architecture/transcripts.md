@@ -95,7 +95,6 @@ Every transcript comes from the session files on this machine, not from a networ
   The first scan reads every session file, 16 sessions at a time.
   On 641 MB across 464 sessions it takes under a second, and the sidebar shows before it finishes.
   A session that names a PR by number alone, reads by number one its own prompt names, or works on a branch, costs one `git remote get-url origin` in its working directory.
-  A `gt submit` call costs, once per directory it ran in, one `git remote get-url origin` and a `git reflog show HEAD` with a `git symbolic-ref HEAD`, which place the branch checked out at the call's time; the server keeps each call's branch for as long as it lists the session.
   A subagent's appends do not change the session file, so its pull requests show once the session writes again, at the latest when it receives the subagent's result.
   `resolveLinks` lists the pull requests a call worked on, submitted, or pushed, or that the session's branch heads, before those the session's own prompt only links or names, each in the order found, since the session details sidebar shows the first.
 - The same scan collects the Linear issues each session worked on, by identifier, from the arguments of its Linear MCP calls: a direct `mcp__linear_<tool>` call or a `write` to `xd://mcp__linear_<tool>`, whose `content` holds the arguments as JSON.
@@ -116,11 +115,10 @@ Every transcript comes from the session files on this machine, not from a networ
   A directory already gone counts in the longest main checkout the server has seen whose path followed by `-` starts it, else in the only one with its last segment as name, checked again at each later placement until one matches.
   Session rows carry it as `workspace`, a `Workspace` from `src/shared/workspaces.ts`, `null` when it is the row's own `cwd`; the page reads it through `workspaceOf` and `workspaceCwd` in `web/sessions.ts`.
 - Each read of the pull request list tells the server which branch heads which pull request in that repository.
-  The server then links each session whose `git push` updated one of those branches, whose `gt submit` submitted one, or whose linked worktree has one of them checked out, to that PR, and sends the sidebar the new links.
+  The server then links each session whose `git push` updated one of those branches, or whose linked worktree has one of them checked out, to that PR, and sends the sidebar the new links.
   It also sets the `pullRequest` of each such session's `branch`, the PR it heads, and so links the PR of a main checkout's branch other than the default one too; the header's **Open PR** shows only while it is `null`.
-- A `gt submit` line names a branch with its PR, so the server takes that PR as the branch's once, when it reads the line, unless the list names one for the branch.
 - The list names a new PR only at the page's next read, up to a minute after the session opened it, only once GitHub's search has indexed it, some seconds after, and not at all while the list's GraphQL budget is spent.
   So while the list names no PR for a session's branch, the server asks GitHub which PR that branch heads, through one `gh api` REST call outside the search and the GraphQL budget (`branchPullRequest` in `src/pull-requests.ts`), and sets `pullRequest` from the newest open or merged one, or `null` when there is none.
-  It asks at once when the session's transcripts name a PR it did not link before, such as the URL `gh pr create` prints, or finish a `gt submit` call, which may open one without printing it (`-q`).
-  Otherwise it asks at most once a minute per branch, at a write of a session on it, so a failed ask is tried again, and a printed or answered PR that closed since is dropped.
-  A printed or answered PR outlives later reads of the list, which search may still leave without it, until one names that branch, whose PR then takes its place and ends the asks.
+  It asks at once when the session's transcripts name a PR it did not link before, such as the URL `gh pr create` prints.
+  Otherwise it asks at most once a minute per branch, at a write of a session on it, so a failed ask is tried again, and an answered PR that closed since is dropped.
+  An answered PR outlives later reads of the list, which search may still leave without it, until one names that branch, whose PR then takes its place and ends the asks.

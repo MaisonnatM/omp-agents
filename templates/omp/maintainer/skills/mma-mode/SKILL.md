@@ -2,7 +2,7 @@
 name: mma-mode
 description: >-
   mma's agent style: poteto-mode principles and playbooks, then mma overlays
-  (go gate, Graphite, Yampa verify, best-in-class bar, no GitHub replies to
+  (go gate, draft-first PRs, Yampa verify, best-in-class bar, no GitHub replies to
   humans). Use for mma, maxence, /mma-mode, /skill:mma-mode, or requests to
   work in this style.
 disable-model-invocation: true
@@ -34,8 +34,8 @@ mma-mode includes poteto. Do not treat poteto as optional for nontrivial work.
    **figure-it-out**. A multi-day program means poteto **Orchestrate**.
 3. **Cite principles** you actually read this session.
 4. **Delegate** playbook code work to the `poteto-agent` subagent.
-5. **Then apply mma overlays.** Overlays win on conflict (Graphite, go gate,
-   commits, GitHub voice, Yampa proof, human todos).
+5. **Then apply mma overlays.** Overlays win on conflict (PR transport, go
+   gate, commits, GitHub voice, Yampa proof, human todos).
 
 ## Non-negotiables
 
@@ -52,9 +52,8 @@ mma-mode includes poteto. Do not treat poteto as optional for nontrivial work.
   that earn their place. Name what you left out and why. A question gets a
   report, not an edit.
 - Human todos stay. Update their status only. Never drop or recreate them.
-- Graphite only for branch and PR work.
-  In omp, read `~/.omp/agent/docs/git-workflow.md`; in Cursor, read `~/.cursor/rules/graphite-cli.mdc`.
-  Never `git push` or `gh pr create` unless the user explicitly overrides this transport.
+- Branch and PR work uses plain `git` and `gh`: drafts with `gh pr create --draft`, publication with `gh pr ready <N>`.
+  In omp, read `~/.omp/agent/docs/git-workflow.md`.
 - Commits only when asked. A draft PR request counts as the ask.
 - Slop gate.
   Before any commit, draft PR, or "ready", strip AI slop and narrating comments from the diff.
@@ -65,20 +64,20 @@ mma-mode includes poteto. Do not treat poteto as optional for nontrivial work.
 | Token | Meaning |
 | --- | --- |
 | **go** / **continue** / **yes go** | Implement the approved scope. |
-| **go on** + ticket URL | Investigate, fix, prove, then open a draft PR (`gt submit --draft`). |
-| **create a draft pr** | Commit, then `gt submit --draft`. Partial work is fine when blocked. Say what is missing. |
+| **go on** + ticket URL | Investigate, fix, prove, then open a draft PR (`gh pr create --draft`). |
+| **create a draft pr** | Commit, push, then `gh pr create --draft`. Partial work is fine when blocked. Say what is missing. |
 | **go all** / **go all don't commit** | Execute everything. **don't commit** = zero git writes. |
 | **fix all** / **fix all don't commit** | Same as go all, for review-comment batches. |
 | **go all then push** / **fix all then push** | Implement first. Push only on the explicit second ask. |
 | **all in one PR** | Overrides stack slicing. |
-| **push** / **gt submit** | Publish ready-for-review only when explicit. Never bundled with go. |
+| **push** | Publish ready-for-review (`gh pr ready <N>`) only when explicit. Never bundled with go. |
 
 ## Autonomy (short)
 
 Proceed without asking on reversible reads, local investigation, prototypes,
 draft plans, stack inspection, comment drafts, test runs. Pause on force-push,
 deploys, data deletion, customer-facing messages, GitHub replies to humans,
-push or submit without a token above, commits under **don't commit**, and
+push or publish without a token above, commits under **don't commit**, and
 nontrivial scope before **go**.
 
 "Harness" is ambiguous. Confirm whether the user means the Yampa runtime
@@ -111,7 +110,7 @@ context this session.
 | --- | --- |
 | [references/routing.md](references/routing.md) | Selecting a domain skill or a playbook |
 | [references/implementation.md](references/implementation.md) | Implementing or executing a settled plan |
-| [references/shipping.md](references/shipping.md) | Approval-token ambiguity, branch/PR work, rebasing, submitting |
+| [references/shipping.md](references/shipping.md) | Approval-token ambiguity, branch/PR work, rebasing, publishing |
 | [references/verification.md](references/verification.md) | Reproducing a bug, proving behavior, querying production |
 | [references/context.md](references/context.md) | Compaction, resuming a session, large artifacts |
 | [references/reply.md](references/reply.md) | Writing a substantive final reply |

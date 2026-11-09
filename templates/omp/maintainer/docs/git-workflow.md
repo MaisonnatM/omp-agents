@@ -1,35 +1,14 @@
-# Git and Graphite workflow
+# Git workflow
 
-## Detect Graphite before creating a branch or opening a PR
+## Create a worktree
 
-Run from the repository or its linked worktree:
-
-```sh
-git_common_dir=$(git rev-parse --path-format=absolute --git-common-dir)
-test -f "$git_common_dir/.graphite_repo_config"
-```
-
-A successful `test` means the repository uses Graphite, except omp-agents (`MaisonnatM/omp-agents`), which never uses Graphite: there use plain `git`, `git push`, and `gh pr create --draft`, and never run `gt`.
-In a linked worktree, `.git` is a file pointing to worktree-specific metadata; Graphite's repository configuration belongs in the shared Git directory.
-`--path-format=absolute` makes the result independent of the current subdirectory.
-If Graphite is configured, prefer `gt create` and `gt submit`; `git worktree add` alone does not register a branch with Graphite.
-
-## Create a worktree in a Graphite repository
-
-Create the branch on its parent under `~/code/<repo>-wt/<topic>`, then track it before the first commit.
+Create the branch on its parent under `~/code/<repo>-wt/<topic>`:
 
 ```sh
 git worktree add -b <branch> ~/code/<repo>-wt/<topic> <parent>
-gt track <branch> -p <parent> --cwd ~/code/<repo>-wt/<topic> --no-interactive -q
 ```
 
-A branch Graphite does not track fails `gt modify`, `gt restack`, and `gt submit` with "Cannot perform this operation on untracked branch"; run the `gt track` above, never fall back to `git commit --amend`.
-When the parent is itself untracked, track it first, from the bottom of the stack up.
-"<parent> is not in the history of <branch>" means the branch was not cut from that parent: run `git rebase <parent>` in the branch's worktree, then `gt track`.
-A warning that branches "diverged from Graphite's tracking" concerns the branches it names; ignore it unless it names your stack.
-Read the stack with `gt log short --stack`; `gt log` and `gt state` print every tracked branch in the repository.
-
-## Resolve conflicts in a rebase or restack
+## Resolve conflicts in a rebase
 
 A rebase stops once per conflicting commit; repeat these steps until no commit stops:
 
@@ -39,11 +18,11 @@ A rebase stops once per conflicting commit; repeat these steps until no commit s
    During a rebase `--ours` is the base and `--theirs` is the branch's commit.
    A post-checkout hook, such as yampa's pre-commit one, fails the plain command with `Unmerged files` after it took that side.
 4. Format a resolved file, then `git add` it.
-5. Continue with `GIT_EDITOR=true gt continue`, or `GIT_EDITOR=true git rebase --continue` without Graphite.
+5. Continue with `GIT_EDITOR=true git rebase --continue`.
 
 ## Create drafts before publishing
 
-Create the PR as a draft with `gt submit --draft` when Graphite is configured, or `gh pr create --draft` otherwise.
+Push the branch with `git push -u origin <branch>`, then create the PR as a draft with `gh pr create --draft`.
 The ship extension blocks publication until a thermonuclear review is applied and pushed, unless the repository commits `.omp/review-paths` and the PR changes no file its globs match.
 When the review applies, run the thermonuclear stage once the user approves the direction, commit and push its fixes, then add `- [x] Thermo-nuclear code quality review` to the PR body.
 When the repository commits `.omp/ui-paths` and a changed file matches it, the interface review runs first the same way and earns `- [x] Interface review`.
@@ -51,24 +30,11 @@ Follow `~/.omp/agent/docs/review-workflow.md` for when the review applies and fo
 When the interface review applies, the extension also blocks while the body has an unchecked `- [ ] Browser proof` box, which yampa's PR template declares.
 Then run the verify-yampa skill, attach a screenshot of the changed UI with `gh pr edit <N> --attach` and no body flag, and check the box with `pr_description`; when the interface review does not apply, delete the line with `pr_description`.
 The extension checks the box, not the screenshot.
-Only then run `gt submit --publish` or `gh pr ready <N>`; the extension asks the user to approve before the command runs.
+Only then run `gh pr ready <N>`; the extension asks the user to approve before the command runs.
 A new branch has no PR body to check: create its draft first rather than retrying publication.
 Authentication or network errors still require fixing the reported access failure, not creating another PR.
 
-## Register every branch with an open PR
+## Stack PRs as base-branch chains
 
-Graphite never auto-discovers a PR opened through plain `git` and `gh pr create`.
-Immediately after creating a PR or noticing an untracked one, register the branch under its actual parent and submit its metadata:
-
-```sh
-gt track <branch> -p <parent-branch> --no-interactive -q
-gt submit --cwd <worktree-or-repo-path> --no-edit --no-stack -q
-```
-
-Before treating a branch created outside Graphite as registered, complete both commands.
-When `git rev-parse <branch>` matches `git rev-parse origin/<branch>`, `gt submit` attaches the existing PR to Graphite without force-pushing or creating a duplicate PR.
-If the branch has no dedicated worktree and the current checkout is dirty, create a throwaway worktree on that branch, submit from there, then remove it only after confirming it has no changes.
-Keep the dirty checkout intact; do not switch its branch.
-
-Periodically compare `gh search prs --author <you> --state open --json number,repository` with `gt state`'s tracked-branch keys.
-Use `--assignee` instead when auditing review-assigned PRs.
+A stack is a chain of branches, each cut from the one below it, with each PR opened on its parent's branch: `gh pr create --draft --base <parent-branch>`.
+When a parent branch changes, run `git rebase <parent-branch>` in the child's worktree and resolve conflicts as above; pushing the rebased child is a force-push, which needs the user's approval.

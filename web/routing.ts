@@ -93,7 +93,7 @@ export const SETTINGS_SECTIONS = [
 	{ value: "providers", label: "Providers", icon: KeyRound, group: "connections", keywords: ["login", "sign in", "accounts", "api key", "quota"] },
 	{ value: "integrations", label: "Integrations", icon: Plug, group: "connections", keywords: ["linear", "slack", "github", "gmail", "calendar", "connect"] },
 	{ value: "mcp-servers", label: "MCP servers", icon: Blocks, group: "connections", keywords: ["mcp", "tools"] },
-	{ value: "source-control", label: "Source control", icon: GitMerge, group: "connections", keywords: ["github", "graphite", "gh", "gt", "pull", "merge"] },
+	{ value: "source-control", label: "Source control", icon: GitMerge, group: "connections", keywords: ["github", "gh", "pull", "merge"] },
 	{ value: "models", label: "Models", icon: RouteIcon, group: "workspace", keywords: ["roles", "fallback", "retry"], meta: AS_LOADED },
 	{ value: "agents", label: "Agents", icon: PAGE_ICON.bots, group: "workspace", keywords: ["subagents", "delegation", "concurrency", "isolation"], meta: { workspace: "Preview of a new session in this workspace", none: "Preview of a new session with user defaults only" } },
 	{ value: "omp", label: "omp settings", icon: Settings2, group: "workspace", keywords: ["config", "thinking", "compaction", "advisor", "bash", "lsp", "tools"], meta: AS_LOADED },

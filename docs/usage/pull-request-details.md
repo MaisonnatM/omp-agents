@@ -33,7 +33,7 @@
   The server keeps merges in `merges.json` beside its access token and resumes them after a restart.
   The `⋯` menu starts with the quick actions, including fixes for CI, conflicts, and review comments.
   On your own open pull request without conflicts that the Pull requests page lists as behind its base, **Rebase on main**, named after its base, follows them, as in a row's `⋯` menu, and the details read the pull request again once it ends.
-  Next come the merge methods, **Approve** where the header offers it, **Ready for review** or **Convert to draft**, links to GitHub and Graphite, **Copy link**, and **Copy PR number**.
+  Next come the merge methods, **Approve** where the header offers it, **Ready for review** or **Convert to draft**, a link to GitHub, **Copy link**, and **Copy PR number**.
   A method picked there applies to this pull request's merge button; **Last selected** in Settings remembers it only once you confirm a merge with it.
   **Close pull request** or **Reopen pull request** comes last and asks for a second click, with the same disarm behavior as merging.
   The header condenses after the details scroll beyond its expanded body and expands again at the top; scrolling the file list or a diff inside **Code** leaves it as it is.
@@ -58,7 +58,7 @@
   A change shows at once and goes to GitHub in turn after the ones before it; when GitHub refuses one, the details undo it, keep the changes made after it, and say why above the tab.
   The header's linked-sessions count opens a small list of the running sessions on the pull request, each opening through the usual session action.
   When another open pull request stacks with it by base branch, the header's **N/M** menu shows the stack top first on a rail and marks the current layer.
-  The menu is the session header's stack popover, with **Merge stack**, the session's other pull requests, and the GitHub and Graphite links.
+  The menu is the session header's stack popover, with **Merge stack**, the session's other pull requests, and the GitHub links.
   The server reads the repository's open pull requests for it and keeps them for 30 seconds.
   **Description**, **Checks**, and **Comments** are collapsible sections with sticky headings.
   **Checks** starts collapsed and says **No checks reported.** when empty; otherwise it lists them as the tab bar's checks popover does, failing and running ones first, with each check's **Details** link.

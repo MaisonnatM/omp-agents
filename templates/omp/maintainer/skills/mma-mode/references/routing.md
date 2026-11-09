@@ -26,8 +26,8 @@ Repo-local paths are relative to the repository, not this skill directory.
 | Component patterns feel hacky | [shadcn docs](https://ui.shadcn.com/docs) before new wrappers |
 | Surrounding architecture unsound | `global-best-practice` |
 | Slim code / defensive guards | `lean-code-simplification-review` |
-| Rebase / conflicts | [shipping.md](shipping.md), `gt restack`; Cursor may also use `fix-merge-conflicts` |
+| Rebase / conflicts | [shipping.md](shipping.md), `git rebase`; Cursor may also use `fix-merge-conflicts` |
 | PR status / get green / Bugbot | Poteto `playbooks/babysit.md` and its skeptical Bugbot triage |
-| Land a green stack | Poteto Shipping, through Graphite unless explicitly told otherwise |
+| Land a green stack | Poteto Shipping, through `gh` |
 
 Research and design details live in [pstack-research-design.md](pstack-research-design.md).
