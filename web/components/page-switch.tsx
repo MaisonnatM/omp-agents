@@ -191,8 +191,8 @@ export const PageSwitch = memo(function PageSwitch({
 			return <NotesPage list={userNotes} todos={userTodos} view={page.list} openId={page.open} hosts={hosts} past={past} disabled={!connected} onChange={changeNote} space={scope.space} />;
 		case "bots": {
 			if (page.target === null) {
-				if (page.adding) return <NewBot workspaces={allWorkspaces} defaultCwd={defaultWorkspace} connected={connected} />;
-				return <BotsGallery rows={bots === null ? null : botRows(bots, hosts, botLasts)} routines={routines} />;
+				if (page.adding) return <NewBot workspaces={workspaces} defaultCwd={defaultWorkspace} connected={connected} />;
+				return <BotsGallery rows={scope.bots === null ? null : botRows(scope.bots, hosts, botLasts)} routines={routines} />;
 			}
 			if (!openBot) return <p className="m-auto text-sm text-muted-foreground">{bots === null ? "Loading the Bots…" : "No Bot has this address. It may have been deleted."}</p>;
 			return (

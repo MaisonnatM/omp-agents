@@ -1,4 +1,5 @@
 /** What the roster and past-session lists say about where sessions ran, and what they work on. */
+import type { ScheduledSend } from "../src/shared/scheduled";
 import { awaitsSubagents, newestPastFirst, type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
 import { inTempDir, type Space, type Spaces, type Workspace } from "../src/shared/workspaces";
 import { everyWord } from "../src/shared/every-word";
@@ -61,6 +62,18 @@ export function discoverableSessions(
 export function sessionsIn(lists: { hosts: RosterHost[]; past: PastSession[]; bots: RosterHost[] }, space: Space, spaces: Spaces): { hosts: RosterHost[]; past: PastSession[]; bots: RosterHost[] } {
 	const inSpace = (row: RosterHost | PastSession): boolean => spaceOf(row, spaces) === space;
 	return { hosts: lists.hosts.filter(inSpace), past: lists.past.filter(inSpace), bots: lists.bots.filter(inSpace) };
+}
+
+/**
+ * The scheduled sends of `sends` in `space`: a start in the space of the directory it starts in, a message or a continue in its
+ * session's, as `sessions` lists it, and in Work when they do not.
+ */
+export function scheduledIn(sends: readonly ScheduledSend[], space: Space, sessions: { hosts: RosterHost[]; past: PastSession[] }, spaces: Spaces): ScheduledSend[] {
+	const sessionSpace = (sessionId: string): Space => {
+		const row = sessions.hosts.find(host => host.sessionId === sessionId) ?? sessions.past.find(session => session.sessionId === sessionId);
+		return row ? spaceOf(row, spaces) : "work";
+	};
+	return sends.filter(({ target }) => (target.kind === "start" ? spaces.of(target.request.cwd, target.request.cwd) : sessionSpace(target.sessionId)) === space);
 }
 
 /** The workspaces of `workspaces` in `space`, with Personal's starting at the personal directory, where its new sessions start. */

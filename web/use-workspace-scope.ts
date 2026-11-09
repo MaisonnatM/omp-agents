@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { Bot } from "../src/shared/bots";
 import { prKey } from "../src/shared/github";
+import type { ScheduledSend } from "../src/shared/scheduled";
 import type { PastSession, RosterHost } from "../src/shared/sessions";
 import { isSpace, type Space, spaces, type Workspace } from "../src/shared/workspaces";
+import { botsIn } from "./bots-model";
 import type { DashboardState } from "./dashboard-state";
 import { pullRequestsScope as scopeOf, pullRequestsStore } from "./reads";
-import { discoverableSessions, listWorkspaces, sessionsIn, type WindowScope, workspacesIn, workspaceSwitch } from "./sessions";
+import { discoverableSessions, listWorkspaces, scheduledIn, sessionsIn, type WindowScope, workspacesIn, workspaceSwitch } from "./sessions";
 import { storeOrRemove, useStoredState } from "./stored-state";
 
 /**
@@ -54,8 +57,12 @@ export interface WorkspaceScope extends WindowScope {
 	hiddenCwds: ReadonlySet<string>;
 	/** The space's workspaces, as {@link listWorkspaces} lists them, Personal's from the personal directory. */
 	workspaces: Workspace[];
-	/** Every space's workspaces, for what a workspace's space does not scope: Settings › Workspaces, Bots, and scheduled sends. */
+	/** Every space's workspaces, for what a workspace's space does not scope: Settings › Workspaces, a Bot's settings, and a scheduled start's page. */
 	allWorkspaces: Workspace[];
+	/** The space's Bots, the sidebar's and the Bots page's; `null` until the server sends them. A Bot's address opens it from either space. */
+	bots: Bot[] | null;
+	/** The space's scheduled sends, the sidebar's; a send's page and its session's composer show it from either space. */
+	scheduled: ScheduledSend[];
 	pickWorkspace: (cwd: string | null) => void;
 	/** The pull requests' scope, as {@link scopeOf} builds it from the workspace, else the space. */
 	pullRequestsScope: string;
@@ -70,7 +77,8 @@ export function useWorkspaceScope(state: DashboardState): WorkspaceScope {
 	const [space, pickSpace] = useSpace();
 	const { personal: personalDir } = state;
 	const personalCwds = state.workspaceList.personal;
-	const placement = useMemo(() => spaces(personalCwds.map(({ cwd }) => cwd), personalDir), [personalCwds, personalDir]);
+	// A Bot or a scheduled start names its directory as the page shows it, `~` included, so a Personal workspace is listed both ways.
+	const placement = useMemo(() => spaces(personalCwds.flatMap(({ cwd, cwdDisplay }) => [cwd, cwdDisplay]), personalDir), [personalCwds, personalDir]);
 	// Temporary and hidden workspaces, and Bots' conversations, remain in the raw sessions; only discoverable sessions enter the workspace list and sidebar view.
 	const hiddenCwds = useMemo(() => new Set(state.workspaceList.hidden.map(hidden => hidden.cwd)), [state.workspaceList.hidden]);
 	const botNames = useMemo(() => new Map((state.bots ?? []).flatMap(bot => (bot.sessionId === null ? [] : [[bot.sessionId, bot.name] as const]))), [state.bots]);
@@ -82,6 +90,8 @@ export function useWorkspaceScope(state: DashboardState): WorkspaceScope {
 		[discoverable, state.workspaceList.added, personalCwds, hiddenCwds],
 	);
 	const workspaces = useMemo(() => workspacesIn(allWorkspaces, space, placement, personalDir), [allWorkspaces, space, placement, personalDir]);
+	const bots = useMemo(() => state.bots && botsIn(state.bots, space, placement), [state.bots, space, placement]);
+	const scheduled = useMemo(() => scheduledIn(state.scheduled, space, { hosts: state.hosts, past: state.past }, placement), [state.scheduled, space, state.hosts, state.past, placement]);
 	const [workspace, pickWorkspace] = useSelectedWorkspace(workspaces);
 	// Until the sessions are listed, the saved workspace reads as all of the space's.
 	const pullRequestsScope = scopeOf({ space, workspace });
@@ -102,7 +112,7 @@ export function useWorkspaceScope(state: DashboardState): WorkspaceScope {
 	}, [started]);
 	const home = space === "personal" ? personalDir : null;
 	return useMemo(
-		() => ({ visible, everySpace: discoverable, hiddenCwds, workspaces, allWorkspaces, workspace, pickWorkspace, pullRequestsScope, space, pickSpace, spaces: placement, home }),
-		[visible, discoverable, hiddenCwds, workspaces, allWorkspaces, workspace, pickWorkspace, pullRequestsScope, space, pickSpace, placement, home],
+		() => ({ visible, everySpace: discoverable, hiddenCwds, workspaces, allWorkspaces, bots, scheduled, workspace, pickWorkspace, pullRequestsScope, space, pickSpace, spaces: placement, home }),
+		[visible, discoverable, hiddenCwds, workspaces, allWorkspaces, bots, scheduled, workspace, pickWorkspace, pullRequestsScope, space, pickSpace, placement, home],
 	);
 }

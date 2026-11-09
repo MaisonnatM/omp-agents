@@ -71,7 +71,7 @@ export function App() {
 	const { layout } = state;
 	const sidebars = useSidebarPanels();
 	const scope = useWorkspaceScope(state);
-	const { visible, workspaces, workspace, pickWorkspace, hiddenCwds, space, pickSpace, pullRequestsScope, spaces, home } = scope;
+	const { visible, workspaces, workspace, pickWorkspace, hiddenCwds, space, pickSpace, pullRequestsScope, spaces, home, bots } = scope;
 	const windowScope = useMemo((): WindowScope => ({ space, spaces, workspace, home }), [space, spaces, workspace, home]);
 	const focused = useFocusedSession(state, page, scope);
 	const sessions = useSessionLists(scope, state.pins, changePins);
@@ -91,7 +91,7 @@ export function App() {
 	/** The dashboard reads and writes Linear: the tickets page lists issues, the Todo page creates them, and the Calendar shows their due days. */
 	const linearCallable = linear !== null && callable(linear.connection);
 	const settings = useSettingsRoute(page);
-	const latestBot = useMemo(() => (state.bots === null ? null : (botRows(state.bots, state.hosts, state.botLasts)[0]?.bot.id ?? null)), [state.bots, state.hosts, state.botLasts]);
+	const latestBot = useMemo(() => (bots === null ? null : (botRows(bots, state.hosts, state.botLasts)[0]?.bot.id ?? null)), [bots, state.hosts, state.botLasts]);
 	const { tab, showTab } = useSidebarTab({ page, signedOutTabs, layout, latestSession: sessions.latest, latestBot, navigate, show });
 	/** The tabs the bar draws, which Cmd+1 onward go to in order. */
 	const barTabs = useMemo(() => placedTabs(tabs, "bar"), [tabs]);
@@ -272,7 +272,6 @@ export function App() {
 												notesView={notesView}
 												hosts={state.hosts}
 												past={state.past}
-												bots={state.bots}
 												botLasts={state.botLasts}
 												todoView={todoView}
 												settings={settings}

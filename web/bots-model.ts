@@ -4,6 +4,7 @@ import { DESIGNER_JOB, DESIGNER_NAME } from "../src/shared/bot-designer";
 import { type Bot, type BotChange, type BotId, type BotKind, type BotLast, jobLine } from "../src/shared/bots";
 import { SHEPHERD_JOB, SHEPHERD_NAME } from "../src/shared/shepherd";
 import type { HostStatus, RosterHost, View } from "../src/shared/sessions";
+import type { Space, Spaces } from "../src/shared/workspaces";
 import { needsYou } from "./attention";
 import { statusLabel } from "./components/status-dot";
 import { plainMarkdown } from "./labels";
@@ -113,6 +114,9 @@ function saidLine(last: BotLast): string {
 		}
 	}
 }
+
+/** The Bots of `bots` in `space`, each in the space of the workspace it works in. */
+export const botsIn = (bots: readonly Bot[], space: Space, spaces: Spaces): Bot[] => bots.filter(bot => spaces.of(bot.cwd, bot.cwd) === space);
 
 /** Each Bot's row, the most recent conversation first, then by name. */
 export function botRows(bots: readonly Bot[], hosts: readonly RosterHost[], lasts: Readonly<Record<BotId, BotLast | null>>): BotRow[] {

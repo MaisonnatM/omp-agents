@@ -1,5 +1,6 @@
 import { Activity, Bot, CircleAlert, CirclePause, History, Hourglass, ListRestart, Loader, Pin, Plus } from "lucide-react";
 import { useState } from "react";
+import type { ScheduledSend } from "../../src/shared/scheduled";
 import type { View } from "../../src/shared/sessions";
 import { SidebarContent, SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -31,6 +32,8 @@ interface SessionListProps {
 	showWorkspace: boolean;
 	/** The open New session draft's directory; `null` while none is open. */
 	newSessionOpen: string | null;
+	/** The space's scheduled sends. */
+	scheduled: readonly ScheduledSend[];
 	/** The scheduled send whose page is open, highlighted in its group; `null` for none. */
 	scheduledOpen: string | null;
 	/** The New session button's label, naming the selected workspace. */
@@ -38,7 +41,7 @@ interface SessionListProps {
 }
 
 /** The Sessions tab: New session, the search field, then the scheduled sends, and the pinned, idle, running, waiting on subagents, Bots, interrupted, and past groups. */
-export function SessionList({ lists, query, onQuery, onTogglePin, open, showWorkspace, newSessionOpen, scheduledOpen, newSessionLabel }: SessionListProps) {
+export function SessionList({ lists, query, onQuery, onTogglePin, open, showWorkspace, newSessionOpen, scheduled, scheduledOpen, newSessionLabel }: SessionListProps) {
 	const { start, dismissStart, openNewSession } = useDashboardActions();
 	const { connected, starts: { resumeAll } } = useDashboardStatus();
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
@@ -75,7 +78,7 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 				{filtering && pinned.hosts.length + pinned.past.length + liveHosts(lists).length + bots.length + interrupted.length + ended.length === 0 && (
 					<p className="px-4 py-2 text-xs text-muted-foreground">{`No sessions match “${query.trim()}”`}</p>
 				)}
-				{!filtering && <ScheduledGroup openId={scheduledOpen} showWorkspace={showWorkspace} open={!collapsed.has("scheduled")} onOpenChange={() => toggleGroup("scheduled")} />}
+				{!filtering && <ScheduledGroup sends={scheduled} openId={scheduledOpen} showWorkspace={showWorkspace} open={!collapsed.has("scheduled")} onOpenChange={() => toggleGroup("scheduled")} />}
 				{pinned.hosts.length + pinned.past.length > 0 && (
 					<SidebarGroup collapsible open={!collapsed.has("pinned")} onOpenChange={() => toggleGroup("pinned")}>
 						<SidebarGroupLabel icon={Pin}>{`${pinned.hosts.length + pinned.past.length} pinned`}</SidebarGroupLabel>

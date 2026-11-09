@@ -4,7 +4,8 @@ import { DESIGNER_JOB, DESIGNER_NAME } from "../src/shared/bot-designer";
 import { type Bot, type BotId, type BotLast, jobLine } from "../src/shared/bots";
 import { SHEPHERD_JOB, SHEPHERD_NAME } from "../src/shared/shepherd";
 import type { RosterHost } from "../src/shared/sessions";
-import { botGroupKey, botGroupLabel, botGroupListName, botGroups, botHost, botMovesTo, type BotRow, botRows, botSections, botsGrouped, botsNeedingYou, botStatus, botView, JOB_TEMPLATES, memoryEntries, NEW_BOT_DRAFT, openBot, pickKind, pickTemplate, starterPrompts } from "./bots-model";
+import { spaces } from "../src/shared/workspaces";
+import { botGroupKey, botGroupLabel, botGroupListName, botGroups, botHost, botMovesTo, type BotRow, botRows, botSections, botsGrouped, botsIn, botsNeedingYou, botStatus, botView, JOB_TEMPLATES, memoryEntries, NEW_BOT_DRAFT, openBot, pickKind, pickTemplate, starterPrompts } from "./bots-model";
 import type { BotRoutineRoute, Page } from "./routing";
 
 const scout = "scout" as BotId;
@@ -24,6 +25,14 @@ describe("Bots", () => {
 		expect(botView(bot("s1"), hosts)).toEqual({ kind: "live", instanceId: "7c51f77b", agentId: null });
 		expect(botView(bot("s2"), hosts)).toEqual({ kind: "past", sessionId: "s2" });
 		expect(botView(bot(null), hosts)).toBeNull();
+	});
+
+	test("a Bot is in the space of the workspace it works in, named as the page shows it", () => {
+		const at = (name: string, cwd: string): Bot => ({ ...bot(null), name, cwd });
+		const bots = [at("Home", "~/personal"), at("Garden", "~/garden"), at("Webapp", "~/code/webapp")];
+		const placed = spaces(["/code/garden", "~/garden"], { cwd: "/home/me/personal", cwdDisplay: "~/personal" });
+		expect(botsIn(bots, "personal", placed).map(({ name }) => name)).toEqual(["Home", "Garden"]);
+		expect(botsIn(bots, "work", placed).map(({ name }) => name)).toEqual(["Webapp"]);
 	});
 
 	test("the open Bot's page shows its conversation, streamed, only while no routine replaces it, and a routine it does not have shows as missing", () => {
