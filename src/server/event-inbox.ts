@@ -1,13 +1,15 @@
 /**
  * The reminders omp's `user_event` tool leaves for the Calendar page's events kept on this computer, one JSON file each
  * in a directory, so the server stays the only writer of `events.json` and a session can add a reminder while the
- * dashboard is down. An agent may add an event in its session's name or remove one its session added; the inbox checks
- * the removal against the events as each file applies, so it cannot remove one you or another session added.
+ * dashboard is down. An agent may add an event in its session's name, filed in that session's space, or remove one its
+ * session added; the inbox checks the removal against the events as each file applies, so it cannot remove one you or
+ * another session added.
  */
 import { isObject, nonEmptyStr } from "../json";
 import { type LocalEvent, MAX_EVENT_TITLE } from "../shared/calendar";
 import { type InboxEntry, type InboxOptions, JsonInboxDir } from "./json-inbox";
 import { type LocalEventChange, parseLocalEvent } from "./local-events-file";
+import type { SpaceOfSession } from "./note-inbox";
 
 /** `value` as a change an agent may make to `events`, or why not. */
 function parseAgentEventChange(value: unknown, events: readonly LocalEvent[]): InboxEntry<LocalEventChange> {
@@ -30,13 +32,13 @@ function parseAgentEventChange(value: unknown, events: readonly LocalEvent[]): I
 }
 
 export class EventInbox extends JsonInboxDir<LocalEventChange> {
-	constructor(dir: string, events: () => readonly LocalEvent[], apply: (change: LocalEventChange) => void, options?: InboxOptions) {
+	constructor(dir: string, events: () => readonly LocalEvent[], apply: (change: LocalEventChange) => void, spaceOf: SpaceOfSession, options?: InboxOptions) {
 		super(
 			dir,
 			{
 				parse: (_name, value) => parseAgentEventChange(value, events()),
-				apply(change) {
-					apply(change);
+				async apply(change) {
+					apply(change.op === "add" && change.event.sessionId !== null ? { ...change, event: { ...change.event, space: await spaceOf(change.event.sessionId) } } : change);
 					return true;
 				},
 			},

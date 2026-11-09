@@ -17,6 +17,8 @@ interface LocalEvent {
 	title: string;
 	when: EventWhen;
 	sessionId: string | null;
+	// Left out on add: the dashboard files the event in the space of the session that added it.
+	space?: "personal" | "work";
 }
 type Change = { op: "add"; event: LocalEvent } | { op: "remove"; id: string; sessionId: string };
 

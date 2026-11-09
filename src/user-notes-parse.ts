@@ -1,5 +1,6 @@
 /** Reading the Notes page's list and its changes from untyped JSON: `notes.json`, the page's `user-note` messages, and the files omp's `user_note` tool leaves. */
 import { isObject } from "./json";
+import { isSpace } from "./shared/workspaces";
 import type { UserNote, UserNoteChange, UserNoteList } from "./user-notes-shared";
 import { isTodoId } from "./user-todos-parse";
 
@@ -23,12 +24,12 @@ interface Fields {
 const STORED: Fields = { id: isString, title: isString, body: isString };
 const SENT: Fields = { id: isTodoId, title: isTitle, body: isBody };
 
-/** A note; one with no body, todo, author, or update time reads as having none, updated when it was added. Other fields drop. */
+/** A note; one with no body, todo, author, space, or update time reads as having none, in Work, updated when it was added. Other fields drop. */
 function parseNote(value: unknown, fields: Fields): UserNote | null {
 	if (!isObject(value)) return null;
-	const { id, title, body = "", todoId = null, addedBy = null, createdAt, updatedAt = createdAt } = value;
-	if (!fields.id(id) || !fields.title(title) || !fields.body(body) || !isOptionalId(todoId) || !isOptionalId(addedBy)) return null;
-	return isTime(createdAt) && isTime(updatedAt) ? { id, title, body, todoId, addedBy, createdAt, updatedAt } : null;
+	const { id, title, body = "", todoId = null, addedBy = null, space = "work", createdAt, updatedAt = createdAt } = value;
+	if (!fields.id(id) || !fields.title(title) || !fields.body(body) || !isOptionalId(todoId) || !isOptionalId(addedBy) || !isSpace(space)) return null;
+	return isTime(createdAt) && isTime(updatedAt) ? { id, title, body, todoId, addedBy, space, createdAt, updatedAt } : null;
 }
 
 /** The list `notes.json` holds, the most recently updated first, `null` when it holds none. */
@@ -66,6 +67,8 @@ export function parseNoteChange(value: unknown): UserNoteChange | null {
 			return isBody(value.text) && isTime(at) ? { op, id, text: value.text, at } : null;
 		case "set-todo":
 			return isOptionalId(value.todoId) ? { op, id, todoId: value.todoId } : null;
+		case "set-space":
+			return isSpace(value.space) ? { op, id, space: value.space } : null;
 		case "remove":
 			return { op, id };
 		default:

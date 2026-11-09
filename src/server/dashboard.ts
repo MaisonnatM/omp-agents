@@ -105,7 +105,7 @@ import { createClientHandler } from "./socket";
 import { botExtension, designerExtension, shepherdExtension } from "./resources";
 import { createStarter, reattachAll, type SessionJoin } from "./start";
 import { EventInbox } from "./event-inbox";
-import { NoteInbox } from "./note-inbox";
+import { NoteInbox, type SpaceOfSession } from "./note-inbox";
 import { TodoInbox } from "./todo-inbox";
 import { SportFile } from "./sport-file";
 import type { JsonInboxDir } from "./json-inbox";
@@ -379,8 +379,12 @@ export class Dashboard {
 		}));
 		this.#usage = new UsagePoll({ refresh: () => broadcasts.refreshUsage(), checkNotices: () => notices.check(PROVIDER_KINDS) });
 		const workspaceOf = (cwd: string): Promise<string> => placement.workspaceOf(cwd, worktreeAt);
+		const spaceOfSession: SpaceOfSession = async sessionId => {
+			const cwd = sessions.bySessionId(sessionId)?.cwd ?? files.savedOf(sessionId)?.cwd;
+			return cwd === undefined ? "work" : this.#spaces().of(cwd, await workspaceOf(cwd));
+		};
 		const todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), workspaceOf, { active: () => ownerLock.held });
-		const noteInbox = new NoteInbox(userNoteInboxDir, change => lists.apply("user-notes", change), { active: () => ownerLock.held });
+		const noteInbox = new NoteInbox(userNoteInboxDir, change => lists.apply("user-notes", change), spaceOfSession, { active: () => ownerLock.held });
 		const sportInbox = new SportInbox(
 			sportInboxDir,
 			() => sport.value,
@@ -390,7 +394,7 @@ export class Dashboard {
 			},
 			{ active: () => ownerLock.held },
 		);
-		const eventInbox = new EventInbox(eventInboxDir, () => this.#localEvents.value, change => this.#localEvents.apply(change), { active: () => ownerLock.held });
+		const eventInbox = new EventInbox(eventInboxDir, () => this.#localEvents.value, change => this.#localEvents.apply(change), spaceOfSession, { active: () => ownerLock.held });
 		const signInInbox = new SignInInbox(
 			signInInboxDir,
 			{

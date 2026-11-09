@@ -1,6 +1,7 @@
 /** The Calendar page's events: your Google calendars and their events, the events it adds, and the events kept on this computer. */
 import { arrayOf, decoder, fields, isBoolean, isDay, isNumber, isObject, isSafeInteger, isString, nullable, oneOf, type Parsed } from "../json";
 import type { AccountId } from "./accounts";
+import { isSpace, type Space } from "./workspaces";
 
 /** A calendar shown in your Google Calendar, which the Calendar page reads unless you unchecked it there. */
 export interface GoogleCalendar {
@@ -77,8 +78,8 @@ export interface CalendarEventsAnswer {
 /** The longest title a new event takes. */
 export const MAX_EVENT_TITLE = 500;
 
-/** The calendar a new event goes in: this computer, or a Google calendar you may write to, by its account and id. */
-export type NewEventCalendar = { kind: "local" } | { kind: "google"; account: AccountId; calendarId: string };
+/** The calendar a new event goes in: this computer, in the space on screen, or a Google calendar you may write to, by its account and id. */
+export type NewEventCalendar = { kind: "local"; space: Space } | { kind: "google"; account: AccountId; calendarId: string };
 
 /** `PUT /api/calendar/events/new`. */
 export interface NewEvent {
@@ -99,11 +100,19 @@ export interface LocalEvent {
 	when: EventWhen;
 	/** The omp session whose `user_event` tool added it; `null` for one you added on the Calendar page. */
 	sessionId: string | null;
+	/** The space it is filed in: an agent's takes its session's, yours the one on screen, and one saved before spaces is Work. */
+	space: Space;
 }
 
-/** `GET /api/calendar/local`: every event kept on this computer. */
+/** `GET /api/calendar/local`: every event kept on this computer, whatever its space. */
 export interface LocalEventsAnswer {
 	events: LocalEvent[];
+}
+
+/** `PUT /api/calendar/events/space`: moves an event kept on this computer to `space`. */
+export interface LocalEventSpace {
+	id: string;
+	space: Space;
 }
 
 /** An event kept on this computer, by its id. */
@@ -159,5 +168,5 @@ export const decodeCalendarEventsAnswer = decoder(
 
 /** A kept {@link LocalEventsAnswer} with every event whole, or `null`. */
 export const decodeLocalEventsAnswer = decoder(
-	fields<LocalEventsAnswer>({ events: arrayOf(fields<LocalEvent>({ id: isString, title: isString, when: isEventWhen, sessionId: nullable(isString) })) }),
+	fields<LocalEventsAnswer>({ events: arrayOf(fields<LocalEvent>({ id: isString, title: isString, when: isEventWhen, sessionId: nullable(isString), space: isSpace })) }),
 );

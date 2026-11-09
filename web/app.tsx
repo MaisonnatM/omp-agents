@@ -217,6 +217,7 @@ export function App() {
 		[state.connected, fork, resume, quick, resumeAll, state.ending, pullRequestsScope, windowScope, state.merges, state.reviewDrafts],
 	);
 	const mentionLists = useMemo(() => ({ todos: state.userTodos?.todos ?? [], hosts: visible.hosts, past: visible.past }), [state.userTodos, visible]);
+	const spaceNotes = useMemo(() => state.userNotes?.notes.filter(note => note.space === space) ?? null, [state.userNotes, space]);
 
 	const routedTodoList = page?.kind === "todo" ? page.list : null;
 	const categories = state.userTodos?.categories;
@@ -396,7 +397,7 @@ export function App() {
 											tabs={barTabs}
 											todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
 											todos={mentionLists.todos}
-											notes={state.userNotes?.notes ?? null}
+											notes={spaceNotes}
 											linearConnected={linearCallable}
 											onCreateTicket={setNewTicket}
 										/>

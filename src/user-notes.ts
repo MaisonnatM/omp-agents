@@ -1,13 +1,14 @@
 /** The rules of the Notes page's list, which the server applies to its file and the page to what it shows until the server answers. */
+import type { Space } from "./shared/workspaces";
 import type { UserNote, UserNoteChange, UserNoteList } from "./user-notes-shared";
 
 type AddChange = Extract<UserNoteChange, { op: "add" }>;
 
-/** The `add` of a new note, with a new id, added and updated now; whatever else `fields` leaves out is none. */
-export function addNote(fields: Partial<Omit<UserNote, "id" | "createdAt" | "updatedAt">> = {}): AddChange {
+/** The `add` of a new note in `space`, with a new id, added and updated now; whatever else `fields` leaves out is none. */
+export function addNote(space: Space, fields: Partial<Omit<UserNote, "id" | "space" | "createdAt" | "updatedAt">> = {}): AddChange {
 	const { title = "", body = "", todoId = null, addedBy = null } = fields;
 	const at = new Date().toISOString();
-	return { op: "add", note: { id: crypto.randomUUID(), title, body, todoId, addedBy, createdAt: at, updatedAt: at } };
+	return { op: "add", note: { id: crypto.randomUUID(), title, body, todoId, addedBy, space, createdAt: at, updatedAt: at } };
 }
 
 /** The list with the note `id` names changed by `change`, moved first when `at` marks it updated; the same list when that changes nothing. */
@@ -34,6 +35,8 @@ export function applyUserNote(list: UserNoteList, change: UserNoteChange): UserN
 			return update(list, change.id, note => (change.text === "" ? note : { ...note, body: note.body === "" ? change.text : `${note.body}\n\n${change.text}` }), change.at);
 		case "set-todo":
 			return update(list, change.id, note => (note.todoId === change.todoId ? note : { ...note, todoId: change.todoId }), null);
+		case "set-space":
+			return update(list, change.id, note => (note.space === change.space ? note : { ...note, space: change.space }), null);
 		case "remove": {
 			const notes = list.notes.filter(note => note.id !== change.id);
 			return notes.length === list.notes.length ? list : { notes };

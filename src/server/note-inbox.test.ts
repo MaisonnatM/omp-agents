@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { UserNoteChange } from "../user-notes-shared";
-import { NoteInbox } from "./note-inbox";
+import { NoteInbox, type SpaceOfSession } from "./note-inbox";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -19,6 +19,8 @@ function inboxDir(): string {
 
 const AT = "2026-10-05T09:00:00.000Z";
 const note = (addedBy: string | null) => ({ id: "a", title: "Findings", body: "", todoId: null, addedBy, createdAt: AT, updatedAt: AT });
+/** Session `s1` runs in the personal directory; every other session is Work. */
+const spaceOf: SpaceOfSession = async sessionId => (sessionId === "s1" ? "personal" : "work");
 
 describe("NoteInbox", () => {
 	test("applies an agent's adds and appends, oldest first, and sets aside an edit, a removal, an add in no session's name, or a file that is not a change", async () => {
@@ -31,9 +33,9 @@ describe("NoteInbox", () => {
 		writeFileSync(join(dir, "6-x.tmp"), JSON.stringify({ op: "add", note: note("s1") }));
 		writeFileSync(join(dir, "7-x.json"), JSON.stringify({ op: "add", note: note(null) }));
 		const applied: UserNoteChange[] = [];
-		await new NoteInbox(dir, change => applied.push(change)).drain();
+		await new NoteInbox(dir, change => applied.push(change), spaceOf).drain();
 		expect(applied).toEqual([
-			{ op: "add", note: note("s1") },
+			{ op: "add", note: { ...note("s1"), space: "personal" } },
 			{ op: "append", id: "a", text: "More", at: AT },
 		]);
 		expect(readdirSync(dir).sort()).toEqual(["3-x.json.invalid", "4-x.json.invalid", "5-x.json.invalid", "6-x.tmp", "7-x.json.invalid"]);
@@ -44,12 +46,21 @@ describe("NoteInbox", () => {
 		writeFileSync(join(dir, "1-x.json"), JSON.stringify({ op: "add", note: note("s1") }));
 		let owns = false;
 		const applied: UserNoteChange[] = [];
-		const inbox = new NoteInbox(dir, change => applied.push(change), { active: () => owns });
+		const inbox = new NoteInbox(dir, change => applied.push(change), spaceOf, { active: () => owns });
 		await inbox.drain();
 		expect(readdirSync(dir)).toEqual(["1-x.json"]);
 		owns = true;
 		await inbox.drain();
 		expect(applied).toHaveLength(1);
 		expect(readdirSync(dir)).toEqual([]);
+	});
+
+	test("files an agent's note in its session's space, whatever space the file names", async () => {
+		const dir = inboxDir();
+		writeFileSync(join(dir, "1-x.json"), JSON.stringify({ op: "add", note: { ...note("s1"), space: "work" } }));
+		writeFileSync(join(dir, "2-x.json"), JSON.stringify({ op: "add", note: { ...note("s2"), id: "b", space: "personal" } }));
+		const applied: UserNoteChange[] = [];
+		await new NoteInbox(dir, change => applied.push(change), spaceOf).drain();
+		expect(applied.map(change => (change.op === "add" ? change.note.space : null))).toEqual(["personal", "work"]);
 	});
 });

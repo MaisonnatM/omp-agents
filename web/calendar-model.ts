@@ -9,6 +9,7 @@ import { type CalendarEvent, calendarKey, type EventWhen, type GoogleCalendar, t
 import type { Ticket, TicketStatusType } from "../src/shared/tickets";
 import type { UserTodoList } from "../src/user-todos-shared";
 import { daysBetween, localDay } from "../src/shared/days";
+import type { Space } from "../src/shared/workspaces";
 
 /** The one color of the events kept on this computer, a neutral slate. */
 const LOCAL_EVENT_COLOR = "#64748b";
@@ -138,13 +139,11 @@ export interface CalendarChoice {
 	calendar: NewEventCalendar;
 }
 
-const LOCAL_CHOICE: CalendarChoice = { value: "local", label: "This computer", calendar: { kind: "local" } };
-
 /**
  * The picker's choices: the shown Google calendars you may write to, account by account and yours first in each, then
- * this computer. With several accounts, each calendar's label names its account's address.
+ * this computer, filing the event in `space`. With several accounts, each calendar's label names its account's address.
  */
-export function calendarChoices(calendars: GoogleCalendar[], accounts: GoogleAccount[]): CalendarChoice[] {
+export function calendarChoices(calendars: GoogleCalendar[], accounts: GoogleAccount[], space: Space): CalendarChoice[] {
 	const writable = calendars.filter(calendar => calendar.shown && calendar.writable);
 	const google = accounts.flatMap(account => {
 		const own = writable.filter(calendar => calendar.account === account.name);
@@ -153,7 +152,7 @@ export function calendarChoices(calendars: GoogleCalendar[], accounts: GoogleAcc
 			({ id, name }): CalendarChoice => ({ value: calendarKey(account.name, id), label: `${name}${suffix}`, calendar: { kind: "google", account: account.name, calendarId: id } }),
 		);
 	});
-	return [...google, LOCAL_CHOICE];
+	return [...google, { value: "local", label: "This computer", calendar: { kind: "local", space } }];
 }
 
 /** How a value kept from before accounts starts: `google:<calendar id>`. */

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { errorText } from "../../../src/json";
 import { type EventWhen, type LocalEvent, MAX_EVENT_TITLE, type NewEvent, type NewEventAnswer } from "../../../src/shared/calendar";
+import type { Space } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -53,6 +54,8 @@ interface NewEventDialogProps {
 	day: string;
 	/** The sidebar's workspace, whose Google Calendar accounts the picker offers; `null` for all workspaces. */
 	workspace: string | null;
+	/** The space on screen, which an event kept on this computer goes in. */
+	space: Space;
 	onClose: () => void;
 	/** The event was added: its first day, and the event as kept on this computer, or `null` for one added to a Google calendar. */
 	onCreated: (day: string, kept: LocalEvent | null) => void;
@@ -62,7 +65,7 @@ interface NewEventDialogProps {
  * The Calendar page's new-event dialog: a title, all day or a start and end time, and the calendar it goes in, a Google
  * calendar you may write to or this computer, the last one used first.
  */
-export function NewEventDialog({ day: initialDay, workspace, onClose, onCreated }: NewEventDialogProps) {
+export function NewEventDialog({ day: initialDay, workspace, space, onClose, onCreated }: NewEventDialogProps) {
 	const { calendars, accounts } = useGoogleCalendars(workspace);
 	const [title, setTitle] = useState("");
 	const [allDay, setAllDay] = useState(false);
@@ -73,7 +76,7 @@ export function NewEventDialog({ day: initialDay, workspace, onClose, onCreated 
 	const [picked, setPicked] = useState<string | null>(() => localStorage.getItem(LAST_CALENDAR_KEY));
 	const [submit, setSubmit] = useState<Submit>({ kind: "writing" });
 
-	const choices = calendarChoices(calendars ?? [], accounts);
+	const choices = calendarChoices(calendars ?? [], accounts, space);
 	const choice = keptChoice(choices, picked);
 	const when = eventWhen(allDay, times);
 	const creating = submit.kind === "creating";

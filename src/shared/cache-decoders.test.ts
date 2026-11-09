@@ -45,7 +45,7 @@ const events: CalendarEventsAnswer = {
 	],
 };
 
-const local: LocalEventsAnswer = { events: [{ id: "l1", title: "Dentist", when: { allDay: false, start: 1, end: 2 }, sessionId: null }] };
+const local: LocalEventsAnswer = { events: [{ id: "l1", title: "Dentist", when: { allDay: false, start: 1, end: 2 }, sessionId: null, space: "work" }] };
 
 const email: EmailAnswer = {
 	accounts: [{ account: "gmail", error: null }],
@@ -151,7 +151,10 @@ const cases: { name: string; decode: (raw: unknown) => unknown; whole: unknown; 
 		name: "local events",
 		decode: decodeLocalEventsAnswer,
 		whole: local,
-		partial: { "an event without its days": { events: [{ id: "l1", title: "Dentist", when: { allDay: true } }] } },
+		partial: {
+			"an event without its days": { events: [{ id: "l1", title: "Dentist", when: { allDay: true }, space: "work" }] },
+			"an event from before spaces": { events: [{ ...local.events[0], space: undefined }] },
+		},
 	},
 	{
 		name: "Gmail inbox",

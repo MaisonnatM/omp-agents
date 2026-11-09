@@ -343,7 +343,7 @@ export function Roster({
 			</TabPanel>
 			<TabPanel value="notes" asChild>
 				<SidebarContent>
-					<NotesNav list={userNotes} view={notesView} />
+					<NotesNav list={userNotes} view={notesView} space={space} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="calendar" asChild>
