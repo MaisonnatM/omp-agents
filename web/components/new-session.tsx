@@ -300,8 +300,8 @@ function SkillToggle({ name, state, onToggle, disabled }: { name: string; state:
 				aria-label={`Skill ${name}`}
 				onClick={onToggle}
 				disabled={off}
-				// When the composer's row runs short, as on a phone, the skill's name gives way first, so the project picker keeps its folder's name.
-				className="min-w-0 shrink-[9]"
+				// When the composer's row runs short, as on a phone, the skill's name truncates first, but stays a tappable chip.
+				className="min-h-7 min-w-16 max-w-28 shrink"
 			>
 				<span className={cn("block max-w-40 truncate", state !== "on" && "text-muted-foreground line-through")}>{name}</span>
 			</Button>

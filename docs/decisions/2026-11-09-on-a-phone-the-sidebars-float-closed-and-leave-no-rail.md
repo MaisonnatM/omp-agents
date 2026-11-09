@@ -20,6 +20,6 @@ We accept that the toggle sits over the header rather than in it, and that a pag
 ## Consequences
 
 On a phone the status bar keeps one row of plan quota that scrolls sideways, and leaves out the terminal, CPU, memory, and disk, which act on the Mac.
-Toasts on a phone show one at a time, at the top of the screen, clear of the composer at the bottom.
+Toasts on a phone show one at a time, under the top bar, clear of the sidebar button and of the composer at the bottom.
 Fields use 16-pixel text on a touch screen, so Safari no longer zooms the page in when one takes focus.
 From 720 pixels up nothing changes.

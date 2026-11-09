@@ -78,7 +78,7 @@ export function Toaster() {
 	return (
 		<Toast.Provider toastManager={toasts} limit={phone ? 1 : undefined}>
 			<Toast.Portal>
-				<div className="pointer-events-none fixed right-4 bottom-10 z-50 flex w-96 max-w-[calc(100vw-2rem)] flex-col items-end gap-2 *:pointer-events-auto max-sm:top-[max(0.5rem,env(safe-area-inset-top))] max-sm:right-2 max-sm:bottom-auto max-sm:max-w-[calc(100vw-1rem)]">
+				<div className="pointer-events-none fixed right-4 bottom-10 z-50 flex w-96 max-w-[calc(100vw-2rem)] flex-col items-end gap-2 *:pointer-events-auto max-sm:top-[max(3.5rem,calc(env(safe-area-inset-top)+2.75rem))] max-sm:right-2 max-sm:bottom-auto max-sm:max-w-[calc(100vw-1rem)]">
 					<Toast.Viewport className="flex w-full flex-col-reverse gap-2">
 						<ToastList phone={phone} />
 					</Toast.Viewport>
