@@ -79,7 +79,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - The Todos card's **Files** section, a session's changed files: `ChangedFileList` in `web/components/changed-files-section.tsx`.
   - The session changes dialog that a file or **Review** opens: `web/components/changes/session-changes-dialog.tsx`, with its explorer in `changes-explorer.tsx` and tree in `file-tree.tsx` beside it.
   - Settings › Files, omp's own config files: `Files` in `web/components/settings/files-tab.tsx`.
-  - Settings › Decisions, a workspace repository's decision records: `DecisionsTab` in `web/components/settings/decisions-tab.tsx`.
+  - Settings › Decisions, a workspace repository's decision records, and every workspace in the space when All workspaces is selected: `DecisionsTab` in `web/components/settings/decisions-tab.tsx`, grouped by `decisionGroups` in `web/components/settings/decision-groups.ts`.
 - A file opened from a path in agent text: `web/components/file-dialog.tsx`.
 - Dictation, the composer's microphone and the status row above its text field: `DictationButton` and `DictationRow` in `web/components/composer-dictation.tsx`, which `conversation.tsx` and `new-session.tsx` mount, over the page's one capture in `web/dictation.ts`.
 - Command palette (Cmd+K): `web/components/command-palette/`, over `web/command-palette.ts`.
@@ -113,6 +113,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
     Settings › Providers' account lines, with each account's place, its up and down arrows, and **Sign out**: `AccountLine` and `ProviderRow` in `web/components/settings/providers-tab.tsx`, over `orderableAccounts` in `src/shared/providers.ts` and `src/omp/account-order.ts`.
     Settings › Worktrees, with its totals, filters, **Merged** and blocker badges, selection bar, and **Remove N merged**: `WorktreesTab` in `web/components/settings/worktrees-tab.tsx`, with the removal queue and its toasts in `web/worktree-removals.ts`.
     Settings › Sync, with its remote, **Sync** button, last outcome, conflict choices, and item switches: `SyncTab` in `web/components/settings/sync-tab.tsx`.
+    Settings › Phone access, with its switch, the tailnet address, the pairing QR, and the paired phones: `PhoneAccessTab` in `web/components/settings/phone-access-tab.tsx`.
     Settings › Storage, with allocated usage, native cleanup previews, phase progress, and global cleanup rules: `StorageTab` in `web/components/settings/storage-tab.tsx`, with phase presentation and the sequential run driver in `web/storage.ts`.
 - List on the left with the open item on the right, split by a line you drag: `ListSplit` in `web/components/list-split.tsx`, over `web/components/drag-separator.tsx`.
 - Shared primitives (buttons, menus, dialogs, tooltips): `web/components/ui/`, from the Fluid registry and some from shadcn's, with the shadcn utilities they need in `web/shadcn.css`; change them only as `web/components/ui/PATCHES.md` describes.

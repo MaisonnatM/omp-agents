@@ -13,6 +13,12 @@ const dataDir = join(process.env.XDG_DATA_HOME || join(HOME, ".local", "share"),
 /** Where the dashboard keeps its access token: `$XDG_CONFIG_HOME/omp-agents/token`, else `~/.config/omp-agents/token`. */
 export const tokenFile = join(configDir, "token");
 
+/**
+ * Phone access: whether it is on, the tailnet address it serves, and the paired phones' token hashes, beside {@link tokenFile}.
+ * Mode 0600, since it names every phone that can reach the dashboard.
+ */
+export const phoneAccessFile = join(configDir, "phone-access.json");
+
 /** The sessions this dashboard started that stopped without End session, beside {@link tokenFile}. */
 export const interruptedFile = join(configDir, "interrupted.json");
 /** Active explicit task owners shared by every dashboard port, beside {@link tokenFile}. */

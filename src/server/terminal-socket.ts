@@ -7,6 +7,8 @@ import { fail } from "./http";
 import { parseTerminalMsg, parseTerminalQuery } from "./wire";
 
 export interface TerminalSocketData {
+	/** The paired phone this socket signed in as, when it did; removing that phone closes it. */
+	phoneId?: string;
 	terminal: Terminal;
 	/** Stops the shell's output reaching this socket; set once the socket opens. */
 	detach: (() => void) | null;

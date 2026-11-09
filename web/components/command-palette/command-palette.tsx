@@ -54,6 +54,7 @@ import { age, ALL_OF_SPACE, hostLabel, pastLabel, workspaceName } from "../../la
 import { PAGE_ICON } from "../../page-icons";
 import { conversationItems, recordItems } from "../../palette-records";
 import { useConversationHits, useRead, useSearchSources } from "../../reads";
+import { isPhonePage } from "../../api";
 import { DASHBOARD_UPDATE_URL, updateDashboard } from "../../dashboard-update";
 import { hashForNotes, hashForSettings, type OpenMode, SETTINGS_GROUP_LABEL, SETTINGS_SECTIONS, type SidebarTab } from "../../routing";
 import { revealMessage } from "../../message-reveal";
@@ -141,7 +142,7 @@ export const CommandPalette = memo(function CommandPalette({ state, ...props }: 
 });
 
 /** One item per settings section, opening it; the subtitle names the sidebar group that lists it. */
-const SETTINGS_ITEMS: readonly PaletteItem[] = SETTINGS_SECTIONS.map(({ value, label, icon, group, keywords }): PaletteItem => ({
+const SETTINGS_ITEMS: readonly PaletteItem[] = SETTINGS_SECTIONS.filter(({ value }) => !(isPhonePage() && value === "phone")).map(({ value, label, icon, group, keywords }): PaletteItem => ({
 	id: `settings:${value}`,
 	section: "settings",
 	title: label,

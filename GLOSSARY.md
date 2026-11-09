@@ -239,6 +239,20 @@ _Avoid_: Rep, round, interval
 An exercise's YouTube video with three cues and an optional caution, which the Sport page shows as a thumbnail and loads only when the user clicks play.
 _Avoid_: Tutorial, clip, embed
 
+## Phone access
+
+**Phone access**:
+The dashboard served to the user's own phone through Tailscale, turned on in Settings › Phone access.
+_Avoid_: Remote access, mobile app
+
+**Paired phone**:
+A phone that scanned a pairing code and holds its own device key, listed in Settings › Phone access.
+_Avoid_: Device, client
+
+**Pairing code**:
+The one-time code, shown as a QR and a link, that signs a phone in. It works once and expires after five minutes.
+_Avoid_: QR code, invite
+
 ## Distribution
 
 **Starter kit**:
