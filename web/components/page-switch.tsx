@@ -212,7 +212,7 @@ export const PageSwitch = memo(function PageSwitch({
 			);
 		}
 		case "calendar":
-			return <CalendarPage routines={routines} todos={userTodos} ticketsShown={linearCallable} space={scope.space} />;
+			return <CalendarPage routines={routines} bots={scope.bots} todos={userTodos} ticketsShown={linearCallable} space={scope.space} spaces={scope.spaces} />;
 		case "email":
 			return <EmailPage target={page.target} space={scope.space} />;
 		case "sport":

@@ -1,8 +1,9 @@
 import { ArrowLeftRight, Plus, Trash2 } from "lucide-react";
 import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 import type { Routine } from "../../../src/routines";
+import type { Bot } from "../../../src/shared/bots";
 import type { EventRef, LocalEvent, LocalEventSpace } from "../../../src/shared/calendar";
-import { otherSpace, type Space, spaceIs } from "../../../src/shared/workspaces";
+import { otherSpace, type Space, type Spaces, spaceIs } from "../../../src/shared/workspaces";
 import type { UserTodoList } from "../../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -22,7 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import { putJson } from "../../api";
 import { type Action, useAction } from "../../use-action";
-import { type CalendarEntry, calendarEntries } from "../../calendar-model";
+import { type CalendarEntry, calendarEntries, routinesOf, todosIn } from "../../calendar-model";
 import { eventLink, type NoticeLink } from "../../notice-model";
 import { dateOfDay, localDay } from "../../../src/shared/days";
 import { SPACE_LABELS } from "../../labels";
@@ -351,17 +352,24 @@ function gridDays(year: number, month: number): Date[] {
 }
 
 interface CalendarPageProps {
+	/** Every Bot's routines; the page shows those of `bots`. */
 	routines: Routine[];
-	/** `null` until the server sends it. */
+	/** The Bots of the space on screen, `null` until they load. */
+	bots: Bot[] | null;
+	/** `null` until the server sends it; the page shows the todos of the space on screen. */
 	todos: UserTodoList | null;
 	/** The dashboard can read Linear, so tickets with a due date show. */
 	ticketsShown: boolean;
-	/** The space on screen, whose Google Calendar accounts and events kept on this computer the page shows, and which a new event kept here goes in. */
+	/** The space on screen, whose Google Calendar accounts, events kept on this computer, routine runs, and due todos the page shows, and which a new event kept here goes in. */
 	space: Space;
+	/** Which space each workspace is in, which places each todo. */
+	spaces: Spaces;
 }
 
-/** A month of the Google events and the events kept on this computer of `space`, routine runs, and due todos and Linear tickets, with one day's list beside it. */
-export function CalendarPage({ routines, todos, ticketsShown, space }: CalendarPageProps) {
+/** A month of the Google events, events kept on this computer, routine runs, and due todos of `space`, and Linear tickets, with one day's list beside it. */
+export function CalendarPage({ routines: allRoutines, bots, todos: allTodos, ticketsShown, space, spaces }: CalendarPageProps) {
+	const routines = useMemo(() => routinesOf(allRoutines, bots), [allRoutines, bots]);
+	const todos = useMemo(() => todosIn(allTodos, space, spaces), [allTodos, space, spaces]);
 	const now = useMinute();
 	const [showRoutines] = useCalendarRoutines();
 	const [month, setMonth] = useCalendarMonth();
