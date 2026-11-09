@@ -3,8 +3,8 @@
  * to as that session lives, a message to a Bot, which reaches its live session or resumes it, and the idle stop of a
  * conversation nothing used for a day.
  */
-import { statSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, renameSync, statSync } from "node:fs";
+import { basename, join } from "node:path";
 import { isObject, str } from "../json";
 import type { LiveSession } from "../live-session";
 import { BOT_FLAGS } from "../omp/bot-extension";
@@ -120,6 +120,8 @@ export interface BotsDeps {
 		shepherdExtension: string;
 		shepherdInboxDir: string;
 		designerExtension: string;
+		/** Where a restarted Bot's old conversation file moves, out of the sessions omp resumes. */
+		sessionArchiveDir: string;
 	};
 	now(): string;
 	/** A Bot's conversation moved to another session, which the list registry did not publish. */
@@ -281,6 +283,37 @@ export class Bots {
 			const written = path === null ? undefined : statSync(path, { throwIfNoEntry: false })?.mtimeMs;
 			if (written !== undefined && now - written >= BOT_IDLE_STOP_MS) await live.end();
 		}
+	}
+
+	/**
+	 * Restarts Bot `id`'s conversation: ends its live session and waits for it, moves its file to the session archive,
+	 * and unbinds the Bot, so its next message starts a new conversation. Waits on any message under way first.
+	 */
+	restart(id: BotId): Promise<void> {
+		const restarted = (this.#sending.get(id) ?? Promise.resolve())
+			.catch(() => {})
+			.then(() => this.#restart(id))
+			.finally(() => {
+				if (this.#sending.get(id) === restarted) this.#sending.delete(id);
+			});
+		this.#sending.set(id, restarted);
+		return restarted;
+	}
+
+	async #restart(id: BotId): Promise<void> {
+		const bot = this.list.find(candidate => candidate.id === id);
+		if (!bot) throw new Error("This Bot is gone.");
+		const { sessionId } = bot;
+		if (sessionId === null) return;
+		const live = this.#deps.live(sessionId);
+		if (live) await live.end();
+		const path = this.#deps.savedFile(sessionId);
+		if (path !== null && existsSync(path)) {
+			mkdirSync(this.#deps.paths.sessionArchiveDir, { recursive: true });
+			renameSync(path, join(this.#deps.paths.sessionArchiveDir, basename(path)));
+		}
+		this.#read.delete(id);
+		if (this.#deps.file.apply({ op: "unbind", id }, this.#deps.now())) this.#deps.onChange();
 	}
 
 	async #send(id: BotId, text: string): Promise<string> {

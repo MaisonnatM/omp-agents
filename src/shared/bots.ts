@@ -85,10 +85,11 @@ export type BotChange =
 	| { op: "pin"; id: BotId; pinned: boolean }
 	| { op: "move"; id: BotId; section: string | null }
 	| { op: "rename-section"; from: string; to: string | null }
-	| { op: "message"; id: BotId; text: string };
+	| { op: "message"; id: BotId; text: string }
+	| { op: "restart"; id: BotId };
 
-/** What edits `bots.json`: a page's change of a Bot or of where Bots list, or the server binding a Bot to the session its conversation runs in. */
-export type BotEdit = Exclude<BotChange, { op: "message" }> | { op: "bind"; id: BotId; sessionId: string };
+/** What edits `bots.json`: a page's change of a Bot or of where Bots list, or the server binding a Bot to the session its conversation runs in, or unbinding it so its next message starts a new one. */
+export type BotEdit = Exclude<BotChange, { op: "message" | "restart" }> | { op: "bind"; id: BotId; sessionId: string } | { op: "unbind"; id: BotId };
 
 /** What a Bot's `set_job` tool asks of the server: Bot `botId`'s job becomes `job`, empty to clear it. */
 export interface BotJobRequest {
@@ -185,6 +186,8 @@ export function applyBot(bots: Bot[], edit: BotEdit, now: string): Bot[] {
 			return stored ? bots.toSpliced(index, 1) : bots;
 		case "bind":
 			return !stored || stored.sessionId === edit.sessionId ? bots : bots.with(index, { ...stored, sessionId: edit.sessionId });
+		case "unbind":
+			return !stored || stored.sessionId === null ? bots : bots.with(index, { ...stored, sessionId: null });
 		case "pin":
 			return !stored || stored.pinned === edit.pinned ? bots : bots.with(index, { ...stored, pinned: edit.pinned });
 		case "move":
@@ -277,6 +280,10 @@ export function parseBotChange(value: unknown): BotChange | null {
 		case "message": {
 			const id = parseBotId(value.id);
 			return id && isNonEmpty(value.text) ? { op: "message", id, text: value.text } : null;
+		}
+		case "restart": {
+			const id = parseBotId(value.id);
+			return id ? { op: "restart", id } : null;
 		}
 		default:
 			return null;

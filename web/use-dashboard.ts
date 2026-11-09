@@ -103,7 +103,7 @@ export interface Dashboard {
 	/** Pin or unpin sessions, which shows at once and reaches the server, on the next socket while none is open, and every other window. */
 	changePins: (change: PinChange) => void;
 	/** Add, change, or delete a Bot, which shows at once and reaches the server, on the next socket while none is open, and every other window. */
-	changeBot: (change: Exclude<BotChange, { op: "message" }>) => void;
+	changeBot: (change: Exclude<BotChange, { op: "message" | "restart" }>) => void;
 	/** Trust the pieces `refused` asks about, then send its start again, which replaces it; rejects with why the trust could not be saved. */
 	trustAndStart: (refused: RefusedStart) => Promise<void>;
 	/** Close the trust dialog of start `reqId`, leaving its error showing. */
@@ -377,7 +377,7 @@ export function useDashboard(): Dashboard {
 		[write],
 	);
 	const changeBot = useCallback(
-		(change: Exclude<BotChange, { op: "message" }>) => {
+		(change: Exclude<BotChange, { op: "message" | "restart" }>) => {
 			dispatch({ t: "bot", change, now: new Date().toISOString() });
 			void write({ t: "bot", change });
 		},

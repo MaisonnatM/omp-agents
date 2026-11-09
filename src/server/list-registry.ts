@@ -24,7 +24,7 @@ interface ListChanges {
 	pins: PinChange;
 	"review-drafts": ReviewDraftEdit;
 	preferences: PreferenceChange;
-	bots: Exclude<BotChange, { op: "message" }>;
+	bots: Exclude<BotChange, { op: "message" | "restart" }>;
 }
 
 /** The lists only the server changes, through actions of their own: the bell's notices, the queued merges, and the personal memory. */
