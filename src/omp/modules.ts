@@ -409,7 +409,7 @@ export const statsRollup = await load<StatsRollupModule>(join(statsSrc, "rollup.
 });
 export const statsLive = await load<StatsLiveModule>(join(statsSrc, "live.ts"), { statsLive: "function" });
 export const statsDb = await load<StatsDbModule>(join(statsSrc, "db.ts"), { initDb: "function" });
-export const rateLimit = await load<RateLimitModule>(join(dirname(packageDir), "pi-ai", "src", "error", "rate-limit.ts"), { is402BillingCapBody: "function" });
+export const rateLimit = await load<RateLimitModule>(join(dirname(packageDir), "pi-ai", "src", "error", "rate-limit.ts"), { isBillingCapUsageLimit: "function" });
 export const errorFlags = await load<ErrorFlagsModule>(join(dirname(packageDir), "pi-ai", "src", "error", "flags.ts"), {
 	"Flag.UsageLimit": "number",
 	"Flag.Transient": "number",

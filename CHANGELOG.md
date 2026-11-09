@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-08
 
+- The bell's Out of credit alert now also comes up when DeepSeek says Insufficient Balance, OpenRouter says Insufficient credits, or a monthly spend limit is reached, not only when a provider refuses a request with a payment error.
 - You can now pick the language you dictate in, such as French, under Settings › omp settings › Interaction › Speech-to-Text Language.
 - When dictation hears nothing, the composer now says why: nothing was loud enough to count as speech, so speak closer to the microphone or raise its input level in your sound settings.
 - On the Sport page, Routine hanche and Mobilité hanche in a workout now have their own Lancer, which runs their exercises in the timer from the first one without ticking anything, and ends on « Terminé » or « Arrêté » with how many holds you did, such as 21 / 21 tenues.
