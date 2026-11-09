@@ -1,8 +1,8 @@
 /** What the roster and past-session lists say about where sessions ran, and what they work on. */
-import { newestPastFirst, type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
+import { awaitsSubagents, newestPastFirst, type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
 import { inTempDir, type Workspace } from "../src/shared/workspaces";
 import { everyWord } from "../src/shared/every-word";
-import { awaitsSubagents, needsYou } from "./attention";
+import { needsYou } from "./attention";
 
 /** A working directory outside the temp directories, and not one Settings → Workspaces hid. */
 export function discoverableCwd(cwd: string, hidden: ReadonlySet<string>): boolean {

@@ -1,6 +1,6 @@
-import { Plus, X } from "lucide-react";
+import { Check, Plus, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { type ModelChain, type ModelRouting, type OmpSettings, type RetrySettings, type RoleRoute, type RoutingEdit } from "../../../src/shared/models";
+import { type ModelChain, type ModelProfileEdit, type ModelProfileSummary, type ModelRouting, type OmpSettings, type RetrySettings, type RoleRoute, type RoutingEdit } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -9,9 +9,10 @@ import { providerOrg } from "../../labels";
 import { CommandPicker } from "../command-picker";
 import { Model } from "../model-picker";
 import { OrgIcon } from "../org-icon";
-import { type Catalog, EditBar, type Editing, FIELD, LINK, NumberField, OrderedList, SaveError, Section, useEditor, writeOrReload } from "./editor";
+import { type Catalog, EditBar, type Editing, ErrorText, FIELD, LINK, NumberField, OrderedList, SaveError, Section, useEditor, useSaving, writeOrReload } from "./editor";
 import { SelectorPicker } from "./selector-picker";
 import { hashForSettings } from "../../routing";
+import { useInlineConfirm } from "../../use-inline-confirm";
 
 /** Each save answers with the settings as they load afterwards. */
 const saveRouting = (editing: Editing, edit: RoutingEdit): Promise<OmpSettings> => writeOrReload(editing, () => putJson<OmpSettings>(settingsUrl("/routing", editing.cwd), edit));
@@ -289,10 +290,108 @@ function ProviderOrderSection({ order, editing }: { order: string[]; editing: Ed
 	);
 }
 
-/** Roles, per-model chains, provider order, and retries: which model a session gets, where its fallbacks are served from, and when omp moves on to them. */
+/** The key a profile edit saves and confirms under. */
+const keyOf = (edit: ModelProfileEdit): string => `${edit.kind}:${edit.name}`;
+
+/** The saved model profiles: a click applies one to config.yml, and the one config.yml routes as now shows active. */
+function ProfilesSection({ profiles, editing }: { profiles: ModelProfileSummary[]; editing: Editing }) {
+	const saving = useSaving<string>();
+	const confirm = useInlineConfirm("model-profiles");
+	const [naming, setNaming] = useState<string | null>(null);
+	const send = (edit: ModelProfileEdit): void =>
+		saving.run(keyOf(edit), async () => {
+			await writeOrReload(editing, () => putJson<OmpSettings>(settingsUrl("/model-profiles", editing.cwd), edit));
+			if (edit.kind === "save") setNaming(null);
+		});
+	const busy = saving.saving !== null;
+	const name = naming?.trim() ?? "";
+	return (
+		<Section
+			title="Model profiles"
+			meta="Running sessions keep their model; new sessions use the profile."
+			actions={
+				naming === null && (
+					<Button variant="tertiary" size="compact" leadingIcon={Plus} disabled={busy} onClick={() => setNaming("")}>
+						Save current as…
+					</Button>
+				)
+			}
+		>
+			{naming !== null && (
+				<form
+					className="flex flex-wrap items-center gap-2"
+					onSubmit={event => {
+						event.preventDefault();
+						if (name) send({ kind: "save", name });
+					}}
+				>
+					<input
+						className={cn(FIELD, "w-56")}
+						aria-label="Profile name"
+						placeholder="Profile name"
+						autoFocus
+						value={naming}
+						onChange={event => setNaming(event.target.value)}
+						onKeyDown={event => {
+							if (event.key === "Escape") setNaming(null);
+						}}
+					/>
+					<Button type="submit" size="compact" disabled={!name || busy} loading={saving.saving === keyOf({ kind: "save", name })}>
+						{profiles.some(profile => profile.name === name) ? `Replace ${name}` : "Save"}
+					</Button>
+					<Button type="button" variant="ghost" size="compact" disabled={busy} onClick={() => setNaming(null)}>
+						Cancel
+					</Button>
+				</form>
+			)}
+			{profiles.length === 0 ? (
+				<p className="text-sm text-muted-foreground">No profiles yet. Save the routing below to switch back to it in one click.</p>
+			) : (
+				<ul className="flex flex-wrap gap-2">
+					{profiles.map(profile => {
+						const apply: ModelProfileEdit = { kind: "apply", name: profile.name };
+						const remove: ModelProfileEdit = { kind: "delete", name: profile.name };
+						return (
+							<li key={profile.name} className="flex items-center gap-1">
+								<Button
+									variant="ghost"
+									size="compact"
+									active={profile.active}
+									aria-current={profile.active || undefined}
+									leadingIcon={profile.active ? Check : undefined}
+									loading={saving.saving === keyOf(apply)}
+									disabled={busy}
+									onClick={() => {
+										if (!profile.active) send(apply);
+									}}
+								>
+									{profile.name}
+								</Button>
+								<Button
+									variant="destructive-outline"
+									size="compact"
+									aria-label={`Delete ${profile.name}`}
+									loading={saving.saving === keyOf(remove)}
+									disabled={busy}
+									{...confirm.props(keyOf(remove), () => send(remove))}
+								>
+									{confirm.isArmed(keyOf(remove)) ? "Confirm delete?" : "Delete"}
+								</Button>
+							</li>
+						);
+					})}
+				</ul>
+			)}
+			{saving.error && <ErrorText>{saving.error}</ErrorText>}
+		</Section>
+	);
+}
+
+/** Profiles, roles, per-model chains, provider order, and retries: which model a session gets, where its fallbacks are served from, and when omp moves on to them. */
 export function ModelsTab({ routing, configPath, editing }: { routing: ModelRouting; configPath: string | undefined; editing: Editing }) {
 	return (
 		<>
+			<ProfilesSection profiles={routing.profiles} editing={editing} />
 			<Section title="Model roles" meta={configPath && `Saved to ${configPath}`}>
 				{routing.roles.length === 0 ? (
 					<p className="text-sm text-muted-foreground">

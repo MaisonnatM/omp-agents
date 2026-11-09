@@ -24,75 +24,68 @@ export interface SessionMovesDeps {
 export class SessionMoves {
 	readonly #deps: SessionMovesDeps;
 	/**
-	 * Each move call a session started, by tool call id, until its end or the end of its turn or session. Its start names
-	 * the session, since the tool cannot know it: a reattached session gets its tools before it is listed.
+	 * The move each call took, by tool call id, until the call's end hands it over: a reattached session gets its tools before
+	 * it is listed, and its events, held until then, are what reach it after.
 	 */
-	readonly #calls = new Map<string, MoveCall>();
-	readonly #tool: RpcHostTool = {
-		name: MOVE_SESSION_TOOL,
-		label: "Move session",
-		description: [
-			"Move this session to another directory, as the user's /move does, when the user asks you to work in another repository or directory.",
-			"The dashboard moves it once your turn ends, then omp reloads the context files of the new directory.",
-			"`path` is absolute or starts with ~.",
-		].join(" "),
-		parameters: {
-			type: "object",
-			properties: { path: { type: "string", description: "The directory to move to, absolute or starting with ~." } },
-			required: ["path"],
-			additionalProperties: false,
-		},
-		loadMode: "essential",
-		execute: async ({ path }, { toolCallId }) => {
-			if (typeof path !== "string" || !/^\s*[/~]/.test(path)) throw new Error("path must be absolute or start with ~.");
-			const dir = await directoryOf(path);
-			if (!dir) throw new Error(`Not a directory: ${path.trim()}`);
-			// A move reloads omp in the new directory, which runs that project's code as a start would.
-			await this.#deps.admit(dir);
-			// A turn cut off while the directory was checked forgot this call, so nothing would hand its move over.
-			const call = this.#calls.get(toolCallId);
-			if (!call) throw new Error("This turn ended before the move was taken; nothing moves.");
-			call.dir = dir;
-			return `When this turn ends, the dashboard moves this session to ${dir} and reloads its context files. End your turn now; do not work in ${dir} before the move.`;
-		},
-	};
+	readonly #taken = new Map<string, TakenMove>();
 
 	constructor(deps: SessionMovesDeps) {
 		this.#deps = deps;
 	}
 
-	/** How `request` joins the server: with the move tool, unless its session stays put. */
-	join(request: StartRequest): SessionJoin {
-		return { rpc: this.#deps.staysPut(request) ? PLAIN_LAUNCH : { ...PLAIN_LAUNCH, tools: [this.#tool] }, attach() {} };
+	/** How `request` joins the server as session `instanceId`: with its own move tool, unless its session stays put. */
+	join(request: StartRequest, instanceId: string): SessionJoin {
+		return { rpc: this.#deps.staysPut(request) ? PLAIN_LAUNCH : { ...PLAIN_LAUNCH, tools: [this.#toolFor(instanceId)] }, attach() {} };
 	}
 
-	/**
-	 * Session `instanceId` reported `event`: the successful end of a move call hands the session its move for the turn's
-	 * end, and the end of a turn forgets the session's move calls it cut off.
-	 */
-	heard(instanceId: string, event: unknown): void {
-		if (!isObject(event)) return;
-		if (event.type === "agent_end") return this.#forget(instanceId);
-		if (typeof event.toolCallId !== "string") return;
-		if (event.type === "tool_execution_start" && event.toolName === MOVE_SESSION_TOOL) this.#calls.set(event.toolCallId, { caller: instanceId, dir: null });
-		if (event.type !== "tool_execution_end") return;
-		const call = this.#calls.get(event.toolCallId);
-		this.#calls.delete(event.toolCallId);
-		if (call?.dir && event.isError !== true) this.#deps.session(instanceId)?.moveAfterTurn(call.dir);
+	/** A live session reported `event`: the successful end of a move call hands its session the move for the turn's end. */
+	heard(event: unknown): void {
+		if (!isObject(event) || event.type !== "tool_execution_end" || typeof event.toolCallId !== "string") return;
+		const move = this.#taken.get(event.toolCallId);
+		if (!move) return;
+		this.#taken.delete(event.toolCallId);
+		if (event.isError !== true) this.#deps.session(move.caller)?.moveAfterTurn(move.dir);
 	}
 
 	/** Session `instanceId` exited, ending any move call it left running. */
 	exited(instanceId: string): void {
-		this.#forget(instanceId);
+		for (const [toolCallId, move] of this.#taken) if (move.caller === instanceId) this.#taken.delete(toolCallId);
 	}
 
-	#forget(instanceId: string): void {
-		for (const [toolCallId, call] of this.#calls) if (call.caller === instanceId) this.#calls.delete(toolCallId);
+	/** The move tool of session `caller`. */
+	#toolFor(caller: string): RpcHostTool {
+		return {
+			name: MOVE_SESSION_TOOL,
+			label: "Move session",
+			description: [
+				"Move this session to another directory, as the user's /move does, when the user asks you to work in another repository or directory.",
+				"The dashboard moves it once your turn ends, then omp reloads the context files of the new directory.",
+				"`path` is absolute or starts with ~.",
+			].join(" "),
+			parameters: {
+				type: "object",
+				properties: { path: { type: "string", description: "The directory to move to, absolute or starting with ~." } },
+				required: ["path"],
+				additionalProperties: false,
+			},
+			loadMode: "essential",
+			execute: async ({ path }, { toolCallId, signal }) => {
+				if (typeof path !== "string" || !/^\s*[/~]/.test(path)) throw new Error("path must be absolute or start with ~.");
+				const dir = await directoryOf(path);
+				if (!dir) throw new Error(`Not a directory: ${path.trim()}`);
+				// A move reloads omp in the new directory, which runs that project's code as a start would.
+				await this.#deps.admit(dir);
+				if (signal.aborted) throw new Error("This turn ended before the move was taken; nothing moves.");
+				this.#taken.set(toolCallId, { caller, dir });
+				return `When this turn ends, the dashboard moves this session to ${dir} and reloads its context files. End your turn now; do not work in ${dir} before the move.`;
+			},
+		};
 	}
 }
 
-/** A move call: the session that started it, and the directory the tool took, `null` until it takes one. */
-interface MoveCall {
+/** A move a call took: the session that called it, and the directory it moves to. */
+interface TakenMove {
 	caller: string;
-	dir: string | null;
+	dir: string;
 }
+

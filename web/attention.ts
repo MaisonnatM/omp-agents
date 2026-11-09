@@ -1,26 +1,17 @@
 /** Which live sessions need you, and the alerts they raise, for the desktop app's Dock badge and the session notifications. */
 import type { SessionAlert } from "../src/shared/desktop-bridge";
-import { hashForSession, type RosterHost, type UnreadTurn, type UserRequest, type View } from "../src/shared/sessions";
+import { awaitsSubagents, hashForSession, type RosterHost, type Stop, stopOf, type UnreadTurn, type View } from "../src/shared/sessions";
 import type { DashboardState } from "./dashboard-state";
 import { hostLabel } from "./labels";
 
-/** Whether `host`'s main agent only waits on a subagent that still runs: its turn ended, or sits only in `wait` or `task` calls. */
-export const awaitsSubagents = (host: RosterHost): boolean =>
-	(host.status === "idle" || (host.status === "working" && host.turnWaits)) && host.agents.some(agent => agent.status === "running");
-
-/**
- * What a session waits on you for now: its oldest open question, else a wait with no question relayed (a terminal
- * session's own dialog, or the placeholder a terminal session shows until its host replays the question), else its
- * unread turn once no subagent it waits on still runs; `null` while it does not need you.
- */
-type Wait = { kind: "ask"; request: UserRequest } | { kind: "input" } | { kind: "turn"; turn: UnreadTurn };
+/** What a session waits on you for now: its {@link Stop}, its ended turn only while you have not looked at it since; `null` while it does not need you. */
+type Wait = Exclude<Stop, { kind: "turn-ended" }> | { kind: "turn"; turn: UnreadTurn };
 
 export function waitOf(host: RosterHost): Wait | null {
-	const [request] = host.requests;
-	if (request) return { kind: "ask", request };
-	if (host.status === "needs-input") return { kind: "input" };
-	if (host.unread && !awaitsSubagents(host)) return { kind: "turn", turn: host.unread };
-	return null;
+	const stop = stopOf(host);
+	if (stop && stop.kind !== "turn-ended") return stop;
+	// An unread turn counts even while omp has not said it is idle, as for a terminal session that reports no busy state.
+	return host.unread && !awaitsSubagents(host) ? { kind: "turn", turn: host.unread } : null;
 }
 
 /** Whether live session `host` needs you: it asks you something, or it ended a turn you have not looked at since and waits on no subagent. */

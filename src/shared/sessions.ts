@@ -152,6 +152,25 @@ export type RosterHost = RosterHostBase &
 		| { source: "dashboard"; thinkingLevels: string[]; switching: boolean; fast: FastMode | null; compaction: CompactionState; advisor: AdvisorState | null; goal: GoalSlot; private: boolean }
 	);
 
+/** Whether `host`'s main agent only waits on a subagent that still runs: its turn ended, or sits only in `wait` or `task` calls. */
+export const awaitsSubagents = (host: Pick<RosterHost, "status" | "turnWaits" | "agents">): boolean =>
+	(host.status === "idle" || (host.status === "working" && host.turnWaits)) && host.agents.some(agent => agent.status === "running");
+
+/**
+ * Why `host` stopped for the user, `null` while it has not: its oldest open question, else a wait with no question relayed
+ * (a terminal session's own dialog, or the placeholder a terminal session shows until its host replays the question),
+ * else its ended turn once no subagent it waits on still runs.
+ */
+export type Stop = { kind: "ask"; request: UserRequest } | { kind: "input" } | { kind: "turn-ended" };
+
+export function stopOf(host: Pick<RosterHost, "requests" | "status" | "turnWaits" | "agents">): Stop | null {
+	const [request] = host.requests;
+	if (request) return { kind: "ask", request };
+	if (host.status === "needs-input") return { kind: "input" };
+	if (host.status === "idle" && !awaitsSubagents(host)) return { kind: "turn-ended" };
+	return null;
+}
+
 /** omp's `/fast` for the session's model: whether you turned it on, and whether requests go out on the priority tier. */
 export interface FastMode {
 	enabled: boolean;

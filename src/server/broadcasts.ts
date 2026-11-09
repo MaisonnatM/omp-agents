@@ -26,6 +26,8 @@ export interface BroadcastDeps {
 	subscriberCount(topic: string): number;
 	/** Runs on each roster push, before it syncs: catches up the views and the live sessions' workspaces. */
 	onRosterPush(): void;
+	/** Runs on each roster push, whether or not a socket listens: the waits on live sessions read the rows then. */
+	onRosterChange(): void;
 	/** Saves which dashboard sessions run now, and whether each one's turn runs. */
 	saveRunning(): void;
 }
@@ -107,6 +109,7 @@ export class Broadcasts {
 	pushRoster(): void {
 		clearTimeout(this.#rosterPush);
 		this.#rosterPush = undefined;
+		this.#deps.onRosterChange();
 		if (!this.listening()) return;
 		this.#deps.onRosterPush();
 		this.#syncRoster();

@@ -86,6 +86,8 @@ export const pinsFile = join(configDir, "pins.json");
 export const preferencesFile = join(configDir, "preferences.json");
 /** When the idle stop ends a session's processes, beside {@link tokenFile}. */
 export const processesFile = join(configDir, "processes.json");
+/** The model profiles Settings › Models saved, beside {@link tokenFile}; omp's own `config.yml` never holds them. */
+export const modelProfilesFile = join(configDir, "model-profiles.json");
 /** The Google calendars the Calendar page's sidebar unchecked, beside {@link tokenFile}. */
 export const calendarsFile = join(configDir, "calendars.json");
 /** The address each Google account signs in as and the workspaces each address is linked to, beside {@link tokenFile}. */

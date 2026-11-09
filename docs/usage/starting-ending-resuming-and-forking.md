@@ -31,6 +31,10 @@
   A session's agent can ask for the move itself: when it finds the work belongs in another directory, its `move_session` tool queues the move, and the dashboard sends `/move <path>` once the turn ends, so the session, its header, and the sidebar's workspace picker follow as they do for the picker.
   A turn that a queued message starts at once keeps the move waiting for the next idle end, and a move omp refuses shows its reason as a note in the conversation.
   Only a session the dashboard started has the tool, except a Bot's conversation, whose directory stays fixed; a session in a terminal still asks you to type `/move`.
+- A session the dashboard started can wait on another running session: name that session with an `@session:` mention and ask it to wait, such as waiting for the session that builds the importer, then reviewing its branch.
+  Its `wait_for_session` tool holds its turn until that session ends its turn with no subagent it waits on still running, asks you a question, or no longer runs, then hands it what happened and that session's last reply.
+  It stops waiting after 60 minutes unless you ask for another limit, up to 240 minutes, and stopping its turn stops the wait.
+  A session cannot wait on itself, and a Bot's conversation has no such tool.
 - The draft's composer has the model menu at its bottom left, as a running session's does, without its Fast row.
   Until you pick one, it names the `default` role's model, such as **Opus 5.5**, which is the model omp starts on without `--model`.
   It reads **Default model** only when no `default` role names a model you are connected to.
