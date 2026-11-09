@@ -169,8 +169,8 @@ export interface ModelRouting {
 	/** The values omp accepts for each enum `retry.*` setting. */
 	retryChoices: Partial<Record<keyof RetrySettings, readonly string[]>>;
 	modelProviderOrder: string[];
-	/** The saved model profiles, in the order they were first saved; `active` when the user's `config.yml` routes as the profile does. */
-	profiles: { name: string; active: boolean }[];
+	/** The saved model profiles, in the order they were first saved. */
+	profiles: ModelProfileSummary[];
 }
 
 /** The routing a model profile holds: the user's `config.yml`'s own `modelRoles`, `retry.fallbackChains`, and `modelProviderOrder`. */
@@ -183,6 +183,12 @@ export interface ProfileRouting {
 /** A named {@link ProfileRouting} that Settings › Models saved and applies in one click. */
 export interface ModelProfile extends ProfileRouting {
 	name: string;
+}
+
+/** A saved {@link ModelProfile} as Settings › Models lists it: `active` while the user's `config.yml` routes as it does. */
+export interface ModelProfileSummary {
+	name: string;
+	active: boolean;
 }
 
 /**

@@ -85,7 +85,7 @@ describe("Bots", () => {
 		const hosts = [
 			{ sessionId: "s1", status: "needs-input", requests: [{ title: "Push to main?" }], unread: null },
 			{ sessionId: "s2", status: "idle", requests: [], unread: { at: 5_000, reply: "Done." }, agents: [] },
-			{ sessionId: "s3", status: "idle", requests: [], unread: null },
+			{ sessionId: "s3", status: "idle", requests: [], unread: null, agents: [] },
 		] as unknown as RosterHost[];
 		expect(botsNeedingYou(botRows(bots, hosts, {}))).toBe(2);
 	});

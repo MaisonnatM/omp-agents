@@ -155,18 +155,13 @@ export function userRoutingOf(settings: OmpSettingsInstance): ProfileRouting {
 
 /**
  * Makes `settings`' global `config.yml` route as `routing` does, through omp's write path like {@link writeRouting}:
- * each role and chain `routing` leaves out is removed, and every key outside the routing survives.
+ * omp writes a setting's whole value at its path, so each map replaces the one on disk and drops each role and chain
+ * `routing` leaves out, while every key outside the routing survives.
  */
-export async function writeUserRouting(settings: OmpSettingsInstance, routing: ProfileRouting): Promise<void> {
-	const current = userRoutingOf(settings);
-	for (const role of new Set([...Object.keys(current.modelRoles), ...Object.keys(routing.modelRoles)])) {
-		settings.setModelRole(role, Object.hasOwn(routing.modelRoles, role) ? routing.modelRoles[role] : undefined);
-	}
-	const chains = setting("retry.fallbackChains");
-	for (const key of new Set([...Object.keys(current.fallbackChains), ...Object.keys(routing.fallbackChains)])) {
-		chains.setEntry(settings, key, Object.hasOwn(routing.fallbackChains, key) ? routing.fallbackChains[key] : undefined);
-	}
-	setting("modelProviderOrder").set(settings, routing.modelProviderOrder.length > 0 ? routing.modelProviderOrder : undefined);
+export async function writeUserRouting(settings: OmpSettingsInstance, { modelRoles, fallbackChains, modelProviderOrder }: ProfileRouting): Promise<void> {
+	setting("modelRoles").set(settings, Object.keys(modelRoles).length > 0 ? modelRoles : undefined);
+	setting("retry.fallbackChains").set(settings, Object.keys(fallbackChains).length > 0 ? fallbackChains : undefined);
+	setting("modelProviderOrder").set(settings, modelProviderOrder.length > 0 ? modelProviderOrder : undefined);
 	await settings.flush();
 }
 

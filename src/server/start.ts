@@ -30,9 +30,9 @@ interface Started {
 	discard?: () => Promise<void>;
 }
 
-type Outcome = { started: Started } | StartFailure;
+type Outcome = { started: Started; join: SessionJoin } | StartFailure;
 
-type Spawn = (instanceId: string, emit: (update: DashboardUpdate) => void) => Promise<Started>;
+type Spawn = (instanceId: string, emit: (update: DashboardUpdate) => void, rpc: AdmittedLaunch) => Promise<Started>;
 
 export interface StartEnv {
 	sessions: LiveSessions;
@@ -48,8 +48,8 @@ export interface StartEnv {
 	workspaceOf(cwd: string): Promise<string>;
 	/** Links todo `todoId` to session `sessionId`, which a new session started for it, and moves a todo not started yet to In Progress. */
 	linkTodo(todoId: string, sessionId: string): void;
-	/** How a start, or the resume of an attached session, joins the server. */
-	joinFor(request: StartRequest): SessionJoin;
+	/** How a start, or the resume of an attached session, joins the server as session `instanceId`. */
+	joinFor(request: StartRequest, instanceId: string): SessionJoin;
 	/** Lets omp spawn in `cwd`, or throws {@link UntrustedProjectError} while its project's agent code is not trusted as it is now. */
 	admit(cwd: string): Promise<void>;
 	privateSessions: Pick<PrivateSessions, "launch" | "holds">;
@@ -63,10 +63,12 @@ export function createStarter(env: StartEnv): Starter {
 	/** Past sessions being resumed, so a second click starts no second omp on the same file. */
 	const resuming = new Set<string>();
 
-	async function launch(failure: string, spawn: Spawn, allocated = sessions.allocate()): Promise<Outcome> {
+	/** Spawns `request`'s session through `spawn`, with the join of the instance id it gets and the admission of its directory. */
+	async function launch(request: StartRequest, failure: string, spawn: Spawn, allocated = sessions.allocate()): Promise<Outcome> {
 		const { instanceId, emit } = allocated;
+		const join = env.joinFor(request, instanceId);
 		try {
-			return { started: await spawn(instanceId, emit) };
+			return { started: await spawn(instanceId, emit, { ...join.rpc, admit: env.admit }), join };
 		} catch (err) {
 			if (err instanceof UntrustedProjectError) return { error: err.message, trust: err.ask };
 			return { error: `${failure}: ${errorText(err)}` };
@@ -114,8 +116,8 @@ export function createStarter(env: StartEnv): Starter {
 		return { here: true, instanceId: claim.instanceId, sessionName: sessions.started(claim.instanceId)?.sessionName ?? null, cwdDisplay };
 	}
 
-	/** Prepares a new, forked, or resumed session; `rpcLaunch` supplies its extensions and host tools, and admits its directory before omp spawns. */
-	async function spawnFor(request: StartRequest, rpcLaunch: AdmittedLaunch): Promise<Outcome> {
+	/** Prepares a new, forked, or resumed session, which {@link launch} spawns. */
+	async function spawnFor(request: StartRequest): Promise<Outcome> {
 		switch (request.kind) {
 			case "new": {
 				const dir = await directoryOf(request.cwd);
@@ -139,10 +141,10 @@ export function createStarter(env: StartEnv): Starter {
 					} catch (err) {
 						return { error: `Cannot read the skills in ${cwd}: ${errorText(err)}` };
 					}
-					return launch("Cannot start omp", async (id, emit) => {
-						const { rpc, discard } = request.private ? await env.privateSessions.launch(id, cwd, rpcLaunch) : { rpc: rpcLaunch, discard: undefined };
+					return launch(request, "Cannot start omp", async (id, emit, rpc) => {
+						const { rpc: launched, discard } = request.private ? await env.privateSessions.launch(id, cwd, rpc) : { rpc, discard: undefined };
 						try {
-							return { session: await DashboardSession.start(id, cwd, model, thinking, rpc, emit, request.private), prompt: null, first: { text, images }, discard };
+							return { session: await DashboardSession.start(id, cwd, model, thinking, launched, emit, request.private), prompt: null, first: { text, images }, discard };
 						} catch (error) {
 							await discard?.();
 							throw error;
@@ -155,7 +157,7 @@ export function createStarter(env: StartEnv): Starter {
 				if (!source) return { error: "Cannot fork: this session's file is not known yet." };
 				if (formatOf(source).source !== "omp") return { error: "Cannot fork: this session is read-only. Only omp sessions fork here." };
 				if (env.privateSessions.holds(source)) return { error: "Cannot fork: a private session is deleted when it ends, so nothing copies it." };
-				return launch("Cannot fork", async (id, emit) => DashboardSession.fork(id, source, request.entryId, rpcLaunch, emit));
+				return launch(request, "Cannot fork", async (id, emit, rpc) => DashboardSession.fork(id, source, request.entryId, rpc, emit));
 			}
 			case "resume": {
 				const { sessionId } = request;
@@ -187,7 +189,7 @@ export function createStarter(env: StartEnv): Starter {
 					} catch (error) {
 						return { error: `Cannot resume: ${errorText(error)}` };
 					}
-					return await claimed(identity, cwd, allocated => launch("Cannot resume", async (id, emit) => ({ session: await DashboardSession.resume(id, path, rpcLaunch, emit), prompt: null }), allocated));
+					return await claimed(identity, cwd, allocated => launch(request, "Cannot resume", async (id, emit, rpc) => ({ session: await DashboardSession.resume(id, path, rpc, emit), prompt: null }), allocated));
 				} finally {
 					resuming.delete(sessionId);
 					if (held !== null) resuming.delete(held);
@@ -197,8 +199,7 @@ export function createStarter(env: StartEnv): Starter {
 	}
 
 	return async request => {
-		const join = env.joinFor(request);
-		const outcome = await spawnFor(request, { ...join.rpc, admit: env.admit });
+		const outcome = await spawnFor(request);
 		if ("error" in outcome) return { ok: false, ...outcome };
 		const { session, prompt, first } = outcome.started;
 		// A session whose omp exited since it spawned would stay in the roster with no one to remove it.
@@ -209,7 +210,7 @@ export function createStarter(env: StartEnv): Starter {
 		}
 		// The todo links first, so the session's first turn already knows the todo it works on.
 		if (request.kind === "new" && request.todoId) env.linkTodo(request.todoId, session.sessionId);
-		join.attach(session);
+		outcome.join.attach(session);
 		// The new session's first message goes in once it is in the registry, where its events find their view.
 		if (first) void session.prompt(null, first.text, first.images, "steer").catch(skipRefused);
 		// Asked before the roster lists the session, so that its first row already counts in its workspace.
@@ -232,7 +233,7 @@ async function attach(sessions: LiveSessions, joinFor: StartEnv["joinFor"], inst
 	const held: DashboardUpdate[] = [];
 	let report = (update: DashboardUpdate): void => void held.push(update);
 	try {
-		const session = await DashboardSession.reattach(instanceId, sessionId => joinFor({ kind: "resume", sessionId }).rpc.tools, update => report(update), isPrivate);
+		const session = await DashboardSession.reattach(instanceId, sessionId => joinFor({ kind: "resume", sessionId }, instanceId).rpc.tools, update => report(update), isPrivate);
 		return {
 			session,
 			publish: () => {
@@ -270,7 +271,7 @@ export async function reattachAll(
 		// Its turn ran when the last server stopped and ended while no server listened, so nobody heard its agent_end.
 		const ended = midTurn.has(session.sessionId) && session.status === "idle" && session.sessionFile ? endedTurn(session.sessionFile) : null;
 		if (ended) sessions.markUnread(session.instanceId, ended);
-		joinFor({ kind: "resume", sessionId: session.sessionId }).attach(session);
+		joinFor({ kind: "resume", sessionId: session.sessionId }, session.instanceId).attach(session);
 		publish();
 	}
 }

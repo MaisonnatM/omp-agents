@@ -21,24 +21,21 @@ function setup() {
 	let hosts = [host("i1", "working"), host("i2", "working", { sessionName: "Build the importer" })];
 	const replies: Record<string, string> = { "s-i2": "Pushed feat/importer; tests pass." };
 	const waits = new SessionWaits({ hosts: () => hosts, reply: sessionId => replies[sessionId] ?? null, isBot: request => request.kind === "new" && request.bot !== null });
-	const tool = waits.join(newSessionRequest("/tmp", "Hi")).rpc.tools[0]!;
-	/** omp starts call `toolCallId` in session `caller`, and the tool runs it. */
-	const call = (toolCallId: string, session: string, { caller = "i1", minutes = null, signal = new AbortController().signal }: { caller?: string; minutes?: number | null; signal?: AbortSignal } = {}) => {
-		waits.heard(caller, { type: "tool_execution_start", toolCallId, toolName: "wait_for_session" });
-		return tool.execute({ session, timeout_minutes: minutes }, { toolCallId, signal });
-	};
+	/** Session `caller`'s turn calls the tool as call `toolCallId`. */
+	const call = (toolCallId: string, session: string, { caller = "i1", minutes = null, signal = new AbortController().signal }: { caller?: string; minutes?: number | null; signal?: AbortSignal } = {}) =>
+		waits.join(newSessionRequest("/tmp", "Hi"), caller).rpc.tools[0]!.execute({ session, timeout_minutes: minutes }, { toolCallId, signal });
 	/** The live sessions' rows change to `rows`, as a roster update reports. */
 	const rows = (...rows: RosterHost[]) => {
 		hosts = rows;
 		waits.check();
 	};
-	return { waits, tool, call, rows };
+	return { waits, call, rows };
 }
 
 describe("the wait_for_session tool", () => {
 	test("every dashboard start gets it but a Bot's conversation", () => {
 		const { waits } = setup();
-		const toolsOf = (request: StartRequest) => waits.join(request).rpc.tools.map(tool => tool.name);
+		const toolsOf = (request: StartRequest) => waits.join(request, "i1").rpc.tools.map(tool => tool.name);
 		expect(toolsOf(newSessionRequest("/tmp", "Hi"))).toEqual(["wait_for_session"]);
 		expect(toolsOf({ kind: "resume", sessionId: "s1" })).toEqual(["wait_for_session"]);
 		expect(toolsOf(newSessionRequest("/tmp", "Hi", { bot: "scout" as BotId }))).toEqual([]);
@@ -78,10 +75,9 @@ describe("the wait_for_session tool", () => {
 	});
 
 	test("answers when the session no longer runs, with the last reply its file holds", async () => {
-		const { waits, call, rows } = setup();
+		const { call, rows } = setup();
 		const wait = call("c1", "s-i2");
 		rows(host("i1", "working"));
-		waits.exited("i2");
 		expect(await wait).toBe('"Build the importer" (id s-i2) no longer runs: it ended or its omp exited.\n\nIts last reply:\n\nPushed feat/importer; tests pass.');
 	});
 
@@ -103,12 +99,9 @@ describe("the wait_for_session tool", () => {
 		await expect(call("c3", "Fix")).rejects.toThrow('2 running sessions are titled "Fix"; pass the session\'s id instead.');
 	});
 
-	test("refuses to wait on its own session, whether omp reports the call's start before or after the call", async () => {
-		const { waits, tool, call } = setup();
+	test("refuses to wait on its own session", async () => {
+		const { call } = setup();
 		await expect(call("c1", "s-i1")).rejects.toThrow("A session cannot wait on itself.");
-		const wait = tool.execute({ session: "s-i1", timeout_minutes: null }, { toolCallId: "c2", signal: new AbortController().signal });
-		waits.heard("i1", { type: "tool_execution_start", toolCallId: "c2", toolName: "wait_for_session" });
-		await expect(wait).rejects.toThrow("A session cannot wait on itself.");
 	});
 
 	test("stops when the calling turn is interrupted or its session exits", async () => {

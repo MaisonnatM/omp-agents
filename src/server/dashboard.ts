@@ -17,7 +17,7 @@ import { GoogleCalendarClient, GoogleCalendars } from "../google-calendar";
 import { loadPullRequests, mergedPullRequests, repoOf } from "../pull-requests";
 import { createIntegrations, type Integrations, integrationFetch, integrationSignedIn } from "../integrations";
 import { errorText } from "../json";
-import { endedTurn, type LiveSession } from "../live-session";
+import type { LiveSession } from "../live-session";
 import { startDictation } from "../omp/dictation";
 import { agentDir } from "../omp/config";
 import { type HostSnapshot, listHosts } from "../omp/collab";
@@ -156,10 +156,7 @@ export class Dashboard {
 	});
 	readonly #waits = new SessionWaits({
 		hosts: () => this.#sessions.rows(this.#files.factsOf),
-		reply: sessionId => {
-			const file = this.#sessions.bySessionId(sessionId)?.transcriptPath(null, this.#files.pathOf) ?? this.#files.pathOf(sessionId);
-			return file ? (endedTurn(file)?.reply ?? null) : null;
-		},
+		reply: sessionId => this.#sessions.lastReply(sessionId, this.#files.pathOf),
 		isBot: request => this.#bots.botOf(request) !== null,
 	});
 	readonly #personalJoin = personalJoin(request => this.#bots.botOf(request) !== null);
@@ -369,6 +366,7 @@ export class Dashboard {
 					if (placed) broadcasts.pushAll();
 				});
 			},
+			onRosterChange: () => this.#waits.check(),
 			saveRunning: () => interrupted.setRunning(sessions.startedHere()),
 		}));
 		this.#usage = new UsagePoll({ refresh: () => broadcasts.refreshUsage(), checkNotices: () => notices.check(PROVIDER_KINDS) });
@@ -414,7 +412,7 @@ export class Dashboard {
 			linkTodo: (todoId, sessionId) => {
 				for (const change of startChanges(todos.value, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
 			},
-			joinFor: request => this.#joinFor(request),
+			joinFor: (request, instanceId) => this.#joinFor(request, instanceId),
 			admit: this.#admit,
 			privateSessions: this.#privateSessions,
 		});
@@ -724,7 +722,7 @@ export class Dashboard {
 		this.#publisher = publisher;
 		mkdirSync(personalDir, { recursive: true });
 		// Before the runners recover, so a session that survived counts as neither interrupted nor stopped with the server.
-		await reattachAll(this.#sessions, request => this.#joinFor(request), instanceId => this.#privateSessions.has(instanceId), survived => this.#interrupted.recover(survived));
+		await reattachAll(this.#sessions, (request, instanceId) => this.#joinFor(request, instanceId), instanceId => this.#privateSessions.has(instanceId), survived => this.#interrupted.recover(survived));
 		// A private session whose omp exited while no server ran is deleted, as its exit would have; one this server could not attach to runs on.
 		const kept = new Set(keptSessions());
 		await this.#privateSessions.sweep(instanceId => kept.has(instanceId) || this.#sessions.get(instanceId) !== undefined);
@@ -815,12 +813,10 @@ export class Dashboard {
 		switch (update.kind) {
 			case "roster":
 				this.#broadcasts.rosterChanged();
-				this.#waits.check();
 				return;
 			case "event":
 				this.#views.applyEvent(instanceId, update.event);
-				this.#moves.heard(instanceId, update.event);
-				this.#waits.heard(instanceId, update.event);
+				this.#moves.heard(update.event);
 				if (this.#sessions.heard(instanceId, update.event)) this.#broadcasts.rosterChanged();
 				return;
 			case "starting":
@@ -904,9 +900,9 @@ export class Dashboard {
 		this.#activity.prune(Date.now() - ACTIVITY_KEPT_DAYS * DAY_MS);
 	}
 
-	/** How `request` joins the server: as a Review session, as a Bot's conversation, both, or plain; any but a Bot's loads the personal extension and can wait on another session, and any but a Bot's or a personal session can move itself. */
-	#joinFor(request: StartRequest): SessionJoin {
-		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#moves.join(request), this.#waits.join(request), this.#personalJoin(request)];
+	/** How `request` joins the server as session `instanceId`: as a Review session, as a Bot's conversation, both, or plain; any but a Bot's loads the personal extension and can wait on another session, and any but a Bot's or a personal session can move itself. */
+	#joinFor(request: StartRequest, instanceId: string): SessionJoin {
+		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#moves.join(request, instanceId), this.#waits.join(request, instanceId), this.#personalJoin(request)];
 		return {
 			rpc: { args: joins.flatMap(join => join.rpc.args), tools: joins.flatMap(join => join.rpc.tools) },
 			attach: session => {
@@ -1019,7 +1015,6 @@ export class Dashboard {
 		}
 		this.#registry = "fresh";
 		const joinedOrLeft = this.#sessions.follow(hosts);
-		this.#waits.check();
 		// Only a listing that worked knows which terminal sessions still run.
 		if (this.#rosterError === null) this.#sessions.restoreListedUnread(hosts, this.#files.pathOf);
 		// A terminal session that asked to end before the registry listed it.

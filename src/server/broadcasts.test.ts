@@ -38,6 +38,7 @@ function setup(initial: PastSession[]) {
 	let sessions = initial;
 	let roster: { hosts: RosterHost[]; error: string | null } = { hosts: [], error: null };
 	let listeners = 0;
+	let rosterChanges = 0;
 	const published: ServerMsg[] = [];
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-lists-"));
 	dirs.push(dir);
@@ -84,6 +85,7 @@ function setup(initial: PastSession[]) {
 		publish: (_topic, json) => void published.push(JSON.parse(json)),
 		subscriberCount: () => listeners,
 		onRosterPush: () => {},
+		onRosterChange: () => void rosterChanges++,
 		saveRunning: () => {},
 	});
 	const sent: ServerMsg[] = [];
@@ -107,6 +109,7 @@ function setup(initial: PastSession[]) {
 		rosterPublished,
 		setSessions: (next: PastSession[]) => void (sessions = next),
 		setRoster: (next: { hosts: RosterHost[]; error: string | null }) => void (roster = next),
+		rosterChanges: () => rosterChanges,
 	};
 }
 
@@ -161,6 +164,13 @@ describe("roster broadcasts", () => {
 		broadcasts.open(ws);
 		expect(rosterPublished()).toEqual([{ t: "roster", reset: false, hosts: [host("b", "/other")], removed: ["a"], error: null }]);
 		expect(sent.filter(msg => msg.t === "roster").at(-1)).toEqual({ t: "roster", reset: true, hosts: [host("b", "/other")], removed: [], error: null });
+	});
+
+	test("each roster push tells the server the roster may have changed, even with no socket listening", () => {
+		const { broadcasts, rosterPublished, rosterChanges } = setup([]);
+		broadcasts.pushRoster();
+		expect(rosterChanges()).toBe(1);
+		expect(rosterPublished()).toEqual([]);
 	});
 });
 

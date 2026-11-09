@@ -30,28 +30,25 @@ function setup(untrusted: (dir: string) => TrustAsk | null = () => null) {
 			if (ask) throw new UntrustedProjectError(ask);
 		},
 	});
-	const tool = moves.join(newSessionRequest("/tmp", "Hi")).rpc.tools[0]!;
-	/** omp starts call `toolCallId` in session `instanceId`, and the tool runs it. */
-	const call = (toolCallId: string, path: string, instanceId = "i1") => {
-		moves.heard(instanceId, { type: "tool_execution_start", toolCallId, toolName: "move_session" });
-		return tool.execute({ path }, { toolCallId, signal: new AbortController().signal });
-	};
-	/** omp's end of call `toolCallId` in session `instanceId`. */
-	const ended = (toolCallId: string, isError = false, instanceId = "i1") => moves.heard(instanceId, { type: "tool_execution_end", toolCallId, toolName: "move_session", isError });
+	/** Session `caller`'s turn calls the tool as call `toolCallId`. */
+	const call = (toolCallId: string, path: string, { caller = "i1", signal = new AbortController().signal }: { caller?: string; signal?: AbortSignal } = {}) =>
+		moves.join(newSessionRequest("/tmp", "Hi"), caller).rpc.tools[0]!.execute({ path }, { toolCallId, signal });
+	/** omp's end of call `toolCallId`. */
+	const ended = (toolCallId: string, isError = false) => moves.heard({ type: "tool_execution_end", toolCallId, toolName: "move_session", isError });
 	return { moves, moved, call, ended };
 }
 
 describe("the move_session tool", () => {
 	test("every dashboard start gets it but a Bot's conversation", () => {
 		const { moves } = setup();
-		const toolsOf = (request: StartRequest) => moves.join(request).rpc.tools.map(tool => tool.name);
+		const toolsOf = (request: StartRequest) => moves.join(request, "i1").rpc.tools.map(tool => tool.name);
 		expect(toolsOf(newSessionRequest("/tmp", "Hi"))).toEqual(["move_session"]);
 		expect(toolsOf({ kind: "resume", sessionId: "s1" })).toEqual(["move_session"]);
 		expect(toolsOf({ kind: "fork", view: { kind: "past", sessionId: "s1" }, entryId: "e1" })).toEqual(["move_session"]);
 		expect(toolsOf(newSessionRequest("/tmp", "Hi", { bot: "scout" as BotId }))).toEqual([]);
 	});
 
-	test("a call's end hands the session that reported it the move for its turn's end, once", async () => {
+	test("a call's end hands the session that called it the move for its turn's end, once", async () => {
 		const { moved, call, ended } = setup();
 		const dir = tempDir();
 		expect(await call("c1", dir)).toBe(`When this turn ends, the dashboard moves this session to ${dir} and reloads its context files. End your turn now; do not work in ${dir} before the move.`);
@@ -93,31 +90,28 @@ describe("the move_session tool", () => {
 
 	test("a call that ends in a session no longer running moves nothing", async () => {
 		const { moved, call, ended } = setup();
-		await call("c1", tempDir(), "gone");
-		ended("c1", false, "gone");
+		await call("c1", tempDir(), { caller: "gone" });
+		ended("c1");
 		expect(moved).toEqual([]);
 	});
 
-	test("a call its turn or its session cut off before its end is forgotten", async () => {
+	test("a call whose session exited before its end is forgotten", async () => {
 		const { moves, moved, call, ended } = setup();
 		await call("c1", tempDir());
-		await call("c2", tempDir(), "i2");
-		moves.heard("i1", { type: "agent_end", messages: [] });
+		moves.exited("i1");
 		ended("c1");
 		expect(moved).toEqual([]);
-
 		const dir = tempDir();
-		await call("c3", dir);
-		moves.exited("i2");
-		ended("c3");
-		ended("c2", false, "i2");
+		await call("c2", dir);
+		ended("c2");
 		expect(moved).toEqual([dir]);
 	});
 
 	test("a call its turn cut off while the directory was checked errors to the model, and its end moves nothing", async () => {
-		const { moves, moved, call, ended } = setup();
-		const result = call("c1", tempDir());
-		moves.heard("i1", { type: "agent_end", messages: [] });
+		const { moved, call, ended } = setup();
+		const turn = new AbortController();
+		const result = call("c1", tempDir(), { signal: turn.signal });
+		turn.abort();
 		await expect(result).rejects.toThrow("This turn ended before the move was taken; nothing moves.");
 		ended("c1");
 		expect(moved).toEqual([]);
