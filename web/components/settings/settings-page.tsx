@@ -199,7 +199,7 @@ export function SettingsPage({
 		sync: <SyncTab active={section === "sync"} />,
 		storage: <StorageTab cwd={cwd} active={section === "storage"} onSaved={settings.reload} />,
 		worktrees: <WorktreesTab cwd={cwd} active={section === "worktrees"} />,
-		decisions: <DecisionsTab cwd={cwd} active={section === "decisions"} />,
+		decisions: <DecisionsTab cwd={cwd} workspaces={workspaces} active={section === "decisions"} />,
 		extensions: <ExtensionsTab cwd={cwd} active={section === "extensions"} onSaved={settings.reload} />,
 	};
 	// Hidden panels stay mounted so an unsaved draft survives switching sections.

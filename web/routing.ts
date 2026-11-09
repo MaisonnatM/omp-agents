@@ -101,7 +101,7 @@ export const SETTINGS_SECTIONS = [
 	{ value: "files", label: "Files", icon: FileText, group: "workspace", keywords: ["AGENTS.md", "config", "skills", "rules"], meta: AS_LOADED },
 	{ value: "extensions", label: "Extensions", icon: Blocks, group: "workspace", meta: { none: "Packages installed for your user, all workspaces", workspace: "As a session in this workspace discovers them" }, keywords: ["plugins", "marketplaces", "registry skills", "contributions", "install"] },
 	{ value: "workflows", label: "Workflows", icon: Workflow, group: "workspace", keywords: ["workflow"], meta: { ...AS_LOADED, none: "Your user skills only, for all workspaces" } },
-	{ value: "decisions", label: "Decisions", icon: Scale, group: "workspace", keywords: ["records", "adr"], meta: { workspace: "The repository's decision records, read-only", none: "Pick a workspace" } },
+	{ value: "decisions", label: "Decisions", icon: Scale, group: "workspace", keywords: ["records", "adr"], meta: { workspace: "The repository's decision records, read-only", none: "Every workspace in this space, grouped by workspace" } },
 	{ value: "worktrees", label: "Worktrees", icon: GitBranch, group: "workspace", keywords: ["branches", "cleanup"], meta: AS_LOADED },
 ] as const satisfies readonly { value: string; label: string; icon: LucideIcon; group: SettingsGroup; keywords: readonly string[]; meta?: { workspace: string; none: string } }[];
 
