@@ -3,7 +3,7 @@ import type { PastSession, RosterHost, View } from "../src/shared/sessions";
 import type { DashboardState } from "./dashboard-state";
 import { documentTitle } from "./document-title";
 import { focusedView, type Page } from "./routing";
-import { workspaceCwd, workspaceSwitch } from "./sessions";
+import { spaceOf, workspaceCwd, workspaceSwitch } from "./sessions";
 import type { WorkspaceScope } from "./use-workspace-scope";
 
 /** The session the focused pane shows, as the sidebar, the title, and the details read it. */
@@ -31,9 +31,10 @@ export interface FocusedSession {
 
 /**
  * The focused pane's session. It keeps the document title on it, and when a `/move` takes a live session to another
- * workspace, the sidebar follows it there.
+ * workspace, the sidebar follows it there. When the panes open a session of the other space, from a link, Back, or a `/move`,
+ * the window switches to that space, so the sidebar lists it.
  */
-export function useFocusedSession(state: DashboardState, page: Page | null, { workspace, hiddenCwds, pickWorkspace }: WorkspaceScope): FocusedSession {
+export function useFocusedSession(state: DashboardState, page: Page | null, { workspace, hiddenCwds, pickWorkspace, space, pickSpace, spaces }: WorkspaceScope): FocusedSession {
 	const view = focusedView(state.layout);
 	const host = view?.kind === "live" ? state.hosts.find(h => h.instanceId === view.instanceId) : undefined;
 	const past = view?.kind === "past" ? state.past.find(s => s.sessionId === view.sessionId) : undefined;
@@ -53,6 +54,11 @@ export function useFocusedSession(state: DashboardState, page: Page | null, { wo
 		if (next !== null) pickWorkspace(next);
 	}, [live?.instanceId, live?.sessionWorkspace, workspace]);
 	const session = host ?? past;
+	const sessionSpace = session && spaces ? spaceOf(session, spaces) : null;
+	// Keyed on the session and its space alone, so a switch the user makes while the panes show a session is not undone.
+	useEffect(() => {
+		if (sessionSpace !== null && sessionSpace !== space) pickSpace(sessionSpace);
+	}, [session?.sessionId, sessionSpace]);
 	const sessionId = view?.kind === "past" ? view.sessionId : view?.kind === "live" && view.agentId === null ? ((host ?? lastHost)?.sessionId ?? null) : null;
 	return {
 		view, host, past, lastHost, sessionId, row: host ?? lastHost ?? past, cwd: session?.cwd, workspace: session && workspaceCwd(session),

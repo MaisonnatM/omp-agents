@@ -4,6 +4,7 @@ import type { TodoStatus, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList }
 import { everyWord } from "../src/shared/every-word";
 import type { BadgeColor } from "@/components/ui/badge";
 import { localDay } from "../src/shared/days";
+import type { Space, Spaces } from "../src/shared/workspaces";
 import { DAY_FORMAT } from "./labels";
 import type { TodoListView } from "./routing";
 import type { StatusKind } from "./tickets-model";
@@ -85,8 +86,18 @@ export function earliestDue(todo: UserTodo): string | null {
 /** Where a session for top-level `todo` starts: its Workspace, else `fallback`, the directory a new session would start in anyway. */
 export const todoCwd = (todo: Pick<UserTodo, "workspace">, fallback: string): string => todo.workspace ?? fallback;
 
-/** The top-level `todos` that name `workspace`, the sidebar's; every one of them for `null`, All workspaces. */
-export const inWorkspace = (todos: UserTodo[], workspace: string | null): UserTodo[] => (workspace === null ? todos : todos.filter(todo => todo.workspace === workspace));
+/** What the sidebar narrows the todos to: its workspace, else its space, where a todo naming no workspace counts as Work. */
+export interface TodoScope {
+	workspace: string | null;
+	space: Space;
+	spaces: Spaces | null;
+}
+
+/** The top-level `todos` in `scope`: those naming its workspace, else those whose workspace is in its space. */
+export function inScope(todos: UserTodo[], { workspace, space, spaces }: TodoScope): UserTodo[] {
+	if (workspace !== null) return todos.filter(todo => todo.workspace === workspace);
+	return todos.filter(todo => (todo.workspace === null ? "work" : (spaces?.of(todo.workspace, todo.workspace) ?? "work")) === space);
+}
 
 /**
  * The top-level todos `view` lists, in its order: the list's, to do first then by earliest due day for Today, or the archive's, latest first.
@@ -116,9 +127,9 @@ export function todosOf(list: UserTodoList, view: TodoListView, day: string, ses
 	}
 }
 
-/** How many of the top-level todos `view` lists that name `workspace` are still open; for Archive, how many it holds. */
-export function leftIn(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions, hidden: ReadonlySet<string>, workspace: string | null): number {
-	const todos = inWorkspace(todosOf(list, view, day, sessions, hidden), workspace);
+/** How many of the top-level todos `view` lists in `scope` are still open; for Archive, how many it holds. */
+export function leftIn(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions, hidden: ReadonlySet<string>, scope: TodoScope): number {
+	const todos = inScope(todosOf(list, view, day, sessions, hidden), scope);
 	return view.kind === "archive" ? todos.length : todos.filter(todo => todo.doneAt === null).length;
 }
 

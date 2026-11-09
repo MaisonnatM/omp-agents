@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { TrustChange, TrustedProject } from "../../../src/shared/project-trust";
 import { type Space, spaces, type Workspace, type WorkspaceChange, type WorkspaceList } from "../../../src/shared/workspaces";
 import { putJson } from "../../api";
-import { folderName } from "../../labels";
+import { folderName, SPACE_LABELS } from "../../labels";
 import { useAction } from "../../use-action";
 import { IntegrationList } from "../integrations/integration-row";
 import { Section } from "./editor";
@@ -14,10 +14,7 @@ import { Section } from "./editor";
 /** The desktop app's bridge, whose folder dialog picks a workspace; absent in a browser, which keeps the typed path alone. */
 const desktop = typeof window === "undefined" ? undefined : window.ompDesktop;
 
-const SPACES: { value: Space; label: string }[] = [
-	{ value: "work", label: "Work" },
-	{ value: "personal", label: "Personal" },
-];
+const SPACES = (["work", "personal"] as const).map(value => ({ value, label: SPACE_LABELS[value] }));
 
 /** The space a workspace is in, which a session started there takes: Work, or Personal with the personal memory and its tools. */
 function SpacePicker({ workspace, space, disabled, onPick }: { workspace: Workspace; space: Space; disabled: boolean; onPick: (space: Space) => void }) {

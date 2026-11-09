@@ -303,8 +303,6 @@ export interface PullRequests {
 }
 
 interface PullRequestsProps {
-	/** The sidebar's workspace `cwd`, or `null` for every workspace. */
-	workspace: string | null;
 	hosts: RosterHost[];
 	past: PastSession[];
 	/** What the main area shows: a pull request's row unfolds, scrolls into view, and stays highlighted while its details or changes show. */
@@ -352,12 +350,12 @@ function useSessionsByPullRequest(hosts: RosterHost[], past: PastSession[]): Rea
 	}, [hosts, past]);
 }
 
-/** The pull requests of `workspace`, with the state and the functions that their list and their board share. */
-export function usePullRequests({ workspace, hosts, past, route }: PullRequestsProps): PullRequests {
+/** The pull requests of the sidebar's scope, with the state and the functions that their list and their board share. */
+export function usePullRequests({ hosts, past, route }: PullRequestsProps): PullRequests {
 	const targetKey = route.target ? prKey(route.target) : null;
 	const { open, start } = useDashboardActions();
-	const { starts: { quick } } = useDashboardStatus();
-	const poll = pullRequestsStore.use(workspace);
+	const { starts: { quick }, pullRequestsScope: scope } = useDashboardStatus();
+	const poll = pullRequestsStore.use(scope);
 	const list = poll.read?.data ?? null;
 	const [order, setOrder] = usePullRequestsOrder();
 	const agent = useMemo(() => agentOn(hosts), [hosts]);
@@ -365,15 +363,15 @@ export function usePullRequests({ workspace, hosts, past, route }: PullRequestsP
 	/** The row, by {@link rowId}, whose `⋯` menu is open. */
 	const [actionsOpen, setActionsOpen] = useState<string | null>(null);
 	const onQuickAction = useCallback((pr: PullRequestSummary, cwd: string, action: PullRequestActionId) => start(pullRequestStart(pr, action, cwd, readPinnedSkill())), [start]);
-	const refresh = useCallback(() => void pullRequestsStore.refresh(workspace, { fresh: true }), [workspace]);
+	const refresh = useCallback(() => void pullRequestsStore.refresh(scope, { fresh: true }), [scope]);
 	const rebaseHooks = useMemo((): RebaseHooks => ({ resolve: ({ pr, cwd }) => onQuickAction(pr, cwd, "resolve-conflicts"), refresh }), [onQuickAction, refresh]);
 	const onRebase = useCallback((pr: PullRequestSummary, cwd: string) => rebasePullRequest({ pr, cwd }, rebaseHooks), [rebaseHooks]);
 	const onActionsOpenChange = useCallback((pr: PullRequest, next: boolean) => setActionsOpen(next ? rowId(pr) : null), []);
 	const onChange = useCallback(
 		async (pr: PullRequestSummary, change: ListChange) => {
-			await writePullRequest(workspace, pr, change);
+			await writePullRequest(scope, pr, change);
 		},
-		[workspace],
+		[scope],
 	);
 	const rowBase = useCallback(
 		(row: SectionRow, cwd: string): RowBase => {

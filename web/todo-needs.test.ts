@@ -21,6 +21,6 @@ const sessions = {
 test("Needs you lists only unchecked todos whose latest session waits on the human", () => {
 	const view = { kind: "needs" } as const;
 	expect(todosOf(list, view, "2026-10-06", sessions, new Set()).map(todo => todo.id)).toEqual(["question", "idle"]);
-	expect(leftIn(list, view, "2026-10-06", sessions, new Set(), null)).toBe(2);
+	expect(leftIn(list, view, "2026-10-06", sessions, new Set(), { workspace: null, space: "work", spaces: null })).toBe(2);
 	expect(routeFromHash(hashForTodo(view))).toEqual({ kind: "page", page: { kind: "todo", list: view, open: null } });
 });

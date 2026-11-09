@@ -131,9 +131,9 @@ test("↓ and ↑ step through sessions, pull requests, todos, notes, conversati
 	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "notesPrevious", "emailPrevious", "sportJournalPrevious", "previousChangedFile"]);
 });
 
-test("Cmd+Shift+P starts a personal session, apart from Cmd+Alt+P's directory picker and P's todo priority", () => {
-	expect(press("P", "KeyP", { ctrl: true, shift: true })).toEqual(["personalSession"]);
-	expect(pressOn(true, "P", "KeyP", { meta: true, shift: true })).toEqual(["personalSession"]);
+test("Cmd+Shift+P switches space, apart from Cmd+Alt+P's directory picker and P's todo priority", () => {
+	expect(press("P", "KeyP", { ctrl: true, shift: true })).toEqual(["switchSpace"]);
+	expect(pressOn(true, "P", "KeyP", { meta: true, shift: true })).toEqual(["switchSpace"]);
 	expect(press("p", "KeyP", { ctrl: true })).toEqual([]);
 	expect(press("π", "KeyP", { ctrl: true, alt: true })).toEqual(["directory"]);
 });

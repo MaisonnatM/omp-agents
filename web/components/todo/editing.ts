@@ -61,7 +61,7 @@ interface TodoEditingOptions {
 	onRemoved: (id: string) => void;
 	/** Where **Start session** opens the new-session draft of a todo with no Workspace. */
 	newSessionCwd: string;
-	/** The sidebar's Workspace, which a todo added here starts its sessions in; `null` under All workspaces. */
+	/** The Workspace a todo added here names and starts its sessions in: the sidebar's, else the personal directory under **All of Personal**; `null` under **All of Work**. */
 	workspace: string | null;
 }
 

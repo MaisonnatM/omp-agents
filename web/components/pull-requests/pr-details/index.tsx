@@ -46,7 +46,8 @@ const LABEL_CLASS = "@max-[30rem]/pr:sr-only";
  * of the other actions; then Summary, Timeline, and Code tabs, and a Review draft tab while a Review session's
  * draft of it is kept, with the checks at a glance on the tab bar.
  */
-export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions, onOpen, session = [], placement, version, tab: picked, onTab, path = null, onPick, workspace, cwd }: DetailContentProps) {
+export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions, onOpen, session = [], placement, version, tab: picked, onTab, path = null, onPick, cwd }: DetailContentProps) {
+	const { pullRequestsScope: scope, reviewDrafts } = useDashboardStatus();
 	const query = new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) });
 	// The list's state of it joins `version`, so a change made from its row, or one the list reads from GitHub, reads the details again.
 	const { data: detail, error, saveError, edit, write, reload } = useEditableRead<PullRequestDetail>(`/api/pull-request?${query}`, `${String(version)}:${listed?.state ?? "unlisted"}`);
@@ -54,7 +55,7 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 	const stack = stackRead.data ?? [];
 	// Until the stack is read, its members would flash in the list of the others.
 	const others = stackRead.data || stackRead.error ? session.filter(other => !samePullRequest(other, pr) && !stack.some(member => samePullRequest(member, other))) : [];
-	const put = (change: PullRequestChange): Promise<PullRequestDetail> => writePullRequest(workspace, pr, change);
+	const put = (change: PullRequestChange): Promise<PullRequestDetail> => writePullRequest(scope, pr, change);
 	const save = (change: PullRequestChange, shown: Partial<PullRequestDetail>): void => {
 		if (detail) edit(shown, () => put(change));
 	};
@@ -62,7 +63,7 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 		await write(() => put(change));
 	};
 	const headingRef = useRef<HTMLHeadingElement>(null);
-	const draft = reviewDraftOf(useDashboardStatus().reviewDrafts, pr);
+	const draft = reviewDraftOf(reviewDrafts, pr);
 	// A discarded draft takes its tab with it.
 	const tab = picked === "review" && !draft ? "summary" : picked;
 	useEffect(() => {
@@ -71,7 +72,7 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 	}, [placement]);
 	const facts = listed && actionFacts(listed, detail);
 	const quick: QuickActionsProps = { actions: facts ? pullRequestActions(facts) : [], pending, onRun: (action: PullRequestActionId) => facts && onRun(facts, action) };
-	const rebaseHooks: RebaseHooks = { resolve: ({ pr: rebased }) => onRun(rebased, "resolve-conflicts"), refresh: () => { void pullRequestsStore.refresh(workspace, { fresh: true }); reload(); } };
+	const rebaseHooks: RebaseHooks = { resolve: ({ pr: rebased }) => onRun(rebased, "resolve-conflicts"), refresh: () => { void pullRequestsStore.refresh(scope, { fresh: true }); reload(); } };
 	const rebase: MenuRebase | null = facts && cwd !== null ? { facts, run: () => rebasePullRequest({ pr: facts, cwd }, rebaseHooks) } : null;
 	const page = placement === "page";
 	const options = usePullRequestOptions(pr);

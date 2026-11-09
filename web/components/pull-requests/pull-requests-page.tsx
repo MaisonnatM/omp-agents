@@ -131,7 +131,7 @@ function RepoTables({ pulls, section }: { pulls: PullRequests; section: SectionT
 }
 
 /** The details of the pull request `route` names, docked beside the list or the board at the width you drag their edge to, with buttons that show them as a page or close them. */
-function DockedDetails({ workspace, hosts, route, onExpand }: { workspace: string | null; hosts: RosterHost[]; route: Extract<PullRequestsRoute, { target: PullRequest }>; onExpand: () => void }) {
+function DockedDetails({ hosts, route, onExpand }: { hosts: RosterHost[]; route: Extract<PullRequestsRoute, { target: PullRequest }>; onExpand: () => void }) {
 	// The docked details keep their own tab, starting on Code when the route opens a file.
 	const [tab, setTab] = useState<PullRequestDetailTab>(route.files ? "code" : "summary");
 	usePullRequestCopyShortcuts(route.target);
@@ -177,7 +177,7 @@ function DockedDetails({ workspace, hosts, route, onExpand }: { workspace: strin
 					</Tooltip>
 				</div>
 				<div className="flex min-h-0 flex-1 flex-col">
-					<PullRequestDetails workspace={workspace} hosts={hosts} target={route.target} path={route.files?.path ?? null} tab={tab} onTab={setTab} placement="sidebar" />
+					<PullRequestDetails hosts={hosts} target={route.target} path={route.files?.path ?? null} tab={tab} onTab={setTab} placement="sidebar" />
 				</div>
 			</TooltipProvider>
 		</aside>
@@ -205,8 +205,6 @@ function RebaseBehindButton({ pulls }: { pulls: PullRequests }) {
 }
 
 interface PullRequestsPageProps {
-	/** The sidebar's workspace `cwd`, or `null` for every workspace. */
-	workspace: string | null;
 	hosts: RosterHost[];
 	past: PastSession[];
 	/** The section or column a sidebar link last chose, to unfold, scroll to, and focus. */
@@ -219,21 +217,21 @@ interface PullRequestsPageProps {
 export function PullRequestsPage(props: PullRequestsPageProps) {
 	const [view, setView] = usePullRequestsView();
 	const [placement, setPlacement] = usePullRequestDetailsPlacement();
-	const { workspace, hosts, route } = props;
+	const { hosts, route } = props;
 	// Checking the target first narrows the route to one with its files.
 	if (route.target && pullRequestsPageShows(view, placement, route) === "details")
-		return <PullRequestDetailPage key={prKey(route.target)} workspace={workspace} hosts={hosts} target={route.target} files={route.files} onDock={() => setPlacement("beside")} />;
+		return <PullRequestDetailPage key={prKey(route.target)} hosts={hosts} target={route.target} files={route.files} onDock={() => setPlacement("beside")} />;
 	return <PullRequestsOverview {...props} view={view} onView={setView} onExpand={() => setPlacement("page")} />;
 }
 
 /**
- * The pull requests in the main area, as a table or a board: those of the sidebar's workspace, or of every workspace,
+ * The pull requests in the main area, as a table or a board: those of the sidebar's workspace, or of its space's workspaces,
  * read from GitHub. It keeps the sidebar list's order, folds, and keys; the browser keeps which view it shows.
  */
-function PullRequestsOverview({ workspace, hosts, past, section, route, view, onView, onExpand }: PullRequestsPageProps & { view: PullRequestsView; onView: (view: PullRequestsView) => void; onExpand: () => void }) {
+function PullRequestsOverview({ hosts, past, section, route, view, onView, onExpand }: PullRequestsPageProps & { view: PullRequestsView; onView: (view: PullRequestsView) => void; onExpand: () => void }) {
 	const { dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
-	const pulls = usePullRequests({ workspace, hosts, past, route });
+	const pulls = usePullRequests({ hosts, past, route });
 	const unmatched = pulls.poll.read?.data.unmatched ?? [];
 	const docked = route.target !== null ? route : null;
 	return (
@@ -274,7 +272,7 @@ function PullRequestsOverview({ workspace, hosts, past, section, route, view, on
 					}}
 				</ListPage>
 			</div>
-			{docked && <DockedDetails workspace={workspace} hosts={hosts} route={docked} onExpand={onExpand} />}
+			{docked && <DockedDetails hosts={hosts} route={docked} onExpand={onExpand} />}
 		</div>
 	);
 }

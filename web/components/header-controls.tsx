@@ -1,10 +1,14 @@
-/** The Notes, Calendar, Email, and Sport buttons, the command menu button, the notices' bell, and Settings: in the desktop app's title bar, else at the end of the page's header; and the title bar's Back and Forward buttons. */
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+/** The Personal and Work switch, the Notes, Calendar, Email, and Sport buttons, the command menu button, the notices' bell, and Settings: in the desktop app's title bar, else at the end of the page's header; and the title bar's Back and Forward buttons. */
+import { Briefcase, ChevronLeft, ChevronRight, Search, UserRound } from "lucide-react";
 import { createContext, memo, type ReactNode, useContext } from "react";
 import type { Notice } from "../../src/shared/notices";
+import type { Space } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
+import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
+import { SizeProvider } from "@/lib/size-context";
 import { activityControl } from "../activity";
+import { SPACE_LABELS } from "../labels";
 import { PAGE_ICON } from "../page-icons";
 import type { SidebarPanel, SidebarTab } from "../routing";
 import { shortcutLabels } from "../shortcuts";
@@ -31,13 +35,36 @@ interface HeaderControlsProps {
 	onTab: (tab: SidebarTab) => void;
 	settingsOpen: boolean;
 	onToggleSettings: () => void;
+	/** The space the window shows, which the switch at the start of the controls changes, under the desktop title bar beside Back and Forward instead. */
+	space: Space;
+	onSpace: (space: Space) => void;
 }
 
 const SettingsIcon = PAGE_ICON.settings;
 
-export const HeaderControls = memo(function HeaderControls({ notices, onShowSearch, tabs, tab, onTab, settingsOpen, onToggleSettings }: HeaderControlsProps) {
+/** Which space the window shows, Personal or Work; the switch shortcut's keys show on the space it goes to. */
+function SpaceSwitch({ space, onSpace }: { space: Space; onSpace: (space: Space) => void }) {
+	return (
+		<SizeProvider size="compact">
+			<Tabs value={space} onValueChange={value => onSpace(value === "personal" ? "personal" : "work")}>
+				<TabsList aria-label="Space">
+					<TabItem {...activityControl("header.space.personal")} value="personal" icon={UserRound} label={SPACE_LABELS.personal} shortcut={space === "personal" ? undefined : shortcutLabels("switchSpace")} />
+					<TabItem {...activityControl("header.space.work")} value="work" icon={Briefcase} label={SPACE_LABELS.work} shortcut={space === "work" ? undefined : shortcutLabels("switchSpace")} />
+				</TabsList>
+			</Tabs>
+		</SizeProvider>
+	);
+}
+
+export const HeaderControls = memo(function HeaderControls({ notices, onShowSearch, tabs, tab, onTab, settingsOpen, onToggleSettings, space, onSpace }: HeaderControlsProps) {
 	return (
 		<div className="flex shrink-0 items-center gap-1">
+			{!DESKTOP_TITLE_BAR && (
+				<>
+					<SpaceSwitch space={space} onSpace={onSpace} />
+					<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border" />
+				</>
+			)}
 			<Tooltip content="Command menu" shortcut={shortcutLabels("switcher")} side="bottom">
 				<Button {...activityControl("header.command-menu")} variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Command menu" onClick={onShowSearch}>
 					<Search />
@@ -105,14 +132,19 @@ function HistoryButtons() {
 	);
 }
 
-/** The window's title bar: a drag strip with the window's buttons inset at its left, then Back and Forward, the document title centered, and the controls at its right. */
-export function DesktopTitleBar({ title, controls }: { title: string; controls: ReactNode }) {
+/** The window's title bar: a drag strip with the window's buttons inset at its left, then Back and Forward and the space switch, the document title centered, and the controls at its right. */
+export function DesktopTitleBar({ title, space, onSpace, controls }: { title: string; space: Space; onSpace: (space: Space) => void; controls: ReactNode }) {
 	// `env(titlebar-area-x)` is where the window's buttons end, with a gap as wide as their inset; desktop/main.ts turns it on with `titleBarOverlay`.
 	// h-9 is also the `top-9` a maximized Browser leaves for it in browser-panel.tsx.
 	return (
 		<div className="relative flex h-9 shrink-0 items-center justify-between border-b border-border bg-sidebar pr-3 pl-[env(titlebar-area-x)] select-none [-webkit-app-region:drag]">
-			<p className="pointer-events-none absolute inset-x-40 truncate text-center text-[13px] font-medium text-muted-foreground">{title}</p>
-			<HistoryButtons />
+			<p className="pointer-events-none absolute inset-x-72 truncate text-center text-[13px] font-medium text-muted-foreground">{title}</p>
+			<div className="flex items-center gap-2">
+				<HistoryButtons />
+				<div className="[-webkit-app-region:no-drag]">
+					<SpaceSwitch space={space} onSpace={onSpace} />
+				</div>
+			</div>
 			<div className="[-webkit-app-region:no-drag]">{controls}</div>
 		</div>
 	);

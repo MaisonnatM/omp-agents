@@ -141,6 +141,7 @@ export function SettingsPage({
 	cwd,
 	onPickWorkspace,
 	workspaces,
+	allWorkspaces,
 	workspaceList,
 	personal,
 	trustedProjects,
@@ -149,7 +150,10 @@ export function SettingsPage({
 	/** The sidebar's workspace, `null` for all workspaces, which reads your user files only. */
 	cwd: string | null;
 	onPickWorkspace: (cwd: string | null) => void;
+	/** The space's workspaces, which the header's picker offers. */
 	workspaces: Workspace[];
+	/** Every space's workspaces, which Settings › Workspaces moves between spaces and Integrations binds accounts to. */
+	allWorkspaces: Workspace[];
 	workspaceList: WorkspaceList<Workspace>;
 	/** The dashboard's personal directory, for Settings › Workspaces; `null` until the server sends it. */
 	personal: Workspace | null;
@@ -188,10 +192,10 @@ export function SettingsPage({
 		activity: <ActivityTab active={section === "activity"} />,
 		providers: <ProvidersTab active={section === "providers"} />,
 		preferences: <PreferencesTab cwd={cwd} workspace={cwd === null ? null : workspaceLabel(cwd, workspaces)} />,
-		integrations: <IntegrationsTab active={section === "integrations"} workspaces={workspaces} />,
+		integrations: <IntegrationsTab active={section === "integrations"} workspaces={allWorkspaces} />,
 		"mcp-servers": <McpServersTab active={section === "mcp-servers"} />,
 		"source-control": <SourceControlTab active={section === "source-control"} />,
-		workspaces: <WorkspacesTab workspaces={workspaces} list={workspaceList} personalDir={personal} trustedProjects={trustedProjects} />,
+		workspaces: <WorkspacesTab workspaces={allWorkspaces} list={workspaceList} personalDir={personal} trustedProjects={trustedProjects} />,
 		sync: <SyncTab active={section === "sync"} />,
 		storage: <StorageTab cwd={cwd} active={section === "storage"} onSaved={settings.reload} />,
 		worktrees: <WorktreesTab cwd={cwd} active={section === "worktrees"} />,

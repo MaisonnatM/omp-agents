@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { DONE_KEPT_HOURS } from "../../../src/user-todos";
 import { localDay } from "../../../src/shared/days";
-import { folderName } from "../../labels";
+import { ALL_OF_SPACE, folderName } from "../../labels";
 import { hashForTodo, type TodoListView } from "../../routing";
 import { shortcutKeys } from "../../shortcuts";
-import { byStatus, inWorkspace, LIST_KINDS, lastOf, leftIn, placeIn, type Section, TODO_STATUS, type TodoEntry, titleOf, todoMatcher, todosOf } from "../../todo-views";
+import { byStatus, inScope, LIST_KINDS, lastOf, leftIn, placeIn, type Section, TODO_STATUS, type TodoEntry, type TodoScope, titleOf, todoMatcher, todosOf } from "../../todo-views";
 import { useHiddenTodoCategories } from "../../use-hidden-todo-categories";
 import { useOpenLatest } from "../../use-open-latest";
 import { useTodoDrag } from "../../use-todo-drag";
@@ -39,7 +39,9 @@ interface TodoPageProps {
 	past: PastSession[];
 	/** Where **Start session** opens the new-session draft of a todo with no Workspace. */
 	newSessionCwd: string;
-	/** The sidebar's Workspace, which a todo added here starts its sessions in; `null` under All workspaces. */
+	/** The sidebar's workspace, else its space, which narrow the list. */
+	scope: TodoScope;
+	/** The Workspace a todo added here names, which its sessions start in: the sidebar's, else the personal directory in Personal; `null` for none. */
 	workspace: string | null;
 	/** The Workspaces a todo's Workspace picker offers. */
 	workspaces: Workspace[];
@@ -62,7 +64,7 @@ export function TodoPage({ list, ...props }: TodoPageProps) {
 	return <LoadedTodoPage list={list} {...props} />;
 }
 
-function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, newSessionCwd, workspace, workspaces, linearConnected }: TodoPageProps & { list: UserTodoList }) {
+function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, newSessionCwd, scope, workspace, workspaces, linearConnected }: TodoPageProps & { list: UserTodoList }) {
 	const openTodo = (id: string | null): void => {
 		location.hash = hashForTodo(view, id);
 	};
@@ -76,20 +78,20 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 	const sessions: KnownSessions = { hosts, past };
 	const [hidden] = useHiddenTodoCategories();
 	const spanning = todosOf(list, view, day, sessions, hidden);
-	const listed = inWorkspace(spanning, workspace);
+	const listed = inScope(spanning, scope);
 	const section: Section = { categoryId: view.kind === "category" ? view.id : null, todos: listed.filter(todoMatcher(query)) };
-	// Looked up before the search and the sidebar's workspace narrow the list, so neither takes the open todo off screen.
+	// Looked up before the search and the sidebar's scope narrow the list, so neither takes the open todo off screen.
 	const open = openId === null ? null : (placeIn([spanning], openId)?.entry ?? null);
 	const editing = useTodoEditing({ list, kind, day, frozen, onChange, onRemoved: id => openId === id && openTodo(null), newSessionCwd, workspace });
 	const drag = useTodoDrag(kind.canMove && !frozen, onChange);
 	const folds = useFolds(FOLDS_KEY, foldedByDefault);
 
 	const title = titleOf(list, view);
-	const left = leftIn(list, view, day, sessions, hidden, workspace);
+	const left = leftIn(list, view, day, sessions, hidden, scope);
 	const anyClosed = section.todos.some(todo => todo.doneAt !== null || todo.children.some(child => child.doneAt !== null));
 	const emptyText = (): string | null => {
 		if (query) return `No todo matches “${query}”.`;
-		if (workspace !== null) return `No todo here names ${folderName(workspace) ?? workspace}, the workspace the sidebar shows. Choose All workspaces in the sidebar to see every todo.`;
+		if (scope.workspace !== null) return `No todo here names ${folderName(scope.workspace) ?? scope.workspace}, the workspace the sidebar shows. Choose ${ALL_OF_SPACE[scope.space]} in the sidebar to see every todo of the space.`;
 		return kind.empty;
 	};
 	const empty = section.todos.length > 0 ? null : emptyText();

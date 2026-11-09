@@ -22,8 +22,6 @@ export interface SessionWork {
 	pullRequests: LinkedPullRequest[];
 	/** The Linear issues the session and its subagents worked on, by identifier, the session's own first. */
 	tickets: string[];
-	/** The sidebar's workspace `cwd`, or `null` for every workspace. */
-	workspace: string | null;
 	hosts: RosterHost[];
 	/** The live session or subagent the sidebar belongs to, whose composer the Browser's picks go to; `null` for a past one. */
 	live: LiveView | null;
@@ -36,7 +34,7 @@ export const ticketsTabs = (tickets: string[], working: boolean): DetailsTab<"ti
 		: [];
 
 /** The **PRs** tab, the **Tickets** tab once the session worked on any, and the **Browser** tab for a live session in the desktop app. */
-export function sessionWorkTabs({ scope, working, pullRequests, tickets, workspace, hosts, live }: SessionWork): DetailsTab<"pull-requests" | "browser" | "tickets">[] {
+export function sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, live }: SessionWork): DetailsTab<"pull-requests" | "browser" | "tickets">[] {
 	return [
 		{
 			value: "pull-requests",
@@ -45,7 +43,7 @@ export function sessionWorkTabs({ scope, working, pullRequests, tickets, workspa
 			control: "session-details.tab.pull-requests",
 			count: pullRequests.length,
 			scrollsItself: true,
-			content: <SessionPullRequestsTab key={scope} pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} current={live?.instanceId ?? null} />,
+			content: <SessionPullRequestsTab key={scope} pullRequests={pullRequests} hosts={hosts} version={working} current={live?.instanceId ?? null} />,
 		},
 		...ticketsTabs(tickets, working),
 		...(BROWSER_AVAILABLE && live !== null
@@ -74,10 +72,10 @@ interface SessionDetailsProps extends Omit<SessionWork, "scope" | "live"> {
 }
 
 /** The right sidebar's content for the focused view: its session's pull requests, its running app, its Linear issues when it has any, and a personal session's **Memory**. */
-export function SessionDetails({ view, working, cwd, personalMemory, pullRequests, tickets, workspace, hosts }: SessionDetailsProps) {
+export function SessionDetails({ view, working, cwd, personalMemory, pullRequests, tickets, hosts }: SessionDetailsProps) {
 	const scope = view.kind === "past" ? view.sessionId : (hosts.find(host => host.instanceId === view.instanceId)?.sessionId ?? view.instanceId);
 	const tabs = [
-		...sessionWorkTabs({ scope, working, pullRequests, tickets, workspace, hosts, live: view.kind === "live" ? view : null }),
+		...sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, live: view.kind === "live" ? view : null }),
 		...(personalMemory !== null
 			? [
 					{
