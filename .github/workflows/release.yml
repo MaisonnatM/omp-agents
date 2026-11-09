@@ -34,7 +34,7 @@ jobs:
         with:
           bun-version: 1.4.4
       # The tests import omp's own modules from its installed package, which needs no install script.
-      - run: bun install -g --ignore-scripts @oh-my-pi/pi-coding-agent@18.18.1
+      - run: bun install -g --ignore-scripts @oh-my-pi/pi-coding-agent@18.18.3
       - run: bun install --frozen-lockfile
       - run: bun install --cwd desktop --frozen-lockfile
       - run: bun test
