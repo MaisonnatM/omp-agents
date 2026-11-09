@@ -61,6 +61,10 @@ Every routine belongs to one Bot through its `botId`; see [Routines](routines.md
 A prompt routine sends its prompt through `Bots.message` and records a `sent` outcome with the session id, and a command routine runs in the Bot's workspace, then posts how it ended the same way; the routine neither tracks nor ends that session.
 The details in the right sidebar, `BotDetails`, list its routines in their own tab and its conversation's usage, `GET /api/analytics/session`, in **Details**; `#bots/<id>/routines` shows the card of them all, `RoutinesCard`, in place of the conversation, `#bots/<id>/routines/<routine id>` the same card with that routine's row open, `#bots/<id>/routines/<routine id>/edit` its editor, and `#bots/<id>/routines/new` the editor of a new one.
 
+`botsIn` in `web/bots-model.ts` keeps the Bots of the window's space, placed by their `cwd` with `spaces().of`, and `useWorkspaceScope` hands them to the sidebar's Bots tab, the gallery, and the latest-Bot shortcut.
+A Bot's `cwd` may be a `~` path, so the page places each Personal workspace by both its `cwd` and its `cwdDisplay`.
+A Bot's page, the Bots it may message, and the status bar read every Bot, so an address opens a Bot from either space.
+
 The page's `#bots/<id>` shows the Bot's session through `ViewConversation`, the conversation a pane draws, and asks for it through `useShowConversation` in `web/pane-store.ts`, so while a page covers the panes the server streams only the conversations pages show this way, such as the Bot's (`watched` in `web/use-dashboard.ts`).
 `useAttention` in `web/use-attention.ts` counts the open Bot's view as shown, so an unread turn of the open Bot is marked read as it would be in a pane.
 `useDashboard` works out the open Bot once with `openBot` in `web/bots-model.ts` and hands it to the page, the details, and `useAttention`: its conversation's view is the live session that runs it, else its saved one, and none while the page shows the routines card, a routine editor, or a routine its address names but the Bot does not have.

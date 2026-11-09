@@ -33,12 +33,14 @@ The server deletes the `google.json` that an older version kept the calendars' s
 
 `PUT /api/calendar/events/new` takes a `NewEvent`, `{ title, when, calendar }`, checked by `parseNewEvent` in `src/server/wire.ts`, and answers a `NewEventAnswer`, `{ kept }`: the event as kept on this computer, or `null` for one added to Google Calendar.
 The title is trimmed, nonempty, and at most 500 characters; `when` is `{ allDay: true, firstDay, lastDay }` with `YYYY-MM-DD` days, the last not before the first, or `{ allDay: false, start, end }` in epoch milliseconds with the end after the start.
-`calendar`, a `NewEventCalendar`, is `{ kind: "local" }` or `{ kind: "google", account, calendarId }`, and the new-event dialog offers only the calendars of the accounts the page shows.
+`calendar`, a `NewEventCalendar`, is `{ kind: "local", space }` or `{ kind: "google", account, calendarId }`, and the new-event dialog offers only the calendars of the accounts the page shows, with the window's space for this computer.
 A Google calendar goes through `GoogleCalendarClient.create`, which refuses a calendar not checked in your Google Calendar's list or not `writable`, and otherwise posts the event to the calendar's `events` with its `summary` and `start` and `end`: `{ date }` for an all-day event, whose end Google takes as the day after the last, or `{ dateTime }` in ISO time.
 It then forgets that calendar's kept event reads, which the client keeps per calendar, so the next read shows the event.
 This computer adds the event to `events.json` beside the access token, through `LocalEventsFile` in `src/server/local-events-file.ts`, with a `crypto.randomUUID()` id; a file it cannot read moves to `events.json.invalid`.
 `parseEventWhen` in `src/shared/calendar.ts` checks an event's `when` both for `parseNewEvent` and for each event that file keeps.
-`GET /api/calendar/local` answers every kept event, since only what you typed by hand is there, and the page lays out the days of the month it shows.
+`GET /api/calendar/local` answers every kept event whatever its space, since only what you typed by hand is there, and the page keeps those of the window's space and lays out the days of the month it shows.
+`PUT /api/calendar/events/space` takes a `LocalEventSpace`, `{ id, space }`, checked by `parseLocalEventSpace`, and applies `set-space` to that kept event; it answers `{}`.
+A `LocalEvent` whose `space` is missing or names none loads in Work.
 `PUT /api/calendar/events/delete` takes an `EventRef`, checked by `parseEventRef`: `{ kind: "local", id }` deletes that kept event if it is still there, and `{ kind: "google", account, calendarId, eventId }` goes through that account's `GoogleCalendarClient.delete`; it answers `{}`.
 `GoogleCalendarClient.delete` refuses a calendar not checked in your Google Calendar's list or not `writable` before asking Google, as `create` does, and otherwise sends a DELETE to the event's address under the calendar's `events`, without `sendUpdates`.
 The client counts an `ApiError` of 404 or 410 as deleted, since Google answers 410 for an event deleted a moment ago and 404 once it is purged, so deleting twice ends the same way.
@@ -49,6 +51,7 @@ The page owns what a write changes: it adds the kept event that `PUT /api/calend
 ### Agent reminders
 
 A `LocalEvent`'s `sessionId` names the omp session that added it, and is `null` for an event you added; one whose `sessionId` is missing or not a nonempty string loads with `null`, so older files read as before.
+`EventInbox` files an added reminder in its session's space through the same `SpaceOfSession` as `NoteInbox`, whatever space the change names.
 The starter kit's `user_event` extension lists the upcoming events of `events.json`, adds a timed reminder in its session's name, and removes one that session added.
 It reads the file but never writes it, and atomically renames each `{ op: "add", event }` or `{ op: "remove", id, sessionId }` into `event-inbox/` beside it.
 It also reads the pending changes, so a session sees its own reminders while the dashboard is stopped.

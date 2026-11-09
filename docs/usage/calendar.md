@@ -2,7 +2,8 @@
 
 - The **Calendar** tab, or a `#calendar` address, shows a month in place of the panes, Monday first.
   The sidebar then lists **Calendar**, then, once Google Calendar is connected, your Google calendars under **My calendars** and **Other calendars**, then **Show routines**.
-- Each day lists its routine runs, the todos due on it, the events you keep on this computer, and, once connected, the Linear tickets due on it and events of the Google calendars you added.
+- Each day lists its routine runs, the todos due on it, the events you keep on this computer in the space on screen, and, once connected, the Linear tickets due on it and events of the Google calendars you added.
+  Google calendars show only for the accounts placed in the space on screen; see [Integrations](integrations.md).
   A green dot is a run that went through, a red one a run that failed, and a hollow one a run still to come.
   A violet dot is a todo, an amber one a ticket, a timed Google event uses its calendar's color, and an event on this computer is slate gray; an all-day event is a band in that color; a done or canceled todo or ticket is struck through.
 - **Show routines** starts checked.
@@ -29,8 +30,10 @@
   The dialog starts on the calendar you picked last, while it is still offered.
   Enter in the title or Cmd+Enter creates it, and Esc closes the dialog; the month then shows the event and lists its first day.
 - An event on **This computer** stays in `events.json` beside the server's access token, so every window of the app shows it, and nothing leaves this computer.
+  It belongs to the space on screen when you add it, and an event added before the spaces existed is in Work.
+  In the day's list, its **Move to Personal** or **Move to Work** button moves it to the other space, and it leaves the list.
 - An agent can add a reminder on **This computer** with its `user_event` tool, such as when you ask for one or when its work can only be checked later, like a performance change or a deploy.
-  The reminder shows on this page like an event you added, and its notice comes 10 minutes before it starts.
+  The reminder shows on this page like an event you added, in the space of the session's workspace, and its notice comes 10 minutes before it starts.
   Clicking the reminder, here or in its notice, opens the session that added it.
   An agent can remove only the reminders its own session added; you can delete any of them here.
 - In the day's list beside the month, an event's trash button deletes it: an event on **This computer**, or a Google event of a calendar you own or may edit.

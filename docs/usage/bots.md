@@ -1,7 +1,9 @@
 # Bots
 
 - A Bot is a named teammate with one conversation you come back to, a job, and a memory.
-- The sidebar's **Bots** tab, just before **Sessions**, lists every Bot like a messaging app, whatever workspace the sidebar shows.
+- The sidebar's **Bots** tab, just before **Sessions**, lists the space's Bots like a messaging app, whatever workspace the sidebar shows.
+  A Bot is in the space of the workspace its conversation runs in, so a Bot in the personal directory or a Personal workspace is in Personal, and every other Bot is in Work.
+  A Bot's `#bots/<id>` address opens its page from either space.
   Each row shows the Bot's avatar, its name, the time of its last message, and that message on one muted line.
   The line reads **You:** before your own words, **Working…** while the Bot works, or the question it waits on you for, in amber.
   When a routine sent the last message, the line starts with that routine's name instead of **You:**, followed by its prompt or command; when another Bot sent it, the line starts with that Bot's name.
@@ -20,7 +22,7 @@
   The **+** beside it, or a `#bots/new` address, opens the New Bot form, and the grid button opens the gallery.
   Until the server sends the Bots, the tab reads **Loading your Bots…**.
 - Choosing the **Bots** tab opens the page of the Bot at the top of its list, the one you spoke with most recently; with no Bot yet it opens the gallery.
-- `#bots` is a gallery of every Bot as a card, as Grok's companions.
+- `#bots` is a gallery of the space's Bots as cards, as Grok's companions.
   Each card shows the Bot's avatar, its name, the first sentence of its job or **No job yet**, whether its session runs or the question it waits on you for, its routine count, and the time of its last message.
   Click a card to open the Bot's page.
   The last card, and **New Bot** in the header, open the New Bot form.
@@ -30,7 +32,7 @@
   Picking **Bot designer** or **PR shepherd** fills its **Job** with its rules, and its name with **Dr Eggbot** or **Shepherd**, and hides the job templates.
   Switching type swaps a name or job the last type or a template filled, and keeps one you typed; picking **Routines** after a type that filled them empties them.
   For a **Routines** Bot, the optional **Job** field starts empty, and a template above it, **PR reviewer**, **Daily retro**, **Worktree janitor**, or **Release watcher**, fills it and the name, keeping either one you typed.
-  It also asks for the workspace its conversation runs in, the sidebar's workspace by default.
+  It also asks for the workspace its conversation runs in, among the space's workspaces, the sidebar's workspace by default, or the personal directory while the sidebar shows all of Personal.
   **Create** saves it and opens its page, `#bots/<id>`.
   A Bot made with no job learns it from you: tell it in your first message what to do, where to look, and what to ask before acting, and it saves that as its job, in its **Job** field.
 - A Bot's page shows its avatar and name in the header, the first sentence of its job under them, and its conversation below.
