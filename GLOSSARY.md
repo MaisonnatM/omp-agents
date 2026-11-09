@@ -101,8 +101,12 @@ _Avoid_: Onboarding, tour, checklist
 The list of running, interrupted, pinned, and past sessions in the sidebar.
 _Avoid_: Session list, inbox
 
+**Space**:
+One of the dashboard's two sides, **Personal** for the user's own life and **Work** for everything else, each with its own workspaces and the sessions, todos, notes, Bots, and accounts that belong to them.
+_Avoid_: Section (see **Section**), profile, mode, side
+
 **Workspace**:
-A repository's main checkout, or a directory outside git, that sessions run in, which the sidebar's picker filters by; a session in a linked git worktree counts in its repository's workspace.
+A repository's main checkout, or a directory outside git, that sessions run in, which belongs to one space and which the sidebar's picker filters by; a session in a linked git worktree counts in its repository's workspace.
 _Avoid_: Project, repo, folder
 
 **Project code**:
