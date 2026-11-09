@@ -289,13 +289,15 @@ export interface RoutineDraft {
 	task: RoutineTask["kind"];
 	prompt: string;
 	command: string;
+	/** Whether the command posts its output to the Bot only when it fails. */
+	failuresOnly: boolean;
 	schedules: ScheduleDraft[];
 	triggers: TriggerKind[];
 }
 
 /** A new routine's form for Bot `botId`: a prompt on weekdays at 9:00. */
 export function newDraft(id: string, botId: BotId): RoutineDraft {
-	return { id, botId, name: "", enabled: true, task: "prompt", prompt: "", command: "", schedules: [blankSchedule()], triggers: [] };
+	return { id, botId, name: "", enabled: true, task: "prompt", prompt: "", command: "", failuresOnly: false, schedules: [blankSchedule()], triggers: [] };
 }
 
 /** One saved schedule as the editor shows it, with the other kind's fields at their defaults. */
@@ -320,6 +322,7 @@ export function draftOf(routine: Routine): RoutineDraft {
 		task: task.kind,
 		prompt: task.kind === "prompt" ? task.prompt : draft.prompt,
 		command: task.kind === "command" ? task.command : draft.command,
+		failuresOnly: task.kind === "command" && task.post === "failures",
 		schedules: routine.schedules.map(scheduleDraft),
 		triggers: routine.triggers.map(({ kind }) => kind),
 	};
@@ -339,7 +342,7 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 			const command = draft.command.trim();
 			if (!command) return { fix: "Write the command to run." };
 			if (command.length > MAX_COMMAND_LENGTH) return { fix: `Shorten the command to ${MAX_COMMAND_LENGTH.toLocaleString("en-US")} characters or fewer.` };
-			task = { kind: "command", command };
+			task = draft.failuresOnly ? { kind: "command", command, post: "failures" } : { kind: "command", command };
 			break;
 		}
 		default: {

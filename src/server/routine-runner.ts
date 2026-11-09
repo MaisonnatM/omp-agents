@@ -128,7 +128,7 @@ export class RoutineRunner {
 					await this.#message(routine, run.at, sentText(routine, run, { kind: "prompt", prompt: task.prompt }));
 					break;
 				case "command":
-					this.#launch(routine, run, task.command);
+					this.#launch(routine, run, task);
 					break;
 				default: {
 					const unhandled: never = task;
@@ -150,7 +150,7 @@ export class RoutineRunner {
 	}
 
 	/** Runs `routine`'s command in its Bot's workspace for `run` without waiting for it, since a command may run for minutes. */
-	#launch(routine: Routine, { at, triggeredBy }: RoutineRun, command: string): void {
+	#launch(routine: Routine, { at, triggeredBy }: RoutineRun, { command, post }: Extract<Routine["task"], { kind: "command" }>): void {
 		const { file } = this.#deps;
 		const refuse = (why: string): void => {
 			file.failed(routine.id, at, why);
@@ -168,6 +168,7 @@ export class RoutineRunner {
 			file.command(routine.id, at, run);
 			if (error !== null) file.failed(routine.id, at, error);
 			this.#deps.onChange();
+			if (post === "failures" && run.phase === "exited" && run.code === 0) return;
 			void this.#post(routine, at, sentText(routine, { at, triggeredBy }, { kind: "command", command, run }));
 		};
 		void this.#deps.exec(command, cwd, { ROUTINE_TRIGGERS: JSON.stringify(triggeredBy) }).then(

@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-09
 
+- A routine that runs a command can now post its output to its Bot only when the command fails: check **Post the output to … only when it fails** in the routine's form. A run that succeeds keeps its output in the routine's history without waking the Bot.
 - On a phone, the header holds one menu named after the page you are on, listing every tab, Personal and Work, and Settings, beside search and the bell.
 - On a phone, the sidebars stay closed until you open them, and the page uses the full width of the screen.
 - On a phone, the status bar shows plan quota on one line you can swipe, without the Mac's terminal and load.
