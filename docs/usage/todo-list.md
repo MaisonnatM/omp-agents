@@ -91,7 +91,7 @@
   When another session already works on the todo, the card names it and offers **Open session** and **End it and start again**, as on [the Pull requests page](pull-requests.md).
 - An open top-level todo's **Start session** opens the new-session draft with its title and notes as the first message, in the todo's workspace, else the sidebar's, to edit the prompt or pick another directory first; `#new/<cwd>?todo=<id>` addresses it, and its directory wins over the todo's.
   A session started from a todo links to it once omp starts, which moves a **Backlog** or **Todo** todo to **In Progress**, and its agent marks the todo **Done** once it finishes the work; see [Todos from agents](#todos-from-agents).
-- With Linear connected, an open top-level todo's **Create Linear ticket** asks for a team, starting with the last one an issue was created in, then opens an issue from the title and notes, assigned to you, and links it to the todo.
+- With Linear connected, in Work, an open top-level todo's **Create Linear ticket** asks for a team, starting with the last one an issue was created in, then opens an issue from the title and notes, assigned to you, and links it to the todo.
   It reports success only once the server's todo list holds the link.
   When the issue opened but the todo did not take the link, it names the issue and offers **Link** for it instead of opening another.
 - The list icon on a ticket adds a todo of no category, last in the list, that links to it.

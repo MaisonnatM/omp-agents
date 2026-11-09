@@ -325,6 +325,7 @@ export function App() {
 																		todoView={todoView}
 																		linear={linear}
 																		linearCallable={linearCallable}
+																		ticketsCallable={ticketsCallable}
 																		maximized={maximized}
 																		hasDetails={detailsView !== null}
 																		rightOpen={sidebars.panels.right.open}

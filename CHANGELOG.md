@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-09
 
+- The Calendar now shows only the routine runs of the space's own Bots and the todos due in that space, so Personal and Work no longer mix.
+- In Personal, the Calendar no longer shows Linear tickets' due days, and a todo no longer offers Create Linear ticket, since tickets belong to Work.
 - The GitHub release now includes a Linux AppImage for x64 and arm64, beside the Mac app. The installed app updates from it.
 - **Fix CI**, **Resolve conflicts**, and **Address comments** sessions now record their work in the PR's ship status, so its widget shows the rebase, CI fix, or comment fix in progress.
 - **Work on it** on a ticket or todo now runs the ship workflow, starting with its questions and plan, and still stops before pushing or opening a pull request.

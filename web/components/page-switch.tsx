@@ -69,6 +69,8 @@ interface PageSwitchProps extends PageState {
 	linear: McpIntegration | null;
 	/** The dashboard reads and writes Linear. */
 	linearCallable: boolean;
+	/** Linear answers and the space shows Tickets, Work: the Calendar shows tickets' due days and a todo can become a ticket. */
+	ticketsCallable: boolean;
 	maximized: boolean;
 	/** The right sidebar shows the focused session's details. */
 	hasDetails: boolean;
@@ -109,6 +111,7 @@ export const PageSwitch = memo(function PageSwitch({
 	todoView,
 	linear,
 	linearCallable,
+	ticketsCallable,
 	maximized,
 	hasDetails,
 	rightOpen,
@@ -183,7 +186,7 @@ export const PageSwitch = memo(function PageSwitch({
 					onChange={changeTodo}
 					newSessionCwd={defaultWorkspace}
 					workspaces={workspaces}
-					linearConnected={linearCallable}
+					linearConnected={ticketsCallable}
 				/>
 			);
 		case "notes":
@@ -212,7 +215,7 @@ export const PageSwitch = memo(function PageSwitch({
 			);
 		}
 		case "calendar":
-			return <CalendarPage routines={routines} todos={userTodos} ticketsShown={linearCallable} space={scope.space} />;
+			return <CalendarPage routines={routines} bots={scope.bots} todos={userTodos} ticketsShown={ticketsCallable} space={scope.space} spaces={scope.spaces} />;
 		case "email":
 			return <EmailPage target={page.target} space={scope.space} />;
 		case "sport":
