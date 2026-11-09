@@ -984,31 +984,28 @@ describe("google accounts", () => {
 	const root = mkdtempSync(join(tmpdir(), "google-accounts-extension-"));
 	afterAll(() => rmSync(root, { recursive: true, force: true }));
 	const env = { XDG_CONFIG_HOME: join(root, "config"), PI_CODING_AGENT_DIR: join(root, "agent") };
-	const work = join(root, "work");
 	mkdirSync(join(root, "config", "omp-agents"), { recursive: true });
 	mkdirSync(join(root, "agent"));
-	mkdirSync(join(work, "app"), { recursive: true });
 	writeFileSync(
 		join(root, "config", "omp-agents", "google-accounts.json"),
-		JSON.stringify({ addresses: { gmail: "ana@example.com", "gmail-2": "ana@work.example" }, links: { "ana@work.example": [work] } }),
+		JSON.stringify({ addresses: { gmail: "ana@example.com", "gmail-2": "ana@work.example" }, personal: ["ana@example.com"] }),
 	);
 	const servers = (names: string[]) =>
 		writeFileSync(join(root, "agent", "mcp.json"), JSON.stringify({ mcpServers: Object.fromEntries(names.map(name => [name, { type: "http", url: "https://gmailmcp.googleapis.com/mcp/v1" }])) }));
 
-	test("a session in a linked workspace hears each account of omp's mcp.json and the one linked to it; one account tells nothing", () => {
+	test("a session hears each account of omp's mcp.json, whatever its space; one account tells nothing", () => {
 		servers(["gmail", "gmail-2"]);
-		expect(exercise("google-accounts", { agentStart: true, omp: true, cwd: join(work, "app") }, env).prompt).toEqual([
+		expect(exercise("google-accounts", { agentStart: true, omp: true }, env).prompt).toEqual([
 			"base",
 			[
 				"omp is signed in to several Google accounts, one MCP server each, and each server's tools start with its prefix.",
 				"Gmail:",
 				"- gmail: ana@example.com, tools `mcp__gmail_`",
 				"- gmail-2: ana@work.example, tools `mcp__gmail_2_`",
-				`The user linked this workspace, ${work}, to ana@work.example: use that account for this workspace's mail and calendar unless the user names another account.`,
 			].join("\n"),
 		]);
 		servers(["gmail"]);
-		expect(exercise("google-accounts", { agentStart: true, omp: true, cwd: join(work, "app") }, env).prompt).toBeNull();
+		expect(exercise("google-accounts", { agentStart: true, omp: true }, env).prompt).toBeNull();
 	});
 
 	test("a Google server's 401 tells the session to ask the user to sign in again, and reports the account once; other failures pass", () => {

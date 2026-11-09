@@ -1,9 +1,10 @@
 import { fromPartial } from "@total-typescript/shoehorn";
 import { describe, expect, test } from "bun:test";
+import type { ScheduledSend } from "../src/shared/scheduled";
 import type { AgentRow, AgentStatus, HostStatus, PastSession, RosterHost, UnreadTurn } from "../src/shared/sessions";
 import { spaces } from "../src/shared/workspaces";
 import type { Layout, Page } from "./routing";
-import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, searchSessions, sessionsIn, sidebarSessions, spaceSession, spaceSwitchPanes, waitingCount, waitingIn, workspaceSession, workspacesIn, workspaceSwitch } from "./sessions";
+import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, scheduledIn, searchSessions, sessionsIn, sidebarSessions, spaceSession, spaceSwitchPanes, waitingCount, waitingIn, workspaceSession, workspacesIn, workspaceSwitch } from "./sessions";
 
 const host = (sessionId: string, cwd: string) => fromPartial<RosterHost>({ instanceId: `i-${sessionId}`, sessionId, cwd, agents: [], turnWaits: false });
 const subagents = (...statuses: AgentStatus[]): AgentRow[] => statuses.map(status => fromPartial<AgentRow>({ status }));
@@ -137,6 +138,22 @@ describe("spaces", () => {
 		expect(spaceSession("personal", hosts, placed)).toEqual({ kind: "live", instanceId: "i-new", agentId: null });
 		expect(spaceSession("work", hosts, placed)).toEqual({ kind: "live", instanceId: "i-job", agentId: null });
 		expect(spaceSession("personal", [running("job", "/code/app", 9)], placed)).toBeNull();
+	});
+
+	test("a scheduled start is in its directory's space, a message or a continue in its session's, and one for a session no list holds in Work", () => {
+		const byPage = spaces([{ cwd: "/code/garden", cwdDisplay: "~/garden" }], personalDir);
+		const send = (id: string, target: ScheduledSend["target"]) => fromPartial<ScheduledSend>({ id, target });
+		const sends = [
+			send("home", fromPartial({ kind: "start", request: { cwd: "~/personal" } })),
+			send("garden", fromPartial({ kind: "start", request: { cwd: "~/garden" } })),
+			send("job", fromPartial({ kind: "start", request: { cwd: "~/app" } })),
+			send("life", { kind: "message", sessionId: "life", text: "hi" }),
+			send("old", { kind: "continue", sessionId: "old", provider: "Anthropic", cause: "usage-limit" }),
+			send("gone", { kind: "message", sessionId: "gone", text: "hi" }),
+		];
+		const sessions = { hosts: [running("life", "/code/garden-wt", 1, "/code/garden")], past: [past("old", "/home/me/personal", false)] };
+		expect(scheduledIn(sends, "personal", sessions, byPage).map(({ id }) => id)).toEqual(["home", "garden", "life", "old"]);
+		expect(scheduledIn(sends, "work", sessions, byPage).map(({ id }) => id)).toEqual(["job", "gone"]);
 	});
 
 	test("a space counts the sessions it lists that need you, not those of a hidden workspace or a Bot", () => {

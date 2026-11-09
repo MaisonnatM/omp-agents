@@ -8,11 +8,11 @@ const server = { name: "google-calendar", url: "https://calendarmcp.googleapis.c
 const failing = (status: number | null, error = `The "google-calendar" MCP server answered HTTP ${status}`) => ({ kind: "failing" as const, server, error, status });
 const calendar = (...connections: McpServerConnection[]): McpIntegration => ({
 	id: "google-calendar",
-	accounts: connections.map((connection, at) => ({ name: at === 0 ? "google-calendar" : `google-calendar-${at + 1}`, address: `me${at}@example.com`, addressError: null, connection, workspaces: [] })),
+	accounts: connections.map((connection, at) => ({ name: at === 0 ? "google-calendar" : `google-calendar-${at + 1}`, address: `me${at}@example.com`, addressError: null, connection, space: "work" as const })),
 	signIn: null,
 	setup: { clientId: "30887206948-fot6diel47j76ceoft65e8sjojbstop1.apps.googleusercontent.com", hasClientSecret: true, callbackPort: 3119, configured: true },
 });
-const row = (integration: McpIntegration): string => renderToStaticMarkup(<McpIntegrationRow integration={integration} workspaces={null} />);
+const row = (integration: McpIntegration, placeable = false): string => renderToStaticMarkup(<McpIntegrationRow integration={integration} placeable={placeable} />);
 
 describe("McpIntegrationRow", () => {
 	test("a Google account answered 403 links to the API's enable page in the client's project, and still offers Check again", () => {
@@ -38,6 +38,12 @@ describe("McpIntegrationRow", () => {
 		expect(html).toContain("google-calendar-2");
 		expect(html).toContain("Add account");
 		expect(html).toContain("2 accounts");
+	});
+
+	test("Settings places each account in a space, and a page that offers to connect does not", () => {
+		const ready = calendar({ kind: "ready", server, tools: [] });
+		expect(row(ready, true)).toContain('aria-label="Space of me0@example.com"');
+		expect(row(ready)).not.toContain("Space of");
 	});
 
 	test("a 403 from a server that is not Google's gets no enable link", () => {

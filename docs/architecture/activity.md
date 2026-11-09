@@ -101,7 +101,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Pages: Bots | view, control, action | `bots`, `bots/new`, `bots/item`, `bots/routines`, `bots/routine`; `bots.delete`, `bots.details`, `bots.job.revert`, `bots.job.template`, `bots.kind`, `bots.look`, `bots.routine.delete`, `bots.routine.new`, `bots.routine.run`, `bots.tab.details`, `bots.tab.routines`; `bot`, `routine` |
 | Pages: Settings | view | `settings/<section>` |
 | Settings › Analytics' context-source table | view | `settings/analytics` |
-| Settings › Integrations' Google account lines | view, action | `settings/integrations`; Add account, Remove, and the workspace picker are `PUT`s |
+| Settings › Integrations' Google account lines | view, action | `settings/integrations`; Add account, Remove, and the space picker are `PUT`s |
 | Settings › Providers' account lines | view, action | `settings/providers`; each up or down arrow is `put /api/providers/account-order`, and Sign out is `put /api/providers/sign-out` |
 | Settings › Workflows | view, action | `settings/workflows`; saving a workflow's skill is the `PUT` that Settings › Files saves with |
 | Settings › Worktrees | view, action | `settings/worktrees`; each queued removal's preview and removal are `PUT`s |

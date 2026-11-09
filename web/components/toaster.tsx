@@ -1,4 +1,4 @@
-/** The page's toasts: the `toasts` manager that shows one from anywhere, `loadingToast` for work that takes a while, and `Toaster`, which stacks them bottom right. */
+/** The page's toasts: the `toasts` manager that shows one from anywhere, `loadingToast` for work that takes a while, `offerUndo` after a delete or a move, and `Toaster`, which stacks them bottom right. */
 import { Toast } from "@base-ui/react/toast";
 import { type ReactNode, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
@@ -38,6 +38,28 @@ export const loadingToast = (text: ToastText): string => toasts.add({ ...text, t
  */
 export function settleToast(id: string, text: ToastText): void {
 	toasts.add({ id, type: undefined, title: text.title, description: text.description });
+}
+
+/** How long **Undo** stays after a delete or a move. */
+const UNDO_MS = 8000;
+
+/**
+ * Shows `title` as toast `id` with **Undo**, which closes it and runs `undo`, for {@link UNDO_MS}. A later one with the same
+ * `id` takes its place, and one `undo` shows itself, as a move back does, stays open.
+ */
+export function offerUndo(id: string, title: string, undo: () => void): void {
+	toasts.add({
+		id,
+		title,
+		timeout: UNDO_MS,
+		actionProps: {
+			children: "Undo",
+			onClick: () => {
+				toasts.close(id);
+				undo();
+			},
+		},
+	});
 }
 
 /** The element under the toasts that {@link UnderToasts} draws into, once `Toaster` has mounted it. */

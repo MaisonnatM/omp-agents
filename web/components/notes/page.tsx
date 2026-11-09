@@ -1,7 +1,8 @@
-import { Bot, NotebookPen, Pencil, Plus, SquareArrowOutUpRight, Trash2 } from "lucide-react";
+import { ArrowLeftRight, Bot, NotebookPen, Pencil, Plus, SquareArrowOutUpRight, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { everyWord } from "../../../src/shared/every-word";
+import { otherSpace, type Space } from "../../../src/shared/workspaces";
 import { addNote } from "../../../src/user-notes";
 import { MAX_NOTE_TITLE } from "../../../src/user-notes-parse";
 import type { UserNote, UserNoteChange, UserNoteList } from "../../../src/user-notes-shared";
@@ -10,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem, MenuLinkItem, MenuSeparator } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { dayLabel } from "../../labels";
+import { dayLabel, SPACE_LABELS } from "../../labels";
 import { notesIn, notesListText } from "../../notes-views";
 import { PAGE_ICON } from "../../page-icons";
 import { hashForNotes, hashForTodoId, type NotesListView } from "../../routing";
@@ -21,7 +22,7 @@ import { focusRow, PageFrame, stepRows, useReturnFocus } from "../list-page";
 import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, ListSplit } from "../list-split";
 import { NotesEditor } from "../notes-editor";
 import { SearchField } from "../search-field";
-import { toasts } from "../toaster";
+import { offerUndo } from "../toaster";
 import { AddedByChip } from "../todo/links";
 
 interface NotesPageProps {
@@ -34,6 +35,8 @@ interface NotesPageProps {
 	onChange: (change: UserNoteChange) => Promise<void>;
 	hosts: RosterHost[];
 	past: PastSession[];
+	/** The space on screen, whose notes the page lists and a new one goes in. */
+	space: Space;
 }
 
 export function NotesPage({ list, ...props }: NotesPageProps) {
@@ -41,13 +44,13 @@ export function NotesPage({ list, ...props }: NotesPageProps) {
 	return <LoadedNotesPage list={list} {...props} />;
 }
 
-function LoadedNotesPage({ list, todos, view, openId, disabled, onChange, hosts, past }: NotesPageProps & { list: UserNoteList }) {
+function LoadedNotesPage({ list, todos, view, openId, disabled, onChange, hosts, past, space }: NotesPageProps & { list: UserNoteList }) {
 	const [query, setQuery] = useState("");
 	const search = useRef<HTMLInputElement>(null);
 	const titleField = useRef<HTMLInputElement>(null);
 	/** The note whose title takes focus once it opens: one just written, or one picked to rename. */
 	const [naming, setNaming] = useState<string | null>(null);
-	const listed = notesIn(list, view);
+	const listed = notesIn(list, view, space);
 	const matches = everyWord(query);
 	const shown = listed.filter(note => matches(`${note.title}\n${note.body}`));
 	const open = listed.find(note => note.id === openId) ?? null;
@@ -61,7 +64,7 @@ function LoadedNotesPage({ list, todos, view, openId, disabled, onChange, hosts,
 	}, [naming, open?.id]);
 	const create = (): void => {
 		if (disabled) return;
-		const change = addNote();
+		const change = addNote(space);
 		onChange(change);
 		setQuery("");
 		setNaming(change.note.id);
@@ -85,15 +88,24 @@ function LoadedNotesPage({ list, todos, view, openId, disabled, onChange, hosts,
 		const index = list.notes.findIndex(row => row.id === note.id);
 		onChange({ op: "remove", id: note.id });
 		navigate(null);
-		toasts.add({ id: "note-undo", title: `Deleted “${note.title || "Untitled"}”`, timeout: 8000, actionProps: { children: "Undo", onClick: () => {
+		offerUndo("note-undo", `Deleted “${note.title || "Untitled"}”`, () => {
 			onChange({ op: "restore", note, index });
 			location.hash = hashForNotes(view, note.id);
-			toasts.close("note-undo");
-		} } });
+		});
 	};
 	const rename = (note: UserNote): void => {
 		setNaming(note.id);
 		navigate(note.id);
+	};
+	const to = otherSpace(space);
+	/** Moves `note` to the other space, which takes it off this page, with an undo that brings it back. */
+	const move = (note: UserNote): void => {
+		onChange({ op: "set-space", id: note.id, space: to });
+		navigate(null);
+		offerUndo("note-move", `Moved “${note.title || "Untitled"}” to ${SPACE_LABELS[to]}`, () => {
+			onChange({ op: "set-space", id: note.id, space });
+			location.hash = hashForNotes(view, note.id);
+		});
 	};
 	return (
 		<PageFrame title={view.kind === "all" ? "Notes" : text.name} meta={`${listed.length} ${listed.length === 1 ? "note" : "notes"}`} actions={<>
@@ -102,11 +114,12 @@ function LoadedNotesPage({ list, todos, view, openId, disabled, onChange, hosts,
 		</>}>
 			<ListSplit widthKey="omp-agents.notes-list-width" resizeLabel="Resize the note list" detailLabel="Open note" empty={{ icon: NotebookPen, title: "No note open", hint: "Click a note, or focus one with ↑ or ↓ and press Enter." }} list={
 				<ul aria-label="Notes" className="mx-auto w-full max-w-3xl space-y-0.5 px-3 py-2">
-					{shown.map(note => <NoteRow key={note.id} note={note} href={hashForNotes(view, note.id)} open={note.id === openId} todoHref={todos && note.todoId ? hashForTodoId(todos, note.todoId) : null} disabled={disabled} onRename={rename} onRemove={remove} />)}
+					{shown.map(note => <NoteRow key={note.id} note={note} href={hashForNotes(view, note.id)} open={note.id === openId} todoHref={todos && note.todoId ? hashForTodoId(todos, note.todoId) : null} disabled={disabled} moveTo={to} onRename={rename} onMove={move} onRemove={remove} />)}
 					{shown.length === 0 && <li className="px-3 py-4 text-sm text-muted-foreground">{query ? `No note matches “${query}”.` : text.empty}</li>}
 				</ul>
 			} detail={open === null ? null : <section key={open.id} aria-label={open.title || "Untitled"}>
 				<DetailBar leading="Notes" previous={{ label: "Previous note", icon: CH_PREVIOUS, shortcut: "notesPrevious", onClick: at > 0 ? () => step(-1) : undefined }} next={{ label: "Next note", icon: CH_NEXT, shortcut: "notesNext", onClick: at >= 0 && at < shown.length - 1 ? () => step(1) : undefined }} close={{ label: "Close the note", icon: CH_CLOSE, shortcut: "notesClose", onClick: () => navigate(null) }}>
+					<Tooltip content={`Move to ${SPACE_LABELS[to]}`}><Button variant="ghost" size="icon-compact" aria-label={`Move note to ${SPACE_LABELS[to]}`} disabled={disabled} onClick={() => move(open)}><ArrowLeftRight /></Button></Tooltip>
 					<Tooltip content="Delete note"><Button variant="ghost" size="icon-compact" aria-label="Delete note" disabled={disabled} onClick={() => remove(open)}><Trash2 /></Button></Tooltip>
 				</DetailBar>
 				<div className="flex flex-col gap-5 px-6 py-5">
@@ -132,12 +145,15 @@ interface NoteRowProps {
 	todoHref: string | null;
 	/** Changes would not reach the server. */
 	disabled: boolean;
+	/** The space **Move to** sends the note to. */
+	moveTo: Space;
 	onRename: (note: UserNote) => void;
+	onMove: (note: UserNote) => void;
 	onRemove: (note: UserNote) => void;
 }
 
-/** A note's row: its title, first line, and last change, with **Open**, **Rename**, **Open todo**, and **Delete** on right-click. */
-function NoteRow({ note, href, open, todoHref, disabled, onRename, onRemove }: NoteRowProps) {
+/** A note's row: its title, first line, and last change, with **Open**, **Rename**, **Open todo**, **Move to** the other space, and **Delete** on right-click. */
+function NoteRow({ note, href, open, todoHref, disabled, moveTo, onRename, onMove, onRemove }: NoteRowProps) {
 	return (
 		<ContextMenu>
 			<ContextMenuTrigger render={<li id={`note-${note.id}`} />}>
@@ -162,6 +178,10 @@ function NoteRow({ note, href, open, todoHref, disabled, onRename, onRemove }: N
 						Open todo
 					</MenuLinkItem>
 				)}
+				<MenuItem disabled={disabled} onClick={() => onMove(note)}>
+					<ArrowLeftRight />
+					Move to {SPACE_LABELS[moveTo]}
+				</MenuItem>
 				<MenuSeparator />
 				<MenuItem variant="destructive" disabled={disabled} onClick={() => onRemove(note)}>
 					<Trash2 />

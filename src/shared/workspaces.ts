@@ -80,29 +80,40 @@ export interface Spaces {
 	 * places it, else `cwd` itself: Personal in the personal directory or in a workspace `personal` lists, else Work.
 	 */
 	of(cwd: string, workspace: string): Space;
-	/** The workspaces of `workspaces` in `space`, each a directory or a row for one. */
-	inSpace<W extends string | Workspace>(workspaces: readonly W[], space: Space): W[];
+	/** The items of `items` in `space`, each a directory or something in one, such as a workspace's row or a Bot, placed by its `cwd`. */
+	inSpace<W extends string | { cwd: string }>(items: readonly W[], space: Space): W[];
 }
 
 /**
- * The {@link Spaces} of the workspaces `personal` lists and `personalDir`, whose `cwdDisplay` is how a `~` path names it. Until the page
- * hears the personal directory, `personalDir` is `null` and only the listed workspaces are Personal.
+ * The {@link Spaces} of the workspaces `personal` lists and `personalDir`. The server names each workspace by its directory; the
+ * page's rows also carry how a `~` path names it, as `personalDir`'s `cwdDisplay` does, so a Bot's or a scheduled start's `~/garden`
+ * finds the workspace too. Until the page hears the personal directory, `personalDir` is `null` and only the listed workspaces are Personal.
  */
-export function spaces(personal: readonly string[], personalDir: Workspace | null): Spaces {
+export function spaces(personal: readonly (string | Workspace)[], personalDir: Workspace | null): Spaces {
+	const named = new Set(personal.flatMap(entry => (typeof entry === "string" ? [entry] : [entry.cwd, entry.cwdDisplay])));
 	const isPersonalDir = (cwd: string): boolean => {
 		if (!personalDir) return false;
 		// The root keeps its `/`.
 		const dir = cwd.trim().replace(/(?<=.)\/+$/, "");
 		return dir === personalDir.cwd || dir === personalDir.cwdDisplay;
 	};
-	const of = (cwd: string, workspace: string): Space => (isPersonalDir(cwd) || personal.includes(workspace) ? "personal" : "work");
+	const of = (cwd: string, workspace: string): Space => (isPersonalDir(cwd) || named.has(workspace) ? "personal" : "work");
 	return {
 		isPersonalDir,
 		of,
-		inSpace: (workspaces, space) =>
-			workspaces.filter(workspace => {
-				const cwd = typeof workspace === "string" ? workspace : workspace.cwd;
+		inSpace: (items, space) =>
+			items.filter(item => {
+				const cwd = typeof item === "string" ? item : item.cwd;
 				return of(cwd, cwd) === space;
 			}),
 	};
 }
+
+/** Whether a note, an event, or an account is in `space`, for a filter of what carries its own space. */
+export const spaceIs =
+	(space: Space) =>
+	(item: { space: Space }): boolean =>
+		item.space === space;
+
+/** The space of omp session `sessionId`'s directory, Work for a session the dashboard does not know. */
+export type SpaceOfSession = (sessionId: string) => Promise<Space>;

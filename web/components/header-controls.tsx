@@ -1,5 +1,5 @@
 /** The Personal and Work switch, the Notes, Calendar, Email, and Sport buttons, the command menu button, the notices' bell, and Settings: in the desktop app's title bar, else at the end of the page's header, where a phone gets one menu of every tab instead; and the title bar's Back and Forward buttons. */
-import { Briefcase, ChevronDown, ChevronLeft, ChevronRight, type LucideIcon, Search, UserRound } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { createContext, memo, type ReactNode, useContext } from "react";
 import type { Notice } from "../../src/shared/notices";
 import { isSpace, type Space, SPACES } from "../../src/shared/workspaces";
@@ -10,7 +10,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { SizeProvider } from "@/lib/size-context";
 import { activityControl } from "../activity";
 import { SPACE_LABELS, sessionsWaiting } from "../labels";
-import { PAGE_ICON } from "../page-icons";
+import { PAGE_ICON, SPACE_ICONS } from "../page-icons";
 import type { SidebarPanel, SidebarTab } from "../routing";
 import { shortcutLabels } from "../shortcuts";
 import { TAB_ROWS } from "../sidebar-tabs";
@@ -49,8 +49,6 @@ interface HeaderControlsProps {
 type SpaceSwitchProps = Pick<HeaderControlsProps, "space" | "onSpace" | "otherWaiting">;
 
 const SettingsIcon = PAGE_ICON.settings;
-
-const SPACE_ICONS: Record<Space, LucideIcon> = { personal: UserRound, work: Briefcase };
 
 /**
  * Which space the window shows, Personal or Work; the switch shortcut's keys show on the space it goes to, and so does the count

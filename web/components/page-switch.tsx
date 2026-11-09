@@ -159,7 +159,7 @@ export const PageSwitch = memo(function PageSwitch({
 					workspaces={workspaces}
 					allWorkspaces={allWorkspaces}
 					workspaceList={workspaceList}
-					personal={personal}
+					spaces={personal && scope.spaces}
 					trustedProjects={trustedProjects}
 				/>
 			);
@@ -187,11 +187,11 @@ export const PageSwitch = memo(function PageSwitch({
 				/>
 			);
 		case "notes":
-			return <NotesPage list={userNotes} todos={userTodos} view={page.list} openId={page.open} hosts={hosts} past={past} disabled={!connected} onChange={changeNote} />;
+			return <NotesPage list={userNotes} todos={userTodos} view={page.list} openId={page.open} hosts={hosts} past={past} disabled={!connected} onChange={changeNote} space={scope.space} />;
 		case "bots": {
 			if (page.target === null) {
-				if (page.adding) return <NewBot workspaces={allWorkspaces} defaultCwd={defaultWorkspace} connected={connected} />;
-				return <BotsGallery rows={bots === null ? null : botRows(bots, hosts, botLasts)} routines={routines} />;
+				if (page.adding) return <NewBot workspaces={workspaces} defaultCwd={defaultWorkspace} connected={connected} />;
+				return <BotsGallery rows={scope.bots === null ? null : botRows(scope.bots, hosts, botLasts)} routines={routines} />;
 			}
 			if (!openBot) return <p className="m-auto text-sm text-muted-foreground">{bots === null ? "Loading the Bots…" : "No Bot has this address. It may have been deleted."}</p>;
 			return (
@@ -212,9 +212,9 @@ export const PageSwitch = memo(function PageSwitch({
 			);
 		}
 		case "calendar":
-			return <CalendarPage routines={routines} todos={userTodos} ticketsShown={linearCallable} workspace={workspace} />;
+			return <CalendarPage routines={routines} todos={userTodos} ticketsShown={linearCallable} space={scope.space} />;
 		case "email":
-			return <EmailPage target={page.target} workspace={workspace} />;
+			return <EmailPage target={page.target} space={scope.space} />;
 		case "sport":
 			return <SportPage state={sport} route={page} disabled={!connected} onChange={changeSport} />;
 		// Get started is a dialog over the home, which `GetStarted` in `web/app.tsx` draws.

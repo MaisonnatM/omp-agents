@@ -106,9 +106,9 @@ export function useCompletion({ editorRef, draft, setDraft, completions, onCompl
 
 	const token = menu?.token ?? null;
 	const query = token && mentionQuery(token);
-	const { pullRequestsScope, scope: { workspace } } = useDashboardStatus();
+	const { pullRequestsScope, scope: { space } } = useDashboardStatus();
 	const { tickets, pullRequestRepos } = useSearchSources(query !== null && wants(query, "ticket"), pullRequestsScope);
-	const { threads, events } = useMailAndEvents(query !== null && wants(query, "mail"), query !== null && wants(query, "event"), workspace);
+	const { threads, events } = useMailAndEvents(query !== null && wants(query, "mail"), query !== null && wants(query, "event"), space);
 	const linearUsers = useRead<TicketChoice[]>(query !== null && wants(query, "person") ? "/api/linear/users" : null).data ?? NO_USERS;
 	const answer = completions && completions.reqId === menu?.reqId ? completions : null;
 	const sections: MenuSection[] =

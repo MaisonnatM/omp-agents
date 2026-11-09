@@ -2,6 +2,7 @@ import { ExternalLink, Mail, SquareArrowOutUpRight, SquarePen, Trash2 } from "lu
 import { useEffect, useState } from "react";
 import { errorText } from "../../../src/json";
 import { type AccountId, anyCallable, callable, type GoogleAccount } from "../../../src/shared/accounts";
+import type { Space } from "../../../src/shared/workspaces";
 import type { MailThread, MailTrash } from "../../../src/shared/gmail";
 import { threadUrl, type MailSend } from "../../../src/shared/gmail";
 import { putJson } from "../../api";
@@ -142,15 +143,15 @@ function ComposePage({ accounts, from }: { accounts: GoogleAccount[]; from: Acco
 const NEW_MAIL: MailDocument = { to: [], cc: [], bcc: [], subject: "", body: "" };
 
 /**
- * The latest conversations of the Gmail inboxes `workspace` shows, newest first, each tagged with its inbox while there
+ * The latest conversations of the Gmail inboxes `space` shows, newest first, each tagged with its inbox while there
  * are several and narrowed to one by the sidebar's picker, beside the conversation `target` names, or Gmail's
  * integration row while omp can read none of them. A conversation that opens from the address while the picker narrows
  * to another account picks its own. With no conversation open, ↓ and ↑ focus the next and previous row;
  * with one open, they open the next and previous one and focus its row, which they read ahead. Esc closes it, and O
  * opens the focused row in Gmail, else the open conversation.
  */
-export function EmailPage({ target, workspace }: { target: EmailRoute["target"]; workspace: string | null }) {
-	const { gmail, poll, accounts, picked, pick, threads: shownThreads } = useEmail(workspace);
+export function EmailPage({ target, space }: { target: EmailRoute["target"]; space: Space }) {
+	const { gmail, poll, accounts, picked, pick, threads: shownThreads } = useEmail(space);
 	const threads = picked === null ? shownThreads : shownThreads.filter(thread => thread.account === picked);
 	const unread = threads.filter(thread => thread.unread).length;
 	const read = poll.read;

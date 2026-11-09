@@ -18,6 +18,7 @@ interface LocalEvent {
 	when: EventWhen;
 	sessionId: string | null;
 }
+// The dashboard files an added event in the space of the session that added it.
 type Change = { op: "add"; event: LocalEvent } | { op: "remove"; id: string; sessionId: string };
 
 /** A date-time with a time of day, and an offset or none; `Date.parse` reads one without an offset as local time. */

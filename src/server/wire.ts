@@ -11,7 +11,7 @@ import { parseBotChange } from "../shared/bots";
 import {
 	GOOGLE_CLIENT_ID,
 	type GoogleClientInput,
-	type GoogleLinks,
+	type GoogleSpace,
 	holdsAccounts,
 	type IntegrationTarget,
 	MCP_INTEGRATIONS,
@@ -20,7 +20,7 @@ import {
 	slackRedirectError,
 } from "../shared/accounts";
 import { type McpServerAdd, type McpServerInput, REMOTE_TRANSPORTS } from "../shared/mcp-servers";
-import { type CalendarShownInput, type EventRef, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar, parseEventWhen } from "../shared/calendar";
+import { type CalendarShownInput, type EventRef, type LocalEventSpace, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar, parseEventWhen } from "../shared/calendar";
 import { MAX_MAIL_BODY, type MailDraft, type MailPerson, type MailReply, type MailSend, type MailTrash } from "../shared/gmail";
 import { parseImages, parseModel, parseNewSessionRequest, parseSkill, parseThinking } from "../shared/sessions";
 import { parseContextAction, parseGoalChange } from "../shared/session-controls";
@@ -625,11 +625,9 @@ export function parseIntegrationTarget(body: unknown): Parsed<IntegrationTarget>
 	return holdsAccounts(body.id) && isNonEmpty(account) ? { ok: { id: body.id, account } } : null;
 }
 
-/** The body of `PUT /api/integrations/google-links`: `{ address, workspaces }`, an address and the absolute workspace directories its accounts are linked to. */
-export const parseGoogleLinks = (body: unknown): Parsed<GoogleLinks> =>
-	isObject(body) && isNonEmpty(body.address) && body.address.includes("@") && isTexts(body.workspaces) && body.workspaces.every(cwd => cwd.startsWith("/"))
-		? { ok: { address: body.address, workspaces: body.workspaces } }
-		: null;
+/** The body of `PUT /api/integrations/google-space`: `{ address, space }`, an address and the space its accounts go in. */
+export const parseGoogleSpace = (body: unknown): Parsed<GoogleSpace> =>
+	isObject(body) && isNonEmpty(body.address) && body.address.includes("@") && isSpace(body.space) ? { ok: { address: body.address, space: body.space } } : null;
 
 /** The body of `PUT /api/mcp-servers/sign-in`, `/sign-out`, and `/remove`: `{ name }` naming a server omp loads. */
 export const parseMcpServerName = (body: unknown): Parsed<string> => (isObject(body) && isNonEmpty(body.name) ? { ok: body.name } : null);
@@ -693,7 +691,7 @@ export const parseCalendarShown = (body: unknown): Parsed<CalendarShownInput> =>
 
 function parseNewEventCalendar(value: unknown): Parsed<NewEventCalendar> {
 	if (!isObject(value)) return null;
-	if (value.kind === "local") return { ok: { kind: "local" } };
+	if (value.kind === "local") return isSpace(value.space) ? { ok: { kind: "local", space: value.space } } : null;
 	return value.kind === "google" && isNonEmpty(value.account) && isNonEmpty(value.calendarId) ? { ok: { kind: "google", account: value.account, calendarId: value.calendarId } } : null;
 }
 
@@ -717,6 +715,10 @@ export function parseEventRef(body: unknown): Parsed<EventRef> {
 	}
 	return null;
 }
+
+/** The body of `PUT /api/calendar/events/space`: an event kept on this computer by its id, and the space it moves to. */
+export const parseLocalEventSpace = (body: unknown): Parsed<LocalEventSpace> =>
+	isObject(body) && isNonEmpty(body.id) && isSpace(body.space) ? { ok: { id: body.id, space: body.space } } : null;
 
 /** The most people one field of a sent mail names. */
 const MAX_RECIPIENTS = 100;

@@ -67,7 +67,7 @@ export interface DashboardStatus {
 	 * requests reads that entry, never another scope's: the unscoped entry asks GitHub about every repository.
 	 */
 	pullRequestsScope: string;
-	/** What this window shows: its space, the sidebar's workspace, which picks the Google accounts the `@` menu reads mail and events of, and Personal's home. */
+	/** What this window shows: its space, which picks the Google accounts the `@` menu reads mail and events of, the sidebar's workspace, and Personal's home. */
 	scope: WindowScope;
 	/** The merges the server waits to make until GitHub allows them, which a pull request's row, its details, and a session's stack show. */
 	merges: readonly QueuedMerge[];

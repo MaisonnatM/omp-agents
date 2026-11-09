@@ -286,11 +286,10 @@ function ScheduledMenu({ send, label }: { send: ScheduledSend; label: string }) 
 }
 
 /**
- * The sidebar's list of every scheduled send, new sessions' starts too, in the session rows' look; hidden while there is none.
+ * The sidebar's list of the space's scheduled sends `sends`, new sessions' starts too, in the session rows' look; hidden while there is none.
  * `openId` is the start whose page is open; `showWorkspace` badges a start with its workspace, as all workspaces badge a session.
  */
-export function ScheduledGroup({ openId, showWorkspace, open, onOpenChange }: { openId: string | null; showWorkspace: boolean; open: boolean; onOpenChange: () => void }) {
-	const sends = useContext(ScheduledSends);
+export function ScheduledGroup({ sends, openId, showWorkspace, open, onOpenChange }: { sends: readonly ScheduledSend[]; openId: string | null; showWorkspace: boolean; open: boolean; onOpenChange: () => void }) {
 	const now = useMinute();
 	if (sends.length === 0) return null;
 	return (

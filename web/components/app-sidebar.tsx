@@ -1,6 +1,6 @@
 import { type Dispatch, type SetStateAction, memo, useCallback, useMemo } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
-import type { Bot, BotId, BotLast } from "../../src/shared/bots";
+import type { BotId, BotLast } from "../../src/shared/bots";
 import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import { botRows } from "../bots-model";
@@ -35,8 +35,6 @@ interface AppSidebarProps {
 	/** Every session, including those in directories the sidebar hides, so a todo's linked session resolves. */
 	hosts: RosterHost[];
 	past: PastSession[];
-	/** The Bots, `null` until the server sends them. */
-	bots: Bot[] | null;
 	/** Each Bot's conversation's last words, `null` for a Bot with none yet. */
 	botLasts: Readonly<Record<BotId, BotLast | null>>;
 	todoView: TodoListView;
@@ -52,7 +50,7 @@ interface AppSidebarProps {
  * message that changes nothing the sidebar shows leaves it alone.
  */
 export const AppSidebar = memo(function AppSidebar({
-	scope: { visible, workspaces },
+	scope: { visible, workspaces, bots, scheduled },
 	sessions: { lists, waiting, query, setQuery, togglePin },
 	page,
 	newDraftDir,
@@ -66,7 +64,6 @@ export const AppSidebar = memo(function AppSidebar({
 	notesView,
 	hosts,
 	past,
-	bots,
 	botLasts,
 	todoView,
 	settings,
@@ -100,6 +97,7 @@ export const AppSidebar = memo(function AppSidebar({
 			onTogglePin={togglePin}
 			open={page ? NO_VIEWS : panes}
 			newSessionOpen={newDraftDir}
+			scheduled={scheduled}
 			scheduledOpen={page?.kind === "scheduled" ? page.id : null}
 			bots={botList}
 			botsOpen={page?.kind !== "bots" ? undefined : page.target === null ? (page.adding ? null : undefined) : page.target}

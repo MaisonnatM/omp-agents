@@ -9,7 +9,7 @@ import type { remoteStatusOf } from "./mcp-status";
 import { auth, mcpCredentials } from "./omp/modules";
 import { type McpServerConfig, type McpSignInTarget, userMcpConfigPath, writeMcpServer } from "./omp/mcp";
 import { GoogleAccountsFile } from "./server/google-accounts-file";
-import type { McpIntegration } from "./shared/accounts";
+import type { IntegrationsAnswer, McpIntegration } from "./shared/accounts";
 import type { McpRemoteStatus } from "./shared/mcp-status";
 
 const GMAIL = "https://gmailmcp.googleapis.com/mcp/v1";
@@ -90,7 +90,7 @@ function integrationsWith(
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-google-accounts-"));
 	dirs.push(dir);
 	const path = join(dir, "google-accounts.json");
-	writeFileSync(path, JSON.stringify({ addresses, links: {} }));
+	writeFileSync(path, JSON.stringify({ addresses }));
 	const store = new GoogleAccountsFile(path);
 	const grant = async (target: McpSignInTarget): Promise<void> => signIn(target.credentialId as string, browser.shift() as string);
 	const accounts = createGoogleAccounts(store, grant, status);
@@ -200,18 +200,22 @@ test("a signed-in account whose address Google does not say shows why", async ()
 	expect(gmail.accounts.map(({ name, address, addressError }) => ({ name, address, addressError }))).toEqual([{ name: "gmail", address: null, addressError: "Google answered 500" }]);
 });
 
-test("a Gmail and a Google Calendar account whose addresses differ only in case share one workspace link", async () => {
+test("a Gmail and a Google Calendar account whose addresses differ only in case share one space, Work until placed", async () => {
 	await configure({ gmail: ORIGINAL, "google-calendar": { type: "http", url: CALENDAR, oauth: OAUTH } });
 	const { integrations } = integrationsWith({});
 	browser.push("Ana@Example.com", "ana@EXAMPLE.com");
 	await integrations.startSignIn({ id: "gmail", account: null });
 	await integrations.startSignIn({ id: "google-calendar", account: null });
 	for (const { auth } of Object.values(config())) signedInIds.add(auth?.credentialId as string);
-	const answer = await integrations.linkGoogleAccount({ address: "ANA@example.com", workspaces: ["/work"] });
-	const linked = [...answer.integrations.gmail.accounts, ...answer.integrations["google-calendar"].accounts].map(({ name, address, workspaces }) => ({ name, address, workspaces }));
-	expect(linked).toEqual([
-		{ name: "gmail", address: "ana@example.com", workspaces: ["/work"] },
-		{ name: "google-calendar", address: "ana@example.com", workspaces: ["/work"] },
+	const placed = (answer: IntegrationsAnswer) =>
+		[...answer.integrations.gmail.accounts, ...answer.integrations["google-calendar"].accounts].map(({ name, address, space }) => ({ name, address, space }));
+	expect(placed(await integrations.load(false))).toEqual([
+		{ name: "gmail", address: "ana@example.com", space: "work" },
+		{ name: "google-calendar", address: "ana@example.com", space: "work" },
+	]);
+	expect(placed(await integrations.placeGoogleAccount({ address: "ANA@example.com", space: "personal" }))).toEqual([
+		{ name: "gmail", address: "ana@example.com", space: "personal" },
+		{ name: "google-calendar", address: "ana@example.com", space: "personal" },
 	]);
 });
 

@@ -70,6 +70,18 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The sidebar's Personal item is gone: in Personal, New session starts in your personal folder unless you pick another workspace.
 - Opening a link to a session from the other space switches to that space.
 - Behind the scenes: the pull request list can ask for one space's repositories.
+- Notes now belong to Personal or Work: the Notes page, its counts, and the command menu show only the space's notes, and a note an agent adds goes in the space of the session that added it.
+- Notes you saved before are in Work; move one with the arrows button in its header or Move to Personal in its right-click menu, with Undo.
+- Events you keep on this computer now belong to a space too, so the Calendar shows only the space's, and each one in the day's list has a button to move it to the other space.
+- Each Google account now sits in Personal or Work, picked in Settings › Integrations, and Email and the Calendar show only the space's accounts; agents are told which accounts to use in their space.
+- The Bots tab and the Bots gallery now show only the Bots working in the space's workspaces, and New Bot offers the space's workspaces; a Bot's link still opens it from either space.
+- The sidebar's Scheduled group now lists only the space's scheduled messages and sessions.
+- Moving an event to the other space now shows a message saying where it went, with Undo to move it back.
+- The space of a Google account in Settings › Integrations is now picked from the same menu as a workspace's, on the right of the account's line.
+- Bots and the helpers a session starts now also learn which Google account their space uses.
+- A Bot whose workspace is in Personal now lists in Personal however its folder is written.
+- Behind the scenes: the Undo message after a delete or a move now comes from one shared piece, and the Calendar, Email, Notes and Settings pick a space's items with one shared rule.
+- Behind the scenes: the dashboard, not the optional starter kit, now tells sessions which Google account their space uses, and an agent's note or reminder no longer names a space the dashboard would ignore.
 - Sport now shows only in Personal, so in Work its header button and its command leave.
 - A link to Sport switches the window to Personal.
 - Linear tickets now show only in Work, so in Personal the Tickets tab and its command leave.

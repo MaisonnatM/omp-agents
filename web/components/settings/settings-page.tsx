@@ -2,7 +2,7 @@ import { FolderOpen } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
 import type { TrustedProject } from "../../../src/shared/project-trust";
-import type { Workspace, WorkspaceList } from "../../../src/shared/workspaces";
+import type { Spaces, Workspace, WorkspaceList } from "../../../src/shared/workspaces";
 import { isPhonePage, settingsUrl } from "../../api";
 import { useEditableRead } from "../../editable-read";
 import { type ReadState, useRead } from "../../reads";
@@ -144,7 +144,7 @@ export function SettingsPage({
 	workspaces,
 	allWorkspaces,
 	workspaceList,
-	personal,
+	spaces,
 	trustedProjects,
 }: {
 	section: SettingsSection;
@@ -153,11 +153,11 @@ export function SettingsPage({
 	onPickWorkspace: (cwd: string | null) => void;
 	/** The space's workspaces, which the header's picker offers. */
 	workspaces: Workspace[];
-	/** Every space's workspaces, which Settings › Workspaces moves between spaces and Integrations binds accounts to. */
+	/** Every space's workspaces, which Settings › Workspaces moves between spaces. */
 	allWorkspaces: Workspace[];
 	workspaceList: WorkspaceList<Workspace>;
-	/** The dashboard's personal directory, for Settings › Workspaces; `null` until the server sends it. */
-	personal: Workspace | null;
+	/** The window's spaces, for Settings › Workspaces; `null` until the server sends the personal directory. */
+	spaces: Spaces | null;
 	/** The projects whose agent code the user trusted, for Settings › Workspaces. */
 	trustedProjects: TrustedProject[];
 }) {
@@ -193,10 +193,10 @@ export function SettingsPage({
 		activity: <ActivityTab active={section === "activity"} />,
 		providers: <ProvidersTab active={section === "providers"} />,
 		preferences: <PreferencesTab cwd={cwd} workspace={cwd === null ? null : workspaceLabel(cwd, workspaces)} />,
-		integrations: <IntegrationsTab active={section === "integrations"} workspaces={allWorkspaces} />,
+		integrations: <IntegrationsTab active={section === "integrations"} />,
 		"mcp-servers": <McpServersTab active={section === "mcp-servers"} />,
 		"source-control": <SourceControlTab active={section === "source-control"} />,
-		workspaces: <WorkspacesTab workspaces={allWorkspaces} list={workspaceList} personalDir={personal} trustedProjects={trustedProjects} />,
+		workspaces: <WorkspacesTab workspaces={allWorkspaces} list={workspaceList} spaces={spaces} trustedProjects={trustedProjects} />,
 		sync: <SyncTab active={section === "sync"} />,
 		phone: <PhoneAccessTab active={section === "phone"} />,
 		storage: <StorageTab cwd={cwd} active={section === "storage"} onSaved={settings.reload} />,

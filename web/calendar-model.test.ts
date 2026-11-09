@@ -181,7 +181,7 @@ describe("Google events", () => {
 });
 
 describe("events kept on this computer", () => {
-	const local = (when: LocalEvent["when"], id = "e1"): LocalEvent => ({ id, title: "Dentist", when, sessionId: null });
+	const local = (when: LocalEvent["when"], id = "e1"): LocalEvent => ({ id, title: "Dentist", when, sessionId: null, space: "work" });
 
 	test("an all-day event spanning the previous month and the next shows once on every day of October", () => {
 		const entries = october({ localEvents: [local({ allDay: true, firstDay: "2026-09-28", lastDay: "2026-11-03" })] });
@@ -199,9 +199,9 @@ describe("events kept on this computer", () => {
 });
 
 describe("the new event's calendars", () => {
-	const account = (name: string): GoogleAccount => ({ name, address: `${name}@example.com`, addressError: null, connection: { kind: "signed-out", server: { name, url: "https://calendarmcp.googleapis.com/mcp/v1", host: "calendarmcp.googleapis.com" } }, workspaces: [] });
+	const account = (name: string): GoogleAccount => ({ name, address: `${name}@example.com`, addressError: null, connection: { kind: "signed-out", server: { name, url: "https://calendarmcp.googleapis.com/mcp/v1", host: "calendarmcp.googleapis.com" } }, space: "work" });
 	const calendar = (account: string, id: string, group: GoogleCalendar["group"] = "mine"): GoogleCalendar => ({ account, id, name: id, color: "#4285f4", group, writable: true, shown: true, error: null });
-	const choices = calendarChoices([calendar("google-calendar", "team", "other"), calendar("google-calendar", "me"), calendar("google-calendar-2", "team")], [account("google-calendar"), account("google-calendar-2")]);
+	const choices = calendarChoices([calendar("google-calendar", "team", "other"), calendar("google-calendar", "me"), calendar("google-calendar-2", "team")], [account("google-calendar"), account("google-calendar-2")], "personal");
 	const named = (choice: { label: string }) => choice.label;
 
 	test("go account by account, yours first in each, each named with its account's address, then this computer", () => {

@@ -1,6 +1,7 @@
 /** The sidebar's Calendar tab: the calendar, the Google calendars it can show by account, and whether it shows routine runs (`CalendarNav`). */
 import { Check } from "lucide-react";
 import { type CalendarShownInput, calendarKey, type GoogleCalendar, type GoogleStatus } from "../../../src/shared/calendar";
+import type { Space } from "../../../src/shared/workspaces";
 import { useCalendarMonth, useCalendarYear } from "@/components/kibo-ui/calendar";
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { putJson } from "../../api";
@@ -17,12 +18,12 @@ const CALENDAR_GROUPS = [
 ] as const satisfies readonly { group: GoogleCalendar["group"]; label: string }[];
 
 /**
- * The calendars checked in the Google Calendar lists of the accounts `workspace` shows, each account under its address
+ * The calendars checked in the Google Calendar lists of the accounts `space` shows, each account under its address
  * when there are several, in Google Calendar's **My calendars** and **Other calendars**, each a checkbox in its color
  * that shows or hides its events on the Calendar page; nothing while the dashboard cannot call Google Calendar.
  */
-function GoogleCalendarGroups({ workspace }: { workspace: string | null }) {
-	const { calendars, accounts } = useGoogleCalendars(workspace);
+function GoogleCalendarGroups({ space }: { space: Space }) {
+	const { calendars, accounts } = useGoogleCalendars(space);
 	if (!calendars) return null;
 
 	return (
@@ -95,10 +96,10 @@ function CalendarItem({ calendar }: { calendar: GoogleCalendar }) {
 }
 
 /**
- * The Calendar tab of the sidebar: the calendar, active while `open`, the Google calendars of the accounts `workspace`
+ * The Calendar tab of the sidebar: the calendar, active while `open`, the Google calendars of the accounts `space`
  * shows, then whether the calendar shows routine runs.
  */
-export function CalendarNav({ open, workspace }: { open: boolean; workspace: string | null }) {
+export function CalendarNav({ open, space }: { open: boolean; space: Space }) {
 	const [showRoutines, setShowRoutines] = useCalendarRoutines();
 	return (
 		<>
@@ -113,7 +114,7 @@ export function CalendarNav({ open, workspace }: { open: boolean; workspace: str
 					</SidebarMenuItem>
 				</SidebarMenu>
 			</SidebarGroup>
-			<GoogleCalendarGroups workspace={workspace} />
+			<GoogleCalendarGroups space={space} />
 			<SidebarGroup>
 				<SidebarGroupLabel>Routines</SidebarGroupLabel>
 				<SidebarMenu aria-label="Routines">

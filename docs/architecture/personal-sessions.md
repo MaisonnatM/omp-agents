@@ -12,16 +12,18 @@ For what the user sees, see [Personal sessions](../usage/personal-sessions.md).
 
 ## The extension
 
-`personalJoin` in `src/server/personal.ts` makes a `SessionJoin` for the dashboard's `#joinFor` from how to tell a Bot's start, so every session the dashboard launches that is not a Bot's loads it with `-e` and the flags in `PERSONAL_FLAGS`: the personal directory, `workspaces.json`, the memory file, `sport.json`, and the sport inbox.
-A Bot's session launches without it, so a Bot whose workspace is in the Personal space keeps only its own memory.
+`personalJoin` in `src/server/personal.ts` makes a `SessionJoin` for the dashboard's `#joinFor` from how to tell a Bot's start, so every session the dashboard launches loads it with `-e` and flags from `PERSONAL_FLAGS`.
+A Bot's session gets only the flags that place it, the personal directory, `workspaces.json`, and `google-accounts.json`, so a Bot whose workspace is in the Personal space keeps only its own memory but still learns which Google account its space uses.
+Every other session also gets the memory file, `sport.json`, and the sport inbox.
 A private session loads it as any other, so a private personal session reads and writes the shared memory.
 
 The extension decides per turn from the hook's `ctx.cwd`, not at load, so a session that moves in or out, or whose workspace Settings › Workspaces moves to the other space, follows.
-`personalIn` reads the flags once omp has set them, reads `workspaces.json` with `readWorkspaces` from `src/workspace-list.ts` each time, asks git which workspace `ctx.cwd` counts in through its own `WorkspacePlacement`, once per directory, and then applies `spaces`.
+`placeOf` reads the flags once omp has set them, reads `workspaces.json` with `readWorkspaces` from `src/workspace-list.ts` each time, asks git which workspace `ctx.cwd` counts in through its own `WorkspacePlacement`, once per directory, and then applies `spaces`; `personalOf` turns that place into a personal session, or none in the Work space or without the memory flag.
 The extension imports nothing from `src/server/`, since it runs inside omp, not in the dashboard.
-Its `before_agent_start` returns nothing for a subagent or a directory in the Work space; otherwise it appends a framing and `memoryLines` of the memory file, the file's newest whole lines within `MAX_MEMORY_BYTES`, as a Bot's prompt carries its memory.
+Its `before_agent_start` appends, for a directory in the Personal space and a main session with the memory flag, a framing and `memoryLines` of the memory file, the file's newest whole lines within `MAX_MEMORY_BYTES`, as a Bot's prompt carries its memory.
 The framing makes the agent the user's personal assistant in the personal directory itself, and tells it a Personal repository is part of the user's own life, not their job, anywhere else.
 When the Sport module has a plan, it then appends one line for today, under 300 characters, from `todayLine` in `src/omp/sport-tool.ts`: the phase and whether it is a deload week, the day's workouts with their log status, and the pain flags that hold.
+In any space, and for a subagent too, it then appends the line `accountsLine` builds from `google-accounts.json` when only some known addresses are in the session's space: use those for mail and calendar unless the user names another account.
 The `personal` list is compared by exact string equality with the paths the dashboard keeps, as omp reports `ctx.cwd`.
 
 `remember`, and `sport` when the dashboard passed both sport flags, are registered only once a session is personal, the first time `session_start` or `before_agent_start` sees it in the Personal space, so every other session's tool list stays as it was.

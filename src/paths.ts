@@ -96,7 +96,7 @@ export const processesFile = join(configDir, "processes.json");
 export const modelProfilesFile = join(configDir, "model-profiles.json");
 /** The Google calendars the Calendar page's sidebar unchecked, beside {@link tokenFile}. */
 export const calendarsFile = join(configDir, "calendars.json");
-/** The address each Google account signs in as and the workspaces each address is linked to, beside {@link tokenFile}. */
+/** The address each Google account signs in as and the addresses in the Personal space, beside {@link tokenFile}. */
 export const googleAccountsFile = join(configDir, "google-accounts.json");
 /** The events the Calendar page keeps on this computer, beside {@link tokenFile}. */
 export const localEventsFile = join(configDir, "events.json");

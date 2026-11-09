@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { callable } from "../src/shared/accounts";
 import type { View } from "../src/shared/sessions";
-import { otherSpace, type Space } from "../src/shared/workspaces";
+import { otherSpace, type Space, spaceIs } from "../src/shared/workspaces";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { errorText } from "../src/json";
 import { AppSidebar } from "./components/app-sidebar";
@@ -71,7 +71,7 @@ export function App() {
 	const { layout } = state;
 	const sidebars = useSidebarPanels();
 	const scope = useWorkspaceScope(state);
-	const { visible, workspaces, workspace, pickWorkspace, hiddenCwds, space, pickSpace, pullRequestsScope, spaces, home } = scope;
+	const { visible, workspaces, workspace, pickWorkspace, hiddenCwds, space, pickSpace, pullRequestsScope, spaces, home, bots } = scope;
 	const windowScope = useMemo((): WindowScope => ({ space, spaces, workspace, home }), [space, spaces, workspace, home]);
 	const focused = useFocusedSession(state, page, scope);
 	const sessions = useSessionLists(scope, state.pins, changePins);
@@ -98,7 +98,7 @@ export function App() {
 	/** Linear answers and the space shows Tickets: the new-ticket shortcut and the palette's tickets apply. */
 	const ticketsCallable = linearCallable && !absentTabs.has("tickets");
 	const settings = useSettingsRoute(page);
-	const latestBot = useMemo(() => (state.bots === null ? null : (botRows(state.bots, state.hosts, state.botLasts)[0]?.bot.id ?? null)), [state.bots, state.hosts, state.botLasts]);
+	const latestBot = useMemo(() => (bots === null ? null : (botRows(bots, state.hosts, state.botLasts)[0]?.bot.id ?? null)), [bots, state.hosts, state.botLasts]);
 	const { tab, showTab } = useSidebarTab({ page, absentTabs, layout, latestSession: sessions.latest, latestBot, navigate, show });
 	/** The tabs the bar draws, which Cmd+1 onward go to in order. */
 	const barTabs = useMemo(() => placedTabs(tabs, "bar"), [tabs]);
@@ -223,6 +223,7 @@ export function App() {
 		[state.connected, fork, resume, quick, resumeAll, state.ending, pullRequestsScope, windowScope, state.merges, state.reviewDrafts],
 	);
 	const mentionLists = useMemo(() => ({ todos: state.userTodos?.todos ?? [], hosts: visible.hosts, past: visible.past }), [state.userTodos, visible]);
+	const spaceNotes = useMemo(() => state.userNotes?.notes.filter(spaceIs(space)) ?? null, [state.userNotes, space]);
 
 	const routedTodoList = page?.kind === "todo" ? page.list : null;
 	const categories = state.userTodos?.categories;
@@ -279,7 +280,6 @@ export function App() {
 												notesView={notesView}
 												hosts={state.hosts}
 												past={state.past}
-												bots={state.bots}
 												botLasts={state.botLasts}
 												todoView={todoView}
 												settings={settings}
@@ -404,7 +404,7 @@ export function App() {
 											tabs={barTabs}
 											todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
 											todos={mentionLists.todos}
-											notes={state.userNotes?.notes ?? null}
+											notes={spaceNotes}
 											ticketsCallable={ticketsCallable}
 											onCreateTicket={setNewTicket}
 										/>

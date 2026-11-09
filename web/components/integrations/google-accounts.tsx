@@ -1,25 +1,25 @@
-/** `GoogleAccountsRow`: a Google service in Settings › Integrations with its accounts, each signed in, reconnected, removed, and linked to workspaces on its own. */
-import { ExternalLink, FolderOpen, KeyRound, Plus, Trash2 } from "lucide-react";
+/** `GoogleAccountsRow`: a Google service in Settings › Integrations with its accounts, each signed in, reconnected, removed, and placed in a space on its own. */
+import { ExternalLink, KeyRound, Plus, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import {
 	type AccountsService,
 	type GoogleAccount,
-	type GoogleLinks,
+	type GoogleSpace,
 	type IntegrationsAnswer,
 	MCP_SERVICES,
 	type McpIntegration,
 	type SignInState,
 	signedIn,
 } from "../../../src/shared/accounts";
-import type { Workspace } from "../../../src/shared/workspaces";
+import type { Space } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
 import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
 import { integrationsStore } from "../../reads";
 import { useSignIn } from "../../use-sign-in";
-import { CommandPicker } from "../command-picker";
 import { MoreActionsMenu } from "../more-actions-menu";
+import { SpacePicker } from "../space-picker";
 import { GoogleClientForm } from "./google-client-form";
 import { IntegrationRow, MarkTile, MetaDot } from "./integration-row";
 import { Confirm, ConnectionCallout, Reconnecting, ReconnectItem, StatusBadge, type StatusLabel, useToolList, WAITING_STATUS } from "./mcp-connection-controls";
@@ -30,79 +30,31 @@ type AccountsIntegration = McpIntegration<AccountsService>;
 const startSignIn = async (id: AccountsService, account: string | null): Promise<SignInState> =>
 	(await putJson<McpIntegration>("/api/integrations/sign-in", { id, account })).signIn;
 
-/** The workspaces account `account` is linked to, as the picker's trigger says them. */
-function linkLabel(account: GoogleAccount, workspaces: Workspace[]): string {
-	const names = account.workspaces.map(cwd => workspaces.find(workspace => workspace.cwd === cwd)?.cwdDisplay ?? cwd);
-	return names.length === 0 ? "All workspaces" : names.length === 1 ? names[0]! : `${names.length} workspaces`;
-}
-
-/** The link writes under way, by address, each after the one before; each resolves to the workspaces it saved. */
-const linkWrites = new Map<string, Promise<readonly string[]>>();
-
-/**
- * Links or unlinks `cwd` for Google address `address`, after any write for it under way, from the workspaces that write
- * saved, else from `linked`, so two quick toggles both stand.
- */
-function toggleLink(address: string, linked: readonly string[], cwd: string): Promise<readonly string[]> {
-	const write = (linkWrites.get(address) ?? Promise.resolve(linked))
-		.catch(() => linked)
-		.then(async current => {
-			const workspaces = current.includes(cwd) ? current.filter(other => other !== cwd) : [...current, cwd];
-			const answer = await putJson<IntegrationsAnswer>("/api/integrations/google-links", { address, workspaces } satisfies GoogleLinks);
-			integrationsStore.update(() => answer);
-			return workspaces;
-		});
-	linkWrites.set(address, write);
-	const settle = (): void => {
-		if (linkWrites.get(address) === write) linkWrites.delete(address);
-	};
-	write.then(settle, settle);
-	return write;
-}
-
-/**
- * The workspaces Google address `address`'s accounts are linked to: each pick links or unlinks one, and none shows the
- * accounts in every workspace. A link to a workspace no longer listed stays checked until you uncheck it.
- */
-function WorkspaceLinks({ account, address, workspaces }: { account: GoogleAccount; address: string; workspaces: Workspace[] }) {
+/** The space Google address `address`'s accounts are in, whose Calendar and Email pages show them; one pick moves them. */
+function AccountSpace({ address, space }: { address: string; space: Space }) {
 	const [error, setError] = useState<string | null>(null);
-	const listed = new Set(workspaces.map(workspace => workspace.cwd));
-	const options = [...workspaces.map(workspace => ({ cwd: workspace.cwd, label: workspace.cwdDisplay })), ...account.workspaces.filter(cwd => !listed.has(cwd)).map(cwd => ({ cwd, label: cwd }))];
-	const toggle = async (cwd: string): Promise<void> => {
+	const [saving, setSaving] = useState(false);
+	const place = async (to: Space): Promise<void> => {
 		setError(null);
+		setSaving(true);
 		try {
-			await toggleLink(address, account.workspaces, cwd);
+			const answer = await putJson<IntegrationsAnswer>("/api/integrations/google-space", { address, space: to } satisfies GoogleSpace);
+			integrationsStore.update(() => answer);
 		} catch (err) {
 			setError(errorText(err));
+		} finally {
+			setSaving(false);
 		}
 	};
 	return (
-		<span className="inline-flex items-center gap-1.5">
-			<CommandPicker
-				trigger={<span className="max-w-48 truncate">{linkLabel(account, workspaces)}</span>}
-				icon={FolderOpen}
-				ariaLabel={`Workspaces of ${address}: ${linkLabel(account, workspaces)}`}
-				tooltip="Pages and sessions in these workspaces use this account; none shows it everywhere"
-				search={{ label: "Search workspaces" }}
-				width="lg"
-				list={{
-					kind: "ready",
-					groups: [
-						{
-							key: "workspaces",
-							heading: "Linked workspaces",
-							items: options.map(({ cwd, label }) => ({ value: cwd, label: <span className="truncate">{label}</span>, selected: account.workspaces.includes(cwd), onSelect: () => void toggle(cwd) })),
-						},
-					],
-				}}
-				empty="No workspace matches."
-			/>
+		<>
 			{error && (
-				<span role="alert" className="text-red-600 dark:text-red-400">
+				<span role="alert" className="text-xs text-red-600 dark:text-red-400">
 					{error}
 				</span>
 			)}
-		</span>
+			<SpacePicker label={`Space of ${address}`} space={space} disabled={saving} onPick={to => void place(to)} />
+		</>
 	);
 }
 
@@ -111,13 +63,13 @@ interface AccountRowProps {
 	account: GoogleAccount;
 	/** Whether it is the service's only server, which keeps the OAuth client and so stays, signed out, when removed. */
 	last: boolean;
-	/** The workspaces it may be linked to; `null` where links are not edited. */
-	workspaces: Workspace[] | null;
+	/** Whether its space is chosen here; `false` on a page that offers to connect. */
+	placeable: boolean;
 	children?: ReactNode;
 }
 
-/** One account of a Google service: its address, where omp stands with it, Reconnect and Remove, its workspace links, and its tools. */
-function AccountRow({ integration, account, last, workspaces, children }: AccountRowProps) {
+/** One account of a Google service: its address, where omp stands with it, Reconnect and Remove, its space, and its tools. */
+function AccountRow({ integration, account, last, placeable, children }: AccountRowProps) {
 	const { id } = integration;
 	const { label } = MCP_SERVICES[id];
 	const { name, address, addressError, connection } = account;
@@ -142,12 +94,6 @@ function AccountRow({ integration, account, last, workspaces, children }: Accoun
 						<span className="font-mono" title="Its server in omp's mcp.json">
 							{name}
 						</span>
-						{workspaces && address && (
-							<>
-								<MetaDot />
-								<WorkspaceLinks account={account} address={address} workspaces={workspaces} />
-							</>
-						)}
 						{addressError && (
 							<>
 								<MetaDot />
@@ -164,6 +110,7 @@ function AccountRow({ integration, account, last, workspaces, children }: Accoun
 				</div>
 				{!signIn.waitingUrl && !removing && (
 					<div className="flex shrink-0 items-center gap-1.5">
+						{placeable && address && <AccountSpace address={address} space={account.space} />}
 						<Reconnecting signIn={signIn} />
 						<MoreActionsMenu name={shown} disabled={signIn.starting}>
 							<ReconnectItem signIn={signIn} />
@@ -224,8 +171,8 @@ function AccountRow({ integration, account, last, workspaces, children }: Accoun
 
 interface GoogleAccountsRowProps {
 	integration: AccountsIntegration;
-	/** The workspaces an account may be linked to; `null` where links are not edited, such as a page that offers to connect. */
-	workspaces: Workspace[] | null;
+	/** Whether each account's space is chosen here; `false` on a page that offers to connect. */
+	placeable: boolean;
 	/** What shows once above the accounts, such as why none of their calendars could be listed. */
 	notice?: ReactNode;
 	/** What shows under each account, such as its calendars. */
@@ -236,7 +183,7 @@ interface GoogleAccountsRowProps {
  * A Google service whose accounts omp signs in to, each a server of its own: Set up until its OAuth client is saved,
  * then Add account, which lets you pick another Google account, and the accounts, each with its own controls.
  */
-export function GoogleAccountsRow({ integration, workspaces, notice, details }: GoogleAccountsRowProps) {
+export function GoogleAccountsRow({ integration, placeable, notice, details }: GoogleAccountsRowProps) {
 	const { id, accounts, setup } = integration;
 	const { label } = MCP_SERVICES[id];
 	const service = SERVICES[id];
@@ -302,7 +249,7 @@ export function GoogleAccountsRow({ integration, workspaces, notice, details }: 
 			{connected.length > 0 && (
 				<ul aria-label={`${label} accounts`} className="divide-y divide-border rounded-lg bg-muted/40 px-3 py-3">
 					{accounts.map(account => (
-						<AccountRow key={account.name} integration={integration} account={account} last={accounts.length === 1} workspaces={workspaces}>
+						<AccountRow key={account.name} integration={integration} account={account} last={accounts.length === 1} placeable={placeable}>
 							{details?.(account)}
 						</AccountRow>
 					))}

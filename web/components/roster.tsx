@@ -1,6 +1,7 @@
 /** The left sidebar's tabbed roster: sessions, pull requests, tickets, todos, notes, and more, under the workspace picker. */
 import { ArrowLeftRight, Folder, Keyboard } from "lucide-react";
 import { type ReactNode, useContext, useState } from "react";
+import type { ScheduledSend } from "../../src/shared/scheduled";
 import type { RosterHost, View } from "../../src/shared/sessions";
 import { otherSpace, type Space, type Workspace } from "../../src/shared/workspaces";
 import type { UserNoteList } from "../../src/user-notes-shared";
@@ -34,7 +35,7 @@ import { NotesNav } from "./notes/nav";
 import { SessionList } from "./session-list";
 import { SportNav } from "./sport/nav";
 import { SettingsNav } from "./settings/settings-nav";
-import { toasts } from "./toaster";
+import { offerUndo, toasts } from "./toaster";
 import { workspaceItems } from "./workspace-picker";
 import { TodoCategories } from "./todo/categories";
 import type { KnownSessions } from "./todo/links";
@@ -44,10 +45,6 @@ interface SidebarWorkspacePickerProps {
 	workspaces: Workspace[];
 	onPick: (cwd: string | null) => void;
 }
-
-/** How long **Undo** stays after a workspace moves to the other space. */
-const UNDO_MS = 8000;
-const MOVE_TOAST = "workspace-move";
 
 /**
  * Moves workspace `cwd`, called `name`, from space `from` to `to`, with **Undo** to move it back. Every page hears the list
@@ -60,18 +57,7 @@ async function moveWorkspace(name: string, cwd: string, from: Space, to: Space):
 		toasts.add({ title: `Could not move ${name} to ${SPACE_LABELS[to]}`, description: errorText(error) });
 		return;
 	}
-	toasts.add({
-		id: MOVE_TOAST,
-		title: `Moved ${name} to ${SPACE_LABELS[to]}`,
-		timeout: UNDO_MS,
-		actionProps: {
-			children: "Undo",
-			onClick: () => {
-				toasts.close(MOVE_TOAST);
-				void moveWorkspace(name, cwd, to, from);
-			},
-		},
-	});
+	offerUndo("workspace-move", `Moved ${name} to ${SPACE_LABELS[to]}`, () => void moveWorkspace(name, cwd, to, from));
 }
 
 /** Scopes the roster to one directory's running and past sessions, or to all of the space's, and moves the selected workspace to the other space. */
@@ -186,9 +172,11 @@ interface RosterProps {
 	open: View[];
 	/** The open New session draft's directory; `null` while none is open. */
 	newSessionOpen: string | null;
+	/** The space's scheduled sends. */
+	scheduled: readonly ScheduledSend[];
 	/** The scheduled send whose page is open, `null` for none. */
 	scheduledOpen: string | null;
-	/** Every Bot's row, whatever the workspace, the most recent conversation first; `null` until the server sends the Bots. */
+	/** The space's Bots' rows, the most recent conversation first; `null` until the server sends the Bots. */
 	bots: readonly BotRow[] | null;
 	/** The Bot whose page is open, `null` for the New Bot form, `undefined` while the gallery, another page, or the panes show. */
 	botsOpen: string | null | undefined;
@@ -233,6 +221,7 @@ export function Roster({
 	onTogglePin,
 	open,
 	newSessionOpen,
+	scheduled,
 	scheduledOpen,
 	bots,
 	botsOpen,
@@ -319,6 +308,7 @@ export function Roster({
 					open={open}
 					showWorkspace={workspace === null}
 					newSessionOpen={newSessionOpen}
+					scheduled={scheduled}
 					scheduledOpen={scheduledOpen}
 					newSessionLabel={newSessionLabel}
 				/>
@@ -343,17 +333,17 @@ export function Roster({
 			</TabPanel>
 			<TabPanel value="notes" asChild>
 				<SidebarContent>
-					<NotesNav list={userNotes} view={notesView} />
+					<NotesNav list={userNotes} view={notesView} space={space} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="calendar" asChild>
 				<SidebarContent>
-					<CalendarNav open={calendarOpen} workspace={workspace} />
+					<CalendarNav open={calendarOpen} space={space} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="email" asChild>
 				<SidebarContent>
-					<EmailNav workspace={workspace} />
+					<EmailNav space={space} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="sport" asChild>
