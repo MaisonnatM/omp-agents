@@ -6,6 +6,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-11-09
 
 - A folder an agent's removed worktree leaves behind, such as `yampa-wt/some-branch` holding only ignored files, no longer shows as a workspace of its own: its sessions count in the repository it came from.
+- In the desktop app's title bar, the Personal and Work switch now sits in the center, and the page title on the left after Back and Forward.
 - You can now save your model setup as a profile, such as Full power or Save credits, under Settings › Models › Model profiles.
 - One click on a saved profile switches your model setup back to it, and new sessions use it.
 - The profile your model setup matches now shows a check.

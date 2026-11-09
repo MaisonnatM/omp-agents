@@ -148,20 +148,21 @@ function HistoryButtons() {
 	);
 }
 
-/** The window's title bar: a drag strip with the window's buttons inset at its left, then Back and Forward and the space switch, the document title centered between them and the controls at its right. */
+/** The window's title bar: a drag strip with the window's buttons inset at its left, then Back and Forward and the document title, the space switch centered, and the controls at its right. */
 export function DesktopTitleBar({ title, space, onSpace, controls }: { title: string; space: Space; onSpace: (space: Space) => void; controls: ReactNode }) {
 	// `env(titlebar-area-x)` is where the window's buttons end, with a gap as wide as their inset; desktop/main.ts turns it on with `titleBarOverlay`.
 	// h-9 is also the `top-9` a maximized Browser leaves for it in browser-panel.tsx.
+	// Equal side columns keep the switch at the window's center whatever the title's length.
 	return (
-		<div className="flex h-9 shrink-0 items-center gap-3 border-b border-border bg-sidebar pr-3 pl-[env(titlebar-area-x)] select-none [-webkit-app-region:drag]">
-			<div className="flex shrink-0 items-center gap-2">
+		<div className="grid h-9 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-b border-border bg-sidebar pr-3 pl-[env(titlebar-area-x)] select-none [-webkit-app-region:drag]">
+			<div className="flex min-w-0 items-center gap-2">
 				<HistoryButtons />
-				<div className="[-webkit-app-region:no-drag]">
-					<SpaceSwitch space={space} onSpace={onSpace} />
-				</div>
+				<p className="pointer-events-none min-w-0 truncate text-[13px] font-medium text-muted-foreground">{title}</p>
 			</div>
-			<p className="pointer-events-none min-w-0 flex-1 truncate text-center text-[13px] font-medium text-muted-foreground">{title}</p>
-			<div className="shrink-0 [-webkit-app-region:no-drag]">{controls}</div>
+			<div className="[-webkit-app-region:no-drag]">
+				<SpaceSwitch space={space} onSpace={onSpace} />
+			</div>
+			<div className="justify-self-end [-webkit-app-region:no-drag]">{controls}</div>
 		</div>
 	);
 }
