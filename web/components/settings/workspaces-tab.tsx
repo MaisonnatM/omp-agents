@@ -22,7 +22,7 @@ const SPACES: { value: Space; label: string }[] = [
 function SpacePicker({ workspace, space, fixed, disabled, onPick }: { workspace: Workspace; space: Space; fixed: boolean; disabled: boolean; onPick: (space: Space) => void }) {
 	return (
 		<Select<Space> items={SPACES} value={space} disabled={disabled || fixed} onValueChange={next => next && next !== space && onPick(next)}>
-			<SelectTrigger aria-label={`Space of ${folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay}`} className="w-fit">
+			<SelectTrigger aria-label={`Space of ${folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay}`} className="w-28">
 				<SelectValue />
 			</SelectTrigger>
 			<SelectContent>
