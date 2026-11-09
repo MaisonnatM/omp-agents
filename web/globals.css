@@ -372,6 +372,13 @@
   }
 }
 
+/* Safari on a phone zooms the page into any field whose text is under 16px when it takes focus, and leaves it zoomed. */
+@media (hover: none) and (pointer: coarse) {
+  input, textarea, select, [contenteditable="true"], [contenteditable=""] {
+    font-size: max(16px, 1em) !important;
+  }
+}
+
   html.transitioning *, html.transitioning *::before, html.transitioning *::after {
     transition: border-radius 180ms ease-in-out, background-color 180ms ease-in-out, color 180ms ease-in-out, border-color 180ms ease-in-out, fill 180ms ease-in-out, stroke 180ms ease-in-out !important;
 }
