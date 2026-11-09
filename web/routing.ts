@@ -1,5 +1,5 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { BarChart3, Blocks, Brain, FileText, Folders, GitBranch, GitMerge, HardDrive, KeyRound, type LucideIcon, MousePointerClick, Plug, RefreshCcw, Route as RouteIcon, Scale, Settings2, SlidersHorizontal, Workflow } from "lucide-react";
+import { BarChart3, Blocks, Brain, FileText, Folders, GitBranch, GitMerge, HardDrive, KeyRound, type LucideIcon, MousePointerClick, Plug, RefreshCcw, Route as RouteIcon, Scale, Settings2, SlidersHorizontal, Smartphone, Workflow } from "lucide-react";
 import { isDay } from "../src/json";
 import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
@@ -91,11 +91,12 @@ export const SETTINGS_SECTIONS = [
 	{ value: "preferences", label: "Preferences", icon: SlidersHorizontal, group: "general", keywords: ["theme", "dark mode", "notifications", "sound", "sidebar tabs", "transcript", "idle processes"] },
 	{ value: "workspaces", label: "Workspaces", icon: Folders, group: "general", keywords: ["directories", "folders", "hide"] },
 	{ value: "sync", label: "Sync", icon: RefreshCcw, group: "general", keywords: ["git", "remote", "machines"] },
+	{ value: "phone", label: "Phone access", icon: Smartphone, group: "general", keywords: ["tailscale", "mobile", "pair", "qr"] },
 	{ value: "storage", label: "Storage", icon: HardDrive, group: "general", keywords: ["disk", "space", "gc", "cleanup", "archive", "compress", "sandboxes"] },
 	{ value: "providers", label: "Providers", icon: KeyRound, group: "connections", keywords: ["login", "sign in", "accounts", "api key", "quota"] },
 	{ value: "integrations", label: "Integrations", icon: Plug, group: "connections", keywords: ["linear", "slack", "github", "gmail", "calendar", "connect"] },
 	{ value: "mcp-servers", label: "MCP servers", icon: Blocks, group: "connections", keywords: ["mcp", "tools"] },
-	{ value: "source-control", label: "Source control", icon: GitMerge, group: "connections", keywords: ["github", "graphite", "gh", "gt", "pull", "merge"] },
+	{ value: "source-control", label: "Source control", icon: GitMerge, group: "connections", keywords: ["github", "gh", "pull", "merge"] },
 	{ value: "models", label: "Models", icon: RouteIcon, group: "workspace", keywords: ["roles", "fallback", "retry"], meta: AS_LOADED },
 	{ value: "agents", label: "Agents", icon: PAGE_ICON.bots, group: "workspace", keywords: ["subagents", "delegation", "concurrency", "isolation"], meta: { workspace: "Preview of a new session in this workspace", none: "Preview of a new session with user defaults only" } },
 	{ value: "omp", label: "omp settings", icon: Settings2, group: "workspace", keywords: ["config", "thinking", "compaction", "advisor", "bash", "lsp", "tools"], meta: AS_LOADED },
@@ -103,7 +104,7 @@ export const SETTINGS_SECTIONS = [
 	{ value: "files", label: "Files", icon: FileText, group: "workspace", keywords: ["AGENTS.md", "config", "skills", "rules"], meta: AS_LOADED },
 	{ value: "extensions", label: "Extensions", icon: Blocks, group: "workspace", meta: { none: "Packages installed for your user, all workspaces", workspace: "As a session in this workspace discovers them" }, keywords: ["plugins", "marketplaces", "registry skills", "contributions", "install"] },
 	{ value: "workflows", label: "Workflows", icon: Workflow, group: "workspace", keywords: ["workflow"], meta: { ...AS_LOADED, none: "Your user skills only, for all workspaces" } },
-	{ value: "decisions", label: "Decisions", icon: Scale, group: "workspace", keywords: ["records", "adr"], meta: { workspace: "The repository's decision records, read-only", none: "Pick a workspace" } },
+	{ value: "decisions", label: "Decisions", icon: Scale, group: "workspace", keywords: ["records", "adr"], meta: { workspace: "The repository's decision records, read-only", none: "Every workspace in this space, grouped by workspace" } },
 	{ value: "worktrees", label: "Worktrees", icon: GitBranch, group: "workspace", keywords: ["branches", "cleanup"], meta: AS_LOADED },
 ] as const satisfies readonly { value: string; label: string; icon: LucideIcon; group: SettingsGroup; keywords: readonly string[]; meta?: { workspace: string; none: string } }[];
 

@@ -1,112 +1,47 @@
-import { ExternalLink, RefreshCw } from "lucide-react";
-import { type ComponentType, type FormEvent, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
+	type GithubStatus,
 	MERGE_METHOD_LABELS,
 	MERGE_METHODS,
 	type MergeMethodChoice,
-	type ProviderStatus,
 	type PullOutcome,
 	type PullRepo,
 	type SourceControlAnswer,
 	type SourceControlChange,
-	type SourceControlProvider,
 } from "../../../src/shared/source-control";
 import { putJson } from "../../api";
-import { type Editable, useEditableRead } from "../../editable-read";
+import { useEditableRead } from "../../editable-read";
 import { age, folderName } from "../../labels";
 import { useMergeMethodChoice } from "../../merge-method";
 import { useAction } from "../../use-action";
 import { IntegrationList } from "../integrations/integration-row";
 import { OrgIcon } from "../org-icon";
-import { ErrorText, FIELD, Section } from "./editor";
+import { Section } from "./editor";
 import { ToggleSwitch } from "../toggle-switch";
 
-/** Sends a change through the tab's read, which then shows what it answers. */
-type Write = Editable<SourceControlAnswer>["write"];
+const GITHUB_FACTS: Record<Exclude<GithubStatus["state"], "signed-in">, string> = { missing: "gh is not installed", "signed-out": "Run gh auth login in a terminal to sign in" };
 
-/** Where Graphite hands out the token `gt auth` takes. */
-const GRAPHITE_TOKEN_PAGE = "https://app.graphite.com/activate";
-
-/** A Graphite token field that signs `gt` in on the server. */
-function GraphiteSignIn({ write }: { write: Write }) {
-	const [token, setToken] = useState("");
-	const signIn = useAction(async () => {
-		await write(() => putJson<SourceControlAnswer>("/api/source-control/graphite-sign-in", { token: token.trim() }));
-	}, null);
-	const pending = signIn.pending;
-	const error = signIn.error;
-	const submit = (event: FormEvent): void => {
-		event.preventDefault();
-		signIn.run();
-	};
-	return (
-		<form className="mt-2 space-y-2" onSubmit={submit}>
-			<div className="flex flex-wrap items-end gap-2">
-				<label className="space-y-1 text-xs text-muted-foreground">
-					Graphite token
-					<input
-						name="graphite-token"
-						type="password"
-						autoComplete="off"
-						autoCapitalize="none"
-						spellCheck={false}
-						value={token}
-						onChange={event => setToken(event.target.value)}
-						className={`${FIELD} block w-72 max-w-full text-foreground`}
-					/>
-				</label>
-				<Button type="submit" variant="secondary" size="compact" loading={pending} disabled={pending || token.trim() === ""}>
-					Sign in
-				</Button>
-				<Button variant="ghost" size="compact" leadingIcon={ExternalLink} render={<a href={GRAPHITE_TOKEN_PAGE} target="_blank" rel="noreferrer" />}>
-					Get a token
-				</Button>
-			</div>
-			{error && <ErrorText>{error}</ErrorText>}
-		</form>
-	);
-}
-
-/** Each CLI's card: what it does, what its row says while it is missing or signed out, and the form that signs it in from here, if any. */
-const PROVIDERS: Record<SourceControlProvider, { name: string; summary: string; cli: string; facts: Record<Exclude<ProviderStatus["state"], "signed-in">, string>; SignIn?: ComponentType<{ write: Write }> }> = {
-	github: {
-		name: "GitHub",
-		summary: "Reads your pull requests, changes them, and merges them through the gh CLI.",
-		cli: "gh",
-		facts: { missing: "gh is not installed", "signed-out": "Run gh auth login in a terminal to sign in" },
-	},
-	graphite: {
-		name: "Graphite",
-		summary: "Opens your pull requests on Graphite, and lets sessions submit stacks with the gt CLI.",
-		cli: "gt",
-		facts: { missing: "gt is not installed. Once it is, run gt auth --token <token> in a terminal to sign in", "signed-out": "Paste a token from Graphite to sign gt in" },
-		SignIn: GraphiteSignIn,
-	},
-};
-
-function ProviderRow({ status, write }: { status: ProviderStatus; write: Write }) {
-	const { name, summary, cli, facts, SignIn } = PROVIDERS[status.provider];
-	const fact = status.state === "signed-in" ? (status.account ? `Signed in as ${status.account}` : `${cli} is signed in`) : facts[status.state];
+function GithubRow({ status }: { status: GithubStatus }) {
+	const fact = status.state === "signed-in" ? (status.account ? `Signed in as ${status.account}` : "gh is signed in") : GITHUB_FACTS[status.state];
 	return (
 		<li className="flex items-start gap-3.5 p-4">
 			<span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-surface-5 shadow-surface-2">
-				<OrgIcon org={status.provider} className="size-5" />
+				<OrgIcon org="github" className="size-5" />
 			</span>
 			<div className="min-w-0 flex-1">
 				<div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-					<h3 className="text-[13px] font-medium">{name}</h3>
+					<h3 className="text-[13px] font-medium">GitHub</h3>
 					{status.state === "signed-in" && (
 						<Badge variant="dot" size="compact" color="green">
 							Connected
 						</Badge>
 					)}
 				</div>
-				<p className="mt-0.5 text-[13px] text-pretty text-muted-foreground">{summary}</p>
+				<p className="mt-0.5 text-[13px] text-pretty text-muted-foreground">Reads your pull requests, changes them, and merges them through the gh CLI.</p>
 				<p className="mt-1.5 text-xs text-muted-foreground">{fact}</p>
-				{status.state === "signed-out" && SignIn && <SignIn write={write} />}
 			</div>
 		</li>
 	);
@@ -128,7 +63,7 @@ type RepoPull = "default" | "on" | "off";
 
 const MERGE_METHOD_CHOICES: Record<MergeMethodChoice, string> = { last: "Last selected", ...MERGE_METHOD_LABELS };
 
-/** GitHub's and Graphite's CLIs, automatic pulls by default and per repository, the cleanup after a merge, and the merge button's starting method. */
+/** The GitHub CLI, automatic pulls by default and per repository, the cleanup after a merge, and the merge button's starting method. */
 export function SourceControlTab({ active }: { active: boolean }) {
 	const read = useEditableRead<SourceControlAnswer>(active ? "/api/source-control" : null);
 	const write = useAction(async (next: SourceControlChange) => {
@@ -144,7 +79,7 @@ export function SourceControlTab({ active }: { active: boolean }) {
 		<>
 			<Section
 				title="Command-line tools"
-				meta="The command-line tools the dashboard and your sessions reach GitHub and Graphite through."
+				meta="The command-line tool the dashboard and your sessions reach GitHub through."
 				actions={
 					<Button variant="ghost" size="compact" leadingIcon={RefreshCw} onClick={read.reload}>
 						Check again
@@ -154,9 +89,7 @@ export function SourceControlTab({ active }: { active: boolean }) {
 				{read.error && <p className="text-xs text-red-600 dark:text-red-400">{read.error}</p>}
 				{answer && (
 					<IntegrationList label="Command-line tools">
-						{answer.providers.map(status => (
-							<ProviderRow key={status.provider} status={status} write={read.write} />
-						))}
+						<GithubRow status={answer.github} />
 					</IntegrationList>
 				)}
 			</Section>

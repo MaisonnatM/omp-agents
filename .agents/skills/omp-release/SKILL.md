@@ -64,8 +64,6 @@ When MUST change holds only the version pins, and both the tests and the module 
 3. Run `bun test` and `bun run typecheck` there.
 4. Commit with the message `Test with omp <target>`, and save your report to a file outside the worktree.
    The report is the PR body; the script's file is not, since it holds every diff and outgrows GitHub's 65,536-character limit.
-5. Open a draft PR from the worktree.
-   When `test -f "$(git rev-parse --path-format=absolute --git-common-dir)/.graphite_repo_config"` succeeds, run `gt track omp-<target> -p main --no-interactive`, `gt submit --draft --no-edit --no-ai --no-interactive`, and `gh pr edit omp-<target> --body-file <report>`.
-   Otherwise run `git push -u origin omp-<target>` and `gh pr create --draft --base main --title "Test with omp <target>" --body-file <report>`.
+5. Open a draft PR from the worktree: run `git push -u origin omp-<target>` and `gh pr create --draft --base main --title "Test with omp <target>" --body-file <report>`.
 
 In every other case, deliver the report and leave the repository as it is.

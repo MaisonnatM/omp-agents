@@ -48,8 +48,8 @@ export function SessionIdCopy({ id }: { id: string }) {
 }
 
 /**
- * The PRs a session submitted or worked on, behind one button whose popover lists them, each opening in its details on the Pull requests page, on GitHub,
- * or on Graphite. When two or more of them stack, the button says so and the popover shows the stack on its rail, the session's other PRs below it.
+ * The PRs a session submitted or worked on, behind one button whose popover lists them, each opening in its details on the Pull requests page or on GitHub.
+ * When two or more of them stack, the button says so and the popover shows the stack on its rail, the session's other PRs below it.
  */
 function PullRequestButton({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {
 	const [first] = pullRequests;

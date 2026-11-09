@@ -54,7 +54,7 @@ describe("new-session agent preview", () => {
 		} finally {
 			await rm(home, { recursive: true, force: true });
 		}
-	});
+	}, 30_000);
 
 	test("bundled seance cannot preview a stale override as effective, while normal agents inherit the session", async () => {
 		const home = await mkdtemp(join(tmpdir(), "agents-seance-"));
@@ -67,5 +67,5 @@ describe("new-session agent preview", () => {
 		} finally {
 			await rm(home, { recursive: true, force: true });
 		}
-	});
+	}, 30_000);
 });

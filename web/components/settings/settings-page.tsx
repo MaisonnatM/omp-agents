@@ -3,7 +3,7 @@ import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from "reac
 import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
 import type { TrustedProject } from "../../../src/shared/project-trust";
 import type { Workspace, WorkspaceList } from "../../../src/shared/workspaces";
-import { settingsUrl } from "../../api";
+import { isPhonePage, settingsUrl } from "../../api";
 import { useEditableRead } from "../../editable-read";
 import { type ReadState, useRead } from "../../reads";
 import { ompSettingsFiles } from "../../omp-settings";
@@ -21,6 +21,7 @@ import { McpServersTab } from "./mcp-servers-tab";
 import { OmpMemoryTab } from "./omp-memory-tab";
 import { OmpSettingsTab } from "./omp-settings-tab";
 import { ExtensionsTab } from "./extensions-tab";
+import { PhoneAccessTab } from "./phone-access-tab";
 import { PreferencesTab } from "./preferences-tab";
 import { ProvidersTab } from "./providers-tab";
 import { ModelsTab } from "./routing-tab";
@@ -197,13 +198,14 @@ export function SettingsPage({
 		"source-control": <SourceControlTab active={section === "source-control"} />,
 		workspaces: <WorkspacesTab workspaces={allWorkspaces} list={workspaceList} personalDir={personal} trustedProjects={trustedProjects} />,
 		sync: <SyncTab active={section === "sync"} />,
+		phone: <PhoneAccessTab active={section === "phone"} />,
 		storage: <StorageTab cwd={cwd} active={section === "storage"} onSaved={settings.reload} />,
 		worktrees: <WorktreesTab cwd={cwd} active={section === "worktrees"} />,
-		decisions: <DecisionsTab cwd={cwd} active={section === "decisions"} />,
+		decisions: <DecisionsTab cwd={cwd} workspaces={workspaces} active={section === "decisions"} />,
 		extensions: <ExtensionsTab cwd={cwd} active={section === "extensions"} onSaved={settings.reload} />,
 	};
 	// Hidden panels stay mounted so an unsaved draft survives switching sections.
-	const body = SETTINGS_SECTIONS.filter(({ value }) => value !== "extensions").map(({ value, label }) => (
+	const body = SETTINGS_SECTIONS.filter(({ value }) => value !== "extensions" && !(isPhonePage() && value === "phone")).map(({ value, label }) => (
 		<section key={value} aria-label={label} hidden={section !== value} tabIndex={0} className={PANEL}>
 			{panels[value]}
 		</section>

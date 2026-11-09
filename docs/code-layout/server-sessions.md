@@ -59,4 +59,3 @@
   `SessionFiles` passes `CachedCheckouts` from `src/git.ts`, which keeps each answer while the files git read for it keep their inode, modification time, and size: the worktree's `HEAD`, its `logs/HEAD` for the head history, `refs/remotes/origin/HEAD` for the default branch, and a reftable repository's `reftable/tables.list` for all three, so a refresh with no checkout moved starts no `git`.
   A refresh asked for while one waits behind the running one joins the waiting one, with the newer list, so a burst of refreshes runs at most two.
   `factsOf` answers one shared empty `SessionFacts` for a session it does not know, and a known session's own arrays, so the facts of an unchanged session stay the same objects.
-  A `gt submit` call's branch is the one its `--branch` names, else `branchAt` over `git.ts`'s `headHistory` of the directory it ran in: the branch that the first checkout after the call moved from, else the one checked out now.

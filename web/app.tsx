@@ -240,6 +240,7 @@ export function App() {
 				notices={state.notices}
 				onShowSearch={showSearch}
 				tabs={headerTabs}
+				allTabs={tabs}
 				tab={tab}
 				onTab={showTab}
 				settingsOpen={page?.kind === "settings"}

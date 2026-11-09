@@ -46,6 +46,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Review drafts](architecture/review-drafts.md)
 - [Updating the dashboard](architecture/updating-the-dashboard.md)
 - [Settings sync](architecture/settings-sync.md)
+- [Phone access](architecture/phone-access.md)
 - [HTTP API](architecture/http-api.md)
   - [Files, git, and conversations](architecture/http-api-files-and-git.md)
   - [Pull requests](architecture/http-api-pull-requests.md)

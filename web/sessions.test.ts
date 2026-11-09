@@ -10,7 +10,7 @@ const subagents = (...statuses: AgentStatus[]): AgentRow[] => statuses.map(statu
 const past = (sessionId: string, cwd: string, interrupted: boolean) => ({ sessionId, cwd, interrupted }) as PastSession;
 const ids = (rows: { sessionId: string }[]) => rows.map(row => row.sessionId);
 const none = new Set<string>();
-const noBots = new Map<string, string>();
+const noBots = new Set<string>();
 
 describe("discoverableSessions", () => {
 	test("hides temporary roots and descendants but keeps lookalikes and directories named tmp elsewhere", () => {
@@ -42,13 +42,10 @@ describe("discoverableSessions", () => {
 		expect(workspaceSwitch("/home/user/other", "/home/user/app", new Set(["/home/user/app"]))).toBeNull();
 	});
 
-	test("a Bot's conversation leaves the session lists, live or past, and a live one joins the Bots list under its Bot's name", () => {
-		const hosts = [host("bot", "/w"), host("mine", "/w"), host("temp-bot", "/tmp/job")];
-		const botNames = new Map([["bot", "Scout"], ["temp-bot", "Runner"]]);
-		const visible = discoverableSessions(hosts, [past("bot", "/w", false), past("old", "/w", false)], none, botNames);
+	test("a Bot's conversation leaves the session lists, live or past", () => {
+		const visible = discoverableSessions([host("bot", "/w"), host("mine", "/w")], [past("bot", "/w", false), past("old", "/w", false)], none, new Set(["bot"]));
 		expect(ids(visible.hosts)).toEqual(["mine"]);
 		expect(ids(visible.past)).toEqual(["old"]);
-		expect(visible.bots.map(row => [row.sessionId, row.sessionName])).toEqual([["bot", "Scout"]]);
 	});
 
 	test("hidden sessions stay out of pinned and interrupted lists without losing saved rows", () => {
@@ -65,7 +62,6 @@ describe("discoverableSessions", () => {
 		const lists = sidebarSessions(
 			visible.hosts,
 			visible.past,
-			[],
 			null,
 			new Set(["hidden-live", "hidden-interrupted", "hidden-ended", "pinned-live", "pinned-ended", "pinned-interrupted"]),
 		);
@@ -116,14 +112,14 @@ describe("spaces", () => {
 
 	test("a session counts in the space of its workspace, the personal directory and a linked worktree of a Personal workspace in Personal", () => {
 		const hosts = [running("life", "/home/me/personal", 1), running("tree", "/code/garden-wt", 2, "/code/garden"), running("job", "/code/app", 3), running("unplaced", "/code/garden", 4)];
-		const lists = { hosts, past: [past("old", "/code/garden", false), past("work", "/code/app", false)], bots: [] };
+		const lists = { hosts, past: [past("old", "/code/garden", false), past("work", "/code/app", false)] };
 		expect(ids(sessionsIn(lists, "personal", placed).hosts)).toEqual(["life", "tree", "unplaced"]);
 		expect(ids(sessionsIn(lists, "personal", placed).past)).toEqual(["old"]);
 		expect(ids(sessionsIn(lists, "work", placed).hosts)).toEqual(["job"]);
 	});
 
 	test("before the server names the personal directory, a session there counts as Work", () => {
-		const lists = { hosts: [running("life", "/home/me/personal", 1)], past: [], bots: [] };
+		const lists = { hosts: [running("life", "/home/me/personal", 1)], past: [] };
 		const unnamed = spaces(["/code/garden"], null);
 		expect(ids(sessionsIn(lists, "work", unnamed).hosts)).toEqual(["life"]);
 		expect(sessionsIn(lists, "personal", unnamed).hosts).toEqual([]);
@@ -143,7 +139,7 @@ describe("spaces", () => {
 		expect(spaceSession("personal", [running("job", "/code/app", 9)], placed)).toBeNull();
 	});
 
-	test("a space counts the sessions and Bot conversations it lists that need you, not those of a hidden workspace", () => {
+	test("a space counts the sessions it lists that need you, not those of a hidden workspace or a Bot", () => {
 		const turn = fromPartial<UnreadTurn>({ at: 1, reply: "Done." });
 		const asks = (sessionId: string, cwd: string) => ({ ...running(sessionId, cwd, 1), status: "needs-input" as const, unread: null, requests: [] });
 		const hosts = [
@@ -154,8 +150,8 @@ describe("spaces", () => {
 			asks("job", "/code/app"),
 			{ ...running("busy", "/code/app", 3), status: "working" as const, unread: null, requests: [] },
 		];
-		const everySpace = discoverableSessions(hosts, [], new Set(["/home/me/personal/hidden"]), new Map([["bot", "Coach"]]));
-		expect(waitingIn(everySpace, "personal", placed)).toBe(3);
+		const everySpace = discoverableSessions(hosts, [], new Set(["/home/me/personal/hidden"]), new Set(["bot"]));
+		expect(waitingIn(everySpace, "personal", placed)).toBe(2);
 		expect(waitingIn(everySpace, "work", placed)).toBe(1);
 	});
 
@@ -178,7 +174,7 @@ describe("spaces", () => {
 describe("latestSession", () => {
 	const running = (sessionId: string, cwd: string, startedAt: number) => ({ ...host(sessionId, cwd), startedAt }) as RosterHost;
 	const saved = (sessionId: string, cwd: string, modifiedAt: number) => ({ ...past(sessionId, cwd, false), modifiedAt }) as PastSession;
-	const latestIn = (hosts: RosterHost[], sessions: PastSession[]) => latestSession(sidebarSessions(hosts, sessions, [], "~/app", none));
+	const latestIn = (hosts: RosterHost[], sessions: PastSession[]) => latestSession(sidebarSessions(hosts, sessions, "~/app", none));
 	const sessions = [saved("older", "~/app", 10), saved("newer", "~/app", 30), saved("elsewhere", "~/other", 50)];
 
 	test("opens the workspace's live session started last, even when a past one or another workspace's session is newer", () => {
@@ -224,7 +220,7 @@ describe("sidebarSessions", () => {
 	const sessions = [past("p1", "~/a", false), past("p2", "~/a", true), past("p3", "~/a", false), past("p4", "~/b", true)];
 
 	test("a pinned session leaves its own list, and pinned past sessions list interrupted ones first", () => {
-		const lists = sidebarSessions(hosts, sessions, [], null, new Set(["h2", "p1", "p4"]));
+		const lists = sidebarSessions(hosts, sessions, null, new Set(["h2", "p1", "p4"]));
 		expect(ids(lists.pinned.hosts)).toEqual(["h2"]);
 		expect(ids(lists.pinned.past)).toEqual(["p4", "p1"]);
 		expect(ids(lists.running)).toEqual(["h1", "h3"]);
@@ -233,7 +229,7 @@ describe("sidebarSessions", () => {
 	});
 
 	test("a pinned session from another workspace stays out of the selected workspace's lists", () => {
-		const lists = sidebarSessions(hosts, sessions, [], "~/a", new Set(["h3", "p4", "p3"]));
+		const lists = sidebarSessions(hosts, sessions, "~/a", new Set(["h3", "p4", "p3"]));
 		expect(ids(lists.pinned.hosts)).toEqual([]);
 		expect(ids(lists.pinned.past)).toEqual(["p3"]);
 		expect(ids(lists.running)).toEqual(["h1", "h2"]);
@@ -242,7 +238,7 @@ describe("sidebarSessions", () => {
 	test("an idle session leaves running for its own list, a pinned one stays pinned, and a question keeps it running", () => {
 		const statuses = { h1: "idle", h2: "needs-input", h3: "working", h4: "idle", h5: "unknown" } as const;
 		const live = Object.entries(statuses).map(([id, status]) => ({ ...host(id, "~/a"), status }));
-		const lists = sidebarSessions(live, [], [], null, new Set(["h4"]));
+		const lists = sidebarSessions(live, [], null, new Set(["h4"]));
 		expect(ids(lists.pinned.hosts)).toEqual(["h4"]);
 		expect(ids(lists.running)).toEqual(["h2", "h3", "h5"]);
 		expect(ids(lists.idle)).toEqual(["h1"]);
@@ -261,7 +257,6 @@ describe("sidebarSessions", () => {
 				live("pinned", "idle", false, subagents("running")),
 			],
 			[],
-			[],
 			null,
 			new Set(["pinned"]),
 		);
@@ -279,20 +274,19 @@ describe("sidebarSessions", () => {
 			{ ...host("h6", "~/b"), status: "idle" as const, unread: turn, requests: [] },
 			{ ...host("h8", "~/a"), status: "idle" as const, unread: turn, requests: [], agents: subagents("running") },
 		];
-		expect(waitingCount(sidebarSessions(live, [], [], "~/a", new Set(["h4"])))).toBe(3);
+		expect(waitingCount(sidebarSessions(live, [], "~/a", new Set(["h4"])))).toBe(3);
 	});
 
-	test("the previous and next session keys walk pinned rows first, then idle, running, waiting on subagents, the selected workspace's Bots, interrupted, and past", () => {
+	test("the previous and next session keys walk pinned rows first, then idle, running, waiting on subagents, interrupted, and past", () => {
 		const delegating = fromPartial<RosterHost>({ ...host("h9", "~/a"), status: "idle", agents: subagents("running") });
 		const live = [delegating, { ...host("h0", "~/a"), status: "idle" as const }, ...hosts];
-		const lists = sidebarSessions(live, sessions, [host("b1", "~/a"), host("b2", "~/b")], "~/a", new Set(["h2", "p3"]));
+		const lists = sidebarSessions(live, sessions, "~/a", new Set(["h2", "p3"]));
 		expect(listedViews(lists)).toEqual([
 			{ kind: "live", instanceId: "i-h2", agentId: null },
 			{ kind: "past", sessionId: "p3" },
 			{ kind: "live", instanceId: "i-h0", agentId: null },
 			{ kind: "live", instanceId: "i-h1", agentId: null },
 			{ kind: "live", instanceId: "i-h9", agentId: null },
-			{ kind: "live", instanceId: "i-b1", agentId: null },
 			{ kind: "past", sessionId: "p2" },
 			{ kind: "past", sessionId: "p1" },
 		]);
@@ -302,11 +296,11 @@ describe("sidebarSessions", () => {
 		const titled = (row: RosterHost | PastSession, title: string | null, cwdDisplay: string) => ({ ...row, cwdDisplay, sessionName: title, title });
 		const live = [titled(host("h1", "~/a"), "Fix login", "~/code/webapp"), titled(host("h2", "~/a"), "Fix billing", "~/code/api"), titled(host("h3", "~/b"), null, "~/code/webapp")] as RosterHost[];
 		const saved = [titled(past("p1", "~/a", false), "Login copy", "~/code/webapp"), titled(past("p2", "~/a", false), "Login copy", "~/code/api")] as PastSession[];
-		const lists = searchSessions(sidebarSessions(live, saved, [], null, new Set(["h2", "p1"])), "  WEBAPP login ");
+		const lists = searchSessions(sidebarSessions(live, saved, null, new Set(["h2", "p1"])), "  WEBAPP login ");
 		expect(ids(lists.running)).toEqual(["h1"]);
 		expect(ids(lists.pinned.past)).toEqual(["p1"]);
 		expect(ids([...lists.pinned.hosts, ...lists.ended])).toEqual([]);
-		expect(ids(searchSessions(sidebarSessions(live, saved, [], "~/b", new Set()), "webapp").running)).toEqual(["h3"]);
+		expect(ids(searchSessions(sidebarSessions(live, saved, "~/b", new Set()), "webapp").running)).toEqual(["h3"]);
 	});
 });
 
@@ -317,7 +311,7 @@ describe("a session in a linked worktree", () => {
 
 	test("counts in its repository's workspace, which lists it, while its directory is no workspace", () => {
 		expect(listWorkspaces([inWorktree], [], [])).toEqual([app]);
-		expect(ids(sidebarSessions([inWorktree, inMain], [], [], "/code/app", new Set()).running)).toEqual(["w", "m"]);
+		expect(ids(sidebarSessions([inWorktree, inMain], [], "/code/app", new Set()).running)).toEqual(["w", "m"]);
 		expect(defaultCwd({ kind: "live", instanceId: "i-w", agentId: null }, [inWorktree], [], { workspace: "/code/app", home: null })).toBe("~/code/app");
 	});
 

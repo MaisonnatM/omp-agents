@@ -114,7 +114,7 @@ export const headKey = (repo: Repo, branch: string): string => `${repoKey(repo)}
 export const samePullRequest = (a: PullRequest, b: PullRequest): boolean => prKey(a) === prKey(b);
 
 /**
- * How a session touched a pull request: it submitted it with `gt submit` or `gh pr create`, or it worked on it with
+ * How a session touched a pull request: it submitted it with `gh pr create`, or it worked on it with
  * `gh pr checkout`, `edit`, `comment`, `review`, `merge`, or `ready`, a `git push` to its branch, a link in its own
  * prompt, or an omp `pr://` read of a PR its own prompt names.
  */

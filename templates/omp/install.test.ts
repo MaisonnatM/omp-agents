@@ -30,12 +30,12 @@ describe("overlayFiles", () => {
 			],
 			[
 				{ rel: "AGENTS.md", text: "maintainer" },
-				{ rel: "docs/git-workflow.md", text: "graphite" },
+				{ rel: "docs/git-workflow.md", text: "workflow" },
 			],
 		]);
 		expect(files).toEqual([
 			{ rel: "AGENTS.md", text: "maintainer" },
-			{ rel: "docs/git-workflow.md", text: "graphite" },
+			{ rel: "docs/git-workflow.md", text: "workflow" },
 			{ rel: "docs/model-routing.md", text: "models" },
 		]);
 	});

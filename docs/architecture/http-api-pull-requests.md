@@ -1,6 +1,6 @@
 # HTTP API: pull requests
 
-`GET /api/pull-request/title?owner=<o>&repo=<r>&number=<n>` answers `{ title }` for a bare GitHub or Graphite PR link.
+`GET /api/pull-request/title?owner=<o>&repo=<r>&number=<n>` answers `{ title }` for a bare GitHub PR link.
 It reads only the title through `gh api graphql`, using the same validated pull request query as the details routes, and keeps each answer for 30 seconds, sharing in-flight reads.
 The page's existing `useRead` drops answers for a previous link and aborts the read when the link unmounts; explicit Markdown labels do not request a title.
 `GET /api/pull-request/files?owner=<o>&repo=<r>&number=<n>` answers `PullRequestChanges`: title and branches from REST, the files from the paginated REST files endpoint, and each file's `viewerViewedState` from paginated GraphQL.
@@ -72,7 +72,7 @@ Each answer carries how many writes had answered when it was asked, so an answer
 `GET /api/pull-requests` answers the `PullRequestList` of `?cwd=<dir>`'s repository, else with `?space=personal` or `?space=work` the repositories of the workspaces sessions ran in that `spaces` places in that space, else of every such workspace; `fresh` skips the server's cache.
 The page asks for its window's workspace, else its space, through `pullRequestsStore` in `web/reads.ts`, which keys each answer by the query `pullRequestsScope` builds; a `space` other than those two, or both `cwd` and `space`, is a 400.
 The reads the dashboard makes on its own go through `ghPolledGraphql` in `src/github.ts`: the pull request list of `GET /api/pull-requests`, which the page polls every minute and the notices check, the stack of `GET /api/pull-request/stack`, every open pull request of the repository, which a session's header and **PRs** sidebar read again as the session works, and the merge cleanup's look at the live sessions' pull requests.
-They share the user's `gh` token, and its 5000 GraphQL points an hour, with every agent's `gh` and `gt`, so `githubQuota`, a `GithubQuota` from `src/github-quota.ts`, reads `gh api rate_limit`, which costs no points, at most every 30 seconds, before `GitHubAccess` sees the call.
+They share the user's `gh` token, and its 5000 GraphQL points an hour, with every agent's `gh` calls, so `githubQuota`, a `GithubQuota` from `src/github-quota.ts`, reads `gh api rate_limit`, which costs no points, at most every 30 seconds, before `GitHubAccess` sees the call.
 While fewer than `GRAPHQL_RESERVE` (1000) points are left, those reads ask GitHub nothing until the quota's `reset`, and throw `GithubQuotaPaused` with `GitHub quota low until HH:MM` in the server's local time.
 `GitHubAccess` still pauses every GraphQL call, these and the user's, once GitHub reports the budget spent, and a refusal leaves `remaining` under the reserve, so the gate needs no refusal handling of its own.
 `loadPullRequests` throws either error for the whole list rather than answering a repository with an error, so the page keeps the list it has and shows it as **Cannot refresh pull requests:**, as for any failed refresh, and the merge cleanup skips a look either error stops without logging it.

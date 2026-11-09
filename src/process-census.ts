@@ -4,6 +4,8 @@
  * a note taken while omp is still their parent finds them; a process omp started since the last note escapes.
  * The server's session process list (`src/server/session-processes.ts`) reads the same table, so this stays a leaf the keeper bundle loads.
  */
+import { readdirSync, readFileSync, readlinkSync } from "node:fs";
+import { join } from "node:path";
 
 /** One process as `ps` lists it. */
 export interface ProcessRow {
@@ -27,7 +29,7 @@ export type ProcessTable = Map<number, ProcessRow>;
 export type Processes = Map<number, string>;
 
 /** `ps` with the columns {@link parsePs} reads, and the locale that keeps `lstart` in English for `Date.parse` and `%cpu`'s decimal point a dot. */
-export const PS_ARGV = ["ps", "-A", "-o", "pid=,ppid=,pgid=,rss=,pcpu=,lstart=,args="];
+export const PS_ARGV = ["ps", "-A", "-ww", "-o", "pid=,ppid=,pgid=,rss=,pcpu=,lstart=,args="];
 export const PS_ENV = { LC_ALL: "C" };
 
 /**
@@ -87,6 +89,107 @@ export function parseCwds(text: string): Map<number, string> {
 		else if (line.startsWith("n") && pid !== null) cwds.set(pid, line.slice(1));
 	}
 	return cwds;
+}
+
+/** TCP listen state in `/proc/net/tcp`. */
+const PROC_LISTEN = "0A";
+
+function listenInodes(text: string): Map<string, number> {
+	const inodes = new Map<string, number>();
+	for (const line of text.split("\n").slice(1)) {
+		const fields = line.trim().split(/\s+/);
+		if (fields.length < 10 || fields[3] !== PROC_LISTEN) continue;
+		const port = Number.parseInt(fields[1]?.split(":")[1] ?? "", 16);
+		const inode = fields[9];
+		if (inode && Number.isInteger(port) && port > 0) inodes.set(inode, port);
+	}
+	return inodes;
+}
+
+/** Listening ports by pid, from a Linux `/proc` tree. Used when `lsof` is not installed. */
+export function listeningPortsIn(procRoot: string): Map<number, number[]> {
+	const inodes = new Map<string, number>();
+	for (const name of ["net/tcp", "net/tcp6"]) {
+		try {
+			for (const [inode, port] of listenInodes(readFileSync(join(procRoot, name), "utf8"))) inodes.set(inode, port);
+		} catch {
+			// That stack's table is absent.
+		}
+	}
+	const ports = new Map<number, Set<number>>();
+	let names: string[] = [];
+	try {
+		names = readdirSync(procRoot);
+	} catch {
+		return new Map();
+	}
+	for (const pidText of names) {
+		if (!/^\d+$/.test(pidText)) continue;
+		const pid = Number(pidText);
+		let fds: string[] = [];
+		try {
+			fds = readdirSync(join(procRoot, pidText, "fd"));
+		} catch {
+			continue;
+		}
+		for (const fd of fds) {
+			let link = "";
+			try {
+				link = readlinkSync(join(procRoot, pidText, "fd", fd));
+			} catch {
+				continue;
+			}
+			const inode = /^socket:\[(\d+)\]$/.exec(link)?.[1];
+			const port = inode ? inodes.get(inode) : undefined;
+			if (port === undefined) continue;
+			const set = ports.get(pid) ?? new Set<number>();
+			set.add(port);
+			ports.set(pid, set);
+		}
+	}
+	return new Map([...ports].map(([pid, set]) => [pid, [...set].sort((a, b) => a - b)]));
+}
+
+/** Working directories from `/proc/<pid>/cwd`, for the pids that still have one. */
+export function cwdsIn(procRoot: string, pids: readonly number[]): Map<number, string> {
+	const cwds = new Map<number, string>();
+	for (const pid of pids) {
+		try {
+			cwds.set(pid, readlinkSync(join(procRoot, String(pid), "cwd")));
+		} catch {
+			// The process exited, or its directory is unreadable.
+		}
+	}
+	return cwds;
+}
+
+/** Absolute paths open as file descriptors under `procRoot`. */
+export function openPathsIn(procRoot: string): string[] {
+	const paths: string[] = [];
+	let names: string[] = [];
+	try {
+		names = readdirSync(procRoot);
+	} catch {
+		return paths;
+	}
+	for (const pidText of names) {
+		if (!/^\d+$/.test(pidText)) continue;
+		let fds: string[] = [];
+		try {
+			fds = readdirSync(join(procRoot, pidText, "fd"));
+		} catch {
+			continue;
+		}
+		for (const fd of fds) {
+			try {
+				const link = readlinkSync(join(procRoot, pidText, "fd", fd));
+				if (link.startsWith("/")) paths.push(link);
+			} catch {
+				// The descriptor closed while it was listed.
+			}
+		}
+	}
+	return paths;
 }
 
 /** The environment `ps` runs in: this process's, with {@link PS_ENV}'s fixed locale. */

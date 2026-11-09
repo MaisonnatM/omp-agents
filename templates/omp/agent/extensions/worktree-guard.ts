@@ -4,7 +4,7 @@
 // - Once this process has changed a linked worktree, a `read`, `edit`, or `write` of a relative path that lands in that
 //   repository's main checkout is blocked: the session sits on main, so the short path opened main's copy, not the worktree's.
 // - A checkout belongs to the omp process that last changed it, a session and its in-process subagents. While that process
-//   lives and the checkout holds uncommitted changes to tracked files, another process's edits, writes, and git, gt, or
+//   lives and the checkout holds uncommitted changes to tracked files, another process's edits, writes, and git or
 //   `gh pr checkout` commands that change the checkout are blocked, and that process works in a worktree of its own.
 // - Once HEAD is no longer where the owner left it, the owner's changes are blocked until a switch of its own succeeds.
 // - An isolated subagent's changes apply to the checkout its spawn names only where an edit could go; a refused apply keeps them as a patch.
@@ -20,8 +20,8 @@ type Effect = "read" | "switch" | "write";
 /** How a call changes a checkout: by a command's effect, or `edit` for the edit and write tools. */
 type Kind = Exclude<Effect, "read"> | "edit";
 
-/** git, gt, and gh subcommands that change the checkout they run in, each with its effect or a rule over its arguments; any other subcommand reads. */
-const CHANGES: Record<"git" | "gt" | "gh", Record<string, Effect | ((args: string[]) => Effect)>> = {
+/** git and gh subcommands that change the checkout they run in, each with its effect or a rule over its arguments; any other subcommand reads. */
+const CHANGES: Record<"git" | "gh", Record<string, Effect | ((args: string[]) => Effect)>> = {
 	git: {
 		add: "write", am: "write", apply: "write", bisect: "write", "cherry-pick": "write", clean: "write", commit: "write", merge: "write",
 		mv: "write", pull: "write", rebase: "write", reset: "write", restore: "write", revert: "write", rm: "write",
@@ -32,14 +32,6 @@ const CHANGES: Record<"git" | "gt" | "gh", Record<string, Effect | ((args: strin
 		checkout: args => (args.some(a => ["-b", "-B", "--orphan", "--", "."].includes(a)) || positionals(args).length !== 1 ? "write" : "switch"),
 		// Changes the worktree it names, which `changes` resolves; `--force` removes one with uncommitted changes.
 		worktree: args => (args[0] === "remove" || args[0] === "move" ? "write" : "read"),
-	},
-	// Names and aliases from `gt --help --all`.
-	gt: {
-		checkout: "switch", co: "switch",
-		absorb: "write", ab: "write", abort: "write", bottom: "write", b: "write", continue: "write", cont: "write", create: "write", c: "write",
-		delete: "write", dl: "write", down: "write", d: "write", fold: "write", get: "write", modify: "write", m: "write", move: "write",
-		pop: "write", rename: "write", rn: "write", reorder: "write", restack: "write", r: "write", revert: "write", split: "write", sp: "write",
-		squash: "write", sq: "write", sync: "write", top: "write", t: "write", undo: "write", up: "write", u: "write",
 	},
 	gh: {
 		pr: args => (args[0] === "checkout" ? "switch" : "read"),
@@ -138,7 +130,6 @@ interface Checkout {
 	commonDir: string;
 	/** The repository's main checkout, not a linked worktree. */
 	main: boolean;
-	graphite: boolean;
 	/** `refs/heads/<branch>`, or the commit a detached HEAD points at. */
 	head: string;
 }
@@ -153,16 +144,7 @@ function checkoutAt(path: string): Checkout | null {
 	const { gitDir, commonDir, top } = place;
 	// omp clones the repository to `<base>/m` for an isolated subagent and marks `<base>` with its owner.
 	if (existsSync(join(dirname(top), ".omp-isolation-owner.json"))) return null;
-	const main = gitDir === commonDir;
-	const head = headOf(gitDir);
-	return {
-		top,
-		gitDir,
-		commonDir,
-		main,
-		graphite: existsSync(join(commonDir, ".graphite_repo_config")),
-		head,
-	};
+	return { top, gitDir, commonDir, main: gitDir === commonDir, head: headOf(gitDir) };
 }
 
 /** A symbolic ref git keeps as a file in `gitDir`: `ref: <name>` gives `<name>`, a commit gives itself; `null` when the file is missing or a reftable placeholder. */
@@ -241,7 +223,6 @@ function guard(c: Checkout, kind: Kind, what: string, ctx: ExtensionContext): st
 		return [
 			`${c.top} is the repository's main checkout, on its default branch \`${branch}\`.`,
 			"Create a worktree on a new branch (`git worktree add -b <branch> ~/code/<repo>-wt/<topic> <parent>`) and make the change there.",
-			...(c.graphite ? ["This repository uses Graphite: run `gt track <branch> -p <parent>` in the new worktree before you commit."] : []),
 			"Edits on the default branch stay blocked, however often you retry. When the user asked you to work in place, switch the main checkout to a branch (`git switch -c <branch>`), then retry the call.",
 		].join(" ");
 	}
@@ -262,18 +243,17 @@ interface Change {
 	words: string[];
 }
 
-/** The commands of a bash line run from `cwd` that change a checkout, in the directories `located` gives, then `git -C`, `gt --cwd`, and the worktree `git worktree` names. */
+/** The commands of a bash line run from `cwd` that change a checkout, in the directories `located` gives, then `git -C` and the worktree `git worktree` names. */
 function changes(line: string, cwd: string | null): Change[] {
 	const out: Change[] = [];
 	for (const { words, dir } of located(line, cwd)) {
 		const [tool, ...rest] = words;
-		if (tool !== "git" && tool !== "gt" && tool !== "gh") continue;
+		if (tool !== "git" && tool !== "gh") continue;
 		let at = dir;
 		let i = 0;
 		for (; i < rest.length && rest[i].startsWith("-"); i++) {
 			const flag = rest[i];
-			if ((tool === "git" && flag === "-C") || (tool === "gt" && flag === "--cwd")) at = within(at, rest[++i]);
-			else if (tool === "gt" && flag.startsWith("--cwd=")) at = within(at, flag.slice(6));
+			if (tool === "git" && flag === "-C") at = within(at, rest[++i]);
 			else if (tool === "git" && flag === "-c") i++;
 			else if (tool === "git" && /^--(?:git-dir|work-tree)(?:=|$)/.test(flag)) {
 				at = null;

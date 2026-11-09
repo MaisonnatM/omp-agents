@@ -1,6 +1,6 @@
 /**
- * The Pull requests page's pull requests, per GitHub repository, live from `gh`: as Graphite's inbox gathers them, the
- * viewer's open and recently merged PRs and the open PRs that ask the viewer for a review.
+ * The Pull requests page's pull requests, per GitHub repository, live from `gh`: the viewer's open and recently
+ * merged PRs and the open PRs that ask the viewer for a review.
  */
 import { createCache } from "./cache";
 import { AVATAR, authorOf, CHANGE, CHECK_RUN, dataOf, ghGraphql, ghPolledGraphql, ghRest, mergeStateOf, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
@@ -78,8 +78,7 @@ function parseReviewers(node: Record<string, unknown>, author: string): Reviewer
 
 /**
  * GitHub's review decision, except that a change request waits on the reviewers again once the author asked each of
- * them for a new review: GitHub keeps reporting `CHANGES_REQUESTED` until they review, and Graphite's inbox moves the
- * pull request to its waiting-for-review section.
+ * them for a new review: GitHub keeps reporting `CHANGES_REQUESTED` until they review.
  */
 function reviewOf(decision: string | undefined, reviewers: Reviewer[]): ReviewDecision {
 	const review = REVIEW[decision ?? ""] ?? "none";

@@ -80,18 +80,19 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - The Todos card's **Files** section, a session's changed files: `ChangedFileList` in `web/components/changed-files-section.tsx`.
   - The session changes dialog that a file or **Review** opens: `web/components/changes/session-changes-dialog.tsx`, with its explorer in `changes-explorer.tsx` and tree in `file-tree.tsx` beside it.
   - Settings › Files, omp's own config files: `Files` in `web/components/settings/files-tab.tsx`.
-  - Settings › Decisions, a workspace repository's decision records: `DecisionsTab` in `web/components/settings/decisions-tab.tsx`.
+  - Settings › Decisions, a workspace repository's decision records, and every workspace in the space when All workspaces is selected: `DecisionsTab` in `web/components/settings/decisions-tab.tsx`, grouped by `decisionGroups` in `web/components/settings/decision-groups.ts`.
 - A file opened from a path in agent text: `web/components/file-dialog.tsx`.
 - Dictation, the composer's microphone and the status row above its text field: `DictationButton` and `DictationRow` in `web/components/composer-dictation.tsx`, which `conversation.tsx` and `new-session.tsx` mount, over the page's one capture in `web/dictation.ts`.
 - Command palette (Cmd+K): `web/components/command-palette/`, over `web/command-palette.ts`.
 - Keyboard shortcuts: the table in `web/shortcuts.ts`, the page-wide handlers in `web/use-page-shortcuts.ts`, and the reference dialog in `web/components/shortcuts-dialog.tsx`.
 - Notes, Calendar, Email, and Sport buttons, command menu button, What's new, notification bell, and Settings button: `HeaderControls` in `web/components/header-controls.tsx`, in the desktop app's title bar, `DesktopTitleBar` there, else at the end of each page's `Header`; What's new is `WhatsNew` in `web/components/whats-new.tsx`; the bell is `NoticesBell` in `web/components/notices.tsx`; toasts come from `web/components/toaster.tsx`.
   The title bar's Back and Forward buttons, at its top left after the window's buttons, are `HistoryButtons` in the same file.
+  On a phone, `PhoneTabMenu` in the same file replaces them: one menu of every shown tab, the space, and Settings, beside the command menu button and the bell.
 - System notifications of sessions that ask or finish, and the desktop app's Dock badge: `useAttention` in `web/use-attention.ts`, shown by `desktop/attention.ts` in the desktop app; their switches and sound picker are `SessionNotifications` in `web/components/settings/preferences-tab.tsx`.
 - Pages, each routed by `web/routing.ts`:
   - Get started: `web/components/get-started.tsx`, the step-by-step setup dialog and its bottom-right bubble under the toasts, mounted in `web/app.tsx` and open at `#get-started` and on a vacant home's first run, with each step's body in `web/components/get-started-steps.tsx` and its facts and surface choice in `web/get-started-model.ts`.
   - The empty home, with **New session** and **Get started**: `EmptyHome` in `web/components/empty-home.tsx`, which `PageSwitch` draws.
-  - New session: `web/components/new-session.tsx`, also used for todo drafts and scheduled starts, which docks the composer at the page's bottom with a new session's directory and branch pickers above it and lists the starters that `rankedStarters` in `web/starters.ts` fills in and ranks in the composer's suggestion list, `useSuggestions` from `web/components/composer-suggestions.tsx`, or in their place a private draft's `PrivateFacts` from `web/components/new-session-modes.tsx`.
+  - New session: `web/components/new-session.tsx`, also used for todo drafts and scheduled starts, which docks the composer at the page's bottom with a new session's directory and branch pickers above it, draws `RetroGrid` from `web/components/dithercn/retro-grid.tsx` behind a new session, and shows a private draft's `PrivateFacts` from `web/components/new-session-modes.tsx` under the composer.
   - Pull requests: `web/components/pull-requests/pull-requests-page.tsx`, with the **Rebase N behind** button at its top, its board view `PullRequestsKanban` in `pull-requests-kanban.tsx` with each card `PullRequestCard` in `pr-row.tsx`, and one pull request in `pr-page.tsx` beside it.
   - Tickets: `web/components/tickets/tickets-page.tsx`.
   - Todo: `web/components/todo/page.tsx`.
@@ -114,10 +115,11 @@ Start a UI change here, then read that file's entry under [Page](#page).
     Settings › Providers' account lines, with each account's place, its up and down arrows, and **Sign out**: `AccountLine` and `ProviderRow` in `web/components/settings/providers-tab.tsx`, over `orderableAccounts` in `src/shared/providers.ts` and `src/omp/account-order.ts`.
     Settings › Worktrees, with its totals, filters, **Merged** and blocker badges, selection bar, and **Remove N merged**: `WorktreesTab` in `web/components/settings/worktrees-tab.tsx`, with the removal queue and its toasts in `web/worktree-removals.ts`.
     Settings › Sync, with its remote, **Sync** button, last outcome, conflict choices, and item switches: `SyncTab` in `web/components/settings/sync-tab.tsx`.
+    Settings › Phone access, with its switch, the tailnet address, the pairing QR, and the paired phones: `PhoneAccessTab` in `web/components/settings/phone-access-tab.tsx`.
     Settings › Storage, with allocated usage, native cleanup previews, phase progress, and global cleanup rules: `StorageTab` in `web/components/settings/storage-tab.tsx`, with phase presentation and the sequential run driver in `web/storage.ts`.
 - List on the left with the open item on the right, split by a line you drag: `ListSplit` in `web/components/list-split.tsx`, over `web/components/drag-separator.tsx`.
 - Shared primitives (buttons, menus, dialogs, tooltips): `web/components/ui/`, from the Fluid registry and some from shadcn's, with the shadcn utilities they need in `web/shadcn.css`; change them only as `web/components/ui/PATCHES.md` describes.
-- Colors, the font, text sizes, and the `surface-glass` utility: the tokens in `web/globals.css`, which are T3 Code's light and dark values for every token the two apps share, with the system font stack and T3's `text-2xs` (11px) and `text-3xs` (10px); the `--surface-*`, `--shadow-*`, `--hover`, `--active`, `--selected`, `--tint`, and `--focus-ring` tokens stay Fluid's, since T3 has none of them.
+- Colors, the font, text sizes, the `phone` breakpoint, and the `surface-glass` utility: the tokens in `web/globals.css`, which are T3 Code's light and dark values for every token the two apps share, with the system font stack, T3's `text-2xs` (11px) and `text-3xs` (10px), and `phone`, 45rem, the 720 px under which the sidebars float; the `--surface-*`, `--shadow-*`, `--hover`, `--active`, `--selected`, `--tint`, and `--focus-ring` tokens stay Fluid's, since T3 has none of them.
 
 ## Server
 

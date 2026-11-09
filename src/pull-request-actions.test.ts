@@ -61,7 +61,7 @@ describe("pullRequestActions", () => {
 			const prompt = PULL_REQUEST_ACTIONS[id].prompt(pr({ conflicts: true }));
 			expect(prompt).toContain("git diff --name-only --diff-filter=U");
 			expect(prompt).toContain("git -c core.hooksPath=/dev/null checkout --theirs -- <file>");
-			expect(prompt).toContain("GIT_EDITOR=true gt continue");
+			expect(prompt).toContain("GIT_EDITOR=true git rebase --continue");
 		}
 	});
 });

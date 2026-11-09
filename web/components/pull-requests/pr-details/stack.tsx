@@ -4,7 +4,6 @@ import { type MouseEvent, type ReactNode, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, prKey, pullRequestUrl, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
 import { queuedMergeOf } from "../../../../src/shared/merge-queue";
 import { age, LINK_VERB } from "../../../labels";
-import { graphiteUrl } from "../../../pull-requests-model";
 import { hashForPullRequests } from "../../../routing";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -31,10 +30,7 @@ interface StackPopoverProps {
 	trigger: (open: boolean) => ReactNode;
 }
 
-/**
- * The stack on its rail with **Merge stack**, then the session's other pull requests, each with its GitHub and Graphite
- * links, and the stack on Graphite.
- */
+/** The stack on its rail with **Merge stack**, then the session's other pull requests, each with its GitHub link. */
 export function StackPopover({ stack, others, current, onPick, align, trigger }: StackPopoverProps) {
 	const [open, setOpen] = useState(false);
 	const top = stack[0];
@@ -50,7 +46,7 @@ export function StackPopover({ stack, others, current, onPick, align, trigger }:
 		<Popover open={open} onOpenChange={setOpen}>
 			<PopoverTrigger asChild>{trigger(open)}</PopoverTrigger>
 			<PopoverContent align={align} className="max-h-(--radix-popover-content-available-height) w-[28rem] max-w-[calc(100vw-2rem)] overflow-y-auto p-0" onClick={closeOnLink}>
-				{top && <StackRail stack={stack} current={current} onPick={pick} trailing={pr => <ExternalLinks pr={pr} />} />}
+				{top && <StackRail stack={stack} current={current} onPick={pick} trailing={pr => <GithubLink pr={pr} />} />}
 				{top && <MergeStack stack={stack} align={align} />}
 				{others.length > 0 && (
 					<div className={top ? "border-t border-border py-1" : "py-1"}>
@@ -69,17 +65,11 @@ export function StackPopover({ stack, others, current, onPick, align, trigger }:
 										</a>
 									)}
 									<span className="shrink-0 text-xs text-muted-foreground">{LINK_VERB[pr.link]}</span>
-									<ExternalLinks pr={pr} />
+									<GithubLink pr={pr} />
 								</li>
 							))}
 						</ul>
 					</div>
-				)}
-				{top && (
-					<a href={graphiteUrl(top)} target="_blank" rel="noreferrer" className="flex items-center gap-2 border-t border-border px-3 py-2 text-sm hover:bg-muted">
-						<OrgIcon org="graphite" className="size-4" />
-						Open stack on Graphite
-					</a>
 				)}
 			</PopoverContent>
 		</Popover>
@@ -111,22 +101,14 @@ function MergeStack({ stack, align }: { stack: StackedPullRequest[]; align: "sta
 	);
 }
 
-/** A pull request's GitHub and Graphite pages, as icon links at the end of its row. */
-function ExternalLinks({ pr }: { pr: PullRequest }) {
-	const link = "rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground";
+/** A pull request's GitHub page, as an icon link at the end of its row. */
+function GithubLink({ pr }: { pr: PullRequest }) {
 	return (
-		<span className="flex shrink-0 items-center">
-			<Tooltip content={`#${pr.number} on GitHub`}>
-				<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" aria-label={`#${pr.number} on GitHub`} className={link}>
-					<OrgIcon org="github" className="size-3.5" />
-				</a>
-			</Tooltip>
-			<Tooltip content={`#${pr.number} on Graphite`}>
-				<a href={graphiteUrl(pr)} target="_blank" rel="noreferrer" aria-label={`#${pr.number} on Graphite`} className={link}>
-					<OrgIcon org="graphite" className="size-3.5" />
-				</a>
-			</Tooltip>
-		</span>
+		<Tooltip content={`#${pr.number} on GitHub`}>
+			<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" aria-label={`#${pr.number} on GitHub`} className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
+				<OrgIcon org="github" className="size-3.5" />
+			</a>
+		</Tooltip>
 	);
 }
 

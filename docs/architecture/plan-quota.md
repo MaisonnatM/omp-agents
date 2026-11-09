@@ -25,6 +25,7 @@ See [Keep CLI quotas and supplement Claude raw billing](../decisions/2026-11-06-
 An Anthropic API key saved in Settings is a stored `api_key` row beside the Anthropic sign-in, so `configuredProviders` also lists `anthropic-api` for it, once, whether or not a model config names that provider.
 That plan has no windows, extra usage, or reset credits. The footer shows its name, and plan notices ignore it.
 `readConsoleCreditBalance` in `src/console-credits.ts` then looks for a Firefox or Zen `sessionKey` cookie for `platform.claude.com` and reads each API organization's prepaid credits.
+On Linux those profiles live under the home directory, including Flatpak and Snap.
 The API credits row gains `balance`, one of two kinds: `grant`, the dollars spent of the promotional grant, the grant, and the soonest expiry, or with no grant, `prepaid`, the dollars `left`, read from the Console's `amount` in US cents and below zero when usage ran past it.
 The first organization with a grant wins; with none, the first organization's prepaid balance does.
 A missing cookie, a refused session, or an answer with no grant and no amount in US dollars leaves the row as the name.

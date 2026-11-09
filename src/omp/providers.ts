@@ -133,7 +133,8 @@ export async function loginProvider(method: string, provider: string, hooks: Log
 export async function logoutProvider(provider: string, credentialId: number): Promise<boolean> {
 	const storage = await auth.discoverAuthStorage();
 	try {
-		const { removed } = await logout.logoutCredential(new modelRegistry.ModelRegistry(storage), provider, credentialId, "");
+		const session = { modelRegistry: new modelRegistry.ModelRegistry(storage), sessionId: "", refreshScopedModels: async () => {} };
+		const { removed } = await logout.logoutCredential(session, provider, credentialId);
 		if (provider === API_CREDITS_PROVIDER && storage.credentials.list(API_CREDITS_PROVIDER).length === 0) {
 			await removeApiCreditsProvider();
 			dropModelList();

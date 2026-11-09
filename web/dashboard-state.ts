@@ -107,7 +107,7 @@ export type Action =
 	| { t: "user-note"; change: UserNoteChange }
 	| { t: "sport-changes"; changes: SportChange[] }
 	| { t: "pin"; change: PinChange }
-	| { t: "bot"; change: Exclude<BotChange, { op: "message" }>; now: string }
+	| { t: "bot"; change: Exclude<BotChange, { op: "message" | "restart" }>; now: string }
 	/** The trust dialog of start `reqId` closed, by trusting or by **Cancel**. */
 	| { t: "trust-dismiss"; reqId: number }
 	| ServerAction;

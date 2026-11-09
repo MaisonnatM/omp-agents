@@ -65,6 +65,7 @@ Each tick at a full wake does three things, in order:
    It spawns the shell in its own process group and stops the whole group with SIGTERM, since a command's own children would otherwise keep running and hold the output pipe open.
    When the command ends, the runner writes its exit code, output, times, and `slept` to the run; a non-zero exit, a stop, or a failed spawn also goes to the run's errors.
    It then posts the command's completed `RoutineMessage` through `routineMessageText` and `Bots.message`, with the routine's name, command, result, how long the Mac slept, and output fenced as data.
+   A command task with `post: "failures"` skips that post, and holds nothing for a full wake, when it exited with code 0; see [Command routines can post only their failures](../decisions/2026-11-04-command-routines-can-post-only-failures.md).
    That post waits for a full wake, since the Bot's turn it starts would stall in a dark wake; it waits in memory, so a server that stops first never posts it, though the run keeps the output.
    The run keeps the output whether or not the post goes through, and a post the Bot refused adds why to the run's errors.
    The runner keeps the routines whose command runs in memory, since a run holds one outcome and later `run-now` claims can push a running command's run out of the saved 10; a command routine whose last command still runs records an error instead of running a second one.
@@ -152,7 +153,7 @@ An ovnfs sandbox stays as unreadable when the sweep cannot locate its checkout: 
 Commits that no remote has do not keep a sandbox, since the copy carries every local branch of the repository it copies, so nearly every sandbox has some, and the repository the task ran from keeps those branches.
 A commit the task itself made, which its omp exited before bringing back, goes with the sandbox, as with `omp worktree clear`.
 A sandbox with the marker but no checkout, left by an omp that exited while it made one, holds nothing of a task and goes, as does an ovnfs sandbox whose running daemon no longer lists its checkout, without any request to ovnfs.
-Just before it removes one, the sweep asks again whether an omp owns it, since a task run again takes the same directory; then it runs omp's teardown in the order of `omp worktree clear`: `stopRetainedMount` stops a retained native mount, and for an ovnfs checkout the sweep sends `rm` with the checkout name it judged to the daemon it judged it on, which deletes its files and never starts a daemon.
+Just before it removes one, the sweep asks again whether an omp owns it, since a task run again takes the same directory; then it runs omp's teardown in the order of `omp worktree clear`: `stopRetainedMount` stops a retained native mount, and for an ovnfs checkout the sweep sends `rm` to the daemon it judged it on, first for the baseline checkout the record names, if any, then for the checkout name it judged, which deletes their files and never starts a daemon.
 A checkout that daemon reports already gone counts as removed, and a daemon that stopped meanwhile fails the teardown.
 Then it renames the sandbox with the suffix `.omp-agents-removing` and deletes it, so the next sweep finishes a removal cut short instead of reading half a sandbox.
 A teardown that fails keeps its sandbox.

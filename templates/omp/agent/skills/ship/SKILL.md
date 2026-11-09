@@ -14,7 +14,7 @@ The session's ship widget and status show the stage and PR needs.
 Read it FIRST on each invocation; resume from the recorded stage and the actual Linear, git, and GitHub state rather than repeating completed work.
 Report the current stage at every stopping point.
 Keep this session available after the PR goes live so `/ship` can resume when new review feedback or conflicts arrive.
-If `~/.omp/agent/docs/git-workflow.md` exists, read it before registering a PR or branching in a Graphite repository.
+If `~/.omp/agent/docs/git-workflow.md` exists, read it before opening a PR or creating a branch.
 
 1. **Ticket.** If no workflow exists, call `ship_stage({stage:"ticket"})`.
    If the user named a Linear issue ID or URL, fetch that issue with `get_issue`.
@@ -23,14 +23,16 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before registering a PR o
    With an issue, record `ship_stage({stage:"plan", issue:"<identifier>"})`, read its `gitBranchName`, and use its issue ID in the branch.
    Without one, record `ship_stage({stage:"plan"})`, name the branch after the work, and say in one line of the report that the change has no ticket.
    If this is the main checkout on its default branch, create a dedicated worktree off the current parent branch per the Git safety rule in `AGENTS.md`; on any other branch, work in place.
-   In a Graphite repo, register the branch under its parent.
 2. **Plan.** Choose how to build the change before anyone writes code.
    If the issue, or the PR body when there is no issue, already has a plan from an earlier run, use that plan and skip to the next step.
    Read `skill://technical-writing` and `skill://arena`; the kit does not ship them, so if either read fails, name the missing skill, tell the user to install it, and stop.
-   Read the issue, or the user's request when there is none, and the code it touches, then list the approaches that would each solve it.
+   Read the issue, or the user's request when there is none, and the code it touches.
+   Then read `skill://grill-with-docs` and follow it to grill the user on the change until its frontier is empty; it writes settled terms to `GLOSSARY.md` and each choice to `docs/decisions/`.
+   When the request leaves nothing to decide, such as a typo, skip the grill and say so in one line of the report.
+   Then list the approaches that would each solve it within the grill's answers.
    If only one approach is sound, such as for a typo or a fix the request spells out, write that plan yourself with the `technical-writing` skill and say in one line of the report why no arena ran.
    Otherwise run the `arena` skill with one runner for each approach, up to three.
-   Give every runner the same prompt: the issue or the request, the checkout's path, the approach it plans, its output path `local://plan-<n>.md`, and the rule to write the plan there with the `technical-writing` skill and edit nothing else.
+   Give every runner the same prompt: the issue or the request, the grill's settled answers, the checkout's path, the approach it plans, its output path `local://plan-<n>.md`, and the rule to write the plan there with the `technical-writing` skill and edit nothing else.
    Each plan opens with how it works today, the current code path in plain words with paths and one concrete example, then names the files it changes, the data shape, the steps in order, how to verify the result, its risks, and what is out of scope.
    Each plan also lists what it reuses: the existing helpers, components, models, and patterns, by path, that already do part of the job, so the change extends them instead of rebuilding them.
    The runners edit no files in the checkout, so spawn them without `isolated`; alternate `poteto-agent` and `poteto-agent-codex`, and run the cross-judge on `poteto-agent-codex` over the `local://plan-<n>.md` paths.
@@ -51,7 +53,6 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before registering a PR o
 4. **Draft PR.** Push the branch, then open a DRAFT PR with `gh pr create --draft`.
    With an issue the user named, put `Fixes <issue ID>` in the body and the issue ID in the title; with one you found by search, put `Refs <issue ID>` instead, so merging does not close a ticket the user never confirmed; without one, put the chosen plan under `## Plan` in the body.
    Never request reviewers while draft.
-   If Graphite is configured, run `gt track <branch> -p <parent> --no-interactive -q` and `gt submit --cwd <checkout> --no-edit --no-stack -q` so the PR is registered.
    Confirm its draft state with `gh pr view --json number,isDraft,url`, then call `ship_stage({stage:"interface_review", pr:<number>})`.
    A successful `gh pr create` also records this transition.
 5. **Interface review.** If the repository commits no `.omp/ui-paths`, or the PR changes no file its globs match, skip this stage: the `ship_stage` status says so, the gates do not ask for the checkbox, and you call `ship_stage({stage:"thermonuclear"})` and say in one line of the report that the review was skipped and why.

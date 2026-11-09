@@ -40,7 +40,7 @@ export interface SessionRoutesEnv {
 /** A route's handler; Bun passes its server, whose `timeout` lifts a slow request's idle timeout. */
 export type Handler = (req: Request, server: Pick<Server<unknown>, "timeout">) => Promise<Response>;
 /** HTTP handlers by path and method, as `Bun.serve` takes them. */
-export type Routes = Record<string, Partial<Record<"GET" | "PUT", Handler>>>;
+export type Routes = Record<string, Partial<Record<"GET" | "PUT" | "POST" | "DELETE", Handler>>>;
 
 /** The ways a route answers: a read of its query, a read that a tag loads, and a write of its JSON body. */
 export interface RouteKit {

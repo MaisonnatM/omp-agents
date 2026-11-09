@@ -45,7 +45,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 - **Session processes.**
   A live session's dev servers, watchers, and omp broker services, biggest memory first, each with a Stop button; the server stops them once their sessions have been idle for 30 minutes, or a time you pick, and when their session ends.
 - **Pull requests.**
-  A Graphite-style list of your GitHub pull requests, sorted by whose move it is and linked to the sessions that submitted or worked on them.
+  A list of your GitHub pull requests, sorted by whose move it is and linked to the sessions that submitted or worked on them.
 - **Linear tickets.**
   The Linear issues assigned to you, grouped by workflow state like Linear's My issues, read through omp's Linear MCP sign-in.
   Click one to read it in full, and start a session that works on it or plans it.
@@ -69,6 +69,8 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
   Edit omp's model roles, fallback chains, retry settings, and context files (`AGENTS.md`, `config.yml`, skills, rules) in place, edit your workflows, the skills tagged `workflow` such as `/ship`'s, and pin a skill that every new session starts through.
 - **Plan quota.**
   Remaining quota per provider plan, from `omp usage`.
+- **Phone access.**
+  Open the dashboard on your phone from anywhere: turn on **Settings › Phone access** and scan the code, which signs that phone in through Tailscale with its own key.
 - **Keyboard-first.**
   Shortcuts that follow omp's terminal keys; press `?` to list them.
 - **omp starter kit.**
@@ -125,7 +127,7 @@ The window signs itself in, so it needs no token from you.
 - On macOS, closing the window (Cmd+Shift+W) hides it and keeps the server and its sessions running; click the app in the Dock to show it again.
   Cmd+Q quits.
 - In the packaged app, **Open at Login** in the app menu starts the app, and with it your routines, when you log in, and **Install omp Starter Kit…** installs the starter kit.
-- Links to GitHub, Graphite, Linear, and every other site open in your default browser.
+- Links to GitHub, Linear, and every other site open in your default browser.
 - `PORT` sets the port for `bun run desktop` and `bun start` alike.
 
 ## Configuration
@@ -169,7 +171,7 @@ bun run omp-template --maintainer
 ```
 
 Pass `--maintainer` to also install the maintainer git profile.
-That profile tells a session to push local `main`, to register Graphite branches, and to clean up worktrees.
+That profile tells a session to push local `main`, to open draft PRs with `gh`, and to clean up worktrees.
 The default install leaves it out.
 
 Files and settings that you already have keep your version unless you pass `--force`; a file you never edited since the kit installed it is brought up to date, and **Update dashboard** does that too.

@@ -27,7 +27,7 @@ export interface CommandOutput {
  * The `gh` an extension runs: the one on omp's PATH, else Homebrew's. An omp that a GUI app or launchd started can have
  * no Homebrew directory on its PATH, where a bare `gh` fails with ENOENT although the shell finds it.
  */
-export const GH = Bun.which("gh") ?? ["/opt/homebrew/bin/gh", "/usr/local/bin/gh"].find(path => existsSync(path)) ?? "gh";
+export const GH = Bun.which("gh") ?? ["/opt/homebrew/bin/gh", "/usr/local/bin/gh", "/usr/bin/gh"].find(path => existsSync(path)) ?? "gh";
 
 /** Runs `gh` with `args`, as an extension binds `pi.exec` to its directory and timeout. */
 export type Gh = (args: string[]) => Promise<CommandOutput>;

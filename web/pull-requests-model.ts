@@ -1,10 +1,8 @@
-/** Pull request links, what each pull request waits on next, the list's sections and stacks, the board's columns and what a drop on one does, what stands between a pull request and its merge, its open review threads, and the state changes it offers. */
+/** What each pull request waits on next, the list's sections and stacks, the board's columns and what a drop on one does, what stands between a pull request and its merge, its open review threads, and the state changes it offers. */
 import { PULL_REQUEST_ACTIONS, type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
 import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestChange, type PullRequestDetail, type Repo, type RepoPullRequests, type Reviewer, prKey, pullRequestName, repoKey, samePullRequest, type SettableState, type StackedPullRequest, unresolvedOf } from "../src/shared/github";
 import { type AgentOn, hasOpenThreads, type MoveId, moveOf, readyOnceChecksPass } from "../src/shared/moves";
 import type { ReviewDraft } from "../src/shared/review-drafts";
-
-export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;
 
 /** A session's pull requests split into the stack two or more of them share, top first, and the rest; `null` when fewer than two sit in `stack`. */
 export function sessionStack(pullRequests: LinkedPullRequest[], stack: StackedPullRequest[]): { stack: StackedPullRequest[]; others: LinkedPullRequest[] } | null {

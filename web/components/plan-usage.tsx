@@ -147,7 +147,7 @@ function PlanRow({ plan }: { plan: PlanUsage }) {
 	);
 }
 
-/** Plan quota, one plan after another, for the status bar. */
+/** Plan quota, one plan after another, for the status bar; on a phone, on one line that scrolls sideways. */
 export function PlanUsageList({ usage }: { usage: DashboardState["usage"] }) {
 	if (usage === null) return <p className="text-muted-foreground">Checking plans…</p>;
 	if (usage.error !== null) return <p className="min-w-0 truncate text-red-600 dark:text-red-400">Cannot read plan usage: {usage.error}</p>;
@@ -158,7 +158,7 @@ export function PlanUsageList({ usage }: { usage: DashboardState["usage"] }) {
 			</p>
 		);
 	return (
-		<ul aria-label="Plan usage" className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5">
+		<ul aria-label="Plan usage" className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5 max-phone:-my-1 max-phone:flex-nowrap max-phone:overflow-x-auto max-phone:py-1 max-phone:scroll-fade-x max-phone:[scrollbar-width:none] max-phone:*:shrink-0">
 			{usage.plans.map((plan, index) => (
 				<PlanRow key={`${plan.provider}:${plan.account ?? index}`} plan={plan} />
 			))}

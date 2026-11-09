@@ -31,7 +31,7 @@ end, best first.
     omp-agents: "Merge on main, then end the session"; "Merge on main" next.
   - Merged or pushed, nothing left: "End the session".
   - A repository that ships through pull requests: the PR step itself, such as
-    "Commit and update the draft PR" or "Push it with gt submit".
+    "Commit and update the draft PR" or "Mark the PR ready for review".
   - A UI change the user has not approved yet: the likeliest design follow-up,
     with merging second; the user usually answers a merge offer here with
     another tweak.
@@ -86,22 +86,6 @@ When a UI change or a prototype is ready to test, or the user asks you to start 
 2. Open that URL headless and screenshot the changed page in the state the user will check.
 3. `read` each screenshot before you show it. Retake one that is blank, white, cropped, still loading, or framed differently from the real page, such as extra padding around it.
 4. Show the checked screenshots with the reply, and write out each running server's full URL, such as `http://localhost:24816/settings`, pointing at the changed page; never give only the port.
-
-# Subagent isolation
-
-When the checkout is on the default branch (`main`), create a worktree for the
-work and spawn every `task` or eval `agent()` that edits it without `isolated`.
-omp's task tool has no per-task cwd or `checkout` field, so a subagent starts in
-the session's cwd on `main`, and `isolated` would clone `main`, whose patch the
-worktree guard refuses. Write the worktree's absolute path into the task and
-tell the subagent to use it for every read, edit, and command (`git -C`, bash
-`cwd`); a relative path lands in the main checkout and the guard rejects it.
-
-When the checkout is on any other local branch, spawn editing subagents without
-`isolated` so they edit that branch in place, alongside its local changes. Run
-two at once only on disjoint files. Competing attempts at the same change, such
-as arena runners that edit files, pass `isolated: true` from a session that sits
-in their worktree, or each get a worktree of their own named by absolute path.
 
 # Asking the user
 

@@ -70,8 +70,8 @@ Files, in `agent/`:
   A branch without a PR gets draft-first recovery instructions; authentication failures retain their actual error.
   When GitHub rejects a token that gh reads from an environment variable, such as `GITHUB_TOKEN` from a project `.env`, while a stored gh login works, this extension and `pr_description` run gh without that variable for the rest of the session, which the agent's own `env -u` cannot do for omp's process.
   When no stored login works, the gate names the rejected credential and the project `.env` file omp read it from at startup, never the token itself.
-  A command run through `env` or after `NAME=value` assignments, such as `env -u GITHUB_TOKEN gt submit --publish`, goes through the same gate.
-  The gate reads the PR and the review paths in the checkout the publishing command runs in, which a `cd`, `env -C`, `bash -c`, `gt --cwd`, or the bash call's cwd names.
+  A command run through `env` or after `NAME=value` assignments, such as `env -u GITHUB_TOKEN gh pr ready 7`, goes through the same gate.
+  The gate reads the PR and the review paths in the checkout the publishing command runs in, which a `cd`, `env -C`, `bash -c`, or the bash call's cwd names.
   It refuses the command when that checkout is not one of the PR's repository, such as `gh pr ready 7 -R other/repo` from this repository, when a variable or `cd -` hides the directory, and when the command sets `GH_REPO` or `GH_HOST` inline.
   A PR on a repository you cannot push to, such as a contribution to someone else's project, skips the review gates.
   A PR body with an unchecked `- [ ] Browser proof` box, which a repository's PR template can declare, also blocks going live when the interface review applies; the extension checks the box, not a screenshot.
@@ -86,7 +86,7 @@ Files, in `agent/`:
   Set `OMP_CACHE_TAIL_TTL=1h` to turn it off.
 - `extensions/land.ts`, with `extensions/land/`: the `land` tool lands a committed branch on `main` in a repository that commits `.omp/land.json`, the way [Ultimate](https://github.com/HazAT/ultimate)'s lander does, with no model in the loop.
   It merges the branch's tip into a fresh temporary worktree of `origin/main` with a merge commit whose message carries the agent's divergence note, runs the setup and checks the file lists on that merged result, and pushes the merge commit, never forced.
-  `land.json` holds `target` (default `main`), `remote` (default `origin`), `setup`, commands run in the worktree first, and `checks`, each a command or a list of commands that run at the same time; checks get `LAND_BASE` and `LAND_TIP`, the target and branch commits.
+  `land.json` holds `target` (default `main`), `remote` (default `origin`), `setup`, commands run in the worktree after the merge so a branch's new dependencies get installed, and `checks`, each a command or a list of commands that run at the same time; checks get `LAND_BASE` and `LAND_TIP`, the target and branch commits.
   A check is stopped after 2 minutes without output or 10 in all, and a failed one runs once more: passing then lands with a flaky warning, failing again returns the failed tests and type errors it named anywhere in its output, then the end of that output.
   A conflict names the files and pushes nothing; a push that loses a race to another landing starts again from the new tip, three times at most.
   Afterwards the local `main` moves forward to the landed commit only when it can without touching uncommitted changes, and worktrees left by an omp process that died are removed at the next landing.
@@ -117,7 +117,7 @@ Files, in `agent/`:
 - `extensions/worktree-guard.ts`: keeps agents from changing a checkout under each other.
   It blocks every `edit` or `write` in a repository's main checkout while it is on its default branch (`origin/HEAD`, else `main` or `master`), and tells the agent to work in a linked worktree; on any other branch the main checkout is edited in place, as `AGENTS.md` asks.
   The omp process that last changed a checkout, a session with its subagents, owns it, and `omp-checkout-owner.json` in the checkout's git dir names its pid.
-  While the owner runs and the checkout holds uncommitted changes to tracked files or an unfinished merge or rebase, another session's `edit`, `write`, and git, gt, or `gh pr checkout` commands that change or switch the checkout are blocked, and that session works in a worktree of its own.
+  While the owner runs and the checkout holds uncommitted changes to tracked files or an unfinished merge or rebase, another session's `edit`, `write`, and git or `gh pr checkout` commands that change or switch the checkout are blocked, and that session works in a worktree of its own.
   The guard reads commands behind `env` and similar wrappers, in the directory an `env -C` names, and inside `bash -c`, and `git worktree remove` or `move` counts as a change to the worktree it names.
   A file git ignores, such as `.env`, is in no worktree, so its edit there asks the user and goes ahead once approved; a declined edit, or one in a session that cannot ask, stays blocked.
   A clean checkout passes to the next session that changes it, and a session that ends gives up its claims.
@@ -147,7 +147,6 @@ Files, in `agent/`:
   omp skips a provider that it cannot reach and uses the next one in the chain.
   Edit `config.yml` before you install to drop a provider, or change the roles later in the dashboard's **Settings**.
 - For `/ship`: the [GitHub CLI](https://cli.github.com) signed in, and the Linear MCP server connected to omp.
-  [Graphite](https://graphite.dev) is used when a repository is set up for it.
 - For `/ship`'s interface review: a repository with `.omp/ui-paths`; without it the review never runs.
 - For `/ship`'s plan: the `arena` and `technical-writing` skills from pstack, under `~/.agents/skills/` or `~/.omp/agent/skills/`.
   The kit does not ship them; without them the plan step stops and names the missing skill.
@@ -155,7 +154,7 @@ Files, in `agent/`:
 ## Maintainer git profile
 
 `bun run omp-template --maintainer` also copies [`maintainer/`](maintainer) on top of the same relative paths.
-The profile includes `AGENTS.md` for local-main pushing and worktree cleanup, `docs/git-workflow.md` for draft-first Graphite shipping, `skills/mma-mode/` for maintainer steering, and `skills/best-in-class-approach/`, the quality bar mma-mode stacks for build and review.
+The profile includes `AGENTS.md` for local-main pushing and worktree cleanup, `docs/git-workflow.md` for worktrees, rebases, draft-first PRs, and stacks with `git` and `gh`, `skills/mma-mode/` for maintainer steering, and `skills/best-in-class-approach/`, the quality bar mma-mode stacks for build and review.
 Mma-mode resolves poteto by URI and loads only references matching the current task instead of a monolithic contract.
 It also includes two scripts, run with `python3 ~/.omp/agent/scripts/<name>`: `prune-git-branches.py`, which with `--apply` removes merged worktrees and local branches whose upstream is gone (a dry run without it), and `session-speed.py`, which compares agent time per prompt before and after a config cutover.
 The default install does not copy those files.

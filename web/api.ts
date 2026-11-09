@@ -21,6 +21,41 @@ export class ApiError extends Error {
 /** What localStorage keeps under `key`, `null` where there is no localStorage, as in tests. */
 const stored = (key: string): string | null => globalThis.localStorage?.getItem(key) ?? null;
 
+/**
+ * A page a paired phone opened: it signed in through Phone access's pairing code, which only a phone does.
+ * The desktop window's preload writes the token without this mark, so the Mac's own page never counts as one.
+ */
+export const PHONE_PAGE_KEY = "omp-agents.phone";
+
+/** Whether this page signed in as a paired phone, which hides what only acts on the Mac. */
+export const isPhonePage = (): boolean => stored(PHONE_PAGE_KEY) === "1";
+
+/**
+ * Trades a `#pair=<code>` fragment for the phone's own token, once, before the page reads whether it is signed in.
+ * The fragment never reaches the server; the exchange does, and a failure leaves the page signed out.
+ */
+export async function exchangePairingCode(): Promise<void> {
+	const code = new URLSearchParams(location.hash.slice(1)).get("pair");
+	if (!code || !globalThis.localStorage) return;
+	history.replaceState(null, "", location.pathname + location.search);
+	try {
+		const response = await fetch("/api/phone-access/pair", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ code, name: navigator.userAgent.includes("Mobile") ? "iPhone" : "Phone" }),
+		});
+		if (!response.ok) return;
+		const body = (await response.json()) as { token?: unknown; mediaKey?: unknown };
+		if (typeof body.token !== "string" || typeof body.mediaKey !== "string") return;
+		localStorage.setItem(TOKEN_STORAGE_KEY, body.token);
+		localStorage.setItem(MEDIA_KEY_STORAGE_KEY, body.mediaKey);
+		localStorage.setItem(PHONE_PAGE_KEY, "1");
+		signedOut = false;
+	} catch {
+		// The code expired or the server is unreachable: the sign-in screen says to scan a new one.
+	}
+}
+
 const signOutListeners = new Set<() => void>();
 let signedOut = typeof window !== "undefined" && stored(TOKEN_STORAGE_KEY) === null;
 
@@ -39,6 +74,7 @@ function signOut(): void {
 	signedOut = true;
 	globalThis.localStorage?.removeItem(TOKEN_STORAGE_KEY);
 	globalThis.localStorage?.removeItem(MEDIA_KEY_STORAGE_KEY);
+	globalThis.localStorage?.removeItem(PHONE_PAGE_KEY);
 	for (const listener of signOutListeners) listener();
 }
 

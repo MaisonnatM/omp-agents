@@ -197,6 +197,13 @@ export function RoutineEditor({ initial, isNew, botName, connected, saving, onSa
 							<p className="text-xs text-muted-foreground">
 								Runs with sh in {botName}'s workspace, without an omp session, and stops after {COMMAND_TIME_LIMIT}. Its output goes into {botName}'s conversation.
 							</p>
+							<label className="flex items-start gap-2 text-sm">
+								<input type="checkbox" checked={draft.failuresOnly} onChange={event => set("failuresOnly", event.target.checked)} className="mt-0.5 size-4 shrink-0 accent-current" />
+								<span className="space-y-0.5">
+									<span className="block">Post the output to {botName} only when it fails</span>
+									<span className="block text-xs text-muted-foreground">A run that exits 0 keeps its output in the run list and starts no turn.</span>
+								</span>
+							</label>
 						</Choice>
 					</div>
 				</Field>

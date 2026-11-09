@@ -435,26 +435,21 @@ function applicationMenu(): Menu {
 	const openAtLogin: MenuItemConstructorOptions[] = app.isPackaged
 		? [{ label: "Open at Login", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin, click: toggleOpenAtLogin }]
 		: [];
-	const appMenu: MenuItemConstructorOptions[] = IS_MAC
-		? [
-				{
-					label: app.name,
-					submenu: [
-						{ role: "about" },
-						...updateItem(),
-						SEPARATOR,
-						...openAtLogin,
-						{ label: "Install omp Starter Kit…", click: () => void installStarterKitFromMenu() },
-						SEPARATOR,
-						{ role: "hide" },
-						{ role: "hideOthers" },
-						{ role: "unhide" },
-						SEPARATOR,
-						{ role: "quit" },
-					],
-				},
-			]
-		: [];
+	const appMenu: MenuItemConstructorOptions[] = [
+		{
+			label: app.name,
+			submenu: [
+				{ role: "about" },
+				...updateItem(),
+				SEPARATOR,
+				...openAtLogin,
+				{ label: "Install omp Starter Kit…", click: () => void installStarterKitFromMenu() },
+				SEPARATOR,
+				...(IS_MAC ? [{ role: "hide" as const }, { role: "hideOthers" as const }, { role: "unhide" as const }, SEPARATOR] : []),
+				{ role: "quit" },
+			],
+		},
+	];
 	const front: MenuItemConstructorOptions[] = IS_MAC ? [SEPARATOR, { role: "front" }] : [];
 	return Menu.buildFromTemplate([
 		...appMenu,
