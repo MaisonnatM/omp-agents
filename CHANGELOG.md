@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-09
 
+- Agents read a slightly shorter set of instructions: the subagent worktree rules now appear once, and poteto-mode no longer tells agents on `main` to use a setting the worktree guard rejects.
 - A folder an agent's removed worktree leaves behind, such as `yampa-wt/some-branch` holding only ignored files, no longer shows as a workspace of its own: its sessions count in the repository it came from.
 - In the desktop app's title bar, the Personal and Work switch now sits in the center, and the page title on the left after Back and Forward.
 - Graphite is gone from the dashboard: Settings › Source control no longer has a Graphite sign-in, and pull requests no longer offer Open on Graphite.
