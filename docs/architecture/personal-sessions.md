@@ -1,24 +1,29 @@
 # Personal sessions
 
-A personal session has no field of its own: a session is personal exactly when its directory is `personalDir` in `src/paths.ts`, `<data dir>/personal`.
+A personal session has no field of its own: a session is personal exactly when its directory is in the Personal space, as `spaceOf` in `src/shared/workspaces.ts` answers.
+`spaceOf` takes a directory and the workspace it counts in, the main checkout for a linked worktree as `WorkspacePlacement` in `src/workspace-placement.ts` finds it, else the directory itself.
+The directory is Personal when it is `personalDir` in `src/paths.ts`, `<data dir>/personal`, exactly, or when its workspace is in the `personal` list of `workspaces.json`, which Settings › Workspaces sets; every other directory is Work, a subdirectory of either included.
+See [Workspaces](http-api-workspaces.md) for the list.
 Its memory is `personalMemoryFile`, `<data dir>/personal-memory.md`, a plain Markdown file shaped as a Bot's `memory.md`, beside the directory so omp never reads it as one of that directory's files.
 For what the user sees, see [Personal sessions](../usage/personal-sessions.md).
 
 ## The extension
 
-`personalJoin` in `src/server/personal.ts` makes a `SessionJoin` for the dashboard's `#joinFor` from how to tell a Bot's start, so every session the dashboard launches that is not a Bot's loads it with `-e` and the flags in `PERSONAL_FLAGS`: the personal directory, the memory file, `sport.json`, and the sport inbox.
-A Bot's session launches without it, so a Bot whose workspace is the personal directory keeps only its own memory.
+`personalJoin` in `src/server/personal.ts` makes a `SessionJoin` for the dashboard's `#joinFor` from how to tell a Bot's start, so every session the dashboard launches that is not a Bot's loads it with `-e` and the flags in `PERSONAL_FLAGS`: the personal directory, `workspaces.json`, the memory file, `sport.json`, and the sport inbox.
+A Bot's session launches without it, so a Bot whose workspace is in the Personal space keeps only its own memory.
 A private session loads it as any other, so a private personal session reads and writes the shared memory.
 
-The extension decides per turn from the hook's `ctx.cwd`, not at load, so a session that moves in or out follows.
-Its `before_agent_start` returns nothing for a subagent or a directory other than the dir flag; otherwise it appends the framing and `memoryLines` of the memory file, the file's newest whole lines within `MAX_MEMORY_BYTES`, as a Bot's prompt carries its memory.
+The extension decides per turn from the hook's `ctx.cwd`, not at load, so a session that moves in or out, or whose workspace Settings › Workspaces moves to the other space, follows.
+`personalIn` reads `workspaces.json` with `readWorkspaces` from `src/server/workspaces-file.ts` each time, and asks git which workspace `ctx.cwd` counts in through its own `WorkspacePlacement`, once per directory and only while some workspace is Personal, so a Work-only setup never runs git.
+Its `before_agent_start` returns nothing for a subagent or a directory in the Work space; otherwise it appends a framing and `memoryLines` of the memory file, the file's newest whole lines within `MAX_MEMORY_BYTES`, as a Bot's prompt carries its memory.
+The framing makes the agent the user's personal assistant in the personal directory itself, and tells it a Personal repository is part of the user's own life, not their job, anywhere else.
 When the Sport module has a plan, it then appends one line for today, under 300 characters, from `todayLine` in `src/omp/sport-tool.ts`: the phase and whether it is a deload week, the day's workouts with their log status, and the pain flags that hold.
-The comparison is exact string equality with the path the dashboard passed, as omp reports `ctx.cwd`.
+Both the personal directory and the `personal` list are compared by exact string equality with the paths the dashboard keeps, as omp reports `ctx.cwd`.
 
-`remember`, and `sport` when the dashboard passed both sport flags, are registered only once a session is personal, the first time `session_start` or `before_agent_start` sees the personal directory, so every other session's tool list stays as it was.
+`remember`, and `sport` when the dashboard passed both sport flags, are registered only once a session is personal, the first time `session_start` or `before_agent_start` sees it in the Personal space, so every other session's tool list stays as it was.
 `session_start` alone is not enough: omp sets extension flags only after every extension loads (see [omp modules](omp-modules.md)), and a session can move in later.
 A tool registered inside `before_agent_start` changes the turn's base system prompt, which omp answers by preparing the turn once more, so the tool is in the first personal turn.
-Each tool's `execute` checks the directory again and refuses outside it, which covers a session that moved out after the tool was registered.
+Each tool's `execute` checks the space again and refuses outside the Personal space, which covers a session that moved out, or whose workspace moved to Work, after the tool was registered.
 `remember` itself is `rememberTool` in `src/omp/extension-kit.ts`, shared with the Bot extension: it trims and collapses the fact, refuses an empty one or one over `MAX_FACT_LENGTH`, and appends `- YYYY-MM-DD <fact>`.
 No inbox and no server writer stand between `remember` and the file, as with a Bot's memory.
 
@@ -37,7 +42,7 @@ It also tells the agent to check a video through YouTube's oEmbed address before
 
 ## Extension kit
 
-`src/omp/extension-kit.ts` holds what the omp-agents extensions share: `ExtensionApi`, the slice of omp's extension API they use, `ToolContext`, `flagValue`, `readText`, `reply`, `memoryLines`, and `rememberTool`.
+`src/omp/extension-kit.ts` holds what the omp-agents extensions share: `ExtensionApi`, the slice of omp's extension API they use, whose hooks may answer with a promise, `ToolContext`, `PromptChange`, `flagValue`, `readText`, `reply`, `memoryLines`, and `rememberTool`, whose memory path may be worked out asynchronously from the call's directory.
 The Bot, designer, shepherd, and personal extensions import from it; `BOT_FLAGS` stays in `src/omp/bot-extension.ts`.
 Their tools reach their inboxes through `inbox` in `templates/omp/agent/extensions/inbox/client.ts`, the starter kit's `user_note`, `user_todo`, and `user_event` tools' too, so one copy names the inbox files.
 `inbox<T>(dir)` types the changes an inbox takes: its `leave` writes one as a JSON file through a temporary name and a rename, under a name that sorts after the one before it, and its `waiting` reads those the dashboard has not applied yet, oldest first, leaving out a file that is not a JSON object.
@@ -47,14 +52,14 @@ Their tools reach their inboxes through `inbox` in `templates/omp/agent/extensio
 The dashboard creates `personalDir` in `start()`.
 It is outside git and holds no agent code, so `ProjectTrustFile.admit` passes for it without a trust; see [Project trust](project-trust.md).
 `isPersonalDir` in `src/server/personal.ts` resolves a `~` path through `absoluteDir` in `src/paths.ts` before comparing, since the page sends directories as shown.
-`SessionMoves` takes `staysPut`, true for a Bot's conversation or a session started in the personal directory, and gives neither the `move_session` tool; the join is decided at launch, so a session that moves into the directory keeps the tool.
+`SessionMoves` takes `staysPut`, true for a Bot's conversation or a session started in the personal directory itself, and gives neither the `move_session` tool; the join is decided at launch, so a session that moves into the directory keeps the tool, and a session on a Personal repository keeps it too.
 
 The page learns the directory and the memory from the read-only list message `personal`, `{ cwd, cwdDisplay, memory }`, which `personalMessage` builds and every socket gets on open.
-The dashboard pushes it again after a personal session's turn ends and when one exits, since that turn may have remembered something, as it pushes `bots` for a Bot's memory.
+The dashboard pushes it again after a personal session's turn ends and when one exits, since that turn may have remembered something, as it pushes `bots` for a Bot's memory; it tells a personal session with `spaceOf` and the placement its session list already holds.
 
 ## The page
 
 `web/dashboard-state.ts` keeps the directory as `personal`, one object while it stays the same, and the memory text as `personalMemory`.
 `PersonalContext` in `web/components/dashboard-context.tsx` provides the directory, and `workspaceName` in `web/labels.ts` names it **Personal**, from the directory as shown, for the workspace pickers, the roster's new-session button, a row's workspace badge, and the command palette.
 `DirectoryPicker` lists it first.
-`SessionDetails` adds a **Memory** tab for a session whose `cwd` is the personal directory, with `MemoryList` from `web/components/memory-list.tsx`, which a Bot's details also use.
+`SessionDetails` adds a **Memory** tab for a session `spaceOf` places in the Personal space, given the focused session's directory, its workspace from the roster, and the `personal` list of the `workspaces` message, with `MemoryList` from `web/components/memory-list.tsx`, which a Bot's details also use.

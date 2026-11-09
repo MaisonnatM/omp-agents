@@ -23,7 +23,7 @@
   - your notes;
   - your todos, with their categories and archive;
   - your preferences: the theme, what transcripts hide, the sidebar tabs, the pinned skill, notifications, the merge method, the diff view, calendar routines, and the idle stop;
-  - the workspaces Settings › Workspaces added and hid;
+  - the workspaces Settings › Workspaces added, hid, and placed in Personal;
   - the Google calendars the Calendar page hides.
   An item you turn off stays as it is, both here and on the remote.
 - **Never synced** lists what stays on each machine whatever the remote holds.

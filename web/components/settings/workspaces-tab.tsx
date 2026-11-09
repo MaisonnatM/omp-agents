@@ -1,8 +1,9 @@
 import { Eye, EyeOff, FolderOpen, FolderPlus, ShieldOff } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { TrustChange, TrustedProject } from "../../../src/shared/project-trust";
-import type { Workspace, WorkspaceChange, WorkspaceList } from "../../../src/shared/workspaces";
+import type { Space, Workspace, WorkspaceChange, WorkspaceList } from "../../../src/shared/workspaces";
 import { putJson } from "../../api";
 import { folderName } from "../../labels";
 import { useAction } from "../../use-action";
@@ -11,6 +12,29 @@ import { Section } from "./editor";
 
 /** The desktop app's bridge, whose folder dialog picks a workspace; absent in a browser, which keeps the typed path alone. */
 const desktop = typeof window === "undefined" ? undefined : window.ompDesktop;
+
+const SPACES: { value: Space; label: string }[] = [
+	{ value: "work", label: "Work" },
+	{ value: "personal", label: "Personal" },
+];
+
+/** The space a workspace is in, which a session started there takes: Work, or Personal with the personal memory and its tools; the personal directory is always Personal. */
+function SpacePicker({ workspace, space, fixed, disabled, onPick }: { workspace: Workspace; space: Space; fixed: boolean; disabled: boolean; onPick: (space: Space) => void }) {
+	return (
+		<Select<Space> items={SPACES} value={space} disabled={disabled || fixed} onValueChange={next => next && next !== space && onPick(next)}>
+			<SelectTrigger aria-label={`Space of ${folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay}`} className="w-fit">
+				<SelectValue />
+			</SelectTrigger>
+			<SelectContent>
+				{SPACES.map(({ value, label }) => (
+					<SelectItem key={value} value={value}>
+						{label}
+					</SelectItem>
+				))}
+			</SelectContent>
+		</Select>
+	);
+}
 
 function WorkspaceRow({ workspace, note, action }: { workspace: Workspace; note: string | null; action: ReactNode }) {
 	return (
@@ -31,6 +55,8 @@ interface WorkspacesTabProps {
 	/** What the pickers and the sidebar offer: directories sessions ran in, then the added ones. */
 	workspaces: Workspace[];
 	list: WorkspaceList<Workspace>;
+	/** The dashboard's personal directory, always in the Personal space; `null` until the server sends it. */
+	personalDir: Workspace | null;
 	trustedProjects: TrustedProject[];
 }
 
@@ -83,9 +109,10 @@ function TrustedProjects({ projects }: { projects: TrustedProject[] }) {
 	);
 }
 
-/** The directories the pickers and the sidebar offer, a field to add one by path or, in the desktop app, from the folder dialog, the hidden ones, each a click from coming back, and the trusted projects. */
-export function WorkspacesTab({ workspaces, list: { added, hidden }, trustedProjects }: WorkspacesTabProps) {
+/** The directories the pickers and the sidebar offer, each with its space, a field to add one by path or, in the desktop app, from the folder dialog, the hidden ones, each a click from coming back, and the trusted projects. */
+export function WorkspacesTab({ workspaces, list: { added, hidden, personal }, personalDir, trustedProjects }: WorkspacesTabProps) {
 	const addedCwds = new Set(added.map(entry => entry.cwd));
+	const personalCwds = new Set(personal.map(entry => entry.cwd));
 	const [path, setPath] = useState("");
 	const { pending, error, change } = useChanges<WorkspaceChange>("/api/workspaces");
 	const add = (event: FormEvent): void => {
@@ -98,7 +125,7 @@ export function WorkspacesTab({ workspaces, list: { added, hidden }, trustedProj
 	};
 	return (
 		<>
-			<Section meta="The directories the directory pickers and the sidebar's workspace picker offer. Hiding one also hides its sessions from the sidebar and search; a link to one still opens it.">
+			<Section meta="The directories the directory pickers and the sidebar's workspace picker offer. A session started in a Personal workspace, or in a worktree of one, remembers what you tell it about your life and can log sport; Work is the default. Hiding one also hides its sessions from the sidebar and search; a link to one still opens it.">
 				<form className="flex flex-wrap items-end gap-2" onSubmit={add}>
 					<label className="space-y-1 text-sm">
 						Directory
@@ -123,18 +150,30 @@ export function WorkspacesTab({ workspaces, list: { added, hidden }, trustedProj
 					<p className="text-sm text-muted-foreground">No workspaces yet. Start a session or add a directory.</p>
 				) : (
 					<IntegrationList label="Workspaces">
-						{workspaces.map(workspace => (
-							<WorkspaceRow
-								key={workspace.cwd}
-								workspace={workspace}
-								note={addedCwds.has(workspace.cwd) ? "Added" : null}
-								action={
-									<Button variant="ghost" size="compact" leadingIcon={EyeOff} loading={pending?.op === "hide" && pending.cwd === workspace.cwd} disabled={pending !== null} onClick={() => change({ op: "hide", cwd: workspace.cwd })}>
-										Hide
-									</Button>
-								}
-							/>
-						))}
+						{workspaces.map(workspace => {
+							const fixed = workspace.cwd === personalDir?.cwd;
+							return (
+								<WorkspaceRow
+									key={workspace.cwd}
+									workspace={workspace}
+									note={fixed ? "Always Personal" : addedCwds.has(workspace.cwd) ? "Added" : null}
+									action={
+										<>
+											<SpacePicker
+												workspace={workspace}
+												space={fixed || personalCwds.has(workspace.cwd) ? "personal" : "work"}
+												fixed={fixed}
+												disabled={pending !== null}
+												onPick={space => change({ op: "space", cwd: workspace.cwd, space })}
+											/>
+											<Button variant="ghost" size="compact" leadingIcon={EyeOff} loading={pending?.op === "hide" && pending.cwd === workspace.cwd} disabled={pending !== null} onClick={() => change({ op: "hide", cwd: workspace.cwd })}>
+												Hide
+											</Button>
+										</>
+									}
+								/>
+							);
+						})}
 					</IntegrationList>
 				)}
 			</Section>
