@@ -1,8 +1,9 @@
 ---
-status: accepted
+status: superseded
 date: 2026-11-04
 decision-makers: Maxence
 supersedes: 2026-11-04-show-new-session-starters-as-pills-under-a-raised-composer
+superseded-by: 2026-11-09-new-session-lists-no-starters
 ---
 
 # List New session starters in the composer's suggestion list

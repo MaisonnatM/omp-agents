@@ -1,10 +1,8 @@
 import { Lock, LockOpen, Sparkles, X } from "lucide-react";
 import { type KeyboardEvent, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { PullRequestSummary } from "../../src/shared/github";
-import { agentOn } from "../../src/shared/moves";
+import { RetroGrid } from "@/components/dithercn/retro-grid";
 import type { BranchChoice } from "../../src/shared/git";
 import type { NewSessionRequest, PastSession, RosterHost } from "../../src/shared/sessions";
-import type { Ticket } from "../../src/shared/tickets";
 import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -13,19 +11,15 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useComposerDraft } from "../composer-drafts";
 import { folderName, sameDir, PRIVATE_NOTE } from "../labels";
 import type { Completions } from "../pane-store";
-import { listedPullRequests, yourMoveCount } from "../pull-requests-model";
-import { pullRequestsStore, ticketsStore } from "../reads";
 import { usePinnedSkill } from "../pinned-skill";
 import { useDraftModelSelection } from "../use-draft-model";
 import { useShortcuts } from "../shortcuts";
 import type { ScheduleWhen } from "../scheduled-model";
 import type { NewOp, StartOf } from "../starts";
-import { rankedStarters, type Starter } from "../starters";
 import { useGitCheckout } from "../use-git-checkout";
 import { useAction } from "../use-action";
 import { useSkills } from "../use-skills";
 import { useCompletion } from "./completion-popup";
-import { useSuggestions } from "./composer-suggestions";
 import { blockedShortcut, ComposerEditor, ComposerNote, EmptyConversation } from "./composer";
 import { BranchPicker, targetOf } from "./git";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
@@ -64,8 +58,6 @@ interface NewSessionProps {
 	scheduled?: ScheduledDraft;
 	/** Where this browser keeps the unsent text; `null` keeps none. */
 	draftKey: string | null;
-	/** Where the starters listed under the composer come from; a scheduled start passes none and lists none. */
-	starters?: StarterSources;
 }
 
 /** What a scheduled start keeps of the draft: text only, in the draft's directory. */
@@ -91,17 +83,10 @@ export interface ScheduledDraft {
  * The composer picks the directory, the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
  * A skill pinned in the settings shows as a toggle, on until you turn it off for this session.
  */
-export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, scheduled, draftKey, starters }: NewSessionProps) {
+export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, scheduled, draftKey }: NewSessionProps) {
 	const initial = scheduled?.request ?? null;
 	const editorRef = useRef<PromptEditorHandle>(null);
 	const [draft, setDraft] = useComposerDraft(draftKey, initial?.prompt ?? todo?.prompt ?? "");
-	// Set by a starter's pick until the editor holds it as the draft, so the caret lands after the prompt.
-	const prefilled = useRef(false);
-	useEffect(() => {
-		if (!prefilled.current) return;
-		prefilled.current = false;
-		editorRef.current?.select(draft.length);
-	}, [draft]);
 	const attachments = usePromptAttachments(true);
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null } | null>(initial && { cwd: initial.cwd, choice: initial.branch });
 	const models = useDraftModelSelection(cwd, initial ?? undefined);
@@ -159,7 +144,6 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		if (completion.onMenuKeyDown(event)) return;
 		dictation.onKeyDown(event);
 		onComposerKey(event);
-		if (!event.defaultPrevented) suggestions.onKeyDown(event);
 		if (!event.defaultPrevented && event.key === "Escape") {
 			event.currentTarget.blur();
 			event.preventDefault();
@@ -176,22 +160,10 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const target = checkout ? targetOf(checkout, cwd, choice) : { dir: cwd, creates: false };
 	const name = folderName(target.dir) ?? target.dir;
 	const error = scheduled ? scheduled.error : launch?.phase === "failed" ? launch.error : null;
-	const starterList = useStarters(starters, name, choice?.name ?? checkout?.branch ?? null);
-	// A private draft lists its facts in the starters' place, and a personal draft lists none, since starters suit project work.
+	// A private draft lists what ending it deletes and what stays under the composer.
 	const panel = scheduled || !isPrivate ? null : <PrivateFacts personal={personalDraft} />;
-	const starterLabels = useMemo(() => new Map(starterList.map(starter => [starter.prompt, starter.label])), [starterList]);
-	// A starter only fills the draft, since some, such as `/ship `, wait for a blank to be filled.
-	const fillStarter = (prompt: string): void => {
-		prefilled.current = true;
-		setDraft(prompt);
-	};
-	const suggestions = useSuggestions({
-		prompts: connected && !starting && !scheduled && panel === null && !personalDraft ? [...starterLabels.keys()] : NO_PROMPTS,
-		labelOf: prompt => starterLabels.get(prompt) ?? prompt,
-		draft,
-		onSend: fillStarter,
-		onFill: fillStarter,
-	});
+	// The grid fills the page's lower half and fades out under the title, its sun on the horizon.
+	const backdrop = <RetroGrid aria-hidden horizon={0.62} sun={0.42} className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[52%] opacity-70 [mask-image:linear-gradient(to_bottom,transparent,black_35%)]" />;
 	const pickers = (
 		<>
 			<DirectoryPicker
@@ -204,11 +176,11 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 				onPick={onPickCwd}
 				control="composer.directory"
 			/>
-			{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
+			{scheduled && checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
 		</>
 	);
 	return (
-		<div className="flex h-full min-h-0 flex-1 flex-col">
+		<div className="relative isolate flex h-full min-h-0 flex-1 flex-col">
 			{scheduled ? (
 				<Header title="Scheduled session" meta={scheduled.when}>
 					{privacy}
@@ -235,13 +207,15 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					{todo && ` Your todo “${todo.text}” links to the session once it starts.`}
 				</EmptyConversation>
 			) : (
-				<NewSessionWelcome folder={name} personal={personalDraft} isPrivate={isPrivate} />
+				<>
+					{backdrop}
+					<NewSessionWelcome folder={name} personal={personalDraft} isPrivate={isPrivate} />
+				</>
 			)}
-			{/* The composer docks at the page's bottom, a new session's directory and branch above it and its starters inside it. */}
-			{/* The pickers above the composer sit inside it too, so a pick hands the focus back to its text box. */}
+			{/* The composer docks at the page's bottom, with the project picker left of the model; only a scheduled start shows the branch. */}
+			{/* The pickers sit inside the composer, so a pick hands the focus back to its text box. */}
 			<ComposerEditor value={editorRef}>
 				<div className="mx-auto w-full max-w-conversation px-3 pb-3">
-					{!scheduled && <div className="flex flex-wrap items-center gap-1 pb-1.5">{pickers}</div>}
 					<div className="relative">
 						{completion.popup}
 						<InputMessage
@@ -261,7 +235,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 							accept={ATTACH_ACCEPT}
 							leftSlot={
 								<>
-									{scheduled && pickers}
+									{pickers}
 									<ModelPicker {...models.picker} disabled={starting || !connected} control="composer.model" />
 									{draftSkill !== null && !ownCommand && <SkillToggle name={draftSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
 								</>
@@ -280,13 +254,10 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 							sending={starting || save.pending}
 							editorProps={{
 								...completion.editorProps,
-								"aria-activedescendant": completion.editorProps["aria-activedescendant"] ?? suggestions.activeId,
 								onKeyDown,
-								onBlur: suggestions.onBlur,
 								onPaste: scheduled ? undefined : attachments.onPaste,
 								autoFocus: true,
 							}}
-							afterActions={suggestions.list}
 						/>
 					</div>
 					{directCommand && <ComposerNote text={directCommand} />}
@@ -297,31 +268,6 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			</ComposerEditor>
 		</div>
 	);
-}
-
-/** Where the starters' blanks and ranking come from beyond the draft: the live sessions, which tell whose move a pull request waits on, and whether Linear answers. */
-export interface StarterSources {
-	hosts: RosterHost[];
-	linear: boolean;
-}
-
-const NO_STARTERS: Starter[] = [];
-const NO_PROMPTS: string[] = [];
-const NO_TICKETS: Ticket[] = [];
-const NO_PULL_REQUESTS: PullRequestSummary[] = [];
-
-/** The starters for a draft in `folder` on `branch`, the best fit now first; none without `sources`. */
-function useStarters(sources: StarterSources | undefined, folder: string, branch: string | null): Starter[] {
-	const { pullRequestsScope } = useDashboardStatus();
-	const tickets = ticketsStore.usePolling(null, sources?.linear ?? false).read?.data.tickets ?? NO_TICKETS;
-	const list = pullRequestsStore.use(pullRequestsScope).read?.data ?? null;
-	const hosts = sources?.hosts;
-	return useMemo(() => {
-		if (!hosts) return NO_STARTERS;
-		const pullRequests = list ? listedPullRequests(list.repos) : NO_PULL_REQUESTS;
-		const waiting = list ? yourMoveCount(list, agentOn(hosts)) : 0;
-		return rankedStarters({ folder, branch, tickets, pullRequests, waiting, now: new Date() });
-	}, [hosts, list, tickets, folder, branch]);
 }
 
 /** Whether the pinned skill applies: `missing` when the directory has no such skill. */

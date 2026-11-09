@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-09
 
+- New session now shows a dithered retro grid with a rising sun behind its title, and no longer lists starters under the composer.
+- New session's project picker now sits in the composer, left of the model, and its branch picker is gone; the session runs on the checked-out branch.
 - `/ship` now grills you on the change before it plans it, asking rounds of questions with a recommended answer each, and saves the settled terms and choices in the project's glossary and decision records.
 - Agents read a slightly shorter set of instructions: the subagent worktree rules now appear once, and poteto-mode no longer tells agents on `main` to use a setting the worktree guard rejects.
 - The Sessions sidebar no longer shows Bot conversations, which remain in Bots.
