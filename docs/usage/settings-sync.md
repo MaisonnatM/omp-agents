@@ -23,13 +23,15 @@
   - your notes;
   - your todos, with their categories and archive;
   - your preferences: the theme, what transcripts hide, the sidebar tabs, the pinned skill, notifications, the merge method, the diff view, calendar routines, and the idle stop;
-  - the workspaces Settings › Workspaces added and hid;
-  - the Google calendars the Calendar page hides.
+  - the workspaces Settings › Workspaces added, hid, and placed in Personal;
+  - the Google calendars the Calendar page hides;
+  - your Bots, each with its name, job, type, look, model, skill, workspace, pin, section, and memory.
+  A Bot's conversation stays on the machine that had it, so a Bot from another machine starts a new one here; facts each machine's Bot remembered arrive on both, and a Bot one machine deleted goes on the other with its routines.
   An item you turn off stays as it is, both here and on the remote.
 - **Never synced** lists what stays on each machine whatever the remote holds.
   That covers omp's `agent.db` and other databases, `mcp.json`, which can hold OAuth client secrets, `secrets.yml`, key files such as `.env` or `*.pem`, session files, lock files, and the dashboard's access token, interrupted sessions, and merges.
   Inside a synced directory, links, binary files, files over 1 MB, and files with text shaped like a token or a private key stay too, and so do your notes, todos, or other lists while one of them holds such text; the sync names each one it left.
-  Routines, scheduled sends, pinned sessions, notices, Google sign-ins, and calendar events kept on this computer do not sync, since they belong to this machine's sessions, runs, and accounts, and a routine on two machines would run twice.
+  Routines, scheduled sends, pinned sessions, notices, Google sign-ins, calendar events kept on this computer, and Bots' conversations do not sync, since they belong to this machine's sessions, runs, and accounts, and a routine on two machines would run twice.
   A synced todo keeps its session links, but they open only on the machine that ran the session.
 - A path under your home directory is written as `~` on the remote: `/Users/ann/notes` in `AGENTS.md` arrives as `~/notes`, and a repository's pull choice or a workspace moves to the same path under the other machine's home.
 - A change you make here while a sync runs is kept, and the next sync sends it.

@@ -142,6 +142,7 @@ export function SettingsPage({
 	onPickWorkspace,
 	workspaces,
 	workspaceList,
+	personal,
 	trustedProjects,
 }: {
 	section: SettingsSection;
@@ -150,6 +151,8 @@ export function SettingsPage({
 	onPickWorkspace: (cwd: string | null) => void;
 	workspaces: Workspace[];
 	workspaceList: WorkspaceList<Workspace>;
+	/** The dashboard's personal directory, for Settings › Workspaces; `null` until the server sends it. */
+	personal: Workspace | null;
 	/** The projects whose agent code the user trusted, for Settings › Workspaces. */
 	trustedProjects: TrustedProject[];
 }) {
@@ -188,7 +191,7 @@ export function SettingsPage({
 		integrations: <IntegrationsTab active={section === "integrations"} workspaces={workspaces} />,
 		"mcp-servers": <McpServersTab active={section === "mcp-servers"} />,
 		"source-control": <SourceControlTab active={section === "source-control"} />,
-		workspaces: <WorkspacesTab workspaces={workspaces} list={workspaceList} trustedProjects={trustedProjects} />,
+		workspaces: <WorkspacesTab workspaces={workspaces} list={workspaceList} personalDir={personal} trustedProjects={trustedProjects} />,
 		sync: <SyncTab active={section === "sync"} />,
 		storage: <StorageTab cwd={cwd} active={section === "storage"} onSaved={settings.reload} />,
 		worktrees: <WorktreesTab cwd={cwd} active={section === "worktrees"} />,

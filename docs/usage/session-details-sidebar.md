@@ -24,7 +24,7 @@
   The issue shows as on the tickets page: its header with the team, the identifier linking to Linear, the title, who opened it, and its branch, then its status, priority, assignee, due date, labels, and project, which you can edit there, then its **Description**, **Sub-issues**, **Links**, and **Comments** as sections that fold.
   **Sub-issues** draws them as a pull request's **Stack** draws its pull requests, on a rail in a box, under how many are done of those not canceled: each row shows the state, identifier, title, and priority, and the rail ends at the issue's own identifier, as a stack's ends at its base branch.
   Opening the tab, picking another issue, and each start and end of the view's turn read it from Linear.
-- **Memory** lists what personal sessions remember about you, each fact with the day it was kept, from `personal-memory.md`; see [Personal sessions](personal-sessions.md).
+- **Memory** lists what personal sessions, those in your Personal space, remember about you, each fact with the day it was kept, from `personal-memory.md`; see [Personal sessions](personal-sessions.md).
   Before anything is kept it reads **Nothing yet. Tell it something worth keeping, and it remembers it.**
   It reads the file again after each turn of a personal session ends.
 - A tab with nothing to show says so.

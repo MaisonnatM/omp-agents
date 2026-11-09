@@ -1,8 +1,10 @@
 import { Eye, EyeOff, FolderOpen, FolderPlus, ShieldOff } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { TrustChange, TrustedProject } from "../../../src/shared/project-trust";
-import type { Workspace, WorkspaceChange, WorkspaceList } from "../../../src/shared/workspaces";
+import { type Space, spaces, type Workspace, type WorkspaceChange, type WorkspaceList } from "../../../src/shared/workspaces";
 import { putJson } from "../../api";
 import { folderName } from "../../labels";
 import { useAction } from "../../use-action";
@@ -11,6 +13,29 @@ import { Section } from "./editor";
 
 /** The desktop app's bridge, whose folder dialog picks a workspace; absent in a browser, which keeps the typed path alone. */
 const desktop = typeof window === "undefined" ? undefined : window.ompDesktop;
+
+const SPACES: { value: Space; label: string }[] = [
+	{ value: "work", label: "Work" },
+	{ value: "personal", label: "Personal" },
+];
+
+/** The space a workspace is in, which a session started there takes: Work, or Personal with the personal memory and its tools. */
+function SpacePicker({ workspace, space, disabled, onPick }: { workspace: Workspace; space: Space; disabled: boolean; onPick: (space: Space) => void }) {
+	return (
+		<Select<Space> items={SPACES} value={space} disabled={disabled} onValueChange={next => next && next !== space && onPick(next)}>
+			<SelectTrigger aria-label={`Space of ${folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay}`} className="w-fit">
+				<SelectValue />
+			</SelectTrigger>
+			<SelectContent>
+				{SPACES.map(({ value, label }) => (
+					<SelectItem key={value} value={value}>
+						{label}
+					</SelectItem>
+				))}
+			</SelectContent>
+		</Select>
+	);
+}
 
 function WorkspaceRow({ workspace, note, action }: { workspace: Workspace; note: string | null; action: ReactNode }) {
 	return (
@@ -31,6 +56,8 @@ interface WorkspacesTabProps {
 	/** What the pickers and the sidebar offer: directories sessions ran in, then the added ones. */
 	workspaces: Workspace[];
 	list: WorkspaceList<Workspace>;
+	/** The dashboard's personal directory; `null` until the server sends it, and until then no row offers a space. */
+	personalDir: Workspace | null;
 	trustedProjects: TrustedProject[];
 }
 
@@ -83,9 +110,10 @@ function TrustedProjects({ projects }: { projects: TrustedProject[] }) {
 	);
 }
 
-/** The directories the pickers and the sidebar offer, a field to add one by path or, in the desktop app, from the folder dialog, the hidden ones, each a click from coming back, and the trusted projects. */
-export function WorkspacesTab({ workspaces, list: { added, hidden }, trustedProjects }: WorkspacesTabProps) {
+/** The directories the pickers and the sidebar offer, each with its space, a field to add one by path or, in the desktop app, from the folder dialog, the hidden ones, each a click from coming back, and the trusted projects. */
+export function WorkspacesTab({ workspaces, list: { added, hidden, personal }, personalDir, trustedProjects }: WorkspacesTabProps) {
 	const addedCwds = new Set(added.map(entry => entry.cwd));
+	const inSpaces = personalDir && spaces(personal.map(entry => entry.cwd), personalDir);
 	const [path, setPath] = useState("");
 	const { pending, error, change } = useChanges<WorkspaceChange>("/api/workspaces");
 	const add = (event: FormEvent): void => {
@@ -98,7 +126,14 @@ export function WorkspacesTab({ workspaces, list: { added, hidden }, trustedProj
 	};
 	return (
 		<>
-			<Section meta="The directories the directory pickers and the sidebar's workspace picker offer. Hiding one also hides its sessions from the sidebar and search; a link to one still opens it.">
+			<Section
+				meta={
+					<>
+						The directories the directory pickers and the sidebar's workspace picker offer. Hiding one also hides its sessions from the sidebar and search; a link to one still opens it.
+						<span className="mt-1 block">A session in a Personal workspace remembers what you tell it about your life and can log sport. Work is the default.</span>
+					</>
+				}
+			>
 				<form className="flex flex-wrap items-end gap-2" onSubmit={add}>
 					<label className="space-y-1 text-sm">
 						Directory
@@ -129,9 +164,18 @@ export function WorkspacesTab({ workspaces, list: { added, hidden }, trustedProj
 								workspace={workspace}
 								note={addedCwds.has(workspace.cwd) ? "Added" : null}
 								action={
-									<Button variant="ghost" size="compact" leadingIcon={EyeOff} loading={pending?.op === "hide" && pending.cwd === workspace.cwd} disabled={pending !== null} onClick={() => change({ op: "hide", cwd: workspace.cwd })}>
-										Hide
-									</Button>
+									<>
+										{inSpaces?.isPersonalDir(workspace.cwd) ? (
+											<Badge variant="dot" size="compact" className="shrink-0">
+												Personal
+											</Badge>
+										) : (
+											inSpaces && <SpacePicker workspace={workspace} space={inSpaces.of(workspace.cwd, workspace.cwd)} disabled={pending !== null} onPick={space => change({ op: "space", cwd: workspace.cwd, space })} />
+										)}
+										<Button variant="ghost" size="compact" leadingIcon={EyeOff} loading={pending?.op === "hide" && pending.cwd === workspace.cwd} disabled={pending !== null} onClick={() => change({ op: "hide", cwd: workspace.cwd })}>
+											Hide
+										</Button>
+									</>
 								}
 							/>
 						))}

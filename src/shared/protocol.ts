@@ -64,7 +64,7 @@ export type ServerMsg =
 	| { t: "personal"; cwd: string; cwdDisplay: string; memory: string }
 	/** Every scheduled send, whole, soonest first, sent when a socket opens and after every change. */
 	| { t: "scheduled"; sends: ScheduledSend[] }
-	/** The directories Settings → Workspaces added and hid, whole, sent when a socket opens and after every change. */
+	/** The directories Settings → Workspaces added, hid, and placed in the Personal space, whole, sent when a socket opens and after every change. */
 	| { t: "workspaces"; list: WorkspaceList<Workspace> }
 	/** The projects whose agent code the user trusted, whole, sent when a socket opens and after every change. */
 	| { t: "project-trust"; projects: TrustedProject[] }

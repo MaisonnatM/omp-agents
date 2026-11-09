@@ -928,12 +928,18 @@ export function parseWorktreeRemoval(body: unknown): Parsed<WorktreeRemovalReque
 export const parseBranchRelease = (body: unknown): Parsed<{ cwd: string; branch: string }> =>
 	isObject(body) && isNonEmpty(body.cwd) && body.cwd.startsWith("/") && isNonEmpty(body.branch) ? { ok: { cwd: body.cwd, branch: body.branch } } : null;
 
-const isWorkspaceOp = oneOf(["add", "hide", "show"] as const);
+const isWorkspaceOp = oneOf(["add", "hide", "show", "space"] as const);
+const isSpace = oneOf(["personal", "work"] as const);
 
-/** The body of `PUT /api/workspaces`: `{ op, cwd }`. Adding takes any path a new session takes; hiding and showing name an absolute directory. */
+/**
+ * The body of `PUT /api/workspaces`: `{ op, cwd }`, or `{ op: "space", cwd, space }`. Adding takes any path a new session
+ * takes; hiding, showing, and placing in a space name an absolute directory.
+ */
 export function parseWorkspaceChange(body: unknown): Parsed<WorkspaceChange> {
 	if (!isObject(body) || !isWorkspaceOp(body.op) || !isNonEmpty(body.cwd)) return null;
-	return body.op === "add" || body.cwd.startsWith("/") ? { ok: { op: body.op, cwd: body.cwd } } : null;
+	if (body.op !== "add" && !body.cwd.startsWith("/")) return null;
+	if (body.op !== "space") return { ok: { op: body.op, cwd: body.cwd } };
+	return isSpace(body.space) ? { ok: { op: "space", cwd: body.cwd, space: body.space } } : null;
 }
 
 /** The body of `PUT /api/project-trust`: `{ op: "trust", root, code: [{ id, hash }] }` or `{ op: "forget", root }`, `root` absolute. */

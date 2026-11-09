@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-09-a-personal-session-is-any-session-in-the-personal-space
 date: 2026-11-03
 decision-makers: agent
 ---

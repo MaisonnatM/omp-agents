@@ -68,7 +68,7 @@ export interface DashboardState extends PaneNavigation {
 	personalMemory: string;
 	/** The messages and session starts that wait for a time, soonest first, empty until the server first sends them. */
 	scheduled: ScheduledSend[];
-	/** The directories Settings → Workspaces added and hid, empty until the server first sends them. */
+	/** The directories Settings → Workspaces added, hid, and placed in the Personal space, empty until the server first sends them. */
 	workspaceList: WorkspaceList<Workspace>;
 	/** The projects whose agent code the user trusted, empty until the server first sends them. */
 	trustedProjects: TrustedProject[];
@@ -308,7 +308,7 @@ export function initialState(route: Route, ratios: SplitRatios = DEFAULT_SPLIT_R
 		personal: null,
 		personalMemory: "",
 		scheduled: [],
-		workspaceList: { added: [], hidden: [] },
+		workspaceList: { added: [], hidden: [], personal: [] },
 		trustedProjects: [],
 		pins: [],
 		notices: [],

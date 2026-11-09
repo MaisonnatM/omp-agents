@@ -161,11 +161,16 @@ export function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): 
 		});
 	});
 
-	/** `PUT /api/workspaces` `{ op, cwd }`: add a directory as a workspace, or hide or show one. */
+	/**
+	 * `PUT /api/workspaces` `{ op, cwd }` or `{ op: "space", cwd, space }`: add a directory as a workspace, hide or show one,
+	 * or place one in the Personal or the Work space; the personal directory is always Personal.
+	 */
 	const workspaceChange = write(
 		async (body): Promise<WorkspaceChange | Response> => {
-			const change = checked(parseWorkspaceChange(body), "Expected { op, cwd } with op add, hide, or show");
-			if (change instanceof Response || change.op !== "add") return change;
+			const change = checked(parseWorkspaceChange(body), 'Expected { op, cwd } with op add, hide, or show, or { op: "space", cwd, space } with space personal or work');
+			if (change instanceof Response) return change;
+			if (change.op === "space" && env.spaces().isPersonalDir(change.cwd)) return fail(400, "The personal directory is always in the Personal space.");
+			if (change.op !== "add") return change;
 			const cwd = await directoryOf(change.cwd);
 			return cwd ? { op: "add", cwd } : fail(400, `${change.cwd.trim()} is not a directory.`);
 		},

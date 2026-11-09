@@ -72,7 +72,7 @@ export const personalMemoryFile = join(dataDir, "personal-memory.md");
 export const privateSessionsDir = join(dataDir, "private-sessions", String(portFromEnv()));
 /** The messages and session starts that wait for their time, beside {@link tokenFile}. */
 export const scheduledFile = join(configDir, "scheduled.json");
-/** The directories Settings → Workspaces added and hid, beside {@link tokenFile}. */
+/** The directories Settings → Workspaces added, hid, and placed in the Personal space, beside {@link tokenFile}. */
 export const workspacesFile = join(configDir, "workspaces.json");
 /** Where an older version kept the {@link workspacesFile} list, beside {@link tokenFile}; the server moves it at startup. */
 export const oldWorkspacesFile = join(configDir, "projects.json");

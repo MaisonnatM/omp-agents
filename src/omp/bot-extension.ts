@@ -120,7 +120,7 @@ export default function botExtension(pi: ExtensionApi): void {
 	});
 
 	pi.registerTool(
-		rememberTool(pi, `Adds one fact to this Bot's memory, which every later turn's system prompt carries. Use one short sentence that stays true, at most ${MAX_FACT_LENGTH} characters.`, () => {
+		rememberTool(pi, `Adds one fact to this Bot's memory, which every later turn's system prompt carries. Use one short sentence that stays true, at most ${MAX_FACT_LENGTH} characters.`, async () => {
 			const memoryPath = thisBot()?.memoryPath;
 			if (!memoryPath) throw new Error("This session is not an omp-agents Bot, so it has no memory.");
 			return memoryPath;

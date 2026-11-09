@@ -451,6 +451,15 @@ describe("parseWorkspaceChange", () => {
 		expect(parseWorkspaceChange({ op: "remove", cwd: "/home/user/app" })).toBeNull();
 		expect(parseWorkspaceChange({ op: "add", cwd: "" })).toBeNull();
 	});
+
+	test("places a directory in a space by its absolute path, and rejects a relative path or another space", () => {
+		expect(parseWorkspaceChange({ op: "space", cwd: "/home/user/garden", space: "personal", extra: 1 })?.ok).toEqual({ op: "space", cwd: "/home/user/garden", space: "personal" });
+		expect(parseWorkspaceChange({ op: "space", cwd: "/home/user/garden", space: "work" })?.ok).toEqual({ op: "space", cwd: "/home/user/garden", space: "work" });
+		expect(parseWorkspaceChange({ op: "hide", cwd: "/home/user/garden", space: "personal" })?.ok).toEqual({ op: "hide", cwd: "/home/user/garden" });
+		expect(parseWorkspaceChange({ op: "space", cwd: "~/garden", space: "personal" })).toBeNull();
+		expect(parseWorkspaceChange({ op: "space", cwd: "/home/user/garden", space: "family" })).toBeNull();
+		expect(parseWorkspaceChange({ op: "space", cwd: "/home/user/garden" })).toBeNull();
+	});
 });
 describe("parseTrustChange", () => {
 	test("trusts pieces by id and hash alone, and forgets a project, by its absolute root", () => {

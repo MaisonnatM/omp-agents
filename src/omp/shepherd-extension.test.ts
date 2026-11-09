@@ -49,11 +49,11 @@ test("a fix that is not a repair, a bad pull request name, or a session that is 
 	expect(left()).toEqual([]);
 	const plain = loaded([SHEPHERD_FLAGS.bot]);
 	await expect(plain.call<MergeParams>(MERGE_TOOL, target)).rejects.toThrow("This session is not an omp-agents PR shepherd.");
-	expect(plain.prompt()).toBeUndefined();
+	expect(await plain.prompt()).toBeUndefined();
 });
 
-test("a shepherd's main agent hears what its tools do and what the dashboard refuses", () => {
-	const lines = loaded().prompt()!;
+test("a shepherd's main agent hears what its tools do and what the dashboard refuses", async () => {
+	const lines = (await loaded().prompt())!;
 	expect(lines[0]).toBe("base");
 	expect(lines[1]).toContain(`\`${FIX_TOOL}\` starts one session on a pull request's branch`);
 	expect(lines[1]).toContain("queues a merge only when the head has the same diff as a commit a reviewer approved");

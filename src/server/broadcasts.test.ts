@@ -65,6 +65,7 @@ function setup(initial: PastSession[]) {
 				list: {
 					added: workspaces.value.added.map(cwd => ({ cwd, cwdDisplay: cwd })),
 					hidden: workspaces.value.hidden.map(cwd => ({ cwd, cwdDisplay: cwd })),
+					personal: workspaces.value.personal.map(cwd => ({ cwd, cwdDisplay: cwd })),
 				},
 			}),
 			apply: change => workspaces.apply(change),
