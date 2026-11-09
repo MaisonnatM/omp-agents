@@ -2,6 +2,8 @@
 
 - The **Tickets** tab, or a `#tickets` address, opens the Linear issues assigned to you, as Linear's **My issues › Assigned** lists them.
   The sidebar then lists the workflow states with their issue counts; click one to scroll the page to it and move focus there, and a folded state unfolds.
+  Tickets shows only in the Work space: in Personal the tab, its number, its command, the command menu's tickets and **Create ticket**, and C's new-ticket dialog leave, and a `#tickets` link switches the window to Work; see [Sessions sidebar](sessions-sidebar.md).
+  The Todo page's **Create Linear ticket** and the Calendar's tickets stay in both spaces.
 - The page groups the issues by workflow state.
   **In Review** comes first, in the sidebar and on the page, with a green circle-dot icon.
   The other states follow Linear's order: triage, started (such as **In Progress**), unstarted (**Todo**), backlog, completed, and canceled.
