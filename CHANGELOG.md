@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-09
 
+- **Fix CI**, **Resolve conflicts**, and **Address comments** sessions now record their work in the PR's ship status, so its widget shows the rebase, CI fix, or comment fix in progress.
+- **Work on it** on a ticket or todo now runs the ship workflow, starting with its questions and plan, and still stops before pushing or opening a pull request.
 - A Bot's details have a **Restart conversation** button: after you confirm, its session ends and is archived, and its next message starts a fresh conversation. Its job, memory, and routines stay.
 - A routine that runs a command can now post its output to its Bot only when the command fails: check **Post the output to … only when it fails** in the routine's form. A run that succeeds keeps its output in the routine's history without waking the Bot.
 - On a phone, the header holds one menu named after the page you are on, listing every tab, Personal and Work, and Settings, beside search and the bell.
