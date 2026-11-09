@@ -10,6 +10,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The profile your model setup matches now shows a check.
 - A session you start from the dashboard can now wait for another running session: mention that session and ask it to wait, for example to review a branch once the session building it finishes.
 - A waiting session picks up as soon as the other session finishes its turn, asks you a question, or ends.
+- Behind the scenes: the record of why a session can move itself to another folder now gives today's reason, since its tools now know which session they belong to.
 - Settings sync now carries your Bots to your other computers, with their name, job, look, workspace, pin, section, and memory.
 - Each computer keeps its own conversation with a Bot, and a Bot you delete on one computer goes on the others with its routines.
 - When an agent grills you about a plan, it now asks each round of questions as clickable choices with its recommended answer first, so you no longer have to ask it to.
