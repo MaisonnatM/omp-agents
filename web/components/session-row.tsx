@@ -72,7 +72,7 @@ function SessionButton({ view, label, title, badge, facts, when, dot, placement,
 	const split = placement === "split";
 	const end = (
 		<>
-			{split && <Columns2 role="img" aria-label="In a split" className="size-3 shrink-0 translate-y-0.5 text-muted-foreground" />}
+			{split && <Columns2 role="img" aria-label="In a split" className="size-3 shrink-0 translate-y-0.5 text-muted-foreground/50" />}
 			<Age at={when} className={ROW_END} />
 		</>
 	);
