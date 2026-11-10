@@ -8,6 +8,7 @@ import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { commands, located } from "./shell/commands";
 import { quotaExhausted } from "./github/access";
 import { type GhCredential, GhRunner, rejectedCredential, TOKEN_VARIABLE } from "./github/runner";
+import { descriptionSnapshot, editDescription } from "./github/description";
 
 const ENTRY = "omp-ship.state";
 const WIDGET = "omp-ship";
@@ -15,8 +16,6 @@ const WIDGET = "omp-ship";
 export const PROOF_BOX = "- [ ] Browser proof";
 const POLL_MS = 60_000;
 const TURN_REFRESH_MS = 15_000;
-/** How long the review gates wait before reading a PR body again that lacks a box, once. */
-const BOX_REPOLL_MS = 1_000;
 
 // The plan comes before any code, so the implementation follows an approach chosen against its alternatives.
 // The interface review comes before the thermonuclear one, so the code-quality review sees the interface fixes.
@@ -73,8 +72,8 @@ const NEXT: Record<Stage, string> = {
 	plan: "Choose how to build the change as the ship skill's Plan step says, then record ship_stage({stage: 'implement'}).",
 	implement: "Implement the plan and commit on the work's branch. Do not open a PR in this stage.",
 	draft_pr: "Push the branch and run `gh pr create --draft`. Reference the issue, or put the plan in the body without one, as the ship skill's Draft PR step says.",
-	interface_review: `If the status says the ${REVIEWS.interface_review.label} is not needed because \`${REVIEWS.interface_review.pathsFile}\` lists no changed file, record ship_stage({stage: 'thermonuclear'}) and move on. Otherwise wait until the user approves the direction, then spawn \`task\` with \`agent: "interface-reviewer"\` on the PR, apply the findings in a fresh agent, push, then add \`${REVIEWS.interface_review.box}\` to the PR body.`,
-	thermonuclear: `If the status says the ${REVIEWS.thermonuclear.label} is not needed because \`${REVIEWS.thermonuclear.pathsFile}\` lists no changed file, skip the review. Otherwise wait until the user approves the direction, then run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${REVIEWS.thermonuclear.box}\` to the PR body. If the ${REVIEWS.interface_review.label} was needed and the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
+	interface_review: `If the status says the ${REVIEWS.interface_review.label} is not needed because \`${REVIEWS.interface_review.pathsFile}\` lists no changed file, record ship_stage({stage: 'thermonuclear'}) and move on. Otherwise wait until the user approves the direction, then spawn \`task\` with \`agent: "interface-reviewer"\` on the PR, apply the findings in a fresh agent, push, then record ship_stage({stage: 'thermonuclear'}), which checks \`${REVIEWS.interface_review.box}\` in the PR body.`,
+	thermonuclear: `If the status says the ${REVIEWS.thermonuclear.label} is not needed because \`${REVIEWS.thermonuclear.pathsFile}\` lists no changed file, skip the review. Otherwise wait until the user approves the direction, then run thermonuclear-reviewer on the PR diff, apply the findings, push, then record ship_stage({stage: 'ready_gate'}), which checks \`${REVIEWS.thermonuclear.box}\` in the PR body. If the ${REVIEWS.interface_review.label} was needed and the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
 	ready_gate: `When the ${REVIEWS.interface_review.label} was needed, make sure the PR body has no unchecked \`${PROOF_BOX}\` box. Then run \`gh pr ready <N>\` without asking first: the command itself asks the user to approve.`,
 	live: "Work the first need below. Stop when the forge reports merge-ready or while waiting for review. Never merge without an explicit request.",
 	merged: "Done.",
@@ -602,7 +601,8 @@ export default function ship(pi: ExtensionAPI) {
 		label: "Ship stage",
 		description: [
 			`Read or record the /ship workflow stage of this session: ${STAGES.join(", ")}.`,
-			"While live, record the work you start: rebase, fix_comments, or fix_ci; record `live` again after you push.",
+			"Recording thermonuclear or ready_gate checks the box of each needed review before it in the PR body, so record it only after that review's fixes are pushed.",
+			"`gh pr ready` records live; while live, record the work you start: rebase, fix_comments, or fix_ci; record `live` again after you push.",
 			"Call with no stage to read the current stage, the PR's live needs from GitHub, and the next action.",
 			"Call with stop: true when the user says 'no ship'; the widget, the gates, and the dashboard's Ship card then drop the run.",
 		].join(" "),
@@ -630,33 +630,48 @@ export default function ship(pi: ExtensionAPI) {
 				if (refreshFailure && stage && NEEDS_CURRENT_STATUS.includes(stage)) {
 					return { content: [{ type: "text" as const, text: `Cannot advance using stale GitHub status: ${refreshFailure}` }], isError: true };
 				}
+				let checked = "";
 				if (stage || issue || pr || repo || note !== undefined) {
 					if (stage === "ready_gate" || (stage !== undefined && isReviewStage(stage))) {
-						const reviews = state?.prStatus?.reviews;
-						if (!reviews && reviewsBefore(stage).length > 0) {
+						const status = state?.prStatus;
+						if (!status && reviewsBefore(stage).length > 0) {
 							return { content: [{ type: "text" as const, text: `GitHub has reported no status for this PR, so ${stage} cannot check its review boxes. Name the PR with ship_stage({pr}).` }], isError: true };
 						}
-						let missing = reviews && missingReview(reviews, stage);
-						if (missing) {
-							// GitHub can still answer with the body from before an edit made seconds ago, such as the box pr_description just added.
-							await Bun.sleep(BOX_REPOLL_MS);
-							await refreshNow(ctx);
-							const fresh = state?.prStatus?.reviews;
-							missing = fresh && missingReview(fresh, stage);
-						}
-						if (missing) {
-							const { label, box, pathsFile, withoutPaths } = REVIEWS[missing];
-							return { content: [{ type: "text" as const, text: `The PR must have \`${box}\` after the ${label} fixes are pushed, since a changed file matches \`${pathsFile}\`${withoutPaths ? ` or the repository has no \`${pathsFile}\`` : ""}.` }], isError: true };
+						const unchecked = status ? reviewsBefore(stage).filter(review => status.reviews[review].needed && !status.reviews[review].done) : [];
+						if (state && status && unchecked.length > 0) {
+							// Recording a stage declares the reviews before it done, so their boxes go in the PR body; a box the body already holds, such as one GitHub's status read missed just after an edit, stays as it is.
+							const path = `repos/${state.repo}/pulls/${state.pr}`;
+							const boxes = unchecked.map(review => `\`${REVIEWS[review].box}\``).join(" and ");
+							try {
+								const { changed } = await editDescription(`${state.repo}-${state.pr}`, { kind: "check", boxes: unchecked.map(review => REVIEWS[review].box) }, {
+									read: async () => descriptionSnapshot(await runner.json(["api", path], ctx.cwd)),
+									write: async body => {
+										await runner.json(["api", "-X", "PATCH", path, "-f", `body=${body}`], ctx.cwd);
+									},
+								});
+								if (changed) checked = `Checked ${boxes} in the PR body.\n`;
+							} catch (error) {
+								return { content: [{ type: "text" as const, text: `Could not check ${boxes} in the PR body, so ${stage} is not recorded: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+							}
+							save(ctx, { ...state, prStatus: { ...status, reviews: byReview(review => (unchecked.includes(review) ? { ...status.reviews[review], done: true } : status.reviews[review])) } });
 						}
 					}
-					if ((stage === "live" || stage === "rebase" || stage === "fix_comments" || stage === "fix_ci") && (!state?.prStatus || state.prStatus.draft || state.prStatus.state !== "OPEN")) {
-						return { content: [{ type: "text" as const, text: "The PR must be open and ready for review before recording live work." }], isError: true };
+					const isWork = stage === "rebase" || stage === "fix_comments" || stage === "fix_ci";
+					if (stage === "live" || isWork) {
+						if (state?.prStatus?.state === "OPEN" && state.prStatus.draft) {
+							const next = stage === "live"
+								? `Run \`gh pr ready ${state.pr}\` once the ready gate passes; it asks the user to approve, and a successful run records live.`
+								: "Do the work without recording it; live work is for a PR under review.";
+							return { content: [{ type: "text" as const, text: `PR #${state.pr} is still a draft, so ${stage} is not recorded and the stage stays ${LABEL[state.stage]}. ${next}` }] };
+						}
+						if (!state?.prStatus || state.prStatus.state !== "OPEN") {
+							return { content: [{ type: "text" as const, text: "The PR must be open before recording live work." }], isError: true };
+						}
 					}
 					if (stage === "merged" && state?.prStatus?.state !== "MERGED") {
 						return { content: [{ type: "text" as const, text: "GitHub has not reported this PR merged." }], isError: true };
 					}
 					const current = state ?? base;
-					const isWork = stage === "rebase" || stage === "fix_comments" || stage === "fix_ci";
 					save(ctx, {
 						...current,
 						stage: stage ? (isWork ? "live" : stage) : current.stage,
@@ -665,7 +680,7 @@ export default function ship(pi: ExtensionAPI) {
 						note: note === undefined ? current.note : note || undefined,
 					});
 				}
-				return { content: [{ type: "text" as const, text: `${report(state)}${refreshFailure ? `\nGitHub status unavailable; previous status is stale: ${refreshFailure}` : ""}` }], details: { state, ...(refreshFailure ? { stale: true, error: refreshFailure } : {}) } };
+				return { content: [{ type: "text" as const, text: `${checked}${report(state)}${refreshFailure ? `\nGitHub status unavailable; previous status is stale: ${refreshFailure}` : ""}` }], details: { state, ...(refreshFailure ? { stale: true, error: refreshFailure } : {}) } };
 			});
 			calls = call.catch(() => undefined);
 			return call;

@@ -2,7 +2,7 @@ import { afterEach, expect, mock, test } from "bun:test";
 import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { descriptionSnapshot, editDescription, type DescriptionChange } from "./agent/extensions/github/description";
+import { checkBoxes, descriptionSnapshot, editDescription, type DescriptionChange } from "./agent/extensions/github/description";
 
 const directories: string[] = [];
 afterEach(() => { for (const dir of directories.splice(0)) rmSync(dir, { recursive: true, force: true }); });
@@ -81,4 +81,20 @@ test("a successful no-op does not write", async () => {
 test("a null REST body is a real empty original, not a failed read", () => {
 	expect(descriptionSnapshot({ body: null, updated_at: snapshot.updatedAt })).toEqual({ body: "", updatedAt: snapshot.updatedAt });
 	for (const answer of [{}, { body: "" }, { body: 2, updated_at: snapshot.updatedAt }]) expect(() => descriptionSnapshot(answer)).toThrow("complete PR description");
+});
+
+test.each([
+	["an unchecked box is checked in place", "## Checks\n- [ ] Interface review\n- [ ] Browser proof\n", "## Checks\n- [x] Interface review\n- [ ] Browser proof\n"],
+	["a missing box is appended on its own line", "## Summary", "## Summary\n- [x] Interface review"],
+	["a checked box stays as it is", "- [x] Interface review\n", "- [x] Interface review\n"],
+])("checking a box: %s", (_, body, checked) => {
+	expect(checkBoxes(body, ["- [x] Interface review"])).toBe(checked);
+});
+
+test("checking boxes writes once, after the concurrent-change read", async () => {
+	const write = mock(async (_body: string) => {});
+	const read = mock(async () => snapshot);
+	await editDescription("acme-app-7", { kind: "check", boxes: ["- [x] Review", "- [x] Interface review"] }, { read, write }, directory());
+	expect(write).toHaveBeenCalledWith("## Summary\nOriginal text.\n- [x] Review\n- [x] Interface review");
+	expect(read).toHaveBeenCalledTimes(2);
 });

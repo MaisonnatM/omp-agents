@@ -55,9 +55,9 @@ The server strips its own `PORT` and `OMP_AGENTS_PARENT` from the sessions, shel
 
 ## Browser smoke
 
-Open the page with the `chrome-devtools` MCP tools (`xd://mcp__chrome-devtools_*`), which run headless Chrome on a throwaway profile, or prove a route's texts with [Smoke proof](#smoke-proof), which also checks that the server serves this checkout as it is now.
+Open the page with the `chrome-devtools` MCP tools (`xd://mcp__chrome_devtools_*`), which run headless Chrome on a throwaway profile, or prove a route's texts with [Smoke proof](#smoke-proof), which also checks that the server serves this checkout as it is now.
 omp's own `browser` is turned off for now (`browser.enabled = false`); eval has no `browser` global.
-Every page tool takes a `pageId`; `list_pages` names it, and the first page is `1`.
+Every page tool takes a `pageId`; `list_pages` names it, and the first page is `1`, which the kit's `chrome-devtools-page` extension fills in when a call leaves it out.
 Chrome starts at 800×600, below the layout's desktop breakpoints, so call `resize_page` with `width: 1920, height: 1080` before screenshots.
 
 The page first loads without a token and says to open the omp agents app; seed `localStorage` with `pageAccess(token)` and reload it.
