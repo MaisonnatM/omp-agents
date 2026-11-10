@@ -103,7 +103,7 @@ export async function removeApiCreditsProvider(dir = agentDir): Promise<void> {
 	if (start < 0) return;
 	let end = start + 1;
 	if (lines[end]?.startsWith(`  ${API_CREDITS_PROVIDER}:`)) end += 1;
-	while (end < lines.length && !/^ {2}[^ #]/.test(lines[end] ?? "")) end += 1;
+	while (end < lines.length && !/^ {0,2}\S/.test(lines[end] ?? "")) end += 1;
 	const next = [...lines.slice(0, start), ...lines.slice(end)].join("\n");
 	await rewrite(path, next);
 }

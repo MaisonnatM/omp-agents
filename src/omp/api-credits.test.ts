@@ -59,6 +59,20 @@ describe("API credits models.yml entry", () => {
 		expect(await readFile(path, "utf8")).toContain("apiKey");
 	});
 
+	test("removing the entry keeps a top-level key and a comment that follow it", async () => {
+		const root = await dir();
+		const path = join(root, "models.yml");
+		await Bun.write(path, "providers:\n  # my gateway\n  other:\n    baseUrl: https://example.com\nequivalence:\n  overrides:\n    a: b\n");
+		await addApiCreditsProvider(["claude-sonnet"], root);
+		await removeApiCreditsProvider(root);
+		expect(await readFile(path, "utf8")).toBe("providers:\n  # my gateway\n  other:\n    baseUrl: https://example.com\nequivalence:\n  overrides:\n    a: b\n");
+
+		await Bun.write(path, "providers:\nequivalence:\n  overrides:\n    a: b\n");
+		await addApiCreditsProvider(["claude-sonnet"], root);
+		await removeApiCreditsProvider(root);
+		expect(Bun.YAML.parse(await readFile(path, "utf8"))).toEqual({ providers: null, equivalence: { overrides: { a: "b" } } });
+	});
+
 	test("an existing models.yml keeps its permissions and stays a symlink to the file it points at", async () => {
 		const root = await dir();
 		const link = join(root, "models.yml");

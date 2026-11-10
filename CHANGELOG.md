@@ -27,6 +27,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Linux: Retry in the packaged app no longer strips the session bus and runtime directory settings from the server it restarts, and the app menu no longer shows Open at Login, which did nothing there.
 - The README no longer says quitting the app stops your sessions: they keep running and show live again at the next launch.
 - Tab no longer lands on the hidden rows of a collapsed sidebar group, such as past sessions.
+- A note or a reminder a Personal session left while the dashboard was closed no longer lands in Work at the next launch.
+- Removing the last Anthropic API key no longer deletes a setting or a comment that follows the dashboard's entry in models.yml.
 - What's new no longer shows stray asterisks and backticks around names in some entries.
 - The README and guides now give the keys the app uses: Cmd+Shift+Backspace stops a turn, Enter queues a message to a terminal session's subagent and Cmd+Enter steers it, and Todo and Calendar open from the header without a tab number.
 - The starter kit's instructions no longer point agents at a pr skill, a Skill tool, and a browser tool address that do not exist.
