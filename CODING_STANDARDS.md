@@ -14,8 +14,8 @@ Then read the section for the work: [Changelog](#changelog), [omp imports](#omp-
   Each of `docs/usage.md`, `docs/architecture.md`, and `docs/code-layout.md` lists its directory's files, one per feature; add a file there when you add one, and split a file before it reaches the 32 KiB that `src/docs.test.ts` allows.
   The README holds only features, installation, and configuration.
 - Look a feature up in `docs/usage/` by the words the page shows, such as a button's or a tab's label, rather than by a code identifier, which the interface docs rarely name.
-- Bump the tested omp version at all five of its pins together: `.github/workflows/checks.yml`, `.github/workflows/release.yml`, the README's omp badge and its `Tested with omp` line, and the `placeholder` in `.github/ISSUE_TEMPLATE/bug_report.yml`.
-  Bump Bun's version in both workflows together with the README's.
+- Bump the tested omp version at all its pins together: `.github/workflows/checks.yml`, `.github/workflows/release.yml`, the README's omp badge and its `Tested with omp` line, the `placeholder` in `.github/ISSUE_TEMPLATE/bug_report.yml`, and the omp version `templates/omp/README.md` names.
+  Bump Bun's version at all its pins together: both workflows, the README's badge and its two version lines, `package.json`'s `engines`, `MIN_BUN` in `src/preflight.ts`, and the Bun `placeholder` in `.github/ISSUE_TEMPLATE/bug_report.yml`.
   Check a new omp release with `bun run omp-release` and the [omp release skill](.agents/skills/omp-release/SKILL.md) before you bump it.
 - A change to a file that [`.omp/review-paths`](.omp/review-paths) matches needs the thermonuclear review before it ships; add a file there when it becomes a shared contract or a central file.
 - A change to a file that [`.omp/ui-paths`](.omp/ui-paths) matches needs the interface review before the thermonuclear one.
@@ -43,7 +43,7 @@ A merge commit skips that hook: when a merge leaves the file too large, run `bun
 ## omp imports
 
 Import omp's code instead of reimplementing a protocol or file format.
-Import omp's modules only from `src/omp/`, and only through `src/omp/modules.ts`.
+Import omp's modules only from `src/omp/`, and only through `src/omp/modules.ts`; the one exception is `src/keeper.ts`, which imports the RPC frame module by the path `modules.ts` gives it.
 It checks each export this app uses at startup, so add a new export there, and the interface it reads to its area's file in `src/omp/module-types/`.
 
 ## omp internals
@@ -63,7 +63,7 @@ After you read omp's source to learn a subsystem, add its files and the exports 
 
 Write every Markdown file with one sentence per line.
 Tools that read a doc cut a line at 768 characters, and an edit that copies the cut line back writes the truncation mark `…` into the file.
-`src/docs.test.ts` fails a line over 700 characters or ending in `…`, in root Markdown and under `docs/` and `templates/omp/`, including nested agent instructions.
+`src/docs.test.ts` fails a line over 700 characters or ending in `…`, in root Markdown and under `docs/`, `templates/omp/`, and `.agents/`, including nested agent instructions and skills.
 
 ## Template sync
 
