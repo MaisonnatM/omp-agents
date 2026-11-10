@@ -9,6 +9,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - In Settings, Source control, a pull that cannot reach its remote now says why, such as a repository that cannot be read, where it used to say only "and the repository exists." A failed settings sync says the same.
 - The server no longer stops when re-reading the session files fails right after a session exits, or when the search for a terminal session's subagent transcript fails.
 - Get started no longer waits without end on a GitHub sign-in check that hangs: the check gives up after 20 seconds.
+- Saving or removing an Anthropic API key in Settings no longer loosens the permissions of omp's models file, and no longer replaces a linked models file with a plain copy.
+- The usage check no longer copies your browsers' cookie files every minute to read the Anthropic Console balance unless an API key is saved, the only case that shows that balance.
 - Behind the scenes: removed unused imports, a prop no row read, and a line that could never run; declared two editor packages the page already used; merged two test files that shared a name, so both are type-checked; and corrected file lists, names, and three server descriptions in the docs.
 - Ship no longer stops on a missing review checkbox: recording the stage after the interface or thermo-nuclear review ticks that review's box in the pull request description, or adds it when the description has none.
 - Recording `live` or a fix while the pull request is still a draft now says what to do next, such as running `gh pr ready`, instead of failing.

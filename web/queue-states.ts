@@ -9,8 +9,6 @@ export interface QueueStates<State extends string> {
 	readonly current: () => ReadonlyMap<string, State>;
 	/** Sets each of `keys` to `state`, or drops it for `null`, then tells subscribers once. */
 	set(keys: Iterable<string>, state: State | null): void;
-	/** Tells subscribers something the queue keeps beside the states changed. */
-	notify(): void;
 	readonly subscribe: (listener: () => void) => () => void;
 	/** Where `key` stands; `null` while it is not queued. */
 	useState(key: string): State | null;
@@ -40,7 +38,6 @@ export function queueStates<State extends string>(): QueueStates<State> {
 			states = next;
 			notify();
 		},
-		notify,
 		subscribe,
 		useState: key => useSyncExternalStore(subscribe, () => states.get(key) ?? null),
 		useStates: () => useSyncExternalStore(subscribe, () => states),
