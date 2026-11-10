@@ -14,7 +14,8 @@ Alt is Option on macOS.
 | Cmd+[ / Cmd+] | Anywhere | Go back or forward, as the title bar's Back and Forward buttons do |
 | Cmd+N / S | Anywhere / outside text fields | Start a new session; on the tickets page, Cmd+N creates a Linear ticket |
 | Cmd+Shift+P | Anywhere but the command menu | Switch between the Personal and Work spaces |
-| Cmd+F | Anywhere | Put the cursor in the sidebar's session search |
+| Cmd+F | Anywhere | Find text in the focused session's conversation, or in the pull request the Pull requests page shows |
+| Cmd+Shift+F | Anywhere | Put the cursor in the sidebar's session search |
 | Cmd+W | Anywhere | End the focused session |
 | Cmd+Alt+↑ | Anywhere | Open the previous session in the sidebar |
 | Cmd+Alt+↓ | Anywhere | Open the next session in the sidebar |

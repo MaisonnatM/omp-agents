@@ -42,8 +42,9 @@
   It shows its key, Cmd+N, on its right.
 - The search field under it narrows every group to the sessions whose title or working directory holds every word typed, in any order and any case, within the selected workspace.
   A group left without a match hides, and `No sessions match` shows when none is left; Esc clears the field.
-  While empty, it shows its key, Cmd+F, on its right.
-  Cmd+F puts the cursor in it while the **Sessions** tab shows; elsewhere, and while the sidebar is hidden, Cmd+F does nothing.
+  While empty, it shows its key, Cmd+Shift+F, on its right.
+  Cmd+Shift+F puts the cursor in it while the **Sessions** tab shows; elsewhere, and while the sidebar is hidden, Cmd+Shift+F does nothing.
+  Cmd+F finds text in the open conversation instead, as [Conversations](conversations.md) says.
   Cmd+K opens the command menu, which searches every workspace of the space instead.
 - Sessions in `/tmp`, `/private/tmp`, or macOS's temp folders under `/var/folders` (where `mktemp -d` puts its directories), including their subdirectories, are hidden from the workspace pickers, session lists and counts, and session search.
   Starting or opening one does not replace the saved workspace.

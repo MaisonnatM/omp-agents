@@ -60,6 +60,8 @@ export const CONTROLS = [
 	{ id: "transcript.todos", label: "Todos card, folded or unfolded", area: "Transcript" },
 	{ id: "transcript.ship", label: "Todos card's Ship section, folded or unfolded", area: "Transcript" },
 	{ id: "transcript.subagents", label: "Todos card's Subagents section, folded or unfolded", area: "Transcript" },
+	{ id: "find-bar.step", label: "Find bar's previous or next match, in a conversation or a pull request", area: "Transcript" },
+	{ id: "find-bar.close", label: "Find bar closed, in a conversation or a pull request", area: "Transcript" },
 	{ id: "media-viewer.open", label: "Image opened large", area: "Transcript" },
 	{ id: "media-viewer.step", label: "Image viewer previous or next", area: "Transcript" },
 	{ id: "media-viewer.new-tab", label: "Image viewer, open in a new tab", area: "Transcript" },

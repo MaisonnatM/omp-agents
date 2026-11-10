@@ -2,7 +2,7 @@
 
 - `web/components/roster.tsx`: the left sidebar's tab bar, which draws the tabs whose place is the bar above a bar tab's panel only, its tickets list, and the workspace picker; `web/components/pull-requests/pull-requests-nav.tsx` is its Pull requests tab, and `web/components/section-link.tsx` the section link that the tickets list and the Pull requests page's section index share.
   `web/components/session-list.tsx` is its Sessions tab, which excludes Bot conversations and lists the first 100 past sessions until you ask for more.
-  `web/components/sidebar-search.tsx` is the Sessions tab's search field; given a shortcut, as the Sessions tab gives Cmd+F, the key puts the cursor in it and the empty field shows the key on its right.
+  `web/components/sidebar-search.tsx` is the Sessions tab's search field; given a shortcut, as the Sessions tab gives Cmd+Shift+F, the key puts the cursor in it and the empty field shows the key on its right.
   `web/components/kbd.tsx` holds `Kbd`, the key chip the command palette draws, and `ShortcutChip`, the smaller chip with a shortcut's first key that **New session** and that search field show on their right.
   `web/components/search-field.tsx` is the bordered search field the Notes page, the Todo page, and Settings › Files share, which Escape clears and leaves.
   `web/components/session-row.tsx` holds `PastRow` and `HostRow`, memoized on the row's session, so a roster push or a search keystroke renders only the rows it changed, each highlighted and marked as in a split by `rowPlacement` from `web/sessions.ts`; a private session's row shows `PrivateChip` from `web/components/private-chip.tsx`, which its header also shows, and its menu's **End** asks for a second click, as any action with a `confirm` does.

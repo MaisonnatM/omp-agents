@@ -85,6 +85,7 @@ import { PromptHistory } from "./prompt-history";
 import { SessionTodosCard } from "./session-todos-card";
 import { CancelAgentButton, SubagentLinks } from "./subagent-links";
 import type { ChangesSession } from "./todos-card-changes";
+import { FindBar, PaneFocused } from "./find-bar";
 import { TranscriptMinimap } from "./transcript-minimap";
 import { latestReviewPages, requestReview } from "../review-pages";
 import { BROWSER_AVAILABLE } from "./browser-panel";
@@ -650,6 +651,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	// The lane's first width counts at once; a new one counts once a resize rests, so a drag does not lay every row out on
 	// each frame of it.
 	const expanded = useContext(ToolsExpanded);
+	const paneFocused = useContext(PaneFocused);
 	const { hideTools, hideThinking } = useContext(ActivityVisibility);
 	const [laneWidth, setLaneWidth] = useState(0);
 	const laneRef = useRef<HTMLDivElement>(null);
@@ -821,6 +823,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 							)}
 						</MessageScrollerContent>
 					</MessageScrollerViewport>
+					<FindBar root={laneRef} enabled={paneFocused} label="Find in conversation" className="conversation-lane px-3" />
 					<TranscriptMinimap turns={model.outline} />
 					<PromptHistory view={view} turns={model.outline} />
 					<MessageScrollerButton {...activityControl("transcript.scroll-to-bottom")} />

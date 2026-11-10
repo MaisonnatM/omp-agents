@@ -33,4 +33,6 @@ export interface DetailContentProps {
 	onPick?: (pr: PullRequest) => void;
 	/** A checkout of its repository, where copying its branch removes the linked worktree that has it checked out; `null` when none is known. */
 	cwd: string | null;
+	/** Whether Cmd+F finds text in it: on the Pull requests page, and not in a session's details sidebar, where Cmd+F finds in the conversation. */
+	findable?: boolean;
 }

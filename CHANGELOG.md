@@ -8,6 +8,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Ship no longer stops on a missing review checkbox: recording the stage after the interface or thermo-nuclear review ticks that review's box in the pull request description, or adds it when the description has none.
 - Recording `live` or a fix while the pull request is still a draft now says what to do next, such as running `gh pr ready`, instead of failing.
 - A chrome-devtools page tool called without a `pageId`, such as a screenshot, now runs on the first page instead of failing; `close_page` and `select_page` still need one.
+- Cmd+F now finds text in the open conversation, or in the pull request the Pull requests page shows: every match is highlighted, the bar counts them, and Enter and Shift+Enter step through them.
+- The sidebar's session search moved to Cmd+Shift+F.
 - Fixed: a screenshot or file an agent names by its bare name, such as inline-rows.png, now opens when the agent had looked at it in another folder, instead of saying the file could not be loaded.
 - A reply that lists pages to review now has a Review visuals eye button under it, beside its copy button, in place of the card that listed the pages. It shows the Browser and opens that reply's pages as tabs, so you no longer go looking for the button in the Browser's toolbar.
 - Session rows in the sidebar line up again: each age shows its largest unit, such as `3h`, in a fixed column, so the workspace chips sit at the same place on every row.
