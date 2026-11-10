@@ -1,4 +1,5 @@
-import { Check, Copy, Ellipsis, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, Link, RefreshCw, Users, X, Zap } from "lucide-react";
+import { BookOpen, Check, Copy, Ellipsis, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, Link, MessageCircleQuestion, RefreshCw, Users, X, Zap } from "lucide-react";
+import { askPrompt, explainPrompt } from "../../../src/pull-request-actions";
 import { type PullRequest, type PullRequestDetail, type PullRequestSummary, prKey, pullRequestUrl, type SettableState } from "../../../src/shared/github";
 import type { QueuedMerge } from "../../../src/shared/merge-queue";
 import { MERGE_METHOD_LABELS, type MergeMethod } from "../../../src/shared/source-control";
@@ -6,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuLinkItem, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuSubmenu, MenuSubmenuContent, MenuSubmenuTrigger } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { appendToComposer, newDraftKey } from "../../composer-drafts";
 import { rebaseApplies } from "../../pull-requests-model";
 import { useRebaseState } from "../../pull-request-rebases";
 import { QUICK_ACTIONS } from "../../quick-actions";
@@ -15,6 +17,7 @@ import { useInlineConfirm } from "../../use-inline-confirm";
 import { OrgIcon } from "../org-icon";
 import { Spinner } from "../spinner";
 import type { QuickActionsProps } from "../quick-actions";
+import { useDashboardActions } from "../dashboard-context";
 import { PersonPicture } from "./avatars";
 import { REBASE_WORDS } from "./busy";
 import { type PullRequestOptionsRead, type ReviewerChange, requestedLogins, reviewerChoices } from "./pr-fields";
@@ -40,6 +43,12 @@ export interface MenuReviewers {
 	onChange: (change: ReviewerChange) => void;
 }
 
+/** **Explain this PR** and **Ask a question**: a new session in `cwd`, the pull request's checkout when one is known, whose draft names `pr`. */
+export interface MenuAsk {
+	pr: PullRequestSummary;
+	cwd: string | null;
+}
+
 export interface PullRequestMenuItemsProps {
 	pr: PullRequest;
 	state: PullRequestDetail["state"] | null;
@@ -50,6 +59,7 @@ export interface PullRequestMenuItemsProps {
 	merge?: HeaderMergeMenu;
 	rebase?: MenuRebase | null;
 	reviewers?: MenuReviewers;
+	ask?: MenuAsk | null;
 	pending?: boolean;
 }
 
@@ -100,7 +110,12 @@ function ReviewersSubmenu({ pr, options, onChange }: MenuReviewers) {
 }
 
 /** The pull request's actions, as its `⋯` menu and its row's right-click menu both list them. */
-export function PullRequestMenuItems({ pr, state, quick, onState, onApprove, merge, rebase, reviewers, pending = false }: PullRequestMenuItemsProps) {
+export function PullRequestMenuItems({ pr, state, quick, onState, onApprove, merge, rebase, reviewers, ask, pending = false }: PullRequestMenuItemsProps) {
+	const { openNewSession } = useDashboardActions();
+	const draft = (on: MenuAsk, prompt: string): void => {
+		appendToComposer(newDraftKey(null), prompt);
+		openNewSession(on.cwd ?? undefined);
+	};
 	const confirm = useInlineConfirm(prKey(pr));
 	const rebasing = useRebaseState(pr);
 	const offersRebase = !!rebase && rebaseApplies(rebase.facts);
@@ -119,7 +134,11 @@ export function PullRequestMenuItems({ pr, state, quick, onState, onApprove, mer
 					{rebasing ? REBASE_WORDS[rebasing].label : `Rebase on ${rebase.facts.base}`}
 				</MenuItem>
 			)}
-			{(quick.actions.length > 0 || offersRebase) && <MenuSeparator />}
+			{ask && <>
+				<MenuItem title="Start a session that walks through its purpose, changes, and risks, without changing code" onClick={() => draft(ask, explainPrompt(ask.pr))}><BookOpen />Explain this PR</MenuItem>
+				<MenuItem title="Start a session about it, with your question still to type" onClick={() => draft(ask, askPrompt(ask.pr))}><MessageCircleQuestion />Ask a question</MenuItem>
+			</>}
+			{(quick.actions.length > 0 || offersRebase || !!ask) && <MenuSeparator />}
 			{changesState && merge && merge.allowed.length > 1 && <>
 				<MenuRadioGroup aria-label="Merge method" value={merge.method ?? ""} onValueChange={value => { const method = merge.allowed.find(candidate => candidate === value); if (method) merge.onPick(method); }}>
 					{merge.allowed.map(method => <MenuRadioItem key={method} value={method} disabled={pending || !!merge.queued} closeOnClick><GitMerge />{MERGE_METHOD_LABELS[method]}</MenuRadioItem>)}
