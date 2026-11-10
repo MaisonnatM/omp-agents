@@ -1,6 +1,7 @@
 /** Settings › Phone access: Tailscale Serve, a one-time pairing code as a QR, and the paired phones. */
 import { useEffect, useState } from "react";
 import { renderSVG } from "uqr";
+import { errorText } from "../../../src/json";
 import { age } from "../../labels";
 import { getJson, putJson } from "../../api";
 import { useAction } from "../../use-action";
@@ -50,12 +51,16 @@ export function PhoneAccessTab({ active }: { active: boolean }) {
 	useEffect(() => {
 		if (!active) return;
 		const controller = new AbortController();
+		// An abort makes `getJson` reject, and neither it nor an answer that arrives with it must show.
 		getJson<PhoneAccessView>("/api/phone-access", controller.signal).then(
 			next => {
+				if (controller.signal.aborted) return;
 				setView(next);
 				setError(null);
 			},
-			(err: unknown) => setError(err instanceof Error ? err.message : String(err)),
+			(err: unknown) => {
+				if (!controller.signal.aborted) setError(errorText(err));
+			},
 		);
 		return () => controller.abort();
 	}, [active]);

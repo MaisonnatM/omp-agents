@@ -2,7 +2,7 @@
  * `useEditableRead`: a server read that writes change in place, and the one owner of what it shows: the server's last
  * answer, from a read or a write, and the edits that show over it until they answer.
  */
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { errorText } from "../src/json";
 import { getJson } from "./api";
 import type { ReadState } from "./reads";
@@ -117,6 +117,7 @@ export function useEditableRead<T extends object>(url: string | null, version?: 
 	};
 	const current = state.url === url ? state : null;
 	const data = useMemo(() => current && shownOf(current), [current]);
+	const reload = useCallback(() => setReads(count => count + 1), []);
 	return {
 		data,
 		error: current?.error ?? null,
@@ -135,6 +136,6 @@ export function useEditableRead<T extends object>(url: string | null, version?: 
 			if (url !== null) dispatch({ url, kind: "saved", id: null, ...answer });
 			return answer.data;
 		},
-		reload: () => setReads(count => count + 1),
+		reload,
 	};
 }

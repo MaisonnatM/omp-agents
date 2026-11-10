@@ -90,6 +90,7 @@ function Probe() {
 }
 const root = createRoot(container);
 await act(async () => root.render(createElement(Probe)));
+const firstReload = resource.reload;
 const answerRead = body => act(async () => reads.shift()(new Response(JSON.stringify(body), { status: 200 })));
 const writes = [];
 const write = () => {
@@ -107,15 +108,16 @@ await act(async () => {
 await act(async () => writes[0].resolve({ title: "new", state: "todo" }));
 await answerRead({ title: "old", state: "todo" });
 await act(async () => writes[1].reject(new Error("Linear is down")));
-console.log(JSON.stringify({ writes: writes.length, seen: seen.map(state => JSON.parse(state)) }));
+console.log(JSON.stringify({ writes: writes.length, sameReload: resource.reload === firstReload, seen: seen.map(state => JSON.parse(state)) }));
 `;
 
-test("useEditableRead keeps later edits over an earlier answer, ignores a stale read, and undoes a refused edit", async () => {
+test("useEditableRead keeps later edits over an earlier answer, ignores a stale read, undoes a refused edit, and keeps one reload function across renders", async () => {
 	const child = Bun.spawn([process.execPath, "--eval", hookScenario], { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" });
 	const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
 	expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" });
 	expect(JSON.parse(stdout)).toEqual({
 		writes: 2,
+		sameReload: true,
 		seen: [
 			{ data: null, saveError: null },
 			{ data: { title: "old", state: "todo" }, saveError: null },

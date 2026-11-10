@@ -465,7 +465,7 @@ export function ExtensionsTab({ cwd, active, onSaved }: { cwd: string | null; ac
 			(kind === "all" || pkg.target.kind === kind) &&
 			(scopeFilter === "all" || pkg.target.scope === scopeFilter) &&
 			(sourceFilter === "all" || pkg.source === sourceFilter) &&
-			`${pkg.name} ${pkg.source} ${pkg.description} ${pkg.target.scope}`.toLowerCase().includes(query.toLowerCase()),
+			`${pkg.name} ${pkg.source ?? ""} ${pkg.description} ${pkg.target.scope}`.toLowerCase().includes(query.toLowerCase()),
 	);
 	const filtered = query !== "" || kind !== "all" || scopeFilter !== "all" || sourceFilter !== "all";
 	const open = packages.find((pkg) => packageKey(pkg) === selected) ?? null;
