@@ -1,4 +1,4 @@
-/** The Personal and Work switch, the Notes, Calendar, Email, and Sport buttons, the command menu button, the notices' bell, and Settings: in the desktop app's title bar, else at the end of the page's header, where a phone gets one menu of every tab instead; and the title bar's Back and Forward buttons. */
+/** The Personal and Work switch, the Notes, Calendar, Todo, Sport, and Email buttons, the command menu button, the notices' bell, and Settings: in the desktop app's title bar, else at the end of the page's header, where a phone gets one menu of every tab instead; and the title bar's Back and Forward buttons. */
 import { ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { createContext, memo, type ReactNode, useContext } from "react";
 import type { Notice } from "../../src/shared/notices";

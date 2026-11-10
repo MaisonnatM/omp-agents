@@ -13,8 +13,8 @@
 - The side of the switch for the space not shown counts that space's sessions that need you, each that asks you something or finished a turn you have not looked at, so they do not wait unseen; hovering the side, or a screen reader, says how many sessions wait on you.
   Their notifications still show while you work in the other space, and clicking one switches to its space; the Dock badge counts both spaces.
 - The content header and both sidebar header rows are 48 px tall at the default font size, each with a hairline under it.
-- The sidebar's tab bar shows **Pull requests**, **Tickets**, **Bots**, **Sessions**, and **Todo**, above the list of the one open; **Tickets** shows only in Work.
-  **Notes**, **Calendar**, **Email**, and **Sport** are buttons in the header, right after the command menu button, between two dividers; each opens its page and shows its list in the sidebar below the tab bar, with no tab selected, and the open one's button stays pressed; **Sport** shows only in Personal.
+- The sidebar's tab bar shows **Pull requests**, **Tickets**, **Bots**, and **Sessions**, above the list of the one open; **Tickets** shows only in Work.
+  **Notes**, **Calendar**, **Todo**, **Sport**, and **Email** are buttons in the header, right after the command menu button, between two dividers; each opens its page and shows its list in the sidebar below the tab bar, with no tab selected, and the open one's button stays pressed; **Sport** shows only in Personal.
   The **Bots** tab lists your Bots and opens their conversations, which stay out of the **Sessions** tab.
   See [Bots](bots.md).
   The **Sessions** tab counts the sessions of the picked workspace that need you: each that asks you something, or finished a turn you have not looked at since.
