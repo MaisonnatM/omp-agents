@@ -11,7 +11,7 @@ import { checkDecisions } from "../templates/omp/agent/skills/decision-records/c
 const MAX_LINE = 700;
 const root = join(import.meta.dir, "..");
 const scan = (patterns: string[]) => patterns.flatMap(pattern => [...new Bun.Glob(pattern).scanSync({ cwd: root })]).sort();
-const docs = scan(["*.md", "docs/**/*.md", "templates/omp/**/*.md"]);
+const docs = scan(["*.md", "docs/**/*.md", "templates/omp/**/*.md", ".agents/**/*.md"]);
 /** The repository's own docs; the starter kit's name paths on the user's machine. */
 const repoDocs = scan(["*.md", "docs/**/*.md"]);
 

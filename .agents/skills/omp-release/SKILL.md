@@ -45,7 +45,7 @@ For each, find what in this repository it touches: the bullet of [omp modules](.
 Each finding goes in one bucket:
 
 - **MUST change**: a failing test or module check, an export or behavior this repository relies on that the release changed (RPC frames and commands, the session file format, settings keys, paths), a patch whose source hunks no longer apply, and the version pins, which every newer release needs.
-  The pins are `.github/workflows/checks.yml`, `.github/workflows/release.yml`, the README's omp badge and its `Tested with omp` line, and the `placeholder` in `.github/ISSUE_TEMPLATE/bug_report.yml`.
+  The pins are `.github/workflows/checks.yml`, `.github/workflows/release.yml`, the README's omp badge and its `Tested with omp` line, the `placeholder` in `.github/ISSUE_TEMPLATE/bug_report.yml`, and the omp version `templates/omp/README.md` names.
 - **SHOULD adopt**: a new capability the dashboard should handle as an RPC host or a session viewer, such as a new RPC command, frame, or field, a new session entry type, or a new extension UI request.
 - **Docs drift**: a statement under `docs/architecture/`, `docs/usage/`, or `docs/code-layout/` that the release makes false, such as a moved file, a renamed export, or changed behavior that a doc describes.
 
@@ -62,8 +62,7 @@ When MUST change holds only the version pins, and both the tests and the module 
 1. Create a worktree off `origin/main` on a branch named `omp-<target>`, outside this checkout, and run `bun install --frozen-lockfile` there.
 2. In it, change the tested version to the target at every pin site listed under MUST change.
 3. Run `bun test` and `bun run typecheck` there.
-4. Commit with the message `Test with omp <target>`, and save your report to a file outside the worktree.
-   The report is the PR body; the script's file is not, since it holds every diff and outgrows GitHub's 65,536-character limit.
-5. Open a draft PR from the worktree: run `git push -u origin omp-<target>` and `gh pr create --draft --base main --title "Test with omp <target>" --body-file <report>`.
+4. Add a `CHANGELOG.md` line under today's heading, as [Changelog](../../../CODING_STANDARDS.md#changelog) says, such as "Behind the scenes: tested with omp <target>.", and commit with the message `Test with omp <target>`.
+5. Land it with the `land` tool, passing the worktree as `path`, and deliver your report in the reply.
 
 In every other case, deliver the report and leave the repository as it is.

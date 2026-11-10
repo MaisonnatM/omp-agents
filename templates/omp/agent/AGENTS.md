@@ -1,6 +1,7 @@
 # OMP user context
 
 Applies to every omp session on this machine.
+When an instruction file and the existing code disagree, follow the conventions in the code, and point out each mismatch in your final reply.
 If `PI_CODING_AGENT_DIR` is set, substitute that directory for `~/.omp/agent` in the reference paths below.
 
 ## Git safety
