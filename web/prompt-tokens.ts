@@ -1,5 +1,5 @@
 /**
- * The references a prompt carries as text, which the composer and the transcript show as chips: what the `/` completion
+ * The references a prompt carries as text, which the composer and the transcript show as chips: what the `$` menu
  * and the `@` menu insert. The prompt stays a string; a chip is a view of the characters it covers.
  */
 import { skillLabel } from "./labels";

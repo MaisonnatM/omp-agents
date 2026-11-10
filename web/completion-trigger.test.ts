@@ -1,11 +1,14 @@
 import { expect, test } from "bun:test";
 import { completionTrigger } from "./completion-trigger";
 
-test("slash suggestions require a token under the caret", () => {
-	expect(completionTrigger("/skill:demo", 11)).toEqual({ kind: "slash" });
-	expect(completionTrigger("Please /skill:demo", 18)).toEqual({ kind: "slash" });
-	expect(completionTrigger("See /skill:demo later", 21)).toBeNull();
-	expect(completionTrigger("https://example.com", 19)).toBeNull();
+test("$ opens commands and skills under the caret, and / no longer does", () => {
+	expect(completionTrigger("$", 1)).toEqual({ kind: "command", start: 0 });
+	expect(completionTrigger("$skill:demo", 11)).toEqual({ kind: "command", start: 0 });
+	expect(completionTrigger("Please $skill:demo", 18)).toEqual({ kind: "command", start: 7 });
+	expect(completionTrigger("See $skill:demo later", 21)).toBeNull();
+	expect(completionTrigger("It costs $5", 11)).toBeNull();
+	expect(completionTrigger("echo a$b", 8)).toBeNull();
+	expect(completionTrigger("/skill:demo", 11)).toBeNull();
 });
 
 test("mentions work after prose but not inside ordinary words", () => {
