@@ -1,6 +1,6 @@
 /** The Todos card's Subagents section: the view's subagents as a tree, each a link to its own view with its status and what it is doing. */
 import { Tooltip } from "@/components/ui/tooltip";
-import { modeOf, SPLIT_CLICK } from "../labels";
+import { SPLIT_CLICK, subagentModeOf } from "../labels";
 import { hashForView } from "../routing";
 import { useStoredState } from "../stored-state";
 import type { SubagentNode } from "../todos-card-subagents-model";
@@ -36,7 +36,7 @@ export function SubagentsSection({ links, nodes }: { links: SubagentLinksValue; 
 					const view = { kind: "live", instanceId: links.instanceId, agentId: agent.id } as const;
 					return (
 						<li key={agent.id} className="flex min-w-0 items-center gap-0.5" style={{ paddingLeft: depth * INDENT_PX }}>
-							<Tooltip content={`${[agent.id, agent.kind, statusLabel(agent.status), agent.activity].filter(Boolean).join(" · ")}. ${SPLIT_CLICK} to open in a split`} side="left">
+							<Tooltip content={`${[agent.id, agent.kind, statusLabel(agent.status), agent.activity].filter(Boolean).join(" · ")}. ${SPLIT_CLICK} to open in this pane`} side="left">
 								<a
 									href={hashForView(view)}
 									className="grid min-w-0 flex-1 grid-cols-[0.375rem_minmax(0,1fr)] items-center gap-x-2 rounded-md px-2 py-1 text-[13px] outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
@@ -44,7 +44,7 @@ export function SubagentsSection({ links, nodes }: { links: SubagentLinksValue; 
 										// Shift- and middle-clicks keep the link's own new-window behavior.
 										if (event.button !== 0 || event.shiftKey || event.altKey) return;
 										event.preventDefault();
-										links.onOpen(view, modeOf(event));
+										links.onOpen(view, subagentModeOf(event));
 									}}
 								>
 									{/* A running subagent draws no dot, so the column keeps names aligned with the rows that do. */}

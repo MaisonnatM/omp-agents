@@ -94,7 +94,7 @@ export function changePanes(state: PaneNavigation, command: PaneCommand, hosts: 
 	const { layout, splits } = state;
 	switch (command.kind) {
 		case "select": {
-			if (command.mode === "split") return edit(state, openView(layout, command.view, "split"), knownHosts(hosts, lastHosts));
+			if (command.mode !== "replace") return edit(state, openView(layout, command.view, command.mode), knownHosts(hosts, lastHosts));
 			const active = layout.panes.findIndex(view => sameView(view, command.view));
 			if (active >= 0) return { layout: { ...layout, focus: active, maximized: false }, splits };
 			const known = knownHosts(hosts, lastHosts);

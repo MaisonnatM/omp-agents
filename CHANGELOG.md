@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-10
 
+- Clicking a subagent now opens it in a split beside its session, at full height, instead of in place of the session. Cmd-click opens it in place, as a click did before.
+- The sidebar marks the sessions of a split with a two-column icon, and highlights a session while one of its subagents is open.
 - The model menu has an Extra usage switch. On, a full Claude allowance stays on Claude instead of moving to a fallback such as Cursor. Off puts the fallback list back. It applies to every session.
 - Fixed: Connect in Integrations failed, such as with "Google Calendar has no server to sign in to", when the service's server was turned off. Connect now turns it back on.
   It skips the sign-in page while the old sign-in still works.

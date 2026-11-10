@@ -1,10 +1,10 @@
 import { fromPartial } from "@total-typescript/shoehorn";
 import { describe, expect, test } from "bun:test";
 import type { ScheduledSend } from "../src/shared/scheduled";
-import type { AgentRow, AgentStatus, HostStatus, PastSession, RosterHost, UnreadTurn } from "../src/shared/sessions";
+import type { AgentRow, AgentStatus, HostStatus, PastSession, RosterHost, UnreadTurn, View } from "../src/shared/sessions";
 import { spaces } from "../src/shared/workspaces";
 import type { Layout, Page } from "./routing";
-import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, scheduledIn, searchSessions, sessionsIn, sidebarSessions, spaceSession, spaceSwitchPanes, waitingCount, waitingIn, workspaceSession, workspacesIn, workspaceSwitch } from "./sessions";
+import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, rowPlacement, scheduledIn, searchSessions, sessionsIn, sidebarSessions, spaceSession, spaceSwitchPanes, waitingCount, waitingIn, workspaceSession, workspacesIn, workspaceSwitch } from "./sessions";
 
 const host = (sessionId: string, cwd: string) => fromPartial<RosterHost>({ instanceId: `i-${sessionId}`, sessionId, cwd, agents: [], turnWaits: false });
 const subagents = (...statuses: AgentStatus[]): AgentRow[] => statuses.map(status => fromPartial<AgentRow>({ status }));
@@ -334,5 +334,33 @@ describe("a session in a linked worktree", () => {
 
 	test("leaves the lists with its hidden workspace", () => {
 		expect(ids(discoverableSessions([inWorktree, inMain], [], new Set(["/code/app"]), noBots).hosts)).toEqual([]);
+	});
+});
+
+describe("rowPlacement", () => {
+	const live = (instanceId: string, agentId: string | null = null): View => ({ kind: "live", instanceId, agentId });
+	const saved: View = { kind: "past", sessionId: "s" };
+
+	test("a session shown alone is alone, and one off screen is hidden", () => {
+		expect(rowPlacement([live("a")], live("a"))).toBe("alone");
+		expect(rowPlacement([live("a")], live("b"))).toBe("hidden");
+		expect(rowPlacement([saved], saved)).toBe("alone");
+		expect(rowPlacement([], saved)).toBe("hidden");
+	});
+
+	test("a session sharing the screen with another pane is in a split", () => {
+		expect(rowPlacement([live("a"), saved], live("a"))).toBe("split");
+		expect(rowPlacement([live("a"), saved], saved)).toBe("split");
+		expect(rowPlacement([live("a"), saved], live("b"))).toBe("hidden");
+	});
+
+	test("a pane of one of its subagents shows the session", () => {
+		expect(rowPlacement([live("a", "explore")], live("a"))).toBe("alone");
+		expect(rowPlacement([live("a"), live("a", "explore")], live("a"))).toBe("split");
+		expect(rowPlacement([live("b"), live("a", "explore")], live("a"))).toBe("split");
+	});
+
+	test("a past session with the same id as a live instance is not confused with it", () => {
+		expect(rowPlacement([live("s")], saved)).toBe("hidden");
 	});
 });

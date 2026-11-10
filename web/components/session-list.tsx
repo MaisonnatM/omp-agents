@@ -4,8 +4,7 @@ import type { ScheduledSend } from "../../src/shared/scheduled";
 import type { View } from "../../src/shared/sessions";
 import { SidebarContent, SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
-import { sameView } from "../routing";
-import { liveHosts, type SidebarSessions } from "../sessions";
+import { liveHosts, rowPlacement, type SidebarSessions } from "../sessions";
 import { shortcutLabels } from "../shortcuts";
 import { useStoredKeys } from "../stored-state";
 import { ShortcutChip } from "./kbd";
@@ -26,7 +25,7 @@ interface SessionListProps {
 	onQuery: (query: string) => void;
 	/** Pin session `sessionId`, or unpin it when it is pinned; the same function on every render. */
 	onTogglePin: (sessionId: string) => void;
-	/** Views on screen, highlighted in the list. */
+	/** Views on screen; their sessions' rows are highlighted, and marked while they share the screen with another pane. */
 	open: View[];
 	/** All workspaces are listed, so a titled row names its workspace. */
 	showWorkspace: boolean;
@@ -48,16 +47,15 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 	const [pastShown, setPastShown] = useState(PAST_PAGE);
 	const { pinned, running, idle, awaitingSubagents, interrupted, ended } = lists;
 	const resumingAll = resumeAll?.phase === "starting";
-	const isOpen = (view: View): boolean => open.some(pane => sameView(pane, view));
 	/** The search field narrows the lists, so a group left empty hides rather than saying it has no sessions. */
 	const filtering = query.trim() !== "";
 	const rowProps = { showWorkspace, onTogglePin };
 	const hostRows = (hosts: SidebarSessions["running"], isPinned: boolean) =>
 		hosts.map(host => (
-			<HostRow key={host.instanceId} session={host} pinned={isPinned} open={isOpen({ kind: "live", instanceId: host.instanceId, agentId: null })} {...rowProps} />
+			<HostRow key={host.instanceId} session={host} pinned={isPinned} placement={rowPlacement(open, { kind: "live", instanceId: host.instanceId, agentId: null })} {...rowProps} />
 		));
 	const pastRows = (past: SidebarSessions["ended"], isPinned: boolean) =>
-		past.map(session => <PastRow key={session.sessionId} session={session} pinned={isPinned} open={isOpen({ kind: "past", sessionId: session.sessionId })} {...rowProps} />);
+		past.map(session => <PastRow key={session.sessionId} session={session} pinned={isPinned} placement={rowPlacement(open, { kind: "past", sessionId: session.sessionId })} {...rowProps} />);
 	const hidden = ended.length - pastShown;
 	return (
 		<>
