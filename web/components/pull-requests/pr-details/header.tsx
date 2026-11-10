@@ -21,7 +21,7 @@ import { Avatar, STATE_ICON } from "../avatars";
 import { type Busy, busyWords, useBusy } from "../busy";
 import { queuedMergeText } from "../merge-popover";
 import { type SavePullRequest, type SendPullRequest } from "../pr-fields";
-import { type MenuRebase, PullRequestMenu } from "../pr-menu";
+import { type MenuAsk, type MenuRebase, PullRequestMenu } from "../pr-menu";
 import { useMergeController } from "../use-merge-controller";
 import type { DetailContentProps, Placement } from "./detail-props";
 import { CheckoutMenu } from "./checkout-menu";
@@ -105,6 +105,7 @@ interface DetailHeaderProps {
 	quick: QuickActionsProps;
 	/** **Rebase on** its base in the `⋯` menu, once its pull request list entry and workspace are known. */
 	rebase: MenuRebase | null;
+	ask: MenuAsk | null;
 	onSave: SavePullRequest;
 	send: SendPullRequest;
 	onMergeQueued: () => void;
@@ -115,7 +116,7 @@ interface DetailHeaderProps {
 	foldRef: RefObject<HTMLDivElement | null>;
 }
 
-export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPick, quick, rebase, onSave, send, onMergeQueued, placement, headingRef, cwd, condensed, foldRef }: DetailHeaderProps) {
+export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPick, quick, rebase, ask, onSave, send, onMergeQueued, placement, headingRef, cwd, condensed, foldRef }: DetailHeaderProps) {
 	const { allowed, method, pick, queued, merging, pending, merge, cancel } = useMergeController({ pr, target: detail, onQueued: onMergeQueued, onCancelled: onMergeQueued });
 	const control = detail ? primaryControl(detail, method, queued?.method ?? null) : { kind: "none" as const };
 	const confirm = useInlineConfirm(`${prKey(pr)}:${detail?.headOid}:${method}`);
@@ -212,7 +213,7 @@ export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPi
 						</Button>
 					</Tooltip>
 				)}
-				<PullRequestMenu pr={pr} state={detail?.state ?? null} quick={quick} rebase={rebase} onState={to => onSave({ field: "state", state: to }, { state: to })} onApprove={approvable ? () => approve.run() : undefined}
+				<PullRequestMenu pr={pr} state={detail?.state ?? null} quick={quick} rebase={rebase} ask={ask} onState={to => onSave({ field: "state", state: to }, { state: to })} onApprove={approvable ? () => approve.run() : undefined}
 					merge={{ allowed, method, onPick: pick, queued, onCancel: cancel.run }} pending={pending} label="More pull request actions" />
 			</div>
 			<div className={cn("col-span-2 grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none", condensed ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>

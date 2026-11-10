@@ -4,7 +4,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { CachedCheckouts, type CheckoutReads } from "./git";
 import { runChecked } from "./proc";
-import { parseShipProgress, type PullRequestRef, resolveLinks, SessionFactsIndex, SessionFactsScan } from "./session-facts";
+import { parseArenaRecord, parseShipProgress, type PullRequestRef, resolveLinks, SessionFactsIndex, SessionFactsScan } from "./session-facts";
 import type { BotId } from "./shared/bots";
 import { type RoutineMessage, routineMessageText } from "./shared/routine-message";
 
@@ -307,6 +307,24 @@ describe("SessionFactsIndex", () => {
 		appendFileSync(session, `${JSON.stringify({ type: "custom", customType: "omp-ship.state", data: { stopped: true } })}\n`);
 		expect(await index.refresh(listed(4))).toBe(true);
 		expect(index.factsOf(session).ship).toBeNull();
+	});
+
+	test("keeps each arena the session recorded, a later call naming the same runners replacing it, and reports the change", async () => {
+		const dir = sessionDir();
+		const session = join(dir, "2026-10-01T00-00-00-000Z_arena.jsonl");
+		const state = (data: object) => JSON.stringify({ type: "custom", customType: "omp-arena.state", data });
+		writeFileSync(session, `${state({ task: "Build it", runners: ["A", "B"], judge: null, base: null, grafts: [] })}\n`);
+		const index = new SessionFactsIndex(async () => null, NO_GIT);
+		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
+
+		expect(await index.refresh(listed(1))).toBe(true);
+		const first = index.factsOf(session).arenas;
+		expect(first).toEqual([{ task: "Build it", runners: ["A", "B"], judge: null, base: null, grafts: [] }]);
+		expect(await index.refresh(listed(2))).toBe(false);
+		expect(index.factsOf(session).arenas).toBe(first);
+		appendFileSync(session, `${state({ task: "Build it", runners: ["B", "A"], judge: "J", base: "B", grafts: [{ from: "A", what: "Copy" }] })}\n${state({ task: "Name it", runners: ["C", "D"] })}\n`);
+		expect(await index.refresh(listed(3))).toBe(true);
+		expect(index.factsOf(session).arenas.map(arena => [arena.runners.join(), arena.base])).toEqual([["B,A", "B"], ["C,D", null]]);
 	});
 
 	test("the changes view's read of a session's own edits leaves what it folded for the next refresh to report", async () => {
@@ -828,5 +846,23 @@ describe("parseShipProgress", () => {
 		expect(parseShipProgress({ work: "rebase" })).toBeNull();
 		expect(parseShipProgress("live")).toBeNull();
 		expect(parseShipProgress(null)).toBeNull();
+	});
+});
+
+describe("parseArenaRecord", () => {
+	test("keeps a base among the runners and the grafts that name a runner and what it gave", () => {
+		expect(parseArenaRecord({ task: "T", runners: ["A", "B"], judge: "J", base: "B", grafts: [{ from: "A", what: "Copy" }, { from: "A" }, "x"] })).toEqual({
+			task: "T", runners: ["A", "B"], judge: "J", base: "B", grafts: [{ from: "A", what: "Copy" }],
+		});
+		expect(parseArenaRecord({ task: "T", runners: ["A", "B"], base: "Z" })?.base).toBeNull();
+	});
+
+	test("is null without a task or two named runners", () => {
+		expect(parseArenaRecord({ task: "T", runners: ["A"] })).toBeNull();
+		expect(parseArenaRecord({ task: "", runners: ["A", "B"] })).toBeNull();
+		expect(parseArenaRecord({ task: "T", runners: ["A", 2] })).toBeNull();
+		expect(parseArenaRecord({ task: "T", runners: ["A", "A"] })).toBeNull();
+		expect(parseArenaRecord({ task: "T", runners: ["A", "B"], judge: "A" })?.judge).toBeNull();
+		expect(parseArenaRecord(null)).toBeNull();
 	});
 });

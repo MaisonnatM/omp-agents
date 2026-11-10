@@ -23,6 +23,7 @@ A rebase stops once per conflicting commit; repeat these steps until no commit s
 ## Create drafts before publishing
 
 Push the branch with `git push -u origin <branch>`, then create the PR as a draft with `gh pr create --draft`.
+Set or change the PR title and body with `pr_description`. `gh pr edit` is only for `--attach`, and it takes no `--body` or `--body-file`.
 The ship extension blocks publication until a thermonuclear review is applied and pushed, unless the repository commits `.omp/review-paths` and the PR changes no file its globs match.
 When the review applies, run the thermonuclear stage once the user approves the direction, commit and push its fixes, then add `- [x] Thermo-nuclear code quality review` to the PR body.
 When the repository commits `.omp/ui-paths` and a changed file matches it, the interface review runs first the same way and earns `- [x] Interface review`.

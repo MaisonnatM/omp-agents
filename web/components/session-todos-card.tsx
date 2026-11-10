@@ -339,7 +339,7 @@ export const SessionTodosCard = memo(function SessionTodosCard({ phases, view, w
 		>
 			{ship && <ShipSection ship={ship} />}
 			{todos && <TodosSection phases={phases} />}
-			{subagents && nodes.length > 0 && <SubagentsSection links={subagents} nodes={nodes} />}
+			{subagents && nodes.length > 0 && <SubagentsSection links={subagents} nodes={nodes} arenas={changes?.facts?.arenas ?? []} />}
 			{found && changes && <ChangesSections view={view} session={changes} changes={found} working={working} />}
 		</section>
 	);

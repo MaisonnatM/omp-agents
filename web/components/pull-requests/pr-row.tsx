@@ -490,6 +490,7 @@ function rowMenuItems({ pr, change, review, options, pending, cwd, onQuickAction
 		onState: to => change.run({ field: "state", state: to }),
 		onApprove: canApprove({ state: pr.state, byViewer: pr.role === "author" }) && !pr.viewerApproved ? () => change.run({ field: "review", verdict: "approve", body: "" }) : undefined,
 		reviewers: { pr: review.shown, options, onChange: review.send },
+		ask: { pr, cwd },
 		pending: change.pending,
 	};
 }

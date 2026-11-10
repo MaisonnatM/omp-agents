@@ -7,6 +7,14 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - Clicking a subagent now opens it in a split beside its session, at full height, instead of in place of the session. Cmd-click opens it in place, as a click did before.
 - The sidebar marks the sessions of a split with a two-column icon, and highlights a session while one of its subagents is open.
+- Hovering a suggested prompt under the composer now shows its keys: send, edit, and mark. Its pencil button puts the prompt in the composer so you can edit it before sending.
+- Installing the omp Starter Kit on a new computer now makes the pstack skills work, such as arena and technical writing, which ship plans with. Before, omp skipped all of them, so ship stopped at its plan step.
+- The omp Starter Kit now brings the two poteto helpers that ship and poteto mode hand work to, one on Claude and one on Codex.
+- Behind the scenes: the starter kit's agent rules now include the newer ship steps, the rule to set pull request descriptions with the checked tool, and the rule to retake pull request screenshots after each push.
+- Code in a pull request's Code tab, the changes view, and messages is a size larger and colored like a code editor: types, functions, properties, tags, and comments each get their own color, in light and dark mode.
+- A pull request's `⋯` menu, and its row's right-click menu, offer Explain this PR and Ask a question. Each opens a new session in the pull request's repository with a draft that names it: Explain asks for a walk through its purpose, changes, and risks, and Ask leaves room for your question. Neither changes code.
+- A pull request's Summary and Timeline are easier to read: descriptions and comments are larger, section titles stand out, and the timeline's names, dates, and file paths are a size larger, with collapsed comment groups less faded.
+- New Bot offers three more templates for a Routines Bot: Memory curator keeps each repository's project memory up to date, Bot coach proposes how to improve your other Bots, and Review requests drafts the reviews teammates ask you for. Each one sets up its own routine in its first conversation.
 - The model menu has an Extra usage switch. On, a full Claude allowance stays on Claude instead of moving to a fallback such as Cursor. Off puts the fallback list back. It applies to every session.
 - Fixed: Connect in Integrations failed, such as with "Google Calendar has no server to sign in to", when the service's server was turned off. Connect now turns it back on.
   It skips the sign-in page while the old sign-in still works.
@@ -15,6 +23,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Click a file chip above a prompt you sent, such as Pasted text.txt, to read the text it carried. The Copy button copies it.
 - Hover or focus the speech bubble count on a pull request, in the sidebar, the table, or the board, to read its five latest comments and reviews without opening it.
   The card leaves out what the Comments filter hides and says how many it left out.
+- When an agent sets two or more subagents on the same task, the Todos card's Subagents section shows them side by side in an Arena box.
+- Once the agent picks, the runner it kept says Base, and the others say Graft, with what it took, or Not used.
+- The agent records its arena with the new arena tool: install the updated omp Starter Kit to get it.
 - Todo moved from the sidebar's tab bar to the top right of the header, between Calendar and Sport. Email now sits after Sport. A saved tab order moves Todo there too.
 - Behind the scenes: agents now follow the code when an instruction disagrees with it, and say so.
 - Behind the scenes: the starter kit's maintainer setup now tells agents to save a pasted secret right away.

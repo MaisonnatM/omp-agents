@@ -86,7 +86,7 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 	return (
 		<SegmentedTabs ref={setRoot} value={tab} onValueChange={value => onTab(value as PullRequestDetailTab)} className={cn("@container/pr relative flex min-h-0 flex-1 flex-col", page && "h-full")}>
 			<div className={cn("shrink-0 bg-background", !page && "pt-2")}>
-				<DetailHeader pr={pr} detail={detail} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} quick={quick} rebase={rebase} onSave={save} send={send} onMergeQueued={reload} placement={placement} headingRef={headingRef} cwd={cwd} condensed={condensed} foldRef={foldRef} />
+				<DetailHeader pr={pr} detail={detail} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} quick={quick} rebase={rebase} ask={facts ? { pr: facts, cwd } : null} onSave={save} send={send} onMergeQueued={reload} placement={placement} headingRef={headingRef} cwd={cwd} condensed={condensed} foldRef={foldRef} />
 				<nav aria-label="Pull request tabs" className="flex min-w-0 flex-wrap items-center gap-2 border-t border-border/60 px-4 py-2">
 					<SegmentedTabsList aria-label="Pull request details">
 						{([

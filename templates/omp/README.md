@@ -17,7 +17,7 @@ The installer:
 - copies every file under [`agent/`](agent) into your omp agent directory, `~/.omp/agent` (or `PI_CODING_AGENT_DIR` when set);
 - with `--maintainer`, also copies [`maintainer/`](maintainer), and a file there replaces the `agent/` file with the same path;
 - applies each setting in [`config.yml`](config.yml) with `omp config set`, so omp writes it and every other key in your `config.yml` stays as it is;
-- adds the [`cursor/plugins`](https://github.com/cursor/plugins) marketplace and installs its `pstack` plugin, unless they are already there;
+- adds the [`cursor/plugins`](https://github.com/cursor/plugins) marketplace and installs its `pstack` plugin, unless they are already there, then links pstack's skills where omp loads them, as `extensions/pstack-skills.ts` below explains;
 - adds the `chrome-devtools` MCP server, headless on a throwaway profile, to `mcp.json` in the agent directory, unless you already list a server by that name.
 
 A setting that you already have keeps your value, and the installer lists it as `keep yours`.
@@ -47,6 +47,7 @@ Settings, in `config.yml`:
 - `task.isolation`: `isolated: true` subagents work in their own clone of the session's checkout, and successful changes apply back there as a patch; omp 18.18.1 has no per-task `checkout` or cwd, so a session on `main` spawns editing subagents without `isolated` and names its worktree's absolute path in their task.
   At most two subagents run at once.
 - `task.perCallModel: on` with `task.perCallModelAllow`: a `task` call may pick its model per spawn, only among the council's three models.
+- `skills.customDirectories`: `~/.omp/plugins/pstack-skills`, where `extensions/pstack-skills.ts` links pstack's skills.
 - `collab.autoStart: control`: every terminal session publishes itself so that the omp-agents dashboard can drive it.
 
 Files, in `agent/`:
@@ -58,6 +59,7 @@ Files, in `agent/`:
 - `APPEND_SYSTEM.md`: short final replies that open with the answer in bold and add only the Needs you, Not verified, and Done lines that have content, ending on up to three suggested next prompts, design variants named once and quoted by that name on every surface, a UI change handed off on a running dev server with checked screenshots, questions asked through the ask tool with the recommended option first, how Cursor models call omp's `ask`, `bash`, `grep`, and skills, and a code-quality review before any pull request, which a repository limits to the files its `.omp/review-paths` globs match.
 - `agents/thermonuclear-reviewer.md`: a read-only reviewer that checks the diff against the `CODING_STANDARDS.md` at the root of the checkout it reviews, then runs the thermo-nuclear code quality review on the `plan` role's model.
 - `agents/interface-reviewer.md`: a read-only reviewer that runs the `interface-review` skill in full mode on a PR, then applies the `app-consistency-review` skill to check the change reuses the app's shared components and follows its tokens and sibling screens, on the `plan` role's model.
+- `agents/poteto-agent.md` and `agents/poteto-agent-codex.md`: the delegates a `/poteto-mode` run and `/ship` spawn, on the parent's model and on Codex, so a panel spans two model families; they replace pstack's own `poteto-agent`, which looks for its skill under Cursor's paths.
 - `agents/design-critic.md`: a read-only reviewer that the `design-workflow` skill spawns on a UI change it did not build; it screenshots each page and state next to the app's sibling screens and lists every visible bug with pixel measurements, on the `default` role's model.
 - `skills/council/SKILL.md` and `agents/council.md`: say "council" and three models from three providers, Claude Opus, GPT Sol, and Gemini Pro, review or advise on the request in rounds, scored out of 10 for a code review.
   The skill passes each member's model on its `task` call; the agent's `model` list and `task.perCallModelAllow` approve exactly those three.
@@ -92,11 +94,16 @@ Files, in `agent/`:
   Afterwards the local `main` moves forward to the landed commit only when it can without touching uncommitted changes, and worktrees left by an omp process that died are removed at the next landing.
   In such a repository the extension blocks an agent's `git push` to `main`, `git merge` into a checked-out `main` other than `--ff-only` from `origin/main`, and `gh pr merge`, so an agent lands only through `land`; your own terminal is not affected, and a subagent cannot land.
 - `extensions/end-session.ts`: the `end_session` tool, with which an agent ends its own session once its turn is over, and the omp-agents dashboard removes its worktree as **End session** does, so a prompt such as "Merge on main, then end the session" runs to the end.
-- In a task subagent, `end-session.ts`, `land.ts`, `ship.ts`, `todos.ts`, `notes.ts`, and `events.ts` remove their tools when its session starts, since those tools act for the session you talk to; each subagent request then carries about 2,600 fewer tokens of tool schemas.
+- `extensions/arena.ts`: the `arena` tool, with which an agent that gives two or more subagents the same task records the runners, its judge, the runner it keeps as the base, and what it takes from the others.
+  The omp-agents dashboard shows those runners side by side in the Todos card's Subagents section and marks the base.
+- In a task subagent, `end-session.ts`, `arena.ts`, `land.ts`, `ship.ts`, `todos.ts`, `notes.ts`, and `events.ts` remove their tools when its session starts, since those tools act for the session you talk to; each subagent request then carries about 2,600 fewer tokens of tool schemas.
 - `extensions/google-accounts.ts`: when omp is signed in to two or more Gmail or Google Calendar accounts, one MCP server each, tells a session at every prompt each account's server, address, and tool prefix.
   When you put only some of the addresses in the session's space, Personal or Work, in the dashboard's Settings › Integrations, it also tells the session to use those for its mail and calendar unless you name another account.
   A session's space is its workspace's, where a linked worktree counts as its repository's main checkout, and no tool is blocked.
   When a Gmail or Google Calendar server answers a tool call with HTTP 401, the session is told the account is signed out, not to retry or sign in itself, and to ask you to sign in again in the dashboard's Settings › Integrations, and the dashboard's bell shows a sign-in notice.
+- `extensions/pstack-skills.ts`: omp skips every pstack skill in the plugin, because pstack's `plugin.json` opts into a strict schema that refuses the `disable-model-invocation` key its skills carry.
+  At each session start this links each skill of the installed pstack into `~/.omp/plugins/pstack-skills`, which `skills.customDirectories` lists and omp reads leniently, keeping them hidden from the model's skill list as pstack intends, and repoints the links after a marketplace update.
+  Those links take the bare name from a skill of the same name in your own skill folders, which stays reachable under a prefixed name such as `agent/<name>`; pstack's `poteto-mode` is left out, so the kit's alias keeps that name.
 - `extensions/headless-mark.ts`: adds an `omp-agents.headless` entry to a session that `omp -p` or `omp --mode json` runs, so the omp-agents dashboard leaves those one-shot runs out of its past sessions.
 - `extensions/project-memory.ts`: gives the omp sessions of one git repository a shared memory and news of each other's work.
   Before a session's first prompt it gets a brief: the repository's memory index and the last 10 landings on its default branch, each with the session that made it and that session's first prompt.
@@ -148,8 +155,7 @@ Files, in `agent/`:
   Edit `config.yml` before you install to drop a provider, or change the roles later in the dashboard's **Settings**.
 - For `/ship`: the [GitHub CLI](https://cli.github.com) signed in, and the Linear MCP server connected to omp.
 - For `/ship`'s interface review: a repository with `.omp/ui-paths`; without it the review never runs.
-- For `/ship`'s plan: the `arena` and `technical-writing` skills from pstack, under `~/.agents/skills/` or `~/.omp/agent/skills/`.
-  The kit does not ship them; without them the plan step stops and names the missing skill.
+- For `/ship`'s plan: the `arena` and `technical-writing` skills from pstack, which the installer and `extensions/pstack-skills.ts` make loadable; without them the plan step stops and names the missing skill.
 
 ## Maintainer git profile
 

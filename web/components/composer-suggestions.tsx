@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { type ComponentProps, type FocusEventHandler, type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
 import { useFluidHover, useRegisterFluidHoverItem } from "@/hooks/use-fluid-hover";
+import { useIsTouch } from "@/hooks/use-is-touch";
 import { useRegionHeight } from "@/hooks/use-region-height";
 import { fontWeights } from "@/lib/font-weight";
 import { useIcon } from "@/lib/icon-context";
@@ -11,9 +12,12 @@ import { useSize } from "@/lib/size-context";
 import { spring } from "@/lib/springs";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
-import { modHeld } from "../shortcuts";
+import { chordLabel, IS_MAC, modHeld } from "../shortcuts";
 
 const NONE: ReadonlySet<string> = new Set();
+const SEND_KEY = chordLabel({ key: "Enter" });
+const EDIT_KEY = chordLabel({ key: "Tab" });
+const MARK_KEY = IS_MAC ? "⌘" : "Ctrl";
 
 /** The prompts a gesture on row `index` sends or fills: the marked ones plus that row, in list order. Several become a Markdown list, so they render as separate rows. */
 export function chosenText(prompts: readonly string[], marked: ReadonlySet<string>, index: number | null): string {
@@ -115,6 +119,12 @@ interface SuggestionRowProps {
 	registerItem: (index: number, element: HTMLElement | null) => void;
 	/** Takes the row, or toggles its mark when `mark`. */
 	onPick: (mark: boolean) => void;
+	/** Puts the row, with the marked ones, in the composer to edit first. */
+	onEdit: () => void;
+}
+
+function KeyChip({ children }: { children: ReactNode }) {
+	return <kbd className="inline-flex h-4 min-w-4 items-center justify-center rounded-[4px] border border-border bg-background px-1 font-sans text-[10px]">{children}</kbd>;
 }
 
 /**
@@ -122,8 +132,9 @@ interface SuggestionRowProps {
  * as `MenuItem` does, since an inline ref callback would re-register every render and keep the hook's measurement pass
  * from ever settling.
  */
-function SuggestionRow({ text, label, index, active, marked, optionId, registerItem, onPick }: SuggestionRowProps) {
-	const EnterIcon = useIcon("corner-down-left");
+function SuggestionRow({ text, label, index, active, marked, optionId, registerItem, onPick, onEdit }: SuggestionRowProps) {
+	const PencilIcon = useIcon("pencil");
+	const isTouch = useIsTouch();
 	const ref = useRef<HTMLDivElement>(null);
 
 	useRegisterFluidHoverItem(registerItem, index, ref);
@@ -141,8 +152,36 @@ function SuggestionRow({ text, label, index, active, marked, optionId, registerI
 			label={label}
 			className={active || marked ? "text-foreground" : "text-muted-foreground"}
 		>
-			{/* ↵ on the highlighted row: Enter sends it. */}
-			<EnterIcon size={13} className={cn("shrink-0 transition-opacity duration-80", active ? "opacity-100" : "opacity-0")} />
+			{/* On the highlighted row: the keys that send, edit, or mark it, then the edit button. */}
+			<span
+				aria-hidden="true"
+				className={cn(
+					"flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground transition-opacity duration-80",
+					active ? "opacity-100" : "opacity-0",
+				)}
+			>
+				<KeyChip>{SEND_KEY}</KeyChip> send
+				<KeyChip>{EDIT_KEY}</KeyChip> edit
+				<KeyChip>{MARK_KEY}</KeyChip>click mark
+			</span>
+			<button
+				{...activityControl("composer-suggestions.edit")}
+				type="button"
+				aria-label={`Edit: ${label}`}
+				title={`Edit before sending (${EDIT_KEY})`}
+				onMouseDown={event => event.preventDefault()}
+				onClick={event => {
+					event.stopPropagation();
+					onEdit();
+				}}
+				className={cn(
+					"flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-hover hover:text-foreground",
+					"cursor-pointer outline-none transition-opacity duration-80",
+					isTouch || active ? "opacity-100" : "opacity-0",
+				)}
+			>
+				<PencilIcon size={13} strokeWidth={2.5} />
+			</button>
 		</Row>
 	);
 }
@@ -273,6 +312,7 @@ export function useSuggestions({ prompts, labelOf, draft, onSend, onFill }: Sugg
 									registerItem={registerItem}
 									// The composer's frame keeps the text field focused on a mousedown here, so marking never moves focus.
 									onPick={mark => (mark ? toggleMark(text) : take(index, onSend))}
+									onEdit={() => take(index, onFill)}
 								/>
 							))}
 						</div>

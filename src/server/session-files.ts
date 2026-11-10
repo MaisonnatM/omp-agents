@@ -18,7 +18,7 @@ const newestFirst = (a: SavedSession, b: SavedSession): number => b.modifiedAt -
 
 /** Whether two answers of `factsOf` are the same facts: each field keeps its identity until it changes. */
 const sameFacts = (a: SessionFacts, b: SessionFacts): boolean =>
-	a.pullRequests === b.pullRequests && a.tickets === b.tickets && a.ship === b.ship && a.worktree === b.worktree && a.branch === b.branch && a.workspace === b.workspace;
+	a.pullRequests === b.pullRequests && a.tickets === b.tickets && a.ship === b.ship && a.arenas === b.arenas && a.worktree === b.worktree && a.branch === b.branch && a.workspace === b.workspace;
 
 /** A past-list row and what it was built from. */
 interface PastRow {

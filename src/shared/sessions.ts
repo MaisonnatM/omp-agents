@@ -64,6 +64,19 @@ export interface ShipProgress {
 	pr?: number;
 }
 
+/** An arena a session ran, as its `arena` tool recorded it: subagents given the same task, its judge, and the runner it kept. */
+export interface ArenaRecord {
+	/** What every runner was asked to produce. */
+	task: string;
+	/** The competing subagents' ids, in the order they were spawned, which seats them A, B, C. */
+	runners: string[];
+	judge: string | null;
+	/** The runner picked as the base; `null` until the pick. */
+	base: string | null;
+	/** What the base took from the other runners. */
+	grafts: { from: string; what: string }[];
+}
+
 /** A branch a session works on. */
 export interface SessionBranch {
 	name: string;
@@ -88,6 +101,8 @@ export interface SessionFacts {
 	 */
 	tickets: string[];
 	ship: ShipProgress | null;
+	/** The arenas the session recorded, in the order it started them. */
+	arenas: readonly ArenaRecord[];
 	/**
 	 * The linked git worktree the session works in, when its own bash calls last ran in one of its working directory's repository other
 	 * than the checkout its working directory is in; `null` when it works in that checkout.
