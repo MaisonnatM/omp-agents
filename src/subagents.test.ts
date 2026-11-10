@@ -196,6 +196,27 @@ describe("SubagentFiles", () => {
 		expect(files.pathOf(sessionFile, "s1", agents)).toBe(moved);
 	});
 
+	test("a search that fails finds nothing, and the subagent is searched for again once its session file moves", async () => {
+		const { project, sessionFile, files, finds, nextFind } = setup();
+		const found = transcript(join(project, "2026-09-01T00-00-00_old", "s1.jsonl"), 3000);
+		// A second agent, whose find settles after the failed search has had its chance.
+		const later = transcript(join(project, "2026-09-02T00-00-00_old", "s2.jsonl"), 5000);
+		const agents = [agent("s1", { createdAt: 1000 }), agent("s2", { createdAt: 1000 })];
+		const gone = join(project, "removed", "2026-10-01T12-00-00_bbbb.jsonl");
+
+		let find = nextFind();
+		expect(files.pathOf(gone, "s1", agents)).toBe(join(gone.replace(/\.jsonl$/, ""), "s1.jsonl"));
+		files.pathOf(sessionFile, "s2", agents);
+		await find;
+		expect(finds()).toBe(1);
+		expect(files.pathOf(sessionFile, "s2", agents)).toBe(later);
+
+		find = nextFind();
+		files.pathOf(sessionFile, "s1", agents);
+		await find;
+		expect(files.pathOf(sessionFile, "s1", agents)).toBe(found);
+	});
+
 	test("a registry change recomputes where a subagent's file is expected", () => {
 		const { sessionFile, files } = setup();
 		const root = sessionFile.replace(/\.jsonl$/, "");

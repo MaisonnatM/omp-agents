@@ -22,6 +22,8 @@ const SKIPPED: Record<string, true> = {
 	"queue-operation": true,
 	"atis-latch": true,
 	"ai-title": true,
+	"custom-title": true,
+	"agent-name": true,
 	mode: true,
 	"permission-mode": true,
 	"cost-state": true,
@@ -121,6 +123,7 @@ export const decodeClaudeCodeLine = (line: string): unknown[] => decodeRecord(pa
 
 function summarize({ head, tail }: FileEdges, path: string): SessionSummary {
 	let cwd: string | undefined;
+	let renamed: string | undefined;
 	let title: string | null = null;
 	let prompt: string | null = null;
 	let answered = false;
@@ -128,6 +131,7 @@ function summarize({ head, tail }: FileEdges, path: string): SessionSummary {
 		const record = parseJson(line);
 		if (!isObject(record)) continue;
 		cwd ??= nonEmptyStr(record.cwd);
+		if (record.type === "custom-title") renamed = nonEmptyStr(record.customTitle) ?? renamed;
 		if (record.type === "ai-title") title = nonEmptyStr(record.aiTitle) ?? title;
 		for (const entry of decodeRecord(record, line)) {
 			if (!isObject(entry) || !isObject(entry.message)) continue;
@@ -136,7 +140,7 @@ function summarize({ head, tail }: FileEdges, path: string): SessionSummary {
 		}
 	}
 	const promptTitle = prompt ? oneLine(prompt) : "";
-	return { id: basename(path, ".jsonl"), cwd: cwd ?? "", title: title ?? (promptTitle || null), empty: prompt === null && !answered };
+	return { id: basename(path, ".jsonl"), cwd: cwd ?? "", title: renamed ?? title ?? (promptTitle || null), empty: prompt === null && !answered };
 }
 
 const SYNTHETIC = "<synthetic>";
