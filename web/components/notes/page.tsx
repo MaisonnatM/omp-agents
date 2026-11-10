@@ -86,11 +86,12 @@ function LoadedNotesPage({ list, todos, view, openId, disabled, onChange, hosts,
 	useOpenLatest(id => hashForNotes(view, id), openId, shown[0]?.id ?? null, true);
 	const remove = (note: UserNote): void => {
 		const index = list.notes.findIndex(row => row.id === note.id);
+		const wasOpen = note.id === openId;
 		onChange({ op: "remove", id: note.id });
-		if (note.id === openId) navigate(null);
+		if (wasOpen) navigate(null);
 		offerUndo("note-undo", `Deleted “${note.title || "Untitled"}”`, () => {
 			onChange({ op: "restore", note, index });
-			location.hash = hashForNotes(view, note.id);
+			if (wasOpen) location.hash = hashForNotes(view, note.id);
 		});
 	};
 	const rename = (note: UserNote): void => {
@@ -100,11 +101,12 @@ function LoadedNotesPage({ list, todos, view, openId, disabled, onChange, hosts,
 	const to = otherSpace(space);
 	/** Moves `note` to the other space, which takes it off this page, with an undo that brings it back. */
 	const move = (note: UserNote): void => {
+		const wasOpen = note.id === openId;
 		onChange({ op: "set-space", id: note.id, space: to });
-		if (note.id === openId) navigate(null);
+		if (wasOpen) navigate(null);
 		offerUndo("note-move", `Moved “${note.title || "Untitled"}” to ${SPACE_LABELS[to]}`, () => {
 			onChange({ op: "set-space", id: note.id, space });
-			location.hash = hashForNotes(view, note.id);
+			if (wasOpen) location.hash = hashForNotes(view, note.id);
 		});
 	};
 	return (
