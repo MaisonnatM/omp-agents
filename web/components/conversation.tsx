@@ -409,7 +409,7 @@ function LiveConversation({
 						afterActions={suggestions.list}
 					/>
 				</ComposerEditor>
-				{directCommand && <ComposerNote text={directCommand} />}
+				{directCommand && !completion.popup && <ComposerNote text={directCommand} />}
 				{writable && attachments.note && <ComposerNote text={attachments.note} />}
 			</div>
 		</div>

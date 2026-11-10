@@ -50,7 +50,7 @@ const NO_STARTERS: string[] = [];
 
 /**
  * The composer while no omp runs the Bot's conversation: a message resumes it, or starts it when it has none, and a new Bot offers its starters.
- * Its `/` and `@` menus resolve in the Bot's workspace, as a new session's there would.
+ * Its `$` and `@` menus resolve in the Bot's workspace, as a new session's there would.
  */
 function BotComposer({ bot, connected, starters, completions }: { bot: Bot; connected: boolean; starters: string[]; completions: Completions | null }) {
 	const { request, send: post } = useDashboardActions();
