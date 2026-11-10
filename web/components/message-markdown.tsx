@@ -1,5 +1,4 @@
 import type { Element, ElementContent } from "hast";
-import { Eye } from "lucide-react";
 import { type ComponentProps, memo, useContext, useRef, useState } from "react";
 import ReactMarkdown, { type Components, defaultUrlTransform, type ExtraProps, type Options, type UrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -16,7 +15,7 @@ import { linkedFile, remarkFilePaths } from "../file-paths";
 import { remarkPromptChips } from "../prompt-tokens";
 import { useRead } from "../reads";
 import { rehypeReplyParts } from "../reply-parts";
-import { parseReviewPages, type ReviewPage } from "../review-pages";
+import { parseReviewPages } from "../review-pages";
 import { hashForPullRequests, hashForTickets, hashForTodoId } from "../routing";
 import { UserTodosContext } from "./dashboard-context";
 import { FileLink } from "./file-link";
@@ -271,33 +270,13 @@ export function FencedCode({ language, text }: { language: string | null; text: 
 
 const codeBlock: Components["pre"] = ({ node }) => <FencedCode {...fenceOf(node)} />;
 
-/** A `review-pages` fence in a session's message: the pages it lists, which **Review visuals** in the Browser opens. */
-function ReviewPagesCard({ pages }: { pages: readonly ReviewPage[] }) {
-	return (
-		<div className="my-2 rounded-lg border border-border px-3 py-2 text-xs">
-			<p className="flex items-center gap-1.5 font-medium">
-				<Eye aria-hidden className="size-3.5" />
-				{pages.length === 0 ? "No pages to review on this computer" : `${pages.length} ${pages.length === 1 ? "page" : "pages"} to review: click Review visuals in the Browser to open ${pages.length === 1 ? "it" : "them"}`}
-			</p>
-			{pages.length > 0 && (
-				<ul className="mt-1 space-y-0.5 text-muted-foreground">
-					{pages.map(page => (
-						<li key={page.url} className="truncate" title={page.url}>
-							{page.label}
-							{page.note && ` · ${page.note}`}
-						</li>
-					))}
-				</ul>
-			)}
-		</div>
-	);
-}
-
-/** In a session's message, a `mermaid` or `chart` fence draws as a diagram or a chart; any other is a code block. */
+/**
+ * In a session's message, a `mermaid` or `chart` fence draws as a diagram or a chart, and a valid `review-pages` list
+ * draws nothing, since the reply's **Review visuals** button opens it; any other is a code block.
+ */
 const sessionCodeBlock: Components["pre"] = ({ node }) => {
 	const { language, text } = fenceOf(node);
-	const pages = language === "review-pages" ? parseReviewPages(text) : null;
-	if (pages) return <ReviewPagesCard pages={pages} />;
+	if (language === "review-pages" && parseReviewPages(text)) return null;
 	if (!isVisualLanguage(language)) return <FencedCode language={language} text={text} />;
 	return <SessionVisual language={language} source={text} code={<CodeLines text={text} language={language} />} />;
 };
