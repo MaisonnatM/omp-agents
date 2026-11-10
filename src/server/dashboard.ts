@@ -176,7 +176,7 @@ export class Dashboard {
 	readonly terminals = new Terminals();
 	/** Aborts as the dashboard stops, which stops every routine command still running. */
 	readonly #stopping = new AbortController();
-	/** Which of the servers beside each other, such as a smoke run on another port, runs routines and the todo, note, and event inboxes. */
+	/** Which of the servers beside each other, such as a smoke run on another port, runs routines and the file inboxes. */
 	readonly #ownerLock: OwnerLock;
 	readonly #google: GoogleCalendars;
 	readonly #gmail = new GmailAccounts(accountClients("gmail", (fetch, account) => new GmailClient(fetch, account)));
@@ -747,7 +747,7 @@ export class Dashboard {
 		this.#loops.watch();
 		if (!this.#claimUnattendedWork()) {
 			const owner = this.#ownerLock.holder();
-			console.log(`omp-agents: the server on port ${owner?.port ?? "?"} (pid ${owner?.pid ?? "?"}) runs routines and the todo, note, and event inboxes; this one takes over when it exits.`);
+			console.log(`omp-agents: the server on port ${owner?.port ?? "?"} (pid ${owner?.pid ?? "?"}) runs routines and the file inboxes; this one takes over when it exits.`);
 		}
 		for (const inbox of this.#inboxes) inbox.watch();
 		this.#endInbox.watch();
@@ -955,7 +955,7 @@ export class Dashboard {
 	}
 
 	/**
-	 * Takes over routines and the todo, note, and event inboxes when no other server runs them, at start or on the minute
+	 * Takes over routines and the file inboxes when no other server runs them, at start or on the minute
 	 * tick after the server that ran them is gone, with the same steps either way; whether this server runs them. Losing
 	 * them needs no step: every owner action checks the lock as it runs.
 	 */
@@ -963,7 +963,7 @@ export class Dashboard {
 		const was = this.#ownerLock.held;
 		const owns = this.#ownerLock.acquire();
 		if (owns && !was) {
-			console.log("omp-agents: this server now runs routines and the todo, note, and event inboxes.");
+			console.log("omp-agents: this server now runs routines and the file inboxes.");
 			// What the server that ran them saved since this one started.
 			this.#routines.reload();
 			this.#bots.reload();

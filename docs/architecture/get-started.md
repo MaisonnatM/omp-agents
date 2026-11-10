@@ -36,7 +36,7 @@ Integrations reuse `integrationsStore` and `connectionsOf(...).some(signedIn)`, 
 The Tools and workflows step reads GitHub, every integration, and pstack before it draws anything, so no row moves between its groups while they load.
 It folds each one to its name, its badge, and its summary, the same three its full row shows: `integrationStatus` in `web/components/integrations/services.ts` gives the badge to both an integration's folded line and its Settings row.
 pstack's row never runs the installer; it sends you to the Starter kit step, which owns it.
-The onboarding stores stay in memory: the providers poll every minute while the dialog or bubble is due, the terminal setting every five seconds while the dialog is open, and the starter kit, source control, and integrations every minute while it is open.
+The providers, terminal setting, starter kit, and source control stores stay in memory, and integrations keep `integrationsStore`'s localStorage copy: the providers poll every minute while the dialog or bubble is due, the terminal setting every five seconds while the dialog is open, and the starter kit, source control, and integrations every minute while it is open.
 The component refreshes on focus and on **Check again**; optional probes never gate the required rows.
 
 Closed, the dialog's bubble draws through `UnderToasts` from `web/components/toaster.tsx` into the toast column's corner, below the toasts and outside their live region, so a toast stacks above it rather than covering it.
