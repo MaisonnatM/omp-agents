@@ -4,9 +4,17 @@ export type CollabAutoStart = "off" | "view" | "control";
 export type TerminalAccess = Exclude<CollabAutoStart, "off">;
 export const isTerminalAccess = (value: unknown): value is TerminalAccess => value === "view" || value === "control";
 
+/** pstack, the plugin behind `/ship`'s plan and poteto mode: whether omp's registry lists it, and how many of its skills the kit links for sessions to load. */
+export interface PstackStatus {
+	installed: boolean;
+	/** Links in `~/.omp/plugins/pstack-skills` whose skill is still on disk. */
+	skills: number;
+}
+
 /** A non-forced installer plan. Customized files and settings count as present. */
 export interface StarterKitStatus {
 	pending: number;
 	kept: number;
 	total: number;
+	pstack: PstackStatus;
 }

@@ -23,7 +23,7 @@ import { SpacePicker } from "../space-picker";
 import { GoogleClientForm } from "./google-client-form";
 import { IntegrationRow, MarkTile, MetaDot } from "./integration-row";
 import { Confirm, ConnectionCallout, Reconnecting, ReconnectItem, StatusBadge, type StatusLabel, useToolList, WAITING_STATUS } from "./mcp-connection-controls";
-import { googleApiOff, SERVICES, STATUS } from "./services";
+import { googleApiOff, integrationStatus, SERVICES, STATUS } from "./services";
 
 type AccountsIntegration = McpIntegration<AccountsService>;
 
@@ -190,13 +190,7 @@ export function GoogleAccountsRow({ integration, placeable, notice, details }: G
 	const adding = useSignIn(integration.signIn?.account === null ? integration.signIn : null, integrationsStore.refresh, () => startSignIn(id, null));
 	const [formOpen, setFormOpen] = useState(false);
 	const connected = accounts.filter(account => signedIn(account.connection));
-	const status: StatusLabel = adding.waitingUrl
-		? WAITING_STATUS
-		: !setup.configured && connected.length === 0
-			? { label: "Not set up", color: "gray" }
-			: connected.length === 0
-				? STATUS[accounts[0]?.connection.kind ?? "absent"]
-				: { label: connected.length === 1 ? "Connected" : `${connected.length} accounts`, color: "green" };
+	const status = integrationStatus(integration);
 	const firstSignIn = connected.length === 0;
 
 	let actions: ReactNode = null;

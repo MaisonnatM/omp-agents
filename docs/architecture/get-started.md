@@ -1,7 +1,7 @@
 # Get started
 
 `web/components/get-started.tsx` owns the setup dialog: its welcome screen, the fixed five-step table, the step rail, Back, Next, and Skip, and the bottom-right bubble it closes into.
-`web/components/get-started-steps.tsx` draws each step's body with its local pending and result state.
+`web/components/get-started-steps.tsx` draws each step's body with its local pending and result state; `web/components/get-started-tools.tsx` draws the Tools and workflows step.
 `web/app.tsx` mounts `GetStarted` once; the dialog is open at `#get-started`, under which `PageSwitch` draws the home or panes, and on its own over a vacant home until it is first closed.
 Closing at `#get-started` returns to the panes; the dialog never opens on its own over a selected page, draft, or pane.
 The provider count and any global live or past session suppress automatic onboarding and the bubble for an existing setup.
@@ -27,11 +27,15 @@ The first-session step appends a suggested prompt to the new-session draft with 
   It reads native marketplace and user/project plugin registries through `src/omp/modules.ts`, takes known setting IDs from the loaded setting registry, and passes that snapshot to the installer's read-only `planStarterKit`.
   It never runs `omp config list`, whose `Settings.init` can migrate or write, nor a plugin command or installation.
   `keep` and `same` count as complete; every pending `create`, `update`, or `remove`, including an outdated file you never edited, a dropped kit file you never edited, settings, marketplace, and plugins, prevents completion.
+  Its `pstack` field says whether those plugin registries list `pstack@cursor-plugins`, and counts the links in `pstack-skills` beside the user registry whose `SKILL.md` still exists, the links the kit's `pstack-skills` extension makes for sessions to load.
 - GitHub comes from the `github` field of `GET /api/source-control`, the answer Settings' Source control tab reads, through `sourceControlStore`.
 
 `firstSessionFact` in `web/get-started-model.ts` reads the global socket `hosts`/`past` arrays: any row is positive evidence even before `listed`.
 An empty array is negative only after listing, with a connected socket and no roster error; otherwise it is checking or unavailable.
 Integrations reuse `integrationsStore` and `connectionsOf(...).some(signedIn)`, counting services rather than accounts.
+The Tools and workflows step reads GitHub, every integration, and pstack before it draws anything, so no row moves between its groups while they load.
+It folds each one to its name, its badge, and its summary, the same three its full row shows: `integrationStatus` in `web/components/integrations/services.ts` gives the badge to both an integration's folded line and its Settings row.
+pstack's row never runs the installer; it sends you to the Starter kit step, which owns it.
 The onboarding stores stay in memory: the providers poll every minute while the dialog or bubble is due, the terminal setting every five seconds while the dialog is open, and the starter kit, source control, and integrations every minute while it is open.
 The component refreshes on focus and on **Check again**; optional probes never gate the required rows.
 
