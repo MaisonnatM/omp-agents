@@ -164,7 +164,7 @@ function Verdict({ seat }: { seat: ArenaSeat }) {
 	const { verdict } = seat;
 	if (verdict === null) return null;
 	return (
-		<div className="mt-auto flex min-w-0 items-center gap-1.5 pt-0.5">
+		<div className="mt-auto flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 pt-0.5">
 			{verdict.kind === "base" ? (
 				<Badge size="compact" color="emerald">
 					<Trophy aria-hidden className="mr-1 inline size-3 align-[-1px]" />
@@ -175,7 +175,7 @@ function Verdict({ seat }: { seat: ArenaSeat }) {
 					<Badge size="compact" color="violet">
 						Graft
 					</Badge>
-					<span className="truncate text-xs text-muted-foreground">{verdict.what}</span>
+					<span className="line-clamp-2 min-w-0 text-xs text-muted-foreground">{verdict.what}</span>
 				</>
 			) : (
 				<Badge size="compact" color="gray">
