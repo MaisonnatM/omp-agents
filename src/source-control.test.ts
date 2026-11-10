@@ -61,6 +61,12 @@ describe("pullDefaultBranch", () => {
 		expect(await pullDefaultBranch(clone)).toEqual({ kind: "pulled", commits: 1 });
 		expect(await head(clone, "refs/heads/main")).toBe(await head(origin));
 	});
+
+	test("a fetch that fails reports git's cause, not the advice that ends its output", async () => {
+		const { origin, clone } = await cloneBehind();
+		rmSync(origin, { recursive: true, force: true });
+		expect(await pullDefaultBranch(clone)).toEqual({ kind: "skipped", reason: "failed", detail: `fatal: '${origin}' does not appear to be a git repository` });
+	});
 });
 
 describe("repositoriesOf", () => {

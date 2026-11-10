@@ -3,16 +3,17 @@
  * keep each workspace repository's default branch current while it has no local changes or commits, and whether a
  * merge cleans up after itself.
  */
-import { canonical, git, worktreesOf } from "./git";
+import { canonical, git, gitCause, worktreesOf } from "./git";
 import { JsonFile } from "./fs";
 import { errorText, isObject } from "./json";
 import { displayPath } from "./paths";
-import { run, runChecked } from "./proc";
+import { run } from "./proc";
 import { applySourceControl, DEFAULT_SOURCE_CONTROL, type GithubStatus, type PullOutcome, type PullRepo, type SourceControlAnswer, type SourceControlChange, type SourceControlSettings } from "./shared/source-control";
 import { inTempDir } from "./shared/workspaces";
 import { SerialLane } from "./serial-lane";
 
 const FETCH_TIMEOUT_MS = 60_000;
+const GH_TIMEOUT_MS = 20_000;
 
 async function commitOf(dir: string, ref: string): Promise<string | null> {
 	const { stdout, code } = await run(["git", "-C", dir, "rev-parse", "--verify", "--quiet", `${ref}^{commit}`]);
@@ -30,11 +31,8 @@ export async function pullDefaultBranch(dir: string): Promise<PullOutcome> {
 	const head = await run(["git", "-C", dir, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"]);
 	if (head.code !== 0 || !head.stdout.startsWith("origin/")) return skipped("no-default-branch", "origin names no default branch");
 	const branch = head.stdout.trim().slice("origin/".length);
-	try {
-		await runChecked(["git", "-C", dir, "fetch", "--quiet", "origin", branch], { timeoutMs: FETCH_TIMEOUT_MS });
-	} catch (err) {
-		return skipped("failed", errorText(err));
-	}
+	const fetched = await run(["git", "-C", dir, "fetch", "--quiet", "origin", branch], { timeoutMs: FETCH_TIMEOUT_MS });
+	if (fetched.code !== 0) return skipped("failed", gitCause(fetched.stderr) ?? `git exited ${fetched.code}`);
 	const [local, remote] = await Promise.all([commitOf(dir, `refs/heads/${branch}`), commitOf(dir, `refs/remotes/origin/${branch}`)]);
 	if (!local || !remote) return skipped("no-default-branch", `No local ${branch} branch`);
 	if (local === remote) return { kind: "current" };
@@ -63,7 +61,7 @@ const installed = (bin: string): boolean => Bun.which(bin, { PATH: process.env.P
 
 export async function githubStatus(): Promise<GithubStatus> {
 	if (!installed("gh")) return { state: "missing", account: null };
-	const { stdout, code } = await run(["gh", "api", "user", "--jq", ".login"]);
+	const { stdout, code } = await run(["gh", "api", "user", "--jq", ".login"], { timeoutMs: GH_TIMEOUT_MS });
 	return code === 0 && stdout.trim() ? { state: "signed-in", account: stdout.trim() } : { state: "signed-out", account: null };
 }
 
