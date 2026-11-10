@@ -88,7 +88,7 @@ A Collab terminal session has no `branch` frame, so only a dashboard session off
 omp's `/move` sends `config_update` too, and the state read after it finds a new session file: the session takes its working directory from that file's header, clears its subagents when the session id changed, and reports `switched`, so the roster and the views follow the moved file.
 omp writes a moved session that has no reply yet only with its first reply, so until that file exists the session keeps its old file and directory, and a later state read follows it.
 The composer's directory picker sends `/move <path>` as a plain `prompt`, only to an idle dashboard session, since omp refuses to move while a turn runs.
-`SessionMoves` in `src/server/session-moves.ts` lets the agent ask for the same move: `join` gives every dashboard-started main session but a Bot's conversation the strict host tool `move_session`, which takes an absolute or `~` path, since the tool cannot know the session's own directory, checks it is a directory, and answers that the move waits for the turn's end.
+`SessionMoves` in `src/server/session-moves.ts` lets the agent ask for the same move: `join` gives every dashboard-started main session, but a Bot's conversation or one started in the personal directory, the strict host tool `move_session`, which takes an absolute or `~` path, since the tool cannot know the session's own directory, checks it is a directory, and answers that the move waits for the turn's end.
 `launch` and `reattachAll` in `src/server/start.ts` build each session's join from its instance id, so the tool knows its caller and records each call it took by its id.
 The call's `tool_execution_end` without error hands the directory to that caller through `DashboardSession.moveAfterTurn`, the last call of a turn winning, since a reattached session gets its tools before it is listed and its held events reach it after; a call cut off before the move was taken moves nothing, and the caller's exit forgets its calls.
 The session itself sends `/move <path>` as the composer does once a turn ends and it shows idle, and otherwise keeps the move for the next turn end; the move goes with the session when it exits.
@@ -122,7 +122,7 @@ A prompt's other files travel as text, so they reach a subagent and a terminal s
 The route hands the bytes and the name's extension to omp's `convertBufferWithMarkit` and answers `{ text }`, the Markdown omp reads; a format omp cannot convert, or a file it fails to read, answers 422 with omp's reason, which the composer shows in its note.
 `withFiles` in `src/shared/prompt-files.ts` puts each file after the typed text in the block omp's `@file` arguments write, `<file name="…">`, its text, and `</file>`, so a leading `/skill:` or file command still expands with the files as its arguments.
 `preparePrompt` in `web/prompt-attachments-model.ts` keeps the files' text under `MAX_PROMPT_FILE_CHARS`, a million characters, in attach order, both as files attach and on the files a prompt sends, after awaiting each file's read.
-omp saves the prompt as that text, so `userPrompt` in `src/transcript.ts` splits the trailing blocks off again with `splitFiles`, and a user item's `files` holds their names, which the transcript shows as chips.
+omp saves the prompt as that text, so `typed` in `src/transcript.ts` splits the trailing blocks off again with `splitFiles`, and a user item's `files` holds their names, which the transcript shows as chips.
 
 ## Private sessions
 

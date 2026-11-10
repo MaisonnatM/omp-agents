@@ -20,6 +20,12 @@ export interface Registration {
 
 export const git = (cwd: string, ...args: string[]): Promise<string> => runChecked(["git", "-C", cwd, ...args], { timeoutMs: 10000 });
 
+/** Git's own line for why a command failed, its first `fatal:` or `error:` line, since a failed fetch ends its output with advice; else its last line. */
+export function gitCause(stderr: string): string | undefined {
+	const lines = stderr.split("\n").map(line => line.trim()).filter(Boolean);
+	return lines.find(line => line.startsWith("fatal:") || line.startsWith("error:")) ?? lines.at(-1);
+}
+
 export async function canonical(path: string): Promise<string> {
 	try {
 		return await realpath(path);

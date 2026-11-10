@@ -164,7 +164,7 @@ const SidebarGroup = forwardRef<HTMLDivElement, SidebarGroupProps>(
                 if (open) setSettled(true);
               }}
             >
-              <div ref={contentRef} className="flex w-full min-w-0 flex-col">
+              <div ref={contentRef} inert={!open} className="flex w-full min-w-0 flex-col">
                 {rest}
               </div>
             </motion.div>

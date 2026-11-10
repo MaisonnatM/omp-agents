@@ -236,7 +236,7 @@ export function plansWithConfiguredProviders(plans: readonly PlanUsage[], config
 export function withCreditBalance(plans: readonly PlanUsage[], balance: CreditBalance | null): PlanUsage[] {
 	if (!balance) return [...plans];
 	return plans.map(plan =>
-		plan.provider === API_CREDITS_PROVIDER && plan.windows.length === 0 && plan.extra === null ? { ...plan, balance } : plan,
+		plan.provider === API_CREDITS_PROVIDER && isNameOnlyPlan(plan) ? { ...plan, balance } : plan,
 	);
 }
 
@@ -251,8 +251,11 @@ export function withCreditRuns(plans: readonly PlanUsage[], runs: readonly Credi
 
 /** omp exits non-zero when some provider fails, after printing the reports it did get. */
 export async function fetchPlanUsage(): Promise<PlanUsage[]> {
-	const credits = readConsoleCreditBalance().catch(() => null);
 	const refusals = readCreditRuns(Date.now()).catch(() => []);
+	// A credential-store miss must not hide the plan windows `omp usage` returns.
+	const configured = configuredProviders().catch((): string[] => []);
+	// Only the API credits row shows the Console balance, so nothing else copies the browser's cookie databases to read it.
+	const credits = configured.then(providers => (providers.includes(API_CREDITS_PROVIDER) ? readConsoleCreditBalance().catch(() => null) : null));
 	const rawReports = await readRawUsageReports().catch(() => null);
 	const { stdout, stderr, code } = await run([...ompCommand, "usage", "--json"], { timeoutMs: TIMEOUT_MS });
 	let plans: PlanUsage[];
@@ -261,12 +264,5 @@ export async function fetchPlanUsage(): Promise<PlanUsage[]> {
 	} catch {
 		throw new Error(stderr.trim().split("\n").pop() || `omp usage exited with code ${code}`);
 	}
-	// A credential-store miss must not hide the plan windows this command already returned.
-	let configured: string[] = [];
-	try {
-		configured = await configuredProviders();
-	} catch {
-		configured = [];
-	}
-	return withCreditRuns(withCreditBalance(plansWithConfiguredProviders(plans, configured), await credits), await refusals);
+	return withCreditRuns(withCreditBalance(plansWithConfiguredProviders(plans, await configured), await credits), await refusals);
 }

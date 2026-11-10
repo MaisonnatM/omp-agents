@@ -1,7 +1,7 @@
 name: Release
 
 # Every push to main publishes the macOS app and the Linux AppImage to GitHub Releases. The installed app's
-# updater reads `latest-mac.yml` or `latest-linux.yml` for its own platform. The version is desktop/package.json's
+# updater reads `latest-mac.yml`, `latest-linux.yml`, or `latest-linux-arm64.yml` for its own platform. The version is desktop/package.json's
 # major.minor with the run number as its patch, so it always
 # grows without a commit back to main; bump major.minor there by hand.
 #
@@ -157,4 +157,4 @@ jobs:
         run: |
           cd release
           gh release create "$TAG" --target "$GITHUB_SHA" --title "omp agents ${TAG#v}" --generate-notes \
-            *.dmg *.zip *.blockmap *.AppImage latest-mac.yml latest-linux.yml
+            *.dmg *.zip *.blockmap *.AppImage latest-*.yml

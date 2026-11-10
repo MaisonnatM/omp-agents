@@ -48,7 +48,8 @@ The continue's own turn does not cancel it, since the runner claimed it first an
 An `edit-prompt` cancels the old session id's continue through `AutoContinue.cancel`, since the edited turn starts under the new id, and ending the session through `Dashboard`'s `#endLive` cancels it too.
 A cancel that arrives while the usage read runs keeps the continue from being scheduled.
 
-`AutoContinue.held` reads the hold from the schedule: a session is held while `scheduled.json` has a continue for it that waits or is under way, or while its limit's usage read runs, the one part kept in memory.
+`AutoContinue.held` reads the hold from the schedule alone: a session is held while `scheduled.json` has a continue for it that waits or is under way.
+`limited` saves the continue from the provider's error before its usage read starts, so the session is held through the read and across a restart during it.
 A continue that failed never goes on its own, so it holds nothing, while the row stays for **Try again** or **Dismiss**.
 So a session the server attached to after a restart is still held while its continue waits.
 The cleanup after a merge reads a session's real `status` and its `occupied`: a turn runs or waits on a question (`occupiedBy` in `src/server/auto-continue.ts`), or `AutoContinue` holds it.

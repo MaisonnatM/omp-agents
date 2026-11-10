@@ -31,7 +31,6 @@ import { useScheduleSend } from "./scheduled";
 import { TICKETS_META, TICKETS_TITLE, TicketsPage } from "./tickets/tickets-page";
 import { TodoPage } from "./todo/page";
 
-/** What a new session for top-level todo `todoId` starts with: its title, then its notes, and its Workspace. `null` while the list names no such todo. */
 /** The directory a New session draft on `page` starts in: the route's, else its todo's Workspace, else `defaultWorkspace`. */
 export function newDraftCwd(page: Extract<Page, { kind: "new" }>, list: UserTodoList | null, defaultWorkspace: string): string {
 	// A directory the route names wins over the todo's Workspace, so picking another one in the draft sticks.
@@ -40,6 +39,7 @@ export function newDraftCwd(page: Extract<Page, { kind: "new" }>, list: UserTodo
 	return seed ? todoCwd(seed, defaultWorkspace) : defaultWorkspace;
 }
 
+/** What a new session for top-level todo `todoId` starts with: its title, then its notes, and its Workspace. `null` while the list names no such todo. */
 function todoSeed(list: UserTodoList | null, todoId: string | null): { text: string; prompt: string; workspace: string | null } | null {
 	const todo = todoId === null ? undefined : list?.todos.find(({ id }) => id === todoId);
 	if (!todo) return null;

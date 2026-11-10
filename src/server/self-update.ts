@@ -4,6 +4,7 @@
  * fast-forward stays as it was, and the answer says why.
  */
 import { join } from "node:path";
+import { gitCause } from "../git";
 import { agentDir } from "../omp/config";
 import { run, runChecked } from "../proc";
 import { SerialLane } from "../serial-lane";
@@ -41,8 +42,7 @@ const originRef = (branch: string): string => `refs/remotes/origin/${branch}`;
 async function gitIn(dir: string, args: string[], codes: readonly number[] = [0]): Promise<{ code: number; stdout: string }> {
 	const { code, stdout, stderr } = await run(["git", "-C", dir, ...args], { timeoutMs: GIT_TIMEOUT_MS });
 	if (codes.includes(code)) return { code, stdout };
-	const lines = stderr.split("\n").map(line => line.trim()).filter(Boolean);
-	const cause = lines.find(line => line.startsWith("fatal:") || line.startsWith("error:")) ?? lines.at(-1) ?? `exit code ${code}`;
+	const cause = gitCause(stderr) ?? `exit code ${code}`;
 	throw new UpdateRefused(`git ${args[0]} failed in ${dir}: ${cause}`);
 }
 

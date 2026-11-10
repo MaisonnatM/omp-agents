@@ -128,11 +128,13 @@ export function chartOf(state: SportState, figure: Figure, from: string | null, 
 			};
 		}
 		case "plan": {
-			const start = planStart(state.plan) ?? today;
+			const start = planStart(state.plan);
 			const data = [];
-			for (let monday = mondayOf(from && from > start ? from : start); monday <= today; monday = addDays(monday, 7)) {
-				const { planned, done } = adherence(state, monday, addDays(monday, 6) < today ? addDays(monday, 6) : today);
-				data.push({ day: shortDate(monday), planned, done });
+			if (start !== null && start <= today) {
+				for (let monday = mondayOf(from && from > start ? from : start); monday <= today; monday = addDays(monday, 7)) {
+					const { planned, done } = adherence(state, monday, addDays(monday, 6) < today ? addDays(monday, 6) : today);
+					data.push({ day: shortDate(monday), planned, done });
+				}
 			}
 			return {
 				title: "Séances faites par semaine",

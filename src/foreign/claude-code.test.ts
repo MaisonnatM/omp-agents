@@ -60,6 +60,8 @@ describe("decodeClaudeCodeLine", () => {
 				user("m1", "<command-name>/clear</command-name>", { isMeta: true }),
 				user("s1", "a subagent's task", { isSidechain: true }),
 				{ type: "ai-title", aiTitle: "Login fix", sessionId: "c1" },
+				{ type: "custom-title", customTitle: "Login fix", sessionId: "c1" },
+				{ type: "agent-name", agentName: "main", sessionId: "c1" },
 				{ type: "file-history-snapshot", messageId: "x", snapshot: {} },
 				{ type: "permission-mode", permissionMode: "default" },
 				{ type: "system", subtype: "informational", uuid: "y", ...base },
@@ -146,7 +148,7 @@ describe("claudeCodeFileOf", () => {
 });
 
 describe("claudeCodeFormat", () => {
-	test("lists each session by its newest title, else its first prompt, and flags one with no turn as empty", async () => {
+	test("lists each session by the user's title, else its newest generated title, else its first prompt, and flags one with no turn as empty", async () => {
 		const root = mkdtempSync(join(tmpdir(), "omp-agents-claude-"));
 		dirs.push(root);
 		writeSession(root, "-work", "c1", [
@@ -157,6 +159,7 @@ describe("claudeCodeFormat", () => {
 		]);
 		writeSession(root, "-work", "c2", [user("u1", "add a\ntest"), assistant("a1", [{ type: "text", text: "Added." }])]);
 		writeSession(root, "-work", "c3", [{ type: "permission-mode", permissionMode: "default", sessionId: "c3" }]);
+		writeSession(root, "-work", "c4", [user("u1", "fix it"), { type: "custom-title", customTitle: "Renamed", sessionId: "c4" }, { type: "ai-title", aiTitle: "Generated", sessionId: "c4" }]);
 		writeSession(join(root, "-work", "c2"), "subagents", "agent-1", [user("u1", "a subagent's task")]);
 		const format = claudeCodeFormat(root);
 		const listed = (await format.list()).toSorted((a, b) => a.id.localeCompare(b.id));
@@ -164,6 +167,7 @@ describe("claudeCodeFormat", () => {
 			{ id: "c1", cwd: "/work", title: "Login fix", empty: false, source: "claude-code" },
 			{ id: "c2", cwd: "/work", title: "add a test", empty: false, source: "claude-code" },
 			{ id: "c3", cwd: "", title: null, empty: true, source: "claude-code" },
+			{ id: "c4", cwd: "/work", title: "Renamed", empty: false, source: "claude-code" },
 		]);
 	});
 

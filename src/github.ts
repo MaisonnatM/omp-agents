@@ -5,7 +5,7 @@
  */
 import { createCache } from "./cache";
 import { GithubQuota, parseRateLimit } from "./github-quota";
-import { errorText, isObject, str } from "./json";
+import { isObject, str } from "./json";
 import { limit } from "./map-limit";
 import { run, runChecked, runJson } from "./proc";
 import type { ChangeStatus } from "./shared/changes";

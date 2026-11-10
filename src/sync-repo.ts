@@ -5,6 +5,7 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { gitCause } from "./git";
 import { run, runChecked, type RunOptions } from "./proc";
 import { MISSING_REPOSITORY } from "./shared/settings-sync";
 
@@ -24,10 +25,10 @@ const quiet = (): Record<string, string> => ({
 	...(process.env.GIT_SSH_COMMAND || process.env.GIT_SSH ? {} : { GIT_SSH_COMMAND: "ssh -o BatchMode=yes" }),
 });
 
-/** Git's line saying the remote repository is missing, which comes before its advice, else its last line. */
+/** Git's line saying the remote repository is missing, else its own line for why the command failed. */
 function failure(stderr: string, what: string): Error {
 	const lines = stderr.split("\n").map(line => line.trim()).filter(Boolean);
-	return new Error(lines.find(line => MISSING_REPOSITORY.test(line)) ?? lines.at(-1) ?? `${what} failed`);
+	return new Error(lines.find(line => MISSING_REPOSITORY.test(line)) ?? gitCause(stderr) ?? `${what} failed`);
 }
 
 /**

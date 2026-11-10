@@ -44,7 +44,7 @@ export function refreshExecutableEnv(): void {
 	if (!app.isPackaged) return;
 	try {
 		const env = loginShellEnv(launchdEnv());
-		for (const key of ["PATH", "BUN_INSTALL", "OMP_PACKAGE_DIR", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"]) {
+		for (const key of ["PATH", "BUN_INSTALL", "OMP_PACKAGE_DIR"]) {
 			const value = env[key];
 			if (value === undefined) delete process.env[key];
 			else process.env[key] = value;

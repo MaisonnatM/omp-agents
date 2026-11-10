@@ -34,6 +34,7 @@ describe("inventory", () => {
 		expect(tabOf("view", "tickets/item")).toBe("tickets");
 		expect(tabOf("view", "email/new")).toBe("email");
 		expect(tabOf("command", "new-ticket")).toBe("tickets");
+		expect(tabOf("command", "tickets-new")).toBe("tickets");
 		expect(tabOf("command", "email-reply")).toBe("email");
 		expect(tabOf("action", "put /api/ticket/new")).toBe("tickets");
 		expect(tabOf("action", "put /api/gmail/send")).toBe("email");

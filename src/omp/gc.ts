@@ -2,8 +2,7 @@
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { parsedAnswer } from "../../templates/omp/agent/extensions/github/command";
-import { arrayOf, fields, isBoolean, isNumber, isString, isTexts, optional, errorText } from "../json";
+import { arrayOf, fields, isBoolean, isNumber, isString, isTexts, optional, errorText, parseJson } from "../json";
 import { run } from "../proc";
 import { CleanupBusy, GC_PHASES, GC_RULES, type GcAnswer, type GcPhase, type StorageUsage } from "../shared/storage";
 import { allocatedUsage } from "../worktrees";
@@ -25,7 +24,7 @@ export function parseGcAnswer(raw: unknown, phases: readonly GcPhase[], apply: b
 
 async function gc(phases: readonly GcPhase[], apply: boolean): Promise<GcAnswer> {
 	const { code, stdout, stderr } = await run([...ompCommand, "gc", "--json", ...phases.map(phase => `--${phase}`), ...(apply ? ["--apply"] : [])], { cwd: homedir(), child: true });
-	const raw = parsedAnswer(stdout);
+	const raw = parseJson(stdout);
 	if (code !== 0 && raw === undefined) {
 		if (stderr.includes("GC already running:")) throw new CleanupBusy();
 		throw new Error(stderr.trim() || `omp cleanup exited ${code}`);

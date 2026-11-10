@@ -70,7 +70,7 @@ export function applyPaneMessage(msg: PaneMsg): void {
 	const view = msg.t === "completions" ? msg.scope.view : msg.view;
 	const key = hashForView(view);
 	if (!open.has(key)) return;
-	const pane = panes.get(key) ?? EMPTY_PANE;
+	const pane = panes.get(key);
 	switch (msg.t) {
 		case "items":
 			panes.set(key, { ...pane, items: applyDelta(pane.items, msg.reset, msg.items, item => item.id, msg.removed), loaded: true });

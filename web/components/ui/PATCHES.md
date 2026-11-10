@@ -99,6 +99,17 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 - `ui/chart.tsx` comes from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/chart.json`).
   It imports `cn` from `@/lib/utils` and drops `"use client"`; the rest is the registry file unchanged.
   Its `--chart-1` to `--chart-5` colors are shadcn's defaults, in `web/globals.css`.
+- `ui/sidebar-group.tsx`: a collapsed group's body is `inert`, so its hidden rows leave the Tab order.
+  `headerActions` is a prop, in place of the registry's detection of action children by type, and `SidebarGroupLabel` takes an `icon`.
+- `ui/scroll-area.tsx`: a `viewportRef` prop, which `SidebarContent` in `ui/sidebar.tsx` passes on.
+- `ui/badge.tsx`: `color` takes any CSS color beside a palette name, such as a Linear label's.
+- `lib/shape-context.tsx`: the rounded shape's `button` is `rounded-sm`, where the registry's is `rounded-lg`.
+- `ui/message-scroller.tsx`: the scroll button's default `variant` is `tertiary`, where the registry's is `secondary`.
+- `ui/tooltip.tsx`: `disabled` anchors hover to a non-focusable wrapper around a disabled child, `wrapperClassName` styles that wrapper, and the trigger ignores a focus that `isReturnedFocus` in `web/use-return-focus.ts` reports.
+- `ui/button.tsx`: `data-pressed` while `active`; the label truncates with an ellipsis and the icons do not shrink.
+- `ui/tabs.tsx`: `labelClassName` on `TabItem`, and `TabsList` scrolls sideways with a hidden scrollbar.
+- `ui/file-thumbnail.tsx`: a text file shows its first 400 characters as its thumbnail.
+- `ui/chat-message.tsx`: `onOpenImage` turns each image above the bubble into a button.
 
 ## `kibo-ui/calendar/index.tsx`
 

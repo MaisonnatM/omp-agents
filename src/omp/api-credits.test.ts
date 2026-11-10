@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { lstat, mkdtemp, readFile, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
@@ -57,6 +57,38 @@ describe("API credits models.yml entry", () => {
 		await Bun.write(path, Bun.YAML.stringify({ providers: { "anthropic-api": { ...apiCreditsEntry(["kept"]), auth: "apiKey", apiKey: "stay" } } }, null, 2));
 		await removeApiCreditsProvider(root);
 		expect(await readFile(path, "utf8")).toContain("apiKey");
+	});
+
+	test("removing the entry keeps a top-level key and a comment that follow it", async () => {
+		const root = await dir();
+		const path = join(root, "models.yml");
+		await Bun.write(path, "providers:\n  # my gateway\n  other:\n    baseUrl: https://example.com\nequivalence:\n  overrides:\n    a: b\n");
+		await addApiCreditsProvider(["claude-sonnet"], root);
+		await removeApiCreditsProvider(root);
+		expect(await readFile(path, "utf8")).toBe("providers:\n  # my gateway\n  other:\n    baseUrl: https://example.com\nequivalence:\n  overrides:\n    a: b\n");
+
+		await Bun.write(path, "providers:\nequivalence:\n  overrides:\n    a: b\n");
+		await addApiCreditsProvider(["claude-sonnet"], root);
+		await removeApiCreditsProvider(root);
+		expect(Bun.YAML.parse(await readFile(path, "utf8"))).toEqual({ providers: null, equivalence: { overrides: { a: "b" } } });
+	});
+
+	test("an existing models.yml keeps its permissions and stays a symlink to the file it points at", async () => {
+		const root = await dir();
+		const link = join(root, "models.yml");
+		const real = join(await dir(), "models.yml");
+		await writeFile(real, "providers:\n  other:\n    apiKey: secret\n", { mode: 0o600 });
+		await symlink(real, link);
+
+		await addApiCreditsProvider(["claude-sonnet"], root);
+		expect((await lstat(link)).isSymbolicLink()).toBe(true);
+		expect(await readFile(real, "utf8")).toContain("claude-sonnet");
+		expect((await stat(real)).mode & 0o777).toBe(0o600);
+
+		await removeApiCreditsProvider(root);
+		expect((await lstat(link)).isSymbolicLink()).toBe(true);
+		expect(await readFile(real, "utf8")).not.toContain("anthropic-api");
+		expect((await stat(real)).mode & 0o777).toBe(0o600);
 	});
 
 	test("moves a key saved beside the Anthropic sign-in and writes the provider", async () => {

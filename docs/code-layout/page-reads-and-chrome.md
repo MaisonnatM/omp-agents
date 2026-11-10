@@ -41,7 +41,7 @@
   `writeMergeQueue` is the one write of a merge, from every merge button: it sends `PUT /api/merge-queue` and, for each pull request the server merged on the way, shows it merged in the list at once and reads the list again; `web/use-workspace-scope.ts` reads the list again when a pull request leaves the queue later.
   `writeWorkspace` is the one write of the Settings › Workspaces list, from Settings and the sidebar's move, and `pullRequestsScope` builds the pull request poll's query from the window's workspace, else its space.
   The details read the pull request again when its state in the list changes, so a change from its row shows in its open details too.
-  The Email page's conversations are not a polled store: `readMailThread` and `useMailThread` keep them in memory by thread id, one read each, and a later read supersedes one in flight.
+  The Email page's conversations live in `mailThreadStore`, a polled store that saves no copy: `useMailThread` reads a conversation the first time it is asked for, under its `mailThreadScope`, and again from Gmail once a later message arrived.
   `web/app.tsx` polls the pull requests instead, on every page once the sessions are listed, for the Pull requests tab's count, and the sidebar's pull request list reads that entry.
   The composer's `@` menu reads the pull request entry that `pullRequestsScope` in the status context names, the one `web/app.tsx` polls, so it starts no poll of its own and never reads the all-workspaces entry, which asks GitHub about every repository, in place of the selected workspace's.
   `web/components/tickets/ticket-pickers.tsx` holds the controlled status, priority, assignee, labels, and project pickers that the issue detail and the new-issue dialog share.

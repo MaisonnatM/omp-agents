@@ -43,7 +43,7 @@
   When Linear refuses a change, the detail view undoes it, keeps the changes made after it, and says why.
   The lists come from the issue's team in Linear, read when you first open one, and the server keeps them for five minutes.
 - `#tickets/<identifier>`, such as `#tickets/ENG-2368`, opens the list with that issue's details beside it, even when the tickets list does not include it or cannot load.
-- **New ticket**, before **Refresh** in the page header, Cmd+N (Ctrl+N off macOS) on the tickets page, where it starts no session, C outside text fields on any page but the Todo page, where C adds a todo, or **Create ticket** in the command menu opens the new-issue dialog over the page you are on, laid out like Linear's.
+- **New ticket**, before **Refresh** in the page header, Cmd+N (Ctrl+N off macOS) on the tickets page, where it starts no session, C outside text fields on any page but the Todo, Notes, Calendar, and Email pages, where C adds a todo, a note, an event, or a new mail, or **Create ticket** in the command menu opens the new-issue dialog over the page you are on, laid out like Linear's.
   Its header names the team by its key, such as ENG, in a pill that picks another team; the team starts as the last one an issue was created in, from here or from a todo, else Linear's first.
   Below come the title, a markdown description, and a pill for each field: the status, which starts as the team's first backlog state, the priority, the assignee, which starts as you, the project, and the labels, each a searchable list as in an issue's details, and **…** for a due date.
   The lists come from the team in Linear, and another team clears the status, labels, and project picked for the last one.

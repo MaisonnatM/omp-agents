@@ -30,12 +30,21 @@ import { type MailDraftEdits, mailExtension, type OpenMailDraft } from "../../ma
 
 const ADDRESS = /^[^\s@<>,]+@[^\s@<>,]+\.[^\s@<>,]+$/;
 
-/** `typed` as someone to write to: `Name <address>` or a bare address, else `null`. */
-function personOf(typed: string): MailPerson | null {
-	const text = typed.trim().replace(/,$/, "");
+/** `text`, trimmed, as someone to write to: `Name <address>` or a bare address, else `null`. */
+function personOf(text: string): MailPerson | null {
 	const named = /^"?([^"<]*)"?\s*<([^>]+)>$/.exec(text);
 	const [name, address] = named ? [named[1]!.trim(), named[2]!.trim()] : ["", text];
 	return ADDRESS.test(address) ? { name, address } : null;
+}
+
+/** Everyone `typed` names, split at commas and semicolons with empty parts dropped, or `null` when a part is no one to write to. */
+export function typedPeople(typed: string): MailPerson[] | null {
+	const people = typed
+		.split(/[,;]/)
+		.map(part => part.trim())
+		.filter(Boolean)
+		.map(personOf);
+	return people.every(person => person !== null) ? people : null;
 }
 
 /** One field of people: a chip for each, removed with its × or Backspace, and a text box that adds who you type on Enter, comma, Tab, or leaving it; none of it while `disabled`. */
@@ -44,13 +53,13 @@ function PeopleField({ label, people, onChange, disabled, autoFocus, trailing }:
 	const [invalid, setInvalid] = useState(false);
 	const commit = (): boolean => {
 		if (disabled || typed.trim() === "") return false;
-		const added = typed.split(/[,;]/).map(personOf);
-		if (added.some(person => person === null)) {
+		const added = typedPeople(typed);
+		if (!added) {
 			setInvalid(true);
 			return false;
 		}
 		const known = new Set(people.map(person => person.address.toLowerCase()));
-		onChange([...people, ...(added as MailPerson[]).filter(person => !known.has(person.address.toLowerCase()))]);
+		onChange([...people, ...added.filter(person => !known.has(person.address.toLowerCase()))]);
 		setTyped("");
 		return true;
 	};

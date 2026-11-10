@@ -15,6 +15,7 @@ import { age } from "../../labels";
 import { sessionUsageStore } from "../../reads";
 import { notHereWords, runWords, startsWords } from "../../routines-model";
 import { useAction } from "../../use-action";
+import { useMinute } from "../../use-minute";
 import { useDashboardActions } from "../dashboard-context";
 import { DetailsEmpty, DetailsSidebarFrame } from "../details-sidebar-frame";
 import { MemoryList } from "../memory-list";
@@ -192,6 +193,7 @@ function JobEditor({ bot, connected }: { bot: Bot; connected: boolean }) {
 /** The Bot's routines, each opening the card of them with its row open in place of the conversation, **All routines** opening the card, and **New routine**; `open` is what the page shows, which they mark. */
 function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: readonly Routine[]; open: OpenRoutine; connected: boolean }) {
 	const openId = open.kind === "open" || open.kind === "edit" ? open.routine.id : null;
+	const now = useMinute();
 	return (
 		<div className="space-y-2">
 			<div className="flex items-center justify-between gap-2">
@@ -234,7 +236,7 @@ function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: r
 										<span className="block truncate text-xs text-muted-foreground" title={starts}>
 											{starts}
 										</span>
-										<span className="block truncate text-xs text-muted-foreground">{last ? `Ran ${age(last.at, { compact: true })} ago · ${runWords(last)}` : "Not run yet"}</span>
+										<span className="block truncate text-xs text-muted-foreground">{last ? `Ran ${age(last.at, { compact: true, now })} ago · ${runWords(last)}` : "Not run yet"}</span>
 									</span>
 								</a>
 							</li>

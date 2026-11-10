@@ -57,7 +57,6 @@ export interface SettingHandle {
 	readonly id: string;
 	/** {@link id} split at its dots, the path it sits at within a settings layer. */
 	readonly segments: readonly string[];
-	readonly definition: { protocolDefault?: readonly string[] };
 	readonly type: "boolean" | "string" | "number" | "enum" | "array" | "record";
 	readonly default: unknown;
 	/** Settings-panel metadata; `undefined` for a setting only `config.yml` edits. */
@@ -66,8 +65,6 @@ export interface SettingHandle {
 	readonly isCredential: boolean;
 	/** The environment variable that can supply the value. */
 	readonly envName: string | undefined;
-	get(settings: OmpSettingsInstance): unknown;
-	pinDefault(settings: OmpSettingsInstance): void;
 	readonly enumValues: readonly string[] | undefined;
 	/** @throws Error when `value` does not fit the setting. */
 	assertWritable(value: unknown): void;

@@ -7,7 +7,7 @@ A model switch's `done` comes once omp switched, or refused, and the session rea
 Context actions send the corresponding `/compact`, `/shake`, or `/handoff` prompt so omp's background command handling keeps Stop responsive; the auto-compact switch uses `set_auto_compaction`.
 Goal operations use native RPC `goal`; replacement explicitly drops and recreates a goal, resetting accounting.
 The model-state lane serializes these controls and refreshes the roster after each operation.
-A message the page does not tag, such as a pin, a todo change, or a queued row's **Send now**, is dropped when the socket is down, as before.
+A message the page does not tag, such as a preference change or a queued row's **Send now**, is dropped when the socket is down, as before.
 
 A socket can close after the server got a request and before its answer reached the page, and the page cannot tell that from a request the server never got, so it may not simply send it again: a prompt would reach the session twice.
 So the page picks an id once per load, `crypto.randomUUID()`, and opens `/ws?page=<id>`, and `RequestLedger` in `src/server/request-ledger.ts` keeps each page's requests by `ack` across its sockets.

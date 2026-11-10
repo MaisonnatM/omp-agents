@@ -15,7 +15,7 @@ Then read the section for the work: [Changelog](#changelog), [omp imports](#omp-
   The README holds only features, installation, and configuration.
 - Look a feature up in `docs/usage/` by the words the page shows, such as a button's or a tab's label, rather than by a code identifier, which the interface docs rarely name.
 - Bump the tested omp version at all its pins together: `.github/workflows/checks.yml`, `.github/workflows/release.yml`, the README's omp badge and its `Tested with omp` line, the `placeholder` in `.github/ISSUE_TEMPLATE/bug_report.yml`, and the omp version `templates/omp/README.md` names.
-  Bump Bun's version at all its pins together: both workflows, the README's badge and its two version lines, `package.json`'s `engines`, `MIN_BUN` in `src/preflight.ts`, and the Bun `placeholder` in `.github/ISSUE_TEMPLATE/bug_report.yml`.
+  Bump Bun's version at all its pins together: both workflows, the README's badge and its two version lines, `package.json`'s `bun` devDependency, `MIN_BUN` in `src/preflight.ts`, and the Bun `placeholder` in `.github/ISSUE_TEMPLATE/bug_report.yml`.
   Check a new omp release with `bun run omp-release` and the [omp release skill](.agents/skills/omp-release/SKILL.md) before you bump it.
 - A change to a file that [`.omp/review-paths`](.omp/review-paths) matches needs the thermonuclear review before it ships; add a file there when it becomes a shared contract or a central file.
 - A change to a file that [`.omp/ui-paths`](.omp/ui-paths) matches needs the interface review before the thermonuclear one.

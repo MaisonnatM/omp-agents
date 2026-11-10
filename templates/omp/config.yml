@@ -52,7 +52,7 @@ modelProviderOrder:
   - openai-codex
   - cursor
 
-# `isolated: true` subagents work in their own clone of the checkout their `checkout` option names; successful changes apply back there as a patch.
+# `isolated: true` subagents work in their own clone of the session's checkout; successful changes apply back there as a patch.
 task:
   isolation:
     enabled: true

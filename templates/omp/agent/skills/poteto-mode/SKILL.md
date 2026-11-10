@@ -19,7 +19,7 @@ pstack is written for Cursor. On omp, the routes below replace every Cursor tool
 
 ## Subagents and models
 
-omp's `task` call has no per-spawn `model`, `readonly`, `environment`, or `run_in_background` field. The agent you pick sets the model, so map pstack roles to agents:
+omp's `task` call has no `readonly`, `environment`, or `run_in_background` field, and its per-spawn `model` accepts only the council's three models (`task.perCallModelAllow`). The agent you pick sets the model, so map pstack roles to agents:
 
 | pstack role or default model | omp agent |
 | --- | --- |

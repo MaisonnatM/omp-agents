@@ -17,7 +17,7 @@
  *
  * Usage:
  *   bun scripts/token-audit/model-replay.ts candidates [--days 14] [--agents poteto-agent,task] [--repo <path>] > tasks.json
- *   bun scripts/token-audit/model-replay.ts run --tasks tasks.json --models anthropic/claude-opus-5-5,anthropic/claude-sonnet-5-5 [--out <dir>]
+ *   bun scripts/token-audit/model-replay.ts run --tasks tasks.json --models anthropic/claude-opus-5-5:auto,anthropic/claude-sonnet-5-5:auto [--out <dir>]
  *   bun scripts/token-audit/model-replay.ts judge [--out <dir>] [--judge anthropic/claude-opus-5-5] [--baseline anthropic/claude-opus-5-5:auto]
  * `--out` defaults to `~/.cache/omp-model-replay` and must sit outside every checkout: a replay nested in one read it.
  */

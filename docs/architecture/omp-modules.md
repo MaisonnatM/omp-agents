@@ -2,7 +2,7 @@
 
 The server imports omp's own modules from the installed package, so it does not reimplement a protocol, the encryption, or the session-file format, and it always speaks the same version as the sessions it shows.
 `src/omp/modules.ts` loads every module once and checks at startup that each export this app uses exists, naming the omp version and the missing export when one does not.
-It casts each module to an interface in `src/omp/module-types/`, the subset of omp this app reads, one file per area: Collab, session files, RPC, config, models, discovery, MCP, stats, and processes.
+It casts each module to an interface in `src/omp/module-types/`, the subset of omp this app reads, one file per area: Collab, session files, RPC, the RPC host tool, config, models, discovery, extensions, MCP, memory, speech, stats, and processes.
 Those files hold only types, so the app imports a type from them directly and every value from `modules.ts`, whose import runs every check.
 It finds the package through `omp` on `PATH`, or `OMP_PACKAGE_DIR` when set; with a Bun global install that is `~/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent`.
 `bun run omp-release` checks a new omp release against these modules and the files listed below; the [omp release skill](../../.agents/skills/omp-release/SKILL.md) says how to read its report.
@@ -136,7 +136,7 @@ The main ones:
   Its teardown sends that daemon's `rm` for the `start` checkout, when the record names one, then for the checkout name it judged, over the same `callSocket`, after `stopRetainedMount`, in the order `omp worktree clear` runs them, and reads an `OvnfsError` with code `not_found` as already removed.
 - Daemon brokers: `collectReports` and `scopeClient` in `pi-coding-agent/src/cli/ps-data.ts`, what `omp ps` lists without starting a broker and the client whose `stop` ends one generation of a service, `TERMINAL_STATES` in `pi-tui/src/apps/ps-data.ts`, the states with no process behind them, and `canonicalProjectDir` in `pi-coding-agent/src/launch/paths.ts`, the directory a project's broker is keyed by, which `src/omp/daemons.ts` hands the process watch; see [Session processes](session-processes.md).
   `createDaemonBrokerClient` in `pi-coding-agent/src/launch/client.ts` connects to the broker of a directory's project and spawns one when none runs; `startOwnedService` in `src/omp/daemons.ts` sends it the `start` and `logs` operations of `pi-coding-agent/src/launch/protocol.ts`, with the `DaemonSpec` of `pi-tui/src/tools/daemon.ts`, as `startService` in `pi-coding-agent/src/launch/services.ts` does for the bash tool, for the Browser's **Start dev server**, with the shell `getShellConfig` of omp's `Settings` gives.
-- Request usage: `omp-stats/src/aggregator.ts` (`getDashboardStats`, `getToolDashboardStats`, `getTimeRangeConfig`), `rollup.ts` (`getProviderTimeSeries`), `live.ts` (`statsLive`), and `db.ts` (`initDb`).
+- Request usage: `omp-stats/src/aggregator.ts` (`getTimeRangeConfig`), `rollup.ts` (`getOverallStats`, `getStatsByModel`, `getStatsByAgentType`, `getToolStats`, `getProviderTimeSeries`), `live.ts` (`statsLive`), and `db.ts` (`initDb`).
   `src/omp/stats.ts` reads omp-stats' database and starts its live sync on its first read, which the provider check makes at startup.
   `pi-catalog/src/models.ts` provides `getBundledModel` and `calculateCost`, which `listPrice` in `src/omp/stats.ts` uses to price Claude Code and Codex requests.
   `pi-catalog/src/types.ts` defines their model and usage arguments, including Anthropic's cache-write lifetimes.

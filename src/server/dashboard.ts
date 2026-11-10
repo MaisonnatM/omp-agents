@@ -91,7 +91,6 @@ import { ScheduledFile } from "./scheduled-file";
 import { AutoContinue, occupiedBy } from "./auto-continue";
 import { ScheduledRunner } from "./scheduled-runner";
 import type { Routes } from "./route-kit";
-import type { PhoneAccess } from "./phone-access";
 import type { PhoneAccessRoutesEnv } from "./phone-access-routes";
 import { createRoutes } from "./routes";
 import type { SelfUpdate } from "./self-update";
@@ -177,7 +176,7 @@ export class Dashboard {
 	readonly terminals = new Terminals();
 	/** Aborts as the dashboard stops, which stops every routine command still running. */
 	readonly #stopping = new AbortController();
-	/** Which of the servers beside each other, such as a smoke run on another port, runs routines and the todo, note, and event inboxes. */
+	/** Which of the servers beside each other, such as a smoke run on another port, runs routines and the file inboxes. */
 	readonly #ownerLock: OwnerLock;
 	readonly #google: GoogleCalendars;
 	readonly #gmail = new GmailAccounts(accountClients("gmail", (fetch, account) => new GmailClient(fetch, account)));
@@ -731,8 +730,8 @@ export class Dashboard {
 	}
 
 	/**
-	 * Starts following omp: attaches to the sessions the last server left running, watches the session files and the
-	 * inboxes, takes the owner lock when it is free, lists the files, checks for the sessions that stopped mid-turn, lists
+	 * Starts following omp: attaches to the sessions the last server left running, watches the session files, lists the
+	 * files, takes the owner lock when it is free, watches the inboxes, checks for the sessions that stopped mid-turn, lists
 	 * the registry, and starts the loops; `publisher` is the server now listening.
 	 */
 	async start(publisher: Publisher): Promise<void> {
@@ -746,13 +745,14 @@ export class Dashboard {
 		this.#reattached.resolve();
 		this.#broadcasts.syncRoster();
 		this.#loops.watch();
+		// Before the owner lock, whose taking drains the inboxes: a note or a reminder an ended session left files under that session's space.
+		await this.#rescanFiles();
 		if (!this.#claimUnattendedWork()) {
 			const owner = this.#ownerLock.holder();
-			console.log(`omp-agents: the server on port ${owner?.port ?? "?"} (pid ${owner?.pid ?? "?"}) runs routines and the todo, note, and event inboxes; this one takes over when it exits.`);
+			console.log(`omp-agents: the server on port ${owner?.port ?? "?"} (pid ${owner?.pid ?? "?"}) runs routines and the file inboxes; this one takes over when it exits.`);
 		}
 		for (const inbox of this.#inboxes) inbox.watch();
 		this.#endInbox.watch();
-		await this.#rescanFiles();
 		// Once the files are listed, so the notice names the sessions that stopped mid-turn with the last server.
 		await this.#notices.check(STOPPED_KINDS);
 		const [calendarServer] = await findMcpServers(MCP_SERVICES["google-calendar"].host);
@@ -858,7 +858,7 @@ export class Dashboard {
 				if (isPrivate) void this.#privateSessions.purge(instanceId).catch((err: unknown) => console.error(`omp-agents: deleting private session ${instanceId} failed: ${errorText(err)}`));
 				else if (sessionId && !update.ended) this.#interrupted.interrupt(sessionId);
 				this.#broadcasts.syncRoster();
-				void this.#loops.listNow();
+				void this.#loops.listNow().catch((err: unknown) => console.error(`omp-agents: listing the session files failed: ${errorText(err)}`));
 				return;
 			}
 			case "written":
@@ -956,7 +956,7 @@ export class Dashboard {
 	}
 
 	/**
-	 * Takes over routines and the todo, note, and event inboxes when no other server runs them, at start or on the minute
+	 * Takes over routines and the file inboxes when no other server runs them, at start or on the minute
 	 * tick after the server that ran them is gone, with the same steps either way; whether this server runs them. Losing
 	 * them needs no step: every owner action checks the lock as it runs.
 	 */
@@ -964,7 +964,7 @@ export class Dashboard {
 		const was = this.#ownerLock.held;
 		const owns = this.#ownerLock.acquire();
 		if (owns && !was) {
-			console.log("omp-agents: this server now runs routines and the todo, note, and event inboxes.");
+			console.log("omp-agents: this server now runs routines and the file inboxes.");
 			// What the server that ran them saved since this one started.
 			this.#routines.reload();
 			this.#bots.reload();

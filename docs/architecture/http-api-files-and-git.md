@@ -1,6 +1,9 @@
 # HTTP API: files, git, and conversations
 
 `GET /api/git?cwd=<directory>` answers the git checkout that the directory is in, or `null` outside one: the checked-out branch, every local branch with the worktree that has it checked out, and the main worktree.
+It runs `git worktree list --porcelain -z`, `git for-each-ref`, and `git symbolic-ref` on each call, and reads `origin` through the pull request list's cached lookup.
+Like a new session's `start`, `cwd` may name any directory.
+The new-session draft reads it for its branch picker, and a live session's header reads it when it opens and when a turn starts or ends.
 
 `GET /api/system` answers the status bar's machine load: `{ cpuPercent, memoryAvailable, memoryTotal, diskAvailable, diskTotal }`.
 `cpuPercent` is the busy share of every core's time since the previous read, from `os.cpus()`, and `null` when no time passed; the first read measures from the server's start.
@@ -16,9 +19,6 @@ It reads the first `MAX_TEXT_FILE_BYTES` (1 MB) and answers 415 when those bytes
 `GET /api/media?path=<absolute path>[&session=<id>&relative=<path as written>]` serves an image or video that agent text names, as the type `MEDIA_FILE_TYPES` in `src/shared/transcript.ts` gives its extension, with the same lookup, path, real-path extension, and `DENIED_DIRS` checks as `GET /api/file`.
 Bun answers a `Range` request with a 206 and that part, so a video seeks.
 It sends `Cache-Control: private, no-cache`, since a file can change under the same path, and `Content-Security-Policy: sandbox; default-src 'none'`, so an SVG opened at that address runs no script on the page's origin.
-It runs `git worktree list --porcelain -z`, `git for-each-ref`, and `git symbolic-ref` on each call, and reads `origin` through the pull request list's cached lookup.
-Like a new session's `start`, `cwd` may name any directory.
-The new-session draft reads it for its branch picker, and a live session's header reads it when it opens and when a turn starts or ends.
 `GET /api/changes?session=<session id>` answers a session's [changes dialog](../usage/session-changes.md) list, `SessionChanges` in `src/shared/changes.ts`, or 404 for a session it does not know.
 It reads the session's checkout from its worktree, else its directory: `git diff --name-status` and `--numstat` against the merge base of `HEAD` with `origin/HEAD`, else against `HEAD`, else against the empty tree before the first commit, and `git ls-files --others --exclude-standard` for untracked files.
 It asks `SessionFactsIndex.changedPathsOf` for the files the session's own `edit` and `write` calls changed, which reads only the lines its transcript gained since the index's last read of it into the index's own fold, or folds it again from its first line once it shrinks, and lists those git does not name after git's.

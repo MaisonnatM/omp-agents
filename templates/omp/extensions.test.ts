@@ -10,7 +10,8 @@ import { spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
-const { z } = createRequire(join(process.argv[2], "package.json"))("zod");
+// The zod omp hands extensions as \`pi.zod\`, so a schema omp refuses to load fails here too.
+const z = await import(createRequire(join(process.argv[2], "package.json")).resolve("@oh-my-pi/omptype/zod"));
 const input = JSON.parse(process.argv[4]);
 // Importing omp's exports takes about a second, so only a test that reads them asks for them.
 const pi = input.omp ? await import(process.argv[2]) : undefined;
@@ -782,6 +783,7 @@ describe("checkout ownership", () => {
 			"git -c core.pager=cat commit": true, "git switch feat; git commit": true,
 			"env GIT_EDITOR=true git rebase --continue": true, "env -u GIT_DIR git commit": true, "nohup env -i git commit": true,
 			"command git commit": true, 'bash -c "git commit -qam x"': true, "sh -c 'git checkout feat'": false,
+			"if true; then git commit; fi": true, "for f in a; do git commit; done": true, "{ git commit; }": true, "! git commit": true, "echo then git commit": false,
 			"git status": false, "git stash list": false, "git branch x": false, "git worktree list": false,
 			"gh pr view": false, "echo git commit": false, "git constructor": false, "bash -lc 'git status'": false,
 		};

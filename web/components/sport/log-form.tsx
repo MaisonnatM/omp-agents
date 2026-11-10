@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { amount, ARKOSE_COLORS, arkoseColor, CLIMB_LABEL, dose, effortWord, hardest, type LogTarget, logSave, longDate, measured, measurementChange, PAIN_PLACE_LABEL, painRule, painWord, type Saved, sendsText, shortDate, signedKg, testOf } from "../../sport-view";
+import { amount, ARKOSE_COLORS, arkoseColor, CLIMB_LABEL, dose, effortWord, hardest, type LogTarget, logSave, longDate, measured, measurementChange, PAIN_PLACE_LABEL, painRule, painWord, type Saved, savedLoads, sendsText, shortDate, signedKg, testOf } from "../../sport-view";
 import { ERROR_TEXT, isSubmitChord, type Submit } from "../form-dialog";
 import { FIELD, TEXT_AREA } from "../form-field";
 import { Callout } from "../integrations/integration-row";
@@ -80,10 +80,7 @@ export function LogForm({ state, target, disabled, onChange, onSaved, onClose }:
 	const [note, setNote] = useState(log?.note ?? "");
 	const { submit, saving, fail, write } = useWrite(onChange);
 
-	const loads = Object.fromEntries(rows.flatMap(({ item, kg, done }) => {
-		const value = parsed(kg);
-		return done && value !== null ? [[item.exercise.key, value]] : [];
-	}));
+	const loads = savedLoads(log?.loads ?? {}, rows.map(({ item, kg, done }) => ({ key: item.exercise.key, kg: parsed(kg), done })));
 	const entry = (status: WorkoutLog["status"]): WorkoutLog => ({
 		id: log?.id ?? crypto.randomUUID(),
 		date,

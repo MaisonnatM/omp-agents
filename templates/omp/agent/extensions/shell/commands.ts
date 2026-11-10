@@ -38,8 +38,14 @@ export function program(w: string[]): { words: string[]; chdir: string[] } {
 	return { words: w.slice(i), chdir };
 }
 
-/** Commands that run the command after their own flags and `NAME=value` settings; `program` reads `env`, whose `-C` changes directory. */
-const WRAPPERS: Record<string, true> = { builtin: true, command: true, exec: true, nice: true, nohup: true, sudo: true, time: true };
+/**
+ * Words that run the command after their own flags and `NAME=value` settings: wrapper commands, and the shell keywords a
+ * command follows, such as `then` and `do`; `program` reads `env`, whose `-C` changes directory.
+ */
+const WRAPPERS: Record<string, true> = {
+	builtin: true, command: true, exec: true, nice: true, nohup: true, sudo: true, time: true,
+	"!": true, "{": true, do: true, elif: true, else: true, if: true, then: true, until: true, while: true,
+};
 const SHELLS: Record<string, true> = { bash: true, sh: true, zsh: true };
 
 /** A command of a bash line with the directory it runs in, `null` when a variable, a command substitution, or `cd -` names it. */

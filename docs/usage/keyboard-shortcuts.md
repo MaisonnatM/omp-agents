@@ -10,6 +10,7 @@ Alt is Option on macOS.
 | Cmd+Enter | Composer | Steer the running turn immediately; on an empty composer, deliver a pending steer now |
 | Shift+Tab | Composer | Cycle the thinking level |
 | ↑ | Empty composer | Move the last queued message back into the composer |
+| Cmd+Shift+M | Composer | Dictate a prompt, or stop dictating |
 | Cmd+K | Anywhere | Open the command menu |
 | Cmd+[ / Cmd+] | Anywhere | Go back or forward, as the title bar's Back and Forward buttons do |
 | Cmd+N / S | Anywhere / outside text fields | Start a new session; on the tickets page, Cmd+N creates a Linear ticket |
@@ -20,6 +21,7 @@ Alt is Option on macOS.
 | Cmd+Alt+↑ | Anywhere | Open the previous session in the sidebar |
 | Cmd+Alt+↓ | Anywhere | Open the next session in the sidebar |
 | ↓ / ↑ | Sessions, outside text fields | Open the next or previous session in the sidebar |
+| 1 … 9 | Sessions, outside text fields, while the focused session asks a question | Answer it with the option of that number |
 | Cmd+Alt+/ | Anywhere | Choose the session's model |
 | Cmd+Alt+P | Anywhere | Choose the session's working directory |
 | Cmd+E | Anywhere | Expand or collapse tool calls |
@@ -70,6 +72,7 @@ Alt is Option on macOS.
 | ← / → | Sport page's demo dialog, outside text fields | Show the workout's previous or next demo |
 | ↓ / ↑ | Sport page's journal, outside text fields | Focus the next or previous session, or open it while one is open |
 | Esc | Sport page's journal, outside text fields | Close the open session |
+| Space / ← / → | Sport timer, outside text fields | Pause or resume, go back a step, or skip to the next |
 | Alt+Shift+↑ / Alt+Shift+↓ | Todo page or Pull requests page | Move the focused todo, or the Pull requests page's focused pull request, section, or repository, up or down |
 | ↓ / ↑ | Changes page or a pull request's **Code** tab, outside text fields | Open the next or previous changed file |
 
@@ -81,8 +84,8 @@ Alt is Option on macOS.
 - Cmd+1 through Cmd+5 go to the first through fifth tab the sidebar's bar draws, even while typing.
   The numbers count only the bar's tabs, in the order **Settings › Preferences** sets: a tab you hide, or Tickets in Personal or without a Linear sign-in, takes no number, and the tabs after it move up one.
   A number with no tab is left to the window.
-  In the default order in Work with Linear connected, Cmd+1 opens **Pull requests**, Cmd+2 **Tickets**, Cmd+3 **Bots**, Cmd+4 **Sessions**, and Cmd+5 **Todo**; in Personal or without Linear, each tab after **Pull requests** takes the number one lower.
-  **Notes**, **Calendar**, **Email**, and **Sport**, the buttons in the header beside the command menu, take no number; Notes keeps G then N and Email keeps G then M, and Sport has no pair.
+  In the default order in Work with Linear connected, Cmd+1 opens **Pull requests**, Cmd+2 **Tickets**, Cmd+3 **Bots**, and Cmd+4 **Sessions**; in Personal or without Linear, each tab after **Pull requests** takes the number one lower.
+  **Notes**, **Calendar**, **Todo**, **Sport**, and **Email**, the buttons in the header beside the command menu, take no number; Notes keeps G then N and Email keeps G then M, and Calendar, Todo, and Sport have no pair.
   In Work, **Go to sport** leaves the command menu; in Personal, **Go to tickets**, the tickets search, **Create ticket**, and C's new-ticket dialog leave too.
   Cmd with T, L, R, D, Q, O, P, S, Tab, or 6 through 0 is left to the window, whose menu takes Cmd+R, Cmd+Q, and Cmd+0, and Cmd+Shift+W to close it; see [Desktop app](desktop-app.md).
   Single keys and the G pairs work only while no text field has focus, so they never take what you type.
@@ -128,9 +131,9 @@ Alt is Option on macOS.
   Cmd+E expands or collapses every tool group.
   Cmd+Shift+E shows or hides the tool rows in those groups, and Alt+T (Option+T on macOS) shows or hides the thinking text.
   Both stay as you set them in the app.
-- The number of the **Pull requests** tab opens the Pull requests page, and that of **Tickets** opens Tickets in Work when connected to Linear; C then opens the new-ticket dialog in Work from any page but the Todo and Calendar pages, where it adds a todo or an event.
+- The number of the **Pull requests** tab opens the Pull requests page, and that of **Tickets** opens Tickets in Work when connected to Linear; C then opens the new-ticket dialog in Work from any page but the Todo, Notes, Calendar, and Email pages, where it adds a todo, a note, an event, or a new mail.
   The number of **Sessions** goes back from the Pull requests page, the todo list, the calendar, the email, a Bot, Settings, or the new-session draft to the panes.
-  The numbers of **Todo** and **Calendar** open those pages, and G then M or the Email tab's number the **Email** page when connected to Gmail.
+  The **Todo** and **Calendar** buttons in the header open those pages, and G then M the **Email** page when connected to Gmail.
   G then ,, like the header's gear button, opens Settings, where the model roles and the integrations live, and closes it again.
   G then W opens the workspace picker with its search field focused.
 - Session shortcuts act on the focused pane.

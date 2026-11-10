@@ -287,11 +287,11 @@ export const calendarEventsStore = createPolledStore<CalendarEventsAnswer>({
 	cache: { key: "omp-agents.calendar-events-cache", decode: decodeCalendarEventsAnswer },
 });
 
-/** The Google Calendar accounts a page in a workspace reads, and their calendars. */
+/** The Google Calendar accounts a page in a space reads, and their calendars. */
 export interface GoogleCalendars {
 	/** Whether the dashboard can call any Google Calendar account. */
 	connected: boolean;
-	/** The Google Calendar accounts `workspace` shows. */
+	/** The Google Calendar accounts `space` shows. */
 	accounts: GoogleAccount[];
 	/** The calendars of those accounts, read every minute while one is callable; `null` while none is or before the first read. */
 	calendars: GoogleCalendar[] | null;

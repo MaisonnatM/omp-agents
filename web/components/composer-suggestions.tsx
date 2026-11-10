@@ -110,7 +110,6 @@ function Row({ sendKey, marked, label, className, children, ...props }: RowProps
 }
 
 interface SuggestionRowProps {
-	text: string;
 	label: string;
 	index: number;
 	active: boolean;
@@ -132,7 +131,7 @@ function KeyChip({ children }: { children: ReactNode }) {
  * as `MenuItem` does, since an inline ref callback would re-register every render and keep the hook's measurement pass
  * from ever settling.
  */
-function SuggestionRow({ text, label, index, active, marked, optionId, registerItem, onPick, onEdit }: SuggestionRowProps) {
+function SuggestionRow({ label, index, active, marked, optionId, registerItem, onPick, onEdit }: SuggestionRowProps) {
 	const PencilIcon = useIcon("pencil");
 	const isTouch = useIsTouch();
 	const ref = useRef<HTMLDivElement>(null);
@@ -188,8 +187,6 @@ function SuggestionRow({ text, label, index, active, marked, optionId, registerI
 
 interface SuggestionOptions {
 	prompts: string[];
-	/** What a row shows for its prompt; the prompt itself by default. */
-	labelOf?: (text: string) => string;
 	draft: string;
 	/** Sends `text` as the composer's draft would go. */
 	onSend: (text: string) => void;
@@ -213,7 +210,7 @@ interface Suggestions {
  * keys and clicks. Marks join every send or fill, in list order; Esc, a send, a fill, and the list closing clear them.
  * Focus stays in the text field.
  */
-export function useSuggestions({ prompts, labelOf, draft, onSend, onFill }: SuggestionOptions): Suggestions {
+export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOptions): Suggestions {
 	const open = prompts.length > 0 && draft === "";
 	const listRef = useRef<HTMLDivElement>(null);
 	const listId = useId();
@@ -303,8 +300,7 @@ export function useSuggestions({ prompts, labelOf, draft, onSend, onFill }: Sugg
 							{prompts.map((text, index) => (
 								<SuggestionRow
 									key={`${text}-${index}`}
-									text={text}
-									label={labelOf?.(text) ?? text}
+									label={text}
 									index={index}
 									active={index === activeIndex}
 									marked={marked.has(text)}

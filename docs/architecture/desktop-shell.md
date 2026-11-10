@@ -69,11 +69,15 @@ Its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/serve
 
 ## Packaging and releases
 
-`scripts/build-desktop-artifact.ts`, modeled on T3 Code's script of the same name, builds `desktop/dist/resources` (the server bundled into `server.js` with Tailwind left out, the page prebuilt by `buildPage`, the keeper and the session visuals extension bundled into `keeper.js` and `session-visuals-extension.js`, and the starter kit's `agent/`, `config.yml`, and installer bundled into `install.js`), downloads the Bun of the build's own version for each architecture into `desktop/dist/bun-<arch>`, and runs electron-builder with a config it generates, which writes a DMG, a zip, their blockmaps, and `latest-mac.yml` to `desktop/release`.
+`scripts/build-desktop-artifact.ts`, modeled on T3 Code's script of the same name, builds `desktop/dist/resources`: the server bundled into `server.js` with Tailwind left out, the page prebuilt by `buildPage`, the keeper bundled into `keeper.js`, and the starter kit's `agent/`, `config.yml`, and installer bundled into `install.js`.
+It bundles the session visuals, Bot, shepherd, designer, and personal extensions beside them, into `session-visuals-extension.js`, `bot-extension.js`, `shepherd-extension.js`, `designer-extension.js`, and `personal-extension.js`.
+It then downloads the Bun of the build's own version for each architecture into `desktop/dist/bun-<arch>`, and runs electron-builder with a config it generates.
+That writes a DMG, a zip, their blockmaps, and `latest-mac.yml` to `desktop/release`, or with `--os linux` one AppImage per architecture with `latest-linux.yml` and `latest-linux-arm64.yml`.
 It signs and notarizes when `CSC_LINK` and the `APPLE_API_KEY*` variables are set, with the hardened runtime and `desktop/entitlements.mac.plist`, which lets Bun JIT; otherwise it signs ad hoc.
 `--mock-update-port <port>` points the update feed at `scripts/mock-update-server.ts`, which serves `desktop/release`, to try an update without publishing.
-`.github/workflows/release.yml` runs on every push to `main`, one run at a time with a newer push cancelling an older run, in three jobs.
+`.github/workflows/release.yml` runs on every push to `main`, one run at a time with a newer push cancelling an older run, in four jobs.
 `test` runs the checks with a read-only token and no secret.
 `build` sets `desktop/package.json`'s patch version to the run number, keeping its major and minor, and builds arm64 and x64 on an Apple silicon runner; the signing secrets reach only its signing step, and its token only reads.
+`build-linux` sets the same version and builds the x64 and arm64 AppImages, unsigned, with a read-only token.
 `publish`, the one job whose token can write, downloads the artifacts and creates a GitHub Release tagged `vX.Y.Z` with every one, running no code from the checkout.
 Every action is pinned to a commit, with its tag in a comment, and no checkout keeps its token in `.git/config`.

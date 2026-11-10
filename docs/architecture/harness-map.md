@@ -77,7 +77,7 @@ flowchart LR
   end
   subgraph inboxes["~/.config/omp-agents/*-inbox/"]
     i1["todo-inbox, note-inbox, event-inbox,<br/>end-inbox, sign-in-inbox"]
-    i2["bot-inbox, routine-inbox, shepherd-inbox"]
+    i2["bot-inbox, routine-inbox, shepherd-inbox,<br/>sport-inbox"]
   end
   kit -->|writes a file| i1
   dashx -->|writes a file| i2

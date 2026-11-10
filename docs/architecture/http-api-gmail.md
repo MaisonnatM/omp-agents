@@ -23,7 +23,7 @@ The body comes from a walk of the message's MIME tree: in `multipart/alternative
 Each text part is decoded from base64url in the `charset` its `Content-Type` names, and in UTF-8 when no decoder knows that charset.
 Every part that names a file becomes an attachment, with its name, MIME type, and size; nothing downloads it.
 A message without an id or an arrival time is left out, and each conversation is kept for a minute per id.
-The page keeps the conversations it read in memory only, by id, through `readMailThread` and `useMailThread` in `web/reads.ts`, since bodies are large and private.
+The page keeps the conversations it read in memory only, by account and id, through `mailThreadStore` and `useMailThread` in `web/reads.ts`, since bodies are large and private.
 It reads a conversation once, reads the next and previous ones of the list ahead while one shows, and reads one again from Gmail on **Refresh**, or when the inbox lists a message that arrived after the last read.
 
 Each `MailMessage` also holds the people its `Reply-To` names, so the page addresses a reply itself: `recipientsOf` in `src/shared/gmail.ts` answers as Gmail does, to the `Reply-To`, else the sender, or to the recipients of a message you sent; replying to all copies everyone else in its `To` and `Cc`, and your address is never a recipient.

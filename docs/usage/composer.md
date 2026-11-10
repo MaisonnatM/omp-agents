@@ -47,10 +47,10 @@
 - Sessions started from the dashboard have a model menu, as Cursor's does: the button reads the model and its effort, such as **Opus 5.5 High**.
   **Fast** turns omp's `/fast` on or off; it is greyed out for a model without a priority tier, and reads **not active** when omp has it on but the provider refused the fast tier.
   **Advisor**, just under Fast, turns passive review on or off for this session and names its model, or the number of configured advisors.
+  Assign an advisor model in **Settings → Models** to enable the switch.
   **Extra usage**, under Advisor, parks the fallback list and clears it, so a full Claude allowance stays on Claude and bills extra usage instead of moving to Cursor or another fallback.
   It applies to every session, and the fallback list comes back when you turn it off.
   Claude has to have extra usage turned on for the account, or the turn stops when the allowance is full.
-  Assign an advisor model in **Settings → Models** to enable the switch.
   **Context** shows the model's context window and switches to a variant of the same model with another window, such as Cursor's `claude-opus-5-5` (300K) and `claude-opus-5-5-1m` (1M); models without such a variant have no Context row.
   **Effort** chooses the thinking level among the ones the live model supports.
   **Model** opens the model search beside the menu, with the cursor in its field.
@@ -84,7 +84,8 @@
   With focus fills the composer with `/compact ` or `/handoff ` for you to finish.
   These actions wait until the running turn ends; **Auto-compact** remains available and changes this session only, not its config file.
   While compaction runs, the ring reads **Compacting…** and pulses unless you prefer reduced motion.
-- Type `$` to complete omp's commands, discovered file commands, and `/skill:<name>` skills; picking one puts its `/` text in the draft, such as `/skill:poteto-mode`, so omp runs it as if you had typed it. A skill whose name has a space is left out, since omp cannot invoke it.
+- Type `$` to complete omp's commands, discovered file commands, and `/skill:<name>` skills; picking one puts its `/` text in the draft, such as `/skill:poteto-mode`, so omp runs it as if you had typed it.
+  A skill whose name has a space is left out, since omp cannot invoke it.
   `$` opens the list at the start of a line or after a space, and not before a digit, so a price such as `$5` stays text; `/` no longer opens it.
   Type `@` to mention something: the list shows the last three files the session changed, then Files & Folders, Todos, Tickets, Pull requests, People, Email, Calendar, and Sessions.
   Picking a category narrows the list to it, which you can also type as a prefix: `@file:`, `@todo:`, `@ticket:`, `@pr:`, `@person:`, `@mail:`, `@event:`, or `@session:`.

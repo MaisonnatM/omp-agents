@@ -162,7 +162,8 @@ export class SubagentFiles {
 		this.#expected.set(agentId, { sessionFile, path });
 		if (!existsSync(path) && !this.#searched.has(agentId)) {
 			this.#searched.add(agentId);
-			void this.#search(dirname(sessionFile), agent);
+			// A search that fails found nothing: the session's directory can vanish while it is walked.
+			void this.#search(dirname(sessionFile), agent).catch(() => this.#searched.delete(agentId));
 		}
 		return path;
 	}

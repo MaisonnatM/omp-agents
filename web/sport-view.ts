@@ -312,6 +312,22 @@ export function measurementChange(state: SportState, metric: string, date: strin
 	return existing ? { op: "edit-measurement", measurement: { ...existing, value } } : { op: "add-measurement", measurement: { id: crypto.randomUUID(), metric, value, at: date, note: "", addedBy: null } };
 }
 
+/** A load row of the Fait dialog: its exercise, the load typed, `null` when none, and whether it is ticked. */
+export interface TypedLoad {
+	key: string;
+	kg: number | null;
+	done: boolean;
+}
+
+/**
+ * The loads a save logs: each listed exercise's while ticked and typed, and, as `logged` has it, the load of an exercise
+ * the dialog lists no row for, such as one of a workout the plan no longer has that day.
+ */
+export function savedLoads(logged: WorkoutLog["loads"], listed: readonly TypedLoad[]): WorkoutLog["loads"] {
+	const keys = new Set(listed.map(({ key }) => key));
+	return Object.fromEntries([...Object.entries(logged).filter(([key]) => !keys.has(key)), ...listed.flatMap(({ key, kg, done }): [string, number][] => (done && kg !== null ? [[key, kg]] : []))]);
+}
+
 /** What the Fait dialog read for a done session: its log, and on a test day the max and the bodyweight typed. */
 export interface LogFields {
 	log: WorkoutLog;
