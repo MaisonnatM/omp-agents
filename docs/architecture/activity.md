@@ -69,7 +69,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Conversation pane, pane grid, and divider | view, control | views `session`, `past`, `split`, `home`; maximize and close change the hash, so they show as views; `trajectory.toggle`, `todos-card.toggle`; dragging the divider is not observed |
 | Desktop link address | not observed | display only |
 | Transcript (code blocks, session visuals, minimap, Todos card, chat history, image viewer) | control | `transcript.activity-group`, `transcript.todos`, `transcript.ship`, `transcript.subagents`, `minimap.jump`, `minimap.step`, `prompt-history.toggle`, `prompt-history.jump`, `media-viewer.open`, `media-viewer.step`, `media-viewer.new-tab`, `viewer.zoom` for the zoom buttons of the image viewer, an expanded visual, and the file dialog's image; the viewer's arrow and zoom keys, a pinch, and a drag record nothing; code block copy and session visuals are not observed |
-| Transcript find bar | control, command | `transcript.find.step`, `transcript.find.close`; Cmd+F records the `session-find` command; Enter, Shift+Enter, and Esc in the field record nothing |
+| Find bar, in a conversation or a pull request | control, command | `find-bar.step`, `find-bar.close`; Cmd+F records the `find` command; Enter, Shift+Enter, and Esc in the field record nothing |
 | Routine run card in a conversation | control, view | `transcript.routine-card` folds or unfolds the card; **Open routine** records the `bots/routine` view; copy and the output disclosure are not observed |
 | Trajectory | control | `trajectory.toggle`, `trajectory.turn`, `trajectory.step` |
 | Scroll-to-bottom arrow | control | `transcript.scroll-to-bottom` |

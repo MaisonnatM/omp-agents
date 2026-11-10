@@ -48,6 +48,8 @@ interface PullRequestDetailsProps {
 	session?: LinkedPullRequest[];
 	/** The `instanceId` of the session whose sidebar shows it, which the details neither chip nor offer to open. */
 	current?: string | null;
+	/** Whether Cmd+F finds text in it, as on the Pull requests page. */
+	findable?: boolean;
 }
 
 /**
@@ -55,7 +57,7 @@ interface PullRequestDetailsProps {
  * became of a quick start on it. The page also says why the list does not hold it; the sidebar does not, since most
  * past sessions' merged pull requests would carry that note.
  */
-export function PullRequestDetails({ hosts, target, placement, version, tab, onTab, path, onPick, session, current = null }: PullRequestDetailsProps) {
+export function PullRequestDetails({ hosts, target, placement, version, tab, onTab, path, onPick, session, current = null, findable = false }: PullRequestDetailsProps) {
 	const { open, start, dismissStart } = useDashboardActions();
 	const { starts: { quick }, pullRequestsScope, scope } = useDashboardStatus();
 	const { read } = pullRequestsStore.use(pullRequestsScope);
@@ -92,6 +94,7 @@ export function PullRequestDetails({ hosts, target, placement, version, tab, onT
 				path={path}
 				onPick={onPick}
 				cwd={listed?.cwd ?? hosts.find(host => host.instanceId === current)?.cwd ?? null}
+				findable={findable}
 			/>
 		</>
 	);
@@ -137,7 +140,7 @@ export function PullRequestDetailPage({ files, onDock, ...props }: PullRequestDe
 			<TooltipProvider>
 				<Header title="Pull requests" meta="Your pull requests and review requests on GitHub" leading={back} />
 				<div className="flex min-h-0 flex-1 flex-col">
-					<PullRequestDetails {...props} placement="page" tab={tab} onTab={choose} path={files?.path ?? null} />
+					<PullRequestDetails {...props} placement="page" tab={tab} onTab={choose} path={files?.path ?? null} findable />
 				</div>
 			</TooltipProvider>
 		</div>

@@ -19,7 +19,7 @@ import { PastConversation } from "./past-conversation";
 import { RenderBoundary } from "./render-boundary";
 import { SidebarToggle } from "./sidebar-panel";
 import { SubagentLinks, type SubagentLinksValue } from "./subagent-links";
-import { PaneFocused } from "./transcript-find";
+import { PaneFocused } from "./find-bar";
 
 interface PaneProps {
 	view: View;

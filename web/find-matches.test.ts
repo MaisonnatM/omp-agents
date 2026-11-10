@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { findMatches } from "./transcript-find";
+import { findMatches } from "./find-matches";
 
 test("finds every occurrence regardless of case, without overlaps", () => {
 	expect(findMatches(["Foo foo FOO"], "foo")).toEqual([

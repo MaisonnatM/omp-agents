@@ -5,7 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-10
 
-- Cmd+F now finds text in the open conversation: every match is highlighted, the bar counts them, and Enter and Shift+Enter step through them.
+- Cmd+F now finds text in the open conversation, or in the pull request the Pull requests page shows: every match is highlighted, the bar counts them, and Enter and Shift+Enter step through them.
 - The sidebar's session search moved to Cmd+Shift+F.
 - Fixed: a screenshot or file an agent names by its bare name, such as inline-rows.png, now opens when the agent had looked at it in another folder, instead of saying the file could not be loaded.
 - A reply that lists pages to review now has a Review visuals eye button under it, beside its copy button, in place of the card that listed the pages. It shows the Browser and opens that reply's pages as tabs, so you no longer go looking for the button in the Browser's toolbar.
