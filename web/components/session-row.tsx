@@ -73,7 +73,7 @@ function SessionButton({ view, label, title, badge, facts, when, dot, placement,
 	const end = (
 		<>
 			{split && <Columns2 role="img" aria-label="In a split" className="size-3 shrink-0 translate-y-0.5 text-muted-foreground/50" />}
-			<Age at={when} className={ROW_END} />
+			<Age at={when} compact className={cn(ROW_END, "w-7 text-right")} />
 		</>
 	);
 	return (
