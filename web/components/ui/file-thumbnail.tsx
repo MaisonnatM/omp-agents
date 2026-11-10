@@ -84,7 +84,7 @@ function FileThumbnail({ file, size, radius, className }: FileThumbnailProps) {
 
   // PDFs need async rendering — loading flash is unavoidable for the first
   // ~100–300ms while pdfjs loads. Falls back to the generic icon on error
-  // (corrupt/password-protected file, CDN worker blocked).
+  // (corrupt/password-protected file).
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfError, setPdfError] = useState(false);
   useEffect(() => {
