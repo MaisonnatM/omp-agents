@@ -611,5 +611,19 @@
 .dark :is(.message-markdown, .code-lines) :is(.hljs-deletion) { color: #ffdcd7; }
 :is(.message-markdown, .code-lines) :is(.hljs-comment, .hljs-doctag) { font-style: italic; }
 :is(.message-markdown, .code-lines) .hljs-section { font-weight: 600; }
+/* An agent's reply in a conversation: a reading measure of about 80 characters, with room between its blocks. */
+[data-item=assistant] .message-markdown { container-type: inline-size; max-width: 64ch; line-height: 1.65; }
+[data-item=assistant] .message-markdown :is(p, ul, ol) { margin-block: 1em; }
+[data-item=assistant] .message-markdown li { margin-block: .6em; }
+/* Its bullets that open with a bold key lay out as a two-column table: keys share one column, at most 12rem wide. */
+[data-item=assistant] .message-markdown > ul:has(> [data-part="keyed"]) { display: grid; grid-template-columns: fit-content(12rem) 1fr; column-gap: 1rem; list-style: none; padding-left: 0; border-top: 1px solid var(--border); }
+[data-item=assistant] .message-markdown > ul:has(> [data-part="keyed"]) > li { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; margin: 0; border-bottom: 1px solid var(--border); padding-block: .6em; }
+[data-item=assistant] .message-markdown > ul:has(> [data-part="keyed"]) > li:not([data-part="keyed"]) > * { grid-column: 1 / -1; }
+[data-item=assistant] .message-markdown [data-part="keyed"] > strong { font-weight: 600; }
+/* A narrow pane leaves too little room for two columns, so the key runs inline again. */
+@container (width < 30rem) {
+	[data-item=assistant] .message-markdown > ul:has(> [data-part="keyed"]) > li { display: block; }
+	[data-item=assistant] .message-markdown [data-part="keyed"] > strong { margin-right: .35em; }
+}
 /* A removed row's gutter mark, hatched so it reads apart from an added row's solid one. */
 .diff-mark-removed { background: repeating-linear-gradient(45deg, var(--diff-deletion) 0 2px, transparent 2px 4px); opacity: .8; }
