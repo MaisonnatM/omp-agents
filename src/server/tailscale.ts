@@ -72,7 +72,6 @@ export function tailscaleOver(runCli: TailscaleRun = cliRunner()): Tailscale {
 	}
 	return {
 		async status() {
-			if (fake) return { dnsName: fake, reason: null };
 			const result = await runCli(["status", "--json"]);
 			if (!result) return { dnsName: null, reason: MISSING };
 			if (result.code !== 0) return { dnsName: null, reason: STOPPED };

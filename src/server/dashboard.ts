@@ -857,7 +857,7 @@ export class Dashboard {
 				if (isPrivate) void this.#privateSessions.purge(instanceId).catch((err: unknown) => console.error(`omp-agents: deleting private session ${instanceId} failed: ${errorText(err)}`));
 				else if (sessionId && !update.ended) this.#interrupted.interrupt(sessionId);
 				this.#broadcasts.syncRoster();
-				void this.#loops.listNow();
+				void this.#loops.listNow().catch((err: unknown) => console.error(`omp-agents: listing the session files failed: ${errorText(err)}`));
 				return;
 			}
 			case "written":
