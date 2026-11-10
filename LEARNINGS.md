@@ -12,7 +12,7 @@ Add one when a mistake cost a retry and the docs did not prevent it.
 
 ## Kit extensions
 
-- omp hands an extension its own zod-compatible `pi.zod`, which refuses an object or array passed to `.default()` and then fails to load the whole extension; `templates/omp/extensions.test.ts` builds schemas with the npm `zod`, which accepts it, so the tests still pass.
+- omp hands an extension its own zod-compatible `pi.zod`, which refuses an object or array passed to `.default()` and then fails to load the whole extension; `templates/omp/extensions.test.ts` builds schemas with that same zod, so such a schema fails there.
 - Pass a factory, `.default(() => ({ ... }))`, and after changing an extension's schemas load it for real with `omp -p --no-extensions -e <path to the extension> "<prompt that calls its tool>"`; a load failure prints `Failed to load extension`.
 
 ## Landing

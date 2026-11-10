@@ -275,7 +275,7 @@ export function describe(result: LandResult): string {
 	switch (result.kind) {
 		case "landed":
 			return [
-				`Landed ${result.sha.slice(0, 12)} on top of ${result.base.slice(0, 12)} and pushed it, after these checks passed on the merged result: ${result.checks.length > 0 ? result.checks.map(c => `\`${c}\``).join(", ") : "none, since the config lists no checks"}.`,
+				`Landed ${result.sha.slice(0, 12)} on top of ${result.base.slice(0, 12)} and pushed it, after these checks passed on the merged result: ${result.checks.map(c => `\`${c}\``).join(", ")}.`,
 				...(result.flaky.length > 0 ? [`Flaky: ${result.flaky.join(", ")} failed once and passed when run again; say so in your reply.`] : []),
 				result.local,
 			].join("\n");
