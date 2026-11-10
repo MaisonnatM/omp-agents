@@ -4,7 +4,7 @@ import { modeOf, SPLIT_CLICK } from "../labels";
 import { hashForView } from "../routing";
 import { useStoredState } from "../stored-state";
 import type { SubagentNode } from "../todos-card-subagents-model";
-import { countLabel } from "../todos-strip-model";
+import { countLabel } from "../todos-card-model";
 import { StatusDot, statusLabel } from "./status-dot";
 import { CancelAgentButton, type SubagentLinksValue } from "./subagent-links";
 import { ChangesSection } from "./todos-card-changes";
@@ -31,7 +31,7 @@ export function SubagentsSection({ links, nodes }: { links: SubagentLinksValue; 
 			onToggle={() => setClosed(shut => !shut)}
 			fold="transcript.subagents"
 		>
-			<ul aria-label="Subagents" className="px-1 py-1">
+			<ul aria-label="Subagents" className="max-h-[min(30vh,12.5rem)] overflow-y-auto px-1 py-1">
 				{nodes.map(({ agent, depth }) => {
 					const view = { kind: "live", instanceId: links.instanceId, agentId: agent.id } as const;
 					return (

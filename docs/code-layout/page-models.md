@@ -6,7 +6,7 @@
   `web/components/changes/file-tree.tsx` draws the explorer's tree; `web/code-highlight.ts` cuts `lowlight`'s syntax colors into lines, for the changes view, recorded edit diffs, and a message's code blocks.
   `web/loaded-once.ts` holds `loadedOnce` and `useLoaded`, a value a dynamic import makes, loaded once on first need, which the grammars and `web/components/raw-html.ts`'s raw HTML plugins use.
 - `web/todos-card-subagents-model.ts`: `subagentTree`, the subagents the Todos card's **Subagents** section lists for a view, the descendants of the session's main agent or of one subagent, depth first with each one's depth, siblings in the order the host lists them.
-- `web/todos-strip-model.ts`: the Todos card's words, which its section headers and its strip share: `STAGE_LABEL`, `WORK_LABEL`, `shipStep`, `countLabel`, `todoTally`, and `stripSummary`, the strip's lead, the /ship stage, the task in progress, or the first count, and the counts after it in the sections' order.
+- `web/todos-card-model.ts`: the words of the Todos card's section headers: `STAGE_LABEL`, `WORK_LABEL`, `shipStep`, `countLabel`, and `todoTally`, the todo list's `11/12` and its task in progress.
 - `web/file-paths.ts`: which paths in agent text name a text file, an image, or a video (`linkedFile`), the absolute path each resolves to, and the `figure` that `remarkFilePaths` ends the text with, listing the images and videos it names.
   `web/delimited.ts` parses a TSV or CSV file into rows.
   `web/components/file-text.tsx` shows a text file for reading: `MarkdownDocument` renders Markdown under the frontmatter the server parsed, which the file dialog and Settings › Files share, and `CodeText` shows any other file as numbered, wrapping, colored lines.
