@@ -11,13 +11,17 @@ export const ComposerEditor = createContext<RefObject<PromptEditorHandle | null>
 /** Where a draft goes: a session this dashboard started, which runs `!` over RPC; a draft that starts one; or a Collab room or a subagent. */
 export type ShellReach = "rpc" | "new" | "none";
 
-/** Why the composer holds back a draft that starts with one of omp's terminal shortcuts, or `null` when it can send it. */
+/**
+ * Why the composer holds back a draft that starts with one of omp's terminal shortcuts, or `null` when it can send it.
+ * Blanks before the shortcut do not count, since a send trims them.
+ */
 export function blockedShortcut(draft: string, shell: ShellReach): string | null {
-	if (draft.startsWith("$")) return "Direct Python execution needs the omp terminal.";
-	if (!draft.startsWith("!")) return null;
+	const text = draft.trimStart();
+	if (text.startsWith("$")) return "Direct Python execution needs the omp terminal.";
+	if (!text.startsWith("!")) return null;
 	if (shell === "none") return "Direct shell execution needs the omp terminal. Collab cannot run it here.";
 	if (shell === "new") return "Start the session with a prompt. A ! command runs once omp has replied.";
-	return draft.startsWith("!!") ? "omp's RPC mode cannot keep a command's output out of context. Use ! or the omp terminal." : null;
+	return text.startsWith("!!") ? "omp's RPC mode cannot keep a command's output out of context. Use ! or the omp terminal." : null;
 }
 
 export const ComposerNote = ({ text }: { text: string }) => (

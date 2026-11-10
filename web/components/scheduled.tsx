@@ -67,7 +67,7 @@ function ScheduleMenu({ draft, files, disabled, pending, onSchedule }: ScheduleB
 	const plans = useContext(Plans);
 	const now = useMinute();
 	// omp runs `!` and `$` only from the composer's own path, and a scheduled message goes to omp as a plain prompt.
-	const blocked = files > 0 ? "Attached files cannot wait for later" : /^[!$]/.test(draft) ? "A ! or $ command cannot wait for later" : null;
+	const blocked = files > 0 ? "Attached files cannot wait for later" : /^\s*[!$]/.test(draft) ? "A ! or $ command cannot wait for later" : null;
 	const choices: { label: string; when: ScheduleWhen }[] = [
 		...resetChoices(plans, now).map(when => ({ label: `When ${when.reset} resets`, when })),
 		{ label: "In 1 hour", when: { at: now + HOUR, reset: null } },
