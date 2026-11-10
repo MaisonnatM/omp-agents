@@ -14,6 +14,11 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - A draft that starts with blanks before `!` or `$` is now treated like one that starts with the command: the note under the composer shows instead of Enter doing nothing, and Send later refuses it.
 - In Settings, Activity, the Tickets page's Cmd+N command now sits under the commands that are not set up while Linear is not connected, with the other ticket commands, instead of under never used.
 - The keyboard shortcuts guide now lists dictation, the number keys that answer a question, and the Sport timer's keys, and names the four pages where C does something other than create a ticket.
+- In a new mail or a reply, a pasted list of recipients that ends with a comma or a semicolon now adds the people in it, instead of being marked invalid.
+- In Settings, Extensions, an install or update no longer restarts its progress check each time the page redraws, and searching for "null" no longer lists every package that has no source.
+- Settings, Phone access no longer shows a cancelled-read error when you come back to the section.
+- In a Bot's details, a routine's "Ran 5m ago" now counts up each minute, as the routines card does.
+- The Settings guide now lists Phone access among its twenty sections.
 - Behind the scenes: removed unused imports, a prop no row read, and a line that could never run; declared two editor packages the page already used; merged two test files that shared a name, so both are type-checked; and corrected file lists, names, and three server descriptions in the docs.
 - Ship no longer stops on a missing review checkbox: recording the stage after the interface or thermo-nuclear review ticks that review's box in the pull request description, or adds it when the description has none.
 - Recording `live` or a fix while the pull request is still a draft now says what to do next, such as running `gh pr ready`, instead of failing.
