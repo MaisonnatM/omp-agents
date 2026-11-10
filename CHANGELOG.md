@@ -12,6 +12,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Saving or removing an Anthropic API key in Settings no longer loosens the permissions of omp's models file, and no longer replaces a linked models file with a plain copy.
 - The usage check no longer copies your browsers' cookie files every minute to read the Anthropic Console balance unless an API key is saved, the only case that shows that balance.
 - A draft that starts with blanks before `!` or `$` is now treated like one that starts with the command: the note under the composer shows instead of Enter doing nothing, and Send later refuses it.
+- In Settings, Activity, the Tickets page's Cmd+N command now sits under the commands that are not set up while Linear is not connected, with the other ticket commands, instead of under never used.
+- The keyboard shortcuts guide now lists dictation, the number keys that answer a question, and the Sport timer's keys, and names the four pages where C does something other than create a ticket.
 - Behind the scenes: removed unused imports, a prop no row read, and a line that could never run; declared two editor packages the page already used; merged two test files that shared a name, so both are type-checked; and corrected file lists, names, and three server descriptions in the docs.
 - Ship no longer stops on a missing review checkbox: recording the stage after the interface or thermo-nuclear review ticks that review's box in the pull request description, or adds it when the description has none.
 - Recording `live` or a fix while the pull request is still a draft now says what to do next, such as running `gh pr ready`, instead of failing.
