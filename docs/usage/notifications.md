@@ -64,7 +64,7 @@
   A session that already waited when the page loads, or when the page reconnects, raises none.
 - A finished turn stays unread until a pane shows the session, not one of its subagents, in a focused window, or its next turn starts; the server keeps which turns are unread, so every window agrees, and keeps them when the dashboard restarts, as it does after an update.
   A turn that finishes while the dashboard is stopped shows unread once it starts again, in a session started from the dashboard or in a terminal.
-- The app shows them unless **Settings › Preferences › Notifications** turns them off, and keeps its choices in its localStorage:
+- The app shows them unless **Settings › Preferences › Notifications** turns them off, and keeps its choices with your other preferences, which the server keeps and **Sync** carries:
   - **Also when a session finishes a turn** off notifies questions only; a turn finished meanwhile raises nothing when you turn it back on.
   - **Sound** picks what a notification plays: **None**, **System default**, or one of macOS's sounds, such as Glass or Ping; picking one plays it.
   - **Play the sound while this window is focused too** plays the sound alone when a session needs you while the window has focus, where no notification shows.

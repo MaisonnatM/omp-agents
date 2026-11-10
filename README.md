@@ -28,7 +28,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 - **Live roster.**
   Every running and past session, with a status dot (running, idle, or waiting on a question), filtered by workspace.
   Pin a session to keep it at the top in every window.
-  Sessions that stopped when the dashboard went down wait in an **interrupted** group, and **Resume all** brings them back.
+  Sessions whose omp stopped while no dashboard ran wait in an **interrupted** group, and **Resume all** brings them back.
   Claude Code and Codex sessions on the same machine list beside omp's, as read-only transcripts you can search.
 - **Session details.**
   The focused conversation's todo list, the files its agent changed with each file's latest diff, the live session's subagents as a tree, and every screenshot and image its agents' tools returned; subagents also open from the `task` call that spawned them, and a back arrow returns to the session.
@@ -62,7 +62,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 - **Your own todo list.**
   Categories, due days with a Today list, drag-to-reorder, search, and an archive with undo.
   A todo links to the sessions, pull requests, and Linear issues it is about, starts a session or opens a Linear issue from its notes, and agents add the steps only you can take through the starter kit's `user_todo` tool, check off a todo once they finish its work, and edit or delete one when you ask.
-  The desktop app captures a todo from any app and badges the Dock with what is left.
+  The desktop app captures a todo from any app.
 - **Notes.**
   Markdown notes with search, optional todo links, and Undo, shared with agent sessions through the starter kit's `user_note` tool.
 - **Settings editor.**
@@ -72,7 +72,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 - **Phone access.**
   Open the dashboard on your phone from anywhere: turn on **Settings › Phone access** and scan the code, which signs that phone in through Tailscale with its own key.
 - **Keyboard-first.**
-  Shortcuts that follow omp's terminal keys; press `?` to list them.
+  Shortcuts for every page and action; press `?` to list them.
 - **omp starter kit.**
   An optional, ready-made omp setup (model routing, agent rules, a review agent, a `/ship` workflow, skills) that one command installs.
 
@@ -158,9 +158,9 @@ PORT=5000 bun run desktop
 
 ### omp starter kit
 
-[`templates/omp`](templates/omp) holds the omp setup this project is built with: model roles and fallback chains across Anthropic, OpenAI Codex, Cursor, and OpenRouter, an `AGENTS.md`, a review agent, a `/ship` workflow skill and its command, and skills.
+[`templates/omp`](templates/omp) holds the omp setup this project is built with: model roles and fallback chains across Anthropic, OpenAI Codex, and Cursor, an `AGENTS.md`, a review agent, a `/ship` workflow skill and its command, and skills.
 It also turns on `collab.autoStart`.
-It is opinionated: it expects accounts on those four providers, installs the third-party `pstack` plugin from the [`cursor/plugins`](https://github.com/cursor/plugins) marketplace, and sets a reply format for every session in `APPEND_SYSTEM.md`.
+It is opinionated: it expects accounts on those three providers, installs the third-party `pstack` plugin from the [`cursor/plugins`](https://github.com/cursor/plugins) marketplace, and sets a reply format for every session in `APPEND_SYSTEM.md`.
 Run it with `--dry-run` first to see each change.
 Install it with:
 
@@ -182,10 +182,10 @@ See the [kit's README](templates/omp/README.md) for what it contains.
 Select a session in the left sidebar to read its conversation and message it.
 Cmd-click (Ctrl-click on Linux and Windows) opens it in a split pane.
 Click **+** to start a session, **Resume** to continue a past one, and **Fork from here** under a prompt or a reply to branch a conversation.
-The **Pull requests** tab shows your pull requests, the **Tickets** tab your Linear issues, and the **Settings** tab opens Settings.
+The **Pull requests** tab shows your pull requests, the **Tickets** tab your Linear issues, and the gear button in the header opens Settings.
 
 While a turn runs, Enter queues a follow-up and Cmd+Enter (Ctrl+Enter on Linux and Windows) steers the turn.
-Esc interrupts it.
+Cmd+Shift+Backspace (Ctrl+Shift+Backspace on Linux and Windows) interrupts it.
 
 In a session the dashboard started, built-in `/` commands and `!<command>` run as they do in omp's terminal.
 A terminal session cannot run them, because Collab accepts guest prompts and not host-side commands.

@@ -39,7 +39,7 @@
   **Default** leaves omp's configured thinking level unchanged.
   Choosing a level starts the session at that level, for the model it was chosen on: choosing another model, or a directory whose `default` role names another model, resets the effort to **Default**.
   Models without selectable thinking levels offer only **Default**.
-  Cmd+. opens the model search here too, and Cmd+J cycles the supported thinking levels after the catalog loads.
+  Cmd+Alt+/ opens the model search here too, and Shift+Tab cycles the supported thinking levels after the catalog loads.
 - A skill pinned in **Settings** shows as a toggle after the model picker, with the skill's name.
   While it is on, the first message goes through the skill, as if you had typed `/skill:<name>` before it, and the transcript shows the skill's pill.
   Click it to start this one session without the skill.

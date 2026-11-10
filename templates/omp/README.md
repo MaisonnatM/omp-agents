@@ -1,6 +1,6 @@
 # omp starter kit
 
-An opinionated omp setup to start from: model roles with fallback chains across four providers, agent rules, a reply format, a review agent, a `/ship` workflow, and UI design skills.
+An opinionated omp setup to start from: model roles with fallback chains across three providers, agent rules, a reply format, a review agent, a `/ship` workflow, and UI design skills.
 It is the setup this project is built with.
 
 ## Install

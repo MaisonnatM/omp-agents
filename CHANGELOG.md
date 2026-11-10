@@ -11,7 +11,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Get started no longer waits without end on a GitHub sign-in check that hangs: the check gives up after 20 seconds.
 - Saving or removing an Anthropic API key in Settings no longer loosens the permissions of omp's models file, and no longer replaces a linked models file with a plain copy.
 - The usage check no longer copies your browsers' cookie files every minute to read the Anthropic Console balance unless an API key is saved, the only case that shows that balance.
-- A draft that starts with blanks before `!` or `$` is now treated like one that starts with the command: the note under the composer shows instead of Enter doing nothing, and Send later refuses it.
+- A draft that starts with blanks before ! or $ is now treated like one that starts with the command: the note under the composer shows instead of Enter doing nothing, and Send later refuses it.
 - In Settings, Activity, the Tickets page's Cmd+N command now sits under the commands that are not set up while Linear is not connected, with the other ticket commands, instead of under never used.
 - The keyboard shortcuts guide now lists dictation, the number keys that answer a question, and the Sport timer's keys, and names the four pages where C does something other than create a ticket.
 - In a new mail or a reply, a pasted list of recipients that ends with a comma or a semicolon now adds the people in it, instead of being marked invalid.
@@ -20,21 +20,21 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - In a Bot's details, a routine's "Ran 5m ago" now counts up each minute, as the routines card does.
 - The Settings guide now lists Phone access among its twenty sections.
 - Sport: saving an edit to a logged session no longer erases the loads of exercises the dialog does not list, such as those of a workout the plan no longer has on that day.
-- Sport: with no plan, the **Plan suivi** chart now says the plan has not started, where it drew one empty week.
+- Sport: with no plan, the Plan suivi chart now says the plan has not started, where it drew one empty week.
 - Notes: deleting or moving another note from its right-click menu no longer closes the note you have open.
-- The starter kit's ship gate, land gate, and worktree guard now see a `git` or `gh` command written after `then`, `do`, `else`, `{`, or `!`, which slipped past them.
+- The starter kit's ship gate, land gate, and worktree guard now see a git or gh command written after then, do, else, {, or !, which slipped past them.
 - Linux: the arm64 AppImage can now update itself, since each release publishes its update feed too.
-- Linux: **Retry** in the packaged app no longer strips the session bus and runtime directory settings from the server it restarts, and the app menu no longer shows **Open at Login**, which did nothing there.
+- Linux: Retry in the packaged app no longer strips the session bus and runtime directory settings from the server it restarts, and the app menu no longer shows Open at Login, which did nothing there.
 - The README no longer says quitting the app stops your sessions: they keep running and show live again at the next launch.
 - Behind the scenes: removed unused imports, a prop no row read, and a line that could never run; declared two editor packages the page already used; merged two test files that shared a name, so both are type-checked; and corrected file lists, names, and three server descriptions in the docs.
 - Ship no longer stops on a missing review checkbox: recording the stage after the interface or thermo-nuclear review ticks that review's box in the pull request description, or adds it when the description has none.
-- Recording `live` or a fix while the pull request is still a draft now says what to do next, such as running `gh pr ready`, instead of failing.
-- A chrome-devtools page tool called without a `pageId`, such as a screenshot, now runs on the first page instead of failing; `close_page` and `select_page` still need one.
+- Recording live or a fix while the pull request is still a draft now says what to do next, such as running gh pr ready, instead of failing.
+- A chrome-devtools page tool called without a pageId, such as a screenshot, now runs on the first page instead of failing; close_page and select_page still need one.
 - Cmd+F now finds text in the open conversation, or in the pull request the Pull requests page shows: every match is highlighted, the bar counts them, and Enter and Shift+Enter step through them.
 - The sidebar's session search moved to Cmd+Shift+F.
 - Fixed: a screenshot or file an agent names by its bare name, such as inline-rows.png, now opens when the agent had looked at it in another folder, instead of saying the file could not be loaded.
 - A reply that lists pages to review now has a Review visuals eye button under it, beside its copy button, in place of the card that listed the pages. It shows the Browser and opens that reply's pages as tabs, so you no longer go looking for the button in the Browser's toolbar.
-- Session rows in the sidebar line up again: each age shows its largest unit, such as `3h`, in a fixed column, so the workspace chips sit at the same place on every row.
+- Session rows in the sidebar line up again: each age shows its largest unit, such as 3h, in a fixed column, so the workspace chips sit at the same place on every row.
 - Long agent replies read more easily: their text keeps the conversation's full width with more space between paragraphs and bullets, and bullets that open with a bold word line up as a two-column table, keys on the left. A narrow conversation keeps the key inline.
 - Clicking a subagent opens it in the same pane as its session again, so a split stays as it is instead of gaining a pane. Cmd-click opens it in a split beside its session.
 - In the composer, type $ to pick a skill or command, and @ to mention a file or anything else. Typing / no longer opens the list. A price such as $5 stays plain text.
@@ -48,7 +48,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The omp Starter Kit now brings the two poteto helpers that ship and poteto mode hand work to, one on Claude and one on Codex.
 - Behind the scenes: the starter kit's agent rules now include the newer ship steps, the rule to set pull request descriptions with the checked tool, and the rule to retake pull request screenshots after each push.
 - Code in a pull request's Code tab, the changes view, and messages is a size larger and colored like a code editor: types, functions, properties, tags, and comments each get their own color, in light and dark mode.
-- A pull request's `⋯` menu, and its row's right-click menu, offer Explain this PR and Ask a question. Each opens a new session in the pull request's repository with a draft that names it: Explain asks for a walk through its purpose, changes, and risks, and Ask leaves room for your question. Neither changes code.
+- A pull request's ⋯ menu, and its row's right-click menu, offer Explain this PR and Ask a question. Each opens a new session in the pull request's repository with a draft that names it: Explain asks for a walk through its purpose, changes, and risks, and Ask leaves room for your question. Neither changes code.
 - A pull request's Summary and Timeline are easier to read: descriptions and comments are larger, section titles stand out, and the timeline's names, dates, and file paths are a size larger, with collapsed comment groups less faded.
 - New Bot offers three more templates for a Routines Bot: Memory curator keeps each repository's project memory up to date, Bot coach proposes how to improve your other Bots, and Review requests drafts the reviews teammates ask you for. Each one sets up its own routine in its first conversation.
 - The model menu has an Extra usage switch. On, a full Claude allowance stays on Claude instead of moving to a fallback such as Cursor. Off puts the fallback list back. It applies to every session.
@@ -71,14 +71,14 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The Calendar now shows only the routine runs of the space's own Bots and the todos due in that space, so Personal and Work no longer mix.
 - In Personal, the Calendar no longer shows Linear tickets' due days, and a todo no longer offers Create Linear ticket, since tickets belong to Work.
 - The GitHub release now includes a Linux AppImage for x64 and arm64, beside the Mac app. The installed app updates from it.
-- **Fix CI**, **Resolve conflicts**, and **Address comments** sessions now record their work in the PR's ship status, so its widget shows the rebase, CI fix, or comment fix in progress.
-- **Work on it** on a ticket or todo now runs the ship workflow, starting with its questions and plan, and still stops before pushing or opening a pull request.
+- Fix CI, Resolve conflicts, and Address comments sessions now record their work in the PR's ship status, so its widget shows the rebase, CI fix, or comment fix in progress.
+- Work on it on a ticket or todo now runs the ship workflow, starting with its questions and plan, and still stops before pushing or opening a pull request.
 - On Linux, session ports and the uv cache cleanup work even when lsof is not installed.
 - On Linux, the app menu has About, Check for Updates, Install omp Starter Kit, and Quit.
 - On Linux, the dashboard can read a Claude Console sign-in from Zen, LibreWolf, or Firefox, including Flatpak and Snap copies.
 - Behind the scenes: the desktop app can be packaged as a Linux AppImage as well as a Mac app.
-- A Bot's details have a **Restart conversation** button: after you confirm, its session ends and is archived, and its next message starts a fresh conversation. Its job, memory, and routines stay.
-- A routine that runs a command can now post its output to its Bot only when the command fails: check **Post the output to … only when it fails** in the routine's form. A run that succeeds keeps its output in the routine's history without waking the Bot.
+- A Bot's details have a Restart conversation button: after you confirm, its session ends and is archived, and its next message starts a fresh conversation. Its job, memory, and routines stay.
+- A routine that runs a command can now post its output to its Bot only when the command fails: check Post the output to … only when it fails in the routine's form. A run that succeeds keeps its output in the routine's history without waking the Bot.
 - On a phone, the header holds one menu named after the page you are on, listing every tab, Personal and Work, and Settings, beside search and the bell.
 - On a phone, the sidebars stay closed until you open them, and the page uses the full width of the screen.
 - On a phone, the status bar shows plan quota on one line you can swipe, without the Mac's terminal and load.
@@ -90,17 +90,17 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The phone layout now also applies to desktop windows narrower than 720 pixels.
 - New session's retro sun now sits lower, leaving more room under the title.
 - Buttons now have tighter corners, matching yampa's.
-- Landing a branch that adds a package now works: `land` installs packages after merging the branch, not before.
+- Landing a branch that adds a package now works: land installs packages after merging the branch, not before.
 - You can open the dashboard on your phone from anywhere: turn on Settings › Phone access and scan the code.
 - Each phone signs in with its own key, and Remove signs that phone out at once.
 - The dashboard now ships a small QR code library, which the coming Phone access settings use to show a pairing code you can scan.
 - In Settings, Decisions, All workspaces now lists each workspace's decision records, grouped by workspace, instead of asking you to pick one.
 - New session now shows a dithered retro grid with a rising sun behind its title, and no longer lists starters under the composer.
 - New session's project picker now sits in the composer, left of the model, and its branch picker is gone; the session runs on the checked-out branch.
-- `/ship` now grills you on the change before it plans it, asking rounds of questions with a recommended answer each, and saves the settled terms and choices in the project's glossary and decision records.
-- Agents read a slightly shorter set of instructions: the subagent worktree rules now appear once, and poteto-mode no longer tells agents on `main` to use a setting the worktree guard rejects.
+- /ship now grills you on the change before it plans it, asking rounds of questions with a recommended answer each, and saves the settled terms and choices in the project's glossary and decision records.
+- Agents read a slightly shorter set of instructions: the subagent worktree rules now appear once, and poteto-mode no longer tells agents on main to use a setting the worktree guard rejects.
 - The Sessions sidebar no longer shows Bot conversations, which remain in Bots.
-- A folder an agent's removed worktree leaves behind, such as `yampa-wt/some-branch` holding only ignored files, no longer shows as a workspace of its own: its sessions count in the repository it came from.
+- A folder an agent's removed worktree leaves behind, such as yampa-wt/some-branch holding only ignored files, no longer shows as a workspace of its own: its sessions count in the repository it came from.
 - In the desktop app's title bar, the Personal and Work switch now sits in the center, and the page title on the left after Back and Forward.
 - Graphite is gone from the dashboard: Settings › Source control no longer has a Graphite sign-in, and pull requests no longer offer Open on Graphite.
 - Graphite links in conversations now show as ordinary links.
@@ -210,7 +210,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Settings › Providers now lists a provider's signed-in accounts in the order omp tries them, each with its place number.
 - Up and down arrows beside each account change which one omp uses first, for example your work Anthropic account before your personal one.
 - The new order is saved at once in omp's settings, and omp follows it without a restart.
-- Fixed: the dashboard no longer freezes when your skill and instruction files sit both under your home folder and elsewhere, such as `/tmp`.
+- Fixed: the dashboard no longer freezes when your skill and instruction files sit both under your home folder and elsewhere, such as /tmp.
 
 ## 2026-11-07
 

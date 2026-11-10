@@ -9,7 +9,7 @@
 - Each row shows, on three lines, who sent the conversation's last message, how many messages it holds when more than one, and when its last message arrived: the time today, the day earlier this year, and the full date before; then its subject; then a snippet.
   An unread conversation's sender and subject are bold, with a blue dot before them, and the header counts them beside your address.
 - Click a row, or focus it and press Enter, to open the conversation in a panel beside the list, at its `#email/<account>/<thread id>` address; its row shows selected, with a bar on its left edge.
-  Arriving at the page, from the **Email** tab, G then M, or the Email tab's number, opens the newest conversation.
+  Arriving at the page, from the **Email** tab or G then M, opens the newest conversation.
   Closing it leaves the list with nothing open, and the panel then says how to open one.
   Drag the line between the list and the panel to size the list, which keeps that width; a page too narrow for both shows the panel in place of the list.
   With no conversation open, ↓ and ↑ outside text fields focus the next and previous row, and O opens the focused row's conversation in Gmail in your default browser, signed in as the inbox's address.

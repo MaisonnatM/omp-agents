@@ -2,7 +2,7 @@
 
 - Opening a live session or subagent puts the cursor in the focused pane's composer once it accepts messages, so you can type right away.
   A session that reconnects takes the cursor back the same way.
-- A dashboard session's title controls include **Set goal** (target icon); the command palette's **Set or edit goal** opens the same editor for the focused live dashboard session.
+- A dashboard session's title controls include **Set goal** (target icon); the command menu's **Set or edit goal** opens the same editor for the focused live dashboard session.
   Enter an objective and an optional token budget: None, 100k, 500k, 1M, or Custom.
   Its header pill opens the full objective, token count, elapsed time, and Pause, Resume, Edit, or Clear.
   Clear asks you to click **Clear goal?** to confirm; clicking elsewhere or pressing Escape cancels it.
@@ -51,8 +51,8 @@
   Each session the dashboard starts, resumes, or forks is told these two formats in its system prompt; a terminal session is not.
 - A subagent's header trail names the session's title and the subagent's id, then the subagent's type as a badge, as in `Fix login / 0-Explore` `explore`.
   Click the session's title to open the session's main agent in the pane, or focus the pane that already shows it.
-- In a subagent of a terminal session, a message steers a running subagent, prompts an idle one, and revives a parked one.
-  A follow-up (Ctrl+Enter, or Cmd+Enter on macOS) waits in the dashboard until the subagent stops running.
+- In a subagent of a terminal session, Enter queues a follow-up that waits in the dashboard until the subagent stops running, and Cmd+Enter (Ctrl+Enter on Linux and Windows) steers the running subagent.
+  A message prompts an idle subagent and revives a parked one.
   In a subagent of a session that the dashboard started, a message steers a running subagent at its next step, through omp's RPC `steer_subagent`.
   omp's RPC mode reaches only a running subagent, so the composer offers no follow-up there and is disabled once the subagent stops.
   The composer is also disabled for aborted subagents and read-only rooms.
