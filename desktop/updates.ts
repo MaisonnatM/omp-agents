@@ -1,7 +1,7 @@
 /**
  * Updates of the packaged app from the repository's GitHub Releases, through electron-updater, as T3 Code does: a
  * first check shortly after launch, then a poll, a download in the background, and the install when the app quits.
- * Nothing restarts on its own, since quitting stops every session the dashboard started.
+ * Nothing restarts on its own: the install waits for the quit, which stops the server while the sessions it started run on.
  */
 import { dialog, Notification } from "electron";
 import { autoUpdater, type UpdateCheckResult } from "electron-updater";

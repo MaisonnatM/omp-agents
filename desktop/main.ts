@@ -301,7 +301,7 @@ function contextMenuItems(params: ContextMenuParams, contents: WebContents): Men
 	return [...spelling, ...(spelling.length ? [SEPARATOR] : []), { role: "cut" }, { role: "copy" }, { role: "paste" }, SEPARATOR, { role: "selectAll" }];
 }
 
-/** Closing hides the window on macOS: quitting stops the server, and with it every session the dashboard started. */
+/** Closing hides the window on macOS, so the server keeps running; only quitting stops it, and the sessions it started run on. */
 function hideInsteadOfClose(win: BrowserWindow, event: Electron.Event): void {
 	event.preventDefault();
 	if (!win.isFullScreen()) return win.hide();
@@ -468,7 +468,8 @@ function updateItem(): MenuItemConstructorOptions[] {
 /** The menu holds no shortcut the dashboard binds (web/shortcuts.ts), so every one reaches the page. */
 function applicationMenu(): Menu {
 	// A checkout's Electron is not an app macOS can open at login.
-	const openAtLogin: MenuItemConstructorOptions[] = app.isPackaged
+	// Electron sets a login item on macOS and Windows alone, so elsewhere the item would untick itself.
+	const openAtLogin: MenuItemConstructorOptions[] = app.isPackaged && IS_MAC
 		? [{ label: "Open at Login", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin, click: toggleOpenAtLogin }]
 		: [];
 	const appMenu: MenuItemConstructorOptions[] = [

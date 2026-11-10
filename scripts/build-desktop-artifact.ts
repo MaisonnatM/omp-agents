@@ -1,7 +1,8 @@
 /**
- * Builds the packaged macOS app, as T3 Code's script of the same name does: the platform-independent JavaScript once
+ * Builds the packaged app for macOS or Linux, as T3 Code's script of the same name does: the platform-independent JavaScript once
  * (the server bundled, the page prebuilt, the shell's main process), a Bun runtime per architecture,
- * then electron-builder for a DMG and a zip, the zip and `latest-mac.yml` being what electron-updater reads.
+ * then electron-builder for a DMG and a zip, the zip and `latest-mac.yml` being what electron-updater reads, or with
+ * `--os linux` an AppImage per architecture, each with its own `latest-linux*.yml`.
  *
  *   bun scripts/build-desktop-artifact.ts [--os darwin|linux] [--arch arm64,x64] [--mock-update-port <port>]
  *
