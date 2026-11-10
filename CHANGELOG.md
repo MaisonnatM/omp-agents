@@ -5,7 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-10
 
-- A reply that lists pages to review now has a Review visuals eye button under it, beside its copy button. It shows the Browser and opens that reply's pages as tabs, so you no longer go looking for the button in the Browser's toolbar.
+- A reply that lists pages to review now has a Review visuals eye button under it, beside its copy button, in place of the card that listed the pages. It shows the Browser and opens that reply's pages as tabs, so you no longer go looking for the button in the Browser's toolbar.
 - Session rows in the sidebar line up again: each age shows its largest unit, such as `3h`, in a fixed column, so the workspace chips sit at the same place on every row.
 - Long agent replies read more easily: their text keeps the conversation's full width with more space between paragraphs and bullets, and bullets that open with a bold word line up as a two-column table, keys on the left. A narrow conversation keeps the key inline.
 - Clicking a subagent opens it in the same pane as its session again, so a split stays as it is instead of gaining a pane. Cmd-click opens it in a split beside its session.

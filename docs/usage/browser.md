@@ -49,7 +49,7 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
 
 ## Review visuals
 
-- A session the dashboard started adds a list of pages to review to its reply after it changes something you should look at, above any suggested prompts; the reply shows the list as a card, with each page's name and how to reach it.
+- A session the dashboard started adds a list of pages to review to its reply after it changes something you should look at, above any suggested prompts; the list itself does not show in the reply.
 - **Review visuals**, the eye button under a reply that lists pages, beside its copy button, shows the Browser and opens one tab per page of that reply, up to 8, after the session's own **App** tab, and shows the first.
   The eye button with violet sparkles in the Browser's toolbar does the same for the latest reply's pages; its tooltip names them.
   A listed page of another omp agents server on this computer, such as the session's test server, opens signed in, in an omp agents window of its own instead of a tab; that window shows the first of that server's pages.
