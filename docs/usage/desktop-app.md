@@ -26,6 +26,10 @@ omp-agents runs as a desktop app: the packaged app, or `bun run desktop` from a 
   Get started's starter kit step runs that same non-forced installer, preserving your files and settings, and shows its result in the page instead of a system dialog.
 - Every link to another site opens in the default browser, and so does an integration's sign-in page.
   The window never leaves the dashboard.
+- A link to another omp agents server on this computer, such as the test server an agent hands you, opens signed in, in an omp agents window of its own, since a browser tab cannot sign in to it.
+  That window shows only that server and starts none: when the server stops, the window says nothing answers, with **Retry**.
+  Clicking another link to the same server shows that page in the same window.
+  `bun run desktop http://127.0.0.1:<port>/#…` opens such a window from a terminal.
 - Cmd+Shift+W closes the window, Cmd+R reloads it, Cmd+Q quits, Cmd+M minimizes, and Cmd+0, Cmd++, and Cmd+- set the zoom.
   The menu takes none of the dashboard's own shortcuts, so Cmd+W ends the focused session instead of closing the window.
   Right-click in a text field for cut, copy, paste, and spelling suggestions, and on an image, such as one in the **Images** section's viewer, for **Copy Image**.

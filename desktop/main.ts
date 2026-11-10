@@ -1,7 +1,7 @@
 /**
  * The desktop shell: the dashboard in a native window. It starts the server, from the app's resources when packaged or
- * from this checkout otherwise, or uses an omp-agents server that already listens on the port, and opens every other
- * address in the default browser.
+ * from this checkout otherwise, or uses an omp-agents server that already listens on the port. It opens another
+ * omp-agents server's page in an app of its own, and every other address in the default browser.
  */
 // First: a packaged app takes the login shell's environment before `src/paths.ts` reads it.
 import { refreshExecutableEnv } from "./shell-env";
@@ -30,7 +30,7 @@ import {
 	type WebContents,
 } from "electron";
 import { errorText, isObject, num } from "../src/json";
-import { ACCESS_CHANNEL, INSTALL_STARTER_KIT_CHANNEL, isWebUrl, PICK_DIRECTORY_CHANNEL, PREVIEW_PARTITION, SIGN_IN_CHANNEL, type StarterKitInstallResult, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
+import { ACCESS_CHANNEL, INSTALL_STARTER_KIT_CHANNEL, isWebUrl, OPEN_DASHBOARD_CHANNEL, PICK_DIRECTORY_CHANNEL, PREVIEW_PARTITION, SIGN_IN_CHANNEL, type StarterKitInstallResult, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
 import { tokenFile } from "../src/paths";
 import { dashboardHosts, isListeningLine, originOf, portFromEnv, QUICK_TODO_EVENT } from "../src/server/address";
 import { helloProof, loadToken, pageAccess } from "../src/server/auth";
@@ -39,7 +39,20 @@ import { trackBrowserGuests } from "./browser-guests";
 import { startUpdates, type Updates } from "./updates";
 import { OMP_INSTALL_COMMAND, OMP_MISSING_EXIT } from "../src/shared/startup";
 
-const PORT = portFromEnv();
+/** The port and hash of `url` when it names an omp-agents page, `http://127.0.0.1:<port>/` with any hash, under any name the server answers to; else `null`. */
+function dashboardPageOf(url: string): { port: number; hash: string } | null {
+	const parsed = URL.parse(url);
+	if (parsed?.protocol !== "http:" || parsed.pathname !== "/" || parsed.port === "") return null;
+	const port = Number(parsed.port);
+	return dashboardHosts(port).includes(parsed.host) ? { port, hash: parsed.hash } : null;
+}
+
+/**
+ * The page the app was launched on, `bun run desktop http://127.0.0.1:<port>/#…`, as {@link openOwnApp} launches it: the
+ * app then shows that port's server, such as an agent's smoke server, and never starts one of its own there.
+ */
+const LAUNCH_PAGE = process.argv.slice(1).map(dashboardPageOf).find(page => page !== null) ?? null;
+const PORT = LAUNCH_PAGE?.port ?? portFromEnv();
 const ORIGIN = originOf(PORT);
 /** What scripts/build-desktop-artifact.ts built, which electron-builder copies into the bundle; `null` when the shell runs from a checkout. */
 const RESOURCES = app.isPackaged ? join(process.resourcesPath, "server") : null;
@@ -108,16 +121,16 @@ const previewPermitted = (contents: WebContents | null, permission: string): boo
 	permission === "clipboard-sanitized-write" && contents?.getType() === "webview" && isDashboard(contents.hostWebContents?.getURL() ?? "");
 
 /**
- * Who answers on the port. `ours`: an omp-agents server that holds this token, since only it can answer
+ * Who answers on `port`. `ours`: an omp-agents server that holds this token, since only it can answer
  * `/api/hello` with {@link helloProof} for a fresh nonce. `free`: nothing listens. `taken`: anything else. The probe
  * sends no token, so a program that took the port learns nothing from it.
  */
-async function probe(token: string): Promise<"ours" | "free" | "taken"> {
+async function probe(token: string, port = PORT): Promise<"ours" | "free" | "taken"> {
 	const nonce = randomBytes(24).toString("base64url");
 	try {
-		const res = await fetch(`${ORIGIN}/api/hello?nonce=${nonce}`, { redirect: "manual", signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
+		const res = await fetch(`${originOf(port)}/api/hello?nonce=${nonce}`, { redirect: "manual", signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
 		const body: unknown = await res.json().catch(() => null);
-		return res.ok && isObject(body) && body.proof === helloProof(token, PORT, nonce) ? "ours" : "taken";
+		return res.ok && isObject(body) && body.proof === helloProof(token, port, nonce) ? "ours" : "taken";
 	} catch (err) {
 		const cause = isObject(err) && isObject(err.cause) ? err.cause : undefined;
 		return cause?.code === "ECONNREFUSED" ? "free" : "taken";
@@ -202,7 +215,7 @@ async function showOmpMissing(win: BrowserWindow): Promise<void> {
 	void win.loadURL(notice("Install omp to get started", `<p>omp agents uses omp to run your sessions.</p>${prerequisite}<pre>${escapeHtml(OMP_INSTALL_COMMAND)}</pre><p><a href="${COPY_OMP_URL}" aria-live="polite">Copy command</a> · <a href="${RETRY_URL}">Retry</a></p><p>Once installation finishes, Retry looks for omp again. Nothing is installed automatically.</p>${detail}`));
 }
 
-/** Uses the server on the port, or starts one, then loads the dashboard, which the preload signs in with the token. */
+/** Uses the server on the port, or starts one unless the app was launched on a page, then loads the dashboard, which the preload signs in with the token. */
 async function connect(win: BrowserWindow): Promise<void> {
 	void win.loadURL(notice("Starting omp agents…"));
 	try {
@@ -214,6 +227,10 @@ async function connect(win: BrowserWindow): Promise<void> {
 				`Port ${PORT} is taken`,
 				`Something other than omp-agents answers on ${ORIGIN}, or an omp-agents server that is older than this app or started before ${tokenFile} changed. Stop it, or start the app with another PORT.`,
 			);
+			return;
+		}
+		if (found === "free" && LAUNCH_PAGE) {
+			showError(win, `Nothing answers on ${ORIGIN}`, "This window shows a server started elsewhere, such as an agent's test server, and starts none of its own. Start that server again, then Retry.");
 			return;
 		}
 		if (found === "free") {
@@ -230,12 +247,28 @@ async function connect(win: BrowserWindow): Promise<void> {
 		return;
 	}
 	// A failed load reaches `did-fail-load`, which shows it.
-	win.loadURL(`${ORIGIN}/`).catch(() => {});
+	win.loadURL(`${ORIGIN}/${LAUNCH_PAGE?.hash ?? ""}`).catch(() => {});
 }
 
-/** Opens a web address in the default browser; any other scheme goes nowhere. */
+/**
+ * Opens `url` in an app of its own when it is the page of another omp-agents server on this computer that holds this
+ * token, such as an agent's smoke server, which no browser can sign in to; answers whether it did. The app of that
+ * port starts on `url`, or, when it already runs, shows it.
+ */
+async function openOwnApp(url: string): Promise<boolean> {
+	const page = dashboardPageOf(url);
+	if (page === null || page.port === PORT || (await probe(loadToken(tokenFile), page.port)) !== "ours") return false;
+	const target = `${originOf(page.port)}/${page.hash}`;
+	spawn(process.execPath, app.isPackaged ? [target] : [app.getAppPath(), target], { detached: true, stdio: "ignore" }).unref();
+	return true;
+}
+
+/** Opens a web address in an app of its own when {@link openOwnApp} takes it, else in the default browser; any other scheme goes nowhere. */
 function openOutside(url: string): void {
-	if (isWebUrl(url)) void shell.openExternal(url);
+	if (!isWebUrl(url)) return;
+	void openOwnApp(url).then(opened => {
+		if (!opened) void shell.openExternal(url);
+	});
 }
 
 /** `url` as the window loads it when it names the dashboard's page, `${ORIGIN}/` with any hash, else `null`. */
@@ -362,6 +395,9 @@ function createWindow(): BrowserWindow {
 		if (event.sender !== contents || event.senderFrame !== contents.mainFrame || !isDashboard(event.senderFrame?.url) || args.length !== 0) throw new Error("Starter kit installation is available only in the dashboard");
 		return installStarterKit();
 	});
+	ipcMain.handle(OPEN_DASHBOARD_CHANNEL, (event, url: unknown) =>
+		event.sender === contents && isDashboard(event.senderFrame?.url ?? "") && typeof url === "string" ? openOwnApp(url) : false,
+	);
 
 	win.on("close", event => {
 		writeFileSync(BOUNDS_FILE, JSON.stringify(win.getNormalBounds()));
@@ -478,7 +514,12 @@ if (!app.requestSingleInstanceLock()) {
 		win.show();
 		win.focus();
 	};
-	app.on("second-instance", reveal);
+	// A second launch on this port, such as `openOwnApp` in another app, shows the page it was launched on.
+	app.on("second-instance", (_event, argv) => {
+		const page = argv.slice(1).map(dashboardPage).find(each => each !== null);
+		if (page && win) win.loadURL(page).catch(() => {});
+		reveal();
+	});
 	app.on("activate", reveal);
 	app.on("window-all-closed", () => app.quit());
 	app.on("before-quit", event => {

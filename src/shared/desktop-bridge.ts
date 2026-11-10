@@ -77,6 +77,8 @@ export const BROWSER_CAPTURE_CHANNEL = "omp-agents:browser-capture";
 export const PICK_DIRECTORY_CHANNEL = "omp-agents:pick-directory";
 /** The only installer operation the page may request. No path, flags, or command arguments cross the bridge. */
 export const INSTALL_STARTER_KIT_CHANNEL = "omp-agents:install-starter-kit";
+/** The page's `invoke` that opens another omp-agents server's page in an app of its own, answered with whether it did. */
+export const OPEN_DASHBOARD_CHANNEL = "omp-agents:open-dashboard";
 
 export interface StarterKitInstallResult {
 	ok: boolean;
@@ -165,6 +167,11 @@ export interface DesktopBridge {
 	pickDirectory?(): Promise<string | null>;
 	/** Runs the desktop's non-forced starter kit installer and returns its output without native dialogs. */
 	installStarterKit?(): Promise<StarterKitInstallResult>;
+	/**
+	 * Opens `url` in an omp agents app of its own when it is the page of another omp-agents server on this computer that
+	 * holds this app's token, such as an agent's test server, and answers whether it did; absent in an app built before it.
+	 */
+	openDashboard?(url: string): Promise<boolean>;
 	/** The window hides the system's title bar, so the page draws its own, with the window's buttons inset at its left; absent in an app built before it. */
 	titleBar?: boolean;
 	/** The window's page can embed a session's app in a `<webview>` for its Preview; absent in an app built before it. */
