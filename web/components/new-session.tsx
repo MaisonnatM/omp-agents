@@ -41,7 +41,7 @@ interface NewSessionProps {
 	connected: boolean;
 	/** The server's last answer to this draft's `complete`. */
 	completions: Completions | null;
-	/** Ask for `/` and `@` suggestions, resolved as a session started in `cwd` would resolve them. */
+	/** Ask for `$` and `@` suggestions, resolved as a session started in `cwd` would resolve them. */
 	onComplete: (reqId: number, text: string, cursor: number) => void;
 	/** Move the draft to directory `cwd`, as typed or displayed. */
 	onPickCwd: (cwd: string) => void;

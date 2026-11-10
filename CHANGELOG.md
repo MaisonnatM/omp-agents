@@ -58,13 +58,11 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - A pull request's Summary and Timeline are easier to read: descriptions and comments are larger, section titles stand out, and the timeline's names, dates, and file paths are a size larger, with collapsed comment groups less faded.
 - New Bot offers three more templates for a Routines Bot: Memory curator keeps each repository's project memory up to date, Bot coach proposes how to improve your other Bots, and Review requests drafts the reviews teammates ask you for. Each one sets up its own routine in its first conversation.
 - The model menu has an Extra usage switch. On, a full Claude allowance stays on Claude instead of moving to a fallback such as Cursor. Off puts the fallback list back. It applies to every session.
-- Fixed: Connect in Integrations failed, such as with "Google Calendar has no server to sign in to", when the service's server was turned off. Connect now turns it back on.
-  It skips the sign-in page while the old sign-in still works.
+- Fixed: Connect in Integrations failed, such as with "Google Calendar has no server to sign in to", when the service's server was turned off. Connect now turns it back on. It skips the sign-in page while the old sign-in still works.
 - A link to an agent's test server, such as one in its reply or listed under Review visuals, now opens signed in, in an omp agents window of its own, instead of a page saying to open the app.
 - The Todos card is back on the right of the conversation, with its todos, subagents, files, images, and sources in view, instead of a line you click open. In a narrow conversation it sits above the messages.
 - Click a file chip above a prompt you sent, such as Pasted text.txt, to read the text it carried. The Copy button copies it.
-- Hover or focus the speech bubble count on a pull request, in the sidebar, the table, or the board, to read its five latest comments and reviews without opening it.
-  The card leaves out what the Comments filter hides and says how many it left out.
+- Hover or focus the speech bubble count on a pull request, in the sidebar, the table, or the board, to read its five latest comments and reviews without opening it. The card leaves out what the Comments filter hides and says how many it left out.
 - When an agent sets two or more subagents on the same task, the Todos card's Subagents section shows them side by side in an Arena box.
 - Once the agent picks, the runner it kept says Base, and the others say Graft, with what it took, or Not used.
 - The agent records its arena with the new arena tool: install the updated omp Starter Kit to get it.

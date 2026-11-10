@@ -153,17 +153,17 @@ export function userRoutingOf(settings: OmpSettingsInstance): ProfileRouting {
 	return { modelRoles, fallbackChains, modelProviderOrder };
 }
 
-/**
- * Makes `settings`' global `config.yml` route as `routing` does, through omp's write path like {@link writeRouting}:
- * omp writes a setting's whole value at its path, so each map replaces the one on disk and drops each role and chain
- * `routing` leaves out, while every key outside the routing survives.
- */
 /** Replaces `retry.fallbackChains` and leaves every other setting. An empty map removes the setting, which is no fallback. */
 export async function writeFallbackChains(settings: OmpSettingsInstance, chains: Record<string, string[]>): Promise<void> {
 	setting("retry.fallbackChains").set(settings, Object.keys(chains).length > 0 ? chains : undefined);
 	await settings.flush();
 }
 
+/**
+ * Makes `settings`' global `config.yml` route as `routing` does, through omp's write path like {@link writeRouting}:
+ * omp writes a setting's whole value at its path, so each map replaces the one on disk and drops each role and chain
+ * `routing` leaves out, while every key outside the routing survives.
+ */
 export async function writeUserRouting(settings: OmpSettingsInstance, { modelRoles, fallbackChains, modelProviderOrder }: ProfileRouting): Promise<void> {
 	setting("modelRoles").set(settings, Object.keys(modelRoles).length > 0 ? modelRoles : undefined);
 	setting("retry.fallbackChains").set(settings, Object.keys(fallbackChains).length > 0 ? fallbackChains : undefined);
