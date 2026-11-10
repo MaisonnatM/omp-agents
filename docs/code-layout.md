@@ -82,7 +82,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - The session changes dialog that a file or **Review** opens: `web/components/changes/session-changes-dialog.tsx`, with its explorer in `changes-explorer.tsx` and tree in `file-tree.tsx` beside it.
   - Settings › Files, omp's own config files: `Files` in `web/components/settings/files-tab.tsx`.
   - Settings › Decisions, a workspace repository's decision records, and every workspace in the space when All workspaces is selected: `DecisionsTab` in `web/components/settings/decisions-tab.tsx`, grouped by `decisionGroups` in `web/components/settings/decision-groups.ts`.
-- A file opened from a path in agent text: `web/components/file-dialog.tsx`.
+- A file opened from a path in agent text, or from a file chip above a sent prompt: `web/components/file-dialog.tsx`; the chips are `PromptFileChips` in `web/components/prompt-file-chips.tsx`.
 - Dictation, the composer's microphone and the status row above its text field: `DictationButton` and `DictationRow` in `web/components/composer-dictation.tsx`, which `conversation.tsx` and `new-session.tsx` mount, over the page's one capture in `web/dictation.ts`.
 - Command palette (Cmd+K): `web/components/command-palette/`, over `web/command-palette.ts`.
 - Keyboard shortcuts: the table in `web/shortcuts.ts`, the page-wide handlers in `web/use-page-shortcuts.ts`, and the reference dialog in `web/components/shortcuts-dialog.tsx`.

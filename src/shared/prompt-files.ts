@@ -47,11 +47,10 @@ function blocks(prompt: string, at: number): PromptFile[] | null {
 	if (!header) return null;
 	const start = HEADER.lastIndex;
 	for (let close = prompt.indexOf(CLOSE, start); close >= 0; close = prompt.indexOf(CLOSE, close + 1)) {
-		const file = { name: header[1], text: prompt.slice(start, close) };
 		const end = close + CLOSE.length;
-		if (end === prompt.length) return [file];
+		if (end === prompt.length) return [{ name: header[1], text: prompt.slice(start, close) }];
 		const rest = prompt.startsWith("\n\n", end) ? blocks(prompt, end + 2) : null;
-		if (rest) return [file, ...rest];
+		if (rest) return [{ name: header[1], text: prompt.slice(start, close) }, ...rest];
 	}
 	return null;
 }
@@ -69,5 +68,10 @@ export function splitFiles(prompt: string): { text: string; files: PromptFile[] 
 /** How a list shows a prompt: its typed text, or the names of its files when it carries files alone. */
 export function promptLabel(prompt: string): string {
 	const { text, files } = splitFiles(prompt);
+	return promptTitle(text, files);
+}
+
+/** A prompt's typed text, or the names of its files when it has none. */
+export function promptTitle(text: string, files: readonly PromptFile[]): string {
 	return text || files.map(file => file.name).join(", ");
 }

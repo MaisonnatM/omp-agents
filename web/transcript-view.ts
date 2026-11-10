@@ -3,6 +3,7 @@
  * facts its rows, its minimap, its chat history, and its Todos card read, as one {@link TranscriptModel}.
  */
 import type { RoutineTask } from "../src/routines";
+import { promptTitle } from "../src/shared/prompt-files";
 import { taskOf, taskText } from "../src/shared/routine-message";
 import { isPrompt, type Item, type PromptItem, type TodoPhase } from "../src/shared/transcript";
 import type { ActionState } from "./use-action";
@@ -267,7 +268,7 @@ function headOf(opener: Opener): TurnHead | null {
 	const text = opener.text.trim();
 	const images = opener.images?.length ?? 0;
 	const files = opener.files ?? [];
-	const prompt = text || files.join(", ") || (images > 0 ? `${images} ${images === 1 ? "image" : "images"}` : "");
+	const prompt = promptTitle(text, files) || (images > 0 ? `${images} ${images === 1 ? "image" : "images"}` : "");
 	const match = !opener.skill && images === 0 && files.length === 0 ? NUDGE.exec(text) : null;
 	return { id: opener.id, prompt, skill: opener.skill, routine: null, botMessage: null, nudge: match ? (match[1] ? "resume" : "approve") : null };
 }
