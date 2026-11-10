@@ -23,6 +23,7 @@
   The dashboard never signs in for you: **Connect** or **Reconnect** on the account's row does, and the notice goes once the account works again.
 - omp's own `/mcp reauth` or `/mcp unauth` on an added account writes it back under its URL and can merge two accounts into one; reconnect it from this page instead.
 - **Connect** signs in the way omp's `/mcp reauth` does, saves the sign-in in omp's credentials, and adds the service's MCP server, such as `https://mcp.linear.app/mcp`, `https://mcp.slack.com/mcp`, `https://calendarmcp.googleapis.com/mcp/v1`, or `https://gmailmcp.googleapis.com/mcp/v1`, to `~/.omp/agent/mcp.json` when omp has none, so new omp sessions can use its tools too.
+  A service whose server omp's `/mcp disable` turned off is turned back on by **Connect**, which skips the browser while omp still holds its sign-in.
   Linear sends the browser back to `localhost:3000`, so that port must be free while you sign in.
   Slack sends the browser to the HTTPS redirect saved for the app, and omp listens for HTTP on the saved callback port.
   Google Calendar and Gmail send the browser back to `localhost` on the saved callback port, 3119 unless you change it.

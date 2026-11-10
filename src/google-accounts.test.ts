@@ -7,7 +7,7 @@ import { accountClients, createGoogleAccounts, type GoogleAccounts, type SignedO
 import { createIntegrations, type Integrations } from "./integrations";
 import type { remoteStatusOf } from "./mcp-status";
 import { auth, mcpCredentials } from "./omp/modules";
-import { type McpServerConfig, type McpSignInTarget, userMcpConfigPath, writeMcpServer } from "./omp/mcp";
+import { type McpServerConfig, type McpSignInTarget, setMcpServerEnabled, userMcpConfigPath, writeMcpServer } from "./omp/mcp";
 import { GoogleAccountsFile } from "./server/google-accounts-file";
 import type { IntegrationsAnswer, McpIntegration } from "./shared/accounts";
 import type { McpRemoteStatus } from "./shared/mcp-status";
@@ -217,6 +217,31 @@ test("a Gmail and a Google Calendar account whose addresses differ only in case 
 		{ name: "gmail", address: "ana@example.com", space: "personal" },
 		{ name: "google-calendar", address: "ana@example.com", space: "personal" },
 	]);
+});
+
+test("Connect on a Google Calendar turned off in MCP servers turns it back on, and its kept sign-in needs no browser", async () => {
+	await configure({ "google-calendar": { type: "http", url: CALENDAR, oauth: OAUTH } });
+	await setMcpServerEnabled("google-calendar", false);
+	await signIn(mcpCredentials.mcpOAuthCredentialIdsForServerUrl(CALENDAR)[0] as string, "ana@example.com");
+	const { integrations } = integrationsWith({});
+	const answer = await integrations.startSignIn({ id: "google-calendar", account: null });
+	expect(answer.signIn).toBeNull();
+	expect(accountsOf(answer).map(({ name, address }) => ({ name, address }))).toEqual([{ name: "google-calendar", address: "ana@example.com" }]);
+	expect(JSON.parse(readFileSync(userMcpConfigPath(), "utf8")).disabledServers ?? []).toEqual([]);
+});
+
+test("Connect on a Google Calendar turned off without a sign-in turns it back on and signs in to it in the browser", async () => {
+	await configure({ "google-calendar": { type: "http", url: CALENDAR, oauth: OAUTH } });
+	await setMcpServerEnabled("google-calendar", false);
+	const { integrations } = integrationsWith({});
+	browser.push("ana@example.com");
+	const answer = await integrations.startSignIn({ id: "google-calendar", account: null });
+	expect(answer.signIn).toBeNull();
+	expect(browser).toEqual([]);
+	const credentialId = config()["google-calendar"]?.auth?.credentialId as string;
+	signedInIds.add(credentialId);
+	expect(Object.keys(config())).toEqual(["google-calendar"]);
+	expect(accountsOf(answer).map(({ name, address }) => ({ name, address }))).toEqual([{ name: "google-calendar", address: "ana@example.com" }]);
 });
 
 test("a session's sign-out report of a Google account stands, at its first time, until the account signs in again or works again", async () => {

@@ -173,6 +173,13 @@ export async function setMcpServerEnabled(name: string, enabled: boolean): Promi
 	forgetMcpTools(name);
 }
 
+/** Turns on every server omp's user config defines on `host` but turns off; whether it turned any on. */
+export async function enableMcpServersOn(host: string): Promise<boolean> {
+	const off = (await listMcpServers()).filter(server => !server.enabled && serverHost(server.config) === host);
+	for (const { name } of off) await setMcpServerEnabled(name, true);
+	return off.length > 0;
+}
+
 /** Why omp refuses `name` as a server name, or `undefined`. */
 export const mcpServerNameError = (name: string): string | undefined => mcpConfigWriter.validateServerName(name);
 
