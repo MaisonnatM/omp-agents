@@ -1,5 +1,5 @@
 /** The body of each Get started step: what it sets up, its live state, and the controls that set it up here. */
-import { ArrowRight, Check, CircleAlert, Eye, GitPullRequest, type LucideIcon, Package, Plug, RefreshCw, SquareTerminal } from "lucide-react";
+import { ArrowRight, Check, CircleAlert, Eye, GitPullRequest, type LucideIcon, Package, RefreshCw, SquareTerminal, Workflow } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,8 @@ import { hashForSettings } from "../routing";
 import { useAction } from "../use-action";
 import { CopyableCode } from "./copyable-code";
 import { useDashboardActions } from "./dashboard-context";
-import { Callout, IntegrationList, IntegrationRow, LIST_SURFACE, MarkTile } from "./integrations/integration-row";
+import { Callout, IntegrationList, IntegrationRow, LIST_SURFACE, MarkTile, MetaDot } from "./integrations/integration-row";
+import { StatusBadge, type StatusLabel } from "./integrations/mcp-connection-controls";
 import { LoadNote } from "./sheet-details";
 import { ProviderGroups } from "./settings/providers-tab";
 
@@ -215,6 +216,62 @@ export function KitStep({ kit }: { kit: Observation<StarterKitStatus> }) {
 	);
 }
 
+/** Whether pstack is installed and sessions load its skills. */
+export const pstackLoaded = (kit: Observation<StarterKitStatus>): boolean => kit.kind === "known" && kit.value.pstack.installed && kit.value.pstack.skills > 0;
+
+export function pstackStatus(kit: Observation<StarterKitStatus>): StatusLabel {
+	if (kit.kind !== "known") return { label: kit.kind === "checking" ? "Checking" : "Unknown", color: "gray" };
+	const { installed, skills } = kit.value.pstack;
+	if (!installed) return { label: "Not installed", color: "gray" };
+	return skills > 0 ? { label: "Loaded", color: "green" } : { label: "Skills not linked", color: "amber" };
+}
+
+function pstackMeta(kit: Observation<StarterKitStatus>): ReactNode {
+	if (kit.kind === "checking") return "Checking this computer…";
+	if (kit.kind === "unavailable") return null;
+	const { installed, skills } = kit.value.pstack;
+	return (
+		<>
+			<span className="font-mono">pstack@cursor-plugins</span>
+			<MetaDot />
+			<span>{installed ? `${skills} ${skills === 1 ? "skill" : "skills"} loaded` : "Comes with the starter kit"}</span>
+		</>
+	);
+}
+
+export const PSTACK_SUMMARY = "The skills /ship plans with, such as arena, and poteto mode.";
+
+/** pstack, which the starter kit installs and links the skills of; while it is missing, the way to the Starter kit step. */
+export function PstackRow({ kit, onKitStep }: { kit: Observation<StarterKitStatus>; onKitStep: () => void }) {
+	const missing = kit.kind === "known" && !pstackLoaded(kit);
+	return (
+		<IntegrationRow
+			name="pstack"
+			mark={<MarkTile icon={Workflow} name="pstack" />}
+			status={<StatusBadge {...pstackStatus(kit)} />}
+			summary={PSTACK_SUMMARY}
+			meta={pstackMeta(kit)}
+			actions={
+				missing && (
+					<Button size="compact" variant="secondary" trailingIcon={ArrowRight} onClick={onKitStep} {...activityControl("get-started.open-kit")}>
+						Go to Starter kit
+					</Button>
+				)
+			}
+		>
+			{kit.kind === "unavailable" ? (
+				<Unavailable fact={kit} />
+			) : (
+				missing && (
+					<p className="text-xs text-pretty text-muted-foreground">
+						{kit.value.pstack.installed ? "pstack is installed, but no session loads its skills yet." : "pstack comes with the starter kit."} Installing the kit on the Starter kit step adds it and links its skills.
+					</p>
+				)
+			)}
+		</IntegrationRow>
+	);
+}
+
 function githubMeta(github: Observation<GithubStatus>): string | null {
 	if (github.kind === "checking") return "Checking this computer…";
 	if (github.kind === "unavailable") return null;
@@ -224,56 +281,61 @@ function githubMeta(github: Observation<GithubStatus>): string | null {
 	return account ? `Signed in as ${account}` : "Signed in";
 }
 
-/** GitHub through its CLI, and the services in Integrations, each checked again when the window regains focus. */
-export function ToolsStep({ github, integrations, onRefresh, refreshing }: { github: Observation<GithubStatus>; integrations: Observation<number>; onRefresh: () => void; refreshing: boolean }) {
-	const signedIn = github.kind === "known" && github.value.state === "signed-in";
-	const connected = integrations.kind === "known" ? integrations.value : 0;
+export const githubSignedIn = (github: Observation<GithubStatus>): boolean => github.kind === "known" && github.value.state === "signed-in";
+
+export const GITHUB_SUMMARY = "Pull requests in the dashboard, and omp working on them.";
+
+const GITHUB_STATUS: Record<GithubStatus["state"], StatusLabel> = {
+	missing: { label: "Not installed", color: "gray" },
+	"signed-out": { label: "Signed out", color: "gray" },
+	"signed-in": { label: "Connected", color: "green" },
+};
+
+export function githubStatus(github: Observation<GithubStatus>): StatusLabel {
+	if (github.kind !== "known") return { label: github.kind === "checking" ? "Checking" : "Unknown", color: "gray" };
+	return GITHUB_STATUS[github.value.state];
+}
+
+/** GitHub through its CLI: its install link, or the command that signs it in. */
+export function GithubRow({ github }: { github: Observation<GithubStatus> }) {
+	const signedIn = githubSignedIn(github);
 	return (
-		<div className="space-y-5">
-			<IntegrationList label="Your tools">
-				<IntegrationRow
-					name="GitHub"
-					mark={<MarkTile icon={GitPullRequest} name="GitHub" />}
-					status={<DoneBadge done={signedIn} need="optional" />}
-					summary="Pull requests in the dashboard, and omp working on them."
-					meta={githubMeta(github)}
-					actions={
-						github.kind === "known" &&
-						github.value.state === "missing" && (
-							<Button variant="secondary" size="compact" render={<a href="https://cli.github.com" target="_blank" rel="noreferrer" />} {...activityControl("get-started.install-gh")}>
-								Install GitHub CLI
-							</Button>
-						)
-					}
-				>
-					{github.kind === "known" && !signedIn && (
-						<div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-							<span>In your terminal:</span>
-							<Command value="gh auth login" />
-						</div>
-					)}
-					<Unavailable fact={github} />
-				</IntegrationRow>
-				<IntegrationRow
-					name="Integrations"
-					mark={<MarkTile icon={Plug} name="Integrations" />}
-					status={<DoneBadge done={connected > 0} need="optional" />}
-					summary="Linear, Slack, Gmail, and the other services omp can work in."
-					meta={integrations.kind === "known" ? `${connected} ${connected === 1 ? "service" : "services"} connected` : integrations.kind === "checking" ? "Checking…" : null}
-					actions={
-						<Button variant="secondary" size="compact" render={<a href="#settings/integrations" />}>
-							Open Integrations
-						</Button>
-					}
-				>
-					<Unavailable fact={integrations} />
-				</IntegrationRow>
-			</IntegrationList>
-			<div className="flex justify-end">
-				<Button variant="ghost" size="compact" leadingIcon={RefreshCw} loading={refreshing} onClick={onRefresh} {...activityControl("get-started.refresh")}>
-					Check again
-				</Button>
-			</div>
+		<IntegrationRow
+			name="GitHub"
+			mark={<MarkTile icon={GitPullRequest} name="GitHub" />}
+			status={<StatusBadge {...githubStatus(github)} />}
+			summary={GITHUB_SUMMARY}
+			meta={githubMeta(github)}
+			actions={
+				github.kind === "known" &&
+				github.value.state === "missing" && (
+					<Button variant="secondary" size="compact" render={<a href="https://cli.github.com" target="_blank" rel="noreferrer" />} {...activityControl("get-started.install-gh")}>
+						Install GitHub CLI
+					</Button>
+				)
+			}
+		>
+			{github.kind === "unavailable" ? (
+				<Unavailable fact={github} />
+			) : (
+				github.kind === "known" &&
+				!signedIn && (
+					<div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+						<span>In your terminal:</span>
+						<Command value="gh auth login" />
+					</div>
+				)
+			)}
+		</IntegrationRow>
+	);
+}
+
+export function CheckAgain({ onRefresh, refreshing }: { onRefresh: () => void; refreshing: boolean }) {
+	return (
+		<div className="flex justify-end">
+			<Button variant="ghost" size="compact" leadingIcon={RefreshCw} loading={refreshing} onClick={onRefresh} {...activityControl("get-started.refresh")}>
+				Check again
+			</Button>
 		</div>
 	);
 }

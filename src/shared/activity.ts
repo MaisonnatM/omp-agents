@@ -36,6 +36,7 @@ export const CONTROLS = [
 	{ id: "get-started.dismiss", label: "Get started dismissed on this computer", area: "Get started" },
 	{ id: "get-started.refresh", label: "Get started checked again", area: "Get started" },
 	{ id: "get-started.install-kit", label: "Get started starter kit installation", area: "Get started" },
+	{ id: "get-started.open-kit", label: "Get started sent from pstack to the starter kit", area: "Get started" },
 	{ id: "get-started.copy-command", label: "Get started command copied", area: "Get started" },
 	{ id: "get-started.install-gh", label: "Get started GitHub CLI installation link", area: "Get started" },
 	{ id: "get-started.next", label: "Get started step continued", area: "Get started" },

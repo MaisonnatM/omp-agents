@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-10
 
+- Get started's fourth step is now Tools and workflows: connect GitHub, Linear, Slack, Google Calendar, and Gmail right there, see whether pstack is loaded, and find what still needs you under Action needed, with Go to Starter kit when pstack is missing.
 - Installing the omp Starter Kit on a new computer now makes the pstack skills work, such as arena and technical writing, which ship plans with. Before, omp skipped all of them, so ship stopped at its plan step.
 - The omp Starter Kit now brings the two poteto helpers that ship and poteto mode hand work to, one on Claude and one on Codex.
 - Behind the scenes: the starter kit's agent rules now include the newer ship steps, the rule to set pull request descriptions with the checked tool, and the rule to retake pull request screenshots after each push.
