@@ -56,7 +56,7 @@ Edit the box with `pr_description`'s `replace-text` change, using the exact unch
 
 Use bullets or an aligned `text` code block for comparisons, rather than markdown pipe tables.
 GitHub renders a PR description's table with `display: block; width: max-content`, so it shrink-wraps narrower than surrounding prose and code blocks.
-For before-and-after evidence, use the `pr` skill's bullet shape: `**Before:** ... **After:** ...`.
+For before-and-after evidence, use this bullet shape: `**Before:** ... **After:** ...`.
 
 ## PR screenshots
 

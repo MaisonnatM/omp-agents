@@ -5,4 +5,4 @@ disable-model-invocation: true
 source: https://github.com/mattpocock/skills (skills/productivity/grill-me/SKILL.md)
 ---
 
-Call the Skill tool with "grilling".
+Read `skill://grilling` in full, then follow it.
