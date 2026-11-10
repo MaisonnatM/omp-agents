@@ -2,7 +2,7 @@
  * The `anthropic-api` provider in omp's `models.yml`, which bills the Anthropic API key Settings saves under that id.
  * The key cannot sit beside the Anthropic sign-in: omp always picks the sign-in first, so a session never spends the key.
  */
-import { readFile } from "node:fs/promises";
+import { readFile, realpath, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { atomicWriteText } from "../fs";
 import { isObject } from "../json";
@@ -62,11 +62,11 @@ export async function addApiCreditsProvider(ids: readonly string[], dir = agentD
 	const text = await readText(path);
 	if (text !== null && API_CREDITS_PROVIDER in providersOf(text, path)) return false;
 	const block = entryText(ids);
-	const next =
-		text === null
-			? `${block.replace(MARKER, "# omp-agents: anthropic-api\nproviders:\n" + MARKER)}\n`
-			: insertBlock(text, block);
-	await atomicWriteText(path, next);
+	if (text === null) {
+		await atomicWriteText(path, `${block.replace(MARKER, "# omp-agents: anthropic-api\nproviders:\n" + MARKER)}\n`);
+	} else {
+		await rewrite(path, insertBlock(text, block));
+	}
 	return true;
 }
 
@@ -75,8 +75,16 @@ function insertBlock(text: string, block: string): string {
 	const match = /^providers:\s*$/m.exec(text);
 	if (!match) return `${text.endsWith("\n") ? text : `${text}\n`}providers:\n${block}\n`;
 	const at = match.index + match[0].length;
-	const gap = text[at] === "\n" ? "\n" : "\n";
-	return `${text.slice(0, at)}${gap}${block}${text.slice(at)}`;
+	return `${text.slice(0, at)}\n${block}${text.slice(at)}`;
+}
+
+/**
+ * Replaces an existing `models.yml` where it really is and with the permissions it had: replacing a symlink would
+ * strand omp's config elsewhere, and a file kept private can hold another provider's key.
+ */
+async function rewrite(path: string, text: string): Promise<void> {
+	const target = await realpath(path);
+	await atomicWriteText(target, text, (await stat(target)).mode & 0o777);
 }
 
 /**
@@ -97,7 +105,7 @@ export async function removeApiCreditsProvider(dir = agentDir): Promise<void> {
 	if (lines[end]?.startsWith(`  ${API_CREDITS_PROVIDER}:`)) end += 1;
 	while (end < lines.length && !/^ {2}[^ #]/.test(lines[end] ?? "")) end += 1;
 	const next = [...lines.slice(0, start), ...lines.slice(end)].join("\n");
-	await atomicWriteText(path, next);
+	await rewrite(path, next);
 }
 
 const KEY_NOT_SAVED = "The API key could not be saved. Check that omp's credential store is available.";

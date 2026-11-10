@@ -1,6 +1,6 @@
 /**
  * The pull request actions: which listed pull request each applies to, and the prompt that starts its session.
- * The Pull requests page's quick actions and the routines both read them, so the server and the page share one prompt.
+ * The Pull requests page's quick actions and a PR shepherd's fixes both read them, so the server and the page share one prompt.
  */
 import { type PullRequestSummary, pullRequestUrl } from "./shared/github";
 import { REVIEW_DRAFT_TOOL } from "./shared/review-drafts";

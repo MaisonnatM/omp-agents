@@ -129,7 +129,7 @@ Taking over a dead or invalid owner holds a short ownership lock at `<path>.reap
 The same mechanism recovers a crashed reclaimer's lock.
 A process id that another program reused keeps the lock held; delete `server.lock` to release it.
 At startup a server that does not own the lock logs once which port does, and the minute tick tries again.
-On a takeover the server logs it, reads `routines.json`, `todos.json`, `notes.json`, and `events.json` again, since the previous owner kept saving them, tracks the routine sessions it attached to, fails the runs that were running a command and the scheduled sends left sending, and drains the todo, note, event, routine, and bot inboxes.
+On a takeover the server logs it, reads `routines.json`, `bots.json`, `todos.json`, `notes.json`, and `events.json` again, since the previous owner kept saving them, fails the runs left sending a prompt or running a command and the scheduled sends left sending, and drains the todo, note, event, routine, and bot inboxes.
 A server that exits normally deletes its lock.
 The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, a todo, **Run now**, or a process's **Stop**; only the minute tick's routines, scheduled sends, and isolation sweep, the runs the routines' triggers start, the todo, note, event, routine, and bot inboxes, the end inbox's requests for sessions started in a terminal, and the process sample's idle and gone-session stops are left to the owner.
 Each server keeps its own copy of `routines.json` and `todos.json` in memory and saves whole, so the last server you edited in wins until the owner changes.

@@ -236,7 +236,7 @@ export function plansWithConfiguredProviders(plans: readonly PlanUsage[], config
 export function withCreditBalance(plans: readonly PlanUsage[], balance: CreditBalance | null): PlanUsage[] {
 	if (!balance) return [...plans];
 	return plans.map(plan =>
-		plan.provider === API_CREDITS_PROVIDER && plan.windows.length === 0 && plan.extra === null ? { ...plan, balance } : plan,
+		plan.provider === API_CREDITS_PROVIDER && isNameOnlyPlan(plan) ? { ...plan, balance } : plan,
 	);
 }
 
@@ -251,7 +251,6 @@ export function withCreditRuns(plans: readonly PlanUsage[], runs: readonly Credi
 
 /** omp exits non-zero when some provider fails, after printing the reports it did get. */
 export async function fetchPlanUsage(): Promise<PlanUsage[]> {
-	const credits = readConsoleCreditBalance().catch(() => null);
 	const refusals = readCreditRuns(Date.now()).catch(() => []);
 	const rawReports = await readRawUsageReports().catch(() => null);
 	const { stdout, stderr, code } = await run([...ompCommand, "usage", "--json"], { timeoutMs: TIMEOUT_MS });
@@ -268,5 +267,7 @@ export async function fetchPlanUsage(): Promise<PlanUsage[]> {
 	} catch {
 		configured = [];
 	}
-	return withCreditRuns(withCreditBalance(plansWithConfiguredProviders(plans, configured), await credits), await refusals);
+	// Only the API credits row shows the Console balance, so nothing else copies the browser's cookie databases to read it.
+	const credits = configured.includes(API_CREDITS_PROVIDER) ? await readConsoleCreditBalance().catch(() => null) : null;
+	return withCreditRuns(withCreditBalance(plansWithConfiguredProviders(plans, configured), credits), await refusals);
 }
