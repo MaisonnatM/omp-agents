@@ -46,6 +46,9 @@
 - Sessions started from the dashboard have a model menu, as Cursor's does: the button reads the model and its effort, such as **Opus 5.5 High**.
   **Fast** turns omp's `/fast` on or off; it is greyed out for a model without a priority tier, and reads **not active** when omp has it on but the provider refused the fast tier.
   **Advisor**, just under Fast, turns passive review on or off for this session and names its model, or the number of configured advisors.
+  **Extra usage**, under Advisor, parks the fallback list and clears it, so a full Claude allowance stays on Claude and bills extra usage instead of moving to Cursor or another fallback.
+  It applies to every session, and the fallback list comes back when you turn it off.
+  Claude has to have extra usage turned on for the account, or the turn stops when the allowance is full.
   Assign an advisor model in **Settings → Models** to enable the switch.
   **Context** shows the model's context window and switches to a variant of the same model with another window, such as Cursor's `claude-opus-5-5` (300K) and `claude-opus-5-5-1m` (1M); models without such a variant have no Context row.
   **Effort** chooses the thinking level among the ones the live model supports.

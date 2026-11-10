@@ -13,7 +13,7 @@ import { sessionsDir } from "../omp/sessions";
 import { readSessionRows, readStats, windowOf } from "../omp/stats";
 import { directoryOf } from "../paths";
 import { clearMemory, editMemoryEntry, loadOmpMemory, rebuildMemory, saveMemoryFile } from "../memory";
-import { editModelProfile, loadOmpSettings, Rejected, saveAgentSetting, saveOmpFile, saveRouting } from "../settings";
+import { editModelProfile, loadOmpSettings, readExtraUsage, Rejected, saveAgentSetting, saveOmpFile, saveRouting, setExtraUsage } from "../settings";
 import { answerExtensionApproval, readExtensionContribution, readExtensionOperation, startExtensionChange } from "../extensions";
 import { discoverExtensions, loadExtensions } from "../omp/extensions";
 import { isAnalyticsRange } from "../shared/analytics";
@@ -243,6 +243,7 @@ export function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): 
 		"/api/settings": { GET: settingsRead(loadOmpSettings) },
 		"/api/settings/routing": { PUT: settingsWrite(saveRouting) },
 		"/api/settings/model-profiles": { PUT: settingsWrite(editModelProfile) },
+		"/api/settings/extra-usage": { GET: settingsRead(readExtraUsage), PUT: settingsWrite(setExtraUsage) },
 		"/api/settings/agent": { PUT: settingsWrite(saveAgentSetting) },
 		"/api/settings/file": { PUT: settingsWrite(saveOmpFile) },
 		"/api/settings/extensions": { GET: settingsRead((cwd) => loadExtensions(cwd)), PUT: settingsWrite(async (cwd, body) => startExtensionChange(cwd, body)) },

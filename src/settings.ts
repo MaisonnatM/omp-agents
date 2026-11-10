@@ -12,6 +12,7 @@ import {
 	expandDefaultRetryFallbackChains,
 	loadGlobalForWrite,
 	loadOmpConfig,
+	writeFallbackChains,
 	loadSessionSettings,
 	type OmpConfig,
 	ompConfigOf,
@@ -24,6 +25,7 @@ import {
 } from "./omp/config";
 import { discoverOmpFiles, type FoundFile } from "./omp/discovery";
 import { findModelUpdates, upgradeEdits } from "./omp/model-updates";
+import { extraUsageChange, extraUsageOn, parkFallbacks, parkedFallbacks } from "./extra-usage";
 import { ModelProfilesFile } from "./model-profiles-file";
 import { connectedProviders, listModels } from "./omp/models";
 import { workflowsOf } from "./omp/workflows";
@@ -229,6 +231,31 @@ const loadForWrite = (cwd: string) =>
 	});
 
 const modelProfiles = new ModelProfilesFile(modelProfilesFile);
+
+/** Whether the composer's Extra usage switch is on: its parked lists are the only fallbacks, and the config has none. */
+export async function readExtraUsage(): Promise<{ on: boolean }> {
+	const { fallbackChains } = await loadOmpConfig(HOME);
+	return { on: extraUsageOn(fallbackChains, parkedFallbacks()) };
+}
+
+/**
+ * Turns Extra usage on or off for every session. On parks `retry.fallbackChains` and clears them, so a full Claude
+ * allowance stays on Claude. Off writes the parked lists back. The park is saved before the clear, and the lists are
+ * written back before the park is forgotten, so a crash keeps a copy of them.
+ */
+export function setExtraUsage(_cwd: string | null, raw: unknown): Promise<{ on: boolean }> {
+	if (!isObject(raw) || typeof raw.on !== "boolean") return Promise.reject(new Rejected(400, "Expected { on: true or false }"));
+	const on = raw.on;
+	return configWrites.run(async () => {
+		const settings = await loadGlobalForWrite(HOME);
+		const { fallbackChains } = userRoutingOf(settings);
+		const next = extraUsageChange(fallbackChains, parkedFallbacks(), on);
+		if (on) parkFallbacks(next.parked);
+		await writeFallbackChains(settings, next.chains);
+		if (!on) parkFallbacks(null);
+		return { on: extraUsageOn(next.chains, next.parked) };
+	});
+}
 
 /** Applies a routing edit to the user's `config.yml` and answers with the settings as they now load. */
 export function saveRouting(cwd: string | null, raw: unknown): Promise<OmpSettings> {

@@ -19,6 +19,7 @@ import {
 	MenuSwitchItem,
 } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
+import { ApiError, getJson, putJson, settingsUrl } from "../api";
 import { activityControl } from "../activity";
 import { modelLabel, modelOrg, providerLabel, providerOrg } from "../labels";
 import { contextVariants, levelLabel, menuModels, modelMatch, providerQuota } from "../model-menu";
@@ -178,6 +179,36 @@ const BACK_TO_MENU: Record<string, true> = { "trigger-hover": true, "sibling-ope
 /** `300K` and `1M`, as model ids name their context sizes, whatever the browser's locale. */
 const tokens = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
 
+/** Extra usage for every session: on parks the fallback lists, so a full Claude allowance stays on Claude. */
+function useExtraUsage(): { on: boolean; pending: boolean; title: string; onChange: (on: boolean) => void } {
+	const [on, setOn] = useState(false);
+	const [ready, setReady] = useState(false);
+	const [pending, setPending] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	useEffect(() => {
+		const controller = new AbortController();
+		getJson<{ on: boolean }>(settingsUrl("/extra-usage", null), controller.signal)
+			.then(answer => setOn(answer.on))
+			.catch((err: unknown) => {
+				if (!controller.signal.aborted) setError(err instanceof ApiError ? err.message : "Could not read extra usage.");
+			})
+			.finally(() => {
+				if (!controller.signal.aborted) setReady(true);
+			});
+		return () => controller.abort();
+	}, []);
+	const onChange = (next: boolean): void => {
+		setPending(true);
+		setError(null);
+		putJson<{ on: boolean }>(settingsUrl("/extra-usage", null), { on: next })
+			.then(answer => setOn(answer.on))
+			.catch((err: unknown) => setError(err instanceof ApiError ? err.message : "Could not change extra usage."))
+			.finally(() => setPending(false));
+	};
+	const title = error ?? (ready ? "When the Claude allowance is full, stay on Claude and bill extra usage instead of the fallback list. Every session uses this. Claude has to have extra usage turned on, or the turn stops." : "Reading extra usage.");
+	return { on, pending: pending || !ready, title, onChange };
+}
+
 /** Cursor's model menu: Fast, Context, and Effort for the current model, then Model, which searches every connected model. */
 export function ModelPicker({ current, unset = "Choose model", list, open, onOpenChange, onPick, disabled, pending = false, effort, fast, advisor, control }: ModelPickerProps) {
 	const models = list.data?.models ?? [];
@@ -185,6 +216,7 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 	const contextWindow = variants.find(model => selectorOf(model) === current)?.contextWindow ?? null;
 	const levels = effort.levels ?? [];
 	const effortValue = pending ? "Switching…" : effort.levels === null ? "Unavailable" : levels.length === 0 ? "None" : effort.current ? levelLabel(effort.current) : "Default";
+	const extra = useExtraUsage();
 	const composer = useContext(ComposerEditor);
 	const picked = useRef(false);
 	const pick = ({ provider, id }: ModelOption): void => {
@@ -245,6 +277,9 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 						{advisor.state && <span className="min-w-0 truncate text-xs text-muted-foreground">{advisor.state.models.length > 1 ? `${advisor.state.models.length} advisors` : modelLabel(advisor.state.models[0]!)}</span>}
 					</MenuSwitchItem>
 				)}
+				<MenuSwitchItem {...activityControl("composer.extra-usage")} checked={extra.on} onCheckedChange={extra.onChange} disabled={disabled || pending || extra.pending} title={extra.title}>
+					Extra usage
+				</MenuSwitchItem>
 				{contextWindow !== null && (
 					<MenuSubmenu>
 						<MenuSubmenuTrigger disabled={pending} value={tokens.format(contextWindow)}>
