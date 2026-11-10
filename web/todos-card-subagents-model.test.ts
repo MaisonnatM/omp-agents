@@ -43,6 +43,14 @@ describe("arenaGroups", () => {
 		expect(seats(group)).toEqual([["A", "RunA", { kind: "graft", what: "Copy, Tests" }], ["B", "RunB", { kind: "base" }], ["C", "RunC", { kind: "unused" }]]);
 	});
 
+	test("a runner already seated in an earlier arena is not seated again, and an arena left with one free runner stays in the rest", () => {
+		const second = { task: "Name it", runners: ["RunC", "Other"], judge: null, base: null, grafts: [] };
+		const { groups, rest } = arenaGroups(nodes, [arena, second]);
+		expect(groups).toHaveLength(1);
+		expect(seats(groups[0]).map(seat => seat[1])).toEqual(["RunA", "RunB", "RunC"]);
+		expect(rest.map(node => node.agent.id)).toEqual(["Other"]);
+	});
+
 	test("an arena with fewer than two runners in the view stays plain rows, and keeps its letters when one is missing", () => {
 		const two = nodes.filter(node => node.agent.id !== "RunA");
 		expect(seats(arenaGroups(two, [arena]).groups[0])).toEqual([["B", "RunB", null], ["C", "RunC", null]]);
