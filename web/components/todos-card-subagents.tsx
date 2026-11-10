@@ -68,7 +68,13 @@ function openHandler(links: SubagentLinksValue, agentId: string) {
 	};
 }
 
-const tooltipOf = (agent: AgentRow) => `${[agent.id, agent.kind, statusLabel(agent.status), agent.activity].filter(Boolean).join(" · ")}. ${SPLIT_CLICK} to open in a split`;
+const tooltipOf = (agent: AgentRow, verdict?: string) => `${[agent.id, agent.kind, statusLabel(agent.status), agent.activity, verdict].filter(Boolean).join(" · ")}. ${SPLIT_CLICK} to open in a split`;
+
+/** The pick's word for a runner, as the card's badge and its tooltip say it. */
+function verdictText(verdict: ArenaSeat["verdict"]): string | undefined {
+	if (verdict === null) return undefined;
+	return verdict.kind === "base" ? "Base" : verdict.kind === "graft" ? `Graft: ${verdict.what}` : "Not used";
+}
 
 /** One subagent as a row of the tree, with an optional `lead` icon before its name. */
 function SubagentRow({ agent, depth, links, lead }: { agent: AgentRow; depth: number; links: SubagentLinksValue; lead?: ReactNode }) {
@@ -102,11 +108,13 @@ function SubagentRow({ agent, depth, links, lead }: { agent: AgentRow; depth: nu
 /** An arena: its task, its runners as cards side by side, and its judge under them. */
 function ArenaLanes({ group, links }: { group: ArenaGroup; links: SubagentLinksValue }) {
 	return (
-		<section aria-label={`Arena: ${group.task}`} className="mx-1 mt-1 rounded-lg border border-border/70 p-1">
+		<section aria-label={`Arena: ${group.task}`} className="mx-1 mt-1 rounded-xl border border-border/70 p-1">
 			<div className="flex min-w-0 items-center gap-2 px-2 pt-1 pb-1 text-[13px]">
 				<Swords aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
 				<span className="shrink-0 font-medium text-foreground">Arena</span>
-				<span className="min-w-0 truncate text-muted-foreground">{group.task}</span>
+				<Tooltip content={group.task} side="left">
+					<span className="min-w-0 truncate text-muted-foreground">{group.task}</span>
+				</Tooltip>
 				{group.base && <span className="ml-auto shrink-0 pl-2 text-xs text-muted-foreground">{group.base} is the base</span>}
 			</div>
 			<ul aria-label="Arena runners" className="grid grid-cols-[repeat(auto-fit,minmax(7.75rem,1fr))] gap-1.5 px-1">
@@ -128,18 +136,18 @@ function RunnerCard({ seat, won, picked, links }: { seat: ArenaSeat; won: boolea
 	const { view, href, onClick } = openHandler(links, agent.id);
 	return (
 		<li className="group/runner relative min-w-0">
-			<Tooltip content={tooltipOf(agent)} side="top">
+			<Tooltip content={tooltipOf(agent, verdictText(seat.verdict))} side="top">
 				<a
 					href={href}
 					onClick={onClick}
-					aria-label={`Runner ${seat.seat}: ${agent.id}, ${statusLabel(agent.status)}`}
 					className={cn(
 						"flex h-full min-w-0 flex-col gap-1 rounded-lg border border-border p-2.5 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-						won && "border-emerald-500/60 bg-emerald-500/5 ring-1 ring-emerald-500/30 hover:bg-emerald-500/10",
+						won && "border-emerald-500/60 bg-emerald-500/5 ring-1 ring-emerald-500/30",
 					)}
 				>
 					<div className="flex min-w-0 items-center gap-1.5 text-[13px]">
-						<span className={cn("inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-0.5 text-[11px] font-semibold tabular-nums", won ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground")}>{seat.seat}</span>
+						<span className="sr-only">Runner </span>
+						<span className={cn("inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-0.5 text-2xs font-semibold tabular-nums", won ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>{seat.seat}</span>
 						<span className="truncate text-foreground">{agent.id}</span>
 						<span className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
 							<StatusDot status={agent.status} />
@@ -152,7 +160,7 @@ function RunnerCard({ seat, won, picked, links }: { seat: ArenaSeat; won: boolea
 				</a>
 			</Tooltip>
 			{links.onCancel && agent.status === "running" && (
-				<span className="absolute top-1 right-1 hidden group-focus-within/runner:block group-hover/runner:block">
+				<span className="absolute top-1 right-1 rounded-md bg-popover opacity-0 group-focus-within/runner:opacity-100 group-hover/runner:opacity-100 pointer-coarse:opacity-100">
 					<CancelAgentButton view={view} onCancel={links.onCancel} running />
 				</span>
 			)}
@@ -166,19 +174,21 @@ function Verdict({ seat }: { seat: ArenaSeat }) {
 	return (
 		<div className="mt-auto flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 pt-0.5">
 			{verdict.kind === "base" ? (
-				<Badge size="compact" color="emerald">
-					<Trophy aria-hidden className="mr-1 inline size-3 align-[-1px]" />
-					Base
+				<Badge variant="dot" size="compact" color="green">
+					<span className="flex items-center gap-1">
+						<Trophy aria-hidden className="size-3" />
+						Base
+					</span>
 				</Badge>
 			) : verdict.kind === "graft" ? (
 				<>
-					<Badge size="compact" color="violet">
+					<Badge variant="dot" size="compact" color="violet">
 						Graft
 					</Badge>
 					<span className="line-clamp-2 min-w-0 text-xs text-muted-foreground">{verdict.what}</span>
 				</>
 			) : (
-				<Badge size="compact" color="gray">
+				<Badge variant="dot" size="compact" color="gray">
 					Not used
 				</Badge>
 			)}
