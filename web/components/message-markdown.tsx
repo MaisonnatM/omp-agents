@@ -15,6 +15,7 @@ import type { UserTodoList } from "../../src/user-todos-shared";
 import { linkedFile, remarkFilePaths } from "../file-paths";
 import { remarkPromptChips } from "../prompt-tokens";
 import { useRead } from "../reads";
+import { rehypeReplyParts } from "../reply-parts";
 import { parseReviewPages, type ReviewPage } from "../review-pages";
 import { hashForPullRequests, hashForTickets, hashForTodoId } from "../routing";
 import { UserTodosContext } from "./dashboard-context";
@@ -351,8 +352,11 @@ export const AGENT_PRESET: MarkdownPreset = { remark: [remarkGfm, remarkFilePath
 /** A user's prompt, read as agent text with its skill, command, file, ticket, pull request, todo, and session references as chips. */
 export const PROMPT_PRESET: MarkdownPreset = { ...AGENT_PRESET, remark: [remarkGfm, remarkPromptChips, remarkFilePaths], components: PROMPT_COMPONENTS };
 
-/** A settled message in a session's conversation: agent text whose `mermaid` and `chart` fences draw as visuals. */
-export const SESSION_AGENT_PRESET: MarkdownPreset = { ...AGENT_PRESET, components: SESSION_AGENT_COMPONENTS };
+/** A streaming reply in a session's conversation: agent text with its parts marked, as `rehypeReplyParts` says. */
+export const SESSION_STREAMING_PRESET: MarkdownPreset = { ...AGENT_PRESET, rehype: [rehypeReplyParts] };
+
+/** A settled message in a session's conversation: a streaming reply whose `mermaid` and `chart` fences draw as visuals. */
+export const SESSION_AGENT_PRESET: MarkdownPreset = { ...SESSION_STREAMING_PRESET, components: SESSION_AGENT_COMPONENTS };
 
 /** A user's prompt in a session's conversation, whose `mermaid` and `chart` fences draw as visuals. */
 export const SESSION_PROMPT_PRESET: MarkdownPreset = { ...PROMPT_PRESET, components: SESSION_PROMPT_COMPONENTS };
