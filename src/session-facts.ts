@@ -46,6 +46,8 @@ const GIT_PUSH = /\bgit\s+(?:-C\s+\S+\s+)?push\b/;
 const OWNER_REPO = /^([\w.-]+)\/([\w.-]+)$/;
 /** omp's `pr://<n>` or `pr://<owner>/<repo>/<n>`, with or without `/diff/…` or `?comments=1` after it. */
 const PR_URI = /^pr:\/\/(?:([\w.-]+)\/([\w.-]+)\/)?(\d+)(?:[/?#]|$)/;
+/** A `read` of an address, such as `skill://x` or `https://…`, rather than of a file. */
+const URI_SCHEME = /^[a-z][a-z\d+.-]*:\/\//i;
 /** A pull request's address in a prompt's prose. */
 const PR_URL = /https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/g;
 /** A PR number as a prompt writes it, `#7049`, `PR 7049`, or `PR#7049`; not `acme/webapp#7049` or `&#39;`. */
@@ -61,7 +63,7 @@ const PUSH_REMOTE = /^To (\S+)\s*$/;
 /** `   1a2b..3c4d  HEAD -> me/b`, ` * [new branch]  me/b -> me/b`, or ` + 1a2b...3c4d … (forced update)`; rejected and deleted refs do not match. */
 const PUSHED_REF = /^\s*[+*]?\s*(?:\[new branch\]|[0-9a-f]{4,}\.\.\.?[0-9a-f]{4,})\s+\S+\s+->\s+(\S+)/;
 /** Lines that can matter hold one of these; skipping the rest before `JSON.parse` is most of the startup scan. */
-const MARKERS = ["github", "gh pr", "push", "pr://", "omp-ship.state", "omp-arena.state", "omp-agents.headless", "mcp__linear_", '"cwd"', '"toolName":"edit"', '"toolName":"write"', "cd ", "-C "];
+const MARKERS = ["github", "gh pr", "push", "pr://", "omp-ship.state", "omp-arena.state", "omp-agents.headless", "mcp__linear_", '"cwd"', '"toolName":"edit"', '"toolName":"write"', '"name":"read"', "cd ", "-C "];
 /**
  * Where `located` starts a bash call that names no absolute `cwd`, so a relative `cd` keeps its path relative to the
  * session's directory, which the scan does not know: no real directory starts with a NUL.
@@ -220,7 +222,7 @@ export class SessionFactsScan {
 	headless = false;
 	/** The `cwd` arguments of bash calls as written, and the directories of the files `edit` and `write` changed, each once, the most recently used last. */
 	readonly workDirs = new Set<string>();
-	/** `workDirs`, plus the absolute directories its bash commands `cd` into: where a relative path in its text may start. Each once, the most recently used last. */
+	/** `workDirs`, the absolute directories its bash commands `cd` into, and those of the files it read: where a relative path in its text may start. Each once, the most recently used last. */
 	readonly fileDirs = new Set<string>();
 	/** A candidate line could not be parsed, so its working-directory evidence is incomplete. */
 	unreadableLines = false;
@@ -365,7 +367,12 @@ export class SessionFactsScan {
 
 	#read(path: string): void {
 		const match = PR_URI.exec(path);
-		if (!match) return;
+		if (!match) {
+			// A file it read, such as a screenshot it checked, is often one its reply then names by its bare name.
+			const dir = dirname(path);
+			if (!URI_SCHEME.test(path) && dir !== ".") this.#movedTo(dir);
+			return;
+		}
 		const [, owner, repo, number] = match;
 		this.#add({ kind: "read", repository: owner && repo ? { owner, repo } : null, number: Number(number) });
 	}
@@ -653,7 +660,7 @@ export class SessionFactsIndex {
 		return this.#own(sessionPath)?.headless ?? false;
 	}
 
-	/** Where a relative path in session `sessionPath`'s text may start: the directories its own bash calls ran in or `cd` into, and those of the files it changed, absolute, the most recently used first; none before its first scan. */
+	/** Where a relative path in session `sessionPath`'s text may start: the directories its own bash calls ran in or `cd` into, and those of the files it changed or read, absolute, the most recently used first; none before its first scan. */
 	fileDirsOf(sessionPath: string): string[] {
 		const session = this.#sessions.get(sessionPath);
 		const own = this.#own(sessionPath);

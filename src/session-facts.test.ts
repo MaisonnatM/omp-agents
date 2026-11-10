@@ -508,6 +508,23 @@ describe("SessionFactsIndex", () => {
 		expect(index.factsOf(session).worktree).toBeNull();
 	});
 
+	test("starts a session's relative file paths in the directories of the files it read too, but not of an address or a file in its own directory", async () => {
+		const parent = realpathSync(sessionDir());
+		const session = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
+		writeFileSync(
+			session,
+			[
+				toolCall("a", "read", { path: "/wt/app/tmp/inline-rows.png" }),
+				toolCall("b", "read", { path: "docs/usage.md:10-20" }),
+				toolCall("c", "read", { path: "skill://ship/SKILL.md" }),
+				toolCall("d", "read", { path: "notes.txt" }),
+			].join("\n") + "\n",
+		);
+		const index = new SessionFactsIndex(async () => null, new CachedCheckouts());
+		await index.refresh([{ path: session, cwd: "/code/app", modifiedAt: 1 }]);
+		expect(index.fileDirsOf(session)).toEqual(["/code/app/docs", "/wt/app/tmp"]);
+	});
+
 	test("names the branch of the linked worktree a session works in, follows a branch switch, and links the PR that heads it, not the main checkout's", async () => {
 		const parent = realpathSync(sessionDir());
 		const main = await repoWithWorktrees(parent);
