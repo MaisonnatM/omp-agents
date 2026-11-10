@@ -611,8 +611,8 @@
 .dark :is(.message-markdown, .code-lines) :is(.hljs-deletion) { color: #ffdcd7; }
 :is(.message-markdown, .code-lines) :is(.hljs-comment, .hljs-doctag) { font-style: italic; }
 :is(.message-markdown, .code-lines) .hljs-section { font-weight: 600; }
-/* An agent's reply in a conversation: a reading measure of about 80 characters, with room between its blocks. */
-[data-item=assistant] .message-markdown { container-type: inline-size; max-width: 64ch; line-height: 1.65; }
+/* An agent's reply in a conversation: the column's full width, with room between its blocks. */
+[data-item=assistant] .message-markdown { container-type: inline-size; line-height: 1.65; }
 [data-item=assistant] .message-markdown :is(p, ul, ol) { margin-block: 1em; }
 [data-item=assistant] .message-markdown li { margin-block: .6em; }
 /* Its bullets that open with a bold key lay out as a two-column table: keys share one column, at most 12rem wide. */
