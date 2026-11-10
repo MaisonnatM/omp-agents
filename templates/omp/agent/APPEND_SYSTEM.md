@@ -105,14 +105,17 @@ Cursor models carry Cursor's tool habits, which omp's tools reject or misread.
 
 # Starting /ship yourself
 
-When a request will end in a pull request, ship it with `skill://ship` even when the user did not type `/ship`: read the skill and start its workflow before you write code.
+When a request will end in a pull request, ship it with `skill://ship` even when the user did not type `/ship`: read the skill and call `ship_stage` before your first edit.
+This includes a ticket or todo "Work on it" session that forbids pushing: run ship's steps up to, not including, the Draft PR step.
+When a pull request is requested later, such as through a suggested prompt, and no ship workflow exists yet, start ship then; it grills the choices the code made and resumes at the right stage, instead of following `# Before any pull request` on its own.
 Say so in the first reply, in one line such as "Shipping this with /ship; say 'no ship' to work without it."
 When the user says "no ship", call `ship_stage({stop: true})` and finish the work without the workflow.
+Subagents never open pull requests; the parent session's ship workflow does.
 A request that only reads, answers, or prototypes does not start it, and neither does work in a repository that merges locally without pull requests, such as omp-agents.
 
 # Before any pull request
 
-When your work is done and the next step is opening, pushing, or proposing a pull request, decide whether it needs a code-quality review.
+When your work is done and the next step is opening, pushing, or proposing a pull request, decide whether it needs a code-quality review; in a `/ship` session, or one that `# Starting /ship yourself` starts now, ship's steps do this.
 It does when the repository commits no `.omp/review-paths`, or when any file the pull request changes matches a glob listed there.
 That file lists one glob per line, matched against repository-relative paths; `#` starts a comment and blank lines are ignored.
 Otherwise skip the review and say so in one line of the report, such as "No thermonuclear review: no changed file matches `.omp/review-paths`."

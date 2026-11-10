@@ -8,6 +8,7 @@
 - Cmd-click a row (Ctrl-click on Linux and Windows), or choose **Open in split** from its menu, to open it in another pane.
   Up to four conversations share the page: one fills it, two sit side by side, and three or four form a 2x2 grid.
   Each pane scrolls on its own, and its composer sends to its own session or subagent.
+  The sidebar highlights the row of each session on screen, including the session whose subagent a pane shows, and marks the rows of a split with a two-column icon before their age.
   A plain click on a row outside the split opens it alone, full width, and the page remembers the split.
   A plain click on any session of that split later brings the split back, in the same order and sizes, with that session focused.
   Closing a pane, or ending its session, forgets the split it belonged to, and a new split that shares a session replaces the older one.
@@ -20,6 +21,7 @@
   A new session opens alone, leaving the split.
   A fork opens in the focused pane.
   With four panes open, Cmd-click and **Open in split** replace the focused pane.
+  A subagent link opens its pane right after the pane you clicked it in; with four panes open it replaces the other pane of that row instead, so its session stays on screen.
   A row that is already open focuses its pane instead of opening a second copy.
   The **×** in a pane's header closes it.
   Closing the second-to-last pane returns to a single conversation.

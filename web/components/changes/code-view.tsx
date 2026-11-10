@@ -9,8 +9,8 @@ import { withoutWhitespaceChanges } from "../../diff-options";
 import { cn } from "@/lib/utils";
 import { type LineRange, useDiffReview } from "./diff-review";
 
-/** One code row's height in px, `leading-5`. */
-export const ROW_HEIGHT = 20;
+/** One code row's height in px, `leading-[21px]`. */
+export const ROW_HEIGHT = 21;
 
 const ROW_TONE = { "+": "bg-emerald-500/12", "-": "bg-red-500/12", " ": "" } as const;
 const NUMBER_TONE = { "+": "bg-emerald-500/20", "-": "bg-red-500/20", " ": "" } as const;
@@ -54,7 +54,7 @@ function Notice({ text, error }: { text: string | null; error: boolean }) {
 export function CodeView(props: CodeViewProps) {
 	const { rows, tokens, notice, failed } = useHighlightedRead(props);
 	return (
-		<div className="code-lines flex min-h-0 flex-1 font-mono text-xs leading-5">
+		<div className="code-lines flex min-h-0 flex-1 font-mono text-[13px] leading-[21px]">
 			{rows ? <FileLines rows={rows} tokens={tokens} /> : <Notice text={notice} error={failed} />}
 		</div>
 	);
@@ -65,7 +65,7 @@ export function DiffView({ path, ...props }: CodeViewProps & { path: string }) {
 	const { options } = useDiffReview();
 	const { rows, tokens, notice, failed } = useHighlightedRead(props, options.ignoreWhitespace);
 	return (
-		<div className="code-lines overflow-x-auto font-mono text-xs leading-5">
+		<div className="code-lines overflow-x-auto font-mono text-[13px] leading-[21px]">
 			{rows ? <DiffLines path={path} rows={rows} tokens={tokens} /> : <Notice text={notice} error={failed} />}
 		</div>
 	);

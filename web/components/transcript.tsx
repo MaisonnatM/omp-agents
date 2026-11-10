@@ -64,7 +64,7 @@ import { cn } from "@/lib/utils";
 import { errorText } from "../../src/json";
 import { activityControl } from "../activity";
 import { mediaSrc } from "../api";
-import { modeOf, SPLIT_CLICK } from "../labels";
+import { SPLIT_CLICK, subagentModeOf } from "../labels";
 import { hashForView, sameView } from "../routing";
 import type { StartOf } from "../starts";
 import { usePaneLoaded, useTranscript } from "../pane-store";
@@ -188,7 +188,7 @@ function SpawnedAgents({ ids }: { ids: string[] }) {
 				const facts = agent ? [agent.kind, statusLabel(agent.status), agent.activity].filter(Boolean).join(" · ") : "not registered";
 				return (
 					<span key={id} className="inline-flex max-w-full items-center gap-0.5">
-						<Tooltip content={`${id} · ${facts}. ${SPLIT_CLICK} to open in a split`}>
+						<Tooltip content={`${id} · ${facts}. ${SPLIT_CLICK} to open in this pane`}>
 							<a
 								href={hashForView(view)}
 								className={cn(chip, "text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring")}
@@ -196,7 +196,7 @@ function SpawnedAgents({ ids }: { ids: string[] }) {
 									// Shift- and middle-clicks keep the link's own new-window behavior.
 									if (event.button !== 0 || event.shiftKey || event.altKey) return;
 									event.preventDefault();
-									links.onOpen(view, modeOf(event));
+									links.onOpen(view, subagentModeOf(event));
 								}}
 							>
 								{agent && <StatusDot status={agent.status} />}

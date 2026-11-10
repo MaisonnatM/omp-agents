@@ -498,12 +498,14 @@ function layoutFromPanes(marked: string): Layout {
 	};
 }
 
-export type OpenMode = "replace" | "split";
+export type OpenMode = "replace" | "split" | "beside";
 
 /**
- * `view` in the focused pane, or in a new pane for `split`. A view already open gets focus instead of a second pane;
- * a split with {@link MAX_PANES} open replaces the focused pane. A plain open keeps a maximized pane maximized,
- * now showing the opened view; a split brings the split back.
+ * `view` in the focused pane, or in a new pane for `split` and `beside`. A view already open gets focus instead of a
+ * second pane. A split adds the last pane, and with {@link MAX_PANES} open replaces the focused pane. Beside, as a
+ * subagent opens from its conversation, puts the pane right after the focused one, and with {@link MAX_PANES} open
+ * replaces the other pane of the focused one's row, so the focused pane stays. A plain open keeps a maximized pane
+ * maximized, now showing the opened view; a split brings the split back.
  */
 export function openView(layout: Layout, view: View, mode: OpenMode): Layout {
 	const { panes, focus } = layout;
@@ -511,8 +513,13 @@ export function openView(layout: Layout, view: View, mode: OpenMode): Layout {
 	const open = panes.findIndex(pane => sameView(pane, view));
 	if (open >= 0) return { panes, focus: open, maximized };
 	if (panes.length === 0) return { panes: [view], focus: 0, maximized: false };
-	if (mode === "split" && panes.length < MAX_PANES) return { panes: [...panes, view], focus: panes.length, maximized: false };
-	return { panes: panes.with(focus, view), focus, maximized };
+	if (mode === "replace") return { panes: panes.with(focus, view), focus, maximized };
+	if (panes.length < MAX_PANES) {
+		const at = mode === "split" ? panes.length : focus + 1;
+		return { panes: panes.toSpliced(at, 0, view), focus: at, maximized: false };
+	}
+	const at = mode === "split" ? focus : focus ^ 1;
+	return { panes: panes.with(at, view), focus: at, maximized: false };
 }
 
 /**

@@ -1,6 +1,6 @@
 ---
 name: ship
-description: Ship a change, with or without a Linear ticket, through a plan, a draft PR, interface and thermonuclear reviews, and live review to merge-ready
+description: Use whenever work will produce a PR, even without "/ship": a fix, feature, or refactor, a "work on it" ticket or todo, a late "open a draft PR" request, or a rebase, CI, or review-comment follow-up. Runs grill, plan, draft PR, reviews, and live review to merge-ready.
 metadata:
   tags: workflow
 ---
@@ -25,9 +25,10 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before opening a PR or cr
    If this is the main checkout on its default branch, create a dedicated worktree off the current parent branch per the Git safety rule in `AGENTS.md`; on any other branch, work in place.
 2. **Plan.** Choose how to build the change before anyone writes code.
    If the issue, or the PR body when there is no issue, already has a plan from an earlier run, use that plan and skip to the next step.
-   Read `skill://technical-writing` and `skill://arena`; the kit does not ship them, so if either read fails, name the missing skill, tell the user to install it, and stop.
+   When ship starts after code already exists, such as at a late request to open a PR, still grill, but only on the choices the code left open or made silently; record them, write a plan of what the code does, skip the arena, and resume at the stage the git and GitHub state shows.
+   Read `skill://technical-writing` and `skill://arena`, which pstack provides through the kit's `pstack-skills` extension; if either read fails, name the missing skill, tell the user to run the starter kit's installer, and stop.
    Read the issue, or the user's request when there is none, and the code it touches.
-   Then read `skill://grill-with-docs` and follow it to grill the user on the change until its frontier is empty; it writes settled terms to `GLOSSARY.md` and each choice to `docs/decisions/`.
+   Then read `skill://grill-with-docs` and follow it to grill the user on the change until its frontier is empty; it writes settled terms to `GLOSSARY.md` and each choice where the `decision-records` skill says.
    When the request leaves nothing to decide, such as a typo, skip the grill and say so in one line of the report.
    Then list the approaches that would each solve it within the grill's answers.
    If only one approach is sound, such as for a typo or a fix the request spells out, write that plan yourself with the `technical-writing` skill and say in one line of the report why no arena ran.

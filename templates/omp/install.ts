@@ -20,6 +20,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { deepEquals, Glob } from "bun";
 import { errorText, isObject } from "../../src/json";
 import { resolveOmp } from "../../src/omp/resolve";
+import { syncPstackSkills } from "./agent/extensions/pstack-skills/sync";
 
 type Json = Record<string, unknown>;
 
@@ -157,7 +158,7 @@ function pluginIds(listing: unknown): Set<string> {
 }
 
 export const STARTER_KIT_MARKETPLACE = { name: "cursor-plugins", source: "cursor/plugins" };
-/** pstack provides the `poteto-mode` skill, which the kit's alias of the same name points at, and the `poteto-agent` that `/ship` delegates to. */
+/** pstack provides the `poteto-mode` skill, which the kit's alias of the same name points at, and the `arena` and `technical-writing` skills `/ship` plans with. */
 const PLUGINS = ["pstack@cursor-plugins"];
 /** `chrome-devtools` drives headless Chrome on a throwaway profile, which the kit's `design-critic` and browser checks use. */
 const MCP_SERVERS: Record<string, Json> = {
@@ -406,6 +407,8 @@ async function main(argv: string[]): Promise<void> {
 	}
 	if (writes(marketplace.action)) await omp(ompCommand, ["plugin", "marketplace", "add", marketplace.source]);
 	for (const { id, action } of plugins) if (writes(action)) await omp(ompCommand, ["plugin", "install", id]);
+	const linked = syncPstackSkills();
+	if (linked) print("link", `pstack skills from ${linked}`);
 	console.log(`Done.${keptNote}`);
 }
 

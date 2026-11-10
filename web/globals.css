@@ -585,15 +585,32 @@
 .notes-editor .notes-nested { list-style: none; padding-left: 0; color: inherit; text-decoration: none; }
 .notes-editor .notes-nested::before, .notes-editor .notes-nested::after { display: none; }
 .notes-editor .notes-nested > .notes-checklist { padding-left: 1.6em; }
-:is(.message-markdown, .code-lines) :is(.hljs-keyword, .hljs-selector-tag) { color: #a92764; }
-:is(.message-markdown, .code-lines) :is(.hljs-string, .hljs-attr) { color: #12673f; }
-:is(.message-markdown, .code-lines) :is(.hljs-number, .hljs-literal) { color: #935713; }
-:is(.message-markdown, .code-lines) :is(.hljs-title, .hljs-function) { color: #265aab; }
-.code-lines .hljs-comment { color: var(--muted-foreground); font-style: italic; }
-.dark :is(.message-markdown, .code-lines) :is(.hljs-keyword, .hljs-selector-tag) { color: #ff92bc; }
-.dark :is(.message-markdown, .code-lines) :is(.hljs-string, .hljs-attr) { color: #8bdcb4; }
-.dark :is(.message-markdown, .code-lines) :is(.hljs-number, .hljs-literal) { color: #f5c27b; }
-.dark :is(.message-markdown, .code-lines) :is(.hljs-title, .hljs-function) { color: #9cbfff; }
+:is(.message-markdown, .code-lines) :is(.hljs-keyword, .hljs-selector-tag, .hljs-meta .hljs-keyword, .hljs-template-tag, .hljs-type) { color: #cf222e; }
+:is(.message-markdown, .code-lines) :is(.hljs-string, .hljs-regexp, .hljs-meta .hljs-string, .hljs-template-variable) { color: #0a3069; }
+:is(.message-markdown, .code-lines) :is(.hljs-number, .hljs-literal, .hljs-variable.constant_, .hljs-symbol, .hljs-bullet) { color: #0550ae; }
+:is(.message-markdown, .code-lines) :is(.hljs-title, .hljs-title.function_, .hljs-function .hljs-title) { color: #8250df; }
+:is(.message-markdown, .code-lines) :is(.hljs-title.class_, .hljs-title.class_.inherited__, .hljs-built_in) { color: #953800; }
+:is(.message-markdown, .code-lines) :is(.hljs-attr, .hljs-attribute, .hljs-property, .hljs-selector-class, .hljs-selector-id, .hljs-variable) { color: #0550ae; }
+:is(.message-markdown, .code-lines) :is(.hljs-name, .hljs-tag, .hljs-selector-pseudo, .hljs-quote) { color: #116329; }
+:is(.message-markdown, .code-lines) :is(.hljs-params, .hljs-subst) { color: #24292f; }
+:is(.message-markdown, .code-lines) :is(.hljs-meta, .hljs-section) { color: #0550ae; }
+:is(.message-markdown, .code-lines) :is(.hljs-comment, .hljs-doctag) { color: #6e7781; }
+:is(.message-markdown, .code-lines) :is(.hljs-addition) { color: #116329; }
+:is(.message-markdown, .code-lines) :is(.hljs-deletion) { color: #82071e; }
+.dark :is(.message-markdown, .code-lines) :is(.hljs-keyword, .hljs-selector-tag, .hljs-meta .hljs-keyword, .hljs-template-tag, .hljs-type) { color: #ff7b72; }
+.dark :is(.message-markdown, .code-lines) :is(.hljs-string, .hljs-regexp, .hljs-meta .hljs-string, .hljs-template-variable) { color: #a5d6ff; }
+.dark :is(.message-markdown, .code-lines) :is(.hljs-number, .hljs-literal, .hljs-variable.constant_, .hljs-symbol, .hljs-bullet) { color: #79c0ff; }
+.dark :is(.message-markdown, .code-lines) :is(.hljs-title, .hljs-title.function_, .hljs-function .hljs-title) { color: #d2a8ff; }
+.dark :is(.message-markdown, .code-lines) :is(.hljs-title.class_, .hljs-title.class_.inherited__, .hljs-built_in) { color: #ffa657; }
+.dark :is(.message-markdown, .code-lines) :is(.hljs-attr, .hljs-attribute, .hljs-property, .hljs-selector-class, .hljs-selector-id, .hljs-variable) { color: #79c0ff; }
+.dark :is(.message-markdown, .code-lines) :is(.hljs-name, .hljs-tag, .hljs-selector-pseudo, .hljs-quote) { color: #7ee787; }
+.dark :is(.message-markdown, .code-lines) :is(.hljs-params, .hljs-subst) { color: #e6edf3; }
+.dark :is(.message-markdown, .code-lines) :is(.hljs-meta, .hljs-section) { color: #79c0ff; }
+.dark :is(.message-markdown, .code-lines) :is(.hljs-comment, .hljs-doctag) { color: #8b949e; }
+.dark :is(.message-markdown, .code-lines) :is(.hljs-addition) { color: #aff5b4; }
+.dark :is(.message-markdown, .code-lines) :is(.hljs-deletion) { color: #ffdcd7; }
+:is(.message-markdown, .code-lines) :is(.hljs-comment, .hljs-doctag) { font-style: italic; }
+:is(.message-markdown, .code-lines) .hljs-section { font-weight: 600; }
 /* An agent's reply in a conversation: a reading measure of about 80 characters, with room between its blocks. */
 [data-item=assistant] .message-markdown { container-type: inline-size; max-width: 64ch; line-height: 1.65; }
 [data-item=assistant] .message-markdown :is(p, ul, ol) { margin-block: 1em; }
@@ -608,6 +625,5 @@
 	[data-item=assistant] .message-markdown > ul:has(> [data-part="keyed"]) > li { display: block; }
 	[data-item=assistant] .message-markdown [data-part="keyed"] > strong { margin-right: .35em; }
 }
-
 /* A removed row's gutter mark, hatched so it reads apart from an added row's solid one. */
 .diff-mark-removed { background: repeating-linear-gradient(45deg, var(--diff-deletion) 0 2px, transparent 2px 4px); opacity: .8; }
