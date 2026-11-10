@@ -187,8 +187,6 @@ function SuggestionRow({ label, index, active, marked, optionId, registerItem, o
 
 interface SuggestionOptions {
 	prompts: string[];
-	/** What a row shows for its prompt; the prompt itself by default. */
-	labelOf?: (text: string) => string;
 	draft: string;
 	/** Sends `text` as the composer's draft would go. */
 	onSend: (text: string) => void;
@@ -212,7 +210,7 @@ interface Suggestions {
  * keys and clicks. Marks join every send or fill, in list order; Esc, a send, a fill, and the list closing clear them.
  * Focus stays in the text field.
  */
-export function useSuggestions({ prompts, labelOf, draft, onSend, onFill }: SuggestionOptions): Suggestions {
+export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOptions): Suggestions {
 	const open = prompts.length > 0 && draft === "";
 	const listRef = useRef<HTMLDivElement>(null);
 	const listId = useId();
@@ -302,7 +300,7 @@ export function useSuggestions({ prompts, labelOf, draft, onSend, onFill }: Sugg
 							{prompts.map((text, index) => (
 								<SuggestionRow
 									key={`${text}-${index}`}
-									label={labelOf?.(text) ?? text}
+									label={text}
 									index={index}
 									active={index === activeIndex}
 									marked={marked.has(text)}
