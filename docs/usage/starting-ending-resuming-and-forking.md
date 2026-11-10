@@ -31,6 +31,7 @@
   It stops waiting after 60 minutes unless you ask for another limit, up to 240 minutes, and stopping its turn stops the wait.
   A session cannot wait on itself, and a Bot's conversation has no such tool.
 - The draft's composer has the model menu at its bottom left, as a running session's does, without its Fast row.
+  Extra usage is there, and it changes every session's fallback list, the same as in a running session.
   Until you pick one, it names the `default` role's model, such as **Opus 5.5**, which is the model omp starts on without `--model`.
   It reads **Default model** only when no `default` role names a model you are connected to.
   Context and the model search work as in a running session, and the curated models come from the draft directory's config.

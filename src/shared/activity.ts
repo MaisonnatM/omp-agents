@@ -73,6 +73,7 @@ export const CONTROLS = [
 	{ id: "composer.model", label: "Model and effort menu", area: "Composer" },
 	{ id: "composer.context-ring", label: "Context ring", area: "Composer" },
 	{ id: "composer.advisor", label: "Advisor switch", area: "Composer" },
+	{ id: "composer.extra-usage", label: "Extra usage switch", area: "Composer" },
 	{ id: "header.goal", label: "Session goal", area: "Header" },
 	{ id: "completion.pick", label: "Slash or mention menu pick", area: "Composer" },
 	{ id: "composer-suggestions.pick", label: "Suggested prompt", area: "Composer" },
