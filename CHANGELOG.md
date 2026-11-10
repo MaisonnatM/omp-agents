@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-10
 
+- A reply that lists pages to review now has a Review visuals eye button under it, beside its copy button. It shows the Browser and opens that reply's pages as tabs, so you no longer go looking for the button in the Browser's toolbar.
 - Long agent replies read more easily: their text keeps the conversation's full width with more space between paragraphs and bullets, and bullets that open with a bold word line up as a two-column table, keys on the left. A narrow conversation keeps the key inline.
 - Clicking a subagent opens it in the same pane as its session again, so a split stays as it is instead of gaining a pane. Cmd-click opens it in a split beside its session.
 - The sidebar marks the sessions of a split with a two-column icon, and highlights a session while one of its subagents is open.
@@ -222,24 +223,3 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Fixed: code highlighting and Markdown now still show if their extra code fails to load.
 - Fixed: a hover card such as the CPU card opens on a pen or touch tap after it closed, and pressing Attach in the Browser twice captures once.
 - Fixed: Settings › Worktrees no longer stays on "Reading" after you leave the tab mid-read, and Escape on a pull request edit throws away the draft text.
-
-## 2026-11-05
-
-- Behind the scenes: a check that deletes a private session now passes after another check has already saved a session title, so the full test run no longer stops there.
-- The model menu shows an API credits group beside Anthropic before you search, for an Anthropic API key saved in Settings. A session you start from that group bills the key. A session on Anthropic still uses your Claude plan.
-- An API key that an older version saved on Anthropic moves to that group the next time the dashboard starts.
-- Fixed: an Anthropic API key added in Settings now shows as API credits in the bottom bar, even while you stay signed in to a Claude plan.
-- Starting a new session while several conversations are open shows that new session alone.
-- Ending a session that is open beside another one leaves a single conversation, instead of filling the empty side with the next session.
-- Esc on a split closes the pane that was added last. Esc on a maximized pane still brings the other panes back.
-- The Sessions tab now lists running Bot conversations in a **Bots** group, under each Bot's name, so every open session shows somewhere; the CPU card names them the same way.
-- A Bot's conversation idle for a day, with nothing written to it, now ends by itself so it holds no omp process; your next message to the Bot resumes it.
-- Fixed: a session whose omp exits before it is ready no longer leaves its socket file behind, which blocked the next start on that session.
-- The model menu now lists models from a provider you configured with an API key, such as API credits.
-- The bottom bar names that provider beside the plan windows. It has no percent, because the plan report has no balance for it.
-- When Firefox or Zen is signed in to the Claude Console, the API credits row shows the dollars spent of the monthly grant, such as $11.13 / $200.00. A Chrome-only sign-in stays a name.
-- Behind the scenes: installing the starter kit now adds a headless Chrome DevTools connection for agents that check pages in the browser, and ships the interface review skills so pull request interface reviews can run without a separate install.
-- Behind the scenes: the starter kit's maintainer profile adds rules for sessions aimed at another project, Linear tickets, docs and changelog edits, plan replies, and headless test windows, and `/ship` plans now include how the code works today plus a second-model critique before coding starts.
-- Settings › Providers can add or replace an Anthropic API key in a masked field, so you do not paste it into a conversation.
-- Saving that key keeps your subscription sign-ins.
-- Fallback routing stays as it is.

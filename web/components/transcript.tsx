@@ -11,6 +11,7 @@ import {
 	Cpu,
 	FilePen,
 	FilePlus,
+	Eye,
 	FileText,
 	Flag,
 	FolderSearch,
@@ -85,6 +86,8 @@ import { SessionTodosCard } from "./session-todos-card";
 import { CancelAgentButton, SubagentLinks } from "./subagent-links";
 import type { ChangesSession } from "./todos-card-changes";
 import { TranscriptMinimap } from "./transcript-minimap";
+import { latestReviewPages, requestReview } from "../review-pages";
+import { BROWSER_AVAILABLE } from "./browser-panel";
 
 /** omp's tool names (`pi-coding-agent/src/tools/builtin-names.ts`, plus its optional and extension tools). */
 const TOOL_ICON: Record<string, LucideIcon> = {
@@ -438,6 +441,17 @@ function EditButton({ onEdit }: { onEdit: () => void }) {
 	);
 }
 
+/** Opens the pages a reply's `review-pages` fence lists as tabs of the session's Browser. */
+function ReviewButton({ onReview }: { onReview: () => void }) {
+	return (
+		<Tooltip content="Review visuals in the Browser">
+			<Button {...activityControl("browser.review-visuals")} variant="ghost" size="icon-compact" aria-label="Review visuals" onClick={onReview}>
+				<Eye />
+			</Button>
+		</Tooltip>
+	);
+}
+
 interface PromptEditorProps {
 	initial: string;
 	text: string;
@@ -551,6 +565,8 @@ interface MessageRowProps {
 	/** The entry an edit of this message replaces, or `null` where it cannot be edited. */
 	editAt: string | null;
 	editor?: ReactNode;
+	/** The live session whose Browser a reply's **Review visuals** opens its pages in, or `null` where there is none. */
+	browser: string | null;
 	/** It took the place of a pending prompt already on screen, so it shows at once without its entrance motion. */
 	replacing: boolean;
 	/** It is not the transcript's last row, so it may skip layout while off screen. */
@@ -561,7 +577,7 @@ interface MessageRowProps {
 
 /** One message with its actions. Every prop keeps its identity while the message is unchanged, so a streamed token renders only the row it extends. */
 const MessageRow = memo(function MessageRow({
-	item, copyable, forkAt, prefill, forking, forkDisabled, failed, editAt, editor, replacing, settled, onFork, onEditing,
+	item, copyable, forkAt, prefill, forking, forkDisabled, failed, editAt, editor, browser, replacing, settled, onFork, onEditing,
 }: MessageRowProps) {
 	const copied = copyText(item);
 	const openImage = useContext(OpenImage);
@@ -570,6 +586,8 @@ const MessageRow = memo(function MessageRow({
 	const pending = item.kind === "user" && item.pending === true;
 	const openFile = useContext(OpenFile);
 	const files = item.kind === "user" && item.files?.length ? item.files : null;
+	const pages = useMemo(() => (browser !== null && item.kind === "assistant" ? latestReviewPages([item]) : []), [browser, item]);
+	const review = browser !== null && pages.length > 0 ? () => requestReview({ instanceId: browser, pages }) : undefined;
 	return (
 		// The dimming sits on the wrapper: the message's entrance motion sets its own inline opacity.
 		<Row messageId={item.id} settled={settled} className={cn(pending && "opacity-60")}>
@@ -581,9 +599,10 @@ const MessageRow = memo(function MessageRow({
 				images={item.kind === "user" ? item.images?.map(mediaSrc) : undefined}
 				onOpenImage={index => openImage(item.id, index)}
 				actions={
-					editor ? undefined : copyable || point || edit ? (
+					editor ? undefined : copyable || point || edit || review ? (
 						<>
 							{copyable && <CopyButton text={copied} />}
+							{review && <ReviewButton onReview={review} />}
 							{edit && <EditButton onEdit={edit} />}
 							{point && onFork && <ForkButton point={point} forking={forking} disabled={forkDisabled} onFork={() => onFork(item.id, point)} />}
 						</>
@@ -786,6 +805,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 												onCancel={() => setEditing(null)}
 											/>
 										) : undefined}
+										browser={BROWSER_AVAILABLE && view.kind === "live" ? view.instanceId : null}
 										replacing={item.id === replacing}
 										settled={settled}
 										onFork={onFork}

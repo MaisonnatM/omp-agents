@@ -271,13 +271,13 @@ export function FencedCode({ language, text }: { language: string | null; text: 
 
 const codeBlock: Components["pre"] = ({ node }) => <FencedCode {...fenceOf(node)} />;
 
-/** A `review-pages` fence in a session's message: the pages it lists, which **Review visuals** in the Browser opens. */
+/** A `review-pages` fence in a session's message: the pages it lists, which the reply's **Review visuals** opens in the Browser. */
 function ReviewPagesCard({ pages }: { pages: readonly ReviewPage[] }) {
 	return (
 		<div className="my-2 rounded-lg border border-border px-3 py-2 text-xs">
 			<p className="flex items-center gap-1.5 font-medium">
 				<Eye aria-hidden className="size-3.5" />
-				{pages.length === 0 ? "No pages to review on this computer" : `${pages.length} ${pages.length === 1 ? "page" : "pages"} to review: click Review visuals in the Browser to open ${pages.length === 1 ? "it" : "them"}`}
+				{pages.length === 0 ? "No pages to review on this computer" : `${pages.length} ${pages.length === 1 ? "page" : "pages"} to review`}
 			</p>
 			{pages.length > 0 && (
 				<ul className="mt-1 space-y-0.5 text-muted-foreground">

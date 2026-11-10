@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { callable } from "../src/shared/accounts";
 import type { View } from "../src/shared/sessions";
 import { otherSpace, type Space, spaceIs } from "../src/shared/workspaces";
@@ -26,7 +26,7 @@ import { NO_PLANS, Plans } from "./components/plan-usage";
 import { useNoticeToasts } from "./components/use-notice-toasts";
 import { RenderBoundary } from "./components/render-boundary";
 import { ScheduledSends } from "./components/scheduled";
-import { SessionDetails } from "./components/session-details";
+import { SessionDetails, TAB_KEY } from "./components/session-details";
 import { GoalDialog } from "./components/session-goal";
 import { ProjectTrustDialog } from "./components/project-trust-dialog";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
@@ -43,6 +43,8 @@ import { botRows } from "./bots-model";
 import { routeOf } from "./dashboard-state";
 import { useOpenPullRequest } from "./open-pull-request";
 import { integrationsStore } from "./reads";
+import { onReviewRequest } from "./review-pages";
+import { storeOrRemove } from "./stored-state";
 import { EMPTY_LAYOUT, hashForLayout, hashForPage, hashForRoute, hashForView, type NotesListView, type OpenMode, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, spaceSwitchPanes, type WindowScope, waitingIn, workspaceSession, workspaceSwitch } from "./sessions";
@@ -130,6 +132,15 @@ export function App() {
 		const { sidebars } = latest.current;
 		sidebars.setOpen(side, !sidebars.panels[side].open);
 	}, []);
+	// A reply's **Review visuals** shows the Browser, whose panel then opens the reply's pages.
+	useEffect(
+		() =>
+			onReviewRequest(() => {
+				storeOrRemove(TAB_KEY, "browser", "pull-requests");
+				latest.current.sidebars.setOpen("right", true);
+			}),
+		[],
+	);
 	const switchWorkspace = useCallback(
 		(cwd: string | null): void => {
 			pickWorkspace(cwd);
