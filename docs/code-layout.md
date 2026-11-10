@@ -31,6 +31,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   A message's code block is `CodeBlock` from `web/components/ui/code-block.tsx`, which `web/components/message-markdown.tsx` renders for each fence.
   In a session's conversation, a `mermaid` or `chart` fence is `SessionVisual` from `web/components/session-visual.tsx` instead, through the `SESSION_AGENT_PRESET` and `SESSION_PROMPT_PRESET` that `MessageRow` passes, and its chart is shadcn's `web/components/ui/chart.tsx`.
   The turn minimap on its left edge is `TranscriptMinimap` in `web/components/transcript-minimap.tsx`, with its turns from the `outline` of the `transcriptModel` in `web/transcript-view.ts` that `Transcript` builds.
+  The find bar that Cmd+F opens at its top right is `TranscriptFind` in `web/components/transcript-find.tsx`.
   The **Todos** card, the agent's own todo list followed by its subagents and its changed files, images, and sources, is `SessionTodosCard` in `web/components/session-todos-card.tsx`.
   It floats at the transcript's top right when the transcript is wide enough to keep it beside the messages, and otherwise sits above them.
   `TodosCardToggle` from the same file, the checklist toggle in the session header before End session, or before **Resume** in a past session's, hides it, as **Show todos card** in Settings › Preferences does; it shows only while the view's card has a section to show.

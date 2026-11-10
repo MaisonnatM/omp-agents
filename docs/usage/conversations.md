@@ -65,6 +65,11 @@
   Hovering a line grows it and, less, its neighbours, and opens a card with the turn's prompt and the first words of its reply, or **Working…** while it runs; a bold label that opens a reply, such as **Résumé**, is left out.
   Click a line to scroll the conversation to that prompt; the arrows above and below the lines, shown on hover, step to the previous and next turn.
   The line of the turn you are reading stays lit as you scroll; after a click it stays on that turn until you scroll yourself, since the last turns may never reach the top.
+- Cmd+F opens a find bar at the top right of the focused pane's conversation, filled with the text you selected in it, if any.
+  Every match on screen is highlighted, the current one more strongly, and the bar counts them, such as `3 of 12`; it starts at the first match from where you are reading.
+  Enter and Shift+Enter, or the bar's arrows, step to the next and previous match and scroll the conversation to it; Esc or the close button closes the bar.
+  It searches the text the conversation shows, so folded tool calls and hidden thinking are left out, and it keeps counting as new output streams in.
+  Focusing another pane closes it; while no conversation shows, Cmd+F keeps the browser's own Find.
 - The **Todos** card holds the agent's todo list, its **Subagents**, and the **Files**, **Images**, and **Sources** sections of [Changed files and images](changed-files-and-images.md), each shown once it has something to list; a past session's conversation shows it too.
   Once the view's agent made a todo list, the card shows the list as its latest `todo` call left it: how many tasks are done of all, a thin progress line, and the task in progress.
   It floats at the conversation's top right once the conversation is wide enough, and the messages move left to make room for it; in a narrower conversation it sits above them, so it never covers a message.

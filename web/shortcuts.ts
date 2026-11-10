@@ -17,6 +17,7 @@ export type ShortcutId =
 	| "newSession"
 	| "switchSpace"
 	| "sessionSearch"
+	| "sessionFind"
 	| "endSession"
 	| "openPullRequest"
 	| "setGoal"
@@ -192,7 +193,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		],
 	},
 	{ id: "switchSpace", category: "general", label: "Switch between the Personal and Work spaces", command: "Switch space", keys: [{ chord: { key: "p", mod: true, shift: true }, scope: "anywhere" }] },
-	{ id: "sessionSearch", category: "sessions", label: "Search the sidebar's sessions", keys: [{ chord: { key: "f", mod: true }, scope: "anywhere" }] },
+	{ id: "sessionSearch", category: "sessions", label: "Search the sidebar's sessions", keys: [{ chord: { key: "f", mod: true, shift: true }, scope: "anywhere" }] },
+	{ id: "sessionFind", category: "sessions", label: "Find text in the focused session's conversation", keys: [{ chord: { key: "f", mod: true }, scope: "anywhere" }] },
 	{ id: "endSession", category: "sessions", label: "End the focused session", keys: [{ chord: END_SESSION, scope: "anywhere" }] },
 	{ id: "openPullRequest", category: "sessions", label: "Review, push, and open a pull request for the focused session's branch", command: "Open pull request", keys: [] },
 	{ id: "setGoal", category: "sessions", label: "Set or edit the focused session's objective and token budget", command: "Set or edit goal", keys: [] },

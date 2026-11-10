@@ -85,6 +85,7 @@ import { PromptHistory } from "./prompt-history";
 import { SessionTodosCard } from "./session-todos-card";
 import { CancelAgentButton, SubagentLinks } from "./subagent-links";
 import type { ChangesSession } from "./todos-card-changes";
+import { TranscriptFind } from "./transcript-find";
 import { TranscriptMinimap } from "./transcript-minimap";
 import { latestReviewPages, requestReview } from "../review-pages";
 import { BROWSER_AVAILABLE } from "./browser-panel";
@@ -821,6 +822,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 							)}
 						</MessageScrollerContent>
 					</MessageScrollerViewport>
+					<TranscriptFind lane={laneRef} />
 					<TranscriptMinimap turns={model.outline} />
 					<PromptHistory view={view} turns={model.outline} />
 					<MessageScrollerButton {...activityControl("transcript.scroll-to-bottom")} />

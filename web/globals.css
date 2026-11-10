@@ -363,6 +363,16 @@
   }
 }
 
+/* The transcript find bar's matches, which `web/components/transcript-find.tsx` registers; the current one is solid. */
+::highlight(transcript-find) {
+  background-color: color-mix(in srgb, var(--color-amber-400) 35%, transparent);
+}
+
+::highlight(transcript-find-current) {
+  background-color: var(--color-amber-400);
+  color: var(--color-zinc-950);
+}
+
 @utility surface-glass {
   background: color-mix(in srgb, var(--background) var(--glass-opacity), transparent);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
