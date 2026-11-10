@@ -8,7 +8,19 @@ import type { GoogleAccounts } from "./google-accounts";
 import type { IntegrationKind } from "./integration-kind";
 import { clientSetup, type ClientSave, planGoogleSave, planSlackSave } from "./mcp-clients";
 import { remoteStatusOf } from "./mcp-status";
-import { addMcpServer, findMcpServers, mcpBearer, type McpServer, mcpSignedIn, signInMcp, signOutMcp, userMcpConfigPath, writeMcpServer } from "./omp/mcp";
+import {
+	addMcpServer,
+	enableMcpServersOn,
+	findMcpServers,
+	mcpBearer,
+	type McpServer,
+	mcpSignedIn,
+	mcpSignedInIds,
+	signInMcp,
+	signOutMcp,
+	userMcpConfigPath,
+	writeMcpServer,
+} from "./omp/mcp";
 import {
 	type AccountId,
 	type ClientService,
@@ -138,9 +150,12 @@ export function createIntegrations(googleAccounts: GoogleAccounts): Integrations
 			return { integrations: Object.fromEntries(loaded.map(integration => [integration.id, integration])) as IntegrationsAnswer["integrations"] };
 		},
 
+		/** A service turned off in Settings › MCP servers is turned back on first, and needs no browser while omp still holds a sign-in to it. */
 		async startSignIn({ id, account }) {
 			const service = MCP_SERVICES[id];
 			await signIns[id].start(account, async (signal, waiting) => {
+				const turnedOn = await enableMcpServersOn(service.host);
+				if (turnedOn && (await mcpSignedInIds((await serversOf(id)).map(server => server.credentialId))).size > 0) return;
 				if (service.client !== "none" && !(await clientSetup(id))?.configured) throw new Error(SETUP_ERROR[service.client]);
 				await kindOf(id).signIn(account, signal, waiting);
 			});

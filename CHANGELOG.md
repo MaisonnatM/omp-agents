@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-10
 
+- Fixed: Connect in Integrations failed, such as with "Google Calendar has no server to sign in to", when the service's server was turned off. Connect now turns it back on.
+  It skips the sign-in page while the old sign-in still works.
 - A link to an agent's test server, such as one in its reply or listed under Review visuals, now opens signed in, in an omp agents window of its own, instead of a page saying to open the app.
 - The Todos card is back on the right of the conversation, with its todos, subagents, files, images, and sources in view, instead of a line you click open. In a narrow conversation it sits above the messages.
 - Click a file chip above a prompt you sent, such as Pasted text.txt, to read the text it carried. The Copy button copies it.
