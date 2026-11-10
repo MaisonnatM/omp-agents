@@ -69,6 +69,8 @@ Files, in `agent/`:
   The extension adds the `ship_stage` tool and shows the stage and the PR's needs in the session.
   When the repository commits `.omp/review-paths`, the gate asks for the thermonuclear checkbox only when a changed file matches one of its globs; a repository without the file reviews every PR.
   The interface review has the opposite default: the gate asks for the `- [x] Interface review` checkbox only when the repository commits `.omp/ui-paths` and a changed file matches one of its globs.
+  Recording `thermonuclear` or `ready_gate` checks the box of each review before it that the PR needs in the PR body, ticking the template's `- [ ]` box or appending it, through the same checked edit as `pr_description`.
+  Recording `live` or live work while the PR is a draft records nothing and names the next step, such as `gh pr ready`, which records `live` itself.
   A branch without a PR gets draft-first recovery instructions; authentication failures retain their actual error.
   When GitHub rejects a token that gh reads from an environment variable, such as `GITHUB_TOKEN` from a project `.env`, while a stored gh login works, this extension and `pr_description` run gh without that variable for the rest of the session, which the agent's own `env -u` cannot do for omp's process.
   When no stored login works, the gate names the rejected credential and the project `.env` file omp read it from at startup, never the token itself.
@@ -105,6 +107,7 @@ Files, in `agent/`:
   At each session start this links each skill of the installed pstack into `~/.omp/plugins/pstack-skills`, which `skills.customDirectories` lists and omp reads leniently, keeping them hidden from the model's skill list as pstack intends, and repoints the links after a marketplace update.
   Those links take the bare name from a skill of the same name in your own skill folders, which stays reachable under a prefixed name such as `agent/<name>`; pstack's `poteto-mode` is left out, so the kit's alias keeps that name.
 - `extensions/headless-mark.ts`: adds an `omp-agents.headless` entry to a session that `omp -p` or `omp --mode json` runs, so the omp-agents dashboard leaves those one-shot runs out of its past sessions.
+- `extensions/chrome-devtools-page.ts`: a `chrome-devtools` MCP call written to its `xd://` device without a `pageId` runs on page `1`, the first page, except `close_page` and `select_page`, whose `pageId` names the page they act on, and `list_pages` and `new_page`, which take none.
 - `extensions/project-memory.ts`: gives the omp sessions of one git repository a shared memory and news of each other's work.
   Before a session's first prompt it gets a brief: the repository's memory index and the last 10 landings on its default branch, each with the session that made it and that session's first prompt.
   Before a later prompt, and only when something is new, it gets a catch-up on what other sessions landed and remembered since, listing first the landings that touch files its own branch changed.

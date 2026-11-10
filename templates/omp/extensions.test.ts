@@ -58,6 +58,9 @@ if (input.command) {
 		ui: { async confirm() { confirmations++; return input.approve; } },
 	});
 	console.log(JSON.stringify({ result: result ?? null, confirmations, executed }));
+} else if (input.toolCall) {
+	const result = await hooks.tool_call({ type: "tool_call", toolCallId: "call", ...input.toolCall }, { cwd: process.cwd(), hasUI: false, sessionManager, agent: { kind: "main" } });
+	console.log(JSON.stringify({ result: result ?? null }));
 } else if (input.write) {
 	// attempts repeats the call, as an agent retrying after a block does; the last answer counts.
 	const ctx = {
@@ -124,8 +127,8 @@ if (input.command) {
 }
 `;
 
-function exercise(name: "ship" | "todos" | "notes" | "events" | "worktree-guard" | "google-accounts" | "pr-description" | "headless-mark" | "arena", input: object, env: Record<string, string> = {}): {
-	result: { block: boolean; reason: string } | null;
+function exercise(name: "ship" | "todos" | "notes" | "events" | "worktree-guard" | "google-accounts" | "pr-description" | "headless-mark" | "arena" | "chrome-devtools-page", input: object, env: Record<string, string> = {}): {
+	result: { block?: boolean; reason?: string; input?: Record<string, unknown> } | null;
 	confirmations: number;
 	valid: boolean;
 	run: { isError: boolean; stage: string | null };
@@ -375,7 +378,7 @@ describe("ship publication gate", () => {
 		expect(result?.block).toBe(true);
 		expect(result?.reason).toContain("`GITHUB_TOKEN`");
 		expect(result?.reason).toContain("gh auth login -h github.com");
-		expect(result?.reason.includes(join(project, ".env"))).toBe(blamed);
+		expect(result?.reason?.includes(join(project, ".env"))).toBe(blamed);
 		expect(result?.reason).not.toContain(token);
 		expect(executed.filter(words => words[0] === "pr")).toHaveLength(1);
 	});
@@ -444,48 +447,99 @@ describe("checked PR description CLI", () => {
 });
 
 describe("ship_stage review gates", () => {
+	const INTERFACE_BOX = "- [x] Interface review";
+	const THERMONUCLEAR_BOX = "- [x] Thermo-nuclear code quality review";
 	// GitHub's answer to the gate's read of a PR with this body changing `file`.
-	const prRead = (body: string, file: string) => {
+	const prRead = (body: string, file: string, isDraft = true) => {
 		const pullRequest = {
-			state: "OPEN", isDraft: true, mergeable: "MERGEABLE", mergeStateStatus: "CLEAN", reviewDecision: null, body,
+			state: "OPEN", isDraft, mergeable: "MERGEABLE", mergeStateStatus: "CLEAN", reviewDecision: null, body,
 			changedFiles: 1, files: { nodes: [{ path: file }] },
 			reviewThreads: { nodes: [], pageInfo: { hasNextPage: false } },
 			commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
 		};
 		return { code: 0, stderr: "", stdout: JSON.stringify({ data: { repository: { pullRequest } } }) };
 	};
+	// GitHub's REST answer for the PR body that the box check reads.
+	const restRead = (body: string) => ({ code: 0, stderr: "", stdout: JSON.stringify({ body, updated_at: "2026-11-10T12:00:00Z" }) });
+	const patched = { code: 0, stdout: "{}", stderr: "" };
 	// Records `stage` for a PR with this body changing `file`, checked from a checkout with `reviewPaths` and `uiPaths`.
-	const record = (stage: string, body: string, file: string, reviewPaths?: string, uiPaths?: string) =>
-		exercise("ship", { run: true, cwd: checkout(reviewPaths, uiPaths), params: { stage, pr: 7, repo: "owner/name" }, response: prRead(body, file) }).run;
+	const record = (stage: string, body: string, file: string, reviewPaths?: string, uiPaths?: string) => exercise("ship", {
+		run: true, cwd: checkout(reviewPaths, uiPaths), params: { stage, pr: 7, repo: "owner/name" },
+		responses: { "api graphql": prRead(body, file), "api repos/owner/name/pulls/7": restRead(body), "api -X": patched },
+	}, quotaConfig());
+	// The body the box check wrote, or null when it wrote none.
+	const written = (executed: string[][]) => executed.find(args => args[1] === "-X")?.at(-1)?.replace(/^body=/, "") ?? null;
 
-	test("a box GitHub returns only on the second read, just after it was added, passes the gate", () => {
+	test("a box GitHub's status read misses but the PR body holds is left as it is", () => {
 		const result = exercise("ship", {
 			run: true, cwd: checkout(), params: { stage: "ready_gate", pr: 7, repo: "owner/name" },
-			sequence: [prRead("Unreviewed PR", "README.md"), prRead("- [x] Thermo-nuclear code quality review", "README.md")],
-		});
+			responses: { "api graphql": prRead("Unreviewed PR", "README.md"), "api repos/owner/name/pulls/7": restRead(THERMONUCLEAR_BOX), "api -X": patched },
+		}, quotaConfig());
 		expect(result.run).toEqual({ isError: false, stage: "ready_gate" });
-		expect(result.executed).toHaveLength(2);
+		expect(written(result.executed)).toBeNull();
 	});
 
-	test.each([["- [x] Thermo-nuclear code quality review", false], ["Unreviewed PR", true]])("the first call naming the PR reads its body (%s)", (body, isError) => {
-		expect(record("ready_gate", body, "README.md")).toEqual({ isError, stage: isError ? null : "ready_gate" });
+	test("recording ready_gate appends a missing thermonuclear box to the PR body", () => {
+		const result = record("ready_gate", "Unreviewed PR", "README.md");
+		expect(result.run).toEqual({ isError: false, stage: "ready_gate" });
+		expect(written(result.executed)).toBe(`Unreviewed PR\n${THERMONUCLEAR_BOX}`);
+		expect(result.text).toStartWith(`Checked \`${THERMONUCLEAR_BOX}\` in the PR body.`);
 	});
 
-	test.each([["README.md", false], ["src/shared/protocol.ts", true]])("with review paths, an unreviewed PR changing %s is held: %s", (file, isError) => {
-		expect(record("ready_gate", "Unreviewed PR", file, "src/shared/**\n")).toEqual({ isError, stage: isError ? null : "ready_gate" });
+	test("recording ready_gate ticks the template's unchecked boxes in place", () => {
+		const body = "## Checks\n- [ ] Interface review\n- [ ] Thermo-nuclear code quality review\n- [ ] Browser proof\n";
+		const result = record("ready_gate", body, "web/app.tsx", undefined, "web/**/*.tsx\n");
+		expect(result.run).toEqual({ isError: false, stage: "ready_gate" });
+		expect(written(result.executed)).toBe(`## Checks\n${INTERFACE_BOX}\n${THERMONUCLEAR_BOX}\n- [ ] Browser proof\n`);
 	});
 
-	test.each(["thermonuclear", "ready_gate"])("with ui paths, recording %s without the interface box is refused", stage => {
-		expect(record(stage, "- [x] Thermo-nuclear code quality review", "web/app.tsx", undefined, "web/**/*.tsx\n")).toEqual({ isError: true, stage: null });
+	test("recording thermonuclear checks only the interface box, before its own review runs", () => {
+		const result = record("thermonuclear", "Unreviewed PR", "web/app.tsx", undefined, "web/**/*.tsx\n");
+		expect(result.run).toEqual({ isError: false, stage: "thermonuclear" });
+		expect(written(result.executed)).toBe(`Unreviewed PR\n${INTERFACE_BOX}`);
 	});
 
-	test.each(["thermonuclear", "ready_gate"])("with ui paths, recording %s with the interface box passes", stage => {
-		const body = "- [x] Interface review\n- [x] Thermo-nuclear code quality review";
-		expect(record(stage, body, "web/app.tsx", undefined, "web/**/*.tsx\n")).toEqual({ isError: false, stage });
+	test.each([["README.md", null], ["src/shared/protocol.ts", `Unreviewed PR\n${THERMONUCLEAR_BOX}`]])("with review paths, a PR changing %s gets the box only when it needs the review", (file, body) => {
+		const result = record("ready_gate", "Unreviewed PR", file, "src/shared/**\n");
+		expect(result.run).toEqual({ isError: false, stage: "ready_gate" });
+		expect(written(result.executed)).toBe(body);
+	});
+
+	test("a PR body with both boxes records ready_gate without writing", () => {
+		const result = record("ready_gate", `${INTERFACE_BOX}\n${THERMONUCLEAR_BOX}`, "web/app.tsx", undefined, "web/**/*.tsx\n");
+		expect(result.run).toEqual({ isError: false, stage: "ready_gate" });
+		expect(result.executed.filter(args => args[1] !== "graphql")).toEqual([]);
 	});
 
 	test("without ui paths, a PR changing web/app.tsx records thermonuclear without the interface box", () => {
-		expect(record("thermonuclear", "Unreviewed PR", "web/app.tsx")).toEqual({ isError: false, stage: "thermonuclear" });
+		const result = record("thermonuclear", "Unreviewed PR", "web/app.tsx");
+		expect(result.run).toEqual({ isError: false, stage: "thermonuclear" });
+		expect(written(result.executed)).toBeNull();
+	});
+
+	test("a PR body the box check cannot read leaves the stage unrecorded", () => {
+		const result = exercise("ship", {
+			run: true, cwd: checkout(), params: { stage: "ready_gate", pr: 7, repo: "owner/name" },
+			responses: { "api graphql": prRead("Unreviewed PR", "README.md"), "api repos/owner/name/pulls/7": { code: 0, stdout: "{}", stderr: "" }, "api -X": patched },
+		}, quotaConfig());
+		expect(result.run).toEqual({ isError: true, stage: null });
+		expect(result.text).toContain("so ready_gate is not recorded");
+		expect(written(result.executed)).toBeNull();
+	});
+
+	test.each([
+		["live", "Run `gh pr ready 7`"],
+		["fix_ci", "Do the work without recording it"],
+	])("recording %s on a draft names the next step instead of failing", (stage, next) => {
+		const result = exercise("ship", { run: true, cwd: checkout(), params: { stage, pr: 7, repo: "owner/name" }, response: prRead(THERMONUCLEAR_BOX, "README.md") });
+		expect(result.run.isError).toBe(false);
+		expect(result.text).toStartWith(`PR #7 is still a draft, so ${stage} is not recorded and the stage stays`);
+		expect(result.text).toContain(next);
+	});
+
+	test("recording live on a PR under review records it", () => {
+		const result = exercise("ship", { run: true, cwd: checkout(), params: { stage: "live", pr: 7, repo: "owner/name" }, response: prRead(THERMONUCLEAR_BOX, "README.md", false) });
+		expect(result.run).toEqual({ isError: false, stage: "live" });
 	});
 
 	test("quota exhaustion exposes stale status and cannot advance the ready gate", () => {
@@ -1071,6 +1125,27 @@ describe("headless-mark", () => {
 
 	test("records the change when a session resumes in the other mode", () => {
 		expect(starts("print", "tui", "print")).toEqual([{ headless: true }, { headless: false }, { headless: true }]);
+	});
+});
+
+describe("chrome-devtools page", () => {
+	const write = (path: string, content: string) => exercise("chrome-devtools-page", { toolCall: { toolName: "write", input: { path, content } } }).result;
+
+	test("a page tool written without a pageId runs on page 1", () => {
+		expect(write("xd://mcp__chrome_devtools_take_screenshot", '{"fullPage":true}')).toEqual({
+			input: { path: "xd://mcp__chrome_devtools_take_screenshot", content: '{"fullPage":true,"pageId":1}' },
+		});
+	});
+
+	test.each([
+		["a call that names its page", "xd://mcp__chrome_devtools_take_screenshot", '{"pageId":2}'],
+		["a tool that takes no page", "xd://mcp__chrome_devtools_list_pages", "{}"],
+		["a tool whose page is the one it closes", "xd://mcp__chrome_devtools_close_page", "{}"],
+		["a help request", "xd://mcp__chrome_devtools_take_screenshot", "help"],
+		["another server's tool", "xd://mcp__linear_get_issue", "{}"],
+		["a file", "/tmp/notes.json", "{}"],
+	])("leaves %s alone", (_, path, content) => {
+		expect(write(path, content)).toBeNull();
 	});
 });
 
