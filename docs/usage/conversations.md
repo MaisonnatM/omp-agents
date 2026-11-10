@@ -85,6 +85,10 @@
   Click a row to open the subagent, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split, or middle-click to open it in the app window in place of what it shows.
   The stop button after a running subagent cancels it, as the one after its link in the conversation does, in every room the dashboard can write to.
   A subagent's own view lists only the subagents it started, and theirs; a past session shows no section, because the dashboard opens subagents only of a running session.
+  When the agent gives two or more subagents the same task and records them with the kit's `arena` tool, those runners show above the other rows in an **Arena** box with the task, as cards side by side lettered A, B, C in the order it started them.
+  Each card shows the runner's id, its status, its type, and what it is doing; the judge, once the agent records one, sits on a row under the cards.
+  Once the agent records its pick, the card it kept turns green with a **Base** badge, a runner it took something from shows **Graft** and what it took, and the others show **Not used**.
+  Click a card to open that runner, as with a row; hover a running one for its stop button.
   The section starts open, and the app remembers whether you folded it.
 - The clock button in the composer, shown once a session has two prompts, opens **Chat history**: it blurs the conversation and gathers every prompt you sent into one column over it, newest at the bottom.
   Prompts that were in view slide from their place into the column.
