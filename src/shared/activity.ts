@@ -77,6 +77,7 @@ export const CONTROLS = [
 	{ id: "header.goal", label: "Session goal", area: "Header" },
 	{ id: "completion.pick", label: "Slash or mention menu pick", area: "Composer" },
 	{ id: "composer-suggestions.pick", label: "Suggested prompt", area: "Composer" },
+	{ id: "composer-suggestions.edit", label: "Suggested prompt, edit", area: "Composer" },
 	{ id: "composer-suggestions.send-all", label: "Suggested prompts, all of them", area: "Composer" },
 	{ id: "composer-queue.send-now", label: "Queued message, send now", area: "Composer" },
 	{ id: "composer-queue.edit", label: "Queued message, edit", area: "Composer" },
