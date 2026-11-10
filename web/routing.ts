@@ -24,11 +24,11 @@ export const SIDEBAR_TABS = [
 	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, place: "bar", integration: "linear", space: "work" },
 	{ value: "bots", label: "Bots", icon: PAGE_ICON.bots, place: "bar" },
 	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions, place: "bar" },
-	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo, place: "bar" },
 	{ value: "notes", label: "Notes", icon: PAGE_ICON.notes, place: "header" },
 	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar, place: "header" },
-	{ value: "email", label: "Email", icon: PAGE_ICON.email, place: "header", integration: "gmail" },
+	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo, place: "header" },
 	{ value: "sport", label: "Sport", icon: PAGE_ICON.sport, place: "header", space: "personal" },
+	{ value: "email", label: "Email", icon: PAGE_ICON.email, place: "header", integration: "gmail" },
 ] as const satisfies readonly { value: string; label: string; icon: LucideIcon; place: TabPlace; integration?: McpIntegrationId; space?: Space }[];
 
 /** A sidebar tab, whose trigger sits in the bar or the header; the tickets, Bots, todo, notes, calendar, email, and sport tabs go with their pages, the sessions and pull requests tabs with the panes. */

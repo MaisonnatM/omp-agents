@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-10
+
+- Todo moved from the sidebar's tab bar to the top right of the header, between Calendar and Sport. Email now sits after Sport. A saved tab order moves Todo there too.
+
 ## 2026-11-09
 
 - The Calendar now shows only the routine runs of the space's own Bots and the todos due in that space, so Personal and Work no longer mix.

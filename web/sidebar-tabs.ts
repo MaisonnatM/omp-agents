@@ -39,6 +39,8 @@ export const pageSpace = (page: Page): Space | null => (isSidebarTab(page.kind) 
  * The layout stored as `raw`. It keeps each known tab once, so a stored Settings tab from before the header's button drops out,
  * and reads a stored {@link LEGACY_EMAIL_TAB} as the Email tab, in its place and hidden as it was.
  * A tab missing from what is stored, such as one added since, takes its default place; anything unreadable gives the default.
+ * A layout that still has Todo immediately before Notes, the slot it took in the bar, puts Todo between Calendar and Sport,
+ * and moves Email out from between them to just after Sport. Putting Todo back immediately before Notes moves it again.
  */
 export function decodeTabLayout(raw: string | null): TabLayout {
 	let stored: unknown;
@@ -59,7 +61,27 @@ export function decodeTabLayout(raw: string | null): TabLayout {
 	for (const [index, { value }] of SIDEBAR_TABS.entries()) {
 		if (!layout.some(kept => kept.tab === value)) layout.splice(Math.min(index, layout.length), 0, { tab: value, hidden: false });
 	}
-	return layout;
+	return todoBetweenCalendarAndSport(layout);
+}
+
+/** `layout` with Todo moved from immediately before Notes to between Calendar and Sport. Email leaves that gap for just after Sport. */
+function todoBetweenCalendarAndSport(layout: { tab: SidebarTab; hidden: boolean }[]): TabLayout {
+	const todoAt = layout.findIndex(entry => entry.tab === "todo");
+	const notesAt = layout.findIndex(entry => entry.tab === "notes");
+	if (todoAt < 0 || notesAt !== todoAt + 1) return layout;
+	const todo = layout[todoAt]!;
+	const next = layout.filter((_, index) => index !== todoAt);
+	const calendarAt = next.findIndex(entry => entry.tab === "calendar");
+	const sportAt = next.findIndex(entry => entry.tab === "sport");
+	if (calendarAt < 0 || sportAt < calendarAt) return layout;
+	const emailAt = next.findIndex(entry => entry.tab === "email");
+	if (emailAt > calendarAt && emailAt < sportAt) {
+		const email = next[emailAt]!;
+		next.splice(emailAt, 1);
+		next.splice(next.findIndex(entry => entry.tab === "sport") + 1, 0, email);
+	}
+	next.splice(next.findIndex(entry => entry.tab === "sport"), 0, todo);
+	return next;
 }
 
 export const encodeTabLayout = (layout: TabLayout): string => JSON.stringify(layout);
@@ -113,7 +135,21 @@ export function useSidebarTabs(space: Space): {
 } {
 	const [layout, setLayout] = useStoredState(KEY, decodeTabLayout, encodeTabLayout);
 	useEffect(() => {
-		if (localStorage.getItem(KEY)?.includes(`"tab":"${LEGACY_EMAIL_TAB}"`)) setLayout(layout);
+		const raw = localStorage.getItem(KEY);
+		let legacyTodo = false;
+		if (raw !== null) {
+			try {
+				const stored: unknown = JSON.parse(raw);
+				if (Array.isArray(stored)) {
+					const tabs = stored.flatMap(entry => (isObject(entry) && typeof entry.tab === "string" ? [entry.tab] : []));
+					const todoAt = tabs.indexOf("todo");
+					legacyTodo = todoAt >= 0 && tabs[todoAt + 1] === "notes";
+				}
+			} catch {
+				legacyTodo = false;
+			}
+		}
+		if ((raw !== null && raw.includes(`"tab":"${LEGACY_EMAIL_TAB}"`)) || legacyTodo) setLayout(layout);
 	}, [layout, setLayout]);
 	const signedOut = useSignedOutTabs();
 	const absent = useMemo((): ReadonlySet<SidebarTab> => new Set([...signedOut, ...tabsOutOfSpace(space)]), [signedOut, space]);
