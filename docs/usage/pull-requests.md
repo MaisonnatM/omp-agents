@@ -60,6 +60,8 @@
   A badge is coloured only for your moves, each with its own icon and colour, such as red for **Fix CI** and orange for **Rebase**; every other move is grey.
   The Pull requests page's table shows each section as a card, one row per pull request: the move's badge, the title with its author's picture and name, number, conversations, and reason under it, the sessions on it, its place in a stack, its checks, its reviewers or review state, the lines added and removed, its age, and its `⋯` menu at the far right.
   Conversations count the pull request's comments and review threads, resolved ones too, as GitHub's own list does, beside a speech bubble; a pull request with none shows no count.
+  Hover the count, in the sidebar, the table, or a board card, for a card of the five latest conversations, newest first, each with its author, age, file and line for a review thread, and the start of its first comment.
+  The card reads the pull request from GitHub when it opens, leaves out what the **Comments** filter on the details' **Summary** hides, and says how many older or hidden conversations it left out.
   A narrow page drops the sessions, stack, and line columns.
   Each pull request takes the first move that applies, in this order.
   A merge from the last seven days is **Merged**.

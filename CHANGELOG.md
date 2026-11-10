@@ -8,6 +8,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - A link to an agent's test server, such as one in its reply or listed under Review visuals, now opens signed in, in an omp agents window of its own, instead of a page saying to open the app.
 - The Todos card is back on the right of the conversation, with its todos, subagents, files, images, and sources in view, instead of a line you click open. In a narrow conversation it sits above the messages.
 - Click a file chip above a prompt you sent, such as Pasted text.txt, to read the text it carried. The Copy button copies it.
+- Hover or focus the speech bubble count on a pull request, in the sidebar, the table, or the board, to read its five latest comments and reviews without opening it.
+  The card leaves out what the Comments filter hides and says how many it left out.
 - Todo moved from the sidebar's tab bar to the top right of the header, between Calendar and Sport. Email now sits after Sport. A saved tab order moves Todo there too.
 - Behind the scenes: agents now follow the code when an instruction disagrees with it, and say so.
 - Behind the scenes: the starter kit's maintainer setup now tells agents to save a pasted secret right away.

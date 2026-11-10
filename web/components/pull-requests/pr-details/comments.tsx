@@ -155,8 +155,11 @@ interface CommentsProps {
 	send: SendPullRequest;
 }
 
+/** Which conversations Summary's **Comments** and a row's comments card leave out, which the browser keeps. */
+export const useCommentFilter = () => useStoredState("omp-agents.pr-comment-filter", decodeCommentFilter, JSON.stringify);
+
 export function Comments({ detail, save, send }: CommentsProps) {
-	const [filter, setFilter] = useStoredState("omp-agents.pr-comment-filter", decodeCommentFilter, JSON.stringify);
+	const [filter, setFilter] = useCommentFilter();
 	const [order, setOrder] = useState<"newest" | "oldest">("newest");
 	const [shown, setShown] = useState(10);
 	const items = conversationItems(detail);

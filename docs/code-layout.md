@@ -71,6 +71,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   **Timeline** in `web/components/pull-requests/pr-timeline.tsx` draws T3's activity rail, conversation and reply disclosures, review verdicts, lifecycle markers, and commit links, over pure grouping and ordering in `web/pull-request-timeline.ts`.
   `code.tsx` holds the **Code** tab's commit scope and which files are folded, and composes `code-toolbar.tsx`, its toolbar, `diff-preferences.ts`, the diff options it keeps on this computer, `viewed-files.tsx`, GitHub's viewed state and the **Viewed** checkbox, `code-files.tsx`, the diffs and file tree, and `diff-controls.tsx`, the line comment box.
   A pull request row's **Review draft** tag is `ReviewDraftTag` in `web/components/pull-requests/pr-row.tsx`.
+  The card of latest comments that a row's or card's conversation count opens on hover is `ConversationPeek` in `web/components/pull-requests/conversation-peek.tsx`.
   The same details show in two places, so reproduce a layout bug in the one the user means: the Pull requests page's `pr-page.tsx`, and the right sidebar's **PRs** tab, a much narrower column.
   A table row's or card's review cell, which asks for reviews, is `ReviewPicker` in `pr-row.tsx`, over `ReviewersField` in `pr-fields.tsx`, the **Summary**'s Reviewers picker.
   A row's or card's right-click menu is `RowContextMenu` in `pr-row.tsx`, which lists the `⋯` menu's `PullRequestMenuItems` from `pr-menu.tsx`, with its **Reviewers** submenu.

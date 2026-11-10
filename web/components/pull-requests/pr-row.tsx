@@ -28,6 +28,7 @@ import { Spinner } from "../spinner";
 import { toasts } from "../toaster";
 import { type Busy, busyWords, useBusy } from "./busy";
 import { type PullRequestOptionsRead, type ReviewerChange, ReviewersField, usePullRequestOptions } from "./pr-fields";
+import { ConversationPeek } from "./conversation-peek";
 import { PullRequestMenu, PullRequestMenuItems, type PullRequestMenuItemsProps } from "./pr-menu";
 
 /** Whether an open pull request is a draft or live, for a row whose move badge does not say so already. */
@@ -258,17 +259,17 @@ function ReviewPicker({ options, review: { shown, send } }: { options: PullReque
 	);
 }
 
-/** How many comments and review threads the pull request holds, as GitHub's list shows it; nothing when it has none. */
+/** How many comments and review threads the pull request holds, as GitHub's list shows it, opening its latest comments on hover; nothing when it has none. */
 function ConversationCount({ pr }: { pr: PullRequestSummary }) {
 	if (pr.conversations === 0) return null;
 	const label = `${pr.conversations} ${pr.conversations === 1 ? "conversation" : "conversations"}`;
 	return (
-		<Tooltip content={label}>
-			<span role="img" aria-label={label} className="flex shrink-0 items-center gap-0.5 text-xs tabular-nums text-muted-foreground">
+		<ConversationPeek pr={pr}>
+			<span role="img" aria-label={label} tabIndex={0} className="flex shrink-0 items-center gap-0.5 rounded-sm text-xs tabular-nums text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
 				<MessageSquare aria-hidden className="size-3.5" />
 				{pr.conversations}
 			</span>
-		</Tooltip>
+		</ConversationPeek>
 	);
 }
 
