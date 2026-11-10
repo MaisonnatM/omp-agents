@@ -3,6 +3,14 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-10
+
+- A Claude Code session you renamed now lists under that name in the past sessions, and its transcript no longer shows Unread line warnings for Claude Code's own title and agent-name records.
+- In Settings, Source control, a pull that cannot reach its remote now says why, such as a repository that cannot be read, where it used to say only "and the repository exists." A failed settings sync says the same.
+- The server no longer stops when re-reading the session files fails right after a session exits, or when the search for a terminal session's subagent transcript fails.
+- Get started no longer waits without end on a GitHub sign-in check that hangs: the check gives up after 20 seconds.
+- Behind the scenes: removed unused imports, a prop no row read, and a line that could never run; declared two editor packages the page already used; merged two test files that shared a name, so both are type-checked; and corrected file lists, names, and three server descriptions in the docs.
+
 ## 2026-11-09
 
 - The Calendar now shows only the routine runs of the space's own Bots and the todos due in that space, so Personal and Work no longer mix.
