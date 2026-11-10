@@ -29,6 +29,7 @@
   With two or more prompts, 0 sends them all as a single message, a Markdown list in list order, and so does a click on the **All of them** row under them.
   ↓ moves a highlight into the list and ↑ back out; Enter sends the highlighted prompt, Tab puts it in the composer to edit first, and Esc drops the highlight.
   A click sends it too.
+  Hovering or highlighting a prompt shows its keys, ↩ to send, ⇥ to edit, and ⌘ (Ctrl off macOS) with a click to mark, and a pencil button that puts it in the composer to edit first, like Tab.
   Cmd+click (Ctrl+click off macOS) marks a prompt without sending it.
   A click or a number then sends the marked prompts plus that one as a single message, a Markdown list when it holds more than one.
   Enter sends them plus the highlighted prompt, if any, and Tab puts the same text in the composer instead.
