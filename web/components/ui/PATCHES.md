@@ -36,7 +36,7 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 
 ## `ui/chat-message.tsx`
 
-- `files`: the names of the files a sent prompt carried as text, shown as chips above the bubble, in place of the registry's `File`s held in the browser and its `thumbnailSize`; with `onOpenFile`, each chip is a button that opens its file.
+- `files`: the names of the files a sent prompt carried as text, shown as chips above the bubble, in place of the registry's `File`s held in the browser and its `thumbnailSize`; with `onOpenFile`, each chip is a button that opens its file, and `fileControl` adds attributes to those buttons, such as the activity tag.
 - `images`: the addresses of the images a sent prompt carried, shown above the bubble.
 - The assistant message spans the transcript column, whose `max-w-3xl` bounds it, in place of the registry's `max-w-[80%]` on every message; the user bubble keeps `max-w-[80%]`.
 - The hover group is named `group/message`, so a nested `group` inside a message does not reveal its actions.

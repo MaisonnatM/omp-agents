@@ -575,6 +575,7 @@ const MessageRow = memo(function MessageRow({
 				time={item.kind === "user" ? (item.from ?? undefined) : undefined}
 				files={item.kind === "user" ? item.files?.map(file => file.name) : undefined}
 				onOpenFile={setOpenFile}
+				fileControl={activityControl("file-dialog.open-attached")}
 				images={item.kind === "user" ? item.images?.map(mediaSrc) : undefined}
 				onOpenImage={index => openImage(item.id, index)}
 				actions={

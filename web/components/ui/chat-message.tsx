@@ -18,6 +18,8 @@ interface ChatMessageProps
   files?: string[];
   /** Opens file `index` of `files`; omitted, the chips are not buttons. */
   onOpenFile?: (index: number) => void;
+  /** Attributes for each file chip button, such as the dashboard's activity tag. */
+  fileControl?: Record<`data-${string}`, string>;
   /** Addresses of images the message carried, shown above the bubble. */
   images?: string[];
   /** Opens image `index` of `images` large; omitted, the images are not buttons. */
@@ -43,7 +45,7 @@ interface ChatMessageProps
 // lets earlier messages slide up smoothly when a new one is appended.
 const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
   (
-    { from, files, onOpenFile, images, onOpenImage, time, actions, children, size, className, ...props },
+    { from, files, onOpenFile, fileControl, images, onOpenImage, time, actions, children, size, className, ...props },
     ref
   ) => {
     const shape = useShape();
@@ -91,12 +93,14 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
               // A message's files never change, so their order names them.
               return onOpenFile ? (
                 <button
+                  {...fileControl}
                   key={i}
                   type="button"
                   title={name}
                   aria-label={`Open ${name}`}
+                  aria-haspopup="dialog"
                   onClick={() => onOpenFile(i)}
-                  className={cn(chip, "cursor-pointer transition-colors hover:text-foreground")}
+                  className={cn(chip, "cursor-pointer transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring")}
                 >
                   {content}
                 </button>

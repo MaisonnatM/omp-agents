@@ -130,11 +130,10 @@ function TextFileDialog({ target, onClose }: { target: FileTarget; onClose: () =
 /** A file a sent prompt carried as text, such as a long paste, shown as the model read it. */
 export function AttachedFileDialog({ file, onClose }: { file: PromptFile; onClose: () => void }) {
 	const { copied, copy } = useCopy();
-	const lines = file.text.split("\n").length;
 	return (
 		<ViewerDialog
 			title={file.name}
-			description={`Attached to this prompt · ${lines.toLocaleString()} ${lines === 1 ? "line" : "lines"}`}
+			description={`Attached to this prompt · ${formatBytes(new TextEncoder().encode(file.text).length)}`}
 			bodyLabel={file.name}
 			onClose={onClose}
 			actions={
