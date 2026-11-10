@@ -34,7 +34,7 @@ const RARELY = 3;
 const MOST_USED = 20;
 
 /** The commands that go with a tab gated on a service, besides the Email page's own. */
-const COMMAND_TABS: Partial<Record<ShortcutId, SidebarTab>> = { tickets: "tickets", newTicket: "tickets", email: "email" };
+const COMMAND_TABS: Partial<Record<ShortcutId, SidebarTab>> = { tickets: "tickets", newTicket: "tickets", ticketsNew: "tickets", email: "email" };
 
 /** The `PUT` routes that go with a tab gated on a service, by path prefix. */
 const ROUTE_TABS: Record<string, SidebarTab> = { "/api/ticket": "tickets", "/api/gmail/": "email" };
