@@ -88,7 +88,7 @@ export const PullRequestMarkdown = memo(function PullRequestMarkdown({ text, rep
 		openImages: true,
 	}), [repo.owner, repo.repo]);
 	return (
-		<div className={cn("text-sm [&_details]:border-0 [&_summary]:text-foreground/80", className)}>
+		<div className={cn("text-[15px] leading-6 [&_details]:border-0 [&_summary]:text-foreground/80", className)}>
 			<MessageMarkdown text={text} preset={preset} />
 		</div>
 	);
