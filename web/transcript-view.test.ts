@@ -62,7 +62,7 @@ describe("transcript rendering", () => {
 			{ ...replacement, text: "unrelated prompt" },
 			{ ...replacement, skill: "review" },
 			{ ...replacement, images: ["image"] },
-			{ ...replacement, files: ["file.txt"] },
+			{ ...replacement, files: [{ name: "file.txt", text: "" }] },
 		]) {
 			expect(ids(withEditedPrompt(blocksOf([user, unrelated]), edit))).toEqual(["u", "old", "new"]);
 		}
@@ -140,7 +140,7 @@ describe("the editable prompt", () => {
 	test("a skill prompt or one with images or files is not editable, since the edit resends text alone", () => {
 		expect(editable([prompt("p1", "e1", { skill: "review" })])).toBeNull();
 		expect(editable([prompt("p1", "e1", { images: ["data:image/png;base64,AA=="] })])).toBeNull();
-		expect(editable([prompt("p1", "e1", { files: ["notes.md"] })])).toBeNull();
+		expect(editable([prompt("p1", "e1", { files: [{ name: "notes.md", text: "" }] })])).toBeNull();
 	});
 });
 

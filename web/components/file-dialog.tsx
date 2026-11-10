@@ -1,5 +1,6 @@
 import { Check, Copy } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
+import type { PromptFile } from "../../src/shared/prompt-files";
 import { MAX_TEXT_FILE_BYTES, type TextFile } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -122,6 +123,29 @@ function TextFileDialog({ target, onClose }: { target: FileTarget; onClose: () =
 					<LoadNote loading="Reading the file…" error={read.error} />
 				</div>
 			)}
+		</ViewerDialog>
+	);
+}
+
+/** A file a sent prompt carried as text, such as a long paste, shown as the model read it. */
+export function AttachedFileDialog({ file, onClose }: { file: PromptFile; onClose: () => void }) {
+	const { copied, copy } = useCopy();
+	const lines = file.text.split("\n").length;
+	return (
+		<ViewerDialog
+			title={file.name}
+			description={`Attached to this prompt · ${lines.toLocaleString()} ${lines === 1 ? "line" : "lines"}`}
+			bodyLabel={file.name}
+			onClose={onClose}
+			actions={
+				<Tooltip content={copied ? "Copied" : "Copy the text"}>
+					<Button {...activityControl("file-dialog.copy-text")} variant="ghost" size="icon-compact" aria-label="Copy the text" onClick={() => copy(file.text)}>
+						{copied ? <Check /> : <Copy />}
+					</Button>
+				</Tooltip>
+			}
+		>
+			<CodeText text={file.text} path={file.name} className="rounded-none border-0" />
 		</ViewerDialog>
 	);
 }

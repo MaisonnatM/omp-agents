@@ -116,6 +116,7 @@
 - Pasting more than 2,000 characters or 40 lines attaches the text as a file, `Pasted text.txt`, instead of filling the text field, as ChatGPT and Claude do; a second one is `Pasted text 2.txt`.
   Its tile shows the text's first lines, and it goes to the model as a text file does.
 - A prompt's images show above it in the transcript as thumbnails at most 128 pixels tall and 240 wide, in live and past sessions, a `/skill:` prompt's included, as are images sent from omp's terminal, and its files show by name in chips above the text.
+  Clicking a file chip, such as `Pasted text.txt`, opens the text the prompt carried, with a button that copies it.
 - In a session that the dashboard started, omp's built-in `/` commands run as they do in its terminal, for example `/compact` or `/usage`, and what a command prints shows as a line in the conversation.
   `!<command>` runs a shell command in the session's directory, as in omp's terminal: the command and its output show as your message, and the agent sees them in its next turn.
   omp saves a new session only with its first reply, so a new session cannot start with a `!` command.

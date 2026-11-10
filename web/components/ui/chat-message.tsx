@@ -16,6 +16,8 @@ interface ChatMessageProps
   from: "user" | "assistant";
   /** Names of files the message carried as text, shown as chips above the bubble. */
   files?: string[];
+  /** Opens file `index` of `files`; omitted, the chips are not buttons. */
+  onOpenFile?: (index: number) => void;
   /** Addresses of images the message carried, shown above the bubble. */
   images?: string[];
   /** Opens image `index` of `images` large; omitted, the images are not buttons. */
@@ -41,7 +43,7 @@ interface ChatMessageProps
 // lets earlier messages slide up smoothly when a new one is appended.
 const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
   (
-    { from, files, images, onOpenImage, time, actions, children, size, className, ...props },
+    { from, files, onOpenFile, images, onOpenImage, time, actions, children, size, className, ...props },
     ref
   ) => {
     const shape = useShape();
@@ -75,20 +77,35 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
               isUser ? "justify-end" : "justify-start"
             )}
           >
-            {files.map((name, i) => (
+            {files.map((name, i) => {
+              const chip = cn(
+                "inline-flex h-7 max-w-60 items-center gap-1.5 px-2.5 text-[12px] text-muted-foreground bg-accent outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10",
+                shape.bg
+              );
+              const content = (
+                <>
+                  <FileIcon size={14} aria-hidden="true" className="shrink-0" />
+                  <span className="truncate">{name}</span>
+                </>
+              );
               // A message's files never change, so their order names them.
-              <span
-                key={i}
-                title={name}
-                className={cn(
-                  "inline-flex h-7 max-w-60 items-center gap-1.5 px-2.5 text-[12px] text-muted-foreground bg-accent outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10",
-                  shape.bg
-                )}
-              >
-                <FileIcon size={14} aria-hidden="true" className="shrink-0" />
-                <span className="truncate">{name}</span>
-              </span>
-            ))}
+              return onOpenFile ? (
+                <button
+                  key={i}
+                  type="button"
+                  title={name}
+                  aria-label={`Open ${name}`}
+                  onClick={() => onOpenFile(i)}
+                  className={cn(chip, "cursor-pointer transition-colors hover:text-foreground")}
+                >
+                  {content}
+                </button>
+              ) : (
+                <span key={i} title={name} className={chip}>
+                  {content}
+                </span>
+              );
+            })}
           </div>
         )}
         {images && images.length > 0 && (

@@ -38,27 +38,29 @@ export function withFiles(text: string, files: PromptFile[]): string {
 }
 
 /**
- * The names of the blocks `prompt` holds from `at` to its end, or `null` when that is not blocks alone. A block ends at
+ * The files of the blocks `prompt` holds from `at` to its end, or `null` when that is not blocks alone. A block ends at
  * the first `</file>` line the rest parses after, so a file whose text holds a block of its own still splits right.
  */
-function blockNames(prompt: string, at: number): string[] | null {
+function blocks(prompt: string, at: number): PromptFile[] | null {
 	HEADER.lastIndex = at;
 	const header = HEADER.exec(prompt);
 	if (!header) return null;
-	for (let close = prompt.indexOf(CLOSE, HEADER.lastIndex); close >= 0; close = prompt.indexOf(CLOSE, close + 1)) {
+	const start = HEADER.lastIndex;
+	for (let close = prompt.indexOf(CLOSE, start); close >= 0; close = prompt.indexOf(CLOSE, close + 1)) {
+		const file = { name: header[1], text: prompt.slice(start, close) };
 		const end = close + CLOSE.length;
-		if (end === prompt.length) return [header[1]];
-		const rest = prompt.startsWith("\n\n", end) ? blockNames(prompt, end + 2) : null;
-		if (rest) return [header[1], ...rest];
+		if (end === prompt.length) return [file];
+		const rest = prompt.startsWith("\n\n", end) ? blocks(prompt, end + 2) : null;
+		if (rest) return [file, ...rest];
 	}
 	return null;
 }
 
-/** A prompt's typed text and the names of the files {@link withFiles} put after it, first file first. */
-export function splitFiles(prompt: string): { text: string; files: string[] } {
+/** A prompt's typed text and the files {@link withFiles} put after it, first file first. */
+export function splitFiles(prompt: string): { text: string; files: PromptFile[] } {
 	if (!prompt.endsWith(CLOSE)) return { text: prompt, files: [] };
 	for (let at = 0; at >= 0; at = prompt.indexOf('\n\n<file name="', at + 1)) {
-		const files = blockNames(prompt, at === 0 ? 0 : at + 2);
+		const files = blocks(prompt, at === 0 ? 0 : at + 2);
 		if (files) return { text: prompt.slice(0, at), files };
 	}
 	return { text: prompt, files: [] };
@@ -67,5 +69,5 @@ export function splitFiles(prompt: string): { text: string; files: string[] } {
 /** How a list shows a prompt: its typed text, or the names of its files when it carries files alone. */
 export function promptLabel(prompt: string): string {
 	const { text, files } = splitFiles(prompt);
-	return text || files.join(", ");
+	return text || files.map(file => file.name).join(", ");
 }

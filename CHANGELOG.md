@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-10
 
+- Click a file chip above a prompt you sent, such as Pasted text.txt, to read the text it carried. The Copy button copies it.
 - Todo moved from the sidebar's tab bar to the top right of the header, between Calendar and Sport. Email now sits after Sport. A saved tab order moves Todo there too.
 
 ## 2026-11-09
