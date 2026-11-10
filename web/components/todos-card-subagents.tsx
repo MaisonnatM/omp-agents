@@ -11,7 +11,7 @@ import type { AgentRow, ArenaRecord } from "../../src/shared/sessions";
 import { modeOf, SPLIT_CLICK } from "../labels";
 import { hashForView } from "../routing";
 import { useStoredState } from "../stored-state";
-import { type ArenaGroup, type ArenaSeat, arenaGroups, type SubagentNode } from "../todos-card-subagents-model";
+import { type ArenaGroup, type ArenaSeat, type ArenaVerdict, arenaGroups, type SubagentNode } from "../todos-card-subagents-model";
 import { countLabel } from "../todos-card-model";
 import { StatusDot, statusLabel } from "./status-dot";
 import { CancelAgentButton, type SubagentLinksValue } from "./subagent-links";
@@ -54,8 +54,8 @@ export function SubagentsSection({ links, nodes, arenas }: { links: SubagentLink
 	);
 }
 
-/** Opens `agentId`'s view on a plain click; shift- and middle-clicks keep the link's own new-window behavior. */
-function openHandler(links: SubagentLinksValue, agentId: string) {
+/** A link to `agentId`'s view that opens it on a plain click; shift- and middle-clicks keep the link's own new-window behavior. */
+function agentLink(links: SubagentLinksValue, agentId: string) {
 	const view = { kind: "live", instanceId: links.instanceId, agentId } as const;
 	return {
 		view,
@@ -70,15 +70,18 @@ function openHandler(links: SubagentLinksValue, agentId: string) {
 
 const tooltipOf = (agent: AgentRow, verdict?: string) => `${[agent.id, agent.kind, statusLabel(agent.status), agent.activity, verdict].filter(Boolean).join(" · ")}. ${SPLIT_CLICK} to open in a split`;
 
-/** The pick's word for a runner, as the card's badge and its tooltip say it. */
-function verdictText(verdict: ArenaSeat["verdict"]): string | undefined {
-	if (verdict === null) return undefined;
-	return verdict.kind === "base" ? "Base" : verdict.kind === "graft" ? `Graft: ${verdict.what}` : "Not used";
-}
+/** The badge each verdict of the pick shows on a runner's card. */
+const VERDICTS = {
+	base: { label: "Base", color: "green" },
+	graft: { label: "Graft", color: "violet" },
+	unused: { label: "Not used", color: "gray" },
+} as const satisfies Record<ArenaVerdict["kind"], { label: string; color: string }>;
+
+const verdictText = (verdict: ArenaVerdict) => (verdict.kind === "graft" ? `${VERDICTS.graft.label}: ${verdict.what}` : VERDICTS[verdict.kind].label);
 
 /** One subagent as a row of the tree, with an optional `lead` icon before its name. */
 function SubagentRow({ agent, depth, links, lead }: { agent: AgentRow; depth: number; links: SubagentLinksValue; lead?: ReactNode }) {
-	const { view, href, onClick } = openHandler(links, agent.id);
+	const { view, href, onClick } = agentLink(links, agent.id);
 	return (
 		<li className="flex min-w-0 items-center gap-0.5" style={{ paddingLeft: depth * INDENT_PX }}>
 			<Tooltip content={tooltipOf(agent)} side="left">
@@ -105,8 +108,9 @@ function SubagentRow({ agent, depth, links, lead }: { agent: AgentRow; depth: nu
 	);
 }
 
-/** An arena: its task, its runners as cards side by side, and its judge under them. */
+/** An arena: its task, its runners as cards side by side, and its judge and the subagents they spawned under them. */
 function ArenaLanes({ group, links }: { group: ArenaGroup; links: SubagentLinksValue }) {
+	const base = group.seats.find(seat => seat.verdict?.kind === "base")?.seat;
 	return (
 		<section aria-label={`Arena: ${group.task}`} className="mx-1 mt-1 rounded-xl border border-border/70 p-1">
 			<div className="flex min-w-0 items-center gap-2 px-2 pt-1 pb-1 text-[13px]">
@@ -115,28 +119,32 @@ function ArenaLanes({ group, links }: { group: ArenaGroup; links: SubagentLinksV
 				<Tooltip content={group.task} side="left">
 					<span className="min-w-0 truncate text-muted-foreground">{group.task}</span>
 				</Tooltip>
-				{group.base && <span className="ml-auto shrink-0 pl-2 text-xs text-muted-foreground">{group.base} is the base</span>}
+				{base && <span className="ml-auto shrink-0 pl-2 text-xs text-muted-foreground">{base} is the base</span>}
 			</div>
 			<ul aria-label="Arena runners" className="grid grid-cols-[repeat(auto-fit,minmax(7.75rem,1fr))] gap-1.5 px-1">
 				{group.seats.map(seat => (
-					<RunnerCard key={seat.agent.id} seat={seat} won={group.base === seat.seat} picked={group.base !== null} links={links} />
+					<RunnerCard key={seat.agent.id} seat={seat} links={links} />
 				))}
 			</ul>
-			{group.judge && (
-				<ul aria-label="Arena judge" className="mt-1">
-					<SubagentRow agent={group.judge} depth={0} links={links} lead={<Gavel aria-label="Judge" className="size-3.5 shrink-0 text-muted-foreground" />} />
+			{(group.judge || group.descendants.length > 0) && (
+				<ul aria-label="Arena judge and helpers" className="mt-1">
+					{group.judge && <SubagentRow agent={group.judge} depth={0} links={links} lead={<Gavel aria-label="Judge" className="size-3.5 shrink-0 text-muted-foreground" />} />}
+					{group.descendants.map(({ agent, depth }) => (
+						<SubagentRow key={agent.id} agent={agent} depth={depth} links={links} />
+					))}
 				</ul>
 			)}
 		</section>
 	);
 }
 
-function RunnerCard({ seat, won, picked, links }: { seat: ArenaSeat; won: boolean; picked: boolean; links: SubagentLinksValue }) {
-	const { agent } = seat;
-	const { view, href, onClick } = openHandler(links, agent.id);
+function RunnerCard({ seat, links }: { seat: ArenaSeat; links: SubagentLinksValue }) {
+	const { agent, verdict } = seat;
+	const won = verdict?.kind === "base";
+	const { view, href, onClick } = agentLink(links, agent.id);
 	return (
 		<li className="group/runner relative min-w-0">
-			<Tooltip content={tooltipOf(agent, verdictText(seat.verdict))} side="top">
+			<Tooltip content={tooltipOf(agent, verdict ? verdictText(verdict) : undefined)} side="top">
 				<a
 					href={href}
 					onClick={onClick}
@@ -156,7 +164,7 @@ function RunnerCard({ seat, won, picked, links }: { seat: ArenaSeat; won: boolea
 					</div>
 					<div className="truncate text-xs text-muted-foreground">{agent.kind}</div>
 					{agent.activity && <div className="line-clamp-2 text-xs text-muted-foreground">{agent.activity}</div>}
-					{picked && <Verdict seat={seat} />}
+					{verdict && <Verdict verdict={verdict} />}
 				</a>
 			</Tooltip>
 			{links.onCancel && agent.status === "running" && (
@@ -168,30 +176,17 @@ function RunnerCard({ seat, won, picked, links }: { seat: ArenaSeat; won: boolea
 	);
 }
 
-function Verdict({ seat }: { seat: ArenaSeat }) {
-	const { verdict } = seat;
-	if (verdict === null) return null;
+function Verdict({ verdict }: { verdict: ArenaVerdict }) {
+	const { label, color } = VERDICTS[verdict.kind];
 	return (
 		<div className="mt-auto flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 pt-0.5">
-			{verdict.kind === "base" ? (
-				<Badge variant="dot" size="compact" color="green">
-					<span className="flex items-center gap-1">
-						<Trophy aria-hidden className="size-3" />
-						Base
-					</span>
-				</Badge>
-			) : verdict.kind === "graft" ? (
-				<>
-					<Badge variant="dot" size="compact" color="violet">
-						Graft
-					</Badge>
-					<span className="line-clamp-2 min-w-0 text-xs text-muted-foreground">{verdict.what}</span>
-				</>
-			) : (
-				<Badge variant="dot" size="compact" color="gray">
-					Not used
-				</Badge>
-			)}
+			<Badge variant="dot" size="compact" color={color}>
+				<span className="flex items-center gap-1">
+					{verdict.kind === "base" && <Trophy aria-hidden className="size-3" />}
+					{label}
+				</span>
+			</Badge>
+			{verdict.kind === "graft" && <span className="line-clamp-2 min-w-0 text-xs text-muted-foreground">{verdict.what}</span>}
 		</div>
 	);
 }

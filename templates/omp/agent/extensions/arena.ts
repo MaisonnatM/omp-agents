@@ -14,7 +14,7 @@ export default function arena(pi: ExtensionAPI) {
 	const z = pi.zod;
 	const params = z.object({
 		task: z.string().trim().min(1).describe("What every runner was asked to produce, in a few words."),
-		runners: z.array(z.string().trim().min(1)).min(2).describe("The competing subagents' ids, as the task tool returned them, in the order you spawned them."),
+		runners: z.array(z.string().trim().min(1)).min(2).max(26).describe("The competing subagents' ids, as the task tool returned them, in the order you spawned them."),
 		judge: z.string().trim().min(1).optional().describe("The judge subagent's id, once you spawn one."),
 		base: z.string().trim().min(1).optional().describe("The runner you picked as the base, once you pick."),
 		grafts: z
@@ -40,6 +40,7 @@ export default function arena(pi: ExtensionAPI) {
 			if (ctx.agent.kind === "sub") return { content: [{ type: "text", text: "The session that runs the arena records it." }], isError: true };
 			const { task, runners, judge, base, grafts = [] } = parsed.data;
 			if (new Set(runners).size !== runners.length) return { content: [{ type: "text", text: "Each runner is named once." }], isError: true };
+			if (judge !== undefined && runners.includes(judge)) return { content: [{ type: "text", text: `The judge ${judge} is one of the runners.` }], isError: true };
 			if (base !== undefined && !runners.includes(base)) return { content: [{ type: "text", text: `The base ${base} is not one of the runners.` }], isError: true };
 			const stray = grafts.find(graft => !runners.includes(graft.from) || graft.from === base);
 			if (stray) return { content: [{ type: "text", text: `A graft comes from a runner other than the base, not ${stray.from}.` }], isError: true };

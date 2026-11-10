@@ -861,6 +861,8 @@ describe("parseArenaRecord", () => {
 		expect(parseArenaRecord({ task: "T", runners: ["A"] })).toBeNull();
 		expect(parseArenaRecord({ task: "", runners: ["A", "B"] })).toBeNull();
 		expect(parseArenaRecord({ task: "T", runners: ["A", 2] })).toBeNull();
+		expect(parseArenaRecord({ task: "T", runners: ["A", "A"] })).toBeNull();
+		expect(parseArenaRecord({ task: "T", runners: ["A", "B"], judge: "A" })?.judge).toBeNull();
 		expect(parseArenaRecord(null)).toBeNull();
 	});
 });

@@ -39,8 +39,21 @@ describe("arenaGroups", () => {
 	test("after the pick, marks the base, each graft with what it gave, and the other runners not used", () => {
 		const picked = { ...arena, base: "RunB", grafts: [{ from: "RunA", what: "Copy" }, { from: "RunA", what: "Tests" }] };
 		const [group] = arenaGroups(nodes, [picked]).groups;
-		expect(group.base).toBe("B");
+		expect(group.seats.find(seat => seat.verdict?.kind === "base")?.seat).toBe("B");
 		expect(seats(group)).toEqual([["A", "RunA", { kind: "graft", what: "Copy, Tests" }], ["B", "RunB", { kind: "base" }], ["C", "RunC", { kind: "unused" }]]);
+	});
+
+	test("a seated runner and the judge take the subagents they spawned with them, deepest kept relative to the arena", () => {
+		const tree = subagentTree([agent("Other", null), agent("RunA", null), agent("RunA.1", "RunA"), agent("RunA.1.a", "RunA.1"), agent("RunB", null), agent("Judge", null), agent("Judge.1", "Judge"), agent("Other.1", "Other")], null);
+		const { groups, rest } = arenaGroups(tree, [{ ...arena, runners: ["RunA", "RunB"] }]);
+		expect(rows(groups[0].descendants)).toEqual(["1 RunA.1", "2 RunA.1.a", "1 Judge.1"]);
+		expect(rows(rest)).toEqual(["0 Other", "1 Other.1"]);
+	});
+
+	test("after the pick, every seat keeps its verdict when the base runner is not in the view", () => {
+		const away = nodes.filter(node => node.agent.id !== "RunB");
+		const [group] = arenaGroups(away, [{ ...arena, base: "RunB" }]).groups;
+		expect(seats(group)).toEqual([["A", "RunA", { kind: "unused" }], ["C", "RunC", { kind: "unused" }]]);
 	});
 
 	test("a runner already seated in an earlier arena is not seated again, and an arena left with one free runner stays in the rest", () => {

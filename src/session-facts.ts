@@ -22,7 +22,7 @@
 import { access } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { branchAt, type CheckoutReads, type HeadHistory, type WorktreeAt } from "./git";
-import { isObject, oneOf, str } from "./json";
+import { isNonEmpty, isObject, oneOf, str } from "./json";
 import { FoldedFile, type LineFold } from "./line-reader";
 import { mapLimit, PROBE_PARALLEL } from "./map-limit";
 import { expandHome } from "./paths";
@@ -176,21 +176,20 @@ export function parseShipProgress(data: unknown): ShipProgress | null {
 	};
 }
 
-const nonEmpty = (value: unknown): value is string => typeof value === "string" && value.length > 0;
 /** No arenas: one value, so that a session without any keeps the same facts from one refresh to the next. */
 const NO_ARENAS: readonly ArenaRecord[] = [];
 
-/** An arena as its `omp-arena.state` entry records it, or `null` when the entry lacks a task or two runners. */
+/** An arena as its `omp-arena.state` entry records it, or `null` when the entry lacks a task or two distinct runners; a judge that is a runner is dropped. */
 export function parseArenaRecord(data: unknown): ArenaRecord | null {
 	if (!isObject(data)) return null;
 	const { task, runners, judge, base, grafts } = data;
-	if (!nonEmpty(task) || !Array.isArray(runners) || runners.length < 2 || !runners.every(nonEmpty)) return null;
+	if (!isNonEmpty(task) || !Array.isArray(runners) || runners.length < 2 || !runners.every(isNonEmpty) || new Set(runners).size !== runners.length) return null;
 	return {
 		task,
 		runners,
-		judge: nonEmpty(judge) ? judge : null,
-		base: nonEmpty(base) && runners.includes(base) ? base : null,
-		grafts: Array.isArray(grafts) ? grafts.flatMap(graft => (isObject(graft) && nonEmpty(graft.from) && nonEmpty(graft.what) ? [{ from: graft.from, what: graft.what }] : [])) : [],
+		judge: isNonEmpty(judge) && !runners.includes(judge) ? judge : null,
+		base: isNonEmpty(base) && runners.includes(base) ? base : null,
+		grafts: Array.isArray(grafts) ? grafts.flatMap(graft => (isObject(graft) && isNonEmpty(graft.from) && isNonEmpty(graft.what) ? [{ from: graft.from, what: graft.what }] : [])) : [],
 	};
 }
 
@@ -635,7 +634,7 @@ export class SessionFactsIndex {
 
 	/**
 	 * What the session in `sessionPath` and its subagents submitted, worked on, and linked, or none before its first scan or without a file.
-	 * The /ship stage, the worktree, and the branch are the session's own transcript's, not its subagents', which run in worktrees of their own.
+	 * The /ship stage, the arenas, the worktree, and the branch are the session's own transcript's, not its subagents', which run in worktrees of their own.
 	 * `workspace` is the one `cwd` counts in: the directory a live session runs in now, which omp writes to its file only with the first
 	 * reply, and after a `/move` only with the next; the file's directory when omitted.
 	 * Each field keeps its identity until a refresh changes it, so a caller can compare them with `===`.
@@ -883,6 +882,7 @@ export class SessionFactsIndex {
 		if (reads.every(read => read.readable)) session.modifiedAt = modifiedAt;
 		const own = session.own.fold.scan;
 		const ship = own.ship ?? null;
+		// The scan builds a new arenas list only when an arena entry arrives, so identity tells a change.
 		const changed = JSON.stringify(session.ship) !== JSON.stringify(ship) || own.arenas !== session.arenas || own.headless !== session.headless;
 		session.ship = ship;
 		session.arenas = own.arenas;

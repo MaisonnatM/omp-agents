@@ -1093,6 +1093,7 @@ describe("arena", () => {
 		["a graft from outside the runners", { ...fanOut, base: "RunB", grafts: [{ from: "Other", what: "Copy" }] }],
 		["a runner named twice", { task: "T", runners: ["RunA", "RunA"] }],
 		["a single runner", { task: "T", runners: ["RunA"] }],
+		["a judge who is a runner", { ...fanOut, judge: "RunA" }],
 	])("refuses %s and records nothing", (_case, params) => {
 		const { runs: results, entries } = runs([params]);
 		expect(results[0].isError).toBe(true);
