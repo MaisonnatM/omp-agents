@@ -265,7 +265,7 @@ function ConversationCount({ pr }: { pr: PullRequestSummary }) {
 	const label = `${pr.conversations} ${pr.conversations === 1 ? "conversation" : "conversations"}`;
 	return (
 		<ConversationPeek pr={pr}>
-			<span role="img" aria-label={label} className="flex shrink-0 items-center gap-0.5 text-xs tabular-nums text-muted-foreground">
+			<span role="img" aria-label={label} tabIndex={0} className="flex shrink-0 items-center gap-0.5 rounded-sm text-xs tabular-nums text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
 				<MessageSquare aria-hidden className="size-3.5" />
 				{pr.conversations}
 			</span>

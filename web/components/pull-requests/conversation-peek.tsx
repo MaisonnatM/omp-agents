@@ -6,10 +6,10 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { useRead } from "../../reads";
 import { latestConversations } from "../../pull-request-comments";
 import { Age } from "../age";
-import { Spinner } from "../spinner";
+import { LoadNote } from "../sheet-details";
 import { Avatar } from "./avatars";
 import { useCommentFilter } from "./pr-details/comments";
-import { REVIEW_STYLE } from "./pr-details/message";
+import { REVIEW_STYLE, ThreadPlace } from "./pr-details/message";
 import { PullRequestMarkdown } from "./pr-markdown";
 
 function Conversations({ pr }: { pr: PullRequestSummary }) {
@@ -18,9 +18,9 @@ function Conversations({ pr }: { pr: PullRequestSummary }) {
 	const detail = read.data;
 	if (!detail) {
 		return (
-			<p className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
-				{read.error ? `Could not read the comments: ${read.error}` : <><Spinner size={14} /> Reading comments…</>}
-			</p>
+			<div className="px-3 py-3">
+				<LoadNote loading="Asking GitHub for the comments…" error={read.error && `Cannot load the comments: ${read.error}`} />
+			</div>
 		);
 	}
 	const { visible, older, filtered } = latestConversations(detail, filter, 5);
@@ -29,7 +29,7 @@ function Conversations({ pr }: { pr: PullRequestSummary }) {
 			{visible.length === 0 ? (
 				<p className="px-3 py-3 text-xs text-muted-foreground">No comments to show.</p>
 			) : (
-				<ol className="divide-y">
+				<ol className="max-h-80 divide-y overflow-y-auto">
 					{visible.map(item => {
 						const [first] = item.comments;
 						if (!first) return null;
@@ -45,9 +45,8 @@ function Conversations({ pr }: { pr: PullRequestSummary }) {
 									<Age at={item.at} compact exact className="ml-auto shrink-0 tabular-nums" />
 								</div>
 								{item.kind === "thread" && (
-									<p className="truncate font-mono text-[11px] text-muted-foreground">
-										{item.thread.path}
-										{item.thread.line !== null && `:${item.thread.line}`}
+									<p className="text-2xs text-muted-foreground">
+										<ThreadPlace detail={detail} thread={item.thread} />
 									</p>
 								)}
 								{first.body.trim() && <PullRequestMarkdown text={first.body} repo={detail} className="line-clamp-3 text-xs" />}
@@ -59,7 +58,7 @@ function Conversations({ pr }: { pr: PullRequestSummary }) {
 			)}
 			{(older > 0 || filtered > 0) && (
 				<p className="border-t px-3 py-2 text-xs text-muted-foreground">
-					{[older > 0 && `${older} older`, filtered > 0 && `${filtered} hidden by the Comments filter`].filter(Boolean).join(" · ")}
+					{[older > 0 && `${older} older ${older === 1 ? "conversation" : "conversations"}`, filtered > 0 && `${filtered} hidden by the Comments filter`].filter(Boolean).join(" · ")}
 				</p>
 			)}
 		</>
@@ -69,16 +68,14 @@ function Conversations({ pr }: { pr: PullRequestSummary }) {
 /** `children` opens a card of `pr`'s latest conversations on hover. */
 export function ConversationPeek({ pr, children }: { pr: PullRequestSummary; children: ReactElement }) {
 	return (
-		<HoverCard openDelay={300} closeDelay={150}>
+		<HoverCard openDelay={350} closeDelay={100}>
 			<HoverCardTrigger asChild>{children}</HoverCardTrigger>
-			<HoverCardContent side="bottom" align="start" sideOffset={8} collisionPadding={12} className="w-80 p-0" onClick={event => event.stopPropagation()}>
+			<HoverCardContent side="bottom" align="start" sideOffset={6} collisionPadding={12} className="w-80 p-0" onClick={event => event.stopPropagation()}>
 				<p className="flex items-center gap-1.5 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
 					<MessageSquare aria-hidden className="size-3.5" />
-					Latest comments
+					Latest comments and reviews
 				</p>
-				<div className="max-h-96 overflow-y-auto">
-					<Conversations pr={pr} />
-				</div>
+				<Conversations pr={pr} />
 			</HoverCardContent>
 		</HoverCard>
 	);
