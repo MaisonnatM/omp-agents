@@ -26,7 +26,11 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Linux: the arm64 AppImage can now update itself, since each release publishes its update feed too.
 - Linux: Retry in the packaged app no longer strips the session bus and runtime directory settings from the server it restarts, and the app menu no longer shows Open at Login, which did nothing there.
 - The README no longer says quitting the app stops your sessions: they keep running and show live again at the next launch.
-- Behind the scenes: removed unused imports, a prop no row read, and a line that could never run; declared two editor packages the page already used; merged two test files that shared a name, so both are type-checked; and corrected file lists, names, and three server descriptions in the docs.
+- Tab no longer lands on the hidden rows of a collapsed sidebar group, such as past sessions.
+- What's new no longer shows stray asterisks and backticks around names in some entries.
+- The README and guides now give the keys the app uses: Cmd+Shift+Backspace stops a turn, Enter queues a message to a terminal session's subagent and Cmd+Enter steers it, and Todo and Calendar open from the header without a tab number.
+- The starter kit's instructions no longer point agents at a pr skill, a Skill tool, and a browser tool address that do not exist.
+- Behind the scenes: removed unused imports, a prop no row read, an option no caller passed, an unused queue member, a dead build setting, and lines that could never run; declared two editor packages the page already used; merged two test files that shared a name, so both are type-checked; the starter kit's tests now load omp's own schema library; and corrected file lists, names, counts, and descriptions across the docs.
 - Ship no longer stops on a missing review checkbox: recording the stage after the interface or thermo-nuclear review ticks that review's box in the pull request description, or adds it when the description has none.
 - Recording live or a fix while the pull request is still a draft now says what to do next, such as running gh pr ready, instead of failing.
 - A chrome-devtools page tool called without a pageId, such as a screenshot, now runs on the first page instead of failing; close_page and select_page still need one.
