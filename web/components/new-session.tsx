@@ -1,8 +1,8 @@
 import { Lock, LockOpen, Sparkles, X } from "lucide-react";
-import { type KeyboardEvent, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useContext, useRef, useState } from "react";
 import { RetroGrid } from "@/components/dithercn/retro-grid";
 import type { BranchChoice } from "../../src/shared/git";
-import type { NewSessionRequest, PastSession, RosterHost } from "../../src/shared/sessions";
+import type { NewSessionRequest } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -24,7 +24,7 @@ import { blockedShortcut, ComposerEditor, ComposerNote, EmptyConversation } from
 import { BranchPicker, targetOf } from "./git";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
 import { DictationButton, DictationRow, useDictation } from "./composer-dictation";
-import { PersonalContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
+import { PersonalContext, useDashboardActions } from "./dashboard-context";
 import { PrivateFacts } from "./new-session-modes";
 import type { PromptEditorHandle } from "./prompt-editor";
 import { ModelPicker } from "./model-picker";

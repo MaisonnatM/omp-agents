@@ -3,7 +3,7 @@ import type { Routine } from "../src/routines";
 import { DESIGNER_JOB, DESIGNER_NAME } from "../src/shared/bot-designer";
 import { type Bot, type BotChange, type BotId, type BotKind, type BotLast, jobLine } from "../src/shared/bots";
 import { SHEPHERD_JOB, SHEPHERD_NAME } from "../src/shared/shepherd";
-import type { HostStatus, RosterHost, View } from "../src/shared/sessions";
+import type { RosterHost, View } from "../src/shared/sessions";
 import { needsYou } from "./attention";
 import { statusLabel } from "./components/status-dot";
 import { plainMarkdown } from "./labels";

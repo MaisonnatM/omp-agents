@@ -2,7 +2,7 @@
 import { RefreshCw } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { readTime } from "../labels";
 import type { PolledEntry } from "../polled-store";

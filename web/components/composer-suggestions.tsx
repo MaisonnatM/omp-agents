@@ -106,7 +106,6 @@ function Row({ sendKey, marked, label, className, children, ...props }: RowProps
 }
 
 interface SuggestionRowProps {
-	text: string;
 	label: string;
 	index: number;
 	active: boolean;
@@ -122,7 +121,7 @@ interface SuggestionRowProps {
  * as `MenuItem` does, since an inline ref callback would re-register every render and keep the hook's measurement pass
  * from ever settling.
  */
-function SuggestionRow({ text, label, index, active, marked, optionId, registerItem, onPick }: SuggestionRowProps) {
+function SuggestionRow({ label, index, active, marked, optionId, registerItem, onPick }: SuggestionRowProps) {
 	const EnterIcon = useIcon("corner-down-left");
 	const ref = useRef<HTMLDivElement>(null);
 
@@ -264,7 +263,6 @@ export function useSuggestions({ prompts, labelOf, draft, onSend, onFill }: Sugg
 							{prompts.map((text, index) => (
 								<SuggestionRow
 									key={`${text}-${index}`}
-									text={text}
 									label={labelOf?.(text) ?? text}
 									index={index}
 									active={index === activeIndex}

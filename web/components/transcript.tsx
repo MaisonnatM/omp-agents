@@ -60,7 +60,6 @@ import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigg
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
-import { errorText } from "../../src/json";
 import { activityControl } from "../activity";
 import { mediaSrc } from "../api";
 import { modeOf, SPLIT_CLICK } from "../labels";

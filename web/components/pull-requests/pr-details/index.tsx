@@ -1,9 +1,8 @@
 /** `PullRequestDetailContent`: a pull request's header and Summary, Timeline, Code, and Review draft tabs. */
 import { ClipboardPen, FileDiff, FileText, History } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { type LinkedPullRequest, type PullRequest, type PullRequestChange, type PullRequestDetail, type PullRequestSummary, type StackedPullRequest, prKey, samePullRequest } from "../../../../src/shared/github";
+import { type PullRequestChange, type PullRequestDetail, type StackedPullRequest, prKey, samePullRequest } from "../../../../src/shared/github";
 import { reviewDraftOf } from "../../../../src/shared/review-drafts";
-import type { RosterHost, View } from "../../../../src/shared/sessions";
 import { SegmentedTab, SegmentedTabPanel, SegmentedTabs, SegmentedTabsList } from "../../segmented-tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -11,7 +10,6 @@ import { activityControl } from "../../../activity";
 import { commentCount } from "../../../pull-requests-model";
 import { type PullRequestActionId, pullRequestActions } from "../../../../src/pull-request-actions";
 import { actionFacts } from "../../../../src/shared/moves";
-import type { OpenMode } from "../../../routing";
 import { useEditableRead } from "../../../editable-read";
 import { type RebaseHooks, rebasePullRequest } from "../../../pull-request-rebases";
 import { pullRequestsStore, useRead, writePullRequest } from "../../../reads";

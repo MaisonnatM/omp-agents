@@ -91,7 +91,6 @@ import { ScheduledFile } from "./scheduled-file";
 import { AutoContinue, occupiedBy } from "./auto-continue";
 import { ScheduledRunner } from "./scheduled-runner";
 import type { Routes } from "./route-kit";
-import type { PhoneAccess } from "./phone-access";
 import type { PhoneAccessRoutesEnv } from "./phone-access-routes";
 import { createRoutes } from "./routes";
 import type { SelfUpdate } from "./self-update";
