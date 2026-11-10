@@ -12,7 +12,8 @@ import { integrationsStore, providersStore, sourceControlStore, starterKitStore,
 import { useStoredState } from "../stored-state";
 import { useAction } from "../use-action";
 import { useDashboardActions } from "./dashboard-context";
-import { KitStep, NEED_LABEL, type Need, ProviderStep, SessionStep, StepHeader, TerminalStep, ToolsStep } from "./get-started-steps";
+import { KitStep, NEED_LABEL, type Need, ProviderStep, pstackLoaded, SessionStep, StepHeader, TerminalStep } from "./get-started-steps";
+import { ToolsStep } from "./get-started-tools";
 import { Callout, LIST_SURFACE } from "./integrations/integration-row";
 import { useProviders } from "./settings/providers-tab";
 import { UnderToasts } from "./toaster";
@@ -27,7 +28,7 @@ const STEPS = [
 	{ id: "provider", label: "Model provider", need: "required", title: "Sign in to a model provider", summary: "omp needs a model to answer you. Connect a provider you already use, with its sign-in or an API key." },
 	{ id: "terminal", label: "Terminal sessions", need: "recommended", title: "Show terminal sessions", summary: "omp sessions you start in a terminal can show here, next to the ones you start in the dashboard. Choose what the dashboard can do with them." },
 	{ id: "kit", label: "Starter kit", need: "optional", title: "Install the starter kit", summary: "The setup this dashboard is built around, ready for every new session." },
-	{ id: "tools", label: "GitHub and tools", need: "optional", title: "Connect your tools", summary: "Bring pull requests, tickets, and messages into the dashboard, so omp can work on them." },
+	{ id: "tools", label: "Tools and workflows", need: "optional", title: "Connect your tools and workflows", summary: "Bring pull requests, tickets, and messages into the dashboard, and load pstack, the skills /ship plans with and poteto mode runs on." },
 	{ id: "session", label: "First session", need: "required", title: "Start your first session", summary: "Pick a first task for omp, or start from a blank prompt." },
 ] as const satisfies readonly { id: string; label: string; need: Need; title: string; summary: string }[];
 
@@ -195,7 +196,8 @@ export function GetStarted({ route, vacantHome, firstSession, rosterError, onClo
 	const sourceControl = observation(sourceControlStore.usePolling(null, open));
 	const github = mapKnown(sourceControl, answer => answer.github);
 	const kit = observation(starterKitStore.usePolling(null, open));
-	const integrations = mapKnown(observation(integrationsStore.usePolling(null, open)), answer => Object.values(answer.integrations).filter(item => connectionsOf(item).some(signedIn)).length);
+	const integrationsEntry = integrationsStore.usePolling(null, open);
+	const integrations = mapKnown(observation(integrationsEntry), answer => Object.values(answer.integrations).filter(item => connectionsOf(item).some(signedIn)).length);
 
 	const refresh = useCallback(async (): Promise<void> => {
 		await Promise.all([providersStore.refresh(), ...(open ? [terminalSessionsStore.refresh(), sourceControlStore.refresh(), starterKitStore.refresh(), integrationsStore.refresh(null, { fresh: true })] : [])]);
@@ -218,7 +220,7 @@ export function GetStarted({ route, vacantHome, firstSession, rosterError, onClo
 		provider: known(providers, count => count > 0),
 		terminal: known(terminal, value => value !== "off"),
 		kit: known(kit, value => value.pending === 0),
-		tools: known(github, value => value.state === "signed-in") || known(integrations, count => count > 0),
+		tools: known(github, value => value.state === "signed-in") || known(integrations, count => count > 0) || pstackLoaded(kit),
 		session: known(firstSession, Boolean),
 	};
 	const requiredFinished = STEPS.filter(item => item.need === "required" && done[item.id]).length;
@@ -258,7 +260,7 @@ export function GetStarted({ route, vacantHome, firstSession, rosterError, onClo
 									provider: <ProviderStep providers={providerEntry} />,
 									terminal: <TerminalStep terminal={terminal} />,
 									kit: <KitStep kit={kit} />,
-									tools: <ToolsStep github={github} integrations={integrations} onRefresh={() => check.run()} refreshing={check.pending} />,
+									tools: <ToolsStep facts={{ github, integrations: integrationsEntry, kit }} onKitStep={() => setPlace("kit")} onRefresh={() => check.run()} refreshing={check.pending} />,
 									session: <SessionStep sessions={firstSession} />,
 								}}
 							/>

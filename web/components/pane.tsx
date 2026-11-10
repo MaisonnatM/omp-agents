@@ -19,6 +19,7 @@ import { PastConversation } from "./past-conversation";
 import { RenderBoundary } from "./render-boundary";
 import { SidebarToggle } from "./sidebar-panel";
 import { SubagentLinks, type SubagentLinksValue } from "./subagent-links";
+import { PaneFocused } from "./find-bar";
 
 interface PaneProps {
 	view: View;
@@ -137,13 +138,15 @@ export const ViewConversation = memo(function ViewConversation({ view, focused, 
 	const fileBase = useFileBase(view.kind === "past" ? session : (host ?? lastHost));
 	return (
 		<HeaderControlsContext.Provider value={null}>
-			<SubagentLinks.Provider value={links}>
-				<FileBaseContext.Provider value={fileBase}>
-					<RenderBoundary resetKey={hashForView(view)} actions={actions}>
-						{content}
-					</RenderBoundary>
-				</FileBaseContext.Provider>
-			</SubagentLinks.Provider>
+			<PaneFocused.Provider value={focused}>
+				<SubagentLinks.Provider value={links}>
+					<FileBaseContext.Provider value={fileBase}>
+						<RenderBoundary resetKey={hashForView(view)} actions={actions}>
+							{content}
+						</RenderBoundary>
+					</FileBaseContext.Provider>
+				</SubagentLinks.Provider>
+			</PaneFocused.Provider>
 		</HeaderControlsContext.Provider>
 	);
 });

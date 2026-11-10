@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { PullRequestComment, PullRequestEvent, PullRequestThread } from "../src/shared/github";
-import { conversationItems, decodeCommentFilter, filterConversations, pageConversations } from "./pull-request-comments";
+import { conversationItems, decodeCommentFilter, filterConversations, latestConversations, pageConversations } from "./pull-request-comments";
 
 const comment = (body: string, at: number, login = "octocat"): PullRequestComment => ({ body, at, author: { login, avatarUrl: null }, url: `https://github.com/o/r/pull/1#${body}`, reactions: [] });
 const event = (body: string, at: number, review: PullRequestEvent["review"] = null, login = "octocat"): PullRequestEvent => ({ ...comment(body, at, login), review });
@@ -26,6 +26,15 @@ describe("Summary conversations", () => {
 		expect(pageConversations(items, 10, "newest").hidden).toBe(2);
 		expect(pageConversations(items, 20, "oldest").visible.map(item => item.at)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
 		expect(pageConversations(items, 20, "oldest").hidden).toBe(0);
+	});
+
+	test("the hover card filters before taking the newest, and counts older and filtered conversations apart", () => {
+		const people = Array.from({ length: 7 }, (_, index) => event(`person-${index + 1}`, index + 1));
+		const bots = [8, 9].map(at => ({ ...event(`bot-${at}`, at), author: { login: "cursor", avatarUrl: null, isBot: true } }));
+		const latest = latestConversations({ threads: [], conversation: [...people, ...bots] }, { bots: false, resolved: false }, 5);
+		expect(latest.visible.map(item => item.at)).toEqual([7, 6, 5, 4, 3]);
+		expect(latest.older).toBe(2);
+		expect(latest.filtered).toBe(2);
 	});
 
 	test("restores valid filters and rejects malformed saved state", () => {

@@ -1,6 +1,6 @@
 ---
 name: ship
-description: Ship a change, with or without a Linear ticket, through a plan, a draft PR, interface and thermonuclear reviews, and live review to merge-ready
+description: Use whenever work will produce a PR, even without "/ship": a fix, feature, or refactor, a "work on it" ticket or todo, a late "open a draft PR" request, or a rebase, CI, or review-comment follow-up. Runs grill, plan, draft PR, reviews, and live review to merge-ready.
 metadata:
   tags: workflow
 ---
@@ -25,9 +25,10 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before opening a PR or cr
    If this is the main checkout on its default branch, create a dedicated worktree off the current parent branch per the Git safety rule in `AGENTS.md`; on any other branch, work in place.
 2. **Plan.** Choose how to build the change before anyone writes code.
    If the issue, or the PR body when there is no issue, already has a plan from an earlier run, use that plan and skip to the next step.
-   Read `skill://technical-writing` and `skill://arena`; the kit does not ship them, so if either read fails, name the missing skill, tell the user to install it, and stop.
+   When ship starts after code already exists, such as at a late request to open a PR, still grill, but only on the choices the code left open or made silently; record them, write a plan of what the code does, skip the arena, and resume at the stage the git and GitHub state shows.
+   Read `skill://technical-writing` and `skill://arena`, which pstack provides through the kit's `pstack-skills` extension; if either read fails, name the missing skill, tell the user to run the starter kit's installer, and stop.
    Read the issue, or the user's request when there is none, and the code it touches.
-   Then read `skill://grill-with-docs` and follow it to grill the user on the change until its frontier is empty; it writes settled terms to `GLOSSARY.md` and each choice to `docs/decisions/`.
+   Then read `skill://grill-with-docs` and follow it to grill the user on the change until its frontier is empty; it writes settled terms to `GLOSSARY.md` and each choice where the `decision-records` skill says.
    When the request leaves nothing to decide, such as a typo, skip the grill and say so in one line of the report.
    Then list the approaches that would each solve it within the grill's answers.
    If only one approach is sound, such as for a typo or a fix the request spells out, write that plan yourself with the `technical-writing` skill and say in one line of the report why no arena ran.
@@ -60,23 +61,19 @@ If `~/.omp/agent/docs/git-workflow.md` exists, read it before opening a PR or cr
    Then run `interface-reviewer` on `pr <number>` with `task`.
    If it reports a missing `interface-review` or `better-interface` skill, stop and tell the user to install it.
    Apply valid findings in a fresh `task` agent, isolated or in place per the Git safety rule in `AGENTS.md`, integrate and verify once, commit and push.
-   Once all findings are resolved and pushed, append `- [x] Interface review` to the PR body with `pr_description`, as step 6 does for its checkbox.
-   Call `ship_stage({stage:"thermonuclear"})`.
+   Once all findings are resolved and pushed, call `ship_stage({stage:"thermonuclear"})`, which checks `- [x] Interface review` in the PR body, ticking the template's box or appending it.
 6. **Thermonuclear.** If the repository commits `.omp/review-paths` and the PR changes no file its globs match, skip this stage: the `ship_stage` status says so, the gates do not ask for the checkbox, and you call `ship_stage({stage:"ready_gate"})` and say in one line of the report that the review was skipped and why.
    Otherwise wait until the user approves the direction, as `# Before any pull request` in `APPEND_SYSTEM.md` says, then run `thermonuclear-reviewer` on `pr://<number>/diff` with `task`.
    Review the actual PR including tests.
    Apply valid findings in a fresh `task` agent, isolated or in place per the same rule, integrate and verify once, commit and push.
    Repeat the review if substantial changes invalidate it.
-   Once all findings are resolved, add `- [x] Thermo-nuclear code quality review` to the current PR body without overwriting other content.
-   Read the description with `pr_description({repo:"<owner>/<repo>", pr:<number>, change:{kind:"read"}})` and use `append` or `replace-text` for the checkbox; do not turn unchecked `gh` stdout into a replacement body.
-   Add the checkbox only AFTER the fixes are pushed.
-   Call `ship_stage({stage:"ready_gate"})`.
+   Once all findings are resolved and pushed, call `ship_stage({stage:"ready_gate"})`, which checks `- [x] Thermo-nuclear code quality review` in the PR body without touching the rest; never add the box yourself before the fixes are pushed.
 7. **Put live for review.** Show the issue if there is one, the PR URL, checks, findings and dispositions before promotion.
-   Run `gh pr ready <number>` only after the body has the checkbox of each review that steps 5 and 6 did not skip.
+   Run `gh pr ready <number>` only after `ship_stage({stage:"ready_gate"})` succeeded, so the body has the checkbox of each review that steps 5 and 6 did not skip.
    When the interface review applied and the body has an unchecked `- [ ] Browser proof` box from the repository's PR template, do what the box and the repository's instructions ask, then check it; the extension blocks on the unchecked box and does not look for a screenshot.
    The extension asks the user for approval and blocks the command if they decline or no UI is available.
    Request the named reviewer, if any, only after promotion succeeds.
-   Call `ship_stage({stage:"live"})`.
+   A successful `gh pr ready` records `live`; never call `ship_stage({stage:"live"})` while the PR is still a draft.
    Never merge as part of this workflow.
 8. **Live review.** On later `/ship` calls, read `ship_stage` again, inspect the PR and its review threads, and address the first need.
    Record `ship_stage({stage:"rebase"})` before rebasing the owned branch, `ship_stage({stage:"fix_comments"})` before addressing comments, and `ship_stage({stage:"fix_ci"})` before fixing a CI failure.

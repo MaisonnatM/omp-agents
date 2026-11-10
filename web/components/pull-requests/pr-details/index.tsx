@@ -1,6 +1,6 @@
 /** `PullRequestDetailContent`: a pull request's header and Summary, Timeline, Code, and Review draft tabs. */
 import { ClipboardPen, FileDiff, FileText, History } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { type PullRequestChange, type PullRequestDetail, type StackedPullRequest, prKey, samePullRequest } from "../../../../src/shared/github";
 import { reviewDraftOf } from "../../../../src/shared/review-drafts";
 import { SegmentedTab, SegmentedTabPanel, SegmentedTabs, SegmentedTabsList } from "../../segmented-tabs";
@@ -16,6 +16,7 @@ import { pullRequestsStore, useRead, writePullRequest } from "../../../reads";
 import type { MenuRebase } from "../pr-menu";
 import type { QuickActionsProps } from "../../quick-actions";
 import { useDashboardStatus } from "../../dashboard-context";
+import { FindBar } from "../../find-bar";
 import { ERROR_TEXT } from "../../form-dialog";
 import { usePullRequestOptions } from "../pr-fields";
 import { LoadNote } from "../../sheet-details";
@@ -44,7 +45,7 @@ const LABEL_CLASS = "@max-[30rem]/pr:sr-only";
  * of the other actions; then Summary, Timeline, and Code tabs, and a Review draft tab while a Review session's
  * draft of it is kept, with the checks at a glance on the tab bar.
  */
-export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions, onOpen, session = [], placement, version, tab: picked, onTab, path = null, onPick, cwd }: DetailContentProps) {
+export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions, onOpen, session = [], placement, version, tab: picked, onTab, path = null, onPick, cwd, findable = false }: DetailContentProps) {
 	const { pullRequestsScope: scope, reviewDrafts } = useDashboardStatus();
 	const query = new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) });
 	// The list's state of it joins `version`, so a change made from its row, or one the list reads from GitHub, reads the details again.
@@ -78,13 +79,18 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 	const openDraft = draft && !draft.posted ? draft : undefined;
 	const pendingFindings = openDraft?.findings.filter(finding => finding.state === "pending").length ?? 0;
 	const [root, setRoot] = useState<HTMLDivElement | null>(null);
+	const findRoot = useRef<HTMLDivElement | null>(null);
+	const keepRoot = useCallback((element: HTMLDivElement | null) => {
+		findRoot.current = element;
+		setRoot(element);
+	}, []);
 	const foldRef = useRef<HTMLDivElement>(null);
 	const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
 	const condensed = useCondensedHeader(scroller, root, foldRef, tab);
 	return (
-		<SegmentedTabs ref={setRoot} value={tab} onValueChange={value => onTab(value as PullRequestDetailTab)} className={cn("@container/pr relative flex min-h-0 flex-1 flex-col", page && "h-full")}>
+		<SegmentedTabs ref={keepRoot} value={tab} onValueChange={value => onTab(value as PullRequestDetailTab)} className={cn("@container/pr relative flex min-h-0 flex-1 flex-col", page && "h-full")}>
 			<div className={cn("shrink-0 bg-background", !page && "pt-2")}>
-				<DetailHeader pr={pr} detail={detail} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} quick={quick} rebase={rebase} onSave={save} send={send} onMergeQueued={reload} placement={placement} headingRef={headingRef} cwd={cwd} condensed={condensed} foldRef={foldRef} />
+				<DetailHeader pr={pr} detail={detail} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} quick={quick} rebase={rebase} ask={facts ? { pr: facts, cwd } : null} onSave={save} send={send} onMergeQueued={reload} placement={placement} headingRef={headingRef} cwd={cwd} condensed={condensed} foldRef={foldRef} />
 				<nav aria-label="Pull request tabs" className="flex min-w-0 flex-wrap items-center gap-2 border-t border-border/60 px-4 py-2">
 					<SegmentedTabsList aria-label="Pull request details">
 						{([
@@ -102,6 +108,7 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 						))}
 					</SegmentedTabsList>
 					{detail && <ChecksSummary checks={detail.checkRuns} />}
+					{findable && <FindBar root={findRoot} enabled label="Find in pull request" className="static ml-auto w-96 max-w-full" />}
 				</nav>
 			</div>
 			<SegmentedTabPanel value={tab} asChild>

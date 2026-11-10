@@ -33,7 +33,7 @@
 - A `task` tool call lists the subagents it spawned, by id, under its row: each one as it starts while the call runs, and every one once the call finishes.
   A tool group that spawned subagents stays open.
   In a live session or subagent, each id is a link with the subagent's status dot (none while running, blue idle, hollow parked, red aborted); hover it for the subagent's type, status, and what it is doing.
-  Click it to open the subagent, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split, or middle-click to open it in the app window in place of what it shows.
+  Click it to open the subagent in this pane, in place of the conversation, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split beside the conversation, or middle-click to open it in the app window in place of what it shows.
   A subagent's own `task` calls link its subagents the same way.
   A past session's ids are not links, because the dashboard opens subagents only of a running session.
 - A tool call whose result returned images, such as a browser screenshot or a `read` of an image file, shows them as thumbnails under its row; click one to open it large, with the tool and what the call said it did.
@@ -65,14 +65,18 @@
   Hovering a line grows it and, less, its neighbours, and opens a card with the turn's prompt and the first words of its reply, or **Working…** while it runs; a bold label that opens a reply, such as **Résumé**, is left out.
   Click a line to scroll the conversation to that prompt; the arrows above and below the lines, shown on hover, step to the previous and next turn.
   The line of the turn you are reading stays lit as you scroll; after a click it stays on that turn until you scroll yourself, since the last turns may never reach the top.
+- Cmd+F opens a find bar at the top right of the focused pane's conversation, filled with the text you selected in it, if any.
+  Every match on screen is highlighted, the current one more strongly, and the bar counts them, such as `3 of 12`; it starts at the first match from where you are reading.
+  Enter and Shift+Enter, or the bar's arrows, step to the next and previous match and scroll the conversation to it; Esc or the close button closes the bar.
+  It searches the text the conversation shows, so folded tool calls and hidden thinking are left out, and it keeps counting as new output streams in.
+  Focusing another pane closes it; while no conversation shows, Cmd+F keeps the browser's own Find.
 - The **Todos** card holds the agent's todo list, its **Subagents**, and the **Files**, **Images**, and **Sources** sections of [Changed files and images](changed-files-and-images.md), each shown once it has something to list; a past session's conversation shows it too.
-  It shows as one line above the messages: the /ship stage and its step, such as **Live review · step 8 of 9**, or else the task in progress, then each section's count in its header's words, such as **Todos 6/12 · 7 Files · 1 Image · 1 Source**.
-  As the conversation narrows, the counts drop from the last one, so the stage or the task keeps room to read.
-  Click the line to open the card over the messages; click outside it or press Escape to close it, and Escape puts the focus back on the line.
-  A file or an image opened from the card opens on top of it, and closing it brings you back to the card.
   Once the view's agent made a todo list, the card shows the list as its latest `todo` call left it: how many tasks are done of all, a thin progress line, and the task in progress.
-  Click the todo summary to fold every phase, and click it again to unfold it; it starts unfolded, and the app remembers your choice for every conversation.
-  **Show todos card** in Settings › Preferences, or the checklist toggle in the session's header, before End session or Resume, hides the whole card, its line, its **Subagents**, **Files**, **Images**, and **Sources** sections too.
+  It floats at the conversation's top right once the conversation is wide enough, and the messages move left to make room for it; in a narrower conversation it sits above them, so it never covers a message.
+  It scrolls as a whole when its sections outgrow it.
+  Click the todo summary to unfold every phase, and click it again to fold it; it starts folded, and the app remembers your choice for every conversation.
+  Closing a file or an image opened from the card puts the focus back on the row or thumbnail you opened it from.
+  **Show todos card** in Settings › Preferences, or the checklist toggle in the session's header, before End session or Resume, hides the whole card, its **Subagents**, **Files**, **Images**, and **Sources** sections too.
   Unfolded, each phase shows its done count and its open tasks first, a blocked task's reason under it; its done and dropped tasks fold into an **N done** row.
   Each status has its own mark: an empty ring for to do, a spinning arc beside a shimmering title for in progress, a green disc with a check for done, an amber disc with an exclamation mark for blocked, and a dashed ring for dropped.
   A phase with every task done folds to one line; click it to open it.
@@ -83,9 +87,13 @@
   A subagent that another subagent started sits indented under it.
   Each row shows the subagent's status dot, the same as on its link in the conversation, its id, its type, and, on one line under them, what it is doing now; hover that line for all of it.
   The section's title counts the subagents, and how many are running.
-  Click a row to open the subagent, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split, or middle-click to open it in the app window in place of what it shows.
+  Click a row to open the subagent in this pane, in place of the conversation, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split beside the conversation, or middle-click to open it in the app window in place of what it shows.
   The stop button after a running subagent cancels it, as the one after its link in the conversation does, in every room the dashboard can write to.
   A subagent's own view lists only the subagents it started, and theirs; a past session shows no section, because the dashboard opens subagents only of a running session.
+  When the agent gives two or more subagents the same task and records them with the kit's `arena` tool, those runners show above the other rows in an **Arena** box with the task, as cards side by side lettered A, B, C in the order it started them.
+  Each card shows the runner's id, its status, its type, and what it is doing; the judge, once the agent records one, sits on a row under the cards.
+  Once the agent records its pick, the card it kept turns green with a **Base** badge, a runner it took something from shows **Graft** and what it took, and the others show **Not used**.
+  Click a card to open that runner, as with a row; hover a running one for its stop button.
   The section starts open, and the app remembers whether you folded it.
 - The clock button in the composer, shown once a session has two prompts, opens **Chat history**: it blurs the conversation and gathers every prompt you sent into one column over it, newest at the bottom.
   Prompts that were in view slide from their place into the column.

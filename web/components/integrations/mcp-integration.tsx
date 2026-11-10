@@ -10,8 +10,8 @@ import { useSignIn } from "../../use-sign-in";
 import { MoreActionsMenu } from "../more-actions-menu";
 import { GoogleAccountsRow } from "./google-accounts";
 import { IntegrationRow, MarkTile, MetaDot } from "./integration-row";
-import { ConnectButton, ConnectionCallout, Reconnecting, ReconnectItem, SignOutConfirm, SignOutItem, StatusBadge, useToolList, WAITING_STATUS } from "./mcp-connection-controls";
-import { SERVICES, STATUS } from "./services";
+import { ConnectButton, ConnectionCallout, Reconnecting, ReconnectItem, SignOutConfirm, SignOutItem, StatusBadge, useToolList } from "./mcp-connection-controls";
+import { integrationStatus, SERVICES } from "./services";
 import { SlackAppForm } from "./slack-app-form";
 
 /** A service that signs in to one server: where omp stands with it, and the buttons that sign in and out. */
@@ -28,7 +28,7 @@ function ServerIntegrationRow({ integration }: { integration: McpIntegration<Sin
 	const [formOpen, setFormOpen] = useState(false);
 	const tools = useToolList(connection.kind === "ready" ? connection : null);
 
-	const status = signIn.waitingUrl ? WAITING_STATUS : needsSetup && !signedIn(connection) ? { label: "Not set up", color: "gray" as const } : STATUS[connection.kind];
+	const status = integrationStatus(integration);
 
 	let actions: ReactNode = null;
 	if (!signIn.waitingUrl && !confirming && !formOpen) {

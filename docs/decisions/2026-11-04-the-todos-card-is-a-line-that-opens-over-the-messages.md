@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 date: 2026-11-04
 decision-makers: Maxence Maisonnat, agent
+superseded-by: 2026-11-10-the-todos-card-floats-beside-the-messages-again
 ---
 
 # The Todos card is a line that opens over the messages
@@ -33,7 +34,7 @@ The new Activity control `todos-card.open` records the line's clicks.
 
 ## Confirmation
 
-`web/todos-strip-model.test.ts` checks that the line's words match the section headers, and the strip's breaks were checked at 744, 440, 280, and 200 pixels in a throwaway harness.
+`todos-strip-model.test.ts` checked that the line's words match the section headers, and the strip's breaks were checked at 744, 440, 280, and 200 pixels in a throwaway harness; the file went with the strip on 2026-11-10.
 
 ## Revisit when
 

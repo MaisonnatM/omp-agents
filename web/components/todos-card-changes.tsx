@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
-import { countLabel } from "../todos-strip-model";
+import { countLabel } from "../todos-card-model";
 import { useChangedFiles, useMedia, useSources } from "../pane-store";
 import { useStoredKeys } from "../stored-state";
 import { ChangedFileList, FileChangesDialog } from "./changed-files-section";
@@ -26,8 +26,8 @@ export interface ChangesSession {
 	sessionId: string | null;
 	/** The session's directory, which the files' relative paths resolve against. */
 	cwd: string | null;
-	/** The session's pull requests and Linear issues, which selected images can be sent to and the sources leave out, and its /ship run. */
-	facts: Pick<SessionFacts, "pullRequests" | "tickets" | "ship"> | null;
+	/** The session's pull requests and Linear issues, which selected images can be sent to and the sources leave out, its /ship run, and its arenas. */
+	facts: Pick<SessionFacts, "pullRequests" | "tickets" | "ship" | "arenas"> | null;
 }
 
 /** What the view's agents changed, took, and opened, each list empty until the server sends it. */
@@ -136,7 +136,9 @@ export function ChangesSections({ view, session: { sessionId, cwd, facts }, chan
 						)
 					}
 				>
-					<ChangedFileList files={files} onOpen={path => setShown({ kind: sessionId === null ? "history" : "changes", path })} />
+					<div className="max-h-[min(30vh,11.5rem)] overflow-y-auto">
+						<ChangedFileList files={files} onOpen={path => setShown({ kind: sessionId === null ? "history" : "changes", path })} />
+					</div>
 				</ChangesSection>
 			)}
 			{media.length > 0 && (
@@ -146,7 +148,9 @@ export function ChangesSections({ view, session: { sessionId, cwd, facts }, chan
 			)}
 			{sources.length > 0 && (
 				<ChangesSection title={countLabel(sources.length, "Source", "Sources")} open={!closed.has("sources")} onToggle={() => toggle("sources")} fold="changes-card.sources.fold">
-					<SourceList sources={sources} />
+					<div className="max-h-[min(30vh,11.5rem)] overflow-y-auto">
+						<SourceList sources={sources} />
+					</div>
 				</ChangesSection>
 			)}
 			{history && <FileChangesDialog file={history} onClose={() => setShown(null)} />}

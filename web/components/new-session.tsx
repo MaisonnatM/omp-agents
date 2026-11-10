@@ -260,7 +260,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 							}}
 						/>
 					</div>
-					{directCommand && <ComposerNote text={directCommand} />}
+					{directCommand && !completion.popup && <ComposerNote text={directCommand} />}
 					{attachments.note && <ComposerNote text={attachments.note} />}
 					{!scheduled && todo && <p className="mt-2 px-1 text-xs text-muted-foreground">Your todo “{todo.text}” links to the session once it starts.</p>}
 					{panel}

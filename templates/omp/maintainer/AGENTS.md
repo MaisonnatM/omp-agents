@@ -1,6 +1,7 @@
 # OMP user context
 
 Applies to every omp session on this machine.
+When an instruction file and the existing code disagree, follow the conventions in the code, and point out each mismatch in your final reply.
 If `PI_CODING_AGENT_DIR` is set, substitute that directory for `~/.omp/agent` in the reference paths below.
 
 ## Session project
@@ -50,6 +51,10 @@ When you tell the user about a server you started, write its full URL, such as `
 
 A test or check runs headless and never opens a window on the user's screen.
 Start an app that opens windows, such as an Electron app, in its hidden mode, such as `OMP_AGENTS_HEADLESS=1` for the omp-agents desktop app, and open a visible window only when the user asks for one.
+
+## Pasted secrets
+
+When the user pastes a secret, such as an API key, a password, or a database URL with a password, save it where it belongs, such as the project's env file, Vercel, or the keychain, in the same turn: once the turn ends the session's saved copy reads `[redacted secret: …]`, so a resumed session no longer has the value.
 
 ## omp-agents dashboard
 

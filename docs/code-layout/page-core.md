@@ -11,7 +11,8 @@
   `web/components/app-sidebar.tsx` wires the roster to the page, `web/components/page-switch.tsx` picks the page or the panes, and `web/components/pane-grid.tsx` lays out the panes.
   `#pull-requests` alone shows the Pull requests page, and the sidebar's Pull requests tab then lists its sections.
 - `web/components/get-started.tsx`: the setup dialog, mounted once in `web/app.tsx`, with its welcome, five-step rail, and Back / Next / Skip, the vacant-home eligibility check, and the bottom-right bubble it closes into, drawn under the toasts through `UnderToasts`.
-  `web/components/get-started-steps.tsx` draws each step's body, reusing the Settings provider list for the sign-in step.
+  `web/components/get-started-steps.tsx` draws each step's body, reusing the Settings provider list for the sign-in step, and the GitHub and pstack rows.
+  `web/components/get-started-tools.tsx` draws the Tools and workflows step: GitHub, each Settings › Integrations row through `McpIntegrationRow`, and pstack, grouped under Action needed and Ready, each folding to its name, badge, and summary.
   `web/get-started-model.ts` holds what it decides without React: `Observation` and `observation()`, `firstSessionFact`, which reads the roster into the first-session fact `web/app.tsx` passes it, and `getStartedSurface`, which picks the dialog, the bubble, or nothing.
   It derives completion from the providers, terminal-session, starter-kit, and source-control reads and the existing global session/integration stores; only dismissal, the closed dialog, and the step on screen are stored locally, never portable completion ticks.
   `#get-started` and the command menu always open the dialog over the home or panes `PageSwitch` draws.

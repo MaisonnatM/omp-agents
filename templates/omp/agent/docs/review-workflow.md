@@ -66,3 +66,4 @@ Never pass `--body`, `--body-file`, `-b`, or `-F` to `gh pr edit`: the pr-descri
 When the cwd is not the PR's repository, pass `-R owner/repo`, or `gh` looks for the PR in the cwd's repository.
 Never commit images to an assets branch or link Linear upload URLs, which expire after five minutes.
 For a sized or side-by-side layout, attach first, then use `pr_description` to put the appended `user-attachments` URLs into `<img>` tags and remove the appended lines.
+A screenshot in the PR shows the UI as of one commit: after every push that changes a screen it shows, retake it in the same state and replace its `user-attachments` URL before you report the push.

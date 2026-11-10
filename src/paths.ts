@@ -94,6 +94,8 @@ export const preferencesFile = join(configDir, "preferences.json");
 export const processesFile = join(configDir, "processes.json");
 /** The model profiles Settings › Models saved, beside {@link tokenFile}; omp's own `config.yml` never holds them. */
 export const modelProfilesFile = join(configDir, "model-profiles.json");
+/** The fallback lists the composer's Extra usage switch parked, beside {@link tokenFile}. */
+export const extraUsageFile = join(configDir, "extra-usage.json");
 /** The Google calendars the Calendar page's sidebar unchecked, beside {@link tokenFile}. */
 export const calendarsFile = join(configDir, "calendars.json");
 /** The address each Google account signs in as and the addresses in the Personal space, beside {@link tokenFile}. */

@@ -29,6 +29,7 @@
   With two or more prompts, 0 sends them all as a single message, a Markdown list in list order, and so does a click on the **All of them** row under them.
   ↓ moves a highlight into the list and ↑ back out; Enter sends the highlighted prompt, Tab puts it in the composer to edit first, and Esc drops the highlight.
   A click sends it too.
+  Hovering or highlighting a prompt shows its keys, ↩ to send, ⇥ to edit, and ⌘ (Ctrl off macOS) with a click to mark, and a pencil button that puts it in the composer to edit first, like Tab.
   Cmd+click (Ctrl+click off macOS) marks a prompt without sending it.
   A click or a number then sends the marked prompts plus that one as a single message, a Markdown list when it holds more than one.
   Enter sends them plus the highlighted prompt, if any, and Tab puts the same text in the composer instead.
@@ -46,6 +47,9 @@
 - Sessions started from the dashboard have a model menu, as Cursor's does: the button reads the model and its effort, such as **Opus 5.5 High**.
   **Fast** turns omp's `/fast` on or off; it is greyed out for a model without a priority tier, and reads **not active** when omp has it on but the provider refused the fast tier.
   **Advisor**, just under Fast, turns passive review on or off for this session and names its model, or the number of configured advisors.
+  **Extra usage**, under Advisor, parks the fallback list and clears it, so a full Claude allowance stays on Claude and bills extra usage instead of moving to Cursor or another fallback.
+  It applies to every session, and the fallback list comes back when you turn it off.
+  Claude has to have extra usage turned on for the account, or the turn stops when the allowance is full.
   Assign an advisor model in **Settings → Models** to enable the switch.
   **Context** shows the model's context window and switches to a variant of the same model with another window, such as Cursor's `claude-opus-5-5` (300K) and `claude-opus-5-5-1m` (1M); models without such a variant have no Context row.
   **Effort** chooses the thinking level among the ones the live model supports.
@@ -80,7 +84,8 @@
   With focus fills the composer with `/compact ` or `/handoff ` for you to finish.
   These actions wait until the running turn ends; **Auto-compact** remains available and changes this session only, not its config file.
   While compaction runs, the ring reads **Compacting…** and pulses unless you prefer reduced motion.
-- Type `/` to complete discovered file commands and `/skill:<name>` skills; a skill whose name has a space is left out, since omp cannot invoke it.
+- Type `$` to complete omp's commands, discovered file commands, and `/skill:<name>` skills; picking one puts its `/` text in the draft, such as `/skill:poteto-mode`, so omp runs it as if you had typed it. A skill whose name has a space is left out, since omp cannot invoke it.
+  `$` opens the list at the start of a line or after a space, and not before a digit, so a price such as `$5` stays text; `/` no longer opens it.
   Type `@` to mention something: the list shows the last three files the session changed, then Files & Folders, Todos, Tickets, Pull requests, People, Email, Calendar, and Sessions.
   Picking a category narrows the list to it, which you can also type as a prefix: `@file:`, `@todo:`, `@ticket:`, `@pr:`, `@person:`, `@mail:`, `@event:`, or `@session:`.
   People lists the authors, reviewers, and review teams of the pull requests the Pull requests page lists, without you or bots, each with the pull requests they are on, so `@person:#12` finds the people on pull request 12, then your Linear workspace's active members while Linear is connected.
@@ -116,6 +121,7 @@
 - Pasting more than 2,000 characters or 40 lines attaches the text as a file, `Pasted text.txt`, instead of filling the text field, as ChatGPT and Claude do; a second one is `Pasted text 2.txt`.
   Its tile shows the text's first lines, and it goes to the model as a text file does.
 - A prompt's images show above it in the transcript as thumbnails at most 128 pixels tall and 240 wide, in live and past sessions, a `/skill:` prompt's included, as are images sent from omp's terminal, and its files show by name in chips above the text.
+  Clicking a file chip, such as `Pasted text.txt`, opens the text the prompt carried, with a button that copies it.
 - In a session that the dashboard started, omp's built-in `/` commands run as they do in its terminal, for example `/compact` or `/usage`, and what a command prints shows as a line in the conversation.
   `!<command>` runs a shell command in the session's directory, as in omp's terminal: the command and its output show as your message, and the agent sees them in its next turn.
   omp saves a new session only with its first reply, so a new session cannot start with a `!` command.

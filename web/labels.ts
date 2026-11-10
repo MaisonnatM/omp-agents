@@ -102,6 +102,9 @@ export function modelOrg(selector: string): string {
 /** ⌘-click on macOS and Ctrl-click elsewhere ({@link modHeld}) opens a row in a new pane. */
 export const modeOf = (event: MouseEvent): OpenMode => (modHeld(event) ? "split" : "replace");
 
+/** A subagent link opens in its conversation's pane, and beside it with the modifier held. */
+export const subagentModeOf = (event: MouseEvent): OpenMode => (modHeld(event) ? "beside" : "replace");
+
 /** The gesture {@link modeOf} reads as a split, as hints name it. */
 export const SPLIT_CLICK = IS_MAC ? "⌘-click" : "Ctrl-click";
 

@@ -10,7 +10,7 @@
 import { isObject, str } from "./json";
 import { imagesOf, textOf, toolSummary, UNREAD_LINE } from "./session-entries";
 import { type BotId, MESSAGE_BOT_TOOL, parseBotId } from "./shared/bots";
-import { splitFiles } from "./shared/prompt-files";
+import { type PromptFile, splitFiles } from "./shared/prompt-files";
 import type { PromptImage } from "./shared/sessions";
 import type { RoutineMessage } from "./shared/routine-message";
 import { isPrompt, type Item, type PromptItem, promptAuthor, skillInvocation, type TodoPhase, type TodoTask } from "./shared/transcript";
@@ -58,7 +58,7 @@ function unwrapSkill(prompt: string): { text: string; skill: string | null } {
 
 /**
  * The item a prompt shows as, `skill` the one it invoked: the dashboard's, a routine's, another Bot's, or the user's as
- * typed, with attached files as their names, not their text.
+ * typed, with attached files apart from its text.
  */
 function promptItem(id: string, { text, skill }: { text: string; skill: string | null }, rest: { from: string | null; entryId: string | null; images?: string[]; pending?: true }): SentItem {
 	const author = promptAuthor(text);
@@ -85,8 +85,8 @@ function withSkill(message: RoutineMessage, skill: string | null): RoutineMessag
 	return { ...message, sent: { kind: "prompt", prompt: skillInvocation(skill, message.sent.prompt) } };
 }
 
-/** `prompt` without the files the composer attached after it, which `files` names when there are any. */
-function typed(prompt: string): { text: string; files?: string[] } {
+/** `prompt` without the files the composer attached after it, which `files` holds when there are any. */
+function typed(prompt: string): { text: string; files?: PromptFile[] } {
 	const { text, files } = splitFiles(prompt);
 	return files.length > 0 ? { text, files } : { text };
 }

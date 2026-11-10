@@ -27,7 +27,7 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
   The app itself can go anywhere on the web, so a sign-in that goes through Google or another provider and comes back finishes in the Browser, and a sign-in popup opens as a small window of the app with the same sign-ins.
   When a sign-in comes back to `localhost` on the port the app runs on day to day, such as `3000`, the Browser loads the same address on the session's server instead, so the sign-in lands in the app you are testing; this happens when nothing listens on that port or another copy of the same app does.
   A sign-in that comes back to another server of yours, such as the app's API on `8000`, goes there as is.
-  A link that opens a new tab opens in your default browser.
+  A link that opens a new tab opens in your default browser, or, for a page of another omp agents server on this computer, in an omp agents window of its own, signed in.
   An address that fails to load says why under the address.
 - Back, Forward, and Reload work as in a browser.
 - The **⋯** button at the end of the toolbar holds two actions, so the address field keeps its room in the sidebar:
@@ -49,8 +49,10 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
 
 ## Review visuals
 
-- A session the dashboard started adds a list of pages to review to its reply after it changes something you should look at, above any suggested prompts; the reply shows the list as a card, with each page's name and how to reach it.
-- **Review visuals**, the eye button with violet sparkles in the Browser's toolbar once a reply lists pages, opens one tab per page, up to 8, after the session's own **App** tab, and shows the first; its tooltip names the pages.
+- A session the dashboard started adds a list of pages to review to its reply after it changes something you should look at, above any suggested prompts; the list itself does not show in the reply.
+- **Review visuals**, the eye button under a reply that lists pages, beside its copy button, shows the Browser and opens one tab per page of that reply, up to 8, after the session's own **App** tab, and shows the first.
+  The eye button with violet sparkles in the Browser's toolbar does the same for the latest reply's pages; its tooltip names them.
+  A listed page of another omp agents server on this computer, such as the session's test server, opens signed in, in an omp agents window of its own instead of a tab; that window shows the first of that server's pages.
 - The tabs look like a browser's: the shown tab joins the toolbar below it, the **App** tab is pinned at the start as its icon alone, and each review tab has the sparkles the page marks the agent's work with, then its name.
 - The Left and Right arrow keys move between tabs once one has the focus.
 - Hover a review tab, or tab to it, to show its close button; a middle click closes it too, and closing the shown tab shows the one after it, else the one before, and gives that tab the focus.

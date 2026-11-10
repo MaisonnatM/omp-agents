@@ -11,7 +11,7 @@ import { SessionPullRequestsTab } from "./session-pull-requests-tab";
 import { SessionTicketsTab } from "./session-tickets-tab";
 
 /** The right sidebar's tab, kept across views; the key keeps its old name, and a tab that no longer exists reads as PRs. */
-const TAB_KEY = "omp-agents.plan-tab";
+export const TAB_KEY = "omp-agents.plan-tab";
 
 /** What a session worked on and runs, which its **PRs**, **Browser**, and **Tickets** tabs show. */
 export interface SessionWork {

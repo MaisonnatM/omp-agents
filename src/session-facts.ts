@@ -22,7 +22,7 @@
 import { access } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { branchAt, type CheckoutReads, type HeadHistory, type WorktreeAt } from "./git";
-import { isObject, oneOf, str } from "./json";
+import { isNonEmpty, isObject, oneOf, str } from "./json";
 import { FoldedFile, type LineFold } from "./line-reader";
 import { mapLimit, PROBE_PARALLEL } from "./map-limit";
 import { expandHome } from "./paths";
@@ -31,7 +31,7 @@ import { subagentFiles } from "./subagents";
 import { headKey, type LinkedPullRequest, parseRemote, type PullRequest, type PullRequestLink, prKey, pullRequestOfUrl, type Repo, repoKey } from "./shared/github";
 import { located, within } from "../templates/omp/agent/extensions/shell/commands";
 import { taskText } from "./shared/routine-message";
-import { SHIP_STAGES, SHIP_WORK, type SessionBranch, type SessionFacts, type ShipProgress } from "./shared/sessions";
+import { type ArenaRecord, SHIP_STAGES, SHIP_WORK, type SessionBranch, type SessionFacts, type ShipProgress } from "./shared/sessions";
 import { TICKET_ID } from "./shared/tickets";
 import { messageItemsOf } from "./transcript";
 import { WorkspacePlacement } from "./workspace-placement";
@@ -46,6 +46,8 @@ const GIT_PUSH = /\bgit\s+(?:-C\s+\S+\s+)?push\b/;
 const OWNER_REPO = /^([\w.-]+)\/([\w.-]+)$/;
 /** omp's `pr://<n>` or `pr://<owner>/<repo>/<n>`, with or without `/diff/…` or `?comments=1` after it. */
 const PR_URI = /^pr:\/\/(?:([\w.-]+)\/([\w.-]+)\/)?(\d+)(?:[/?#]|$)/;
+/** A `read` of an address, such as `skill://x` or `https://…`, rather than of a file. */
+const URI_SCHEME = /^[a-z][a-z\d+.-]*:\/\//i;
 /** A pull request's address in a prompt's prose. */
 const PR_URL = /https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/g;
 /** A PR number as a prompt writes it, `#7049`, `PR 7049`, or `PR#7049`; not `acme/webapp#7049` or `&#39;`. */
@@ -61,7 +63,7 @@ const PUSH_REMOTE = /^To (\S+)\s*$/;
 /** `   1a2b..3c4d  HEAD -> me/b`, ` * [new branch]  me/b -> me/b`, or ` + 1a2b...3c4d … (forced update)`; rejected and deleted refs do not match. */
 const PUSHED_REF = /^\s*[+*]?\s*(?:\[new branch\]|[0-9a-f]{4,}\.\.\.?[0-9a-f]{4,})\s+\S+\s+->\s+(\S+)/;
 /** Lines that can matter hold one of these; skipping the rest before `JSON.parse` is most of the startup scan. */
-const MARKERS = ["github", "gh pr", "push", "pr://", "omp-ship.state", "omp-agents.headless", "mcp__linear_", '"cwd"', '"toolName":"edit"', '"toolName":"write"', "cd ", "-C "];
+const MARKERS = ["github", "gh pr", "push", "pr://", "omp-ship.state", "omp-arena.state", "omp-agents.headless", "mcp__linear_", '"cwd"', '"toolName":"edit"', '"toolName":"write"', '"name":"read"', "cd ", "-C "];
 /**
  * Where `located` starts a bash call that names no absolute `cwd`, so a relative `cd` keeps its path relative to the
  * session's directory, which the scan does not know: no real directory starts with a NUL.
@@ -176,6 +178,30 @@ export function parseShipProgress(data: unknown): ShipProgress | null {
 	};
 }
 
+/** No arenas: one value, so that a session without any keeps the same facts from one refresh to the next. */
+const NO_ARENAS: readonly ArenaRecord[] = [];
+
+/** An arena as its `omp-arena.state` entry records it, or `null` when the entry lacks a task or two distinct runners; a judge that is a runner is dropped. */
+export function parseArenaRecord(data: unknown): ArenaRecord | null {
+	if (!isObject(data)) return null;
+	const { task, runners, judge, base, grafts } = data;
+	if (!isNonEmpty(task) || !Array.isArray(runners) || runners.length < 2 || !runners.every(isNonEmpty) || new Set(runners).size !== runners.length) return null;
+	return {
+		task,
+		runners,
+		judge: isNonEmpty(judge) && !runners.includes(judge) ? judge : null,
+		base: isNonEmpty(base) && runners.includes(base) ? base : null,
+		grafts: Array.isArray(grafts) ? grafts.flatMap(graft => (isObject(graft) && isNonEmpty(graft.from) && isNonEmpty(graft.what) ? [{ from: graft.from, what: graft.what }] : [])) : [],
+	};
+}
+
+/** `arenas` with `arena` in place of the one naming the same runners, or after them when none does. */
+function withArena(arenas: readonly ArenaRecord[], arena: ArenaRecord): ArenaRecord[] {
+	const same = (other: ArenaRecord) => other.runners.length === arena.runners.length && other.runners.every(id => arena.runners.includes(id));
+	const at = arenas.findIndex(same);
+	return at < 0 ? [...arenas, arena] : arenas.with(at, arena);
+}
+
 /** Folds one transcript's lines, in order, into the pull requests and Linear issues it names, each once. */
 export class SessionFactsScan {
 	/** Bash calls, then their background jobs, whose output has not been read yet, and what it can prove. */
@@ -190,11 +216,13 @@ export class SessionFactsScan {
 	/** The PR numbers the session's own prompts name, `#7049` or `PR 7049`. */
 	readonly named = new Set<number>();
 	ship: ShipProgress | null = null;
+	/** The arenas the `arena` tool recorded, each replaced whole by a later entry naming the same runners. */
+	arenas: readonly ArenaRecord[] = NO_ARENAS;
 	/** omp ran the session as `omp -p` or `--mode json`, as the `headless-mark` extension records. */
 	headless = false;
 	/** The `cwd` arguments of bash calls as written, and the directories of the files `edit` and `write` changed, each once, the most recently used last. */
 	readonly workDirs = new Set<string>();
-	/** `workDirs`, plus the absolute directories its bash commands `cd` into: where a relative path in its text may start. Each once, the most recently used last. */
+	/** `workDirs`, the absolute directories its bash commands `cd` into, and those of the files it read: where a relative path in its text may start. Each once, the most recently used last. */
 	readonly fileDirs = new Set<string>();
 	/** A candidate line could not be parsed, so its working-directory evidence is incomplete. */
 	unreadableLines = false;
@@ -240,6 +268,9 @@ export class SessionFactsScan {
 					this.ship = ship;
 					if (ship.issue) this.#ticket(ship.issue, "worked");
 				}
+			} else if (entry.customType === "omp-arena.state") {
+				const arena = parseArenaRecord(entry.data);
+				if (arena) this.arenas = withArena(this.arenas, arena);
 			}
 			return;
 		}
@@ -336,7 +367,12 @@ export class SessionFactsScan {
 
 	#read(path: string): void {
 		const match = PR_URI.exec(path);
-		if (!match) return;
+		if (!match) {
+			// A file it read, such as a screenshot it checked, is often one its reply then names by its bare name.
+			const dir = dirname(path);
+			if (!URI_SCHEME.test(path) && dir !== ".") this.#movedTo(dir);
+			return;
+		}
 		const [, owner, repo, number] = match;
 		this.#add({ kind: "read", repository: owner && repo ? { owner, repo } : null, number: Number(number) });
 	}
@@ -468,8 +504,9 @@ interface SessionScan {
 	worktree: string | null;
 	/** The branch it works on in `worktree`, else in `cwd`, as `SessionFacts.branch` describes it; only `#resolve` writes it, whole, from git's answer, the default branch, and the pull request it heads. */
 	branch: SessionBranch | null;
-	/** The /ship stage and headless mark of its own file as the last refresh reported them, which `#scan` compares with. */
+	/** The /ship stage, arenas, and headless mark of its own file as the last refresh reported them, which `#scan` compares with. */
 	ship: ShipProgress | null;
+	arenas: readonly ArenaRecord[];
 	headless: boolean;
 }
 
@@ -559,7 +596,7 @@ const SCAN_PARALLEL = PROBE_PARALLEL;
 const ASK_AGAIN_MS = 60_000;
 
 /** The facts of a session before its first scan: one value, so that a caller can tell by identity that they did not change. */
-const NO_FACTS: SessionFacts = { pullRequests: [], tickets: [], ship: null, worktree: null, branch: null, workspace: null };
+const NO_FACTS: SessionFacts = { pullRequests: [], tickets: [], ship: null, arenas: NO_ARENAS, worktree: null, branch: null, workspace: null };
 
 export class SessionFactsIndex {
 	readonly #sessions = new Map<string, SessionScan>();
@@ -604,7 +641,7 @@ export class SessionFactsIndex {
 
 	/**
 	 * What the session in `sessionPath` and its subagents submitted, worked on, and linked, or none before its first scan or without a file.
-	 * The /ship stage, the worktree, and the branch are the session's own transcript's, not its subagents', which run in worktrees of their own.
+	 * The /ship stage, the arenas, the worktree, and the branch are the session's own transcript's, not its subagents', which run in worktrees of their own.
 	 * `workspace` is the one `cwd` counts in: the directory a live session runs in now, which omp writes to its file only with the first
 	 * reply, and after a `/move` only with the next; the file's directory when omitted.
 	 * Each field keeps its identity until a refresh changes it, so a caller can compare them with `===`.
@@ -615,7 +652,7 @@ export class SessionFactsIndex {
 		const workspace = dir === undefined ? null : this.placement.at(dir);
 		if (!session || sessionPath === null) return workspace ? { ...NO_FACTS, workspace } : NO_FACTS;
 		const own = this.#ownFile(sessionPath)?.fold;
-		return { pullRequests: session.pullRequests, tickets: session.tickets, ship: own?.scan.ship ?? null, worktree: session.worktree, branch: session.branch, workspace };
+		return { pullRequests: session.pullRequests, tickets: session.tickets, ship: own?.scan.ship ?? null, arenas: session.arenas, worktree: session.worktree, branch: session.branch, workspace };
 	}
 
 	/** Whether omp last started session `sessionPath` as `omp -p` or `--mode json`; `false` before its first scan. */
@@ -623,7 +660,7 @@ export class SessionFactsIndex {
 		return this.#own(sessionPath)?.headless ?? false;
 	}
 
-	/** Where a relative path in session `sessionPath`'s text may start: the directories its own bash calls ran in or `cd` into, and those of the files it changed, absolute, the most recently used first; none before its first scan. */
+	/** Where a relative path in session `sessionPath`'s text may start: the directories its own bash calls ran in or `cd` into, and those of the files it changed or read, absolute, the most recently used first; none before its first scan. */
 	fileDirsOf(sessionPath: string): string[] {
 		const session = this.#sessions.get(sessionPath);
 		const own = this.#own(sessionPath);
@@ -842,7 +879,7 @@ export class SessionFactsIndex {
 		session ??= {
 			modifiedAt: Number.NaN, cwd, own: new FoldedFile(path, () => new TranscriptFold(new SessionFactsScan(true), this.#ownFileFolds.map(folds => folds.start(path)))), subagents: new Map(),
 			refs: [], repo: null, named: new Set(), pullRequests: [], evidence: new Map(), tickets: [], workDirs: [], worktree: null, branch: null,
-			ship: null, headless: false,
+			ship: null, arenas: NO_ARENAS, headless: false,
 		};
 		this.#sessions.set(path, session);
 		for (const file of await subagentFiles(path)) {
@@ -852,8 +889,10 @@ export class SessionFactsIndex {
 		if (reads.every(read => read.readable)) session.modifiedAt = modifiedAt;
 		const own = session.own.fold.scan;
 		const ship = own.ship ?? null;
-		const changed = JSON.stringify(session.ship) !== JSON.stringify(ship) || own.headless !== session.headless;
+		// The scan builds a new arenas list only when an arena entry arrives, so identity tells a change.
+		const changed = JSON.stringify(session.ship) !== JSON.stringify(ship) || own.arenas !== session.arenas || own.headless !== session.headless;
 		session.ship = ship;
+		session.arenas = own.arenas;
 		session.headless = own.headless;
 		const workDirs = [...own.workDirs].reverse().map(dir => absolute(cwd, dir));
 		const dirsBefore = session.workDirs;

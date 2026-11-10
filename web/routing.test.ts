@@ -280,6 +280,16 @@ describe("opening and closing panes", () => {
 		expect(openView(split([a, b, c, d], 1), e, "split")).toEqual(split([a, e, c, d], 1));
 	});
 
+	test("beside puts the pane right after the focused one, and with four open keeps the focused pane", () => {
+		expect(openView(split([a], 0), b, "beside")).toEqual(split([a, b], 1));
+		expect(openView(split([a, b], 0), c, "beside")).toEqual(split([a, c, b], 1));
+		expect(openView(split([a, b, c], 2), d, "beside")).toEqual(split([a, b, c, d], 3));
+		expect(openView(split([a, b, c, d], 1), e, "beside")).toEqual(split([e, b, c, d], 0));
+		expect(openView(split([a, b, c, d], 2), e, "beside")).toEqual(split([a, b, c, e], 3));
+		expect(openView(maximized([a, b], 0), c, "beside")).toEqual(split([a, c, b], 1));
+		expect(openView(split([a, b], 0), b, "beside")).toEqual(split([a, b], 1));
+	});
+
 	test("a view already open gets focus instead of a second pane", () => {
 		expect(openView(split([a, b, c], 0), c, "split")).toEqual(split([a, b, c], 2));
 		expect(openView(split([a, b, c], 0), b, "replace")).toEqual(split([a, b, c], 1));

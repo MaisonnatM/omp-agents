@@ -110,15 +110,15 @@ describe("Transcript", () => {
 		expect(t.items()).toMatchObject([{ id: "m800", images: [`/api/image?hash=${hash}&type=image%2Fpng`] }]);
 	});
 
-	test("a prompt's attached files show by name, apart from its text, a skill prompt's arguments included", () => {
+	test("a prompt's attached files show apart from its text, a skill prompt's arguments included", () => {
 		const t = new Transcript();
 		const files = withFiles("sum these up", [{ name: "notes.md", text: "# Notes" }, { name: "spec.pdf", text: "Spec" }]);
 		t.applyEntry({ type: "message", id: "e1", message: { role: "user", timestamp: 100, content: files } });
 		const details = { name: "mma-mode", path: "/s/SKILL.md", args: withFiles("", [{ name: "log.txt", text: "boom" }]) };
 		t.applyEntry({ type: "custom_message", id: "e2", customType: "skill-prompt", content: "[IMPORTANT: …]", display: true, attribution: "user", details });
 		expect(t.items()).toMatchObject([
-			{ id: "m100", text: "sum these up", files: ["notes.md", "spec.pdf"] },
-			{ id: "e2", text: "", skill: "mma-mode", files: ["log.txt"] },
+			{ id: "m100", text: "sum these up", files: [{ name: "notes.md", text: "# Notes" }, { name: "spec.pdf", text: "Spec" }] },
+			{ id: "e2", text: "", skill: "mma-mode", files: [{ name: "log.txt", text: "boom" }] },
 		]);
 	});
 
@@ -127,13 +127,13 @@ describe("Transcript", () => {
 		t.applyEvent({ type: "message_end", message: assistant(600, [text("Done")], { stopReason: "stop" }) });
 		const prompt = withFiles("sum these up", [{ name: "notes.md", text: "# Notes" }]);
 		expect(t.setStarting({ id: "req_1", text: prompt, images: [{ data: "aGk=", mimeType: "image/png" }] })).toEqual([
-			{ id: "starting:req_1", kind: "user", text: "sum these up", skill: null, from: null, entryId: null, files: ["notes.md"], images: ["data:image/png;base64,aGk="], pending: true },
+			{ id: "starting:req_1", kind: "user", text: "sum these up", skill: null, from: null, entryId: null, files: [{ name: "notes.md", text: "# Notes" }], images: ["data:image/png;base64,aGk="], pending: true },
 		]);
 		expect(t.setStarting({ id: "req_1", text: prompt, images: [] })).toEqual([]);
 		expect(t.takeRemoved()).toEqual([]);
 
 		const skill = { id: "req_2", text: `/skill:mma-mode ${withFiles("check this", [{ name: "log.txt", text: "boom" }])}`, images: [] };
-		expect(t.setStarting(skill)).toMatchObject([{ id: "starting:req_2", text: "check this", skill: "mma-mode", files: ["log.txt"] }]);
+		expect(t.setStarting(skill)).toMatchObject([{ id: "starting:req_2", text: "check this", skill: "mma-mode", files: [{ name: "log.txt", text: "boom" }] }]);
 		expect(t.items().map(item => item.id)).toEqual(["m600:0", "starting:req_2"]);
 		expect(t.takeRemoved()).toEqual(["starting:req_1"]);
 

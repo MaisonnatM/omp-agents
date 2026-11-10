@@ -46,7 +46,7 @@ const END_WHEN_DONE = "Once that is done, end this session with the `end_session
 
 /** How a session that repairs the PR's branch records each kind of work with the ship workflow, in the order it does them. */
 const shipWork = (pr: PullRequestSummary, ...work: ("rebase" | "fix_comments" | "fix_ci")[]): string =>
-	`Record the work with the ship workflow: call \`ship_stage({repo:"${pr.owner}/${pr.repo}", pr:${pr.number}, stage:"${work[0]}"})\` before you start${work.slice(1).map(stage => `, \`ship_stage({stage:"${stage}"})\` before that next step`).join("")}, and \`ship_stage({stage:"live"})\` after you push. It refuses while the PR is a draft; skip those calls then.`;
+	`Record the work with the ship workflow: call \`ship_stage({repo:"${pr.owner}/${pr.repo}", pr:${pr.number}, stage:"${work[0]}"})\` before you start${work.slice(1).map(stage => `, \`ship_stage({stage:"${stage}"})\` before that next step`).join("")}, and \`ship_stage({stage:"live"})\` after you push. While the PR is a draft it records nothing and says so; skip those calls then.`;
 
 /** How a session runs the thermo-nuclear review of `pr`: on the `plan` role, through the kit's reviewer agent. */
 const thermonuclear = (pr: PullRequestSummary): string =>
@@ -114,6 +114,14 @@ const PULL_REQUEST_IDS = Object.keys(PULL_REQUEST_ACTIONS) as PullRequestActionI
 
 /** The actions that apply to `pr`, in registry order. */
 export const pullRequestActions = (pr: PullRequestSummary): PullRequestActionId[] => PULL_REQUEST_IDS.filter(id => PULL_REQUEST_ACTIONS[id].applies(pr));
+
+/** The draft that **Explain this PR** opens a new session with. */
+export const explainPrompt = (pr: PullRequestSummary): string =>
+	`${pullRequestContext(pr)} Explain it: read the description and the diff (\`pr://${pr.owner}/${pr.repo}/${pr.number}/diff\`), and walk through its purpose, the changes, the risks, and what I should read closely before approving. Do not change any code or post anything on GitHub.`;
+
+/** The draft that **Ask a question** opens a new session with, ending where the question goes. */
+export const askPrompt = (pr: PullRequestSummary): string =>
+	`${pullRequestContext(pr)} Read it (\`pr://${pr.owner}/${pr.repo}/${pr.number}\`) and answer my question without changing any code or posting anything on GitHub.\n\n`;
 
 /** The prompt of the session that lands `pr` through the `land` tool, for a repository that commits `.omp/land.json` and whose PR shepherd asked to merge it. */
 export const landPrompt = (pr: PullRequestSummary): string =>

@@ -177,7 +177,7 @@ function DockedDetails({ hosts, route, onExpand }: { hosts: RosterHost[]; route:
 					</Tooltip>
 				</div>
 				<div className="flex min-h-0 flex-1 flex-col">
-					<PullRequestDetails hosts={hosts} target={route.target} path={route.files?.path ?? null} tab={tab} onTab={setTab} placement="sidebar" />
+					<PullRequestDetails hosts={hosts} target={route.target} path={route.files?.path ?? null} tab={tab} onTab={setTab} placement="sidebar" findable />
 				</div>
 			</TooltipProvider>
 		</aside>

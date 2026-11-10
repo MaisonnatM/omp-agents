@@ -24,7 +24,7 @@ test("each reference the composer inserts reads back as its chip", () => {
 });
 
 test("a command or skill counts only where the prompt starts", () => {
-	expect(kinds("/move there")).toEqual([{ kind: "command", label: "/move", target: "move" }]);
+	expect(kinds("/move there")).toEqual([{ kind: "command", label: "Move", target: "move" }]);
 	expect(kinds("go /move there")).toEqual([]);
 	expect(kinds("/skill:x", { leading: false })).toEqual([]);
 });

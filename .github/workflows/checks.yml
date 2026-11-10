@@ -16,6 +16,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+          fetch-depth: 0
+      # Every change that reaches main adds CHANGELOG.md lines (CODING_STANDARDS.md#changelog); a PR merged on GitHub skips the local hooks.
+      - if: github.event_name == 'pull_request'
+        run: git diff --quiet "${{ github.event.pull_request.base.sha }}" HEAD -- CHANGELOG.md && { echo "::error::Add lines to CHANGELOG.md, as CODING_STANDARDS.md#changelog says."; exit 1; } || true
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.4

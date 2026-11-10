@@ -162,6 +162,16 @@ type LiveList = (typeof LIVE_LISTS)[number];
 /** Every live session `lists` holds outside pinned, in the sidebar's order. */
 export const liveHosts = (lists: Pick<SidebarSessions, LiveList>): RosterHost[] => LIVE_LISTS.flatMap(list => lists[list]);
 
+/** Where a sidebar row's session shows: in no pane, alone, or in a split with other panes. */
+export type RowPlacement = "hidden" | "alone" | "split";
+
+/** Where `row`, a session's own view, shows among `panes`; a pane of one of its subagents shows the session too. */
+export function rowPlacement(panes: readonly View[], row: View): RowPlacement {
+	const shown = panes.some(pane => (row.kind === "live" ? pane.kind === "live" && pane.instanceId === row.instanceId : pane.kind === "past" && pane.sessionId === row.sessionId));
+	if (!shown) return "hidden";
+	return panes.length > 1 ? "split" : "alone";
+}
+
 /** The list unpinned live session `host` lands in: `idle` and `running` hold the sessions that wait on no subagent, by its status. */
 function liveList(host: RosterHost): LiveList {
 	if (awaitsSubagents(host)) return "awaitingSubagents";

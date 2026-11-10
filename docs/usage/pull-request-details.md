@@ -48,6 +48,9 @@
   **Show all** reveals completed checks when other checks are failing or running, and **Show less** hides them again.
   Each row names its status and links to the check run through **Details** when GitHub provides a link.
   In a narrow panel the checks label hides, but the status icon's accessible name keeps the summary.
+- Cmd+F opens a find bar over the tab bar's right end, on the Pull requests page and in the details docked beside its list, but not in a session's **PRs** sidebar, where Cmd+F finds in the conversation.
+  It finds text in the header and the open tab, highlights every match, counts them, and steps through them with Enter and Shift+Enter, scrolling the tab to each; Esc closes it.
+  It searches only what shows: a collapsed section, or a file diff the **Code** tab has not loaded yet, is left out until it opens.
 - **Summary** starts with the pull request's reviewers and labels.
   **Reviewers** shows overlapping avatars, each with the dot the pull request list marks a review's outcome with, or **None**.
   Click the row for the people who can review on the repository, with the author left out, each shown with their picture and GitHub profile name, then their login; someone with no profile name shows only their login.

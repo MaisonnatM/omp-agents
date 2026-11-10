@@ -48,7 +48,7 @@
   Its `storageUsage` builds `AgentSettingRow`s through `agent-settings.ts`'s `rowOf` from one native settings load; workspace override ids travel separately so Storage keeps the global rows editable.
   `gc.test.ts` checks report validation, native preview and apply against an isolated fixture directory, global rule rows with workspace overrides, and refusal of a live native cleanup lock.
   `module-types/config.ts` also declares the background compression log export loaded by `modules.ts`.
-- `src/readiness.ts`: the read-only starter-kit snapshot, using native settings and marketplace registries plus the installer-owned non-forced plan; see [Get started](../architecture/get-started.md).
+- `src/readiness.ts`: the read-only starter-kit snapshot, using native settings and marketplace registries plus the installer-owned non-forced plan, and whether pstack is installed and how many of its skills are linked; see [Get started](../architecture/get-started.md).
 - `src/activity.ts`: `foldActivity`, which folds the stored activity rows into Settings › Activity's uses, last uses, moves between views, time on each view, and days; `src/shared/activity.ts` holds the key pattern, `CONTROLS`, `ACTION_MESSAGES`, and the answer's decoder.
   `src/shared/activity-event.ts` holds one event and its kinds, which the socket protocol imports, so the protocol does not import `activity.ts`.
 - `src/analytics.ts`: merges Claude Code's and Codex's requests into omp-stats' `StatsRead` with `withForeignUsage`, then folds per-file rows into sessions and workspaces.

@@ -10,6 +10,44 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The server no longer stops when re-reading the session files fails right after a session exits, or when the search for a terminal session's subagent transcript fails.
 - Get started no longer waits without end on a GitHub sign-in check that hangs: the check gives up after 20 seconds.
 - Behind the scenes: removed unused imports, a prop no row read, and a line that could never run; declared two editor packages the page already used; merged two test files that shared a name, so both are type-checked; and corrected file lists, names, and three server descriptions in the docs.
+- Ship no longer stops on a missing review checkbox: recording the stage after the interface or thermo-nuclear review ticks that review's box in the pull request description, or adds it when the description has none.
+- Recording `live` or a fix while the pull request is still a draft now says what to do next, such as running `gh pr ready`, instead of failing.
+- A chrome-devtools page tool called without a `pageId`, such as a screenshot, now runs on the first page instead of failing; `close_page` and `select_page` still need one.
+- Cmd+F now finds text in the open conversation, or in the pull request the Pull requests page shows: every match is highlighted, the bar counts them, and Enter and Shift+Enter step through them.
+- The sidebar's session search moved to Cmd+Shift+F.
+- Fixed: a screenshot or file an agent names by its bare name, such as inline-rows.png, now opens when the agent had looked at it in another folder, instead of saying the file could not be loaded.
+- A reply that lists pages to review now has a Review visuals eye button under it, beside its copy button, in place of the card that listed the pages. It shows the Browser and opens that reply's pages as tabs, so you no longer go looking for the button in the Browser's toolbar.
+- Session rows in the sidebar line up again: each age shows its largest unit, such as `3h`, in a fixed column, so the workspace chips sit at the same place on every row.
+- Long agent replies read more easily: their text keeps the conversation's full width with more space between paragraphs and bullets, and bullets that open with a bold word line up as a two-column table, keys on the left. A narrow conversation keeps the key inline.
+- Clicking a subagent opens it in the same pane as its session again, so a split stays as it is instead of gaining a pane. Cmd-click opens it in a split beside its session.
+- In the composer, type $ to pick a skill or command, and @ to mention a file or anything else. Typing / no longer opens the list. A price such as $5 stays plain text.
+- Skills, files, tickets and other references in a prompt show as an icon and a label in their own color, without a badge around them. A command or skill reads as its name, such as Poteto Mode, with the text it runs in its tooltip.
+- Long agent replies read more easily: their text keeps a narrower line length with more space between paragraphs and bullets, and bullets that open with a bold word line up as a two-column table, keys on the left. A narrow conversation keeps the key inline.
+- Clicking a subagent now opens it in a split beside its session, at full height, instead of in place of the session. Cmd-click opens it in place, as a click did before.
+- The sidebar marks the sessions of a split with a two-column icon, and highlights a session while one of its subagents is open.
+- Hovering a suggested prompt under the composer now shows its keys: send, edit, and mark. Its pencil button puts the prompt in the composer so you can edit it before sending.
+- Get started's fourth step is now Tools and workflows: connect GitHub, Linear, Slack, Google Calendar, and Gmail right there, see whether pstack is loaded, and find what still needs you under Action needed, with Go to Starter kit when pstack is missing.
+- Installing the omp Starter Kit on a new computer now makes the pstack skills work, such as arena and technical writing, which ship plans with. Before, omp skipped all of them, so ship stopped at its plan step.
+- The omp Starter Kit now brings the two poteto helpers that ship and poteto mode hand work to, one on Claude and one on Codex.
+- Behind the scenes: the starter kit's agent rules now include the newer ship steps, the rule to set pull request descriptions with the checked tool, and the rule to retake pull request screenshots after each push.
+- Code in a pull request's Code tab, the changes view, and messages is a size larger and colored like a code editor: types, functions, properties, tags, and comments each get their own color, in light and dark mode.
+- A pull request's `⋯` menu, and its row's right-click menu, offer Explain this PR and Ask a question. Each opens a new session in the pull request's repository with a draft that names it: Explain asks for a walk through its purpose, changes, and risks, and Ask leaves room for your question. Neither changes code.
+- A pull request's Summary and Timeline are easier to read: descriptions and comments are larger, section titles stand out, and the timeline's names, dates, and file paths are a size larger, with collapsed comment groups less faded.
+- New Bot offers three more templates for a Routines Bot: Memory curator keeps each repository's project memory up to date, Bot coach proposes how to improve your other Bots, and Review requests drafts the reviews teammates ask you for. Each one sets up its own routine in its first conversation.
+- The model menu has an Extra usage switch. On, a full Claude allowance stays on Claude instead of moving to a fallback such as Cursor. Off puts the fallback list back. It applies to every session.
+- Fixed: Connect in Integrations failed, such as with "Google Calendar has no server to sign in to", when the service's server was turned off. Connect now turns it back on.
+  It skips the sign-in page while the old sign-in still works.
+- A link to an agent's test server, such as one in its reply or listed under Review visuals, now opens signed in, in an omp agents window of its own, instead of a page saying to open the app.
+- The Todos card is back on the right of the conversation, with its todos, subagents, files, images, and sources in view, instead of a line you click open. In a narrow conversation it sits above the messages.
+- Click a file chip above a prompt you sent, such as Pasted text.txt, to read the text it carried. The Copy button copies it.
+- Hover or focus the speech bubble count on a pull request, in the sidebar, the table, or the board, to read its five latest comments and reviews without opening it.
+  The card leaves out what the Comments filter hides and says how many it left out.
+- When an agent sets two or more subagents on the same task, the Todos card's Subagents section shows them side by side in an Arena box.
+- Once the agent picks, the runner it kept says Base, and the others say Graft, with what it took, or Not used.
+- The agent records its arena with the new arena tool: install the updated omp Starter Kit to get it.
+- Todo moved from the sidebar's tab bar to the top right of the header, between Calendar and Sport. Email now sits after Sport. A saved tab order moves Todo there too.
+- Behind the scenes: agents now follow the code when an instruction disagrees with it, and say so.
+- Behind the scenes: the starter kit's maintainer setup now tells agents to save a pasted secret right away.
 
 ## 2026-11-09
 
@@ -168,58 +206,3 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The API credits row in the bottom bar now shows the dollars left on your Console balance when you have no monthly grant, in red once it runs out, instead of only its name.
 - The paid Cursor fallback patch and the tool documentation patch for omp now apply to omp 18.18.0, together with the Cursor tools patch.
 - omp-agents is now tested with omp 18.18.0.
-
-## 2026-11-06
-
-- Fixed: the composer model menu now lists Anthropic API credits after you save the key, without restarting the dashboard.
-- With the starter kit, saying "council" now asks Claude Opus, GPT Sol, and Gemini Pro for their review or advice side by side, with a score out of 10 for each round of a code review.
-- Behind the scenes: the list of outside tools an agent sees is now names grouped by service, instead of every tool's description, so sessions spend far less of their context on it.
-- Fixed: subagents that edit for a session on `main` are now told to write in its worktree by full path, instead of using an option omp does not have, so their edits stop being refused.
-- Fixed: poteto agents now open the poteto mode file in one step instead of failing on its name and searching folders.
-- Fixed: the design critic now calls the browser tools by their real names.
-- Behind the scenes: each group of API routes now lives in its own file, so a mail change and a session change are no longer the same edit.
-- Behind the scenes: a change to one part of the dashboard no longer has to be read together with another part that only shared a type with it.
-- Behind the scenes: agents can list shared project memory even when their provider supplies empty fields for unused options.
-- Behind the scenes: the saved runtime fixes let agents read selected lines of tool help without losing the tool or flooding the conversation with its inventory.
-- Behind the scenes: historical consults now explain when an exact session file is needed, and the Memory curator uses it when working across projects.
-- Fixed: Claude extra usage now appears automatically in the account's billing currency, including euros, in the bottom bar and model menu.
-- Fixed: a note or todo you edit while the dashboard is reconnecting is now saved once it reconnects, instead of being dropped, and the reconnect no longer replaces the text you typed.
-- Fixed: after a failed write to disk, such as a full disk, later changes are saved again once the disk has room, instead of only at the next clean stop.
-- Fixed: a routine run cut off by a server stop while sending its message now shows as failed, saying the message may not have arrived, instead of "Running…" until the next run. A run being sent reads "Sending…", and **Run now** waits while the last run is still under way.
-- Fixed: a failed storage cleanup now says it failed, not that it was stopped.
-- Fixed: a worktree removal or rebase that hits an error no longer blocks every later one until you reload the page, and a worktree removal cut short by a stop is finished at the next start.
-- Fixed: two quick actions started in a row now both open their session or show their failure.
-- Fixed: dictation no longer stays blocked for every page after a capture that never reported its end.
-- Fixed: on the Extensions tab, a failed progress read keeps checking instead of stopping, and approving clears the old error.
-- Fixed: when a pull request comment posts but closing it fails, retrying only closes it, so the comment is not posted twice.
-- Fixed: pressing an action button twice quickly in Settings and other panels now runs it once.
-- Fixed: settings sync drops a result from a remote you changed during the sync, and the desktop app still stops its server when you quit during startup and says when an update did not install.
-- Fixed: a session move waiting on a turn that ends with a question now goes, a prompt to a session whose omp has exited is refused with a plain message, and unread marks saved before a restart survive it.
-- Fixed: an auto-continue scheduled while the usage limit was being read survives a restart.
-- Fixed: a terminal tab you open after its shell exited shows the exit at once, instead of waiting forever.
-- Fixed: a sign-in row no longer shows an old failure beside a fresh sign-in link.
-- Fixed: when an update fails to download in the desktop app, it now says so, and a background update check no longer answers the one you asked for.
-- Fixed: code highlighting and Markdown now still show if their extra code fails to load.
-- Fixed: a hover card such as the CPU card opens on a pen or touch tap after it closed, and pressing Attach in the Browser twice captures once.
-- Fixed: Settings › Worktrees no longer stays on "Reading" after you leave the tab mid-read, and Escape on a pull request edit throws away the draft text.
-
-## 2026-11-05
-
-- Behind the scenes: a check that deletes a private session now passes after another check has already saved a session title, so the full test run no longer stops there.
-- The model menu shows an API credits group beside Anthropic before you search, for an Anthropic API key saved in Settings. A session you start from that group bills the key. A session on Anthropic still uses your Claude plan.
-- An API key that an older version saved on Anthropic moves to that group the next time the dashboard starts.
-- Fixed: an Anthropic API key added in Settings now shows as API credits in the bottom bar, even while you stay signed in to a Claude plan.
-- Starting a new session while several conversations are open shows that new session alone.
-- Ending a session that is open beside another one leaves a single conversation, instead of filling the empty side with the next session.
-- Esc on a split closes the pane that was added last. Esc on a maximized pane still brings the other panes back.
-- The Sessions tab now lists running Bot conversations in a **Bots** group, under each Bot's name, so every open session shows somewhere; the CPU card names them the same way.
-- A Bot's conversation idle for a day, with nothing written to it, now ends by itself so it holds no omp process; your next message to the Bot resumes it.
-- Fixed: a session whose omp exits before it is ready no longer leaves its socket file behind, which blocked the next start on that session.
-- The model menu now lists models from a provider you configured with an API key, such as API credits.
-- The bottom bar names that provider beside the plan windows. It has no percent, because the plan report has no balance for it.
-- When Firefox or Zen is signed in to the Claude Console, the API credits row shows the dollars spent of the monthly grant, such as $11.13 / $200.00. A Chrome-only sign-in stays a name.
-- Behind the scenes: installing the starter kit now adds a headless Chrome DevTools connection for agents that check pages in the browser, and ships the interface review skills so pull request interface reviews can run without a separate install.
-- Behind the scenes: the starter kit's maintainer profile adds rules for sessions aimed at another project, Linear tickets, docs and changelog edits, plan replies, and headless test windows, and `/ship` plans now include how the code works today plus a second-model critique before coding starts.
-- Settings › Providers can add or replace an Anthropic API key in a masked field, so you do not paste it into a conversation.
-- Saving that key keeps your subscription sign-ins.
-- Fallback routing stays as it is.

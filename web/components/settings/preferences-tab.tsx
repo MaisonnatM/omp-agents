@@ -46,7 +46,7 @@ function SidebarTabs() {
 	return (
 		<Section
 			title="Sidebar tabs"
-			meta={`The tabs the sidebar shows, in order. Notes, Calendar, Email, and Sport sit in the header beside the command menu, and ${shortcutKeys("tab1")} goes to the first tab the sidebar's bar draws. A hidden tab's page, command, and links still work. Saved in this app.`}
+			meta={`The tabs the sidebar shows, in order. Notes, Calendar, Todo, Sport, and Email sit in the header beside the command menu, and ${shortcutKeys("tab1")} goes to the first tab the sidebar's bar draws. A hidden tab's page, command, and links still work. Saved in this app.`}
 		>
 			<ol className="space-y-1 text-sm">
 				{layout.map(({ tab, hidden }, index) => {
@@ -213,7 +213,7 @@ export function PreferencesTab({ cwd, workspace }: { cwd: string | null; workspa
 					})}
 				</RadioGroup>
 			</Section>
-			<Section title="Transcript" meta="What each activity group shows under its heading, and whether the Todos card's line shows above the messages, in every pane. Saved in this app.">
+			<Section title="Transcript" meta="What each activity group shows under its heading, and whether the Todos card shows beside or above the messages, in every pane. Saved in this app.">
 				<div className="space-y-2">
 					<ActivitySwitch label="Show tool calls" shortcut="hideTools" checked={!hideTools} onToggle={toggleTools} />
 					<ActivitySwitch label="Show thinking" shortcut="hideThinking" checked={!hideThinking} onToggle={toggleThinking} />

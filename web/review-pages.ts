@@ -53,3 +53,32 @@ export function latestReviewPages(items: readonly Item[]): ReviewPage[] {
 /** Whether two lists name the same pages, in the same order, so a reader renders only when the list changes. */
 export const samePages = (a: readonly ReviewPage[], b: readonly ReviewPage[]): boolean =>
 	a.length === b.length && a.every((page, at) => page.url === b[at]!.url && page.label === b[at]!.label && page.note === b[at]!.note);
+
+/** A **Review visuals** click on a reply: the live session whose Browser opens `pages` as tabs. */
+interface ReviewRequest {
+	instanceId: string;
+	pages: readonly ReviewPage[];
+}
+
+/** The request no Browser took yet, kept so a Browser that mounts after the click still opens it. */
+let pending: ReviewRequest | null = null;
+const listeners = new Set<() => void>();
+
+export function requestReview(request: ReviewRequest): void {
+	pending = request;
+	for (const listener of listeners) listener();
+}
+
+/** The pages a click asked session `instanceId`'s Browser to open, once; `null` when none waits for it. */
+export function takeReview(instanceId: string): readonly ReviewPage[] | null {
+	if (pending?.instanceId !== instanceId) return null;
+	const { pages } = pending;
+	pending = null;
+	return pages;
+}
+
+/** Calls `listener` after each {@link requestReview}, until the returned function stops it. */
+export function onReviewRequest(listener: () => void): () => void {
+	listeners.add(listener);
+	return () => listeners.delete(listener);
+}

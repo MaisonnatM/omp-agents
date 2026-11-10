@@ -11,6 +11,7 @@ import {
 	Cpu,
 	FilePen,
 	FilePlus,
+	Eye,
 	FileText,
 	Flag,
 	FolderSearch,
@@ -44,6 +45,7 @@ import {
 import { createContext, Fragment, type KeyboardEvent, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { View } from "../../src/shared/sessions";
 import { taskText } from "../../src/shared/routine-message";
+import type { PromptFile } from "../../src/shared/prompt-files";
 import { type Item, skillInvocation } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
@@ -62,7 +64,7 @@ import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { mediaSrc } from "../api";
-import { modeOf, SPLIT_CLICK } from "../labels";
+import { SPLIT_CLICK, subagentModeOf } from "../labels";
 import { hashForView, sameView } from "../routing";
 import type { StartOf } from "../starts";
 import { usePaneLoaded, useTranscript } from "../pane-store";
@@ -71,8 +73,10 @@ import { type ActivityItem, EMPTY_TRANSCRIPT, type ForkPoint, replacingPrompt, r
 import { useAction } from "../use-action";
 import { useCopy } from "../use-copy";
 import { type ToolChipLabels, ToolChipsContext } from "./tool-chips";
+import { AttachedFileDialog } from "./file-dialog";
+import { PromptFileChips } from "./prompt-file-chips";
 import { ImageViewer } from "./media-viewer";
-import { AGENT_PRESET, MessageMarkdown, SESSION_AGENT_PRESET, SESSION_PROMPT_PRESET } from "./message-markdown";
+import { MessageMarkdown, SESSION_AGENT_PRESET, SESSION_PROMPT_PRESET, SESSION_STREAMING_PRESET } from "./message-markdown";
 import { StatusDot, statusLabel } from "./status-dot";
 import { RoutineRunCard } from "./routines/routine-run-card";
 import { BotMessageCard } from "./bots/bot-message-card";
@@ -80,7 +84,10 @@ import { PromptHistory } from "./prompt-history";
 import { SessionTodosCard } from "./session-todos-card";
 import { CancelAgentButton, SubagentLinks } from "./subagent-links";
 import type { ChangesSession } from "./todos-card-changes";
+import { FindBar, PaneFocused } from "./find-bar";
 import { TranscriptMinimap } from "./transcript-minimap";
+import { latestReviewPages, requestReview } from "../review-pages";
+import { BROWSER_AVAILABLE } from "./browser-panel";
 
 /** omp's tool names (`pi-coding-agent/src/tools/builtin-names.ts`, plus its optional and extension tools). */
 const TOOL_ICON: Record<string, LucideIcon> = {
@@ -162,6 +169,8 @@ const RESIZE_REST_MS = 150;
 
 /** Opens the transcript's image viewer at image `at` of prompt or tool item `id`; outside a `Transcript` it does nothing. */
 const OpenImage = createContext<(id: string, at: number) => void>(() => {});
+/** Opens a prompt's attached file in the transcript's dialog; outside a `Transcript` it does nothing. */
+const OpenFile = createContext<(file: PromptFile) => void>(() => {});
 
 /** The subagents a `task` call spawned, each a link to its own view with its status. */
 function SpawnedAgents({ ids }: { ids: string[] }) {
@@ -190,7 +199,7 @@ function SpawnedAgents({ ids }: { ids: string[] }) {
 									// Shift- and middle-clicks keep the link's own new-window behavior.
 									if (event.button !== 0 || event.shiftKey || event.altKey) return;
 									event.preventDefault();
-									links.onOpen(view, modeOf(event));
+									links.onOpen(view, subagentModeOf(event));
 								}}
 							>
 								{agent && <StatusDot status={agent.status} />}
@@ -432,6 +441,17 @@ function EditButton({ onEdit }: { onEdit: () => void }) {
 	);
 }
 
+/** Opens the pages a reply's `review-pages` fence lists as tabs of the session's Browser. */
+function ReviewButton({ onReview }: { onReview: () => void }) {
+	return (
+		<Tooltip content="Review visuals in the Browser">
+			<Button {...activityControl("browser.review-visuals")} variant="ghost" size="icon-compact" aria-label="Review visuals" onClick={onReview}>
+				<Eye />
+			</Button>
+		</Tooltip>
+	);
+}
+
 interface PromptEditorProps {
 	initial: string;
 	text: string;
@@ -545,6 +565,8 @@ interface MessageRowProps {
 	/** The entry an edit of this message replaces, or `null` where it cannot be edited. */
 	editAt: string | null;
 	editor?: ReactNode;
+	/** The live session whose Browser a reply's **Review visuals** opens its pages in, or `null` where there is none. */
+	browser: string | null;
 	/** It took the place of a pending prompt already on screen, so it shows at once without its entrance motion. */
 	replacing: boolean;
 	/** It is not the transcript's last row, so it may skip layout while off screen. */
@@ -555,13 +577,17 @@ interface MessageRowProps {
 
 /** One message with its actions. Every prop keeps its identity while the message is unchanged, so a streamed token renders only the row it extends. */
 const MessageRow = memo(function MessageRow({
-	item, copyable, forkAt, prefill, forking, forkDisabled, failed, editAt, editor, replacing, settled, onFork, onEditing,
+	item, copyable, forkAt, prefill, forking, forkDisabled, failed, editAt, editor, browser, replacing, settled, onFork, onEditing,
 }: MessageRowProps) {
 	const copied = copyText(item);
 	const openImage = useContext(OpenImage);
 	const point = forkAt === null || !onFork ? null : { entryId: forkAt, prefill };
 	const edit = editAt !== null && item.kind === "user" ? () => onEditing(item, editAt) : undefined;
 	const pending = item.kind === "user" && item.pending === true;
+	const openFile = useContext(OpenFile);
+	const files = item.kind === "user" && item.files?.length ? item.files : null;
+	const pages = useMemo(() => (browser !== null && item.kind === "assistant" ? latestReviewPages([item]) : []), [browser, item]);
+	const review = browser !== null && pages.length > 0 ? () => requestReview({ instanceId: browser, pages }) : undefined;
 	return (
 		// The dimming sits on the wrapper: the message's entrance motion sets its own inline opacity.
 		<Row messageId={item.id} settled={settled} className={cn(pending && "opacity-60")}>
@@ -569,13 +595,14 @@ const MessageRow = memo(function MessageRow({
 				{...(replacing ? { initial: false } : {})}
 				from={item.kind}
 				time={item.kind === "user" ? (item.from ?? undefined) : undefined}
-				files={item.kind === "user" ? item.files : undefined}
+				files={files && <PromptFileChips files={files} onOpen={openFile} />}
 				images={item.kind === "user" ? item.images?.map(mediaSrc) : undefined}
 				onOpenImage={index => openImage(item.id, index)}
 				actions={
-					editor ? undefined : copyable || point || edit ? (
+					editor ? undefined : copyable || point || edit || review ? (
 						<>
 							{copyable && <CopyButton text={copied} />}
+							{review && <ReviewButton onReview={review} />}
 							{edit && <EditButton onEdit={edit} />}
 							{point && onFork && <ForkButton point={point} forking={forking} disabled={forkDisabled} onFork={() => onFork(item.id, point)} />}
 						</>
@@ -591,7 +618,7 @@ const MessageRow = memo(function MessageRow({
 					<MessageMarkdown text={copyText(item)} preset={SESSION_PROMPT_PRESET} />
 				) : item.text ? (
 					// A streaming reply keeps its fences as code, so a diagram or chart draws once, from its whole source.
-					<MessageMarkdown text={item.text} preset={item.kind === "assistant" && item.streaming ? AGENT_PRESET : SESSION_AGENT_PRESET} />
+					<MessageMarkdown text={item.text} preset={item.kind === "assistant" && item.streaming ? SESSION_STREAMING_PRESET : SESSION_AGENT_PRESET} />
 				) : null)}
 			</ChatMessage>
 			{failed && (
@@ -623,6 +650,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	// The lane's first width counts at once; a new one counts once a resize rests, so a drag does not lay every row out on
 	// each frame of it.
 	const expanded = useContext(ToolsExpanded);
+	const paneFocused = useContext(PaneFocused);
 	const { hideTools, hideThinking } = useContext(ActivityVisibility);
 	const [laneWidth, setLaneWidth] = useState(0);
 	const laneRef = useRef<HTMLDivElement>(null);
@@ -661,6 +689,8 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	useEffect(() => {
 		if (image && imageIndex < 0) setImage(null);
 	}, [image, imageIndex]);
+	// A dialog the transcript holds, so the pending prompt's row giving way to the live one leaves it open.
+	const [file, setFile] = useState<PromptFile | null>(null);
 	const previousItems = useRef<Item[]>([]);
 	const replacing = useMemo(() => {
 		const id = replacingPrompt(previousItems.current, items);
@@ -715,6 +745,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 
 	return (
 		<OpenImage.Provider value={openImage}>
+		<OpenFile.Provider value={setFile}>
 			<div className="@container/conversation relative flex min-h-0 flex-1 flex-col" data-conversation>
 				<SessionTodosCard
 					phases={model.todos}
@@ -775,6 +806,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 												onCancel={() => setEditing(null)}
 											/>
 										) : undefined}
+										browser={BROWSER_AVAILABLE && view.kind === "live" ? view.instanceId : null}
 										replacing={item.id === replacing}
 										settled={settled}
 										onFork={onFork}
@@ -790,6 +822,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 							)}
 						</MessageScrollerContent>
 					</MessageScrollerViewport>
+					<FindBar root={laneRef} enabled={paneFocused} label="Find in conversation" className="conversation-lane px-3" />
 					<TranscriptMinimap turns={model.outline} />
 					<PromptHistory view={view} turns={model.outline} />
 					<MessageScrollerButton {...activityControl("transcript.scroll-to-bottom")} />
@@ -807,6 +840,8 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 					onClose={() => setImage(null)}
 				/>
 			)}
+			{file && <AttachedFileDialog file={file} onClose={() => setFile(null)} />}
+		</OpenFile.Provider>
 		</OpenImage.Provider>
 	);
 });

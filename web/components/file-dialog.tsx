@@ -1,5 +1,6 @@
 import { Check, Copy } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
+import type { PromptFile } from "../../src/shared/prompt-files";
 import { MAX_TEXT_FILE_BYTES, type TextFile } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -62,7 +63,6 @@ function VideoFileDialog({ target, onClose }: { target: FileTarget; onClose: () 
 
 /** The dialog an image or video file shows in: its name, its path, and a button that copies the path. */
 function MediaFileDialog({ target, zoom, onClose, children }: { target: FileTarget; zoom?: Zoom; onClose: () => void; children: ReactNode }) {
-	const { copied, copy } = useCopy();
 	const { path } = target;
 	const name = path.slice(path.lastIndexOf("/") + 1);
 	return (
@@ -73,11 +73,7 @@ function MediaFileDialog({ target, zoom, onClose, children }: { target: FileTarg
 			zoom={zoom}
 			onClose={onClose}
 			actions={
-				<Tooltip content={copied ? "Copied" : "Copy the path"}>
-					<Button {...activityControl("file-dialog.copy-path")} variant="ghost" size="icon-compact" aria-label="Copy the path" onClick={() => copy(path)}>
-						{copied ? <Check /> : <Copy />}
-					</Button>
-				</Tooltip>
+				<CopyAction control="file-dialog.copy-path" label="Copy the path" text={path} />
 			}
 		>
 			{children}
@@ -91,7 +87,6 @@ function TextFileDialog({ target, onClose }: { target: FileTarget; onClose: () =
 	const read = useRead<TextFile>(textFileUrl(target));
 	const look = isMarkdownPath(path) ? "markdown" : (TABLES[extensionOf(path)] ?? "text");
 	const [source, setSource] = useState(false);
-	const { copied, copy } = useCopy();
 	const file = read.data;
 	const name = path.slice(path.lastIndexOf("/") + 1);
 	return (
@@ -107,11 +102,7 @@ function TextFileDialog({ target, onClose }: { target: FileTarget; onClose: () =
 							{source ? "Show rendered" : "Show source"}
 						</Button>
 					)}
-					<Tooltip content={copied ? "Copied" : "Copy the path"}>
-						<Button {...activityControl("file-dialog.copy-path")} variant="ghost" size="icon-compact" aria-label="Copy the path" onClick={() => copy(file?.path ?? path)}>
-							{copied ? <Check /> : <Copy />}
-						</Button>
-					</Tooltip>
+					<CopyAction control="file-dialog.copy-path" label="Copy the path" text={file?.path ?? path} />
 				</>
 			}
 		>
@@ -123,6 +114,36 @@ function TextFileDialog({ target, onClose }: { target: FileTarget; onClose: () =
 				</div>
 			)}
 		</ViewerDialog>
+	);
+}
+
+/** A file a sent prompt carried as text, such as a long paste, shown as the model read it. */
+export function AttachedFileDialog({ file, onClose }: { file: PromptFile; onClose: () => void }) {
+	const size = useMemo(() => formatBytes(new TextEncoder().encode(file.text).length), [file.text]);
+	return (
+		<ViewerDialog
+			title={file.name}
+			description={`Attached to this prompt · ${size}`}
+			bodyLabel={file.name}
+			onClose={onClose}
+			actions={
+				<CopyAction control="file-dialog.copy-text" label="Copy the text" text={file.text} />
+			}
+		>
+			<CodeText text={file.text} path={file.name} className="rounded-none border-0" />
+		</ViewerDialog>
+	);
+}
+
+/** A dialog header's copy button, whose own state flips to a check without redrawing the dialog's body. */
+function CopyAction({ control, label, text }: { control: Parameters<typeof activityControl>[0]; label: string; text: string }) {
+	const { copied, copy } = useCopy();
+	return (
+		<Tooltip content={copied ? "Copied" : label}>
+			<Button {...activityControl(control)} variant="ghost" size="icon-compact" aria-label={label} onClick={() => copy(text)}>
+				{copied ? <Check /> : <Copy />}
+			</Button>
+		</Tooltip>
 	);
 }
 

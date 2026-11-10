@@ -16,6 +16,8 @@ It takes them over only when that dashboard is not running, so a smoke run that 
 
 Every request needs the access token, stored in `~/.config/omp-agents/token`, or `$XDG_CONFIG_HOME/omp-agents/token` when that is set; the server prints no sign-in address, and `/?token=` signs nothing in.
 The page reads the token from its origin's `localStorage`, which only the desktop window's preload fills, so a browser smoke seeds the same entries itself, `pageAccess(token)` from `src/server/auth.ts`, as [Browser smoke](#browser-smoke) shows.
+A smoke server that keeps the user's token is safe to hand off by its dashboard address, such as `http://127.0.0.1:<port>/#past/<id>`, in a reply or a `review-pages` list: the user's desktop app opens it signed in, in a window of its own; one on isolated state, with a token of its own, opens in the default browser, signed out.
+A desktop smoke can open the window on such a server with `bun launch.ts http://127.0.0.1:<port>/#<route>` in `desktop/`, which starts no server of its own.
 For curl, send `Authorization: Bearer <token>` and a matching `Host` header.
 The server does not reload and serves the page bundle built at startup.
 Restart it after editing `src/` or `web/`.
@@ -53,9 +55,9 @@ The server strips its own `PORT` and `OMP_AGENTS_PARENT` from the sessions, shel
 
 ## Browser smoke
 
-Open the page with the `chrome-devtools` MCP tools (`xd://mcp__chrome-devtools_*`), which run headless Chrome on a throwaway profile, or prove a route's texts with [Smoke proof](#smoke-proof), which also checks that the server serves this checkout as it is now.
+Open the page with the `chrome-devtools` MCP tools (`xd://mcp__chrome_devtools_*`), which run headless Chrome on a throwaway profile, or prove a route's texts with [Smoke proof](#smoke-proof), which also checks that the server serves this checkout as it is now.
 omp's own `browser` is turned off for now (`browser.enabled = false`); eval has no `browser` global.
-Every page tool takes a `pageId`; `list_pages` names it, and the first page is `1`.
+Every page tool takes a `pageId`; `list_pages` names it, and the first page is `1`, which the kit's `chrome-devtools-page` extension fills in when a call leaves it out.
 Chrome starts at 800×600, below the layout's desktop breakpoints, so call `resize_page` with `width: 1920, height: 1080` before screenshots.
 
 The page first loads without a token and says to open the omp agents app; seed `localStorage` with `pageAccess(token)` and reload it.

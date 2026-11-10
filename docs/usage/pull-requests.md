@@ -23,16 +23,16 @@
   An issue counts when the session or one of its subagents changed or opened it (`save_issue`) or commented on it (`save_comment`), when the session names it in its `/ship` step, or when a Linear link to it is in the session's own prompt.
   Weaker evidence counts once two kinds of it agree: a read with omp's Linear tools (`get_issue`, `list_comments`), its identifier in the session's own prompt, and the session's branch, such as `eng-2716-agent-templates` or `me/eng-2712`.
   So an issue a subagent only read for context does not count, and neither does one that a `list_issues` search only listed.
-- Sessions that use `/ship` lead the Todos card's line above their transcript with the current step and its place among the nine, such as **Plan · step 2 of 9**, and the card opens on a **Ship** section with the Linear issue if the work has one, the PR, and how many steps are done.
+- Sessions that use `/ship` show a **Ship** section at the top of the Todos card, with the Linear issue if the work has one, the PR, the current step, and its place among the nine, such as **Step 2 of 9** during the plan.
   Agents start `/ship` on their own when a request will end in a pull request, and say so in their first reply; answer "no ship" to work without it, and the Ship section goes away.
-  Click the line to see every step.
+  Click the section to see every step.
   The steps are ticket, plan, implementation, draft PR, interface review, thermonuclear review, ready gate, live review, and merged.
   The ticket step links the issue you named or one that matches the work, and passes without one rather than creating a ticket.
   In the plan step the agent compares up to three ways to build the change and posts the one it chose on the Linear issue, or in the PR body when there is no issue.
-  During live review the line and the section name the active rebase, review-comment, or CI-fix work.
+  During live review the section names the active rebase, review-comment, or CI-fix work.
   omp writes each step to its session file; the dashboard reads those entries for running and past sessions and updates when the step changes.
   Other sessions have no Ship section.
-- Tabs under the sidebar header switch pages and what the sidebar lists: **Pull requests**, **Tickets**, **Bots**, **Sessions**, and **Todo** in the sidebar's tab bar, and **Notes**, **Calendar**, **Email**, and **Sport** as buttons in the header beside the command menu.
+- Tabs under the sidebar header switch pages and what the sidebar lists: **Pull requests**, **Tickets**, **Bots**, and **Sessions** in the sidebar's tab bar, and **Notes**, **Calendar**, **Todo**, **Sport**, and **Email** as buttons in the header beside the command menu.
   Click a tab or use the left and right arrow keys while a bar tab has focus to switch pages.
   **Tickets** shows only once Linear is connected; see [Linear tickets](linear-tickets.md).
   **Email** shows only once Gmail is connected; see [Email](email.md).
@@ -60,6 +60,8 @@
   A badge is coloured only for your moves, each with its own icon and colour, such as red for **Fix CI** and orange for **Rebase**; every other move is grey.
   The Pull requests page's table shows each section as a card, one row per pull request: the move's badge, the title with its author's picture and name, number, conversations, and reason under it, the sessions on it, its place in a stack, its checks, its reviewers or review state, the lines added and removed, its age, and its `⋯` menu at the far right.
   Conversations count the pull request's comments and review threads, resolved ones too, as GitHub's own list does, beside a speech bubble; a pull request with none shows no count.
+  Hover the count, in the sidebar, the table, or a board card, for a card of the five latest conversations, newest first, each with its author, age, file and line for a review thread, and the start of its first comment.
+  The card reads the pull request from GitHub when it opens, leaves out what the **Comments** filter on the details' **Summary** hides, and says how many older or hidden conversations it left out.
   A narrow page drops the sessions, stack, and line columns.
   Each pull request takes the first move that applies, in this order.
   A merge from the last seven days is **Merged**.

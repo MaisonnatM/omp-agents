@@ -19,7 +19,7 @@ A dashboard session's row carries `fast`, `{ enabled, active }` from omp's state
 `PUT /api/dictation/settings?cwd=<directory>` with `{ enabled: true }` turns the user's `stt.enabled` on and answers `DictationSettings` from `src/shared/dictation.ts` for that directory: whether omp's dictation is on there and what turned it off, the language, and where speech is transcribed.
 They stay off while a project's config or an environment variable turns dictation off; see [Dictation](dictation.md).
 
-`GET /api/skills?cwd=<directory>` answers `{ skills }`, each `{ name, description }`: the skills that `/skill:<name>` invokes in a session started in that directory, from the same discovery as the composer's `/` completions (`listSkills` in `src/commands.ts`), and none when omp's `skills.enableSkillCommands` is off.
+`GET /api/skills?cwd=<directory>` answers `{ skills }`, each `{ name, description }`: the skills that `/skill:<name>` invokes in a session started in that directory, from the same discovery as the composer's `$` completions (`listSkills` in `src/commands.ts`), and none when omp's `skills.enableSkillCommands` is off.
 Both leave out a skill whose frontmatter `name` holds whitespace, such as `Poteto Mode`: omp reads a `/skill:` name up to the first space, so no prompt can invoke it.
 The settings page lists them to pin one, and the new-session draft reads them to show whether the pinned skill exists there.
 The page keeps the pin in localStorage (`web/pinned-skill.ts`).

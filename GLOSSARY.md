@@ -50,6 +50,10 @@ _Avoid_: User session, assistant session, private session (see **Private session
 A session that another session's `task` call spawned.
 _Avoid_: Child agent, worker
 
+**Arena**:
+Two or more subagents a session gives the same task so it can keep the best attempt, as the session's `arena` tool records it: its **runners**, lettered A, B, C in the order they started, its judge, the runner kept as the **base**, and the **grafts**, what the base took from other runners.
+_Avoid_: Competition, race, tournament
+
 **Agent definition**:
 The named prompt, declared tools, and model choices omp discovers for a kind of subagent, which Settings › Agents previews before a new session starts.
 It is not a running subagent or a Bot.

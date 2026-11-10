@@ -69,6 +69,8 @@ Edits go through four endpoints, each taking the same `?cwd=` and answering with
   A selector that the config already names passes as it is, so keeping an entry never blocks a save.
   omp checks each retry value against the setting's type and allowed values.
   If omp cannot load `config.yml`, the write is refused, because omp would move the broken file aside before it writes.
+- `GET /api/settings/extra-usage` answers `{ on }`. `on` is true while the composer's Extra usage switch has parked `retry.fallbackChains` and the config holds none.
+  `PUT` takes `{ on }`. Turning it on parks the lists in `extra-usage.json` and clears them. Turning it off writes the parked lists back. A crash keeps a copy either in the park file or in the config.
 - `PUT /api/settings/model-profiles` takes `{ kind, name }`, where `kind` is `save`, `apply`, or `delete`, and edits the model profiles that the routing's `profiles` lists.
   `save` keeps the `modelRoles`, `retry.fallbackChains`, and `modelProviderOrder` of the user's `config.yml` under `name` in the dashboard's `model-profiles.json`, replacing a profile with that name, and `delete` removes one.
   `apply` writes a profile's three settings to `config.yml` through the same omp write path as routing, removing each role and chain that the profile lacks, and answers 404 for a name that no profile has.
