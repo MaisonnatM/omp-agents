@@ -65,6 +65,11 @@ task:
     - openai-codex/gpt-6.1-sol
     - cursor/gemini-3.1-pro
 
+# omp rejects pstack's skills from its plugin; extensions/pstack-skills.ts links them here, where omp loads them hidden as pstack intends.
+skills:
+  customDirectories:
+    - ~/.omp/plugins/pstack-skills
+
 # Publish every terminal session to the local Collab registry, so the omp-agents dashboard can drive it.
 collab:
   autoStart: control

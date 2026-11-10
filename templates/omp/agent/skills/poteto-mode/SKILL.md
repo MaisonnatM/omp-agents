@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # poteto-mode
 
-The mode lives in pstack's own skill file, also named `poteto-mode`, which `skill://poteto-mode` opens instead of this one when both are installed. Reached here, find it with one `glob` of `~/.omp/plugins/cache/plugins/cursor-plugins___pstack___*/skills/poteto-mode/SKILL.md`, then `read` the highest version's file in full, including its inline Principles index, and work in that style for the rest of the session.
+The mode lives in pstack's own skill file, also named `poteto-mode`, which the kit's `pstack-skills` extension leaves out of the pstack skills it links so that this map keeps the name. Find it with one `glob` of `~/.omp/plugins/cache/plugins/cursor-plugins___pstack___*/skills/poteto-mode/SKILL.md`, then `read` the highest version's file in full, including its inline Principles index, and work in that style for the rest of the session.
 Its material sits in the same directory: `playbooks/<name>.md`, `references/<name>.md`, and `scripts/<file>`. Each principle or routed skill is at `skill://<name>`.
 
 pstack is written for Cursor. On omp, the routes below replace every Cursor tool, path, and model name in the mode, its playbooks, and its routed skills. Translate as you read, and open each skill through its exact `skill://` URI, not a plugin cache path.
@@ -14,7 +14,7 @@ pstack is written for Cursor. On omp, the routes below replace every Cursor tool
 ## Precedence
 
 - The user's final-answer format (bold answer first, optional Needs you / Not verified / Done lines) is the shape of every reply. Poteto's **Writing the reply** rules apply to the sentences inside it.
-- A session that `/ship` owns keeps its stages, `ship_stage` calls, draft-only PR, and thermonuclear gate. Pstack playbooks run inside those stages and never mark a PR ready or merge it on their own.
+- Pstack's "Opening a PR" playbook never runs on omp: whenever work will produce a pull request, start or resume `skill://ship`, which opens it. A session that `/ship` owns keeps its stages, `ship_stage` calls, draft-only PR, and thermonuclear gate. Pstack playbooks run inside those stages and never open, mark ready, or merge a PR on their own.
 - The git-safety rules in `~/.omp/agent/AGENTS.md` apply too: on `main`, work in a dedicated worktree and spawn editing subagents without `isolated`, naming that worktree's absolute path in each task; on any other local branch, the session and its editing subagents work in place.
 
 ## Subagents and models
@@ -58,5 +58,5 @@ omp's `task` call has no per-spawn `model`, `readonly`, `environment`, or `run_i
 
 ## Scripts
 
-Script dependencies live in `scripts/node_modules`. After a pstack upgrade, run `bun install --frozen-lockfile` in the `scripts` directory of the resolved skill.
+A script that needs dependencies, such as `watch-pr`, installs them into `scripts/node_modules` on its first run after a pstack upgrade.
 Resolve `scripts/worktree-audit.sh` against that pstack `skills/poteto-mode/` directory, and run it from the repository you are auditing.

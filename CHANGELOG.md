@@ -5,6 +5,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-10
 
+- Installing the omp Starter Kit on a new computer now makes the pstack skills work, such as arena and technical writing, which ship plans with. Before, omp skipped all of them, so ship stopped at its plan step.
+- The omp Starter Kit now brings the two poteto helpers that ship and poteto mode hand work to, one on Claude and one on Codex.
+- Behind the scenes: the starter kit's agent rules now include the newer ship steps, the rule to set pull request descriptions with the checked tool, and the rule to retake pull request screenshots after each push.
 - New Bot offers three more templates for a Routines Bot: Memory curator keeps each repository's project memory up to date, Bot coach proposes how to improve your other Bots, and Review requests drafts the reviews teammates ask you for. Each one sets up its own routine in its first conversation.
 - The model menu has an Extra usage switch. On, a full Claude allowance stays on Claude instead of moving to a fallback such as Cursor. Off puts the fallback list back. It applies to every session.
 - Fixed: Connect in Integrations failed, such as with "Google Calendar has no server to sign in to", when the service's server was turned off. Connect now turns it back on.
