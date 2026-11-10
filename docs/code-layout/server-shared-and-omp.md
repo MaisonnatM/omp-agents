@@ -38,10 +38,12 @@
   `scoped-discovery.ts` binds read-only settings to one native discovery read at a time across settings, prompts, project code, MCP, and Extensions.
   `config.ts` exposes the shared `configWrites` lane and canonical setting/global-write helpers for model routing, terminal sharing, raw config edits, and Extensions settings.
   `rpc.ts`'s `startRpc` takes an `AdmittedLaunch`, an `RpcLaunch` with the required `admit` it awaits before omp spawns; see [Project trust](../architecture/project-trust.md).
+  `module-types/rpc-host-tool.ts` holds `RpcHostTool`, the tool this process serves to a session over RPC, which `rpc.ts` registers.
   `context-index.ts` keeps the context-source index beside omp-stats' database: each request of each session file split by source, re-read only for files that changed.
   `dictation.ts` holds `dictationSettings`, omp's speech-to-text settings for a directory, and `startDictation`, one capture through omp's RPC dictation bridge, which answers the settings instead where dictation is off; it opens omp's settings and model registry with `openRegistry` in `models.ts`, and `module-types/speech.ts` types the omp modules they load.
   `session-visuals-extension.ts` is the omp extension, loaded with `-e`, that appends the two visual fence formats, the `review-pages` list that `web/review-pages.ts` reads, and on a Cursor model `CURSOR_TOOLS_PROMPT`, to the system prompt of a session the dashboard starts, resumes, or forks; `sessionVisualsExtension` in `src/server/resources.ts` names its file, a bundle beside `server.js` in the packaged app.
   `session-visuals-extension.test.ts` checks that only a Cursor model's turn gets that paragraph.
+  `fake-extension-api.ts` is the stand-in for omp's extension API that the extensions' tests load an extension with.
   `gc.ts` runs native dry runs and single-phase applies, parses even a nonzero exit's JSON report, measures storage, and reads cleanup rules and the background compression log.
   Its `storageUsage` builds `AgentSettingRow`s through `agent-settings.ts`'s `rowOf` from one native settings load; workspace override ids travel separately so Storage keeps the global rows editable.
   `gc.test.ts` checks report validation, native preview and apply against an isolated fixture directory, global rule rows with workspace overrides, and refusal of a live native cleanup lock.
