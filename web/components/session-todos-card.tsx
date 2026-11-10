@@ -2,7 +2,7 @@ import { ChevronRight, ListChecks, Ship } from "lucide-react";
 import { memo, type ReactNode, useLayoutEffect, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { SHIP_STAGES, type ShipProgress, type View } from "../../src/shared/sessions";
+import { type ArenaRecord, SHIP_STAGES, type ShipProgress, type View } from "../../src/shared/sessions";
 import type { TodoPhase, TodoTask } from "../../src/shared/transcript";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,8 @@ import { Stepper } from "./arc/stepper";
 const OPEN_KEY = "omp-agents.todos-card-open";
 const SHOWN_KEY = "omp-agents.todos-card-shown";
 const SHIP_OPEN_KEY = "omp-agents.todos-card-ship-open";
+/** No arenas: one value, so that the memoized card keeps its props from one render to the next. */
+const NO_ARENAS: readonly ArenaRecord[] = [];
 
 /** Whether transcripts show the whole Todos card, which the checklist toggle in the session header and Settings → Preferences both toggle. */
 export const useTodosCardShown = () => useStoredState(SHOWN_KEY, raw => raw !== "false");
@@ -308,6 +310,8 @@ interface SessionTodosCardProps {
 	subagents: SubagentLinksValue | null;
 	/** The session's /ship run, shown as its own section; `null` without one. */
 	ship: ShipProgress | null;
+	/** The arenas the session recorded, whose runners the Subagents section shows side by side; omitted, it shows none. */
+	arenas?: readonly ArenaRecord[];
 }
 
 /**
@@ -318,7 +322,7 @@ interface SessionTodosCardProps {
  * and otherwise sits above them.
  * Memoized: `phases` keeps its identity until a `todo` call changes it, so a streamed token leaves the card as it is.
  */
-export const SessionTodosCard = memo(function SessionTodosCard({ phases, view, working, changes, subagents, ship }: SessionTodosCardProps) {
+export const SessionTodosCard = memo(function SessionTodosCard({ phases, view, working, changes, subagents, ship, arenas = NO_ARENAS }: SessionTodosCardProps) {
 	const [shown] = useTodosCardShown();
 	const found = useChanges(view, changes);
 	const todos = phases.length > 0;
@@ -339,7 +343,7 @@ export const SessionTodosCard = memo(function SessionTodosCard({ phases, view, w
 		>
 			{ship && <ShipSection ship={ship} />}
 			{todos && <TodosSection phases={phases} />}
-			{subagents && nodes.length > 0 && <SubagentsSection links={subagents} nodes={nodes} />}
+			{subagents && nodes.length > 0 && <SubagentsSection links={subagents} nodes={nodes} arenas={arenas} />}
 			{found && changes && <ChangesSections view={view} session={changes} changes={found} working={working} />}
 		</section>
 	);

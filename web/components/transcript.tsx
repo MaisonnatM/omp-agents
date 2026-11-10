@@ -734,6 +734,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 					changes={activityShown ? changes : undefined}
 					subagents={activityShown ? subagents : null}
 					ship={changes?.sessionId ? (changes.facts?.ship ?? null) : null}
+					arenas={changes?.sessionId ? changes.facts?.arenas : undefined}
 				/>
 				<MessageScroller className="@container min-h-0 flex-1">
 					<MessageScrollerViewport>

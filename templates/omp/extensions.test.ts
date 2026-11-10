@@ -110,11 +110,11 @@ if (input.command) {
 	console.log(JSON.stringify({ toolResults: results }));
 } else if (input.runs) {
 	// Several calls in one session, one after another, or all at once with parallel, as an agent's parallel tool calls run.
-	const call = params => tool.execute("call", params, undefined, undefined, { cwd: input.cwd ?? process.cwd(), hasUI: false, sessionManager });
+	const call = params => tool.execute("call", params, undefined, undefined, { cwd: input.cwd ?? process.cwd(), hasUI: false, sessionManager, agent: { kind: input.agent ?? "main" } });
 	const results = [];
 	if (input.parallel) results.push(...(await Promise.all(input.runs.map(call))));
 	else for (const params of input.runs) results.push(await call(params));
-	console.log(JSON.stringify({ runs: results.map(result => ({ isError: result.isError ?? false, text: result.content?.[0]?.text ?? null })), executed }));
+	console.log(JSON.stringify({ runs: results.map(result => ({ isError: result.isError ?? false, text: result.content?.[0]?.text ?? null })), executed, entries }));
 } else if (input.run) {
 	const result = await tool.execute("call", input.params, undefined, undefined, { cwd: input.cwd ?? process.cwd(), hasUI: false, sessionManager });
 	console.log(JSON.stringify({ run: { isError: result.isError ?? false, stage: result.details?.state?.stage ?? null }, text: result.content?.[0]?.text ?? null, executed }));
@@ -124,7 +124,7 @@ if (input.command) {
 }
 `;
 
-function exercise(name: "ship" | "todos" | "notes" | "events" | "worktree-guard" | "google-accounts" | "pr-description" | "headless-mark", input: object, env: Record<string, string> = {}): {
+function exercise(name: "ship" | "todos" | "notes" | "events" | "worktree-guard" | "google-accounts" | "pr-description" | "headless-mark" | "arena", input: object, env: Record<string, string> = {}): {
 	result: { block: boolean; reason: string } | null;
 	confirmations: number;
 	valid: boolean;
@@ -1071,5 +1071,37 @@ describe("headless-mark", () => {
 
 	test("records the change when a session resumes in the other mode", () => {
 		expect(starts("print", "tui", "print")).toEqual([{ headless: true }, { headless: false }, { headless: true }]);
+	});
+});
+
+describe("arena", () => {
+	const runs = (calls: object[], agent = "main") => exercise("arena", { runs: calls, agent });
+	const fanOut = { task: "Build the lanes", runners: ["RunA", "RunB", "RunC"] };
+
+	test("records the whole arena on each call, from fan-out to the pick", () => {
+		const { runs: results, entries } = runs([fanOut, { ...fanOut, judge: "Judge", base: "RunB", grafts: [{ from: "RunA", what: "Copy" }] }]);
+		expect(results.map(result => result.isError)).toEqual([false, false]);
+		expect(entries.map(entry => [entry.customType, entry.data])).toEqual([
+			["omp-arena.state", { ...fanOut, judge: null, base: null, grafts: [] }],
+			["omp-arena.state", { ...fanOut, judge: "Judge", base: "RunB", grafts: [{ from: "RunA", what: "Copy" }] }],
+		]);
+	});
+
+	test.each([
+		["a base outside the runners", { ...fanOut, base: "Other" }],
+		["a graft from the base", { ...fanOut, base: "RunB", grafts: [{ from: "RunB", what: "Copy" }] }],
+		["a graft from outside the runners", { ...fanOut, base: "RunB", grafts: [{ from: "Other", what: "Copy" }] }],
+		["a runner named twice", { task: "T", runners: ["RunA", "RunA"] }],
+		["a single runner", { task: "T", runners: ["RunA"] }],
+	])("refuses %s and records nothing", (_case, params) => {
+		const { runs: results, entries } = runs([params]);
+		expect(results[0].isError).toBe(true);
+		expect(entries).toEqual([]);
+	});
+
+	test("a subagent cannot record an arena", () => {
+		const { runs: results, entries } = runs([fanOut], "sub");
+		expect(results[0].isError).toBe(true);
+		expect(entries).toEqual([]);
 	});
 });
