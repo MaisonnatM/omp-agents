@@ -49,7 +49,7 @@ export interface RouteKit {
 	/** `get` for a file that an image, a video, or a frame loads, which sends no header: it also takes the media key as `?key=`. */
 	media(handle: (params: URLSearchParams, req: Request) => Response | Promise<Response>): Handler;
 	/**
-	 * A write: admitted with its JSON body (origin, content type, size), `parse`d with the request's query into an input or the
+	 * A write: admitted with its JSON body (origin, content type), `parse`d with the request's query into an input or the
 	 * response refusing it, then `run`, whose result is the answer's JSON, unless it is a `Response`; `refuse` answers an error
 	 * `run` throws, and any other is a 500 with its text.
 	 */
