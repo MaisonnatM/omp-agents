@@ -110,15 +110,25 @@ const reviewPagesOf = (pane: PaneData): ReviewPage[] => latestReviewPages(pane.i
 /**
  * Live session `view`'s Browser: its own page, plus one tab per page its latest reply listed for review once the
  * toolbar's **Review visuals** opens them. Every tab stays mounted once opened, so each page keeps its state while another shows.
+ * A listed page of another omp-agents server, such as the session's test server, opens in an app of its own instead,
+ * signed in, which no tab can be; that app shows the first of its pages.
  */
 export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: string }) {
 	const pages = usePaneSelect(view, reviewPagesOf, samePages);
 	const [open, setOpen] = useState<readonly ReviewPage[]>([]);
 	const [active, setActive] = useState(APP_TAB);
 	const rootRef = useRef<HTMLDivElement>(null);
-	const review = (): void => {
-		setOpen(pages);
-		setActive(pages[0]?.url ?? APP_TAB);
+	const review = async (): Promise<void> => {
+		const tabs: ReviewPage[] = [];
+		const inApps = new Set<string>();
+		for (const page of pages) {
+			const origin = URL.parse(page.url)?.origin ?? page.url;
+			if (inApps.has(origin)) continue;
+			if (await window.ompDesktop?.openDashboard?.(page.url)) inApps.add(origin);
+			else tabs.push(page);
+		}
+		setOpen(tabs);
+		setActive(tabs[0]?.url ?? APP_TAB);
 	};
 	const close = (url: string, refocus: boolean): void => {
 		const at = open.findIndex(page => page.url === url);
@@ -147,7 +157,7 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 						className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
 					>
 						{page?.note && <p className="shrink-0 border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">{page.note}</p>}
-						<BrowserPage view={view} sessionId={sessionId} page={page} active={value === active} pages={pages} onReview={review} />
+						<BrowserPage view={view} sessionId={sessionId} page={page} active={value === active} pages={pages} onReview={() => void review()} />
 					</TabsPrimitive.Content>
 				);
 			})}

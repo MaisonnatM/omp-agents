@@ -1,10 +1,11 @@
 /**
  * The window's preload: signs the dashboard's page in before its scripts run, then hands it `window.ompDesktop`, which
- * reports the sessions that need you to `attention.ts`, asks for a sign-in, and opens the system's folder dialog.
+ * reports the sessions that need you to `attention.ts`, asks for a sign-in, opens the system's folder dialog, and opens
+ * another omp-agents server's page in an app of its own.
  */
 import { contextBridge, type IpcRendererEvent, ipcRenderer } from "electron";
 import { isString, recordOf } from "../src/json";
-import { ACCESS_CHANNEL, ALERT_CHANNEL, BADGE_CHANNEL, BROWSER_CAPTURE_CHANNEL, BROWSER_PORTS_CHANNEL, DESKTOP_BRIDGE, type DesktopBridge, INSTALL_STARTER_KIT_CHANNEL, PICK_DIRECTORY_CHANNEL, SIGN_IN_CHANNEL, SOUND_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
+import { ACCESS_CHANNEL, ALERT_CHANNEL, BADGE_CHANNEL, BROWSER_CAPTURE_CHANNEL, BROWSER_PORTS_CHANNEL, DESKTOP_BRIDGE, type DesktopBridge, INSTALL_STARTER_KIT_CHANNEL, OPEN_DASHBOARD_CHANNEL, PICK_DIRECTORY_CHANNEL, SIGN_IN_CHANNEL, SOUND_CHANNEL, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
 
 // Main answers only the dashboard's own page, so any other page, such as the shell's own notice, gets nothing.
 const access: unknown = ipcRenderer.sendSync(ACCESS_CHANNEL);
@@ -29,6 +30,7 @@ const bridge: DesktopBridge = {
 		return typeof picked === "string" ? picked : null;
 	},
 	installStarterKit: () => ipcRenderer.invoke(INSTALL_STARTER_KIT_CHANNEL),
+	openDashboard: async url => (await ipcRenderer.invoke(OPEN_DASHBOARD_CHANNEL, url)) === true,
 	titleBar: process.platform === "darwin",
 	preview: true,
 };
