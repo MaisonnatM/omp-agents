@@ -33,20 +33,21 @@ function Conversations({ pr }: { pr: PullRequestSummary }) {
 					{visible.map(item => {
 						const [first] = item.comments;
 						if (!first) return null;
+						const thread = item.kind === "thread" ? item.thread : null;
 						const review = item.kind === "event" ? item.event.review : null;
-						const replies = item.kind === "thread" ? item.thread.commentCount - 1 : 0;
+						const replies = (thread?.commentCount ?? 1) - 1;
 						return (
 							<li key={item.id} className="space-y-1 px-3 py-2.5">
 								<div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
 									<Avatar person={first.author} label={first.author.login} className="size-4 ring-0" />
 									<span className="min-w-0 truncate font-medium text-foreground">{first.author.login}</span>
 									{review && <span className={REVIEW_STYLE[review].tone}>{REVIEW_STYLE[review].label}</span>}
-									{item.kind === "thread" && item.thread.resolved && <span>Resolved</span>}
+									{thread?.resolved ? <span>Resolved</span> : thread?.dismissed && <span>Dismissed</span>}
 									<Age at={item.at} compact exact className="ml-auto shrink-0 tabular-nums" />
 								</div>
-								{item.kind === "thread" && (
+								{thread && (
 									<p className="text-2xs text-muted-foreground">
-										<ThreadPlace detail={detail} thread={item.thread} />
+										<ThreadPlace detail={detail} thread={thread} />
 									</p>
 								)}
 								{first.body.trim() && <PullRequestMarkdown text={first.body} repo={detail} className="line-clamp-3 text-xs" />}
@@ -70,7 +71,7 @@ export function ConversationPeek({ pr, children }: { pr: PullRequestSummary; chi
 	return (
 		<HoverCard openDelay={350} closeDelay={100}>
 			<HoverCardTrigger asChild>{children}</HoverCardTrigger>
-			<HoverCardContent side="bottom" align="start" sideOffset={6} collisionPadding={12} className="w-80 p-0" onClick={event => event.stopPropagation()}>
+			<HoverCardContent side="bottom" align="start" sideOffset={6} collisionPadding={12} className="w-80 p-0" onDragStart={event => event.stopPropagation()}>
 				<p className="flex items-center gap-1.5 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
 					<MessageSquare aria-hidden className="size-3.5" />
 					Latest comments and reviews
