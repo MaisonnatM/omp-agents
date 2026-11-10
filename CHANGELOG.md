@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-10
 
+- Hover the speech bubble count on a pull request, in the sidebar, the table, or the board, to read its five latest comments without opening it. The card leaves out what the Comments filter hides and says how many it left out.
 - Todo moved from the sidebar's tab bar to the top right of the header, between Calendar and Sport. Email now sits after Sport. A saved tab order moves Todo there too.
 
 ## 2026-11-09

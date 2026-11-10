@@ -37,3 +37,11 @@ export function pageConversations(items: ConversationItem[], count: number, orde
 	const recent = items.slice(0, count);
 	return { visible: order === "oldest" ? recent.toReversed() : recent, hidden: Math.max(0, items.length - recent.length) };
 }
+
+/** The `count` newest conversations `filter` keeps, newest first, with how many older ones it kept and how many it hid. */
+export function latestConversations(detail: Pick<PullRequestDetail, "threads" | "conversation">, filter: CommentFilter, count: number): { visible: ConversationItem[]; older: number; filtered: number } {
+	const all = conversationItems(detail);
+	const kept = filterConversations(all, filter);
+	const { visible, hidden } = pageConversations(kept, count, "newest");
+	return { visible, older: hidden, filtered: all.length - kept.length };
+}
