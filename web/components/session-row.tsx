@@ -1,5 +1,5 @@
 /** `HostRow` and `PastRow`, a running or past session's row in the sidebar, with its status, age, and actions menu. */
-import { Loader } from "lucide-react";
+import { Columns2, Loader } from "lucide-react";
 import { Fragment, memo, type ReactElement, type ReactNode, useContext } from "react";
 import { awaitsSubagents, type PastSession, type RosterHost, type View } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,7 @@ import type { PaletteAction } from "../command-palette";
 import { hostLabel, modeOf, pastLabel, PRIVATE_NOTE, SOURCE_LABELS, SPLIT_CLICK, workspaceName } from "../labels";
 import type { OpenMode } from "../routing";
 import { sessionActions, type SessionEntry, type SessionRun } from "../session-actions";
-import { isPrivateHost, workspaceCwd, workspaceOf } from "../sessions";
+import { isPrivateHost, type RowPlacement, workspaceCwd, workspaceOf } from "../sessions";
 import { type InlineConfirm, useInlineConfirm } from "../use-inline-confirm";
 import { Age } from "./age";
 import { PersonalContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
@@ -32,7 +32,7 @@ interface SessionButtonProps {
 	facts: { text: string } | null;
 	when: number;
 	dot?: ReactNode;
-	open: boolean;
+	placement: RowPlacement;
 	onOpen: (view: View, mode: OpenMode) => void;
 }
 
@@ -68,11 +68,18 @@ export function RowLine({ dot, badge, label, facts, end }: RowLineProps) {
 	);
 }
 
-function SessionButton({ view, label, title, badge, facts, when, dot, open, onOpen }: SessionButtonProps) {
+function SessionButton({ view, label, title, badge, facts, when, dot, placement, onOpen }: SessionButtonProps) {
+	const split = placement === "split";
+	const end = (
+		<>
+			{split && <Columns2 role="img" aria-label="In a split" className="size-3 shrink-0 translate-y-0.5 text-muted-foreground/50" />}
+			<Age at={when} className={ROW_END} />
+		</>
+	);
 	return (
-		<Tooltip content={`${label}. ${title}. ${SPLIT_CLICK} to open in a split`} side="right">
-			<SidebarMenuButton isActive={open} onClick={event => onOpen(view, modeOf(event))}>
-				<RowLine dot={dot} badge={badge} label={label} facts={facts} end={<Age at={when} className={ROW_END} />} />
+		<Tooltip content={`${label}. ${title}. ${split ? "In a split." : `${SPLIT_CLICK} to open in a split`}`} side="right">
+			<SidebarMenuButton isActive={placement !== "hidden"} onClick={event => onOpen(view, modeOf(event))}>
+				<RowLine dot={dot} badge={badge} label={label} facts={facts} end={end} />
 			</SidebarMenuButton>
 		</Tooltip>
 	);
@@ -181,20 +188,20 @@ interface RowProps<T> {
 	session: T;
 	/** The row is listed under Pinned; a pinned interrupted session says so, as its own group does not. */
 	pinned: boolean;
-	/** The session is on screen. */
-	open: boolean;
+	/** Where the session shows on screen. */
+	placement: RowPlacement;
 	/** All workspaces are listed, so a row names its workspace where its label does not. */
 	showWorkspace: boolean;
 	/** Pin the session, or unpin it when it is pinned. */
 	onTogglePin: (sessionId: string) => void;
 }
 
-export const PastRow = memo(function PastRow({ session, pinned, open, showWorkspace, onTogglePin }: RowProps<PastSession>) {
+export const PastRow = memo(function PastRow({ session, pinned, placement, showWorkspace, onTogglePin }: RowProps<PastSession>) {
 	const { open: onOpen } = useDashboardActions();
 	const view: View = { kind: "past", sessionId: session.sessionId };
 	const label = pastLabel(session);
 	return (
-		<RowMenu entry={{ kind: "past", session }} onScreen={open} pinned={pinned} onTogglePin={onTogglePin}>
+		<RowMenu entry={{ kind: "past", session }} onScreen={placement !== "hidden"} pinned={pinned} onTogglePin={onTogglePin}>
 			<SessionButton
 				view={view}
 				label={label}
@@ -202,7 +209,7 @@ export const PastRow = memo(function PastRow({ session, pinned, open, showWorksp
 				badge={showWorkspace && (session.title !== null || workspaceCwd(session) !== session.cwd) ? <WorkspaceBadge cwdDisplay={workspaceOf(session).cwdDisplay} /> : null}
 				facts={sessionFacts([session.source !== "omp" && SOURCE_LABELS[session.source], pinned && session.interrupted && "interrupted"])}
 				when={session.modifiedAt}
-				open={open}
+				placement={placement}
 				onOpen={onOpen}
 			/>
 		</RowMenu>
@@ -217,7 +224,7 @@ function HostStatus({ host, status }: { host: RosterHost; status: RowStatus }) {
 }
 
 /** A running session's row, with its status dot, and End session where the server controls it. */
-export const HostRow = memo(function HostRow({ session: host, pinned, open, showWorkspace, onTogglePin }: RowProps<RosterHost>) {
+export const HostRow = memo(function HostRow({ session: host, pinned, placement, showWorkspace, onTogglePin }: RowProps<RosterHost>) {
 	const { open: onOpen } = useDashboardActions();
 	const view: View = { kind: "live", instanceId: host.instanceId, agentId: null };
 	const label = hostLabel(host);
@@ -226,7 +233,7 @@ export const HostRow = memo(function HostRow({ session: host, pinned, open, show
 	const isPrivate = isPrivateHost(host);
 	const workspace = showWorkspace && (host.sessionName !== null || workspaceCwd(host) !== host.cwd) ? <WorkspaceBadge cwdDisplay={workspaceOf(host).cwdDisplay} /> : null;
 	return (
-		<RowMenu entry={{ kind: "live", host }} onScreen={open} pinned={pinned} onTogglePin={onTogglePin}>
+		<RowMenu entry={{ kind: "live", host }} onScreen={placement !== "hidden"} pinned={pinned} onTogglePin={onTogglePin}>
 			<SessionButton
 				view={view}
 				label={label}
@@ -244,7 +251,7 @@ export const HostRow = memo(function HostRow({ session: host, pinned, open, show
 				facts={sessionFacts([host.source === "terminal" && !host.relayConnected && "relay offline"])}
 				when={host.startedAt}
 				dot={<HostStatus host={host} status={status} />}
-				open={open}
+				placement={placement}
 				onOpen={onOpen}
 			/>
 		</RowMenu>

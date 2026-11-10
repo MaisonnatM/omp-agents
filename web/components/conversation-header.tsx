@@ -61,20 +61,20 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 	const endNow = (): void => onEnd(view.instanceId);
 	const title =
 		subject.kind === "subagent" ? (
-			<span className="inline-flex min-w-0 items-center">
+			<span className="inline-flex max-w-full min-w-0 items-center">
 				{shown?.sessionName && (
 					<>
-						<button type="button" className={`${PARENT_CRUMB} cursor-pointer hover:text-foreground hover:underline`} onClick={() => open({ ...view, agentId: null }, "replace")}>
+						<button type="button" className={`${PARENT_CRUMB} min-w-0 cursor-pointer truncate hover:text-foreground hover:underline`} onClick={() => open({ ...view, agentId: null }, "replace")}>
 							{shown.sessionName}
 						</button>
-						<span aria-hidden className={CRUMB_SEPARATOR}>
+						<span aria-hidden className={`${CRUMB_SEPARATOR} shrink-0`}>
 							/
 						</span>
 					</>
 				)}
-				<span>{agent?.id ?? view.agentId}</span>
+				<span className="shrink-0">{agent?.id ?? view.agentId}</span>
 				{agent && (
-					<Badge variant="dot" size="compact" className="ml-2">
+					<Badge variant="dot" size="compact" className="ml-2 shrink-0">
 						{agent.kind}
 					</Badge>
 				)}

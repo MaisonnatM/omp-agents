@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { AgentRow, ArenaRecord } from "../../src/shared/sessions";
-import { modeOf, SPLIT_CLICK } from "../labels";
+import { SPLIT_CLICK, subagentModeOf } from "../labels";
 import { hashForView } from "../routing";
 import { useStoredState } from "../stored-state";
 import { type ArenaGroup, type ArenaSeat, type ArenaVerdict, arenaGroups, type SubagentNode } from "../todos-card-subagents-model";
@@ -63,12 +63,12 @@ function agentLink(links: SubagentLinksValue, agentId: string) {
 		onClick: (event: MouseEvent) => {
 			if (event.button !== 0 || event.shiftKey || event.altKey) return;
 			event.preventDefault();
-			links.onOpen(view, modeOf(event));
+			links.onOpen(view, subagentModeOf(event));
 		},
 	};
 }
 
-const tooltipOf = (agent: AgentRow, verdict?: string) => `${[agent.id, agent.kind, statusLabel(agent.status), agent.activity, verdict].filter(Boolean).join(" · ")}. ${SPLIT_CLICK} to open in a split`;
+const tooltipOf = (agent: AgentRow, verdict?: string) => `${[agent.id, agent.kind, statusLabel(agent.status), agent.activity, verdict].filter(Boolean).join(" · ")}. ${SPLIT_CLICK} to open in this pane`;
 
 /** The badge each verdict of the pick shows on a runner's card. */
 const VERDICTS = {
