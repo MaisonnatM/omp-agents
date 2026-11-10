@@ -33,7 +33,7 @@
 - A `task` tool call lists the subagents it spawned, by id, under its row: each one as it starts while the call runs, and every one once the call finishes.
   A tool group that spawned subagents stays open.
   In a live session or subagent, each id is a link with the subagent's status dot (none while running, blue idle, hollow parked, red aborted); hover it for the subagent's type, status, and what it is doing.
-  Click it to open the subagent in a split beside the conversation, Cmd-click (Ctrl-click on Linux and Windows) to open it in this pane instead, or middle-click to open it in the app window in place of what it shows.
+  Click it to open the subagent in this pane, in place of the conversation, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split beside the conversation, or middle-click to open it in the app window in place of what it shows.
   A subagent's own `task` calls link its subagents the same way.
   A past session's ids are not links, because the dashboard opens subagents only of a running session.
 - A tool call whose result returned images, such as a browser screenshot or a `read` of an image file, shows them as thumbnails under its row; click one to open it large, with the tool and what the call said it did.
@@ -82,7 +82,7 @@
   A subagent that another subagent started sits indented under it.
   Each row shows the subagent's status dot, the same as on its link in the conversation, its id, its type, and, on one line under them, what it is doing now; hover that line for all of it.
   The section's title counts the subagents, and how many are running.
-  Click a row to open the subagent in a split beside the conversation, Cmd-click (Ctrl-click on Linux and Windows) to open it in this pane instead, or middle-click to open it in the app window in place of what it shows.
+  Click a row to open the subagent in this pane, in place of the conversation, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split beside the conversation, or middle-click to open it in the app window in place of what it shows.
   The stop button after a running subagent cancels it, as the one after its link in the conversation does, in every room the dashboard can write to.
   A subagent's own view lists only the subagents it started, and theirs; a past session shows no section, because the dashboard opens subagents only of a running session.
   When the agent gives two or more subagents the same task and records them with the kit's `arena` tool, those runners show above the other rows in an **Arena** box with the task, as cards side by side lettered A, B, C in the order it started them.

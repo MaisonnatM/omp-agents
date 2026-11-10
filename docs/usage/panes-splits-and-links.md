@@ -21,7 +21,7 @@
   A new session opens alone, leaving the split.
   A fork opens in the focused pane.
   With four panes open, Cmd-click and **Open in split** replace the focused pane.
-  A subagent link opens its pane right after the pane you clicked it in; with four panes open it replaces the other pane of that row instead, so its session stays on screen.
+  A subagent link opens in the pane you clicked it in, so a split keeps its other panes; Cmd-click opens it in a pane right after that one, and with four panes open replaces the other pane of that row instead, so its session stays on screen.
   A row that is already open focuses its pane instead of opening a second copy.
   The **×** in a pane's header closes it.
   Closing the second-to-last pane returns to a single conversation.
