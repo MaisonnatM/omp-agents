@@ -249,7 +249,6 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   `#email/<account>/<thread id>` that account's conversation in full in the main content.
  * - `#sport` opens the Sport page on this week, `?day=<YYYY-MM-DD>` on that day's week with that day open, `#sport/journal` on
  *   the workout journal, `?open=<log id>` with that log open, and `#sport/progress` on the progress charts.
- * - `#repo/<dir>` opens every file of the git checkout that directory is in, read only, and `#repo/<dir>/<path>` the file at that path; both are encoded.
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
 	"get-started": () => ({ kind: "get-started" }),
