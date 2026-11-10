@@ -44,6 +44,7 @@ import {
 import { createContext, Fragment, type KeyboardEvent, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { View } from "../../src/shared/sessions";
 import { taskText } from "../../src/shared/routine-message";
+import type { PromptFile } from "../../src/shared/prompt-files";
 import { type Item, skillInvocation } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
@@ -72,6 +73,8 @@ import { type ActivityItem, EMPTY_TRANSCRIPT, type ForkPoint, replacingPrompt, r
 import { useAction } from "../use-action";
 import { useCopy } from "../use-copy";
 import { type ToolChipLabels, ToolChipsContext } from "./tool-chips";
+import { AttachedFileDialog } from "./file-dialog";
+import { PromptFileChips } from "./prompt-file-chips";
 import { ImageViewer } from "./media-viewer";
 import { AGENT_PRESET, MessageMarkdown, SESSION_AGENT_PRESET, SESSION_PROMPT_PRESET } from "./message-markdown";
 import { StatusDot, statusLabel } from "./status-dot";
@@ -163,6 +166,8 @@ const RESIZE_REST_MS = 150;
 
 /** Opens the transcript's image viewer at image `at` of prompt or tool item `id`; outside a `Transcript` it does nothing. */
 const OpenImage = createContext<(id: string, at: number) => void>(() => {});
+/** Opens a prompt's attached file in the transcript's dialog; outside a `Transcript` it does nothing. */
+const OpenFile = createContext<(file: PromptFile) => void>(() => {});
 
 /** The subagents a `task` call spawned, each a link to its own view with its status. */
 function SpawnedAgents({ ids }: { ids: string[] }) {
@@ -563,6 +568,8 @@ const MessageRow = memo(function MessageRow({
 	const point = forkAt === null || !onFork ? null : { entryId: forkAt, prefill };
 	const edit = editAt !== null && item.kind === "user" ? () => onEditing(item, editAt) : undefined;
 	const pending = item.kind === "user" && item.pending === true;
+	const openFile = useContext(OpenFile);
+	const files = item.kind === "user" && item.files?.length ? item.files : null;
 	return (
 		// The dimming sits on the wrapper: the message's entrance motion sets its own inline opacity.
 		<Row messageId={item.id} settled={settled} className={cn(pending && "opacity-60")}>
@@ -570,7 +577,7 @@ const MessageRow = memo(function MessageRow({
 				{...(replacing ? { initial: false } : {})}
 				from={item.kind}
 				time={item.kind === "user" ? (item.from ?? undefined) : undefined}
-				files={item.kind === "user" ? item.files : undefined}
+				files={files && <PromptFileChips files={files} onOpen={openFile} />}
 				images={item.kind === "user" ? item.images?.map(mediaSrc) : undefined}
 				onOpenImage={index => openImage(item.id, index)}
 				actions={
@@ -662,6 +669,8 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	useEffect(() => {
 		if (image && imageIndex < 0) setImage(null);
 	}, [image, imageIndex]);
+	// A dialog the transcript holds, so the pending prompt's row giving way to the live one leaves it open.
+	const [file, setFile] = useState<PromptFile | null>(null);
 	const previousItems = useRef<Item[]>([]);
 	const replacing = useMemo(() => {
 		const id = replacingPrompt(previousItems.current, items);
@@ -716,6 +725,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 
 	return (
 		<OpenImage.Provider value={openImage}>
+		<OpenFile.Provider value={setFile}>
 			<div className="@container/conversation relative flex min-h-0 flex-1 flex-col" data-conversation>
 				<SessionTodosCard
 					phases={model.todos}
@@ -808,6 +818,8 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 					onClose={() => setImage(null)}
 				/>
 			)}
+			{file && <AttachedFileDialog file={file} onClose={() => setFile(null)} />}
+		</OpenFile.Provider>
 		</OpenImage.Provider>
 	);
 });

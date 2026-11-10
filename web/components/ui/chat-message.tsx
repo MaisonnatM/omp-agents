@@ -7,15 +7,14 @@ import { spring } from "@/lib/springs";
 import { useShape } from "@/lib/shape-context";
 import { useSize, type SizeVariant } from "@/lib/size-context";
 import { useTouchPrimary } from "@/hooks/use-touch-primary";
-import { useIcon } from "@/lib/icon-context";
 
 interface ChatMessageProps
   extends Omit<HTMLMotionProps<"div">, "children"> {
   /** Who sent the message. Drives alignment and bubble colour:
    *  `user` → right-aligned accent bubble, `assistant` → left-aligned plain text. */
   from: "user" | "assistant";
-  /** Names of files the message carried as text, shown as chips above the bubble. */
-  files?: string[];
+  /** The files the message carried as text, such as the caller's chips, shown in a row above the bubble. */
+  files?: ReactNode;
   /** Addresses of images the message carried, shown above the bubble. */
   images?: string[];
   /** Opens image `index` of `images` large; omitted, the images are not buttons. */
@@ -45,7 +44,6 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
     ref
   ) => {
     const shape = useShape();
-    const FileIcon = useIcon("file-text");
     const compact = useSize(size).variant === "compact";
     const isUser = from === "user";
     // Hover-reveal is unreachable on touch — keep the meta row visible there.
@@ -68,27 +66,14 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
         )}
         {...props}
       >
-        {files && files.length > 0 && (
+        {files != null && (
           <div
             className={cn(
               "flex flex-wrap gap-1.5",
               isUser ? "justify-end" : "justify-start"
             )}
           >
-            {files.map((name, i) => (
-              // A message's files never change, so their order names them.
-              <span
-                key={i}
-                title={name}
-                className={cn(
-                  "inline-flex h-7 max-w-60 items-center gap-1.5 px-2.5 text-[12px] text-muted-foreground bg-accent outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10",
-                  shape.bg
-                )}
-              >
-                <FileIcon size={14} aria-hidden="true" className="shrink-0" />
-                <span className="truncate">{name}</span>
-              </span>
-            ))}
+            {files}
           </div>
         )}
         {images && images.length > 0 && (

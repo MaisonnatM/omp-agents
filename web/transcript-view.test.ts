@@ -62,7 +62,7 @@ describe("transcript rendering", () => {
 			{ ...replacement, text: "unrelated prompt" },
 			{ ...replacement, skill: "review" },
 			{ ...replacement, images: ["image"] },
-			{ ...replacement, files: ["file.txt"] },
+			{ ...replacement, files: [{ name: "file.txt", text: "" }] },
 		]) {
 			expect(ids(withEditedPrompt(blocksOf([user, unrelated]), edit))).toEqual(["u", "old", "new"]);
 		}
@@ -140,7 +140,7 @@ describe("the editable prompt", () => {
 	test("a skill prompt or one with images or files is not editable, since the edit resends text alone", () => {
 		expect(editable([prompt("p1", "e1", { skill: "review" })])).toBeNull();
 		expect(editable([prompt("p1", "e1", { images: ["data:image/png;base64,AA=="] })])).toBeNull();
-		expect(editable([prompt("p1", "e1", { files: ["notes.md"] })])).toBeNull();
+		expect(editable([prompt("p1", "e1", { files: [{ name: "notes.md", text: "" }] })])).toBeNull();
 	});
 });
 
@@ -182,13 +182,14 @@ describe("outline", () => {
 		]);
 	});
 
-	test("a prompt without text reads as the images it carried, and a skill prompt keeps its skill", () => {
+	test("a prompt without text reads as the files or images it carried, and a skill prompt keeps its skill", () => {
 		expect(
 			outline(
 				[
 					prompt("one", "", { images: ["data:image/png;base64,AA=="] }),
 					prompt("two", " ", { images: ["/api/image?hash=a", "/api/image?hash=b"] }),
 					prompt("skill", "", { skill: "review", images: ["/api/image?hash=c"] }),
+					prompt("pasted", "", { files: [{ name: "Pasted text.txt", text: "a" }, { name: "notes.md", text: "b" }], images: ["/api/image?hash=d"] }),
 				],
 				false,
 			),
@@ -196,6 +197,7 @@ describe("outline", () => {
 			expect.objectContaining({ id: "one", prompt: "1 image", skill: null }),
 			expect.objectContaining({ id: "two", prompt: "2 images", skill: null }),
 			expect.objectContaining({ id: "skill", prompt: "1 image", skill: "review" }),
+			expect.objectContaining({ id: "pasted", prompt: "Pasted text.txt, notes.md" }),
 		]);
 	});
 

@@ -81,7 +81,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Files: the session changes dialog | control | `changes-dialog.scope.all`, `changes-dialog.scope.session`, `changes-dialog.refresh` |
 | Files: Settings › Files | view | `settings/files` |
 | Settings › Storage | view, control, action | `settings/storage`; `storage.stop` stops between steps; previews and applies use `PUT /api/storage/cleanup`; rule changes use `PUT /api/settings/agent` |
-| File dialog | control | `file-dialog.open`, `file-dialog.source`, `file-dialog.copy-path` |
+| File dialog | control | `file-dialog.open`, `file-dialog.open-attached`, `file-dialog.source`, `file-dialog.copy-path`, `file-dialog.copy-text` |
 | Dictation | action, command | actions `dictation-start`, `dictation-stop`, `dictation-discard`; command `dictate`; Enable dictation is `put /api/dictation/settings` |
 | Command palette | command | the command each item runs |
 | Keyboard shortcuts | command, control | each shortcut's command key; `shortcuts.open`, `shortcuts.tab` |

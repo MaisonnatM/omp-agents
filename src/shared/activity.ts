@@ -66,6 +66,8 @@ export const CONTROLS = [
 	{ id: "file-dialog.open", label: "File path in agent text", area: "Transcript" },
 	{ id: "file-dialog.source", label: "File dialog, source or rendered", area: "Transcript" },
 	{ id: "file-dialog.copy-path", label: "File dialog, copy the path", area: "Transcript" },
+	{ id: "file-dialog.open-attached", label: "Attached file chip above a prompt", area: "Transcript" },
+	{ id: "file-dialog.copy-text", label: "Attached file dialog, copy the text", area: "Transcript" },
 	{ id: "composer.directory", label: "Directory picker", area: "Composer" },
 	{ id: "composer.branch", label: "Branch picker", area: "Composer" },
 	{ id: "composer.model", label: "Model and effort menu", area: "Composer" },

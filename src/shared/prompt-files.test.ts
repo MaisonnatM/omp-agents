@@ -2,19 +2,20 @@ import { describe, expect, test } from "bun:test";
 import { plainText, promptLabel, splitFiles, withFiles } from "./prompt-files";
 
 describe("withFiles and splitFiles", () => {
-	test("files follow the text and split back off by name, each file's text kept out of the typed text", () => {
-		const prompt = withFiles("compare these", [{ name: "a.md", text: "# A\n\n<file name=\"x\">" }, { name: "b.txt", text: "" }]);
+	test("files follow the text and split back off with their text as written, kept out of the typed text", () => {
+		const files = [{ name: "a.md", text: "# A\n\n<file name=\"x\">" }, { name: "b.txt", text: "" }];
+		const prompt = withFiles("compare these", files);
 		expect(prompt.startsWith("compare these\n\n<file name=\"a.md\">\n# A")).toBe(true);
-		expect(splitFiles(prompt)).toEqual({ text: "compare these", files: ["a.md", "b.txt"] });
+		expect(splitFiles(prompt)).toEqual({ text: "compare these", files });
 	});
 
 	test("a prompt of files alone has empty text, and a skill command stays first", () => {
-		expect(splitFiles(withFiles("", [{ name: "log.txt", text: "boom" }]))).toEqual({ text: "", files: ["log.txt"] });
-		expect(splitFiles(withFiles("/skill:review check", [{ name: "diff.txt", text: "-a\n+b" }]))).toEqual({ text: "/skill:review check", files: ["diff.txt"] });
+		expect(splitFiles(withFiles("", [{ name: "log.txt", text: "boom" }]))).toEqual({ text: "", files: [{ name: "log.txt", text: "boom" }] });
+		expect(splitFiles(withFiles("/skill:review check", [{ name: "diff.txt", text: "-a\n+b" }]))).toEqual({ text: "/skill:review check", files: [{ name: "diff.txt", text: "-a\n+b" }] });
 	});
 
 	test("a quote or newline in a name cannot break the block it heads", () => {
-		expect(splitFiles(withFiles("x", [{ name: 'say "hi"\n.md', text: "t" }])).files).toEqual(["say _hi__.md"]);
+		expect(splitFiles(withFiles("x", [{ name: 'say "hi"\n.md', text: "t" }])).files).toEqual([{ name: "say _hi__.md", text: "t" }]);
 	});
 
 	test("typed text that only looks like a file block stays text", () => {

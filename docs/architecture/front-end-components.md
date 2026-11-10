@@ -50,7 +50,7 @@ The dashboard keeps them mechanical where it can.
 `InputMessage`'s text field is `PromptEditor` instead of a `<textarea>`, and gets an `onKeyDown` and `onPaste` passthrough, so the completion list and the composer shortcuts see a key before the submit handling and a pasted file attaches, and a `stopShortcut`.
 It also gets two slots, `beforeEditor` and `afterActions`: `composer-queue.tsx` renders the queued rows that omp or the server holds into the first, and `composer-suggestions.tsx` into the second the prompts that the last turn's reply ends on, which `splitSuggestions` in `src/transcript.ts` splits off the reply into the assistant item's `suggestions`.
 Its own queue, history recall, and suggested prompts are removed, since those slots replace them.
-`ChatMessage` gets `files`, the names of the files a sent prompt carried as text, and `images`, the addresses of the images it carried.
+`ChatMessage` gets `files`, a slot above the bubble where `MessageRow` puts `PromptFileChips`, the files a sent prompt carried as text, and `images`, the addresses of the images it carried.
 
 Markdown uses `react-markdown` and `remark-gfm` (`web/components/message-markdown.tsx`).
 A fenced code block renders as a `CodeBlock`, colored line by line by `highlightLines` in `web/code-highlight.ts`, the `lowlight` grammars the changes view uses, rather than shadcn's `shiki` hook, so the page bundles one highlighter.
