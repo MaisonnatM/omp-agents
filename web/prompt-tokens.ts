@@ -49,7 +49,7 @@ interface Pattern {
 
 const PATTERNS: readonly Pattern[] = [
 	{ re: /^\/skill:(\S+)(?=\s|$)/g, leading: true, token: m => ({ kind: "skill", label: skillLabel(m[1]), target: m[1] }) },
-	{ re: /^\/([a-z][\w-]*)(?=\s|$)/g, leading: true, token: m => ({ kind: "command", label: `/${m[1]}`, target: m[1] }) },
+	{ re: /^\/([a-z][\w-]*)(?=\s|$)/g, leading: true, token: m => ({ kind: "command", label: skillLabel(m[1]), target: m[1] }) },
 	{
 		re: /\[([A-Z][A-Z\d]*-\d+ (?:[^\]\\\n]|\\.)*)\]\((https:\/\/linear\.app\/[^)\s]+)\)/g,
 		token: m => ({ kind: "ticket", label: unescapeLink(m[1]), target: m[2] }),
