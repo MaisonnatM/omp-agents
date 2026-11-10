@@ -1,10 +1,10 @@
 # Changed files and images
 
-- The **Todos** card, the line above each live session's, subagent's, or past session's messages, counts what the agent changed, took, and opened, such as **7 Files · 1 Image · 1 Source**, and lists them under its todo list once you click the line.
+- The **Todos** card at the top right of each live session's, subagent's, or past session's conversation, or above its messages when the conversation is narrow, lists what the agent changed, took, and opened under its todo list.
   It has separate **Files**, **Images**, and **Sources** sections, each shown only when it has items; the card shows once any of them, or the todo list, has something to show.
   Click a section's header to fold or unfold it.
   Each starts open, and the app keeps each choice across sessions and reloads.
-  The open card covers the messages down to the composer, and scrolls as a whole when its sections outgrow that; a click outside it or Escape closes it.
+  The card scrolls as a whole when its sections outgrow it.
   **Show todos card** in Settings › Preferences, or the checklist toggle in the session's header, before End session or Resume, hides the whole card, these sections included.
   A Bot's page, which reads as a chat, leaves these sections out, and the card hides while the trajectory takes the transcript's place.
 - **Files** lists the files the agent's `edit` and `write` calls changed, in the order it first touched them.
@@ -23,6 +23,7 @@
   A write replaces the whole file and records no diff, so it shows how many lines it wrote instead.
   A write counts as creating the file when the session had not read or changed that path before, since omp does not record whether the file existed; a created file counts every line it wrote as added, and a later write over it counts none.
   A failed call, and a write to something other than a file, such as an `agent://` message, count for nothing.
+  The file list scrolls within the card, keeping its header visible.
 - Subagents are not listed here; open one from its link in the transcript, under the call that spawned it.
 - **Images** shows a horizontal thumbnail strip of the images that the agent's tools returned and those of its subagents at any depth, newest first: browser screenshots from `eval`, and image files that `read` opened.
   It also shows the image files the session wrote that a tool call or its result named, such as the `page.png` a script saved; a named file counts as written when it changed after the session started, so paths in source code and older files stay out.
@@ -44,4 +45,4 @@
   A failed call, a page on this computer such as a dev server, and search results the agent never opened are left out, and so are the session's own pull requests and Linear issues, which the [session details sidebar](session-details-sidebar.md) shows.
   Each row shows the site's icon, the site, and the page's path; its tooltip names the full address, the agent and tool, what the call said it did, and how long ago.
   The dashboard's server fetches the icons from the sites themselves, so no outside icon service learns which sites a session opened; a site without one shows a globe.
-  Click a row to open the page in your browser.
+  Click a row to open the page in your browser; the list scrolls within the card.
