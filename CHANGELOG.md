@@ -19,6 +19,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Settings, Phone access no longer shows a cancelled-read error when you come back to the section.
 - In a Bot's details, a routine's "Ran 5m ago" now counts up each minute, as the routines card does.
 - The Settings guide now lists Phone access among its twenty sections.
+- Sport: saving an edit to a logged session no longer erases the loads of exercises the dialog does not list, such as those of a workout the plan no longer has on that day.
+- Sport: with no plan, the **Plan suivi** chart now says the plan has not started, where it drew one empty week.
+- Notes: deleting or moving another note from its right-click menu no longer closes the note you have open.
 - Behind the scenes: removed unused imports, a prop no row read, and a line that could never run; declared two editor packages the page already used; merged two test files that shared a name, so both are type-checked; and corrected file lists, names, and three server descriptions in the docs.
 - Ship no longer stops on a missing review checkbox: recording the stage after the interface or thermo-nuclear review ticks that review's box in the pull request description, or adds it when the description has none.
 - Recording `live` or a fix while the pull request is still a draft now says what to do next, such as running `gh pr ready`, instead of failing.

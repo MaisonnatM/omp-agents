@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { exercise, log, measurement, SEMI, STATE, withLogs, withMeasurements } from "../src/sport-fixtures";
 import type { Climb, FrenchGrade, Plan } from "../src/shared/sport";
 import { dayPlan, loadFor, records } from "../src/sport-week";
-import { amount, beaten, bodyweightOf, daySummary, demosOf, dose, effortWord, exerciseName, hardest, journalWeeks, loadSource, loadText, logDetail, logSave, measured, nextTest, opening, painRule, painWord, phaseLabel, recordLogs, recordRows, REMOVED_TEXT, sendsText, signedAmount, signedKg, testOf, weekTitle, workoutDemos, workoutOf } from "./sport-view";
+import { amount, beaten, bodyweightOf, daySummary, demosOf, dose, effortWord, exerciseName, hardest, journalWeeks, loadSource, loadText, logDetail, logSave, measured, nextTest, opening, painRule, painWord, phaseLabel, recordLogs, recordRows, REMOVED_TEXT, savedLoads, sendsText, signedAmount, signedKg, testOf, weekTitle, workoutDemos, workoutOf } from "./sport-view";
 
 const plan = STATE.plan!;
 const demo = (youtubeId: string) => ({ youtubeId, by: "Lattice", cues: ["a", "b", "c"] as [string, string, string], caution: null });
@@ -25,6 +25,11 @@ describe("loads", () => {
 	test("a logged load names the day it was lifted", () => {
 		const state = withLogs(STATE, log("l1", "2026-11-17", { workout: "mardi", loads: { semi: 17 } }));
 		expect(loadSource(loadFor(state, SEMI, "2026-11-24"))).toBe("Dernière fois +17 kg · 17 nov.");
+	});
+
+	test("a save keeps the logged load of an exercise the form lists no row for, and a listed row's load only while ticked and typed", () => {
+		expect(savedLoads({ semi: 17 }, [])).toEqual({ semi: 17 });
+		expect(savedLoads({ semi: 17, open: 10, pull: 30 }, [{ key: "semi", kg: 18, done: true }, { key: "open", kg: 10, done: false }, { key: "pinch", kg: null, done: true }])).toEqual({ pull: 30, semi: 18 });
 	});
 });
 

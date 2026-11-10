@@ -21,6 +21,10 @@ describe("progress", () => {
 		expect(chartOf(STATE, { kind: "plan" }, null, "2026-11-10")).toMatchObject({ spec: { data: [] }, empty: "Le plan n'a pas encore commencé." });
 	});
 
+	test("with no plan, the plan chart says the plan has not started instead of drawing an empty week", () => {
+		expect(chartOf({ ...STATE, plan: null }, { kind: "plan" }, null, "2026-11-25")).toMatchObject({ spec: { data: [] }, empty: "Le plan n'a pas encore commencé." });
+	});
+
 	test("a metric's chart says how far it moved, what is left to its target, and the next test, with the target as its line", () => {
 		const chart = chartOf(tested, { kind: "metric", metric: max }, null, "2026-11-25");
 		expect(chart.sentence).toBe("+5 kg depuis le 26 août. Il te reste 2 kg pour atteindre 119 kg d'ici le 7 févr. Prochain test le 29 déc.");
