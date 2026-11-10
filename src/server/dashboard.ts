@@ -730,8 +730,8 @@ export class Dashboard {
 	}
 
 	/**
-	 * Starts following omp: attaches to the sessions the last server left running, watches the session files, takes the
-	 * owner lock when it is free, lists the files, watches the inboxes, checks for the sessions that stopped mid-turn, lists
+	 * Starts following omp: attaches to the sessions the last server left running, watches the session files, lists the
+	 * files, takes the owner lock when it is free, watches the inboxes, checks for the sessions that stopped mid-turn, lists
 	 * the registry, and starts the loops; `publisher` is the server now listening.
 	 */
 	async start(publisher: Publisher): Promise<void> {
@@ -745,12 +745,12 @@ export class Dashboard {
 		this.#reattached.resolve();
 		this.#broadcasts.syncRoster();
 		this.#loops.watch();
+		// Before the owner lock, whose taking drains the inboxes: a note or a reminder an ended session left files under that session's space.
+		await this.#rescanFiles();
 		if (!this.#claimUnattendedWork()) {
 			const owner = this.#ownerLock.holder();
 			console.log(`omp-agents: the server on port ${owner?.port ?? "?"} (pid ${owner?.pid ?? "?"}) runs routines and the file inboxes; this one takes over when it exits.`);
 		}
-		await this.#rescanFiles();
-		// Once the files are listed, so a note or a reminder an ended session left files under that session's space.
 		for (const inbox of this.#inboxes) inbox.watch();
 		this.#endInbox.watch();
 		// Once the files are listed, so the notice names the sessions that stopped mid-turn with the last server.

@@ -252,6 +252,10 @@ export function withCreditRuns(plans: readonly PlanUsage[], runs: readonly Credi
 /** omp exits non-zero when some provider fails, after printing the reports it did get. */
 export async function fetchPlanUsage(): Promise<PlanUsage[]> {
 	const refusals = readCreditRuns(Date.now()).catch(() => []);
+	// A credential-store miss must not hide the plan windows `omp usage` returns.
+	const configured = configuredProviders().catch((): string[] => []);
+	// Only the API credits row shows the Console balance, so nothing else copies the browser's cookie databases to read it.
+	const credits = configured.then(providers => (providers.includes(API_CREDITS_PROVIDER) ? readConsoleCreditBalance().catch(() => null) : null));
 	const rawReports = await readRawUsageReports().catch(() => null);
 	const { stdout, stderr, code } = await run([...ompCommand, "usage", "--json"], { timeoutMs: TIMEOUT_MS });
 	let plans: PlanUsage[];
@@ -260,14 +264,5 @@ export async function fetchPlanUsage(): Promise<PlanUsage[]> {
 	} catch {
 		throw new Error(stderr.trim().split("\n").pop() || `omp usage exited with code ${code}`);
 	}
-	// A credential-store miss must not hide the plan windows this command already returned.
-	let configured: string[] = [];
-	try {
-		configured = await configuredProviders();
-	} catch {
-		configured = [];
-	}
-	// Only the API credits row shows the Console balance, so nothing else copies the browser's cookie databases to read it.
-	const credits = configured.includes(API_CREDITS_PROVIDER) ? await readConsoleCreditBalance().catch(() => null) : null;
-	return withCreditRuns(withCreditBalance(plansWithConfiguredProviders(plans, configured), credits), await refusals);
+	return withCreditRuns(withCreditBalance(plansWithConfiguredProviders(plans, await configured), await credits), await refusals);
 }

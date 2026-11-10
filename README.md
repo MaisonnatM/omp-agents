@@ -126,7 +126,8 @@ The window signs itself in, so it needs no token from you.
   Otherwise the app starts the server and stops it when you quit; the sessions that the dashboard started keep running and show live again at the next launch.
 - On macOS, closing the window (Cmd+Shift+W) hides it and keeps the server and its sessions running; click the app in the Dock to show it again.
   Cmd+Q quits.
-- In the packaged app, **Open at Login** in the app menu starts the app, and with it your routines, when you log in, and **Install omp Starter Kit…** installs the starter kit.
+- In the packaged app on macOS, **Open at Login** in the app menu starts the app, and with it your routines, when you log in.
+  **Install omp Starter Kit…** in the same menu installs the starter kit.
 - Links to GitHub, Linear, and every other site open in your default browser.
 - `PORT` sets the port for `bun run desktop` and `bun start` alike.
 

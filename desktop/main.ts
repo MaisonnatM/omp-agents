@@ -468,7 +468,7 @@ function updateItem(): MenuItemConstructorOptions[] {
 /** The menu holds no shortcut the dashboard binds (web/shortcuts.ts), so every one reaches the page. */
 function applicationMenu(): Menu {
 	// A checkout's Electron is not an app macOS can open at login.
-	// Electron sets a login item on macOS and Windows alone, so elsewhere the item would untick itself.
+	// Electron sets no login item on Linux, so there the item would untick itself.
 	const openAtLogin: MenuItemConstructorOptions[] = app.isPackaged && IS_MAC
 		? [{ label: "Open at Login", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin, click: toggleOpenAtLogin }]
 		: [];

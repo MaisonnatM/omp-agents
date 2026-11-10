@@ -5,6 +5,7 @@ import { promptLabel } from "../../src/shared/prompt-files";
 import { CONTINUE_PROMPT, type ScheduledChange, type ScheduledSend, type ScheduledTarget } from "../../src/shared/scheduled";
 import { hashForSession } from "../../src/shared/sessions";
 import { hashForScheduled } from "../routing";
+import { opensWithShortcut } from "./composer";
 import { ROW_END, RowLine, WorkspaceBadge } from "./session-row";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
@@ -67,7 +68,7 @@ function ScheduleMenu({ draft, files, disabled, pending, onSchedule }: ScheduleB
 	const plans = useContext(Plans);
 	const now = useMinute();
 	// omp runs `!` and `$` only from the composer's own path, and a scheduled message goes to omp as a plain prompt.
-	const blocked = files > 0 ? "Attached files cannot wait for later" : /^\s*[!$]/.test(draft) ? "A ! or $ command cannot wait for later" : null;
+	const blocked = files > 0 ? "Attached files cannot wait for later" : opensWithShortcut(draft) ? "A ! or $ command cannot wait for later" : null;
 	const choices: { label: string; when: ScheduleWhen }[] = [
 		...resetChoices(plans, now).map(when => ({ label: `When ${when.reset} resets`, when })),
 		{ label: "In 1 hour", when: { at: now + HOUR, reset: null } },

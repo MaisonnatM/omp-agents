@@ -84,15 +84,19 @@ function LoadedNotesPage({ list, todos, view, openId, disabled, onChange, hosts,
 	};
 	useShortcuts({ notesSearch: () => search.current?.focus(), notesNew: create, notesNext: () => step(1), notesPrevious: () => step(-1), notesClose: () => { if (open !== null) navigate(null); } });
 	useOpenLatest(id => hashForNotes(view, id), openId, shown[0]?.id ?? null, true);
-	const remove = (note: UserNote): void => {
-		const index = list.notes.findIndex(row => row.id === note.id);
+	/** Applies a change that takes `note` off this page, closing it when it is the open one; the undo reopens it only then. */
+	const takeAway = (note: UserNote, toast: string, message: string, change: UserNoteChange, undo: UserNoteChange): void => {
 		const wasOpen = note.id === openId;
-		onChange({ op: "remove", id: note.id });
+		onChange(change);
 		if (wasOpen) navigate(null);
-		offerUndo("note-undo", `Deleted “${note.title || "Untitled"}”`, () => {
-			onChange({ op: "restore", note, index });
+		offerUndo(toast, message, () => {
+			onChange(undo);
 			if (wasOpen) location.hash = hashForNotes(view, note.id);
 		});
+	};
+	const remove = (note: UserNote): void => {
+		const index = list.notes.findIndex(row => row.id === note.id);
+		takeAway(note, "note-undo", `Deleted “${note.title || "Untitled"}”`, { op: "remove", id: note.id }, { op: "restore", note, index });
 	};
 	const rename = (note: UserNote): void => {
 		setNaming(note.id);
@@ -101,13 +105,7 @@ function LoadedNotesPage({ list, todos, view, openId, disabled, onChange, hosts,
 	const to = otherSpace(space);
 	/** Moves `note` to the other space, which takes it off this page, with an undo that brings it back. */
 	const move = (note: UserNote): void => {
-		const wasOpen = note.id === openId;
-		onChange({ op: "set-space", id: note.id, space: to });
-		if (wasOpen) navigate(null);
-		offerUndo("note-move", `Moved “${note.title || "Untitled"}” to ${SPACE_LABELS[to]}`, () => {
-			onChange({ op: "set-space", id: note.id, space });
-			if (wasOpen) location.hash = hashForNotes(view, note.id);
-		});
+		takeAway(note, "note-move", `Moved “${note.title || "Untitled"}” to ${SPACE_LABELS[to]}`, { op: "set-space", id: note.id, space: to }, { op: "set-space", id: note.id, space });
 	};
 	return (
 		<PageFrame title={view.kind === "all" ? "Notes" : text.name} meta={`${listed.length} ${listed.length === 1 ? "note" : "notes"}`} actions={<>
