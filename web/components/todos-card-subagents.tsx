@@ -68,7 +68,7 @@ function agentLink(links: SubagentLinksValue, agentId: string) {
 	};
 }
 
-const tooltipOf = (agent: AgentRow, verdict?: string) => `${[agent.id, agent.kind, statusLabel(agent.status), agent.activity, verdict].filter(Boolean).join(" · ")}. ${SPLIT_CLICK} to open in this pane`;
+const tooltipOf = (agent: AgentRow, verdict?: string) => `${[agent.id, agent.kind, statusLabel(agent.status), agent.activity, verdict].filter(Boolean).join(" · ")}. ${SPLIT_CLICK} to open in a split`;
 
 /** The badge each verdict of the pick shows on a runner's card. */
 const VERDICTS = {

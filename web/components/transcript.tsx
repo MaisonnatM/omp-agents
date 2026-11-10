@@ -188,7 +188,7 @@ function SpawnedAgents({ ids }: { ids: string[] }) {
 				const facts = agent ? [agent.kind, statusLabel(agent.status), agent.activity].filter(Boolean).join(" · ") : "not registered";
 				return (
 					<span key={id} className="inline-flex max-w-full items-center gap-0.5">
-						<Tooltip content={`${id} · ${facts}. ${SPLIT_CLICK} to open in this pane`}>
+						<Tooltip content={`${id} · ${facts}. ${SPLIT_CLICK} to open in a split`}>
 							<a
 								href={hashForView(view)}
 								className={cn(chip, "text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring")}

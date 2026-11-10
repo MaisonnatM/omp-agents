@@ -6,7 +6,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-11-10
 
 - Long agent replies read more easily: their text keeps the conversation's full width with more space between paragraphs and bullets, and bullets that open with a bold word line up as a two-column table, keys on the left. A narrow conversation keeps the key inline.
-- Clicking a subagent now opens it in a split beside its session, at full height, instead of in place of the session. Cmd-click opens it in place, as a click did before.
+- Clicking a subagent opens it in the same pane as its session again, so a split stays as it is instead of gaining a pane. Cmd-click opens it in a split beside its session.
 - The sidebar marks the sessions of a split with a two-column icon, and highlights a session while one of its subagents is open.
 - Hovering a suggested prompt under the composer now shows its keys: send, edit, and mark. Its pencil button puts the prompt in the composer so you can edit it before sending.
 - Installing the omp Starter Kit on a new computer now makes the pstack skills work, such as arena and technical writing, which ship plans with. Before, omp skipped all of them, so ship stopped at its plan step.
