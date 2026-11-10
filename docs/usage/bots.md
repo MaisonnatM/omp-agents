@@ -31,7 +31,7 @@
   The type stays what you picked: **Bot designer** asks what Bot you want and creates it, as [Bot designers](#bot-designers) says, **Routines** works through its conversation and its routines, and **PR shepherd** also drives your approved pull requests to merged, as [PR shepherds](#pr-shepherds) says.
   Picking **Bot designer** or **PR shepherd** fills its **Job** with its rules, and its name with **Dr Eggbot** or **Shepherd**, and hides the job templates.
   Switching type swaps a name or job the last type or a template filled, and keeps one you typed; picking **Routines** after a type that filled them empties them.
-  For a **Routines** Bot, the optional **Job** field starts empty, and a template above it, **PR reviewer**, **Daily retro**, **Worktree janitor**, or **Release watcher**, fills it and the name, keeping either one you typed.
+  For a **Routines** Bot, the optional **Job** field starts empty, and a template above it, **PR reviewer**, **Daily retro**, **Worktree janitor**, **Release watcher**, **Memory curator**, **Bot coach**, or **Review requests**, fills it and the name, keeping either one you typed.
   It also asks for the workspace its conversation runs in, among the space's workspaces, the sidebar's workspace by default, or the personal directory while the sidebar shows all of Personal.
   **Create** saves it and opens its page, `#bots/<id>`.
   A Bot made with no job learns it from you: tell it in your first message what to do, where to look, and what to ask before acting, and it saves that as its job, in its **Job** field.
