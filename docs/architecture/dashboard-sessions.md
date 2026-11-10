@@ -28,7 +28,8 @@ It flushes while the host's `state` frame counts a queued message (`queuedMessag
 Plain `--mode rpc` gives the session no `ask` tool.
 `rpc-ui` gives it one, and omp sends extension dialogs as `extension_ui_request` frames.
 An `input` frame carries `secret: true` when the extension asks for a secret, such as an API key, and the server keeps it as a text request whose `field` is `secret` rather than `line`, which the page draws as a password field.
-The server sends `set_ask_dialog` when it opens a session, so omp sends each `ask` call whole as one `ask` frame and takes all its answers in one `extension_ui_response` (`requestRpcAskDialog` in `rpc-mode.ts`) instead of a chain of selects, whose frames do not report a multi-select's checked rows.
+The server sends `set_ask_dialog` when it opens a session, so omp sends an extension's `askDialog` whole as one `ask` frame and takes all its answers in one `extension_ui_response` (`requestRpcAskDialog` in `rpc-mode.ts`) instead of a chain of selects, whose frames do not report a multi-select's checked rows.
+The `ask` tool sends its questions as an HTML form, which stock omp walks one field at a time through `select`, `input`, and `editor` frames even then; the [rpc-ask-form runtime patch](omp-modules.md) sends that form as one `ask` frame too, a question per field, with no options for a text field, and asks again in a second frame only for fields whose answers fail the form's checks ([decision](../decisions/2026-11-10-one-ask-card-per-form-through-a-runtime-patch.md)).
 omp's `RpcClient` reads those frames but only hands them to its own login flow, so the server reads a copy of the child's stdout through omp's JSONL reader and chunk decoder.
 It writes the `extension_ui_response` to the child's stdin as one line, the way `RpcClient` writes its own commands.
 omp sends a `cancel` frame when a question ends without an answer, for example after Stop.

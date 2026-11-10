@@ -182,8 +182,10 @@ function AskCard({ request, queued, onAnswer, shortcuts }: UserRequestCardProps 
 		title: index === question.recommended ? `${shownLabel(option.label)} (Recommended)` : shownLabel(option.label),
 		description: option.description ?? undefined,
 	}));
-	const shown: Question = typing
-		? { kind: "text", title: question.question, field: "line", placeholder: "Type your answer…", submitLabel: last && !question.multi ? "Send" : "Next" }
+	// A question with no options, a text field of the `ask` tool's form, only takes typed text; left blank, it keeps the field's value.
+	const freeText = question.options.length === 0;
+	const shown: Question = typing || freeText
+		? { kind: "text", title: question.question, field: "line", placeholder: "Type your answer…", submitLabel: last && !question.multi ? "Send" : "Next", allowEmpty: freeText }
 		: {
 				kind: "options",
 				title: question.question,
@@ -219,7 +221,7 @@ function AskCard({ request, queued, onAnswer, shortcuts }: UserRequestCardProps 
 		setReplies(update({ ...current, selected }));
 	};
 	useShortcuts(
-		shortcuts && !typing
+		shortcuts && !typing && !freeText
 			? {
 					answer: key => {
 						if (key > question.options.length) return false;
@@ -242,7 +244,8 @@ function AskCard({ request, queued, onAnswer, shortcuts }: UserRequestCardProps 
 		</Button>
 	);
 	let footer: ReactNode = null;
-	if (!typing && (question.multi || back)) {
+	if (freeText) footer = back;
+	else if (!typing && (question.multi || back)) {
 		footer = (
 			<div className="flex items-center justify-end gap-2 -mx-2 sm:-mx-3">
 				{back}

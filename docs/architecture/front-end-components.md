@@ -44,6 +44,7 @@ A select is one row per omp option, and a confirm is **Yes** and **No** rows, bo
 An input an extension marks `secret`, such as an API key prompt, is a password field that shows dots, which the page neither saves nor shows anywhere else.
 A terminal session's select takes its checked rows from the request, since omp sends a multi-select pick back as a new request with the row checked.
 A dashboard session's `ask` request holds every question; `AskCard` keeps the picks and typed text of each, shows multi-select rows as checkboxes, and sends one `ask` answer after the last question.
+A question with no options, a text field of the `ask` tool's form, opens as a text field that may be sent blank to keep the field's value, with Back beside its button; on a stock omp, which sends that form a field at a time ([Dashboard sessions](dashboard-sessions.md)), each field is a card of its own.
 
 Changes the dashboard makes to Fluid's components are listed in `web/components/ui/PATCHES.md`, each with its reason, so an upgrade is a merge that checks each entry.
 The dashboard keeps them mechanical where it can.

@@ -28,6 +28,8 @@ export interface StartingPrompt {
 }
 
 const COLLAB_PROMPT = "collab-prompt";
+/** A peer's or the parent agent's message to this session; omp's `irc_message` event also carries relays this session only observes. */
+const IRC_INCOMING = "irc:incoming";
 /** How omp's terminal and RPC clients record a `/skill:<name>` prompt: the skill's text, with the invocation in `details`. */
 export const SKILL_PROMPT = "skill-prompt";
 /**
@@ -266,6 +268,7 @@ export class Transcript {
 				return this.#applyMessage(key, entry.message, false, str(entry.id) ?? null);
 			}
 			case "custom_message": {
+				if (entry.customType === IRC_INCOMING) return this.#applyIrc({ ...entry, role: "custom" });
 				if (!skillPrompt) return this.#applyMessage(id, { ...entry, role: "custom" }, false, null);
 				const key = `m${written}`;
 				this.#settled.add(key);
@@ -319,6 +322,8 @@ export class Transcript {
 			}
 			case "auto_retry_start":
 				return this.note("warning", `Retrying (${event.attempt}/${event.maxAttempts}): ${String(event.errorMessage)}`);
+			case "irc_message":
+				return isObject(event.message) ? this.#applyIrc(event.message) : [];
 			default:
 				return [];
 		}
@@ -328,6 +333,19 @@ export class Transcript {
 	note(level: "info" | "warning" | "error", text: string): Item[] {
 		this.#now = Date.now();
 		return this.#upsert({ id: `notice${++this.#noticeSeq}`, kind: "notice", level, text });
+	}
+
+	/**
+	 * A peer's or the parent agent's message to this session, shown as a prompt from its sender. The live
+	 * `irc_message` event and the file entry share omp's message id, so the card appears once; omp marks the
+	 * parent's steer `display: false` while the turn runs, since its card comes when the agent takes it.
+	 */
+	#applyIrc(message: Json): Item[] {
+		const details = isObject(message.details) ? message.details : {};
+		const id = str(details.id);
+		const text = str(details.message);
+		if (message.customType !== IRC_INCOMING || message.display === false || !id || text === undefined) return [];
+		return this.#upsert({ id: `irc:${id}`, kind: "user", text, skill: null, from: str(details.from) ?? null, entryId: null });
 	}
 
 	/**
@@ -347,6 +365,11 @@ export class Transcript {
 		switch (message.role) {
 			case "user":
 				if (message.synthetic) return [];
+				// A parent's message that arrives mid-turn reaches the agent as a steer wrapped in omp's instructions.
+				if (isObject(message.parentIrc)) {
+					const parent = message.parentIrc;
+					return this.#upsert({ id: key, kind: "user", text: str(parent.body) ?? "", skill: null, from: str(parent.from) ?? null, entryId });
+				}
 				return this.#upsert(promptItem(key, unwrapSkill(textOf(message.content)), { from: null, entryId, ...imagesOf(message.content) }));
 			case "custom": {
 				const details = isObject(message.details) ? message.details : {};

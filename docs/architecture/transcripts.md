@@ -25,6 +25,8 @@ Every transcript comes from the session files on this machine, not from a networ
   omp writes a fresh session's file only with its first reply.
   Until then the prompt shows from its live event, except a prompt sent from the dashboard to a terminal session, whose file entry has no message timestamp to merge on.
   A `/skill:` prompt is a `custom` message of type `skill-prompt`, and omp writes its `custom_message` entry with the message's timestamp, so it merges on that.
+  A message from a peer or the parent agent is a `custom` message of type `irc:incoming`, whose `details` carry omp's message id, the sender, and the body; it shows as a user item from the sender, keyed by that id, so the live `irc_message` event and the file's `custom_message` entry make one item.
+  An `irc_message` that only relays a message between two other agents, and one omp marks `display: false`, shows nothing; a parent's message that reaches a running turn as a steer is a user message with `parentIrc`, which shows as its body from the parent rather than omp's wrapping.
   A queued steer or follow-up keeps the time it was sent, though the agent takes it later.
   So a message from the file never goes ahead of the file messages before it, and a live user message goes after everything already shown.
   A message that arrives older than items already shown, such as a prompt that reaches the file only after its streamed reply, goes after the last item at or before its time.

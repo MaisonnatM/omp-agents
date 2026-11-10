@@ -1,4 +1,4 @@
-From 5b044cf0e719d91c891cd1811591333fa2dce363 Mon Sep 17 00:00:00 2001
+From 44dead591881917cb6cb172b0464669fc4fb7048 Mon Sep 17 00:00:00 2001
 From: maxence_maisonnat <maisonnatmax@gmail.com>
 Date: Sat, 7 Nov 2026 11:45:44 +0100
 Subject: [PATCH] fix(ai/cursor): tell the model which tools are dynamic-only
@@ -16,16 +16,17 @@ the rule reaches the model on the first turn and every later one. The
 advertised tools and allowed-tools header are unchanged.
 
 Omp-Session: 01a1b59a-9df8-752f-b412-98a0184fcedf
+Omp-Session: 01a1c493-10f5-74be-9bda-1ed9dcb33daf
 ---
  packages/ai/src/providers/cursor.ts           | 60 +++++++++++++++----
  .../test/cursor-system-prompt-history.test.ts | 54 +++++++++++++++--
  2 files changed, 97 insertions(+), 17 deletions(-)
 
 diff --git a/packages/ai/src/providers/cursor.ts b/packages/ai/src/providers/cursor.ts
-index 85126e909f..5eddb06586 100644
+index 5f6cfe9746..3fca81c4aa 100644
 --- a/packages/ai/src/providers/cursor.ts
 +++ b/packages/ai/src/providers/cursor.ts
-@@ -568,6 +568,8 @@ interface CursorGrpcRequest {
+@@ -570,6 +570,8 @@ interface CursorGrpcRequest {
  	requestBytes: Uint8Array;
  	blobStore: Map<string, Uint8Array>;
  	conversationState: ConversationStateStructure;
@@ -34,7 +35,7 @@ index 85126e909f..5eddb06586 100644
  }
  
  interface CursorTransportRequest extends CursorGrpcRequest {
-@@ -1428,19 +1430,13 @@ function streamCursorWithWireMode(
+@@ -1453,19 +1455,13 @@ function streamCursorWithWireMode(
  				},
  				wireMode,
  			);
@@ -55,7 +56,7 @@ index 85126e909f..5eddb06586 100644
  
  			const baseUrl = model.baseUrl || CURSOR_API_URL;
  			const requestPath = transportMode === "http2" ? CURSOR_RUN_PATH : CURSOR_RUN_SSE_PATH;
-@@ -6361,6 +6357,20 @@ export function buildCursorRequestContextRules(systemPrompt: readonly string[] |
+@@ -6438,6 +6434,20 @@ export function buildCursorRequestContextRules(systemPrompt: readonly string[] |
  	);
  }
  
@@ -76,7 +77,7 @@ index 85126e909f..5eddb06586 100644
  /**
   * Local tools Cursor already drives natively over the exec channel, so
   * advertising them again as MCP tools would give the model two ways to call the
-@@ -7219,7 +7229,19 @@ async function buildGrpcRequestForWireMode(
+@@ -7296,7 +7306,19 @@ async function buildGrpcRequestForWireMode(
  ): Promise<CursorTransportRequest> {
  	const blobStore = state.blobStore;
  
@@ -97,7 +98,7 @@ index 85126e909f..5eddb06586 100644
  		storeCursorBlob(blobStore, new TextEncoder().encode(json)),
  	);
  
-@@ -7284,7 +7306,15 @@ async function buildGrpcRequestForWireMode(
+@@ -7361,7 +7383,15 @@ async function buildGrpcRequestForWireMode(
  				// its turns hold the partial turn the server resumes from, which
  				// `context.messages` cannot rebuild.
  				{ conversationState: state.conversationState, replayed: false }
@@ -114,7 +115,7 @@ index 85126e909f..5eddb06586 100644
  	const { conversationState } = built;
  	// Fingerprints of the history as built, to tell which field the hook below edited.
  	const builtRootHash = built.replayed ? hashCursorBlobIds(conversationState.rootPromptMessagesJson) : undefined;
-@@ -7321,7 +7351,7 @@ async function buildGrpcRequestForWireMode(
+@@ -7398,7 +7428,7 @@ async function buildGrpcRequestForWireMode(
  		if (rootAsBuilt || turnsAsBuilt) {
  			const rebuilt = buildCursorConversationState(
  				model,
@@ -123,7 +124,7 @@ index 85126e909f..5eddb06586 100644
  				state,
  				blobStore,
  				systemPromptIds,
-@@ -7369,7 +7399,15 @@ async function buildGrpcRequestForWireMode(
+@@ -7446,7 +7476,15 @@ async function buildGrpcRequestForWireMode(
  		detail: detail || undefined,
  	});
  

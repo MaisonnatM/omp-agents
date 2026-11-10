@@ -1,9 +1,10 @@
-From 917366a0153ef58ff94cbff36c0d243ae05aac30 Mon Sep 17 00:00:00 2001
+From bf340a69cdd8f7c5909ed0c099f41aeb57d1b8d5 Mon Sep 17 00:00:00 2001
 From: omp-agents <omp-agents@local>
 Date: Sat, 7 Nov 2026 12:13:26 +0100
 Subject: [PATCH] fix: read Anthropic's credit-balance 400 as a usage limit
 
 Omp-Session: 01a1b5a2-fbff-710e-85d7-f5e09e03e8ac
+Omp-Session: 01a1c493-10f5-74be-9bda-1ed9dcb33daf
 ---
  packages/ai/src/error/rate-limit.ts           |  8 +-
  .../ai/test/anthropic-stream-envelope.test.ts |  9 ++-
@@ -85,7 +86,7 @@ index 27a89ec23a..07d51c240f 100644
  
  describe("calculateRateLimitBackoffMs", () => {
 diff --git a/packages/coding-agent/test/agent-session-retry-fallback.test.ts b/packages/coding-agent/test/agent-session-retry-fallback.test.ts
-index fa98c97323..37d18220b0 100644
+index c2ae135a18..f0b4089acf 100644
 --- a/packages/coding-agent/test/agent-session-retry-fallback.test.ts
 +++ b/packages/coding-agent/test/agent-session-retry-fallback.test.ts
 @@ -3498,6 +3498,86 @@ describe("AgentSession retry fallback", () => {

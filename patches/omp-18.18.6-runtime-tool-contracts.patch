@@ -1,4 +1,4 @@
-From ecc82547de896fe034f5ff8fbe5dae7af766e4b6 Mon Sep 17 00:00:00 2001
+From 6a079e116697e841cd8dff2e917bd19c3a4970b8 Mon Sep 17 00:00:00 2001
 From: omp-agents <omp-agents@localhost>
 Date: Sat, 7 Nov 2026 11:57:47 +0100
 Subject: [PATCH] fix(coding-agent): tighten runtime tool contracts for xd
@@ -10,6 +10,7 @@ devices, and scope seance session-id lookup to the caller's artifacts
 and current project.
 
 Omp-Session: 01a1b5a7-fbd3-7560-a579-bddf331c93ee
+Omp-Session: 01a1c493-10f5-74be-9bda-1ed9dcb33daf
 ---
  .../coding-agent/src/internal-urls/router.ts  |  3 +
  .../src/internal-urls/xd-protocol.ts          |  2 +-
@@ -19,11 +20,11 @@ Omp-Session: 01a1b5a7-fbd3-7560-a579-bddf331c93ee
  packages/coding-agent/src/task/seance.ts      |  5 +-
  packages/coding-agent/src/tools/read.ts       |  5 +-
  packages/coding-agent/src/tools/xdev.ts       | 32 ++++++++--
- .../agent-session-tool-rebuild-skip.test.ts   | 23 +++-----
+ .../agent-session-tool-rebuild-skip.test.ts   | 25 +++-----
  .../coding-agent/test/task/seance.test.ts     | 15 +++--
  .../test/tools/read-repeat-hint.test.ts       |  8 ++-
  .../test/write-xdev-dispatch.test.ts          | 59 +++++++++++++++++++
- 12 files changed, 126 insertions(+), 34 deletions(-)
+ 12 files changed, 127 insertions(+), 35 deletions(-)
 
 diff --git a/packages/coding-agent/src/internal-urls/router.ts b/packages/coding-agent/src/internal-urls/router.ts
 index 86b6792f17..2c9f15d05d 100644
@@ -75,10 +76,10 @@ index 6d052bff54..4a3a9218a6 100644
  If the saved model is absent/unavailable, set `model` explicitly.
  When the user points at an earlier session, the consult IS the read: NEVER read, grep, or re-run its `.jsonl` here. Only facts that changed since (an open PR's state) need a live check.
 diff --git a/packages/coding-agent/src/session/session-tools.ts b/packages/coding-agent/src/session/session-tools.ts
-index aa82d438a1..5feb78ce6b 100644
+index 6cee4a2cf8..edb9e25c08 100644
 --- a/packages/coding-agent/src/session/session-tools.ts
 +++ b/packages/coding-agent/src/session/session-tools.ts
-@@ -48,6 +48,7 @@ import {
+@@ -57,6 +57,7 @@ import {
  	planXdevPromptDocs,
  	type XdevState,
  	xdevDocsFor,
@@ -86,7 +87,7 @@ index aa82d438a1..5feb78ce6b 100644
  	xdevEntries,
  } from "../tools/xdev";
  import type { EditModeSetting } from "../edit/settings";
-@@ -2046,8 +2047,8 @@ export class SessionTools {
+@@ -2233,8 +2234,8 @@ export class SessionTools {
  		if (addedNames.length === 0 && removedNames.length === 0) {
  			return { notice: undefined, announcedMounts };
  		}
@@ -192,7 +193,7 @@ index 0146853e35..5a634f8cbd 100644
  	}
  	return inst;
 diff --git a/packages/coding-agent/test/agent-session-tool-rebuild-skip.test.ts b/packages/coding-agent/test/agent-session-tool-rebuild-skip.test.ts
-index 77deec59cf..9f2902dc99 100644
+index e96429f024..b55856b79f 100644
 --- a/packages/coding-agent/test/agent-session-tool-rebuild-skip.test.ts
 +++ b/packages/coding-agent/test/agent-session-tool-rebuild-skip.test.ts
 @@ -17,7 +17,7 @@ import {
@@ -249,8 +250,17 @@ index 77deec59cf..9f2902dc99 100644
 +		expect(mountNoticesIn(contexts[1]).join("\n")).toContain("- nucleus (MCP): mcp__nucleus_fetch");
  	});
  
+ 	it("keeps a held MCP mount out of a prefix-bound prompt across a rebuild that changes nothing else", async () => {
+@@ -1409,7 +1402,7 @@ These tools became available:
+ 
+ 		expect(evalTool.description).toBe(boundDescription);
+ 		expect(systemPrompts[2]).toEqual(systemPrompts[0]);
+-		expect(mountNoticesIn(contexts[1]).join("\n")).toContain("xd://mcp__nucleus_fetch");
++		expect(mountNoticesIn(contexts[1]).join("\n")).toContain("- nucleus (MCP): mcp__nucleus_fetch");
+ 	});
+ 
  	it("announces an unmount after a maintenance rebuild delivered the pending addition", async () => {
-@@ -1443,7 +1436,7 @@ These tools became available:
+@@ -1474,7 +1467,7 @@ These tools became available:
  		expect(systemPrompts[0]).toEqual(replacementPrompt);
  		const notices = mountNoticesIn(contexts[0]);
  		expect(notices).toHaveLength(1);

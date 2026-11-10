@@ -14,7 +14,7 @@ import { type OptionLayout, type QuestionOption, QuestionOptions } from "./quest
 /** What a card asks: rows to pick one or several of, or a free-text answer. */
 export type Question = { title: string; description?: string } & (
 	| { kind: "options"; options: QuestionOption[]; layout: OptionLayout; multi?: boolean }
-	| { kind: "text"; field: TextField; placeholder?: string; submitLabel: string }
+	| { kind: "text"; field: TextField; placeholder?: string; submitLabel: string; allowEmpty?: boolean }
 );
 
 /** A picked row's index, or the typed text, trimmed. */
@@ -28,7 +28,7 @@ interface QuestionCardProps extends HTMLAttributes<HTMLDivElement> {
 	defaultText?: string;
 	/** The line above the title. */
 	header: ReactNode;
-	/** The row under an options question, such as the button that sends a multi-select's picks. */
+	/** Buttons beside the answer: under an options question, such as the one that sends a multi-select's picks, or before a text question's submit button. */
 	footer?: ReactNode;
 	onAnswer: (answer: QuestionAnswer) => void;
 }
@@ -48,9 +48,10 @@ export function QuestionCard({ question, checked, defaultText = "", header, foot
 	const titleId = useId();
 	const [text, setText] = useState(defaultText);
 
+	const empty = text.trim().length === 0 && !(question.kind === "text" && question.allowEmpty);
 	const submit = (): void => {
 		const trimmed = text.trim();
-		if (!trimmed) return;
+		if (empty) return;
 		setText(trimmed);
 		onAnswer({ kind: "text", text: trimmed });
 	};
@@ -124,8 +125,9 @@ export function QuestionCard({ question, checked, defaultText = "", header, foot
 			{question.kind === "options" && footer && <div className={cn("pt-1", padX, compact ? "pb-1.5" : "pb-2")}>{footer}</div>}
 			{question.kind === "text" && (
 				<div className={cn("pt-1", padX, compact ? "pb-1.5" : "pb-2")}>
-					<div className="flex items-center justify-end -mx-2 sm:-mx-3">
-						<Button size="sm" onClick={submit} disabled={text.trim().length === 0} className="pr-3 sm:pr-2">
+					<div className="flex items-center justify-end gap-2 -mx-2 sm:-mx-3">
+						{footer}
+						<Button size="sm" onClick={submit} disabled={empty} className="pr-3 sm:pr-2">
 							<span className="inline-flex items-center gap-1.5">
 								{question.submitLabel}
 								<kbd
