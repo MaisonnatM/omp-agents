@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { frontmatterOf } from "../../../src/frontmatter";
 import type { OmpFile, Workflow } from "../../../src/shared/models";
 import type { Editing } from "./editor";
-import { Workflows } from "./workflows-tab";
+import { Workflows, workflowDiagram } from "./workflows-tab";
 
 const editing: Editing = {
 	cwd: null,
@@ -35,4 +35,12 @@ test("packaged workflows render read-only with the frontmatter as properties rat
 	const authored = renderToStaticMarkup(<Workflows workflows={[workflow]} files={[file]} editing={editing} />);
 	expect(authored).toContain(">Edit<");
 	expect(authored).not.toContain("Manage package");
+});
+
+test("a workflow's own mermaid diagram wins over its steps, which draw only without one", () => {
+	const steps = "1. **Ticket.** Find it.\n2. **Plan.** Grill.\n";
+	expect(workflowDiagram(steps)).toBe('flowchart TD\n  s0["1. Ticket"]\n  s1["2. Plan"]\n  s0 --> s1');
+	const drawn = "flowchart TD\n  a --> b\n  b -->|again| a";
+	expect(workflowDiagram(`# Ship\n\n\`\`\`mermaid\n${drawn}\n\`\`\`\n\n${steps}`)).toBe(drawn);
+	expect(workflowDiagram("1. **Only.** One step.\n")).toBeNull();
 });

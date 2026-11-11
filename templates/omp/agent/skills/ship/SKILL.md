@@ -16,6 +16,20 @@ Report the current stage at every stopping point.
 Keep this session available after the PR goes live so `/ship` can resume when new review feedback or conflicts arrive.
 If `~/.omp/agent/docs/git-workflow.md` exists, read it before opening a PR or creating a branch.
 
+```mermaid
+flowchart TD
+  ticket["1. Ticket"] --> plan["2. Plan<br/>grill, arena, critic"]
+  plan --> implement["3. Implement"]
+  implement --> draft["4. Draft PR"]
+  draft --> ui["5. Interface review<br/>if .omp/ui-paths matches"]
+  ui --> tn["6. Thermonuclear<br/>unless .omp/review-paths skips it"]
+  tn --> ready["7. Put live for review<br/>ready gate, gh pr ready"]
+  ready --> live["8. Live review"]
+  live -->|"conflicts, comments, red CI"| work["Rebase, fix comments, fix CI"]
+  work -->|push| live
+  live -->|"merge on request"| merged["Merged"]
+```
+
 1. **Ticket.** If no workflow exists, call `ship_stage({stage:"ticket"})`.
    If the user named a Linear issue ID or URL, fetch that issue with `get_issue`.
    Otherwise search Linear for an open issue that matches the work, and use it only if it clearly does.
