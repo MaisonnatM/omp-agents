@@ -3,7 +3,7 @@ import { ChevronRight } from "lucide-react";
 import { type HTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject, useId, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
-import { completionTrigger, type MentionToken } from "../completion-trigger";
+import { completionTrigger, type Trigger } from "../completion-trigger";
 import { type Composer, completionOption, fileSearch, mentionMenu, mentionQuery, type MenuOption, type MenuSection, wants } from "../mentions";
 import type { Completions } from "../pane-store";
 import type { TicketChoice } from "../../src/shared/tickets";
@@ -92,35 +92,32 @@ interface Completion {
 }
 
 /**
- * omp's commands and skills behind `$`, and the `@` menu, for a composer: suggestions follow the caret, and the open list owns Esc, the
- * arrows, Tab, and Enter. Live sessions, the new-session draft, and a Bot's composer share it, so all offer the same commands and skills.
+ * omp's commands behind `/`, its skills behind `$`, and the `@` menu, for a composer: suggestions follow the caret, and the open list
+ * owns Esc, the arrows, Tab, and Enter. Live sessions, the new-session draft, and a Bot's composer share it, so all offer the same commands and skills.
  * The `@` menu adds todos, tickets, pull requests, people, email, events, and sessions to omp's files; it asks the server only for files.
  */
 export function useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer }: CompletionOptions): Completion {
-	/** The `@` token the open list answers, `null` for `$`, and the `complete` request whose answer it shows, if it sent one. */
-	const [menu, setMenu] = useState<{ token: MentionToken | null; reqId: number | null } | null>(null);
+	/** What opened the list, and the `complete` request whose answer it shows, if it sent one. */
+	const [menu, setMenu] = useState<{ trigger: Trigger; reqId: number | null } | null>(null);
 	const [active, setActive] = useState(0);
 	const nextId = useRef(0);
 	const popupId = useId();
 	const lists = useMentionLists();
 
-	const token = menu?.token ?? null;
+	const token = menu?.trigger.kind === "mention" ? menu.trigger.token : null;
 	const query = token && mentionQuery(token);
 	const { pullRequestsScope, scope: { space } } = useDashboardStatus();
 	const { tickets, pullRequestRepos } = useSearchSources(query !== null && wants(query, "ticket"), pullRequestsScope);
 	const { threads, events } = useMailAndEvents(query !== null && wants(query, "mail"), query !== null && wants(query, "event"), space);
 	const linearUsers = useRead<TicketChoice[]>(query !== null && wants(query, "person") ? "/api/linear/users" : null).data ?? NO_USERS;
 	const answer = completions && completions.reqId === menu?.reqId ? completions : null;
-	// `$src/` reaches omp as `/src/`, which it also completes as an absolute path; `$` offers only commands and skills.
-	const commands = token ? [] : (answer?.items ?? []).filter(item => item.kind === "command" || item.kind === "skill");
-	const sections: MenuSection[] =
-		menu === null
-			? []
-			: token
-				? mentionMenu({ text: draft, token, data: { ...lists, tickets, pullRequestRepos, linearUsers, threads, events }, composer, files: answer?.items ?? null })
-				: commands.length
-					? [{ title: null, options: commands.map(completionOption) }]
-					: [];
+	// omp answers `/` with a `skill:` row besides its commands, and `/skill:` with skills only; each list keeps its own kind.
+	const ompItems = menu && menu.trigger.kind !== "mention" ? (answer?.items ?? []).filter(item => item.kind === menu.trigger.kind) : [];
+	const sections: MenuSection[] = token
+		? mentionMenu({ text: draft, token, data: { ...lists, tickets, pullRequestRepos, linearUsers, threads, events }, composer, files: answer?.items ?? null })
+		: ompItems.length
+			? [{ title: null, options: ompItems.map(completionOption) }]
+			: [];
 	const options = sections.flatMap(section => section.options);
 	const shown = Math.min(active, options.length - 1);
 
@@ -130,11 +127,15 @@ export function useCompletion({ editorRef, draft, setDraft, completions, onCompl
 			setMenu(null);
 			return;
 		}
-		const mention = trigger.kind === "mention" ? trigger.token : null;
-		// omp completes `/`; its answer's edit puts the `/` its command or skill needs where the `$` was.
-		const request = trigger.kind === "mention" ? fileSearch(text, trigger.token) : { text: `${text.slice(0, trigger.start)}/${text.slice(trigger.start + 1)}`, cursor };
+		// omp completes skills as `/skill:<name>`; its answer's edit puts that where the `$` was.
+		const request =
+			trigger.kind === "mention"
+				? fileSearch(text, trigger.token)
+				: trigger.kind === "skill"
+					? { text: `${text.slice(0, trigger.start)}/skill:${text.slice(trigger.start + 1)}`, cursor: cursor + "skill:".length }
+					: { text, cursor };
 		const reqId = request ? ++nextId.current : null;
-		setMenu({ token: mention, reqId });
+		setMenu({ trigger, reqId });
 		setActive(0);
 		if (request && reqId !== null) onComplete(reqId, request.text, request.cursor);
 	};

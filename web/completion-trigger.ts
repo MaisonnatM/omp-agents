@@ -10,12 +10,13 @@ export interface MentionToken {
 	body: string;
 }
 
-/** `command` is a `$` that opens omp's commands and skills, at `start`. */
-export type Trigger = { kind: "command"; start: number } | { kind: "mention"; token: MentionToken };
+/** `command` is a `/` that opens omp's commands; `skill` is a `$` at `start` that opens its skills. */
+export type Trigger = { kind: "command" } | { kind: "skill"; start: number } | { kind: "mention"; token: MentionToken };
 
 /**
- * The suggestions the caret asks for: a `$` command or skill, or an `@` mention, each at a line start or after a space,
- * so `email@example.com` asks none; a `$` before a digit, a price such as `$5`, asks none either.
+ * The suggestions the caret asks for: a `/` command at the start of the prompt, where omp runs one, or a `$` skill or an
+ * `@` mention at a line start or after a space, so `email@example.com` asks none; a `$` before a digit, a price such as
+ * `$5`, asks none either, and neither does a path such as `/tmp/a`.
  */
 export function completionTrigger(text: string, cursor: number): Trigger | null {
 	const before = text.slice(0, cursor);
@@ -25,7 +26,8 @@ export function completionTrigger(text: string, cursor: number): Trigger | null 
 		const [, prefix = null, body] = mention;
 		return { kind: "mention", token: { start: cursor - body.length - (prefix === null ? 0 : prefix.length + 1) - 1, end: cursor, prefix, body } };
 	}
-	const command = /(?:^|\s)\$((?:[^\s\d][^\s]*)?)$/.exec(line);
-	if (command) return { kind: "command", start: cursor - command[1].length - 1 };
+	const skill = /(?:^|\s)\$((?:[^\s\d][^\s]*)?)$/.exec(line);
+	if (skill) return { kind: "skill", start: cursor - skill[1].length - 1 };
+	if (/^\s*\/[^\s/]*$/.test(before)) return { kind: "command" };
 	return null;
 }

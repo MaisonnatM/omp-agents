@@ -1,14 +1,22 @@
 import { expect, test } from "bun:test";
 import { completionTrigger } from "./completion-trigger";
 
-test("$ opens commands and skills under the caret, and / no longer does", () => {
-	expect(completionTrigger("$", 1)).toEqual({ kind: "command", start: 0 });
-	expect(completionTrigger("$skill:demo", 11)).toEqual({ kind: "command", start: 0 });
-	expect(completionTrigger("Please $skill:demo", 18)).toEqual({ kind: "command", start: 7 });
-	expect(completionTrigger("See $skill:demo later", 21)).toBeNull();
+test("$ opens skills under the caret at a line start or after a space, but not a price", () => {
+	expect(completionTrigger("$", 1)).toEqual({ kind: "skill", start: 0 });
+	expect(completionTrigger("$poteto", 7)).toEqual({ kind: "skill", start: 0 });
+	expect(completionTrigger("Please $poteto", 14)).toEqual({ kind: "skill", start: 7 });
+	expect(completionTrigger("See $poteto later", 17)).toBeNull();
 	expect(completionTrigger("It costs $5", 11)).toBeNull();
 	expect(completionTrigger("echo a$b", 8)).toBeNull();
-	expect(completionTrigger("/skill:demo", 11)).toBeNull();
+});
+
+test("/ opens commands only at the start of the prompt, and not for a path", () => {
+	expect(completionTrigger("/", 1)).toEqual({ kind: "command" });
+	expect(completionTrigger("  /sh", 5)).toEqual({ kind: "command" });
+	expect(completionTrigger("/ship now", 9)).toBeNull();
+	expect(completionTrigger("Please /ship", 12)).toBeNull();
+	expect(completionTrigger("Fix it\n/ship", 12)).toBeNull();
+	expect(completionTrigger("/tmp/a", 6)).toBeNull();
 });
 
 test("mentions work after prose but not inside ordinary words", () => {
