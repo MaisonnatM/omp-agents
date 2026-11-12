@@ -40,6 +40,11 @@ describe("artifactsOf", () => {
 		expect([...artifactNumbers(items)]).toEqual([["1", 1], ["2", 1], ["3", 2], ["4", 3]]);
 	});
 
+	test("equal bytes saved under a new title retitle the artifact without adding a version", () => {
+		const artifacts = artifactsOf([saved("1", save("a.html", "a", { title: "Draft" })), saved("2", save("a.html", "a", { title: "Pricing" }))]);
+		expect(artifacts.map(artifact => [artifact.title, artifact.versions.map(version => version.itemId)])).toEqual([["Pricing", ["1"]]]);
+	});
+
 	test("tool calls without an artifact, such as a running one, add nothing", () => {
 		expect(artifactsOf([running("1"), reply])).toEqual([]);
 	});
@@ -52,6 +57,13 @@ describe("sameArtifacts", () => {
 		expect(sameArtifacts(first, artifactsOf([saved("1", save("a.html", "a"))]))).toBe(true);
 		expect(sameArtifacts(first, artifactsOf([...items, saved("2", save("a.html", "b"))]))).toBe(false);
 		expect(sameArtifacts(first, artifactsOf([saved("1", save("a.html", "a", { note: "x" }))]))).toBe(false);
+	});
+
+	test("a retitle, or a save of equal bytes that moves an artifact to the top, is a change", () => {
+		const items = [saved("1", save("a.html", "a")), saved("2", save("b.svg", "b"))];
+		const first = artifactsOf(items);
+		expect(sameArtifacts(first, artifactsOf([...items, saved("3", save("b.svg", "b", { title: "Logo" }))]))).toBe(false);
+		expect(sameArtifacts(first, artifactsOf([...items, saved("3", save("a.html", "a"))]))).toBe(false);
 	});
 });
 

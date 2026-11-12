@@ -30,6 +30,10 @@ describe("Transcript", () => {
 			t.applyEvent({ type: "tool_execution_end", toolCallId: "a", toolName, isError, result: { details: record } });
 			expect(t.items()[0]).not.toHaveProperty("artifact");
 		}
+		const failedOnDisk = new Transcript();
+		failedOnDisk.applyEntry({ type: "message", id: "e1", message: { role: "toolResult", timestamp: 200, toolCallId: "a", toolName: "artifact", isError: true, details } });
+		expect(failedOnDisk.items()[0]).toMatchObject({ kind: "tool", status: "error" });
+		expect(failedOnDisk.items()[0]).not.toHaveProperty("artifact");
 	});
 
 	test("a streamed reply is replaced in place by its file entry, and later events cannot undo it", () => {
