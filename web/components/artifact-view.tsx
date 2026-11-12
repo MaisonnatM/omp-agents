@@ -5,7 +5,7 @@ import type { ArtifactKind } from "../../src/shared/artifacts";
 import { type Loaded, useArtifactText } from "../artifact-links";
 import { CodeText } from "./file-text";
 import { MessageMarkdown } from "./message-markdown";
-import { Spinner } from "./spinner";
+import { LoadNote } from "./sheet-details";
 
 interface RenderedProps {
 	url: string;
@@ -53,11 +53,11 @@ function MarkdownText({ text }: RenderedProps) {
 	);
 }
 
-/** A spinner while the version loads, or why it could not. */
+/** The reading line while the version loads, or why it could not. */
 function Waiting({ failure }: { failure: string | null }) {
 	return (
-		<div className="flex size-full items-center justify-center p-4 text-center text-[12px] text-muted-foreground">
-			{failure === null ? <Spinner className="size-4" /> : <p role="alert">{failure}</p>}
+		<div className="flex size-full items-center justify-center p-4 text-center">
+			<LoadNote loading="Reading the version…" error={failure} />
 		</div>
 	);
 }
