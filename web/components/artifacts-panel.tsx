@@ -154,7 +154,7 @@ function ArtifactBody({ view, sessionId, artifact, version, source, onSource }: 
 									{...activityControl("artifacts.latest")}
 									type="button"
 									onClick={() => pick(latest)}
-									className={cn("rounded-sm whitespace-nowrap text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring", TALLER_TAP)}
+									className={cn("rounded-sm whitespace-nowrap text-blue-600 hover:underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring dark:text-blue-400", TALLER_TAP)}
 								>
 									Go to latest
 								</button>
