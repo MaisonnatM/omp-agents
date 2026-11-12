@@ -19,6 +19,14 @@ It reads the first `MAX_TEXT_FILE_BYTES` (1 MB) and answers 415 when those bytes
 `GET /api/media?path=<absolute path>[&session=<id>&relative=<path as written>]` serves an image or video that agent text names, as the type `MEDIA_FILE_TYPES` in `src/shared/transcript.ts` gives its extension, with the same lookup, path, real-path extension, and `DENIED_DIRS` checks as `GET /api/file`.
 Bun answers a `Range` request with a 206 and that part, so a video seeks.
 It sends `Cache-Control: private, no-cache`, since a file can change under the same path, and `Content-Security-Policy: sandbox; default-src 'none'`, so an SVG opened at that address runs no script on the page's origin.
+
+`GET /api/artifact-link?session=<id>&version=<sha256>.<kind>` requires the bearer token and returns `{ url }`, a capability URL for exactly one version of one session.
+`GET /api/artifact?session=<id>&version=<sha256>.<kind>&cap=<key>` needs no bearer token, but checks its host, fetch site, and capability before serving the immutable copy.
+HTML runs under an opaque-origin sandbox CSP, SVG runs no scripts, and Markdown is plain text.
+Every kind sends `nosniff`, `no-referrer`, and a private immutable cache header.
+The route checks the live session's file before the saved index, includes private live sessions, and follows a fork's native parent link when its own copy is absent.
+See [Artifacts](artifacts.md) for the copy layout, policies, and ancestor depth cap.
+
 `GET /api/changes?session=<session id>` answers a session's [changes dialog](../usage/session-changes.md) list, `SessionChanges` in `src/shared/changes.ts`, or 404 for a session it does not know.
 It reads the session's checkout from its worktree, else its directory: `git diff --name-status` and `--numstat` against the merge base of `HEAD` with `origin/HEAD`, else against `HEAD`, else against the empty tree before the first commit, and `git ls-files --others --exclude-standard` for untracked files.
 It asks `SessionFactsIndex.changedPathsOf` for the files the session's own `edit` and `write` calls changed, which reads only the lines its transcript gained since the index's last read of it into the index's own fold, or folds it again from its first line once it shrinks, and lists those git does not name after git's.

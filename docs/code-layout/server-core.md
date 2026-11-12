@@ -36,6 +36,10 @@
   `src/server/dir-param.ts` reads the `?cwd=` directory the session and file groups both take.
   Every read goes through `get`, and every write through `write(parse, run, refuse?)`, which checks the origin and the JSON body, answers a body `parse` refuses with its response, and maps an error `run` throws through `refuse`, else to a 500.
   A route that an image, a video, or a mail frame loads goes through `media` instead of `get`, which also takes the media key as `?key=`, since such a tag sends no header.
+  `capability` admits one resource with `?cap=` rather than a bearer token or media key, including address-bar opens.
+- `src/server/artifact-routes.ts` serves bearer-authenticated artifact links and capability-authenticated version bytes under each kind's sandbox CSP.
+  Its ancestor lookup follows the native header's `parentSession` for at most eight session files when a fork has no copy of its own.
+  `src/server/artifact-routes.test.ts` covers scoped capabilities, missing copies, fork inheritance, bounded parent cycles, and each kind's response headers.
   `src/server/calendar-routes.ts` serves the calendar group, Google Calendar's calendars and events and the events kept on this computer, which `routes.ts` composes with the rest.
   `src/server/storage-routes.ts` serves Storage's `GET /api/storage` and `PUT /api/storage/cleanup`, taking only sandbox preview and removal through `StorageRoutesEnv`; its `untimed` wrapper removes the idle timeout for these long requests.
   `src/server/package-caches.ts` previews and prunes the uv, pnpm, and bun caches for the Package caches step, putting back the uv entries a running process has open.
@@ -57,6 +61,7 @@
   The registry keeps each session's unread turn, the turn it ended since a page showed it in a focused window: `Dashboard` sets it with `markUnread` at `turn-ended` and clears it with `markRead` at `turn-started`, both from `turnUpdate` in `src/live-session.ts`, and `markRead` clears it for the page's `read` message too; see [Session notifications](../architecture/notifications.md#session-notifications).
   It saves them in `unreadFile`, and `restoreUnread`, which `reattachAll` calls once at startup, brings back those of the sessions that survived the restart.
   The registry indexes its sessions by session id for `bySessionId`, and rebuilds the index when a session joins or leaves or a dashboard session reports `switched`.
+  `fileOf` resolves the live main agent's file before the saved index, private sessions included, and `lastReply` reads through it.
   `add` refuses a session whose `finished()` already holds, such as a dashboard session whose omp exited as it spawned, and `start.ts` answers that start with an error.
   After each registry poll, `follow` hands every session the listed hosts and removes the ones that report `finished(now)`; a terminal guest decides there when to rejoin, so the registry reads no result from `follow`.
 - `src/server/turn-waits.ts`: `TurnWaits`, the main agent's tool calls in flight per live session, from its `tool_execution_start` and `tool_execution_end` events, cleared at each `agent_start` and `agent_end`, since a cut-off call never ends.
