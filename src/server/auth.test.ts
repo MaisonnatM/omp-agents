@@ -81,24 +81,22 @@ describe("bearerToken", () => {
 
 describe("API and socket guards", () => {
 	test("capabilities open only one purpose from an allowed host and fetch site", () => {
-		const purpose = "artifact main version";
-		const cap = guards.capabilityKey(purpose);
-		expect(cap).not.toContain(TOKEN);
-		expect(guards.admitCapability(request(`/api/artifact?cap=${cap}`), purpose)).toBeNull();
-		expect(guards.admitCapability(request(`/api/artifact?cap=${cap}`, { "sec-fetch-site": "none" }), purpose)).toBeNull();
-		expect(guards.admitCapability(request(`/api/artifact?cap=${cap}`), "artifact other version")?.status).toBe(403);
-		expect(guards.admitCapability(request(`/api/artifact?cap=${cap}`, { host: "evil.test:4317" }), purpose)?.status).toBe(403);
-		expect(guards.admitCapability(request(`/api/artifact?cap=${cap}`, { "sec-fetch-site": "cross-site" }), purpose)?.status).toBe(403);
-		expect(guards.admitCapability(request(`/api/artifact?cap=${cap}`, { "sec-fetch-site": "same-site" }), purpose)?.status).toBe(403);
-		expect(guards.admitCapability(request("/api/artifact", signedIn), purpose)?.status).toBe(403);
-		expect(guards.admitCapability(request(`/api/artifact?cap=${cap}`), null)?.status).toBe(403);
+		const { key, admit } = guards.capability("artifact main version");
+		expect(key).not.toContain(TOKEN);
+		expect(admit(request(`/api/artifact?cap=${key}`))).toBeNull();
+		expect(admit(request(`/api/artifact?cap=${key}`, { "sec-fetch-site": "none" }))).toBeNull();
+		expect(guards.capability("artifact other version").admit(request(`/api/artifact?cap=${key}`))?.status).toBe(403);
+		expect(admit(request(`/api/artifact?cap=${key}`, { host: "evil.test:4317" }))?.status).toBe(403);
+		expect(admit(request(`/api/artifact?cap=${key}`, { "sec-fetch-site": "cross-site" }))?.status).toBe(403);
+		expect(admit(request(`/api/artifact?cap=${key}`, { "sec-fetch-site": "same-site" }))?.status).toBe(403);
+		expect(admit(request("/api/artifact", signedIn))?.status).toBe(403);
 	});
 
 	test("a capability opens only under the token that signed it", () => {
 		const purpose = "artifact main version";
-		const restarted = guardsFor(4317, "B".repeat(43));
-		expect(restarted.admitCapability(request(`/api/artifact?cap=${restarted.capabilityKey(purpose)}`), purpose)).toBeNull();
-		expect(restarted.admitCapability(request(`/api/artifact?cap=${guards.capabilityKey(purpose)}`), purpose)?.status).toBe(403);
+		const restarted = guardsFor(4317, "B".repeat(43)).capability(purpose);
+		expect(restarted.admit(request(`/api/artifact?cap=${restarted.key}`))).toBeNull();
+		expect(restarted.admit(request(`/api/artifact?cap=${guards.capability(purpose).key}`))?.status).toBe(403);
 	});
 
 	test("without the Bearer token the request is 401, with it admitted", () => {

@@ -8,7 +8,7 @@ import type { TrustChange } from "../shared/project-trust";
 import type { ConversationHit } from "../shared/sessions";
 import type { SourceControlAnswer, SourceControlChange } from "../shared/source-control";
 import type { Spaces, WorkspaceChange } from "../shared/workspaces";
-import { answer, type Guards } from "./http";
+import { answer, fail, type Guards } from "./http";
 
 /** What the session routes read: the workspaces sessions count in, their files, and the workspaces Settings keeps. */
 export interface SessionRoutesEnv {
@@ -42,15 +42,23 @@ export type Handler = (req: Request, server: Pick<Server<unknown>, "timeout">) =
 /** HTTP handlers by path and method, as `Bun.serve` takes them. */
 export type Routes = Record<string, Partial<Record<"GET" | "PUT" | "POST" | "DELETE", Handler>>>;
 
-/** The ways a route answers: a read of its query, a read that a tag loads, and a write of its JSON body. */
+/**
+ * A capability URL, which opens one resource without the bearer token: `sign` makes the key for one input, and `serve`
+ * answers 400 to a query `parse` refuses, 403 to a request the input's key does not admit, and otherwise `handle`.
+ */
+export interface Capability<T> {
+	sign(input: T): string;
+	serve(handle: (input: T) => Promise<Response>): Handler;
+}
+
+/** The ways a route answers: a read of its query, a read that a tag loads, a capability URL, and a write of its JSON body. */
 export interface RouteKit {
 	/** A read: admitted like every other, then handed the request's query. */
 	get(handle: (params: URLSearchParams, req: Request) => Response | Promise<Response>): Handler;
 	/** `get` for a file that an image, a video, or a frame loads, which sends no header: it also takes the media key as `?key=`. */
 	media(handle: (params: URLSearchParams, req: Request) => Response | Promise<Response>): Handler;
-	/** A capability URL opens one resource without the bearer token. */
-	capability(purposeOf: (params: URLSearchParams) => string | null, handle: (req: Request, url: URL) => Promise<Response>): Handler;
-	capabilityKey(purpose: string): string;
+	/** A capability URL whose query `parse` reads once; `purposeOf` names the one resource an input opens, so its key opens no other. */
+	capability<T>(parse: (params: URLSearchParams) => T | null, purposeOf: (input: T) => string): Capability<T>;
 	/**
 	 * A write: admitted with its JSON body (origin, content type), `parse`d with the request's query into an input or the
 	 * response refusing it, then `run`, whose result is the answer's JSON, unless it is a `Response`; `refuse` answers an error
@@ -67,11 +75,14 @@ export function routeKit(guards: Guards): RouteKit {
 	return {
 		get: (handle) => async (req) => guards.admit(req) ?? handle(new URL(req.url).searchParams, req),
 		media: (handle) => async (req) => guards.admitMedia(req) ?? handle(new URL(req.url).searchParams, req),
-		capabilityKey: purpose => guards.capabilityKey(purpose),
-		capability: (purposeOf, handle) => async req => {
-			const url = new URL(req.url);
-			return guards.admitCapability(req, purposeOf(url.searchParams)) ?? handle(req, url);
-		},
+		capability: (parse, purposeOf) => ({
+			sign: input => guards.capability(purposeOf(input)).key,
+			serve: handle => async req => {
+				const input = parse(new URL(req.url).searchParams);
+				if (input === null) return fail(400, "Malformed capability URL");
+				return guards.capability(purposeOf(input)).admit(req) ?? handle(input);
+			},
+		}),
 		write: (parse, run, refuse) => async (req) => {
 			const guarded = await guards.writeBody(req);
 			if (guarded instanceof Response) return guarded;

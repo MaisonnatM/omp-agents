@@ -8,8 +8,7 @@ import { sportThumbRoutes } from "./sport-thumbs";
 const kit: RouteKit = {
 	get: handle => async req => handle(new URL(req.url).searchParams, req),
 	media: handle => async req => handle(new URL(req.url).searchParams, req),
-	capability: (_purpose, handle) => async req => handle(req, new URL(req.url)),
-	capabilityKey: purpose => purpose,
+	capability: () => ({ sign: () => "", serve: () => async () => new Response() }),
 	write: () => async () => new Response(),
 };
 const server = { timeout: () => {} };

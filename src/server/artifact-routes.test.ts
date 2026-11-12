@@ -71,6 +71,11 @@ describe("artifact routes", () => {
 		expect((await request(url.replace("session=main", "session=other"))).status).toBe(403);
 		expect((await request(url.replace(`${sha}.html`, `${sha}.svg`))).status).toBe(403);
 	});
+	test("a malformed query is 400 before any cap is checked", async () => {
+		const url = await link("main", `${sha}.html`);
+		expect((await request(url.replace(`${sha}.html`, "../bad"))).status).toBe(400);
+		expect((await request(url.replace("session=main&", ""))).status).toBe(400);
+	});
 	test("a missing copy or session is 404", async () => {
 		session("missing");
 		expect((await request(await link("missing", `${sha}.html`))).status).toBe(404);
