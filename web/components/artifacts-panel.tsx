@@ -21,14 +21,15 @@ import { useCopy } from "../use-copy";
 import { ARTIFACT_KIND, ArtifactView } from "./artifact-view";
 import { SegmentedTab, SegmentedTabPanel, SegmentedTabs, SegmentedTabsList } from "./segmented-tabs";
 
-/** Under this panel width the actions and the Rendered and Source switch keep only their icons. */
+/** Under this panel width the Rendered and Source switch keeps only its icons. */
 const ICONS_ONLY = "@max-[30rem]/artifacts:sr-only";
 
-/** An action that keeps only its icon is the app's 28px square icon button. */
-const ICON_SQUARE = "@max-[30rem]/artifacts:w-7 @max-[30rem]/artifacts:px-0";
+/** The pull request header's action recipe: under this panel width an action keeps only its icon, and its `aria-label` names it. */
+const ACTION_LABEL = "@max-[30rem]/artifacts:hidden";
+const ACTION_BUTTON = "shrink-0 font-medium @max-[30rem]/artifacts:gap-0 @max-[30rem]/artifacts:px-1.5";
 
 /** Download and Open in browser are links, which take no `disabled`: with no address they look and act as a disabled button does. */
-const LINK_ACTION = cn(ICON_SQUARE, "aria-disabled:pointer-events-none aria-disabled:opacity-50");
+const LINK_ACTION = cn(ACTION_BUTTON, "aria-disabled:pointer-events-none aria-disabled:opacity-50");
 
 /** On a touch screen a small control also takes taps up to 8px above and below it. */
 const TALLER_TAP = "relative pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-2";
@@ -95,26 +96,26 @@ function ArtifactBody({ view, sessionId, artifact, version, source, onSource }: 
 		<SegmentedTabs value={source ? "source" : "rendered"} onValueChange={value => onSource(value === "source")} className="flex min-h-0 flex-1 flex-col">
 			<div className="shrink-0 px-4 pt-3.5 pb-3">
 				<div className="flex items-start gap-3">
-					<h3 className="min-w-0 flex-1 text-[16px] leading-7 font-semibold tracking-tight [overflow-wrap:anywhere]">{artifact.title}</h3>
-					<div className="flex shrink-0 items-center gap-1.5">
+					<h3 className="min-w-0 flex-1 text-base leading-7 font-semibold tracking-tight [overflow-wrap:anywhere]">{artifact.title}</h3>
+					<div className="flex h-7 shrink-0 items-center gap-1">
 						<CopyAction url={url} />
 						<Tooltip content="Download">
-							<Button {...activityControl("artifacts.download")} asChild variant="tertiary" size="compact" leadingIcon={Download} className={LINK_ACTION}>
+							<Button {...activityControl("artifacts.download")} asChild variant="outline" size="xs" leadingIcon={Download} aria-label="Download" className={LINK_ACTION}>
 								<a href={url ?? undefined} download={name} aria-disabled={url === null || undefined}>
-									<span className={ICONS_ONLY}>Download</span>
+									<span className={ACTION_LABEL}>Download</span>
 								</a>
 							</Button>
 						</Tooltip>
 						<Tooltip content="Open in browser">
-							<Button {...activityControl("artifacts.open-in-browser")} asChild variant="tertiary" size="compact" leadingIcon={ExternalLink} className={LINK_ACTION}>
+							<Button {...activityControl("artifacts.open-in-browser")} asChild variant="outline" size="xs" leadingIcon={ExternalLink} aria-label="Open in browser" className={LINK_ACTION}>
 								<a href={url ?? undefined} target="_blank" rel="noopener noreferrer" aria-disabled={url === null || undefined}>
-									<span className={ICONS_ONLY}>Open in browser</span>
+									<span className={ACTION_LABEL}>Open in browser</span>
 								</a>
 							</Button>
 						</Tooltip>
 					</div>
 				</div>
-				<p className="text-[12px] text-muted-foreground [overflow-wrap:anywhere]">
+				<p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
 					<span className="font-mono">{artifact.file}</span>
 					{"\u00a0· "}
 					<span className="whitespace-nowrap">
@@ -133,8 +134,8 @@ function ArtifactBody({ view, sessionId, artifact, version, source, onSource }: 
 								<Tooltip key={each.number} content={`Version ${each.number}${each.save.note ? ` · ${each.save.note}` : ""} · saved ${mailTime(each.save.savedAt)}`}>
 									<SegmentedTab
 										{...activityControl("artifacts.version")}
-										value={String(each.number)}
 										variant="pills"
+										value={String(each.number)}
 										aria-label={`Version ${each.number}`}
 										aria-controls={undefined}
 										className={TALLER_TAP}
@@ -146,7 +147,7 @@ function ArtifactBody({ view, sessionId, artifact, version, source, onSource }: 
 						</SegmentedTabsList>
 					</SegmentedTabs>
 					{(save.note || version !== latest) && (
-						<p className="min-w-0 flex-1 text-[12px] text-muted-foreground [overflow-wrap:anywhere] @max-[32rem]/artifacts:order-last @max-[32rem]/artifacts:basis-full">
+						<p className="min-w-0 flex-1 text-xs text-muted-foreground [overflow-wrap:anywhere] @max-[32rem]/artifacts:order-last @max-[32rem]/artifacts:basis-full">
 							{save.note}
 							{save.note && version !== latest && " · "}
 							{version !== latest && (
@@ -196,15 +197,16 @@ function CopyAction({ url }: { url: string | null }) {
 		<Tooltip content={copied ? "Copied" : "Copy"}>
 			<Button
 				{...activityControl("artifacts.copy")}
-				variant="tertiary"
-				size="compact"
+				variant="outline"
+				size="xs"
 				leadingIcon={copied ? CheckIcon : CopyIcon}
 				loading={copying.pending}
 				disabled={url === null}
 				onClick={() => url && copying.run(url)}
-				className={ICON_SQUARE}
+				aria-label={copied ? "Copied" : "Copy"}
+				className={ACTION_BUTTON}
 			>
-				<span className={ICONS_ONLY}>{copied ? "Copied" : "Copy"}</span>
+				<span className={ACTION_LABEL}>{copied ? "Copied" : "Copy"}</span>
 			</Button>
 		</Tooltip>
 	);
