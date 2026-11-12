@@ -1,10 +1,11 @@
 /**
- * Which workspace each session directory counts in: a linked worktree counts in its repository's main checkout. Git is asked
- * once per directory, and a directory git no longer knows, gone or left behind by a removed worktree, waits for a main
- * checkout seen since to claim it by its name, so it never lists as a workspace of its own.
+ * Which workspace each session directory counts in: any directory of a repository, a linked worktree, a subfolder, or a test
+ * repository nested in another checkout, counts in its outermost main checkout. Git is asked once per directory, and a directory
+ * git no longer knows, gone or left behind by a removed worktree, waits for a main checkout seen since to claim it by its name,
+ * so it never lists as a workspace of its own; one still gone after that never lists at all.
  */
 import { access } from "node:fs/promises";
-import { basename } from "node:path";
+import { basename, dirname } from "node:path";
 import { mainCheckoutOf, type WorktreeAt } from "./git";
 import { mapLimit, PROBE_PARALLEL } from "./map-limit";
 import { workspaceFor } from "./paths";
@@ -12,7 +13,7 @@ import type { Workspace } from "./shared/workspaces";
 
 /**
  * The main checkout among `mains` whose worktrees a directory `cwd` git no longer knows was likely one of: worktree tools name
- * them after it, as `<main>-<branch>` or `<main>-wt/<branch>`, where the longest match wins, so `app-web` beats `app` for
+ * them after it, as `<main>-<branch>`, `<main>-wt/<branch>`, or `<main>.wt/<branch>`, where the longest match wins, so `app-web` beats `app` for
  * `app-web-fix`. Else, for a gone directory only, Codex's `<root>/<id>/<repository name>`: the one main checkout of that name,
  * none when two share it; a directory still there may be any folder that happens to share a repository's name.
  */
@@ -20,7 +21,7 @@ function mainCheckoutOfStray(cwd: string, gone: boolean, mains: Iterable<string>
 	let found: string | null = null;
 	const named: string[] = [];
 	for (const main of mains) {
-		if (cwd.startsWith(`${main}-`) && (found === null || main.length > found.length)) found = main;
+		if ((cwd.startsWith(`${main}-`) || cwd.startsWith(`${main}.`)) && (found === null || main.length > found.length)) found = main;
 		if (basename(main) === basename(cwd)) named.push(main);
 	}
 	return found ?? (gone && named.length === 1 ? named[0]! : null);
@@ -34,8 +35,8 @@ export class WorkspacePlacement {
 	readonly #workspaces = new Map<string, Workspace | null>();
 	/** Directories outside any repository when git was asked, which no main checkout claimed yet, each with whether it was gone. */
 	readonly #strays = new Map<string, boolean>();
-	/** The main checkout of every repository an asked directory was in. */
-	readonly #mainCheckouts = new Set<string>();
+	/** The main checkout of every repository an asked directory was in, each with the outermost main checkout it sits in. */
+	readonly #mainCheckouts = new Map<string, Promise<string>>();
 
 	/** The workspace `cwd` counts in as git last answered, the same object until that answer changes; `null` while git was not asked, or when it counts in itself. */
 	at(cwd: string): Workspace | null {
@@ -45,6 +46,9 @@ export class WorkspacePlacement {
 	/** The directory of the workspace `cwd` counts in: {@link at}'s, else `cwd` itself. */
 	readonly cwdOf = (cwd: string): string => this.#workspaces.get(cwd)?.cwd ?? cwd;
 
+	/** Whether `cwd` was gone when git was asked and no main checkout claimed it, so no list offers it as a workspace. */
+	readonly gone = (cwd: string): boolean => this.#strays.get(cwd) === true;
+
 	/** Ask `worktreeAt` which workspace each of `cwds` not asked about yet counts in; returns whether any workspace changed. */
 	async place(cwds: readonly string[], worktreeAt: (dir: string) => Promise<WorktreeAt | null>): Promise<boolean> {
 		const unasked = [...new Set(cwds)].filter(cwd => !this.#workspaces.has(cwd));
@@ -52,9 +56,9 @@ export class WorkspacePlacement {
 		await mapLimit(unasked, PROBE_PARALLEL, async cwd => {
 			const at = await worktreeAt(cwd);
 			const main = at && mainCheckoutOf(at);
-			if (main !== null) this.#mainCheckouts.add(main);
 			if (at === null) this.#strays.set(cwd, await access(cwd).then(() => false, () => true));
-			const workspace = at?.linked && main !== null ? workspaceFor(main) : null;
+			const outer = main === null ? null : await this.#outermost(main, worktreeAt);
+			const workspace = outer !== null && outer !== cwd ? workspaceFor(outer) : null;
 			this.#workspaces.set(cwd, workspace);
 			if (workspace) placed = true;
 		});
@@ -67,11 +71,28 @@ export class WorkspacePlacement {
 		return this.cwdOf(cwd);
 	}
 
+	/** The outermost main checkout `main` sits in, `main` itself when no other repository holds it; git is asked once per main checkout. */
+	#outermost(main: string, worktreeAt: (dir: string) => Promise<WorktreeAt | null>): Promise<string> {
+		let outer = this.#mainCheckouts.get(main);
+		if (outer === undefined) {
+			const parent = dirname(main);
+			outer =
+				parent === main
+					? Promise.resolve(main)
+					: worktreeAt(parent).then(at => {
+							const held = at && mainCheckoutOf(at);
+							return held === null ? main : this.#outermost(held, worktreeAt);
+						});
+			this.#mainCheckouts.set(main, outer);
+		}
+		return outer;
+	}
+
 	/** Count each stray directory that a known main checkout claims in that checkout; returns whether any was claimed. */
 	#claimStrays(): boolean {
 		let claimed = false;
 		for (const [cwd, gone] of this.#strays) {
-			const main = mainCheckoutOfStray(cwd, gone, this.#mainCheckouts);
+			const main = mainCheckoutOfStray(cwd, gone, this.#mainCheckouts.keys());
 			if (main === null) continue;
 			this.#strays.delete(cwd);
 			this.#workspaces.set(cwd, workspaceFor(main));

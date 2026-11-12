@@ -596,7 +596,7 @@ const SCAN_PARALLEL = PROBE_PARALLEL;
 const ASK_AGAIN_MS = 60_000;
 
 /** The facts of a session before its first scan: one value, so that a caller can tell by identity that they did not change. */
-const NO_FACTS: SessionFacts = { pullRequests: [], tickets: [], ship: null, arenas: NO_ARENAS, worktree: null, branch: null, workspace: null };
+const NO_FACTS: SessionFacts = { pullRequests: [], tickets: [], ship: null, arenas: NO_ARENAS, worktree: null, branch: null, workspace: null, gone: false };
 
 export class SessionFactsIndex {
 	readonly #sessions = new Map<string, SessionScan>();
@@ -650,9 +650,10 @@ export class SessionFactsIndex {
 		const session = sessionPath === null ? undefined : this.#sessions.get(sessionPath);
 		const dir = cwd ?? session?.cwd;
 		const workspace = dir === undefined ? null : this.placement.at(dir);
-		if (!session || sessionPath === null) return workspace ? { ...NO_FACTS, workspace } : NO_FACTS;
+		const gone = dir !== undefined && this.placement.gone(dir);
+		if (!session || sessionPath === null) return workspace || gone ? { ...NO_FACTS, workspace, gone } : NO_FACTS;
 		const own = this.#ownFile(sessionPath)?.fold;
-		return { pullRequests: session.pullRequests, tickets: session.tickets, ship: own?.scan.ship ?? null, arenas: session.arenas, worktree: session.worktree, branch: session.branch, workspace };
+		return { pullRequests: session.pullRequests, tickets: session.tickets, ship: own?.scan.ship ?? null, arenas: session.arenas, worktree: session.worktree, branch: session.branch, workspace, gone };
 	}
 
 	/** Whether omp last started session `sessionPath` as `omp -p` or `--mode json`; `false` before its first scan. */

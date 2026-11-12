@@ -46,6 +46,29 @@ describe("WorkspacePlacement", () => {
 		expect([wip, main, gone, stray].map(placement.cwdOf)).toEqual([main, main, main, stray]);
 	});
 
+	test("counts a subfolder, and a test repository nested in a worktree, in the outermost main checkout", async () => {
+		const parent = tempDir();
+		const main = await repoWithWorktree(parent);
+		const sub = join(main, "web");
+		const nested = join(parent, "app-wip", "tmp", "smoke");
+		mkdirSync(sub);
+		mkdirSync(nested, { recursive: true });
+		await git(nested, "init", "-q", "-b", "main");
+		const placement = new WorkspacePlacement();
+
+		await placement.place([sub, nested], worktreeAt);
+		expect([sub, nested].map(placement.cwdOf)).toEqual([main, main]);
+	});
+
+	test("marks a gone directory no main checkout claims as gone", async () => {
+		const parent = tempDir();
+		const gone = join(parent, "other-gone");
+		const placement = new WorkspacePlacement();
+
+		await placement.place([gone, parent], worktreeAt);
+		expect([gone, parent].map(placement.gone)).toEqual([true, false]);
+	});
+
 	test("asks git about each directory once and keeps its workspace", async () => {
 		const parent = tempDir();
 		const main = await repoWithWorktree(parent);
@@ -63,7 +86,7 @@ describe("WorkspacePlacement", () => {
 		expect(app).toEqual({ cwd: main, cwdDisplay: main });
 		expect(await placement.place([wip, main], counted)).toBe(false);
 		expect(placement.at(wip)).toBe(app);
-		expect(asked.toSorted()).toEqual([main, wip]);
+		expect(asked.toSorted()).toEqual([parent, main, wip]);
 	});
 
 	test("counts a gone Codex worktree `<root>/<id>/<name>` in the one main checkout of that name, and in none when two share it", async () => {

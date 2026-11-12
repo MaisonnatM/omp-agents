@@ -1,4 +1,4 @@
-import { stat } from "node:fs/promises";
+import { mkdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { portFromEnv } from "./server/address";
@@ -133,6 +133,12 @@ export const workspaceFor = (cwd: string): Workspace => ({ cwd, cwdDisplay: disp
 
 /** The absolute path `input` names (absolute, `~`-relative, or relative to the home directory), without checking that it exists. */
 export const absoluteDir = (input: string): string => resolve(HOME, expandHome(input.trim()));
+
+/** {@link directoryOf} after creating the directory `input` names, with any parent it lacks; `null` when it cannot be one. */
+export async function createdDirectoryOf(input: string): Promise<string | null> {
+	await mkdir(absoluteDir(input), { recursive: true }).catch(() => undefined);
+	return directoryOf(input);
+}
 
 /** The directory `input` names, as {@link absoluteDir} reads it, or `null` when it is not one; stats without blocking the event loop. */
 export async function directoryOf(input: string): Promise<string | null> {

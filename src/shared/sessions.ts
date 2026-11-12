@@ -118,6 +118,8 @@ export interface SessionFacts {
 	 * worktree, or was in one that is gone; `null` counts it in `cwd` itself.
 	 */
 	workspace: Workspace | null;
+	/** Whether `cwd` was gone when git was asked and no repository claimed it, so no picker offers it as a workspace. */
+	gone: boolean;
 }
 
 interface RosterHostBase extends SessionFacts {

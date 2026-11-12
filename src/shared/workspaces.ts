@@ -35,6 +35,9 @@ const TEMP_ROOTS = ["/tmp", "/private/tmp", "/var/folders", "/private/var/folder
 /** Whether `dir` is a temp root or under one: no picker, list, or project list offers it. */
 export const inTempDir = (dir: string): boolean => TEMP_ROOTS.some(root => dir === root || dir.startsWith(`${root}/`));
 
+/** Whether `dir` is in an app's own data, a dot folder or a `Library` folder such as `~/.cache` or `~/Library`: no session there lists it as a workspace. */
+export const inAppData = (dir: string): boolean => dir.split("/").some(part => part.startsWith(".") || part === "Library");
+
 /** `entries` with `entry` once, the same array when it already holds it. */
 const withEntry = (entries: string[], entry: string): string[] => (entries.includes(entry) ? entries : [...entries, entry]);
 const withoutEntry = (entries: string[], entry: string): string[] => entries.filter(other => other !== entry);

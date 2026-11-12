@@ -45,7 +45,7 @@ import { modelUpdates, upgradeModel } from "../settings";
 import { MCP_SERVICES } from "../shared/accounts";
 import { agentOn } from "../shared/moves";
 import type { StartRequest, StartResult, View } from "../shared/sessions";
-import { type Space, type SpaceOfSession, type Spaces, spaces } from "../shared/workspaces";
+import { inAppData, type Space, type SpaceOfSession, type Spaces, spaces } from "../shared/workspaces";
 import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
 import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
@@ -817,8 +817,9 @@ export class Dashboard {
 
 	/** The workspaces sessions count in: live ones first, then saved ones newest first. */
 	knownWorkspaces(): string[] {
-		const live = this.#sessions.cwds().map(this.#files.facts.placement.cwdOf);
-		return [...new Set([...live, ...this.#files.workspaces()].filter(Boolean))];
+		const { placement } = this.#files.facts;
+		const ran = [...this.#sessions.cwds(), ...this.#files.cwds()].filter(cwd => cwd && !placement.gone(cwd)).map(placement.cwdOf);
+		return [...new Set(ran.filter(cwd => cwd === personalDir || !inAppData(cwd)))];
 	}
 
 	#workspaceCwds(): string[] {

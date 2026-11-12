@@ -98,6 +98,11 @@ export async function writeWorkspace(change: WorkspaceChange): Promise<void> {
 	await putJson("/api/workspaces", change);
 }
 
+/** Creates the directory `path` names, with any parent it lacks, and adds it as a workspace. */
+export async function createWorkspace(path: string): Promise<void> {
+	await putJson("/api/workspaces", { op: "add", cwd: path, create: true });
+}
+
 /** The scope {@link pullRequestsStore} keys a window's pull requests by: the query reading the selected `workspace`, else every workspace of `space`. */
 export const pullRequestsScope = ({ space, workspace }: { space: Space; workspace: string | null }): string => new URLSearchParams(workspace !== null ? { cwd: workspace } : { space }).toString();
 
