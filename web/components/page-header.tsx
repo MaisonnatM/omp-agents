@@ -19,15 +19,16 @@ interface HeaderProps {
 
 /**
  * The title, an optional meta line, and controls that head a pane or a page, ending with the command menu and the bell.
- * In a header under 40rem, as on a phone, the title keeps its width, so when the controls leave it too little they wrap to a row of their own under it.
+ * The title keeps at least 16rem beside the controls, or its whole width when shorter; when they would leave it less,
+ * they wrap to a right-aligned row of their own under it, as on a phone.
  */
 export function Header({ title, meta, status, alert = false, leading, trailing, children, end }: HeaderProps) {
 	const controls = useHeaderControls();
 	return (
 		<header className="@container/header shrink-0 border-b border-border">
-			<div className="flex h-(--page-header-height) items-center justify-between gap-4 px-6 @max-[40rem]/header:h-auto @max-[40rem]/header:min-h-(--page-header-height) @max-[40rem]/header:flex-wrap @max-[40rem]/header:gap-x-4 @max-[40rem]/header:gap-y-0 max-phone:px-3">
+			<div className="flex min-h-(--page-header-height) flex-wrap items-center gap-x-4 px-6 max-phone:px-3">
 				{/* On a phone the Sessions sidebar's toggle floats over the header's left corner, so the title starts after it while the rows the controls wrap to keep the full width. */}
-				<div className="group/title flex min-w-0 items-center gap-2 max-phone:pl-(--sidebar-toggle-clearance) @max-[40rem]/header:min-h-(--page-header-height) @max-[40rem]/header:max-w-full @max-[40rem]/header:shrink-0">
+				<div className="group/title flex min-h-(--page-header-height) max-w-max min-w-0 grow basis-64 items-center gap-2 max-phone:pl-(--sidebar-toggle-clearance)">
 					{leading}
 					<div className="min-w-0">
 						<h2 className="truncate text-sm font-semibold">{title}</h2>
@@ -39,7 +40,7 @@ export function Header({ title, meta, status, alert = false, leading, trailing, 
 						</div>
 					)}
 				</div>
-				<div className="flex shrink-0 items-center gap-3 @max-[40rem]/header:ml-auto @max-[40rem]/header:min-h-10 @max-[40rem]/header:max-w-full @max-[40rem]/header:flex-wrap @max-[40rem]/header:justify-end @max-[40rem]/header:gap-y-2 @max-[40rem]/header:py-1.5">
+				<div className="ml-auto flex min-h-10 max-w-full shrink-0 flex-wrap items-center justify-end gap-3 gap-y-2 py-1.5">
 					{status !== undefined && (
 						<span className={cn("text-xs", alert ? "text-red-600 dark:text-red-400" : "text-muted-foreground")} data-status>
 							{status}

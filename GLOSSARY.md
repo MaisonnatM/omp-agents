@@ -141,6 +141,11 @@ _Avoid_: Todos card (its former name), details card, changes card
 The review a **Review** session saved of one pull request, with its verdict, summary, and findings, which waits in the dashboard for the user to accept, edit, and post.
 _Avoid_: Pending review (GitHub's own unsubmitted review), draft review
 
+**Artifact**:
+A standalone HTML page, Markdown document, or SVG image an agent made in a session for the user to view and reuse apart from its replies, with every version the agent saved of it.
+It is not omp's artifacts directory, where omp keeps a session's tool output and subagent files.
+_Avoid_: Canvas, document, attachment
+
 **Note**:
 A Markdown entry on the Notes page, optionally linked to a top-level todo.
 It is separate from a todo's notes field.

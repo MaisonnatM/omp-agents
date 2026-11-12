@@ -9,6 +9,7 @@
  */
 import { isObject, str } from "./json";
 import { imagesOf, textOf, toolSummary, UNREAD_LINE } from "./session-entries";
+import { type ArtifactSave, parseArtifactSave } from "./shared/artifacts";
 import { type BotId, MESSAGE_BOT_TOOL, parseBotId } from "./shared/bots";
 import { type PromptFile, splitFiles } from "./shared/prompt-files";
 import type { PromptImage } from "./shared/sessions";
@@ -125,6 +126,13 @@ function spawnedAgents(toolName: unknown, result: unknown): string[] {
 	return [...new Set(rows.flatMap(row => (isObject(row) && typeof row.id === "string" && row.id ? [row.id] : [])))];
 }
 
+/** The version an `artifact` call that did not fail saved, from its result's `details`; absent for any other call. */
+function artifactSave(toolName: unknown, isError: unknown, details: unknown): { artifact?: ArtifactSave } {
+	if (toolName !== "artifact" || isError) return {};
+	const artifact = parseArtifactSave(details);
+	return artifact ? { artifact } : {};
+}
+
 /** The Bot a `message_bot` call's arguments `args` name; absent for any other call. */
 function recipient(toolName: unknown, args: unknown): { to?: BotId } {
 	const to = toolName === MESSAGE_BOT_TOOL && isObject(args) ? parseBotId(args.to) : null;
@@ -137,10 +145,10 @@ function union(prev: string[], next: string[]): string[] {
 	return added.length === 0 ? prev : [...prev, ...added];
 }
 
-/** Whether two field values are equal: primitives by value, lists (a tool's `agents` or `images`, a reply's `suggestions`) by their contents. */
+/** Whether two field values are equal, primitives by value and lists or records by contents. */
 function sameValue(a: unknown, b: unknown): boolean {
 	if (a === b) return true;
-	return Array.isArray(a) && Array.isArray(b) && a.length === b.length && JSON.stringify(a) === JSON.stringify(b);
+	return isObject(a) && isObject(b) && JSON.stringify(a) === JSON.stringify(b);
 }
 
 /** Whether two items show the same thing, field by field. */
@@ -295,7 +303,7 @@ export class Transcript {
 				// A running `task` reports its subagents as they spawn, long before its result reaches the file.
 				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), undefined, undefined, spawnedAgents(event.toolName, event.partialResult));
 			case "tool_execution_end":
-				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), undefined, event.isError ? "error" : "ok", spawnedAgents(event.toolName, event.result));
+				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), undefined, event.isError ? "error" : "ok", spawnedAgents(event.toolName, event.result), artifactSave(event.toolName, event.isError, isObject(event.result) ? event.result.details : undefined));
 			case "agent_end":
 				// An interrupted turn ends without tool_execution_end for the call it cut off, or message_end for thinking still streaming.
 				return [...this.#items.values()].flatMap(item => {
@@ -356,7 +364,7 @@ export class Transcript {
 			case "toolResult": {
 				const callId = str(message.toolCallId);
 				if (callId) this.#settled.add(`tool:${callId}`);
-				return this.#upsertTool(callId, str(message.toolName), undefined, message.isError ? "error" : "ok", spawnedAgents(message.toolName, message), imagesOf(message.content));
+				return this.#upsertTool(callId, str(message.toolName), undefined, message.isError ? "error" : "ok", spawnedAgents(message.toolName, message), { ...imagesOf(message.content), ...artifactSave(message.toolName, message.isError, message.details) });
 			}
 			case "bashExecution": {
 				// omp runs a `!` prompt's text without its `!`, so putting it back makes the text the one the routine sent:
@@ -398,7 +406,7 @@ export class Transcript {
 		summary: string | undefined,
 		status: ToolItem["status"] | undefined,
 		agents: string[] = [],
-		result: { to?: BotId } = {},
+		result: { to?: BotId; artifact?: ArtifactSave } = {},
 	): Item[] {
 		if (!callId || this.#settled.has(`tool:${callId}`)) return [];
 		return this.#upsertTool(callId, name, summary, status, agents, result);
@@ -411,7 +419,7 @@ export class Transcript {
 		summary: string | undefined,
 		status: ToolItem["status"] | undefined,
 		agents: string[],
-		result: { images?: string[]; to?: BotId } = {},
+		result: { images?: string[]; to?: BotId; artifact?: ArtifactSave } = {},
 	): Item[] {
 		if (!callId) return [];
 		const id = `tool:${callId}`;

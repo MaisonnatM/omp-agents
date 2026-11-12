@@ -3,7 +3,7 @@ import { errorText, type Parsed } from "../json";
 import { MEDIA_KEY_PARAM, SOCKET_PROTOCOL, SOCKET_TOKEN_PREFIX } from "../shared/access";
 import type { SettingsError } from "../shared/models";
 import { dashboardHosts } from "./address";
-import { bearerToken, fetchSiteAllowed, helloProof, mediaKey, tokenMatches } from "./auth";
+import { bearerToken, capabilityKey, fetchSiteAllowed, helloProof, mediaKey, tokenMatches } from "./auth";
 import type { PhoneAccess } from "./phone-access";
 
 export const fail = (status: number, error: string, conflict = false): Response =>
@@ -79,6 +79,11 @@ export interface Guards {
 	/** `admit` that also takes the media key as `?key=`, for the routes that an image, a video, or a mail frame loads. */
 	admitMedia(req: Request): Response | null;
 	/**
+	 * The capability of one resource, named by `purpose`: its `key`, signed with the token without disclosing it, and `admit`,
+	 * which refuses a request from another host or site, the address bar allowed, or whose `?cap=` is not that key.
+	 */
+	capability(purpose: string): { key: string; admit(req: Request): Response | null };
+	/**
 	 * `admit` for the socket upgrade, which carries full control of every session: an Origin that matches the Host,
 	 * and the token as a header or, since a browser's socket can send none, as the subprotocol `bearer.<token>`.
 	 */
@@ -122,9 +127,10 @@ export function guardsFor(port: number, token: string, phones?: PhoneAccess): Gu
 	const allowedHost = (req: Request): boolean => loopback.has(hostOf(req)) || tailnet(req);
 	const originOf = (req: Request): string => (tailnet(req) ? "https" : "http") + `://${hostOf(req)}`;
 	const sameOrigin = (req: Request): boolean => allowedHost(req) && req.headers.get("origin") === originOf(req);
-	const outside = (req: Request): Response | null => {
+	/** The Host check, then `Sec-Fetch-Site`; a `page` the address bar may open also takes `none`. */
+	const outside = (req: Request, page = false): Response | null => {
 		if (!allowedHost(req)) return fail(403, "forbidden host");
-		if (!fetchSiteAllowed(req.headers.get("sec-fetch-site"), false)) return fail(403, "forbidden origin");
+		if (!fetchSiteAllowed(req.headers.get("sec-fetch-site"), page)) return fail(403, "forbidden origin");
 		return null;
 	};
 	/** The token a browser's socket offers as the `bearer.<token>` subprotocol, since it can send no header. */
@@ -160,6 +166,13 @@ export function guardsFor(port: number, token: string, phones?: PhoneAccess): Gu
 	return {
 		allowedHost,
 		admit,
+		capability(purpose) {
+			const key = capabilityKey(token, purpose);
+			return {
+				key,
+				admit: req => outside(req, true) ?? (tokenMatches(key, new URL(req.url).searchParams.get("cap")) ? null : fail(403, "forbidden capability")),
+			};
+		},
 		admitMedia: req => {
 			const refused = outside(req);
 			if (refused) return refused;

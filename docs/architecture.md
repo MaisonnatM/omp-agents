@@ -10,6 +10,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Extensions library](architecture/extensions.md)
 - [Get started](architecture/get-started.md)
 - [Transcripts](architecture/transcripts.md)
+- [Artifacts](architecture/artifacts.md)
 - [Terminal sessions](architecture/terminal-sessions.md)
   - [Why the server joins every terminal session](architecture/terminal-sessions.md#why-the-server-joins-every-terminal-session)
 - [Dashboard sessions](architecture/dashboard-sessions.md)

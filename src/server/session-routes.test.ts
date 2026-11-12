@@ -7,6 +7,7 @@ const handler = async (): Promise<Response> => new Response();
 const kit: RouteKit = {
 	get: handle => async req => handle(new URL(req.url).searchParams, req),
 	media: handle => async req => handle(new URL(req.url).searchParams, req),
+	capability: () => ({ sign: () => "", serve: () => async () => new Response() }),
 	write: () => handler,
 };
 const unused = (): never => {

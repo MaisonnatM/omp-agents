@@ -43,6 +43,7 @@ import {
 	Wrench,
 } from "lucide-react";
 import { createContext, Fragment, type KeyboardEvent, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import type { ArtifactSave } from "../../src/shared/artifacts";
 import type { View } from "../../src/shared/sessions";
 import { taskText } from "../../src/shared/routine-message";
 import type { PromptFile } from "../../src/shared/prompt-files";
@@ -63,16 +64,19 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
+import { openArtifact, useShownArtifact } from "../artifact-requests";
+import { versionNumber } from "../artifacts-model";
 import { mediaSrc } from "../api";
 import { SPLIT_CLICK, subagentModeOf } from "../labels";
 import { hashForView, sameView } from "../routing";
 import type { StartOf } from "../starts";
-import { usePaneLoaded, useTranscript } from "../pane-store";
+import { useArtifacts, usePaneLoaded, useTranscript } from "../pane-store";
 import { revealed, useReveal } from "../message-reveal";
 import { type ActivityItem, EMPTY_TRANSCRIPT, type ForkPoint, replacingPrompt, resendOf, type ToolItem, transcriptModel, withEditedPrompt } from "../transcript-view";
 import { useAction } from "../use-action";
 import { useCopy } from "../use-copy";
 import { type ToolChipLabels, ToolChipsContext } from "./tool-chips";
+import { ArtifactCard } from "./artifact-card";
 import { AttachedFileDialog } from "./file-dialog";
 import { PromptFileChips } from "./prompt-file-chips";
 import { ImageViewer } from "./media-viewer";
@@ -119,6 +123,7 @@ const TOOL_ICON: Record<string, LucideIcon> = {
 	generate_image: Image,
 	github: GitPullRequest,
 	ship_stage: Ship,
+	artifact: Sparkles,
 	checkpoint: Flag,
 	rewind: History,
 	context_notes: StickyNote,
@@ -386,6 +391,16 @@ const ActivityRow = memo(function ActivityRow({ id, entries, settled, shown, chi
 	);
 });
 
+/** A saved artifact version's card; nothing on a Bot's page, which shows no activity. Its Open shows this version in the Artifacts tab. */
+const ArtifactRow = memo(function ArtifactRow({ id, view, save, number, showing, settled, shown }: { id: string; view: View; save: ArtifactSave; number: number; showing: boolean; settled: boolean; shown: boolean }) {
+	if (!shown) return null;
+	return (
+		<Row messageId={id} settled={settled}>
+			<ArtifactCard save={save} number={number} showing={showing} onOpen={() => openArtifact(view, { file: save.file, version: number })} />
+		</Row>
+	);
+});
+
 function CopyButton({ text, label = "Copy message" }: { text: string; label?: string }) {
 	const { copied, copy } = useCopy();
 	const CopyIcon = useIcon("copy");
@@ -644,6 +659,8 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	const modelRef = useRef(EMPTY_TRANSCRIPT);
 	const model = useMemo(() => (modelRef.current = transcriptModel(items, working, modelRef.current)), [items, working]);
 	const { blocks, forks, replies, images } = model;
+	const artifacts = useArtifacts(view);
+	const shownArtifact = useShownArtifact(view);
 	// Settled rows skip layout off screen only once every row has laid out, so each remembers its real height. The
 	// second frame comes after the browser laid out the first one. Anything that changes rows' heights while off screen,
 	// another view, tools expanded or hidden, thinking hidden, or the lane's width, lays every row out in full again first.
@@ -766,6 +783,22 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 								const settled = index < visibleBlocks.length - 1;
 								if (block.kind === "activity") {
 									return <ActivityRow key={block.id} id={block.id} entries={block.entries} settled={settled} shown={activityShown} chips={toolChips} />;
+								}
+								if (block.kind === "artifact") {
+									const { id, artifact } = block.item;
+									const number = versionNumber(artifacts, block.item);
+									return (
+										<ArtifactRow
+											key={id}
+											id={id}
+											view={view}
+											save={artifact}
+											number={number}
+											showing={shownArtifact?.file === artifact.file && shownArtifact.number === number}
+											settled={settled}
+											shown={activityShown}
+										/>
+									);
 								}
 								const item = block.item;
 								if (item.kind === "notice") {

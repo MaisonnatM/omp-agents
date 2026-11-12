@@ -1,10 +1,11 @@
 # Session details sidebar
 
-- The right sidebar shows the focused view's session's pull requests and Linear issues, including those of its subagents, and in the desktop app the app a live session runs.
+- The right sidebar shows the focused view's session's pull requests, Linear issues, and artifacts, including the pull requests and issues of its subagents, and in the desktop app the app a live session runs.
   It follows a live session, one of its subagents, or a past session.
   It hides for a pull request's details, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side; a maximized pane brings it back.
-- Its tabs are **PRs**, **Browser**, which shows only in the [desktop app](desktop-app.md) for a live session or subagent, **Tickets**, which shows only for a session with a Linear issue, and **Memory**, which shows only for a [personal session](personal-sessions.md).
-  Each tab shows its name, and **PRs** and **Tickets** a badge with their item count.
+- Its tabs are **PRs**, **Tickets**, which shows only for a session with a Linear issue, **Browser**, which shows only in the [desktop app](desktop-app.md) for a live session or subagent, **Artifacts**, which shows only once the agent saved an artifact, and **Memory**, which shows only for a [personal session](personal-sessions.md).
+  Each tab shows its name, and **PRs**, **Tickets**, and **Artifacts** a badge with their item count.
+  With five tabs, the sidebar's default width keeps only their icons.
   The sidebar remembers the tab you chose, for every view, and defaults to **PRs**.
   A saved choice of the former **Todos**, **Files**, **Media**, or **Processes** tab falls back to that default.
   What a live session runs besides omp shows in the status bar's CPU card; see [Sessions sidebar](sessions-sidebar.md).
@@ -17,6 +18,7 @@
   The quick actions apply only when the pull request list of the sidebar's workspace includes the pull request.
   Opening the tab, or picking another pull request, reads it from GitHub, and so does each start and end of the view's turn, so its checks and reviews follow the agent's pushes; the server keeps its answer for 30 seconds.
 - **Browser** shows the app the session runs and adds an element you pick in it to the session's composer; see [Browser](browser.md).
+- **Artifacts** shows the pages, documents, and drawings the agent saved for you to look at, each version kept; see [Artifacts](artifacts.md).
 - **Tickets** shows the Linear issues the session and its subagents worked on, as its header lists them, the session's own first.
   An issue the session only read, or that its prompt or its branch names, shows once two of those agree; see [Pull requests](pull-requests.md).
   The first one shows until you click another identifier above it, or the issue's **Sub-issue of** link or one of its **Sub-issues**, which show it in place.

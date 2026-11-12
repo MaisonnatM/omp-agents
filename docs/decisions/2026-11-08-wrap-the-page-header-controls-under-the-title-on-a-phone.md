@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 date: 2026-11-08
 decision-makers: Maxence Maisonnat
+superseded-by: 2026-11-12-the-page-header-folds-its-buttons-before-it-squeezes-the-title
 ---
 
 # Wrap the page header's controls under the title on a phone

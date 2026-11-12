@@ -15,6 +15,7 @@ import { type DashboardState, initialState, reduce, type ServerAction } from "./
 import { applyDictationMessage, dictationDisconnected } from "./dictation";
 import { Outbox } from "./outbox";
 import { applyPaneMessage, retainPanes, retainTrajectories, useShownConversations, useShownTrajectories } from "./pane-store";
+import { applyItems } from "./artifact-requests";
 import { DEFAULT_SPLIT_RATIOS, type SplitAxis, type SplitRatios } from "./pane-navigation";
 import {
 	hashForView,
@@ -231,6 +232,8 @@ export function useDashboard(): Dashboard {
 						build = msg.id;
 						return;
 					case "items":
+						applyItems(msg);
+						return;
 					case "work":
 					case "media":
 					case "turns":

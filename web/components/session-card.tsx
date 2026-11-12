@@ -74,7 +74,7 @@ export const SessionCard = memo(function SessionCard({ view, working, changes, s
 		<section
 			aria-label="Session card"
 			data-session-card
-			className="mx-auto mt-3 max-h-[45%] min-h-0 w-[calc(100%-1.5rem)] max-w-[calc(var(--container-conversation)-1.5rem)] shrink-0 divide-y divide-border overflow-y-auto rounded-2xl border border-border bg-popover/95 text-popover-foreground shadow-sm backdrop-blur [scrollbar-width:thin] @min-[65.75rem]/conversation:absolute @min-[65.75rem]/conversation:top-3 @min-[65.75rem]/conversation:right-3 @min-[65.75rem]/conversation:z-10 @min-[65.75rem]/conversation:m-0 @min-[65.75rem]/conversation:max-h-[calc(100%-5rem)] @min-[65.75rem]/conversation:w-80 @min-[65.75rem]/conversation:max-w-none"
+			className="mx-auto mt-3 mb-3 max-h-[45%] min-h-0 w-[calc(100%-1.5rem)] max-w-[calc(var(--container-conversation)-1.5rem)] shrink-0 divide-y divide-border overflow-y-auto rounded-2xl border border-border bg-popover text-popover-foreground [scrollbar-width:thin] @min-[65.75rem]/conversation:absolute @min-[65.75rem]/conversation:top-3 @min-[65.75rem]/conversation:right-3 @min-[65.75rem]/conversation:z-10 @min-[65.75rem]/conversation:m-0 @min-[65.75rem]/conversation:max-h-[calc(100%-5rem)] @min-[65.75rem]/conversation:w-80 @min-[65.75rem]/conversation:max-w-none @min-[65.75rem]/conversation:bg-popover/95 @min-[65.75rem]/conversation:shadow-sm @min-[65.75rem]/conversation:backdrop-blur"
 		>
 			{subagents && nodes.length > 0 && <SubagentsSection links={subagents} nodes={nodes} arenas={changes?.facts?.arenas ?? []} />}
 			{found && changes && <ChangesSections view={view} session={changes} changes={found} working={working} />}

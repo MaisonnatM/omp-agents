@@ -1,9 +1,10 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { packageDir } from "../../src/omp/install";
+import { parseArtifactSave } from "../../src/shared/artifacts";
 
 const loader = `
 import { spawnSync } from "node:child_process";
@@ -18,8 +19,9 @@ const pi = input.omp ? await import(process.argv[2]) : undefined;
 let tool;
 let confirmations = 0;
 const executed = [];
+let activeTools = ["artifact", "read"];
 const entries = [];
-const sessionManager = { getSessionId: () => input.sessionId ?? "session" };
+const sessionManager = { getSessionId: () => input.sessionId ?? "session", getArtifactsDir: () => input.artifactsDir ?? null };
 // Loads an extension as one omp session does and returns its handlers by event name.
 function load(extension) {
 	const hooks = {};
@@ -28,6 +30,8 @@ function load(extension) {
 		zod: z,
 		on(name, handler) { hooks[name] = handler; },
 		registerTool(registered) { tool = registered; },
+		getActiveTools() { return activeTools; },
+		async setActiveTools(names) { activeTools = names; },
 		appendEntry(customType, data) { entries.push({ type: "custom", customType, data }); },
 		// input.byArg answers by an argument anywhere in the call, such as "n=53" for one PR's read; input.responses answers by subcommand, such as "pr view" or "repo view", or "env -u GITHUB_TOKEN pr view" for gh run without that variable; input.at answers by directory first; input.response answers the rest.
 		async exec(command, args, options) {
@@ -52,7 +56,10 @@ function load(extension) {
 }
 // The same harness loads whichever installed extension the caller selects.
 const hooks = load((await import(process.argv[3])).default);
-if (input.command) {
+if (input.subToolStart) {
+	await hooks.session_start({ type: "session_start" }, { agent: { kind: "sub" } });
+	console.log(JSON.stringify({ activeTools }));
+} else if (input.command) {
 	if (!hooks.tool_call) throw new Error("No command gate registered");
 	const result = await hooks.tool_call({ toolName: "bash", input: { command: input.command, cwd: input.bashCwd } }, {
 		cwd: input.cwd ?? process.cwd(), hasUI: true,
@@ -118,7 +125,7 @@ if (input.command) {
 	const results = [];
 	if (input.parallel) results.push(...(await Promise.all(input.runs.map(call))));
 	else for (const params of input.runs) results.push(await call(params));
-	console.log(JSON.stringify({ runs: results.map(result => ({ isError: result.isError ?? false, text: result.content?.[0]?.text ?? null })), executed, entries }));
+	console.log(JSON.stringify({ runs: results.map(result => ({ isError: result.isError ?? false, text: result.content?.[0]?.text ?? null, details: result.details ?? null })), executed, entries }));
 } else if (input.run) {
 	const result = await tool.execute("call", input.params, undefined, undefined, { cwd: input.cwd ?? process.cwd(), hasUI: false, sessionManager });
 	console.log(JSON.stringify({ run: { isError: result.isError ?? false, stage: result.details?.state?.stage ?? null }, text: result.content?.[0]?.text ?? null, executed }));
@@ -128,18 +135,19 @@ if (input.command) {
 }
 `;
 
-function exercise(name: "ship" | "todos" | "notes" | "events" | "worktree-guard" | "google-accounts" | "pr-description" | "headless-mark" | "arena" | "chrome-devtools-page", input: object, env: Record<string, string> = {}): {
+function exercise(name: "artifact" | "ship" | "todos" | "notes" | "events" | "worktree-guard" | "google-accounts" | "pr-description" | "headless-mark" | "arena" | "chrome-devtools-page", input: object, env: Record<string, string> = {}): {
 	result: { block?: boolean; reason?: string; input?: Record<string, unknown> } | null;
 	confirmations: number;
 	valid: boolean;
 	run: { isError: boolean; stage: string | null };
-	runs: { isError: boolean; text: string | null }[];
+	runs: { isError: boolean; text: string | null; details: unknown }[];
 	text: string | null;
 	prompt: string[] | null;
 	toolResults: ({ isError: boolean; text: string } | null)[];
 	results: (string | null)[];
 	executed: string[][];
 	entries: { customType: string; data: unknown }[];
+	activeTools: string[];
 } {
 	const child = Bun.spawnSync([
 		process.execPath, "run", "-", packageDir,
@@ -1181,5 +1189,66 @@ describe("arena", () => {
 		const { runs: results, entries } = runs([fanOut], "sub");
 		expect(results[0].isError).toBe(true);
 		expect(entries).toEqual([]);
+	});
+});
+
+describe("artifact", () => {
+	const dir = mkdtempSync(join(tmpdir(), "omp-artifact-"));
+	const local = join(dir, "local");
+	mkdirSync(local);
+	afterAll(() => rmSync(dir, { recursive: true, force: true }));
+	const save = (path: string, extra: object = {}) => exercise("artifact", { artifactsDir: dir, runs: [{ path, title: "Example" }], ...extra }).runs[0]!;
+	test("subagents omit the artifact schema", () => {
+		expect(exercise("artifact", { subToolStart: true }).activeTools).toEqual(["read"]);
+	});
+	test("notes are optional, trimmed, short, and on one line", () => {
+		writeFileSync(join(local, "noted.html"), "<p>noted</p>");
+		const run = (note?: string) => save("local://noted.html", { runs: [{ path: "local://noted.html", title: "Noted", ...(note !== undefined && { note }) }] });
+		expect(parseArtifactSave(run().details)?.note).toBeNull();
+		expect(parseArtifactSave(run("  Changed heading  ").details)?.note).toBe("Changed heading");
+		expect(parseArtifactSave(run("x".repeat(120)).details)?.note).toBe("x".repeat(120));
+		for (const note of [" ", "x".repeat(121), "two\nlines"]) expect(run(note).isError).toBe(true);
+	});
+	test("symlinks cannot escape the local root", () => {
+		writeFileSync(join(dir, "outside.html"), "<p>outside</p>");
+		symlinkSync(join(dir, "outside.html"), join(local, "escape.html"));
+		expect(save("local://escape.html").isError).toBe(true);
+	});
+
+	test("each kit source extension produces details accepted by the shared parser", () => {
+		for (const [extension, kind, text] of [["html", "html", "<p>page</p>"], ["htm", "html", "<p>page</p>"], ["HTML", "html", "<p>page</p>"], ["md", "markdown", "# Page"], ["markdown", "markdown", "# Page"], ["svg", "svg", "<svg/>"]]) {
+			writeFileSync(join(local, `page.${extension}`), text!);
+			const before = Date.now();
+			const result = save(`local://page.${extension}`);
+			expect(result.isError).toBe(false);
+			const parsed = parseArtifactSave(result.details);
+			expect(parsed).toMatchObject({ file: `page.${extension}`, kind, title: "Example", bytes: Buffer.byteLength(text!) });
+			expect(parsed!.savedAt).toBeGreaterThanOrEqual(before);
+		}
+	});
+	test("equal bytes keep one copy and leave no staging files", () => {
+		writeFileSync(join(local, "same.html"), "<p>same</p>");
+		const results = exercise("artifact", { artifactsDir: dir, parallel: true, runs: [{ path: "local://same.html", title: "Same" }, { path: "local://same.html", title: "Same" }] }).runs;
+		const { savedAt: _first, ...first } = results[0]!.details as Record<string, unknown>;
+		const { savedAt: _second, ...second } = results[1]!.details as Record<string, unknown>;
+		expect(first).toEqual(second);
+		const parsed = parseArtifactSave(results[0]!.details)!;
+		expect(readFileSync(join(dir, "artifact-versions", `${parsed.sha256}.${parsed.kind}`), "utf8")).toBe("<p>same</p>");
+		expect(readdirSync(join(dir, "artifact-versions")).filter(name => name.startsWith(parsed.sha256))).toEqual([`${parsed.sha256}.html`]);
+	});
+	test("a file of exactly 2 MiB saves", () => {
+		writeFileSync(join(local, "limit.md"), "x".repeat(2 * 1024 * 1024));
+		expect(parseArtifactSave(save("local://limit.md").details)?.bytes).toBe(2 * 1024 * 1024);
+	});
+	test("refuses unsupported, empty, oversized, invalid UTF-8, and non-SVG files", () => {
+		for (const [file, content] of [["empty.html", ""], ["large.html", "x".repeat(2 * 1024 * 1024 + 1)], ["bad.html", Buffer.from([0xff])], ["bad.svg", "<p>not svg</p>"], ["page.txt", "text"]] as const) {
+			writeFileSync(join(local, file), content);
+			expect(save(`local://${file}`).isError).toBe(true);
+		}
+	});
+	test("refuses paths outside local, missing files, and sessions without an artifacts directory", () => {
+		for (const path of ["/tmp/page.html", "local://../page.html", "local:///tmp/page.html", "local://a/../page.html", "local://missing.html"]) expect(save(path).isError).toBe(true);
+		expect(save("local://page.html", { artifactsDir: null }).isError).toBe(true);
+		expect(save("local://page.html", { agent: "sub" }).isError).toBe(true);
 	});
 });

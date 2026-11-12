@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import type { ArtifactSave, Sha256 } from "../src/shared/artifacts";
 import { parseBotId } from "../src/shared/bots";
 import type { RoutineMessage } from "../src/shared/routine-message";
 import type { Item } from "../src/shared/transcript";
 import { type Block, nextSuggestions, resendOf, type TranscriptModel, transcriptModel, withEditedPrompt } from "./transcript-view";
 
 const blocksOf = (items: Item[]): readonly Block[] => transcriptModel(items, false).blocks;
-const ids = (blocks: readonly Block[]): string[] => blocks.map(block => (block.kind === "item" ? block.item.id : block.id));
+const ids = (blocks: readonly Block[]): string[] => blocks.map(block => (block.kind === "activity" ? block.id : block.item.id));
 
 describe("transcript rendering", () => {
 	const user: Item = { id: "u", kind: "user", text: "go", skill: null, from: null, entryId: "e-u" };
@@ -19,6 +20,18 @@ describe("transcript rendering", () => {
 			"h1+t1+t2",
 			"u",
 			"t3",
+		]);
+	});
+
+	test("a saved artifact leaves its tool group as its own block; a failed save stays in the group", () => {
+		const artifact: ArtifactSave = { file: "page.html", kind: "html", title: "Page", note: null, sha256: "a".repeat(64) as Sha256, bytes: 12, savedAt: 1_700_000_000_000 };
+		const saved: Item = { id: "s", kind: "tool", name: "artifact", summary: "page.html", status: "ok", agents: [], artifact };
+		const failed: Item = { id: "f", kind: "tool", name: "artifact", summary: "page.html", status: "error", agents: [] };
+		const blocks = blocksOf([tool("t1", "ok"), saved, tool("t2", "ok"), failed]);
+		expect(blocks.map(block => [block.kind, block.kind === "activity" ? block.entries.map(entry => entry.id).join("+") : block.item.id])).toEqual([
+			["activity", "t1"],
+			["artifact", "s"],
+			["activity", "t2+f"],
 		]);
 	});
 

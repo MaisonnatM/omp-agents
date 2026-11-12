@@ -93,9 +93,14 @@ export class LiveSessions {
 		return this.#bySessionId.get(sessionId);
 	}
 
+	/** The live main agent's file, private sessions included, then the saved file. */
+	fileOf(sessionId: string, savedFile: (sessionId: string) => string | null): string | null {
+		return this.#bySessionId.get(sessionId)?.transcriptPath(null, savedFile) ?? savedFile(sessionId);
+	}
+
 	/** The last reply in session `sessionId`'s file, of its running or last turn, `null` when it has none; `savedFile` finds the file of one that no longer runs. */
 	lastReply(sessionId: string, savedFile: (sessionId: string) => string | null): string | null {
-		const file = this.#bySessionId.get(sessionId)?.transcriptPath(null, savedFile) ?? savedFile(sessionId);
+		const file = this.fileOf(sessionId, savedFile);
 		return file ? (endedTurn(file)?.reply ?? null) : null;
 	}
 

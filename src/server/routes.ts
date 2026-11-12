@@ -26,6 +26,7 @@ import { sportThumbRoutes, type SportThumbsEnv } from "./sport-thumbs";
 import { phoneAccessRoutes, type PhoneAccessRoutesEnv } from "./phone-access-routes";
 import { syncRoutes, type SyncRoutesEnv } from "./sync-routes";
 import { todoRoutes, type TodoRoutesEnv } from "./todo-routes";
+import { artifactRoutes, type ArtifactRoutesEnv } from "./artifact-routes";
 
 /** Everything the HTTP API reads, by concern. */
 export interface RouteEnv {
@@ -36,6 +37,7 @@ export interface RouteEnv {
 	calendar: CalendarRoutesEnv;
 	gmail: GmailAccounts;
 	files: FileRoutesEnv;
+	artifacts: ArtifactRoutesEnv;
 	todos: TodoRoutesEnv;
 	pullRequests: PullRequestRoutesEnv;
 	dashboard: DashboardRoutesEnv;
@@ -70,6 +72,7 @@ export function createRoutes(env: RouteEnv): Routes {
 		...gmailRoutes(kit, env.gmail),
 		...pullRequestRoutes(kit, env.pullRequests),
 		...fileRoutes(kit, env.files),
+		...artifactRoutes(kit, env.artifacts),
 		...todoRoutes(kit, env.todos),
 		...dashboardRoutes(kit, env.dashboard),
 		...syncRoutes(kit, env.sync),

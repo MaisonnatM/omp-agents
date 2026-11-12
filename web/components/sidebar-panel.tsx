@@ -1,6 +1,6 @@
 /** `DashboardSidebar`, one of the dashboard's two sidebars, resizable and closeable; `useSidebarPanels` keeps both panels' state and `SidebarToggle` shows or hides one. */
 import { type LucideIcon, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createContext, type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Sidebar, type SidebarSide } from "@/components/ui/sidebar";
@@ -240,6 +240,9 @@ interface DashboardSidebarProps {
 	children: ReactNode;
 }
 
+/** Whether the sidebar a component sits in is open, so what it shows is in sight; outside any sidebar it always is. */
+export const SidebarOpen = createContext(true);
+
 /**
  * A sidebar with its resize handle, sliding its width open and shut. A sidebar with a rail keeps its toggle on its
  * outer edge, so the toggle glides from the header's corner to the rail with the edge and follows a resize drag. The
@@ -293,7 +296,7 @@ export function DashboardSidebar({ side, panel, onResize, onToggle, address, chi
 				className={cn(panel.floating ? cn("absolute inset-y-0 z-40 bg-background shadow-xl", side === "left" ? "left-0" : "right-0") : "relative", "h-full", dragging && "[&_webview]:pointer-events-none")}
 				style={{ width: panel.width }}
 			>
-				{children}
+				<SidebarOpen.Provider value={panel.open}>{children}</SidebarOpen.Provider>
 				<SidebarResizeHandle side={side} width={panel.width} max={panel.max} onWidth={onResize} onDragging={setDragging} />
 			</Sidebar>
 			{rail > 0 && (

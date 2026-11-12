@@ -3,6 +3,7 @@ import type { ServerMsg } from "../src/shared/protocol";
 import type { CompletionItem, View, WithdrawnMessage } from "../src/shared/sessions";
 import type { Turn } from "../src/shared/trajectory";
 import { type AgentMedia, type AgentSource, type ChangedFile, type Item, newestMediaFirst } from "../src/shared/transcript";
+import { type Artifact, type ArtifactToolItem, artifactsOf, savedArtifact } from "./artifacts-model";
 import { applyDelta } from "./keyed-list";
 import { keyedStore } from "./keyed-store";
 import { hashForView } from "./routing";
@@ -101,6 +102,12 @@ export function applyPaneMessage(msg: PaneMsg): void {
 	}
 }
 
+/** `view`'s transcript as the store holds it now, outside React; `null` when the page does not show the view. */
+export function paneItemsOf(view: View): Item[] | null {
+	const key = hashForView(view);
+	return open.has(key) ? panes.get(key).items : null;
+}
+
 /**
  * A field of `view`'s data, rendering again only when that field changes. A streamed token changes `items` alone, so a
  * component that reads another field never renders for it; each hook below names the field it reads. With no view it reads an empty pane.
@@ -117,7 +124,8 @@ const sourcesOf = (pane: PaneData): AgentSource[] | null => pane.sources;
 const turnsOf = (pane: PaneData): Turn[] | null => pane.turns;
 const composerOf = ({ completions, withdrawn }: PaneData): ComposerData => ({ completions, withdrawn });
 const sameComposer = (a: ComposerData, b: ComposerData): boolean => a.completions === b.completions && a.withdrawn === b.withdrawn;
-const sameStrings = (a: string[], b: string[]): boolean => a.length === b.length && a.every((text, index) => text === b[index]);
+const sameElements = <T>(a: readonly T[], b: readonly T[]): boolean => a.length === b.length && a.every((entry, index) => entry === b[index]);
+const savesOf = (pane: PaneData): ArtifactToolItem[] => pane.items.filter(savedArtifact);
 
 /** `view`'s transcript: the one field a streamed token changes, so only the components that draw it read it. */
 export const useTranscript = (view: View): Item[] => usePaneSelect(view, itemsOf);
@@ -136,6 +144,15 @@ export const useSources = (view: View): AgentSource[] | null => usePaneSelect(vi
 
 /** `view`'s turns, in order; `null` until the server sends them. */
 export const useTurns = (view: View): Turn[] | null => usePaneSelect(view, turnsOf);
+
+/**
+ * `view`'s artifacts, built again only when a saving item changes: a delta keeps every item it did not change the same
+ * object, so a streamed token leaves the saves as they were.
+ */
+export function useArtifacts(view: View): Artifact[] {
+	const saves = usePaneSelect(view, savesOf, sameElements);
+	return useMemo(() => artifactsOf(saves), [saves]);
+}
 
 /** Views some mounted components show, by {@link hashForView}, with how many components show each, as one list the page streams. */
 interface ShownViews {
@@ -199,5 +216,5 @@ export const useComposerData = (view: View): ComposerData => usePaneSelect(view,
 /** What the last turn of `view`'s transcript suggests sending next, as {@link nextSuggestions} reads it. */
 export function useNextSuggestions(view: View, working: boolean): string[] {
 	const select = useMemo(() => (pane: PaneData) => nextSuggestions(pane.items, working), [working]);
-	return usePaneSelect(view, select, sameStrings);
+	return usePaneSelect(view, select, sameElements);
 }

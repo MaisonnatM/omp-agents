@@ -14,6 +14,7 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 - [Panes, splits, and links](usage/panes-splits-and-links.md)
 - [Conversations](usage/conversations.md)
 - [Browser](usage/browser.md)
+- [Artifacts](usage/artifacts.md)
 - [Composer](usage/composer.md)
 - [Send later](usage/send-later.md)
   - [Continue after a usage limit or a connection error](usage/send-later.md#continue-after-a-usage-limit-or-a-connection-error)

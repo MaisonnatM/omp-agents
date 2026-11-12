@@ -6,6 +6,7 @@ import type { RoutineTask } from "../src/routines";
 import { promptTitle } from "../src/shared/prompt-files";
 import { taskOf, taskText } from "../src/shared/routine-message";
 import { isPrompt, type Item, type PromptItem } from "../src/shared/transcript";
+import { type ArtifactToolItem, savedArtifact } from "./artifacts-model";
 import type { ActionState } from "./use-action";
 
 export type ToolItem = Extract<Item, { kind: "tool" }>;
@@ -18,15 +19,19 @@ type DashboardItem = Extract<Item, { kind: "dashboard" }>;
 type Opener = PromptItem | DashboardItem;
 type AssistantItem = Extract<Item, { kind: "assistant" }>;
 
-export type Block = { kind: "item"; item: Exclude<Item, ActivityItem | DashboardItem> } | { kind: "activity"; id: string; entries: ActivityItem[] };
+/** A message or notice; a group of tool calls and thinking; or a call that saved an artifact, lifted out of its group to show as a card. */
+export type Block =
+	| { kind: "item"; item: Exclude<Item, ActivityItem | DashboardItem> }
+	| { kind: "activity"; id: string; entries: ActivityItem[] }
+	| { kind: "artifact"; item: ArtifactToolItem };
 
 /** Whether `item` opens a turn: a prompt, the user's, one a routine or another Bot sent, or one the dashboard sent in their place, which shows nothing. */
 export const opensTurn = (item: Item): item is Opener => isPrompt(item) || item.kind === "dashboard";
 
-const blockKey = (block: Block): string => (block.kind === "item" ? block.item.id : block.id);
+const blockKey = (block: Block): string => (block.kind === "activity" ? block.id : block.item.id);
 
 const sameBlock = (a: Block, b: Block): boolean =>
-	a.kind === "item" ? b.kind === "item" && a.item === b.item : b.kind === "activity" && a.entries.length === b.entries.length && a.entries.every((entry, i) => entry === b.entries[i]);
+	a.kind === "activity" ? b.kind === "activity" && a.entries.length === b.entries.length && a.entries.every((entry, i) => entry === b.entries[i]) : a.kind === b.kind && a.item === b.item;
 
 /**
  * The blocks of the items from `start` to `end`, without the prompts the dashboard sent. A block of `previous` whose
@@ -39,7 +44,8 @@ function blocksOf(items: readonly Item[], start: number, end: number, previous: 
 		const item = items[at]!;
 		if (item.kind === "dashboard") continue;
 		const last = blocks.at(-1);
-		if (item.kind === "tool" || item.kind === "thinking") {
+		if (savedArtifact(item)) blocks.push({ kind: "artifact", item });
+		else if (item.kind === "tool" || item.kind === "thinking") {
 			if (last?.kind === "activity") last.entries.push(item);
 			else blocks.push({ kind: "activity", id: item.id, entries: [item] });
 		} else blocks.push({ kind: "item", item });
