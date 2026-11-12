@@ -18,7 +18,7 @@
   A turn's tokens add up its requests and its side calls, each from the usage omp recorded for it.
   A subagent's turns show in the subagent's own pane, not its parent's.
   The pane goes back to the transcript when it opens another conversation.
-- The **Session card** toggle, a list icon in a session's header between **Open PR** and End session, or before **Resume** in a past session, hides or shows the **Session** card in every pane, the same choice as **Show session card** in Settings › Preferences.
+- The **Session card** toggle, a list icon in a session's header between **Open PR** and End session, or before **Resume** in a past session, hides or shows the Session card in every pane, the same choice as **Show session card** in Settings › Preferences.
   It looks pressed while the card shows.
   It appears only while the card has something to show, subagents, files, images, or sources, and leaves with the card while the trajectory takes the transcript's place.
 - The transcript fades at its top or bottom edge only while more of it lies past that edge, so a conversation that fits the pane shows no fade.
@@ -70,7 +70,7 @@
   Enter and Shift+Enter, or the bar's arrows, step to the next and previous match and scroll the conversation to it; Esc or the close button closes the bar.
   It searches the text the conversation shows, so folded tool calls and hidden thinking are left out, and it keeps counting as new output streams in.
   Focusing another pane closes it; while no conversation shows, Cmd+F keeps the browser's own Find.
-- The **Session** card holds the agent's **Subagents** and the **Files**, **Images**, and **Sources** sections of [Changed files and images](changed-files-and-images.md), each shown once it has something to list; a past session's conversation shows it too.
+- The Session card holds the agent's **Subagents** and the **Files**, **Images**, and **Sources** sections of [Changed files and images](changed-files-and-images.md), each shown once it has something to list; a past session's conversation shows it too.
   It floats at the conversation's top right once the conversation is wide enough, and the messages move left to make room for it; in a narrower conversation it sits above them, so it never covers a message.
   It scrolls as a whole when its sections outgrow it.
   Closing a file or an image opened from the card puts the focus back on the row or thumbnail you opened it from.
