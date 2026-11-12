@@ -52,10 +52,13 @@ Settings, in `config.yml`:
 
 Files, in `agent/`:
 
-- `AGENTS.md`: worktree and force-push safety, the rule that sends every UI change through the `design-workflow` skill, plus conditional pointers for model routing, reviews, and decision records.
+- `AGENTS.md`: worktree and force-push safety, the rule that sends every UI change through the `design-workflow` skill, the rule that runs builds, test suites, and browser runs through `scripts/heavy.py`, plus conditional pointers for model routing, reviews, and decision records.
   Read the matching reference under `~/.omp/agent/docs/` before taking that branch of the workflow, regardless of the repository's working directory.
 - `docs/`: `model-routing.md` covers provider order and quota handling, and `review-workflow.md` covers thermonuclear and interface reviews, proof boxes, PR descriptions, and PR screenshots.
   These references load on demand rather than in every session's context.
+- `scripts/heavy.py`: `python3 ~/.omp/agent/scripts/heavy.py <command>` runs a heavy command, such as a build, a test suite, or a Playwright run, once one of the slots every session on the computer shares is free, so parallel sessions cannot pile builds onto the machine until tools time out.
+  There are `OMP_HEAVY_SLOTS` slots, by default a quarter of the CPU cores and at least one; each is an `flock` on a file in `/tmp/omp-heavy-<uid>`, or `OMP_HEAVY_DIR`, which the system releases when the holder ends, however it ends.
+  A waiting command prints once that it is queued and what holds each slot, and again when it starts; one argument runs through `/bin/sh -c`, for `&&` and pipes, and a heavy command started inside another runs at once in its parent's slot.
 - `APPEND_SYSTEM.md`: short final replies that open with the answer in bold and add only the Needs you, Not verified, and Done lines that have content, ending on up to three suggested next prompts, design variants named once and quoted by that name on every surface, a UI change handed off on a running dev server with checked screenshots, questions asked through the ask tool with the recommended option first, how Cursor models call omp's `ask`, `bash`, `grep`, and skills, and a code-quality review before any pull request, which a repository limits to the files its `.omp/review-paths` globs match.
 - `agents/thermonuclear-reviewer.md`: a read-only reviewer that checks the diff against the `CODING_STANDARDS.md` at the root of the checkout it reviews, then runs the thermo-nuclear code quality review on the `plan` role's model.
 - `agents/interface-reviewer.md`: a read-only reviewer that runs the `interface-review` skill in full mode on a PR, then applies the `app-consistency-review` skill to check the change reuses the app's shared components and follows its tokens and sibling screens, on the `plan` role's model.
