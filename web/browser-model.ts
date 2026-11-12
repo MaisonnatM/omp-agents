@@ -1,6 +1,6 @@
 /** What a session's Browser can load: the addresses its jobs and services listen on, and the one it opens on. */
 import type { LiveSessionProcesses } from "../src/shared/processes";
-import { isLoopbackUrl } from "../src/shared/desktop-bridge";
+import { FIT_PANEL, isLoopbackUrl, isScreenSize, type ScreenChoice, SCREEN_DEVICES } from "../src/shared/desktop-bridge";
 
 /** A dev server of a session: one of its own jobs or services that listens on a port, which **Stop dev server** stops by `id`. */
 export interface DevServer {
@@ -34,6 +34,20 @@ export const browserCandidates = (servers: readonly DevServer[]): BrowserCandida
 /** The address the Browser opens on: the one last loaded for the session, else the first candidate, else none. */
 export const initialAddress = (saved: string | null, candidates: readonly BrowserCandidate[]): string | null =>
 	saved !== null && isLoopbackUrl(saved) ? saved : (candidates[0]?.url ?? null);
+
+/** How the Browser keeps a session's {@link ScreenChoice}: its size, then ` landscape` when turned, or `null` for **Fit panel**, which needs no entry. */
+export const storedScreen = ({ size, landscape }: ScreenChoice): string | null => (size === "fit" ? null : landscape ? `${size} landscape` : size);
+
+/** The {@link ScreenChoice} `stored` keeps, or **Fit panel** for none or one in another shape. */
+export function screenChoiceOf(stored: string | null): ScreenChoice {
+	const [size, turned, ...rest] = stored?.split(" ") ?? [];
+	if (!isScreenSize(size) || size === "fit" || rest.length > 0 || (turned !== undefined && turned !== "landscape")) return FIT_PANEL;
+	return { size, landscape: turned === "landscape" && SCREEN_DEVICES[size].touch };
+}
+
+/** The share of its own size a `screen` shows at in a `box`: shrunk to fit it, never grown past 1. */
+export const fitZoom = (box: { width: number; height: number }, screen: { width: number; height: number }): number =>
+	Math.min(1, box.width / screen.width, box.height / screen.height);
 
 export interface Point {
 	x: number;
@@ -120,37 +134,38 @@ export function cardPlace(bounds: Area, size: { width: number; height: number },
 	};
 }
 
-/** What one **Attach** sends: the comment, the page, the selected elements, and how many boxes and lines it marked. */
+/** What one **Attach** sends: the comment, the page, the selected elements, how many boxes and lines it marked, and the screen size it showed at. */
 export interface Annotation {
 	comment: string;
 	page: { url: string; title: string };
 	elements: readonly { name: string; snippet: string }[];
 	regions: number;
 	strokes: number;
+	/** The screen size's name, such as `Mobile, 390×844`, or `null` on **Fit panel**. */
+	screen: string | null;
 }
 
 const plural = (count: number, one: string, many: string): string => `${count} ${count === 1 ? one : many}`;
 
-/** The chip's label of an annotation: its comment on one line, else its first element's name with how many more, else the page's title. */
-function chipLabel({ comment, page, elements }: Annotation): string {
+/** The chip's label of an annotation: its comment on one line, else its first element's name with how many more, else the page's title, then the screen size it showed at. */
+function chipLabel({ comment, page, elements, screen }: Annotation): string {
 	const said = comment.replace(/\s+/g, " ").trim();
-	if (said) return said;
 	const [first] = elements;
-	if (first) return elements.length > 1 ? `${first.name} +${elements.length - 1}` : first.name;
-	return page.title.trim() || "Browser annotation";
+	const label = said || (first ? (elements.length > 1 ? `${first.name} +${elements.length - 1}` : first.name) : page.title.trim() || "Browser annotation");
+	return screen ? `${label} (${screen})` : label;
 }
 
 /**
  * The chip's label and the text the prompt gets of `annotation`. The label is the comment, else the first element's
- * name, else the page's title; the text holds the comment, the page, react-grab's text of each element, and what the
- * attached picture marks.
+ * name, else the page's title, with the screen size; the text holds the comment, the page and the screen size,
+ * react-grab's text of each element, and what the attached picture marks.
  */
 export function annotationText(annotation: Annotation): { label: string; content: string } {
-	const { comment, page, elements, regions, strokes } = annotation;
+	const { comment, page, elements, regions, strokes, screen } = annotation;
 	const marked = [elements.length > 0 && plural(elements.length, "outlined element", "outlined elements"), regions > 0 && plural(regions, "box", "boxes"), strokes > 0 && plural(strokes, "line", "lines")].filter(Boolean);
 	const lines = [
 		...(comment ? [comment, ""] : []),
-		`Annotated in the Browser on ${page.url}${page.title.trim() ? ` (${page.title.trim()})` : ""}.`,
+		`Annotated in the Browser on ${page.url}${page.title.trim() ? ` (${page.title.trim()})` : ""}${screen ? `, shown at the ${screen} screen size` : ""}.`,
 		...elements.flatMap((element, index) => ["", `Element ${index + 1}, ${element.name}:`, element.snippet]),
 		"",
 		`The attached picture shows ${marked.join(", ")}.`,

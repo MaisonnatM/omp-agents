@@ -144,6 +144,8 @@ export const CONTROLS = [
 	{ id: "browser.select-element", label: "Browser Pick in the app", area: "Browser" },
 	{ id: "browser.screenshot", label: "Browser Screenshot", area: "Browser" },
 	{ id: "browser.review-visuals", label: "Browser Review visuals", area: "Browser" },
+	{ id: "browser.screen-size", label: "Browser Screen size menu", area: "Browser" },
+	{ id: "browser.rotate", label: "Browser Screen size Rotate", area: "Browser" },
 	{ id: "browser.pick.select", label: "Browser pick mode Select", area: "Browser" },
 	{ id: "browser.pick.region", label: "Browser pick mode Region", area: "Browser" },
 	{ id: "browser.pick.draw", label: "Browser pick mode Draw", area: "Browser" },

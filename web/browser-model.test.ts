@@ -81,7 +81,7 @@ test("an annotation's chip is named after the comment, else its elements, else t
 	const page = { url: "http://localhost:5173/cart", title: "Cart" };
 	const buy = { name: "BuyButton", snippet: "<button>Buy</button>" };
 	const card = { name: "ProductCard", snippet: "<section>…</section>" };
-	const base = { comment: "", page, elements: [], regions: 0, strokes: 0 };
+	const base = { comment: "", page, elements: [], regions: 0, strokes: 0, screen: null };
 	expect(annotationText({ ...base, comment: "  make it\n blue ", elements: [buy] }).label).toBe("make it blue");
 	expect(annotationText({ ...base, elements: [buy, card] }).label).toBe("BuyButton +1");
 	expect(annotationText({ ...base, elements: [buy] }).label).toBe("BuyButton");
@@ -96,6 +96,7 @@ test("an annotation's text gives the comment, the page, each element, and what t
 		elements: [{ name: "BuyButton", snippet: "<button>Buy</button>" }],
 		regions: 2,
 		strokes: 1,
+		screen: null,
 	});
 	expect(content).toBe(
 		"match card B\n\nAnnotated in the Browser on http://localhost:5173/ (Shop).\n\nElement 1, BuyButton:\n<button>Buy</button>\n\nThe attached picture shows 1 outlined element, 2 boxes, 1 line.",

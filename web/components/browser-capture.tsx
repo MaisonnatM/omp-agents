@@ -30,17 +30,18 @@ const MODES: { mode: PickMode; label: string; hint: string; control: ControlId; 
 /** The space kept around the marks in the attached image, in the page's CSS pixels. */
 const IMAGE_MARGIN = 8;
 
-const fileName = (what: string): string => `Browser ${what} ${new Date().toLocaleTimeString()}.png`;
+/** A picture's file name, with the screen size it was taken at, such as `Mobile, 390×844`, unless `null`. */
+const fileName = (what: string, screen: string | null): string => `Browser ${what}${screen ? ` ${screen}` : ""} ${new Date().toLocaleTimeString()}.png`;
 
 /** `png`, all the page shows, as an image file to attach. */
-const screenshotFile = (png: Uint8Array): File => new File([new Uint8Array(png)], fileName("screenshot"), { type: "image/png" });
+const screenshotFile = (png: Uint8Array, screen: string | null): File => new File([new Uint8Array(png)], fileName("screenshot", screen), { type: "image/png" });
 
 /**
  * `png`, all the page shows at the screen's density, with `marks` drawn on it in `color`, cut to the marks, the
  * `elements`, whose outlines the app drew itself, and a margin around them, as an image file to attach. `pageWidth` is
  * the page's CSS width, which gives the density.
  */
-async function annotationFile(png: Uint8Array, marks: readonly Mark[], elements: readonly Area[], pageWidth: number, color: string): Promise<File> {
+async function annotationFile(png: Uint8Array, marks: readonly Mark[], elements: readonly Area[], pageWidth: number, color: string, screen: string | null): Promise<File> {
 	const bitmap = await createImageBitmap(new Blob([new Uint8Array(png)], { type: "image/png" }));
 	const scale = bitmap.width / pageWidth;
 	const bounds = unionArea(
@@ -75,7 +76,7 @@ async function annotationFile(png: Uint8Array, marks: readonly Mark[], elements:
 		}
 	}
 	bitmap.close();
-	return new File([await canvas.convertToBlob({ type: "image/png" })], fileName("annotation"), { type: "image/png" });
+	return new File([await canvas.convertToBlob({ type: "image/png" })], fileName("annotation", screen), { type: "image/png" });
 }
 
 /** What one **Attach** of {@link Picking} hands over: the marks, the comment typed beside them, and the page's CSS width. */
@@ -112,9 +113,9 @@ export interface PickingSession {
 /**
  * The picking session of the Browser that `webview` drives, as T3 Code's: Select picks elements in the app; Region,
  * Draw, and Erase mark the page; one **Attach** sends them all to the composer of `draftKey`. The modes' shortcuts
- * switch the mode while picking.
+ * switch the mode while picking. Its pictures and chips name `screen`, the screen size the page shows at, unless `null`.
  */
-export function usePicking(webview: Webview, draftKey: string): PickingSession {
+export function usePicking(webview: Webview, draftKey: string, screen: string | null): PickingSession {
 	const [mode, setMode] = useState<PickMode | null>(null);
 	const [color, setColor] = useState("");
 	const [elements, setElements] = useState<PreviewElementBox[]>([]);
@@ -138,10 +139,10 @@ export function usePicking(webview: Webview, draftKey: string): PickingSession {
 		const png = await webview.capture();
 		if (png === null) return void toasts.add({ title: "Could not capture the Browser" });
 		const boxes = elements.filter(box => picked.some(element => element.id === box.id));
-		if (!attachFile(await annotationFile(png, marks, boxes, pageWidth, color))) return;
+		if (!attachFile(await annotationFile(png, marks, boxes, pageWidth, color, screen))) return;
 		choose(null);
 		const regions = marks.filter(mark => mark.kind === "region").length;
-		const { label, content } = annotationText({ comment, page: webview.page(), elements: picked, regions, strokes: marks.length - regions });
+		const { label, content } = annotationText({ comment, page: webview.page(), elements: picked, regions, strokes: marks.length - regions, screen });
 		appendToComposer(draftKey, annotationReference(label, content));
 	}, "Could not attach the marks");
 	return {
@@ -164,7 +165,7 @@ export function usePicking(webview: Webview, draftKey: string): PickingSession {
 		screenshot: async () => {
 			const png = await webview.capture();
 			if (png === null) return void toasts.add({ title: "Could not capture the Browser" });
-			attachFile(screenshotFile(png));
+			attachFile(screenshotFile(png, screen));
 		},
 	};
 }
