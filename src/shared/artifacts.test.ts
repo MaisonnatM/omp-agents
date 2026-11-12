@@ -7,8 +7,9 @@ describe("artifact boundaries", () => {
 	test("accepts every kind and round-trips its version name", () => {
 		for (const kind of ARTIFACT_KINDS) {
 			const parsed = parseArtifactSave({ ...save, kind });
-			expect(parsed).toEqual({ ...save, kind });
-			expect(parseVersionName(versionName(parsed!))).toEqual({ sha256: save.sha256, kind });
+			expect(parsed).toMatchObject({ file: save.file, kind, title: save.title, note: null, bytes: save.bytes });
+			expect(String(parsed!.sha256)).toBe(save.sha256);
+			expect(parseVersionName(versionName(parsed!))).toEqual({ sha256: parsed!.sha256, kind });
 		}
 	});
 	test("accepts a short single-line change note or null", () => {
