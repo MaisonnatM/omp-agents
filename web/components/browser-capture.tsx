@@ -1,7 +1,7 @@
 /**
  * The Browser's picking, as T3 Code has it: `usePicking`, a Browser's picking session and **Screenshot**, with the image
- * files they attach to the composer, and `Picking`, the Select, Region, Draw, and Erase switch over the page and the
- * layer where Region boxes and Draw lines mark the page, with the card that attaches them and the selected elements.
+ * files they attach to the composer; `Picking`, the layer over the page where Region boxes and Draw lines mark it, with
+ * the card that attaches them and the selected elements; and `PickModes`, the Select, Region, Draw, and Erase switch.
  */
 import { type PointerEvent, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import type { ControlId } from "../../src/shared/activity";
 import type { PreviewElementBox } from "../../src/shared/desktop-bridge";
 import { activityControl } from "../activity";
-import { annotationText, type Area, boundsOf, cardPlace, dragArea, elementAt, type Mark, markAt, type Point, STROKE_WIDTH, strokeArea, unionArea } from "../browser-model";
+import { annotationText, type Area, boundsOf, cardPlace, dragArea, elementAt, type Mark, markAt, type Point, scaleArea, STROKE_WIDTH, strokeArea, unionArea } from "../browser-model";
 import { appendToComposer, attachToComposer } from "../composer-drafts";
 import { annotationReference } from "../prompt-tokens";
 import { type ShortcutId, shortcutBindings, shortcutKeys, useShortcuts } from "../shortcuts";
@@ -31,17 +31,18 @@ const MODES: { mode: PickMode; label: string; hint: string; control: ControlId; 
 const IMAGE_MARGIN = 8;
 
 /** A picture's file name, with the screen size it was taken at, such as `Mobile, 390×844`, unless `null`. */
-const fileName = (what: string, screen: string | null): string => `Browser ${what}${screen ? ` ${screen}` : ""} ${new Date().toLocaleTimeString()}.png`;
+const fileName = (what: string, shownAt: string | null): string => `Browser ${what}${shownAt ? ` ${shownAt}` : ""} ${new Date().toLocaleTimeString()}.png`;
 
 /** `png`, all the page shows, as an image file to attach. */
-const screenshotFile = (png: Uint8Array, screen: string | null): File => new File([new Uint8Array(png)], fileName("screenshot", screen), { type: "image/png" });
+const screenshotFile = (png: Uint8Array, shownAt: string | null): File => new File([new Uint8Array(png)], fileName("screenshot", shownAt), { type: "image/png" });
 
 /**
  * `png`, all the page shows at the screen's density, with `marks` drawn on it in `color`, cut to the marks, the
  * `elements`, whose outlines the app drew itself, and a margin around them, as an image file to attach. `pageWidth` is
- * the page's CSS width, which gives the density.
+ * the width of the layer the marks were drawn on: the page's CSS width, or at a screen size the zoomed frame's, which
+ * gives the density.
  */
-async function annotationFile(png: Uint8Array, marks: readonly Mark[], elements: readonly Area[], pageWidth: number, color: string, screen: string | null): Promise<File> {
+async function annotationFile(png: Uint8Array, marks: readonly Mark[], elements: readonly Area[], pageWidth: number, color: string, shownAt: string | null): Promise<File> {
 	const bitmap = await createImageBitmap(new Blob([new Uint8Array(png)], { type: "image/png" }));
 	const scale = bitmap.width / pageWidth;
 	const bounds = unionArea(
@@ -76,13 +77,14 @@ async function annotationFile(png: Uint8Array, marks: readonly Mark[], elements:
 		}
 	}
 	bitmap.close();
-	return new File([await canvas.convertToBlob({ type: "image/png" })], fileName("annotation", screen), { type: "image/png" });
+	return new File([await canvas.convertToBlob({ type: "image/png" })], fileName("annotation", shownAt), { type: "image/png" });
 }
 
-/** What one **Attach** of {@link Picking} hands over: the marks, the comment typed beside them, and the page's CSS width. */
+/** What one **Attach** of {@link Picking} hands over: the marks, the comment typed beside them, and the width of the layer they were drawn on. */
 export interface Marking {
 	marks: Mark[];
 	comment: string;
+	/** The page's CSS width, or at a screen size the zoomed frame's. */
 	pageWidth: number;
 }
 
@@ -92,9 +94,9 @@ export interface PickingSession {
 	mode: PickMode | null;
 	/** The dashboard's accent, read as picking starts, which the outlines in the app, the marks, and their picture take. */
 	color: string;
-	/** Where the elements Select picked show in the app. */
+	/** Where the elements Select picked show over the page, at its zoom. */
 	elements: readonly PreviewElementBox[];
-	/** Takes where the elements Select picked show, again each time the app scrolls. */
+	/** Takes where the elements Select picked are in the app, in its CSS pixels, again each time the app scrolls. */
 	onSelection: (boxes: PreviewElementBox[]) => void;
 	/** Starts picking in `mode`, switches to it, or stops picking for `null`, which drops the selection and the marks. */
 	choose: (mode: PickMode | null) => void;
@@ -113,12 +115,15 @@ export interface PickingSession {
 /**
  * The picking session of the Browser that `webview` drives, as T3 Code's: Select picks elements in the app; Region,
  * Draw, and Erase mark the page; one **Attach** sends them all to the composer of `draftKey`. The modes' shortcuts
- * switch the mode while picking. Its pictures and chips name `screen`, the screen size the page shows at, unless `null`.
+ * switch the mode while picking. Its pictures and chips name `shownAt`, the screen size the page shows at, unless
+ * `null`, and the selected elements show at `zoom`, the share of its size the frame shows at.
  */
-export function usePicking(webview: Webview, draftKey: string, screen: string | null): PickingSession {
+export function usePicking(webview: Webview, draftKey: string, shownAt: string | null, zoom: number): PickingSession {
 	const [mode, setMode] = useState<PickMode | null>(null);
 	const [color, setColor] = useState("");
-	const [elements, setElements] = useState<PreviewElementBox[]>([]);
+	// In the app's CSS pixels, so a zoom change moves the boxes without the app reporting them again.
+	const [boxes, setBoxes] = useState<PreviewElementBox[]>([]);
+	const elements = zoom === 1 ? boxes : boxes.map(box => scaleArea(box, zoom));
 	const choose = (next: PickMode | null): void => {
 		setMode(next);
 		if (next === null) return webview.clearSelection();
@@ -138,18 +143,18 @@ export function usePicking(webview: Webview, draftKey: string, screen: string | 
 		const picked = await webview.resolveSelection();
 		const png = await webview.capture();
 		if (png === null) return void toasts.add({ title: "Could not capture the Browser" });
-		const boxes = elements.filter(box => picked.some(element => element.id === box.id));
-		if (!attachFile(await annotationFile(png, marks, boxes, pageWidth, color, screen))) return;
+		const outlined = elements.filter(box => picked.some(element => element.id === box.id));
+		if (!attachFile(await annotationFile(png, marks, outlined, pageWidth, color, shownAt))) return;
 		choose(null);
 		const regions = marks.filter(mark => mark.kind === "region").length;
-		const { label, content } = annotationText({ comment, page: webview.page(), elements: picked, regions, strokes: marks.length - regions, screen });
+		const { label, content } = annotationText({ comment, page: webview.page(), elements: picked, regions, strokes: marks.length - regions, shownAt });
 		appendToComposer(draftKey, annotationReference(label, content));
 	}, "Could not attach the marks");
 	return {
 		mode,
 		color,
 		elements,
-		onSelection: setElements,
+		onSelection: setBoxes,
 		choose,
 		stop: () => {
 			if (mode === null) return false;
@@ -165,7 +170,7 @@ export function usePicking(webview: Webview, draftKey: string, screen: string | 
 		screenshot: async () => {
 			const png = await webview.capture();
 			if (png === null) return void toasts.add({ title: "Could not capture the Browser" });
-			attachFile(screenshotFile(png, screen));
+			attachFile(screenshotFile(png, shownAt));
 		},
 	};
 }

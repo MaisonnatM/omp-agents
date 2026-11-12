@@ -9,7 +9,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import type { ControlId } from "../../src/shared/activity";
 import type { LiveView } from "../../src/shared/sessions";
-import { FIT_PANEL, isScreenSize, PREVIEW_PARTITION, SCREEN_DEVICES, SCREEN_SIZES, type ScreenChoice, type ScreenSize, screenName, screenOf } from "../../src/shared/desktop-bridge";
+import { isScreenSize, PREVIEW_PARTITION, SCREEN_SIZES, type ScreenChoice, screenChoice, type ScreenSize, screenOf } from "../../src/shared/desktop-bridge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, MenuSeparator, DropdownMenuTrigger, MenuItem, MenuLinkItem, MenuRadioGroup, MenuRadioItem, MenuShortcut, MenuSubmenu, MenuSubmenuContent, MenuSubmenuTrigger } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { liveDraftKey } from "../composer-drafts";
 import { expiringStrings } from "../expiring-strings";
-import { browserCandidates, type DevServer, devServers, fitZoom, initialAddress, screenChoiceOf, storedScreen } from "../browser-model";
+import { browserCandidates, type DevServer, devServers, FIT_PANEL, fitZoom, initialAddress, SCREEN_LABELS, screenChoiceOf, screenName, storedScreen } from "../browser-model";
 import { commandLabel } from "../labels";
 import { latestReviewPages, onReviewRequest, type ReviewPage, samePages, takeReview } from "../review-pages";
 import { type PaneData, usePaneSelect } from "../pane-store";
@@ -46,12 +46,6 @@ const SCREEN_AVAILABLE = typeof window !== "undefined" && typeof window.ompDeskt
 
 /** Each **Screen size**'s icon, which the toolbar button shows for the size picked. */
 const SCREEN_ICONS: Record<ScreenSize, LucideIcon> = { fit: Proportions, mobile: Smartphone, tablet: Tablet, desktop: Monitor };
-
-/** Each **Screen size**'s name in its menu. */
-const SCREEN_LABELS: Record<ScreenSize, string> = { fit: "Fit panel", mobile: SCREEN_DEVICES.mobile.label, tablet: SCREEN_DEVICES.tablet.label, desktop: SCREEN_DEVICES.desktop.label };
-
-/** The room the size and zoom line above a **Screen size** takes: its `h-4` and `mb-1.5`, in CSS pixels. */
-const SCREEN_LABEL_ROOM = 22;
 
 /** The sparkles the page marks agent-made things with, as the notification bell's Updates do. */
 const AI_SPARKLES = "text-violet-600 dark:text-violet-400";
@@ -108,11 +102,14 @@ function inertAround(kept: HTMLElement): () => void {
 	};
 }
 
-/** The address each session's Browser last loaded, by omp session id, dropped once unused for 30 days. */
-const addresses = expiringStrings("omp-agents.preview-addresses", 30 * 24 * 60 * 60 * 1000);
+/** How long a session's Browser keeps what it last showed once unchanged: 30 days. */
+const KEPT_FOR = 30 * 24 * 60 * 60 * 1000;
 
-/** The **Screen size** each session's Browser shows, by omp session id, as {@link storedScreen} writes it, dropped once unchanged for 30 days. */
-const screens = expiringStrings("omp-agents.browser-screens", 30 * 24 * 60 * 60 * 1000);
+/** The address each session's Browser last loaded, by omp session id, dropped once unused for {@link KEPT_FOR}. */
+const addresses = expiringStrings("omp-agents.preview-addresses", KEPT_FOR);
+
+/** The **Screen size** each session's Browser shows, by omp session id, as {@link storedScreen} writes it, dropped once unchanged for {@link KEPT_FOR}. */
+const screens = expiringStrings("omp-agents.browser-screens", KEPT_FOR);
 
 /** The value of the Browser's tab for the session's own page; a review tab's value is its page's address. */
 const APP_TAB = "app";
@@ -262,6 +259,72 @@ function BrowserTabStrip({ pages, active, onClose }: { pages: readonly ReviewPag
 	);
 }
 
+/** The toolbar's **Screen size** menu: the size `screen` shows, the others `onScreen` picks, and **Rotate** for a phone or tablet. */
+function ScreenSizeMenu({ screen, onScreen }: { screen: ScreenChoice; onScreen: (screen: ScreenChoice) => void }) {
+	const [open, setOpen] = useState(false);
+	const shown = screenOf(screen);
+	const ScreenIcon = SCREEN_ICONS[screen.size];
+	const label = `Screen size: ${SCREEN_LABELS[screen.size]}`;
+	return (
+		<DropdownMenu open={open} onOpenChange={setOpen}>
+			<Tooltip content={label} side="bottom" forceOpen={open ? false : undefined}>
+				<DropdownMenuTrigger {...activityControl("browser.screen-size")} render={<Button variant="ghost" size="icon-compact" active={shown !== null} aria-label={label} />}>
+					<ScreenIcon />
+				</DropdownMenuTrigger>
+			</Tooltip>
+			<DropdownMenuContent align="end">
+				<MenuRadioGroup
+					aria-label="Screen size"
+					value={screen.size}
+					// A turned screen stays turned on the other touch size.
+					onValueChange={(size: unknown) => isScreenSize(size) && onScreen(screenChoice(size, screen.landscape))}
+				>
+					{SCREEN_SIZES.map(size => {
+						const Icon = SCREEN_ICONS[size];
+						// Each touch size reads turned while the chosen one is.
+						const sized = screenOf(screenChoice(size, screen.landscape));
+						return (
+							<MenuRadioItem key={size} value={size} closeOnClick>
+								<Icon />
+								<span className="flex-1">{SCREEN_LABELS[size]}</span>
+								{sized && (
+									<span className="pl-4 font-mono text-xs text-muted-foreground">
+										{sized.width}×{sized.height}
+									</span>
+								)}
+							</MenuRadioItem>
+						);
+					})}
+				</MenuRadioGroup>
+				{shown?.device.touch && (
+					<>
+						<MenuSeparator />
+						<MenuItem {...activityControl("browser.rotate")} onClick={() => onScreen({ ...screen, landscape: !screen.landscape })}>
+							<RotateCwSquare />
+							{screen.landscape ? "Rotate to portrait" : "Rotate to landscape"}
+						</MenuItem>
+					</>
+				)}
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+/** The share of its size a screen size `shown` shows at in the box `ref` renders, `1` for none. */
+function useFitZoom(shown: { width: number; height: number } | null): { ref: (box: HTMLDivElement | null) => void; zoom: number } {
+	const [box, setBox] = useState<HTMLDivElement | null>(null);
+	const [room, setRoom] = useState<{ width: number; height: number } | null>(null);
+	useEffect(() => {
+		if (!box) return;
+		const observer = new ResizeObserver(([entry]) => {
+			if (entry) setRoom({ width: entry.contentRect.width, height: entry.contentRect.height });
+		});
+		observer.observe(box);
+		return () => observer.disconnect();
+	}, [box]);
+	return { ref: setBox, zoom: shown && room ? fitZoom(room, shown) : 1 };
+}
+
 /**
  * One page of `view`'s Browser in a `<webview>`: a review page's address, else the address last loaded for
  * `sessionId`, else the first port its jobs and services listen on, shown at `screen`. Each **Attach** of what was
@@ -288,10 +351,11 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 	);
 	const [saved] = useState(() => addresses.get(sessionId));
 	const [maximized, setMaximized] = useState(false);
+	const shown = screenOf(screen);
+	const fit = useFitZoom(shown);
 	const webview = useWebview({
 		initial: page?.url ?? initialAddress(saved, candidates),
-		// Picking draws over the shown, zoomed screen, so a box in the app's CSS pixels shrinks by the zoom.
-		onSelection: boxes => picking.onSelection(boxes.map(box => ({ ...box, x: box.x * zoom, y: box.y * zoom, width: box.width * zoom, height: box.height * zoom }))),
+		onSelection: boxes => picking.onSelection(boxes),
 		onNavigate: url => {
 			if (page === null) addresses.set(sessionId, url);
 		},
@@ -299,19 +363,11 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 		onEscape: () => picking.stop() || setMaximized(false),
 		onPickKey: key => picking.pickKey(key),
 		ports,
+		screen,
 	});
-	const picking = usePicking(webview, liveDraftKey(view), screenName(screen));
-	const pickingOn = picking.mode !== null;
-	useEffect(() => {
-		const element = webview.ref.current;
-		if (SCREEN_AVAILABLE && webview.ready && element) window.ompDesktop?.screenBrowser?.(element.getWebContentsId(), { ...screen, picking: pickingOn });
-	}, [webview.ready, screen.size, screen.landscape, pickingOn]);
-	const shown = screenOf(screen);
-	const ScreenIcon = SCREEN_ICONS[screen.size];
-	const stageRef = useRef<HTMLDivElement>(null);
-	const [stage, setStage] = useState<{ width: number; height: number } | null>(null);
+	// Picking draws over the shown, zoomed screen, so it shows the app's boxes at the zoom.
+	const picking = usePicking(webview, liveDraftKey(view), screenName(screen), fit.zoom);
 	const [menuOpen, setMenuOpen] = useState(false);
-	const [screenMenuOpen, setScreenMenuOpen] = useState(false);
 	const { request } = useDashboardActions();
 	const startServer = useAction(async () => {
 		const answer = await writeStartServer(view.instanceId);
@@ -330,16 +386,7 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 	// The candidates choose the first address, fill the server menu, and name the ports a sign-in comes back to, so `ps` and `lsof` run only until they are read once, and while the menu is open.
 	sessionProcessesStore.usePolling(null, webview.src === null || read === null || menuOpen);
 	const mounted = webview.src !== null;
-	useEffect(() => {
-		const element = stageRef.current;
-		if (!element) return;
-		const observer = new ResizeObserver(([entry]) => {
-			if (entry) setStage({ width: entry.contentRect.width, height: entry.contentRect.height - SCREEN_LABEL_ROOM });
-		});
-		observer.observe(element);
-		return () => observer.disconnect();
-	}, [mounted]);
-	const zoom = shown && stage ? Math.max(fitZoom(stage, shown), 0) : 1;
+	const zoom = fit.zoom;
 	useShortcuts({ browserRestore: () => active && (picking.stop() || (maximized ? setMaximized(false) : false)) });
 	const sectionRef = useRef<HTMLElement>(null);
 	// What the maximized Browser covers leaves the tab order and the accessibility tree.
@@ -441,52 +488,7 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 						<Camera />
 					</ToolbarButton>
 				)}
-				{SCREEN_AVAILABLE && (
-					<DropdownMenu open={screenMenuOpen} onOpenChange={setScreenMenuOpen}>
-						<Tooltip content={`Screen size: ${SCREEN_LABELS[screen.size]}`} side="bottom" forceOpen={screenMenuOpen ? false : undefined}>
-							<DropdownMenuTrigger
-								{...activityControl("browser.screen-size")}
-								render={<Button variant="ghost" size="icon-compact" active={shown !== null} aria-label={`Screen size: ${SCREEN_LABELS[screen.size]}`} />}
-							>
-								<ScreenIcon />
-							</DropdownMenuTrigger>
-						</Tooltip>
-						<DropdownMenuContent align="end">
-							<MenuRadioGroup
-								aria-label="Screen size"
-								value={screen.size}
-								// A turned screen stays turned on the other touch size.
-								onValueChange={(size: unknown) => isScreenSize(size) && onScreen({ size, landscape: screen.landscape && size !== "fit" && SCREEN_DEVICES[size].touch })}
-							>
-								{SCREEN_SIZES.map(size => {
-									const Icon = SCREEN_ICONS[size];
-									// Each touch size reads turned while the chosen one is.
-									const sized = screenOf({ size, landscape: screen.landscape });
-									return (
-										<MenuRadioItem key={size} value={size} closeOnClick>
-											<Icon />
-											<span className="flex-1">{SCREEN_LABELS[size]}</span>
-											{sized && (
-												<span className="pl-4 font-mono text-xs text-muted-foreground">
-													{sized.width}×{sized.height}
-												</span>
-											)}
-										</MenuRadioItem>
-									);
-								})}
-							</MenuRadioGroup>
-							{shown?.device.touch && (
-								<>
-									<MenuSeparator />
-									<MenuItem {...activityControl("browser.rotate")} onClick={() => onScreen({ ...screen, landscape: !screen.landscape })}>
-										<RotateCwSquare />
-										{screen.landscape ? "Rotate to portrait" : "Rotate to landscape"}
-									</MenuItem>
-								</>
-							)}
-						</DropdownMenuContent>
-					</DropdownMenu>
-				)}
+				{SCREEN_AVAILABLE && <ScreenSizeMenu screen={screen} onScreen={onScreen} />}
 				{pages.length > 0 && (
 					<ToolbarButton
 						label={`Review visuals: ${pages.map(each => each.label).join(" · ")}`}
@@ -535,37 +537,39 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 					</Button>
 				</div>
 			) : (
-				<div ref={stageRef} className={cn("relative flex min-h-0 flex-1 flex-col", shown && "items-center justify-center overflow-hidden bg-muted p-3")}>
-					{shown && (
-						<p className="mb-1.5 h-4 shrink-0 text-xs leading-4 text-muted-foreground tabular-nums">
-							{shown.width}×{shown.height} · {Math.round(zoom * 100)}%
-						</p>
-					)}
-					<div
-						className={cn("relative flex min-h-0", shown ? "shrink-0 overflow-hidden bg-background shadow-sm ring-1 ring-border" : "flex-1")}
-						style={shown ? { width: shown.width * zoom, height: shown.height * zoom } : undefined}
-					>
-						<webview
-							ref={webview.ref}
-							src={webview.src}
-							partition={PREVIEW_PARTITION}
-							// Without it the guest drops every `window.open` and `target="_blank"` link; with it the shell opens them in the browser.
-							// React writes no attribute for `true` on a name it does not know, and Electron reads only the attribute's presence.
-							allowpopups={"" as unknown as boolean}
-							// A screen size keeps its own CSS size and shows scaled to the frame, so the app lays out as on the device.
-							className={shown ? "absolute top-0 left-0 flex origin-top-left" : "flex min-h-0 w-full flex-1"}
-							style={shown ? { width: shown.width, height: shown.height, transform: `scale(${zoom})` } : undefined}
-						/>
-						{picking.mode !== null && (
-							<Picking
-								mode={picking.mode}
-								color={picking.color}
-								elements={picking.elements}
-								onDeselect={webview.deselect}
-								onAttach={picking.attach}
-								attaching={picking.attaching}
-							/>
-						)}
+				<div className={cn("relative flex min-h-0 flex-1 flex-col", shown && "overflow-hidden bg-muted p-3")}>
+					{/* The room the frame fits in, which the zoom is measured against; its top padding holds the size line, which rides on the frame. */}
+					<div ref={fit.ref} className={cn("flex min-h-0 min-w-0 flex-1", shown && "items-center justify-center pt-5.5")}>
+						<div className={cn("relative flex min-h-0", shown ? "shrink-0" : "flex-1")} style={shown ? { width: shown.width * zoom, height: shown.height * zoom } : undefined}>
+							{shown && (
+								<p className="absolute inset-x-0 bottom-full mb-1.5 h-4 text-center text-xs leading-4 whitespace-nowrap text-muted-foreground tabular-nums">
+									{shown.width}×{shown.height} · {Math.round(zoom * 100)}%
+								</p>
+							)}
+							<div className={cn("relative flex min-h-0 flex-1", shown && "overflow-hidden bg-background shadow-sm ring-1 ring-border")}>
+								<webview
+									ref={webview.ref}
+									src={webview.src}
+									partition={PREVIEW_PARTITION}
+									// Without it the guest drops every `window.open` and `target="_blank"` link; with it the shell opens them in the browser.
+									// React writes no attribute for `true` on a name it does not know, and Electron reads only the attribute's presence.
+									allowpopups={"" as unknown as boolean}
+									// A screen size keeps its own CSS size and shows scaled to the frame, so the app lays out as on the device.
+									className={shown ? "absolute top-0 left-0 flex origin-top-left" : "flex min-h-0 w-full flex-1"}
+									style={shown ? { width: shown.width, height: shown.height, transform: `scale(${zoom})` } : undefined}
+								/>
+								{picking.mode !== null && (
+									<Picking
+										mode={picking.mode}
+										color={picking.color}
+										elements={picking.elements}
+										onDeselect={webview.deselect}
+										onAttach={picking.attach}
+										attaching={picking.attaching}
+									/>
+								)}
+							</div>
+						</div>
 					</div>
 					{picking.mode !== null && <PickModes mode={picking.mode} onMode={picking.choose} />}
 				</div>

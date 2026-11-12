@@ -2,6 +2,7 @@
 import { type RefObject, useEffect, useRef, useState } from "react";
 import {
 	type BrowserPorts,
+	type ScreenChoice,
 	isLoopbackUrl,
 	isPreviewElement,
 	isPreviewSelection,
@@ -59,6 +60,8 @@ interface WebviewOptions {
 	onPickKey: (key: string) => void;
 	/** The ports the session and other servers listen on, which decide where a sign-in back to the app's usual port goes. */
 	ports: BrowserPorts;
+	/** The screen size the shell emulates in it, with the mouse kept a mouse while picking. */
+	screen: ScreenChoice;
 }
 
 /** The Browser's `<webview>`, the address field's state, and the toolbar's and picking's actions on it. */
@@ -79,10 +82,10 @@ export interface Webview {
 	back: () => void;
 	forward: () => void;
 	reload: () => void;
-	/** Turns Select on in the app, its outlines in `color`, or off, keeping what it selected. */
+	/** Starts or keeps picking, with Select on in the app, its outlines in `color`, or off, keeping what it selected. */
 	select: (on: boolean, color: string) => void;
 	deselect: (id: number) => void;
-	/** Drops what Select picked and turns it off. */
+	/** Ends picking: drops what Select picked and turns it off. */
 	clearSelection: () => void;
 	/** What Select picked, read in the app, or none once a sign-in took the webview off this computer. */
 	resolveSelection: () => Promise<PreviewElement[]>;
@@ -93,7 +96,7 @@ export interface Webview {
 }
 
 /** The `<webview>` to render with `ref` and `src` once `src` is not `null`, the address field's state, and the toolbar's actions. */
-export function useWebview({ initial, onSelection, onNavigate, onEscape, onPickKey, ports }: WebviewOptions): Webview {
+export function useWebview({ initial, onSelection, onNavigate, onEscape, onPickKey, ports, screen }: WebviewOptions): Webview {
 	const ref = useRef<WebviewTag>(null);
 	// The webview's first address: later ones go through `loadURL`, since a changed `src` would load each page again.
 	const [src, setSrc] = useState(initial);
@@ -101,6 +104,8 @@ export function useWebview({ initial, onSelection, onNavigate, onEscape, onPickK
 	const [problem, setProblem] = useState<string | null>(null);
 	const [ready, setReady] = useState(false);
 	const [history, setHistory] = useState({ back: false, forward: false });
+	// Picking is on from the first `select` until `clearSelection`, so the shell keeps the mouse a mouse meanwhile.
+	const [picking, setPicking] = useState(false);
 	const latest = useRef({ onSelection, onNavigate, onEscape, onPickKey });
 	latest.current = { onSelection, onNavigate, onEscape, onPickKey };
 	// Select as the page last set it, which a new page in the webview starts again.
@@ -162,6 +167,10 @@ export function useWebview({ initial, onSelection, onNavigate, onEscape, onPickK
 		if (ready && ref.current) window.ompDesktop?.browserPorts?.(ref.current.getWebContentsId(), ports);
 	}, [ready, ports]);
 
+	useEffect(() => {
+		if (ready && ref.current) window.ompDesktop?.screenBrowser?.(ref.current.getWebContentsId(), { ...screen, picking });
+	}, [ready, screen.size, screen.landscape, picking]);
+
 	const load = (typed: string): void => {
 		const url = addressOf(typed);
 		if (url === null) {
@@ -188,11 +197,13 @@ export function useWebview({ initial, onSelection, onNavigate, onEscape, onPickK
 		reload: () => ref.current?.reload(),
 		select: (on, color) => {
 			selecting.current = { on, color };
+			setPicking(true);
 			void ref.current?.executeJavaScript(call("select", on, color)).catch(() => {});
 		},
 		deselect: id => void ref.current?.executeJavaScript(call("deselect", id)).catch(() => {}),
 		clearSelection: () => {
 			selecting.current = { on: false, color: "" };
+			setPicking(false);
 			void ref.current?.executeJavaScript(call("clear")).catch(() => {});
 		},
 		resolveSelection: async () => {

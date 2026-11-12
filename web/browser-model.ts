@@ -1,6 +1,6 @@
 /** What a session's Browser can load: the addresses its jobs and services listen on, and the one it opens on. */
 import type { LiveSessionProcesses } from "../src/shared/processes";
-import { FIT_PANEL, isLoopbackUrl, isScreenSize, type ScreenChoice, SCREEN_DEVICES } from "../src/shared/desktop-bridge";
+import { isLoopbackUrl, isScreenSize, type ScreenChoice, screenChoice, type ScreenSize, screenOf } from "../src/shared/desktop-bridge";
 
 /** A dev server of a session: one of its own jobs or services that listens on a port, which **Stop dev server** stops by `id`. */
 export interface DevServer {
@@ -35,6 +35,18 @@ export const browserCandidates = (servers: readonly DevServer[]): BrowserCandida
 export const initialAddress = (saved: string | null, candidates: readonly BrowserCandidate[]): string | null =>
 	saved !== null && isLoopbackUrl(saved) ? saved : (candidates[0]?.url ?? null);
 
+/** The **Screen size** the Browser shows with none picked: the app fills it. */
+export const FIT_PANEL: ScreenChoice = { size: "fit", landscape: false };
+
+/** Each **Screen size**'s name, in its menu and in a picture's. */
+export const SCREEN_LABELS: Readonly<Record<ScreenSize, string>> = { fit: "Fit panel", mobile: "Mobile", tablet: "Tablet", desktop: "Desktop" };
+
+/** How a picture names `choice`, such as `Mobile, 390×844`, or `null` for `fit`, whose pictures name none. */
+export function screenName(choice: ScreenChoice): string | null {
+	const shown = screenOf(choice);
+	return shown && `${SCREEN_LABELS[choice.size]}, ${shown.width}×${shown.height}`;
+}
+
 /** How the Browser keeps a session's {@link ScreenChoice}: its size, then ` landscape` when turned, or `null` for **Fit panel**, which needs no entry. */
 export const storedScreen = ({ size, landscape }: ScreenChoice): string | null => (size === "fit" ? null : landscape ? `${size} landscape` : size);
 
@@ -42,12 +54,12 @@ export const storedScreen = ({ size, landscape }: ScreenChoice): string | null =
 export function screenChoiceOf(stored: string | null): ScreenChoice {
 	const [size, turned, ...rest] = stored?.split(" ") ?? [];
 	if (!isScreenSize(size) || size === "fit" || rest.length > 0 || (turned !== undefined && turned !== "landscape")) return FIT_PANEL;
-	return { size, landscape: turned === "landscape" && SCREEN_DEVICES[size].touch };
+	return screenChoice(size, turned === "landscape");
 }
 
-/** The share of its own size a `screen` shows at in a `box`: shrunk to fit it, never grown past 1. */
-export const fitZoom = (box: { width: number; height: number }, screen: { width: number; height: number }): number =>
-	Math.min(1, box.width / screen.width, box.height / screen.height);
+/** The share of its own size a screen size `shown` shows at in a `box`: shrunk to fit it, never grown past 1. */
+export const fitZoom = (box: { width: number; height: number }, shown: { width: number; height: number }): number =>
+	Math.min(1, box.width / shown.width, box.height / shown.height);
 
 export interface Point {
 	x: number;
@@ -59,6 +71,9 @@ export interface Area extends Point {
 	width: number;
 	height: number;
 }
+
+/** `area`, in the app's CSS pixels, as it shows at `zoom`. */
+export const scaleArea = <T extends Area>(area: T, zoom: number): T => ({ ...area, x: area.x * zoom, y: area.y * zoom, width: area.width * zoom, height: area.height * zoom });
 
 /** A drag shorter than this either way is a click, which marks no region. */
 const CLICK_SLOP = 4;
@@ -146,18 +161,18 @@ export interface Annotation {
 	elements: readonly { name: string; snippet: string }[];
 	regions: number;
 	strokes: number;
-	/** The screen size's name, such as `Mobile, 390×844`, or `null` on **Fit panel**. */
-	screen: string | null;
+	/** The screen size's name, such as `Mobile, 390×844`, as {@link screenName} gives it, or `null` on **Fit panel**. */
+	shownAt: string | null;
 }
 
 const plural = (count: number, one: string, many: string): string => `${count} ${count === 1 ? one : many}`;
 
 /** The chip's label of an annotation: its comment on one line, else its first element's name with how many more, else the page's title, then the screen size it showed at. */
-function chipLabel({ comment, page, elements, screen }: Annotation): string {
+function chipLabel({ comment, page, elements, shownAt }: Annotation): string {
 	const said = comment.replace(/\s+/g, " ").trim();
 	const [first] = elements;
 	const label = said || (first ? (elements.length > 1 ? `${first.name} +${elements.length - 1}` : first.name) : page.title.trim() || "Browser annotation");
-	return screen ? `${label} (${screen})` : label;
+	return shownAt ? `${label} (${shownAt})` : label;
 }
 
 /**
@@ -166,11 +181,11 @@ function chipLabel({ comment, page, elements, screen }: Annotation): string {
  * react-grab's text of each element, and what the attached picture marks.
  */
 export function annotationText(annotation: Annotation): { label: string; content: string } {
-	const { comment, page, elements, regions, strokes, screen } = annotation;
+	const { comment, page, elements, regions, strokes, shownAt } = annotation;
 	const marked = [elements.length > 0 && plural(elements.length, "outlined element", "outlined elements"), regions > 0 && plural(regions, "box", "boxes"), strokes > 0 && plural(strokes, "line", "lines")].filter(Boolean);
 	const lines = [
 		...(comment ? [comment, ""] : []),
-		`Annotated in the Browser on ${page.url}${page.title.trim() ? ` (${page.title.trim()})` : ""}${screen ? `, shown at the ${screen} screen size` : ""}.`,
+		`Annotated in the Browser on ${page.url}${page.title.trim() ? ` (${page.title.trim()})` : ""}${shownAt ? `, shown at the ${shownAt} screen size` : ""}.`,
 		...elements.flatMap((element, index) => ["", `Element ${index + 1}, ${element.name}:`, element.snippet]),
 		"",
 		`The attached picture shows ${marked.join(", ")}.`,

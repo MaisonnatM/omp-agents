@@ -18,7 +18,7 @@ import {
 	screenOf,
 } from "../src/shared/desktop-bridge";
 
-/** A guest of the Browser, the ports its session and other servers listen on, and the screen it emulates, `null` before the page asked for one. */
+/** A guest of the Browser, the ports its session and other servers listen on, and the screen the page last asked it for, `null` before it asked. */
 interface BrowserApp {
 	guest: WebContents;
 	ports: BrowserPorts;
@@ -59,46 +59,40 @@ function keepInBrowser(contents: WebContents, app: BrowserApp, win: BrowserWindo
  * Has `app`'s guest emulate `next` through the DevTools protocol: its size, pixel density, touch screen, orientation,
  * and user agent, or none for `fit`. Turning picking on or off only switches whether the mouse acts as a finger, so the
  * app keeps its layout and state; any other change starts again from no emulation, which detaching restores.
+ * Whether the debugger is attached says whether a size is emulated: one another debugger holds shows the app as it fits.
  * The page names the size once the guest's first page is ready, so a guest that opens on a size loads that page again
  * under it, as a script reading the user agent or touch support at load would otherwise see the window's.
  */
 function emulate(app: BrowserApp, next: BrowserScreen): void {
 	const before = app.screen;
-	const screen = screenOf(next);
-	const tools = app.guest.debugger;
 	app.screen = next;
+	const shown = screenOf(next);
+	const tools = app.guest.debugger;
 	const send = (method: string, params: object): Promise<unknown> => tools.sendCommand(method, params).catch(() => {});
-	if (screen && before?.size === next.size && before.landscape === next.landscape && tools.isAttached()) {
-		if (screen.device.touch) void send("Emulation.setEmitTouchEventsForMouse", { enabled: !next.picking, configuration: "mobile" });
-		return;
+	if (!(before?.size === next.size && before.landscape === next.landscape && tools.isAttached())) {
+		if (tools.isAttached()) tools.detach();
+		if (!shown) return;
+		try {
+			tools.attach("1.3");
+		} catch {
+			return;
+		}
+		const { device, width, height } = shown;
+		const sent = [send("Emulation.setDeviceMetricsOverride", {
+			width,
+			height,
+			screenWidth: width,
+			screenHeight: height,
+			deviceScaleFactor: device.deviceScaleFactor,
+			mobile: device.touch,
+			...(device.touch && { screenOrientation: next.landscape ? { type: "landscapePrimary", angle: 90 } : { type: "portraitPrimary", angle: 0 } }),
+		})];
+		if (device.touch) sent.push(send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 }));
+		if (device.agent) sent.push(send("Emulation.setUserAgentOverride", device.agent));
+		// The guest's own reload, unless the page asked for another size meanwhile: the protocol's `Page.reload` from a guest reloads the dashboard that embeds it.
+		if (before === null) void Promise.all(sent).then(() => app.screen?.size === next.size && app.screen.landscape === next.landscape && !app.guest.isDestroyed() && app.guest.reload());
 	}
-	if (tools.isAttached()) tools.detach();
-	if (!screen) return;
-	try {
-		tools.attach("1.3");
-	} catch {
-		// Another debugger holds the guest: it shows the app as it fits.
-		app.screen = null;
-		return;
-	}
-	const { device, width, height } = screen;
-	const landscape = width > height;
-	const sent = [send("Emulation.setDeviceMetricsOverride", {
-		width,
-		height,
-		screenWidth: width,
-		screenHeight: height,
-		deviceScaleFactor: device.deviceScaleFactor,
-		mobile: device.touch,
-		...(device.touch && { screenOrientation: landscape ? { type: "landscapePrimary", angle: 90 } : { type: "portraitPrimary", angle: 0 } }),
-	})];
-	if (device.touch) {
-		sent.push(send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 }));
-		sent.push(send("Emulation.setEmitTouchEventsForMouse", { enabled: !next.picking, configuration: "mobile" }));
-	}
-	if (device.agent) sent.push(send("Emulation.setUserAgentOverride", device.agent));
-	// The guest's own reload: the protocol's `Page.reload` from a guest reloads the dashboard that embeds it.
-	if (before === null) void Promise.all(sent).then(() => app.screen === next && !app.guest.isDestroyed() && app.guest.reload());
+	if (shown?.device.touch) void send("Emulation.setEmitTouchEventsForMouse", { enabled: !next.picking, configuration: "mobile" });
 }
 
 /** Gives the Browser's guests that the dashboard in `win` attaches their preload, sandbox, partition, and rules. */
@@ -137,8 +131,8 @@ export function trackBrowserGuests(win: BrowserWindow, { preload, isDashboard, o
 		if (!app || !isDashboard(event.senderFrame?.url ?? "")) return null;
 		const image = await app.guest.capturePage();
 		if (image.isEmpty()) return null;
-		// At a screen size, the picture keeps its CSS size at 1×, whatever pixel density the window or the device has.
-		const screen = app.screen && screenOf(app.screen);
-		return (screen ? image.resize({ width: screen.width, quality: "best" }) : image).toPNG();
+		// While a screen size is emulated, the picture keeps its CSS size at 1×, whatever pixel density the window or the device has.
+		const shown = app.guest.debugger.isAttached() && app.screen && screenOf(app.screen);
+		return (shown ? image.resize({ width: shown.width, quality: "best" }) : image).toPNG();
 	});
 }

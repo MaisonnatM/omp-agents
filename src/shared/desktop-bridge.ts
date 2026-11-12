@@ -83,7 +83,6 @@ export const isScreenSize: Guard<ScreenSize> = oneOf(SCREEN_SIZES);
 
 /** A device a **Screen size** emulates, as its app sees it. */
 export interface ScreenDevice {
-	label: string;
 	/** Its CSS size in portrait. */
 	width: number;
 	height: number;
@@ -98,7 +97,6 @@ export interface ScreenDevice {
 /** The devices behind each **Screen size** but `fit`: an iPhone, an iPad, and a laptop. An iPad's Safari names itself a Mac, so Tablet does too. */
 export const SCREEN_DEVICES: Readonly<Record<Exclude<ScreenSize, "fit">, ScreenDevice>> = {
 	mobile: {
-		label: "Mobile",
 		width: 390,
 		height: 844,
 		touch: true,
@@ -106,14 +104,13 @@ export const SCREEN_DEVICES: Readonly<Record<Exclude<ScreenSize, "fit">, ScreenD
 		agent: { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1", platform: "iPhone" },
 	},
 	tablet: {
-		label: "Tablet",
 		width: 768,
 		height: 1024,
 		touch: true,
 		deviceScaleFactor: 2,
 		agent: { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15", platform: "MacIntel" },
 	},
-	desktop: { label: "Desktop", width: 1440, height: 900, touch: false, deviceScaleFactor: 0, agent: null },
+	desktop: { width: 1440, height: 900, touch: false, deviceScaleFactor: 0, agent: null },
 };
 
 /** The **Screen size** a Browser shows, and whether its phone or tablet is turned to landscape. */
@@ -121,7 +118,9 @@ export interface ScreenChoice {
 	size: ScreenSize;
 	landscape: boolean;
 }
-export const FIT_PANEL: ScreenChoice = { size: "fit", landscape: false };
+
+/** The {@link ScreenChoice} of `size` turned to `landscape`, which only a phone or tablet can be. */
+export const screenChoice = (size: ScreenSize, landscape: boolean): ScreenChoice => ({ size, landscape: landscape && size !== "fit" && SCREEN_DEVICES[size].touch });
 
 /** The device and CSS size `choice` emulates, turned for landscape, or `null` for `fit`. */
 export function screenOf(choice: ScreenChoice): { device: ScreenDevice; width: number; height: number } | null {
@@ -129,12 +128,6 @@ export function screenOf(choice: ScreenChoice): { device: ScreenDevice; width: n
 	const device = SCREEN_DEVICES[choice.size];
 	const turned = choice.landscape && device.touch;
 	return { device, width: turned ? device.height : device.width, height: turned ? device.width : device.height };
-}
-
-/** How a picture names `choice`, such as `Mobile, 390×844`, or `null` for `fit`, whose pictures name none. */
-export function screenName(choice: ScreenChoice): string | null {
-	const screen = screenOf(choice);
-	return screen && `${screen.device.label}, ${screen.width}×${screen.height}`;
 }
 
 /** What the page asks a Browser's guest to show: its {@link ScreenChoice}, and whether picking needs the mouse. */
