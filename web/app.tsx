@@ -383,7 +383,7 @@ export function App() {
 														personalMemory={focused.cwd !== undefined && spaces.of(focused.cwd, focused.workspace ?? focused.cwd) === "personal" ? state.personalMemory : null}
 														pullRequests={focused.row?.pullRequests ?? []}
 														tickets={focused.row?.tickets ?? []}
-														hosts={visible.hosts}
+														hosts={state.hosts}
 														open={sidebars.panels.right.open}
 													/>
 												) : (
