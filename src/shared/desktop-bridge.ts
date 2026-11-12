@@ -73,6 +73,77 @@ export const PREVIEW_PARTITION = "persist:omp-preview";
 export const BROWSER_PORTS_CHANNEL = "omp-agents:browser-ports";
 /** The page's request for a PNG of what a Browser's guest shows, answered by the shell. */
 export const BROWSER_CAPTURE_CHANNEL = "omp-agents:browser-capture";
+/** The page's request that a Browser's guest show its app at a {@link BrowserScreen}, which the shell emulates. */
+export const BROWSER_SCREEN_CHANNEL = "omp-agents:browser-screen";
+
+/** The Browser's **Screen size** choices: `fit` fills the Browser, as it does with none picked, and the others emulate a {@link ScreenDevice}. */
+export const SCREEN_SIZES = ["fit", "mobile", "tablet", "desktop"] as const;
+export type ScreenSize = (typeof SCREEN_SIZES)[number];
+export const isScreenSize: Guard<ScreenSize> = oneOf(SCREEN_SIZES);
+
+/** A device a **Screen size** emulates, as its app sees it. */
+export interface ScreenDevice {
+	label: string;
+	/** Its CSS size in portrait. */
+	width: number;
+	height: number;
+	/** A phone or tablet: a touch screen, which **Rotate** turns to landscape. */
+	touch: boolean;
+	/** Its pixel density, or `0` for the window's. */
+	deviceScaleFactor: number;
+	/** Safari's user agent and `navigator.platform` on the device, or `null` to keep the guest's own. */
+	agent: { userAgent: string; platform: string } | null;
+}
+
+/** The devices behind each **Screen size** but `fit`: an iPhone, an iPad, and a laptop. An iPad's Safari names itself a Mac, so Tablet does too. */
+export const SCREEN_DEVICES: Readonly<Record<Exclude<ScreenSize, "fit">, ScreenDevice>> = {
+	mobile: {
+		label: "Mobile",
+		width: 390,
+		height: 844,
+		touch: true,
+		deviceScaleFactor: 3,
+		agent: { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1", platform: "iPhone" },
+	},
+	tablet: {
+		label: "Tablet",
+		width: 768,
+		height: 1024,
+		touch: true,
+		deviceScaleFactor: 2,
+		agent: { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15", platform: "MacIntel" },
+	},
+	desktop: { label: "Desktop", width: 1440, height: 900, touch: false, deviceScaleFactor: 0, agent: null },
+};
+
+/** The **Screen size** a Browser shows, and whether its phone or tablet is turned to landscape. */
+export interface ScreenChoice {
+	size: ScreenSize;
+	landscape: boolean;
+}
+export const FIT_PANEL: ScreenChoice = { size: "fit", landscape: false };
+
+/** The device and CSS size `choice` emulates, turned for landscape, or `null` for `fit`. */
+export function screenOf(choice: ScreenChoice): { device: ScreenDevice; width: number; height: number } | null {
+	if (choice.size === "fit") return null;
+	const device = SCREEN_DEVICES[choice.size];
+	const turned = choice.landscape && device.touch;
+	return { device, width: turned ? device.height : device.width, height: turned ? device.width : device.height };
+}
+
+/** How a picture names `choice`, such as `Mobile, 390×844`, or `null` for `fit`, whose pictures name none. */
+export function screenName(choice: ScreenChoice): string | null {
+	const screen = screenOf(choice);
+	return screen && `${screen.device.label}, ${screen.width}×${screen.height}`;
+}
+
+/** What the page asks a Browser's guest to show: its {@link ScreenChoice}, and whether picking needs the mouse. */
+export interface BrowserScreen extends ScreenChoice {
+	/** Picking is on, so the mouse stays a mouse while a touch screen is emulated. */
+	picking: boolean;
+}
+export const isBrowserScreen: Guard<BrowserScreen> = fields<BrowserScreen>({ size: isScreenSize, landscape: isBoolean, picking: isBoolean });
+
 /** The page's `invoke` that opens the system's folder dialog over the window, answered with the folder picked or `null`. */
 export const PICK_DIRECTORY_CHANNEL = "omp-agents:pick-directory";
 /** The only installer operation the page may request. No path, flags, or command arguments cross the bridge. */
@@ -161,8 +232,13 @@ export interface DesktopBridge {
 	signIn?(): void;
 	/** Tells the shell the {@link BrowserPorts} of the Browser's guest `guestId`, for {@link appAddress}; absent in an app built before it. */
 	browserPorts?(guestId: number, ports: BrowserPorts): void;
-	/** A PNG of what the Browser's guest `guestId` shows, at the screen's pixel density, or `null` when it shows nothing; absent in an app built before it. */
+	/**
+	 * A PNG of what the Browser's guest `guestId` shows, at the screen's pixel density, or at 1× of its CSS size while it
+	 * emulates a **Screen size**, or `null` when it shows nothing; absent in an app built before it.
+	 */
 	captureBrowser?(guestId: number): Promise<Uint8Array | null>;
+	/** Has the Browser's guest `guestId` emulate `screen`, or stop emulating for `fit`; absent in an app built before it, which shows no **Screen size**. */
+	screenBrowser?(guestId: number, screen: BrowserScreen): void;
 	/** Opens the system's folder dialog over the window, and answers the folder picked, or `null` when it was cancelled; absent in an app built before it. */
 	pickDirectory?(): Promise<string | null>;
 	/** Runs the desktop's non-forced starter kit installer and returns its output without native dialogs. */
