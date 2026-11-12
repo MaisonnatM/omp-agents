@@ -44,8 +44,7 @@ export default function artifact(pi: ExtensionAPI): void {
 				const root = await realpath(join(dir, "local"));
 				const source = await realpath(resolve(root, file));
 				if (!inside(root, source)) return refuse("The file must stay under local://.");
-				const info = await stat(source);
-				if (!info.isFile() || info.size === 0 || info.size > MAX_BYTES) return refuse("Save a non-empty file of at most 2 MiB.");
+				if (!(await stat(source)).isFile()) return refuse("Save a non-empty file of at most 2 MiB.");
 				const bytes = await readFile(source);
 				if (!bytes.length || bytes.length > MAX_BYTES) return refuse("Save a non-empty file of at most 2 MiB.");
 				let text: string;

@@ -25,12 +25,21 @@ export interface ArtifactSave {
 const SHA256 = /^[a-f0-9]{64}$/;
 const isKind = (value: unknown): value is ArtifactKind => ARTIFACT_KINDS.includes(value as ArtifactKind);
 
+/** A slash-separated path that stays under the session's local root: no empty, `.`, or `..` part, no backslash, NUL, or drive letter. */
+function isLocalFile(file: unknown): file is string {
+	return isNonEmpty(file) && !file.includes("\\") && !file.includes("\0") && !/^[A-Za-z]:/.test(file) && file.split("/").every(part => part && part !== "." && part !== "..");
+}
+
+/** A version's note: one trimmed line of at most 120 characters, or null for none. */
+function isNote(note: unknown): note is string | null {
+	return note === null || (typeof note === "string" && note.length > 0 && note === note.trim() && note.length <= 120 && !/[\r\n]/.test(note));
+}
+
 export function parseArtifactSave(details: unknown): ArtifactSave | null {
 	if (!isObject(details)) return null;
 	const { file, kind, title, note, sha256, bytes, savedAt } = details;
-	if (!isNonEmpty(file) || file.includes("\\") || file.includes("\0") || file.split("/").some(part => !part || part === "." || part === "..") || /^[A-Za-z]:/.test(file)) return null;
-	if (!isKind(kind) || !isNonEmpty(title) || typeof sha256 !== "string" || !SHA256.test(sha256) || !isSafeInteger(bytes) || bytes <= 0 || !isSafeInteger(savedAt) || savedAt <= 0) return null;
-	if (note !== null && (typeof note !== "string" || !note.trim() || note !== note.trim() || note.length > 120 || /[\r\n]/.test(note))) return null;
+	if (!isLocalFile(file) || !isKind(kind) || !isNonEmpty(title) || !isNote(note)) return null;
+	if (typeof sha256 !== "string" || !SHA256.test(sha256) || !isSafeInteger(bytes) || bytes <= 0 || !isSafeInteger(savedAt) || savedAt <= 0) return null;
 	return { file, kind, title, note, sha256: sha256 as Sha256, bytes, savedAt };
 }
 
