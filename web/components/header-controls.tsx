@@ -1,4 +1,4 @@
-/** The Personal and Work switch, the Notes, Calendar, Todo, Sport, and Email buttons, the command menu button, the notices' bell, and Settings: in the desktop app's title bar, else at the end of the page's header, where a phone gets one menu of every tab instead; and the title bar's Back and Forward buttons. */
+/** The Personal and Work switch, the Notes, Calendar, Todo, Sport, and Email buttons, the command menu button, the notices' bell, and Settings: in the desktop app's title bar, else at the end of the page's header, where a header under 56rem, as on a phone, gets one menu of every tab instead; and the title bar's Back and Forward buttons. */
 import { ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { createContext, memo, type ReactNode, useContext } from "react";
 import type { Notice } from "../../src/shared/notices";
@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuR
 import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { SizeProvider } from "@/lib/size-context";
+import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { SPACE_LABELS, sessionsWaiting } from "../labels";
 import { PAGE_ICON, SPACE_ICONS } from "../page-icons";
@@ -15,7 +16,6 @@ import type { SidebarPanel, SidebarTab } from "../routing";
 import { shortcutLabels } from "../shortcuts";
 import { TAB_ROWS } from "../sidebar-tabs";
 import { useHistoryPosition } from "../use-history-position";
-import { usePhoneWidth } from "../use-phone-width";
 import { NoticesBell } from "./notices";
 import { WhatsNew } from "./whats-new";
 
@@ -32,7 +32,7 @@ interface HeaderControlsProps {
 	onShowSearch: () => void;
 	/** The shown tabs whose triggers sit here, after the command menu button between two dividers, in order. */
 	tabs: readonly SidebarTab[];
-	/** Every shown tab, in order, which a phone lists in one menu in place of the sidebar's bar and the header's buttons. */
+	/** Every shown tab, in order, which a header under 56rem lists in one menu in place of the header's buttons. */
 	allTabs: readonly SidebarTab[];
 	/** The panel the sidebar shows, whose button is pressed. */
 	tab: SidebarPanel;
@@ -50,10 +50,13 @@ type SpaceSwitchProps = Pick<HeaderControlsProps, "space" | "onSpace" | "otherWa
 
 const SettingsIcon = PAGE_ICON.settings;
 
+/** Hides what the tab menu stands in for once the page's header is under 56rem; a parent without the `header` container, as the title bar, always shows it. */
+const FULL_ONLY = "@max-[56rem]/header:hidden";
+
 /**
  * Which space the window shows, Personal or Work; the switch shortcut's keys show on the space it goes to, and so does the count
  * of that space's sessions that need you, so they do not wait unseen. Each tab keeps its tooltip whichever space is on, so switching
- * leaves the tab mounted and the keyboard focus on it. In a page's header narrower than 56rem the labels leave the icons alone,
+ * leaves the tab mounted and the keyboard focus on it. In a page's header narrower than 64rem the labels leave the icons alone,
  * their names kept in the tooltip and for screen readers.
  */
 function SpaceSwitch({ space, onSpace, otherWaiting }: SpaceSwitchProps) {
@@ -75,7 +78,7 @@ function SpaceSwitch({ space, onSpace, otherWaiting }: SpaceSwitchProps) {
 								value={value}
 								icon={SPACE_ICONS[value]}
 								label={SPACE_LABELS[value]}
-								labelClassName="@max-[56rem]/header:sr-only"
+								labelClassName="@max-[64rem]/header:sr-only"
 								tooltip={waiting > 0 ? `${SPACE_LABELS[value]} · ${sessionsWaiting(waiting)}` : SPACE_LABELS[value]}
 								shortcut={value === space ? undefined : shortcutLabels("switchSpace")}
 								badge={waiting > 0 ? waiting : undefined}
@@ -90,16 +93,16 @@ function SpaceSwitch({ space, onSpace, otherWaiting }: SpaceSwitchProps) {
 }
 
 /**
- * A phone's one way to every tab: the button names the tab on, and its menu lists every shown tab, then the space and Settings,
- * so the header holds this menu, the command menu, and the bell.
+ * One way to every tab in a header under 56rem, as on a phone or beside a wide sidebar: the button names the tab on, and its menu
+ * lists every shown tab, then the space and Settings, so the header holds this menu, the command menu, and the bell.
  */
-function PhoneTabMenu({ tabs, tab, onTab, settingsOpen, onToggleSettings, space, onSpace }: Omit<HeaderControlsProps, "notices" | "onShowSearch" | "allTabs" | "otherWaiting">) {
+function TabMenu({ tabs, tab, onTab, settingsOpen, onToggleSettings, space, onSpace }: Omit<HeaderControlsProps, "notices" | "onShowSearch" | "allTabs" | "otherWaiting">) {
 	const current = tab === "settings" ? { label: "Settings", icon: SettingsIcon } : TAB_ROWS[tab];
 	const CurrentIcon = current.icon;
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger
-				render={<Button {...activityControl("header.tab-menu")} variant="ghost" size="compact" className="min-w-0 gap-1.5 px-2 font-medium text-foreground [&_svg]:size-3.5" aria-label={`${current.label}. Go to another tab`} />}
+				render={<Button {...activityControl("header.tab-menu")} variant="ghost" size="compact" className="hidden min-w-0 gap-1.5 px-2 font-medium text-foreground @max-[56rem]/header:inline-flex [&_svg]:size-3.5" aria-label={`${current.label}. Go to another tab`} />}
 			>
 				<CurrentIcon />
 				<span className="truncate">{current.label}</span>
@@ -145,28 +148,23 @@ function PhoneTabMenu({ tabs, tab, onTab, settingsOpen, onToggleSettings, space,
 }
 
 export const HeaderControls = memo(function HeaderControls({ notices, onShowSearch, tabs, allTabs, tab, onTab, settingsOpen, onToggleSettings, space, onSpace, otherWaiting }: HeaderControlsProps) {
-	const phone = usePhoneWidth();
-	const commandMenu = (
-		<Tooltip content="Command menu" shortcut={shortcutLabels("switcher")} side="bottom">
-			<Button {...activityControl("header.command-menu")} variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Command menu" onClick={onShowSearch}>
-				<Search />
-			</Button>
-		</Tooltip>
-	);
-	if (phone)
-		return (
-			<div className="flex min-w-0 items-center gap-1">
-				<PhoneTabMenu tabs={allTabs} tab={tab} onTab={onTab} settingsOpen={settingsOpen} onToggleSettings={onToggleSettings} space={space} onSpace={onSpace} />
-				{commandMenu}
-				<NoticesBell notices={notices} />
-			</div>
-		);
 	return (
 		<div className="flex shrink-0 items-center gap-1">
-			{!DESKTOP_TITLE_BAR && <SpaceSwitch space={space} onSpace={onSpace} otherWaiting={otherWaiting} />}
-			{commandMenu}
-			{tabs.length > 0 && (
+			{!DESKTOP_TITLE_BAR && (
 				<>
+					<TabMenu tabs={allTabs} tab={tab} onTab={onTab} settingsOpen={settingsOpen} onToggleSettings={onToggleSettings} space={space} onSpace={onSpace} />
+					<div className={cn("flex", FULL_ONLY)}>
+						<SpaceSwitch space={space} onSpace={onSpace} otherWaiting={otherWaiting} />
+					</div>
+				</>
+			)}
+			<Tooltip content="Command menu" shortcut={shortcutLabels("switcher")} side="bottom">
+				<Button {...activityControl("header.command-menu")} variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Command menu" onClick={onShowSearch}>
+					<Search />
+				</Button>
+			</Tooltip>
+			{tabs.length > 0 && (
+				<div className={cn("flex items-center gap-1", FULL_ONLY)}>
 					<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border" />
 					{tabs.map(value => {
 						const { label, icon: Icon } = TAB_ROWS[value];
@@ -187,16 +185,18 @@ export const HeaderControls = memo(function HeaderControls({ notices, onShowSear
 						);
 					})}
 					<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border" />
-				</>
+				</div>
 			)}
-			<WhatsNew />
+			<div className={cn("flex", FULL_ONLY)}>
+				<WhatsNew />
+			</div>
 			<NoticesBell notices={notices} />
 			<Tooltip content={settingsOpen ? "Close settings" : "Settings"} shortcut={shortcutLabels("settings")} side="bottom">
 				<Button
 					{...activityControl("header.settings")}
 					variant="ghost"
 					size="icon-compact"
-					className="shrink-0 text-muted-foreground aria-pressed:bg-selected aria-pressed:text-foreground"
+					className={cn("shrink-0 text-muted-foreground aria-pressed:bg-selected aria-pressed:text-foreground", FULL_ONLY)}
 					aria-label="Settings"
 					aria-pressed={settingsOpen}
 					onClick={onToggleSettings}

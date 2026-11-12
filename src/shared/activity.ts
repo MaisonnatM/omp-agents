@@ -122,7 +122,7 @@ export const CONTROLS = [
 	{ id: "header.space.personal", label: "Personal space switch", area: "Header" },
 	{ id: "header.space.work", label: "Work space switch", area: "Header" },
 	{ id: "header.tab", label: "Notes, Calendar, Email, and Sport buttons", area: "Header" },
-	{ id: "header.tab-menu", label: "Phone tab menu", area: "Header" },
+	{ id: "header.tab-menu", label: "Tab menu", area: "Header" },
 	{ id: "header.whats-new", label: "What's new button", area: "Header" },
 	{ id: "notices.open", label: "Notification bell", area: "Notifications" },
 	{ id: "notices.filter", label: "Notifications source filter", area: "Notifications" },

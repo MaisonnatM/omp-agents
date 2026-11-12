@@ -1,7 +1,8 @@
 # Sessions sidebar
 
 - The **Personal** and **Work** switch at the top of the window picks the space the dashboard shows: in the desktop app it sits beside Back and Forward in the title bar, and in a browser at the right of the page header, or at the top right of the empty home.
-  In a page header narrower than 56rem the switch shows its two icons alone, and hovering one names its space.
+  In a page header narrower than 64rem the switch shows its two icons alone, and hovering one names its space.
+  In a header narrower than 56rem, as on a phone or beside a wide right sidebar, one menu named after the tab you are on holds every tab, the space, and Settings, beside the command menu and the bell.
   Personal holds the personal directory and the workspaces Settings › Workspaces placed in Personal; every other workspace is in Work, a workspace the page cannot place yet included.
   The sidebar's sessions, its counts, the session search, the scheduled sends, the Todo page, the pull requests, the Bots, the Notes, the Calendar's events on this computer, the Google accounts that Email and Calendar show, the command menu's sessions, workspaces, and notes, Settings' workspace pickers, and New session's directory picker then hold only the space's.
   Switching keeps the page you are on; on the panes it opens the space's most recently started running session, or the empty home when none runs there.
