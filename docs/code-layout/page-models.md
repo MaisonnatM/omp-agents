@@ -76,6 +76,7 @@
   `web/artifacts-model.test.ts` covers the grouping, folding, numbering, fallbacks, and a replayed delta.
 - `web/artifact-requests.ts`: `requestArtifact`, a save landing or a card's **Open**, which sets the view's pick, the version the **Artifacts** tab shows, and tells `onArtifactRequest`'s listener in `web/app.tsx`; `showArtifact` and `useShownArtifact` hold the version the open tab shows, so its card reads **Showing**.
 - `web/artifact-links.ts`: `useArtifactUrl`, each version's capability address from `GET /api/artifact-link`, and `useArtifactText`, its text, which every kind waits for before it draws, each asked once per page load.
+  `web/artifact-links.test.ts` covers readers sharing one pending load and a failed load being asked again.
 - `web/reply-parts.ts`: `rehypeReplyParts`, which marks each top-level bullet of a reply that opens with a bold key as `keyed`, so `MessageMarkdown` lays the key out as its own column.
 - `web/components/session-visual.tsx`: `SessionVisual`, a `mermaid` or `chart` fence in a session's message drawn as a diagram image or a chart, with **Preview** and **Source**, Copy, and an expand dialog on `ViewerDialog`, or its text and why when it breaks a rule of `src/shared/session-visuals.ts`.
   A diagram loads `beautiful-mermaid` on first use and shows as a blob URL image, drawn again when `useDarkClass` in `web/theme.ts` sees the theme change; a chart draws through `web/components/ui/chart.tsx` on `recharts`, in `ChartView` from `web/components/session-chart.tsx`, which loads on the first chart.
