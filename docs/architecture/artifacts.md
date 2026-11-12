@@ -40,6 +40,13 @@ SVG has no scripts or network sources, and Markdown is served as plain text for 
 Every kind sends `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and `Cache-Control: private, max-age=31536000, immutable`.
 A missing or wrong capability returns 403, even when the request carries a bearer token.
 
+## Page
+
+`artifactsOf` in `web/artifacts-model.ts` groups a transcript's saved tool items by file into numbered versions; a save whose SHA-256 equals the version before it folds into that version, so the card and the tab agree on every number.
+A pick names a version by its number, or `latest`, never by its hash, since equal bytes can return after a different save.
+`web/use-dashboard.ts` compares each non-reset `items` delta with the transcript before it through `landedSaves`, so only a call that newly finished asks `web/app.tsx` to show its artifact, and a reconnect or replay asks nothing.
+The page asks `/api/artifact-link` once per version and page load, then loads the version from the capability URL; see [Front-end components](front-end-components.md#artifacts) for how each kind renders.
+
 ## Session lifecycle
 
 omp 18.18.6 does not prune individual files in `artifact-versions/`.

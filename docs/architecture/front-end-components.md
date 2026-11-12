@@ -87,3 +87,11 @@ On a Cursor model, whose `api` is `cursor-agent`, it also appends `CURSOR_TOOLS_
 `DashboardSession` passes it with `-e` when it starts, forks, or resumes a session (`withSessionVisuals` in `src/dashboard-session.ts`).
 The extension sits outside `templates/omp/agent/`, so the starter kit never installs it and a terminal session never loads it, and it types the part of omp's API it uses by hand, as `tsc` cannot resolve omp's package.
 `sessionVisualsExtension` in `src/server/resources.ts` names the file, and the packaged app ships it bundled as `session-visuals-extension.js`, as it ships the keeper.
+
+## Artifacts
+
+`ArtifactView` in `web/components/artifact-view.tsx` draws one artifact version from its capability URL, which `useArtifactUrl` in `web/artifact-links.ts` asks for once per version; see [Artifacts](artifacts.md) for the routes.
+HTML renders in an iframe whose `sandbox` lists scripts, forms, modals, popups, and downloads but not `allow-same-origin`, so the page runs with an opaque origin even though `frame-src 'self'` lets it load; the route's own CSP seals it the same way when opened in a browser tab.
+SVG renders as an `<img>`, so its markup never scripts the page, and Markdown, which the route serves as plain text, is fetched and rendered by `MessageMarkdown` with its default preset, without session visuals.
+**Source** renders any kind's text in `CodeBlock`, colored by the kind's language.
+The **Rendered** and **Source** switch is `SegmentedTabs` from `web/components/segmented-tabs.tsx`, as the pull request details' tabs are.

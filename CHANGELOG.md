@@ -3,6 +3,13 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-12
+
+- You can ask an agent to make a page, a document, or a drawing for you to look at, and it opens beside the conversation in the new Artifacts tab of the right sidebar, ready to use: a page's buttons and forms work, sealed off from the dashboard.
+- You can go back to any earlier version of an artifact: each time the agent saves it again, a numbered version is kept with a short note on what changed, and Go to latest returns to the newest.
+- You can see each save in the conversation as "Saved … as version N", and its Open button shows that version in the sidebar, even from a pane beside others.
+- You can switch an artifact between how it looks and its source text, copy it, download it, or open it in its own browser tab.
+
 ## 2026-11-10
 
 - A Claude Code session you renamed now lists under that name in the past sessions, and its transcript no longer shows Unread line warnings for Claude Code's own title and agent-name records.
@@ -215,15 +222,3 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Up and down arrows beside each account change which one omp uses first, for example your work Anthropic account before your personal one.
 - The new order is saved at once in omp's settings, and omp follows it without a restart.
 - Fixed: the dashboard no longer freezes when your skill and instruction files sit both under your home folder and elsewhere, such as /tmp.
-
-## 2026-11-07
-
-- Fixed: the daily cleanup and Settings › Storage now check a subagent's copy of your repository for edits and live sessions even when omp keeps that copy outside the task's folder.
-- Fixed: removing a leftover task's folder now also deletes that outside copy, instead of leaving it behind.
-- Fixed: a Bot page's model menu now lists the models, instead of staying on Loading models.
-- The API credits row at the bottom of the window turns red and reads used up when Anthropic refuses requests because the key's credit ran out, and the bell's alert now reads Out of credit: API credits.
-- Fixed: with the new omp 18.18.0 credit patch applied, a session whose Anthropic API key runs out of credit moves to the next model in its fallback list and stays off that key, instead of stopping or going back to it.
-- Fixed: sessions on a Cursor model now find the dashboard's tools, such as landing on main, ending the session, and moving it to another folder, instead of saying they are missing.
-- The API credits row in the bottom bar now shows the dollars left on your Console balance when you have no monthly grant, in red once it runs out, instead of only its name.
-- The paid Cursor fallback patch and the tool documentation patch for omp now apply to omp 18.18.0, together with the Cursor tools patch.
-- omp-agents is now tested with omp 18.18.0.
