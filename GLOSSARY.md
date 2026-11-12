@@ -133,6 +133,10 @@ _Avoid_: Folder, category
 An entry under the bell: what a check found or how an update went.
 _Avoid_: Alert, notification (reserved for session notifications)
 
+**Session card**:
+The card at a transcript's top right, or above its messages when the transcript is narrow, that lists the view's **Subagents**, **Files**, **Images**, and **Sources**, and that **Show session card** in Settings › Preferences or the toggle in the session's header hides.
+_Avoid_: Todos card (its former name), details card, changes card
+
 **Review draft**:
 The review a **Review** session saved of one pull request, with its verdict, summary, and findings, which waits in the dashboard for the user to accept, edit, and post.
 _Avoid_: Pending review (GitHub's own unsubmitted review), draft review

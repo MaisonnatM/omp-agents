@@ -11,6 +11,10 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - In Settings, Workflows, the ship workflow's diagram now shows its real path: the reviews it can skip, the ready step, the live review loop of rebases, comments, and CI fixes, and the merge at the end.
 - A workflow can draw its own diagram in Settings, Workflows by holding a mermaid block in its skill file; without one, its numbered steps still show in a line.
+## 2026-11-11
+
+- The Todos card no longer shows the agent's todo list or the Ship steps; it keeps Subagents, Files, Images, and Sources.
+- The Todos card is now the Session card, and Settings › Preferences says Show session card.
 
 ## 2026-11-10
 

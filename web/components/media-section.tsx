@@ -1,4 +1,4 @@
-/** The Todos card's Images section: a strip of the view's images, their viewer, and the bar that sends the selected ones on. */
+/** The Session card's Images section: a strip of the view's images, their viewer, and the bar that sends the selected ones on. */
 import { ChevronDown, GitPullRequest, type LucideIcon, MessageSquare, Paperclip } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";

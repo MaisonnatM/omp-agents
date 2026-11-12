@@ -1,4 +1,4 @@
-/** The Todos card's Files section: a row per changed file, and the dialog of one file's recorded changes that a subagent's row opens. */
+/** The Session card's Files section: a row per changed file, and the dialog of one file's recorded changes that a subagent's row opens. */
 import {
 	File as FileIcon,
 	FileCode,

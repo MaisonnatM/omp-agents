@@ -31,7 +31,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
   Sessions whose omp stopped while no dashboard ran wait in an **interrupted** group, and **Resume all** brings them back.
   Claude Code and Codex sessions on the same machine list beside omp's, as read-only transcripts you can search.
 - **Session details.**
-  The focused conversation's todo list, the files its agent changed with each file's latest diff, the live session's subagents as a tree, and every screenshot and image its agents' tools returned; subagents also open from the `task` call that spawned them, and a back arrow returns to the session.
+  The files the focused conversation's agent changed with each file's latest diff, the live session's subagents as a tree, and every screenshot and image its agents' tools returned; subagents also open from the `task` call that spawned them, and a back arrow returns to the session.
 - **Live conversations.**
   Streaming Markdown transcripts, tool calls, and context-window usage, in up to four split panes.
 - **Full control.**

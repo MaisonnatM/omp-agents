@@ -271,22 +271,14 @@ describe("viewer images", () => {
 describe("a model built from the one before", () => {
 	const prompt = (id: string, text = id): Item => ({ id, kind: "user", text, skill: null, from: null, entryId: `e-${id}` });
 	const reply = (id: string, text: string, streaming: boolean): Item => ({ id, kind: "assistant", text, streaming, suggestions: [] });
-	const todo = (id: string, content: string): Item => ({
-		id,
-		kind: "tool",
-		name: "todo",
-		summary: "",
-		status: "ok",
-		agents: [],
-		todos: [{ name: "Work", tasks: [{ content, status: "in_progress" }] }],
-	});
+	const todo = (id: string): Item => ({ id, kind: "tool", name: "todo", summary: "", status: "ok", agents: [] });
 	const shot: Item = { id: "shot", kind: "tool", name: "browser", summary: "screenshot", status: "ok", agents: [], images: ["/s.png"] };
 	const update: Item = { id: "d", kind: "dashboard", text: "[omp-agents] Project update.", entryId: "e-d" };
 	const tool = (id: string, status: "ok" | "error"): Item => ({ id, kind: "tool", name: "bash", summary: "ls", status, agents: [] });
 
 	test("matches the model built from scratch at every step, keeping settled turns and rows as the same objects", () => {
 		const p1 = prompt("p1", "Fix it");
-		const t1 = todo("t1", "Read the code");
+		const t1 = todo("t1");
 		const r1 = reply("r1", "Fixed.", false);
 		const steps: [Item[], boolean][] = [
 			[[p1], true],
@@ -296,8 +288,8 @@ describe("a model built from the one before", () => {
 			[[p1, t1, r1], true],
 			[[p1, t1, r1], false],
 			[[p1, t1, r1, prompt("p2", "go")], true],
-			[[p1, t1, r1, prompt("p2", "go"), shot, todo("t2", "Ship it")], true],
-			[[p1, t1, r1, prompt("p2", "go"), shot, todo("t2", "Ship it"), update, reply("r2", "Shipped", false)], false],
+			[[p1, t1, r1, prompt("p2", "go"), shot, todo("t2")], true],
+			[[p1, t1, r1, prompt("p2", "go"), shot, todo("t2"), update, reply("r2", "Shipped", false)], false],
 			[[p1, t1, r1, prompt("p3", "continue")], false],
 			[[prompt("q1", "Another view")], false],
 			[[], false],
@@ -386,7 +378,6 @@ describe("a model built from the one before", () => {
 							status: pick(["ok", "error", "running"]),
 							agents: [],
 							...(random() < 0.2 ? { images: ["/s.png"] } : {}),
-							...(random() < 0.2 ? { todos: [{ name: "Work", tasks: [{ content: id, status: "pending" as const }] }] } : {}),
 						};
 					case "notice":
 						return { id, kind: "notice", level: "info", text: "Compacted" };
@@ -432,19 +423,17 @@ describe("a model built from the one before", () => {
 		}
 	});
 
-	test("a streamed token leaves the settled outline, forks, replies, images, and todos as the same objects", () => {
-		const base = [prompt("p1"), todo("t1", "Plan"), shot, reply("r1", "Done", false), prompt("p2")];
+	test("a streamed token leaves the settled outline, forks, replies, and images as the same objects", () => {
+		const base = [prompt("p1"), todo("t1"), shot, reply("r1", "Done", false), prompt("p2")];
 		const first = transcriptModel([...base, reply("r2", "Wor", true)], true);
 		const next = transcriptModel([...base, reply("r2", "Working", true)], true, first);
 		expect(next.outline).toBe(first.outline);
 		expect(next.forks).toBe(first.forks);
 		expect(next.replies).toBe(first.replies);
 		expect(next.images).toBe(first.images);
-		expect(next.todos).toBe(first.todos);
 		const done = transcriptModel([...base, reply("r2", "Working", false)], false, next);
 		expect(done.outline[0]).toBe(first.outline[0]!);
 		expect(done.outline[1]).not.toBe(first.outline[1]);
 		expect(done.outline[1]!.reply).toEqual({ id: "r2", text: "Working" });
-		expect(done.todos).toEqual([{ name: "Work", tasks: [{ content: "Plan", status: "in_progress" }] }]);
 	});
 });

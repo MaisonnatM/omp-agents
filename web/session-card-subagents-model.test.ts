@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { type AgentRow, EMPTY_QUEUE } from "../src/shared/sessions";
-import { arenaGroups, type SubagentNode, subagentTree } from "./todos-card-subagents-model";
+import { arenaGroups, type SubagentNode, subagentTree } from "./session-card-subagents-model";
 
 const agent = (id: string, parentId: string | null): AgentRow => ({ id, kind: "task", parentId, status: "running", activity: null, canMessage: true, queue: EMPTY_QUEUE });
 const rows = (tree: SubagentNode[]) => tree.map(node => `${node.depth} ${node.agent.id}`);

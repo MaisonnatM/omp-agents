@@ -32,11 +32,11 @@ Start a UI change here, then read that file's entry under [Page](#page).
   In a session's conversation, a `mermaid` or `chart` fence is `SessionVisual` from `web/components/session-visual.tsx` instead, through the `SESSION_AGENT_PRESET` and `SESSION_PROMPT_PRESET` that `MessageRow` passes, and its chart is shadcn's `web/components/ui/chart.tsx`.
   The turn minimap on its left edge is `TranscriptMinimap` in `web/components/transcript-minimap.tsx`, with its turns from the `outline` of the `transcriptModel` in `web/transcript-view.ts` that `Transcript` builds.
   The find bar that Cmd+F opens at its top right is `FindBar` in `web/components/find-bar.tsx`, which a pull request's details also mount on their tab bar.
-  The **Todos** card, the agent's own todo list followed by its subagents and its changed files, images, and sources, is `SessionTodosCard` in `web/components/session-todos-card.tsx`.
+  The **Session** card, the agent's subagents followed by its changed files, images, and sources, is `SessionCard` in `web/components/session-card.tsx`.
   It floats at the transcript's top right when the transcript is wide enough to keep it beside the messages, and otherwise sits above them.
-  `TodosCardToggle` from the same file, the checklist toggle in the session header before End session, or before **Resume** in a past session's, hides it, as **Show todos card** in Settings › Preferences does; it shows only while the view's card has a section to show.
-  Its **Subagents** section is `SubagentsSection` in `web/components/todos-card-subagents.tsx`, over `subagentTree` and `arenaGroups` in `web/todos-card-subagents-model.ts`, from the `SubagentLinks` context of `web/components/subagent-links.tsx` that `ViewConversation` in `web/components/pane.tsx` provides, with the same `CancelAgentButton` as a `task` row's subagent links; an arena's runner cards come from `SessionFacts.arenas`, which the `arena` tool of `templates/omp/agent/extensions/arena.ts` records.
-  Its **Files**, **Images**, and **Sources** sections are `ChangesSections` in `web/components/todos-card-changes.tsx`, from the `changes` that `conversation.tsx` and `past-conversation.tsx` pass `Transcript`.
+  `SessionCardToggle` from the same file, the card toggle in the session header before End session, or before **Resume** in a past session's, hides it, as **Show session card** in Settings › Preferences does; it shows only while the view's card has a section to show.
+  Its **Subagents** section is `SubagentsSection` in `web/components/session-card-subagents.tsx`, over `subagentTree` and `arenaGroups` in `web/session-card-subagents-model.ts`, from the `SubagentLinks` context of `web/components/subagent-links.tsx` that `ViewConversation` in `web/components/pane.tsx` provides, with the same `CancelAgentButton` as a `task` row's subagent links; an arena's runner cards come from `SessionFacts.arenas`, which the `arena` tool of `templates/omp/agent/extensions/arena.ts` records.
+  Its **Files**, **Images**, and **Sources** sections are `ChangesSections` in `web/components/session-card-changes.tsx`, from the `changes` that `conversation.tsx` and `past-conversation.tsx` pass `Transcript`.
   Its **Files** section is `ChangedFileList` in `changed-files-section.tsx`; its **Images** section is `MediaStrip` in `media-section.tsx`, with the selection bar that sends images to a pull request or Linear issue; its **Sources** section is `SourceList` in `sources-section.tsx`.
   The sections fold independently, with closed sections kept by `useStoredKeys`.
   A subagent's recorded edits open `FileChangesDialog` in `changed-files-section.tsx`, with Kobra-inspired cards from `web/components/file-diff.tsx`.
@@ -80,7 +80,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   The disk card's **Clean up…** link opens Settings › Storage.
   Its plan quota, each plan's windows and the **API credits** row with its grant and its red `used up` once a provider refuses requests for lack of credit, is `PlanUsageList` in `web/components/plan-usage.tsx`.
 - The three things called Files:
-  - The Todos card's **Files** section, a session's changed files: `ChangedFileList` in `web/components/changed-files-section.tsx`.
+  - The Session card's **Files** section, a session's changed files: `ChangedFileList` in `web/components/changed-files-section.tsx`.
   - The session changes dialog that a file or **Review** opens: `web/components/changes/session-changes-dialog.tsx`, with its explorer in `changes-explorer.tsx` and tree in `file-tree.tsx` beside it.
   - Settings › Files, omp's own config files: `Files` in `web/components/settings/files-tab.tsx`.
   - Settings › Decisions, a workspace repository's decision records, and every workspace in the space when All workspaces is selected: `DecisionsTab` in `web/components/settings/decisions-tab.tsx`, grouped by `decisionGroups` in `web/components/settings/decision-groups.ts`.
