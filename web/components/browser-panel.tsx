@@ -25,7 +25,7 @@ import { sessionProcessesStore, writeProcessStop, writeStartServer } from "../re
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useAction } from "../use-action";
 import { useWebview } from "../use-webview";
-import { Picking, usePicking } from "./browser-capture";
+import { PickModes, Picking, usePicking } from "./browser-capture";
 import { DESKTOP_TITLE_BAR } from "./header-controls";
 import { MoreActionsMenu } from "./more-actions-menu";
 import { useDashboardActions } from "./dashboard-context";
@@ -311,6 +311,7 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 	const stageRef = useRef<HTMLDivElement>(null);
 	const [stage, setStage] = useState<{ width: number; height: number } | null>(null);
 	const [menuOpen, setMenuOpen] = useState(false);
+	const [screenMenuOpen, setScreenMenuOpen] = useState(false);
 	const { request } = useDashboardActions();
 	const startServer = useAction(async () => {
 		const answer = await writeStartServer(view.instanceId);
@@ -352,7 +353,7 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 			className={cn("@container/browser flex min-h-0 flex-col bg-background", maximized ? cn("fixed inset-x-0 bottom-0 z-30", DESKTOP_TITLE_BAR ? "top-9" : "top-0") : "flex-1")}
 		>
 			{/* In a narrow Browser, such as the sidebar at its default width, the address field takes a row of its own below the buttons. */}
-			<div className="flex min-h-9 shrink-0 flex-wrap items-center gap-0.5 border-b border-border px-1.5 @max-[24rem]/browser:pt-1">
+			<div className="flex min-h-9 shrink-0 flex-wrap items-center gap-0.5 border-b border-border px-1.5 @max-[24rem]/browser:pt-1 @max-[16rem]/browser:gap-0">
 				<ToolbarButton label="Back" control="browser.back" disabled={!webview.ready || !webview.history.back} onClick={webview.back}>
 					<ArrowLeft />
 				</ToolbarButton>
@@ -441,8 +442,8 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 					</ToolbarButton>
 				)}
 				{SCREEN_AVAILABLE && (
-					<DropdownMenu>
-						<Tooltip content={`Screen size: ${SCREEN_LABELS[screen.size]}`} side="bottom">
+					<DropdownMenu open={screenMenuOpen} onOpenChange={setScreenMenuOpen}>
+						<Tooltip content={`Screen size: ${SCREEN_LABELS[screen.size]}`} side="bottom" forceOpen={screenMenuOpen ? false : undefined}>
 							<DropdownMenuTrigger
 								{...activityControl("browser.screen-size")}
 								render={<Button variant="ghost" size="icon-compact" active={shown !== null} aria-label={`Screen size: ${SCREEN_LABELS[screen.size]}`} />}
@@ -560,13 +561,13 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 								mode={picking.mode}
 								color={picking.color}
 								elements={picking.elements}
-								onMode={picking.choose}
 								onDeselect={webview.deselect}
 								onAttach={picking.attach}
 								attaching={picking.attaching}
 							/>
 						)}
 					</div>
+					{picking.mode !== null && <PickModes mode={picking.mode} onMode={picking.choose} />}
 				</div>
 			)}
 		</section>

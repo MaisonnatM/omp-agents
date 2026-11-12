@@ -181,7 +181,6 @@ interface PickingProps {
 	color: string;
 	/** Where the elements Select picked show, which the card sits beside and Erase removes. */
 	elements: readonly PreviewElementBox[];
-	onMode: (mode: PickMode) => void;
 	onDeselect: (id: number) => void;
 	onAttach: (marking: Marking) => void;
 	/** An Attach is capturing the page, so the button shows it and takes no second press. */
@@ -189,11 +188,11 @@ interface PickingProps {
 }
 
 /**
- * Covers the page while picking, with the switch between the modes floating at its top: Region drags a box, Draw a
- * line, and Erase removes the mark or selected element it clicks, until **Attach** in the card beside them. Under
- * Select, it lets the pointer through to the app and still shows the marks.
+ * Covers the page while picking: Region drags a box, Draw a line, and Erase removes the mark or selected element it
+ * clicks, until **Attach** in the card beside them. Under Select, it lets the pointer through to the app and still
+ * shows the marks. {@link PickModes} switches between the modes.
  */
-export function Picking({ mode, color, elements, onMode, onDeselect, onAttach, attaching }: PickingProps) {
+export function Picking({ mode, color, elements, onDeselect, onAttach, attaching }: PickingProps) {
 	const [marks, setMarks] = useState<Mark[]>([]);
 	const [drawing, setDrawing] = useState<Drawing | null>(null);
 	const [comment, setComment] = useState("");
@@ -224,114 +223,118 @@ export function Picking({ mode, color, elements, onMode, onDeselect, onAttach, a
 	const drawingArea = drawing?.kind === "region" && layerRef.current ? dragArea(drawing.from, drawing.to, layerRef.current.clientWidth, layerRef.current.clientHeight) : null;
 
 	return (
-		<>
-			<div
-				ref={layerRef}
-				role="presentation"
-				className={cn(
-					"absolute inset-0 z-10 touch-none overflow-hidden select-none",
-					mode === "select" ? "pointer-events-none" : mode === "erase" ? "cursor-default" : "cursor-crosshair",
+		<div
+			ref={layerRef}
+			role="presentation"
+			className={cn(
+				"absolute inset-0 z-10 touch-none overflow-hidden select-none",
+				mode === "select" ? "pointer-events-none" : mode === "erase" ? "cursor-default" : "cursor-crosshair",
+			)}
+			style={{ color }}
+			onPointerDown={event => {
+				if (event.button !== 0 || event.target !== event.currentTarget) return;
+				const at = pointOf(event);
+				if (mode === "erase") {
+					const hit = markAt(marks, at);
+					const element = hit ? undefined : elementAt(elements, at);
+					if (hit) setMarks(marks.filter(mark => mark !== hit));
+					else if (element) onDeselect(element.id);
+					return;
+				}
+				event.currentTarget.setPointerCapture(event.pointerId);
+				setDrawing(mode === "draw" ? { kind: "stroke", points: [at] } : { kind: "region", from: at, to: at });
+			}}
+			onPointerMove={event => {
+				if (!drawing) return;
+				const at = pointOf(event);
+				setDrawing(drawing.kind === "stroke" ? { kind: "stroke", points: [...drawing.points, at] } : { ...drawing, to: at });
+			}}
+			onPointerUp={event => {
+				if (!drawing) return;
+				setDrawing(null);
+				const id = nextId.current++;
+				const { clientWidth, clientHeight } = event.currentTarget;
+				if (drawing.kind === "stroke") {
+					const area = strokeArea(drawing.points);
+					if (area && drawing.points.length > 1) setMarks([...marks, { kind: "stroke", id, points: drawing.points, area }]);
+					return;
+				}
+				const area = dragArea(drawing.from, pointOf(event), clientWidth, clientHeight);
+				if (area) setMarks([...marks, { kind: "region", id, area }]);
+			}}
+		>
+			<svg aria-hidden className="pointer-events-none absolute inset-0 size-full overflow-visible">
+				{marks.map(mark =>
+					mark.kind === "region" ? (
+						<rect key={mark.id} {...rectProps(mark.area)} className="fill-current/6 stroke-current" strokeWidth={2} />
+					) : (
+						<path key={mark.id} d={pathOf(mark.points)} className="fill-none stroke-current" strokeWidth={STROKE_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
+					),
 				)}
-				style={{ color }}
-				onPointerDown={event => {
-					if (event.button !== 0 || event.target !== event.currentTarget) return;
-					const at = pointOf(event);
-					if (mode === "erase") {
-						const hit = markAt(marks, at);
-						const element = hit ? undefined : elementAt(elements, at);
-						if (hit) setMarks(marks.filter(mark => mark !== hit));
-						else if (element) onDeselect(element.id);
-						return;
-					}
-					event.currentTarget.setPointerCapture(event.pointerId);
-					setDrawing(mode === "draw" ? { kind: "stroke", points: [at] } : { kind: "region", from: at, to: at });
-				}}
-				onPointerMove={event => {
-					if (!drawing) return;
-					const at = pointOf(event);
-					setDrawing(drawing.kind === "stroke" ? { kind: "stroke", points: [...drawing.points, at] } : { ...drawing, to: at });
-				}}
-				onPointerUp={event => {
-					if (!drawing) return;
-					setDrawing(null);
-					const id = nextId.current++;
-					const { clientWidth, clientHeight } = event.currentTarget;
-					if (drawing.kind === "stroke") {
-						const area = strokeArea(drawing.points);
-						if (area && drawing.points.length > 1) setMarks([...marks, { kind: "stroke", id, points: drawing.points, area }]);
-						return;
-					}
-					const area = dragArea(drawing.from, pointOf(event), clientWidth, clientHeight);
-					if (area) setMarks([...marks, { kind: "region", id, area }]);
-				}}
-			>
-				<svg aria-hidden className="pointer-events-none absolute inset-0 size-full overflow-visible">
-					{marks.map(mark =>
-						mark.kind === "region" ? (
-							<rect key={mark.id} {...rectProps(mark.area)} className="fill-current/6 stroke-current" strokeWidth={2} />
-						) : (
-							<path key={mark.id} d={pathOf(mark.points)} className="fill-none stroke-current" strokeWidth={STROKE_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
-						),
-					)}
-					{drawingArea && <rect {...rectProps(drawingArea)} className="fill-current/6 stroke-current" strokeWidth={2} />}
-					{drawing?.kind === "stroke" && (
-						<path d={pathOf(drawing.points)} className="fill-none stroke-current" strokeWidth={STROKE_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
-					)}
-				</svg>
-				{(marks.length > 0 || elements.length > 0) && (
-					<div
-						ref={cardRef}
-						className={cn(
-							"pointer-events-auto absolute flex w-[min(360px,calc(100%-16px))] cursor-default items-start gap-2 rounded-xl border border-border bg-popover/95 p-2 text-popover-foreground shadow-2xl backdrop-blur-xl",
-							place === null && "invisible",
-						)}
-						style={{ left: place?.x ?? 0, top: place?.y ?? 0 }}
-					>
-						<textarea
-							// Focused once the first mark is drawn or element selected, as in T3 Code, so the comment is typed next.
-							autoFocus
-							rows={1}
-							value={comment}
-							placeholder="Describe the change…"
-							aria-label="Comment on the marks"
-							className="field-sizing-content max-h-24 min-h-8 min-w-0 flex-1 resize-none border-0 bg-transparent px-0 py-1.5 text-sm leading-5 text-foreground outline-none placeholder:text-muted-foreground"
-							onChange={event => setComment(event.target.value)}
-							onKeyDown={event => {
-								if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
-								event.preventDefault();
-								attach();
-							}}
-						/>
-						<Button {...activityControl("browser.annotation.attach")} size="compact" className="mt-0.5 shrink-0" loading={attaching} onClick={attach}>
-							Attach
-						</Button>
-					</div>
+				{drawingArea && <rect {...rectProps(drawingArea)} className="fill-current/6 stroke-current" strokeWidth={2} />}
+				{drawing?.kind === "stroke" && (
+					<path d={pathOf(drawing.points)} className="fill-none stroke-current" strokeWidth={STROKE_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
 				)}
-			</div>
-			<div
-				role="radiogroup"
-				aria-label="Pick mode"
-				className="absolute top-2.5 left-1/2 z-20 flex -translate-x-1/2 gap-0.5 rounded-lg border border-border bg-popover/95 p-1 text-popover-foreground shadow-lg backdrop-blur-xl"
-			>
-				{MODES.map(item => (
-					<button
-						key={item.mode}
-						{...activityControl(item.control)}
-						type="button"
-						role="radio"
-						aria-checked={item.mode === mode}
-						title={`${item.hint} (${shortcutKeys(item.shortcut)})`}
-						className={cn(
-							"h-7 rounded-md px-2.5 text-xs font-medium outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/40",
-							item.mode === mode && "bg-primary/10 text-primary hover:bg-primary/10",
-						)}
-						onClick={() => onMode(item.mode)}
-					>
-						{item.label}
-					</button>
-				))}
-			</div>
-		</>
+			</svg>
+			{(marks.length > 0 || elements.length > 0) && (
+				<div
+					ref={cardRef}
+					className={cn(
+						"pointer-events-auto absolute flex w-[min(360px,calc(100%-16px))] cursor-default items-start gap-2 rounded-xl border border-border bg-popover/95 p-2 text-popover-foreground shadow-2xl backdrop-blur-xl",
+						place === null && "invisible",
+					)}
+					style={{ left: place?.x ?? 0, top: place?.y ?? 0 }}
+				>
+					<textarea
+						// Focused once the first mark is drawn or element selected, as in T3 Code, so the comment is typed next.
+						autoFocus
+						rows={1}
+						value={comment}
+						placeholder="Describe the change…"
+						aria-label="Comment on the marks"
+						className="field-sizing-content max-h-24 min-h-8 min-w-0 flex-1 resize-none border-0 bg-transparent px-0 py-1.5 text-sm leading-5 text-foreground outline-none placeholder:text-muted-foreground"
+						onChange={event => setComment(event.target.value)}
+						onKeyDown={event => {
+							if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+							event.preventDefault();
+							attach();
+						}}
+					/>
+					<Button {...activityControl("browser.annotation.attach")} size="compact" className="mt-0.5 shrink-0" loading={attaching} onClick={attach}>
+						Attach
+					</Button>
+				</div>
+			)}
+		</div>
+	);
+}
+
+/** The switch between the pick modes, floating at the top of the Browser's stage, over any scaled frame, so a small one never clips it. */
+export function PickModes({ mode, onMode }: { mode: PickMode; onMode: (mode: PickMode) => void }) {
+	return (
+		<div
+			role="radiogroup"
+			aria-label="Pick mode"
+			className="absolute top-2.5 left-1/2 z-20 flex -translate-x-1/2 gap-0.5 rounded-lg border border-border bg-popover/95 p-1 text-popover-foreground shadow-lg backdrop-blur-xl"
+		>
+			{MODES.map(item => (
+				<button
+					key={item.mode}
+					{...activityControl(item.control)}
+					type="button"
+					role="radio"
+					aria-checked={item.mode === mode}
+					title={`${item.hint} (${shortcutKeys(item.shortcut)})`}
+					className={cn(
+						"h-7 rounded-md px-2.5 text-xs font-medium outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/40",
+						item.mode === mode && "bg-primary/10 text-primary hover:bg-primary/10",
+					)}
+					onClick={() => onMode(item.mode)}
+				>
+					{item.label}
+				</button>
+			))}
+		</div>
 	);
 }
 
