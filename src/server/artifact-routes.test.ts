@@ -7,7 +7,7 @@ import { artifactRoutes } from "./artifact-routes";
 import { guardsFor } from "./http";
 import { routeKit } from "./route-kit";
 
-const token = "a".repeat(43);
+const token = "t".repeat(43);
 const guards = guardsFor(4317, token);
 const dir = mkdtempSync(join(tmpdir(), "omp-artifact-routes-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));

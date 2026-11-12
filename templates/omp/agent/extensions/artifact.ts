@@ -51,7 +51,7 @@ export default function artifact(pi: ExtensionAPI): void {
 				let text: string;
 				try { text = new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
 				catch { return refuse("Artifacts must be UTF-8 text."); }
-				if (kind === "svg" && !/<svg(?:\s|>)/i.test(text)) return refuse("The SVG file must contain an <svg> element.");
+				if (kind === "svg" && !/<svg(?:\s|\/?>)/i.test(text)) return refuse("The SVG file must contain an <svg> element.");
 				const sha256 = createHash("sha256").update(bytes).digest("hex");
 				await keepVersion(dir, sha256, kind, bytes);
 				return { content: [{ type: "text", text: `Saved ${title}. The user sees it in the Artifacts tab.` }], details: { file, kind, title, note, sha256, bytes: bytes.length } };

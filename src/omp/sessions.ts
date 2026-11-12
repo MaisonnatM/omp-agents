@@ -108,7 +108,7 @@ export async function readSessionFile(path: string): Promise<SavedSession | null
 
 /**
  * The current native header of the session file at `path`, without the listing cache, bounded as omp's own header reader
- * is: its session id, and its cwd when absolute. `null` while the file has no header yet.
+ * is, including its session id, absolute cwd, and parent session link. `null` while the file has no header yet.
  */
 export async function readSessionHeader(path: string): Promise<{ id: string; cwd: string | null; parentSession: string | null } | null> {
 	let header: { id: string; cwd: string | null; parentSession: string | null } | null = null;

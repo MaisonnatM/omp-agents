@@ -1215,7 +1215,7 @@ describe("artifact", () => {
 	});
 
 	test("each kit source extension produces details accepted by the shared parser", () => {
-		for (const [extension, kind, text] of [["html", "html", "<p>page</p>"], ["htm", "html", "<p>page</p>"], ["md", "markdown", "# Page"], ["markdown", "markdown", "# Page"], ["svg", "svg", "<svg></svg>"]]) {
+		for (const [extension, kind, text] of [["html", "html", "<p>page</p>"], ["htm", "html", "<p>page</p>"], ["md", "markdown", "# Page"], ["markdown", "markdown", "# Page"], ["svg", "svg", "<svg/>"]]) {
 			writeFileSync(join(local, `page.${extension}`), text!);
 			const result = save(`local://page.${extension}`);
 			expect(result.isError).toBe(false);
