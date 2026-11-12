@@ -131,7 +131,12 @@ function ArtifactBody({ view, sessionId, artifact, version, source, onSource }: 
 						<SegmentedTabsList aria-label="Versions" className="flex-wrap">
 							{artifact.versions.map(each => (
 								<Tooltip key={each.number} content={`Version ${each.number}${each.save.note ? ` · ${each.save.note}` : ""} · saved ${mailTime(each.save.savedAt)}`}>
-									<SegmentedTab {...activityControl("artifacts.version")} value={String(each.number)} aria-label={`Version ${each.number}`} className={cn("min-w-6 px-1.5 tabular-nums", TALLER_TAP)}>
+									<SegmentedTab
+										{...activityControl("artifacts.version")}
+										value={String(each.number)}
+										aria-label={`Version ${each.number}`}
+										className={cn("min-w-6 px-1.5 tabular-nums aria-selected:bg-foreground aria-selected:text-background aria-selected:hover:bg-foreground dark:aria-selected:bg-foreground", TALLER_TAP)}
+									>
 										{each.number}
 									</SegmentedTab>
 								</Tooltip>
