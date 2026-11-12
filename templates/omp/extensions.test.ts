@@ -1206,6 +1206,7 @@ describe("artifact", () => {
 		const run = (note?: string) => save("local://noted.html", { runs: [{ path: "local://noted.html", title: "Noted", ...(note !== undefined && { note }) }] });
 		expect(parseArtifactSave(run().details)?.note).toBeNull();
 		expect(parseArtifactSave(run("  Changed heading  ").details)?.note).toBe("Changed heading");
+		expect(parseArtifactSave(run("x".repeat(120)).details)?.note).toBe("x".repeat(120));
 		for (const note of [" ", "x".repeat(121), "two\nlines"]) expect(run(note).isError).toBe(true);
 	});
 	test("symlinks cannot escape the local root", () => {
@@ -1215,7 +1216,7 @@ describe("artifact", () => {
 	});
 
 	test("each kit source extension produces details accepted by the shared parser", () => {
-		for (const [extension, kind, text] of [["html", "html", "<p>page</p>"], ["htm", "html", "<p>page</p>"], ["md", "markdown", "# Page"], ["markdown", "markdown", "# Page"], ["svg", "svg", "<svg/>"]]) {
+		for (const [extension, kind, text] of [["html", "html", "<p>page</p>"], ["htm", "html", "<p>page</p>"], ["HTML", "html", "<p>page</p>"], ["md", "markdown", "# Page"], ["markdown", "markdown", "# Page"], ["svg", "svg", "<svg/>"]]) {
 			writeFileSync(join(local, `page.${extension}`), text!);
 			const before = Date.now();
 			const result = save(`local://page.${extension}`);
@@ -1235,14 +1236,18 @@ describe("artifact", () => {
 		expect(readFileSync(join(dir, "artifact-versions", `${parsed.sha256}.${parsed.kind}`), "utf8")).toBe("<p>same</p>");
 		expect(readdirSync(join(dir, "artifact-versions")).filter(name => name.startsWith(parsed.sha256))).toEqual([`${parsed.sha256}.html`]);
 	});
+	test("a file of exactly 2 MiB saves", () => {
+		writeFileSync(join(local, "limit.md"), "x".repeat(2 * 1024 * 1024));
+		expect(parseArtifactSave(save("local://limit.md").details)?.bytes).toBe(2 * 1024 * 1024);
+	});
 	test("refuses unsupported, empty, oversized, invalid UTF-8, and non-SVG files", () => {
 		for (const [file, content] of [["empty.html", ""], ["large.html", "x".repeat(2 * 1024 * 1024 + 1)], ["bad.html", Buffer.from([0xff])], ["bad.svg", "<p>not svg</p>"], ["page.txt", "text"]] as const) {
 			writeFileSync(join(local, file), content);
 			expect(save(`local://${file}`).isError).toBe(true);
 		}
 	});
-	test("refuses paths outside local and sessions without an artifacts directory", () => {
-		for (const path of ["/tmp/page.html", "local://../page.html", "local:///tmp/page.html", "local://a/../page.html"]) expect(save(path).isError).toBe(true);
+	test("refuses paths outside local, missing files, and sessions without an artifacts directory", () => {
+		for (const path of ["/tmp/page.html", "local://../page.html", "local:///tmp/page.html", "local://a/../page.html", "local://missing.html"]) expect(save(path).isError).toBe(true);
 		expect(save("local://page.html", { artifactsDir: null }).isError).toBe(true);
 		expect(save("local://page.html", { agent: "sub" }).isError).toBe(true);
 	});
