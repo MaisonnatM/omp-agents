@@ -58,7 +58,7 @@ export function ArtifactsPanel({ view, sessionId, artifacts, open }: ArtifactsPa
 		<Tabs value={artifact.file} onValueChange={file => pickArtifact(view, { file, version: "latest" })} className="@container/artifacts flex min-h-0 flex-1 flex-col">
 			<div className="shrink-0 border-b border-border px-4 py-2">
 				<SizeProvider size="compact">
-					<TabsList aria-label="Artifacts">
+					<TabsList aria-label="Artifacts" className="flex-wrap">
 						{artifacts.map(each => (
 							<TabItem {...activityControl("artifacts.artifact")} key={each.file} value={each.file} icon={ARTIFACT_KIND[each.kind].icon} label={each.title} />
 						))}
