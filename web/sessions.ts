@@ -1,7 +1,7 @@
 /** What the roster and past-session lists say about where sessions ran, and what they work on. */
 import type { ScheduledSend } from "../src/shared/scheduled";
 import { awaitsSubagents, newestPastFirst, type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
-import { inTempDir, type Space, type Spaces, type Workspace } from "../src/shared/workspaces";
+import { inAppData, inTempDir, type Space, type Spaces, type Workspace } from "../src/shared/workspaces";
 import { everyWord } from "../src/shared/every-word";
 import { needsYou } from "./attention";
 import type { Layout, Page } from "./routing";
@@ -131,10 +131,14 @@ export function defaultCwd(view: View | null, hosts: RosterHost[], past: PastSes
 	return chosen ? workspaceOf(chosen).cwdDisplay : "~";
 }
 
-/** The workspaces sessions count in, live ones first, then past ones newest first, then the ones Settings → Workspaces added. The settings page reads a workspace from one. */
+/**
+ * The workspaces sessions count in, live ones first, then past ones newest first, then the ones Settings → Workspaces added. A
+ * session in a gone directory, or in an app's own data, adds none. The settings page reads a workspace from one.
+ */
 export function listWorkspaces(hosts: RosterHost[], past: PastSession[], added: readonly Workspace[]): Workspace[] {
 	const byCwd = new Map<string, string>();
-	for (const row of [...[...hosts.toSorted(newestFirst), ...past].map(workspaceOf), ...added]) {
+	const ran = [...hosts.toSorted(newestFirst), ...past].filter(row => !row.gone).map(workspaceOf).filter(({ cwd }) => !inAppData(cwd));
+	for (const row of [...ran, ...added]) {
 		// Sessions from old omp versions recorded no directory.
 		if (row.cwd && !byCwd.has(row.cwd)) byCwd.set(row.cwd, row.cwdDisplay);
 	}

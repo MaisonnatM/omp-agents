@@ -11,7 +11,7 @@ function host(instanceId: string, sessionId = `session-${instanceId}`, agents: A
 		control: { phase: "live", readOnly: false }, requests: [], queue: { steering: [], followUp: [] },
 		unread: null, turnWaits: false, thinkingLevels: [], switching: false, fast: null, pullRequests: [], tickets: [], ship: null, arenas: [],
 		compaction: { auto: true, running: null, thresholdTokens: null }, advisor: null, goal: { kind: "none", continues: false },
-		worktree: null, branch: null, workspace: null, private: false,
+		worktree: null, branch: null, workspace: null, gone: false, private: false,
 	};
 }
 

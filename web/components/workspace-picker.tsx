@@ -1,12 +1,15 @@
 /** The workspace picker: the searchable directory list for the roster and the new session's directory. */
-import { Folder } from "lucide-react";
+import { Folder, FolderPlus } from "lucide-react";
 import { useContext, useState } from "react";
+import { errorText } from "../../src/json";
 import type { ControlId } from "../../src/shared/activity";
 import type { Workspace } from "../../src/shared/workspaces";
 import { sameDir, workspaceName } from "../labels";
+import { createWorkspace } from "../reads";
 import type { ShortcutId } from "../shortcuts";
 import { CommandPicker, type PickerItem } from "./command-picker";
 import { PersonalContext } from "./dashboard-context";
+import { toasts } from "./toaster";
 
 /** The same visible directory row and search words for the roster and the new-session picker; `personal` reads as **Personal**. */
 export function workspaceItems(workspaces: Workspace[], current: string | null, personal: Workspace | null, onPick: (workspace: Workspace) => void): PickerItem[] {
@@ -42,13 +45,22 @@ interface DirectoryPickerProps {
 	control?: ControlId;
 }
 
-/** A working directory: a workspace of the space, **Personal** first in Personal, or any directory typed into the search field. */
+/** A working directory: a workspace of the space, **Personal** first in Personal, or any directory typed into the search field, used as is or created as a new workspace. */
 export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shortcut, side = "top", open, onOpenChange, onPick, control }: DirectoryPickerProps) {
 	const personal = useContext(PersonalContext);
 	const [query, setQuery] = useState("");
 	const typed = query.trim();
 	const pick = (next: string): void => {
 		if (next !== cwd) onPick(next);
+	};
+	const create = async (path: string): Promise<void> => {
+		try {
+			await createWorkspace(path);
+		} catch (error) {
+			toasts.add({ title: `Could not create ${path}`, description: errorText(error) });
+			return;
+		}
+		pick(path);
 	};
 	return (
 		<CommandPicker
@@ -90,6 +102,16 @@ export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shor
 											</span>
 											),
 											onSelect: () => pick(typed),
+										},
+										{
+											value: `create ${typed}`,
+											icon: FolderPlus,
+											label: (
+												<span className="truncate">
+													Create folder <span className="font-mono">{typed}</span>
+												</span>
+											),
+											onSelect: () => void create(typed),
 										},
 									],
 								},

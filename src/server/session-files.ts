@@ -74,9 +74,9 @@ export class SessionFiles {
 		return path === null ? [] : this.facts.fileDirsOf(path);
 	};
 
-	/** The workspace each session counts in, newest first. Sessions from old omp versions recorded no directory. */
-	workspaces(): string[] {
-		return this.#files.map(session => this.facts.placement.cwdOf(session.cwd)).filter(Boolean);
+	/** The directory each session ran in, newest first. Sessions from old omp versions recorded none. */
+	cwds(): string[] {
+		return this.#files.map(session => session.cwd).filter(Boolean);
 	}
 
 	/** Session-file activity for the worktree inventory, including a session whose directory sits inside a checkout. */

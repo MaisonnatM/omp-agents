@@ -5,6 +5,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-12
 
+- The workspace pickers no longer list folders that were deleted, or folders inside an app's own data such as ~/.cache, ~/.codex, or ~/Library.
+- A session in a subfolder of a project, or in a test project made inside it, now counts in that project's workspace instead of adding one of its own.
+- In the new session's folder picker, type a path and choose Create folder to make that folder and start there.
 - In the box you type a prompt in, / now lists commands, $ lists skills by name, and @ stays for files and other mentions.
 - The plan usage at the bottom of the screen now shows one short chip per account, such as `yampa 5h 71% left · ✦ 2`, naming the account when a provider has two and how many windows are used up. Hovering or clicking a chip opens a card with every window's bar, when it resets, such as "Resets in 1d3h · Fri 13 Nov, 14:00", and the reset credits left.
 - You can ask an agent to make a page, a document, or a drawing for you to look at, and it opens beside the conversation in the new Artifacts tab of the right sidebar.
