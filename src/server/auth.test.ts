@@ -94,6 +94,13 @@ describe("API and socket guards", () => {
 		expect(guards.admitCapability(request(`/api/artifact?cap=${cap}`), null)?.status).toBe(403);
 	});
 
+	test("a capability opens only under the token that signed it", () => {
+		const purpose = "artifact main version";
+		const restarted = guardsFor(4317, "B".repeat(43));
+		expect(restarted.admitCapability(request(`/api/artifact?cap=${restarted.capabilityKey(purpose)}`), purpose)).toBeNull();
+		expect(restarted.admitCapability(request(`/api/artifact?cap=${guards.capabilityKey(purpose)}`), purpose)?.status).toBe(403);
+	});
+
 	test("without the Bearer token the request is 401, with it admitted", () => {
 		expect(guards.admit(request("/api/settings"))?.status).toBe(401);
 		expect(guards.admit(request("/api/settings", { authorization: "Bearer wrong" }))?.status).toBe(401);

@@ -85,6 +85,14 @@ describe("artifact routes", () => {
 		expect(response.status).toBe(200);
 		expect(await response.text()).toBe("ancestor copy");
 	});
+	test("a parent link that names a session id, as some omp forks write, is followed through the session's file", async () => {
+		session("id-parent");
+		copy("id-parent", `${sha}.svg`, "<svg/>");
+		session("id-child", "id-parent");
+		const response = await request(await link("id-child", `${sha}.svg`));
+		expect(response.status).toBe(200);
+		expect(await response.text()).toBe("<svg/>");
+	});
 	test("parent cycles stop at the depth cap", async () => {
 		const file = join(dir, "cycle.jsonl");
 		session("cycle", file);
