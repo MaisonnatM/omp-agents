@@ -21,7 +21,7 @@ Bun answers a `Range` request with a 206 and that part, so a video seeks.
 It sends `Cache-Control: private, no-cache`, since a file can change under the same path, and `Content-Security-Policy: sandbox; default-src 'none'`, so an SVG opened at that address runs no script on the page's origin.
 
 `GET /api/artifact-link?session=<id>&version=<sha256>.<kind>` requires the bearer token and returns `{ url }`, a capability URL for exactly one version of one session.
-`GET /api/artifact?session=<id>&version=<sha256>.<kind>&cap=<key>` needs no bearer token, but checks its host, fetch site, and capability before serving the immutable copy.
+`GET /api/artifact?session=<id>&version=<sha256>.<kind>&cap=<key>` needs no bearer token, answers 400 to a malformed query, and otherwise checks its host, fetch site, and capability before serving the immutable copy.
 HTML runs under an opaque-origin sandbox CSP, SVG runs no scripts, and Markdown is plain text.
 Every kind sends `nosniff`, `no-referrer`, and a private immutable cache header.
 The route checks the live session's file before the saved index, includes private live sessions, and follows a fork's native parent link when its own copy is absent.

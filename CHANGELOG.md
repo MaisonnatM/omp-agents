@@ -5,12 +5,15 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-12
 
-- You can ask an agent to make a page, a document, or a drawing for you to look at, and it opens beside the conversation in the new Artifacts tab of the right sidebar, ready to use: a page's buttons and forms work, sealed off from the dashboard.
-- You can go back to any earlier version of an artifact: each time the agent saves it again, a numbered version is kept with a short note on what changed, and Go to latest returns to the newest.
+- You can ask an agent to make a page, a document, or a drawing for you to look at, and it opens beside the conversation in the new Artifacts tab of the right sidebar.
+- A page in the Artifacts tab is ready to use: its buttons and forms work, sealed off from the dashboard.
+- Each time the agent saves an artifact again, a numbered version is kept with a short note on what changed, so you can go back to any earlier one.
+- Go to latest, beside an earlier version, returns to the newest one.
 - You can see each save in the conversation as "Saved … as version N", and its Open button shows that version in the sidebar, even from a pane beside others.
 - You can switch an artifact between how it looks and its source text, copy it, download it, or open it in its own browser tab.
 - The pull request description tool and the ship workflow now stop a gh command that hangs after 20 seconds and say which one timed out, such as "gh pr view timed out after 20s", where they could wait many minutes and then report only "gh exited -1".
-- Fixed: a session's title no longer disappears in a narrow header, such as beside a wide right sidebar; the header's buttons fold into one menu named after the tab you are on, as on a phone, so the title keeps room to read.
+- Fixed: a session's title no longer disappears in a narrow header, such as beside a wide right sidebar.
+- In a narrow header, the header's buttons now fold into one menu named after the tab you are on, as on a phone, so the title keeps room to read.
 - Fixed: a session's header beside a wide right sidebar now takes at most two rows, the title and then its buttons, where it could take three.
 - The menu named after your tab in a narrow header now shows a blue dot on its button and a count beside Personal or Work while the other space has sessions that need you, as the switch it replaces does.
 - Fixed: on a phone or in a narrow conversation, the Session card above the messages no longer looks like it covers them: it sits flat with a gap below it, and keeps its shadow only where it floats beside the messages.

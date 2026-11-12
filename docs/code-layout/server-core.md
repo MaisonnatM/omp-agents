@@ -36,7 +36,7 @@
   `src/server/dir-param.ts` reads the `?cwd=` directory the session and file groups both take.
   Every read goes through `get`, and every write through `write(parse, run, refuse?)`, which checks the origin and the JSON body, answers a body `parse` refuses with its response, and maps an error `run` throws through `refuse`, else to a 500.
   A route that an image, a video, or a mail frame loads goes through `media` instead of `get`, which also takes the media key as `?key=`, since such a tag sends no header.
-  `capability` admits one resource with `?cap=` rather than a bearer token or media key, including address-bar opens.
+  `capability` takes a parser for a resource's query and the purpose a parsed query names; its `serve` answers 400 to a query the parser refuses, then admits that one resource with `?cap=` rather than a bearer token or media key, including address-bar opens, and its `sign` makes the key a link carries.
   `src/server/calendar-routes.ts` serves the calendar group, Google Calendar's calendars and events and the events kept on this computer, which `routes.ts` composes with the rest.
   `src/server/storage-routes.ts` serves Storage's `GET /api/storage` and `PUT /api/storage/cleanup`, taking only sandbox preview and removal through `StorageRoutesEnv`; its `untimed` wrapper removes the idle timeout for these long requests.
   `src/server/package-caches.ts` previews and prunes the uv, pnpm, and bun caches for the Package caches step, putting back the uv entries a running process has open.
@@ -44,7 +44,7 @@
   A shape the server also keeps in a file is parsed by its domain module, which `wire.ts` imports, so a file store never imports the transport: `parseRoutineSpec` in `src/routines.ts`, `parseScheduledSpec` in `src/shared/scheduled.ts`, `parseEventWhen` in `src/shared/calendar.ts`, `parseProcessSettings` in `src/shared/processes.ts`, and `parseNewSessionRequest`, the new-session start that a scheduled start keeps, in `src/shared/sessions.ts`.
 - `src/server/artifact-routes.ts` serves bearer-authenticated artifact links and capability-authenticated version bytes under each kind's sandbox CSP.
   Its ancestor lookup follows the native header's `parentSession` for at most eight session files when a fork has no copy of its own.
-  `src/server/artifact-routes.test.ts` covers scoped capabilities, missing copies, fork inheritance, bounded parent cycles, and each kind's response headers.
+  `src/server/artifact-routes.test.ts` covers scoped capabilities, a malformed query answered 400 before any capability check, missing copies, fork inheritance, bounded parent cycles, and each kind's response headers.
 - `src/terminals.ts`: the terminal panel's shells, each in a pseudo-terminal with its scrollback; `src/server/terminal-socket.ts` handles the `/ws/terminal` sockets that attach to them, and `src/shared/terminals.ts` holds the shapes and messages the page shares.
 - `src/server/activity-store.ts`: `ActivityStore`, the page's activity events in `activity.db`, which only the server holding `server.lock` writes and prunes; see [Activity](../architecture/activity.md).
   `src/server/activity-routes.ts` serves `GET /api/activity`, composed after every other route group so it lists their `PUT` paths as the inventory's server actions.

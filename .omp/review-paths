@@ -9,6 +9,7 @@ src/shared/readiness.ts
 src/shared/startup.ts
 src/shared/extensions.ts
 src/shared/desktop-bridge.ts
+src/shared/artifacts.ts
 src/live-session.ts
 src/omp/modules.ts
 src/omp/module-types/**
