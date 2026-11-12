@@ -10,6 +10,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - You can see each save in the conversation as "Saved … as version N", and its Open button shows that version in the sidebar, even from a pane beside others.
 - You can switch an artifact between how it looks and its source text, copy it, download it, or open it in its own browser tab.
 - The pull request description tool and the ship workflow now stop a gh command that hangs after 20 seconds and say which one timed out, such as "gh pr view timed out after 20s", where they could wait many minutes and then report only "gh exited -1".
+- Fixed: a session's title no longer disappears in a narrow header, such as beside a wide right sidebar; the header's buttons fold into one menu named after the tab you are on, as on a phone, so the title keeps room to read.
+- Fixed: a session's header beside a wide right sidebar now takes at most two rows, the title and then its buttons, where it could take three.
+- Fixed: on a phone or in a narrow conversation, the Session card above the messages no longer looks like it covers them: it sits flat with a gap below it, and keeps its shadow only where it floats beside the messages.
 
 ## 2026-11-11
 
