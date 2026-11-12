@@ -1,5 +1,6 @@
 /** What a transcript shows: its items, the files its agent changed, its images, and the files it opens. */
 
+import type { ArtifactSave } from "./artifacts";
 import { type BotMessage, readBotMessage } from "./bot-message";
 import type { BotId } from "./bots";
 import type { DiffRow } from "./changes";
@@ -93,8 +94,9 @@ export type Item =
 	 * `images`: the addresses of the images its result returned, such as a screenshot, as a prompt's; absent when none.
 	 * `todos`: the agent's whole todo list after a successful `todo` call; absent for every other call.
 	 * `to`: the Bot a `message_bot` call messaged; absent for every other call.
+	 * `artifact`: the checked record of a successful artifact save, absent on other tools or failed saves.
 	 */
-	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; agents: string[]; images?: string[]; todos?: TodoPhase[]; to?: BotId }
+	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; agents: string[]; images?: string[]; todos?: TodoPhase[]; artifact?: ArtifactSave; to?: BotId }
 	| { id: string; kind: "notice"; level: "info" | "warning" | "error"; text: string };
 
 /** A prompt the page shows: the user's, a routine's, or another Bot's message; the dashboard's opens a turn but shows nothing. */
