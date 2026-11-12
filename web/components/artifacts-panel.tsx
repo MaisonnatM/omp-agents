@@ -125,17 +125,19 @@ function ArtifactBody({ view, sessionId, artifact, version, source, onSource }: 
 					</time>
 				</p>
 				<div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5">
-					<span className="text-[12px] text-muted-foreground">Version</span>
-					{/* Its own tabs, which switch no panel: the arrow keys move between versions and Enter shows one, so passing one loads nothing. */}
+					<span className="text-xs text-muted-foreground">Version</span>
+					{/* Its own tabs, which switch no panel and so name none: the arrow keys move between versions and Enter shows one, so passing one loads nothing. */}
 					<SegmentedTabs value={String(version.number)} onValueChange={value => pick(artifact.versions.find(each => String(each.number) === value)!)} activationMode="manual">
-						<SegmentedTabsList aria-label="Versions" className="flex-wrap bg-transparent p-0">
+						<SegmentedTabsList variant="pills" aria-label="Versions">
 							{artifact.versions.map(each => (
 								<Tooltip key={each.number} content={`Version ${each.number}${each.save.note ? ` · ${each.save.note}` : ""} · saved ${mailTime(each.save.savedAt)}`}>
 									<SegmentedTab
 										{...activityControl("artifacts.version")}
 										value={String(each.number)}
+										variant="pills"
 										aria-label={`Version ${each.number}`}
-										className={cn("min-w-6 px-1.5 tabular-nums aria-selected:bg-foreground aria-selected:text-background aria-selected:hover:bg-foreground dark:aria-selected:bg-foreground", TALLER_TAP)}
+										aria-controls={undefined}
+										className={TALLER_TAP}
 									>
 										{each.number}
 									</SegmentedTab>
