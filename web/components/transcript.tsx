@@ -64,13 +64,13 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
-import { requestArtifact, useShownArtifact } from "../artifact-requests";
-import { artifactNumbers } from "../artifacts-model";
+import { openArtifact, useShownArtifact } from "../artifact-requests";
+import { versionNumber } from "../artifacts-model";
 import { mediaSrc } from "../api";
 import { SPLIT_CLICK, subagentModeOf } from "../labels";
 import { hashForView, sameView } from "../routing";
 import type { StartOf } from "../starts";
-import { usePaneLoaded, useTranscript } from "../pane-store";
+import { useArtifacts, usePaneLoaded, useTranscript } from "../pane-store";
 import { revealed, useReveal } from "../message-reveal";
 import { type ActivityItem, EMPTY_TRANSCRIPT, type ForkPoint, replacingPrompt, resendOf, type ToolItem, transcriptModel, withEditedPrompt } from "../transcript-view";
 import { useAction } from "../use-action";
@@ -396,7 +396,7 @@ const ArtifactRow = memo(function ArtifactRow({ id, view, save, number, showing,
 	if (!shown) return null;
 	return (
 		<Row messageId={id} settled={settled}>
-			<ArtifactCard save={save} number={number} showing={showing} onOpen={() => requestArtifact({ view, file: save.file, version: number, reason: "clicked" })} />
+			<ArtifactCard save={save} number={number} showing={showing} onOpen={() => openArtifact(view, { file: save.file, version: number })} />
 		</Row>
 	);
 });
@@ -659,7 +659,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	const modelRef = useRef(EMPTY_TRANSCRIPT);
 	const model = useMemo(() => (modelRef.current = transcriptModel(items, working, modelRef.current)), [items, working]);
 	const { blocks, forks, replies, images } = model;
-	const numbers = useMemo(() => artifactNumbers(items), [items]);
+	const artifacts = useArtifacts(view);
 	const shownArtifact = useShownArtifact(view);
 	// Settled rows skip layout off screen only once every row has laid out, so each remembers its real height. The
 	// second frame comes after the browser laid out the first one. Anything that changes rows' heights while off screen,
@@ -786,7 +786,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 								}
 								if (block.kind === "artifact") {
 									const { id, artifact } = block.item;
-									const number = numbers.get(id) ?? 1;
+									const number = versionNumber(artifacts, block.item);
 									return (
 										<ArtifactRow
 											key={id}

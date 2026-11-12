@@ -2,8 +2,8 @@
 import { AppWindow, Brain, GitPullRequest, Sparkles } from "lucide-react";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { LiveView, RosterHost, View } from "../../src/shared/sessions";
-import { type Artifact, artifactsOf, sameArtifacts } from "../artifacts-model";
-import { type PaneData, usePaneSelect } from "../pane-store";
+import type { Artifact } from "../artifacts-model";
+import { useArtifacts } from "../pane-store";
 import { PAGE_ICON } from "../page-icons";
 import { type DetailsTab, DetailsSidebarFrame } from "./details-sidebar-frame";
 import { isPhonePage } from "../api";
@@ -31,10 +31,10 @@ export interface SessionWork {
 	live: LiveView | null;
 	/** The view the sidebar belongs to, whose transcript's cards the **Artifacts** tab answers. */
 	view: View;
+	/** The session whose artifacts these are, which their addresses name; `null` while unknown, as for a subagent, which leaves the **Artifacts** tab out. */
+	sessionId: string | null;
 	/** The artifacts the view's session saved, most recently saved first. */
 	artifacts: Artifact[];
-	/** Whether the right sidebar is open. */
-	open: boolean;
 }
 
 /** The **Tickets** tab once the session worked on any Linear issue; none before. */
@@ -44,7 +44,7 @@ export const ticketsTabs = (tickets: string[], working: boolean): DetailsTab<"ti
 		: [];
 
 /** The **PRs** tab, the **Tickets** tab once the session worked on any, the **Browser** tab for a live session in the desktop app, and the **Artifacts** tab once the session saved any. */
-export function sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, live, view, artifacts, open }: SessionWork): DetailsTab<"pull-requests" | "browser" | "tickets" | "artifacts">[] {
+export function sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, live, view, sessionId, artifacts }: SessionWork): DetailsTab<"pull-requests" | "browser" | "tickets" | "artifacts">[] {
 	return [
 		{
 			value: "pull-requests",
@@ -70,7 +70,7 @@ export function sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, 
 					} as const,
 				]
 			: []),
-		...(artifacts.length > 0
+		...(sessionId !== null && artifacts.length > 0
 			? [
 					{
 						value: "artifacts",
@@ -79,15 +79,12 @@ export function sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, 
 						control: "session-details.tab.artifacts",
 						count: artifacts.length,
 						scrollsItself: true,
-						content: <ArtifactsPanel key={scope} view={view} sessionId={scope} artifacts={artifacts} open={open} />,
+						content: <ArtifactsPanel key={sessionId} view={view} sessionId={sessionId} artifacts={artifacts} />,
 					} as const,
 				]
 			: []),
 	];
 }
-
-/** Module-level, so the store keeps one selector and runs it only when the pane changes. */
-const paneArtifacts = (pane: PaneData): Artifact[] => artifactsOf(pane.items);
 
 interface SessionDetailsProps extends Omit<SessionWork, "scope" | "live" | "artifacts"> {
 	/** The session's directory, which relative file paths in pull requests and issues resolve against. */
@@ -97,11 +94,11 @@ interface SessionDetailsProps extends Omit<SessionWork, "scope" | "live" | "arti
 }
 
 /** The right sidebar's content for the focused view: its session's pull requests, its running app, its Linear issues and its artifacts when it has any, and a personal session's **Memory**. */
-export function SessionDetails({ view, working, cwd, personalMemory, pullRequests, tickets, hosts, open }: SessionDetailsProps) {
+export function SessionDetails({ view, sessionId, working, cwd, personalMemory, pullRequests, tickets, hosts }: SessionDetailsProps) {
 	const scope = view.kind === "past" ? view.sessionId : (hosts.find(host => host.instanceId === view.instanceId)?.sessionId ?? view.instanceId);
-	const artifacts = usePaneSelect(view, paneArtifacts, sameArtifacts);
+	const artifacts = useArtifacts(view);
 	const tabs = [
-		...sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, live: view.kind === "live" ? view : null, view, artifacts, open }),
+		...sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, live: view.kind === "live" ? view : null, view, sessionId, artifacts }),
 		...(personalMemory !== null
 			? [
 					{

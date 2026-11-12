@@ -43,7 +43,7 @@ import { botRows } from "./bots-model";
 import { routeOf } from "./dashboard-state";
 import { useOpenPullRequest } from "./open-pull-request";
 import { integrationsStore } from "./reads";
-import { onArtifactRequest } from "./artifact-requests";
+import { onArtifactOpen, onArtifactsReveal } from "./artifact-requests";
 import { onReviewRequest } from "./review-pages";
 import { storeOrRemove } from "./stored-state";
 import { EMPTY_LAYOUT, hashForLayout, hashForPage, hashForRoute, hashForView, type NotesListView, type OpenMode, sameView, type TodoListView } from "./routing";
@@ -133,32 +133,32 @@ export function App() {
 		const { sidebars } = latest.current;
 		sidebars.setOpen(side, !sidebars.panels[side].open);
 	}, []);
+	const showDetailsTab = useCallback((tab: "browser" | "artifacts"): void => {
+		storeOrRemove(TAB_KEY, tab, "pull-requests");
+		latest.current.sidebars.setOpen("right", true);
+	}, []);
 	// A reply's **Review visuals** shows the Browser, whose panel then opens the reply's pages.
+	useEffect(() => onReviewRequest(() => showDetailsTab("browser")), [showDetailsTab]);
+	// A save in the view whose details show brings its Artifacts tab into sight.
 	useEffect(
 		() =>
-			onReviewRequest(() => {
-				storeOrRemove(TAB_KEY, "browser", "pull-requests");
-				latest.current.sidebars.setOpen("right", true);
+			onArtifactsReveal(view => {
+				const { detailsView } = latest.current;
+				if (detailsView && sameView(detailsView, view)) showDetailsTab("artifacts");
 			}),
-		[],
+		[showDetailsTab],
 	);
-	// A save in the view whose details show brings its Artifacts tab into sight. A card's Open does so from any pane,
-	// first filling the page with that pane when others share it, since side-by-side panes show no details.
+	// A card's Open does so from any pane, first filling the page with that pane when others share it, since side-by-side panes show no details.
 	useEffect(
 		() =>
-			onArtifactRequest(request => {
-				const { layout, page, detailsView, sidebars } = latest.current;
-				if (request.reason === "saved") {
-					if (!detailsView || !sameView(detailsView, request.view)) return;
-				} else {
-					const index = layout.panes.findIndex(view => sameView(view, request.view));
-					if (page || index < 0) return;
-					if (layout.panes.length > 1 && !(layout.maximized && layout.focus === index)) show({ ...layout, focus: index, maximized: true });
-				}
-				storeOrRemove(TAB_KEY, "artifacts", "pull-requests");
-				sidebars.setOpen("right", true);
+			onArtifactOpen(view => {
+				const { layout, page } = latest.current;
+				const index = layout.panes.findIndex(each => sameView(each, view));
+				if (page || index < 0) return;
+				if (layout.panes.length > 1 && !(layout.maximized && layout.focus === index)) show({ ...layout, focus: index, maximized: true });
+				showDetailsTab("artifacts");
 			}),
-		[show],
+		[show, showDetailsTab],
 	);
 	const switchWorkspace = useCallback(
 		(cwd: string | null): void => {
@@ -383,8 +383,8 @@ export function App() {
 														personalMemory={focused.cwd !== undefined && spaces.of(focused.cwd, focused.workspace ?? focused.cwd) === "personal" ? state.personalMemory : null}
 														pullRequests={focused.row?.pullRequests ?? []}
 														tickets={focused.row?.tickets ?? []}
-														hosts={state.hosts}
-														open={sidebars.panels.right.open}
+														hosts={visible.hosts}
+														sessionId={focused.sessionId}
 													/>
 												) : (
 													openBot && (
