@@ -78,14 +78,24 @@ function QuotaChip({ label, value, tooltip, tone }: { label: string; value: stri
 	);
 }
 
+/** Time until `at`, in its two largest units: `3h24m`, `1d3h`, `12m`. */
+function untilLabel(at: number, now: number): string {
+	const minutes = Math.max(0, Math.round((at - now) / 60_000));
+	const days = Math.floor(minutes / 1440);
+	const hours = Math.floor((minutes % 1440) / 60);
+	if (days > 0) return `${days}d${hours}h`;
+	return hours > 0 ? `${hours}h${minutes % 60}m` : `${minutes}m`;
+}
+
 function WindowLeft({ window }: { window: PlanWindow }) {
 	const percent = Math.round(window.remaining * 100);
 	const reset = window.resetsAt === null ? "" : ` Resets ${new Date(window.resetsAt).toLocaleString()}.`;
 	const spent = window.usd ? ` ${spendLabel(window.usd)} spent.` : "";
+	const until = window.resetsAt === null ? "" : ` ↻${untilLabel(window.resetsAt, Date.now())}`;
 	return (
 		<QuotaChip
 			label={window.label}
-			value={`${percent}%`}
+			value={`${percent}%${until}`}
 			tooltip={`${window.title}: ${window.exhausted ? "used up" : `${percent}% left`}.${spent}${reset}`}
 			tone={window.exhausted ? "out" : window.remaining < LOW ? "low" : "ok"}
 		/>
@@ -139,6 +149,9 @@ function PlanRow({ plan }: { plan: PlanUsage }) {
 				<QuotaChip label={plan.name} value="used up" tooltip={`${plan.name}: used up.${refusedSince(plan.outOfCreditSince)}`} tone="out" />
 			)}
 			{nameOnly && plan.balance && <CreditAmount name={plan.name} balance={plan.balance} outOfCreditSince={plan.outOfCreditSince} />}
+			{plan.resetCredits && plan.resetCredits.count > 0 && (
+				<QuotaChip label="✦" value={String(plan.resetCredits.count)} tooltip={`Saved resets: ${creditsLine(plan.resetCredits)}`} tone="ok" />
+			)}
 			{plan.extra && <ExtraSpent extra={plan.extra} />}
 			{plan.windows.map(window => (
 				<WindowLeft key={window.label} window={window} />

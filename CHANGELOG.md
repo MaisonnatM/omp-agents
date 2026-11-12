@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-12
 
+- The plan usage at the bottom of the screen now shows when each window resets, such as `7d 95% ↻6d2h`, and how many saved resets each account holds, such as `✦ 3`, without hovering.
 - The pull request description tool and the ship workflow now stop a gh command that hangs after 20 seconds and say which one timed out, such as "gh pr view timed out after 20s", where they could wait many minutes and then report only "gh exited -1".
 
 ## 2026-11-11
