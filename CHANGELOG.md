@@ -5,7 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-12
 
-- The plan usage at the bottom of the screen now shows one short chip per account, such as `yampa 5h 71% left · ✦ 2`, naming the account when a provider has two and how many windows are used up. Hovering or clicking a chip opens a card with every window's bar, when it resets, such as "Resets in 1d3h · Fri 13 Nov, 14:00", and the saved resets left.
+- The plan usage at the bottom of the screen now shows one short chip per account, such as `yampa 5h 71% left · ✦ 2`, naming the account when a provider has two and how many windows are used up. Hovering or clicking a chip opens a card with every window's bar, when it resets, such as "Resets in 1d3h · Fri 13 Nov, 14:00", and the reset credits left.
 - The pull request description tool and the ship workflow now stop a gh command that hangs after 20 seconds and say which one timed out, such as "gh pr view timed out after 20s", where they could wait many minutes and then report only "gh exited -1".
 
 ## 2026-11-11

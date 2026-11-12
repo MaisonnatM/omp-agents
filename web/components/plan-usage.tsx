@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import type { DashboardState } from "../dashboard-state";
 import { DAY_FORMAT, providerOrg } from "../labels";
 import { useHoverPopover } from "../use-hover-popover";
+import { useMinute } from "../use-minute";
 import { dollars } from "./settings/analytics-format";
 import { OrgIcon } from "./org-icon";
 
@@ -30,16 +31,13 @@ export function spendLabel({ used, limit, currency = "USD" }: Pick<ExtraUsage, "
 	return limit === null ? format(used) : `${format(used)} / ${format(limit)}`;
 }
 
-
 type Tone = "out" | "low" | "ok";
 
-const TONE_CLASS: Record<Tone, string> = {
-	out: "text-red-600 dark:text-red-400",
-	low: "text-amber-600 dark:text-amber-400",
-	ok: "text-foreground",
+const TONE_CLASS: Record<Tone, { text: string; bar: string }> = {
+	out: { text: "text-red-600 dark:text-red-400", bar: "bg-red-500" },
+	low: { text: "text-amber-600 dark:text-amber-400", bar: "bg-amber-500" },
+	ok: { text: "text-foreground", bar: "bg-foreground/60" },
 };
-
-const BAR_CLASS: Record<Tone, string> = { out: "bg-red-500", low: "bg-amber-500", ok: "bg-foreground/60" };
 
 const FOCUS = "rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
@@ -75,7 +73,7 @@ export function creditView(balance: CreditBalance): { amount: string; phrase: st
 function QuotaChip({ label, value, tooltip, tone }: { label: string; value: string; tooltip: string; tone: Tone }) {
 	return (
 		<Tooltip content={tooltip}>
-			<span tabIndex={0} className={cn("whitespace-nowrap tabular-nums", FOCUS, TONE_CLASS[tone])}>
+			<span tabIndex={0} className={cn("whitespace-nowrap tabular-nums", FOCUS, TONE_CLASS[tone].text)}>
 				<span className="text-muted-foreground">{label}</span> {value}
 			</span>
 		</Tooltip>
@@ -93,8 +91,12 @@ function refusedSince(since: number): string {
 	return ` Requests refused for lack of credit since ${new Date(since).toLocaleString()}.`;
 }
 
+/** A plan shows as a {@link PlanChip} when it has windows or spend, or only reset credits with no balance or refusal to show; else by name. */
+const hasChip = (plan: PlanUsage): boolean =>
+	!isNameOnlyPlan(plan) || (plan.resetCredits !== null && !plan.balance && plan.outOfCreditSince === undefined);
+
 /** Time until `at`, in its two largest units: `3h24m`, `1d3h`, `12m`. */
-function untilLabel(at: number, now: number): string {
+export function untilLabel(at: number, now: number): string {
 	const minutes = Math.max(0, Math.round((at - now) / 60_000));
 	const days = Math.floor(minutes / 1440);
 	const hours = Math.floor((minutes % 1440) / 60);
@@ -105,35 +107,76 @@ function untilLabel(at: number, now: number): string {
 /** A reset moment with its date, so a weekday two weeks out never reads as today: `Thu 26 Nov, 17:21`. */
 const RESET_FORMAT = new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
+const percentLeft = (window: PlanWindow): number => Math.round(window.remaining * 100);
 const windowTone = (window: PlanWindow): Tone => (window.exhausted ? "out" : window.remaining < LOW ? "low" : "ok");
-const leftLabel = (window: PlanWindow): string => (window.exhausted ? "used up" : `${Math.round(window.remaining * 100)}% left`);
+const extraTone = (extra: ExtraUsage): Tone => (extra.exhausted ? "out" : extra.limit !== null && extra.used / extra.limit > 1 - LOW ? "low" : "ok");
+const leftLabel = (window: PlanWindow): string => (window.exhausted ? "used up" : `${percentLeft(window)}% left`);
 
-function savedResetsLine({ count, nextExpiresAt }: ResetCredits): string {
-	const resets = count === 1 ? "1 saved reset" : `${count} saved resets`;
-	return nextExpiresAt === null ? `${resets}.` : `${resets}, ${count === 1 ? "expires" : "next expires"} ${DAY_FORMAT.format(nextExpiresAt)}.`;
+export function creditsLine({ count, nextExpiresAt }: ResetCredits): string {
+	const credits = count === 1 ? "1 reset credit" : `${count} reset credits`;
+	return nextExpiresAt === null ? `${credits}.` : `${credits}, ${count === 1 ? "expires" : "next expires"} ${DAY_FORMAT.format(nextExpiresAt)}.`;
 }
 
-/** The account's short tag, such as `yampa` for `maxence@yampa.ai`, when its provider has another account in `plans`; else `null`. */
-function accountTag(plan: PlanUsage, plans: readonly PlanUsage[]): string | null {
-	if (!plan.account || plans.filter(other => other.provider === plan.provider).length < 2) return null;
-	const domain = plan.account.split("@")[1];
-	return domain ? domain.split(".")[0]! : plan.account;
+/**
+ * A short tag per account of a provider with more than one: the email domain's first label, such as `yampa` for
+ * `maxence@yampa.ai`, or the local part when another account of that provider shares the domain.
+ */
+export function accountTags(plans: readonly PlanUsage[]): Map<PlanUsage, string> {
+	const tags = new Map<PlanUsage, string>();
+	for (const plan of plans) {
+		if (!plan.account) continue;
+		const siblings = plans.filter(other => other.provider === plan.provider && other.account);
+		if (siblings.length < 2) continue;
+		const [local, domain = ""] = plan.account.split("@");
+		const label = domain.split(".")[0];
+		const shared = siblings.some(other => other !== plan && other.account!.split("@")[1]?.split(".")[0] === label);
+		tags.set(plan, label && !shared ? label : (local ?? plan.account));
+	}
+	return tags;
+}
+
+/** One figure on a plan's chip: an optional muted label, then the text in its tone. */
+export interface ChipPart {
+	label?: string;
+	text: string;
+	tone: Tone;
+}
+
+/**
+ * What a plan's chip says, in order: its tightest open window, or `used up` with the time until the last used-up window
+ * resets; how many other windows are used up; the spend past the plan when it has no windows; its reset credits.
+ */
+export function chipParts(plan: PlanUsage, now: number): ChipPart[] {
+	const parts: ChipPart[] = [];
+	let open: PlanWindow | undefined;
+	let usedUp = 0;
+	let backAt: number | null = null;
+	for (const window of plan.windows) {
+		if (!window.exhausted) {
+			if (!open || window.remaining < open.remaining) open = window;
+		} else {
+			usedUp++;
+			if (window.resetsAt !== null) backAt = Math.max(backAt ?? 0, window.resetsAt);
+		}
+	}
+	if (open) parts.push({ label: open.label, text: `${percentLeft(open)}% left`, tone: windowTone(open) });
+	if (usedUp > 0) parts.push({ text: open ? `${usedUp} used up` : backAt === null ? "used up" : `used up, resets in ${untilLabel(backAt, now)}`, tone: "out" });
+	if (plan.windows.length === 0 && plan.extra) parts.push({ label: "extra", text: spendLabel(plan.extra), tone: extraTone(plan.extra) });
+	if (plan.resetCredits) parts.push({ text: `✦ ${plan.resetCredits.count}`, tone: "ok" });
+	return parts;
 }
 
 /** The share of a window left, as a bar that empties as the window is used. */
 function Meter({ window }: { window: PlanWindow }) {
 	return (
 		<span aria-hidden className="relative col-span-2 block h-1.5 overflow-hidden rounded-full bg-foreground/12">
-			<span className={cn("absolute inset-y-0 left-0", BAR_CLASS[windowTone(window)])} style={{ width: `${Math.round(window.remaining * 100)}%` }} />
+			<span className={cn("absolute inset-y-0 left-0", TONE_CLASS[windowTone(window)].bar)} style={{ width: `${percentLeft(window)}%` }} />
 		</span>
 	);
 }
 
-/** Extra spend past most of its cap reads as running low. */
-const extraLow = (extra: ExtraUsage): boolean => extra.limit !== null && extra.used / extra.limit > 1 - LOW;
-
-/** The card a plan's chip opens: every window with its bar and reset, the spend past the plan, and the saved resets. */
-function PlanCard({ plan, now }: { plan: PlanUsage; now: number }) {
+/** The card a plan's chip opens: every window with its bar and reset, the spend past the plan, and the reset credits. */
+export function PlanCard({ plan, now }: { plan: PlanUsage; now: number }) {
 	return (
 		<>
 			<div className="border-b border-border px-3 py-2">
@@ -144,48 +187,42 @@ function PlanCard({ plan, now }: { plan: PlanUsage; now: number }) {
 				{plan.account && <p className="text-xs text-muted-foreground">{plan.account}</p>}
 			</div>
 			{(plan.windows.length > 0 || plan.extra) && (
-			<div className="flex flex-col gap-3 px-3 py-2.5">
-				{plan.windows.map(window => (
-					<div key={window.id} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-xs">
-						<span className="truncate">{window.title}</span>
-						<span className={cn("tabular-nums", TONE_CLASS[windowTone(window)])}>
-							{leftLabel(window)}
-							{window.usd && <span className="text-muted-foreground"> · {spendLabel(window.usd)} spent</span>}
-						</span>
-						<Meter window={window} />
-						{window.resetsAt !== null && (
-							<span className="col-span-2 tabular-nums text-muted-foreground">
-								Resets in {untilLabel(window.resetsAt, now)} · {RESET_FORMAT.format(window.resetsAt)}
+				<div className="flex flex-col gap-3 px-3 py-2.5">
+					{plan.windows.map(window => (
+						<div key={window.id} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-xs">
+							<span className="truncate">{window.title}</span>
+							<span className={cn("tabular-nums", TONE_CLASS[windowTone(window)].text)}>
+								{leftLabel(window)}
+								{window.usd && <span className="text-muted-foreground"> · {spendLabel(window.usd)} spent</span>}
 							</span>
-						)}
-					</div>
-				))}
-				{plan.extra && (
-					<div className="flex items-center justify-between gap-3 text-xs">
-						<span className="truncate">{plan.extra.title}</span>
-						<span className={cn("tabular-nums", plan.extra.exhausted ? TONE_CLASS.out : extraLow(plan.extra) ? TONE_CLASS.low : "text-muted-foreground")}>
-							{spendLabel(plan.extra)} spent{plan.extra.exhausted ? ", used up" : ""}
-						</span>
-					</div>
-				)}
-			</div>
+							<Meter window={window} />
+							{window.resetsAt !== null && (
+								<span className="col-span-2 tabular-nums text-muted-foreground">
+									Resets in {untilLabel(window.resetsAt, now)} · {RESET_FORMAT.format(window.resetsAt)}
+								</span>
+							)}
+						</div>
+					))}
+					{plan.extra && (
+						<div className="flex items-center justify-between gap-3 text-xs">
+							<span className="truncate">{plan.extra.title}</span>
+							<span className={cn("tabular-nums", TONE_CLASS[extraTone(plan.extra)].text)}>
+								{spendLabel(plan.extra)} spent{plan.extra.exhausted ? ", used up" : ""}
+							</span>
+						</div>
+					)}
+				</div>
 			)}
-			{plan.resetCredits?.count ? <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">✦ {savedResetsLine(plan.resetCredits)}</p> : null}
+			{plan.resetCredits && <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">✦ {creditsLine(plan.resetCredits)}</p>}
 		</>
 	);
 }
 
-/**
- * A plan with usage windows: its logo, the account's tag when the provider has two, the tightest window still open, how
- * many windows are used up, and the saved resets; hovering or clicking opens {@link PlanCard}.
- */
-function PlanChip({ plan, tag }: { plan: PlanUsage; tag: string | null }) {
+/** A plan with usage windows, spend, or reset credits: its logo, its account tag, and {@link chipParts}; hovering or clicking opens {@link PlanCard}. */
+function PlanChip({ plan, tag }: { plan: PlanUsage; tag: string | undefined }) {
 	const popover = useHoverPopover();
-	const now = Date.now();
-	const open = plan.windows.filter(window => !window.exhausted).sort((a, b) => a.remaining - b.remaining)[0];
-	const usedUp = plan.windows.filter(window => window.exhausted);
-	const backAt = usedUp.reduce<number | null>((latest, window) => (window.resetsAt === null ? latest : Math.max(latest ?? 0, window.resetsAt)), null);
-	const saved = plan.resetCredits?.count ?? 0;
+	const now = useMinute();
+	const credits = plan.resetCredits?.count;
 	return (
 		<Popover {...popover.root}>
 			<PopoverTrigger asChild>
@@ -195,28 +232,14 @@ function PlanChip({ plan, tag }: { plan: PlanUsage; tag: string | null }) {
 					</span>
 					<span className="sr-only">{plan.account ? `${plan.name} ${plan.account}:` : `${plan.name}:`}</span>
 					{tag && <span aria-hidden className="text-muted-foreground">{tag}</span>}
-					{open && (
-						<span className={TONE_CLASS[windowTone(open)]}>
-							<span className="text-muted-foreground">{open.label}</span> {Math.round(open.remaining * 100)}% left
+					{chipParts(plan, now).map((part, index) => (
+						<span key={part.text} className={TONE_CLASS[part.tone].text}>
+							{index > 0 && <span className="text-muted-foreground">· </span>}
+							{part.label && <span className="text-muted-foreground">{part.label} </span>}
+							{part.text}
 						</span>
-					)}
-					{!open && usedUp.length > 0 && <span className={TONE_CLASS.out}>used up{backAt !== null && ` · resets in ${untilLabel(backAt, now)}`}</span>}
-					{open && usedUp.length > 0 && (
-						<span className={TONE_CLASS.out}>
-							<span className="text-muted-foreground">·</span> {usedUp.length} used up
-						</span>
-					)}
-					{plan.windows.length === 0 && plan.extra && (
-						<span className={plan.extra.exhausted ? TONE_CLASS.out : extraLow(plan.extra) ? TONE_CLASS.low : "text-foreground"}>
-							<span className="text-muted-foreground">extra</span> {spendLabel(plan.extra)}
-						</span>
-					)}
-					{saved > 0 && (
-						<span className="text-muted-foreground">
-							{plan.windows.length > 0 || plan.extra ? "· " : ""}✦ {saved}
-							<span className="sr-only"> saved {saved === 1 ? "reset" : "resets"}</span>
-						</span>
-					)}
+					))}
+					{credits && <span className="sr-only"> {credits === 1 ? "reset credit" : "reset credits"}</span>}
 				</button>
 			</PopoverTrigger>
 			<PopoverContent {...popover.content} side="top" align="start" aria-label={`${plan.name} usage`} className="w-96 max-w-[calc(100vw-2rem)] p-0">
@@ -226,30 +249,14 @@ function PlanChip({ plan, tag }: { plan: PlanUsage; tag: string | null }) {
 	);
 }
 
-/** A plan with no usage windows, such as API credits: its name, then its balance or `used up` once the provider refuses requests. */
-function NamedPlan({ plan, tag }: { plan: PlanUsage; tag: string | null }) {
+/** A plan without a chip, such as API credits: its name and account tag, then its balance or `used up` once the provider refuses requests. */
+function NamedPlan({ plan, tag }: { plan: PlanUsage; tag: string | undefined }) {
 	const name = tag ? `${plan.name} ${tag}` : plan.name;
 	if (plan.balance) return <CreditAmount name={name} balance={plan.balance} outOfCreditSince={plan.outOfCreditSince} />;
 	if (plan.outOfCreditSince !== undefined) {
 		return <QuotaChip label={name} value="used up" tooltip={`${name}: used up.${refusedSince(plan.outOfCreditSince)}`} tone="out" />;
 	}
 	return <span className="whitespace-nowrap text-foreground">{name}</span>;
-}
-
-function PlanRow({ plan, tag }: { plan: PlanUsage; tag: string | null }) {
-	const nameOnly = isNameOnlyPlan(plan) && !plan.resetCredits?.count;
-	return (
-		<li className="flex items-center gap-2 border-border not-first:border-l not-first:pl-2.5">
-			{nameOnly ? (
-				<>
-					<OrgIcon org={providerOrg(plan.provider)} fallback={null} />
-					<NamedPlan plan={plan} tag={tag} />
-				</>
-			) : (
-				<PlanChip plan={plan} tag={tag} />
-			)}
-		</li>
-	);
 }
 
 /** Plan quota, one chip per account, for the status bar; on a phone, on one line that scrolls sideways. */
@@ -262,10 +269,20 @@ export function PlanUsageList({ usage }: { usage: DashboardState["usage"] }) {
 				<code>omp usage</code> reports no plan limits.
 			</p>
 		);
+	const tags = accountTags(usage.plans);
 	return (
 		<ul aria-label="Plan usage" className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5 max-phone:-my-1 max-phone:flex-nowrap max-phone:overflow-x-auto max-phone:py-1 max-phone:scroll-fade-x max-phone:[scrollbar-width:none] max-phone:*:shrink-0">
 			{usage.plans.map((plan, index) => (
-				<PlanRow key={`${plan.provider}:${plan.account ?? index}`} plan={plan} tag={accountTag(plan, usage.plans)} />
+				<li key={`${plan.provider}:${plan.account ?? index}`} className="flex items-center gap-2 border-border not-first:border-l not-first:pl-2.5">
+					{hasChip(plan) ? (
+						<PlanChip plan={plan} tag={tags.get(plan)} />
+					) : (
+						<>
+							<OrgIcon org={providerOrg(plan.provider)} fallback={null} />
+							<NamedPlan plan={plan} tag={tags.get(plan)} />
+						</>
+					)}
+				</li>
 			))}
 		</ul>
 	);
