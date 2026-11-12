@@ -10,7 +10,7 @@ import { pastLabel, SOURCE_LABELS } from "../labels";
 import { Header } from "./page-header";
 import { SessionIdCopy, SessionMeta } from "./session-meta";
 import { SessionTitle } from "./session-title";
-import { TodosCardToggle } from "./session-todos-card";
+import { SessionCardToggle } from "./session-card";
 import { Trajectory } from "./trajectory";
 import { NOTICE_TONE, Transcript } from "./transcript";
 
@@ -57,7 +57,7 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 						{session && (
 							<>
 								<SessionMeta facts={session} />
-								<TodosCardToggle view={view} />
+								<SessionCardToggle view={view} />
 								{!foreign && (
 									<Tooltip content="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here.">
 										<Button

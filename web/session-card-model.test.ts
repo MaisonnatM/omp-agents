@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { countLabel } from "./todos-card-model";
+import { countLabel } from "./session-card-model";
 
 describe("countLabel", () => {
 	test("names one in the singular and any other count in the plural", () => {

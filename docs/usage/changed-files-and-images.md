@@ -1,11 +1,11 @@
 # Changed files and images
 
-- The **Todos** card at the top right of each live session's, subagent's, or past session's conversation, or above its messages when the conversation is narrow, lists what the agent changed, took, and opened under its subagents.
+- The **Session** card at the top right of each live session's, subagent's, or past session's conversation, or above its messages when the conversation is narrow, lists what the agent changed, took, and opened under its subagents.
   It has separate **Files**, **Images**, and **Sources** sections, each shown only when it has items; the card shows once any of them, or the **Subagents** section, has something to show.
   Click a section's header to fold or unfold it.
   Each starts open, and the app keeps each choice across sessions and reloads.
   The card scrolls as a whole when its sections outgrow it.
-  **Show todos card** in Settings › Preferences, or the checklist toggle in the session's header, before End session or Resume, hides the whole card, these sections included.
+  **Show session card** in Settings › Preferences, or the **Session card** toggle in the session's header, before End session or Resume, hides the whole card, these sections included.
   A Bot's page, which reads as a chat, leaves these sections out, and the card hides while the trajectory takes the transcript's place.
 - **Files** lists the files the agent's `edit` and `write` calls changed, in the order it first touched them.
   Each row shows a file-type icon, the file's name, and its lines added and removed, which the header totals.

@@ -2,11 +2,11 @@
 
 - `web/pull-request-checks.ts`: `presentChecks`, the detail tab bar's checks text, popover heading, aggregate state, and stable attention, running, and completed groups.
 - `web/changes-model.ts`: `folderTree`, the tree of folders that the changes explorer and the notes list share, and `fileTree`, the explorer's, where a folder holding one folder and no file joins it, then the diff's folded runs, the file view's gutter marks, the diff list's sizes and `lastAtOrAbove`, which finds the file at the top of its scroll, and `changesPathOf`, which finds a card's file path in the session changes list.
-  `shortPaths` adds the fewest parent folders needed to tell files of one name apart in the Todos card's **Files** section.
+  `shortPaths` adds the fewest parent folders needed to tell files of one name apart in the Session card's **Files** section.
   `web/components/changes/file-tree.tsx` draws the explorer's tree; `web/code-highlight.ts` cuts `lowlight`'s syntax colors into lines, for the changes view, recorded edit diffs, and a message's code blocks.
   `web/loaded-once.ts` holds `loadedOnce` and `useLoaded`, a value a dynamic import makes, loaded once on first need, which the grammars and `web/components/raw-html.ts`'s raw HTML plugins use.
-- `web/todos-card-subagents-model.ts`: `subagentTree`, the subagents the Todos card's **Subagents** section lists for a view, the descendants of the session's main agent or of one subagent, depth first with each one's depth, siblings in the order the host lists them; and `arenaGroups`, which takes out of those rows the runners and judge of each arena with two runners among them, seated A, B, C in the arena's order with what the pick made of each.
-- `web/todos-card-model.ts`: `countLabel`, the count in the Todos card's section headers, such as `7 Files`.
+- `web/session-card-subagents-model.ts`: `subagentTree`, the subagents the Session card's **Subagents** section lists for a view, the descendants of the session's main agent or of one subagent, depth first with each one's depth, siblings in the order the host lists them; and `arenaGroups`, which takes out of those rows the runners and judge of each arena with two runners among them, seated A, B, C in the arena's order with what the pick made of each.
+- `web/session-card-model.ts`: `countLabel`, the count in the Session card's section headers, such as `7 Files`.
 - `web/file-paths.ts`: which paths in agent text name a text file, an image, or a video (`linkedFile`), the absolute path each resolves to, and the `figure` that `remarkFilePaths` ends the text with, listing the images and videos it names.
   `web/delimited.ts` parses a TSV or CSV file into rows.
   `web/components/file-text.tsx` shows a text file for reading: `MarkdownDocument` renders Markdown under the frontmatter the server parsed, which the file dialog and Settings › Files share, and `CodeText` shows any other file as numbered, wrapping, colored lines.

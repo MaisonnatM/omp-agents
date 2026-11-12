@@ -1,7 +1,7 @@
 // The `arena` tool: an agent that sets two or more subagents on the same task to keep the best attempt records which
 // subagents compete, the judge, the one it picked as the base, and what it took from the others. Each call appends an
 // `omp-arena.state` entry to the session file, which the omp-agents dashboard reads to show the runners side by side in
-// the Todos card's Subagents section and mark the winner. A call naming the same runners as an earlier one updates it.
+// the Session card's Subagents section and mark the winner. A call naming the same runners as an earlier one updates it.
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 
 const ENTRY = "omp-arena.state";

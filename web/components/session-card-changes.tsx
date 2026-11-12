@@ -1,4 +1,4 @@
-/** The Todos card's Files, Images, and Sources sections: the files the view's agent changed, the images its tools took, and the pages they opened, each a section that folds. */
+/** The Session card's Files, Images, and Sources sections: the files the view's agent changed, the images its tools took, and the pages they opened, each a section that folds. */
 import { ChevronRight } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
-import { countLabel } from "../todos-card-model";
+import { countLabel } from "../session-card-model";
 import { useChangedFiles, useMedia, useSources } from "../pane-store";
 import { useStoredKeys } from "../stored-state";
 import { ChangedFileList, FileChangesDialog } from "./changed-files-section";
@@ -17,7 +17,7 @@ import { LineCounts } from "./line-counts";
 import { MediaStrip } from "./media-section";
 import { SourceList } from "./sources-section";
 
-/** The sections folded shut, `files`, `images`, and `sources`, which localStorage keeps for every view; each starts open. The key predates the Todos card, so earlier folds carry over. */
+/** The sections folded shut, `files`, `images`, and `sources`, which localStorage keeps for every view; each starts open. The key predates the Session card, so earlier folds carry over. */
 const CLOSED_KEY = "omp-agents.changes-card-closed";
 
 /** The session whose changes the card lists. */
@@ -78,7 +78,7 @@ interface ChangesSectionProps {
 	children: ReactNode;
 }
 
-/** A section of the Todos card under its todo list: a folding header with an optional action at its right. */
+/** A section of the Session card: a folding header with an optional action at its right. */
 export function ChangesSection({ title, open, onToggle, fold, action, children }: ChangesSectionProps) {
 	return (
 		<Collapsible open={open} onOpenChange={onToggle}>
@@ -108,7 +108,7 @@ interface ChangesSectionsProps {
 }
 
 /**
- * The Files, Images, and Sources sections of the Todos card, each shown only while it has items. On a session, a file
+ * The Files, Images, and Sources sections of the Session card, each shown only while it has items. On a session, a file
  * opens the session's changes at it and **Review** at the first; on a subagent, a file opens omp's recorded diffs of it.
  */
 export function ChangesSections({ view, session: { sessionId, cwd, facts }, changes: { files, media, sources }, working }: ChangesSectionsProps) {

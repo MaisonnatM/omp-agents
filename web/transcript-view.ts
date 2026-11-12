@@ -1,6 +1,6 @@
 /**
  * Pure transforms from the server's `items` messages to what a transcript renders: its blocks, its outline, and the
- * facts its rows, its minimap, its chat history, and its Todos card read, as one {@link TranscriptModel}.
+ * facts its rows, its minimap, its chat history, and its Session card read, as one {@link TranscriptModel}.
  */
 import type { RoutineTask } from "../src/routines";
 import { promptTitle } from "../src/shared/prompt-files";
