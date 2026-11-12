@@ -3,7 +3,7 @@ import { errorText, type Parsed } from "../json";
 import { MEDIA_KEY_PARAM, SOCKET_PROTOCOL, SOCKET_TOKEN_PREFIX } from "../shared/access";
 import type { SettingsError } from "../shared/models";
 import { dashboardHosts } from "./address";
-import { bearerToken, fetchSiteAllowed, helloProof, mediaKey, tokenMatches } from "./auth";
+import { bearerToken, capabilityKey, fetchSiteAllowed, helloProof, mediaKey, tokenMatches } from "./auth";
 import type { PhoneAccess } from "./phone-access";
 
 export const fail = (status: number, error: string, conflict = false): Response =>
@@ -78,6 +78,9 @@ export interface Guards {
 	admit(req: Request): Response | null;
 	/** `admit` that also takes the media key as `?key=`, for the routes that an image, a video, or a mail frame loads. */
 	admitMedia(req: Request): Response | null;
+	/** A host-checked same-origin or address-bar read of one resource, signed by `?cap=`. */
+	admitCapability(req: Request, purpose: string | null): Response | null;
+	capabilityKey(purpose: string): string;
 	/**
 	 * `admit` for the socket upgrade, which carries full control of every session: an Origin that matches the Host,
 	 * and the token as a header or, since a browser's socket can send none, as the subprotocol `bearer.<token>`.
@@ -160,6 +163,13 @@ export function guardsFor(port: number, token: string, phones?: PhoneAccess): Gu
 	return {
 		allowedHost,
 		admit,
+		capabilityKey: purpose => capabilityKey(token, purpose),
+		admitCapability(req, purpose) {
+			if (!allowedHost(req)) return fail(403, "forbidden host");
+			if (!fetchSiteAllowed(req.headers.get("sec-fetch-site"), true)) return fail(403, "forbidden origin");
+			if (purpose === null || !tokenMatches(capabilityKey(token, purpose), new URL(req.url).searchParams.get("cap"))) return fail(403, "forbidden capability");
+			return null;
+		},
 		admitMedia: req => {
 			const refused = outside(req);
 			if (refused) return refused;

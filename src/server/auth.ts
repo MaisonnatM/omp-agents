@@ -62,6 +62,9 @@ const keyed = (token: string, purpose: string): string => createHmac("sha256", t
  */
 export const mediaKey = (token: string): string => keyed(token, "omp-agents media key");
 
+/** A key opening only the resource named by `purpose`, without disclosing the bearer token. */
+export const capabilityKey = (token: string, purpose: string): string => keyed(token, `omp-agents capability ${purpose}`);
+
 /** The localStorage entries that sign the page in: the desktop window's preload writes them, as does a script that drives the page. */
 export const pageAccess = (token: string): Record<string, string> => ({ [TOKEN_STORAGE_KEY]: token, [MEDIA_KEY_STORAGE_KEY]: mediaKey(token) });
 

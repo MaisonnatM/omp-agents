@@ -48,6 +48,9 @@ export interface RouteKit {
 	get(handle: (params: URLSearchParams, req: Request) => Response | Promise<Response>): Handler;
 	/** `get` for a file that an image, a video, or a frame loads, which sends no header: it also takes the media key as `?key=`. */
 	media(handle: (params: URLSearchParams, req: Request) => Response | Promise<Response>): Handler;
+	/** A capability URL opens one resource without the bearer token. */
+	capability(purposeOf: (params: URLSearchParams) => string | null, handle: (req: Request, url: URL) => Promise<Response>): Handler;
+	capabilityKey(purpose: string): string;
 	/**
 	 * A write: admitted with its JSON body (origin, content type), `parse`d with the request's query into an input or the
 	 * response refusing it, then `run`, whose result is the answer's JSON, unless it is a `Response`; `refuse` answers an error
@@ -64,6 +67,11 @@ export function routeKit(guards: Guards): RouteKit {
 	return {
 		get: (handle) => async (req) => guards.admit(req) ?? handle(new URL(req.url).searchParams, req),
 		media: (handle) => async (req) => guards.admitMedia(req) ?? handle(new URL(req.url).searchParams, req),
+		capabilityKey: purpose => guards.capabilityKey(purpose),
+		capability: (purposeOf, handle) => async req => {
+			const url = new URL(req.url);
+			return guards.admitCapability(req, purposeOf(url.searchParams)) ?? handle(req, url);
+		},
 		write: (parse, run, refuse) => async (req) => {
 			const guarded = await guards.writeBody(req);
 			if (guarded instanceof Response) return guarded;

@@ -80,6 +80,20 @@ describe("bearerToken", () => {
 });
 
 describe("API and socket guards", () => {
+	test("capabilities open only one purpose from an allowed host and fetch site", () => {
+		const purpose = "artifact main version";
+		const cap = guards.capabilityKey(purpose);
+		expect(cap).not.toContain(TOKEN);
+		expect(guards.admitCapability(request(`/api/artifact?cap=${cap}`), purpose)).toBeNull();
+		expect(guards.admitCapability(request(`/api/artifact?cap=${cap}`, { "sec-fetch-site": "none" }), purpose)).toBeNull();
+		expect(guards.admitCapability(request(`/api/artifact?cap=${cap}`), "artifact other version")?.status).toBe(403);
+		expect(guards.admitCapability(request(`/api/artifact?cap=${cap}`, { host: "evil.test:4317" }), purpose)?.status).toBe(403);
+		expect(guards.admitCapability(request(`/api/artifact?cap=${cap}`, { "sec-fetch-site": "cross-site" }), purpose)?.status).toBe(403);
+		expect(guards.admitCapability(request(`/api/artifact?cap=${cap}`, { "sec-fetch-site": "same-site" }), purpose)?.status).toBe(403);
+		expect(guards.admitCapability(request("/api/artifact", signedIn), purpose)?.status).toBe(403);
+		expect(guards.admitCapability(request(`/api/artifact?cap=${cap}`), null)?.status).toBe(403);
+	});
+
 	test("without the Bearer token the request is 401, with it admitted", () => {
 		expect(guards.admit(request("/api/settings"))?.status).toBe(401);
 		expect(guards.admit(request("/api/settings", { authorization: "Bearer wrong" }))?.status).toBe(401);

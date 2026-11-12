@@ -17,6 +17,7 @@ src/omp/module-types/**
 src/server/wire.ts
 src/server/socket.ts
 src/server/dashboard.ts
+src/server/artifact-routes.ts
 src/server/live-sessions.ts
 src/server/session-files.ts
 web/use-dashboard.ts
