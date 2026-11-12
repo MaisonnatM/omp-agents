@@ -232,7 +232,7 @@ function MenuRadioGroup({
   return <MenuPrimitive.RadioGroup data-slot="menu-radio-group" {...props} />
 }
 
-/** One choice of a {@link MenuRadioGroup}, checked at its end while chosen. */
+/** One choice of a {@link MenuRadioGroup}, checked at its end while chosen; every row keeps the check's room, so trailing text stays aligned. */
 function MenuRadioItem({
   className,
   children,
@@ -245,7 +245,7 @@ function MenuRadioItem({
       {...props}
     >
       {children}
-      <MenuPrimitive.RadioItemIndicator className="ml-auto pl-4">
+      <MenuPrimitive.RadioItemIndicator keepMounted className="ml-auto pl-4 data-unchecked:invisible">
         <Check aria-hidden />
       </MenuPrimitive.RadioItemIndicator>
     </MenuPrimitive.RadioItem>
