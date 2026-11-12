@@ -9,6 +9,7 @@ import { Spinner } from "./spinner";
 
 interface RenderedProps {
 	url: string;
+	text: string;
 	title: string;
 }
 
@@ -44,23 +45,19 @@ function SvgImage({ url, title }: RenderedProps) {
 	);
 }
 
-function MarkdownText({ url }: RenderedProps) {
-	const text = useArtifactText(url);
-	if (text.state !== "ready") return <Waiting loaded={text} />;
+function MarkdownText({ text }: RenderedProps) {
 	return (
 		<div className="size-full overflow-auto px-4 py-3">
-			<MessageMarkdown text={text.value} />
+			<MessageMarkdown text={text} />
 		</div>
 	);
 }
 
-function SourceText({ url, kind }: { url: string; kind: ArtifactKind }) {
-	const text = useArtifactText(url);
-	if (text.state !== "ready") return <Waiting loaded={text} />;
+function SourceText({ text, kind }: { text: string; kind: ArtifactKind }) {
 	return (
 		<CodeBlock size="sm" className="h-full rounded-none border-0">
 			<CodeBlockContent wrap className="flex-1">
-				<CodeLines text={text.value} language={kind} />
+				<CodeLines text={text} language={kind} />
 			</CodeBlockContent>
 		</CodeBlock>
 	);
@@ -74,10 +71,15 @@ function Waiting({ loaded }: { loaded: Exclude<Loaded<unknown>, { state: "ready"
 	);
 }
 
-/** The version behind `link`, rendered, or its source when `source` is set. */
+/**
+ * The version behind `link`, rendered, or its source when `source` is set.
+ * Every kind waits for the version's text, so a missing copy says so instead of framing the route's JSON 404.
+ */
 export function ArtifactView({ link, kind, title, source }: { link: Loaded<string>; kind: ArtifactKind; title: string; source: boolean }) {
+	const text = useArtifactText(link.state === "ready" ? link.value : null);
 	if (link.state !== "ready") return <Waiting loaded={link} />;
-	if (source) return <SourceText url={link.value} kind={kind} />;
+	if (text.state !== "ready") return <Waiting loaded={text} />;
+	if (source) return <SourceText text={text.value} kind={kind} />;
 	const { Rendered } = ARTIFACT_KIND[kind];
-	return <Rendered url={link.value} title={title} />;
+	return <Rendered url={link.value} text={text.value} title={title} />;
 }
