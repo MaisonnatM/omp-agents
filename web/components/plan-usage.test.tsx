@@ -58,7 +58,7 @@ test("an account's chip shows its tightest open window and counts the used-up on
 test("with every window used up, the chip says when the last one comes back", () => {
 	const now = Date.now();
 	const chip = text([{ ...claude, windows: [window("5h", 0, now + 3 * 3_600_000), window("7d", 0, now + 30 * 3_600_000)] }]);
-	expect(chip).toContain("used up · back in 1d6h");
+	expect(chip).toContain("used up · resets in 1d6h");
 });
 
 test("the account tag appears only when its provider has another account", () => {

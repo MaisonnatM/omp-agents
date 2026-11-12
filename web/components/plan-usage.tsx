@@ -129,6 +129,9 @@ function Meter({ window }: { window: PlanWindow }) {
 	);
 }
 
+/** Extra spend past most of its cap reads as running low. */
+const extraLow = (extra: ExtraUsage): boolean => extra.limit !== null && extra.used / extra.limit > 1 - LOW;
+
 /** The card a plan's chip opens: every window with its bar and reset, the spend past the plan, and the saved resets. */
 function PlanCard({ plan, now }: { plan: PlanUsage; now: number }) {
 	return (
@@ -140,6 +143,7 @@ function PlanCard({ plan, now }: { plan: PlanUsage; now: number }) {
 				</p>
 				{plan.account && <p className="text-xs text-muted-foreground">{plan.account}</p>}
 			</div>
+			{(plan.windows.length > 0 || plan.extra) && (
 			<div className="flex flex-col gap-3 px-3 py-2.5">
 				{plan.windows.map(window => (
 					<div key={window.id} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-xs">
@@ -159,12 +163,13 @@ function PlanCard({ plan, now }: { plan: PlanUsage; now: number }) {
 				{plan.extra && (
 					<div className="flex items-center justify-between gap-3 text-xs">
 						<span className="truncate">{plan.extra.title}</span>
-						<span className={cn("tabular-nums", plan.extra.exhausted ? TONE_CLASS.out : "text-muted-foreground")}>
+						<span className={cn("tabular-nums", plan.extra.exhausted ? TONE_CLASS.out : extraLow(plan.extra) ? TONE_CLASS.low : "text-muted-foreground")}>
 							{spendLabel(plan.extra)} spent{plan.extra.exhausted ? ", used up" : ""}
 						</span>
 					</div>
 				)}
 			</div>
+			)}
 			{plan.resetCredits?.count ? <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">✦ {savedResetsLine(plan.resetCredits)}</p> : null}
 		</>
 	);
@@ -195,10 +200,14 @@ function PlanChip({ plan, tag }: { plan: PlanUsage; tag: string | null }) {
 							<span className="text-muted-foreground">{open.label}</span> {Math.round(open.remaining * 100)}% left
 						</span>
 					)}
-					{!open && usedUp.length > 0 && <span className={TONE_CLASS.out}>used up{backAt !== null && ` · back in ${untilLabel(backAt, now)}`}</span>}
-					{open && usedUp.length > 0 && <span className={TONE_CLASS.out}>· {usedUp.length} used up</span>}
+					{!open && usedUp.length > 0 && <span className={TONE_CLASS.out}>used up{backAt !== null && ` · resets in ${untilLabel(backAt, now)}`}</span>}
+					{open && usedUp.length > 0 && (
+						<span className={TONE_CLASS.out}>
+							<span className="text-muted-foreground">·</span> {usedUp.length} used up
+						</span>
+					)}
 					{plan.windows.length === 0 && plan.extra && (
-						<span className={plan.extra.exhausted ? TONE_CLASS.out : "text-foreground"}>
+						<span className={plan.extra.exhausted ? TONE_CLASS.out : extraLow(plan.extra) ? TONE_CLASS.low : "text-foreground"}>
 							<span className="text-muted-foreground">extra</span> {spendLabel(plan.extra)}
 						</span>
 					)}
@@ -210,7 +219,7 @@ function PlanChip({ plan, tag }: { plan: PlanUsage; tag: string | null }) {
 					)}
 				</button>
 			</PopoverTrigger>
-			<PopoverContent {...popover.content} side="top" align="start" onOpenAutoFocus={event => event.preventDefault()} aria-label={`${plan.name} usage`} className="w-96 p-0">
+			<PopoverContent {...popover.content} side="top" align="start" aria-label={`${plan.name} usage`} className="w-96 max-w-[calc(100vw-2rem)] p-0">
 				<PlanCard plan={plan} now={now} />
 			</PopoverContent>
 		</Popover>
@@ -218,12 +227,13 @@ function PlanChip({ plan, tag }: { plan: PlanUsage; tag: string | null }) {
 }
 
 /** A plan with no usage windows, such as API credits: its name, then its balance or `used up` once the provider refuses requests. */
-function NamedPlan({ plan }: { plan: PlanUsage }) {
-	if (plan.balance) return <CreditAmount name={plan.name} balance={plan.balance} outOfCreditSince={plan.outOfCreditSince} />;
+function NamedPlan({ plan, tag }: { plan: PlanUsage; tag: string | null }) {
+	const name = tag ? `${plan.name} ${tag}` : plan.name;
+	if (plan.balance) return <CreditAmount name={name} balance={plan.balance} outOfCreditSince={plan.outOfCreditSince} />;
 	if (plan.outOfCreditSince !== undefined) {
-		return <QuotaChip label={plan.name} value="used up" tooltip={`${plan.name}: used up.${refusedSince(plan.outOfCreditSince)}`} tone="out" />;
+		return <QuotaChip label={name} value="used up" tooltip={`${name}: used up.${refusedSince(plan.outOfCreditSince)}`} tone="out" />;
 	}
-	return <span className="whitespace-nowrap text-foreground">{plan.name}</span>;
+	return <span className="whitespace-nowrap text-foreground">{name}</span>;
 }
 
 function PlanRow({ plan, tag }: { plan: PlanUsage; tag: string | null }) {
@@ -233,7 +243,7 @@ function PlanRow({ plan, tag }: { plan: PlanUsage; tag: string | null }) {
 			{nameOnly ? (
 				<>
 					<OrgIcon org={providerOrg(plan.provider)} fallback={null} />
-					<NamedPlan plan={plan} />
+					<NamedPlan plan={plan} tag={tag} />
 				</>
 			) : (
 				<PlanChip plan={plan} tag={tag} />
