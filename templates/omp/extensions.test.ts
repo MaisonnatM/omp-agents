@@ -1217,15 +1217,20 @@ describe("artifact", () => {
 	test("each kit source extension produces details accepted by the shared parser", () => {
 		for (const [extension, kind, text] of [["html", "html", "<p>page</p>"], ["htm", "html", "<p>page</p>"], ["md", "markdown", "# Page"], ["markdown", "markdown", "# Page"], ["svg", "svg", "<svg/>"]]) {
 			writeFileSync(join(local, `page.${extension}`), text!);
+			const before = Date.now();
 			const result = save(`local://page.${extension}`);
 			expect(result.isError).toBe(false);
-			expect(parseArtifactSave(result.details)).toMatchObject({ file: `page.${extension}`, kind, title: "Example", bytes: Buffer.byteLength(text!) });
+			const parsed = parseArtifactSave(result.details);
+			expect(parsed).toMatchObject({ file: `page.${extension}`, kind, title: "Example", bytes: Buffer.byteLength(text!) });
+			expect(parsed!.savedAt).toBeGreaterThanOrEqual(before);
 		}
 	});
 	test("equal bytes keep one copy and leave no staging files", () => {
 		writeFileSync(join(local, "same.html"), "<p>same</p>");
 		const results = exercise("artifact", { artifactsDir: dir, parallel: true, runs: [{ path: "local://same.html", title: "Same" }, { path: "local://same.html", title: "Same" }] }).runs;
-		expect(results[0]!.details).toEqual(results[1]!.details);
+		const { savedAt: _first, ...first } = results[0]!.details as Record<string, unknown>;
+		const { savedAt: _second, ...second } = results[1]!.details as Record<string, unknown>;
+		expect(first).toEqual(second);
 		const parsed = parseArtifactSave(results[0]!.details)!;
 		expect(readFileSync(join(dir, "artifact-versions", `${parsed.sha256}.${parsed.kind}`), "utf8")).toBe("<p>same</p>");
 		expect(readdirSync(join(dir, "artifact-versions")).filter(name => name.startsWith(parsed.sha256))).toEqual([`${parsed.sha256}.html`]);

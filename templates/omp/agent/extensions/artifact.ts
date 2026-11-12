@@ -54,7 +54,7 @@ export default function artifact(pi: ExtensionAPI): void {
 				if (kind === "svg" && !/<svg(?:\s|\/?>)/i.test(text)) return refuse("The SVG file must contain an <svg> element.");
 				const sha256 = createHash("sha256").update(bytes).digest("hex");
 				await keepVersion(dir, sha256, kind, bytes);
-				return { content: [{ type: "text", text: `Saved ${title}. The user sees it in the Artifacts tab.` }], details: { file, kind, title, note, sha256, bytes: bytes.length } };
+				return { content: [{ type: "text", text: `Saved ${title}. The user sees it in the Artifacts tab.` }], details: { file, kind, title, note, sha256, bytes: bytes.length, savedAt: Date.now() } };
 			} catch (err) {
 				return refuse(`Could not save the artifact. ${err instanceof Error ? err.message : String(err)}`);
 			}

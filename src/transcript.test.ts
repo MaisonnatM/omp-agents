@@ -20,7 +20,7 @@ const text = (value: string) => ({ type: "text", text: value });
 
 describe("Transcript", () => {
 	test("artifact saves fold live and from disk only once, while invalid or failed results stay ordinary tools", () => {
-		const details = { file: "page.html", title: "Page", note: "Adjusted spacing", kind: "html", sha256: "a".repeat(64), bytes: 12 };
+		const details = { file: "page.html", title: "Page", note: "Adjusted spacing", kind: "html", sha256: "a".repeat(64), bytes: 12, savedAt: 1_700_000_000_000 };
 		const live = new Transcript();
 		expect(live.applyEvent({ type: "tool_execution_end", toolCallId: "a", toolName: "artifact", result: { details }, isError: false })).toMatchObject([{ artifact: details, status: "ok" }]);
 		expect(live.applyEntry({ type: "message", id: "e1", message: { role: "toolResult", timestamp: 200, toolCallId: "a", toolName: "artifact", details: { ...details } } })).toEqual([]);

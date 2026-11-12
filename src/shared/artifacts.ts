@@ -18,6 +18,8 @@ export interface ArtifactSave {
 	note: string | null;
 	sha256: Sha256;
 	bytes: number;
+	/** When the tool saved this version, in ms since the epoch. */
+	savedAt: number;
 }
 
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -25,11 +27,11 @@ const isKind = (value: unknown): value is ArtifactKind => ARTIFACT_KINDS.include
 
 export function parseArtifactSave(details: unknown): ArtifactSave | null {
 	if (!isObject(details)) return null;
-	const { file, kind, title, note, sha256, bytes } = details;
+	const { file, kind, title, note, sha256, bytes, savedAt } = details;
 	if (!isNonEmpty(file) || file.includes("\\") || file.includes("\0") || file.split("/").some(part => !part || part === "." || part === "..") || /^[A-Za-z]:/.test(file)) return null;
-	if (!isKind(kind) || !isNonEmpty(title) || typeof sha256 !== "string" || !SHA256.test(sha256) || !isSafeInteger(bytes) || bytes <= 0) return null;
+	if (!isKind(kind) || !isNonEmpty(title) || typeof sha256 !== "string" || !SHA256.test(sha256) || !isSafeInteger(bytes) || bytes <= 0 || !isSafeInteger(savedAt) || savedAt <= 0) return null;
 	if (note !== null && (typeof note !== "string" || !note.trim() || note !== note.trim() || note.length > 120 || /[\r\n]/.test(note))) return null;
-	return { file, kind, title, note, sha256: sha256 as Sha256, bytes };
+	return { file, kind, title, note, sha256: sha256 as Sha256, bytes, savedAt };
 }
 
 export const versionName = (save: Pick<ArtifactSave, "sha256" | "kind">): VersionName => `${save.sha256}.${save.kind}`;

@@ -59,7 +59,7 @@ Every transcript comes from the session files on this machine, not from a networ
   A running `task` reports them sooner through `tool_execution_update` events.
 - A tool result's images, through `imagesOf` in `src/session-entries.ts` as a prompt's, ride on its tool item as `images`, which the transcript shows under the call's row; only the view's own file adds them, while the media tree below also collects its subagents'.
 - A successful `artifact` result contributes its checked `details` as `Item.artifact`, from both live `tool_execution_end` events and saved `toolResult` messages.
-  `parseArtifactSave` in `src/shared/artifacts.ts` checks its identity, kind, title, change note, hash, and byte count once at that boundary.
+  `parseArtifactSave` in `src/shared/artifacts.ts` checks its identity, kind, title, change note, hash, byte count, and save time once at that boundary.
   Equal records compare by contents, so the saved entry replacing the live event does not land a second save.
   Failed or malformed saves remain ordinary tool items without `artifact`.
   See [Artifacts](artifacts.md) for the version copies and capability URLs.

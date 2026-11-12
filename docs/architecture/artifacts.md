@@ -6,7 +6,8 @@ There is no custom session entry, `SessionFacts` field, or separate artifact ind
 
 ## Records and copies
 
-`ArtifactSave` in `src/shared/artifacts.ts` holds the file's slash-separated identity under `local://`, its kind, title, optional change note as `string | null`, lowercase SHA-256, and byte count.
+`ArtifactSave` in `src/shared/artifacts.ts` holds the file's slash-separated identity under `local://`, its kind, title, optional change note as `string | null`, lowercase SHA-256, byte count, and `savedAt`, the save time in milliseconds since the epoch.
+The tool stamps `savedAt`, so the live event and the file entry carry the same record and the Artifacts tab can say when each version was saved.
 A note is trimmed, contains one line, and has at most 120 characters.
 `parseArtifactSave` checks the record at the transcript boundary, and `parseVersionName` checks `<sha256>.<kind>` at the HTTP boundary.
 `src/transcript.ts` folds successful artifact results into `Item.artifact`, both from live tool events and from file entries.
