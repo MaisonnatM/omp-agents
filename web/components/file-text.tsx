@@ -40,12 +40,15 @@ export function MarkdownDocument({ text, frontmatter, path, className }: { text:
 	);
 }
 
-/** `text` as numbered lines that wrap, colored by `path`'s extension; a token longer than a line, such as minified CSS, breaks anywhere. */
+/**
+ * `text` as numbered lines that wrap, colored by `path`'s extension; a token longer than a line, such as minified CSS, breaks anywhere.
+ * The newline that ends the last line numbers no empty line after it.
+ */
 export function CodeText({ text, path, className }: { text: string; path: string; className?: string }) {
 	return (
 		<CodeBlock size="sm" className={cn("code-lines", className)}>
 			<CodeBlockContent wrap lineNumbers aria-label={`Contents of ${path}`} className="data-wrap:wrap-anywhere">
-				<CodeLines text={text} language={extensionOf(path)} />
+				<CodeLines text={text.endsWith("\n") ? text.slice(0, -1) : text} language={extensionOf(path)} />
 			</CodeBlockContent>
 		</CodeBlock>
 	);
