@@ -106,8 +106,8 @@ function CommitScope({ commits, commit, onCommit }: Pick<CodeToolbarProps, "comm
 						.slice(0, shown)
 						.map(entry => (
 							<MenuRadioItem key={entry.oid} value={entry.oid} closeOnClick>
-								<span className="truncate">{entry.headline}</span>
-								<span className="ml-auto font-mono text-2xs">{entry.sha}</span>
+								<span className="min-w-0 flex-1 truncate">{entry.headline}</span>
+								<span className="pl-4 font-mono text-2xs">{entry.sha}</span>
 							</MenuRadioItem>
 						))}
 				</MenuRadioGroup>

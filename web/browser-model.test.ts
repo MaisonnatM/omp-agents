@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { LiveSessionProcesses, SessionProcess } from "../src/shared/processes";
-import { annotationText, boundsOf, browserCandidates, cardPlace, devServers, dragArea, elementAt, initialAddress, type Mark, markAt, strokeArea, unionArea } from "./browser-model";
+import { annotationText, boundsOf, browserCandidates, cardPlace, devServers, dragArea, elementAt, FIT_PANEL, fitZoom, initialAddress, type Mark, markAt, scaleArea, screenChoiceOf, screenName, storedScreen, strokeArea, unionArea } from "./browser-model";
 
 const running = (label: string, ports: number[], shared = false): SessionProcess => ({
 	id: label, kind: shared ? "service" : "job", shared, label, memoryBytes: 0, cpuPercent: 0, processCount: 1, ports, startedAt: 0, stopsAt: null,
@@ -77,11 +77,46 @@ test("the card sits right of the marks, else left of them, else below, and alway
 	expect(cardPlace({ x: 0, y: 0, width: 1000, height: 600 }, size, 1000, 600)).toEqual({ x: 692, y: 532 });
 });
 
+test("on a page too narrow beside the marks, the card goes below them rather than on top", () => {
+	// A button picked in a phone frame scaled into the sidebar: right of it spills least, but kept inside it covers the button.
+	expect(cardPlace({ x: 13, y: 47, width: 43, height: 29 }, { width: 247, height: 50 }, 263, 565)).toEqual({ x: 8, y: 84 });
+});
+
+test("a screen size round-trips through its stored form, and anything else reads as Fit panel", () => {
+	for (const choice of [{ size: "mobile", landscape: false }, { size: "mobile", landscape: true }, { size: "tablet", landscape: true }, { size: "desktop", landscape: false }] as const) {
+		expect(screenChoiceOf(storedScreen(choice))).toEqual(choice);
+	}
+	expect(storedScreen({ size: "fit", landscape: false })).toBeNull();
+	for (const stored of [null, "", "fit", "watch", "mobile sideways", "mobile landscape extra"]) expect(screenChoiceOf(stored)).toEqual(FIT_PANEL);
+	// Desktop has no landscape: a stored one reads upright.
+	expect(screenChoiceOf("desktop landscape")).toEqual({ size: "desktop", landscape: false });
+});
+
+test("a screen size shrinks to fit the Browser and never grows past its own size", () => {
+	expect(fitZoom({ width: 263, height: 800 }, { width: 390, height: 844 })).toBeCloseTo(263 / 390);
+	expect(fitZoom({ width: 1000, height: 400 }, { width: 390, height: 844 })).toBeCloseTo(400 / 844);
+	expect(fitZoom({ width: 2000, height: 2000 }, { width: 390, height: 844 })).toBe(1);
+});
+
+test("an element's box in the app's pixels scales by the zoom it shows at, keeping its other fields", () => {
+	expect(scaleArea({ id: 7, x: 10, y: 20, width: 100, height: 40 }, 0.5)).toEqual({ id: 7, x: 5, y: 10, width: 50, height: 20 });
+});
+
+test("an annotation at a screen size names it in its chip and its text", () => {
+	const shownAt = screenName({ size: "mobile", landscape: true });
+	expect(shownAt).toBe("Mobile, 844×390");
+	expect(screenName({ size: "fit", landscape: false })).toBeNull();
+	const annotation = { comment: "", page: { url: "http://localhost:5173/", title: "Shop" }, elements: [{ name: "button", snippet: "<button>" }], regions: 0, strokes: 0, shownAt };
+	const { label, content } = annotationText(annotation);
+	expect(label).toBe("button (Mobile, 844×390)");
+	expect(content).toContain("Annotated in the Browser on http://localhost:5173/ (Shop), shown at the Mobile, 844×390 screen size.");
+});
+
 test("an annotation's chip is named after the comment, else its elements, else the page", () => {
 	const page = { url: "http://localhost:5173/cart", title: "Cart" };
 	const buy = { name: "BuyButton", snippet: "<button>Buy</button>" };
 	const card = { name: "ProductCard", snippet: "<section>…</section>" };
-	const base = { comment: "", page, elements: [], regions: 0, strokes: 0 };
+	const base = { comment: "", page, elements: [], regions: 0, strokes: 0, shownAt: null };
 	expect(annotationText({ ...base, comment: "  make it\n blue ", elements: [buy] }).label).toBe("make it blue");
 	expect(annotationText({ ...base, elements: [buy, card] }).label).toBe("BuyButton +1");
 	expect(annotationText({ ...base, elements: [buy] }).label).toBe("BuyButton");
@@ -96,6 +131,7 @@ test("an annotation's text gives the comment, the page, each element, and what t
 		elements: [{ name: "BuyButton", snippet: "<button>Buy</button>" }],
 		regions: 2,
 		strokes: 1,
+		shownAt: null,
 	});
 	expect(content).toBe(
 		"match card B\n\nAnnotated in the Browser on http://localhost:5173/ (Shop).\n\nElement 1, BuyButton:\n<button>Buy</button>\n\nThe attached picture shows 1 outlined element, 2 boxes, 1 line.",

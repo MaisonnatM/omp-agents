@@ -1,15 +1,28 @@
 /**
  * The Browser's `<webview>` guests of the dashboard window: what each gets when it attaches, where its navigations and
  * new windows go, the ports its session and other servers listen on, which the page reports so a sign-in comes back
- * to the session's server, and the captures of what it shows that the page asks for.
+ * to the session's server, the **Screen size** each emulates, and the captures of what it shows that the page asks for.
  */
 import type { BrowserWindow, WebContents, WebPreferences } from "electron";
-import { appAddress, BROWSER_CAPTURE_CHANNEL, BROWSER_PORTS_CHANNEL, type BrowserPorts, isLoopbackUrl, isWebUrl, PREVIEW_PARTITION } from "../src/shared/desktop-bridge";
+import {
+	appAddress,
+	BROWSER_CAPTURE_CHANNEL,
+	BROWSER_PORTS_CHANNEL,
+	BROWSER_SCREEN_CHANNEL,
+	type BrowserPorts,
+	type BrowserScreen,
+	isBrowserScreen,
+	isLoopbackUrl,
+	isWebUrl,
+	PREVIEW_PARTITION,
+	screenOf,
+} from "../src/shared/desktop-bridge";
 
-/** A guest of the Browser, and the ports its session and other servers listen on. */
+/** A guest of the Browser, the ports its session and other servers listen on, and the screen the page last asked it for, `null` before it asked. */
 interface BrowserApp {
 	guest: WebContents;
 	ports: BrowserPorts;
+	screen: BrowserScreen | null;
 }
 
 const isPorts = (value: unknown): value is readonly number[] => Array.isArray(value) && value.every(port => Number.isInteger(port));
@@ -42,6 +55,46 @@ function keepInBrowser(contents: WebContents, app: BrowserApp, win: BrowserWindo
 	contents.on("will-redirect", follow);
 }
 
+/**
+ * Has `app`'s guest emulate `next` through the DevTools protocol: its size, pixel density, touch screen, orientation,
+ * and user agent, or none for `fit`. Turning picking on or off only switches whether the mouse acts as a finger, so the
+ * app keeps its layout and state; any other change starts again from no emulation, which detaching restores.
+ * Whether the debugger is attached says whether a size is emulated: one another debugger holds shows the app as it fits.
+ * The page names the size once the guest's first page is ready, so a guest that opens on a size loads that page again
+ * under it, as a script reading the user agent or touch support at load would otherwise see the window's.
+ */
+function emulate(app: BrowserApp, next: BrowserScreen): void {
+	const before = app.screen;
+	app.screen = next;
+	const shown = screenOf(next);
+	const tools = app.guest.debugger;
+	const send = (method: string, params: object): Promise<unknown> => tools.sendCommand(method, params).catch(() => {});
+	if (!(before?.size === next.size && before.landscape === next.landscape && tools.isAttached())) {
+		if (tools.isAttached()) tools.detach();
+		if (!shown) return;
+		try {
+			tools.attach("1.3");
+		} catch {
+			return;
+		}
+		const { device, width, height } = shown;
+		const sent = [send("Emulation.setDeviceMetricsOverride", {
+			width,
+			height,
+			screenWidth: width,
+			screenHeight: height,
+			deviceScaleFactor: device.deviceScaleFactor,
+			mobile: device.touch,
+			...(device.touch && { screenOrientation: next.landscape ? { type: "landscapePrimary", angle: 90 } : { type: "portraitPrimary", angle: 0 } }),
+		})];
+		if (device.touch) sent.push(send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 }));
+		if (device.agent) sent.push(send("Emulation.setUserAgentOverride", device.agent));
+		// The guest's own reload, unless the page asked for another size meanwhile: the protocol's `Page.reload` from a guest reloads the dashboard that embeds it.
+		if (before === null) void Promise.all(sent).then(() => app.screen?.size === next.size && app.screen.landscape === next.landscape && !app.guest.isDestroyed() && app.guest.reload());
+	}
+	if (shown?.device.touch) void send("Emulation.setEmitTouchEventsForMouse", { enabled: !next.picking, configuration: "mobile" });
+}
+
 /** Gives the Browser's guests that the dashboard in `win` attaches their preload, sandbox, partition, and rules. */
 export function trackBrowserGuests(win: BrowserWindow, { preload, isDashboard, openOutside }: {
 	preload: string;
@@ -57,7 +110,7 @@ export function trackBrowserGuests(win: BrowserWindow, { preload, isDashboard, o
 		if (!isDashboard(contents.getURL()) || !isLoopbackUrl(params.src ?? "")) event.preventDefault();
 	});
 	contents.on("did-attach-webview", (_event, guest) => {
-		const app: BrowserApp = { guest, ports: { session: [], other: [] } };
+		const app: BrowserApp = { guest, ports: { session: [], other: [] }, screen: null };
 		apps.set(guest.id, app);
 		guest.once("destroyed", () => apps.delete(guest.id));
 		keepInBrowser(guest, app, win, openOutside);
@@ -69,10 +122,17 @@ export function trackBrowserGuests(win: BrowserWindow, { preload, isDashboard, o
 			app.ports = { session: ports.session, other: ports.other };
 		}
 	});
+	contents.ipc.on(BROWSER_SCREEN_CHANNEL, (event, guestId: unknown, screen: unknown) => {
+		const app = typeof guestId === "number" ? apps.get(guestId) : undefined;
+		if (app && isDashboard(event.senderFrame?.url ?? "") && isBrowserScreen(screen)) emulate(app, screen);
+	});
 	contents.ipc.handle(BROWSER_CAPTURE_CHANNEL, async (event, guestId: unknown) => {
 		const app = typeof guestId === "number" ? apps.get(guestId) : undefined;
 		if (!app || !isDashboard(event.senderFrame?.url ?? "")) return null;
 		const image = await app.guest.capturePage();
-		return image.isEmpty() ? null : image.toPNG();
+		if (image.isEmpty()) return null;
+		// While a screen size is emulated, the picture keeps its CSS size at 1×, whatever pixel density the window or the device has.
+		const shown = app.guest.debugger.isAttached() && app.screen && screenOf(app.screen);
+		return (shown ? image.resize({ width: shown.width, quality: "best" }) : image).toPNG();
 	});
 }

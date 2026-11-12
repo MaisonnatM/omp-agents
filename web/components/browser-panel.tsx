@@ -3,21 +3,21 @@
  * tab, where the elements selected and the marks drawn on the page land in the session's composer as one chip and its
  * picture, and a whole page as an image.
  */
-import { AppWindow, ArrowLeft, ArrowRight, Camera, CircleStop, ExternalLink, Eye, Maximize2, Minimize2, MousePointerClick, Play, RotateCw, Server, Sparkles, X } from "lucide-react";
+import { AppWindow, ArrowLeft, ArrowRight, Camera, CircleStop, ExternalLink, Eye, type LucideIcon, Maximize2, Minimize2, Monitor, MousePointerClick, Play, Proportions, RotateCw, RotateCwSquare, Server, Smartphone, Sparkles, Tablet, X } from "lucide-react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import type { ControlId } from "../../src/shared/activity";
 import type { LiveView } from "../../src/shared/sessions";
-import { PREVIEW_PARTITION } from "../../src/shared/desktop-bridge";
+import { isScreenSize, PREVIEW_PARTITION, SCREEN_SIZES, type ScreenChoice, screenChoice, type ScreenSize, screenOf } from "../../src/shared/desktop-bridge";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, MenuSeparator, DropdownMenuTrigger, MenuItem, MenuLinkItem, MenuShortcut, MenuSubmenu, MenuSubmenuContent, MenuSubmenuTrigger } from "@/components/ui/menu";
+import { DropdownMenu, DropdownMenuContent, MenuSeparator, DropdownMenuTrigger, MenuItem, MenuLinkItem, MenuRadioGroup, MenuRadioItem, MenuShortcut, MenuSubmenu, MenuSubmenuContent, MenuSubmenuTrigger } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { liveDraftKey } from "../composer-drafts";
 import { expiringStrings } from "../expiring-strings";
-import { browserCandidates, type DevServer, devServers, initialAddress } from "../browser-model";
+import { browserCandidates, type DevServer, devServers, FIT_PANEL, fitZoom, initialAddress, SCREEN_LABELS, screenChoiceOf, screenName, storedScreen } from "../browser-model";
 import { commandLabel } from "../labels";
 import { latestReviewPages, onReviewRequest, type ReviewPage, samePages, takeReview } from "../review-pages";
 import { type PaneData, usePaneSelect } from "../pane-store";
@@ -25,7 +25,7 @@ import { sessionProcessesStore, writeProcessStop, writeStartServer } from "../re
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useAction } from "../use-action";
 import { useWebview } from "../use-webview";
-import { Picking, usePicking } from "./browser-capture";
+import { PickModes, Picking, usePicking } from "./browser-capture";
 import { DESKTOP_TITLE_BAR } from "./header-controls";
 import { MoreActionsMenu } from "./more-actions-menu";
 import { useDashboardActions } from "./dashboard-context";
@@ -40,6 +40,12 @@ export const BROWSER_AVAILABLE = typeof window !== "undefined" && window.ompDesk
 
 /** The window's shell takes capture requests and picks in the app: the desktop app, from the build that added **Screenshot** and T3 Code's picking. */
 const CAPTURE_AVAILABLE = typeof window !== "undefined" && typeof window.ompDesktop?.captureBrowser === "function";
+
+/** The window's shell emulates a **Screen size** in the Browser: the desktop app, from the build that added it. */
+const SCREEN_AVAILABLE = typeof window !== "undefined" && typeof window.ompDesktop?.screenBrowser === "function";
+
+/** Each **Screen size**'s icon, which the toolbar button shows for the size picked. */
+const SCREEN_ICONS: Record<ScreenSize, LucideIcon> = { fit: Proportions, mobile: Smartphone, tablet: Tablet, desktop: Monitor };
 
 /** The sparkles the page marks agent-made things with, as the notification bell's Updates do. */
 const AI_SPARKLES = "text-violet-600 dark:text-violet-400";
@@ -96,8 +102,14 @@ function inertAround(kept: HTMLElement): () => void {
 	};
 }
 
-/** The address each session's Browser last loaded, by omp session id, dropped once unused for 30 days. */
-const addresses = expiringStrings("omp-agents.preview-addresses", 30 * 24 * 60 * 60 * 1000);
+/** How long a session's Browser keeps what it last showed once unchanged: 30 days. */
+const KEPT_FOR = 30 * 24 * 60 * 60 * 1000;
+
+/** The address each session's Browser last loaded, by omp session id, dropped once unused for {@link KEPT_FOR}. */
+const addresses = expiringStrings("omp-agents.preview-addresses", KEPT_FOR);
+
+/** The **Screen size** each session's Browser shows, by omp session id, as {@link storedScreen} writes it, dropped once unchanged for {@link KEPT_FOR}. */
+const screens = expiringStrings("omp-agents.browser-screens", KEPT_FOR);
 
 /** The value of the Browser's tab for the session's own page; a review tab's value is its page's address. */
 const APP_TAB = "app";
@@ -110,7 +122,7 @@ const reviewPagesOf = (pane: PaneData): ReviewPage[] => latestReviewPages(pane.i
 /**
  * Live session `view`'s Browser: its own page, plus one tab per page a reply listed for review once the toolbar's
  * **Review visuals**, for its latest reply, or a reply's own opens them. Every tab stays mounted once opened, so each
- * page keeps its state while another shows.
+ * page keeps its state while another shows. Every tab shows the session's **Screen size**.
  * A listed page of another omp-agents server, such as the session's test server, opens in an app of its own instead,
  * signed in, which no tab can be; that app shows the first of its pages.
  */
@@ -119,6 +131,11 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 	const [open, setOpen] = useState<readonly ReviewPage[]>([]);
 	const [active, setActive] = useState(APP_TAB);
 	const rootRef = useRef<HTMLDivElement>(null);
+	const [screen, setScreen] = useState(() => (SCREEN_AVAILABLE ? screenChoiceOf(screens.get(sessionId)) : FIT_PANEL));
+	const chooseScreen = (next: ScreenChoice): void => {
+		setScreen(next);
+		screens.set(sessionId, storedScreen(next));
+	};
 	const review = async (listed: readonly ReviewPage[]): Promise<void> => {
 		const tabs: ReviewPage[] = [];
 		const inApps = new Set<string>();
@@ -168,7 +185,7 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 						className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
 					>
 						{page?.note && <p className="shrink-0 border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">{page.note}</p>}
-						<BrowserPage view={view} sessionId={sessionId} page={page} active={value === active} pages={pages} onReview={() => void review(pages)} />
+						<BrowserPage view={view} sessionId={sessionId} page={page} active={value === active} pages={pages} onReview={() => void review(pages)} screen={screen} onScreen={chooseScreen} />
 					</TabsPrimitive.Content>
 				);
 			})}
@@ -242,12 +259,78 @@ function BrowserTabStrip({ pages, active, onClose }: { pages: readonly ReviewPag
 	);
 }
 
+/** The toolbar's **Screen size** menu: the size `screen` shows, the others `onScreen` picks, and **Rotate** for a phone or tablet. */
+function ScreenSizeMenu({ screen, onScreen }: { screen: ScreenChoice; onScreen: (screen: ScreenChoice) => void }) {
+	const [open, setOpen] = useState(false);
+	const shown = screenOf(screen);
+	const ScreenIcon = SCREEN_ICONS[screen.size];
+	const label = `Screen size: ${SCREEN_LABELS[screen.size]}`;
+	return (
+		<DropdownMenu open={open} onOpenChange={setOpen}>
+			<Tooltip content={label} side="bottom" forceOpen={open ? false : undefined}>
+				<DropdownMenuTrigger {...activityControl("browser.screen-size")} render={<Button variant="ghost" size="icon-compact" active={shown !== null} aria-label={label} />}>
+					<ScreenIcon />
+				</DropdownMenuTrigger>
+			</Tooltip>
+			<DropdownMenuContent align="end">
+				<MenuRadioGroup
+					aria-label="Screen size"
+					value={screen.size}
+					// A turned screen stays turned on the other touch size.
+					onValueChange={(size: unknown) => isScreenSize(size) && onScreen(screenChoice(size, screen.landscape))}
+				>
+					{SCREEN_SIZES.map(size => {
+						const Icon = SCREEN_ICONS[size];
+						// Each touch size reads turned while the chosen one is.
+						const sized = screenOf(screenChoice(size, screen.landscape));
+						return (
+							<MenuRadioItem key={size} value={size} closeOnClick>
+								<Icon />
+								<span className="flex-1">{SCREEN_LABELS[size]}</span>
+								{sized && (
+									<span className="pl-4 font-mono text-xs text-muted-foreground">
+										{sized.width}×{sized.height}
+									</span>
+								)}
+							</MenuRadioItem>
+						);
+					})}
+				</MenuRadioGroup>
+				{shown?.device.touch && (
+					<>
+						<MenuSeparator />
+						<MenuItem {...activityControl("browser.rotate")} onClick={() => onScreen({ ...screen, landscape: !screen.landscape })}>
+							<RotateCwSquare />
+							{screen.landscape ? "Rotate to portrait" : "Rotate to landscape"}
+						</MenuItem>
+					</>
+				)}
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+/** The share of its size a screen size `shown` shows at in the box `ref` renders, `1` for none. */
+function useFitZoom(shown: { width: number; height: number } | null): { ref: (box: HTMLDivElement | null) => void; zoom: number } {
+	const [box, setBox] = useState<HTMLDivElement | null>(null);
+	const [room, setRoom] = useState<{ width: number; height: number } | null>(null);
+	useEffect(() => {
+		if (!box) return;
+		const observer = new ResizeObserver(([entry]) => {
+			if (entry) setRoom({ width: entry.contentRect.width, height: entry.contentRect.height });
+		});
+		observer.observe(box);
+		return () => observer.disconnect();
+	}, [box]);
+	return { ref: setBox, zoom: shown && room ? fitZoom(room, shown) : 1 };
+}
+
 /**
  * One page of `view`'s Browser in a `<webview>`: a review page's address, else the address last loaded for
- * `sessionId`, else the first port its jobs and services listen on. Each **Attach** of what was picked in it is
- * appended to the view's composer.
+ * `sessionId`, else the first port its jobs and services listen on, shown at `screen`. Each **Attach** of what was
+ * picked in it is appended to the view's composer.
  */
-function BrowserPage({ view, sessionId, page, active, pages, onReview }: {
+function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, onScreen }: {
 	view: LiveView;
 	sessionId: string;
 	page: ReviewPage | null;
@@ -255,6 +338,9 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview }: {
 	/** The pages the latest reply listed, which **Review visuals** opens as tabs. */
 	pages: readonly ReviewPage[];
 	onReview: () => void;
+	/** The session's **Screen size**, which every tab shows and its toolbar changes with `onScreen`. */
+	screen: ScreenChoice;
+	onScreen: (screen: ScreenChoice) => void;
 }) {
 	const { read } = sessionProcessesStore.use();
 	const servers = useMemo(() => devServers(read?.data ?? null, view.instanceId), [read, view.instanceId]);
@@ -265,6 +351,8 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview }: {
 	);
 	const [saved] = useState(() => addresses.get(sessionId));
 	const [maximized, setMaximized] = useState(false);
+	const shown = screenOf(screen);
+	const fit = useFitZoom(shown);
 	const webview = useWebview({
 		initial: page?.url ?? initialAddress(saved, candidates),
 		onSelection: boxes => picking.onSelection(boxes),
@@ -275,8 +363,10 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview }: {
 		onEscape: () => picking.stop() || setMaximized(false),
 		onPickKey: key => picking.pickKey(key),
 		ports,
+		screen,
 	});
-	const picking = usePicking(webview, liveDraftKey(view));
+	// Picking draws over the shown, zoomed screen, so it shows the app's boxes at the zoom.
+	const picking = usePicking(webview, liveDraftKey(view), screenName(screen), fit.zoom);
 	const [menuOpen, setMenuOpen] = useState(false);
 	const { request } = useDashboardActions();
 	const startServer = useAction(async () => {
@@ -296,6 +386,7 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview }: {
 	// The candidates choose the first address, fill the server menu, and name the ports a sign-in comes back to, so `ps` and `lsof` run only until they are read once, and while the menu is open.
 	sessionProcessesStore.usePolling(null, webview.src === null || read === null || menuOpen);
 	const mounted = webview.src !== null;
+	const zoom = fit.zoom;
 	useShortcuts({ browserRestore: () => active && (picking.stop() || (maximized ? setMaximized(false) : false)) });
 	const sectionRef = useRef<HTMLElement>(null);
 	// What the maximized Browser covers leaves the tab order and the accessibility tree.
@@ -309,7 +400,7 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview }: {
 			className={cn("@container/browser flex min-h-0 flex-col bg-background", maximized ? cn("fixed inset-x-0 bottom-0 z-30", DESKTOP_TITLE_BAR ? "top-9" : "top-0") : "flex-1")}
 		>
 			{/* In a narrow Browser, such as the sidebar at its default width, the address field takes a row of its own below the buttons. */}
-			<div className="flex min-h-9 shrink-0 flex-wrap items-center gap-0.5 border-b border-border px-1.5 @max-[24rem]/browser:pt-1">
+			<div className="flex min-h-9 shrink-0 flex-wrap items-center gap-0.5 border-b border-border px-1.5 @max-[24rem]/browser:pt-1 @max-[16rem]/browser:gap-0">
 				<ToolbarButton label="Back" control="browser.back" disabled={!webview.ready || !webview.history.back} onClick={webview.back}>
 					<ArrowLeft />
 				</ToolbarButton>
@@ -397,6 +488,7 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview }: {
 						<Camera />
 					</ToolbarButton>
 				)}
+				{SCREEN_AVAILABLE && <ScreenSizeMenu screen={screen} onScreen={onScreen} />}
 				{pages.length > 0 && (
 					<ToolbarButton
 						label={`Review visuals: ${pages.map(each => each.label).join(" · ")}`}
@@ -445,27 +537,41 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview }: {
 					</Button>
 				</div>
 			) : (
-				<div className="relative flex min-h-0 flex-1">
-					<webview
-						ref={webview.ref}
-						src={webview.src}
-						partition={PREVIEW_PARTITION}
-						// Without it the guest drops every `window.open` and `target="_blank"` link; with it the shell opens them in the browser.
-						// React writes no attribute for `true` on a name it does not know, and Electron reads only the attribute's presence.
-						allowpopups={"" as unknown as boolean}
-						className="flex min-h-0 w-full flex-1"
-					/>
-					{picking.mode !== null && (
-						<Picking
-							mode={picking.mode}
-							color={picking.color}
-							elements={picking.elements}
-							onMode={picking.choose}
-							onDeselect={webview.deselect}
-							onAttach={picking.attach}
-							attaching={picking.attaching}
-						/>
-					)}
+				<div className={cn("relative flex min-h-0 flex-1 flex-col", shown && "overflow-hidden bg-muted p-3")}>
+					{/* The room the frame fits in, which the zoom is measured against; its top padding holds the size line, which rides on the frame. */}
+					<div ref={fit.ref} className={cn("flex min-h-0 min-w-0 flex-1", shown && "items-center justify-center pt-5.5")}>
+						<div className={cn("relative flex min-h-0", shown ? "shrink-0" : "flex-1")} style={shown ? { width: shown.width * zoom, height: shown.height * zoom } : undefined}>
+							{shown && (
+								<p className="absolute inset-x-0 bottom-full mb-1.5 h-4 text-center text-xs leading-4 whitespace-nowrap text-muted-foreground tabular-nums">
+									{shown.width}×{shown.height} · {Math.round(zoom * 100)}%
+								</p>
+							)}
+							<div className={cn("relative flex min-h-0 flex-1", shown && "overflow-hidden bg-background shadow-sm ring-1 ring-border")}>
+								<webview
+									ref={webview.ref}
+									src={webview.src}
+									partition={PREVIEW_PARTITION}
+									// Without it the guest drops every `window.open` and `target="_blank"` link; with it the shell opens them in the browser.
+									// React writes no attribute for `true` on a name it does not know, and Electron reads only the attribute's presence.
+									allowpopups={"" as unknown as boolean}
+									// A screen size keeps its own CSS size and shows scaled to the frame, so the app lays out as on the device.
+									className={shown ? "absolute top-0 left-0 flex origin-top-left" : "flex min-h-0 w-full flex-1"}
+									style={shown ? { width: shown.width, height: shown.height, transform: `scale(${zoom})` } : undefined}
+								/>
+								{picking.mode !== null && (
+									<Picking
+										mode={picking.mode}
+										color={picking.color}
+										elements={picking.elements}
+										onDeselect={webview.deselect}
+										onAttach={picking.attach}
+										attaching={picking.attaching}
+									/>
+								)}
+							</div>
+						</div>
+					</div>
+					{picking.mode !== null && <PickModes mode={picking.mode} onMode={picking.choose} />}
 				</div>
 			)}
 		</section>

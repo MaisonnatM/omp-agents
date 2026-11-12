@@ -15,6 +15,10 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - The Todos card no longer shows the agent's todo list or the Ship steps; it keeps Subagents, Files, Images, and Sources.
 - The Todos card is now the Session card, and Settings › Preferences says Show session card.
+## 2026-11-11
+
+- The Browser's new Screen size menu shows the app as an iPhone, an iPad, or a laptop sees it, with a touch screen and Safari's user agent on the phone and tablet, so you can test its responsive layout; its Rotate turns the phone or tablet sideways, a size too big for the Browser shrinks to fit, and the session keeps its pick for 30 days.
+- A Browser picture taken at a screen size keeps that size's own width and its chip names the size, such as Mobile, 390×844.
 
 ## 2026-11-10
 

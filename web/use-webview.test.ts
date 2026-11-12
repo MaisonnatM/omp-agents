@@ -15,7 +15,7 @@ const { useWebview } = await import("./use-webview.ts");
 
 let webview;
 function Probe({ initial }) {
-	webview = useWebview({ initial, onPick: noop, onNavigate: noop, onEscape: noop, sessionPorts: [] });
+	webview = useWebview({ initial, onPick: noop, onNavigate: noop, onEscape: noop, sessionPorts: [], screen: { size: "fit", landscape: false } });
 	return null;
 }
 const results = {};
