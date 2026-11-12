@@ -84,9 +84,10 @@
   With focus fills the composer with `/compact ` or `/handoff ` for you to finish.
   These actions wait until the running turn ends; **Auto-compact** remains available and changes this session only, not its config file.
   While compaction runs, the ring reads **Compacting…** and pulses unless you prefer reduced motion.
-- Type `$` to complete omp's commands, discovered file commands, and `/skill:<name>` skills; picking one puts its `/` text in the draft, such as `/skill:poteto-mode`, so omp runs it as if you had typed it.
+- Type `/` at the start of the prompt to complete discovered file commands, such as `/ship`; a `/` later in the prompt, or a path such as `/tmp/a`, opens nothing.
+  Type `$` to complete `/skill:<name>` skills: the list shows each skill by its name, and picking one puts its `/skill:` text in the draft, such as `/skill:poteto-mode`, so omp runs it as if you had typed it.
   A skill whose name has a space is left out, since omp cannot invoke it.
-  `$` opens the list at the start of a line or after a space, and not before a digit, so a price such as `$5` stays text; `/` no longer opens it.
+  `$` opens the list at the start of a line or after a space, and not before a digit, so a price such as `$5` stays text.
   Type `@` to mention something: the list shows the last three files the session changed, then Files & Folders, Todos, Tickets, Pull requests, People, Email, Calendar, and Sessions.
   Picking a category narrows the list to it, which you can also type as a prefix: `@file:`, `@todo:`, `@ticket:`, `@pr:`, `@person:`, `@mail:`, `@event:`, or `@session:`.
   People lists the authors, reviewers, and review teams of the pull requests the Pull requests page lists, without you or bots, each with the pull requests they are on, so `@person:#12` finds the people on pull request 12, then your Linear workspace's active members while Linear is connected.

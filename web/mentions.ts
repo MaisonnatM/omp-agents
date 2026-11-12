@@ -106,9 +106,10 @@ function source({ list, ...category }: Omit<Category, "searchLimit" | "options">
 
 const COMPLETION_ICON: Record<CompletionItem["kind"], LucideIcon> = { command: Slash, skill: Sparkles, file: File, directory: Folder };
 
-/** omp's own suggestion, which carries the draft and caret it leaves. */
+/** omp's own suggestion, which carries the draft and caret it leaves; a skill's row reads as its name, since `$` already says skill. */
 export function completionOption(item: CompletionItem): MenuOption {
-	return { icon: COMPLETION_ICON[item.kind], label: item.label, detail: item.description, edit: { text: item.text, cursor: item.cursor }, opens: false };
+	const label = item.kind === "skill" ? item.label.replace(/^skill:/, "") : item.label;
+	return { icon: COMPLETION_ICON[item.kind], label, detail: item.description, edit: { text: item.text, cursor: item.cursor }, opens: false };
 }
 
 /** Brackets in a Markdown link's text would end it early. */

@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-12
 
+- In the box you type a prompt in, / now lists commands, $ lists skills by name, and @ stays for files and other mentions.
 - The plan usage at the bottom of the screen now shows one short chip per account, such as `yampa 5h 71% left · ✦ 2`, naming the account when a provider has two and how many windows are used up. Hovering or clicking a chip opens a card with every window's bar, when it resets, such as "Resets in 1d3h · Fri 13 Nov, 14:00", and the reset credits left.
 - You can ask an agent to make a page, a document, or a drawing for you to look at, and it opens beside the conversation in the new Artifacts tab of the right sidebar.
 - A page in the Artifacts tab is ready to use: its buttons and forms work, sealed off from the dashboard.
