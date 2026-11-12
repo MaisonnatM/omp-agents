@@ -145,6 +145,10 @@ It is separate from a todo's notes field.
 What the page records of how its user uses the dashboard, by registry id only, which Settings › Activity reports.
 _Avoid_: Usage (omp's requests, in Analytics), analytics, telemetry
 
+**Screen size**:
+The screen the Browser shows the session's app on: **Fit panel**, the Browser's own size with a mouse, or **Mobile**, **Tablet**, or **Desktop**, each a fixed size with the pointer and identity of an iPhone, an iPad, or a computer.
+_Avoid_: Device (see **Paired phone**), device preset, viewport, breakpoint
+
 ## Unattended work
 
 **Routine**:
