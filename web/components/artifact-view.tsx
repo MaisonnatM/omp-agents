@@ -53,10 +53,11 @@ function MarkdownText({ text }: RenderedProps) {
 	);
 }
 
-function Waiting({ loaded }: { loaded: Exclude<Loaded<unknown>, { state: "ready" }> }) {
+/** A spinner while the version loads, or why it could not. */
+function Waiting({ failure }: { failure: string | null }) {
 	return (
 		<div className="flex size-full items-center justify-center p-4 text-center text-[12px] text-muted-foreground">
-			{loaded.state === "loading" ? <Spinner className="size-4" /> : <p role="alert">Could not load this version. {loaded.error}</p>}
+			{failure === null ? <Spinner className="size-4" /> : <p role="alert">{failure}</p>}
 		</div>
 	);
 }
@@ -67,8 +68,9 @@ function Waiting({ loaded }: { loaded: Exclude<Loaded<unknown>, { state: "ready"
  */
 export function ArtifactView({ link, kind, file, title, source }: { link: Loaded<string>; kind: ArtifactKind; file: string; title: string; source: boolean }) {
 	const text = useArtifactText(link.state === "ready" ? link.value : null);
-	if (link.state !== "ready") return <Waiting loaded={link} />;
-	if (text.state !== "ready") return <Waiting loaded={text} />;
+	// The text's failures are whole sentences already; the link's are the server's words.
+	const failure = link.state === "failed" ? `Could not load this version. ${link.error}` : text.state === "failed" ? text.error : null;
+	if (link.state !== "ready" || text.state !== "ready") return <Waiting failure={failure} />;
 	if (source) return <CodeText text={text.value} path={file} className="h-full rounded-none border-0" />;
 	const { Rendered } = ARTIFACT_KIND[kind];
 	return <Rendered url={link.value} text={text.value} title={title} />;

@@ -52,9 +52,11 @@ const links = cache(async key => {
 	return url;
 });
 
+/** Each failure reads as a whole sentence the panel shows as it is. */
 const texts = cache(async url => {
 	const response = await fetch(url);
-	if (!response.ok) throw new Error(response.status === 404 ? "This version's saved copy is gone." : `The server answered ${response.status}.`);
+	if (response.status === 404) throw new Error("This version's saved copy is gone. Pick another version.");
+	if (!response.ok) throw new Error(`Could not load this version. The server answered ${response.status}.`);
 	return response.text();
 });
 
