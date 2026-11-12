@@ -25,8 +25,11 @@ flowchart TD
   ui --> tn["6. Thermonuclear<br/>unless .omp/review-paths skips it"]
   tn --> ready["7. Put live for review<br/>ready gate, gh pr ready"]
   ready --> live["8. Live review"]
-  live -->|"conflicts, comments, red CI"| work["Rebase, fix comments, fix CI"]
-  work -->|push| live
+  subgraph review[" "]
+    direction LR
+    live["8. Live review"] -->|"conflicts, comments, red CI"| work["Rebase, fix comments, fix CI"]
+    work -->|push| live
+  end
   live -->|"merge on request"| merged["Merged"]
 ```
 
