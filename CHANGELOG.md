@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-12
 
+- The starter kit now tells agents to run builds, test suites, and browser runs through a small helper that lets only a few of them run at once across all sessions, a quarter of the computer's cores by default, so many sessions testing together no longer slow the computer until tools time out. A command that has to wait says it is queued and what it waits for.
 - The workspace pickers no longer list folders that were deleted, or folders inside an app's own data such as ~/.cache, ~/.codex, or ~/Library.
 - A session in a subfolder of a project, or in a test project made inside it, now counts in that project's workspace instead of adding one of its own.
 - In the new session's folder picker, type a path and choose Create folder to make that folder and start there.
