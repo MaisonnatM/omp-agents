@@ -138,7 +138,7 @@ export const listPrice: Pricer = (provider, model, { input, output, cacheRead, c
 };
 
 // Anthropic refuses a spent API key with a 400 (or an in-stream error) that says so, which stock omp misses;
-// patches/omp-18.18.6-credit-balance-fallback.patch adds the phrase to omp, so this goes once omp ships it.
+// patches/omp-18.18.8-credit-balance-fallback.patch adds the phrase to omp, so this goes once omp ships it.
 const CREDIT_BALANCE_TOO_LOW = /\bcredit balance is too low\b/i;
 
 // A billing cap is one waiting never clears, so Cursor's plan window, whose usage limits reset with the monthly cycle,

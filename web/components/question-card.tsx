@@ -31,6 +31,8 @@ interface QuestionCardProps extends HTMLAttributes<HTMLDivElement> {
 	/** Buttons beside the answer: under an options question, such as the one that sends a multi-select's picks, or before a text question's submit button. */
 	footer?: ReactNode;
 	onAnswer: (answer: QuestionAnswer) => void;
+	/** Each edit of the text field, so an owner that remounts the card can keep the draft. */
+	onTextChange?: (text: string) => void;
 }
 
 /** The keys that send a text answer: ⌘↵ on macOS, ⌃↵ elsewhere. */
@@ -41,7 +43,7 @@ const SUBMIT_CHORD = `${IS_MAC ? "⌘" : "⌃"}↵`;
  * owner's to bind. A text question focuses its field on mount and sends with the submit button, with ⌘↵ or ⌃↵, or with
  * Enter when it is one line. A secret field shows dots for what you type.
  */
-export function QuestionCard({ question, checked, defaultText = "", header, footer, onAnswer, className, onKeyDown, ...rest }: QuestionCardProps) {
+export function QuestionCard({ question, checked, defaultText = "", header, footer, onAnswer, onTextChange, className, onKeyDown, ...rest }: QuestionCardProps) {
 	const shape = useShape();
 	const size = useSize();
 	const compact = size.variant === "compact";
@@ -115,7 +117,10 @@ export function QuestionCard({ question, checked, defaultText = "", header, foot
 								field={question.field}
 								placeholder={question.placeholder ?? "Type your answer…"}
 								labelledBy={titleId}
-								onChange={setText}
+								onChange={value => {
+									setText(value);
+									onTextChange?.(value);
+								}}
 								onSubmit={submit}
 							/>
 						)}
@@ -183,7 +188,8 @@ function TextAnswer({ value, field, placeholder, labelledBy, onChange, onSubmit 
 
 	const sendOnEnter = (event: KeyboardEvent): void => {
 		// ⌘↵ and ⌃↵ reach the card, which sends from either kind of field.
-		if (event.key !== "Enter" || event.shiftKey || event.metaKey || event.ctrlKey || field === "lines") return;
+		// A held Enter, such as one carried over from the question before, never sends; a blank field may be sendable.
+		if (event.key !== "Enter" || event.repeat || event.shiftKey || event.metaKey || event.ctrlKey || field === "lines") return;
 		event.preventDefault();
 		onSubmit();
 	};
