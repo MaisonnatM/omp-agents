@@ -2,9 +2,9 @@
 import { FileCode2, FileText, Image, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ArtifactKind } from "../../src/shared/artifacts";
-import { CodeBlock, CodeBlockContent } from "@/components/ui/code-block";
 import { type Loaded, useArtifactText } from "../artifact-links";
-import { CodeLines, MessageMarkdown } from "./message-markdown";
+import { CodeText } from "./file-text";
+import { MessageMarkdown } from "./message-markdown";
 import { Spinner } from "./spinner";
 
 interface RenderedProps {
@@ -13,7 +13,7 @@ interface RenderedProps {
 	title: string;
 }
 
-/** Each kind's name, icon, and how it draws; the kind's own name also names the grammar that colors its source. */
+/** Each kind's name, icon, and how it draws. */
 export const ARTIFACT_KIND: Record<ArtifactKind, { label: string; icon: LucideIcon; Rendered: (props: RenderedProps) => ReactNode }> = {
 	html: { label: "HTML", icon: FileCode2, Rendered: HtmlFrame },
 	markdown: { label: "Markdown", icon: FileText, Rendered: MarkdownText },
@@ -53,16 +53,6 @@ function MarkdownText({ text }: RenderedProps) {
 	);
 }
 
-function SourceText({ text, kind }: { text: string; kind: ArtifactKind }) {
-	return (
-		<CodeBlock size="sm" className="h-full rounded-none border-0">
-			<CodeBlockContent wrap className="flex-1">
-				<CodeLines text={text} language={kind} />
-			</CodeBlockContent>
-		</CodeBlock>
-	);
-}
-
 function Waiting({ loaded }: { loaded: Exclude<Loaded<unknown>, { state: "ready" }> }) {
 	return (
 		<div className="flex size-full items-center justify-center p-4 text-center text-[12px] text-muted-foreground">
@@ -75,11 +65,11 @@ function Waiting({ loaded }: { loaded: Exclude<Loaded<unknown>, { state: "ready"
  * The version behind `link`, rendered, or its source when `source` is set.
  * Every kind waits for the version's text, so a missing copy says so instead of framing the route's JSON 404.
  */
-export function ArtifactView({ link, kind, title, source }: { link: Loaded<string>; kind: ArtifactKind; title: string; source: boolean }) {
+export function ArtifactView({ link, kind, file, title, source }: { link: Loaded<string>; kind: ArtifactKind; file: string; title: string; source: boolean }) {
 	const text = useArtifactText(link.state === "ready" ? link.value : null);
 	if (link.state !== "ready") return <Waiting loaded={link} />;
 	if (text.state !== "ready") return <Waiting loaded={text} />;
-	if (source) return <SourceText text={text.value} kind={kind} />;
+	if (source) return <CodeText text={text.value} path={file} className="h-full rounded-none border-0" />;
 	const { Rendered } = ARTIFACT_KIND[kind];
 	return <Rendered url={link.value} text={text.value} title={title} />;
 }

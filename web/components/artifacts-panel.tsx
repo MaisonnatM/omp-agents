@@ -171,7 +171,7 @@ function ArtifactBody({ view, sessionId, artifact, version, source, onSource }: 
 			</div>
 			<SegmentedTabPanel value={source ? "source" : "rendered"} className="flex min-h-0 flex-1 flex-col px-4 pb-4 outline-none">
 				<div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-background shadow-surface-3">
-					<ArtifactView link={link} kind={artifact.kind} title={artifact.title} source={source} />
+					<ArtifactView link={link} kind={artifact.kind} file={artifact.file} title={artifact.title} source={source} />
 				</div>
 			</SegmentedTabPanel>
 		</SegmentedTabs>

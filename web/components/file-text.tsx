@@ -40,11 +40,11 @@ export function MarkdownDocument({ text, frontmatter, path, className }: { text:
 	);
 }
 
-/** `text` as numbered lines that wrap, colored by `path`'s extension. */
+/** `text` as numbered lines that wrap, colored by `path`'s extension; a token longer than a line, such as minified CSS, breaks anywhere. */
 export function CodeText({ text, path, className }: { text: string; path: string; className?: string }) {
 	return (
 		<CodeBlock size="sm" className={cn("code-lines", className)}>
-			<CodeBlockContent wrap lineNumbers aria-label={`Contents of ${path}`}>
+			<CodeBlockContent wrap lineNumbers aria-label={`Contents of ${path}`} className="data-wrap:wrap-anywhere">
 				<CodeLines text={text} language={extensionOf(path)} />
 			</CodeBlockContent>
 		</CodeBlock>

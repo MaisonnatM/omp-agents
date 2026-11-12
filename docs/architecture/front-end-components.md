@@ -94,5 +94,5 @@ The extension sits outside `templates/omp/agent/`, so the starter kit never inst
 Every kind first waits for the version's text from `useArtifactText`, so a copy the route answers 404 for reads as gone instead of framing the route's JSON error; the frame or image then asks for the same address, which the route marks immutable.
 HTML renders in an iframe whose `sandbox` lists scripts, forms, modals, popups, and downloads but not `allow-same-origin`, so the page runs with an opaque origin even though `frame-src 'self'` lets it load; the route's own CSP seals it the same way when opened in a browser tab.
 SVG renders as an `<img>`, so its markup never scripts the page, and Markdown, which the route serves as plain text, is fetched and rendered by `MessageMarkdown` with its default preset, without session visuals.
-**Source** renders any kind's text in `CodeBlock`, colored by the kind's language.
+**Source** renders any kind's text in `CodeText` from `web/components/file-text.tsx`, the file dialog's numbered, wrapping lines, colored by the file's extension.
 The **Rendered** and **Source** switch is `SegmentedTabs` from `web/components/segmented-tabs.tsx`, as the pull request details' tabs are.
