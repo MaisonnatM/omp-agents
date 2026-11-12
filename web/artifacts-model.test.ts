@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ArtifactSave, Sha256 } from "../src/shared/artifacts";
 import type { Item } from "../src/shared/transcript";
-import { artifactNumbers, artifactsOf, landedSaves, pickedVersion, sameArtifacts } from "./artifacts-model";
+import { artifactsOf, landedSaves, pickedVersion, savedArtifact, versionNumber } from "./artifacts-model";
 
 const sha = (char: string): Sha256 => char.repeat(64) as Sha256;
 const save = (file: string, hash: string, extra: Partial<ArtifactSave> = {}): ArtifactSave => ({
@@ -28,42 +28,26 @@ describe("artifactsOf", () => {
 		]);
 		expect(artifacts.map(artifact => artifact.file)).toEqual(["a.html", "b.svg"]);
 		expect(artifacts[0]!.title).toBe("Pricing");
-		expect(artifacts[0]!.versions.map(version => [version.number, version.itemId, version.save.note])).toEqual([
-			[1, "1", null],
-			[2, "3", "Bigger buttons"],
+		expect(artifacts[0]!.versions.map(version => [version.number, version.itemIds, version.save.note])).toEqual([
+			[1, ["1"], null],
+			[2, ["3"], "Bigger buttons"],
 		]);
 	});
 
 	test("a save equal to the one before adds no version, but equal bytes after a change do", () => {
 		const items = [saved("1", save("a.html", "a")), saved("2", save("a.html", "a")), saved("3", save("a.html", "b")), saved("4", save("a.html", "a"))];
-		expect(artifactsOf(items)[0]!.versions.map(version => version.itemId)).toEqual(["1", "3", "4"]);
-		expect([...artifactNumbers(items)]).toEqual([["1", 1], ["2", 1], ["3", 2], ["4", 3]]);
+		const artifacts = artifactsOf(items);
+		expect(artifacts[0]!.versions.map(version => version.itemIds)).toEqual([["1", "2"], ["3"], ["4"]]);
+		expect(items.filter(savedArtifact).map(item => versionNumber(artifacts, item))).toEqual([1, 1, 2, 3]);
 	});
 
 	test("equal bytes saved under a new title retitle the artifact without adding a version", () => {
 		const artifacts = artifactsOf([saved("1", save("a.html", "a", { title: "Draft" })), saved("2", save("a.html", "a", { title: "Pricing" }))]);
-		expect(artifacts.map(artifact => [artifact.title, artifact.versions.map(version => version.itemId)])).toEqual([["Pricing", ["1"]]]);
+		expect(artifacts.map(artifact => [artifact.title, artifact.versions.map(version => version.itemIds)])).toEqual([["Pricing", [["1", "2"]]]]);
 	});
 
 	test("tool calls without an artifact, such as a running one, add nothing", () => {
 		expect(artifactsOf([running("1"), reply])).toEqual([]);
-	});
-});
-
-describe("sameArtifacts", () => {
-	test("equal lists built from new item objects compare equal; a new version or note does not", () => {
-		const items = [saved("1", save("a.html", "a"))];
-		const first = artifactsOf(items);
-		expect(sameArtifacts(first, artifactsOf([saved("1", save("a.html", "a"))]))).toBe(true);
-		expect(sameArtifacts(first, artifactsOf([...items, saved("2", save("a.html", "b"))]))).toBe(false);
-		expect(sameArtifacts(first, artifactsOf([saved("1", save("a.html", "a", { note: "x" }))]))).toBe(false);
-	});
-
-	test("a retitle, or a save of equal bytes that moves an artifact to the top, is a change", () => {
-		const items = [saved("1", save("a.html", "a")), saved("2", save("b.svg", "b"))];
-		const first = artifactsOf(items);
-		expect(sameArtifacts(first, artifactsOf([...items, saved("3", save("b.svg", "b", { title: "Logo" }))]))).toBe(false);
-		expect(sameArtifacts(first, artifactsOf([...items, saved("3", save("a.html", "a"))]))).toBe(false);
 	});
 });
 
