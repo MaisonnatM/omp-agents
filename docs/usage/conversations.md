@@ -41,8 +41,8 @@
   An image you sent opens the same way from its thumbnail above your message, captioned "Your message".
   A tool group that returned images stays open.
   Hiding tool calls hides them too; the Session card's **Images** section still lists every one.
-- Each artifact the agent saves shows as its own line between the tool groups, **Saved** with its title **as version N**, and an **Open** chip that shows that version in the sidebar's **Artifacts** tab; see [Artifacts](artifacts.md).
-  While the tab shows that version, the chip reads **Showing**.
+- Each artifact the agent saves shows as its own line between the tool groups, **Saved** with its title **as version N**, and an **Open** button that shows that version in the sidebar's **Artifacts** tab; see [Artifacts](artifacts.md).
+  While the tab shows that version, a blue **Showing** badge takes the button's place.
   A save whose bytes equal the version before it names that version's number.
   Hiding tool calls keeps these lines; a Bot's page shows none.
 - A code block in a message names its language above the code, colors it, and has a copy button; a block with no language shows the button when you hover or focus it.

@@ -71,7 +71,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   The floating comment and review composer at its bottom right, on the Pull requests page only, is `PullRequestComposer` in `pr-details/composer.tsx`.
   `header.tsx` draws T3's crumbs, **Check out** menu, inline-confirmed primary action, title editor, base freshness warning, copyable command and branch, stack menu, and linked-sessions count; the **Check out** menu is `CheckoutMenu` in `checkout-menu.tsx`.
   The Reviewers and Labels pickers and collapsible Description, Checks, and Comments sections live in **Summary**.
-  `web/components/segmented-tabs.tsx` provides its T3-styled 24px tabs with Radix keyboard navigation and tab-panel semantics.
+  `web/components/segmented-tabs.tsx` provides its T3-styled 24px tabs with Radix keyboard navigation and tab-panel semantics, and a `pills` variant, with no track, that the Artifacts tab's version numbers use.
   `checks.tsx` draws the checks status line and grouped popover, over the pure summary and grouping in `web/pull-request-checks.ts`.
   **Timeline** in `web/components/pull-requests/pr-timeline.tsx` draws T3's activity rail, conversation and reply disclosures, review verdicts, lifecycle markers, and commit links, over pure grouping and ordering in `web/pull-request-timeline.ts`.
   `code.tsx` holds the **Code** tab's commit scope and which files are folded, and composes `code-toolbar.tsx`, its toolbar, `diff-preferences.ts`, the diff options it keeps on this computer, `viewed-files.tsx`, GitHub's viewed state and the **Viewed** checkbox, `code-files.tsx`, the diffs and file tree, and `diff-controls.tsx`, the line comment box.
