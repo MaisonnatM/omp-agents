@@ -25,7 +25,7 @@ export function ArtifactCard({ save, number, showing, onOpen }: { save: Artifact
 					type="button"
 					aria-label={`Open ${save.title}, version ${number}`}
 					onClick={onOpen}
-					className={`${CHIP} bg-muted text-foreground transition-colors duration-150 ease-out hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`}
+					className={`${CHIP} relative bg-muted text-foreground transition-colors duration-150 ease-out hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:after:absolute pointer-coarse:after:-inset-2`}
 				>
 					<Icon aria-hidden />
 					Open

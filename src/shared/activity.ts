@@ -138,7 +138,7 @@ export const CONTROLS = [
 	{ id: "session-details.tab.memory", label: "Session details Memory tab", area: "Right sidebar" },
 	{ id: "session-details.tab.artifacts", label: "Session details Artifacts tab", area: "Right sidebar" },
 	{ id: "artifacts.artifact", label: "Artifacts tab artifact picked", area: "Artifacts" },
-	{ id: "artifacts.version", label: "Artifacts version button", area: "Artifacts" },
+	{ id: "artifacts.version", label: "Artifacts version picked", area: "Artifacts" },
 	{ id: "artifacts.latest", label: "Artifacts Go to latest", area: "Artifacts" },
 	{ id: "artifacts.rendered", label: "Artifacts Rendered view", area: "Artifacts" },
 	{ id: "artifacts.source", label: "Artifacts Source view", area: "Artifacts" },
