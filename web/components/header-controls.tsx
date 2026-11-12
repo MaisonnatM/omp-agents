@@ -94,19 +94,29 @@ function SpaceSwitch({ space, onSpace, otherWaiting }: SpaceSwitchProps) {
 
 /**
  * One way to every tab in a header under 56rem, as on a phone or beside a wide sidebar: the button names the tab on, and its menu
- * lists every shown tab, then the space and Settings, so the header holds this menu, the command menu, and the bell.
+ * lists every shown tab, then the space and Settings, so the header holds this menu, the command menu, and the bell. As the switch it
+ * stands in for, it counts the other space's sessions that need you, on that space's row and as a dot on the button.
  */
-function TabMenu({ tabs, tab, onTab, settingsOpen, onToggleSettings, space, onSpace }: Omit<HeaderControlsProps, "notices" | "onShowSearch" | "allTabs" | "otherWaiting">) {
+function TabMenu({ tabs, tab, onTab, settingsOpen, onToggleSettings, space, onSpace, otherWaiting }: Omit<HeaderControlsProps, "notices" | "onShowSearch" | "allTabs">) {
 	const current = tab === "settings" ? { label: "Settings", icon: SettingsIcon } : TAB_ROWS[tab];
-	const CurrentIcon = current.icon;
+	const other = SPACES.find(value => value !== space)!;
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger
-				render={<Button {...activityControl("header.tab-menu")} variant="ghost" size="compact" className="hidden min-w-0 gap-1.5 px-2 font-medium text-foreground @max-[56rem]/header:inline-flex [&_svg]:size-3.5" aria-label={`${current.label}. Go to another tab`} />}
+				render={
+					<Button
+						{...activityControl("header.tab-menu")}
+						variant="ghost"
+						size="compact"
+						leadingIcon={current.icon}
+						trailingIcon={ChevronDown}
+						className="hidden min-w-0 gap-1.5 px-2 font-medium text-foreground @max-[56rem]/header:inline-flex [&_svg:last-child]:text-muted-foreground"
+						aria-label={`${current.label}. Go to another tab${otherWaiting > 0 ? `. ${SPACE_LABELS[other]}, ${sessionsWaiting(otherWaiting)}` : ""}`}
+					/>
+				}
 			>
-				<CurrentIcon />
-				<span className="truncate">{current.label}</span>
-				<ChevronDown className="text-muted-foreground" />
+				{current.label}
+				{otherWaiting > 0 && <span aria-hidden className="absolute -top-1 -right-1.5 size-2 rounded-full bg-blue-500 ring-2 ring-background" />}
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end" className="w-56">
 				<MenuRadioGroup value={tab} onValueChange={(value: SidebarTab) => onTab(value)}>
@@ -129,10 +139,16 @@ function TabMenu({ tabs, tab, onTab, settingsOpen, onToggleSettings, space, onSp
 				>
 					{SPACES.map(value => {
 						const Icon = SPACE_ICONS[value];
+						const waiting = value === other ? otherWaiting : 0;
 						return (
-							<MenuRadioItem key={value} value={value} closeOnClick>
+							<MenuRadioItem key={value} value={value} closeOnClick aria-label={waiting > 0 ? `${SPACE_LABELS[value]}, ${sessionsWaiting(waiting)}` : undefined}>
 								<Icon />
 								{SPACE_LABELS[value]}
+								{waiting > 0 && (
+									<span aria-hidden className="min-w-4 rounded-full bg-foreground/10 px-1 text-center text-[10px] leading-4 tabular-nums text-foreground">
+										{waiting}
+									</span>
+								)}
 							</MenuRadioItem>
 						);
 					})}
@@ -152,7 +168,7 @@ export const HeaderControls = memo(function HeaderControls({ notices, onShowSear
 		<div className="flex shrink-0 items-center gap-1">
 			{!DESKTOP_TITLE_BAR && (
 				<>
-					<TabMenu tabs={allTabs} tab={tab} onTab={onTab} settingsOpen={settingsOpen} onToggleSettings={onToggleSettings} space={space} onSpace={onSpace} />
+					<TabMenu tabs={allTabs} tab={tab} onTab={onTab} settingsOpen={settingsOpen} onToggleSettings={onToggleSettings} space={space} onSpace={onSpace} otherWaiting={otherWaiting} />
 					<div className={cn("flex", FULL_ONLY)}>
 						<SpaceSwitch space={space} onSpace={onSpace} otherWaiting={otherWaiting} />
 					</div>
