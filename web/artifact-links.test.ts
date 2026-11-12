@@ -8,7 +8,7 @@ const noop = () => {};
 const document = { addEventListener: noop, removeEventListener: noop, querySelector: () => null };
 const container = { nodeType: 1, nodeName: "DIV", tagName: "DIV", namespaceURI: "http://www.w3.org/1999/xhtml", ownerDocument: document, addEventListener: noop, removeEventListener: noop };
 document.documentElement = container;
-Object.assign(globalThis, { window: globalThis, document, addEventListener: noop, removeEventListener: noop, IS_REACT_ACT_ENVIRONMENT: true });
+Object.assign(globalThis, { window: globalThis, document, addEventListener: noop, removeEventListener: noop, HTMLIFrameElement: class {}, IS_REACT_ACT_ENVIRONMENT: true });
 const asked = [];
 const texts = [new Response("shared"), new Response("Artifact version not found", { status: 404 }), new Response("saved copy")];
 globalThis.fetch = async url => {

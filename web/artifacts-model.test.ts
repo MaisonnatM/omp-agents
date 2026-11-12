@@ -55,13 +55,13 @@ describe("pickedVersion", () => {
 	const artifacts = artifactsOf([saved("1", save("a.html", "a")), saved("2", save("a.html", "b")), saved("3", save("b.md", "c"))]);
 
 	test("a pick by number stays on that version; latest follows the last one", () => {
-		expect(pickedVersion(artifacts, { file: "a.html", version: 1 })?.version.itemId).toBe("1");
-		expect(pickedVersion(artifacts, { file: "a.html", version: "latest" })?.version.itemId).toBe("2");
+		expect(pickedVersion(artifacts, { file: "a.html", version: 1 })?.version.itemIds).toEqual(["1"]);
+		expect(pickedVersion(artifacts, { file: "a.html", version: "latest" })?.version.itemIds).toEqual(["2"]);
 	});
 
 	test("a missing version falls back to the artifact's latest, a missing artifact to the newest artifact's latest", () => {
-		expect(pickedVersion(artifacts, { file: "a.html", version: 9 })?.version.itemId).toBe("2");
-		expect(pickedVersion(artifacts, { file: "gone.html", version: 1 })?.version.itemId).toBe("3");
+		expect(pickedVersion(artifacts, { file: "a.html", version: 9 })?.version.itemIds).toEqual(["2"]);
+		expect(pickedVersion(artifacts, { file: "gone.html", version: 1 })?.version.itemIds).toEqual(["3"]);
 		expect(pickedVersion(artifacts, null)?.artifact.file).toBe("b.md");
 		expect(pickedVersion([], null)).toBeNull();
 	});
