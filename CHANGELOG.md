@@ -5,7 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-12
 
-- The plan usage at the bottom of the screen now shows when each window resets, such as `7d 95% ↻6d2h`, and how many saved resets each account holds, such as `✦ 3`, without hovering.
+- The plan usage at the bottom of the screen now shows one short chip per account, such as `yampa 5h 71% left · ✦ 2`, naming the account when a provider has two and how many windows are used up. Hovering or clicking a chip opens a card with every window's bar, when it resets, such as "Resets in 1d3h · Fri 13 Nov, 14:00", and the saved resets left.
 - The pull request description tool and the ship workflow now stop a gh command that hangs after 20 seconds and say which one timed out, such as "gh pr view timed out after 20s", where they could wait many minutes and then report only "gh exited -1".
 
 ## 2026-11-11
@@ -181,55 +181,3 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Hovering that count says what it counts.
 - The Dock badge still counts both spaces.
 - Settings › Preferences › Sidebar tabs now marks Tickets as shown only in Work and Sport as shown only in Personal.
-
-## 2026-11-08
-
-- The bell's Out of credit alert now also comes up when DeepSeek says Insufficient Balance, OpenRouter says Insufficient credits, or a monthly spend limit is reached, not only when a provider refuses a request with a payment error.
-- You can now pick the language you dictate in, such as French, under Settings › omp settings › Interaction › Speech-to-Text Language.
-- When dictation hears nothing, the composer now says why: nothing was loud enough to count as speech, so speak closer to the microphone or raise its input level in your sound settings.
-- On the Sport page, Routine hanche and Mobilité hanche in a workout now have their own Lancer, which runs their exercises in the timer from the first one without ticking anything, and ends on « Terminé » or « Arrêté » with how many holds you did, such as 21 / 21 tenues.
-- In the timer, an exercise counted in reps shows its count in the ring, such as « 8 répétitions · côté gauche », and the big button reads Fait to go on once they are done; Space still pauses.
-- The timer's break before the next exercise, « Suivant », now lasts 10 seconds; « Change de côté » stays at 5.
-- On a phone, every page's title and the line under it now read in full, with the header's buttons on a row under them, and the Notes and Todo headers no longer push the page sideways.
-- On the Sport page, Lancer beside the daily stretches opens a full-screen timer that counts down each stretch, left side then right, with a short break between them, beeps for the last seconds, and a French voice saying what comes next.
-- The timer ticks each stretch off for the day as soon as it is held to the end, so stopping halfway keeps what you did; Space pauses, the arrows skip, and the speaker button turns the sound off.
-- The timer is green while you hold a stretch and amber between stretches, grays out under a large « En pause » when paused, and ends on « Arrêté » with the count ticked when some stretches were skipped.
-- The timer starts on the first stretch not yet ticked that day, and it no longer closes by accident: Esc pauses it, Esc again closes it, and a click beside it does nothing until the end.
-- On a phone, the Sport page header now fits the screen, so the timer's close button is no longer pushed off the edge.
-- A stretch done on each side now reads « par côté » in its dose, such as 2 × 45 s par côté.
-- On the Sport page, the daily stretches now list each stretch with its dose, its note, and its demo, with a box to tick each one off; the ticks are kept for each day, and a count such as 2 / 5 shows how many are done.
-- Behind the scenes: the model replay now works in a copy that holds only the starting point, hidden from your worktrees and past sessions and with no way to reach GitHub, so a model can no longer copy the original answer or push to the real repository.
-- Behind the scenes: the model replay now keeps each model on its own work, so a model that hits its usage limit is retried later instead of being quietly answered by Opus, and a third, cheaper model can join the comparison.
-- Behind the scenes: a replay script reruns real helper-agent tasks on two models side by side, with the project's checks and a blind review of both results, to tell whether a cheaper model does the work as well.
-- Behind the scenes: the dashboard now keeps your training plan, test results, targets, and workout log together and works out each week's workouts and loads, ready for the coming Sport page.
-- Behind the scenes: the dashboard now keeps your training plan, test results, targets, and workout log together and works out each week's workouts and loads, which the Sport page shows.
-- Your personal assistant can now read your training week, with each day's loads.
-- It can log a workout, record a test result, and set your plan and targets. The dashboard saves each change for it.
-- It never changes or deletes a workout or test result you entered yourself.
-- New Sport page, from the Sport button in the header: your training week day by day, with each exercise's load worked out from your last test or your last session.
-- Click an exercise to watch its demo video with three tips; the video loads only when you press play.
-- Press Fait… on a workout to note your loads, sends, effort, and any pain; the next sessions start from what you noted, and pain in your fingers takes the fingerboard out for a week.
-- The Journal tab lists every session you noted, week by week, and the Progrès tab charts your tests and best grades against your targets, with your records.
-- In the Journal tab, ↓ and ↑ step through your sessions and Esc closes the open one.
-- Behind the scenes: the dashboard keeps each demo's preview picture on your computer after loading it once, and YouTube's player comes from its privacy-enhanced address.
-- On the Sport page, a session that fails to save now says so in its dialog, and nothing of it is kept, so a test result is never saved without its session.
-- Installing the starter kit, or Update dashboard, now removes the kit files the kit stopped shipping, unless you edited them, so old extensions stop running in your sessions.
-- With the starter kit, helper agents that a session starts no longer carry the tools only your own session uses, such as ending the session, landing, and your todos, notes, and reminders, so each of their requests costs less.
-- Fixed: with the starter kit, helper agents in poteto mode no longer look for a skill under an old name that always failed.
-- Behind the scenes: a token cost report prices recent omp requests by agent, cache use, and tool, and the developer docs map where the money goes, with ranked proposals to spend less.
-- Behind the scenes: the developer docs gain a harness map, five diagrams of how the dashboard, omp, and the starter kit fit together, so contributors find their way faster.
-- The Sessions tab has a Waiting on subagents group for sessions whose subagents still work while the main agent waits for them.
-- Rows in it show no blue dot, so Idle lists only sessions that are done and Running only sessions that work.
-- A turn that ends while its session's subagents still work no longer counts on the Dock badge, and notifies once they stop.
-- The starter kit now includes the grill-with-docs design interview: type /skill:grill-with-docs and a plan, and the agent asks rounds of numbered questions, each with its recommended answer, writing agreed words to the project's glossary as you go.
-- Decisions settled during that interview go into the project's usual decision records, not a second folder.
-- The starter kit also includes grill-me, the same interview for plans outside a project, such as a trip or a career move: type /skill:grill-me and your plan.
-- Fixed: with the starter kit, telling the ship tracker a pull request was merged now works for each pull request you name, even right after another one was marked merged, and it still refuses one that is not merged yet.
-- With the starter kit, a session whose Google Calendar or Gmail sign-in has run out now tells you to sign in again in Settings › Integrations, instead of trying again.
-- The bell now shows a notice when Google Calendar or Gmail is signed out, under a new Integrations tab, and opening it takes you to Settings › Integrations; it goes away once you sign in again.
-- The four omp patches, paid Cursor fallback, tool documentation, Cursor tools, and the credit patch, now apply to omp 18.18.1, and the credit patch now applies on its own.
-- omp-agents is now tested with omp 18.18.1.
-- Settings › Providers now lists a provider's signed-in accounts in the order omp tries them, each with its place number.
-- Up and down arrows beside each account change which one omp uses first, for example your work Anthropic account before your personal one.
-- The new order is saved at once in omp's settings, and omp follows it without a restart.
-- Fixed: the dashboard no longer freezes when your skill and instruction files sit both under your home folder and elsewhere, such as /tmp.
