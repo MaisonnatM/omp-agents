@@ -25,6 +25,8 @@ Add one when a mistake cost a retry and the docs did not prevent it.
 - Search for the exact text you see on screen, such as `xd://:` rather than `mounted`; a common word across `src`, `web`, and omp's source returns hundreds of unrelated lines.
 - End a browser eval with an explicit `print` of the fields you need; a bare trailing `globalThis.tab = tab` prints the whole tab object, about 120 lines.
 - For a smoke check of something that should disappear, use `scripts/smoke-proof.ts --expect-absent`, which also proves the server serves your checkout; see [docs/agent-smoke.md](docs/agent-smoke.md).
+- In the headless desktop app, `Input.dispatchMouseEvent` on the page's DevTools port can hang and a hidden window stops painting; click through the main process's `webContents.sendInputEvent` and nudge painting with a page `Emulation.setDeviceMetricsOverride` then `clearDeviceMetricsOverride`, but that override's pixel density reaches the Browser's guest too, so read a guest's `devicePixelRatio` without it.
+- Never send `Page.reload` through a Browser guest's `debugger`: it reloads the dashboard that embeds the guest, which here looped forever; call the guest's `reload()`.
 
 ## Shortcuts in dialogs
 
