@@ -96,9 +96,13 @@ function ArtifactBody({ view, sessionId, artifact, version, source, onSource }: 
 				<div className="flex items-start gap-3">
 					<div className="min-w-0 flex-1">
 						<h3 className="truncate text-[16px] font-semibold tracking-tight">{artifact.title}</h3>
-						<p className="mt-0.5 truncate text-[12px] text-muted-foreground">
-							<span className="font-mono">{artifact.file}</span> · {kind.label} · {formatBytes(save.bytes)} ·{" "}
-							<time dateTime={new Date(save.savedAt).toISOString()} title={new Date(save.savedAt).toLocaleString()}>
+						<p className="mt-0.5 text-[12px] text-muted-foreground [overflow-wrap:anywhere]">
+							<span className="font-mono">{artifact.file}</span>
+							{"\u00a0· "}
+							<span className="whitespace-nowrap">
+								{kind.label} · {formatBytes(save.bytes)} ·
+							</span>{" "}
+							<time dateTime={new Date(save.savedAt).toISOString()} title={new Date(save.savedAt).toLocaleString()} className="whitespace-nowrap">
 								saved {mailTime(save.savedAt)}
 							</time>
 						</p>
