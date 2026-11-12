@@ -14,7 +14,9 @@ import { clearDraft, liveDraftKey, newDraftKey, putDraft } from "./composer-draf
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
 import { applyDictationMessage, dictationDisconnected } from "./dictation";
 import { Outbox } from "./outbox";
-import { applyPaneMessage, retainPanes, retainTrajectories, useShownConversations, useShownTrajectories } from "./pane-store";
+import { applyPaneMessage, paneItemsOf, retainPanes, retainTrajectories, useShownConversations, useShownTrajectories } from "./pane-store";
+import { requestArtifact } from "./artifact-requests";
+import { landedSaves } from "./artifacts-model";
 import { DEFAULT_SPLIT_RATIOS, type SplitAxis, type SplitRatios } from "./pane-navigation";
 import {
 	hashForView,
@@ -230,7 +232,14 @@ export function useDashboard(): Dashboard {
 						if (build !== null && build !== msg.id) location.reload();
 						build = msg.id;
 						return;
-					case "items":
+					case "items": {
+						// Read before the delta applies, so a call turning from running to done lands its save once.
+						const before = paneItemsOf(msg.view);
+						const saves = before ? landedSaves(before, msg) : [];
+						applyPaneMessage(msg);
+						for (const save of saves) requestArtifact({ view: msg.view, file: save.file, version: "latest", reason: "saved" });
+						return;
+					}
 					case "work":
 					case "media":
 					case "turns":

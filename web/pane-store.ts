@@ -101,6 +101,12 @@ export function applyPaneMessage(msg: PaneMsg): void {
 	}
 }
 
+/** `view`'s transcript as the store holds it now, outside React; `null` when the page does not show the view. */
+export function paneItemsOf(view: View): Item[] | null {
+	const key = hashForView(view);
+	return open.has(key) ? panes.get(key).items : null;
+}
+
 /**
  * A field of `view`'s data, rendering again only when that field changes. A streamed token changes `items` alone, so a
  * component that reads another field never renders for it; each hook below names the field it reads. With no view it reads an empty pane.

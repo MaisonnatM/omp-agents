@@ -43,9 +43,10 @@ import { botRows } from "./bots-model";
 import { routeOf } from "./dashboard-state";
 import { useOpenPullRequest } from "./open-pull-request";
 import { integrationsStore } from "./reads";
+import { onArtifactRequest } from "./artifact-requests";
 import { onReviewRequest } from "./review-pages";
 import { storeOrRemove } from "./stored-state";
-import { EMPTY_LAYOUT, hashForLayout, hashForPage, hashForRoute, hashForView, type NotesListView, type OpenMode, type TodoListView } from "./routing";
+import { EMPTY_LAYOUT, hashForLayout, hashForPage, hashForRoute, hashForView, type NotesListView, type OpenMode, sameView, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, spaceSwitchPanes, type WindowScope, waitingIn, workspaceSession, workspaceSwitch } from "./sessions";
 import { placedTabs, useSidebarTabs } from "./sidebar-tabs";
@@ -112,8 +113,8 @@ export function App() {
 	const defaultWorkspace = defaultCwd(focused.view, visible.hosts, visible.past, windowScope);
 	// The live rows of the sessions list, whose order ending a session moves its panes along.
 	const listedHosts = sessions.listed.flatMap(view => (view.kind === "live" ? view.instanceId : []));
-	const latest = useRef({ layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, shownWorkspace: focused.workspace, scope });
-	latest.current = { layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, shownWorkspace: focused.workspace, scope };
+	const latest = useRef({ layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, shownWorkspace: focused.workspace, scope, detailsView });
+	latest.current = { layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, shownWorkspace: focused.workspace, scope, detailsView };
 
 	const endHost = useCallback(
 		async (instanceId: string): Promise<boolean> => {
@@ -140,6 +141,24 @@ export function App() {
 				latest.current.sidebars.setOpen("right", true);
 			}),
 		[],
+	);
+	// A save in the view whose details show brings its Artifacts tab into sight. A card's Open does so from any pane,
+	// first filling the page with that pane when others share it, since side-by-side panes show no details.
+	useEffect(
+		() =>
+			onArtifactRequest(request => {
+				const { layout, page, detailsView, sidebars } = latest.current;
+				if (request.reason === "saved") {
+					if (!detailsView || !sameView(detailsView, request.view)) return;
+				} else {
+					const index = layout.panes.findIndex(view => sameView(view, request.view));
+					if (page || index < 0) return;
+					if (layout.panes.length > 1 && !(layout.maximized && layout.focus === index)) show({ ...layout, focus: index, maximized: true });
+				}
+				storeOrRemove(TAB_KEY, "artifacts", "pull-requests");
+				sidebars.setOpen("right", true);
+			}),
+		[show],
 	);
 	const switchWorkspace = useCallback(
 		(cwd: string | null): void => {
@@ -365,6 +384,7 @@ export function App() {
 														pullRequests={focused.row?.pullRequests ?? []}
 														tickets={focused.row?.tickets ?? []}
 														hosts={visible.hosts}
+														open={sidebars.panels.right.open}
 													/>
 												) : (
 													openBot && (
