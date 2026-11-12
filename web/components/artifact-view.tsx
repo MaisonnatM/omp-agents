@@ -2,7 +2,7 @@
 import { FileCode2, FileText, Image, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ArtifactKind } from "../../src/shared/artifacts";
-import { type Loaded, useArtifactText } from "../artifact-links";
+import type { Loaded } from "../artifact-links";
 import { CodeText } from "./file-text";
 import { MessageMarkdown } from "./message-markdown";
 import { LoadNote } from "./sheet-details";
@@ -62,16 +62,11 @@ function Waiting({ failure }: { failure: string | null }) {
 	);
 }
 
-/**
- * The version behind `link`, rendered, or its source when `source` is set.
- * Every kind waits for the version's text, so a missing copy says so instead of framing the route's JSON 404.
- */
-export function ArtifactView({ link, kind, file, title, source }: { link: Loaded<string>; kind: ArtifactKind; file: string; title: string; source: boolean }) {
-	const text = useArtifactText(link.state === "ready" ? link.value : null);
-	// The text's failures are whole sentences already; the link's are the server's words.
-	const failure = link.state === "failed" ? `Could not load this version. ${link.error}` : text.state === "failed" ? text.error : null;
-	if (link.state !== "ready" || text.state !== "ready") return <Waiting failure={failure} />;
-	if (source) return <CodeText text={text.value} path={file} className="h-full rounded-none border-0" />;
+/** The version `loaded` holds, rendered, or its source when `source` is set; while it loads, or once it failed, the reading line. */
+export function ArtifactView({ loaded, kind, file, title, source }: { loaded: Loaded<{ url: string; text: string }>; kind: ArtifactKind; file: string; title: string; source: boolean }) {
+	if (loaded.state !== "ready") return <Waiting failure={loaded.state === "failed" ? loaded.error : null} />;
+	const { url, text } = loaded.value;
+	if (source) return <CodeText text={text} path={file} className="h-full rounded-none border-0" />;
 	const { Rendered } = ARTIFACT_KIND[kind];
-	return <Rendered url={link.value} text={text.value} title={title} />;
+	return <Rendered url={url} text={text} title={title} />;
 }
