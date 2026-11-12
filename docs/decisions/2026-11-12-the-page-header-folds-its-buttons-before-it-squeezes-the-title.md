@@ -1,7 +1,7 @@
 ---
 status: accepted
 date: 2026-11-12
-decision-makers: agent
+decision-makers: Maxence Maisonnat
 supersedes:
   - 2026-11-08-wrap-the-page-header-controls-under-the-title-on-a-phone
 ---

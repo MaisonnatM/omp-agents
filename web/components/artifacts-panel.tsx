@@ -128,7 +128,7 @@ function ArtifactBody({ view, sessionId, artifact, version, source, onSource }: 
 					<span className="text-[12px] text-muted-foreground">Version</span>
 					{/* Its own tabs, which switch no panel: the arrow keys move between versions and Enter shows one, so passing one loads nothing. */}
 					<SegmentedTabs value={String(version.number)} onValueChange={value => pick(artifact.versions.find(each => String(each.number) === value)!)} activationMode="manual">
-						<SegmentedTabsList aria-label="Versions" className="flex-wrap">
+						<SegmentedTabsList aria-label="Versions" className="flex-wrap bg-transparent p-0">
 							{artifact.versions.map(each => (
 								<Tooltip key={each.number} content={`Version ${each.number}${each.save.note ? ` · ${each.save.note}` : ""} · saved ${mailTime(each.save.savedAt)}`}>
 									<SegmentedTab
