@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-12
+
+- The pull request description tool and the ship workflow now stop a gh command that hangs after 20 seconds and say which one timed out, such as "gh pr view timed out after 20s", where they could wait many minutes and then report only "gh exited -1".
+
 ## 2026-11-11
 
 - In Settings, Workflows, the ship workflow's diagram now shows its real path: the reviews it can skip, the ready step, the live review loop of rebases, comments, and CI fixes, and the merge at the end.
