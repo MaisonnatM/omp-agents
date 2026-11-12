@@ -73,5 +73,5 @@ test("the account tag appears only when its provider has another account", () =>
 
 test("saved resets show on an account with no windows instead of hiding behind its name", () => {
 	expect(text([{ ...claude, resetCredits: { count: 3, nextExpiresAt: null } }])).toContain("✦ 3 saved resets");
-	expect(text([{ ...claude, extra: { title: "Extra usage", used: 4, limit: 50, exhausted: false } }])).toContain("extra $4.00 / $50.00");
+	expect(text([{ ...claude, extra: { title: "Extra usage", used: 4, limit: 50, currency: "USD", exhausted: false } }])).toContain("extra $4.00 / $50.00");
 });
