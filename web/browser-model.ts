@@ -115,23 +115,28 @@ export const elementAt = <T extends Area>(elements: readonly T[], point: Point):
 
 /**
  * Where the comment card of `size` goes beside the marks covering `bounds` on a `width` by `height` page, as T3 Code
- * places it: right of them, else left, else below, else above, whichever spills least, then kept inside the page.
+ * places it: right of them, else left, else below, else above, kept inside the page. Kept inside, a spot that spills
+ * can land on the marks, as on a narrow page, so the spot covering the least of them wins, then the one spilling least.
  */
 export function cardPlace(bounds: Area, size: { width: number; height: number }, width: number, height: number): Point {
 	const gap = 8;
-	const candidates: Point[] = [
+	const spots = [
 		{ x: bounds.x + bounds.width + gap, y: bounds.y },
 		{ x: bounds.x - size.width - gap, y: bounds.y },
 		{ x: bounds.x + bounds.width - size.width, y: bounds.y + bounds.height + gap },
 		{ x: bounds.x + bounds.width - size.width, y: bounds.y - size.height - gap },
-	];
-	const spill = ({ x, y }: Point): number =>
-		Math.max(0, -x) + Math.max(0, -y) + Math.max(0, x + size.width - width) + Math.max(0, y + size.height - height);
-	const best = candidates.reduce((current, candidate) => (spill(candidate) < spill(current) ? candidate : current));
-	return {
-		x: Math.min(Math.max(gap, best.x), Math.max(gap, width - size.width - gap)),
-		y: Math.min(Math.max(gap, best.y), Math.max(gap, height - size.height - gap)),
-	};
+	].map(({ x, y }) => {
+		const place = {
+			x: Math.min(Math.max(gap, x), Math.max(gap, width - size.width - gap)),
+			y: Math.min(Math.max(gap, y), Math.max(gap, height - size.height - gap)),
+		};
+		const covered =
+			Math.max(0, Math.min(place.x + size.width, bounds.x + bounds.width) - Math.max(place.x, bounds.x)) *
+			Math.max(0, Math.min(place.y + size.height, bounds.y + bounds.height) - Math.max(place.y, bounds.y));
+		const spill = Math.max(0, -x) + Math.max(0, -y) + Math.max(0, x + size.width - width) + Math.max(0, y + size.height - height);
+		return { place, covered, spill };
+	});
+	return spots.reduce((best, spot) => (spot.covered < best.covered || (spot.covered === best.covered && spot.spill < best.spill) ? spot : best)).place;
 }
 
 /** What one **Attach** sends: the comment, the page, the selected elements, how many boxes and lines it marked, and the screen size it showed at. */
