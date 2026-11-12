@@ -52,6 +52,8 @@ const SettingsIcon = PAGE_ICON.settings;
 
 /** Hides what the tab menu stands in for once the page's header is under 56rem; a parent without the `header` container, as the title bar, always shows it. */
 const FULL_ONLY = "@max-[56rem]/header:hidden";
+/** Shows the tab menu only where {@link FULL_ONLY} hides what it stands in for. */
+const MENU_ONLY = "@max-[56rem]/header:inline-flex";
 
 /**
  * Which space the window shows, Personal or Work; the switch shortcut's keys show on the space it goes to, and so does the count
@@ -110,7 +112,7 @@ function TabMenu({ tabs, tab, onTab, settingsOpen, onToggleSettings, space, onSp
 						size="compact"
 						leadingIcon={current.icon}
 						trailingIcon={ChevronDown}
-						className="hidden min-w-0 gap-1.5 px-2 font-medium text-foreground @max-[56rem]/header:inline-flex [&_svg:last-child]:text-muted-foreground"
+						className={cn("hidden min-w-0 gap-1.5 px-2 font-medium text-foreground [&_svg:last-child]:text-muted-foreground", MENU_ONLY)}
 						aria-label={`${current.label}. Go to another tab${otherWaiting > 0 ? `. ${SPACE_LABELS[other]}, ${sessionsWaiting(otherWaiting)}` : ""}`}
 					/>
 				}
@@ -179,31 +181,31 @@ export const HeaderControls = memo(function HeaderControls({ notices, onShowSear
 					<Search />
 				</Button>
 			</Tooltip>
-			{tabs.length > 0 && (
-				<div className={cn("flex items-center gap-1", FULL_ONLY)}>
-					<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border" />
-					{tabs.map(value => {
-						const { label, icon: Icon } = TAB_ROWS[value];
-						return (
-							<Tooltip key={value} content={label} shortcut={shortcutLabels(value)} side="bottom">
-								<Button
-									{...activityControl("header.tab")}
-									variant="ghost"
-									size="icon-compact"
-									className="shrink-0 text-muted-foreground aria-pressed:bg-selected aria-pressed:text-foreground"
-									aria-label={label}
-									aria-pressed={tab === value}
-									onClick={() => onTab(value)}
-								>
-									<Icon />
-								</Button>
-							</Tooltip>
-						);
-					})}
-					<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border" />
-				</div>
-			)}
-			<div className={cn("flex", FULL_ONLY)}>
+			<div className={cn("flex items-center gap-1", FULL_ONLY)}>
+				{tabs.length > 0 && (
+					<>
+						<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border" />
+						{tabs.map(value => {
+							const { label, icon: Icon } = TAB_ROWS[value];
+							return (
+								<Tooltip key={value} content={label} shortcut={shortcutLabels(value)} side="bottom">
+									<Button
+										{...activityControl("header.tab")}
+										variant="ghost"
+										size="icon-compact"
+										className="shrink-0 text-muted-foreground aria-pressed:bg-selected aria-pressed:text-foreground"
+										aria-label={label}
+										aria-pressed={tab === value}
+										onClick={() => onTab(value)}
+									>
+										<Icon />
+									</Button>
+								</Tooltip>
+							);
+						})}
+						<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border" />
+					</>
+				)}
 				<WhatsNew />
 			</div>
 			<NoticesBell notices={notices} />
