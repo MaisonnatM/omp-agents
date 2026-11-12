@@ -47,7 +47,7 @@ export function useHoverPopover<Trigger extends HTMLElement = HTMLButtonElement>
 				if (!open || !hovered.current) return;
 				event.preventDefault();
 				hovered.current = false;
-				content.current?.querySelector("button")?.focus();
+				(content.current?.querySelector("button") ?? content.current)?.focus();
 			},
 		},
 		content: {

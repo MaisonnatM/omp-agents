@@ -29,7 +29,7 @@ const second = clock(1000);
 
 /** The time now, renewed each minute, so "Today" turns into "Tomorrow", a passed slot reads as due, and an age counts up. */
 export function useMinute(): number {
-	return useSyncExternalStore(minute.subscribe, minute.now);
+	return useSyncExternalStore(minute.subscribe, minute.now, minute.now);
 }
 
 /** The time now, renewed each second, for a count of the time something has run; only what counts listens to this timer. */

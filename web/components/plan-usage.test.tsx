@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { PlanUsage } from "../../src/shared/models";
-import { creditView, PlanUsageList, spendLabel } from "./plan-usage";
+import type { PlanUsage, PlanWindow } from "../../src/shared/models";
+import { accountTags, chipParts, creditView, PlanCard, PlanUsageList, spendLabel } from "./plan-usage";
 
 const apiCredits: PlanUsage = { provider: "anthropic-api", name: "API credits", account: null, windows: [], extra: null, resetCredits: null };
 const footer = (plan: PlanUsage) => renderToStaticMarkup(<PlanUsageList usage={{ plans: [plan], error: null }} />);
@@ -43,4 +43,46 @@ test("a provider refusing requests for lack of credit reads used up, with or wit
 	const withPrepaid = footer({ ...apiCredits, balance: { kind: "prepaid", left: 3 }, outOfCreditSince: 1 });
 	expect(withPrepaid).toContain("text-red-600");
 	expect(withPrepaid).toContain("$3.00 left");
+});
+
+const NOW = Date.parse("2026-11-12T10:00:00Z");
+const HOUR = 3_600_000;
+const planWindow = (label: string, remaining: number, resetsAt: number | null = null): PlanWindow => ({ id: label, label, title: `Claude ${label}`, remaining, exhausted: remaining === 0, resetsAt });
+const claude: PlanUsage = { provider: "anthropic", name: "Anthropic", account: "maxence@yampa.ai", windows: [], extra: null, resetCredits: null };
+const chip = (plan: Partial<PlanUsage>) => chipParts({ ...claude, ...plan }, NOW).map(({ label, text }) => (label ? `${label} ${text}` : text));
+
+test("a chip shows the tightest open window, then how many windows are used up, then the reset credits", () => {
+	const windows = [planWindow("7d", 0.9), planWindow("5h", 0.43), planWindow("fable", 0, NOW + HOUR)];
+	expect(chip({ windows, resetCredits: { count: 2, nextExpiresAt: null } })).toEqual(["5h 43% left", "1 used up", "✦ 2"]);
+	expect(chipParts({ ...claude, windows: [planWindow("5h", 0.1)] }, NOW)[0]?.tone).toBe("low");
+});
+
+test("with every window used up, the chip says when the last one resets", () => {
+	expect(chip({ windows: [planWindow("5h", 0, NOW + 3 * HOUR), planWindow("7d", 0, NOW + 30 * HOUR)] })).toEqual(["used up, resets in 1d6h"]);
+	expect(chip({ windows: [planWindow("5h", 0)] })).toEqual(["used up"]);
+});
+
+test("a plan with no windows shows its spend past the plan, amber past most of its cap", () => {
+	const parts = chipParts({ ...claude, extra: { title: "Extra usage", used: 45, limit: 50, currency: "USD", exhausted: false } }, NOW);
+	expect(parts).toEqual([{ label: "extra", text: "$45.00 / $50.00", tone: "low" }]);
+});
+
+test("account tags tell apart the accounts of one provider, by domain or else by name", () => {
+	const yampa = { ...claude };
+	const gmail = { ...claude, account: "max@gmail.com" };
+	const gmail2 = { ...claude, account: "ana@gmail.com" };
+	const openai = { ...claude, provider: "openai-codex", account: "maxence@yampa.ai" };
+	const tags = accountTags([yampa, gmail, gmail2, openai]);
+	expect([tags.get(yampa), tags.get(gmail), tags.get(gmail2), tags.get(openai)]).toEqual(["yampa", "max", "ana", undefined]);
+});
+
+test("reset credits on an account with no windows show on its chip instead of hiding behind its name", () => {
+	expect(footer({ ...claude, resetCredits: { count: 3, nextExpiresAt: null } })).toContain("✦ 3");
+});
+
+test("the card gives every window its share left and when it resets, with the date", () => {
+	const card = renderToStaticMarkup(<PlanCard plan={{ ...claude, windows: [planWindow("5h", 0.59, NOW + 4 * HOUR + 19 * 60_000), planWindow("7d", 0)] }} now={NOW} />).replaceAll("<!-- -->", "");
+	expect(card).toContain("59% left");
+	expect(card).toContain("used up");
+	expect(card).toMatch(/Resets in 4h19m · \D*12\b/);
 });
