@@ -748,12 +748,10 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 		<OpenFile.Provider value={setFile}>
 			<div className="@container/conversation relative flex min-h-0 flex-1 flex-col" data-conversation>
 				<SessionTodosCard
-					phases={model.todos}
 					view={view}
 					working={working}
 					changes={activityShown ? changes : undefined}
 					subagents={activityShown ? subagents : null}
-					ship={changes?.sessionId ? (changes.facts?.ship ?? null) : null}
 				/>
 				<MessageScroller className="@container min-h-0 flex-1">
 					<MessageScrollerViewport>

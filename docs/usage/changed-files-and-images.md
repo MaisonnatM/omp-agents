@@ -1,7 +1,7 @@
 # Changed files and images
 
-- The **Todos** card at the top right of each live session's, subagent's, or past session's conversation, or above its messages when the conversation is narrow, lists what the agent changed, took, and opened under its todo list.
-  It has separate **Files**, **Images**, and **Sources** sections, each shown only when it has items; the card shows once any of them, or the todo list, has something to show.
+- The **Todos** card at the top right of each live session's, subagent's, or past session's conversation, or above its messages when the conversation is narrow, lists what the agent changed, took, and opened under its subagents.
+  It has separate **Files**, **Images**, and **Sources** sections, each shown only when it has items; the card shows once any of them, or the **Subagents** section, has something to show.
   Click a section's header to fold or unfold it.
   Each starts open, and the app keeps each choice across sessions and reloads.
   The card scrolls as a whole when its sections outgrow it.

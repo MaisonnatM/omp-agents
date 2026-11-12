@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-11
+
+- The Todos card no longer shows the agent's todo list or the Ship steps; it keeps Subagents, Files, Images, and Sources.
+
 ## 2026-11-10
 
 - A Claude Code session you renamed now lists under that name in the past sessions, and its transcript no longer shows Unread line warnings for Claude Code's own title and agent-name records.
