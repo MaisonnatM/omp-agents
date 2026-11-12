@@ -140,7 +140,7 @@ test("a session in a repository placed in the Personal space gets remember, spor
 	await expect(session.call("remember", { fact: "Cooks for four." }, repo)).rejects.toThrow("not in the Personal space");
 });
 
-test("a linked worktree of a Personal repository is personal too, and its main checkout's subdirectory and other repositories are not", async () => {
+test("a linked worktree and a subdirectory of a Personal repository are personal too, and other repositories are not", async () => {
 	const session = loadedPersonal();
 	const { main, worktree } = await repoWithWorktree(session.root);
 	const other = join(session.root, "app");
@@ -149,7 +149,7 @@ test("a linked worktree of a Personal repository is personal too, and its main c
 	expect(await session.prompt("main", worktree)).toHaveLength(2);
 	expect(await session.prompt("main", other)).toEqual(undefined);
 	mkdirSync(join(main, "notes"));
-	expect(await session.prompt("main", join(main, "notes"))).toEqual(undefined);
+	expect(await session.prompt("main", join(main, "notes"))).toHaveLength(2);
 });
 
 test("a workspaces file an older version wrote, without personal, places every repository in Work", async () => {
