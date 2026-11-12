@@ -5,7 +5,7 @@ import type { Item } from "../src/shared/transcript";
 import { type Block, nextSuggestions, resendOf, type TranscriptModel, transcriptModel, withEditedPrompt } from "./transcript-view";
 
 const blocksOf = (items: Item[]): readonly Block[] => transcriptModel(items, false).blocks;
-const ids = (blocks: readonly Block[]): string[] => blocks.map(block => (block.kind === "item" ? block.item.id : block.id));
+const ids = (blocks: readonly Block[]): string[] => blocks.map(block => (block.kind === "activity" ? block.id : block.item.id));
 
 describe("transcript rendering", () => {
 	const user: Item = { id: "u", kind: "user", text: "go", skill: null, from: null, entryId: "e-u" };
