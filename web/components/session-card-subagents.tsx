@@ -1,5 +1,5 @@
 /**
- * The Todos card's Subagents section: the view's subagents as a tree, each a link to its own view with its status and what it is doing.
+ * The Session card's Subagents section: the view's subagents as a tree, each a link to its own view with its status and what it is doing.
  * The runners of an arena the session recorded sit side by side above the tree, with the judge under them and the base marked.
  */
 import { Gavel, Swords, Trophy } from "lucide-react";
@@ -11,13 +11,13 @@ import type { AgentRow, ArenaRecord } from "../../src/shared/sessions";
 import { SPLIT_CLICK, subagentModeOf } from "../labels";
 import { hashForView } from "../routing";
 import { useStoredState } from "../stored-state";
-import { type ArenaGroup, type ArenaSeat, type ArenaVerdict, arenaGroups, type SubagentNode } from "../todos-card-subagents-model";
-import { countLabel } from "../todos-card-model";
+import { type ArenaGroup, type ArenaSeat, type ArenaVerdict, arenaGroups, type SubagentNode } from "../session-card-subagents-model";
+import { countLabel } from "../session-card-model";
 import { StatusDot, statusLabel } from "./status-dot";
 import { CancelAgentButton, type SubagentLinksValue } from "./subagent-links";
-import { ChangesSection } from "./todos-card-changes";
+import { ChangesSection } from "./session-card-changes";
 
-/** Whether the section is folded shut, kept for every view; it starts open. */
+/** Whether the section is folded shut, kept for every view; it starts open. The key keeps the card's old name, so earlier folds carry over. */
 const CLOSED_KEY = "omp-agents.todos-card-subagents-closed";
 
 /** Each level of nesting indents a row by this many pixels. */

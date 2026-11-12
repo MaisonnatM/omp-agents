@@ -92,31 +92,16 @@ export type Item =
 	/**
 	 * `agents`: the subagents a `task` call spawned, by id, in the order they appeared; empty for every other tool.
 	 * `images`: the addresses of the images its result returned, such as a screenshot, as a prompt's; absent when none.
-	 * `todos`: the agent's whole todo list after a successful `todo` call; absent for every other call.
 	 * `to`: the Bot a `message_bot` call messaged; absent for every other call.
 	 * `artifact`: the checked record of a successful artifact save, absent on other tools or failed saves.
 	 */
-	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; agents: string[]; images?: string[]; todos?: TodoPhase[]; artifact?: ArtifactSave; to?: BotId }
+	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; agents: string[]; images?: string[]; artifact?: ArtifactSave; to?: BotId }
 	| { id: string; kind: "notice"; level: "info" | "warning" | "error"; text: string };
 
 /** A prompt the page shows: the user's, a routine's, or another Bot's message; the dashboard's opens a turn but shows nothing. */
 export type PromptItem = Extract<Item, { kind: "user" | "routine" | "bot-message" }>;
 
 export const isPrompt = (item: Item): item is PromptItem => item.kind === "user" || item.kind === "routine" || item.kind === "bot-message";
-
-/** A task on the agent's todo list, as omp's `todo` tool records it. */
-export interface TodoTask {
-	content: string;
-	status: "pending" | "in_progress" | "completed" | "abandoned" | "blocked";
-	/** Why a blocked task waits; absent otherwise. */
-	blocker?: string;
-}
-
-/** One named phase of the agent's todo list. */
-export interface TodoPhase {
-	name: string;
-	tasks: TodoTask[];
-}
 
 /** One successful `edit` or `write` result on a file; `at` is when omp recorded it, in ms since the epoch, or `null` when its entry carries no time. */
 export type FileChange =

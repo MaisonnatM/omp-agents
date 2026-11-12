@@ -14,7 +14,7 @@ import { type BotId, MESSAGE_BOT_TOOL, parseBotId } from "./shared/bots";
 import { type PromptFile, splitFiles } from "./shared/prompt-files";
 import type { PromptImage } from "./shared/sessions";
 import type { RoutineMessage } from "./shared/routine-message";
-import { isPrompt, type Item, type PromptItem, promptAuthor, skillInvocation, type TodoPhase, type TodoTask } from "./shared/transcript";
+import { isPrompt, type Item, type PromptItem, promptAuthor, skillInvocation } from "./shared/transcript";
 
 type Json = Record<string, unknown>;
 type ToolItem = Extract<Item, { kind: "tool" }>;
@@ -126,30 +126,11 @@ function spawnedAgents(toolName: unknown, result: unknown): string[] {
 	return [...new Set(rows.flatMap(row => (isObject(row) && typeof row.id === "string" && row.id ? [row.id] : [])))];
 }
 
-const TODO_STATUSES: Record<TodoTask["status"], true> = { pending: true, in_progress: true, completed: true, abandoned: true, blocked: true };
-const isTodoStatus = (status: unknown): status is TodoTask["status"] => typeof status === "string" && Object.hasOwn(TODO_STATUSES, status);
-
-/** The whole todo list a successful `todo` result records in `details.phases`; absent for any other result. */
-function todoList(toolName: unknown, result: unknown): { todos?: TodoPhase[] } {
-	if (toolName !== "todo" || !isObject(result) || result.isError || !isObject(result.details) || !Array.isArray(result.details.phases)) return {};
-	const todos = result.details.phases.flatMap((phase): TodoPhase[] => {
-		if (!isObject(phase) || !Array.isArray(phase.tasks)) return [];
-		const tasks = phase.tasks.flatMap((task): TodoTask[] => {
-			if (!isObject(task) || typeof task.content !== "string" || !isTodoStatus(task.status)) return [];
-			const blocker = str(task.blocker);
-			return [{ content: task.content, status: task.status, ...(blocker ? { blocker } : {}) }];
-		});
-		return [{ name: str(phase.name) ?? "", tasks }];
-	});
-	return { todos };
-}
-
 function artifactSave(toolName: unknown, result: unknown): { artifact?: ArtifactSave } {
 	if (toolName !== "artifact" || !isObject(result) || result.isError) return {};
 	const artifact = parseArtifactSave(result.details);
 	return artifact ? { artifact } : {};
 }
-
 /** The Bot a `message_bot` call's arguments `args` name; absent for any other call. */
 function recipient(toolName: unknown, args: unknown): { to?: BotId } {
 	const to = toolName === MESSAGE_BOT_TOOL && isObject(args) ? parseBotId(args.to) : null;
@@ -321,7 +302,7 @@ export class Transcript {
 				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), undefined, undefined, spawnedAgents(event.toolName, event.partialResult));
 			case "tool_execution_end": {
 				const result = { ...(isObject(event.result) ? event.result : {}), isError: event.isError };
-				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), undefined, event.isError ? "error" : "ok", spawnedAgents(event.toolName, event.result), { ...todoList(event.toolName, result), ...artifactSave(event.toolName, result) });
+				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), undefined, event.isError ? "error" : "ok", spawnedAgents(event.toolName, event.result), artifactSave(event.toolName, result));
 			}
 			case "agent_end":
 				// An interrupted turn ends without tool_execution_end for the call it cut off, or message_end for thinking still streaming.
@@ -383,7 +364,7 @@ export class Transcript {
 			case "toolResult": {
 				const callId = str(message.toolCallId);
 				if (callId) this.#settled.add(`tool:${callId}`);
-				return this.#upsertTool(callId, str(message.toolName), undefined, message.isError ? "error" : "ok", spawnedAgents(message.toolName, message), { ...imagesOf(message.content), ...todoList(message.toolName, message), ...artifactSave(message.toolName, message) });
+				return this.#upsertTool(callId, str(message.toolName), undefined, message.isError ? "error" : "ok", spawnedAgents(message.toolName, message), { ...imagesOf(message.content), ...artifactSave(message.toolName, message) });
 			}
 			case "bashExecution": {
 				// omp runs a `!` prompt's text without its `!`, so putting it back makes the text the one the routine sent:
@@ -425,7 +406,7 @@ export class Transcript {
 		summary: string | undefined,
 		status: ToolItem["status"] | undefined,
 		agents: string[] = [],
-		result: { todos?: TodoPhase[]; to?: BotId; artifact?: ArtifactSave } = {},
+		result: { to?: BotId; artifact?: ArtifactSave } = {},
 	): Item[] {
 		if (!callId || this.#settled.has(`tool:${callId}`)) return [];
 		return this.#upsertTool(callId, name, summary, status, agents, result);
@@ -438,7 +419,7 @@ export class Transcript {
 		summary: string | undefined,
 		status: ToolItem["status"] | undefined,
 		agents: string[],
-		result: { images?: string[]; todos?: TodoPhase[]; to?: BotId; artifact?: ArtifactSave } = {},
+		result: { images?: string[]; to?: BotId; artifact?: ArtifactSave } = {},
 	): Item[] {
 		if (!callId) return [];
 		const id = `tool:${callId}`;

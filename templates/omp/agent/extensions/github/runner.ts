@@ -41,8 +41,13 @@ function credentialsOf(report: unknown): GhCredential[] | undefined {
 	return credentials;
 }
 
-/** An extension's `pi.exec`. */
-export type Exec = (command: string, args: string[], options: { cwd: string; timeout: number }) => Promise<CommandOutput>;
+/** An extension's `pi.exec`; `killed` is set when `timeout` or `signal` ended the command. */
+export type Exec = (command: string, args: string[], options: { cwd: string; timeout: number; signal: AbortSignal }) => Promise<CommandOutput & { killed?: boolean }>;
+
+/** How long gh may run before the runner kills it. */
+const GH_TIMEOUT = 20_000;
+/** How long past its timeout the runner waits for `exec` to report a killed gh before giving up on it. */
+const KILL_GRACE = 2_000;
 
 /**
  * How an extension runs gh: under the shared quota cooldowns, and without an environment token GitHub rejects ahead of a stored login that works,
@@ -55,8 +60,11 @@ export class GhRunner {
 	/** Keyed on the credential gh runs with, so a dropped token's cooldowns give way to those the stored login shares with the dashboard. */
 	#access = new GitHubAccess();
 
-	constructor(exec: Exec) {
+	readonly #timeout: number;
+
+	constructor(exec: Exec, timeout = GH_TIMEOUT) {
 		this.#exec = exec;
+		this.#timeout = timeout;
 	}
 
 	/** `gh args`'s stdout, run again once after dropping a rejected environment token. @throws CommandError or GitHubQuotaError. */
@@ -93,8 +101,22 @@ export class GhRunner {
 		return true;
 	}
 
-	#run(args: string[], cwd: string): Promise<CommandOutput> {
+	/** @throws CommandError naming the gh subcommand when gh outlives the timeout; it returns by `KILL_GRACE` after it even when `exec` has not reaped gh. */
+	async #run(args: string[], cwd: string): Promise<CommandOutput> {
 		const [command, prefix] = this.#unset.length ? ["env", [...this.#unset.flatMap(name => ["-u", name]), GH]] : [GH, []];
-		return this.#exec(command, [...prefix, ...args], { cwd, timeout: 20_000 });
+		const timedOut = () => new CommandError(`gh ${args.slice(0, 2).filter(arg => !arg.startsWith("-")).join(" ")} timed out after ${Math.round(this.#timeout / 1000)}s`, undefined);
+		// Aborting makes exec kill gh even when its own timer is late; the deadline keeps the call prompt when exec still waits on gh's tree.
+		const abort = new AbortController();
+		const { promise: deadline, reject } = Promise.withResolvers<never>();
+		const killer = setTimeout(() => abort.abort(), this.#timeout);
+		const giveUp = setTimeout(() => reject(timedOut()), this.#timeout + KILL_GRACE);
+		try {
+			const output = await Promise.race([this.#exec(command, [...prefix, ...args], { cwd, timeout: this.#timeout, signal: abort.signal }), deadline]);
+			if (output.killed) throw timedOut();
+			return output;
+		} finally {
+			clearTimeout(killer);
+			clearTimeout(giveUp);
+		}
 	}
 }

@@ -156,6 +156,7 @@
 - The **Workflows** section lists your workflows: skills whose `SKILL.md` frontmatter tags them `workflow`, such as the starter kit's `ship` skill, which holds the steps `/ship` follows.
   Each shows its name, how to start it, `/<name>` when a command of the same name exists and `/skill:<name>` otherwise, and whether it is a user or a project skill.
   Select one to read its `SKILL.md`, and choose **Edit** to change an authored workflow in place, with the same save and conflict rules as **Files**; packaged workflows are read-only and link to Extensions.
+  Above it, a diagram shows the workflow: the first `mermaid` block in its `SKILL.md`, such as the `ship` skill's stages with their skips and the live review loop, or, without one, its numbered `1. **Step.**` items in a straight line.
   To make a skill a workflow, add `tags: workflow` under `metadata:` in its frontmatter; `tags` takes a comma-separated list, such as `review, workflow`, and a top-level `tags:` key does not count.
   With none tagged, the section shows those two lines to copy.
 - The **Decisions** section shows the decision records of the workspace's repository as a timeline, newest first, under a month header that stays at the top while you scroll: each record's date, status, title, and first paragraph, with **Read the record** to open the whole of it.
@@ -168,7 +169,7 @@
   The server keeps them too, so every window you open shows the same, and **Sync** carries them to your other machines; **Stop idle processes** is the server's own and stays on this machine.
   The width of a sidebar or a split, a folded section, and what you last picked in a menu stay with the browser that set them.
   **Theme**: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one; it applies at once and does not change omp's terminal theme.
-  **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts, and **Show todos card** shows or hides the whole Todos card, its **Subagents**, **Files**, **Images**, and **Sources** sections included, beside or above the messages of every transcript, the same choice as the checklist toggle in a session's header.
+  **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts, and **Show session card** shows or hides the whole Session card, its **Subagents**, **Files**, **Images**, and **Sources** sections included, beside or above the messages of every transcript, the same choice as the **Session card** toggle in a session's header.
   **Sidebar tabs** lists the nine sidebar tabs in the order they show, each with the Cmd+number it takes, a switch that shows or hides it, and buttons that move it up or down.
   **Notes**, **Calendar**, **Todo**, **Email**, and **Sport** say **Header**: they sit in the header beside the command menu and take no number, and Cmd+1 goes to the first tab the sidebar's bar draws.
   A hidden tab only leaves the sidebar's bar or the header and loses its number: its page, its command in the command menu, its G pair, and links to it still work.

@@ -9,7 +9,6 @@
   The sidebar remembers the tab you chose, for every view, and defaults to **PRs**.
   A saved choice of the former **Todos**, **Files**, **Media**, or **Processes** tab falls back to that default.
   What a live session runs besides omp shows in the status bar's CPU card; see [Sessions sidebar](sessions-sidebar.md).
-  The agent's own todo list shows in the conversation's **Todos** card; see [Conversations](conversations.md).
 - **PRs** shows the pull requests the session and its subagents submitted or worked on, as its header lists them, the session's own first; a subagent's view shows its session's.
   A pull request the session only read shows only when the session's own prompt names it, as `#7049` or `PR 7049`; see [Pull requests](pull-requests.md).
   The pull requests the session worked on, such as one it opened, pushed, or edited, come before those its prompt only links or names, so the one it opened shows before the one the prompt linked.

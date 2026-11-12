@@ -1,4 +1,4 @@
-/** `ImageViewer`, one image of a list shown large, which the Todos card's Images section, the transcript's tool images, the thumbnails under agent text, and a pull request's Markdown images open. */
+/** `ImageViewer`, one image of a list shown large, which the Session card's Images section, the transcript's tool images, the thumbnails under agent text, and a pull request's Markdown images open. */
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ChevronLeft, ChevronRight, ExternalLink, X } from "lucide-react";
 import type { ReactNode } from "react";

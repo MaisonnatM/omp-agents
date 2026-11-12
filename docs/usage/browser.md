@@ -45,6 +45,16 @@ It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser 
 - **Screenshot**, the camera button, attaches a picture of all the app shows to the composer at once.
   A picture needs the session's conversation open, since attachments live in its composer.
   When the picture cannot be taken or the conversation is closed, **Attach** adds nothing and keeps picking, with the selection and the marks, so you can try again.
+- **Screen size**, the toolbar button whose icon shows the size picked, shows the app as a phone, a tablet, or a laptop sees it, to test its responsive layout.
+  **Fit panel**, first in its menu and where the Browser starts, fills the Browser as before.
+  **Mobile** is an iPhone, 390 by 844 pixels, and **Tablet** an iPad, 768 by 1024: the app gets a touch screen, the device's pixel density, and Safari's user agent, so touch-only styles, `pointer: coarse`, and server-side mobile checks behave as on the device.
+  **Desktop** is a 1440 by 900 laptop screen with a mouse and the window's pixel density.
+  A new user agent applies from the next request, so reload a page whose server picks its layout from it; a Browser that opens on a size loads its first page twice, the second time as the device.
+  While **Mobile** or **Tablet** is picked, the menu's **Rotate to landscape** or **Rotate to portrait** turns it, and the menu lists each touch size turned the same way.
+  A size bigger than the Browser shrinks to fit it, and a smaller one sits centered at its real size on a muted background; the size and the zoom show above it, such as `390×844 · 62%`, and it never grows past 100%.
+  Picking keeps the mouse while a touch screen is emulated, so **Select**, **Region**, and **Draw** work as on **Fit panel**.
+  A picture from **Attach** or **Screenshot** is taken at the size's own width, at 1×, whatever the zoom, and its chip or name says the size, such as `Mobile, 390×844`.
+  The Browser keeps the size and its rotation for each session for 30 days, and its review tabs show the same size.
 - The Browser keeps its own cookies and storage across launches, apart from the dashboard's, so an app you signed in to stays signed in.
 
 ## Review visuals

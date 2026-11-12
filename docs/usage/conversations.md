@@ -18,9 +18,9 @@
   A turn's tokens add up its requests and its side calls, each from the usage omp recorded for it.
   A subagent's turns show in the subagent's own pane, not its parent's.
   The pane goes back to the transcript when it opens another conversation.
-- The checklist toggle in a session's header, between **Open PR** and End session, or before **Resume** in a past session, hides or shows the **Todos** card in every pane, the same choice as **Show todos card** in Settings › Preferences.
+- The **Session card** toggle, a list icon in a session's header between **Open PR** and End session, or before **Resume** in a past session, hides or shows the Session card in every pane, the same choice as **Show session card** in Settings › Preferences.
   It looks pressed while the card shows.
-  It appears only while the card has something to show, a todo list, /ship steps, subagents, files, images, or sources, and leaves with the card while the trajectory takes the transcript's place.
+  It appears only while the card has something to show, subagents, files, images, or sources, and leaves with the card while the trajectory takes the transcript's place.
 - The transcript fades at its top or bottom edge only while more of it lies past that edge, so a conversation that fits the pane shows no fade.
 - Each tool call in a tool group is a line with an icon for its tool, such as a terminal for `bash`, a page for `read`, and a plug for an MCP tool; a tool without its own icon shows a wrench.
   A call that is running shimmers, a call that failed is red, and the group's heading counts the failures.
@@ -40,7 +40,7 @@
   The arrows, or the Left and Right keys, step to the previous and next image of the conversation, across calls and the images your messages carried, and the external-link button opens the image in your default browser.
   An image you sent opens the same way from its thumbnail above your message, captioned "Your message".
   A tool group that returned images stays open.
-  Hiding tool calls hides them too; the Todos card's **Images** section still lists every one.
+  Hiding tool calls hides them too; the Session card's **Images** section still lists every one.
 - Each artifact the agent saves shows as its own line between the tool groups, **Saved** with its title **as version N**, and an **Open** chip that shows that version in the sidebar's **Artifacts** tab; see [Artifacts](artifacts.md).
   While the tab shows that version, the chip reads **Showing**.
   A save whose bytes equal the version before it names that version's number.
@@ -74,20 +74,12 @@
   Enter and Shift+Enter, or the bar's arrows, step to the next and previous match and scroll the conversation to it; Esc or the close button closes the bar.
   It searches the text the conversation shows, so folded tool calls and hidden thinking are left out, and it keeps counting as new output streams in.
   Focusing another pane closes it; while no conversation shows, Cmd+F keeps the browser's own Find.
-- The **Todos** card holds the agent's todo list, its **Subagents**, and the **Files**, **Images**, and **Sources** sections of [Changed files and images](changed-files-and-images.md), each shown once it has something to list; a past session's conversation shows it too.
-  Once the view's agent made a todo list, the card shows the list as its latest `todo` call left it: how many tasks are done of all, a thin progress line, and the task in progress.
+- The Session card holds the agent's **Subagents** and the **Files**, **Images**, and **Sources** sections of [Changed files and images](changed-files-and-images.md), each shown once it has something to list; a past session's conversation shows it too.
   It floats at the conversation's top right once the conversation is wide enough, and the messages move left to make room for it; in a narrower conversation it sits above them, so it never covers a message.
   It scrolls as a whole when its sections outgrow it.
-  Click the todo summary to unfold every phase, and click it again to fold it; it starts folded, and the app remembers your choice for every conversation.
   Closing a file or an image opened from the card puts the focus back on the row or thumbnail you opened it from.
-  **Show todos card** in Settings › Preferences, or the checklist toggle in the session's header, before End session or Resume, hides the whole card, its **Subagents**, **Files**, **Images**, and **Sources** sections too.
-  Unfolded, each phase shows its done count and its open tasks first, a blocked task's reason under it; its done and dropped tasks fold into an **N done** row.
-  Each status has its own mark: an empty ring for to do, a spinning arc beside a shimmering title for in progress, a green disc with a check for done, an amber disc with an exclamation mark for blocked, and a dashed ring for dropped.
-  A phase with every task done folds to one line; click it to open it.
-  Task text shows its Markdown, such as code and bold.
-  It follows the agent's calls while the turn runs, and a subagent's view shows that subagent's own list.
-  This list is the agent's own and is separate from your Todo page.
-- In a live session, the Todos card's **Subagents** section, after the todo list, lists the session's subagents, so you can reach one without scrolling back to the `task` call that started it.
+  **Show session card** in Settings › Preferences, or the **Session card** toggle in the session's header, before End session or Resume, hides the whole card, its **Subagents**, **Files**, **Images**, and **Sources** sections too.
+- In a live session, the Session card's **Subagents** section, at the top of the card, lists the session's subagents, so you can reach one without scrolling back to the `task` call that started it.
   A subagent that another subagent started sits indented under it.
   Each row shows the subagent's status dot, the same as on its link in the conversation, its id, its type, and, on one line under them, what it is doing now; hover that line for all of it.
   The section's title counts the subagents, and how many are running.

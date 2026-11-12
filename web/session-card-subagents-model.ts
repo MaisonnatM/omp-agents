@@ -1,4 +1,4 @@
-/** The Todos card's **Subagents** section as a tree: which subagents a view lists, in what order, and how deep each sits. */
+/** The Session card's **Subagents** section as a tree: which subagents a view lists, in what order, and how deep each sits. */
 import type { AgentRow, ArenaRecord } from "../src/shared/sessions";
 
 export interface SubagentNode {

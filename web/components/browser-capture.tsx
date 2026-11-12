@@ -1,7 +1,7 @@
 /**
  * The Browser's picking, as T3 Code has it: `usePicking`, a Browser's picking session and **Screenshot**, with the image
- * files they attach to the composer, and `Picking`, the Select, Region, Draw, and Erase switch over the page and the
- * layer where Region boxes and Draw lines mark the page, with the card that attaches them and the selected elements.
+ * files they attach to the composer; `Picking`, the layer over the page where Region boxes and Draw lines mark it, with
+ * the card that attaches them and the selected elements; and `PickModes`, the Select, Region, Draw, and Erase switch.
  */
 import { type PointerEvent, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import type { ControlId } from "../../src/shared/activity";
 import type { PreviewElementBox } from "../../src/shared/desktop-bridge";
 import { activityControl } from "../activity";
-import { annotationText, type Area, boundsOf, cardPlace, dragArea, elementAt, type Mark, markAt, type Point, STROKE_WIDTH, strokeArea, unionArea } from "../browser-model";
+import { annotationText, type Area, boundsOf, cardPlace, dragArea, elementAt, type Mark, markAt, type Point, scaleArea, STROKE_WIDTH, strokeArea, unionArea } from "../browser-model";
 import { appendToComposer, attachToComposer } from "../composer-drafts";
 import { annotationReference } from "../prompt-tokens";
 import { type ShortcutId, shortcutBindings, shortcutKeys, useShortcuts } from "../shortcuts";
@@ -30,17 +30,19 @@ const MODES: { mode: PickMode; label: string; hint: string; control: ControlId; 
 /** The space kept around the marks in the attached image, in the page's CSS pixels. */
 const IMAGE_MARGIN = 8;
 
-const fileName = (what: string): string => `Browser ${what} ${new Date().toLocaleTimeString()}.png`;
+/** A picture's file name, with the screen size it was taken at, such as `Mobile, 390×844`, unless `null`. */
+const fileName = (what: string, shownAt: string | null): string => `Browser ${what}${shownAt ? ` ${shownAt}` : ""} ${new Date().toLocaleTimeString()}.png`;
 
 /** `png`, all the page shows, as an image file to attach. */
-const screenshotFile = (png: Uint8Array): File => new File([new Uint8Array(png)], fileName("screenshot"), { type: "image/png" });
+const screenshotFile = (png: Uint8Array, shownAt: string | null): File => new File([new Uint8Array(png)], fileName("screenshot", shownAt), { type: "image/png" });
 
 /**
  * `png`, all the page shows at the screen's density, with `marks` drawn on it in `color`, cut to the marks, the
  * `elements`, whose outlines the app drew itself, and a margin around them, as an image file to attach. `pageWidth` is
- * the page's CSS width, which gives the density.
+ * the width of the layer the marks were drawn on: the page's CSS width, or at a screen size the zoomed frame's, which
+ * gives the density.
  */
-async function annotationFile(png: Uint8Array, marks: readonly Mark[], elements: readonly Area[], pageWidth: number, color: string): Promise<File> {
+async function annotationFile(png: Uint8Array, marks: readonly Mark[], elements: readonly Area[], pageWidth: number, color: string, shownAt: string | null): Promise<File> {
 	const bitmap = await createImageBitmap(new Blob([new Uint8Array(png)], { type: "image/png" }));
 	const scale = bitmap.width / pageWidth;
 	const bounds = unionArea(
@@ -75,13 +77,14 @@ async function annotationFile(png: Uint8Array, marks: readonly Mark[], elements:
 		}
 	}
 	bitmap.close();
-	return new File([await canvas.convertToBlob({ type: "image/png" })], fileName("annotation"), { type: "image/png" });
+	return new File([await canvas.convertToBlob({ type: "image/png" })], fileName("annotation", shownAt), { type: "image/png" });
 }
 
-/** What one **Attach** of {@link Picking} hands over: the marks, the comment typed beside them, and the page's CSS width. */
+/** What one **Attach** of {@link Picking} hands over: the marks, the comment typed beside them, and the width of the layer they were drawn on. */
 export interface Marking {
 	marks: Mark[];
 	comment: string;
+	/** The page's CSS width, or at a screen size the zoomed frame's. */
 	pageWidth: number;
 }
 
@@ -91,9 +94,9 @@ export interface PickingSession {
 	mode: PickMode | null;
 	/** The dashboard's accent, read as picking starts, which the outlines in the app, the marks, and their picture take. */
 	color: string;
-	/** Where the elements Select picked show in the app. */
+	/** Where the elements Select picked show over the page, at its zoom. */
 	elements: readonly PreviewElementBox[];
-	/** Takes where the elements Select picked show, again each time the app scrolls. */
+	/** Takes where the elements Select picked are in the app, in its CSS pixels, again each time the app scrolls. */
 	onSelection: (boxes: PreviewElementBox[]) => void;
 	/** Starts picking in `mode`, switches to it, or stops picking for `null`, which drops the selection and the marks. */
 	choose: (mode: PickMode | null) => void;
@@ -112,12 +115,15 @@ export interface PickingSession {
 /**
  * The picking session of the Browser that `webview` drives, as T3 Code's: Select picks elements in the app; Region,
  * Draw, and Erase mark the page; one **Attach** sends them all to the composer of `draftKey`. The modes' shortcuts
- * switch the mode while picking.
+ * switch the mode while picking. Its pictures and chips name `shownAt`, the screen size the page shows at, unless
+ * `null`, and the selected elements show at `zoom`, the share of its size the frame shows at.
  */
-export function usePicking(webview: Webview, draftKey: string): PickingSession {
+export function usePicking(webview: Webview, draftKey: string, shownAt: string | null, zoom: number): PickingSession {
 	const [mode, setMode] = useState<PickMode | null>(null);
 	const [color, setColor] = useState("");
-	const [elements, setElements] = useState<PreviewElementBox[]>([]);
+	// In the app's CSS pixels, so a zoom change moves the boxes without the app reporting them again.
+	const [boxes, setBoxes] = useState<PreviewElementBox[]>([]);
+	const elements = zoom === 1 ? boxes : boxes.map(box => scaleArea(box, zoom));
 	const choose = (next: PickMode | null): void => {
 		setMode(next);
 		if (next === null) return webview.clearSelection();
@@ -137,18 +143,18 @@ export function usePicking(webview: Webview, draftKey: string): PickingSession {
 		const picked = await webview.resolveSelection();
 		const png = await webview.capture();
 		if (png === null) return void toasts.add({ title: "Could not capture the Browser" });
-		const boxes = elements.filter(box => picked.some(element => element.id === box.id));
-		if (!attachFile(await annotationFile(png, marks, boxes, pageWidth, color))) return;
+		const outlined = elements.filter(box => picked.some(element => element.id === box.id));
+		if (!attachFile(await annotationFile(png, marks, outlined, pageWidth, color, shownAt))) return;
 		choose(null);
 		const regions = marks.filter(mark => mark.kind === "region").length;
-		const { label, content } = annotationText({ comment, page: webview.page(), elements: picked, regions, strokes: marks.length - regions });
+		const { label, content } = annotationText({ comment, page: webview.page(), elements: picked, regions, strokes: marks.length - regions, shownAt });
 		appendToComposer(draftKey, annotationReference(label, content));
 	}, "Could not attach the marks");
 	return {
 		mode,
 		color,
 		elements,
-		onSelection: setElements,
+		onSelection: setBoxes,
 		choose,
 		stop: () => {
 			if (mode === null) return false;
@@ -164,7 +170,7 @@ export function usePicking(webview: Webview, draftKey: string): PickingSession {
 		screenshot: async () => {
 			const png = await webview.capture();
 			if (png === null) return void toasts.add({ title: "Could not capture the Browser" });
-			attachFile(screenshotFile(png));
+			attachFile(screenshotFile(png, shownAt));
 		},
 	};
 }
@@ -180,7 +186,6 @@ interface PickingProps {
 	color: string;
 	/** Where the elements Select picked show, which the card sits beside and Erase removes. */
 	elements: readonly PreviewElementBox[];
-	onMode: (mode: PickMode) => void;
 	onDeselect: (id: number) => void;
 	onAttach: (marking: Marking) => void;
 	/** An Attach is capturing the page, so the button shows it and takes no second press. */
@@ -188,11 +193,11 @@ interface PickingProps {
 }
 
 /**
- * Covers the page while picking, with the switch between the modes floating at its top: Region drags a box, Draw a
- * line, and Erase removes the mark or selected element it clicks, until **Attach** in the card beside them. Under
- * Select, it lets the pointer through to the app and still shows the marks.
+ * Covers the page while picking: Region drags a box, Draw a line, and Erase removes the mark or selected element it
+ * clicks, until **Attach** in the card beside them. Under Select, it lets the pointer through to the app and still
+ * shows the marks. {@link PickModes} switches between the modes.
  */
-export function Picking({ mode, color, elements, onMode, onDeselect, onAttach, attaching }: PickingProps) {
+export function Picking({ mode, color, elements, onDeselect, onAttach, attaching }: PickingProps) {
 	const [marks, setMarks] = useState<Mark[]>([]);
 	const [drawing, setDrawing] = useState<Drawing | null>(null);
 	const [comment, setComment] = useState("");
@@ -223,114 +228,118 @@ export function Picking({ mode, color, elements, onMode, onDeselect, onAttach, a
 	const drawingArea = drawing?.kind === "region" && layerRef.current ? dragArea(drawing.from, drawing.to, layerRef.current.clientWidth, layerRef.current.clientHeight) : null;
 
 	return (
-		<>
-			<div
-				ref={layerRef}
-				role="presentation"
-				className={cn(
-					"absolute inset-0 z-10 touch-none overflow-hidden select-none",
-					mode === "select" ? "pointer-events-none" : mode === "erase" ? "cursor-default" : "cursor-crosshair",
+		<div
+			ref={layerRef}
+			role="presentation"
+			className={cn(
+				"absolute inset-0 z-10 touch-none overflow-hidden select-none",
+				mode === "select" ? "pointer-events-none" : mode === "erase" ? "cursor-default" : "cursor-crosshair",
+			)}
+			style={{ color }}
+			onPointerDown={event => {
+				if (event.button !== 0 || event.target !== event.currentTarget) return;
+				const at = pointOf(event);
+				if (mode === "erase") {
+					const hit = markAt(marks, at);
+					const element = hit ? undefined : elementAt(elements, at);
+					if (hit) setMarks(marks.filter(mark => mark !== hit));
+					else if (element) onDeselect(element.id);
+					return;
+				}
+				event.currentTarget.setPointerCapture(event.pointerId);
+				setDrawing(mode === "draw" ? { kind: "stroke", points: [at] } : { kind: "region", from: at, to: at });
+			}}
+			onPointerMove={event => {
+				if (!drawing) return;
+				const at = pointOf(event);
+				setDrawing(drawing.kind === "stroke" ? { kind: "stroke", points: [...drawing.points, at] } : { ...drawing, to: at });
+			}}
+			onPointerUp={event => {
+				if (!drawing) return;
+				setDrawing(null);
+				const id = nextId.current++;
+				const { clientWidth, clientHeight } = event.currentTarget;
+				if (drawing.kind === "stroke") {
+					const area = strokeArea(drawing.points);
+					if (area && drawing.points.length > 1) setMarks([...marks, { kind: "stroke", id, points: drawing.points, area }]);
+					return;
+				}
+				const area = dragArea(drawing.from, pointOf(event), clientWidth, clientHeight);
+				if (area) setMarks([...marks, { kind: "region", id, area }]);
+			}}
+		>
+			<svg aria-hidden className="pointer-events-none absolute inset-0 size-full overflow-visible">
+				{marks.map(mark =>
+					mark.kind === "region" ? (
+						<rect key={mark.id} {...rectProps(mark.area)} className="fill-current/6 stroke-current" strokeWidth={2} />
+					) : (
+						<path key={mark.id} d={pathOf(mark.points)} className="fill-none stroke-current" strokeWidth={STROKE_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
+					),
 				)}
-				style={{ color }}
-				onPointerDown={event => {
-					if (event.button !== 0 || event.target !== event.currentTarget) return;
-					const at = pointOf(event);
-					if (mode === "erase") {
-						const hit = markAt(marks, at);
-						const element = hit ? undefined : elementAt(elements, at);
-						if (hit) setMarks(marks.filter(mark => mark !== hit));
-						else if (element) onDeselect(element.id);
-						return;
-					}
-					event.currentTarget.setPointerCapture(event.pointerId);
-					setDrawing(mode === "draw" ? { kind: "stroke", points: [at] } : { kind: "region", from: at, to: at });
-				}}
-				onPointerMove={event => {
-					if (!drawing) return;
-					const at = pointOf(event);
-					setDrawing(drawing.kind === "stroke" ? { kind: "stroke", points: [...drawing.points, at] } : { ...drawing, to: at });
-				}}
-				onPointerUp={event => {
-					if (!drawing) return;
-					setDrawing(null);
-					const id = nextId.current++;
-					const { clientWidth, clientHeight } = event.currentTarget;
-					if (drawing.kind === "stroke") {
-						const area = strokeArea(drawing.points);
-						if (area && drawing.points.length > 1) setMarks([...marks, { kind: "stroke", id, points: drawing.points, area }]);
-						return;
-					}
-					const area = dragArea(drawing.from, pointOf(event), clientWidth, clientHeight);
-					if (area) setMarks([...marks, { kind: "region", id, area }]);
-				}}
-			>
-				<svg aria-hidden className="pointer-events-none absolute inset-0 size-full overflow-visible">
-					{marks.map(mark =>
-						mark.kind === "region" ? (
-							<rect key={mark.id} {...rectProps(mark.area)} className="fill-current/6 stroke-current" strokeWidth={2} />
-						) : (
-							<path key={mark.id} d={pathOf(mark.points)} className="fill-none stroke-current" strokeWidth={STROKE_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
-						),
-					)}
-					{drawingArea && <rect {...rectProps(drawingArea)} className="fill-current/6 stroke-current" strokeWidth={2} />}
-					{drawing?.kind === "stroke" && (
-						<path d={pathOf(drawing.points)} className="fill-none stroke-current" strokeWidth={STROKE_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
-					)}
-				</svg>
-				{(marks.length > 0 || elements.length > 0) && (
-					<div
-						ref={cardRef}
-						className={cn(
-							"pointer-events-auto absolute flex w-[min(360px,calc(100%-16px))] cursor-default items-start gap-2 rounded-xl border border-border bg-popover/95 p-2 text-popover-foreground shadow-2xl backdrop-blur-xl",
-							place === null && "invisible",
-						)}
-						style={{ left: place?.x ?? 0, top: place?.y ?? 0 }}
-					>
-						<textarea
-							// Focused once the first mark is drawn or element selected, as in T3 Code, so the comment is typed next.
-							autoFocus
-							rows={1}
-							value={comment}
-							placeholder="Describe the change…"
-							aria-label="Comment on the marks"
-							className="field-sizing-content max-h-24 min-h-8 min-w-0 flex-1 resize-none border-0 bg-transparent px-0 py-1.5 text-sm leading-5 text-foreground outline-none placeholder:text-muted-foreground"
-							onChange={event => setComment(event.target.value)}
-							onKeyDown={event => {
-								if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
-								event.preventDefault();
-								attach();
-							}}
-						/>
-						<Button {...activityControl("browser.annotation.attach")} size="compact" className="mt-0.5 shrink-0" loading={attaching} onClick={attach}>
-							Attach
-						</Button>
-					</div>
+				{drawingArea && <rect {...rectProps(drawingArea)} className="fill-current/6 stroke-current" strokeWidth={2} />}
+				{drawing?.kind === "stroke" && (
+					<path d={pathOf(drawing.points)} className="fill-none stroke-current" strokeWidth={STROKE_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
 				)}
-			</div>
-			<div
-				role="radiogroup"
-				aria-label="Pick mode"
-				className="absolute top-2.5 left-1/2 z-20 flex -translate-x-1/2 gap-0.5 rounded-lg border border-border bg-popover/95 p-1 text-popover-foreground shadow-lg backdrop-blur-xl"
-			>
-				{MODES.map(item => (
-					<button
-						key={item.mode}
-						{...activityControl(item.control)}
-						type="button"
-						role="radio"
-						aria-checked={item.mode === mode}
-						title={`${item.hint} (${shortcutKeys(item.shortcut)})`}
-						className={cn(
-							"h-7 rounded-md px-2.5 text-xs font-medium outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/40",
-							item.mode === mode && "bg-primary/10 text-primary hover:bg-primary/10",
-						)}
-						onClick={() => onMode(item.mode)}
-					>
-						{item.label}
-					</button>
-				))}
-			</div>
-		</>
+			</svg>
+			{(marks.length > 0 || elements.length > 0) && (
+				<div
+					ref={cardRef}
+					className={cn(
+						"pointer-events-auto absolute flex w-[min(360px,calc(100%-16px))] cursor-default items-start gap-2 rounded-xl border border-border bg-popover/95 p-2 text-popover-foreground shadow-2xl backdrop-blur-xl",
+						place === null && "invisible",
+					)}
+					style={{ left: place?.x ?? 0, top: place?.y ?? 0 }}
+				>
+					<textarea
+						// Focused once the first mark is drawn or element selected, as in T3 Code, so the comment is typed next.
+						autoFocus
+						rows={1}
+						value={comment}
+						placeholder="Describe the change…"
+						aria-label="Comment on the marks"
+						className="field-sizing-content max-h-24 min-h-8 min-w-0 flex-1 resize-none border-0 bg-transparent px-0 py-1.5 text-sm leading-5 text-foreground outline-none placeholder:text-muted-foreground"
+						onChange={event => setComment(event.target.value)}
+						onKeyDown={event => {
+							if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+							event.preventDefault();
+							attach();
+						}}
+					/>
+					<Button {...activityControl("browser.annotation.attach")} size="compact" className="mt-0.5 shrink-0" loading={attaching} onClick={attach}>
+						Attach
+					</Button>
+				</div>
+			)}
+		</div>
+	);
+}
+
+/** The switch between the pick modes, floating at the top of the Browser's stage, over any scaled frame, so a small one never clips it. */
+export function PickModes({ mode, onMode }: { mode: PickMode; onMode: (mode: PickMode) => void }) {
+	return (
+		<div
+			role="radiogroup"
+			aria-label="Pick mode"
+			className="absolute top-2.5 left-1/2 z-20 flex -translate-x-1/2 gap-0.5 rounded-lg border border-border bg-popover/95 p-1 text-popover-foreground shadow-lg backdrop-blur-xl"
+		>
+			{MODES.map(item => (
+				<button
+					key={item.mode}
+					{...activityControl(item.control)}
+					type="button"
+					role="radio"
+					aria-checked={item.mode === mode}
+					title={`${item.hint} (${shortcutKeys(item.shortcut)})`}
+					className={cn(
+						"h-7 rounded-md px-2.5 text-xs font-medium outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/40",
+						item.mode === mode && "bg-primary/10 text-primary hover:bg-primary/10",
+					)}
+					onClick={() => onMode(item.mode)}
+				>
+					{item.label}
+				</button>
+			))}
+		</div>
 	);
 }
 

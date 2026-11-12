@@ -1,11 +1,11 @@
 /**
  * Pure transforms from the server's `items` messages to what a transcript renders: its blocks, its outline, and the
- * facts its rows, its minimap, its chat history, and its Todos card read, as one {@link TranscriptModel}.
+ * facts its rows, its minimap, its chat history, and its Session card read, as one {@link TranscriptModel}.
  */
 import type { RoutineTask } from "../src/routines";
 import { promptTitle } from "../src/shared/prompt-files";
 import { taskOf, taskText } from "../src/shared/routine-message";
-import { isPrompt, type Item, type PromptItem, type TodoPhase } from "../src/shared/transcript";
+import { isPrompt, type Item, type PromptItem } from "../src/shared/transcript";
 import { type ArtifactToolItem, savedArtifact } from "./artifacts-model";
 import type { ActionState } from "./use-action";
 
@@ -171,8 +171,6 @@ interface Segment {
 	tools: number;
 	failed: number;
 	images: TranscriptImage[];
-	/** The agent's todo list as its latest successful `todo` call up to and including this segment left it. */
-	todos: readonly TodoPhase[];
 }
 
 /**
@@ -210,8 +208,6 @@ export interface TranscriptModel {
 	outline: readonly OutlineTurn[];
 	/** Every image the prompts carried and the tool calls returned, in reading order, each captioned with what sent it. */
 	images: readonly TranscriptImage[];
-	/** The agent's todo list as its latest successful `todo` call left it; empty before its first one. */
-	todos: readonly TodoPhase[];
 	/**
 	 * The prompt a double-click edits: the last one, once omp has saved it. omp resends an edit as text alone, so a skill
 	 * prompt or one that carried images or files is not editable. None after a prompt a routine or the dashboard sent,
@@ -223,9 +219,7 @@ export interface TranscriptModel {
 /** What each model was built from, which the next one starts from; kept off the model, so its readers see none of it. */
 const builtFrom = new WeakMap<TranscriptModel, { items: readonly Item[]; working: boolean; regions: readonly Region[] }>();
 
-const NO_TODOS: readonly TodoPhase[] = [];
-
-export const EMPTY_TRANSCRIPT: TranscriptModel = { blocks: [], forks: new Map(), replies: new Set(), outline: [], images: [], todos: NO_TODOS, editable: null };
+export const EMPTY_TRANSCRIPT: TranscriptModel = { blocks: [], forks: new Map(), replies: new Set(), outline: [], images: [], editable: null };
 builtFrom.set(EMPTY_TRANSCRIPT, { items: [], working: false, regions: [] });
 
 /** A comparer for each field of `T`, so a field added to `T` does not compile until it says how it compares. */
@@ -281,10 +275,9 @@ function headOf(opener: Opener): TurnHead | null {
 
 /**
  * The segment of `items` from `start` to `end`. `next` is the prompt after it; `ends` marks the last segment while the
- * transcript works. `previous` is the segment at its place in the model before, whose head it keeps for the same prompt;
- * `todos` is the todo list the segments before it left.
+ * transcript works. `previous` is the segment at its place in the model before, whose head it keeps for the same prompt.
  */
-function segmentOf(items: readonly Item[], start: number, end: number, next: Item | undefined, ends: boolean, previous: Segment | undefined, todos: readonly TodoPhase[]): Segment {
+function segmentOf(items: readonly Item[], start: number, end: number, next: Item | undefined, ends: boolean, previous: Segment | undefined): Segment {
 	const first = items[start]!;
 	const opener = opensTurn(first) ? first : null;
 	let reply: AssistantItem | null = null;
@@ -300,7 +293,6 @@ function segmentOf(items: readonly Item[], start: number, end: number, next: Ite
 		} else if (item.kind === "tool") {
 			tools++;
 			if (item.status === "error") failed++;
-			if (item.todos) todos = item.todos;
 			if (item.images) {
 				const caption = [item.name, item.summary].filter(Boolean).join(" · ");
 				item.images.forEach((src, index) => images.push({ id: item.id, at: index, src, caption }));
@@ -321,7 +313,6 @@ function segmentOf(items: readonly Item[], start: number, end: number, next: Ite
 		tools,
 		failed,
 		images,
-		todos,
 	};
 }
 
@@ -335,8 +326,7 @@ function regionOf(items: readonly Item[], start: number, end: number, ends: bool
 	for (let from = start; from < end; ) {
 		let to = from + 1;
 		while (to < end && items[to]!.kind !== "dashboard") to++;
-		const todos = segments.at(-1)?.todos ?? before?.segments.at(-1)?.todos ?? NO_TODOS;
-		segments.push(segmentOf(items, from, to, items[to], ends && to === end, previous?.segments[segments.length], todos));
+		segments.push(segmentOf(items, from, to, items[to], ends && to === end, previous?.segments[segments.length]));
 		from = to;
 	}
 	const head = segments[0]!.head;
@@ -419,7 +409,6 @@ export function transcriptModel(items: readonly Item[], working: boolean, previo
 		replies: factsKept ? previous.replies : new Set(segments.flatMap(segment => (segment.reply ? [segment.reply.id] : []))),
 		outline: withTail(previous.outline, previous.outline.length - stale.filter(region => region.turn).length, fresh.flatMap(region => (region.turn ? [region.turn] : []))),
 		images: factsKept ? previous.images : segments.flatMap(segment => segment.images),
-		todos: last?.todos ?? NO_TODOS,
 		editable: editable && previous.editable?.itemId === editable.itemId && previous.editable.entryId === editable.entryId ? previous.editable : editable,
 	};
 	builtFrom.set(model, { items, working, regions });

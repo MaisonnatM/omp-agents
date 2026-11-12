@@ -14,15 +14,21 @@ const TAG_SNIPPET = "metadata:\n  tags: workflow";
 const invocation = (workflow: Workflow): string => (workflow.command ? `/${workflow.name}` : `/skill:${workflow.name}`);
 
 /** The skill's steps, its top-level `1. **Title.**` items, in order. */
-export function workflowSteps(text: string): string[] {
+function workflowSteps(text: string): string[] {
 	return [...text.matchAll(/^\d+\. \*\*(.+?)\.?\*\*/gm)].map((match) => match[1]!.trim());
 }
 
 /** The steps as a top-to-bottom mermaid flowchart; `null` under two steps. */
-export function stepsFlowchart(steps: string[]): string | null {
+function stepsFlowchart(steps: string[]): string | null {
 	if (steps.length < 2) return null;
 	const nodes = steps.map((step, i) => `  s${i}["${i + 1}. ${step.replaceAll('"', "'")}"]`);
 	return ["flowchart TD", ...nodes, `  ${steps.map((_, i) => `s${i}`).join(" --> ")}`].join("\n");
+}
+
+/** The skill's own diagram, its first `mermaid` fence, else its steps as a flowchart. */
+export function workflowDiagram(text: string): string | null {
+	const drawn = /^```mermaid\n([\s\S]*?)^```/m.exec(text)?.[1]?.trim();
+	return drawn || stepsFlowchart(workflowSteps(text));
 }
 
 export function Workflows({ workflows, files, editing }: { workflows: Workflow[]; files: OmpFile[]; editing: Editing }) {
@@ -77,7 +83,7 @@ export function Workflows({ workflows, files, editing }: { workflows: Workflow[]
 				</ul>
 			</nav>
 			<div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4">
-				<StepsChart key={open.skill.path} file={open.skill} />
+				<WorkflowChart key={open.skill.path} file={open.skill} />
 				{open.skill.packaged ? (
 					<>
 						<a href={hashForSettings("extensions")} className="text-xs text-foreground underline-offset-2 hover:underline">
@@ -93,7 +99,7 @@ export function Workflows({ workflows, files, editing }: { workflows: Workflow[]
 	);
 }
 
-function StepsChart({ file }: { file: OmpFile }) {
-	const source = file.body.state === "read" ? stepsFlowchart(workflowSteps(file.body.text)) : null;
+function WorkflowChart({ file }: { file: OmpFile }) {
+	const source = file.body.state === "read" ? workflowDiagram(file.body.text) : null;
 	return source ? <SessionVisual language="mermaid" source={source} code={source} /> : null;
 }
