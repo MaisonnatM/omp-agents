@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-13
 
+- A session's header no longer shows its branch or its pull request and Linear issue buttons.
 - The Personal and Work spaces are gone: every page shows all your workspaces, sessions, Bots, events, and accounts together, and the sidebar's Workspaces label still narrows the list to one workspace.
 - Keyboard shortcuts now live in Settings › Keyboard, and ? opens it.
 - The sidebar no longer has a Keyboard shortcuts link at its bottom; ? still opens Settings › Keyboard.

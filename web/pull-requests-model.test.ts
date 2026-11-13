@@ -26,7 +26,6 @@ import {
 	shownBoardPullRequests,
 	shownPullRequests,
 	rebaseOrder,
-	sessionStack,
 	threadStarters,
 	withPullRequestReviewers,
 	withPullRequestState,
@@ -471,32 +470,6 @@ describe("pull request details", () => {
 		const resolved = withThreadResolved(before, "PRRT_a", true);
 		expect(resolved).toEqual({ threads: [{ ...thread("PRRT_a", true), comments: [bugbot] }, thread("PRRT_b", false)], unresolved: { count: 1, exact: false, bots: 0 } });
 		expect(withThreadResolved({ ...before, ...resolved }, "PRRT_a", false)).toEqual({ threads: before.threads, unresolved: { count: 2, exact: false, bots: 1 } });
-	});
-});
-
-describe("session stack", () => {
-	const linked = (number: number): LinkedPullRequest => ({ owner: "acme", repo: "webapp", number, link: "submitted" });
-	const member = (number: number): StackedPullRequest => ({
-		owner: "acme",
-		repo: "webapp",
-		number,
-		title: `PR ${number}`,
-		author: { login: "me", avatarUrl: null },
-		state: "open",
-		checks: "passing",
-		head: `me/branch-${number}`,
-		base: `me/branch-${number - 1}`,
-		updatedAt: number,
-	});
-
-	test("two or more of the session's pull requests in one stack show as the stack, the rest after it", () => {
-		const stack = [member(3), member(2), member(1)];
-		expect(sessionStack([linked(1), linked(9), linked(2)], stack)).toEqual({ stack, others: [linked(9)] });
-	});
-
-	test("a stack holding one of the session's pull requests, or none read yet, leaves the list as it is", () => {
-		expect(sessionStack([linked(1), linked(9)], [member(2), member(1)])).toBeNull();
-		expect(sessionStack([linked(1), linked(2)], [])).toBeNull();
 	});
 });
 
