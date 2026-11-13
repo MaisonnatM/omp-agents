@@ -40,7 +40,6 @@ export interface PageShortcutInput {
 	toggleTools: () => void;
 	toggleHideTools: () => void;
 	toggleHideThinking: () => void;
-	toggleTerminal: () => void;
 }
 
 /**
@@ -136,7 +135,6 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				if (layout.panes.length < 2) return false;
 				show(closePane(layout, layout.panes.length - 1));
 			},
-			terminal: () => latest.current.toggleTerminal(),
 			openPullRequest: () => {
 				const { openPullRequest } = latest.current;
 				if (!openPullRequest) return false;

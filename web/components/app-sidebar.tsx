@@ -1,26 +1,28 @@
-import { IconKeyboard, IconMagnifyingGlass } from "central-icons";
+import { IconMagnifyingGlass } from "central-icons";
 import { memo, type ReactNode, useContext, useMemo } from "react";
-import type { View } from "../../src/shared/sessions";
+import type { Bot } from "../../src/shared/bots";
+import type { RosterHost, View } from "../../src/shared/sessions";
 import { agentOn } from "../../src/shared/moves";
 import { Button } from "@/components/ui/button";
-import { SidebarContent, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { SidebarContent } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
 import { type BotRow, botsNeedingYou } from "../bots-model";
+import type { DashboardState } from "../dashboard-state";
 import { folderName, sessionsWaiting } from "../labels";
 import { yourMoveCount } from "../pull-requests-model";
 import { pullRequestsStore } from "../reads";
-import { hashForPage, type Page, type SettingsRoute, type SidebarTab } from "../routing";
+import type { Page, SettingsRoute, SidebarTab } from "../routing";
 import { shortcutLabels } from "../shortcuts";
 import type { NavRow } from "../sidebar-tabs";
 import type { SessionLists } from "../use-session-lists";
 import type { WorkspaceScope } from "../use-workspace-scope";
 import { AppMark } from "./app-mark";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
-import { ShortcutChip } from "./kbd";
 import { Roster } from "./roster";
 import { ScheduledSends } from "./scheduled";
 import { type NavCount, SidebarNav } from "./sidebar-nav";
+import { SidebarStatus } from "./sidebar-status";
 
 const NO_VIEWS: View[] = [];
 
@@ -41,10 +43,15 @@ interface AppSidebarProps {
 	settings: SettingsRoute;
 	onPickWorkspace: (cwd: string | null) => void;
 	onSearch: () => void;
+	usage: DashboardState["usage"];
+	/** Every live session, which names the sessions in the CPU card. */
+	hosts: readonly RosterHost[];
+	/** The Bots, which name their conversations in the CPU card; `null` before the first list. */
+	bots: readonly Bot[] | null;
 }
 
 /**
- * The left sidebar: the app's row with the command menu, the page list, the roster, and the keyboard shortcuts link.
+ * The left sidebar: the app's row with the command menu, the page list, the roster, and plan quota with the machine's load at its foot.
  * The nodes it hands down are memoized, so a roster message that changes nothing the sidebar shows leaves it alone.
  */
 export const AppSidebar = memo(function AppSidebar({
@@ -60,6 +67,9 @@ export const AppSidebar = memo(function AppSidebar({
 	settings,
 	onPickWorkspace,
 	onSearch,
+	usage,
+	hosts,
+	bots,
 }: AppSidebarProps) {
 	const { openNewSession } = useDashboardActions();
 	const { connected, pullRequestsScope } = useDashboardStatus();
@@ -114,18 +124,7 @@ export const AppSidebar = memo(function AppSidebar({
 					onPickWorkspace={onPickWorkspace}
 				/>
 			</SidebarContent>
-			<SidebarMenu className="shrink-0 px-2 pt-1 pb-2">
-				<SidebarMenuItem>
-					<SidebarMenuButton size="short" asChild icon={IconKeyboard} isActive={page?.kind === "settings" && page.section === "keyboard"}>
-						<a {...activityControl("shortcuts.open")} href={hashForPage({ kind: "settings", section: "keyboard" })}>
-							Keyboard shortcuts
-						</a>
-					</SidebarMenuButton>
-					<SidebarMenuBadge>
-						<ShortcutChip id="help" />
-					</SidebarMenuBadge>
-				</SidebarMenuItem>
-			</SidebarMenu>
+			<SidebarStatus usage={usage} hosts={hosts} bots={bots} />
 		</div>
 	);
 });

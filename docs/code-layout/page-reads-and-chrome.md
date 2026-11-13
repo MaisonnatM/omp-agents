@@ -1,13 +1,13 @@
-# Page: status bar, terminal, HTTP reads, shortcuts, and theme
+# Page: sidebar status, terminal, HTTP reads, shortcuts, and theme
 
-- `web/components/status-bar.tsx`: the window's bottom strip, with `PlanUsageList` from `web/components/plan-usage.tsx` on the left, and on the right the **Terminal** button and the machine's CPU, available memory, and free disk space from `GET /api/system`.
-  In `plan-usage.tsx`, `creditView` decides how the API credits balance reads and is colored, for this strip and the model menu's heading alike.
+- `web/components/sidebar-status.tsx`: the sidebar's foot, under the roster, with `PlanUsageList` from `web/components/plan-usage.tsx` drawn one plan per row, then a row with the machine's CPU, available memory, and free disk space from `GET /api/system`, left out on a paired phone.
+  In `plan-usage.tsx`, `creditView` decides how the API credits balance reads and is colored, for this foot and the model menu's heading alike.
   The CPU fact is a popover, opened by hover or click through `useHoverPopover`, that lists every live session's processes, busiest session first, each session named by `hostLabel` over the roster `app.tsx` passes, and each row with its own `useAction` for **Stop**, which `writeProcessStop` sends.
   The disk fact uses the same popover behavior, breaks down the volume that holds the home directory, and links **Clean up…** to Settings › Storage.
-- `web/components/terminal/terminal-panel.tsx`: the terminal panel under the panes, its tabs, height, and open state, and `useTerminalPanel`, which saves the last two in localStorage.
+- `web/components/terminal/terminal-panel.tsx`: parked and not mounted since the terminal left the page, so no button, command, or chord opens it; the panel still holds its tabs, height, and open state, and `useTerminalPanel`, which saves the last two in localStorage.
   `terminal-tab.ts` holds the tab shape and its lifecycle, `TerminalTabState`, `starting`, `connected`, `closing`, or `disconnected`, which `nextTabState` moves through the socket's `opened` and close and the user's close; closing a starting or connected tab asks its shell to exit through the view and keeps the tab until its socket closes.
   `terminal-inventory.ts` holds `readTerminalTabs`, which turns `GET /api/terminals` into the panel's loading, failed, or ready tabs: a tab per running shell, or one new shell only when the read succeeds and lists none.
-  `terminal-view.tsx` draws one tab with xterm.js over its `/ws/terminal` socket, fits it to the panel, follows the page's theme, and passes the toggle chord, and every Cmd chord on macOS, to the page's shortcuts; the panel loads it with `React.lazy`, so xterm.js is a chunk of its own that loads when the panel first opens.
+  `terminal-view.tsx` draws one tab with xterm.js over its `/ws/terminal` socket, fits it to the panel, follows the page's theme, and passes every Cmd chord on macOS to the page's shortcuts; the panel loads it with `React.lazy`, so xterm.js is a chunk of its own that loads when the panel first opens.
   `terminal-socket.ts` sends its commands and retains a kill requested while the socket connects, sending it when the socket opens.
 - `web/quick-actions.ts`: the quick actions of the Pull requests page, the tickets page, and the open todo, which pull requests, issues, and todos each applies to, and the start, with its prompt, that runs it; the pull request actions themselves come from `src/pull-request-actions.ts`.
   Tickets and todos share the **Work on it** and **Plan it** labels and descriptions in `WORK_ACTIONS`, and each keeps its own rules, which of its items an action applies to and the prompt it sends.

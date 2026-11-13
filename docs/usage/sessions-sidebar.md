@@ -1,6 +1,6 @@
 # Sessions sidebar
 
-- **Keyboard shortcuts** at the foot of the sidebar opens Settings › Keyboard, and shows its key, ?.
+- The sidebar's foot shows how much quota is left on each plan, one per row, and the Mac's CPU, free memory, and free disk: hover or click the CPU for each session's processes with **Stop**, or the disk for **Clean up…**.
 - The sidebar runs the window's height on the window's background, and the page and the session details sidebar sit beside it as rounded panels.
   Its top row, 48 px tall at the default font size as the header's tabs beside it are, holds the omp mark, the command menu button, and the button that hides the sidebar.
 - Under it the page list shows **New session**, then **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Calendar**, **Todo**, **Sport**, and **Email** in the order Settings › Preferences gives them, then **Settings**.
@@ -101,7 +101,7 @@
   Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Alt+B the details sidebar, which shows the session's details on the panes and a Bot's on its page.
   Each sidebar's width, and whether it is hidden, is saved in the app.
 - The left sidebar's session rows leave out the full working directory, the model, the /ship step, and the pull requests; hover the workspace in the pane header to see the directory, the composer shows the model, and the session details sidebar shows the pull requests.
-- A strip along the bottom of the window, under both sidebars, shows how much quota is left on each plan that `omp usage` reports, the plans side by side: each plan's provider logo, from [svgl](https://svgl.app), then each window, for example `5h 66%  7d 68%` for Anthropic.
+- The sidebar's foot, under the roster, shows how much quota is left on each plan that `omp usage` reports, one plan per row: each plan's provider logo, from [svgl](https://svgl.app), then each window, for example `5h 66%  7d 68%` for Anthropic.
   Hover the logo to see the plan's name and account, and how many reset credits the plan holds with when the soonest one expires, such as `3 reset credits, next expires Oct 22.`; a reset credit, which omp redeems, clears a used-up window.
   A provider without a logo shows the plan's name instead.
   A window is named by its length plus its model tier (`7d fable`).
@@ -122,8 +122,8 @@
   A sign-in that exists only in Chrome stays a name, because that browser's cookies are encrypted.
   A window omp meters in dollars, such as Cursor's `Other Models`, adds the dollars spent to its hover.
   The server runs `omp usage --json` every minute while a page is open, and once when a page opens after a minute with none.
-- The strip's right side shows the machine's CPU, the percent of every core's time spent busy since the last read, the memory available, which macOS reads as `memory_pressure`'s free percentage of the physical memory, and the disk space free on the volume that holds your home directory.
-  The strip reads them again every five seconds while the page is visible.
+- The sidebar's foot, below the plans, shows the machine's CPU, the percent of every core's time spent busy since the last read, the memory available, which macOS reads as `memory_pressure`'s free percentage of the physical memory, and the disk space free on the volume that holds your home directory.
+  The foot reads them again every five seconds while the page is visible.
   Hover or focus the memory for its full reading.
   Hover or click the disk space for that volume's percent used, a bar of it, and the space used, free, and in total.
   Click it or press Enter to move focus into the popover, then follow **Clean up…** to [Settings › Storage](settings.md).
@@ -143,4 +143,3 @@
   Only the server that runs unattended work, the first one started, stops processes, so another server shows no **Stops in** time.
 - When a session ends or its omp exits, the server stops the services it owned and the jobs it left running.
   A session started from the dashboard also has the rest of its processes ended when it ends, as before.
-- **Terminal**, at the start of the strip's right side, shows or hides the [terminal](terminal.md).

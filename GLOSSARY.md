@@ -93,7 +93,7 @@ Its checks reflect real setup; only its dismissal, its closed state, and the ste
 _Avoid_: Onboarding, tour, checklist
 
 **Sidebar**:
-The column down the window's left side: the omp mark and the command menu at its top, the page list, the roster, and the **Keyboard shortcuts** link at its foot.
+The column down the window's left side: the omp mark and the command menu at its top, the page list, the roster, and at its foot the plan quota and the machine's CPU, memory, and disk.
 _Avoid_: Nav, navigation rail, left panel
 
 **Header tabs**:

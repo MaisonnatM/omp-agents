@@ -29,7 +29,6 @@ Alt is Option on macOS.
 | Alt+T | Anywhere | Show or hide thinking |
 | Cmd+B | Anywhere | Show or hide the sessions sidebar |
 | Cmd+Alt+B | Anywhere | Show or hide the details sidebar, on the right: a session's, or a Bot's |
-| Ctrl+\` | Anywhere, the terminal too, on every platform | Show or hide the terminal |
 | Esc | Maximized pane | Restore the split |
 | Esc | Maximized Browser, the app in it too | Put the Browser back in the sidebar |
 | V / R / D / E | Browser while picking, outside text fields, the app in it too | Switch to Select, Region, Draw, or Erase |
@@ -71,7 +70,7 @@ Alt is Option on macOS.
 | Alt+Shift+↑ / Alt+Shift+↓ | Todo page or Pull requests page | Move the focused todo, or the Pull requests page's focused pull request, section, or repository, up or down |
 | ↓ / ↑ | Changes page or a pull request's **Code** tab, outside text fields | Open the next or previous changed file |
 
-- **Settings › Keyboard** lists the keyboard shortcuts; press `?` outside a text field, or click **Keyboard shortcuts** at the foot of the sidebar, to open it, and `?` there goes back to the panes.
+- **Settings › Keyboard** lists the keyboard shortcuts; press `?` outside a text field to open it, and `?` there goes back to the panes.
   It lists them in sections by category: General, Sessions, Pull requests, Todo, Email, Calendar, Sport, and Changes.
   Its first line states the rule for where a key works: chords with Cmd, Alt, or Ctrl work anywhere, even while you type, and single keys and G pairs work outside text fields; a **Composer only** tag marks the keys that work only in the composer.
   Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar's top row and page list, the header's tabs' buttons, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the open Sport journal session's ↑, ↓, and **×**, the Sport demo dialog's **Précédent** and **Suivant**, the Calendar page's **New event**, and an Email conversation's **Reply**, **Reply all**, **Delete**, and **Open in Gmail**.

@@ -5,7 +5,7 @@ It runs `git worktree list --porcelain -z`, `git for-each-ref`, and `git symboli
 Like a new session's `start`, `cwd` may name any directory.
 The new-session draft reads it for its branch picker, and a live session's header reads it when it opens and when a turn starts or ends.
 
-`GET /api/system` answers the status bar's machine load: `{ cpuPercent, memoryAvailable, memoryTotal, diskAvailable, diskTotal }`.
+`GET /api/system` answers the sidebar's machine load: `{ cpuPercent, memoryAvailable, memoryTotal, diskAvailable, diskTotal }`.
 `cpuPercent` is the busy share of every core's time since the previous read, from `os.cpus()`, and `null` when no time passed; the first read measures from the server's start.
 `memoryAvailable` is `kern.memorystatus_level`, the free percentage `memory_pressure` reports, of the physical memory on macOS, since `os.freemem()` counts only never-used pages there, and `os.freemem()` elsewhere.
 `diskAvailable` and `diskTotal` come from `statfs` on the home directory: the blocks free to an unprivileged user and all the volume's blocks; on macOS the free figure leaves out purgeable space, which Finder counts.

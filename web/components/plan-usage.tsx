@@ -1,4 +1,4 @@
-/** How much of each provider plan's usage windows is left, shown in the status bar and the model menu. */
+/** How much of each provider plan's usage windows is left, shown at the sidebar's foot and in the model menu. */
 import { createContext } from "react";
 import { type CreditBalance, type ExtraUsage, isNameOnlyPlan, type PlanUsage, type PlanWindow, type ResetCredits } from "../../src/shared/models";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -226,7 +226,7 @@ function PlanChip({ plan, tag }: { plan: PlanUsage; tag: string | undefined }) {
 	return (
 		<Popover {...popover.root}>
 			<PopoverTrigger asChild>
-				<button {...popover.trigger} type="button" className={cn("-mx-1 flex items-center gap-1.5 whitespace-nowrap px-1 tabular-nums hover:bg-muted", FOCUS)}>
+				<button {...popover.trigger} type="button" className={cn("-mx-1 flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-sm px-1 tabular-nums hover:bg-hover", FOCUS)}>
 					<span aria-hidden className="flex shrink-0 items-center">
 						<OrgIcon org={providerOrg(plan.provider)} fallback={<span className="font-medium text-foreground">{plan.name}</span>} />
 					</span>
@@ -259,7 +259,7 @@ function NamedPlan({ plan, tag }: { plan: PlanUsage; tag: string | undefined }) 
 	return <span className="whitespace-nowrap text-foreground">{name}</span>;
 }
 
-/** Plan quota, one chip per account, for the status bar; on a phone, on one line that scrolls sideways. */
+/** Plan quota, one row per account, for the sidebar's foot. */
 export function PlanUsageList({ usage }: { usage: DashboardState["usage"] }) {
 	if (usage === null) return <p className="text-muted-foreground">Checking plans…</p>;
 	if (usage.error !== null) return <p className="min-w-0 truncate text-red-600 dark:text-red-400">Cannot read plan usage: {usage.error}</p>;
@@ -271,9 +271,9 @@ export function PlanUsageList({ usage }: { usage: DashboardState["usage"] }) {
 		);
 	const tags = accountTags(usage.plans);
 	return (
-		<ul aria-label="Plan usage" className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5 max-phone:-my-1 max-phone:flex-nowrap max-phone:overflow-x-auto max-phone:py-1 max-phone:scroll-fade-x max-phone:[scrollbar-width:none] max-phone:*:shrink-0">
+		<ul aria-label="Plan usage" className="flex min-w-0 flex-col items-start gap-1">
 			{usage.plans.map((plan, index) => (
-				<li key={`${plan.provider}:${plan.account ?? index}`} className="flex items-center gap-2 border-border not-first:border-l not-first:pl-2.5">
+				<li key={`${plan.provider}:${plan.account ?? index}`} className="flex max-w-full min-w-0 items-center gap-2">
 					{hasChip(plan) ? (
 						<PlanChip plan={plan} tag={tags.get(plan)} />
 					) : (

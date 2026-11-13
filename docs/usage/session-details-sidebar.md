@@ -8,7 +8,7 @@
   With five tabs or more, the sidebar's default width keeps only their icons.
   The sidebar remembers the tab you chose, for every view, and defaults to **Overview**.
   A saved choice of the former **Todos**, **Files**, **Media**, **Processes**, or **Memory** tab falls back to that default.
-  What a live session runs besides omp shows in the status bar's CPU card; see [Sessions sidebar](sessions-sidebar.md).
+  What a live session runs besides omp shows in the sidebar's CPU card; see [Sessions sidebar](sessions-sidebar.md).
 - **Overview** lists the view's **Subagents**, then the **Files**, **Images**, and **Sources** of [Changed files and images](changed-files-and-images.md), each under a filled header with its count that folds on a click; see [Conversations](conversations.md) for the **Subagents** section.
   A section shows once it has something to list, and the tab says **Nothing yet** once the session's lists have loaded and none has.
   A past session's view shows its files, images, and sources but no subagents.

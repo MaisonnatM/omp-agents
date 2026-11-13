@@ -5,6 +5,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-13
 
+- The bottom of the sidebar now shows how much of each model plan is left, one plan per row, and your Mac's CPU, free memory, and free disk, where the Keyboard shortcuts link was. Hover or click CPU to see each session's processes, or the disk to clean up. Settings › Keyboard and ? still open the shortcuts.
+- The strip along the bottom of the window is gone, so the page runs to the window's edge.
+- The terminal is removed for now: its button, its Ctrl+` shortcut, and its command in the command menu are gone.
 - The Personal and Work spaces are gone: every page shows all your workspaces, sessions, Bots, events, and accounts together, and the sidebar's Workspaces label still narrows the list to one workspace.
 - Keyboard shortcuts now live in Settings › Keyboard, and ? opens it.
 - The bottom of the sidebar now has a Keyboard shortcuts link, where the Personal and Work switch was.

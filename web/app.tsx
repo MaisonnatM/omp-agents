@@ -32,10 +32,8 @@ import { ProjectTrustDialog } from "./components/project-trust-dialog";
 import { GetStarted } from "./components/get-started";
 import { firstSessionFact } from "./get-started-model";
 import { DashboardSidebar, useSidebarPanels } from "./components/sidebar-panel";
-import { StatusBar } from "./components/status-bar";
 import { subjectOf } from "./components/subject";
 import { NewTicketDialog } from "./components/tickets/new-ticket";
-import { TerminalPanel, useTerminalPanel } from "./components/terminal/terminal-panel";
 import { ActivityVisibility, ToolsExpanded } from "./components/transcript";
 import { toasts } from "./components/toaster";
 import { botRows } from "./bots-model";
@@ -78,7 +76,6 @@ export function App() {
 	const sessions = useSessionLists(scope, state.pins, changePins);
 	const overlays = useOverlays();
 	const display = useTranscriptDisplay();
-	const terminal = useTerminalPanel();
 	useNoticeToasts(state.notices, state.connected, send, start);
 	useAttention(state, openBot?.view ?? null, send);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
@@ -210,7 +207,6 @@ export function App() {
 		toggleTools: display.toggleTools,
 		toggleHideTools: display.toggleHideTools,
 		toggleHideThinking: display.toggleHideThinking,
-		toggleTerminal: terminal.toggle,
 	});
 
 	const actions = useMemo(
@@ -286,6 +282,9 @@ export function App() {
 										settings={settings}
 										onPickWorkspace={switchWorkspace}
 										onSearch={showSearch}
+										usage={state.usage}
+										hosts={state.hosts}
+										bots={state.bots}
 									/>
 								</DashboardSidebar>
 								<HeaderTabs className="[grid-area:tabs]" address={address} hosts={state.hosts} past={state.past} controls={headerControls} />
@@ -345,7 +344,6 @@ export function App() {
 											</Plans>
 										</div>
 									</div>
-									<TerminalPanel panel={terminal} cwd={focused.workDir ?? workspace ?? "~"} />
 								</SidebarInset>
 								{(detailsView || openBot) && (
 									<DashboardSidebar side="right" className="[grid-area:details]" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")} address={address}>
@@ -413,7 +411,6 @@ export function App() {
 									onCreateTicket={setNewTicket}
 								/>
 							</SidebarProvider>
-							<StatusBar usage={state.usage} hosts={state.hosts} bots={state.bots} terminalOpen={terminal.open} onToggleTerminal={terminal.toggle} />
 							<DesktopLinkPreview />
 						</div>
 					</UserTodosContext.Provider>

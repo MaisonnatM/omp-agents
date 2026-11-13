@@ -1,7 +1,7 @@
 # Storage
 
 - **Storage** is a section of [Settings](settings.md), at `#settings/storage`, that measures session files, attachments, and isolation sandboxes across all workspaces.
-  Open it from the disk reading's **Clean up…** link in the bottom bar.
+  Open it from the disk reading's **Clean up…** link in the sidebar's foot.
   The checklist previews old reports and replicas, unused attachments, cold sessions to archive, idle files to compress, database logs, sandboxes of ended tasks, sandboxes of ended tasks with leftover changes, and package caches.
   It starts with your saved cleanup switches, plus sandboxes of ended tasks; empty phases, sandboxes with leftover changes, and package caches stay unchecked.
   **Check again** refreshes the preview without deleting anything.
