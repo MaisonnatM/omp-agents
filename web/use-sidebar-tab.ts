@@ -11,7 +11,6 @@ const TAB_PAGE: Record<Exclude<SidebarTab, WebModuleId>, CorePage> = {
 	tickets: { kind: "tickets", target: null },
 	bots: { kind: "bots", target: null, adding: false },
 	todo: { kind: "todo", list: { kind: "all" }, open: null },
-	calendar: { kind: "calendar" },
 	email: { kind: "email", target: null },
 };
 

@@ -183,7 +183,6 @@ const CORE_VIEWS = [
 	{ key: "tickets/item", label: "A ticket", tab: "tickets" },
 	{ key: "todo", label: "Todo" },
 	{ key: "todo/item", label: "A todo" },
-	{ key: "calendar", label: "Calendar" },
 	{ key: "bots", label: "Bots" },
 	{ key: "bots/new", label: "New Bot" },
 	{ key: "bots/item", label: "A Bot" },
@@ -231,7 +230,6 @@ function pageView(page: Page): ViewKey {
 			return page.target === null ? "email" : page.target === "new" ? "email/new" : "email/item";
 		case "scheduled":
 			return page.id === null ? "scheduled" : "scheduled/item";
-		case "calendar":
 		case "get-started":
 		case "new":
 			return page.kind;

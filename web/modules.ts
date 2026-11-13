@@ -7,6 +7,7 @@
 import type { IconComponent } from "@/lib/icon-context";
 import type { ModuleChanges, ModuleValues, StoredModuleId } from "../src/modules";
 import type { McpIntegrationId } from "../src/shared/accounts";
+import { CALENDAR_PAGE } from "./components/calendar/module";
 import { SPORT_PAGE } from "./components/sport/module";
 import type { Binding } from "./shortcuts";
 
@@ -61,7 +62,7 @@ export type StoredPageModule<Id extends string, Route, Value, Change, Shortcut e
 };
 
 /** Every module, in the order the hubs list them: adding one is adding its definition here and its server half to `SERVER_MODULES` in `src/modules.ts`. */
-export const WEB_MODULES = { sport: SPORT_PAGE };
+export const WEB_MODULES = { calendar: CALENDAR_PAGE, sport: SPORT_PAGE };
 
 type WebModules = typeof WEB_MODULES;
 export type WebModuleId = keyof WebModules;
@@ -95,11 +96,11 @@ export const isModulePage = (page: { kind: string }): page is ModulePage => isWe
 /** Module `page.kind`'s definition, whose methods take `page` as their route, since a page's kind names the module whose route it holds. */
 export const moduleOf = (page: ModulePage): AnyPageModule => BY_ID[page.kind];
 
-/** Module `id`'s page at the address `#<id>/<rest>?<query>`. */
-export const modulePage = (id: WebModuleId, rest: string | null, query: URLSearchParams): ModulePage => ({ kind: id, ...WEB_MODULES[id].address.parse(rest, query) });
+/** Module `id`'s page at the address `#<id>/<rest>?<query>`; TypeScript cannot pair `id` with its module's route, so the result is asserted. */
+export const modulePage = (id: WebModuleId, rest: string | null, query: URLSearchParams): ModulePage => ({ kind: id, ...WEB_MODULES[id].address.parse(rest, query) }) as ModulePage;
 
 /** Module `id`'s page as its tab opens it. */
-export const moduleHome = (id: WebModuleId): ModulePage => ({ kind: id, ...WEB_MODULES[id].home });
+export const moduleHome = (id: WebModuleId): ModulePage => ({ kind: id, ...WEB_MODULES[id].home }) as ModulePage;
 
 /** No stored module's state, as the page holds before the server sends any. */
 export const EMPTY_MODULE_STATES = Object.fromEntries(Object.values(WEB_MODULES).flatMap(module => ("store" in module ? [[module.id, null]] : []))) as ModuleStates;

@@ -76,7 +76,6 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			tickets: goToTab("tickets"),
 			bots: goToTab("bots"),
 			todo: goToTab("todo"),
-			calendar: goToTab("calendar"),
 			email: goToTab("email"),
 			...moduleGoTo,
 		};
@@ -123,7 +122,6 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				latest.current.showTab("sessions");
 			},
 			todo: goTo.todo,
-			calendar: goTo.calendar,
 			email: goTo.email,
 			...moduleGoTo,
 			...positions,

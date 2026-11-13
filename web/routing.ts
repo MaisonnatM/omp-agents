@@ -24,7 +24,6 @@ const CORE_TABS = [
 	{ value: "pull-requests", label: "Pull requests", icon: PAGE_ICON["pull-requests"], place: 10 },
 	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, place: 20, integration: "linear" },
 	{ value: "bots", label: "Bots", icon: PAGE_ICON.bots, place: 30 },
-	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar, place: 40 },
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo, place: 50 },
 	{ value: "email", label: "Email", icon: PAGE_ICON.email, place: 70, integration: "gmail" },
 ] as const satisfies readonly { value: string; label: string; icon: IconComponent; place: number; integration?: McpIntegrationId }[];
@@ -179,7 +178,6 @@ export type CorePage =
 	| ({ kind: "tickets" } & TicketsRoute)
 	| ({ kind: "todo" } & TodoRoute)
 	| ({ kind: "bots" } & BotsRoute)
-	| { kind: "calendar" }
 	| ({ kind: "email" } & EmailRoute)
 	| ({ kind: "new" } & NewSessionRoute)
 	| ({ kind: "scheduled" } & ScheduledRoute);
@@ -232,7 +230,6 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   Bot's routines in place of its conversation, `#bots/<id>/routines/<routine id>` that card with that routine open,
  *   `#bots/<id>/routines/<routine id>/edit` that routine's editor, and `#bots/<id>/routines/new` a new routine's editor; Bot and routine ids
  *   are UUIDs, so none reads as `new`.
- * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
  * - `#email` opens the Email page, your Gmail inboxes' latest conversations, `#email/new` a new mail, and
  *   `#email/<account>/<thread id>` that account's conversation in full in the main content.
  * - A module's page, `#<id>`, reads the rest of its hash as its module's address does.
@@ -262,7 +259,6 @@ const PAGES: { [K in CorePage["kind"]]: (rest: string | null, query: URLSearchPa
 		if (!target) return { kind: "bots", target: null, adding: false };
 		return { kind: "bots", target, routine: routines === "routines" ? botRoutineRoute(routine, more) : null };
 	},
-	calendar: () => ({ kind: "calendar" }),
 	email: rest => {
 		if (rest === "new") return { kind: "email", target: "new" };
 		const [account, thread, ...more] = (rest ?? "").split("/").map(decodeSegment);
@@ -296,7 +292,6 @@ function restOfPage(page: CorePage): string | null {
 			return page.target === null || page.target === "new" ? page.target : `${encodeURIComponent(page.target.account)}/${encodeURIComponent(page.target.thread)}`;
 		case "scheduled":
 			return page.id === null ? null : encodeURIComponent(page.id);
-		case "calendar":
 		case "get-started":
 			return null;
 		default: {
@@ -317,7 +312,6 @@ function queryOfPage(page: CorePage): string | null {
 		case "pull-requests":
 		case "tickets":
 		case "bots":
-		case "calendar":
 		case "get-started":
 		case "email":
 		case "scheduled":
@@ -352,7 +346,6 @@ export function hashForTodoId({ todos, archive }: UserTodoList, id: string): str
 export const hashForBots = (target: string | null): string => hashForPage(target === null ? { kind: "bots", target, adding: false } : { kind: "bots", target, routine: null });
 export const hashForNewBot = (): string => hashForPage({ kind: "bots", target: null, adding: true });
 export const hashForBotRoutine = (botId: string, routine: BotRoutineRoute): string => hashForPage({ kind: "bots", target: botId, routine });
-export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
 export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
 export const hashForScheduled = (id: string): string => hashForPage({ kind: "scheduled", id });

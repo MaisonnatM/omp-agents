@@ -11,7 +11,11 @@ The core lists the modules in two registries and iterates them, so no hub file n
 
 | Module | Server definition | Page definition | Page components |
 | --- | --- | --- | --- |
+| Calendar | none | `CALENDAR_PAGE` in `web/components/calendar/module.ts` | `CalendarPage` and `CalendarNav` |
 | Sport | `SPORT_MODULE` in `src/sport-module.ts` | `SPORT_PAGE` in `web/components/sport/module.ts` | `SportPage` and `SportNav` |
+
+A module without a server definition keeps its server side in the core.
+Calendar's routes, its Google and local event stores, and its calendar choices stay in `Dashboard`, because the bell's event notices, routine event triggers, and settings sync share those same instances.
 
 The list is fixed when the code is built.
 There is no runtime plugin loading and no dynamic import.
@@ -50,6 +54,10 @@ The page keeps each stored module's state in `DashboardState.modules`, `null` un
 
 The page half is split in three files so that the pure registry never imports React components.
 `web/modules.ts` holds the contract and the list, the module's `module.ts` holds its definition, and `web/components/module-views.tsx` maps each id to its `Page` and `Nav` components.
+
+Every module's `Page` takes its `route` and `core`, a `CoreData` that `PageSwitch` builds from the core's own state.
+`CoreData` holds the routines, the Bots, the todo list, and whether tickets show, so a module reads core data without importing the core's stores.
+A stored module's `Page` also takes its `state`, `disabled`, and `onChange`.
 
 ## Adding a module
 

@@ -1,5 +1,5 @@
 /** `HeaderTabs`, the row across the top of the page and the details sidebar: Back and Forward, the tabs you browse in, a + that opens a new one, then the header's controls. */
-import { IconBubbleText, IconCrossMedium, IconDotGrid2x3, IconEditBig, IconHome, IconPlusLarge, IconSparklesTwo } from "central-icons";
+import { IconBubbleText, IconCalendarClock, IconCrossMedium, IconDotGrid2x3, IconEditBig, IconHome, IconPlusLarge, IconSparklesTwo } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { awaitsSubagents, type PastSession, type RosterHost } from "../../src/shared/sessions";
@@ -25,7 +25,7 @@ const PAGE_TAB_ICON: Record<Page["kind"], IconComponent> = {
 	...(Object.fromEntries(MODULE_LIST.map(({ id, tab }) => [id, tab.icon])) as Record<WebModuleId, IconComponent>),
 	"get-started": IconSparklesTwo,
 	new: IconEditBig,
-	scheduled: PAGE_ICON.calendar,
+	scheduled: IconCalendarClock,
 };
 
 const ICON = "size-3.5 shrink-0";

@@ -11,7 +11,6 @@ import type { TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import { TAB_ROWS } from "../sidebar-tabs";
 import { BotsNav } from "./bots/bots-nav";
-import { CalendarNav } from "./calendar/calendar-nav";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { EmailNav } from "./email/email-nav";
 import { ModuleNavView } from "./module-views";
@@ -62,8 +61,6 @@ export function PageList({ page, listed, hosts, past, todoSessions, botList, use
 			return <BotsNav rows={botList} openId={page.target === null ? (page.adding ? null : undefined) : page.target} />;
 		case "todo":
 			return <TodoCategories list={userTodos} view={todoView} disabled={!connected} onChange={changeTodo} sessions={todoSessions} />;
-		case "calendar":
-			return <CalendarNav />;
 		case "email":
 			return <EmailNav />;
 		case "settings":

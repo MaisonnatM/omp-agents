@@ -54,7 +54,6 @@ export type ShortcutId =
 	| "bots"
 	| "sessions"
 	| "todo"
-	| "calendar"
 	| "email"
 	| "workspace"
 	| "nextPullRequest"
@@ -75,7 +74,6 @@ export type ShortcutId =
 	| "todoDue"
 	| "todoNew"
 	| "todoClose"
-	| "calendarNewEvent"
 	| "emailNext"
 	| "emailPrevious"
 	| "emailClose"
@@ -127,7 +125,6 @@ const CORE_CATEGORIES = [
 	{ id: "pull-requests", label: "Pull requests" },
 	{ id: "todo", label: "Todo" },
 	{ id: "email", label: "Email" },
-	{ id: "calendar", label: "Calendar" },
 ] as const;
 
 export type ShortcutCategory = (typeof CORE_CATEGORIES)[number]["id"] | WebModuleId | "changes";
@@ -271,7 +268,6 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "bots", category: "general", label: "Go to your Bots", command: "Go to Bots", keys: [] },
 	{ id: "sessions", category: "general", label: "Go to the sessions", command: "Go to sessions", keys: [] },
 	{ id: "todo", category: "general", label: "Go to your todo list", command: "Go to todo list", keys: [] },
-	{ id: "calendar", category: "general", label: "Go to your calendar", command: "Go to calendar", keys: [] },
 	{ id: "email", category: "general", label: "Go to your email", command: "Go to email", keys: [{ goTo: "m" }] },
 	...MODULE_LIST.map(({ id, shortcuts: { goTo } }): Shortcut => ({ id, category: "general", ...goTo })),
 	{ id: "workspace", category: "general", label: "Choose the sidebar's workspace", keys: [{ goTo: "w" }] },
@@ -298,7 +294,6 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "todoDue", category: "todo", label: "Change the focused or open todo's due day", keys: [{ chord: { key: "d", shift: true }, scope: "outside-fields" }] },
 	{ id: "todoNew", category: "todo", label: "Add a todo to the Todo group", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "todoClose", category: "todo", label: "Close the open todo", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
-	{ id: "calendarNewEvent", category: "calendar", label: "Calendar: add an event", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "emailNext", category: "email", label: "Email: focus the next conversation, or open it while a conversation is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "emailPrevious", category: "email", label: "Email: focus the previous conversation, or open it while a conversation is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "emailClose", category: "email", label: "Email: close the open conversation", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },

@@ -13,7 +13,6 @@ import type { SectionTarget } from "../section";
 import type { StartOf } from "../starts";
 import { todoCwd } from "../todo-views";
 import type { WorkspaceScope } from "../use-workspace-scope";
-import { CalendarPage } from "./calendar/calendar-page";
 import { useDashboardActions } from "./dashboard-context";
 import { EmailPage } from "./email/email-page";
 import { EmptyHome } from "./empty-home";
@@ -69,7 +68,7 @@ interface PageSwitchProps extends PageState {
 	linear: McpIntegration | null;
 	/** The dashboard reads and writes Linear. */
 	linearCallable: boolean;
-	/** Linear answers and Tickets is signed in: the Calendar shows tickets' due days and a todo can become a ticket. */
+	/** Linear answers and Tickets is signed in: a module's page shows tickets and a todo can become a ticket. */
 	ticketsCallable: boolean;
 	maximized: boolean;
 	/** The right sidebar shows the focused session's details. */
@@ -121,7 +120,7 @@ export const PageSwitch = memo(function PageSwitch({
 	const { send, start, dismissStart, changeTodo } = useDashboardActions();
 	const scheduleSend = useScheduleSend();
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
-	if (page && isModulePage(page)) return <ModulePageView page={page} states={modules} disabled={!connected} />;
+	if (page && isModulePage(page)) return <ModulePageView page={page} states={modules} disabled={!connected} core={{ routines, bots, todos: userTodos, ticketsShown: ticketsCallable }} />;
 	switch (page?.kind) {
 		case "new": {
 			const seed = todoSeed(userTodos, page.todoId);
@@ -210,8 +209,6 @@ export const PageSwitch = memo(function PageSwitch({
 				/>
 			);
 		}
-		case "calendar":
-			return <CalendarPage routines={routines} bots={bots} todos={userTodos} ticketsShown={ticketsCallable} />;
 		case "email":
 			return <EmailPage target={page.target} />;
 		// Get started is a dialog over the home, which `GetStarted` in `web/app.tsx` draws.
