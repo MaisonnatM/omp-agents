@@ -50,7 +50,7 @@ It also tells the agent to check a video through YouTube's oEmbed address before
 
 `src/omp/extension-kit.ts` holds what the omp-agents extensions share: `ExtensionApi`, the slice of omp's extension API they use, whose hooks may answer with a promise, `ToolContext`, `PromptChange`, `flagValue`, `readText`, `reply`, `memoryLines`, and `rememberTool`, whose memory path may be worked out asynchronously from the call's directory.
 The Bot, designer, shepherd, and personal extensions import from it; `BOT_FLAGS` stays in `src/omp/bot-extension.ts`.
-Their tools reach their inboxes through `inbox` in `templates/omp/agent/extensions/inbox/client.ts`, the starter kit's `user_note`, `user_todo`, and `user_event` tools' too, so one copy names the inbox files.
+Their tools reach their inboxes through `inbox` in `templates/omp/agent/extensions/inbox/client.ts`, the starter kit's `user_todo` and `user_event` tools' too, so one copy names the inbox files.
 `inbox<T>(dir)` types the changes an inbox takes: its `leave` writes one as a JSON file through a temporary name and a rename, under a name that sorts after the one before it, and its `waiting` reads those the dashboard has not applied yet, oldest first, leaving out a file that is not a JSON object.
 
 ## The server

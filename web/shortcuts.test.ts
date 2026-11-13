@@ -88,7 +88,7 @@ test("a letter key that types no ASCII letter matches by its physical key, an AS
 	expect(pressOn(true, "˚", "KeyK", { meta: true })).toEqual(["switcher"]);
 	expect(press("?", "KeyM", { shift: true })).toEqual(["help"]);
 	expect(press("?", "Slash", { shift: true })).toEqual(["help"]);
-	expect(press("/", "Digit7", { shift: true })).toEqual(["focusComposer", "todoSearch", "notesSearch"]);
+	expect(press("/", "Digit7", { shift: true })).toEqual(["focusComposer", "todoSearch"]);
 	expect(pressOn(true, "÷", "Slash", { meta: true, alt: true })).toEqual(["model"]);
 });
 
@@ -109,7 +109,6 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 		{ id: "restore", scope: "anywhere", key: 0 },
 		{ id: "browserRestore", scope: "anywhere", key: 0 },
 		{ id: "todoClose", scope: "outside-fields", key: 0 },
-		{ id: "notesClose", scope: "outside-fields", key: 0 },
 		{ id: "emailClose", scope: "outside-fields", key: 0 },
 		{ id: "sportJournalClose", scope: "outside-fields", key: 0 },
 	]);
@@ -118,7 +117,6 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 	expect(shortcutsFor(keyEvent("/", "Slash"), null, false)).toEqual([
 		{ id: "focusComposer", scope: "outside-fields", key: 0 },
 		{ id: "todoSearch", scope: "outside-fields", key: 0 },
-		{ id: "notesSearch", scope: "outside-fields", key: 0 },
 	]);
 	expect(shortcutsFor(keyEvent("i", "KeyI", { ctrl: true }), null, false)).toEqual([{ id: "focusComposer", scope: "anywhere", key: 1 }]);
 	expect(press("i", "KeyI", { ctrl: true })).toEqual(["focusComposer"]);
@@ -128,9 +126,9 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 	]);
 });
 
-test("↓ and ↑ step through sessions, pull requests, todos, notes, conversations, sport logs, and changed files, and ↑ also takes back a queued message", () => {
-	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "notesNext", "emailNext", "sportJournalNext", "nextChangedFile"]);
-	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "notesPrevious", "emailPrevious", "sportJournalPrevious", "previousChangedFile"]);
+test("↓ and ↑ step through sessions, pull requests, todos, conversations, sport logs, and changed files, and ↑ also takes back a queued message", () => {
+	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "emailNext", "sportJournalNext", "nextChangedFile"]);
+	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "emailPrevious", "sportJournalPrevious", "previousChangedFile"]);
 });
 
 test("Cmd+Shift+P switches space, apart from Cmd+Alt+P's directory picker and P's todo priority", () => {
@@ -156,13 +154,12 @@ test("the Browser's preload hands over exactly the keys of the pick mode shortcu
 	expect(keys.toSorted()).toEqual([...PICK_MODE_KEYS].toSorted());
 });
 
-test("G then N, W, M, or comma goes to a page only right after a plain G, and P picks a todo's priority", () => {
+test("G then W, M, or comma goes to a page only right after a plain G, and P picks a todo's priority", () => {
 	const after = (previous: string | null, key: string, mods: Mods = {}) => pressOn(false, key, `Key${key.toUpperCase()}`, mods, previous);
 	// R alone switches the Browser's pick mode or replies on an open conversation, and a G before it changes nothing.
 	expect(after("g", "r")).toEqual(["browserPickRegion", "emailReply"]);
 	expect(after("g", "w")).toEqual(["workspace"]);
 	expect(after("g", "m")).toEqual(["email"]);
-	expect(after("g", "n")).toEqual(["notes"]);
 	expect(pressOn(false, ",", "Comma", {}, "g")).toEqual(["settings"]);
 	expect(pressOn(false, ",", "Comma")).toEqual([]);
 	expect(after(null, "n")).toEqual([]);

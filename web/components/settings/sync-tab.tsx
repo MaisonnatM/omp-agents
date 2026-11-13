@@ -256,7 +256,7 @@ export function SyncTab({ active }: { active: boolean }) {
 					{NEVER_SYNCED.map(rule => (
 						<li key={rule.what}>{rule.what}</li>
 					))}
-					<li>Links, binary files, files over 1 MB, and files or lists, such as your notes or todos, with text shaped like a token or a private key</li>
+					<li>Links, binary files, files over 1 MB, and files or lists, such as your todos, with text shaped like a token or a private key</li>
 					<li>Routines, scheduled sends, pinned sessions, notices, Google sign-ins, and calendar events kept on this computer, which belong to this machine and its sessions</li>
 				</ul>
 			</Section>

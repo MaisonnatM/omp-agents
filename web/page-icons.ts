@@ -1,4 +1,4 @@
-import { IconAiBotHead, IconBubbles, IconCalendarClock, IconDumbell, IconEmail1, IconKanbanView, IconNotebook, IconPullRequest, IconSettingsGear1, IconSuitcaseWork, IconTodos, IconUser } from "central-icons";
+import { IconAiBotHead, IconBubbles, IconCalendarClock, IconDumbell, IconEmail1, IconKanbanView, IconPullRequest, IconSettingsGear1, IconSuitcaseWork, IconTodos, IconUser } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import type { Space } from "../src/shared/workspaces";
 
@@ -9,7 +9,6 @@ export const PAGE_ICON = {
 	bots: IconAiBotHead,
 	sessions: IconBubbles,
 	todo: IconTodos,
-	notes: IconNotebook,
 	calendar: IconCalendarClock,
 	email: IconEmail1,
 	sport: IconDumbell,

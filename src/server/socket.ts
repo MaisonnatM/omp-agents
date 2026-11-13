@@ -172,7 +172,6 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 	goal: ({ sessions }, _peer, { instanceId, change }) => sessions.started(instanceId)?.changeGoal(change),
 	answer: ({ sessions }, _peer, { instanceId, requestId, answer }) => sessions.get(instanceId)?.answer(requestId, answer),
 	"user-todo": ({ lists }, peer, { change }) => void lists.apply("user-todos", change, peer),
-	"user-note": ({ lists }, peer, { change }) => void lists.apply("user-notes", change, peer),
 	"sport-changes": ({ lists }, peer, { changes }) => void lists.apply("sport", changes, peer),
 	routine: ({ lists, runRoutine }, peer, { change }) => (change.op === "run-now" ? runRoutine(change.id) : void lists.apply("routines", change, peer)),
 	bot: ({ lists, messageBot, restartBot }, peer, { change }) => {

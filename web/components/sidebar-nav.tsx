@@ -36,13 +36,13 @@ interface SidebarNavProps {
 export function SidebarNav({ tabs, current, counts, list, newSessionLabel, onNewSession, onTab, settingsRoute }: SidebarNavProps) {
 	const sub = list !== null && (
 		<SidebarMenuNested>
-			<ScrollArea className="ml-[15px] border-l border-border" viewportClassName="scroll-fade max-h-[45svh] pl-1 [&>div]:!block [&>div]:!min-w-0">
+			<ScrollArea className="ml-[15px] border-l border-border" viewportClassName="scroll-fade max-h-[30svh] pl-1 [&>div]:!block [&>div]:!min-w-0">
 				{list}
 			</ScrollArea>
 		</SidebarMenuNested>
 	);
 	return (
-		<SidebarGroup className="py-1">
+		<SidebarGroup className="shrink-0 py-1">
 			<nav aria-label="Pages">
 				<SidebarMenu className="gap-px">
 					<SidebarMenuItem>

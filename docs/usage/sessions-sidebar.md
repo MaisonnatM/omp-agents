@@ -2,7 +2,7 @@
 
 - The account row at the foot of the sidebar names the space the dashboard shows, **Personal** or **Work**, and how many workspaces it lists; its menu switches to the other space and opens **Keyboard shortcuts**.
   Personal holds the personal directory and the workspaces Settings › Workspaces placed in Personal; every other workspace is in Work, a workspace the page cannot place yet included.
-  The sidebar's sessions, its counts, the session search, the scheduled sends, the Todo page, the pull requests, the Bots, the Notes, the Calendar's events on this computer, the Google accounts that Email and Calendar show, the command menu's sessions, workspaces, and notes, Settings' workspace pickers, and New session's directory picker then hold only the space's.
+  The sidebar's sessions, its counts, the session search, the scheduled sends, the Todo page, the pull requests, the Bots, the Calendar's events on this computer, the Google accounts that Email and Calendar show, the command menu's sessions and workspaces, Settings' workspace pickers, and New session's directory picker then hold only the space's.
   Switching keeps the page you are on; on the panes it opens the space's most recently started running session, or the empty home when none runs there.
   A page of the space you leave, Sport leaving Personal or Tickets leaving Work, gives way to the panes.
   Cmd+Shift+P (Ctrl+Shift+P elsewhere) switches too.
@@ -13,7 +13,7 @@
   Their notifications still show while you work in the other space, and clicking one switches to its space; the Dock badge counts both spaces.
 - The sidebar runs the window's height on the window's background, and the page and the session details sidebar sit beside it as rounded panels.
   Its top row, 48 px tall at the default font size as the header's tabs beside it are, holds the omp mark, the command menu button, and the button that hides the sidebar.
-- Under it the page list shows **New session**, then **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Notes**, **Calendar**, **Todo**, **Sport**, and **Email** in the order Settings › Preferences gives them, then **Settings**; **Tickets** shows only in Work and **Sport** only in Personal.
+- Under it the page list shows **New session**, then **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Calendar**, **Todo**, **Sport**, and **Email** in the order Settings › Preferences gives them, then **Settings**; **Tickets** shows only in Work and **Sport** only in Personal.
   A row opens its page, and the open page's row stays highlighted with that page's own list nested under it, such as the Todo categories or the Settings sections.
   A page whose row you hid in Preferences shows its list after the last row.
   **Bots** lists your Bots and opens their conversations, which stay out of the roster.

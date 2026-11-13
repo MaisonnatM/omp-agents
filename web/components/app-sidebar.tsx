@@ -2,7 +2,6 @@ import { IconMagnifyingGlass } from "central-icons";
 import { memo, type ReactNode, useContext, useMemo } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { BotId, BotLast } from "../../src/shared/bots";
-import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import { agentOn } from "../../src/shared/moves";
 import { Button } from "@/components/ui/button";
@@ -13,7 +12,7 @@ import { botRows, botsNeedingYou } from "../bots-model";
 import { SPACE_LABELS, sessionsWaiting, workspaceName } from "../labels";
 import { yourMoveCount } from "../pull-requests-model";
 import { pullRequestsStore } from "../reads";
-import type { NotesListView, PullRequestsRoute, Page, SettingsRoute, SidebarTab, TodoListView } from "../routing";
+import type { PullRequestsRoute, Page, SettingsRoute, SidebarTab, TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import { shortcutLabels } from "../shortcuts";
 import type { NavRow } from "../sidebar-tabs";
@@ -24,7 +23,6 @@ import { BotsNav } from "./bots/bots-nav";
 import { CalendarNav } from "./calendar/calendar-nav";
 import { PersonalContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { EmailNav } from "./email/email-nav";
-import { NotesNav } from "./notes/nav";
 import { pullRequestsPageShows, usePullRequestDetailsPlacement, usePullRequestsView } from "./pull-requests/pull-requests-board";
 import { PullRequestsBoardIndex, PullRequestsIndex, PullRequestsNav } from "./pull-requests/pull-requests-nav";
 import { Roster } from "./roster";
@@ -51,8 +49,6 @@ interface AppSidebarProps {
 	/** The server has sent the session lists. */
 	listed: boolean;
 	userTodos: UserTodoList | null;
-	userNotes: UserNoteList | null;
-	notesView: NotesListView;
 	/** Every session, including those in directories the sidebar hides, so a todo's linked session resolves. */
 	hosts: RosterHost[];
 	past: PastSession[];
@@ -83,8 +79,6 @@ export const AppSidebar = memo(function AppSidebar({
 	tabs,
 	listed,
 	userTodos,
-	userNotes,
-	notesView,
 	hosts,
 	past,
 	botLasts,
@@ -135,8 +129,6 @@ export const AppSidebar = memo(function AppSidebar({
 				return <BotsNav rows={botList} openId={page?.kind !== "bots" ? undefined : page.target === null ? (page.adding ? null : undefined) : page.target} />;
 			case "todo":
 				return <TodoCategories list={userTodos} view={todoView} disabled={!connected} onChange={changeTodo} sessions={todoSessions} />;
-			case "notes":
-				return <NotesNav list={userNotes} view={notesView} space={space} />;
 			case "calendar":
 				return <CalendarNav open={page?.kind === "calendar"} space={space} />;
 			case "email":
@@ -150,7 +142,7 @@ export const AppSidebar = memo(function AppSidebar({
 				return never;
 			}
 		}
-	}, [row, listed, page, pullRequestsView, detailsPlacement, visible, sectionTarget, onSectionTarget, botList, userTodos, todoView, connected, changeTodo, todoSessions, userNotes, notesView, space, settings]);
+	}, [row, listed, page, pullRequestsView, detailsPlacement, visible, sectionTarget, onSectionTarget, botList, userTodos, todoView, connected, changeTodo, todoSessions, space, settings]);
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
 	const newSessionLabel = selectedWorkspace
 		? `New session in ${workspaceName(selectedWorkspace.cwdDisplay, personal) ?? selectedWorkspace.cwdDisplay}`
@@ -170,17 +162,17 @@ export const AppSidebar = memo(function AppSidebar({
 				<span aria-hidden className="size-7 shrink-0" />
 			</div>
 			{!connected && <p className="mx-3 mb-1 rounded-md bg-red-500/10 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">Lost the dashboard server. Retrying…</p>}
+			<SidebarNav
+				tabs={tabs}
+				current={row}
+				counts={counts}
+				list={list}
+				newSessionLabel={newSessionLabel}
+				onNewSession={() => openNewSession()}
+				onTab={onTab}
+				settingsRoute={settings}
+			/>
 			<SidebarContent>
-				<SidebarNav
-					tabs={tabs}
-					current={row}
-					counts={counts}
-					list={list}
-					newSessionLabel={newSessionLabel}
-					onNewSession={() => openNewSession()}
-					onTab={onTab}
-					settingsRoute={settings}
-				/>
 				<Roster
 					workspaces={workspaces}
 					lists={lists}

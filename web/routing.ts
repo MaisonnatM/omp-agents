@@ -22,14 +22,13 @@ export const SIDEBAR_TABS = [
 	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, integration: "linear", space: "work" },
 	{ value: "bots", label: "Bots", icon: PAGE_ICON.bots },
 	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions },
-	{ value: "notes", label: "Notes", icon: PAGE_ICON.notes },
 	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar },
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo },
 	{ value: "sport", label: "Sport", icon: PAGE_ICON.sport, space: "personal" },
 	{ value: "email", label: "Email", icon: PAGE_ICON.email, integration: "gmail" },
 ] as const satisfies readonly { value: string; label: string; icon: IconComponent; integration?: McpIntegrationId; space?: Space }[];
 
-/** A sidebar tab, a row of the sidebar's page list; the tickets, Bots, todo, notes, calendar, email, and sport tabs go with their pages, the sessions and pull requests tabs with the panes. */
+/** A sidebar tab, a row of the sidebar's page list; the tickets, Bots, todo, calendar, email, and sport tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 const PAST_PREFIX = "past/";
@@ -122,15 +121,6 @@ export interface TodoRoute {
 	open: string | null;
 }
 
-/** Which notes the Notes page lists: every one, or those agents added. */
-export type NotesListView = { kind: "all" } | { kind: "agents" };
-
-/** The Notes page, listing `list`, with note `open` beside it when it is non-null and in the list. */
-export interface NotesRoute {
-	list: NotesListView;
-	open: string | null;
-}
-
 /**
  * A Bot's page, its conversation beside the right sidebar's details: its look, name, job, memory, and routines; `null` for the gallery of
  * every Bot, or the New Bot form while `adding`. `routine` names what shows in place of the conversation, `null` for none.
@@ -185,7 +175,6 @@ export type Page =
 	| ({ kind: "pull-requests" } & PullRequestsRoute)
 	| ({ kind: "tickets" } & TicketsRoute)
 	| ({ kind: "todo" } & TodoRoute)
-	| ({ kind: "notes" } & NotesRoute)
 	| ({ kind: "bots" } & BotsRoute)
 	| { kind: "calendar" }
 	| ({ kind: "email" } & EmailRoute)
@@ -234,7 +223,6 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   opens that issue's details in the main content. Any other `#tickets/…` opens the list alone.
  * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/archive` with the todos due by
  *   today, waiting on you, added by agents, or in the archive; `#todo/<category id>` shows that category alone, and `?open=<id>` opens that todo.
- * - `#notes` opens the Notes page with every note, `#notes/agents` with the notes agents added, and `?open=<id>` opens that note.
  * - `#bots` opens the gallery of every Bot, `#bots/new` the New Bot form, `#bots/<id>` that Bot's page, `#bots/<id>/routines` the card of that
  *   Bot's routines in place of its conversation, `#bots/<id>/routines/<routine id>` that card with that routine open,
  *   `#bots/<id>/routines/<routine id>/edit` that routine's editor, and `#bots/<id>/routines/new` a new routine's editor; Bot and routine ids
@@ -264,7 +252,6 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		const id = named ? null : decodeSegment(rest);
 		return { kind: "todo", list: named ?? (id === null ? { kind: "all" } : { kind: "category", id }), open };
 	},
-	notes: (rest, query) => ({ kind: "notes", list: rest === "agents" ? { kind: "agents" } : { kind: "all" }, open: query.get("open") || null }),
 	bots: rest => {
 		if (rest === "new") return { kind: "bots", target: null, adding: true };
 		const [target, routines, routine, ...more] = (rest ?? "").split("/").map(decodeSegment);
@@ -304,8 +291,6 @@ function restOfPage(page: Page): string | null {
 			return page.target || null;
 		case "todo":
 			return page.list.kind === "all" ? null : page.list.kind === "category" ? encodeURIComponent(page.list.id) : page.list.kind;
-		case "notes":
-			return page.list.kind === "all" ? null : page.list.kind;
 		case "bots":
 			if (page.target === null) return page.adding ? "new" : null;
 			return page.routine === null ? encodeURIComponent(page.target) : `${encodeURIComponent(page.target)}/${restOfBotRoutine(page.routine)}`;
@@ -325,13 +310,12 @@ function restOfPage(page: Page): string | null {
 	}
 }
 
-/** The `?name=value` that follows `page`'s path: the todo a new session works on, or the todo or note its page opens; `null` for none. */
+/** The `?name=value` that follows `page`'s path: the todo a new session works on, or the todo its page opens; `null` for none. */
 function queryOfPage(page: Page): string | null {
 	switch (page.kind) {
 		case "new":
 			return page.todoId === null ? null : `todo=${encodeURIComponent(page.todoId)}`;
 		case "todo":
-		case "notes":
 			return page.open === null ? null : `open=${encodeURIComponent(page.open)}`;
 		case "sport":
 			if (page.tab === "week") return page.day === null ? null : `day=${page.day}`;
@@ -372,7 +356,6 @@ export function hashForTodoId({ todos, archive }: UserTodoList, id: string): str
 	if (open) return hashForOpenTodo(id, open.categoryId);
 	return archive.some(holds) ? hashForTodo({ kind: "archive" }, id) : null;
 }
-export const hashForNotes = (list: NotesListView, open: string | null = null): string => hashForPage({ kind: "notes", list, open });
 export const hashForBots = (target: string | null): string => hashForPage(target === null ? { kind: "bots", target, adding: false } : { kind: "bots", target, routine: null });
 export const hashForNewBot = (): string => hashForPage({ kind: "bots", target: null, adding: true });
 export const hashForBotRoutine = (botId: string, routine: BotRoutineRoute): string => hashForPage({ kind: "bots", target: botId, routine });
@@ -440,7 +423,7 @@ function paneForView(view: View): string {
 	return view.agentId === null ? session : `${session}/${encodeURIComponent(view.agentId)}`;
 }
 
-/** Instance ids are hex, so none reads as `past`, `settings`, `pull-requests`, `tickets`, `todo`, `notes`, `bots`, `session`, or `new`. `null` for a pane whose ids do not decode. */
+/** Instance ids are hex, so none reads as `past`, `settings`, `pull-requests`, `tickets`, `todo`, `bots`, `session`, or `new`. `null` for a pane whose ids do not decode. */
 function viewFromPane(pane: string): View | null {
 	if (pane.startsWith(PAST_PREFIX)) {
 		const sessionId = decodeSegment(pane.slice(PAST_PREFIX.length));
