@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { PlanUsage, PlanWindow } from "../../src/shared/models";
-import { accountTags, creditView, PlanCard, planGauge, spendLabel } from "./plan-usage";
+import { accountTags, creditView, PlanCard, planGauge, PlanUsageList, spendLabel } from "./plan-usage";
 
 const apiCredits: PlanUsage = { provider: "anthropic-api", name: "API credits", account: null, windows: [], extra: null, resetCredits: null };
 const tile = (plan: PlanUsage) => planGauge(plan, undefined);
@@ -60,6 +60,13 @@ test("a provider with several accounts names each by its full email; a lone acco
 	const openai = { ...claude, provider: "openai-codex", account: "maxence@yampa.ai" };
 	const tags = accountTags([yampa, gmail, openai]);
 	expect([tags.get(yampa), tags.get(gmail), tags.get(openai)]).toEqual(["maxence@yampa.ai", "max@gmail.com", undefined]);
+});
+
+test("the machine's tiles still show when plan usage cannot be read, under the reason", () => {
+	const markup = renderToStaticMarkup(<PlanUsageList usage={{ plans: [], error: "omp not found" }} after={<span>CPU tile</span>} />).replaceAll("<!-- -->", "");
+	expect(markup).toContain("Cannot read plan usage: omp not found");
+	expect(markup).toContain("CPU tile");
+	expect(markup).not.toContain("API credits");
 });
 
 test("the card gives every window its share left and when it resets, with the date", () => {
