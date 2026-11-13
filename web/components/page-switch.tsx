@@ -32,7 +32,7 @@ import { TICKETS_META, TICKETS_TITLE, TicketsPage } from "./tickets/tickets-page
 import { TodoPage } from "./todo/page";
 
 /** The directory a New session draft on `page` starts in: the route's, else its todo's Workspace, else `defaultWorkspace`. */
-export function newDraftCwd(page: Extract<Page, { kind: "new" }>, list: UserTodoList | null, defaultWorkspace: string): string {
+function newDraftCwd(page: Extract<Page, { kind: "new" }>, list: UserTodoList | null, defaultWorkspace: string): string {
 	// A directory the route names wins over the todo's Workspace, so picking another one in the draft sticks.
 	if (page.cwd !== null) return page.cwd;
 	const seed = todoSeed(list, page.todoId);

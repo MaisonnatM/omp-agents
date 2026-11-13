@@ -1,7 +1,7 @@
 import { type Dispatch, type SetStateAction, useMemo, useRef } from "react";
 import type { View } from "../src/shared/sessions";
 import type { PaletteEvent, PaletteState } from "./command-palette";
-import { adjacentSession, closePane, type Layout, type Page, type SettingsRoute, type SidebarPanel, type SidebarTab } from "./routing";
+import { adjacentSession, closePane, type Layout, type Page, type SettingsRoute, type SidebarTab } from "./routing";
 import { type ShortcutHandler, type ShortcutHandlers, type ShortcutId, useShortcuts } from "./shortcuts";
 import { positionHandlers } from "./sidebar-tabs";
 import { useHistoryPosition } from "./use-history-position";
@@ -12,7 +12,6 @@ export interface PageShortcutInput {
 	layout: Layout;
 	/** A pane fills the grid. */
 	maximized: boolean;
-	tab: SidebarPanel;
 	settings: SettingsRoute;
 	/** The views of the Sessions tab, in order, and the focused one: what the session shortcuts step through. */
 	listed: View[];
@@ -78,8 +77,7 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			tickets: goToTab("tickets"),
 			bots: goToTab("bots"),
 			sessions: () => {
-				const { tab, page } = latest.current;
-				if (tab === "sessions" && !page) return;
+				if (!latest.current.page) return;
 				latest.current.showTab("sessions");
 			},
 			todo: goToTab("todo"),

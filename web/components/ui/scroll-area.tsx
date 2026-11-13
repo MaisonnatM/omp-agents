@@ -194,6 +194,8 @@ const ScrollBar = forwardRef<
     >
       <ScrollAreaPrimitive.ScrollAreaThumb
         data-slot="scroll-area-thumb"
+        // Radix sizes both axes inline, but sets only the scrolling axis's variable, so the cross axis would resolve to 0px over the class.
+        style={orientation === "vertical" ? { width: undefined } : { height: undefined }}
         className={cn(
           // Fixed surface-relative overlay ramp (8 → 12 → 16%) — same tint
           // direction as the menu hover/active tokens, one notch stronger.

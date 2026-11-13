@@ -15,7 +15,8 @@ import { hostLabel, LINK_VERB, modeOf, pastLabel, SPLIT_CLICK } from "../../labe
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
 import { QUICK_ACTIONS, type QuickActionId } from "../../quick-actions";
 import { type Action, useAction } from "../../use-action";
-import { DROP_LINE, type DragItem } from "../../use-drag-order";
+import { DROP_LINE } from "../../order";
+import type { DragItem } from "../../use-drag-order";
 import { Age } from "../age";
 import { BranchLabel } from "../git";
 import { SessionChip } from "../session-chip";

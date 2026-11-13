@@ -1,44 +1,36 @@
-/** The left sidebar's tabbed roster: sessions, pull requests, tickets, todos, notes, and more, under the workspace picker. */
-import { ArrowLeftRight, Folder, Keyboard } from "lucide-react";
+/** The left sidebar's roster: the Workspaces section, whose label picks the workspace, and its search, then the scheduled sends, the pinned sessions, each workspace's sessions, and the past ones. */
+import { ArrowLeftRight, Folder, FolderOpen, ListRestart, Loader, MoreHorizontal, Pin, Plus, Search } from "lucide-react";
 import { type ReactNode, useContext, useState } from "react";
 import type { ScheduledSend } from "../../src/shared/scheduled";
-import type { RosterHost, View } from "../../src/shared/sessions";
+import type { PastSession, View } from "../../src/shared/sessions";
 import { otherSpace, type Space, type Workspace } from "../../src/shared/workspaces";
-import type { UserNoteList } from "../../src/user-notes-shared";
-import type { UserTodoList } from "../../src/user-todos-shared";
-import { Button } from "@/components/ui/button";
-import { SidebarContent, SidebarGroup, SidebarHeader, SidebarMenu } from "@/components/ui/sidebar";
-import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
+import { SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
-import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
-import { agentOn } from "../../src/shared/moves";
 import { errorText } from "../../src/json";
-import { activityControl } from "../activity";
-import { yourMoveCount } from "../pull-requests-model";
+import { needsYou } from "../attention";
 import { ALL_OF_SPACE, SPACE_LABELS, sessionsWaiting, workspaceName } from "../labels";
-import { pullRequestsStore, ticketsStore, writeWorkspace } from "../reads";
-import { hashForTickets, type NotesListView, type SettingsRoute, type SidebarPanel, type SidebarTab, type SportRoute, type TodoListView } from "../routing";
-import type { SectionTarget } from "../section";
-import type { SidebarSessions } from "../sessions";
+import { writeWorkspace } from "../reads";
+import { type RosterFolder, rosterFolders, rowPlacement, type SidebarSessions, type WorkspaceGroup } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
-import { TAB_ROWS, tabShortcutLabels } from "../sidebar-tabs";
-import { ticketGroups, ticketSection } from "../tickets-model";
+import { useStoredKeys, useStoredState } from "../stored-state";
 import { CommandPicker } from "./command-picker";
-import { SectionLink } from "./section-link";
-import { BotsNav } from "./bots/bots-nav";
-import { type BotRow, botsNeedingYou } from "../bots-model";
+import { CountPill } from "./count-pill";
 import { PersonalContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
-import { CalendarNav } from "./calendar/calendar-nav";
-import { EmailNav } from "./email/email-nav";
-import { NotesNav } from "./notes/nav";
-import { SessionList } from "./session-list";
-import { SportNav } from "./sport/nav";
-import { SettingsNav } from "./settings/settings-nav";
+import { ScheduledGroup } from "./scheduled";
+import { HostRow, PastRow } from "./session-row";
+import { SidebarOpen } from "./sidebar-panel";
+import { SidebarSearch } from "./sidebar-search";
 import { offerUndo, toasts } from "./toaster";
 import { workspaceItems } from "./workspace-picker";
-import { TodoCategories } from "./todo/categories";
-import type { KnownSessions } from "./todo/links";
+
+const COLLAPSED_GROUPS_KEY = "omp-agents.sidebar-collapsed-groups";
+/** Past stays folded under the workspaces until you unfold it, which this browser keeps. */
+const PAST_OPEN_KEY = "omp-agents.sidebar-past-open";
+/** Past sessions the list shows at first, and how many more each "Show more" adds; the rest stay out of the page until asked for. */
+const PAST_PAGE = 100;
+/** Workspaces the roster shows before "N more", unless more of them hold sessions. */
+const GROUPS_SHOWN = 8;
 
 interface SidebarWorkspacePickerProps {
 	/** The space's workspaces, as {@link workspacesIn} lists them. */
@@ -60,7 +52,7 @@ async function moveWorkspace(name: string, cwd: string, from: Space, to: Space):
 	offerUndo("workspace-move", `Moved ${name} to ${SPACE_LABELS[to]}`, () => void moveWorkspace(name, cwd, to, from));
 }
 
-/** Scopes the roster to one directory's running and past sessions, or to all of the space's, and moves the selected workspace to the other space. */
+/** The Workspaces section's label: scopes the roster to one directory's running and past sessions, or to all of the space's, and moves the selected workspace to the other space. */
 function SidebarWorkspacePicker({ workspaces, onPick }: SidebarWorkspacePickerProps) {
 	const [open, setOpen] = useState(false);
 	const personal = useContext(PersonalContext);
@@ -82,13 +74,12 @@ function SidebarWorkspacePicker({ workspaces, onPick }: SidebarWorkspacePickerPr
 	};
 	return (
 		<CommandPicker
-			trigger={label}
-			icon={Folder}
+			trigger={selected ? label : "Workspaces"}
 			control="sidebar.workspace"
 			tooltip={selected?.cwdDisplay ?? allLabel}
 			shortcut="workspace"
 			ariaLabel={`Show sessions from: ${label}`}
-			className="min-w-0 font-semibold"
+			className="h-6 min-w-0 gap-1 px-2 text-xs font-normal text-muted-foreground"
 			search={{ label: "Search workspaces" }}
 			width="md"
 			open={open}
@@ -110,252 +101,217 @@ function SidebarWorkspacePicker({ workspaces, onPick }: SidebarWorkspacePickerPr
 	);
 }
 
-const navNote = (text: string) => <p className="px-2 py-1 text-xs text-muted-foreground">{text}</p>;
-
-interface TicketsNavProps {
-	target: SectionTarget | null;
-	onTarget: (target: SectionTarget) => void;
+interface WorkspaceFolderProps {
+	folder: RosterFolder;
+	/** The workspace's name, yours if you gave it one, else its path. */
+	name: string;
+	/** The folder shows its rows; you fold it with its label. */
+	open: boolean;
+	onOpenChange: () => void;
+	onNewSession: () => void;
+	/** The folder's session rows, in order. */
+	children: ReactNode;
 }
 
-/** The tickets page's status groups with their issue counts, each a link to its group on the page. */
-function TicketsNav({ target, onTarget }: TicketsNavProps) {
-	const { read, error } = ticketsStore.use();
-	if (!read) return <SidebarGroup>{navNote(error ? `Cannot load the tickets: ${error}` : "Asking Linear for your issues…")}</SidebarGroup>;
-	const groups = ticketGroups(read.data.tickets);
-	if (groups.length === 0) return <SidebarGroup>{navNote("No issues assigned to you.")}</SidebarGroup>;
+/** A workspace in the roster: a folder of its session rows, or with none its name alone; hovering it offers a new session there. */
+function WorkspaceFolder({ folder: { group, rows }, name, open, onOpenChange, onNewSession, children }: WorkspaceFolderProps) {
+	const waiting = group.hosts.filter(needsYou).length;
+	const newHere = (
+		<SidebarGroupActions className={cn("opacity-0 transition-opacity group-hover/workspace:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100", rows === 0 ? "top-0" : "top-0.5")}>
+			<Tooltip content={`New session in ${name}`} side="right">
+				<SidebarGroupAction aria-label={`New session in ${name}`} onClick={onNewSession}>
+					<Plus />
+				</SidebarGroupAction>
+			</Tooltip>
+		</SidebarGroupActions>
+	);
 	return (
-		<SidebarGroup>
-			<SidebarMenu aria-label="Ticket groups">
-				{groups.map(({ status, count: length }) => (
-					<SectionLink
-						key={status}
-						href={hashForTickets(null)}
-						section={ticketSection(status)}
-						chosen={target}
-						title={status}
-						label={`${status}, ${length} issue${length === 1 ? "" : "s"}`}
-						count={length}
-						onChoose={section => {
-							location.hash = hashForTickets(null);
-							onTarget(section);
-						}}
-					/>
-				))}
-			</SidebarMenu>
+		<SidebarGroup className="group/workspace py-0" collapsible={rows > 0} open={open} onOpenChange={onOpenChange} headerActions={rows > 0 && newHere}>
+			<SidebarGroupLabel icon={rows > 0 && open ? FolderOpen : Folder} title={group.workspace.cwdDisplay} className="h-7 text-[13px] text-foreground/85 hover:text-foreground">
+				{name}
+				{waiting > 0 && (
+					<>
+						<CountPill count={waiting} />
+						<span className="sr-only">{`, ${sessionsWaiting(waiting)}`}</span>
+					</>
+				)}
+			</SidebarGroupLabel>
+			{rows > 0 ? (
+				<SidebarMenu aria-label={`omp sessions in ${name}`} className="ml-[15px] w-auto gap-px border-l border-border pl-1">
+					{children}
+				</SidebarMenu>
+			) : (
+				newHere
+			)}
 		</SidebarGroup>
 	);
 }
 
-/**
- * How the sidebar tabs fit its width, through container queries: labels while they fit, then icons alone, the row only as
- * wide as its tabs. Icons alone keep each name in the tooltip and for screen readers. The width fits the bar's tabs, with
- * room for counts on Pull requests and Sessions and the list's margins.
- */
-const SIDEBAR_TAB_FIT = {
-	tab: "@min-[26rem]/sidebar:[&>svg]:hidden",
-	label: "@max-[26rem]/sidebar:sr-only",
-};
-
 interface RosterProps {
-	/** The space's workspaces, as {@link workspacesIn} lists them. */
+	/** The space's workspaces, as {@link workspacesIn} lists them, which the picker offers. */
 	workspaces: Workspace[];
-	/** The sessions tab's lists, under the selected workspace and matching `query`. */
+	/** The sessions under the selected workspace that match `query`. */
 	lists: SidebarSessions;
-	/** Live sessions in the selected workspace that wait on your move, whatever the search field hides. */
-	waiting: number;
-	/** What the sessions tab's search field holds; it narrows `lists`. */
+	/** The live and interrupted sessions of `lists` by workspace. */
+	groups: WorkspaceGroup[];
+	/** What the search field holds; it narrows `lists`. */
 	query: string;
 	onQuery: (query: string) => void;
-	/** Pin session `sessionId`, or unpin it when it is pinned. */
+	/** Pin session `sessionId`, or unpin it when it is pinned; the same function on every render. */
 	onTogglePin: (sessionId: string) => void;
-	/** Views on screen, highlighted in the list. */
+	/** Views on screen; their sessions' rows are highlighted, and marked while they share the screen with another pane. */
 	open: View[];
-	/** The open New session draft's directory; `null` while none is open. */
-	newSessionOpen: string | null;
 	/** The space's scheduled sends. */
 	scheduled: readonly ScheduledSend[];
-	/** The scheduled send whose page is open, `null` for none. */
+	/** The scheduled send whose page is open, highlighted in its group; `null` for none. */
 	scheduledOpen: string | null;
-	/** The space's Bots' rows, the most recent conversation first; `null` until the server sends the Bots. */
-	bots: readonly BotRow[] | null;
-	/** The Bot whose page is open, `null` for the New Bot form, `undefined` while the gallery, another page, or the panes show. */
-	botsOpen: string | null | undefined;
-	/** The shown tabs the bar draws, in order, which the position keys count. */
-	tabs: readonly SidebarTab[];
-	/** The sidebar's panel, selected by the page or kept over the panes. */
-	tab: SidebarPanel;
-	onTab: (tab: SidebarTab) => void;
-	/** The Todo page's list, `null` until the server sends it. */
-	userTodos: UserTodoList | null;
-	/** The list the Todo page shows. */
-	todoView: TodoListView;
-	/** Unfiltered sessions, so the workspace picker does not hide a todo's linked session. */
-	todoSessions: KnownSessions;
-	/** The Notes page's list, `null` until the server sends it. */
-	userNotes: UserNoteList | null;
-	/** The list the Notes page shows. */
-	notesView: NotesListView;
-	/** The Calendar page is open. */
-	calendarOpen: boolean;
-	/** The Sport page's tab while it is open, `null` on any other page. */
-	sportOpen: SportRoute | null;
-	/** The settings section and workspace the sidebar's settings links keep. */
-	settingsRoute: SettingsRoute;
-	/** The tickets section a sidebar link last chose. */
-	sectionTarget: SectionTarget | null;
-	onSectionTarget: (target: SectionTarget) => void;
-	/** The Pull requests tab's content. */
-	pullRequestsTab: ReactNode;
-	/** The live sessions, which take a pull request's move while they work on it or ask about it. */
-	hosts: RosterHost[];
 	onPickWorkspace: (cwd: string | null) => void;
-	onShowShortcuts: () => void;
 }
 
-export function Roster({
-	workspaces,
-	lists,
-	waiting,
-	query,
-	onQuery,
-	onTogglePin,
-	open,
-	newSessionOpen,
-	scheduled,
-	scheduledOpen,
-	bots,
-	botsOpen,
-	tabs,
-	tab,
-	onTab,
-	userTodos,
-	todoView,
-	todoSessions,
-	userNotes,
-	notesView,
-	calendarOpen,
-	sportOpen,
-	settingsRoute,
-	sectionTarget,
-	onSectionTarget,
-	pullRequestsTab,
-	hosts,
-	onPickWorkspace,
-	onShowShortcuts,
-}: RosterProps) {
-	const { changeTodo: onTodoChange } = useDashboardActions();
-	const { connected, pullRequestsScope, scope: { workspace, space } } = useDashboardStatus();
+/**
+ * The roster: each workspace holds its live and interrupted sessions, the busy ones first, and Past lists the ended ones.
+ * An ended session on screen that Past does not show, folded or beyond its page, shows under its workspace instead.
+ */
+export function Roster({ workspaces, lists, groups, query, onQuery, onTogglePin, open, scheduled, scheduledOpen, onPickWorkspace }: RosterProps) {
+	const { start, dismissStart, openNewSession } = useDashboardActions();
+	const { connected, starts: { resumeAll }, scope: { workspace } } = useDashboardStatus();
 	const personal = useContext(PersonalContext);
-	const pullRequestRead = pullRequestsStore.use(pullRequestsScope).read;
-	/** The count after a tab's label, and how its accessible name says it. */
-	const tabCounts: Partial<Record<SidebarTab, { count: number; says: (count: number) => string }>> = {
-		sessions: { count: waiting, says: sessionsWaiting },
-		bots: { count: bots ? botsNeedingYou(bots) : 0, says: sessionsWaiting },
-		"pull-requests": { count: pullRequestRead ? yourMoveCount(pullRequestRead.data, agentOn(hosts)) : 0, says: count => `${count} your move` },
-	};
-	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
-	const newSessionLabel = selectedWorkspace
-		? `New session in ${workspaceName(selectedWorkspace.cwdDisplay, personal) ?? selectedWorkspace.cwdDisplay}`
-		: space === "personal" ? `New session in ${SPACE_LABELS.personal}` : "New session";
+	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
+	const [pastOpen, setPastOpen] = useStoredState(PAST_OPEN_KEY, raw => raw === "true");
+	const [pastShown, setPastShown] = useState(PAST_PAGE);
+	const [allGroups, setAllGroups] = useState(false);
+	// The search field shows while you search: opened by its button or shortcut, it stays while it holds a query.
+	// A hidden sidebar leaves the key its usual meaning.
+	const sidebarOpen = useContext(SidebarOpen);
+	const [searching, setSearching] = useState(false);
+	const searchShown = searching || query !== "";
+	useShortcuts(
+		searchShown
+			? {}
+			: {
+					sessionSearch: () => {
+						if (!sidebarOpen) return false;
+						setSearching(true);
+						return true;
+					},
+				},
+	);
+	const { pinned, interrupted, ended } = lists;
+	const resumingAll = resumeAll?.phase === "starting";
+	/** The search field narrows the lists, so a workspace left empty hides rather than showing no sessions. */
+	const filtering = query.trim() !== "";
+	const showWorkspace = workspace === null;
+	const folders = rosterFolders(groups, ended, open, { pastListed: pastOpen ? pastShown : 0, limit: GROUPS_SHOWN, all: allGroups, filtering });
+	const hostRow = (host: SidebarSessions["running"][number], isPinned: boolean, badged: boolean) => (
+		<HostRow key={host.instanceId} session={host} pinned={isPinned} placement={rowPlacement(open, { kind: "live", instanceId: host.instanceId, agentId: null })} showWorkspace={badged} onTogglePin={onTogglePin} />
+	);
+	const pastRow = (session: PastSession, isPinned: boolean, badged: boolean) => (
+		<PastRow key={session.sessionId} session={session} pinned={isPinned} placement={rowPlacement(open, { kind: "past", sessionId: session.sessionId })} showWorkspace={badged} onTogglePin={onTogglePin} />
+	);
+	const hiddenPast = ended.length - pastShown;
+	const nothing = pinned.hosts.length + pinned.past.length === 0 && folders.shown.every(folder => folder.rows === 0) && ended.length === 0;
 	return (
-		<Tabs value={tab} onValueChange={value => onTab(value as SidebarTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
-			<SidebarHeader className="h-(--page-header-height) flex-row items-center justify-between gap-2 border-b border-border px-2 py-0">
-				<h1 className="sr-only">omp sessions</h1>
-				<SidebarWorkspacePicker workspaces={workspaces} onPick={onPickWorkspace} />
-				<Tooltip content="Keyboard shortcuts" shortcut={shortcutLabels("help")} side="bottom">
-					<Button {...activityControl("shortcuts.open")} variant="ghost" size="icon-compact" className="ml-auto shrink-0 text-muted-foreground" aria-label="Keyboard shortcuts" onClick={onShowShortcuts}>
-						<Keyboard />
-					</Button>
-				</Tooltip>
-				{/* The sidebar's toggle rides over this corner, from `DashboardSidebar`, so it can glide to the strip a hidden sidebar leaves. */}
-				<span aria-hidden className="size-7 shrink-0" />
-			</SidebarHeader>
-			{tabs.length > 0 && (
-				<SizeProvider size="compact">
-					<TabsList aria-label="Sidebar" className="mx-2 mt-2 max-w-[calc(100%-1rem)] self-start">
-						{tabs.map(value => {
-							const { label, icon } = TAB_ROWS[value];
-							const counted = tabCounts[value];
-							const badge = counted && counted.count > 0 ? counted : undefined;
-							return (
-								<TabItem
-									key={value}
-									value={value}
-									label={label}
-									icon={icon}
-									badge={badge?.count}
-									aria-label={badge && `${label}, ${badge.says(badge.count)}`}
-									className={cn("px-2", SIDEBAR_TAB_FIT.tab)}
-									labelClassName={SIDEBAR_TAB_FIT.label}
-									shortcut={tabShortcutLabels(value, tabs)}
-								/>
-							);
-						})}
-					</TabsList>
-				</SizeProvider>
+		<>
+			<SidebarGroup className="gap-1 pt-4 pb-1">
+				<div className="flex h-6 min-w-0 items-center gap-0.5">
+					<SidebarWorkspacePicker workspaces={workspaces} onPick={onPickWorkspace} />
+					<SidebarGroupActions className="relative top-auto right-auto ml-auto h-6 shrink-0 pr-1.5">
+						{!searchShown && (
+							<Tooltip content="Search sessions" shortcut={shortcutLabels("sessionSearch")}>
+								<SidebarGroupAction asChild>
+									<button type="button" aria-label="Search sessions" onClick={() => setSearching(true)}>
+										<Search />
+									</button>
+								</SidebarGroupAction>
+							</Tooltip>
+						)}
+						{interrupted.length > 0 && (
+							<Tooltip content={resumingAll ? "Resuming…" : `Resume all ${interrupted.length} interrupted`} disabled={resumingAll || !connected}>
+								<SidebarGroupAction asChild className="disabled:pointer-events-none disabled:opacity-50">
+									<button
+										type="button"
+										aria-label={resumingAll ? "Resuming interrupted sessions" : "Resume all interrupted sessions"}
+										disabled={resumingAll || !connected}
+										onClick={() => start({ kind: "resume-all", sessionIds: interrupted.map(session => session.sessionId) })}
+									>
+										{resumingAll ? <Loader className="animate-spin" /> : <ListRestart />}
+									</button>
+								</SidebarGroupAction>
+							</Tooltip>
+						)}
+					</SidebarGroupActions>
+				</div>
+				{resumeAll?.phase === "failed" && (
+					<p role="alert" className="flex items-start gap-2 rounded-md bg-red-500/10 px-2 py-1.5 text-xs text-red-600 dark:text-red-400">
+						<span className="min-w-0 flex-1">{resumeAll.error}</span>
+						<button type="button" className="shrink-0 underline-offset-2 hover:underline" onClick={() => dismissStart("resume-all")}>
+							Dismiss
+						</button>
+					</p>
+				)}
+				{searchShown && (
+					<SidebarSearch
+						label="Filter the sidebar's sessions"
+						placeholder="Search sessions"
+						query={query}
+						onQuery={onQuery}
+						shortcut="sessionSearch"
+						autoFocus={searching}
+						onLeave={() => setSearching(false)}
+					/>
+				)}
+			</SidebarGroup>
+			{filtering && nothing && <p className="px-4 py-2 text-xs text-muted-foreground">{`No sessions match “${query.trim()}”`}</p>}
+			{!filtering && <ScheduledGroup sends={scheduled} openId={scheduledOpen} showWorkspace={showWorkspace} open={!collapsed.has("scheduled")} onOpenChange={() => toggleGroup("scheduled")} />}
+			{pinned.hosts.length + pinned.past.length > 0 && (
+				<SidebarGroup collapsible open={!collapsed.has("pinned")} onOpenChange={() => toggleGroup("pinned")}>
+					<SidebarGroupLabel icon={Pin}>{`${pinned.hosts.length + pinned.past.length} pinned`}</SidebarGroupLabel>
+					<SidebarMenu aria-label="Pinned omp sessions" className="gap-px">
+						{pinned.hosts.map(host => hostRow(host, true, showWorkspace))}
+						{pinned.past.map(session => pastRow(session, true, showWorkspace))}
+					</SidebarMenu>
+				</SidebarGroup>
 			)}
-			{!connected && (
-				<p className="mx-3 mt-2 rounded-md bg-red-500/10 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">
-					Lost the dashboard server. Retrying…
-				</p>
+			{folders.shown.map(folder => {
+				const { cwd, cwdDisplay } = folder.group.workspace;
+				const key = `workspace:${cwd}`;
+				return (
+					<WorkspaceFolder key={cwd} folder={folder} name={workspaceName(cwdDisplay, personal) ?? cwdDisplay} open={!collapsed.has(key)} onOpenChange={() => toggleGroup(key)} onNewSession={() => openNewSession(cwd)}>
+						{folder.group.hosts.map(host => hostRow(host, false, false))}
+						{folder.group.interrupted.map(session => pastRow(session, false, false))}
+						{folder.under.map(session => pastRow(session, false, false))}
+					</WorkspaceFolder>
+				);
+			})}
+			{(folders.more > 0 || (allGroups && folders.foldable)) && (
+				<SidebarGroup className="py-0">
+					<SidebarMenu>
+						<SidebarMenuItem>
+							<SidebarMenuButton icon={MoreHorizontal} className="text-muted-foreground" onClick={() => setAllGroups(all => !all)}>
+								{folders.more > 0 ? `${folders.more} more workspace${folders.more === 1 ? "" : "s"}` : "Fewer workspaces"}
+							</SidebarMenuButton>
+						</SidebarMenuItem>
+					</SidebarMenu>
+				</SidebarGroup>
 			)}
-			<TabPanel value="sessions" forceMount className={tab === "sessions" ? "flex min-h-0 flex-1 flex-col" : "hidden"}>
-				<SessionList
-					lists={lists}
-					query={query}
-					onQuery={onQuery}
-					onTogglePin={onTogglePin}
-					open={open}
-					showWorkspace={workspace === null}
-					newSessionOpen={newSessionOpen}
-					scheduled={scheduled}
-					scheduledOpen={scheduledOpen}
-					newSessionLabel={newSessionLabel}
-				/>
-			</TabPanel>
-			<TabPanel value="bots" className="flex min-h-0 flex-1 flex-col">
-				<BotsNav rows={bots} openId={botsOpen} />
-			</TabPanel>
-			<TabPanel value="pull-requests" asChild>
-				<SidebarContent>
-					{pullRequestsTab}
-				</SidebarContent>
-			</TabPanel>
-			<TabPanel value="tickets" asChild>
-				<SidebarContent>
-					<TicketsNav target={sectionTarget} onTarget={onSectionTarget} />
-				</SidebarContent>
-			</TabPanel>
-			<TabPanel value="todo" asChild>
-				<SidebarContent>
-					<TodoCategories list={userTodos} view={todoView} disabled={!connected} onChange={onTodoChange} sessions={todoSessions} />
-				</SidebarContent>
-			</TabPanel>
-			<TabPanel value="notes" asChild>
-				<SidebarContent>
-					<NotesNav list={userNotes} view={notesView} space={space} />
-				</SidebarContent>
-			</TabPanel>
-			<TabPanel value="calendar" asChild>
-				<SidebarContent>
-					<CalendarNav open={calendarOpen} space={space} />
-				</SidebarContent>
-			</TabPanel>
-			<TabPanel value="email" asChild>
-				<SidebarContent>
-					<EmailNav space={space} />
-				</SidebarContent>
-			</TabPanel>
-			<TabPanel value="sport" asChild>
-				<SidebarContent>
-					<SportNav open={sportOpen} />
-				</SidebarContent>
-			</TabPanel>
-			<TabPanel value="settings" asChild>
-				<SidebarContent>
-					<SettingsNav route={settingsRoute} />
-				</SidebarContent>
-			</TabPanel>
-		</Tabs>
+			{(!filtering || ended.length > 0) && (
+				<SidebarGroup collapsible open={pastOpen} onOpenChange={setPastOpen}>
+					<SidebarGroupLabel>
+						{ended.length === 0 ? "No past sessions" : "Past"}
+						{ended.length > 0 && <span className="tabular-nums text-muted-foreground/70">{ended.length}</span>}
+					</SidebarGroupLabel>
+					<SidebarMenu aria-label="Past omp sessions" className="gap-px">
+						{ended.slice(0, pastShown).map(session => pastRow(session, false, showWorkspace))}
+						{hiddenPast > 0 && (
+							<SidebarMenuItem>
+								<SidebarMenuButton className="text-muted-foreground" onClick={() => setPastShown(shown => shown + PAST_PAGE)}>
+									{`Show ${Math.min(hiddenPast, PAST_PAGE)} more`}
+								</SidebarMenuButton>
+							</SidebarMenuItem>
+						)}
+					</SidebarMenu>
+				</SidebarGroup>
+			)}
+		</>
 	);
 }

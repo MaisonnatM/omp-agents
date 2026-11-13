@@ -1,9 +1,10 @@
 ---
-status: accepted
+status: superseded
 date: 2026-11-12
 decision-makers: Maxence Maisonnat
 supersedes:
   - 2026-11-08-wrap-the-page-header-controls-under-the-title-on-a-phone
+superseded-by: 2026-11-13-the-window-uses-an-inset-sidebar-and-a-tab-strip-across-the-top
 ---
 
 # The page header folds its buttons before it squeezes the title

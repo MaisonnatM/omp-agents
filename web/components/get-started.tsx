@@ -11,6 +11,7 @@ import { getStartedSurface, known, mapKnown, type Observation, observation } fro
 import { integrationsStore, providersStore, sourceControlStore, starterKitStore, terminalSessionsStore } from "../reads";
 import { useStoredState } from "../stored-state";
 import { useAction } from "../use-action";
+import { AppMark } from "./app-mark";
 import { useDashboardActions } from "./dashboard-context";
 import { KitStep, NEED_LABEL, type Need, ProviderStep, pstackLoaded, SessionStep, StepHeader, TerminalStep } from "./get-started-steps";
 import { ToolsStep } from "./get-started-tools";
@@ -37,23 +38,6 @@ type Place = "welcome" | StepId;
 
 const isPlace = (raw: string | null): raw is Place => raw === "welcome" || STEPS.some(step => step.id === raw);
 const REQUIRED_COUNT = STEPS.filter(item => item.need === "required").length;
-
-/** The app's mark, as `web/favicon.svg` draws it. */
-function AppMark({ className }: { className: string }) {
-	const gradient = useId();
-	return (
-		<svg aria-hidden viewBox="0 0 64 64" className={className}>
-			<defs>
-				<linearGradient id={gradient} x1="0" y1="0" x2="1" y2="1">
-					<stop offset="0" stopColor="oklch(0.7 0.24 340)" />
-					<stop offset=".5" stopColor="oklch(0.62 0.21 295)" />
-					<stop offset="1" stopColor="oklch(0.81 0.14 200)" />
-				</linearGradient>
-			</defs>
-			<path fill={`url(#${gradient})`} d="M10 14h44v9H43v33h-9V23h-9v22h-9V23H10z" />
-		</svg>
-	);
-}
 
 /** A step's number in its circle, or a check once it is done. */
 function Marker({ index, done, current }: { index: number; done: boolean; current: boolean }) {
@@ -110,7 +94,7 @@ function Welcome({ titleId, done, onStart, onDismiss }: { titleId: string; done:
 				<CloseButton />
 			</div>
 			<div className="m-auto flex w-full max-w-md flex-col items-center gap-7 py-6 text-center motion-safe:animate-in motion-safe:duration-300 motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2">
-				<AppMark className="size-12" />
+				<AppMark className="size-9" />
 				<div className="space-y-2">
 					<h2 id={titleId} tabIndex={-1} className="text-2xl font-semibold tracking-tight text-balance outline-none">
 						Welcome to omp agents
@@ -315,7 +299,7 @@ function Wizard({ place, titleId, done, requiredFinished, rosterError, body, onP
 		<div className="@container/get-started flex min-w-0 flex-1">
 			<nav aria-label="Setup steps" className="hidden w-60 shrink-0 flex-col gap-6 border-e border-border bg-surface-1 p-4 @2xl/get-started:flex">
 				<div className="flex items-center gap-2.5 px-2 pt-1">
-					<AppMark className="size-5 shrink-0" />
+					<AppMark className="size-4 shrink-0" />
 					<div className="min-w-0">
 						<p className="text-[13px] font-medium">Set up omp agents</p>
 						<p className="text-xs text-muted-foreground tabular-nums">

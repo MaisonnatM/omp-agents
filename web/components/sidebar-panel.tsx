@@ -1,6 +1,6 @@
 /** `DashboardSidebar`, one of the dashboard's two sidebars, resizable and closeable; `useSidebarPanels` keeps both panels' state and `SidebarToggle` shows or hides one. */
 import { type LucideIcon, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
-import { createContext, type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createContext, type CSSProperties, type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Sidebar, type SidebarSide } from "@/components/ui/sidebar";
@@ -41,12 +41,12 @@ interface SidebarSpec {
 	showIcon: LucideIcon;
 	/**
 	 * The strip the hidden sidebar leaves for its toggle, which then rides the sidebar's outer edge: 9 px in from it,
-	 * where the header's `px-2` and border put its last button, and centered in the strip. 0 leaves none, and the toggle
+	 * where the sidebar's top row puts its last button, and centered in the strip. 0 leaves none, and the toggle
 	 * sits in the pane header instead.
 	 */
 	rail: number;
-	/** Lays the wrapper out on its side: the content stays put against the outer edge while the width slides. */
-	frame: string;
+	/** How the docked sidebar's panel draws: the sessions sidebar sits on the window with no border, the details sidebar is an inset panel like the page's. */
+	panel: string;
 }
 
 const SIDEBARS: Record<SidebarSide, SidebarSpec> = {
@@ -61,7 +61,7 @@ const SIDEBARS: Record<SidebarSide, SidebarSpec> = {
 		hideIcon: PanelLeftClose,
 		showIcon: PanelLeftOpen,
 		rail: 46,
-		frame: "",
+		panel: "",
 	},
 	right: {
 		name: "Details",
@@ -74,9 +74,12 @@ const SIDEBARS: Record<SidebarSide, SidebarSpec> = {
 		hideIcon: PanelRightClose,
 		showIcon: PanelRightOpen,
 		rail: 0,
-		frame: "order-last justify-end",
+		panel: "ml-1.5 inset-panel bg-background",
 	},
 };
+
+/** The window grid's sidebar sizes for its other rows: `--sidebar-rail`, the strip the closed sessions sidebar leaves, which the header tabs' padding counts. */
+export const SIDEBAR_VARS = { "--sidebar-rail": `${SIDEBARS.left.rail}px` } as CSSProperties;
 
 export interface SidebarPanel {
 	open: boolean;
@@ -237,6 +240,8 @@ interface DashboardSidebarProps {
 	onToggle: () => void;
 	/** The address of what the page shows; a change closes a floating sidebar. */
 	address: string;
+	/** Places the sidebar in the window's grid. */
+	className?: string;
 	children: ReactNode;
 }
 
@@ -245,11 +250,11 @@ export const SidebarOpen = createContext(true);
 
 /**
  * A sidebar with its resize handle, sliding its width open and shut. A sidebar with a rail keeps its toggle on its
- * outer edge, so the toggle glides from the header's corner to the rail with the edge and follows a resize drag. The
+ * outer edge, so the toggle glides from the sidebar's top row to the rail with the edge and follows a resize drag. The
  * hidden sidebar stays mounted, so its filter and scroll survive; the right one's toggle sits in the pane header (see `App`).
  */
-export function DashboardSidebar({ side, panel, onResize, onToggle, address, children }: DashboardSidebarProps) {
-	const { id, rail, frame } = SIDEBARS[side];
+export function DashboardSidebar({ side, panel, onResize, onToggle, address, className, children }: DashboardSidebarProps) {
+	const { id, rail, panel: panelStyle } = SIDEBARS[side];
 	// While the width moves: the transition applies only then, so a resize drag follows the pointer without lag.
 	const [moving, setMoving] = useState(false);
 	const [shownOpen, setShownOpen] = useState(panel.open);
@@ -273,16 +278,17 @@ export function DashboardSidebar({ side, panel, onResize, onToggle, address, chi
 	// While a resize drag runs: a page in a `<webview>`, the Browser's, would take the pointer from the handle's capture once it crosses into it.
 	const [dragging, setDragging] = useState(false);
 	const sliding = !panel.floating && moving;
-	// A floating sidebar leaves no rail: its toggle floats over the page header's corner, which `Header` keeps clear, so the page gets the whole width.
+	// A floating sidebar leaves no rail: its toggle floats over the header tabs' left end, which `HeaderTabs` keeps clear, so the page gets the whole width.
 	const shownRail = panel.floating ? 0 : rail;
 	return (
 		<div
 			className={cn(
+				// The content stays put against the outer edge while the width slides.
 				"relative flex h-full shrink-0",
-				frame,
+				side === "right" && "justify-end",
+				className,
 				!panel.floating && (!panel.open || moving) && "overflow-hidden",
 				sliding && cn("transition-[width]", MOTION),
-				shownRail > 0 && !panel.open && "border-r border-border",
 			)}
 			style={{ width: panel.open && !panel.floating ? panel.width : shownRail, transitionDuration: `${MOTION_MS}ms` }}
 		>
@@ -293,7 +299,8 @@ export function DashboardSidebar({ side, panel, onResize, onToggle, address, chi
 				side={side}
 				hidden={!panel.open && !sliding}
 				inert={!panel.open}
-				className={cn(panel.floating ? cn("absolute inset-y-0 z-40 bg-background shadow-xl", side === "left" ? "left-0" : "right-0") : "relative", "h-full", dragging && "[&_webview]:pointer-events-none")}
+				className={cn(panel.floating ? cn("absolute inset-y-0 z-40 shadow-xl", side === "left" ? "left-0 bg-sidebar" : "right-0 bg-background") : "relative", "h-full", dragging && "[&_webview]:pointer-events-none")}
+				panelClassName={panel.floating ? undefined : panelStyle}
 				style={{ width: panel.width }}
 			>
 				<SidebarOpen.Provider value={panel.open}>{children}</SidebarOpen.Provider>
@@ -301,7 +308,12 @@ export function DashboardSidebar({ side, panel, onResize, onToggle, address, chi
 			</Sidebar>
 			{rail > 0 && (
 				<div
-					className={cn("absolute top-[calc((var(--page-header-height)-1.75rem)/2)]", floatingOpen ? "z-50" : panel.floating ? "left-[9px] z-20" : "right-[9px] z-10")}
+					className={cn(
+						"absolute",
+						// The desktop app's window buttons sit over the top row's left end, so a closed rail's toggle drops below them.
+						!panel.open && !panel.floating ? "top-[calc(var(--title-bar-height)+(var(--page-header-height)-1.75rem)/2)]" : "top-[calc((var(--page-header-height)-1.75rem)/2)]",
+						floatingOpen ? "z-50" : panel.floating ? "left-[9px] z-20" : "right-[9px] z-10",
+					)}
 					style={floatingOpen ? { left: panel.width - 9 - 28 } : undefined}
 				>
 					<SidebarToggle side={side} open={panel.open} onToggle={onToggle} />

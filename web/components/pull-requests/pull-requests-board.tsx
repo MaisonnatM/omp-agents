@@ -23,7 +23,6 @@ import {
 	pullRequestSections,
 	listedPullRequest,
 	moveAction,
-	moveKey,
 	movesSummary,
 	orderedRepos,
 	placedManual,
@@ -31,9 +30,8 @@ import {
 	rebaseOrder,
 	sectionTitles,
 	shownPullRequests,
-	stepTarget,
-	type Where,
 } from "../../pull-requests-model";
+import { moveKey, stepTarget, type Where } from "../../order";
 import { folderName } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, pullRequestStart } from "../../quick-actions";

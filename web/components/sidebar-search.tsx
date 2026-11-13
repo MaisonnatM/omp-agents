@@ -11,10 +11,14 @@ interface SidebarSearchProps {
 	onQuery: (query: string) => void;
 	/** The shortcut that puts the cursor in the field, whose key the empty field shows on its right. */
 	shortcut?: ShortcutId;
+	/** Puts the cursor in the field when it mounts. */
+	autoFocus?: boolean;
+	/** Called when the cursor leaves the field. */
+	onLeave?: () => void;
 }
 
 /** A sidebar list's search field; Esc clears it and leaves it. */
-export function SidebarSearch({ label, placeholder, query, onQuery, shortcut }: SidebarSearchProps) {
+export function SidebarSearch({ label, placeholder, query, onQuery, shortcut, autoFocus, onLeave }: SidebarSearchProps) {
 	const ref = useRef<HTMLInputElement>(null);
 	const focusField = (): boolean => {
 		const input = ref.current;
@@ -35,7 +39,9 @@ export function SidebarSearch({ label, placeholder, query, onQuery, shortcut }: 
 				aria-label={label}
 				placeholder={placeholder}
 				value={query}
+				autoFocus={autoFocus}
 				onChange={event => onQuery(event.target.value)}
+				onBlur={onLeave}
 				onKeyDown={event => {
 					if (event.key !== "Escape") return;
 					onQuery("");

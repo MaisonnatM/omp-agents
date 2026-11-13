@@ -6,7 +6,7 @@ import { useContext } from "react";
 import { MCP_SERVICES } from "../../../src/shared/accounts";
 import { usePinnedSkill } from "../../pinned-skill";
 import { type ShortcutId, shortcutKeys } from "../../shortcuts";
-import { hideTab, moveTab, placedTabs, positionKey, TAB_ROWS, tabSpace, useSidebarTabs } from "../../sidebar-tabs";
+import { hideTab, moveTab, positionKey, TAB_ROWS, tabSpace, useSidebarTabs } from "../../sidebar-tabs";
 import { SPACE_LABELS } from "../../labels";
 import { useDashboardStatus } from "../dashboard-context";
 import { type Theme, THEMES, useTheme } from "../../theme";
@@ -42,23 +42,21 @@ function ActivitySwitch({ label, shortcut, checked, onToggle }: { label: string;
 function SidebarTabs() {
 	const { space } = useDashboardStatus().scope;
 	const { layout, setLayout, signedOut, shown } = useSidebarTabs(space);
-	const barTabs = placedTabs(shown, "bar");
 	return (
 		<Section
 			title="Sidebar tabs"
-			meta={`The tabs the sidebar shows, in order. Notes, Calendar, Todo, Sport, and Email sit in the header beside the command menu, and ${shortcutKeys("tab1")} goes to the first tab the sidebar's bar draws. A hidden tab's page, command, and links still work. Saved in this app.`}
+			meta={`The pages the sidebar lists, in order, and ${shortcutKeys("tab1")} goes to the first one it shows. A hidden tab's page, command, and links still work. Saved in this app.`}
 		>
 			<ol className="space-y-1 text-sm">
 				{layout.map(({ tab, hidden }, index) => {
 					const row = TAB_ROWS[tab];
 					const only = tabSpace(tab);
-					const position = positionKey(tab, barTabs);
+					const position = positionKey(tab, shown);
 					return (
 						<li key={tab} className="flex items-center gap-2">
 							<row.icon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
 							<div className="min-w-0 flex-1">
 								{row.label}
-								{row.place === "header" && <span className="ml-1.5 text-xs text-muted-foreground">Header</span>}
 								{"integration" in row && signedOut.has(tab) && (
 									<p className="text-xs text-muted-foreground">Shows only while {MCP_SERVICES[row.integration].label} is connected.</p>
 								)}

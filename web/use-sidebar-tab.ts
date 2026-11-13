@@ -1,10 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { View } from "../src/shared/sessions";
-import { type Layout, openView, type Page, type SettingsRoute, settingsSection, type SidebarPanel, type SidebarTab } from "./routing";
+import { type Layout, openView, type Page, type SettingsRoute, settingsSection, type SidebarTab } from "./routing";
+import { type NavRow, navRowOf } from "./sidebar-tabs";
 import { useStoredState } from "./stored-state";
-
-/** The sidebar panel that goes with each page; the panes keep the tab you chose. A session's changes go with the sessions. */
-const PAGE_TAB: Partial<Record<Page["kind"], SidebarPanel>> = { "pull-requests": "pull-requests", tickets: "tickets", todo: "todo", bots: "bots", notes: "notes", calendar: "calendar", email: "email", sport: "sport", settings: "settings" };
 
 /** The page each tab shows, but for Sessions, which shows the panes, and Bots while it has one to open. */
 const TAB_PAGE: Record<Exclude<SidebarTab, "sessions">, Page> = {
@@ -31,7 +29,7 @@ export function useSettingsRoute(page: Page | null): SettingsRoute {
 
 interface SidebarTabInput {
 	page: Page | null;
-	/** The tabs that neither show nor apply, signed out or of the other space; a page of one keeps the tab the panes had. */
+	/** The tabs that neither show nor apply, signed out or of the other space; a page of one selects no row. */
 	absentTabs: ReadonlySet<SidebarTab>;
 	layout: Layout;
 	/** The session the Sessions tab opens when no pane shows one; `null` for none. */
@@ -43,25 +41,15 @@ interface SidebarTabInput {
 }
 
 /**
- * The panel the sidebar shows, and the way to show another tab: a page selects its tab, and `#pull-requests` picks the
- * Pull requests tab, which stays while you work in the panes until you choose Sessions. Sessions keeps the panes, or
- * opens the latest session when no pane shows one; Bots opens the latest Bot's page. `showTab` keeps its identity across renders.
- * A page whose tab the user hid in Preferences still selects that tab, so its panel shows with no tab of the bar selected,
- * and a page whose trigger sits in the header shows its panel, such as the Notes nav, with no bar; a page whose tab is absent keeps the tab the panes had.
+ * The row of the page list the page on screen selects, {@link navRowOf}, and the way to show another tab.
+ * Sessions keeps the panes, or opens the latest session when no pane shows one; Bots opens the latest Bot's page.
+ * `showTab` keeps its identity across renders.
  */
 export function useSidebarTab({ page, absentTabs, layout, latestSession, latestBot, navigate, show }: SidebarTabInput): {
-	tab: SidebarPanel;
+	row: NavRow | null;
 	showTab: (tab: SidebarTab) => void;
 } {
-	const onPullRequests = page?.kind === "pull-requests";
-	const [paneTab, setPaneTab] = useState<"sessions" | "pull-requests">(onPullRequests ? "pull-requests" : "sessions");
-	const [wasOnPullRequests, setWasOnPullRequests] = useState(onPullRequests);
-	if (onPullRequests !== wasOnPullRequests) {
-		setWasOnPullRequests(onPullRequests);
-		if (onPullRequests) setPaneTab("pull-requests");
-	}
-	const pageTab = page ? PAGE_TAB[page.kind] : undefined;
-	const tab: SidebarPanel = pageTab && (pageTab === "settings" || !absentTabs.has(pageTab)) ? pageTab : paneTab;
+	const row = navRowOf(page, layout.panes, absentTabs);
 	const latest = useRef({ layout, latestSession, latestBot });
 	latest.current = { layout, latestSession, latestBot };
 	const showTab = useCallback(
@@ -69,11 +57,10 @@ export function useSidebarTab({ page, absentTabs, layout, latestSession, latestB
 			const bot = latest.current.latestBot;
 			if (next === "bots" && bot !== null) return navigate({ kind: "bots", target: bot, routine: null });
 			if (next !== "sessions") return navigate(TAB_PAGE[next]);
-			setPaneTab("sessions");
 			const { layout: panes, latestSession: session } = latest.current;
 			show(panes.panes.length === 0 && session ? openView(panes, session, "replace") : panes);
 		},
 		[navigate, show],
 	);
-	return { tab, showTab };
+	return { row, showTab };
 }

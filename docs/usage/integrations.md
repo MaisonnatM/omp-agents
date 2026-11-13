@@ -15,7 +15,7 @@
   A new OAuth client ID or secret removes every added account and signs out the remaining one, since Google ties sign-ins to the client.
 - Each Google account's space menu, on the right of its row, puts its address in **Personal** or **Work**, which covers that address's Gmail and Google Calendar accounts; it is the same menu as a workspace's in Settings › Workspaces.
   Every account starts in Work, including one you had linked to workspaces before spaces.
-  The Email page, the Calendar, their sidebar tabs, and the `@` menu show only the accounts of the space the title bar's switch picks, whatever workspace the sidebar picks.
+  The Email page, the Calendar, their sidebar tabs, and the `@` menu show only the accounts of the space the sidebar's account row picks, whatever workspace the sidebar picks.
   When only some of your addresses are in a session's space, every session the dashboard starts, a Bot's too, is told at each prompt to use those for its mail and calendar unless you name another account.
   A session's space is its workspace's, where a linked worktree counts as its repository's main checkout; every account's tools stay available to it.
   With the starter kit's `extensions/google-accounts.ts` installed (`bun run omp-template`), an omp session whose service has two or more accounts is also told each account's address and tool prefix.

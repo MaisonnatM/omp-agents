@@ -15,7 +15,7 @@ import { hashForPullRequestFiles, hashForPullRequests, type PullRequestsRoute } 
 import type { SectionTarget } from "../../section";
 import { useRebasing } from "../../pull-request-rebases";
 import { useStoredState } from "../../stored-state";
-import { DROP_LINE } from "../../use-drag-order";
+import { DROP_LINE } from "../../order";
 import { useInlineConfirm } from "../../use-inline-confirm";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { Separator, useDragSeparator } from "../drag-separator";

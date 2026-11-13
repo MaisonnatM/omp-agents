@@ -2,7 +2,7 @@ import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRe
 import { isTypingTarget } from "../src/shared/desktop-bridge";
 import { commandKey, record } from "./activity";
 
-/** The keys that go to the sidebar's tabs by position: Cmd+1 goes to the first tab the bar draws, whichever it is; one per tab the bar can draw. */
+/** The keys that go to the sidebar's tabs by position: Cmd+1 goes to the first page row of the sidebar, whichever it is, through Cmd+5 for the fifth. */
 export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4", "tab5"] as const;
 
 export type TabShortcut = (typeof TAB_SHORTCUTS)[number];
@@ -37,6 +37,8 @@ export type ShortcutId =
 	| "getStarted"
 	| "back"
 	| "forward"
+	| "moveTabLeft"
+	| "moveTabRight"
 	| "help"
 	| "restore"
 	| "browserRestore"
@@ -249,6 +251,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "settings", category: "general", label: "Open or close settings", command: "Toggle settings", keys: [{ goTo: "," }] },
 	{ id: "back", category: "general", label: "Go back", command: "Go back", keys: [{ chord: { key: "[", mod: true }, scope: "anywhere" }] },
 	{ id: "forward", category: "general", label: "Go forward", command: "Go forward", keys: [{ chord: { key: "]", mod: true }, scope: "anywhere" }] },
+	{ id: "moveTabLeft", category: "general", label: "Move the focused header tab left", keys: [{ chord: { key: "ArrowLeft", alt: true, shift: true }, scope: "anywhere" }] },
+	{ id: "moveTabRight", category: "general", label: "Move the focused header tab right", keys: [{ chord: { key: "ArrowRight", alt: true, shift: true }, scope: "anywhere" }] },
 	{ id: "help", category: "general", label: "Show keyboard shortcuts", command: "Show keyboard shortcuts", keys: [{ chord: { key: "?" }, scope: "outside-fields" }] },
 	{ id: "restore", category: "sessions", label: "Leave a maximized pane, or close the pane a split added", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },
 	{ id: "browserRestore", category: "sessions", label: "Put a maximized Browser back in the sidebar", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },

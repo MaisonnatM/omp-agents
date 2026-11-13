@@ -5,35 +5,53 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* The shared tokens are T3 Code's (apps/web/src/index.css), so its pull request panel and this one draw from one palette.
+/* What shows only while its `group/reveal` is hovered or holds the focus, and always on a touch screen, which has no hover: a header tab's ×, a page title's trailing controls. */
+@custom-variant revealed {
+  @media (hover: hover) {
+    &:is(:where(.group\/reveal):hover *) {
+      @slot;
+    }
+  }
+  &:is(:where(.group\/reveal):focus-within *) {
+    @slot;
+  }
+  @media (hover: none) {
+    @slot;
+  }
+}
+
+/* The surface tokens, from --background to --active, are Capy's: the window and the sidebar sit on --sidebar, the work on --background, in inset panels with --border hairlines.
+   The rest are T3 Code's (apps/web/src/index.css), so its pull request panel and this one draw from one palette.
    Their color-mix()es name palette colors where T3's name other tokens: Bun's CSS build keeps one color-mix() override per rule and serves the rest their first color. */
 :root {
   color-scheme: light;
-  --radius: 0.625rem;
+  --radius: 0.5rem;
   --page-header-height: 3rem;
   /* How far past a header's own padding its content starts on a phone, where the floating Sessions sidebar's toggle sits over its left corner. */
   --sidebar-toggle-clearance: 2.25rem;
-  --background: var(--color-zinc-25);
-  --foreground: var(--color-zinc-800);
-  --card: var(--color-white);
-  --card-foreground: var(--color-zinc-800);
-  --popover: var(--color-white);
-  --popover-foreground: var(--color-zinc-800);
-  --primary: oklch(0.488 0.217 264);
+  /* The desktop window's title bar over the top row, which `startDesktopTitleBar` in `web/desktop-title-bar.ts` marks; none in a browser. */
+  --title-bar-height: 0px;
+  --background: #ffffff;
+  --foreground: #1c1c1e;
+  --card: #ffffff;
+  --card-foreground: #1c1c1e;
+  --popover: #ffffff;
+  --popover-foreground: #1c1c1e;
+  --primary: #2f5be8;
   --primary-foreground: var(--color-white);
   --dither-ink: var(--primary);
   --dither-paper: var(--background);
   --dither-cell: 3px;
   --dither-bloom: 0.6;
-  --secondary: var(--color-zinc-50);
-  --secondary-foreground: var(--color-zinc-800);
-  --muted: var(--color-zinc-50);
-  --muted-foreground: var(--color-zinc-500);
-  --accent: var(--color-zinc-100);
-  --accent-foreground: var(--color-zinc-900);
+  --secondary: #f2f2f3;
+  --secondary-foreground: #1c1c1e;
+  --muted: #f2f2f3;
+  --muted-foreground: #6b6b70;
+  --accent: #efeff1;
+  --accent-foreground: #1c1c1e;
   --destructive: var(--color-red-500);
   --destructive-foreground: var(--color-red-700);
-  --success: var(--color-emerald-500);
+  --success: #22a547;
   --success-foreground: var(--color-emerald-700);
   --diff-addition: var(--success);
   --diff-deletion: var(--destructive);
@@ -42,16 +60,16 @@
   --warning: var(--color-amber-500);
   --warning-foreground: var(--color-amber-700);
   --warning-surface: color-mix(in srgb, var(--color-amber-500) 8%, transparent);
-  --border: var(--color-zinc-200);
-  --input: var(--color-zinc-300);
+  --border: #e7e7e9;
+  --input: #dededf;
   --ring: var(--primary);
-  --sidebar: var(--color-zinc-50);
+  --sidebar: #f5f5f6;
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: var(--color-white);
+  --sidebar-accent: #e9e9eb;
   --sidebar-accent-foreground: var(--foreground);
-  --sidebar-border: var(--border);
+  --sidebar-border: transparent;
   --sidebar-ring: var(--ring);
   --glass-blur: 12px;
   --glass-opacity: 80%;
@@ -73,8 +91,8 @@
   --shadow-6: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color), 0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color), 0 12px 12px -6px var(--shadow-color), 0 24px 24px -12px var(--shadow-color);
   --shadow-7: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color), 0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color), 0 12px 12px -6px var(--shadow-color), 0 24px 24px -12px var(--shadow-color), 0 48px 48px -24px var(--shadow-color);
   --shadow-8: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color), 0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color), 0 12px 12px -6px var(--shadow-color), 0 24px 24px -12px var(--shadow-color), 0 48px 48px -24px var(--shadow-color), 0 96px 96px -48px var(--shadow-color);
-  --hover: rgb(0 0 0 / 0.04);
-  --active: rgb(0 0 0 / 0.07);
+  --hover: rgb(0 0 0 / 0.045);
+  --active: rgb(0 0 0 / 0.075);
   --selected: #D4D4D4;
   --destructive-light: #FEF2F2;
   --overlay: 0 0 0;
@@ -88,33 +106,40 @@
   --chart-5: oklch(0.769 0.188 70.08);
 }
 
+/* In the desktop app on macOS the top row is the window's title bar, its buttons over the row's left end. */
+:root[data-title-bar] {
+  --title-bar-height: var(--page-header-height);
+}
+
 .dark {
   color-scheme: dark;
-  --background: var(--color-neutral-950);
-  --foreground: var(--color-neutral-100);
-  --card: color-mix(in srgb, var(--color-neutral-950) 97%, var(--color-white));
-  --card-foreground: var(--color-neutral-100);
-  --popover: color-mix(in srgb, var(--color-neutral-950) 97%, var(--color-white));
-  --popover-foreground: var(--color-neutral-100);
-  --primary: oklch(0.571 0.21 264);
+  --background: #141414;
+  --foreground: #e8e8e8;
+  --card: #1a1a1a;
+  --card-foreground: #e8e8e8;
+  --popover: #1c1c1c;
+  --popover-foreground: #e8e8e8;
+  --primary: #4f5ff5;
   --dither-bloom: 1;
-  --secondary: color-mix(in oklab, var(--color-white) 3%, transparent);
-  --secondary-foreground: var(--color-neutral-100);
-  --muted: color-mix(in oklab, var(--color-white) 3%, transparent);
-  --muted-foreground: color-mix(in srgb, var(--color-neutral-500) 90%, var(--color-white));
-  --accent: color-mix(in oklab, var(--color-white) 4%, transparent);
-  --accent-foreground: var(--color-neutral-100);
+  --secondary: #1f1f1f;
+  --secondary-foreground: #e8e8e8;
+  --muted: #1c1c1c;
+  --muted-foreground: #8a8a8a;
+  --accent: #222222;
+  --accent-foreground: #e8e8e8;
   --destructive: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
   --destructive-foreground: var(--color-red-400);
+  --success: #34c759;
   --success-foreground: var(--color-emerald-400);
   --diff-addition-foreground: var(--color-emerald-400);
   --diff-deletion-foreground: var(--color-red-400);
   --warning-foreground: var(--color-amber-400);
   --warning-surface: color-mix(in srgb, var(--color-amber-500) 16%, transparent);
-  --border: color-mix(in oklab, var(--color-white) 6%, transparent);
-  --input: color-mix(in oklab, var(--color-white) 8%, transparent);
-  --sidebar: var(--card);
-  --sidebar-accent: var(--accent);
+  --border: rgb(255 255 255 / 0.07);
+  --input: rgb(255 255 255 / 0.1);
+  --sidebar: #0b0b0b;
+  --sidebar-accent: #1c1c1c;
+  --sidebar-border: transparent;
   --glass-blur: 16px;
   --glass-saturation: 1.08;
   --surface-1: #171717;
@@ -141,8 +166,8 @@
   --shadow-6: inset 0 1px 0 0 var(--dm-hi-high), inset 0 0 0 1px var(--dm-ring-high), 0 0 0 1px rgba(0,0,0,0.18), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop), 0 6px 6px -3px var(--dm-drop), 0 12px 12px -6px var(--dm-drop), 0 24px 24px -12px var(--dm-drop);
   --shadow-7: inset 0 1px 0 0 var(--dm-hi-peak), inset 0 0 0 1px var(--dm-ring-high), 0 0 0 1px rgba(0,0,0,0.20), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop), 0 6px 6px -3px var(--dm-drop), 0 12px 12px -6px var(--dm-drop), 0 24px 24px -12px var(--dm-drop), 0 48px 48px -24px var(--dm-drop);
   --shadow-8: inset 0 1px 0 0 var(--dm-hi-peak), inset 0 0 0 1px var(--dm-ring-high), 0 0 0 1px rgba(0,0,0,0.22), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop), 0 6px 6px -3px var(--dm-drop), 0 12px 12px -6px var(--dm-drop), 0 24px 24px -12px var(--dm-drop), 0 48px 48px -24px var(--dm-drop), 0 96px 96px -48px var(--dm-drop);
-  --hover: rgb(255 255 255 / 0.06);
-  --active: rgb(255 255 255 / 0.1);
+  --hover: rgb(255 255 255 / 0.05);
+  --active: rgb(255 255 255 / 0.09);
   --selected: #525252;
   --destructive-light: #450A0A;
   --overlay: 255 255 255;
@@ -169,6 +194,8 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  /* The inset page and details panels, a step between lg and xl. */
+  --radius-panel: calc(var(--radius) + 2px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -250,6 +277,8 @@
   --shadow-3: var(--shadow-3);
   --shadow-2: var(--shadow-2);
   --shadow-1: var(--shadow-1);
+  /* The lift of the inset panels and the active header tab, under their border. */
+  --shadow-raised: 0 1px 2px var(--shadow-color);
   --color-shadow-color: var(--shadow-color);
   @keyframes shimmer {
   0% {
@@ -371,6 +400,11 @@
 ::highlight(find-current) {
   background-color: var(--color-amber-400);
   color: var(--color-zinc-950);
+}
+
+/* A panel inset on the window's sidebar color: the page and the docked details sidebar. */
+@utility inset-panel {
+  @apply overflow-hidden rounded-panel border border-border shadow-raised;
 }
 
 @utility surface-glass {

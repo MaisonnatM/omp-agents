@@ -26,7 +26,6 @@ import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useAction } from "../use-action";
 import { useWebview } from "../use-webview";
 import { PickModes, Picking, usePicking } from "./browser-capture";
-import { DESKTOP_TITLE_BAR } from "./header-controls";
 import { MoreActionsMenu } from "./more-actions-menu";
 import { useDashboardActions } from "./dashboard-context";
 import { toasts } from "./toaster";
@@ -396,8 +395,8 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 		<section
 			ref={sectionRef}
 			aria-label="Browser"
-			// Maximized, it covers the window below its title bar (`DesktopTitleBar`'s h-9), whose window buttons and drag strip stay usable.
-			className={cn("@container/browser flex min-h-0 flex-col bg-background", maximized ? cn("fixed inset-x-0 bottom-0 z-30", DESKTOP_TITLE_BAR ? "top-9" : "top-0") : "flex-1")}
+			// Maximized, it covers the window below the header's tabs (`HeaderTabs`, one header height tall), whose window buttons and drag strip stay usable.
+			className={cn("@container/browser flex min-h-0 flex-col bg-background", maximized ? "fixed inset-x-0 top-(--title-bar-height) bottom-0 z-30" : "flex-1")}
 		>
 			{/* In a narrow Browser, such as the sidebar at its default width, the address field takes a row of its own below the buttons. */}
 			<div className="flex min-h-9 shrink-0 flex-wrap items-center gap-0.5 border-b border-border px-1.5 @max-[24rem]/browser:pt-1 @max-[16rem]/browser:gap-0">

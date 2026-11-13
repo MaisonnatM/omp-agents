@@ -1,5 +1,5 @@
 import { type DragEvent, useCallback, useRef, useState } from "react";
-import type { Where } from "./pull-requests-model";
+import type { Where } from "./order";
 
 /** The item being dragged within its `scope`, and where a drop on the item under the pointer would put it. */
 interface Drag {
@@ -7,12 +7,6 @@ interface Drag {
 	key: string;
 	over: { key: string; where: Where } | null;
 }
-
-/** The line that shows where a dragged item would land, on an element that is `relative`. */
-export const DROP_LINE: Record<Where, string> = {
-	before: "before:absolute before:inset-x-1 before:-top-px before:h-0.5 before:rounded-full before:bg-ring",
-	after: "after:absolute after:inset-x-1 after:-bottom-px after:h-0.5 after:rounded-full after:bg-ring",
-};
 
 /** One draggable item: the element you grab, the element that takes a drop, where a drop would land, and whether it is the one dragged. */
 export interface DragItem {
@@ -40,9 +34,10 @@ interface Held {
  * Dragging an item among the others of its `scope`, such as the pull request list's repositories, its sections, or one section's
  * pull requests. An item takes a drop only from its own scope; `onDrop` gets the dragged key and the side of `key` it lands on.
  * An item's `handle` and `target` stay the same across renders, so a memoized row that holds them is drawn again only
- * when its `dropAt` or `dragging` changes. The returned function changes when the drag does.
+ * when its `dropAt` or `dragging` changes. The returned function changes when the drag does. Items stack in a column, or,
+ * with `axis` `"x"`, sit in a row, where a drop before an item lands on its left.
  */
-export function useDragOrder(): (scope: string, key: string, onDrop: (dragged: string, where: Where) => void) => DragItem {
+export function useDragOrder(axis: "x" | "y" = "y"): (scope: string, key: string, onDrop: (dragged: string, where: Where) => void) => DragItem {
 	const [drag, setDrag] = useState<Drag | null>(null);
 	// The drag the handlers read, which a handler's own change reaches before the render does.
 	const current = useRef<Drag | null>(null);
@@ -77,7 +72,7 @@ export function useDragOrder(): (scope: string, key: string, onDrop: (dragged: s
 							event.preventDefault();
 							event.stopPropagation();
 							const box = event.currentTarget.getBoundingClientRect();
-							const where: Where = event.clientY < box.top + box.height / 2 ? "before" : "after";
+							const where: Where = (axis === "x" ? event.clientX < box.left + box.width / 2 : event.clientY < box.top + box.height / 2) ? "before" : "after";
 							const over = now.key === key ? null : { key, where };
 							if (now.over?.key !== over?.key || now.over?.where !== over?.where) change({ ...now, over });
 						},
@@ -102,6 +97,6 @@ export function useDragOrder(): (scope: string, key: string, onDrop: (dragged: s
 				dragging: drag?.scope === scope && drag.key === key,
 			};
 		},
-		[drag, held, change],
+		[drag, held, change, axis],
 	);
 }

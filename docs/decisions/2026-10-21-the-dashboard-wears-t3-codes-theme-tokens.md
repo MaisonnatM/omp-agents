@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 date: 2026-10-21
 decision-makers: Maxence Maisonnat
+superseded-by: 2026-11-13-the-window-uses-an-inset-sidebar-and-a-tab-strip-across-the-top
 ---
 
 # The dashboard wears T3 Code's theme tokens

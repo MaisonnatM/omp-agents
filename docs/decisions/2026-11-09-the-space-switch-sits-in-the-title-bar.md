@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 date: 2026-11-09
 decision-makers: Maxence, agent
+superseded-by: 2026-11-13-the-window-uses-an-inset-sidebar-and-a-tab-strip-across-the-top
 ---
 
 # The space switch sits in the title bar

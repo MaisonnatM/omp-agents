@@ -16,6 +16,17 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - The starter kit's artifact tool now names the Artifacts tab in its description, so agents link it to the rule about when to save one.
 - Fixed: with omp 18.20, Settings › Models again reads your model roles and fallback chains, and offers model updates.
 - The starter kit now tells agents when to save something to the Artifacts tab on their own: a report you will choose from or come back to, a one-file mockup, or a diagram too large for the reply.
+- The window has a new look. The sidebar runs down the whole left side with every page in one list, and the page sits beside it in a rounded panel.
+- A row of tabs now runs across the top of the window with the pages and sessions you opened lately. Click a tab to go back to it, drag it or press Alt+Shift and an arrow key on it to move it, and close it with its x or a middle click.
+- Notes, Calendar, Todo, Sport, and Email now sit in the sidebar's page list with the other pages, and Cmd+1 to Cmd+5 go to the first five pages of that list.
+- The Personal and Work switch now lives in the account row at the bottom of the sidebar, and its menu also opens the keyboard shortcuts.
+- Sessions now show inside a folder for each workspace, with interrupted ones at the end of their folder, and Past stays folded until you open it.
+- The sessions search now opens from the search button beside Workspaces or with Cmd+Shift+F.
+- Scroll bars no longer vanish to nothing in some lists.
+- A tab in the top row now has the same name as the window's title, such as the pull request's owner/repo#12 or the ticket's id, instead of just Pull requests or Tickets.
+- Fixed: the window's title on the Bots gallery now says Bots instead of New Bot.
+- Behind the scenes: the window's layout is declared in one place, the reorder helpers moved out of the pull requests model, and the tab row now keeps its edge fades right when the window resizes.
+- Behind the scenes: the header buttons, the tab menu, and the desktop title bar were removed, and the Activity history for the command menu and space switch buttons starts over under new names.
 - When Update dashboard brings in a new version that does not start, the desktop app now goes back to the version you had and starts it again. The bell and the command menu say which update did not start and why, and Update dashboard waits for a newer one before it tries again.
 - When the dashboard stops on its own, the desktop app now starts it again after a few seconds, keeping your page. If it keeps stopping, the app shows what went wrong with a Retry button.
 - When Obscura is installed (`brew install obscura`), the starter kit adds it as a browser agents use by default to read and click through pages. It loads a page several times faster than Chrome and uses about a tenth of the memory. Screenshots and design checks still use Chrome.

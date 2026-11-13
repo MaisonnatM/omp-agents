@@ -1,5 +1,5 @@
 /** `HostRow` and `PastRow`, a running or past session's row in the sidebar, with its status, age, and actions menu. */
-import { Columns2, Loader } from "lucide-react";
+import { CirclePause, Columns2, Loader } from "lucide-react";
 import { Fragment, memo, type ReactElement, type ReactNode, useContext } from "react";
 import { awaitsSubagents, type PastSession, type RosterHost, type View } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
@@ -54,7 +54,7 @@ export function RowLine({ dot, badge, label, facts, end }: RowLineProps) {
 		<span className="flex min-w-0 flex-1 items-baseline gap-2">
 			{/* `contents` makes the dot itself the flex item, so a running session's `sr-only` label takes no gap. */}
 			{dot && <span className="contents *:self-center">{dot}</span>}
-			<span className="truncate font-medium text-foreground">{label}</span>
+			<span className="truncate text-foreground">{label}</span>
 			{facts && (
 				<span className={cn("shrink-0 text-xs", facts.alert ? "text-red-600 dark:text-red-400" : "text-muted-foreground")} title={facts.title}>
 					{facts.text}
@@ -78,7 +78,7 @@ function SessionButton({ view, label, title, badge, facts, when, dot, placement,
 	);
 	return (
 		<Tooltip content={`${label}. ${title}. ${split ? "In a split." : `${SPLIT_CLICK} to open in a split`}`} side="right">
-			<SidebarMenuButton isActive={placement !== "hidden"} onClick={event => onOpen(view, modeOf(event))}>
+			<SidebarMenuButton isActive={placement !== "hidden"} size="short" onClick={event => onOpen(view, modeOf(event))}>
 				<RowLine dot={dot} badge={badge} label={label} facts={facts} end={end} />
 			</SidebarMenuButton>
 		</Tooltip>
@@ -186,7 +186,7 @@ function ActionItem({ action, confirm }: { action: PaletteAction<SessionRun>; co
  */
 interface RowProps<T> {
 	session: T;
-	/** The row is listed under Pinned; a pinned interrupted session says so, as its own group does not. */
+	/** The row is listed under Pinned, so its menu offers Unpin. */
 	pinned: boolean;
 	/** Where the session shows on screen. */
 	placement: RowPlacement;
@@ -207,8 +207,9 @@ export const PastRow = memo(function PastRow({ session, pinned, placement, showW
 				label={label}
 				title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
 				badge={showWorkspace && (session.title !== null || workspaceCwd(session) !== session.cwd) ? <WorkspaceBadge cwdDisplay={workspaceOf(session).cwdDisplay} /> : null}
-				facts={sessionFacts([session.source !== "omp" && SOURCE_LABELS[session.source], pinned && session.interrupted && "interrupted"])}
+				facts={sessionFacts([session.source !== "omp" && SOURCE_LABELS[session.source]])}
 				when={session.modifiedAt}
+				dot={session.interrupted ? <CirclePause role="img" aria-label="Interrupted" className="size-3 shrink-0 text-warning-foreground" /> : undefined}
 				placement={placement}
 				onOpen={onOpen}
 			/>

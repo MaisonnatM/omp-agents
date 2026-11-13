@@ -9,12 +9,15 @@ import type { SidebarSide } from "@/components/ui/sidebar-core";
 
 interface SidebarProps extends HTMLAttributes<HTMLDivElement> {
   side?: SidebarSide;
+  /** Classes for the inner panel, in place of its border on the inner side. */
+  panelClassName?: string;
 }
 
-/** A fixed panel at the wrapper's edge, bordered on its inner side. Its
- *  width comes from `style`; the dashboard sizes, resizes and hides it. */
+/** A fixed panel at the wrapper's edge, bordered on its inner side unless
+ *  `panelClassName` draws it otherwise. Its width comes from `style`; the
+ *  dashboard sizes, resizes and hides it. */
 const Sidebar = forwardRef<HTMLDivElement, SidebarProps>(
-  ({ side = "left", className, children, ...props }, ref) => (
+  ({ side = "left", className, panelClassName, children, ...props }, ref) => (
     <div
       ref={ref}
       data-slot="sidebar"
@@ -30,7 +33,7 @@ const Sidebar = forwardRef<HTMLDivElement, SidebarProps>(
         data-sidebar="sidebar"
         className={cn(
           "flex h-full w-full min-h-0 flex-col",
-          side === "left" ? "border-r border-border" : "border-l border-border"
+          panelClassName ?? (side === "left" ? "border-r border-border" : "border-l border-border")
         )}
       >
         {children}
@@ -81,6 +84,7 @@ export {
 export {
   SidebarMenu,
   SidebarMenuItem,
+  SidebarMenuNested,
   SidebarMenuButton,
   SidebarMenuAction,
   SidebarMenuBadge,
