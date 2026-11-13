@@ -1,4 +1,4 @@
-/** The Session card's Files section: a row per changed file, and the dialog of one file's recorded changes that a subagent's row opens. */
+/** The Overview tab's Files section: a row per changed file, and the dialog of one file's recorded changes that a subagent's row opens. */
 import { IconCode, IconConsole, IconFileBend, IconFileEdit, IconFileLock, IconFileText, IconImages1, IconJson, IconPageAdd, IconPageCross, IconTable } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useMemo } from "react";

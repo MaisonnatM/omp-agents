@@ -1,4 +1,4 @@
-/** The Session card's Images section: a strip of the view's images, their viewer, and the bar that sends the selected ones on. */
+/** The Overview tab's Images section: a strip of the view's images, their viewer, and the bar that sends the selected ones on. */
 import { IconBubbleText, IconChevronBottom, IconPaperclip1, IconPullRequest } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useState } from "react";

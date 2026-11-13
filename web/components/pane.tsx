@@ -17,7 +17,7 @@ import type { FileBase } from "../file-paths";
 import { PastConversation } from "./past-conversation";
 import { RenderBoundary } from "./render-boundary";
 import { SidebarToggle } from "./sidebar-panel";
-import { SubagentLinks, type SubagentLinksValue } from "./subagent-links";
+import { SubagentLinks, useSubagentLinks } from "./subagent-links";
 import { PaneFocused } from "./find-bar";
 
 interface PaneProps {
@@ -68,18 +68,9 @@ interface ViewConversationProps {
  * token never asks it to render.
  */
 export const ViewConversation = memo(function ViewConversation({ view, focused, host, lastHost, session, models, workspaces, actions, header, placeholder }: ViewConversationProps) {
-	const { send, request, start, open, end } = useDashboardActions();
+	const { send, start, end } = useDashboardActions();
 	const { fork, resume } = useDashboardStatus().starts;
-	const instanceId = view.kind === "live" ? view.instanceId : null;
-	const agents = host?.agents;
-	const writable = host?.control.phase === "live" && !host.control.readOnly;
-	const links = useMemo<SubagentLinksValue | null>(
-		() =>
-			instanceId
-				? { instanceId, agents: agents ?? [], onOpen: open, onCancel: writable ? agent => request({ t: "cancel-agent", view: agent }) : null }
-				: null,
-		[instanceId, agents, open, writable, request],
-	);
+	const links = useSubagentLinks(view, host);
 	const onFork = useCallback((itemId: string, point: ForkPoint) => start({ kind: "fork", view, itemId, point }), [start, view]);
 	const onResume = useCallback(() => view.kind === "past" && start({ kind: "resume", sessionId: view.sessionId }), [start, view]);
 	// Kept by view, so a pane that switches to another session shows its transcript.

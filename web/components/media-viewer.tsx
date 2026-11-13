@@ -1,4 +1,4 @@
-/** `ImageViewer`, one image of a list shown large, which the Session card's Images section, the transcript's tool images, the thumbnails under agent text, and a pull request's Markdown images open. */
+/** `ImageViewer`, one image of a list shown large, which the Overview tab's Images section, the transcript's tool images, the thumbnails under agent text, and a pull request's Markdown images open. */
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { IconChevronLeft, IconChevronRight, IconCrossMedium, IconSquareArrowTopRight } from "central-icons";
 import type { ReactNode } from "react";

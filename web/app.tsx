@@ -392,6 +392,8 @@ export function App() {
 														tickets={focused.row?.tickets ?? []}
 														hosts={visible.hosts}
 														sessionId={focused.sessionId}
+														host={focused.host ?? null}
+														facts={focused.row ?? null}
 													/>
 												) : (
 													openBot && (

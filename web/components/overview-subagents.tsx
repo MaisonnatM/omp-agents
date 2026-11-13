@@ -1,5 +1,5 @@
 /**
- * The Session card's Subagents section: the view's subagents as a tree, each a link to its own view with its status and what it is doing.
+ * The Overview tab's Subagents section: the view's subagents as a tree, each a link to its own view with its status and what it is doing.
  * The runners of an arena the session recorded sit side by side above the tree, with the judge under them and the base marked.
  */
 import { IconJudgeGavel, IconSword, IconTrophy } from "central-icons";
@@ -11,31 +11,27 @@ import type { AgentRow, ArenaRecord } from "../../src/shared/sessions";
 import { SPLIT_CLICK, subagentModeOf } from "../labels";
 import { hashForView } from "../routing";
 import { useStoredState } from "../stored-state";
-import { type ArenaGroup, type ArenaSeat, type ArenaVerdict, arenaGroups, type SubagentNode } from "../session-card-subagents-model";
-import { countLabel } from "../session-card-model";
+import { type ArenaGroup, type ArenaSeat, type ArenaVerdict, arenaGroups, type SubagentNode } from "../overview-subagents-model";
 import { StatusDot, statusLabel } from "./status-dot";
 import { CancelAgentButton, type SubagentLinksValue } from "./subagent-links";
-import { ChangesSection } from "./session-card-changes";
+import { ChangesSection } from "./overview-changes";
 
-/** Whether the section is folded shut, kept for every view; it starts open. The key keeps the card's old name, so earlier folds carry over. */
+/** Whether the section is folded shut, kept for every view; it starts open. The key keeps an earlier name, so earlier folds carry over. */
 const CLOSED_KEY = "omp-agents.todos-card-subagents-closed";
 
 /** Each level of nesting indents a row by this many pixels. */
 const INDENT_PX = 12;
 
-/** `nodes`, the rows of `subagentTree` for the view, which the card shows this section for only while it has any; `arenas`, the session's. */
+/** `nodes`, the rows of `subagentTree` for the view, which the Overview tab shows this section for only while it has any; `arenas`, the session's. */
 export function SubagentsSection({ links, nodes, arenas }: { links: SubagentLinksValue; nodes: readonly SubagentNode[]; arenas: readonly ArenaRecord[] }) {
 	const [closed, setClosed] = useStoredState(CLOSED_KEY, raw => raw === "true");
 	const running = nodes.filter(node => node.agent.status === "running").length;
 	const { groups, rest } = arenaGroups(nodes, arenas);
 	return (
 		<ChangesSection
-			title={
-				<span className="truncate">
-					{countLabel(nodes.length, "Subagent", "Subagents")}
-					{running > 0 && <span className="font-normal text-muted-foreground"> · {running} running</span>}
-				</span>
-			}
+			title="Subagents"
+			count={nodes.length}
+			detail={running > 0 && <span className="shrink-0 font-normal text-muted-foreground">· {running} running</span>}
 			open={!closed}
 			onToggle={() => setClosed(shut => !shut)}
 			fold="transcript.subagents"
@@ -44,7 +40,7 @@ export function SubagentsSection({ links, nodes, arenas }: { links: SubagentLink
 				<ArenaLanes key={group.seats[0].agent.id} group={group} links={links} />
 			))}
 			{rest.length > 0 && (
-				<ul aria-label="Subagents" className="max-h-[min(30vh,12.5rem)] overflow-y-auto px-1 py-1">
+				<ul aria-label="Subagents" className="px-1 py-1">
 					{rest.map(({ agent, depth }) => (
 						<SubagentRow key={agent.id} agent={agent} depth={depth} links={links} />
 					))}

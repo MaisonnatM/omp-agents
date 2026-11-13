@@ -285,7 +285,6 @@ function LiveConversation({
 			) : undefined,
 		[session, writable, cwdDisplay],
 	);
-	const changes = useMemo(() => ({ sessionId, cwd: shown?.cwd ?? null, facts: shown }), [sessionId, shown]);
 	// A private session leaves nothing behind, so nothing may fork it.
 	const isPrivate = isPrivateHost(shown);
 
@@ -295,7 +294,7 @@ function LiveConversation({
 			{trajectory ? (
 				<Trajectory view={view} />
 			) : (
-				<Transcript view={view} working={working} fork={fork} onFork={isPrivate ? undefined : onFork} onEdit={switchable ? editPrompt : undefined} empty={empty} changes={changes} />
+				<Transcript view={view} working={working} fork={fork} onFork={isPrivate ? undefined : onFork} onEdit={switchable ? editPrompt : undefined} empty={empty} />
 			)}
 			<div className="conversation-lane relative px-3 pb-3">
 				{requests[0] && (

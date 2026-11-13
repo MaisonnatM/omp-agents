@@ -70,7 +70,7 @@ export function pullRequestRoutes({ get, media, write }: RouteKit, env: PullRequ
 
 	/** Images and videos hosted by GitHub; the proxy restricts hosts and keeps the GitHub token off redirected hosts. */
 	const githubMedia = media((params) => readGithubMedia(params.get("url")));
-	/** The icons of the sites the Session card's sources name; the proxy asks public HTTPS hosts only. */
+	/** The icons of the sites the Overview tab's sources name; the proxy asks public HTTPS hosts only. */
 	const favicon = media((params) => readFavicon(params.get("host")));
 
 	/** `PUT /api/pull-request`: `PullRequestEdit`, made on GitHub; answers the pull request in full as it is after it. */
