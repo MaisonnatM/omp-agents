@@ -1,6 +1,6 @@
 # Sessions sidebar
 
-- The sidebar's foot shows how much quota is left on each plan, one per row, and the Mac's CPU, free memory, and free disk: hover or click the CPU for each session's processes with **Stop**, or the disk for **Clean up…**.
+- The sidebar's foot shows how much quota is left on each plan account, as a grid of rings, and the Mac's CPU, free memory, and free disk: hover or click the CPU for each session's processes with **Stop**, or the disk for **Clean up…**.
 - The sidebar runs the window's height on the window's background, and the page and the session details sidebar sit beside it as rounded panels.
   Its top row, 48 px tall at the default font size as the header's tabs beside it are, holds the omp mark, the command menu button, and the button that hides the sidebar.
 - Under it the page list shows **New session**, then **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Calendar**, **Todo**, **Sport**, and **Email** in the order Settings › Preferences gives them, then **Settings**.
@@ -101,14 +101,11 @@
   Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Alt+B the details sidebar, which shows the session's details on the panes and a Bot's on its page.
   Each sidebar's width, and whether it is hidden, is saved in the app.
 - The left sidebar's session rows leave out the full working directory, the model, the /ship step, and the pull requests; hover the workspace in the pane header to see the directory, the composer shows the model, and the session details sidebar shows the pull requests.
-- The sidebar's foot, under the roster, shows how much quota is left on each plan that `omp usage` reports, one plan per row: each plan's provider logo, from [svgl](https://svgl.app), then each window, for example `5h 66%  7d 68%` for Anthropic.
-  Hover the logo to see the plan's name and account, and how many reset credits the plan holds with when the soonest one expires, such as `3 reset credits, next expires Oct 22.`; a reset credit, which omp redeems, clears a used-up window.
-  A provider without a logo shows the plan's name instead.
-  A window is named by its length plus its model tier (`7d fable`).
-  Two limits that would share a name, like Cursor's monthly limits, show omp's label instead.
+- The sidebar's foot, under the roster, shows how much quota is left on each plan account that `omp usage` reports, as a grid of four tiles per row: each tile is the provider's logo, from [svgl](https://svgl.app), inside a ring that empties as the plan is used, then the percent left of its tightest open window, then the account's tag, such as `gmail`, or the window, such as `7d`, when the provider has one account.
+  A provider without a logo shows the first letters of the plan's name in the ring.
   Amber means less than 20% is left, and red means the window is used up, as omp reports it.
-  Hover or focus a window to see omp's full limit name and when it resets.
-  Next to the provider logo, before the windows, a plan with extra usage, the pay-as-you-go spend past its plan such as Claude's, shows the amount spent and the cap, as `extra $12.40 / $50.00`.
+  Hover or click a tile to see every window of the plan with its bar and when it resets, the extra usage, and how many reset credits the plan holds with when the soonest one expires, such as `3 reset credits, next expires Oct 22.`; a reset credit, which omp redeems, clears a used-up window.
+  A plan with extra usage and no windows, the pay-as-you-go spend past its plan such as Claude's, shows the amount spent and the cap, as `$12.40 / $50.00`.
   Extra usage keeps the provider's billing currency without conversion, so a euro account shows euros.
   When the provider reports no cap, only the spend appears, as `extra €13.65`.
   Amber means less than 20% of a known cap is left, and red means the extra usage is used up.

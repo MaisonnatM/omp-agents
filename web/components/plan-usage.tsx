@@ -31,7 +31,7 @@ export function spendLabel({ used, limit, currency = "USD" }: Pick<ExtraUsage, "
 	return limit === null ? format(used) : `${format(used)} / ${format(limit)}`;
 }
 
-type Tone = "out" | "low" | "ok";
+export type Tone = "out" | "low" | "ok";
 
 const TONE_CLASS: Record<Tone, { text: string; bar: string }> = {
 	out: { text: "text-red-600 dark:text-red-400", bar: "bg-red-500" },
@@ -69,30 +69,9 @@ export function creditView(balance: CreditBalance): { amount: string; phrase: st
 	}
 }
 
-/** One footer figure: a muted label, then the value in its tone, with the details on hover or focus. */
-function QuotaChip({ label, value, tooltip, tone }: { label: string; value: string; tooltip: string; tone: Tone }) {
-	return (
-		<Tooltip content={tooltip}>
-			<span tabIndex={0} className={cn("whitespace-nowrap tabular-nums", FOCUS, TONE_CLASS[tone].text)}>
-				<span className="text-muted-foreground">{label}</span> {value}
-			</span>
-		</Tooltip>
-	);
-}
-
-/** The balance in its tone, turned red once the provider refuses requests for lack of credit. */
-function CreditAmount({ name, balance, outOfCreditSince }: { name: string; balance: CreditBalance; outOfCreditSince?: number }) {
-	const { amount, tooltip, tone } = creditView(balance);
-	if (outOfCreditSince === undefined) return <QuotaChip label={name} value={amount} tooltip={tooltip} tone={tone} />;
-	return <QuotaChip label={name} value={amount} tooltip={`${tooltip}${refusedSince(outOfCreditSince)}`} tone="out" />;
-}
-
 function refusedSince(since: number): string {
 	return ` Requests refused for lack of credit since ${new Date(since).toLocaleString()}.`;
 }
-
-/** A plan shows as a {@link PlanChip} when it has windows or spend; else by name. */
-const hasChip = (plan: PlanUsage): boolean => !isNameOnlyPlan(plan);
 
 /** Time until `at`, in its two largest units: `3h24m`, `1d3h`, `12m`. */
 export function untilLabel(at: number, now: number): string {
@@ -134,30 +113,33 @@ export function accountTags(plans: readonly PlanUsage[]): Map<PlanUsage, string>
 	return tags;
 }
 
-/** One figure on a plan's chip: an optional muted label, then the text in its tone. */
-export interface ChipPart {
-	label?: string;
-	text: string;
+/** A plan's tile: the share left of its tightest window, its spend, or its credit balance, as a ring and a figure. */
+export interface PlanGauge {
+	/** Fraction the ring fills, 0 to 1; `null` when nothing measures it. */
+	left: number | null;
+	/** The figure under the ring; `null` for a plan known by name only. */
+	value: string | null;
 	tone: Tone;
+	/** What tells the tile apart: the account tag, else the window, else the plan's name. */
+	caption: string;
 }
 
-/**
- * What a plan's chip says, in order: its tightest open window, or `used up`; how many other windows are used up; the
- * spend past the plan when it has no windows. Resets and reset credits show only in {@link PlanCard}.
- */
-export function chipParts(plan: PlanUsage): ChipPart[] {
-	const parts: ChipPart[] = [];
-	let open: PlanWindow | undefined;
-	let usedUp = 0;
-	for (const window of plan.windows) {
-		if (!window.exhausted) {
-			if (!open || window.remaining < open.remaining) open = window;
-		} else usedUp++;
+export function planGauge(plan: PlanUsage, tag: string | undefined): PlanGauge {
+	const open = plan.windows.filter(window => !window.exhausted).sort((a, b) => a.remaining - b.remaining)[0];
+	if (open) return { left: open.remaining, value: `${percentLeft(open)}%`, tone: windowTone(open), caption: tag ?? open.label };
+	if (plan.windows.length > 0) return { left: 0, value: "used up", tone: "out", caption: tag ?? plan.name };
+	if (plan.extra) {
+		const left = plan.extra.limit === null ? null : Math.max(0, 1 - plan.extra.used / plan.extra.limit);
+		return { left, value: spendLabel(plan.extra), tone: extraTone(plan.extra), caption: tag ?? "extra" };
 	}
-	if (open) parts.push({ label: open.label, text: `${percentLeft(open)}%`, tone: windowTone(open) });
-	if (usedUp > 0) parts.push({ text: open ? `${usedUp} used up` : "used up", tone: "out" });
-	if (plan.windows.length === 0 && plan.extra) parts.push({ label: "extra", text: spendLabel(plan.extra), tone: extraTone(plan.extra) });
-	return parts;
+	const caption = tag ? `${plan.name} ${tag}` : plan.name;
+	if (plan.balance) {
+		const { amount, tone } = creditView(plan.balance);
+		const left = plan.balance.kind === "grant" && plan.balance.limit > 0 ? Math.max(0, 1 - plan.balance.used / plan.balance.limit) : null;
+		return { left, value: amount, tone: plan.outOfCreditSince === undefined ? tone : "out", caption };
+	}
+	if (plan.outOfCreditSince !== undefined) return { left: 0, value: "used up", tone: "out", caption };
+	return { left: null, value: null, tone: "ok", caption };
 }
 
 /** The share of a window left, as a bar that empties as the window is used. */
@@ -212,23 +194,45 @@ export function PlanCard({ plan, now }: { plan: PlanUsage; now: number }) {
 	);
 }
 
-/** A plan with usage windows or spend: its account tag and {@link chipParts}; hovering or clicking opens {@link PlanCard}. */
-function PlanChip({ plan, tag }: { plan: PlanUsage; tag: string | undefined }) {
+const RING_STROKE: Record<Tone, string> = { out: "stroke-red-500", low: "stroke-amber-500", ok: "stroke-foreground/60" };
+const RING_RADIUS = 13;
+const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
+const TILE = "flex min-w-0 flex-col items-center gap-0.5 rounded-md px-0.5 py-1 tabular-nums hover:bg-hover";
+
+/** A provider's logo inside a ring that empties as the plan is used. */
+function Ring({ plan, gauge }: { plan: PlanUsage; gauge: PlanGauge }) {
+	return (
+		<span aria-hidden className="relative grid size-8 place-items-center">
+			<svg viewBox="0 0 32 32" className="absolute inset-0 -rotate-90">
+				<circle cx="16" cy="16" r={RING_RADIUS} fill="none" strokeWidth="2.5" className="stroke-foreground/10" />
+				{gauge.left !== null && (
+					<circle cx="16" cy="16" r={RING_RADIUS} fill="none" strokeWidth="2.5" strokeLinecap="round" className={RING_STROKE[gauge.tone]} strokeDasharray={`${Math.max(0.02, gauge.left) * RING_LENGTH} ${RING_LENGTH}`} />
+				)}
+			</svg>
+			<OrgIcon org={providerOrg(plan.provider)} className="size-3.5" fallback={<span className="text-[10px] font-medium">{plan.name.slice(0, 2)}</span>} />
+		</span>
+	);
+}
+
+function TileText({ gauge }: { gauge: PlanGauge }) {
+	return (
+		<>
+			<span className={cn("max-w-full truncate font-medium", TONE_CLASS[gauge.tone].text)}>{gauge.value ?? "—"}</span>
+			<span className="max-w-full truncate text-[10px] text-muted-foreground">{gauge.caption}</span>
+		</>
+	);
+}
+
+/** A plan with windows or spend; hovering or clicking opens {@link PlanCard} with its resets and credits. */
+function PlanTile({ plan, gauge }: { plan: PlanUsage; gauge: PlanGauge }) {
 	const popover = useHoverPopover();
 	const now = useMinute();
 	return (
 		<Popover {...popover.root}>
 			<PopoverTrigger asChild>
-				<button {...popover.trigger} type="button" className={cn("-mx-1 flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-sm px-1 tabular-nums hover:bg-hover", FOCUS)}>
-					<span className="sr-only">{plan.account ? `${plan.name} ${plan.account}:` : `${plan.name}:`}</span>
-					{tag && <span aria-hidden className="text-muted-foreground">{tag}</span>}
-					{chipParts(plan).map((part, index) => (
-						<span key={part.text} className={TONE_CLASS[part.tone].text}>
-							{index > 0 && <span className="text-muted-foreground">· </span>}
-							{part.label && <span className="text-muted-foreground">{part.label} </span>}
-							{part.text}
-						</span>
-					))}
+				<button {...popover.trigger} type="button" aria-label={`${plan.name} ${plan.account ?? ""} ${gauge.caption} ${gauge.value ?? ""}`} className={cn(TILE, FOCUS)}>
+					<Ring plan={plan} gauge={gauge} />
+					<TileText gauge={gauge} />
 				</button>
 			</PopoverTrigger>
 			<PopoverContent {...popover.content} side="top" align="start" aria-label={`${plan.name} usage`} className="w-96 max-w-[calc(100vw-2rem)] p-0">
@@ -238,17 +242,21 @@ function PlanChip({ plan, tag }: { plan: PlanUsage; tag: string | undefined }) {
 	);
 }
 
-/** A plan without a chip, such as API credits: its name and account tag, then its balance or `used up` once the provider refuses requests. */
-function NamedPlan({ plan, tag }: { plan: PlanUsage; tag: string | undefined }) {
-	const name = tag ? `${plan.name} ${tag}` : plan.name;
-	if (plan.balance) return <CreditAmount name={name} balance={plan.balance} outOfCreditSince={plan.outOfCreditSince} />;
-	if (plan.outOfCreditSince !== undefined) {
-		return <QuotaChip label={name} value="used up" tooltip={`${name}: used up.${refusedSince(plan.outOfCreditSince)}`} tone="out" />;
-	}
-	return <span className="whitespace-nowrap text-foreground">{name}</span>;
+/** A plan known by name, such as API credits: its balance, or `used up` once the provider refuses requests, explained on hover. */
+function NamedTile({ plan, gauge }: { plan: PlanUsage; gauge: PlanGauge }) {
+	const balance = plan.balance ? creditView(plan.balance).tooltip : `${gauge.caption}${gauge.value ? `: ${gauge.value}.` : "."}`;
+	const tooltip = plan.outOfCreditSince === undefined ? balance : `${balance}${refusedSince(plan.outOfCreditSince)}`;
+	return (
+		<Tooltip content={tooltip}>
+			<span tabIndex={0} aria-label={tooltip} className={cn(TILE, FOCUS)}>
+				<Ring plan={plan} gauge={gauge} />
+				<TileText gauge={gauge} />
+			</span>
+		</Tooltip>
+	);
 }
 
-/** Plan quota for the sidebar's foot: one row per provider, its logo once, then each of its accounts. */
+/** Plan quota for the sidebar's foot: a grid of ring tiles, one per account, in `omp usage` order. */
 export function PlanUsageList({ usage }: { usage: DashboardState["usage"] }) {
 	if (usage === null) return <p className="text-muted-foreground">Checking plans…</p>;
 	if (usage.error !== null) return <p className="min-w-0 truncate text-red-600 dark:text-red-400">Cannot read plan usage: {usage.error}</p>;
@@ -259,21 +267,16 @@ export function PlanUsageList({ usage }: { usage: DashboardState["usage"] }) {
 			</p>
 		);
 	const tags = accountTags(usage.plans);
-	const makers = Map.groupBy(usage.plans, plan => providerOrg(plan.provider) ?? plan.provider);
 	return (
-		<ul aria-label="Plan usage" className="flex min-w-0 flex-col items-start gap-1">
-			{[...makers].map(([maker, plans]) => (
-				<li key={maker} className="flex max-w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-					<span aria-hidden className="flex shrink-0 items-center">
-						<OrgIcon org={providerOrg(plans[0]!.provider)} fallback={<span className="font-medium text-foreground">{plans[0]!.name}</span>} />
-					</span>
-					{plans.map((plan, index) => (
-						<span key={`${plan.provider}:${plan.account ?? index}`} className={cn("flex min-w-0 items-center", index > 0 && "border-l border-border pl-2")}>
-							{hasChip(plan) ? <PlanChip plan={plan} tag={tags.get(plan)} /> : <NamedPlan plan={plan} tag={tags.get(plan)} />}
-						</span>
-					))}
-				</li>
-			))}
+		<ul aria-label="Plan usage" className="grid grid-cols-4 gap-1">
+			{usage.plans.map((plan, index) => {
+				const gauge = planGauge(plan, tags.get(plan));
+				return (
+					<li key={`${plan.provider}:${plan.account ?? index}`} className="flex min-w-0 flex-col">
+						{isNameOnlyPlan(plan) ? <NamedTile plan={plan} gauge={gauge} /> : <PlanTile plan={plan} gauge={gauge} />}
+					</li>
+				);
+			})}
 		</ul>
 	);
 }

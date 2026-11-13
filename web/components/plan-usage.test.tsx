@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { PlanUsage, PlanWindow } from "../../src/shared/models";
-import { accountTags, chipParts, creditView, PlanCard, PlanUsageList, spendLabel } from "./plan-usage";
+import { accountTags, creditView, PlanCard, planGauge, spendLabel } from "./plan-usage";
 
 const apiCredits: PlanUsage = { provider: "anthropic-api", name: "API credits", account: null, windows: [], extra: null, resetCredits: null };
-const footer = (plan: PlanUsage) => renderToStaticMarkup(<PlanUsageList usage={{ plans: [plan], error: null }} />);
+const tile = (plan: PlanUsage) => planGauge(plan, undefined);
 
 test("formats subscription spend and caps in the account currency without converting", () => {
 	expect(spendLabel({ used: 13.65, limit: null, currency: "EUR" })).toBe("€13.65");
@@ -29,38 +29,29 @@ test("the API credits amount and tone: red once the grant or the prepaid balance
 	for (const [balance, amount, tone] of cases) expect(creditView(balance)).toMatchObject({ amount, tone });
 });
 
-test("a provider refusing requests for lack of credit reads used up, with or without a balance to show", () => {
-	const refused = footer({ ...apiCredits, outOfCreditSince: Date.parse("2026-11-07T08:46:51Z") });
-	expect(refused).toContain("text-red-600");
-	expect(refused).toContain("</span> used up</span>");
-	expect(footer(apiCredits)).not.toContain("used up");
-
-	const withGrant = footer({ ...apiCredits, balance: { kind: "grant", used: 120, limit: 200, expiresAt: null }, outOfCreditSince: 1 });
-	expect(withGrant).toContain("text-red-600");
-	expect(withGrant).toContain("$120.00 / $200.00");
-	expect(footer({ ...apiCredits, balance: { kind: "grant", used: 120, limit: 200, expiresAt: null } })).not.toContain("text-red-600");
-
-	const withPrepaid = footer({ ...apiCredits, balance: { kind: "prepaid", left: 3 }, outOfCreditSince: 1 });
-	expect(withPrepaid).toContain("text-red-600");
-	expect(withPrepaid).toContain("$3.00 left");
+test("a provider refusing requests for lack of credit reads used up and red, with or without a balance to show", () => {
+	expect(tile({ ...apiCredits, outOfCreditSince: Date.parse("2026-11-07T08:46:51Z") })).toMatchObject({ value: "used up", tone: "out" });
+	expect(tile(apiCredits)).toMatchObject({ value: null, left: null });
+	const grant = { ...apiCredits, balance: { kind: "grant", used: 120, limit: 200, expiresAt: null } } as const;
+	expect(tile({ ...grant, outOfCreditSince: 1 })).toMatchObject({ value: "$120.00 / $200.00", tone: "out" });
+	expect(tile(grant)).toMatchObject({ tone: "ok", left: 0.4 });
+	expect(tile({ ...apiCredits, balance: { kind: "prepaid", left: 3 }, outOfCreditSince: 1 })).toMatchObject({ value: "$3.00 left", tone: "out" });
 });
 
 const NOW = Date.parse("2026-11-12T10:00:00Z");
 const HOUR = 3_600_000;
 const planWindow = (label: string, remaining: number, resetsAt: number | null = null): PlanWindow => ({ id: label, label, title: `Claude ${label}`, remaining, exhausted: remaining === 0, resetsAt });
 const claude: PlanUsage = { provider: "anthropic", name: "Anthropic", account: "maxence@yampa.ai", windows: [], extra: null, resetCredits: null };
-const chip = (plan: Partial<PlanUsage>) => chipParts({ ...claude, ...plan }).map(({ label, text }) => (label ? `${label} ${text}` : text));
 
-test("a chip shows the tightest open window, then how many windows are used up, and never resets or reset credits", () => {
+test("a tile reads the tightest open window, named by the account tag when the provider has several", () => {
 	const windows = [planWindow("7d", 0.9), planWindow("5h", 0.43), planWindow("fable", 0, NOW + HOUR)];
-	expect(chip({ windows, resetCredits: { count: 2, nextExpiresAt: null } })).toEqual(["5h 43%", "1 used up"]);
-	expect(chipParts({ ...claude, windows: [planWindow("5h", 0.1)] })[0]?.tone).toBe("low");
-	expect(chip({ windows: [planWindow("5h", 0, NOW + 3 * HOUR)] })).toEqual(["used up"]);
+	expect(planGauge({ ...claude, windows }, undefined)).toEqual({ left: 0.43, value: "43%", tone: "ok", caption: "5h" });
+	expect(planGauge({ ...claude, windows: [planWindow("5h", 0.1)] }, "gmail")).toMatchObject({ tone: "low", caption: "gmail" });
+	expect(tile({ ...claude, windows: [planWindow("5h", 0, NOW + 3 * HOUR)] })).toMatchObject({ value: "used up", tone: "out", left: 0 });
 });
 
 test("a plan with no windows shows its spend past the plan, amber past most of its cap", () => {
-	const parts = chipParts({ ...claude, extra: { title: "Extra usage", used: 45, limit: 50, currency: "USD", exhausted: false } });
-	expect(parts).toEqual([{ label: "extra", text: "$45.00 / $50.00", tone: "low" }]);
+	expect(tile({ ...claude, extra: { title: "Extra usage", used: 45, limit: 50, currency: "USD", exhausted: false } })).toMatchObject({ value: "$45.00 / $50.00", tone: "low" });
 });
 
 test("account tags tell apart the accounts of one provider, by domain or else by name", () => {
@@ -72,10 +63,6 @@ test("account tags tell apart the accounts of one provider, by domain or else by
 	expect([tags.get(yampa), tags.get(gmail), tags.get(gmail2), tags.get(openai)]).toEqual(["yampa", "max", "ana", undefined]);
 });
 
-test("the accounts of one provider share one row with one logo", () => {
-	const markup = renderToStaticMarkup(<PlanUsageList usage={{ plans: [{ ...claude, windows: [planWindow("5h", 0.5)] }, { ...claude, account: "max@gmail.com", windows: [planWindow("5h", 0.2)] }], error: null }} />);
-	expect(markup.match(/<li/g)).toHaveLength(1);
-});
 
 test("the card gives every window its share left and when it resets, with the date", () => {
 	const card = renderToStaticMarkup(<PlanCard plan={{ ...claude, windows: [planWindow("5h", 0.59, NOW + 4 * HOUR + 19 * 60_000), planWindow("7d", 0)] }} now={NOW} />).replaceAll("<!-- -->", "");
