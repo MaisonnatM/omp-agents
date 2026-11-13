@@ -4,7 +4,7 @@ import type { ScheduledSend } from "../src/shared/scheduled";
 import type { AgentRow, AgentStatus, HostStatus, PastSession, RosterHost, UnreadTurn, View } from "../src/shared/sessions";
 import { spaces } from "../src/shared/workspaces";
 import type { Layout, Page } from "./routing";
-import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, rowPlacement, scheduledIn, searchSessions, sessionsIn, sidebarSessions, spaceSession, spaceSwitchPanes, waitingCount, waitingIn, workspaceSession, workspacesIn, workspaceSwitch } from "./sessions";
+import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, rosterFolders, rowPlacement, scheduledIn, searchSessions, sessionsIn, sidebarSessions, spaceSession, spaceSwitchPanes, waitingCount, waitingIn, workspaceGroups, workspaceSession, workspacesIn, workspaceSwitch } from "./sessions";
 
 const host = (sessionId: string, cwd: string) => fromPartial<RosterHost>({ instanceId: `i-${sessionId}`, sessionId, cwd, agents: [], turnWaits: false });
 const subagents = (...statuses: AgentStatus[]): AgentRow[] => statuses.map(status => fromPartial<AgentRow>({ status }));
@@ -294,11 +294,11 @@ describe("sidebarSessions", () => {
 		expect(waitingCount(sidebarSessions(live, [], "~/a", new Set(["h4"])))).toBe(3);
 	});
 
-	test("the previous and next session keys walk pinned rows first, then idle, running, waiting on subagents, interrupted, and past", () => {
+	test("the previous and next session keys walk pinned rows first, then each workspace's idle, running, waiting on subagents, and interrupted rows, then past", () => {
 		const delegating = fromPartial<RosterHost>({ ...host("h9", "~/a"), status: "idle", agents: subagents("running") });
 		const live = [delegating, { ...host("h0", "~/a"), status: "idle" as const }, ...hosts];
 		const lists = sidebarSessions(live, sessions, "~/a", new Set(["h2", "p3"]));
-		expect(listedViews(lists)).toEqual([
+		expect(listedViews(lists, workspaceGroups(lists, []))).toEqual([
 			{ kind: "live", instanceId: "i-h2", agentId: null },
 			{ kind: "past", sessionId: "p3" },
 			{ kind: "live", instanceId: "i-h0", agentId: null },
@@ -307,6 +307,30 @@ describe("sidebarSessions", () => {
 			{ kind: "past", sessionId: "p2" },
 			{ kind: "past", sessionId: "p1" },
 		]);
+	});
+
+	test("the roster groups live and interrupted sessions by workspace, busy workspaces first, each in the workspaces' order", () => {
+		const workspace = (cwd: string) => ({ cwd, cwdDisplay: cwd });
+		const live = [{ ...host("h1", "~/b"), status: "idle" as const }, { ...host("h2", "~/c"), status: "working" as const }];
+		const lists = sidebarSessions(live, [past("p1", "~/a", true), past("p2", "~/a", false)], null, none);
+		const groups = workspaceGroups(lists, [workspace("~/a"), workspace("~/quiet"), workspace("~/b")]);
+		expect(groups.map(group => group.workspace.cwd)).toEqual(["~/a", "~/b", "~/c", "~/quiet"]);
+		expect(groups.map(group => [ids(group.hosts), ids(group.interrupted)])).toEqual([[[], ["p1"]], [["h1"], []], [["h2"], []], [[], []]]);
+		expect(listedViews(lists, groups)).toEqual([
+			{ kind: "past", sessionId: "p1" },
+			{ kind: "live", instanceId: "i-h1", agentId: null },
+			{ kind: "live", instanceId: "i-h2", agentId: null },
+			{ kind: "past", sessionId: "p2" },
+		]);
+	});
+
+	test("the roster's workspace order stays put while a session's turn ends, though the idle sessions list first", () => {
+		const workspaces = [{ cwd: "~/a", cwdDisplay: "~/a" }, { cwd: "~/b", cwdDisplay: "~/b" }];
+		const order = (live: RosterHost[]) => workspaceGroups(sidebarSessions(live, [], null, none), workspaces).map(group => group.workspace.cwd);
+		const working = [{ ...host("h1", "~/a"), status: "working" as const }, { ...host("h2", "~/b"), status: "working" as const }];
+		expect(order(working)).toEqual(["~/a", "~/b"]);
+		expect(order([working[0]!, { ...working[1]!, status: "idle" as const }])).toEqual(["~/a", "~/b"]);
+		expect(order([{ ...working[0]!, status: "idle" as const }, working[1]!])).toEqual(["~/a", "~/b"]);
 	});
 
 	test("a search keeps the rows whose title or directory holds every word, in any order and any case, pinned ones included", () => {
@@ -362,5 +386,30 @@ describe("rowPlacement", () => {
 
 	test("a past session with the same id as a live instance is not confused with it", () => {
 		expect(rowPlacement([live("s")], saved)).toBe("hidden");
+	});
+});
+
+describe("rosterFolders", () => {
+	const workspace = (cwd: string) => ({ cwd, cwdDisplay: cwd });
+	const ended = (sessionId: string, cwd: string) => ({ sessionId, cwd, cwdDisplay: cwd, workspace: null, interrupted: false }) as PastSession;
+	const groups = workspaceGroups(sidebarSessions([host("h1", "~/c")], [], null, none), ["~/a", "~/b", "~/c", "~/d"].map(workspace));
+	const saved = [ended("p1", "~/a"), ended("p2", "~/d"), ended("p3", "~/b")];
+	const cwds = ({ shown }: { shown: { group: { workspace: { cwd: string } } }[] }) => shown.map(({ group }) => group.workspace.cwd);
+	const options = { pastListed: 0, limit: 2, all: false, filtering: false };
+
+	test("an open ended session that Past does not list shows under its folder, and the folder keeps its place", () => {
+		const before = rosterFolders(groups, saved, [], options);
+		expect(cwds(before)).toEqual(["~/c", "~/a"]);
+		expect(before.more).toBe(2);
+		const opened = rosterFolders(groups, saved, [{ kind: "past", sessionId: "p2" }], options);
+		expect(cwds(opened)).toEqual(["~/c", "~/a", "~/d"]);
+		expect(opened.shown.map(({ under }) => ids(under))).toEqual([[], [], ["p2"]]);
+		expect(opened.more).toBe(1);
+	});
+
+	test("an open ended session that Past lists stays there and leaves the folders alone", () => {
+		const folders = rosterFolders(groups, saved, [{ kind: "past", sessionId: "p2" }], { ...options, pastListed: saved.length });
+		expect(cwds(folders)).toEqual(["~/c", "~/a"]);
+		expect(folders.shown.every(({ under }) => under.length === 0)).toBe(true);
 	});
 });
