@@ -54,9 +54,21 @@ test("an update's action, failure, and toast follow its status", () => {
 });
 
 test("new omp-agents commits name their count and branch, and their Update pulls and restarts", () => {
-	const dashboard = (commits: number): Notice => ({ id: "d", ...flags, kind: "dashboard", branch: "main", commits, status: { state: "available" } });
+	const dashboard = (commits: number): Notice => ({ id: "d", ...flags, kind: "dashboard", branch: "main", running: "a1b2c3d4e5", commits, status: { state: "available" } });
 	expect(presentNotice(dashboard(1), NOW)).toMatchObject({ source: "updates", headline: "omp-agents update: 1 new commit on main", preview: "Update pulls them and restarts omp-agents.", action: { kind: "update", updating: false, ready: true } });
 	expect(presentNotice(dashboard(4), NOW).headline).toBe("omp-agents update: 4 new commits on main");
+});
+
+test("an omp-agents update that did not start says where omp-agents went back to and why, toasts until dismissed, and offers no Update", () => {
+	const failed: Notice = { id: "f", ...flags, kind: "dashboard-failed", branch: "main", running: "a1b2c3d4e5", failed: { commit: "e5f6a7b8c9", failure: "exited with code 1" } };
+	expect(presentNotice(failed, NOW)).toMatchObject({
+		source: "updates",
+		headline: "omp-agents update undone",
+		preview: "omp-agents went back to a1b2c3d until origin/main has a newer commit. e5f6a7b did not start (exited with code 1).",
+		failed: true,
+		action: { kind: "none" },
+		toast: { kind: "news", timeout: 0 },
+	});
 });
 
 test("sessions that stopped mid-turn are counted, named as past sessions are, stay toasted, open the first of them, and Continue all carries their ids", () => {

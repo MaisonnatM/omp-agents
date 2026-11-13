@@ -1,5 +1,6 @@
 /** How the bell words, pictures, links, acts on, and toasts each notice: {@link presentNotice}, the one place that tells notice kinds apart. */
 import { type AccountsService, MCP_SERVICES } from "../src/shared/accounts";
+import { didNotStart, shortCommit } from "../src/shared/dashboard-update";
 import type { PullRequestSummary } from "../src/shared/github";
 import type { YourMove } from "../src/shared/moves";
 import { type Notice, type UpdateSubject, usesClause } from "../src/shared/notices";
@@ -184,6 +185,19 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 				link: { href: hashForSettings("integrations"), external: false },
 				face: { kind: "sign-in", service: notice.service },
 				// Every session that needs the account fails until you sign in again.
+				toast: { kind: "news", timeout: 0 },
+			};
+		case "dashboard-failed":
+			// No Update: origin still holds the commit that did not start, which it would only refuse.
+			return {
+				...NEWS,
+				source: "updates",
+				headline: "omp-agents update undone",
+				preview: `omp-agents went back to ${shortCommit(notice.running)} until origin/${notice.branch} has a newer commit. ${didNotStart(notice.failed)}.`,
+				failed: true,
+				link: null,
+				face: { kind: "update" },
+				// It comes at the server's start, which you may not watch.
 				toast: { kind: "news", timeout: 0 },
 			};
 		case "omp":

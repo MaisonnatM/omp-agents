@@ -71,6 +71,7 @@ function originOf(notice: Notice): { logo: ReactNode; label: string } {
 		case "model":
 			return { logo: sparkles, label: "omp" };
 		case "dashboard":
+		case "dashboard-failed":
 			return { logo: sparkles, label: "omp-agents" };
 		case "stopped":
 			return { logo: <CircleAlert aria-hidden className={cn(mark, "text-amber-600 dark:text-amber-400")} />, label: "omp-agents" };

@@ -6,6 +6,7 @@ import { flushJsonFiles } from "../fs";
 import type { PullRequestList, PullRequestSummary } from "../shared/github";
 import type { PlanUsage, PlanWindow } from "../shared/models";
 import type { AgentState } from "../shared/moves";
+import type { FailedUpdate } from "../shared/dashboard-update";
 import type { CreditsSubject, ModelUpdate, Notice } from "../shared/notices";
 import type { SlackFound } from "../slack-messages";
 import { InterruptedSessions } from "./interrupted";
@@ -78,6 +79,8 @@ interface State {
 	dashboardCommits?: number;
 	/** Why updating omp-agents is refused, when it is. */
 	dashboardRefusal?: string;
+	/** The omp-agents update the desktop shell rolled back while origin still holds its commit. */
+	dashboardFailed?: FailedUpdate;
 	/** How many times the dashboard check fetched omp-agents' branch. */
 	dashboardFetches?: number;
 	/** The Google accounts sessions reported signed out that still do not work. */
@@ -108,9 +111,11 @@ function sources(state: State): NoticeSources {
 		upgradeModel: async update => {
 			state.models = state.models.filter(model => model !== update);
 		},
-		dashboardCommits: async () => {
+		dashboardNews: async () => {
 			state.dashboardFetches = (state.dashboardFetches ?? 0) + 1;
-			return state.dashboardCommits ? { branch: "main", running: "a1b2c3d4", commits: state.dashboardCommits } : null;
+			if (!state.dashboardCommits) return null;
+			const found = { branch: "main", running: "a1b2c3d4" };
+			return state.dashboardFailed ? { kind: "dashboard-failed", ...found, failed: state.dashboardFailed } : { kind: "dashboard", ...found, commits: state.dashboardCommits };
 		},
 		updateDashboard: async () => {
 			if (state.dashboardRefusal) throw new Error(state.dashboardRefusal);
@@ -190,7 +195,7 @@ describe("Notices", () => {
 		await notices.check(DASHBOARD_KINDS);
 		state.dashboardCommits = 3;
 		await notices.check(DASHBOARD_KINDS);
-		expect(notices.list).toEqual([{ id: "dashboard:a1b2c3d4", at: 0, seen: false, read: false, kind: "dashboard", branch: "main", commits: 3, status: { state: "available" } }]);
+		expect(notices.list).toEqual([{ id: "dashboard:a1b2c3d4", at: 0, seen: false, read: false, kind: "dashboard", branch: "main", running: "a1b2c3d4", commits: 3, status: { state: "available" } }]);
 
 		state.dashboardRefusal = "/code/omp-agents has changes to tracked files (bun.lock).";
 		await notices.apply(["dashboard:a1b2c3d4"], "update");
@@ -200,6 +205,20 @@ describe("Notices", () => {
 		await notices.apply(["dashboard:a1b2c3d4"], "update");
 		expect(notices.list.map(notice => "status" in notice && notice.status)).toEqual([{ state: "updated", note: "Restarting omp-agents at e5f6a7b…" }]);
 		expect(state.dashboardFetches).toBe(2);
+	});
+
+	test("an omp-agents update that did not start is a notice of its own, apart from the running build's new commits, with no update to run", async () => {
+		const state: State = { latest: null, installed: "18.8.0", models: [], dashboardCommits: 1, dashboardFailed: { commit: "e5f6a7b8c9", failure: "exited with code 1" } };
+		const notices = new Notices(noticesPath(), sources(state), () => {});
+		await notices.check(DASHBOARD_KINDS);
+		expect(notices.list.map(notice => notice.id)).toEqual(["dashboard:a1b2c3d4:failed:e5f6a7b8c9"]);
+		state.dashboardRefusal = "e5f6a7b did not start.";
+		await notices.apply(["dashboard:a1b2c3d4:failed:e5f6a7b8c9"], "update");
+		expect(notices.list.map(notice => "status" in notice)).toEqual([false]);
+		state.dashboardFailed = undefined;
+		state.dashboardCommits = 2;
+		await notices.check(DASHBOARD_KINDS);
+		expect(notices.list.map(notice => notice.id)).toEqual(["dashboard:a1b2c3d4"]);
 	});
 
 	test("a check that fails keeps the notices and marks the last one found", async () => {

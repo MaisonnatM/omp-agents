@@ -271,7 +271,7 @@ export class Dashboard {
 				updateOmp,
 				modelUpdates,
 				upgradeModel,
-				dashboardCommits: () => selfUpdate.newCommits(),
+				dashboardNews: () => selfUpdate.news(),
 				updateDashboard: () => selfUpdate.update(),
 				pullRequests: async () => {
 					const list = await loadPullRequests(this.knownWorkspaces(), false);

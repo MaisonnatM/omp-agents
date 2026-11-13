@@ -24,7 +24,7 @@ import {
 	Target,
 } from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { DashboardUpdateStatus } from "../../../src/shared/dashboard-update";
+import { type DashboardUpdateStatus, didNotStart, shortCommit } from "../../../src/shared/dashboard-update";
 import type { PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import type { UserTodo, UserTodoCategory } from "../../../src/user-todos-shared";
@@ -240,12 +240,16 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 							id: "command:update-dashboard",
 							section: "commands",
 							title: "Update dashboard",
-							subtitle: status.behind === 0 ? `omp-agents is current with origin/${status.branch}` : `${status.behind === 1 ? "1 new commit" : `${status.behind} new commits`} on ${status.branch}`,
+							subtitle: status.failed
+								? `${didNotStart(status.failed)}, so omp-agents went back to ${shortCommit(status.running)}`
+								: status.behind === 0
+									? `omp-agents is current with origin/${status.branch}`
+									: `${status.behind === 1 ? "1 new commit" : `${status.behind} new commits`} on ${status.branch}`,
 							keywords: ["omp-agents", "pull", "restart", "upgrade"],
 							icon: RefreshCw,
 							accessories: [],
 							kind: "Command",
-							actions: [[{ id: "run", title: "Pull and restart", icon: RefreshCw, run: { kind: "do", fn: () => void updateDashboard() } }]],
+							actions: [[{ id: "run", title: status.failed ? "Check for a newer commit" : "Pull and restart", icon: RefreshCw, run: { kind: "do", fn: () => void updateDashboard() } }]],
 						},
 					]
 				: [];

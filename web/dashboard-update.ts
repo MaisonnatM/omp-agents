@@ -13,7 +13,7 @@ export async function updateDashboard(): Promise<void> {
 		toasts.add(
 			outcome.kind === "current"
 				? { title: "omp-agents already runs the newest commit" }
-				: { title: `Restarting omp-agents at ${outcome.to.slice(0, 7)}`, description: `${outcome.installed ? "Installed the packages the new bun.lock names. " : ""}The page reloads once the server is back.` },
+				: { title: `Restarting omp-agents at ${outcome.to.slice(0, 7)}`, description: outcome.installed ? "Installed the packages the new bun.lock names." : undefined },
 		);
 	} catch (err) {
 		toasts.add({ title: "omp-agents did not update", description: errorText(err) });

@@ -7,7 +7,7 @@ import type { SignedOutAccount } from "../google-accounts";
 import { errorText, isObject } from "../json";
 import { type PullRequestList, prKey, repoKey } from "../shared/github";
 import { type AgentOn, yourMoves } from "../shared/moves";
-import type { DashboardUpdateOutcome } from "../shared/dashboard-update";
+import type { DashboardNews, DashboardUpdateOutcome } from "../shared/dashboard-update";
 import type { PlanUsage } from "../shared/models";
 import type { CreditsSubject, EventSubject, ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject, StoppedSession, UpdateSubject } from "../shared/notices";
 import { EVENT_LEAD_MS, usesClause } from "../shared/notices";
@@ -31,8 +31,11 @@ export interface NoticeSources {
 	updateOmp(latest: string): Promise<string>;
 	modelUpdates(): Promise<ModelUpdate[]>;
 	upgradeModel(update: ModelUpdate): Promise<void>;
-	/** How many commits origin's branch holds past the commit the omp-agents server runs, after fetching it; `null` for none, or when it cannot update itself. */
-	dashboardCommits(): Promise<{ branch: string; running: string; commits: number } | null>;
+	/**
+	 * How many commits origin's branch holds past the commit the omp-agents server runs, after fetching it, or the update that
+	 * did not start while origin still holds its commit; `null` for no commits, or when it cannot update itself.
+	 */
+	dashboardNews(): Promise<DashboardNews | null>;
 	/** Pulls omp-agents' checkout and restarts the server; rejects with why it cannot. */
 	updateDashboard(): Promise<DashboardUpdateOutcome>;
 	/** Every workspace's pull request list, and where the running sessions on each pull request stand. */
@@ -111,6 +114,7 @@ const LOOKED_FOR: Record<NoticeKind, string> = {
 	omp: "a newer omp",
 	model: "newer models",
 	dashboard: "omp-agents updates",
+	"dashboard-failed": "omp-agents updates",
 	"pull-request": "your pull requests' moves",
 	slack: "Slack messages",
 	plan: "used-up plans",
@@ -324,7 +328,9 @@ export class Notices {
 				return all(await this.#ompNotices(), false);
 			case "model":
 				return all(await this.#modelNotices(), false);
+			// One check finds both: the commits past the running build, or the update that did not start.
 			case "dashboard":
+			case "dashboard-failed":
 				return all(await this.#dashboardNotices(), false);
 			case "pull-request": {
 				const { list, agent } = await this.#sources.pullRequests();
@@ -423,10 +429,15 @@ export class Notices {
 		return (await this.#sources.modelUpdates()).map(update => ({ id: `model:${update.provider}/${update.from.id}>${update.to.id}`, at, kind: "model", ...update }));
 	}
 
-	/** One notice per running build, so the count of new commits grows on it rather than toasting again for each. */
+	/**
+	 * One notice per running build, so the count of new commits grows on it rather than toasting again for each, and
+	 * another for the update that did not start, which toasts once.
+	 */
 	async #dashboardNotices(): Promise<Unscoped[]> {
-		const found = await this.#sources.dashboardCommits();
-		return found ? [{ id: `dashboard:${found.running}`, at: this.#sources.now(), kind: "dashboard", branch: found.branch, commits: found.commits }] : [];
+		const found = await this.#sources.dashboardNews();
+		if (found === null) return [];
+		const id = found.kind === "dashboard-failed" ? `dashboard:${found.running}:failed:${found.failed.commit}` : `dashboard:${found.running}`;
+		return [{ id, at: this.#sources.now(), ...found }];
 	}
 
 	#setStatus(id: string, status: NoticeStatus): void {

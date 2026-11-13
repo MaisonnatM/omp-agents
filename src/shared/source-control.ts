@@ -53,11 +53,11 @@ export function applySourceControl(now: SourceControlSettings, change: SourceCon
 	}
 }
 
-/** What one pull of a repository's default branch did. */
+/** What one pull of a repository's default branch did; `held` when origin's commit is an omp-agents update that did not start there. */
 export type PullOutcome =
 	| { kind: "current" }
 	| { kind: "pulled"; commits: number }
-	| { kind: "skipped"; reason: "changes" | "commits" | "no-default-branch" | "failed"; detail: string | null };
+	| { kind: "skipped"; reason: "changes" | "commits" | "held" | "no-default-branch" | "failed"; detail: string | null };
 
 export interface PullRepo {
 	/** Its main checkout. */

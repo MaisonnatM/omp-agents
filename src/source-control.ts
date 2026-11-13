@@ -8,10 +8,12 @@ import { JsonFile } from "./fs";
 import { errorText, isObject } from "./json";
 import { displayPath } from "./paths";
 import { run } from "./proc";
+import { shortCommit } from "./shared/dashboard-update";
 import { gitCause } from "./shared/git";
 import { applySourceControl, DEFAULT_SOURCE_CONTROL, type GithubStatus, type PullOutcome, type PullRepo, type SourceControlAnswer, type SourceControlChange, type SourceControlSettings } from "./shared/source-control";
 import { inTempDir } from "./shared/workspaces";
 import { SerialLane } from "./serial-lane";
+import { heldBack } from "./server/update-journal";
 
 const FETCH_TIMEOUT_MS = 60_000;
 const GH_TIMEOUT_MS = 20_000;
@@ -25,8 +27,8 @@ const skipped = (reason: Extract<PullOutcome, { kind: "skipped" }>["reason"], de
 
 /**
  * Fast-forwards the default branch of the repository `dir` is in to `origin`'s, unless the branch has commits `origin`
- * lacks or the worktree that has it checked out has changes to tracked files. A branch no worktree has checked out
- * moves without a checkout.
+ * lacks, or the worktree that has it checked out has changes to tracked files or runs an omp-agents server that went
+ * back from `origin`'s commit after it did not start. A branch no worktree has checked out moves without a checkout.
  */
 export async function pullDefaultBranch(dir: string): Promise<PullOutcome> {
 	const head = await run(["git", "-C", dir, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"]);
@@ -42,6 +44,8 @@ export async function pullDefaultBranch(dir: string): Promise<PullOutcome> {
 	const checkout = (await worktreesOf(dir)).find(worktree => worktree.branch === branch && worktree.prunable === null);
 	try {
 		if (checkout) {
+			const held = await heldBack(checkout.path, remote);
+			if (held) return skipped("held", `${shortCommit(held.move.to)} did not start, so omp-agents runs ${shortCommit(held.move.from)}`);
 			if ((await git(checkout.path, "status", "--porcelain", "--untracked-files=no")).trim()) return skipped("changes", `${checkout.path} has changes`);
 			await git(checkout.path, "merge", "--ff-only", "--quiet", remote);
 		} else await git(dir, "update-ref", `refs/heads/${branch}`, remote, local);

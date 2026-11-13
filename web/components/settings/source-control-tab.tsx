@@ -47,7 +47,7 @@ function GithubRow({ status }: { status: GithubStatus }) {
 	);
 }
 
-const SKIPPED: Record<Extract<PullOutcome, { kind: "skipped" }>["reason"], string> = { changes: "Skipped: local changes", commits: "Skipped: local commits", "no-default-branch": "Skipped: no default branch", failed: "Failed" };
+const SKIPPED: Record<Extract<PullOutcome, { kind: "skipped" }>["reason"], string> = { changes: "Skipped: local changes", commits: "Skipped: local commits", held: "Skipped: update undone", "no-default-branch": "Skipped: no default branch", failed: "Failed" };
 
 function outcomeLabel(outcome: PullOutcome): string {
 	if (outcome.kind === "current") return "Up to date";

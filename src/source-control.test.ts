@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { git } from "./git";
 import { applySourceControl, DEFAULT_SOURCE_CONTROL, startingMethod } from "./shared/source-control";
+import { UpdateJournal } from "./server/update-journal";
 import { pullDefaultBranch, repositoriesOf } from "./source-control";
 
 const dirs: string[] = [];
@@ -60,6 +61,16 @@ describe("pullDefaultBranch", () => {
 		writeFileSync(join(clone, "a"), "edited");
 		expect(await pullDefaultBranch(clone)).toEqual({ kind: "pulled", commits: 1 });
 		expect(await head(clone, "refs/heads/main")).toBe(await head(origin));
+	});
+
+	test("leaves a checkout on the commit an omp-agents server went back to while origin holds the update that did not start", async () => {
+		const { origin, clone } = await cloneBehind();
+		const [from, to] = [await head(clone), await head(origin)];
+		const journal = await UpdateJournal.at(clone, 4317, "true");
+		journal!.handOver({ branch: "main", from, to, lockChanged: false });
+		await journal!.recover({ failure: "exited with code 1", error: null });
+		expect(await pullDefaultBranch(clone)).toMatchObject({ kind: "skipped", reason: "held" });
+		expect(await head(clone)).toBe(from);
 	});
 
 	test("a fetch that fails reports git's cause, not the advice that ends its output", async () => {
