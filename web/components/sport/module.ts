@@ -85,8 +85,22 @@ export const SPORT_PAGE: StoredPageModule<"sport", SportRoute, SportState, Sport
 			{ id: "sportNextDay", label: "Sport week: open the day after", keys: [{ chord: { key: "ArrowRight" }, scope: "outside-fields" }] },
 			{ id: "sportPreviousDemo", label: "Sport demo: show the workout's previous demo", keys: [{ chord: { key: "ArrowLeft" }, scope: "outside-fields" }] },
 			{ id: "sportNextDemo", label: "Sport demo: show the workout's next demo", keys: [{ chord: { key: "ArrowRight" }, scope: "outside-fields" }] },
-			{ id: "sportJournalNext", label: "Sport journal: focus the next, older session, or open it while a session is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
-			{ id: "sportJournalPrevious", label: "Sport journal: focus the previous, newer session, or open it while a session is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
+			{
+				id: "sportJournalNext",
+				label: "Sport journal: focus the next, older session, or open it while a session is open",
+				keys: [
+					{ chord: { key: "ArrowDown" }, scope: "outside-fields" },
+					{ chord: { key: "j" }, scope: "outside-fields" },
+				],
+			},
+			{
+				id: "sportJournalPrevious",
+				label: "Sport journal: focus the previous, newer session, or open it while a session is open",
+				keys: [
+					{ chord: { key: "ArrowUp" }, scope: "outside-fields" },
+					{ chord: { key: "k" }, scope: "outside-fields" },
+				],
+			},
 			{ id: "sportJournalClose", label: "Sport journal: close the open session", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
 			{ id: "sportTimerPause", label: "Sport timer: pause or resume the routine", keys: [{ chord: { key: " " }, scope: "outside-fields" }] },
 			{ id: "sportTimerPrevious", label: "Sport timer: go back to the previous step", keys: [{ chord: { key: "ArrowLeft" }, scope: "outside-fields" }] },

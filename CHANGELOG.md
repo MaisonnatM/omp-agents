@@ -5,6 +5,13 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-13
 
+- The shortcuts now match Capy's. Cmd+1 to Cmd+9 go to your tabs at the top, and Option+1 to Option+9 open the sidebar's first nine sessions.
+- Cmd+T opens a new tab, Cmd+Option+W closes all the other tabs, and Ctrl+Tab or Cmd+Option+→ and ← move between tabs.
+- New keys, the old ones no longer work: Cmd+Shift+O starts a new session, Cmd+. stops the turn, Option+M dictates, Cmd+, opens Settings, Cmd+Shift+B shows the details sidebar, and Cmd+Shift+, copies a pull request's link.
+- New keys: Cmd+/ attaches files, Cmd+Shift+L also opens the right sidebar when it is closed, Cmd+Shift+G pressed again on the Overview opens Review, Ctrl+Shift+F maximizes a pane, and J and K move through lists like ↓ and ↑.
+- The sidebar's pages no longer take Cmd+number keys; open them from the sidebar or the command menu.
+- The tab on screen no longer shows a dotted grip; you can still drag any tab from anywhere on it.
+- A session's header no longer shows Open PR; Open pull request in the command menu still asks the session to open one.
 - With the sidebar open, the back and forward buttons now sit beside its toggle at the sidebar's right edge, and the tabs start right where the page does.
 - The bottom of the sidebar now shows how much of each model plan is left, as a grid of rings with the provider's logo inside and the percent left below, one per account, and your Mac's CPU, free memory, and free disk in the same rings, where the Keyboard shortcuts link was. Reset times and reset credits show when you hover a ring. Hover or click CPU to see each session's processes, or the disk to clean up. Settings › Keyboard and ? still open the shortcuts.
 - The strip along the bottom of the window is gone, so the page runs to the window's edge.

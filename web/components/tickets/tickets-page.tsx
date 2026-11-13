@@ -111,7 +111,7 @@ function TicketsList({ target, section, cwd, hosts }: TicketsListProps) {
 	const listRef = useRef<HTMLDivElement>(null);
 	useReturnFocus(target, id => id, id => document.getElementById(ticketRowId(id))?.querySelector<HTMLElement>("a"), poll.read, () => listRef.current);
 	useReveal(target === null ? section : null, folds, { token: section, block: "start", focus: true });
-	// On this page ⌘N creates a ticket, where the App's binding of it starts a session.
+	// On this page ⌘⇧O creates a ticket, where the App's binding of it starts a session.
 	useShortcuts({ ticketsNew: () => openNewTicket("") });
 
 	const groups = ticketGroups(tickets);

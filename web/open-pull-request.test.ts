@@ -27,7 +27,7 @@ function phases(steps: { host: OpenPullRequestHost; last: string | null; answer?
 	});
 }
 
-test("offers Open PR only to a session the dashboard can prompt, on a branch other than the default one that heads no pull request", () => {
+test("offers Open pull request only to a session the dashboard can prompt, on a branch other than the default one that heads no pull request", () => {
 	const offered = [
 		host(),
 		host({ branch: null }),

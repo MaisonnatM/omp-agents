@@ -137,23 +137,6 @@ A text counts as visible when an element whose whole text is exactly it, case an
 It writes `tmp/smoke/<run>/report.json`, `report.md`, and `screenshot.png`, prints that directory, and exits 0 only when provenance matches, the tab ran the served page, and every expectation held.
 The report holds both identities, the verdict, the address, the route, the page check, each expectation's result, and the time; `<run>` defaults to the local commit and the time.
 
-## Pull request header fixture
-
-The session header's pull request moves, such as **Open PR**, depend on what GitHub says of the session's branch, which a smoke check cannot change on a real repository.
-`scripts/fake-gh/gh` stands in for `gh` on a smoke server's `PATH`: it answers from the JSON rules in `FAKE_GH_FIXTURE`, read again on every call, exits 1 with one stderr line for any call no rule answers, and appends each call to `FAKE_GH_LOG`.
-Sessions that server starts get the fake `gh` too, so nothing reaches GitHub.
-`scripts/pr-header-fixture.ts <dir> (--pr <number> | --no-pr)` creates `<dir>/repo`, a checkout of `smoke-fixture/webapp` on branch `feature`, once, and writes the rules that say `feature` heads no pull request or open PR `#<number>`.
-
-1. Run `bun scripts/pr-header-fixture.ts <dir> --no-pr`, which prints the env for the smoke server and the new-session route.
-2. Start the smoke server with that env and fresh `XDG_CONFIG_HOME` and `XDG_DATA_HOME` (see [Isolated state](#isolated-state)).
-3. Open the printed `#new/<encoded repo>` route as in [Browser smoke](#browser-smoke) and start a session with the prompt `Reply with just the word ok. Use no tools.`.
-4. Run `bun scripts/smoke-proof.ts --omp http://127.0.0.1:<port> --token <token> --route <the session's hash> --expect "Open PR"`, with the token from the smoke server's `$XDG_CONFIG_HOME/omp-agents/token`.
-5. Run `bun scripts/pr-header-fixture.ts <dir> --pr 7`, which leaves the repository as it is.
-6. Run `bun scripts/smoke-proof.ts --omp http://127.0.0.1:<port> --token <token> --route <the session's hash> --expect-absent "Open PR" --expect "#7" --timeout 90`, since the server asks GitHub about a branch with no pull request once a minute.
-
-`<dir>/gh.log` then shows which GitHub reads the server made and which rule answered each.
-The rules answer only the reads behind the header, so the pull request panel says it cannot load the pull request.
-
 ## Parity harness
 
 `scripts/pr-parity.ts` compares the pull request panel with T3 Code's, so a change to it shows its screenshots before and after.

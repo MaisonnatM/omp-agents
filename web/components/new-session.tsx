@@ -87,6 +87,7 @@ export interface ScheduledDraft {
 export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, scheduled, draftKey }: NewSessionProps) {
 	const initial = scheduled?.request ?? null;
 	const editorRef = useRef<PromptEditorHandle>(null);
+	const pickFiles = useRef<(accept?: string) => void>(null);
 	const [draft, setDraft] = useComposerDraft(draftKey, initial?.prompt ?? todo?.prompt ?? "");
 	const attachments = usePromptAttachments(true);
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null } | null>(initial && { cwd: initial.cwd, choice: initial.branch });
@@ -121,6 +122,10 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const dictation = useDictation({ composer: draftKey !== null && !starting ? { draftKey, cwd } : null, text: draft, editorRef, send, connected });
 	const onComposerKey = useShortcuts({
 		dictate: dictation.toggle,
+		attachFiles: () => {
+			if (starting || scheduled || !pickFiles.current) return false;
+			pickFiles.current();
+		},
 		model: () => {
 			if (starting || !connected) return false;
 			models.openModels("models");
@@ -220,6 +225,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 						<InputMessage
 							className={cn(isPrivate && "outline-2 outline-foreground")}
 							editorRef={editorRef}
+							filePickerRef={pickFiles}
 							value={draft}
 							onValueChange={completion.onValueChange}
 							onSend={text => {

@@ -121,7 +121,7 @@
   While fewer than 1000 of your GitHub token's hourly GraphQL points are left, which your agents' `gh` calls share, the list stops asking GitHub and says `Cannot refresh pull requests: GitHub quota low until HH:MM`, keeping the list it has until the quota resets; details you open, and every change you make, still go to GitHub until the quota is spent.
   A pull request's details open on **Summary**.
   A session's **PRs** sidebar shows the session's first pull request, and its **Summary** and stack menu show another there in its place, without changing the page.
-  While the Pull requests page shows a PR, Cmd+Shift+K copies its `#N` and Cmd+Shift+C copies its GitHub link.
+  While the Pull requests page shows a PR, Cmd+Shift+K copies its `#N` and Cmd+Shift+, copies its GitHub link.
 - **Rebase N behind** at the top of the Pull requests page shows while N of your pull requests can rebase on their base, counting the ones stacked on them.
   The first click arms **Confirm rebase of N?**, and a second click within three seconds rebases them one at a time, as **Rebase on main** does, the bottom of each stack first.
   A pull request stacked on one whose rebase stopped at a conflict or failed is skipped, even when a **Rebase on main** click queued that one before.

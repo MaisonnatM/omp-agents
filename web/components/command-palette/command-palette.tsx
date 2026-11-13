@@ -1,6 +1,6 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Command as CommandPrimitive } from "cmdk";
-import { IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowRotateClockwise, IconArrowUp, IconCmd, IconFolder1, IconHistory, IconKeyboard, IconLayersTwo, IconMagnifyingGlass, IconPlusLarge, IconPullRequest, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide, IconTarget, IconTodos, IconToolbox } from "central-icons";
+import { IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowRotateClockwise, IconArrowUp, IconCmd, IconCrossMedium, IconExpand, IconFolder1, IconHistory, IconKeyboard, IconLayersTwo, IconMagnifyingGlass, IconPlusLarge, IconPullRequest, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide, IconTarget, IconTodos, IconToolbox, IconWindowApp } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type DashboardUpdateStatus, didNotStart, shortCommit } from "../../../src/shared/dashboard-update";
@@ -34,12 +34,11 @@ import { conversationItems, recordItems } from "../../palette-records";
 import { useConversationHits, useRead, useSearchSources } from "../../reads";
 import { isPhonePage } from "../../api";
 import { DASHBOARD_UPDATE_URL, updateDashboard } from "../../dashboard-update";
-import { hashForSettings, type OpenMode, SETTINGS_GROUP_LABEL, SETTINGS_SECTIONS, type SidebarTab } from "../../routing";
+import { hashForSettings, type OpenMode, SETTINGS_GROUP_LABEL, SETTINGS_SECTIONS } from "../../routing";
 import { revealMessage } from "../../message-reveal";
 import { sessionActions, type SessionEntry } from "../../session-actions";
 import { workspaceCwd } from "../../sessions";
-import { pressesChord, type ShortcutHandlers, type ShortcutId, shortcutLabels } from "../../shortcuts";
-import { tabShortcutLabels } from "../../sidebar-tabs";
+import { pressesChord, registeredHandlers, type ShortcutId, shortcutLabels } from "../../shortcuts";
 import { useStoredState } from "../../stored-state";
 import { quickAddTodo } from "../../todo-quick-add";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
@@ -53,6 +52,10 @@ const COMMAND_ICON: Partial<Record<ShortcutId, IconComponent>> = {
 	newSession: IconPlusLarge,
 	previousSession: IconArrowUp,
 	nextSession: IconArrowDown,
+	newTab: IconPlusLarge,
+	previousTab: IconArrowLeft,
+	nextTab: IconArrowRight,
+	closeOtherTabs: IconCrossMedium,
 	back: IconArrowLeft,
 	forward: IconArrowRight,
 	openPullRequest: IconPullRequest,
@@ -60,6 +63,8 @@ const COMMAND_ICON: Partial<Record<ShortcutId, IconComponent>> = {
 	tools: IconToolbox,
 	sessionsSidebar: IconSidebarSimpleLeftWide,
 	detailsSidebar: IconSidebarSimpleRightWide,
+	detailsBrowser: IconWindowApp,
+	maximizePane: IconExpand,
 	settings: PAGE_ICON.settings,
 	help: IconKeyboard,
 	"pull-requests": PAGE_ICON["pull-requests"],
@@ -86,12 +91,8 @@ interface CommandPaletteProps {
 	/** Pinned sessions, by session ID. */
 	pinned: ReadonlySet<string>;
 	onTogglePin: (sessionId: string) => void;
-	/** What the page's shortcuts run; each with a command title lists as a command. */
-	handlers: ShortcutHandlers;
 	/** Commands that do nothing now, which the palette leaves out. */
 	unavailable: ReadonlySet<ShortcutId>;
-	/** The tabs the sidebar's bar draws, in order, whose position keys the tab commands show. */
-	tabs: readonly SidebarTab[];
 	/** The todo list's categories, which a typed `#category` files a new todo under; `null` while the list cannot be edited. */
 	todoCategories: readonly UserTodoCategory[] | null;
 	/** The todo list's top-level todos, which a search lists. */
@@ -125,7 +126,9 @@ const SETTINGS_ITEMS: readonly PaletteItem[] = SETTINGS_SECTIONS.filter(({ value
 	actions: [[{ id: "open", title: "Open", icon, run: { kind: "link", href: hashForSettings(value) } }]],
 }));
 
-function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, tabs, todoCategories, todos, ticketsCallable, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
+function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, unavailable, todoCategories, todos, ticketsCallable, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
+	// What the page's shortcuts run as the palette opens; each with a command title lists as a command.
+	const [handlers] = useState(registeredHandlers);
 	const { send, start, end, changeTodo, workspaceSettings } = useDashboardActions();
 	const { starts, ending, pullRequestsScope } = useDashboardStatus();
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
@@ -230,7 +233,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 					title: command,
 					keywords: [label],
 					icon: COMMAND_ICON[id] ?? IconCmd,
-					accessories: [{ kind: "keys", labels: tabShortcutLabels(id, tabs) }],
+					accessories: [{ kind: "keys", labels: shortcutLabels(id) }],
 					kind: "Command",
 					// A command runs as its shortcut's first key does.
 					actions: [[{ id: "run", title: "Run command", icon: COMMAND_ICON[id] ?? IconCmd, run: { kind: "do", fn: () => {
@@ -243,7 +246,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 			pushItem("command:create-todo", "Create todo", IconTodos, "createTodo", ["add todo", "task"], []),
 			...updateItem(selfUpdate),
 		];
-	}, [handlers, unavailable, tabs, selfUpdate]);
+	}, [handlers, unavailable, selfUpdate]);
 
 	const workspaceItems = useMemo((): PaletteItem[] => {
 		const pickWorkspace = (cwd: string | null): void => {

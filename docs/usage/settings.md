@@ -1,12 +1,12 @@
 # Settings
 
-- The sidebar's **Settings** row opens **Settings**; G then , does the same, and pressing it again returns to the panes.
+- The sidebar's **Settings** row opens **Settings**; Cmd+, does the same, and pressing it again returns to the panes.
   While Settings is open the sidebar lists its sections under its **Settings** row; select another row, such as **Sessions**, to leave.
   The sidebar lists twenty sections in four groups.
   **Usage** holds **Analytics** and **Activity**, **General** holds **Preferences**, **Workspaces**, **Sync**, **Phone access**, and **Storage**, and **Connections** holds **Providers**, **Integrations**, **MCP servers**, and **Source control**; these are the same whatever the workspace.
   **This workspace** holds **Models**, **Agents**, **omp settings**, **omp memory**, **Files**, **Extensions**, **Workflows**, **Decisions**, and **Worktrees**, which show omp's config and files, package discovery, and the repository's records and worktrees, as a session in the sidebar's workspace sees them; only these sections show the workspace picker.
   The command menu finds a section by its name or by what it holds, such as "theme" or "github", under **Settings**.
-  The gear button and G then , reopen the section you last had open in this app, **Analytics** the first time, and the header names the open section.
+  The gear button and Cmd+, reopen the section you last had open in this app, **Analytics** the first time, and the header names the open section.
   Switching sections keeps an unsaved edit and opens the new section at its top, and the selected section stays when you change workspace.
 - **Analytics** shows request usage for the last 24 hours.
   Choose **Today**, **24h**, **7d**, **30d**, **90d**, or **All** to change the range; **Today** starts at local midnight.
@@ -169,9 +169,8 @@
   The width of a sidebar or a split, a folded section, and what you last picked in a menu stay with the browser that set them.
   **Theme**: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one; it applies at once and does not change omp's terminal theme.
   **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts.
-  **Sidebar tabs** lists the nine sidebar tabs in the order they show, each with the Cmd+number it takes, a switch that shows or hides it, and buttons that move it up or down.
-  Cmd+1 goes to the first tab the sidebar's page list shows, and a tab after the fifth takes no number.
-  A hidden tab only leaves the sidebar's page list and loses its number: its page, its command in the command menu, its G pair, and links to it still work.
+  **Sidebar tabs** lists the nine sidebar tabs in the order they show, each with a switch that shows or hides it, and buttons that move it up or down.
+  A hidden tab only leaves the sidebar's page list: its page, its command in the command menu, its G pair, and links to it still work.
   While omp holds no sign-in to Linear or Gmail, the **Tickets** or **Email** row says that tab shows only once the service is connected.
   Putting every tab back in its default order and shown forgets the choice, so the sidebar follows the default again.
   **Notifications** turns the [session notifications](notifications.md#session-notifications) on or off, picks whether finished turns notify too, and picks their sound and whether it plays while the window is focused.

@@ -31,7 +31,7 @@ export const TICKETS_PAGE: PageModule<"tickets", TicketsRoute, "ticketsNew"> = {
 	shortcuts: {
 		category: "Tickets",
 		goTo: { label: "Go to your Linear tickets", command: "Go to tickets", keys: [] },
-		rows: [{ id: "ticketsNew", label: "Tickets page: create a Linear ticket, in place of a new session", keys: [{ chord: { key: "n", mod: true }, scope: "anywhere" }] }],
+		rows: [{ id: "ticketsNew", label: "Tickets page: create a Linear ticket, in place of a new session", keys: [{ chord: { key: "o", mod: true, shift: true }, scope: "anywhere" }] }],
 	},
 	controls: [],
 	split: true,

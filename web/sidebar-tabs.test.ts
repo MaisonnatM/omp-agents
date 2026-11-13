@@ -1,6 +1,5 @@
 import { expect, test } from "bun:test";
 import { type Page, routeFromHash } from "./routing";
-import { bindingLabel, IS_MAC } from "./shortcuts";
 import {
 	DEFAULT_TAB_LAYOUT,
 	decodeTabLayout,
@@ -8,11 +7,8 @@ import {
 	hideTab,
 	moveTab,
 	navRowOf,
-	positionKey,
-	shortcutRows,
 	shownTabs,
 	tabsSignedOut,
-	tabShortcutLabels,
 	type TabLayout,
 } from "./sidebar-tabs";
 
@@ -141,43 +137,6 @@ test("a layout stored in the old order, Todo in the bar before Notes, puts Todo 
 
 test("until the integrations answer, the tabs that wait on one are signed out", () => {
 	expect(tabsSignedOut(undefined)).toEqual(["tickets", "email"]);
-});
-
-
-test("the first five shown tabs take the position keys", () => {
-	const shown = shownTabs(DEFAULT_TAB_LAYOUT, new Set());
-	expect(shown.map(tab => positionKey(tab, shown))).toEqual(["tab1", "tab2", "tab3", "tab4", "tab5", undefined, undefined]);
-});
-
-test("positionKey takes the position among the shown tabs, or none", () => {
-	const shown = shownTabs(moveTab(hideTab(DEFAULT_TAB_LAYOUT, "todo", true), "email", -1), new Set(["tickets"]));
-	expect(shown).toEqual(["pull-requests", "bots", "calendar", "email", "sport"]);
-	expect(positionKey("pull-requests", shown)).toBe("tab1");
-	expect(positionKey("bots", shown)).toBe("tab2");
-	expect(positionKey("calendar", shown)).toBe("tab3");
-	expect(positionKey("email", shown)).toBe("tab4");
-	expect(positionKey("sport", shown)).toBe("tab5");
-	expect(positionKey("todo", shown)).toBeUndefined();
-	expect(positionKey("tickets", shown)).toBeUndefined();
-	expect(positionKey("settings", shown)).toBeUndefined();
-});
-
-test("shortcutRows folds each shown tab's position key into its row, drops the position rows and a tab with no key, and keeps every other shortcut", () => {
-	const shown = shownTabs(moveTab(hideTab(DEFAULT_TAB_LAYOUT, "todo", true), "email", -1), new Set(["tickets"]));
-	const rows = shortcutRows(shown);
-	const keysOf = (id: string) => rows.find(row => row.id === id)?.keys.map(bindingLabel);
-	const mod = IS_MAC ? "⌘" : "Ctrl+";
-	expect(keysOf("settings")).toEqual(["G then ,"]);
-	expect(keysOf("pull-requests")).toEqual([`${mod}1`]);
-	expect(keysOf("bots")).toEqual([`${mod}2`]);
-	expect(keysOf("calendar")).toEqual([`${mod}3`]);
-	expect(keysOf("email")).toEqual([`${mod}4`, "G then M"]);
-	expect(keysOf("sport")).toEqual([`${mod}5`]);
-	expect(keysOf("todo")).toBeUndefined();
-	expect(keysOf("tab1")).toBeUndefined();
-	expect(keysOf("switcher")).toEqual([IS_MAC ? "⌘K" : "Ctrl+K"]);
-	expect(tabShortcutLabels("calendar", shown)).toEqual([`${mod}3`]);
-	expect(tabShortcutLabels("email", shown)).toEqual([`${mod}4`, "G then M"]);
 });
 
 const pageAt = (hash: string): Page => {

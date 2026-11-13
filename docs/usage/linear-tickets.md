@@ -41,7 +41,7 @@
   When Linear refuses a change, the detail view undoes it, keeps the changes made after it, and says why.
   The lists come from the issue's team in Linear, read when you first open one, and the server keeps them for five minutes.
 - `#tickets/<identifier>`, such as `#tickets/ENG-2368`, opens the list with that issue's details beside it, even when the tickets list does not include it or cannot load.
-- **New ticket**, before **Refresh** in the page header, Cmd+N (Ctrl+N off macOS) on the tickets page, where it starts no session, C outside text fields on any page but the Todo, Calendar, and Email pages, where C adds a todo, an event, or a new mail, or **Create ticket** in the command menu opens the new-issue dialog over the page you are on, laid out like Linear's.
+- **New ticket**, before **Refresh** in the page header, Cmd+Shift+O (Ctrl+Shift+O off macOS) on the tickets page, where it starts no session, C outside text fields on any page but the Todo, Calendar, and Email pages, where C adds a todo, an event, or a new mail, or **Create ticket** in the command menu opens the new-issue dialog over the page you are on, laid out like Linear's.
   Its header names the team by its key, such as ENG, in a pill that picks another team; the team starts as the last one an issue was created in, from here or from a todo, else Linear's first.
   Below come the title, a markdown description, and a pill for each field: the status, which starts as the team's first backlog state, the priority, the assignee, which starts as you, the project, and the labels, each a searchable list as in an issue's details, and **…** for a due date.
   The lists come from the team in Linear, and another team clears the status, labels, and project picked for the last one.
@@ -71,7 +71,7 @@
   A saved tickets list without each issue's opening date is discarded, and the page reads Linear again.
   The server keeps Linear's answer for 30 seconds, and **Refresh** asks again at once.
 - The dashboard reads Linear through omp's Linear MCP server and its sign-in, so there is no key to set.
-  Until omp is signed in to that server, the sidebar has no **Tickets** tab, which then takes no number, so the tabs after it move up one, and a `#tickets` address shows Linear's integration row instead of the issues.
+  Until omp is signed in to that server, the sidebar has no **Tickets** tab, and a `#tickets` address shows Linear's integration row instead of the issues.
 - To connect, open **Settings › Integrations** and choose **Connect** on Linear's row; see [Integrations](integrations.md).
   Your default browser opens Linear's sign-in page; approve omp there, and the **Tickets** tab appears within a few seconds.
   When Linear later refuses the sign-in, the **Tickets** tab stays and its page shows Linear's row with **Reconnect**; the Todo page's **Create Linear ticket** and the Calendar's tickets hide until it works again.

@@ -6,6 +6,7 @@ import { PROMPT_IMAGE_TYPES, type PromptImage } from "../../src/shared/sessions"
 import { errorText } from "../../src/json";
 import { putJson } from "../api";
 import { type Attachment, type AttachmentRead, pastedTextFile, preparePrompt, screenFiles } from "../prompt-attachments-model";
+import { shortcutLabels } from "../shortcuts";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 
@@ -124,7 +125,7 @@ export function usePromptAttachments(images: boolean): PromptAttachments {
 /** Opens the file picker. Dropping or pasting a file into the composer attaches it too. */
 export function AttachButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
 	return (
-		<Tooltip content="Attach images, text files, or documents, or drop or paste them" side="top">
+		<Tooltip content="Attach images, text files, or documents, or drop or paste them" shortcut={shortcutLabels("attachFiles")} side="top">
 			<Button variant="ghost" size="icon-sm" aria-label="Attach files" disabled={disabled} onClick={onClick}>
 				<IconPaperclip1 aria-hidden="true" />
 			</Button>

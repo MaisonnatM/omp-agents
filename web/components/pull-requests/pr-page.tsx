@@ -100,7 +100,7 @@ export function PullRequestDetails({ hosts, target, placement, version, tab, onT
 	);
 }
 
-/** Cmd+Shift+K copies `target`'s `#N` and Cmd+Shift+C its GitHub link, while the Pull requests page shows its details. */
+/** Cmd+Shift+K copies `target`'s `#N` and Cmd+Shift+, its GitHub link, while the Pull requests page shows its details. */
 export function usePullRequestCopyShortcuts(target: PullRequest): void {
 	const clipboard = useClipboard();
 	useShortcuts({

@@ -13,11 +13,11 @@ Your first session, then the integrations that each need a sign-in.
 
 ## Your first session
 
-1. Click **New session** at the top of the sidebar, or press Cmd+N (Ctrl+N on Linux and Windows), or S outside a text field.
+1. Click **New session** at the top of the sidebar, or press Cmd+Shift+O (Ctrl+Shift+O on Linux and Windows), or S outside a text field.
 2. Pick the workspace omp runs in, and a branch or a new worktree if the folder is a git repository.
 3. Type a prompt and press Enter.
    omp starts when you send the first message, so a draft you leave starts nothing.
-4. While the turn runs, Enter queues a follow-up for when it finishes, Cmd+Enter (Ctrl+Enter) steers the running turn, and Cmd+Shift+Backspace (Ctrl+Shift+Backspace) interrupts it.
+4. While the turn runs, Enter queues a follow-up for when it finishes, Cmd+Enter (Ctrl+Enter) steers the running turn, and Cmd+. (Ctrl+.) interrupts it.
 5. Cmd-click (Ctrl-click) another session in the sidebar to open it in a split pane, up to four.
 6. Click **End session** in the session's header when you are done.
    Ending removes the git worktree the session worked in, and keeps its branch and any worktree with uncommitted changes.

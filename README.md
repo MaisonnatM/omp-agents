@@ -184,7 +184,7 @@ Click **+** to start a session, **Resume** to continue a past one, and **Fork fr
 The **Pull requests** tab shows your pull requests, the **Tickets** tab your Linear issues, and the gear button in the header opens Settings.
 
 While a turn runs, Enter queues a follow-up and Cmd+Enter (Ctrl+Enter on Linux and Windows) steers the turn.
-Cmd+Shift+Backspace (Ctrl+Shift+Backspace on Linux and Windows) interrupts it.
+Cmd+. (Ctrl+. on Linux and Windows) interrupts it.
 
 In a session the dashboard started, built-in `/` commands and `!<command>` run as they do in omp's terminal.
 A terminal session cannot run them, because Collab accepts guest prompts and not host-side commands.

@@ -1,9 +1,10 @@
 /** The Overview tab's Files, Images, and Sources sections: the files the view's agent changed, the images its tools took, and the pages they opened, each a section that folds. */
-import { useMemo, useState } from "react";
+import { useContext, useMemo, useState } from "react";
 import type { SessionFacts, View } from "../../src/shared/sessions";
 import { type AgentMedia, type AgentSource, type ChangedFile, lineTotals } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { activityControl } from "../activity";
+import { useShortcuts } from "../shortcuts";
 import { useChangedFiles, useMedia, useSources } from "../pane-store";
 import { useStoredKeys } from "../stored-state";
 import { ChangedFileList, FileChangesDialog } from "./changed-files-section";
@@ -11,6 +12,7 @@ import { SessionChangesDialog } from "./changes/session-changes-dialog";
 import { LineCounts } from "./line-counts";
 import { MediaStrip } from "./media-section";
 import { OverviewSection } from "./overview-section";
+import { SidebarOpen } from "./sidebar-panel";
 import { SourceList } from "./sources-section";
 
 /** The sections folded shut, `files`, `images`, and `sources`, which localStorage keeps for every view; each starts open. The key keeps an earlier name, so earlier folds carry over. */
@@ -79,7 +81,16 @@ interface ChangesSectionsProps {
 export function ChangesSections({ view, session: { sessionId, cwd, facts }, changes: { files, media, sources }, working }: ChangesSectionsProps) {
 	const [closed, toggle] = useStoredKeys(CLOSED_KEY);
 	const [shown, setShown] = useState<Shown>(null);
+	const sidebarOpen = useContext(SidebarOpen);
 	const history = shown?.kind === "history" ? files.find(file => file.path === shown.path) : undefined;
+	useShortcuts({
+		// A closed sidebar keeps its Overview mounted; its key then passes on, as the sidebar's tab keys do.
+		reviewChanges: () => {
+			const first = files[0];
+			if (!sidebarOpen || sessionId === null || !first) return false;
+			setShown({ kind: "changes", path: first.path });
+		},
+	});
 	return (
 		<>
 			{files.length > 0 && (

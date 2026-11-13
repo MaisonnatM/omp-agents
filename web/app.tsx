@@ -179,10 +179,10 @@ export function App() {
 	);
 
 	const { setOpenedFile, setNewTicket, dispatchPalette } = overlays;
-	// The command menu's **Open pull request** acts on the focused pane's session while the panes show, as its header's **Open PR** does.
+	// The command menu's **Open pull request** acts on the focused pane's session while the panes show and that session's branch can take a pull request, as `offeredPrompt` says.
 	const openPullRequest = useOpenPullRequest(page ? null : focused.view, focused.host, request);
 	const focusedGoal = page === null && focused.view?.kind === "live" && focused.view.agentId === null && focused.host?.source === "dashboard" && focused.host.goal.kind !== "off" && focused.host.control.phase === "live" && !focused.host.control.readOnly ? focused.host : null;
-	const { handlers, unavailable } = usePageShortcuts({
+	const unavailable = usePageShortcuts({
 		page,
 		layout,
 		maximized,
@@ -190,7 +190,6 @@ export function App() {
 		listed: sessions.listed,
 		view: focused.view,
 		absentTabs,
-		tabs,
 		ticketsCallable,
 		hasDetails: detailsView !== null || openBot !== null,
 		openPullRequest: openPullRequest.state.kind === "ready" ? openPullRequest.run : null,
@@ -204,6 +203,7 @@ export function App() {
 		navigate,
 		showTab,
 		toggleSidebar,
+		showBrowser: () => showDetailsTab("browser"),
 		toggleTools: display.toggleTools,
 		toggleHideTools: display.toggleHideTools,
 		toggleHideThinking: display.toggleHideThinking,
@@ -400,9 +400,7 @@ export function App() {
 									onPickWorkspace={switchWorkspace}
 									pinned={sessions.pinned}
 									onTogglePin={sessions.togglePin}
-									handlers={handlers}
 									unavailable={unavailable}
-									tabs={tabs}
 									todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
 									todos={mentionLists.todos}
 									ticketsCallable={ticketsCallable}

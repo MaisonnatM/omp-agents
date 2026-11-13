@@ -4,7 +4,6 @@ import type { PaletteEvent, PaletteState } from "./command-palette";
 import { MODULE_LIST, type WebModuleId } from "./modules";
 import { adjacentSession, closePane, type Layout, type Page, type SettingsRoute, type SidebarTab } from "./routing";
 import { type ShortcutHandler, type ShortcutHandlers, type ShortcutId, useShortcuts } from "./shortcuts";
-import { positionHandlers } from "./sidebar-tabs";
 import { useHistoryPosition } from "./use-history-position";
 
 /** What the page-wide shortcuts read when a key arrives, and what they call. */
@@ -14,18 +13,16 @@ export interface PageShortcutInput {
 	/** A pane fills the grid. */
 	maximized: boolean;
 	settings: SettingsRoute;
-	/** The views of the Sessions tab, in order, and the focused one: what the session shortcuts step through. */
+	/** The views of the Sessions tab, in order, and the focused one: what the session shortcuts step through, and ⌥1 to ⌥9 count. */
 	listed: View[];
 	view: View | null;
 	/** The sidebar tabs whose service omp holds no sign-in to; their shortcuts and commands do not apply. */
 	absentTabs: ReadonlySet<SidebarTab>;
-	/** The shown tabs the sidebar's bar draws, in order: Cmd+1 goes to the first. */
-	tabs: readonly SidebarTab[];
 	/** The dashboard can create Linear issues, and the sidebar shows Tickets, so the new-ticket shortcut applies. */
 	ticketsCallable: boolean;
 	/** The right sidebar has a session to show. */
 	hasDetails: boolean;
-	/** Sends the focused session **Open PR**'s prompt, or `null` while its header offers no **Open PR** to press. */
+	/** Sends the focused session **Open pull request**'s prompt, or `null` while its branch can take no pull request, as `offeredPrompt` says, or a press of it is under way. */
 	openPullRequest: (() => void) | null;
 	/** Opens the focused live dashboard session's goal editor, or `null` when unavailable. */
 	setGoal: (() => void) | null;
@@ -38,6 +35,8 @@ export interface PageShortcutInput {
 	navigate: (page: Page) => void;
 	showTab: (tab: SidebarTab | "sessions") => void;
 	toggleSidebar: (side: "left" | "right") => void;
+	/** Opens the details sidebar on its Browser tab. */
+	showBrowser: () => void;
 	toggleTools: () => void;
 	toggleHideTools: () => void;
 	toggleHideThinking: () => void;
@@ -45,10 +44,10 @@ export interface PageShortcutInput {
 
 /**
  * The page-wide shortcuts, registered with the keyboard stack: App mounts first, so a page's own bindings take a key before these.
- * `handlers` keeps its identity across renders, as does `unavailable` until a command starts or stops applying, and a
- * handler reads what it needs from the render that last ran. The command palette runs the same `handlers`.
+ * The handlers keep their identity across renders, and each reads what it needs from the render that last ran. Returns
+ * the commands that would do nothing now, which keeps its identity until one starts or stops applying.
  */
-export function usePageShortcuts(input: PageShortcutInput): { handlers: ShortcutHandlers; unavailable: ReadonlySet<ShortcutId> } {
+export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<ShortcutId> {
 	const latest = useRef(input);
 	latest.current = input;
 	const handlers = useMemo((): ShortcutHandlers => {
@@ -65,18 +64,6 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			showTab(tab);
 		};
 		const moduleGoTo = Object.fromEntries(MODULE_LIST.map(({ id }) => [id, goToTab(id)])) as Record<WebModuleId, ShortcutHandler>;
-		const goTo: Record<SidebarTab, ShortcutHandler> = {
-			"pull-requests": () => {
-				const { page } = latest.current;
-				// The Pull requests page lists the pull requests itself; its shortcut then has nothing to open.
-				if (page?.kind === "pull-requests" && !page.target) return;
-				latest.current.showTab("pull-requests");
-			},
-			bots: goToTab("bots"),
-			todo: goToTab("todo"),
-			...moduleGoTo,
-		};
-		const positions = positionHandlers(() => latest.current.tabs, goTo);
 		return {
 			help: () => {
 				const { page, layout, navigate, show } = latest.current;
@@ -88,6 +75,12 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			getStarted: () => latest.current.navigate({ kind: "get-started" }),
 			previousSession: () => step(-1),
 			nextSession: () => step(1),
+			jumpToSession: key => {
+				const { listed, open } = latest.current;
+				const next = listed[key];
+				if (!next) return false;
+				open(next, "replace");
+			},
 			// ↑ and ↓ step only while the panes show: a page's list, or its native scrolling, keeps them.
 			sessionsNext: () => (latest.current.page ? false : step(1)),
 			sessionsPrevious: () => (latest.current.page ? false : step(-1)),
@@ -99,6 +92,10 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				if (!latest.current.hasDetails) return false;
 				latest.current.toggleSidebar("right");
 			},
+			detailsBrowser: () => {
+				if (!latest.current.hasDetails) return false;
+				latest.current.showBrowser();
+			},
 			settings: () => {
 				const { page, layout, settings, navigate, show } = latest.current;
 				if (page?.kind === "settings") show(layout);
@@ -106,20 +103,24 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			},
 			back: () => history.back(),
 			forward: () => history.forward(),
-			"pull-requests": goTo["pull-requests"],
+			"pull-requests": () => {
+				const { page } = latest.current;
+				// The Pull requests page lists the pull requests itself; its shortcut then has nothing to open.
+				if (page?.kind === "pull-requests" && !page.target) return;
+				latest.current.showTab("pull-requests");
+			},
 			newTicket: () => {
 				const { ticketsCallable, setNewTicket } = latest.current;
 				if (!ticketsCallable) return false;
 				setNewTicket(current => current ?? "");
 			},
-			bots: goTo.bots,
+			bots: goToTab("bots"),
 			sessions: () => {
 				if (!latest.current.page) return;
 				latest.current.showTab("sessions");
 			},
-			todo: goTo.todo,
+			todo: goToTab("todo"),
 			...moduleGoTo,
-			...positions,
 			restore: () => {
 				const { page, maximized, layout, show } = latest.current;
 				if (page) return false;
@@ -129,6 +130,11 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				}
 				if (layout.panes.length < 2) return false;
 				show(closePane(layout, layout.panes.length - 1));
+			},
+			maximizePane: () => {
+				const { page, maximized, layout, show } = latest.current;
+				if (page || layout.panes.length < 2) return false;
+				show({ ...layout, maximized: !maximized });
 			},
 			openPullRequest: () => {
 				const { openPullRequest } = latest.current;
@@ -146,6 +152,7 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 	const { absentTabs, ticketsCallable, hasDetails } = input;
 	const canOpenPullRequest = input.openPullRequest !== null;
 	const canSetGoal = input.setGoal !== null;
+	const canMaximize = input.page === null && input.layout.panes.length > 1;
 	const { canGoBack, canGoForward } = useHistoryPosition();
 	/** Commands that would do nothing now. */
 	const unavailable = useMemo(
@@ -154,13 +161,14 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				// A sidebar tab's shortcut has the tab's id.
 				...(absentTabs satisfies ReadonlySet<ShortcutId>),
 				...(ticketsCallable ? [] : ["newTicket" as const]),
-				...(hasDetails ? [] : ["detailsSidebar" as const]),
+				...(hasDetails ? [] : ["detailsSidebar" as const, "detailsBrowser" as const]),
+				...(canMaximize ? [] : ["maximizePane" as const]),
 				...(canOpenPullRequest ? [] : ["openPullRequest" as const]),
 				...(canSetGoal ? [] : ["setGoal" as const]),
 				...(canGoBack ? [] : ["back" as const]),
 				...(canGoForward ? [] : ["forward" as const]),
 			]),
-		[absentTabs, ticketsCallable, hasDetails, canOpenPullRequest, canSetGoal, canGoBack, canGoForward],
+		[absentTabs, ticketsCallable, hasDetails, canMaximize, canOpenPullRequest, canSetGoal, canGoBack, canGoForward],
 	);
-	return { handlers, unavailable };
+	return unavailable;
 }

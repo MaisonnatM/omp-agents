@@ -18,7 +18,7 @@ export interface EmailRoute {
 
 type EmailShortcut = "emailNext" | "emailPrevious" | "emailClose" | "emailOnGmail" | "emailReply" | "emailReplyAll" | "emailTrash" | "emailCompose";
 
-const outside = (key: string) => [{ chord: { key }, scope: "outside-fields" }] as const;
+const outside = (...keys: string[]) => keys.map(key => ({ chord: { key }, scope: "outside-fields" as const }));
 
 export const EMAIL_PAGE: PageModule<"email", EmailRoute, EmailShortcut> = {
 	id: "email",
@@ -45,8 +45,8 @@ export const EMAIL_PAGE: PageModule<"email", EmailRoute, EmailShortcut> = {
 		category: "Email",
 		goTo: { label: "Go to your email", command: "Go to email", keys: [{ goTo: "m" }] },
 		rows: [
-			{ id: "emailNext", label: "Email: focus the next conversation, or open it while a conversation is open", keys: outside("ArrowDown") },
-			{ id: "emailPrevious", label: "Email: focus the previous conversation, or open it while a conversation is open", keys: outside("ArrowUp") },
+			{ id: "emailNext", label: "Email: focus the next conversation, or open it while a conversation is open", keys: outside("ArrowDown", "j") },
+			{ id: "emailPrevious", label: "Email: focus the previous conversation, or open it while a conversation is open", keys: outside("ArrowUp", "k") },
 			{ id: "emailClose", label: "Email: close the open conversation", keys: outside("Escape") },
 			{ id: "emailOnGmail", label: "Email: open the focused or open conversation in Gmail", keys: outside("o") },
 			{ id: "emailReply", label: "Email: reply to the open conversation's last message", keys: outside("r") },
