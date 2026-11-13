@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 date: 2026-10-23
 decision-makers: Maxence Maisonnat
+superseded-by: 2026-11-13-remove-the-notes-page-and-the-user-note-tool
 ---
 
 # Keep Notes page entries in one server-owned JSON file

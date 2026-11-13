@@ -1,7 +1,7 @@
 # Page: list models, sidebar tabs, model menu, and mentions
 
 - `web/pull-request-checks.ts`: `presentChecks`, the detail tab bar's checks text, popover heading, aggregate state, and stable attention, running, and completed groups.
-- `web/changes-model.ts`: `folderTree`, the tree of folders that the changes explorer and the notes list share, and `fileTree`, the explorer's, where a folder holding one folder and no file joins it, then the diff's folded runs, the file view's gutter marks, the diff list's sizes and `lastAtOrAbove`, which finds the file at the top of its scroll, and `changesPathOf`, which finds a card's file path in the session changes list.
+- `web/changes-model.ts`: `folderTree`, the tree of folders a list of files makes, and `fileTree`, the explorer's, where a folder holding one folder and no file joins it, then the diff's folded runs, the file view's gutter marks, the diff list's sizes and `lastAtOrAbove`, which finds the file at the top of its scroll, and `changesPathOf`, which finds a card's file path in the session changes list.
   `shortPaths` adds the fewest parent folders needed to tell files of one name apart in the Session card's **Files** section.
   `web/components/changes/file-tree.tsx` draws the explorer's tree; `web/code-highlight.ts` cuts `lowlight`'s syntax colors into lines, for the changes view, recorded edit diffs, and a message's code blocks.
   `web/loaded-once.ts` holds `loadedOnce` and `useLoaded`, a value a dynamic import makes, loaded once on first need, which the grammars and `web/components/raw-html.ts`'s raw HTML plugins use.

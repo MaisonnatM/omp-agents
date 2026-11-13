@@ -115,7 +115,7 @@ The sessions in the sidebar under **Workspaces** and **Past**: each workspace's 
 _Avoid_: Session list, inbox
 
 **Space**:
-One of the dashboard's two sides, **Personal** for the user's own life and **Work** for everything else, each with its own workspaces and the sessions, todos, notes, Bots, and accounts that belong to them.
+One of the dashboard's two sides, **Personal** for the user's own life and **Work** for everything else, each with its own workspaces and the sessions, todos, Bots, and accounts that belong to them.
 _Avoid_: Section (see **Section**), profile, mode, side
 
 **Workspace**:
@@ -154,10 +154,6 @@ _Avoid_: Pending review (GitHub's own unsubmitted review), draft review
 A standalone HTML page, Markdown document, or SVG image an agent made in a session for the user to view and reuse apart from its replies, with every version the agent saved of it.
 It is not omp's artifacts directory, where omp keeps a session's tool output and subagent files.
 _Avoid_: Canvas, document, attachment
-
-**Note**:
-A Markdown entry on the Notes page, optionally linked to a top-level todo.
-It is separate from a todo's notes field.
 
 **Activity**:
 What the page records of how its user uses the dashboard, by registry id only, which Settings › Activity reports.
