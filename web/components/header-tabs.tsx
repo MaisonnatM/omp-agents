@@ -1,4 +1,4 @@
-/** `HeaderTabs`, the row across the top of the page and the details sidebar: Back and Forward, the tabs you browse in, a + that opens a new one, then the header's controls. */
+/** `HeaderTabs`, the row across the top of the page and the details sidebar: Back and Forward, the tabs you browse in, and a + that opens a new one. */
 import { IconBubbleText, IconDotGrid2x3, IconEditBig, IconHome, IconPlusLarge, IconSparklesTwo } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useEffect, useRef } from "react";
@@ -117,8 +117,6 @@ interface HeaderTabsProps {
 	address: string;
 	hosts: readonly RosterHost[];
 	past: readonly PastSession[];
-	/** What's new, the bell, and Settings, at the row's right end. */
-	controls: ReactNode;
 }
 
 /**
@@ -126,7 +124,7 @@ interface HeaderTabsProps {
  * a session another tab shows focuses that tab, and only + opens a new tab. Drag one, or press Alt+Shift+← or → on it, to reorder;
  * its × or a middle-click closes it, closing the one on screen shows its neighbour, and closing the last leaves a new one.
  */
-export function HeaderTabs({ className, address, hosts, past, controls }: HeaderTabsProps) {
+export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps) {
 	const { openNewSession } = useDashboardActions();
 	const [row, setRow] = useStoredState(HEADER_TABS_KEY, decodeHeaderTabs, encodeHeaderTabs);
 	useEffect(() => {
@@ -227,7 +225,6 @@ export function HeaderTabs({ className, address, hosts, past, controls }: Header
 					<IconPlusLarge />
 				</Button>
 			</Tooltip>
-			<div className="ml-auto flex shrink-0 items-center pr-1.5">{controls}</div>
 		</div>
 	);
 }

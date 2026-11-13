@@ -153,11 +153,11 @@
   For a router model such as `openrouter/moonshotai/kimi-k3`, the org is the one the id names.
   Hover it to see the full model selector.
   The settings page labels models the same way.
-- Click the branch of a pull request's details, of a session's header, or of a Linear issue's detail view to copy it; its icon turns into a check mark for a moment.
-  A long branch name keeps its start and end with `…` in the middle, in a branch picker, a pull request's branches, a session's header, a Linear issue's branch, and a stack's base name; its full name shows on hover where the label has no tooltip, and copying still copies the full name.
-  Copying the branch of a session's header also removes the linked worktree that has it checked out, so you can check the branch out elsewhere, and keeps the branch.
+- Click the branch of a pull request's details or of a Linear issue's detail view to copy it; its icon turns into a check mark for a moment.
+  A long branch name keeps its start and end with `…` in the middle, in a branch picker, a pull request's branches, a Linear issue's branch, and a stack's base name; its full name shows on hover where the label has no tooltip, and copying still copies the full name.
+  Copying the head branch of a pull request's details also removes the linked worktree that has it checked out, so you can check the branch out elsewhere, and keeps the branch.
   It applies the checks of **Settings → Worktrees**: it never removes a repository's main checkout, a locked checkout, one with uncommitted or untracked changes, one a live session or this dashboard uses, or one with a nested repository.
   A toast names the worktree it removed, or the one it kept and why; a branch that no linked worktree has checked out shows no toast.
-  Copying the branch of a pull request's details or of a Linear issue only copies.
+  Copying the branch of a Linear issue only copies.
 - A live session's header shows no connection status.
   It says **Connecting…**, **Reconnecting…**, or **Disconnected** only while the pane is not live; the sidebar's status dot tells whether the session works, idles, or waits on a question.

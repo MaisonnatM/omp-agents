@@ -38,6 +38,7 @@ interface AppSidebarProps {
 	/** The open page's own list, shown beneath its row while the sidebar floats, as on a phone; otherwise the page holds it. */
 	list: ReactNode;
 	settings: SettingsRoute;
+	unreadNotices: number;
 	onPickWorkspace: (cwd: string | null) => void;
 	onSearch: () => void;
 }
@@ -57,6 +58,7 @@ export const AppSidebar = memo(function AppSidebar({
 	botList,
 	list,
 	settings,
+	unreadNotices,
 	onPickWorkspace,
 	onSearch,
 }: AppSidebarProps) {
@@ -97,6 +99,7 @@ export const AppSidebar = memo(function AppSidebar({
 				onNewSession={() => openNewSession()}
 				onTab={onTab}
 				settingsRoute={settings}
+				unreadNotices={unreadNotices}
 			/>
 			<SidebarContent>
 				<Roster

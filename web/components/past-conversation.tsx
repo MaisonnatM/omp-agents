@@ -8,7 +8,7 @@ import type { StartOf } from "../starts";
 import type { ForkPoint } from "../transcript-view";
 import { pastLabel, SOURCE_LABELS } from "../labels";
 import { Header } from "./page-header";
-import { SessionIdCopy, SessionMeta } from "./session-meta";
+import { SessionIdCopy } from "./session-meta";
 import { SessionTitle } from "./session-title";
 import { Trajectory } from "./trajectory";
 import { NOTICE_TONE, Transcript } from "./transcript";
@@ -52,10 +52,7 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 						status={foreign ? `Read-only · ${SOURCE_LABELS[session.source]}` : "Read-only"}
 						alert={false}
 					>
-						{session && (
-							<>
-								<SessionMeta facts={session} />
-								{!foreign && (
+						{session && !foreign && (
 									<Tooltip content="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here.">
 										<Button
 											size="compact"
@@ -66,8 +63,6 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 											{resuming ? "Resuming…" : "Resume"}
 										</Button>
 									</Tooltip>
-								)}
-							</>
 						)}
 						{actions}
 					</Header>
