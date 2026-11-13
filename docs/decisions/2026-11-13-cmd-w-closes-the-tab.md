@@ -2,6 +2,7 @@
 status: accepted
 date: 2026-11-13
 decision-makers: Maxence Maisonnat
+supersedes: 2026-10-30-end-a-session-with-cmd-w
 ---
 
 # Cmd+W closes the tab
