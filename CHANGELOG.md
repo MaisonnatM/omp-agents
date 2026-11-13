@@ -20,6 +20,9 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Sessions now show inside a folder for each workspace, with interrupted ones at the end of their folder, and Past stays folded until you open it.
 - The sessions search now opens from the search button beside Workspaces or with Cmd+Shift+F.
 - Scroll bars no longer vanish to nothing in some lists.
+- A tab in the top row now has the same name as the window's title, such as the pull request's owner/repo#12 or the ticket's id, instead of just Pull requests or Tickets.
+- Fixed: the window's title on the Bots gallery now says Bots instead of New Bot.
+- Behind the scenes: the window's layout is declared in one place, the reorder helpers moved out of the pull requests model, and the tab row now keeps its edge fades right when the window resizes.
 - Behind the scenes: the header buttons, the tab menu, and the desktop title bar were removed, and the Activity history for the command menu and space switch buttons starts over under new names.
 - When Update dashboard brings in a new version that does not start, the desktop app now goes back to the version you had and starts it again. The bell and the command menu say which update did not start and why, and Update dashboard waits for a newer one before it tries again.
 - When the dashboard stops on its own, the desktop app now starts it again after a few seconds, keeping your page. If it keeps stopping, the app shows what went wrong with a Retry button.
