@@ -6,19 +6,24 @@
 // - A checkout belongs to the omp process that last changed it, a session and its in-process subagents. While that process
 //   lives and the checkout holds uncommitted changes to tracked files, another process's edits, writes, and git or
 //   `gh pr checkout` commands that change the checkout are blocked, and that process works in a worktree of its own.
-// - Once HEAD is no longer where the owner left it, the owner's changes are blocked until a switch of its own succeeds.
+// - Once HEAD is no longer where the owner left it, the owner's changes are blocked until a switch of its own succeeds. HEAD a bash call
+//   of the owner's moved while it ran, a background job of the owner's moved, or an unfinished merge, cherry-pick, revert, or rebase moves
+//   is the owner's own, and passes.
 // - An isolated subagent's changes apply to the checkout its spawn names only where an edit could go; a refused apply keeps them as a patch.
 // Reads, files outside git, internal URLs such as `local://`, and the clones omp makes for isolated subagents pass.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
+import type { BashToolResultEvent, ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { located, positionals, within } from "./shell/commands";
 
 /** What a command does to the checkout it runs in: `switch` moves HEAD to a named branch or commit. */
 type Effect = "read" | "switch" | "write";
 /** How a call changes a checkout: by a command's effect, or `edit` for the edit and write tools. */
 type Kind = Exclude<Effect, "read"> | "edit";
+
+/** `git checkout` flags that create a branch, or restore paths such as one side of a conflict: each writes rather than switches. */
+const CHECKOUT_WRITES = ["-b", "-B", "--orphan", "--", ".", "--ours", "--theirs", "-p", "--patch"];
 
 /** git and gh subcommands that change the checkout they run in, each with its effect or a rule over its arguments; any other subcommand reads. */
 const CHANGES: Record<"git" | "gh", Record<string, Effect | ((args: string[]) => Effect)>> = {
@@ -29,7 +34,7 @@ const CHANGES: Record<"git" | "gh", Record<string, Effect | ((args: string[]) =>
 		stash: args => (args[0] === "list" || args[0] === "show" ? "read" : "write"),
 		// Creating a branch carries the tree's state onto it, and restoring paths discards changes: both write rather than switch.
 		switch: args => (args.some(a => ["-c", "-C", "--create", "--force-create", "--orphan"].includes(a)) ? "write" : "switch"),
-		checkout: args => (args.some(a => ["-b", "-B", "--orphan", "--", "."].includes(a)) || positionals(args).length !== 1 ? "write" : "switch"),
+		checkout: args => (args.some(a => CHECKOUT_WRITES.includes(a)) || positionals(args).length !== 1 ? "write" : "switch"),
 		// Changes the worktree it names, which `changes` resolves; `--force` removes one with uncommitted changes.
 		worktree: args => (args[0] === "remove" || args[0] === "move" ? "write" : "read"),
 	},
@@ -58,15 +63,17 @@ interface Family {
 	started: string;
 	/** Where this process last left HEAD in each checkout it changed, by git dir: `refs/heads/<branch>`, or a commit when detached. */
 	expected: Map<string, string>;
-	/** The checkouts each running bash call changes, as they were before it ran, by tool call id: a switch git refused leaves HEAD as it was. */
-	before: Map<string, Checkout[]>;
+	/** HEAD as each bash call started, by tool call id, in each checkout it changes and each this process expects HEAD in and found it there; `switched` marks a checkout another process switched that the call's own switch passed for. */
+	before: Map<string, { heads: { gitDir: string; head: string; switched: boolean }[]; reach: string[] }>;
+	/** The background bash jobs this process started that still ran when last seen, by job id: the session that started each, which alone sees it in omp's job snapshot, and the checkouts it runs in or changes, where HEAD it moves is this process's. */
+	jobs: Map<string, { session: string; gitDirs: string[] }>;
 	/** Where each directory's checkout is, by directory, as {@link placeOf} last read it. */
 	places: Map<string, { at: number; place: Place }>;
 }
 
 function family(): Family {
 	const store = globalThis as Record<symbol, Family | undefined>;
-	return (store[Symbol.for("omp-agents.worktree-guard")] ??= { pid: process.pid, started: startOf(process.pid), expected: new Map(), before: new Map(), places: new Map() });
+	return (store[Symbol.for("omp-agents.worktree-guard")] ??= { pid: process.pid, started: startOf(process.pid), expected: new Map(), before: new Map(), jobs: new Map(), places: new Map() });
 }
 
 function startOf(pid: number): string {
@@ -175,9 +182,31 @@ function defaultBranchOf(c: Checkout): string | null {
 	return (originHead ? [originHead] : ["main", "master"]).includes(branch) ? branch : null;
 }
 
+/** Whether a merge, cherry-pick, revert, or rebase waits to be finished in the checkout of `gitDir`, moving HEAD as it goes. */
+const unfinished = (gitDir: string) => UNFINISHED.some(name => existsSync(join(gitDir, name)));
+
 /** Work a branch switch would carry off or break: uncommitted changes to tracked files, or an unfinished merge, cherry-pick, revert, or rebase. */
 function working(c: Checkout): boolean {
-	return UNFINISHED.some(name => existsSync(join(c.gitDir, name))) || git(c.top, ["status", "--porcelain", "--untracked-files=no"]) !== "";
+	return unfinished(c.gitDir) || git(c.top, ["status", "--porcelain", "--untracked-files=no"]) !== "";
+}
+
+/** Takes where HEAD is now in the checkout of `gitDir` as where this process left it, while this process owns the checkout. */
+function adopt(me: Family, gitDir: string) {
+	const head = headOf(gitDir);
+	// A process that took the checkout meanwhile owns what HEAD is now; this one's next change reports the switch.
+	if (head && mine(readClaim(gitDir), me)) me.expected.set(gitDir, head);
+}
+
+/** Forgets the background jobs the session of `ctx` started that no longer run, or every one of them when `all`, adopting HEAD in the checkouts each reached: HEAD a job moved before it ended is this process's. */
+function settleJobs(me: Family, ctx: ExtensionContext, all = false) {
+	if (me.jobs.size === 0) return;
+	const session = ctx.sessionManager.getSessionId();
+	const running = new Set(all ? [] : ctx.getAsyncJobSnapshot()?.running.map(job => job.id));
+	for (const [id, job] of me.jobs) {
+		if (job.session !== session || running.has(id)) continue;
+		me.jobs.delete(id);
+		for (const gitDir of job.gitDirs) adopt(me, gitDir);
+	}
 }
 
 const label = (head: string) => (head.startsWith("refs/heads/") ? `\`${head.slice(11)}\`` : `a detached HEAD at \`${head.slice(0, 12)}\``);
@@ -209,7 +238,10 @@ function guard(c: Checkout, kind: Kind, what: string, ctx: ExtensionContext): st
 		].join(" ");
 	}
 	const expected = me.expected.get(c.gitDir);
-	if (expected && expected !== c.head && kind !== "switch") {
+	const drifted = expected !== undefined && expected !== c.head;
+	// A rebase or merge under way moves HEAD as it goes, and a background job this process started in the checkout may have moved it: neither is another process's switch.
+	const own = drifted && (unfinished(c.gitDir) || (mine(claim, me) && [...me.jobs.values()].some(job => job.gitDirs.includes(c.gitDir))));
+	if (drifted && !own && kind !== "switch") {
 		return [
 			`${c.top} is on ${label(c.head)}, but this session left it on ${label(expected)}: another process switched it.`,
 			"Your uncommitted changes may have moved with it or into a stash, and the changes in the tree now may not be yours.",
@@ -232,7 +264,7 @@ function guard(c: Checkout, kind: Kind, what: string, ctx: ExtensionContext): st
 		writeFileSync(`${file}.${me.pid}`, JSON.stringify(next));
 		renameSync(`${file}.${me.pid}`, file);
 	}
-	if (!expected) me.expected.set(c.gitDir, c.head);
+	if (!expected || own) me.expected.set(c.gitDir, c.head);
 	return undefined;
 }
 
@@ -296,6 +328,9 @@ function wrongTree(path: string, c: Checkout, tool: string): string | undefined 
 export default function worktreeGuard(pi: ExtensionAPI) {
 	pi.on("tool_call", async (event, ctx) => {
 		const input = event.input as Record<string, unknown>;
+		const me = family();
+		settleJobs(me, ctx);
+		const bashCwd = typeof input.cwd === "string" ? resolve(ctx.cwd, input.cwd) : ctx.cwd;
 		// Each checkout the call changes, judged once by the strongest change the call makes there: a write over a switch.
 		const touched = new Map<string, { c: Checkout; kind: Kind; what: string }>();
 		const touch = (c: Checkout | null, kind: Kind, what: string) => {
@@ -315,7 +350,7 @@ export default function worktreeGuard(pi: ExtensionAPI) {
 				else touch(c, "edit", `This ${event.toolName} of ${path}`);
 			}
 		} else if (event.toolName === "bash" && typeof input.command === "string") {
-			for (const change of changes(input.command, typeof input.cwd === "string" ? resolve(ctx.cwd, input.cwd) : ctx.cwd)) {
+			for (const change of changes(input.command, bashCwd)) {
 				const command = `\`${change.words.join(" ")}\``;
 				if (change.dir === null) {
 					return {
@@ -330,7 +365,17 @@ export default function worktreeGuard(pi: ExtensionAPI) {
 			const reason = guard(c, kind, what, ctx);
 			if (reason) return { block: true, reason };
 		}
-		if (event.toolName === "bash" && touched.size > 0) family().before.set(event.toolCallId, [...touched.values()].map(({ c }) => c));
+		if (event.toolName === "bash") {
+			// HEAD as the call starts, for `tool_result` to tell the call's moves from earlier ones; a checkout another process already switched keeps its drift block.
+			const heads = [...touched.values()].map(({ c }) => ({ gitDir: c.gitDir, head: c.head, switched: me.expected.get(c.gitDir) !== c.head }));
+			for (const [gitDir, expected] of me.expected) {
+				if (touched.has(gitDir)) continue;
+				if (!existsSync(gitDir)) me.expected.delete(gitDir);
+				else if (headOf(gitDir) === expected) heads.push({ gitDir, head: expected, switched: false });
+			}
+			const home = checkoutAt(bashCwd)?.gitDir;
+			if (heads.length > 0) me.before.set(event.toolCallId, { heads, reach: home ? [...touched.keys(), home] : [...touched.keys()] });
+		}
 		if (ignored.length === 0) return;
 		const ignoredHere = `git ignores ${ignored.map(file => `\`${file}\``).join(", ")}, so no worktree has it, and its main checkout is on the default branch.`;
 		if (ctx.hasUI && (await ctx.ui.confirm("Edit an ignored file on the default branch?", `${ignoredHere} Allow this edit there?`))) return;
@@ -353,23 +398,32 @@ export default function worktreeGuard(pi: ExtensionAPI) {
 		};
 	});
 
-	// Adopts the HEAD the owner's own command left once it succeeded or moved HEAD, as `git switch x && false` does; a switch git refused keeps the drift block.
-	pi.on("tool_result", event => {
+	// Adopts the HEAD each bash call of the owner left where HEAD was where the owner expected it as the call started: what moved it since is the call, a script it ran included.
+	// After another process's switch, only the call's own switch adopts, once it succeeded or moved HEAD, as `git switch x && false` does; a switch git refused keeps the drift block.
+	pi.on("tool_result", (event, ctx) => {
 		const me = family();
 		const before = me.before.get(event.toolCallId);
 		me.before.delete(event.toolCallId);
-		for (const c of before ?? []) {
-			const head = headOf(c.gitDir);
-			// A process that took the checkout while the command ran owns what HEAD is now; this one's next change reports the switch.
-			if (head && (!event.isError || head !== c.head) && mine(readClaim(c.gitDir), me)) me.expected.set(c.gitDir, head);
+		if (!before) return;
+		const adopted: string[] = [];
+		for (const { gitDir, head: was, switched } of before.heads) {
+			if (me.expected.get(gitDir) !== was && !(switched && (!event.isError || headOf(gitDir) !== was))) continue;
+			adopt(me, gitDir);
+			adopted.push(gitDir);
 		}
+		// A command omp moved to the background keeps running after this result, so HEAD it moves where it runs or changes stays this process's until it ends.
+		const job = event.toolName === "bash" ? (event as BashToolResultEvent).details?.async : undefined;
+		if (job?.state === "running") me.jobs.set(job.jobId, { session: ctx.sessionManager.getSessionId(), gitDirs: adopted.filter(gitDir => before.reach.includes(gitDir)) });
 	});
 
 	pi.on("session_shutdown", (_event, ctx) => {
-		if (ctx.agent.kind === "sub") return;
 		const me = family();
+		// A subagent's jobs end with it, and only its own session could see them end.
+		settleJobs(me, ctx, true);
+		if (ctx.agent.kind === "sub") return;
 		for (const gitDir of me.expected.keys()) if (mine(readClaim(gitDir), me)) rmSync(join(gitDir, CLAIM), { force: true });
 		me.expected.clear();
 		me.before.clear();
+		me.jobs.clear();
 	});
 }

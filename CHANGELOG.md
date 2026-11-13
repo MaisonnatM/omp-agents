@@ -20,6 +20,7 @@ The dashboard shows the same lines in Settings › What's new.
 - Resume, or a message to a past session, now puts back the folder the session worked in when archiving it had removed that folder, on the same branch, so the agent picks up where it left off.
 - When the session's branch was deleted meanwhile, the folder comes back on a fresh branch of the same name, started from the latest main branch.
 - Fixed: when the project the session worked in is gone, Resume now says so instead of starting an agent in a missing folder.
+- Fixed: an agent that rebased its own branch, or ran a script or background job that switched it, was told another process had switched the branch and could not edit, resolve the rebase, or abort it. Its own moves now pass, and a switch by another session still stops it.
 - Settings › Keyboard and Settings › Activity now list each page's shortcuts and views in the same order as the sidebar.
 - Behind the scenes: Sport, Calendar, Email, and Tickets are now separate modules, so a page like them can be added or removed without touching the rest of the app.
 - The **+** menu in a session's right sidebar now lists its subagents, each opening its view, and **New terminal**, which opens the terminal on a new shell.
