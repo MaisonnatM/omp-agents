@@ -218,7 +218,8 @@ interface SidebarMenuButtonProps
   extends ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof sidebarMenuButtonVariants> {
   isActive?: boolean;
-  size?: "default" | "sm" | "lg";
+  /** `dense` is the compact step's 28px row at the surrounding text size. */
+  size?: "default" | "sm" | "lg" | "dense";
   icon?: IconComponent;
   /** Semantic thread state for status-dot navigation. Drives the dot
    *  visuals (`active`/`unread` → filled, `idle` → ring), stamps
@@ -274,7 +275,7 @@ const SidebarMenuButton = forwardRef<HTMLButtonElement, SidebarMenuButtonProps>(
     const resolvedDot =
       dot ?? (status ? (status === "idle" ? "ring" : "filled") : undefined);
     const heightClass =
-      size === "sm"
+      size === "sm" || size === "dense"
         ? "h-7"
         : size === "lg"
           ? "h-12"

@@ -79,7 +79,7 @@ const SIDEBARS: Record<SidebarSide, SidebarSpec> = {
 		showIcon: PanelRightOpen,
 		rail: 0,
 		frame: "col-start-3 row-start-2 justify-end",
-		panel: "ml-1.5 overflow-hidden rounded-[10px] border border-border bg-background shadow-[0_1px_2px_rgb(0_0_0/0.03)]",
+		panel: "ml-1.5 overflow-hidden rounded-panel border border-border bg-background shadow-raised",
 	},
 };
 

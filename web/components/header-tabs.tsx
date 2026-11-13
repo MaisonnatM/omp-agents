@@ -1,35 +1,33 @@
 /** `HeaderTabs`, the row across the top of the page and the details sidebar: Back and Forward, one tab per page or session you opened, New session, then the header's controls. */
-import { GripVertical, House, Loader, type LucideIcon, MessageSquare, Plus, Sparkles, SquarePen, X } from "lucide-react";
+import { GripVertical, House, type LucideIcon, MessageSquare, Plus, Sparkles, SquarePen, X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { awaitsSubagents, type PastSession, type RosterHost } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl, record } from "../activity";
+import { stepTarget } from "../pull-requests-model";
 import { closeHeaderTab, decodeHeaderTabs, encodeHeaderTabs, HEADER_TABS_KEY, headerTabKey, moveHeaderTab, visitHeaderTab } from "../header-tabs";
 import { hostLabel, pastLabel } from "../labels";
 import { PAGE_ICON } from "../page-icons";
-import { focusedView, type Page, routeFromHash } from "../routing";
-import { shortcutLabels } from "../shortcuts";
+import { focusedView, type Page, routeFromHash, type SidebarTab } from "../routing";
+import { shortcutLabels, useShortcuts } from "../shortcuts";
+import { isSidebarTab, TAB_ROWS } from "../sidebar-tabs";
 import { useStoredState } from "../stored-state";
 import { DESKTOP_TITLE_BAR } from "../desktop-title-bar";
+import { SIDE_DROP_LINE, useDragOrder } from "../use-drag-order";
 import { HistoryButtons } from "./header-controls";
 import { StatusDot } from "./status-dot";
 
-const PAGE_LABEL: Record<Page["kind"], string> = {
+/** The names of the pages with no sidebar tab; a tab's page takes its row's label from {@link TAB_ROWS}. */
+const OTHER_PAGE_LABEL: Record<Exclude<Page["kind"], SidebarTab>, string> = {
 	"get-started": "Get started",
 	settings: "Settings",
-	"pull-requests": "Pull requests",
-	tickets: "Tickets",
-	todo: "Todo",
-	notes: "Notes",
-	bots: "Bots",
-	calendar: "Calendar",
-	email: "Email",
 	new: "New session",
 	scheduled: "Scheduled session",
-	sport: "Sport",
 };
+
+const pageLabel = (kind: Page["kind"]): string => (isSidebarTab(kind) ? TAB_ROWS[kind].label : OTHER_PAGE_LABEL[kind]);
 
 const PAGE_TAB_ICON: Record<Page["kind"], LucideIcon> = { ...PAGE_ICON, "get-started": Sparkles, new: SquarePen, scheduled: PAGE_ICON.calendar };
 
@@ -40,7 +38,7 @@ function faceOf(hash: string, hosts: readonly RosterHost[], past: readonly PastS
 	const route = routeFromHash(hash);
 	if (route.kind === "page") {
 		const Icon = PAGE_TAB_ICON[route.page.kind];
-		return { label: PAGE_LABEL[route.page.kind], lead: <Icon className={ICON} /> };
+		return { label: pageLabel(route.page.kind), lead: <Icon className={ICON} /> };
 	}
 	const view = route.kind === "panes" ? focusedView(route.layout) : null;
 	if (view === null) return { label: "Home", lead: <House className={ICON} /> };
@@ -53,7 +51,8 @@ function faceOf(hash: string, hosts: readonly RosterHost[], past: readonly PastS
 	const label = view.agentId === null ? name : `${view.agentId} · ${name}`;
 	if (!host) return { label, lead: <MessageSquare className={ICON} /> };
 	const status = awaitsSubagents(host) ? "awaiting-subagents" : host.status;
-	if (status === "working" || status === "awaiting-subagents") return { label, lead: <Loader aria-label="Working" className={cn(ICON, "animate-spin text-success")} /> };
+	// A working session draws no mark, as its sidebar row's dot does not: the icon, and the status only for screen readers.
+	if (status === "working" || status === "awaiting-subagents") return { label, lead: <><MessageSquare className={ICON} /><StatusDot status={status} /></> };
 	return { label, lead: <span className="flex w-3.5 justify-center"><StatusDot status={status} /></span> };
 }
 
@@ -71,14 +70,16 @@ interface HeaderTabsProps {
 
 /**
  * The row of header tabs: a tab for each page and focused session you open, at most eight, the one seen longest ago dropping out,
- * kept in this browser. Drag one to reorder; its × or a middle-click closes it, and closing the one on screen shows its neighbour.
+ * kept in this browser. Drag one, or press Alt+Shift+← or → on it, to reorder; its × or a middle-click closes it, and closing the one on screen shows its neighbour.
  */
 export function HeaderTabs({ address, hosts, past, sidebarDocked, onNewSession, controls }: HeaderTabsProps) {
 	const [tabs, setTabs] = useStoredState(HEADER_TABS_KEY, decodeHeaderTabs, encodeHeaderTabs);
 	useEffect(() => setTabs(current => visitHeaderTab(current, address, Date.now())), [address, setTabs]);
 	const activeKey = headerTabKey(address);
 	const list = useRef<HTMLDivElement>(null);
-	const dragged = useRef<{ key: string; moved: boolean } | null>(null);
+	const dragOrder = useDragOrder("x");
+	/** The tab a key press moved, which takes the focus back once the row is drawn again in its new order. */
+	const refocus = useRef<string | null>(null);
 	/** Which ends of the row hide tabs past them, faded so the row says it scrolls. */
 	const [edges, setEdges] = useState({ start: false, end: false });
 	const measureEdges = (): void => {
@@ -89,6 +90,26 @@ export function HeaderTabs({ address, hosts, past, sidebarDocked, onNewSession, 
 		list.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
 		measureEdges();
 	}, [activeKey, tabs.length]);
+	useEffect(() => {
+		const key = refocus.current;
+		refocus.current = null;
+		if (key !== null) list.current?.querySelector<HTMLElement>(`[data-tab-key="${CSS.escape(key)}"] a`)?.focus();
+	}, [tabs]);
+	const move = (key: string, target: string, where: "before" | "after"): void => {
+		setTabs(current => moveHeaderTab(current, key, target, where));
+		record("control", "header.tab.move");
+	};
+	/** Moves the focused tab one place `by`; a key press with no tab focused passes on. */
+	const moveFocused = (by: 1 | -1): boolean => {
+		const key = document.activeElement?.closest<HTMLElement>("[data-tab-key]")?.dataset.tabKey;
+		if (key === undefined || !list.current?.contains(document.activeElement)) return false;
+		const step = stepTarget(tabs.map(tab => tab.key), key, by);
+		if (step === null) return true;
+		refocus.current = key;
+		move(key, step.target, step.where);
+		return true;
+	};
+	useShortcuts({ moveTabLeft: () => moveFocused(-1), moveTabRight: () => moveFocused(1) });
 	const close = (key: string): void => {
 		const { tabs: rest, go } = closeHeaderTab(tabs, key, activeKey);
 		setTabs(rest);
@@ -113,29 +134,19 @@ export function HeaderTabs({ address, hosts, past, sidebarDocked, onNewSession, 
 				{tabs.map(tab => {
 					const active = tab.key === activeKey;
 					const { label, lead } = faceOf(tab.hash, hosts, past);
+					const drag = dragOrder("header-tabs", tab.key, (dragged, where) => move(dragged, tab.key, where));
 					return (
 						<div
 							key={tab.key}
-							draggable
-							onDragStart={event => {
-								dragged.current = { key: tab.key, moved: false };
-								event.dataTransfer.effectAllowed = "move";
-							}}
-							onDragOver={event => {
-								event.preventDefault();
-								const from = dragged.current;
-								if (!from || from.key === tab.key) return;
-								from.moved = true;
-								setTabs(current => moveHeaderTab(current, from.key, tab.key));
-							}}
-							onDragEnd={() => {
-								if (dragged.current?.moved) record("control", "header.tab.move");
-								dragged.current = null;
-							}}
+							data-tab-key={tab.key}
+							{...drag.handle}
+							{...drag.target}
 							className={cn(
 								"group relative flex h-7 max-w-60 min-w-24 items-center rounded-lg border text-[13px]",
 								tab.key.startsWith("view:") ? "min-w-36 flex-[0_1_auto]" : "shrink-0",
-								active ? "border-border bg-background text-foreground shadow-[0_1px_2px_rgb(0_0_0/0.06)]" : "border-transparent text-muted-foreground hover:bg-hover hover:text-foreground",
+								active ? "border-border bg-background text-foreground shadow-raised" : "border-transparent text-muted-foreground hover:bg-hover hover:text-foreground",
+								drag.dragging && "opacity-50",
+								drag.dropAt && SIDE_DROP_LINE[drag.dropAt],
 							)}
 						>
 							<a
@@ -145,7 +156,8 @@ export function HeaderTabs({ address, hosts, past, sidebarDocked, onNewSession, 
 								draggable={false}
 								className={cn(
 									"flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-lg pl-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring",
-									active ? "pr-11" : "pr-2.5 group-hover:[mask-image:linear-gradient(to_left,transparent_1.625rem,black_2rem)]",
+									// An inactive tab's × shows on hover, on focus, and always on a touch screen; the label fades under it there.
+									active ? "pr-11" : "pr-2.5 group-focus-within:[mask-image:linear-gradient(to_left,transparent_1.625rem,black_2rem)] group-hover:[mask-image:linear-gradient(to_left,transparent_1.625rem,black_2rem)] [@media(hover:none)]:[mask-image:linear-gradient(to_left,transparent_1.625rem,black_2rem)]",
 								)}
 								onClick={event => {
 									if (event.metaKey || event.ctrlKey || event.shiftKey) return;
@@ -171,12 +183,14 @@ export function HeaderTabs({ address, hosts, past, sidebarDocked, onNewSession, 
 								{...activityControl("header.tab.close")}
 								aria-label={`Close ${label}`}
 								className={cn(
-									"absolute right-1 flex size-5 items-center justify-center rounded-md text-muted-foreground hover:bg-active hover:text-foreground focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-									!active && "opacity-0 group-hover:opacity-100",
+									"group/close absolute right-0.5 grid size-6 place-items-center rounded-md text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [@media(hover:none)]:opacity-100",
+									!active && "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100",
 								)}
 								onClick={() => close(tab.key)}
 							>
-								<X className="size-3" />
+								<span className="grid size-4 place-items-center rounded-md group-hover/close:bg-active">
+									<X className="size-3" />
+								</span>
 							</button>
 						</div>
 					);

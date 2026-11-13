@@ -14,7 +14,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Fixed: with omp 18.20, Settings › Models again reads your model roles and fallback chains, and offers model updates.
 - The starter kit now tells agents when to save something to the Artifacts tab on their own: a report you will choose from or come back to, a one-file mockup, or a diagram too large for the reply.
 - The window has a new look. The sidebar runs down the whole left side with every page in one list, and the page sits beside it in a rounded panel.
-- A row of tabs now runs across the top of the window with the pages and sessions you opened lately. Click a tab to go back to it, drag it to move it, and close it with its x or a middle click.
+- A row of tabs now runs across the top of the window with the pages and sessions you opened lately. Click a tab to go back to it, drag it or press Alt+Shift and an arrow key on it to move it, and close it with its x or a middle click.
 - Notes, Calendar, Todo, Sport, and Email now sit in the sidebar's page list with the other pages, and Cmd+1 to Cmd+5 go to the first five pages of that list.
 - The Personal and Work switch now lives in the account row at the bottom of the sidebar, and its menu also opens the keyboard shortcuts.
 - Sessions now show inside a folder for each workspace, with interrupted ones at the end of their folder, and Past stays folded until you open it.

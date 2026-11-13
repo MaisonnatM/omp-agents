@@ -36,7 +36,8 @@ The frame before this had the sidebar's tab bar for Pull requests, Tickets, Bots
 - Cmd+1 through Cmd+5 go to the first five rows of the page list, so Notes, Calendar, Todo, Sport, and Email take numbers too when they sit among the first five.
 - The roster under **Workspaces** lists each workspace as a folder holding its running and interrupted sessions; **Past** stays folded until you open it, and this browser keeps that choice.
 - The account row at the sidebar's foot shows the space and its workspace count, and its menu switches the space and opens the keyboard shortcuts.
-- The header's tabs keep up to eight pages and sessions in this browser, a click focuses one, × or a middle-click closes it, and a drag reorders it.
+- The header's tabs keep up to eight pages and sessions in this browser, a click focuses one, × or a middle-click closes it, and a drag, or Alt+Shift+← or → on the focused tab, reorders it.
+- The **Search sessions** button beside the **Workspaces** label stays visible, as the field it replaced was, rather than showing only on hover.
 - The page header holds only its page's title and buttons, so a narrow header has nothing to fold into a tab menu.
 - In the desktop app on macOS the header's tabs are the title bar: the row is 48 pixels tall, drags the window, starts after the window's buttons through `env(titlebar-area-x)`, and `trafficLightPosition` in `desktop/main.ts` sits at y 17 to center the buttons in it.
 - The maximized Browser of [Maximized Browser covers the window](2026-10-28-maximized-browser-covers-the-window.md) now starts below `--page-header-height` rather than `top-9`, since the title bar it named changed height.

@@ -8,6 +8,7 @@ import { PAGE_ICON } from "../page-icons";
 import { hashForPage, type SettingsRoute, type SidebarTab } from "../routing";
 import { shortcutLabels } from "../shortcuts";
 import { TAB_ROWS, tabShortcutLabels } from "../sidebar-tabs";
+import { CountPill } from "./count-pill";
 
 /** A row of the page list: a tab's page, Settings, or the New session draft. */
 export type NavRow = SidebarTab | "settings" | "new";
@@ -36,9 +37,6 @@ interface SidebarNavProps {
 	settingsRoute: SettingsRoute;
 }
 
-/** A page row's height, a step under the menu's own, so the list reads as one dense column. */
-const ROW = "h-7";
-const BADGE = "top-1.5 h-4 min-w-4 rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground";
 
 export function SidebarNav({ tabs, current, counts, listOf, list, newSessionLabel, onNewSession, onTab, settingsRoute }: SidebarNavProps) {
 	const row = (value: NavRow): ReactNode => {
@@ -47,7 +45,7 @@ export function SidebarNav({ tabs, current, counts, listOf, list, newSessionLabe
 			return (
 				<SidebarMenuItem key={value}>
 					<Tooltip content={newSessionLabel} shortcut={shortcutLabels("newSession")} side="right">
-						<SidebarMenuButton className={ROW} icon={SquarePen} isActive={active} aria-label={newSessionLabel} onClick={onNewSession}>
+						<SidebarMenuButton size="dense" icon={SquarePen} isActive={active} aria-label={newSessionLabel} onClick={onNewSession}>
 							{newSessionLabel}
 						</SidebarMenuButton>
 					</Tooltip>
@@ -58,7 +56,7 @@ export function SidebarNav({ tabs, current, counts, listOf, list, newSessionLabe
 			return (
 				<SidebarMenuItem key={value}>
 					<Tooltip content="Settings" shortcut={shortcutLabels("settings")} side="right">
-						<SidebarMenuButton className={ROW} asChild icon={PAGE_ICON.settings} isActive={active}>
+						<SidebarMenuButton size="dense" asChild icon={PAGE_ICON.settings} isActive={active}>
 							<a href={hashForPage({ kind: "settings", ...settingsRoute })}>Settings</a>
 						</SidebarMenuButton>
 					</Tooltip>
@@ -71,13 +69,13 @@ export function SidebarNav({ tabs, current, counts, listOf, list, newSessionLabe
 		return (
 			<SidebarMenuItem key={value}>
 				<Tooltip content={label} shortcut={tabShortcutLabels(value, tabs)} side="right">
-					<SidebarMenuButton className={ROW} icon={icon} isActive={active} aria-label={badge ? `${label}, ${badge.says(badge.count)}` : undefined} onClick={() => onTab(value)}>
+					<SidebarMenuButton size="dense" icon={icon} isActive={active} aria-label={badge ? `${label}, ${badge.says(badge.count)}` : undefined} onClick={() => onTab(value)}>
 						{label}
 					</SidebarMenuButton>
 				</Tooltip>
 				{badge && (
-					<SidebarMenuBadge aria-hidden className={BADGE}>
-						{badge.count}
+					<SidebarMenuBadge aria-hidden>
+						<CountPill count={badge.count} />
 					</SidebarMenuBadge>
 				)}
 			</SidebarMenuItem>

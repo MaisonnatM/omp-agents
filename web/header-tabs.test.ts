@@ -30,7 +30,7 @@ describe("visitHeaderTab", () => {
 describe("moveHeaderTab", () => {
 	test("a reordered row survives being stored and read back, and a later visit keeps it", () => {
 		const tabs = visit(["#pull-requests", "#past/a", "#todo"]);
-		const moved = moveHeaderTab(tabs, headerTabKey("#todo")!, headerTabKey("#pull-requests")!);
+		const moved = moveHeaderTab(tabs, headerTabKey("#todo")!, headerTabKey("#pull-requests")!, "before");
 		expect(hashes(moved)).toEqual(["#todo", "#pull-requests", "#past/a"]);
 		const stored = decodeHeaderTabs(encodeHeaderTabs(moved));
 		expect(stored).toEqual(moved);

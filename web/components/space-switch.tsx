@@ -1,10 +1,12 @@
 import { ChevronsUpDown, Keyboard } from "lucide-react";
 import { isSpace, type Space, SPACES } from "../../src/shared/workspaces";
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuShortcut } from "@/components/ui/menu";
 import { activityControl } from "../activity";
 import { SPACE_LABELS, sessionsWaiting } from "../labels";
 import { SPACE_ICONS } from "../page-icons";
 import { shortcutLabels } from "../shortcuts";
+import { CountPill } from "./count-pill";
 
 interface SpaceSwitchProps {
 	space: Space;
@@ -19,29 +21,34 @@ interface SpaceSwitchProps {
 /** The sidebar's foot: the space the window shows, as an account row whose menu switches to the other space and opens the keyboard shortcuts. */
 export function SpaceSwitch({ space, onSpace, otherWaiting, workspaces, onShowShortcuts }: SpaceSwitchProps) {
 	const label = SPACE_LABELS[space];
+	const Icon = SPACE_ICONS[space];
 	return (
 		<DropdownMenu>
-			<DropdownMenuTrigger
-				render={
-					<button
-						type="button"
-						aria-label={`${label} space. Switch space${otherWaiting > 0 ? `, ${sessionsWaiting(otherWaiting)} in the other` : ""}`}
-						className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring data-[popup-open]:bg-hover"
-					/>
-				}
-			>
-				<span aria-hidden className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-orange-500 text-sm font-semibold text-white">
-					{label[0]}
-					{otherWaiting > 0 && <span aria-hidden className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-primary ring-2 ring-sidebar" />}
-				</span>
-				<span className="min-w-0 flex-1 leading-tight">
-					<span className="block truncate text-[13px] font-medium">{label}</span>
-					<span className="block truncate text-xs text-muted-foreground">
-						{workspaces} workspace{workspaces === 1 ? "" : "s"}
-					</span>
-				</span>
-				<ChevronsUpDown aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-			</DropdownMenuTrigger>
+			<SidebarMenu>
+				<SidebarMenuItem>
+					<DropdownMenuTrigger
+						render={
+							<SidebarMenuButton
+								size="lg"
+								className="px-2 data-[popup-open]:bg-hover"
+								aria-label={`${label} space. Switch space${otherWaiting > 0 ? `, ${sessionsWaiting(otherWaiting)} in the other` : ""}`}
+							/>
+						}
+					>
+						<span aria-hidden className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+							<Icon className="size-4" />
+							{otherWaiting > 0 && <span aria-hidden className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-primary ring-2 ring-sidebar" />}
+						</span>
+						<span className="min-w-0 flex-1 text-left leading-tight">
+							<span className="block truncate text-[13px] font-medium">{label}</span>
+							<span className="block truncate text-xs text-muted-foreground">
+								{workspaces} workspace{workspaces === 1 ? "" : "s"}
+							</span>
+						</span>
+						<ChevronsUpDown aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+					</DropdownMenuTrigger>
+				</SidebarMenuItem>
+			</SidebarMenu>
 			<DropdownMenuContent side="top" align="start" className="w-60">
 				<MenuRadioGroup value={space} onValueChange={(value: string) => isSpace(value) && onSpace(value)}>
 					{SPACES.map(value => {
@@ -57,11 +64,7 @@ export function SpaceSwitch({ space, onSpace, otherWaiting, workspaces, onShowSh
 							>
 								<SpaceIcon />
 								{SPACE_LABELS[value]}
-								{waiting > 0 && (
-									<span aria-hidden className="min-w-4 rounded-full bg-primary px-1 text-center text-[10px] leading-4 font-semibold tabular-nums text-primary-foreground">
-										{waiting}
-									</span>
-								)}
+								{waiting > 0 && <CountPill count={waiting} />}
 								{value !== space && <MenuShortcut>{shortcutLabels("switchSpace").join(" ")}</MenuShortcut>}
 							</MenuRadioItem>
 						);

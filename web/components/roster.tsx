@@ -15,6 +15,7 @@ import { rosterFolders, rowPlacement, type SidebarSessions, type WorkspaceGroup 
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useStoredKeys, useStoredState } from "../stored-state";
 import { CommandPicker } from "./command-picker";
+import { CountPill } from "./count-pill";
 import { PersonalContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { ScheduledGroup } from "./scheduled";
 import { HostRow, PastRow } from "./session-row";
@@ -28,8 +29,6 @@ const COLLAPSED_GROUPS_KEY = "omp-agents.sidebar-collapsed-groups";
 const PAST_OPEN_KEY = "omp-agents.sidebar-past-open";
 /** Past sessions the list shows at first, and how many more each "Show more" adds; the rest stay out of the page until asked for. */
 const PAST_PAGE = 100;
-/** Shows a section header's button only while the header is hovered or holds focus, and always on a touch screen. */
-const REVEAL = "opacity-0 transition-opacity group-hover/section:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100";
 /** Workspaces the roster shows before "N more", unless more of them hold sessions. */
 const GROUPS_SHOWN = 8;
 
@@ -168,12 +167,12 @@ export function Roster({ workspaces, lists, groups, query, onQuery, onTogglePin,
 	return (
 		<>
 			<SidebarGroup className="gap-1 pt-4 pb-1">
-				<div className="group/section flex h-6 min-w-0 items-center gap-0.5">
+				<div className="flex h-6 min-w-0 items-center gap-0.5">
 					<SidebarWorkspacePicker workspaces={workspaces} onPick={onPickWorkspace} />
-					<span className="ml-auto flex shrink-0 items-center gap-0.5 pr-1.5">
+					<SidebarGroupActions className="relative top-auto right-auto ml-auto h-6 shrink-0 pr-1.5">
 						{!searchShown && (
 							<Tooltip content="Search sessions" shortcut={shortcutLabels("sessionSearch")}>
-								<SidebarGroupAction asChild className={cn("relative right-auto top-auto", REVEAL)}>
+								<SidebarGroupAction asChild>
 									<button type="button" aria-label="Search sessions" onClick={() => setSearching(true)}>
 										<Search />
 									</button>
@@ -182,7 +181,7 @@ export function Roster({ workspaces, lists, groups, query, onQuery, onTogglePin,
 						)}
 						{interrupted.length > 0 && (
 							<Tooltip content={resumingAll ? "Resuming…" : `Resume all ${interrupted.length} interrupted`} disabled={resumingAll || !connected}>
-								<SidebarGroupAction asChild className="relative right-auto top-auto disabled:pointer-events-none disabled:opacity-50">
+								<SidebarGroupAction asChild className="disabled:pointer-events-none disabled:opacity-50">
 									<button
 										type="button"
 										aria-label={resumingAll ? "Resuming interrupted sessions" : "Resume all interrupted sessions"}
@@ -194,7 +193,7 @@ export function Roster({ workspaces, lists, groups, query, onQuery, onTogglePin,
 								</SidebarGroupAction>
 							</Tooltip>
 						)}
-					</span>
+					</SidebarGroupActions>
 				</div>
 				{resumeAll?.phase === "failed" && (
 					<p role="alert" className="flex items-start gap-2 rounded-md bg-red-500/10 px-2 py-1.5 text-xs text-red-600 dark:text-red-400">
@@ -247,9 +246,10 @@ export function Roster({ workspaces, lists, groups, query, onQuery, onTogglePin,
 					<SidebarGroupLabel icon={unfolded ? FolderOpen : Folder} title={cwdDisplay} className="h-7 text-[13px] text-foreground/85 hover:text-foreground">
 						{name}
 						{waiting > 0 && (
-							<span aria-label={sessionsWaiting(waiting)} className="min-w-4 shrink-0 rounded-full bg-primary px-1 text-center text-[10px] leading-4 font-semibold tabular-nums text-primary-foreground">
-								{waiting}
-							</span>
+							<>
+								<CountPill count={waiting} />
+								<span className="sr-only">{`, ${sessionsWaiting(waiting)}`}</span>
+							</>
 						)}
 					</SidebarGroupLabel>
 				);

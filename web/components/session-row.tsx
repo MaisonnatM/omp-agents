@@ -78,7 +78,7 @@ function SessionButton({ view, label, title, badge, facts, when, dot, placement,
 	);
 	return (
 		<Tooltip content={`${label}. ${title}. ${split ? "In a split." : `${SPLIT_CLICK} to open in a split`}`} side="right">
-			<SidebarMenuButton isActive={placement !== "hidden"} className="h-7" onClick={event => onOpen(view, modeOf(event))}>
+			<SidebarMenuButton isActive={placement !== "hidden"} size="dense" onClick={event => onOpen(view, modeOf(event))}>
 				<RowLine dot={dot} badge={badge} label={label} facts={facts} end={end} />
 			</SidebarMenuButton>
 		</Tooltip>
@@ -209,7 +209,7 @@ export const PastRow = memo(function PastRow({ session, pinned, placement, showW
 				badge={showWorkspace && (session.title !== null || workspaceCwd(session) !== session.cwd) ? <WorkspaceBadge cwdDisplay={workspaceOf(session).cwdDisplay} /> : null}
 				facts={sessionFacts([session.source !== "omp" && SOURCE_LABELS[session.source]])}
 				when={session.modifiedAt}
-				dot={session.interrupted ? <CirclePause role="img" aria-label="Interrupted" className="size-3 shrink-0 text-amber-500" /> : undefined}
+				dot={session.interrupted ? <CirclePause role="img" aria-label="Interrupted" className="size-3 shrink-0 text-warning-foreground" /> : undefined}
 				placement={placement}
 				onOpen={onOpen}
 			/>

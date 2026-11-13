@@ -1,5 +1,6 @@
 /** The header tabs' model: one tab per page or focused session you opened, kept in this browser in the order you dragged them. */
 import { focusedView, hashForView, routeFromHash } from "./routing";
+import { moveKey, type Where } from "./pull-requests-model";
 
 /** One header tab: `key` names what it shows, one per page kind or per focused session; `hash` is where you last saw it, and `at` when. */
 export interface HeaderTab {
@@ -44,13 +45,10 @@ export function visitHeaderTab(tabs: readonly HeaderTab[], hash: string, now: nu
 	return next.filter(tab => tab !== oldest);
 }
 
-/** `tabs` with the tab keyed `from` moved to where the tab keyed `to` is. */
-export function moveHeaderTab(tabs: readonly HeaderTab[], from: string, to: string): readonly HeaderTab[] {
-	const moved = tabs.find(tab => tab.key === from);
-	const target = tabs.findIndex(tab => tab.key === to);
-	if (!moved || target < 0 || from === to) return tabs;
-	const rest = tabs.filter(tab => tab !== moved);
-	return [...rest.slice(0, target), moved, ...rest.slice(target)];
+/** `tabs` with the tab keyed `from` moved to just before or after the tab keyed `to`. */
+export function moveHeaderTab(tabs: readonly HeaderTab[], from: string, to: string, where: Where): readonly HeaderTab[] {
+	const order = moveKey(tabs.map(tab => tab.key), from, to, where);
+	return order.map(key => tabs.find(tab => tab.key === key)!);
 }
 
 /** `tabs` without the tab keyed `key`, and where to go when it was the one on screen, `activeKey`: the tab now in its place, else the one before it, else the home. `null` stays put. */

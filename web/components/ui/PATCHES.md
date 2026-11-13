@@ -110,6 +110,7 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 - `ui/message-scroller.tsx`: the scroll button's default `variant` is `tertiary`, where the registry's is `secondary`.
 - `ui/tooltip.tsx`: `disabled` anchors hover to a non-focusable wrapper around a disabled child, `wrapperClassName` styles that wrapper, and the trigger ignores a focus that `isReturnedFocus` in `web/use-return-focus.ts` reports.
 - `ui/button.tsx`: `data-pressed` while `active`; the label truncates with an ellipsis and the icons do not shrink.
+- `ui/sidebar-menu.tsx`: `SidebarMenuButton` takes `size="dense"`, a 28px row at the surrounding text size, which the sessions sidebar's page and session rows use.
 - `ui/tabs.tsx`: `labelClassName` on `TabItem`, and `TabsList` scrolls sideways with a hidden scrollbar.
 - `ui/file-thumbnail.tsx`: a text file shows its first 400 characters as its thumbnail.
 - `ui/chat-message.tsx`: `onOpenImage` turns each image above the bubble into a button.

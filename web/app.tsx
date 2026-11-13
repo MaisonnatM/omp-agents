@@ -304,7 +304,7 @@ export function App() {
 											/>
 										</DashboardSidebar>
 										<HeaderTabs address={address} hosts={state.hosts} past={state.past} sidebarDocked={sidebars.panels.left.open && !sidebars.panels.left.floating} onNewSession={newSession} controls={headerControls} />
-										<SidebarInset className="col-start-2 row-start-2 overflow-hidden rounded-[10px] border border-border shadow-[0_1px_2px_rgb(0_0_0/0.03)]">
+										<SidebarInset className="col-start-2 row-start-2 overflow-hidden rounded-panel border border-border shadow-raised">
 											<Plans value={state.usage?.plans ?? NO_PLANS}>
 												<ActivityVisibility.Provider value={display.activityVisibility}>
 													<ToolsExpanded value={display.toolsExpanded}>

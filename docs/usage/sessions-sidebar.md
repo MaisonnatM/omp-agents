@@ -24,7 +24,7 @@
 - The header's tabs run across the top right of the sidebar: Back and Forward, a tab for each page and session you opened lately, **New session** as a +, and What's new, the bell, and Settings at the right end.
   Clicking a tab focuses its page or session, and opening a page or a session that has no tab adds one at the end; the row keeps eight, dropping the one seen longest ago.
   The × on a tab, or a middle-click, closes it, and closing the one on screen shows its neighbor.
-  Drag a tab to move it; this browser keeps the tabs and their order across reloads.
+  Drag a tab to move it, or focus it and press Alt+Shift+← or →; this browser keeps the tabs and their order across reloads.
   In the desktop app on macOS the row is the window's title bar: it starts after the window's buttons and drags the window.
 - The dot before each session shows when it waits on you.
   A running turn shows no dot, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
@@ -46,7 +46,7 @@
 - **New session** at the top of the page list opens the new-session draft, in the selected workspace when there is one, and stays highlighted while the draft is open.
   In Personal with no workspace picked, it reads **New session in Personal** and starts in the personal directory.
   Hovering it shows its key, Cmd+N.
-- The **Search sessions** button at the right of the **Workspaces** label, shown while the pointer is over the label, opens a search field under it, and so does Cmd+Shift+F while the sidebar shows.
+- The **Search sessions** button at the right of the **Workspaces** label opens a search field under it, and so does Cmd+Shift+F while the sidebar shows.
   The field narrows every folder to the sessions whose title or working directory holds every word typed, in any order and any case, within the selected workspace.
   A folder left without a match hides, and `No sessions match` shows when none is left; Esc clears the field, and the field closes once it is empty and loses the cursor.
   While empty, it shows its key, Cmd+Shift+F, on its right.

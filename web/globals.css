@@ -172,6 +172,8 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  /* The inset page and details panels, a step between lg and xl. */
+  --radius-panel: calc(var(--radius) + 2px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -253,6 +255,8 @@
   --shadow-3: var(--shadow-3);
   --shadow-2: var(--shadow-2);
   --shadow-1: var(--shadow-1);
+  /* The lift of the inset panels and the active header tab, under their border. */
+  --shadow-raised: 0 1px 2px var(--shadow-color);
   --color-shadow-color: var(--shadow-color);
   @keyframes shimmer {
   0% {

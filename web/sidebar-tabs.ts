@@ -30,7 +30,8 @@ export function tabSpace(tab: SidebarTab): Space | null {
 	return "space" in row ? row.space : null;
 }
 
-const isSidebarTab = (kind: string): kind is SidebarTab => kind in TAB_ROWS;
+/** Whether a page kind is a sidebar tab's, with a row in {@link TAB_ROWS}. */
+export const isSidebarTab = (kind: string): kind is SidebarTab => kind in TAB_ROWS;
 
 /** The space page `page` shows in alone, its tab's {@link tabSpace}: Work for Tickets, Personal for Sport; `null` for a page of both. */
 export const pageSpace = (page: Page): Space | null => (isSidebarTab(page.kind) ? tabSpace(page.kind) : null);
