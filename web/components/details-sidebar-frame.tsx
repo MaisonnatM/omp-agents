@@ -1,22 +1,29 @@
 /** The right sidebar's shell for a focused view: the directory its file references resolve against, a row of the tabs open in it with + to open more, and the open tab's panel. */
+import * as TabsPrimitive from "@radix-ui/react-tabs";
 import type { IconComponent } from "@/lib/icon-context";
-import { IconCheckmark1, IconCrossMedium, IconPlusLarge } from "central-icons";
-import { type KeyboardEvent, type ReactNode, useId, useMemo, useState } from "react";
+import { IconPlusLarge } from "central-icons";
+import { type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuShortcut } from "@/components/ui/menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuRadioGroup, MenuRadioItem, MenuShortcut } from "@/components/ui/menu";
 import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
-import { closeDetailsTab, decodeDetailsTabs, encodeDetailsTabs, openDetailsTab } from "../details-tabs";
-import { type ShortcutId, shortcutLabels, useShortcuts } from "../shortcuts";
+import { closeDetailsTab, decodeDetailsTabs, encodeDetailsTabs, showDetailsTab } from "../details-tabs";
+import { type ShortcutHandlers, type ShortcutId, shortcutLabels, useShortcuts } from "../shortcuts";
 import { useStoredState } from "../stored-state";
+import { ClosableTab, useTabRowEdges } from "./closable-tab";
+import { CountPill } from "./count-pill";
 import { FileBaseContext } from "./file-link";
+import { SidebarOpen } from "./sidebar-panel";
 
 /** Keeps each tab's content off the header's hairline at rest, and scrolls away with it. */
 const PANEL_VIEWPORT = "pt-2";
+
+/** The tab on screen in the row, which a change scrolls into view and a keyboard close focuses. */
+const ACTIVE_TAB = '[role="tab"][data-state="active"]';
 
 export interface DetailsTab<T extends string> {
 	value: T;
@@ -26,7 +33,7 @@ export interface DetailsTab<T extends string> {
 	control: ControlId;
 	/** The keys that open or show it while the sidebar shows, listed in the + menu, as Capy's ⇧⌘L opens its Browser. */
 	shortcut?: ShortcutId;
-	/** Shown after its name, which screen readers hear with it; zero shows none. */
+	/** Shown as a pill after its name, which screen readers hear with it; zero shows none. */
 	count: number;
 	/** The content scrolls itself inside the panel's full height, as a pull request's details do below their header and tabs. */
 	scrollsItself?: boolean;
@@ -67,70 +74,46 @@ export function DetailsEmpty({ icon: Icon, title, description }: { icon: IconCom
 
 interface DetailsTabChipProps {
 	tab: DetailsTab<string>;
-	ids: { tab: string; panel: string };
 	active: boolean;
-	/** `null` for the first tab, which stays open. */
-	onClose: (() => void) | null;
-	onSelect: () => void;
+	/** `null` for the first tab, which stays open; `byKey` when Delete or Backspace on the focused tab closes it. */
+	onClose: ((byKey: boolean) => void) | null;
 }
 
-/** One open tab, as Capy's side panel draws it: its icon, name, and count, and an × on hover, on focus, and always on the tab on screen. */
-function DetailsTabChip({ tab, ids, active, onClose, onSelect }: DetailsTabChipProps) {
+/** One open tab, as Capy's side panel draws it: its icon, name, and count, and the {@link ClosableTab} ×; Delete or Backspace on it closes it too. */
+function DetailsTabChip({ tab, active, onClose }: DetailsTabChipProps) {
 	const Icon = tab.icon;
 	return (
-		<div
-			className={cn(
-				"group/reveal relative flex h-7 min-w-0 shrink-0 items-center rounded-lg text-[13px]",
-				active ? "bg-active text-foreground" : "text-muted-foreground hover:bg-hover hover:text-foreground",
-			)}
+		<ClosableTab
+			name={tab.name}
+			active={active}
+			onClose={onClose && (() => onClose(false))}
+			closeControl="details.tab.close"
+			activePadding="pr-7"
+			className={cn("min-w-0 shrink-0", active && "bg-active text-foreground")}
 		>
-			<button
-				type="button"
-				role="tab"
-				{...activityControl(tab.control)}
-				id={ids.tab}
-				aria-selected={active}
-				aria-controls={active ? ids.panel : undefined}
-				aria-label={tab.count > 0 ? `${tab.name} (${tab.count})` : undefined}
-				tabIndex={active ? 0 : -1}
-				className={cn(
-					"flex h-full min-w-0 items-center gap-1.5 rounded-lg pl-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring",
-					onClose === null ? "pr-2.5" : active ? "pr-7" : "pr-2.5 revealed:[mask-image:linear-gradient(to_left,transparent_1.5rem,black_1.875rem)]",
-				)}
-				onClick={onSelect}
-				onKeyDown={event => {
-					if (onClose === null || (event.key !== "Delete" && event.key !== "Backspace")) return;
-					event.preventDefault();
-					onClose();
-				}}
-			>
-				<Icon aria-hidden="true" className="size-3.5 shrink-0" />
-				<span className="truncate">{tab.name}</span>
-				{tab.count > 0 && <span className="text-muted-foreground tabular-nums">{tab.count}</span>}
-			</button>
-			{onClose !== null && (
-				<button
-					type="button"
-					{...activityControl("details.tab.close")}
-					tabIndex={-1}
-					aria-label={`Close ${tab.name}`}
-					className={cn(
-						"group/close absolute right-0.5 grid size-6 place-items-center rounded-md text-muted-foreground outline-none hover:text-foreground",
-						!active && "opacity-0 revealed:opacity-100",
-					)}
-					onClick={onClose}
+			{body => (
+				<TabsPrimitive.Trigger
+					value={tab.value}
+					{...activityControl(tab.control)}
+					aria-label={tab.count > 0 ? `${tab.name} (${tab.count})` : undefined}
+					className={body}
+					onKeyDown={event => {
+						if (onClose === null || (event.key !== "Delete" && event.key !== "Backspace")) return;
+						event.preventDefault();
+						onClose(true);
+					}}
 				>
-					<span className="grid size-4 place-items-center rounded-md group-hover/close:bg-active">
-						<IconCrossMedium className="size-3" />
-					</span>
-				</button>
+					<Icon aria-hidden="true" className="size-3.5 shrink-0" />
+					<span className="truncate">{tab.name}</span>
+					{tab.count > 0 && <CountPill count={tab.count} />}
+				</TabsPrimitive.Trigger>
 			)}
-		</div>
+		</ClosableTab>
 	);
 }
 
 /** The + menu: every tab the view can show, the one on screen checked; picking one opens it, or shows it when already open. */
-function OpenTabMenu<T extends string>({ tabs, active, onPick, sections }: { tabs: readonly DetailsTab<T>[]; active: T; onPick: (value: T) => void; sections: ReactNode }) {
+function OpenTabMenu<T extends string>({ tabs, active, onPick, sections }: { tabs: readonly DetailsTab<T>[]; active: string; onPick: (value: unknown) => void; sections: ReactNode }) {
 	const [open, setOpen] = useState(false);
 	return (
 		<DropdownMenu open={open} onOpenChange={setOpen}>
@@ -143,20 +126,23 @@ function OpenTabMenu<T extends string>({ tabs, active, onPick, sections }: { tab
 				</DropdownMenuTrigger>
 			</Tooltip>
 			<DropdownMenuContent align="start" className="min-w-52">
-				{tabs.map(each => {
-					const Icon = each.icon;
-					return (
-						<MenuItem key={each.value} {...activityControl(each.control)} onClick={() => onPick(each.value)}>
-							<Icon aria-hidden="true" />
-							{each.name}
-							<MenuShortcut className="flex items-center gap-2 tabular-nums">
-								{each.count > 0 && each.count}
-								{each.shortcut && <span>{shortcutLabels(each.shortcut).join(" ")}</span>}
-								<IconCheckmark1 aria-hidden="true" className={cn("text-foreground", each.value !== active && "invisible")} />
-							</MenuShortcut>
-						</MenuItem>
-					);
-				})}
+				<MenuRadioGroup value={active} onValueChange={onPick}>
+					{tabs.map(each => {
+						const Icon = each.icon;
+						return (
+							<MenuRadioItem key={each.value} value={each.value} closeOnClick {...activityControl(each.control)}>
+								<Icon aria-hidden="true" />
+								<span className="flex-1">{each.name}</span>
+								{(each.count > 0 || each.shortcut) && (
+									<MenuShortcut className="flex items-center gap-2 tabular-nums">
+										{each.count > 0 && <span>{each.count}</span>}
+										{each.shortcut && <span>{shortcutLabels(each.shortcut).join(" ")}</span>}
+									</MenuShortcut>
+								)}
+							</MenuRadioItem>
+						);
+					})}
+				</MenuRadioGroup>
 				{sections}
 			</DropdownMenuContent>
 		</DropdownMenu>
@@ -166,60 +152,72 @@ function OpenTabMenu<T extends string>({ tabs, active, onPick, sections }: { tab
 export function DetailsSidebarFrame<T extends string>({ label, storageKey, defaultTab, cwd, tabs, menuSections }: DetailsSidebarFrameProps<T>) {
 	const [stored, setStored] = useStoredState(storageKey, decodeDetailsTabs, encodeDetailsTabs);
 	// Resolved each render: a stored tab that shows only once its items arrive, such as Tickets, comes back then.
-	const byValue = new Map<string, DetailsTab<T>>(tabs.map(each => [each.value, each]));
-	const shown = [defaultTab, ...stored.open.filter(value => value !== defaultTab && byValue.has(value))] as T[];
-	const tab = shown.find(value => value === stored.active) ?? defaultTab;
-	const [mounted, setMounted] = useState<ReadonlySet<string>>(() => new Set([tab]));
-	if (!mounted.has(tab)) setMounted(new Set(mounted).add(tab));
+	const first = tabs.find(each => each.value === defaultTab);
+	const shown = [...(first ? [first] : []), ...stored.open.flatMap(value => (value !== defaultTab && tabs.find(each => each.value === value)) || [])];
+	const shownValues = shown.map(each => each.value);
+	const active = (shown.find(each => each.value === stored.active) ?? shown[0])?.value ?? defaultTab;
+	const [mounted, setMounted] = useState<ReadonlySet<string>>(() => new Set([active]));
+	if (!mounted.has(active)) setMounted(new Set(mounted).add(active));
 	const fileBase = useMemo(() => (cwd === null ? null : { dir: cwd, session: null }), [cwd]);
-	const prefix = useId();
-	const ids = (value: string) => ({ tab: `${prefix}-tab-${value}`, panel: `${prefix}-panel-${value}` });
-	const show = (value: T): void => setStored(current => (value === defaultTab ? { open: current.open, active: null } : openDetailsTab(current, value)));
-	useShortcuts(Object.fromEntries(tabs.flatMap(each => (each.shortcut ? [[each.shortcut, () => show(each.value)]] : []))));
-	const onListKey = (event: KeyboardEvent<HTMLDivElement>): void => {
-		const at = shown.indexOf(tab);
-		const step = { ArrowLeft: at - 1, ArrowRight: at + 1, Home: 0, End: shown.length - 1 }[event.key];
-		if (step === undefined) return;
-		event.preventDefault();
-		const next = shown[(step + shown.length) % shown.length]!;
-		show(next);
-		document.getElementById(ids(next).tab)?.focus();
+	const sidebarOpen = useContext(SidebarOpen);
+	const list = useRef<HTMLDivElement>(null);
+	/** Set by a keyboard close, so the tab that then shows takes the focus the closed one had. */
+	const refocus = useRef(false);
+	const edges = useTabRowEdges(list, shownValues.join(" "));
+	useEffect(() => {
+		const tab = list.current?.querySelector<HTMLElement>(ACTIVE_TAB);
+		tab?.scrollIntoView({ block: "nearest", inline: "nearest" });
+		if (!refocus.current) return;
+		refocus.current = false;
+		tab?.focus();
+	}, [active, shown.length]);
+
+	const show = (value: T): void => setStored(current => showDetailsTab(current, value, defaultTab));
+	const pick = (value: unknown): void => {
+		const picked = tabs.find(each => each.value === value);
+		if (picked) show(picked.value);
 	};
+	const close = (value: T, byKey: boolean): void => {
+		refocus.current = byKey;
+		setStored(current => closeDetailsTab(current, value, shownValues));
+	};
+	const handlers: ShortcutHandlers = {};
+	for (const each of tabs) {
+		if (!each.shortcut) continue;
+		// A closed sidebar stays mounted, so its keys pass on to the page, such as the browser's ⇧⌘G, instead of changing what it hides.
+		handlers[each.shortcut] = () => {
+			if (!sidebarOpen) return false;
+			show(each.value);
+		};
+	}
+	useShortcuts(handlers);
+
 	return (
 		<FileBaseContext.Provider value={fileBase}>
-			<div className="flex min-h-0 flex-1 flex-col">
+			<TabsPrimitive.Root value={active} onValueChange={pick} className="flex min-h-0 flex-1 flex-col">
 				<SidebarHeader className="h-(--page-header-height) flex-row items-center gap-1 border-b border-border px-2 py-0">
 					<h2 className="sr-only">{label}</h2>
-					<div role="tablist" aria-label={label} className="flex min-w-0 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]" onKeyDown={onListKey}>
-						{shown.map(value => (
-							<DetailsTabChip
-								key={value}
-								tab={byValue.get(value)!}
-								ids={ids(value)}
-								active={value === tab}
-								onSelect={() => show(value)}
-								onClose={value === defaultTab ? null : () => setStored(current => closeDetailsTab(current, value, shown))}
-							/>
+					<TabsPrimitive.List ref={list} aria-label={label} onScroll={edges.onScroll} style={edges.style} className="flex min-w-0 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
+						{shown.map(each => (
+							<DetailsTabChip key={each.value} tab={each} active={each.value === active} onClose={each.value === defaultTab ? null : byKey => close(each.value, byKey)} />
 						))}
-					</div>
-					<OpenTabMenu tabs={tabs} active={tab} onPick={show} sections={menuSections} />
+					</TabsPrimitive.List>
+					<OpenTabMenu tabs={tabs} active={active} onPick={pick} sections={menuSections} />
 				</SidebarHeader>
-				{shown.map(value => {
-					const each = byValue.get(value)!;
-					const active = value === tab;
-					if (!active && !(each.keepMounted && mounted.has(value))) return null;
-					const panel = { role: "tabpanel", id: ids(value).panel, "aria-labelledby": ids(value).tab };
+				{shown.map(each => {
+					// A kept panel stays drawn while inactive, so its class hides it.
+					const panel = { value: each.value, forceMount: each.keepMounted && mounted.has(each.value) ? (true as const) : undefined };
 					return each.scrollsItself ? (
-						<div key={value} {...panel} className={cn("flex min-h-0 flex-1 flex-col", !active && "hidden")}>
+						<TabsPrimitive.Content key={each.value} {...panel} className="flex min-h-0 flex-1 flex-col outline-none data-[state=inactive]:hidden">
 							{each.content}
-						</div>
+						</TabsPrimitive.Content>
 					) : (
-						<SidebarContent key={value} {...panel} viewportClassName={PANEL_VIEWPORT} className={cn(!active && "hidden")}>
-							{each.content}
-						</SidebarContent>
+						<TabsPrimitive.Content key={each.value} {...panel} asChild className="outline-none data-[state=inactive]:hidden">
+							<SidebarContent viewportClassName={PANEL_VIEWPORT}>{each.content}</SidebarContent>
+						</TabsPrimitive.Content>
 					);
 				})}
-			</div>
+			</TabsPrimitive.Root>
 		</FileBaseContext.Provider>
 	);
 }

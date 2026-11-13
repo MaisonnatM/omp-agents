@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { closeDetailsTab, decodeDetailsTabs, encodeDetailsTabs, openDetailsTab } from "./details-tabs";
+import { closeDetailsTab, decodeDetailsTabs, encodeDetailsTabs, showDetailsTab } from "./details-tabs";
 
 describe("decodeDetailsTabs", () => {
 	test("a tab name stored before tabs could close opens that tab", () => {
@@ -13,9 +13,17 @@ describe("decodeDetailsTabs", () => {
 	});
 });
 
-describe("openDetailsTab", () => {
+describe("showDetailsTab", () => {
 	test("shows an open tab without adding it twice", () => {
-		expect(openDetailsTab({ open: ["pull-requests", "artifacts"], active: "artifacts" }, "pull-requests")).toEqual({ open: ["pull-requests", "artifacts"], active: "pull-requests" });
+		expect(showDetailsTab({ open: ["pull-requests", "artifacts"], active: "artifacts" }, "pull-requests", "overview")).toEqual({ open: ["pull-requests", "artifacts"], active: "pull-requests" });
+	});
+
+	test("opens a tab that is not open as the last one", () => {
+		expect(showDetailsTab({ open: ["pull-requests"], active: null }, "browser", "overview")).toEqual({ open: ["pull-requests", "browser"], active: "browser" });
+	});
+
+	test("shows the first tab without adding it to the open tabs", () => {
+		expect(showDetailsTab({ open: ["pull-requests"], active: "pull-requests" }, "overview", "overview")).toEqual({ open: ["pull-requests"], active: null });
 	});
 });
 

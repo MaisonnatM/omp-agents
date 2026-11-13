@@ -1,11 +1,12 @@
-/** `SubagentLinks`, where a live view's subagents open and stop, `useSubagentLinks`, which builds it, and `CancelAgentButton`, the stop button after a running subagent's link. */
+/** `SubagentLinks`, where a live view's subagents open and stop, `useSubagentLinks`, which builds it, `agentLink`, one subagent's link, and `CancelAgentButton`, the stop button after a running subagent's link. */
 import { IconStopCircle } from "central-icons";
-import { createContext, useMemo } from "react";
+import { createContext, type MouseEvent, useMemo } from "react";
 import type { AgentRow, LiveView, RosterHost, View } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
-import type { OpenMode } from "../routing";
+import { subagentModeOf } from "../labels";
+import { hashForView, type OpenMode } from "../routing";
 import { useAction } from "../use-action";
 import { useDashboardActions } from "./dashboard-context";
 
@@ -39,6 +40,20 @@ export function useSubagentLinks(view: View, host: RosterHost | null): SubagentL
 				: null,
 		[instanceId, agents, open, writable, request],
 	);
+}
+
+/** A link to `agentId`'s view that opens it on a plain click; shift- and middle-clicks keep the link's own new-window behavior. */
+export function agentLink(links: SubagentLinksValue, agentId: string) {
+	const view: SubagentView = { kind: "live", instanceId: links.instanceId, agentId };
+	return {
+		view,
+		href: hashForView(view),
+		onClick: (event: MouseEvent) => {
+			if (event.button !== 0 || event.shiftKey || event.altKey) return;
+			event.preventDefault();
+			links.onOpen(view, subagentModeOf(event));
+		},
+	};
 }
 
 export function CancelAgentButton({ view, onCancel, running }: { view: SubagentView; onCancel: (view: SubagentView) => Promise<void>; running: boolean }) {

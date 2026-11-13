@@ -126,7 +126,7 @@ export function App() {
 		sidebars.setOpen(side, !sidebars.panels[side].open);
 	}, []);
 	const showDetailsTab = useCallback((tab: "browser" | "artifacts"): void => {
-		revealDetailsTab(TAB_KEY, tab);
+		revealDetailsTab(TAB_KEY, tab, "overview");
 		latest.current.sidebars.setOpen("right", true);
 	}, []);
 	// A reply's **Review visuals** shows the Browser, whose panel then opens the reply's pages.

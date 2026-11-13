@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { getJson } from "../../api";
 import { folderName } from "../../labels";
 import { useStoredState } from "../../stored-state";
+import { onNewTerminalRequest } from "../../terminal-requests";
 import { Separator, useDragSeparator } from "../drag-separator";
 import { LOADING_TABS, readTerminalTabs, type TerminalTabs } from "./terminal-inventory";
 import { closeEndsShell, newTab, nextTabState, type Tab, type TabEvent, tabTerminal } from "./terminal-tab";
@@ -43,13 +44,6 @@ export function useTerminalPanel(): TerminalPanelState {
 	return { open, setOpen, toggle, height, setHeight };
 }
 
-const newTerminalListeners = new Set<() => void>();
-
-/** Opens the terminal panel on a new shell, as the details sidebar's **New terminal** does. */
-export function requestNewTerminal(): void {
-	for (const listener of newTerminalListeners) listener();
-}
-
 interface TerminalPanelProps {
 	panel: TerminalPanelState;
 	/** Where a new tab's shell starts: the focused session's worktree, else the sidebar's workspace, else `~`. */
@@ -80,22 +74,18 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 		setActive(tab.key);
 	}, [setTabs]);
 
-	const [wantsNew, setWantsNew] = useState(false);
-	useEffect(() => {
-		const listener = (): void => {
-			setOpen(true);
-			setWantsNew(true);
-		};
-		newTerminalListeners.add(listener);
-		return () => void newTerminalListeners.delete(listener);
-	}, [setOpen]);
-	useEffect(() => {
-		if (!wantsNew || inventory.state === "loading") return;
-		setWantsNew(false);
-		// A panel that just loaded with no shell running already started a new one.
-		const startedOne = inventory.state === "ready" && inventory.tabs.length === 1 && inventory.tabs[0]!.state.phase === "starting";
-		if (inventory.state === "ready" && !startedOne) add();
-	}, [wantsNew, inventory, add]);
+	/** A **New terminal** asked for while the tabs were not ready yet, which the next read of the running shells adds. */
+	const pendingNew = useRef(false);
+	const ready = inventory.state === "ready";
+	useEffect(
+		() =>
+			onNewTerminalRequest(() => {
+				setOpen(true);
+				if (ready) add();
+				else pendingNew.current = true;
+			}),
+		[ready, setOpen, add],
+	);
 
 	useEffect(() => {
 		if (!open || inventory.state !== "loading") return;
@@ -103,10 +93,14 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 		void readTerminalTabs(
 			() => getJson<TerminalInfo[]>("/api/terminals"),
 			() => latestCwd.current,
+			() => pendingNew.current,
 		).then(read => {
 			if (cancelled) return;
 			setInventory(read);
-			if (read.state === "ready") setActive(read.tabs.at(-1)!.key);
+			if (read.state !== "ready") return;
+			// A request kept through a failed read waits for the one that lands.
+			pendingNew.current = false;
+			setActive(read.tabs.at(-1)!.key);
 		});
 		return () => {
 			cancelled = true;
