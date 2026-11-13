@@ -50,6 +50,11 @@ export interface StartEnv {
 	linkTodo(todoId: string, sessionId: string): void;
 	/** How a start, or the resume of an attached session, joins the server as session `instanceId`. */
 	joinFor(request: StartRequest, instanceId: string): SessionJoin;
+	/**
+	 * Adds back the worktree that ending the first of `sessionIds` with one removed, before that session resumes in it;
+	 * throws when it cannot, such as when its repository is gone.
+	 */
+	restoreWorktree(sessionIds: readonly string[]): Promise<void>;
 	/** Lets omp spawn in `cwd`, or throws {@link UntrustedProjectError} while its project's agent code is not trusted as it is now. */
 	admit(cwd: string): Promise<void>;
 	privateSessions: Pick<PrivateSessions, "launch" | "holds">;
@@ -185,6 +190,8 @@ export function createStarter(env: StartEnv): Starter {
 						const ticket = facts.tickets[0];
 						const pr = facts.pullRequests[0];
 						identity = sessions.savedTask(sessionId) ?? (ticket ? ticketTask(ticket) : pr ? pullRequestTask(pr) : null);
+						// Ending the session removed the worktree it worked in, which its own directory or its agent's commands name.
+						await env.restoreWorktree(held === null ? [sessionId] : [held, sessionId]);
 						cwd = await recordedCwd(path);
 					} catch (error) {
 						return { error: `Cannot resume: ${errorText(error)}` };

@@ -53,6 +53,8 @@ A dashboard session reports `turn-ended` before the roster update that shows it 
 Each main-agent `agent_start` makes the session report `turn-started` once its status reads working, whoever prompted it, which cancels a continue the session waits on.
 A session keeps running when the server stops, restarts, or crashes; only **End session**, or omp exiting on its own, ends it.
 The transcripts stay on disk, and **Resume**, or `omp --resume <session id>` in a terminal, continues one that ended.
+Ending a session removes the linked worktree it worked in, and `src/server/session-end.ts` keeps its path, repository, and branch by session id in `ended-worktrees.json`.
+A resume first adds a missing one back, as `checkoutDir` adds a work branch, and fails with `Cannot resume: the repository … no longer exists` when the repository is gone.
 
 omp acks a `prompt` once it admitted it, but on every turn its auto-thinking classifier (`applyAutoThinkingLevel` in `pi-coding-agent/src/session/model-controls.ts`) holds `agent_start` back by about a second, and a new session's first turn can also wait on MCP discovery (`MCP_DISCOVERY_TURN_WAIT_MS` in `pi-coding-agent/src/session/agent-session.ts`).
 So a prompt the main agent takes while idle becomes the session's starting prompt at its ack: the session reports `working` and tells its view, which shows the prompt as pending ([Transcripts](transcripts.md)).

@@ -1,6 +1,6 @@
 import { afterEach, expect, mock, spyOn, test } from "bun:test";
 import { fromPartial } from "@total-typescript/shoehorn";
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DashboardSession } from "../dashboard-session";
@@ -15,11 +15,13 @@ import { flushJsonFiles } from "../fs";
 import * as keeperLink from "../keeper-link";
 import { pidFileOf } from "../keeper-wire";
 import * as rpc from "../omp/rpc";
+import { runChecked } from "../proc";
 import { refuseUntil } from "./http";
 import { InterruptedSessions } from "./interrupted";
 import { LiveSessions } from "./live-sessions";
 import { PrivateSessions } from "./private-sessions";
 import { UntrustedProjectError, untrustedText } from "./project-trust-file";
+import { EndedWorktrees, endSession, restoreEndedWorktree } from "./session-end";
 import { createStarter, reattachAll, type SessionJoin } from "./start";
 
 afterEach(() => mock.restore());
@@ -41,6 +43,7 @@ test("a Claude Code or Codex session neither resumes nor forks, before any omp s
 		workspaceOf: async cwd => cwd,
 		linkTodo: () => {},
 		admit: async () => { throw new Error("A read-only start must not take a census."); },
+		restoreWorktree: async () => { throw new Error("A read-only resume must not add a worktree back."); },
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
 		privateSessions: fromPartial<PrivateSessions>({ holds: () => false }),
 	});
@@ -64,6 +67,7 @@ test("a private session does not fork, before any omp starts, since its copy wou
 		workspaceOf: async cwd => cwd,
 		linkTodo: () => {},
 		admit: async () => {},
+		restoreWorktree: async () => {},
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
 		privateSessions: new PrivateSessions({ root, unpin: () => {} }),
 	});
@@ -204,6 +208,7 @@ function claimedStarter(
 	savedFile: string | null = null,
 	factsFor: () => SessionFacts = () => ({ tickets: [], pullRequests: [], worktree: null, branch: null, ship: null, arenas: [], workspace: null, gone: false }),
 	admit: (cwd: string) => Promise<void> = async () => {},
+	restoreWorktree: (sessionIds: readonly string[]) => Promise<void> = async () => {},
 ) {
 	return createStarter({
 		sessions,
@@ -215,6 +220,7 @@ function claimedStarter(
 		linkTodo: () => {},
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
 		admit,
+		restoreWorktree,
 		privateSessions: fromPartial<PrivateSessions>({ holds: () => false }),
 	});
 }
@@ -346,6 +352,43 @@ test("a resume whose task lookup fails never starts an unclaimed writer", async 
 		expect(resume).not.toHaveBeenCalled();
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("resuming a session whose worktree ending it removed adds that worktree back before omp starts, and refuses once its repository is gone", async () => {
+	const parent = realpathSync(mkdtempSync(join(tmpdir(), "omp-start-restore-")));
+	const inRepo = (cwd: string, ...args: string[]) => runChecked(["git", ...args], { cwd });
+	try {
+		const main = join(parent, "app");
+		const worktree = join(parent, "app-wt", "topic");
+		await inRepo(parent, "init", "-q", "-b", "main", main);
+		await inRepo(main, "commit", "-q", "--allow-empty", "-m", "one");
+		await inRepo(main, "worktree", "add", "-q", "-b", "topic", worktree);
+		const file = join(parent, "saved.jsonl");
+		writeFileSync(file, `${JSON.stringify({ type: "session", cwd: worktree })}\n`);
+		const ended = new EndedWorktrees(join(parent, "ended-worktrees.json"));
+		const removeCheckout = async (dir: string) => {
+			await inRepo(main, "worktree", "remove", "--", dir);
+			return { repository: join(main, ".git"), path: dir, removed: true, blockers: [], error: null };
+		};
+		await endSession({ sessionId: "saved", workDir: worktree, end: async () => {} }, removeCheckout, removed => ended.record("saved", removed));
+		expect(existsSync(worktree)).toBe(false);
+		const sessions = new LiveSessions(() => {}, new TaskClaims(join(parent, "claims.json")));
+		const start = claimedStarter(sessions, file, undefined, undefined, async sessionIds => restoreEndedWorktree(ended.of(sessionIds)));
+		const resume = spyOn(DashboardSession, "resume").mockImplementation(async id => {
+			expect(existsSync(worktree)).toBe(true);
+			return sessionForStart(id, worktree);
+		});
+		expect((await start({ kind: "resume", sessionId: "saved" })).ok).toBe(true);
+		expect((await inRepo(worktree, "branch", "--show-current")).trim()).toBe("topic");
+
+		await endSession({ sessionId: "saved", workDir: worktree, end: async () => {} }, removeCheckout, removed => ended.record("saved", removed));
+		rmSync(main, { recursive: true, force: true });
+		expect(await start({ kind: "resume", sessionId: "saved" })).toEqual({ ok: false, error: `Cannot resume: the repository ${main} of this session's worktree ${worktree} no longer exists` });
+		expect(resume).toHaveBeenCalledTimes(1);
+		expect(existsSync(worktree)).toBe(false);
+	} finally {
+		rmSync(parent, { recursive: true, force: true });
 	}
 });
 
