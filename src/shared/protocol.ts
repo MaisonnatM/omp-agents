@@ -1,6 +1,5 @@
 /** The messages the dashboard socket carries between the server and the page. */
 import type { Routine, RoutineChange } from "../routines";
-import type { UserNoteChange, UserNoteList } from "../user-notes-shared";
 import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
 import type { ActivityEvent } from "./activity-event";
 import type { Bot, BotChange, BotId, BotLast } from "./bots";
@@ -52,8 +51,6 @@ export type ServerMsg =
 	| { t: "withdrawn"; view: LiveView; reqId: number; messages: WithdrawnMessage[] }
 	/** The Todo page's list, whole, sent when a socket opens and after every change. */
 	| { t: "user-todos"; list: UserTodoList }
-	/** The Notes page's list, whole, sent when a socket opens and after every change. */
-	| { t: "user-notes"; list: UserNoteList }
 	/** The Sport module's state, whole, sent when a socket opens and after every change. */
 	| { t: "sport"; state: SportState }
 	/** Every routine, whole, sent when a socket opens and after every change, including each run's progress. */
@@ -140,8 +137,6 @@ export type ClientMsg =
 	| { t: "cancel-agent"; view: LiveView & { agentId: string } }
 	/** Change the Todo page's list; every socket then gets the list as it is after. */
 	| { t: "user-todo"; change: UserTodoChange }
-	/** Change the Notes page's list; every socket then gets the list as it is after. */
-	| { t: "user-note"; change: UserNoteChange }
 	/** Change the Sport module's state by all of `changes` or, when one is refused, none; every socket then gets the state as it is after. */
 	| { t: "sport-changes"; changes: SportChange[] }
 	/** Change the routines, or run one now; every socket then gets the routines as they are after. */

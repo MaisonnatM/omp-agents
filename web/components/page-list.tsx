@@ -2,19 +2,17 @@
 import type { ReactNode } from "react";
 import type { BotRow } from "../bots-model";
 import type { PastSession, RosterHost } from "../../src/shared/sessions";
-import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import type { Space } from "../../src/shared/workspaces";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useStoredState } from "../stored-state";
-import type { NotesListView, Page, PullRequestsRoute, SettingsRoute, TodoListView } from "../routing";
+import type { Page, PullRequestsRoute, SettingsRoute, TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import { type NavRow, TAB_ROWS } from "../sidebar-tabs";
 import { BotsNav } from "./bots/bots-nav";
 import { CalendarNav } from "./calendar/calendar-nav";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { EmailNav } from "./email/email-nav";
-import { NotesNav } from "./notes/nav";
 import { pullRequestsPageShows, usePullRequestDetailsPlacement, usePullRequestsView } from "./pull-requests/pull-requests-board";
 import { PullRequestsBoardIndex, PullRequestsIndex, PullRequestsNav } from "./pull-requests/pull-requests-nav";
 import { SettingsNav } from "./settings/settings-nav";
@@ -51,15 +49,13 @@ interface PageListProps {
 	botList: BotRow[] | null;
 	userTodos: UserTodoList | null;
 	todoView: TodoListView;
-	userNotes: UserNoteList | null;
-	notesView: NotesListView;
 	space: Space;
 	settings: SettingsRoute;
 	sectionTarget: SectionTarget | null;
 	onSectionTarget: (target: SectionTarget) => void;
 }
 
-export function PageList({ row, page, listed, hosts, past, todoSessions, botList, userTodos, todoView, userNotes, notesView, space, settings, sectionTarget, onSectionTarget }: PageListProps) {
+export function PageList({ row, page, listed, hosts, past, todoSessions, botList, userTodos, todoView, space, settings, sectionTarget, onSectionTarget }: PageListProps) {
 	const { changeTodo } = useDashboardActions();
 	const { connected } = useDashboardStatus();
 	const [pullRequestsView] = usePullRequestsView();
@@ -81,8 +77,6 @@ export function PageList({ row, page, listed, hosts, past, todoSessions, botList
 			return <BotsNav rows={botList} openId={page?.kind !== "bots" ? undefined : page.target === null ? (page.adding ? null : undefined) : page.target} />;
 		case "todo":
 			return <TodoCategories list={userTodos} view={todoView} disabled={!connected} onChange={changeTodo} sessions={todoSessions} />;
-		case "notes":
-			return <NotesNav list={userNotes} view={notesView} space={space} />;
 		case "calendar":
 			return <CalendarNav open={page?.kind === "calendar"} space={space} />;
 		case "email":

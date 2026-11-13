@@ -106,7 +106,6 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - Pull requests: `web/components/pull-requests/pull-requests-page.tsx`, with the **Rebase N behind** button at its top, its board view `PullRequestsKanban` in `pull-requests-kanban.tsx` with each card `PullRequestCard` in `pr-row.tsx`, and one pull request in `pr-page.tsx` beside it.
   - Tickets: `web/components/tickets/tickets-page.tsx`.
   - Todo: `web/components/todo/page.tsx`.
-  - Notes: `web/components/notes/page.tsx`, with its sidebar lists in `web/components/notes/nav.tsx`.
   - Calendar: `web/components/calendar/calendar-page.tsx`, with **Show routines** in `web/components/calendar/calendar-nav.tsx`, both reading the saved display preference in `web/use-calendar-display.ts`.
   - Email: `web/components/email/email-page.tsx`.
   - Sport: `web/components/sport/page.tsx`, with its sidebar tab in `web/components/sport/nav.tsx`, the week in `week.tsx` and `day-detail.tsx`, the demos in `demo-dialog.tsx`, the Fait dialog in `log-form.tsx`, the journal in `journal.tsx`, and the progress in `progress.tsx`, all in `web/components/sport/`.
@@ -152,6 +151,6 @@ Its files, listed by area:
 - [Shell, state, and models](code-layout/page-core.md)
 - [List models, sidebar tabs, model menu, and mentions](code-layout/page-models.md)
 - [Status bar, terminal, HTTP reads, shortcuts, and theme](code-layout/page-reads-and-chrome.md)
-- [Sidebar, Todo, Notes, Bots, Routines, Calendar, Email, and Sport](code-layout/page-pages.md)
+- [Sidebar, Todo, Bots, Routines, Calendar, Email, and Sport](code-layout/page-pages.md)
 - [Panes, session details, and changes](code-layout/page-panes.md)
 - [Pull requests, tickets, settings, integrations, and primitives](code-layout/page-pull-requests-and-settings.md)

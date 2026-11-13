@@ -10,7 +10,6 @@ const TAB_PAGE: Record<Exclude<SidebarTab, "sessions">, Page> = {
 	tickets: { kind: "tickets", target: null },
 	bots: { kind: "bots", target: null, adding: false },
 	todo: { kind: "todo", list: { kind: "all" }, open: null },
-	notes: { kind: "notes", list: { kind: "all" }, open: null },
 	calendar: { kind: "calendar" },
 	email: { kind: "email", target: null },
 	sport: { kind: "sport", tab: "week", day: null },

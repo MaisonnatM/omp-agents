@@ -17,7 +17,7 @@ const { values } = parseArgs({ options: { rows: { type: "string", default: "2000
 const rows = Number(values.rows);
 const runs = Number(values.runs);
 const BATCH = 50;
-const KEYS = ["home", "session", "pull-requests", "settings/analytics", "todo", "notes"];
+const KEYS = ["home", "session", "pull-requests", "settings/analytics", "todo"];
 
 const dir = mkdtempSync(join(tmpdir(), "activity-bench-"));
 const path = join(dir, "activity.db");

@@ -29,7 +29,7 @@ import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, machineFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, personalDir, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, signInInboxDir, sourceControlFile, sportFile, sportInboxDir, sportThumbsDir, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, machineFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, personalDir, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, signInInboxDir, sourceControlFile, sportFile, sportInboxDir, sportThumbsDir, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -107,12 +107,10 @@ import { createClientHandler } from "./socket";
 import { botExtension, designerExtension, shepherdExtension } from "./resources";
 import { createStarter, reattachAll, type SessionJoin } from "./start";
 import { EventInbox } from "./event-inbox";
-import { NoteInbox } from "./note-inbox";
 import { TodoInbox } from "./todo-inbox";
 import { SportFile } from "./sport-file";
 import type { JsonInboxDir } from "./json-inbox";
 import { SportInbox } from "./sport-inbox";
-import { UserNotesFile } from "./user-notes-file";
 import { UserTodosFile } from "./user-todos-file";
 import { UsagePoll } from "./usage-poll";
 import { type Socket, Views } from "./views";
@@ -133,7 +131,6 @@ export class Dashboard {
 	readonly #foreignUsage = new ForeignUsage(SESSION_FORMATS, listPrice);
 	readonly #interrupted = new InterruptedSessions(interruptedFile, () => void this.#notices.check(STOPPED_KINDS));
 	readonly #todos = new UserTodosFile(userTodosFile);
-	readonly #notes = new UserNotesFile(userNotesFile);
 	readonly #sport = new SportFile(sportFile);
 	readonly #routines = new RoutinesFile(routinesFile);
 	readonly #scheduled = new ScheduledFile(scheduledFile);
@@ -231,7 +228,7 @@ export class Dashboard {
 		const workspaces = (this.#workspaces = new WorkspacesFile(workspacesFile));
 		// A sync, which runs only once the server listens, tells the pages that show a list it rewrote.
 		const stores = syncStores(
-			{ sourceControl: this.#sourceControl, notes: this.#notes, todos: this.#todos, preferences: this.#preferences, processes: this.#processSettings, workspaces, calendars: this.#calendars, bots: this.#botsFile, botsDir, routines: this.#routines, machine: thisMachine(machineFile) },
+			{ sourceControl: this.#sourceControl, todos: this.#todos, preferences: this.#preferences, processes: this.#processSettings, workspaces, calendars: this.#calendars, bots: this.#botsFile, botsDir, routines: this.#routines, machine: thisMachine(machineFile) },
 			HOME,
 			list => {
 				// Every Bot memory is read again, since a sync may have rewritten them.
@@ -242,7 +239,6 @@ export class Dashboard {
 		this.#settingsSync = new SettingsSync(settingsSyncFile, settingsSyncRepo, { omp: agentDir, home: HOME, stores });
 		const files = this.#files;
 		const todos = this.#todos;
-		const notes = this.#notes;
 		const sport = this.#sport;
 		const routines = this.#routines;
 		const scheduled = this.#scheduled;
@@ -328,7 +324,6 @@ export class Dashboard {
 		));
 		const lists = (this.#lists = new ListRegistry({
 			"user-todos": { msg: () => ({ t: "user-todos", list: todos.value }), apply: change => todos.apply(change) },
-			"user-notes": { msg: () => ({ t: "user-notes", list: notes.value }), apply: change => notes.apply(change) },
 			sport: { msg: () => ({ t: "sport", state: sport.value }), apply: changes => sport.apply(changes) },
 			// Every routine belongs to a Bot, so a save for a Bot that is gone saves nothing.
 			routines: {
@@ -386,7 +381,6 @@ export class Dashboard {
 			return cwd === undefined ? "work" : this.#spaceOf(cwd);
 		};
 		const todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), workspaceOf, { active: () => ownerLock.held });
-		const noteInbox = new NoteInbox(userNoteInboxDir, change => lists.apply("user-notes", change), spaceOfSession, { active: () => ownerLock.held });
 		const sportInbox = new SportInbox(
 			sportInboxDir,
 			() => sport.value,
@@ -554,7 +548,7 @@ export class Dashboard {
 			},
 			{ active: () => ownerLock.held },
 		);
-		this.#inboxes = [todoInbox, noteInbox, sportInbox, eventInbox, signInInbox, routineInbox, botInbox, shepherdInbox];
+		this.#inboxes = [todoInbox, sportInbox, eventInbox, signInInbox, routineInbox, botInbox, shepherdInbox];
 		// Private sessions' files poke the views that follow them, but no format lists them, so they never show as past sessions.
 		this.#loops = new Loops([...SESSION_FORMATS, { root: privateSessionsDir, createRoot: true }], {
 			onRegistryTick: async () => {
@@ -746,7 +740,7 @@ export class Dashboard {
 		this.#reattached.resolve();
 		this.#broadcasts.syncRoster();
 		this.#loops.watch();
-		// Before the owner lock, whose taking drains the inboxes: a note or a reminder an ended session left files under that session's space.
+		// Before the owner lock, whose taking drains the inboxes: a reminder an ended session left files under that session's space.
 		await this.#rescanFiles();
 		if (!this.#claimUnattendedWork()) {
 			const owner = this.#ownerLock.holder();
@@ -972,12 +966,10 @@ export class Dashboard {
 			this.#bots.reload();
 			this.#migrateRoutines();
 			this.#todos.reload();
-			this.#notes.reload();
 			this.#localEvents.reload();
 			this.#broadcasts.pushList("routines");
 			this.#broadcasts.pushList("bots");
 			this.#broadcasts.pushList("user-todos");
-			this.#broadcasts.pushList("user-notes");
 			this.#runner.recover();
 			this.#scheduledRunner.recover();
 			for (const inbox of this.#inboxes) void inbox.drain();

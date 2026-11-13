@@ -180,12 +180,12 @@ describe("omp-template --files", () => {
 		const agentDir = scratch();
 		const kitShip = readFileSync(join(import.meta.dir, "agent/extensions/ship.ts"), "utf8");
 		put(agentDir, { "extensions/ship.ts": "installed before", "extensions/land.ts": "installed before, then edited" });
-		record(agentDir, { maintainer: false, files: { "extensions/ship.ts": blobId("installed before"), "extensions/land.ts": blobId("installed before"), "extensions/notes.ts": blobId("installed before") } });
+		record(agentDir, { maintainer: false, files: { "extensions/ship.ts": blobId("installed before"), "extensions/land.ts": blobId("installed before"), "extensions/events.ts": blobId("installed before") } });
 		const proc = files(agentDir);
 		expect(proc.exitCode).toBe(0);
 		expect(readFileSync(join(agentDir, "extensions/ship.ts"), "utf8")).toBe(kitShip);
 		expect(readFileSync(join(agentDir, "extensions/land.ts"), "utf8")).toBe("installed before, then edited");
-		expect(existsSync(join(agentDir, "extensions/notes.ts"))).toBe(false);
+		expect(existsSync(join(agentDir, "extensions/events.ts"))).toBe(false);
 		expect(readFileSync(join(agentDir, "extensions/todos.ts"), "utf8")).toBe(readFileSync(join(import.meta.dir, "agent/extensions/todos.ts"), "utf8"));
 		const after = readInstalledRecord(agentDir);
 		expect(after?.files["extensions/ship.ts"]).toBe(blobId(kitShip));

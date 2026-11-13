@@ -1,4 +1,4 @@
-# Page: sidebar, Todo, Notes, Bots, Routines, Calendar, Email, and Sport
+# Page: sidebar, Todo, Bots, Routines, Calendar, Email, and Sport
 
 - `web/components/sidebar-nav.tsx`: the left sidebar's page list, **New session**, each shown tab's row with its count, and **Settings**, with the open page's own list nested under its row only while the sidebar floats, as on a phone; `web/components/pull-requests/pull-requests-nav.tsx` is the Pull requests row's list, `web/components/tickets/tickets-nav.tsx` the Tickets row's, and `web/components/section-link.tsx` the section link that the tickets list and the Pull requests page's section index share.
   `web/components/page-list.tsx` holds `PageList`, which picks the open page's own list, and `PageListColumn`, the column at the page's left that `web/app.tsx` shows it in, as Linear's inbox does, whenever the sidebar does not float; a line on its right edge sizes it, the width in localStorage under `omp-agents.page-list-width`.
@@ -6,7 +6,7 @@
   `web/components/sidebar-search.tsx` is the roster's search field, which its **Search** button or Cmd+Shift+F opens and which stays while it holds a query; given a shortcut, the key puts the cursor in it and the empty field shows the key on its right.
   `web/components/space-switch.tsx` is the account row at the sidebar's foot, whose menu switches the space, counts the other space's sessions that need you, and opens the keyboard shortcuts.
   `web/components/kbd.tsx` holds `Kbd`, the key chip the command palette draws, and `ShortcutChip`, the smaller chip with a shortcut's first key that **New session** and that search field show on their right.
-  `web/components/search-field.tsx` is the bordered search field the Notes page, the Todo page, and Settings › Files share, which Escape clears and leaves.
+  `web/components/search-field.tsx` is the bordered search field the Todo page and Settings › Files share, which Escape clears and leaves.
   `web/components/session-row.tsx` holds `PastRow` and `HostRow`, memoized on the row's session, so a roster push or a search keystroke renders only the rows it changed, each highlighted and marked as in a split by `rowPlacement` from `web/sessions.ts`; a private session's row shows `PrivateChip` from `web/components/private-chip.tsx`, which its header also shows, and its menu's **End** asks for a second click, as any action with a `confirm` does.
   Every row names its source among its facts, from `SOURCE_LABELS` in `web/labels.ts`, without replacing its workspace badge.
   The row's menu items read the dashboard contexts only once the menu opens, and their ages count up on the page's one minute timer.
@@ -16,7 +16,7 @@
 - `web/components/toaster.tsx`: `toasts`, the page's one Base UI toast manager, which shows a toast from anywhere without rendering its caller again, its `ToastData`, a toast's optional source line and a loading toast's start, and `Toaster`, which `web/main.tsx` mounts at the bottom right.
   `loadingToast` opens a toast for work that takes a while, drawn with `Spinner` from `web/components/spinner.tsx`, the Button's infinity glyph, and the time since it opened; `toasts.update` changes its words as the work goes on, and `settleToast` turns it into how the work ended, in place, which then closes as any toast does.
   `UnderToasts` draws its children in that corner under the toasts, outside their live region, as Get started's bubble does, so toasts stack above it.
-  `offerUndo` shows the eight-second **Undo** toast that a todo's or a note's delete, a note's, an event's, or a workspace's move to the other space offers.
+  `offerUndo` shows the eight-second **Undo** toast that a todo's delete, or an event's or a workspace's move to the other space, offers.
   `web/components/notices.tsx` holds `NoticesBell`, the header's bell, its source filters, and its list, and `NoticeOrigin`, the logo and name of where a notice came from.
   `web/components/header-controls.tsx` holds `HeaderControls`, What's new, the bell, and the Settings button at the header tabs' right end, and `HistoryButtons`, Back and Forward at their left end.
   `web/components/header-tabs.tsx` holds `HeaderTabs`, the row across the top that `web/app.tsx` draws over the page, which drags the window when the desktop bridge's `titleBar` says the window hides the system's; `HeaderTabItem` there is one tab.
@@ -42,10 +42,6 @@
   `web/use-hidden-todo-categories.ts` keeps the categories unchecked in the sidebar in a portable preference through `useStoredKeys`, which `todosOf` in `web/todo-views.ts` leaves out of the lists that span categories.
   `web/todo-work-state.ts` derives the pill and the **Needs you** filter from the latest linked session's live status, outstanding question, submitted pull request, or recorded `/ship` merge; it keeps unknown and ended sessions distinct from new ideas.
   `web/todo-quick-add.ts` reads a trailing due day and `#category` off a new todo's title, in the page's new todos and in the command palette's **Create todo**.
-- `web/components/notes/page.tsx`: the Notes page's searchable list, each row's right-click menu, Markdown detail, todo picker, deletion with Undo, and keyboard navigation.
-  `web/components/notes/nav.tsx` draws its sidebar's **All** and **From agents** lists from `web/notes-views.ts`.
-  A top-level todo's `detail.tsx` lists linked notes and creates a note with its todo id.
-  `web/palette-records.ts` includes note titles and bodies in command-menu search.
 - `web/components/routines/routines-card.tsx`: `RoutinesCard`, a Bot's routines as one card in place of its conversation, as Arc's Agent routines: a header with **New routine**, then a row per routine, one open at a time, the arrow keys moving between their names.
   `web/components/routines/routine-row.tsx` draws a row: its name, **Run now**, and the switch that pauses it; its schedules and its next run's countdown; its trigger logos, its task, and its last 10 runs as a strip of ticks, each with a tooltip, that opens the row on that run.
   `web/components/routines/routine-open.tsx` draws an open row: the picked run, with what triggered it, its command's output, and its errors; the task whole; the schedule as a cadence, a time, and a day that save as they change; and **Edit** and **Delete**.

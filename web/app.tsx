@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { callable } from "../src/shared/accounts";
 import type { View } from "../src/shared/sessions";
-import { otherSpace, type Space, spaceIs } from "../src/shared/workspaces";
+import { otherSpace, type Space } from "../src/shared/workspaces";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { errorText } from "../src/json";
 import { AppSidebar } from "./components/app-sidebar";
@@ -17,7 +17,6 @@ import {
 	DashboardStatusContext,
 	MentionListsContext,
 	PersonalContext,
-	UserNotesContext,
 	UserTodosContext,
 } from "./components/dashboard-context";
 import { DesktopLinkPreview } from "./components/desktop-link-preview";
@@ -49,7 +48,7 @@ import { integrationsStore } from "./reads";
 import { onArtifactOpen, onArtifactsReveal } from "./artifact-requests";
 import { onReviewRequest } from "./review-pages";
 import { storeOrRemove } from "./stored-state";
-import { EMPTY_LAYOUT, hashForLayout, hashForPage, hashForRoute, hashForView, type NotesListView, type OpenMode, sameView, type TodoListView } from "./routing";
+import { EMPTY_LAYOUT, hashForLayout, hashForPage, hashForRoute, hashForView, type OpenMode, sameView, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, spaceSwitchPanes, type WindowScope, waitingIn, workspaceSession, workspaceSwitch } from "./sessions";
 import { useSidebarTabs } from "./sidebar-tabs";
@@ -65,14 +64,13 @@ import { useTranscriptDisplay } from "./use-transcript-display";
 import { useWorkspaceScope } from "./use-workspace-scope";
 
 const ALL_TODOS: TodoListView = { kind: "all" };
-const ALL_NOTES: NotesListView = { kind: "all" };
 
 /**
  * The dashboard: the socket's state, sliced into what each part reads, and the parts. Each hook it calls owns one
  * slice, and the two dashboard contexts split what is stable, the actions, from what changes, the connection and the starts.
  */
 export function App() {
-	const { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeNote, changeSport, changePins, changeBot, trustAndStart, dismissTrust } = useDashboard();
+	const { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeSport, changePins, changeBot, trustAndStart, dismissTrust } = useDashboard();
 
 	const { layout } = state;
 	const sidebars = useSidebarPanels();
@@ -239,8 +237,8 @@ export function App() {
 	});
 
 	const actions = useMemo(
-		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, changeSport, changeBot, end: endHost, openFile: setOpenedFile, openNewTicket: setNewTicket, editGoal, workspaceSettings }),
-		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeNote, changeSport, changeBot, endHost, setOpenedFile, setNewTicket, editGoal, workspaceSettings],
+		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeSport, changeBot, end: endHost, openFile: setOpenedFile, openNewTicket: setNewTicket, editGoal, workspaceSettings }),
+		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeSport, changeBot, endHost, setOpenedFile, setNewTicket, editGoal, workspaceSettings],
 	);
 	const fork = startOf(state.starts, "fork");
 	const resume = startOf(state.starts, "resume");
@@ -253,7 +251,6 @@ export function App() {
 		[state.connected, fork, resume, quick, resumeAll, state.ending, pullRequestsScope, windowScope, state.merges, state.reviewDrafts],
 	);
 	const mentionLists = useMemo(() => ({ todos: state.userTodos?.todos ?? [], hosts: visible.hosts, past: visible.past }), [state.userTodos, visible]);
-	const spaceNotes = useMemo(() => state.userNotes?.notes.filter(spaceIs(space)) ?? null, [state.userNotes, space]);
 
 	const routedTodoList = page?.kind === "todo" ? page.list : null;
 	const categories = state.userTodos?.categories;
@@ -262,7 +259,6 @@ export function App() {
 		(): TodoListView => (routedTodoList === null || (routedTodoList.kind === "category" && !categories?.some(({ id }) => id === routedTodoList.id)) ? ALL_TODOS : routedTodoList),
 		[routedTodoList, categories],
 	);
-	const notesView = page?.kind === "notes" ? page.list : ALL_NOTES;
 	const todoSessions = useMemo(() => ({ hosts: state.hosts, past: state.past }), [state.hosts, state.past]);
 	const pageList = useMemo(
 		() =>
@@ -277,15 +273,13 @@ export function App() {
 					botList={botList}
 					userTodos={state.userTodos}
 					todoView={todoView}
-					userNotes={state.userNotes}
-					notesView={notesView}
 					space={space}
 					settings={settings}
 					sectionTarget={sectionTarget}
 					onSectionTarget={setSectionTarget}
 				/>
 			) : null,
-		[row, page, state.listed, visible, todoSessions, botList, state.userTodos, todoView, state.userNotes, notesView, space, settings, sectionTarget],
+		[row, page, state.listed, visible, todoSessions, botList, state.userTodos, todoView, space, settings, sectionTarget],
 	);
 	// A floating sidebar, as on a phone, keeps the page's list under its row, since a column beside the page would leave the page no room.
 	const floating = sidebars.panels.left.floating;
@@ -302,7 +296,6 @@ export function App() {
 			<DashboardStatusContext.Provider value={status}>
 				<ScheduledSends.Provider value={state.scheduled}>
 					<UserTodosContext.Provider value={state.userTodos}>
-						<UserNotesContext.Provider value={state.userNotes}>
 							<PersonalContext.Provider value={state.personal}>
 								<div className="flex h-svh flex-col bg-sidebar">
 									{/* The sidebar runs the window's height; the header's tabs sit right of it, above the page and the details sidebar, each an inset panel on the sidebar's color. */}
@@ -346,7 +339,6 @@ export function App() {
 																			splits={state.splits}
 																			models={state.models}
 																			userTodos={state.userTodos}
-																			userNotes={state.userNotes}
 																			sport={state.sport}
 																			routines={state.routines}
 																			bots={state.bots}
@@ -448,7 +440,6 @@ export function App() {
 											tabs={tabs}
 											todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
 											todos={mentionLists.todos}
-											notes={spaceNotes}
 											ticketsCallable={ticketsCallable}
 											onCreateTicket={setNewTicket}
 										/>
@@ -457,7 +448,6 @@ export function App() {
 									<DesktopLinkPreview />
 								</div>
 							</PersonalContext.Provider>
-						</UserNotesContext.Provider>
 					</UserTodosContext.Provider>
 				</ScheduledSends.Provider>
 			</DashboardStatusContext.Provider>
