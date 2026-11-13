@@ -9,6 +9,8 @@ The dashboard shows the same lines in Settings › What's new.
 - ⇧⌘G shows the right sidebar's Overview tab and ⇧⌘L opens its Browser tab in the desktop app, as in Capy; the + menu lists both keys.
 - The right sidebar's tabs now work as Capy's: it starts with Overview, + lists PRs, Browser, Tickets, and Artifacts to open as tabs, and each opened tab has an × to close it. A Bot's details do the same with Routines and Tickets.
 - Notifications moved from the bell at the top right to a Notifications row in the sidebar, before Settings, with its unread count; it opens a full page with the same filters and Mark all as read.
+- The omp logo and the search button moved down out of the window's top bar to their own row in the sidebar, just above New session.
+- Notifications moved from the bell at the top right to a Notifications row in the sidebar, right under New session, with its unread count; it opens a full page with the same filters and Mark all as read.
 - The header no longer has a Settings button; the sidebar's Settings row and G then , still open Settings.
 - What's new moved from the sparkles button at the top right to Settings › What's new, with Update dashboard. The header now holds only your tabs.
 - Archive session now shows an archive icon in the header and the sidebar's right-click menu, and the header button is plain instead of filled.

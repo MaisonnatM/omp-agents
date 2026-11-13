@@ -1,4 +1,4 @@
-/** The left sidebar's page list: New session, each shown tab's page with its count, Notifications with its unread count, What's new with a dot for unseen lines, and Settings; while the sidebar floats, the page on screen holds its own list beneath its row. */
+/** The left sidebar's page list: New session, Notifications with its unread count, each shown tab's page with its count, and Settings; while the sidebar floats, the page on screen holds its own list beneath its row. */
 import { IconEditBig } from "central-icons";
 import { Fragment, type ReactNode } from "react";
 import { SidebarGroup, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarMenuNested } from "@/components/ui/sidebar";
@@ -54,6 +54,24 @@ export function SidebarNav({ tabs, current, counts, list, newSessionLabel, onNew
 							</SidebarMenuButton>
 						</Tooltip>
 					</SidebarMenuItem>
+					<SidebarMenuItem>
+						<Tooltip content="Notifications" side="right">
+							<SidebarMenuButton
+								size="short"
+								asChild
+								icon={PAGE_ICON.notifications}
+								isActive={current === "notifications"}
+								aria-label={unreadNotices > 0 ? `Notifications, ${unreadNotices} unread` : undefined}
+							>
+								<a href={hashForNotifications()}>Notifications</a>
+							</SidebarMenuButton>
+						</Tooltip>
+						{unreadNotices > 0 && (
+							<SidebarMenuBadge aria-hidden>
+								<CountPill count={unreadNotices} />
+							</SidebarMenuBadge>
+						)}
+					</SidebarMenuItem>
 					{tabs.map(tab => {
 						const { label, icon } = TAB_ROWS[tab];
 						const counted = counts[tab];
@@ -76,24 +94,6 @@ export function SidebarNav({ tabs, current, counts, list, newSessionLabel, onNew
 							</Fragment>
 						);
 					})}
-					<SidebarMenuItem>
-						<Tooltip content="Notifications" side="right">
-							<SidebarMenuButton
-								size="short"
-								asChild
-								icon={PAGE_ICON.notifications}
-								isActive={current === "notifications"}
-								aria-label={unreadNotices > 0 ? `Notifications, ${unreadNotices} unread` : undefined}
-							>
-								<a href={hashForNotifications()}>Notifications</a>
-							</SidebarMenuButton>
-						</Tooltip>
-						{unreadNotices > 0 && (
-							<SidebarMenuBadge aria-hidden>
-								<CountPill count={unreadNotices} />
-							</SidebarMenuBadge>
-						)}
-					</SidebarMenuItem>
 					<SidebarMenuItem>
 						<Tooltip content="Settings" shortcut={shortcutLabels("settings")} side="right">
 							<SidebarMenuButton size="short" asChild icon={PAGE_ICON.settings} isActive={current === "settings"}>

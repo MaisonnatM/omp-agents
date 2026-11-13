@@ -1,8 +1,8 @@
 # Sessions sidebar
 
 - The sidebar runs the window's height on the window's background, and the page and the session details sidebar sit beside it as rounded panels.
-  Its top row, 48 px tall at the default font size as the header's tabs beside it are, holds the omp mark, the command menu button, and the button that hides the sidebar.
-- Under it the page list shows **New session**, then **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Calendar**, **Todo**, **Sport**, and **Email** in the order Settings › Preferences gives them, then **Notifications** with its unread count, and **Settings**.
+  Its top row, 48 px tall at the default font size as the header's tabs beside it are, holds the button that hides the sidebar; under it a row holds the omp mark and the command menu button.
+- Under it the page list shows **New session**, then **Notifications** with its unread count, then **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Calendar**, **Todo**, **Sport**, and **Email** in the order Settings › Preferences gives them, and **Settings**.
   A row opens its page, and the open page's row stays highlighted while that page's own list, such as the Bots, the Todo categories, or the Settings sections, shows in a column at the page's left, as in Linear's inbox.
   Drag the column's right edge to widen or narrow it, or double-click the edge to reset it; every page's list keeps that width in this browser.
   On a phone, where the sidebar floats over the page, that list shows under the page's row instead, and a page whose row you hid in Preferences shows its list after the last row.
