@@ -5,12 +5,12 @@
 import { arrayOf, fields, type Guard, isNumber, isObject, isString, nullable, oneOf, type Parsed, tagged } from "../json";
 import { parseRemote } from "./github";
 
-export const SYNC_ITEM_IDS = ["omp-config", "omp-agents-md", "omp-append-system", "omp-skills", "omp-rules", "omp-agents", "omp-commands", "source-control", "notes", "todos", "preferences", "workspaces", "calendars", "bots"] as const;
+export const SYNC_ITEM_IDS = ["omp-config", "omp-agents-md", "omp-append-system", "omp-skills", "omp-rules", "omp-agents", "omp-commands", "source-control", "todos", "preferences", "workspaces", "calendars", "bots"] as const;
 export type SyncItemId = (typeof SYNC_ITEM_IDS)[number];
 export const isSyncItemId = oneOf(SYNC_ITEM_IDS);
 
 /** A store the server holds, which sync reads and writes through its `SyncStore` rather than as a file. */
-export type SyncStoreId = "source-control" | "notes" | "todos" | "preferences" | "workspaces" | "calendars" | "bots";
+export type SyncStoreId = "source-control" | "todos" | "preferences" | "workspaces" | "calendars" | "bots";
 
 /** Where an item lives on this machine: a file or a directory under omp's agent directory, or a store the server holds. */
 export type SyncSource = { kind: "omp-file"; path: string } | { kind: "omp-tree"; path: string } | { kind: "store"; store: SyncStoreId };
@@ -43,7 +43,6 @@ export const SYNC_ITEMS: readonly SyncItem[] = [
 		source: { kind: "store", store: "source-control" },
 		json: true,
 	},
-	{ id: "notes", label: "Notes", detail: "Every note on the Notes page", path: "dashboard/notes.json", source: { kind: "store", store: "notes" }, json: true },
 	{ id: "todos", label: "Todos", detail: "The Todo page's todos, categories, and archive", path: "dashboard/todos.json", source: { kind: "store", store: "todos" }, json: true },
 	{
 		id: "preferences",
@@ -119,7 +118,8 @@ const BRANCH = /^(?!-)(?!.*\.\.)(?!.*\/\/)(?!.*@\{)[A-Za-z0-9._/-]+(?<![./])$/;
 
 /**
  * The settings `value` names, or why not. The remote is any address git takes, without a password in it: sync uses this
- * machine's git credentials. An address that starts with `-` would read as an option.
+ * machine's git credentials. An address that starts with `-` would read as an option. An excluded item this version
+ * lacks, such as an older version's `notes`, drops out.
  */
 export function parseSyncSettings(value: unknown): Parsed<SyncSettings, { error: string }> {
 	if (!isObject(value) || typeof value.remote !== "string" || typeof value.branch !== "string" || !Array.isArray(value.excluded)) return { error: "Expected { remote, branch, excluded }" };
@@ -128,7 +128,6 @@ export function parseSyncSettings(value: unknown): Parsed<SyncSettings, { error:
 	if (remote.startsWith("-") || /\s/.test(remote)) return { error: "That is not a Git remote address" };
 	if (/^[a-z][a-z0-9+.-]*:\/\/[^/@]*:[^/@]*@/i.test(remote)) return { error: "Leave the password out of the address; sync uses this machine's git credentials" };
 	if (!BRANCH.test(branch)) return { error: "That is not a branch name" };
-	if (!value.excluded.every(isSyncItemId)) return { error: "Unknown sync item" };
 	return { ok: { remote, branch, excluded: SYNC_ITEM_IDS.filter(id => (value.excluded as unknown[]).includes(id)) } };
 }
 

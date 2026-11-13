@@ -52,12 +52,12 @@ The page owns what a write changes: it adds the kept event that `PUT /api/calend
 ### Agent reminders
 
 A `LocalEvent`'s `sessionId` names the omp session that added it, and is `null` for an event you added; one whose `sessionId` is missing or not a nonempty string loads with `null`, so older files read as before.
-`EventInbox` files an added reminder in its session's space through `inSessionSpace` and the same `SpaceOfSession` as `NoteInbox`; the change names no space, and any it carried is replaced.
+`EventInbox` files an added reminder in its session's space through `inSessionSpace` and `SpaceOfSession`, the space of the session's directory, Work for a session the dashboard does not know; the change names no space, and any it carried is replaced.
 The starter kit's `user_event` extension lists the upcoming events of `events.json`, adds a timed reminder in its session's name, and removes one that session added.
 It reads the file but never writes it, and atomically renames each `{ op: "add", event }` or `{ op: "remove", id, sessionId }` into `event-inbox/` beside it.
 It also reads the pending changes, so a session sees its own reminders while the dashboard is stopped.
 `EventInbox` in `src/server/event-inbox.ts` uses `JsonInboxDir` to apply them through `LocalEventsFile` in filename order.
 It sets aside an add that names no session and a removal whose event another session or you added, checked against the kept events when it applies the change.
 An add of an id already kept adds nothing, so a replayed change never shows an event twice.
-Only the server holding `OwnerLock` drains the inbox, and it reloads `events.json` before taking ownership, as it does `notes.json`.
+Only the server holding `OwnerLock` drains the inbox, and it reloads `events.json` before taking ownership.
 A kept event's notice and its Calendar page entry link to `hashForSession(sessionId)` when it names a session; see [Notifications](notifications.md).

@@ -23,7 +23,6 @@ import type { SourceControlSettings } from "./shared/source-control";
 import type { WorkspaceList } from "./shared/workspaces";
 import { parseSourceControlSettings, type SourceControl } from "./source-control";
 import { plainPath, type RepoFile, SyncRepo } from "./sync-repo";
-import type { UserNoteList } from "./user-notes-shared";
 import type { UserTodoList } from "./user-todos-shared";
 
 /** `path` with `home` shortened to `~`, as every machine names it. */
@@ -273,12 +272,6 @@ function partsStore(parts: Readonly<Record<string, SyncStore>>): SyncStore {
 	};
 }
 
-/** Notes by id: each edit moves its note first, so as a list two machines' edits of two notes would disagree on the order. */
-const NOTES_BY_ID: Carriage = {
-	portable: json => (isPlainObject(json) && Array.isArray(json.notes) ? { ...json, notes: Object.fromEntries(json.notes.map(note => [note.id, note])) } : json),
-	local: json => (isPlainObject(json) && isPlainObject(json.notes) ? { ...json, notes: Object.values(json.notes) } : json),
-};
-
 /** Each todo once, where the list first holds it: a todo two machines moved to two places arrives in both. */
 function todosOnce(json: unknown): unknown {
 	if (!isPlainObject(json)) return json;
@@ -428,7 +421,6 @@ function botsStore(files: SyncedFiles, home: string, changed: (list: ListKind) =
 /** The files sync carries beside omp's. */
 export interface SyncedFiles {
 	sourceControl: SourceControl;
-	notes: SyncedFile<UserNoteList>;
 	todos: SyncedFile<UserTodoList>;
 	preferences: SyncedFile<PagePreferences | null>;
 	processes: SyncedFile<ProcessSettings>;
@@ -458,7 +450,6 @@ export function thisMachine(path: string): RoutineMachine {
 export function syncStores(files: SyncedFiles, home: string, changed: (list: ListKind) => void): Record<SyncStoreId, SyncStore> {
 	return {
 		"source-control": sourceControlStore(files.sourceControl, home),
-		notes: fileStore(files.notes, () => changed("user-notes"), NOTES_BY_ID),
 		todos: fileStore(files.todos, () => changed("user-todos"), todoCarriage(home)),
 		preferences: partsStore({ page: fileStore(files.preferences, () => changed("preferences"), PAGE_VALUES), processes: fileStore(files.processes) }),
 		workspaces: fileStore(files.workspaces, () => changed("workspaces"), homePaths(home)),

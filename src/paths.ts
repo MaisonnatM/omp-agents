@@ -39,10 +39,6 @@ export const userTodosFile = join(configDir, "todos.json");
  * The server applies and deletes them, so it stays the only writer of {@link userTodosFile}.
  */
 export const userTodoInboxDir = join(configDir, "todo-inbox");
-/** The Notes page's list, beside {@link tokenFile}. */
-export const userNotesFile = join(configDir, "notes.json");
-/** Where omp's `user_note` tool leaves the notes it adds and appends to, one JSON file each, so the server stays the only writer of {@link userNotesFile}. */
-export const userNoteInboxDir = join(configDir, "note-inbox");
 /** The Sport module's plan, measurements, and workout log, beside {@link tokenFile}. */
 export const sportFile = join(configDir, "sport.json");
 /** Where omp's `sport` tool leaves its changes to the Sport module, one JSON file each, so the server stays the only writer of {@link sportFile}. */

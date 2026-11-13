@@ -18,7 +18,6 @@ import { ScheduledFile } from "./scheduled-file";
 import { SportFile } from "./sport-file";
 import { createClientHandler, type SocketEnv } from "./socket";
 import { UserTodosFile } from "./user-todos-file";
-import { UserNotesFile } from "./user-notes-file";
 import { ProjectTrustFile } from "./project-trust-file";
 import { WorkspacesFile } from "./workspaces-file";
 import type { Socket, SocketData } from "./views";
@@ -43,7 +42,6 @@ function setup(initial: PastSession[]) {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-lists-"));
 	dirs.push(dir);
 	const todos = new UserTodosFile(join(dir, "todos.json"));
-	const notes = new UserNotesFile(join(dir, "notes.json"));
 	const sport = new SportFile(join(dir, "sport.json"));
 	const routines = new RoutinesFile(join(dir, "routines.json"));
 	const scheduled = new ScheduledFile(join(dir, "scheduled.json"));
@@ -55,7 +53,6 @@ function setup(initial: PastSession[]) {
 	const bots = new BotsFile(join(dir, "bots.json"));
 	const lists = new ListRegistry({
 		"user-todos": { msg: () => ({ t: "user-todos", list: todos.value }), apply: change => todos.apply(change) },
-		"user-notes": { msg: () => ({ t: "user-notes", list: notes.value }), apply: change => notes.apply(change) },
 		sport: { msg: () => ({ t: "sport", state: sport.value }), apply: changes => sport.apply(changes) },
 		routines: { msg: () => ({ t: "routines", routines: routines.value }), apply: change => routines.apply(change, 1000) },
 		scheduled: { msg: () => ({ t: "scheduled", sends: scheduled.value }), apply: change => scheduled.apply(change, 1000) },
@@ -204,7 +201,6 @@ describe("registered whole-list broadcasts", () => {
 		const replies: ServerMsg[] = [];
 		const peer = { send: (msg: ServerMsg) => void replies.push(msg) };
 		expect(lists.apply("user-todos", { op: "remove", id: "missing" }, peer)).toBe(false);
-		expect(lists.apply("user-notes", { op: "remove", id: "missing" }, peer)).toBe(false);
 		expect(lists.apply("sport", [{ op: "remove-log", id: "missing" }], peer)).toBe(false);
 		expect(lists.apply("routines", { op: "remove", id: "missing" }, peer)).toBe(false);
 		expect(lists.apply("scheduled", { op: "remove", id: "missing" }, peer)).toBe(false);

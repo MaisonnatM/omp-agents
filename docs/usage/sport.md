@@ -95,4 +95,4 @@
 
 - No minutes per block: the plan gives a workout's length, not its blocks', so the page shows the whole workout's length alone.
 - One **Fait…** per workout: a note belongs to one workout, so a day with two workouts has two buttons.
-- The week's address is `#sport`, not `#sport/week`, as the Notes page's first list is `#notes`.
+- The week's address is `#sport`, not `#sport/week`, as the Todo page's first list is `#todo`.

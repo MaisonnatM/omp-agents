@@ -22,7 +22,7 @@
   `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request, a Linear issue, or a todo, which runs in the background.
   `request` resolves or rejects on `done` and keeps waiting across a reconnect, whose `resume` hands the server every request still waiting.
   Ending sessions stay in a separate set until their requests settle, even if they have already left the roster.
-  A user-data change, such as a note, a todo, a pin, or a Bot, goes out through `write`, which `web/outbox.ts` holds while the socket is down and sends after the next `resume`, so a change made offline is not dropped.
+  A user-data change, such as a todo, a pin, or a Bot, goes out through `write`, which `web/outbox.ts` holds while the socket is down and sends after the next `resume`, so a change made offline is not dropped.
 - `web/use-action.ts`: one runner per control, idle, pending, or failed with its arguments, so a second press while it runs starts nothing; it shows failures through the toast manager.
 - `web/use-hover-popover.ts`: `useHoverPopover`, the props for a popover a mouse opens by hovering its trigger without moving focus, and a click or Enter opens with focus inside, so its buttons stay reachable by keyboard; the status bar's CPU and a pull request's out-of-date base branch use it.
 - `web/use-return-focus.ts`: `useReturnFocus`, the close handler of a dialog shown without a Radix trigger, which gives the focus back to what had it as the dialog opened; the changes explorer, `ViewerDialog`, and `ImageViewer` use it.
