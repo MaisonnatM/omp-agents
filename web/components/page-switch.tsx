@@ -19,6 +19,7 @@ import { EmptyHome } from "./empty-home";
 import { DisconnectedPage } from "./integrations/disconnected-page";
 import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { NewSession } from "./new-session";
+import { NotificationsPage } from "./notices";
 
 import { PaneGrid } from "./pane-grid";
 import { BotPage, NewBot } from "./bots/bot-page";
@@ -49,7 +50,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "sport" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "sport" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError" | "notices"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -101,6 +102,7 @@ export const PageSwitch = memo(function PageSwitch({
 	connected,
 	listed,
 	rosterError,
+	notices,
 	newStart,
 	scope,
 	defaultWorkspace,
@@ -210,6 +212,8 @@ export const PageSwitch = memo(function PageSwitch({
 		}
 		case "calendar":
 			return <CalendarPage routines={routines} bots={bots} todos={userTodos} ticketsShown={ticketsCallable} />;
+		case "notifications":
+			return <NotificationsPage notices={notices} />;
 		case "email":
 			return <EmailPage target={page.target} />;
 		case "sport":

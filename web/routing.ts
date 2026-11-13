@@ -175,6 +175,7 @@ export type Page =
 	| ({ kind: "todo" } & TodoRoute)
 	| ({ kind: "bots" } & BotsRoute)
 	| { kind: "calendar" }
+	| { kind: "notifications" }
 	| ({ kind: "email" } & EmailRoute)
 	| ({ kind: "new" } & NewSessionRoute)
 	| ({ kind: "scheduled" } & ScheduledRoute)
@@ -226,6 +227,7 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   `#bots/<id>/routines/<routine id>/edit` that routine's editor, and `#bots/<id>/routines/new` a new routine's editor; Bot and routine ids
  *   are UUIDs, so none reads as `new`.
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
+ * - `#notifications` opens the Notifications page, every notice by source, unread first.
  * - `#email` opens the Email page, your Gmail inboxes' latest conversations, `#email/new` a new mail, and
  *   `#email/<account>/<thread id>` that account's conversation in full in the main content.
  * - `#sport` opens the Sport page on this week, `?day=<YYYY-MM-DD>` on that day's week with that day open, `#sport/journal` on
@@ -257,6 +259,7 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		return { kind: "bots", target, routine: routines === "routines" ? botRoutineRoute(routine, more) : null };
 	},
 	calendar: () => ({ kind: "calendar" }),
+	notifications: () => ({ kind: "notifications" }),
 	email: rest => {
 		if (rest === "new") return { kind: "email", target: "new" };
 		const [account, thread, ...more] = (rest ?? "").split("/").map(decodeSegment);
@@ -299,6 +302,7 @@ function restOfPage(page: Page): string | null {
 		case "sport":
 			return page.tab === "week" ? null : page.tab;
 		case "calendar":
+		case "notifications":
 		case "get-started":
 			return null;
 		default: {
@@ -323,6 +327,7 @@ function queryOfPage(page: Page): string | null {
 		case "tickets":
 		case "bots":
 		case "calendar":
+		case "notifications":
 		case "get-started":
 		case "email":
 		case "scheduled":
@@ -358,6 +363,7 @@ export const hashForBots = (target: string | null): string => hashForPage(target
 export const hashForNewBot = (): string => hashForPage({ kind: "bots", target: null, adding: true });
 export const hashForBotRoutine = (botId: string, routine: BotRoutineRoute): string => hashForPage({ kind: "bots", target: botId, routine });
 export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
+export const hashForNotifications = (): string => hashForPage({ kind: "notifications" });
 export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
 export const hashForScheduled = (id: string): string => hashForPage({ kind: "scheduled", id });

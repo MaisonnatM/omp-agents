@@ -7,7 +7,7 @@ import { errorText } from "../src/json";
 import { AppSidebar } from "./components/app-sidebar";
 import { BotDetails } from "./components/bots/bot-details";
 import { CommandPalette } from "./components/command-palette/command-palette";
-import { HeaderControls } from "./components/header-controls";
+import { WhatsNew } from "./components/whats-new";
 import { HeaderTabs } from "./components/header-tabs";
 import {
 	type DashboardActions,
@@ -260,8 +260,8 @@ export function App() {
 		[listPage, state.listed, visible, state.hosts, state.past, botList, state.userTodos, todoView, sectionTarget],
 	);
 	const showSearch = useCallback(() => dispatchPalette({ type: "open" }), [dispatchPalette]);
-	const toggleSettings = useCallback(() => void handlers.settings?.(0), [handlers]);
-	const headerControls = useMemo(() => <HeaderControls notices={state.notices} settingsOpen={page?.kind === "settings"} onToggleSettings={toggleSettings} />, [state.notices, page?.kind, toggleSettings]);
+	const headerControls = useMemo(() => <WhatsNew />, []);
+	const unreadNotices = useMemo(() => state.notices.filter(notice => !notice.read).length, [state.notices]);
 
 	return (
 		<DashboardActionsContext.Provider value={actions}>
@@ -285,6 +285,7 @@ export function App() {
 										botList={botList}
 										list={placement?.at === "sidebar" ? pageList : null}
 										settings={settings}
+										unreadNotices={unreadNotices}
 										onPickWorkspace={switchWorkspace}
 										onSearch={showSearch}
 									/>
@@ -323,6 +324,7 @@ export function App() {
 																	connected={state.connected}
 																	listed={state.listed}
 																	rosterError={state.rosterError}
+																	notices={state.notices}
 																	newStart={startOf(state.starts, "new")}
 																	scope={scope}
 																	defaultWorkspace={defaultWorkspace}

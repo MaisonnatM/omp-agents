@@ -97,7 +97,7 @@ The column down the window's left side: the omp mark and the command menu at its
 _Avoid_: Nav, navigation rail, left panel
 
 **Header tabs**:
-The row across the top of the window, right of the sidebar, that holds Back and Forward, your tabs, a + that opens a new one, and What's new, the bell, and Settings at its end.
+The row across the top of the window, right of the sidebar, that holds Back and Forward, your tabs, a + that opens a new one, and What's new at its end.
 Opening a page or session shows it in the tab on screen, and a session another tab shows switches to that tab; × closes a tab, and a drag reorders it; this browser keeps them.
 _Avoid_: Title bar, tab strip, browser tabs
 
@@ -127,7 +127,7 @@ A named group of Bots in the Bots tab and the gallery, which exists while a Bot 
 _Avoid_: Folder, category
 
 **Notice**:
-An entry under the bell: what a check found or how an update went.
+An entry on the Notifications page: what a check found or how an update went.
 _Avoid_: Alert, notification (reserved for session notifications)
 
 **Overview**:

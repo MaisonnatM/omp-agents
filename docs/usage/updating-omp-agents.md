@@ -18,7 +18,7 @@
   The 5th stop within 5 minutes shows the error page with the server's last output and **Retry**.
   A server you run with `bun start` in a terminal does neither.
 - Changes to `desktop/` load only when the desktop app starts again.
-- **What's new**, the sparkles button before the bell at the top right, lists what changed in the build you run, in everyday words, newest day first: the lines of the repository's `CHANGELOG.md`, which every change to `main` adds to.
+- **What's new**, the sparkles button at the top right, lists what changed in the build you run, in everyday words, newest day first: the lines of the repository's `CHANGELOG.md`, which every change to `main` adds to.
   A blue dot on the button marks more lines than it showed when it last opened on this machine; opening it clears the dot.
   **Not loaded yet**, at its top, lists the lines in the `CHANGELOG.md` of the branch's origin, as last fetched, that the running build lacks, with **Update dashboard**.
   A packaged app, or a server outside a git checkout, has no `CHANGELOG.md` to read and says why.

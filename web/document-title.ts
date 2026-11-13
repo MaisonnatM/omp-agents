@@ -27,6 +27,8 @@ export function pageTitle(page: Page): string {
 			return page.routine.kind === "list" || page.routine.kind === "open" ? "Routines" : "Routine";
 		case "calendar":
 			return "Calendar";
+		case "notifications":
+			return "Notifications";
 		case "email":
 			return "Email";
 		case "sport":
