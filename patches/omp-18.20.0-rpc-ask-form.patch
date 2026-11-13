@@ -1,18 +1,5 @@
-From f3797e3dbf2b0f811fa1c11444f72ed823420a5c Mon Sep 17 00:00:00 2001
-From: omp-agents <omp-agents@local>
-Date: Tue, 10 Nov 2026 09:34:40 +0100
-Subject: [PATCH] feat(rpc): send the ask tool form as one ask dialog to hosts
- that opt in
-
-Omp-Session: 01a1c493-10f5-74be-9bda-1ed9dcb33daf
----
- docs/rpc.md                                   |  11 +-
- .../coding-agent/src/modes/rpc/rpc-mode.ts    | 115 +++++++++++++++
- .../test/rpc-extension-ui.test.ts             | 134 +++++++++++++++++-
- 3 files changed, 253 insertions(+), 7 deletions(-)
-
 diff --git a/docs/rpc.md b/docs/rpc.md
-index 5b28e058b1..841129431c 100644
+index b7913e8e2c1a1598c97659980bd5ad8df507108e..91927e45da0f7b21676e8ff92a5cc2a761041b24 100644
 --- a/docs/rpc.md
 +++ b/docs/rpc.md
 @@ -739,7 +739,8 @@ The corresponding `get_state` result reports the same computed state:
@@ -25,7 +12,7 @@ index 5b28e058b1..841129431c 100644
  command answer with a failed `response`, so hosts should keep the `select`
  fallback when enabling fails.
  
-@@ -1325,8 +1326,12 @@ Use `--mode rpc --no-ui` for a host without a tool UI surface; use `--mode rpc-u
+@@ -1336,8 +1337,12 @@ Use `--mode rpc --no-ui` for a host without a tool UI surface; use `--mode rpc-u
       host hint from `ExtensionUIDialogOptions.secret`; hosts that support
       masked input should hide typed characters when `secret: true`.
     - `ask` is emitted only after `set_ask_dialog` enables it. It carries every
@@ -41,7 +28,7 @@ index 5b28e058b1..841129431c 100644
       plus `timeout?: number`. `options` never include an "Other" entry; hosts
       always offer free text.
 diff --git a/packages/coding-agent/src/modes/rpc/rpc-mode.ts b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
-index e63970f88f..4ac7f3e8a5 100644
+index 4408b13370c5d7448c80da2bfa412dddf784a577..8407726b7c74460c49b4abecf60c9afb61125519 100644
 --- a/packages/coding-agent/src/modes/rpc/rpc-mode.ts
 +++ b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
 @@ -24,7 +24,9 @@ import { clearPluginRootsAndCaches, resolveActiveProjectRegistryPath } from "../
@@ -70,7 +57,7 @@ index e63970f88f..4ac7f3e8a5 100644
  import {
  	type BuiltSkillPromptMessage,
  	loadSkillPrompt,
-@@ -1191,6 +1202,104 @@ export async function requestRpcAskDialog(
+@@ -1195,6 +1206,104 @@ export async function requestRpcAskDialog(
  	return timedOut ? timedOutAskDialogResult(questions) : result;
  }
  
@@ -175,7 +162,7 @@ index e63970f88f..4ac7f3e8a5 100644
  export function requestRpcEditor(
  	pendingRequests: Map<string, PendingExtensionRequest>,
  	output: RpcOutput,
-@@ -1530,6 +1639,12 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions
+@@ -1534,6 +1643,12 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions
  				requestRpcAskDialog(this.pendingRequests, this.output, questions, dialogOptions);
  		}
  
@@ -189,7 +176,7 @@ index e63970f88f..4ac7f3e8a5 100644
  			title: string,
  			options: ExtensionUISelectItem[],
 diff --git a/packages/coding-agent/test/rpc-extension-ui.test.ts b/packages/coding-agent/test/rpc-extension-ui.test.ts
-index bebfe32ef2..6159907711 100644
+index c66027b1224520b69c6d3f20c1892a27469b3b4b..3d4ef68597681fc47c437388dccd38e04f5c7989 100644
 --- a/packages/coding-agent/test/rpc-extension-ui.test.ts
 +++ b/packages/coding-agent/test/rpc-extension-ui.test.ts
 @@ -7,6 +7,7 @@ import {
@@ -200,7 +187,7 @@ index bebfe32ef2..6159907711 100644
  	requestRpcInput,
  	requestRpcSelect,
  } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-mode";
-@@ -707,7 +708,115 @@ describe("RPC ask dialog", () => {
+@@ -736,7 +737,115 @@ describe("RPC ask dialog", () => {
  		expect(onTimeout).not.toHaveBeenCalled();
  	});
  
@@ -317,7 +304,7 @@ index bebfe32ef2..6159907711 100644
  		await using temp = await TempDir.create("@rpc-ask-dialog-");
  		const extensionPath = temp.join("scripted-ask.ts");
  		await Bun.write(extensionPath, scriptedAskProvider);
-@@ -768,7 +877,11 @@ describe("RPC ask dialog", () => {
+@@ -797,7 +906,11 @@ describe("RPC ask dialog", () => {
  					await send({ type: "extension_ui_response", id: frame.id, value: "Postgres" });
  				} else if (frame.type === "extension_ui_request" && frame.method === "ask") {
  					askRequests.push(frame);
@@ -330,7 +317,7 @@ index bebfe32ef2..6159907711 100644
  				} else if (frame.type === "tool_execution_end" && frame.toolName === "ask") {
  					toolResults.push(frame.result);
  				} else if (frame.type === "prompt_result" && frame.id === "fallback") {
-@@ -789,7 +902,7 @@ describe("RPC ask dialog", () => {
+@@ -818,7 +931,7 @@ describe("RPC ask dialog", () => {
  
  		if (!finished) throw new Error(`RPC ask fixture did not finish: ${await stderr}`);
  		await stderr;
@@ -339,7 +326,7 @@ index bebfe32ef2..6159907711 100644
  		expect(selectRequests[0]).toMatchObject({ method: "select", title: "Which database?" });
  		expect(optInResponse).toEqual({
  			id: "opt-in",
-@@ -798,7 +911,20 @@ describe("RPC ask dialog", () => {
+@@ -827,7 +940,20 @@ describe("RPC ask dialog", () => {
  			success: true,
  			data: { enabled: true },
  		});
@@ -361,6 +348,3 @@ index bebfe32ef2..6159907711 100644
  		const answered = expect.objectContaining({
  			details: { answers: [{ name: "db", question: "Which database?", answer: "Postgres" }] },
  		});
--- 
-2.56.0
-

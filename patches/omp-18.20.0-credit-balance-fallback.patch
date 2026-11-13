@@ -1,19 +1,5 @@
-From bf340a69cdd8f7c5909ed0c099f41aeb57d1b8d5 Mon Sep 17 00:00:00 2001
-From: omp-agents <omp-agents@local>
-Date: Sat, 7 Nov 2026 12:13:26 +0100
-Subject: [PATCH] fix: read Anthropic's credit-balance 400 as a usage limit
-
-Omp-Session: 01a1b5a2-fbff-710e-85d7-f5e09e03e8ac
-Omp-Session: 01a1c493-10f5-74be-9bda-1ed9dcb33daf
----
- packages/ai/src/error/rate-limit.ts           |  8 +-
- .../ai/test/anthropic-stream-envelope.test.ts |  9 ++-
- packages/ai/test/rate-limit-utils.test.ts     | 16 +++-
- .../test/agent-session-retry-fallback.test.ts | 80 +++++++++++++++++++
- 4 files changed, 108 insertions(+), 5 deletions(-)
-
 diff --git a/packages/ai/src/error/rate-limit.ts b/packages/ai/src/error/rate-limit.ts
-index d601526994..a5f26dad98 100644
+index 8de5873c1a9e2f5b4bd6908ef464d30b3ffee2b5..9b6fffe734d4a93ccd66ce28b98c272db23e7d1a 100644
 --- a/packages/ai/src/error/rate-limit.ts
 +++ b/packages/ai/src/error/rate-limit.ts
 @@ -26,10 +26,12 @@ const ACCOUNT_RATE_LIMIT_PATTERN =
@@ -33,7 +19,7 @@ index d601526994..a5f26dad98 100644
  // model" with `error_code: credits_required`. The account cannot serve the model
  // at all, so rotate to a sibling rather than backing off on this one. Bounded to
 diff --git a/packages/ai/test/anthropic-stream-envelope.test.ts b/packages/ai/test/anthropic-stream-envelope.test.ts
-index 01c1f2d7f8..d232d561b4 100644
+index 01c1f2d7f806efdf8505b4088bd2e0eaabe08e34..d232d561b4f994aef86a6a712a4cac59b03143d1 100644
 --- a/packages/ai/test/anthropic-stream-envelope.test.ts
 +++ b/packages/ai/test/anthropic-stream-envelope.test.ts
 @@ -1721,7 +1721,14 @@ describe("anthropic stream envelope handling", () => {
@@ -53,7 +39,7 @@ index 01c1f2d7f8..d232d561b4 100644
  		}
  	});
 diff --git a/packages/ai/test/rate-limit-utils.test.ts b/packages/ai/test/rate-limit-utils.test.ts
-index 27a89ec23a..07d51c240f 100644
+index 27a89ec23a9eb84db992fe7bd1cfdf386689ee98..07d51c240f2aaabe170882afc1807078ad7b0365 100644
 --- a/packages/ai/test/rate-limit-utils.test.ts
 +++ b/packages/ai/test/rate-limit-utils.test.ts
 @@ -1,6 +1,6 @@
@@ -86,10 +72,10 @@ index 27a89ec23a..07d51c240f 100644
  
  describe("calculateRateLimitBackoffMs", () => {
 diff --git a/packages/coding-agent/test/agent-session-retry-fallback.test.ts b/packages/coding-agent/test/agent-session-retry-fallback.test.ts
-index c2ae135a18..f0b4089acf 100644
+index 2028970e70eca4fdce08b0006d7b36b89347e0a3..bb967b9c9471e7fadd6612259168d29e6acdc6a7 100644
 --- a/packages/coding-agent/test/agent-session-retry-fallback.test.ts
 +++ b/packages/coding-agent/test/agent-session-retry-fallback.test.ts
-@@ -3498,6 +3498,86 @@ describe("AgentSession retry fallback", () => {
+@@ -3500,6 +3500,86 @@ describe("AgentSession retry fallback", () => {
  		expect(session.model?.id).toBe(fallbackModel.id);
  	});
  
@@ -176,6 +162,3 @@ index c2ae135a18..f0b4089acf 100644
  	it("applies a provider-wildcard chain to any model of that provider", async () => {
  		const primaryModel = getBundledModel("anthropic", "claude-opus-4-5");
  		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
--- 
-2.56.0
-

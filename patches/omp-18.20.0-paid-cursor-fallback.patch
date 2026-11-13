@@ -1,5 +1,5 @@
 diff --git a/docs/non-compaction-retry-policy.md b/docs/non-compaction-retry-policy.md
-index 1ead7f6d71..9b8070dc42 100644
+index 1ead7f6d71e160d4f5eb0210691cbe75d656e650..9b8070dc4247df19fc9e30c38644d60e668cbdd5 100644
 --- a/docs/non-compaction-retry-policy.md
 +++ b/docs/non-compaction-retry-policy.md
 @@ -203,6 +203,7 @@ Defined in `packages/coding-agent/src/session/settings.ts`:
@@ -47,10 +47,10 @@ index 1ead7f6d71..9b8070dc42 100644
 +
 +Cursor uses the same completion transport for included and on-demand requests. This policy controls deliberate local routing using reported quota. It does not disable Cursor's server-side automatic billing or guarantee zero incidental overage when reports are stale or unknown.
 diff --git a/docs/settings.md b/docs/settings.md
-index 5635d7027b..fc23b5ba66 100644
+index fe4360d8cd3e93e6e750983d2c214cfaf181e69f..9e5152cabeef9643f5bd87474d60174ce5e6d3c3 100644
 --- a/docs/settings.md
 +++ b/docs/settings.md
-@@ -603,6 +603,7 @@ providers:
+@@ -604,6 +604,7 @@ providers:
  | `retry.fallbackRevertPolicy`             | enum    | `cooldown-expiry` | `cooldown-expiry` returns to the primary model once its suppression window ends; `never` stays on the fallback until switched manually.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
  | `retry.waitForUsageReset`                | boolean | `false`           | Allow provider-stated usage-limit waits past `retry.maxDelayMs` when a reset hint or complete usage report supplies authoritative timing. Waits are abortable but can also hold subagents.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
  | `retry.usageAwareFallback`               | boolean | `false`           | Before a turn, use reliable coding-plan quota reports to prefer healthy same-provider accounts and then configured fallback models. Unknown usage keeps the current model; ordinary API keys are excluded.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
@@ -59,7 +59,7 @@ index 5635d7027b..fc23b5ba66 100644
  | `retry.usageReservePolicy`               | enum    | `confirm`         | `confirm`, `auto`, `fail-closed`. At reserve, `confirm` asks when an interactive confirmer is available and otherwise auto-falls back; exhausted quota can fall back without confirmation. `fail-closed` blocks known reserve/depleted quota rather than spending it.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
  | `providers.anthropic.serverSideFallback` | boolean | `false`           | Opt in to Anthropic's `server-side-fallback-2026-06-01` beta for eligible direct Claude Fable/Mythos requests. The catalog-owned server-side chain currently targets `claude-opus-5`, not `claude-opus-5-5`; unsupported models and hosts have no chain.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 diff --git a/packages/ai/CHANGELOG.md b/packages/ai/CHANGELOG.md
-index e4b736dba9..ce93fff95f 100644
+index 919869f1d4f23737021b137e283c3907ffe56e60..bb236a3ca7843b7be92b3588598d73f822838be5 100644
 --- a/packages/ai/CHANGELOG.md
 +++ b/packages/ai/CHANGELOG.md
 @@ -2,6 +2,14 @@
@@ -74,14 +74,14 @@ index e4b736dba9..ce93fff95f 100644
 +
 +- Treat numerically exhausted included-plan windows as depleted even when the provider labels them `ok`, preserving their reset time instead of routing through zero reserve.
 +
- ## [18.18.8] - 2026-11-11
+ ## [18.20.0] - 2026-11-12
  
- - Fixed provider in-flight lock cleanup failures being swallowed silently — they are now logged instead of ignored ([#18654](https://github.com/can1357/oh-my-pi/pull/18654) by [@yuzu-octopus](https://github.com/yuzu-octopus))
+ ### Added
 diff --git a/packages/ai/src/auth/cascade.ts b/packages/ai/src/auth/cascade.ts
-index aaf71f669f..2290731005 100644
+index cedfa188e4d3fc5f4ba186d4cf7a23eb72bee09a..834e846aa5657f4b5a590cb1e1a1e13212bd33d3 100644
 --- a/packages/ai/src/auth/cascade.ts
 +++ b/packages/ai/src/auth/cascade.ts
-@@ -390,6 +390,10 @@ export class KeyCascade implements KeysApi {
+@@ -389,6 +389,10 @@ export class KeyCascade implements KeysApi {
  		// runtime, models.yml, stored, env or broker.
  		if (providerPauseReason(provider) !== undefined) return undefined;
  		const restricted = this.#deps.affinity.isRestricted(provider, sessionId);
@@ -92,7 +92,7 @@ index aaf71f669f..2290731005 100644
  		// Runtime override takes highest priority
  		const runtimeKey = restricted ? undefined : this.#deps.overrides.runtimeKey(provider);
  		if (runtimeKey) {
-@@ -443,7 +447,9 @@ export class KeyCascade implements KeysApi {
+@@ -442,7 +446,9 @@ export class KeyCascade implements KeysApi {
  			provider,
  			sessionId,
  			options,
@@ -103,7 +103,7 @@ index aaf71f669f..2290731005 100644
  		);
  		if (loginApiKeySelection) {
  			if (options?.recordAffinity !== false) {
-@@ -456,6 +462,10 @@ export class KeyCascade implements KeysApi {
+@@ -455,6 +461,10 @@ export class KeyCascade implements KeysApi {
  			if (apiKey !== undefined && credentialId !== undefined) onCredentialId?.(credentialId);
  			return apiKey;
  		}
@@ -115,7 +115,7 @@ index aaf71f669f..2290731005 100644
  		// Past OAuth: the session sticky (if any) is stale — the request authenticates via
  		// env/api_key, not OAuth, so clear it now so getOAuthAccountId() correctly
 diff --git a/packages/ai/src/auth/health.ts b/packages/ai/src/auth/health.ts
-index ec9f6a474e..5bbdab71ab 100644
+index 9a008711f64c6d7ea816a29bcad7caad5f2e3e88..8d6fb479ef32ecffa2c55dc275168d76dfd39ccc 100644
 --- a/packages/ai/src/auth/health.ts
 +++ b/packages/ai/src/auth/health.ts
 @@ -1,6 +1,6 @@
@@ -206,7 +206,7 @@ index ec9f6a474e..5bbdab71ab 100644
  					const futureResets = activeExhausted
  						.map(limit => limit.window?.resetsAt)
 diff --git a/packages/ai/src/auth/rank.ts b/packages/ai/src/auth/rank.ts
-index 89b80c11aa..38c07d0e9d 100644
+index 89b80c11aaebd5b68292ba1298475d865762c505..38c07d0e9d29fac977d37a091ca93c25119b5e5c 100644
 --- a/packages/ai/src/auth/rank.ts
 +++ b/packages/ai/src/auth/rank.ts
 @@ -16,6 +16,8 @@ export type UsageCandidate<T extends AuthCredential> = {
@@ -227,7 +227,7 @@ index 89b80c11aa..38c07d0e9d 100644
  		reserveMeasured: candidate.reserveMeasured,
  		allowanceSpent: candidate.allowanceSpent,
 diff --git a/packages/ai/src/auth/rotation.ts b/packages/ai/src/auth/rotation.ts
-index 9e02b51444..04d6348585 100644
+index 231489400f8beff3551663a874c6a84503de2aef..3bc97a76f304d71acb8c940112ec9297b9cbd31c 100644
 --- a/packages/ai/src/auth/rotation.ts
 +++ b/packages/ai/src/auth/rotation.ts
 @@ -120,10 +120,11 @@ export class RateLimits implements LimitsApi {
@@ -242,8 +242,8 @@ index 9e02b51444..04d6348585 100644
 +		const rankingContext: CredentialRankingContext = { modelId, billingIntent };
  		const defaultBlockScope = strategy?.blockScope?.(rankingContext);
  		const blockScope = blockScopeOverride ?? defaultBlockScope;
- 		const requestBlockScopes = credentialBlockScopesForRequest(provider, strategy, rankingContext, defaultBlockScope);
-@@ -291,7 +292,13 @@ export class RateLimits implements LimitsApi {
+ 		const requestBlockScopes = credentialBlockScopesForRequest(strategy, rankingContext, defaultBlockScope);
+@@ -303,7 +304,13 @@ export class RateLimits implements LimitsApi {
  		const credentialType = sessionCredential.type;
  		const targetCredentialId = target.id;
  
@@ -258,15 +258,15 @@ index 9e02b51444..04d6348585 100644
  		const now = Date.now();
  		const requestedBlockedUntilMs = now + (options?.retryAfterMs ?? DEFAULT_BLOCK_MS);
  		let blockedUntil = requestedBlockedUntilMs;
-@@ -464,6 +471,7 @@ export class RateLimits implements LimitsApi {
- 				retryAfterMs,
+@@ -480,6 +487,7 @@ export class RateLimits implements LimitsApi {
  				providerTimed: retryAfterMs !== undefined,
+ 				baseUrl: options?.baseUrl,
  				modelId: options?.modelId,
 +				billingIntent: options?.billingIntent,
  				apiKey: options?.apiKey,
  				credentialId: options?.credentialId,
  				signal: options?.signal,
-@@ -495,6 +503,7 @@ export class RateLimits implements LimitsApi {
+@@ -501,6 +509,7 @@ export class RateLimits implements LimitsApi {
  				sessionCredential.type,
  				options?.modelId,
  				modelPolicyScope,
@@ -275,7 +275,7 @@ index 9e02b51444..04d6348585 100644
  			// Account-wide denials must not inherit a quota scope that healthy usage can heal.
  			routing.blockScope = modelPolicyScope ?? ACCOUNT_POLICY_BLOCK_SCOPE;
 diff --git a/packages/ai/src/auth/select.ts b/packages/ai/src/auth/select.ts
-index bcbb57c875..b327051de2 100644
+index 38dec226ef50d2c7464c710537863743ecfd2527..ee2fd2279409c357ba6818ba87dda852bc22fb05 100644
 --- a/packages/ai/src/auth/select.ts
 +++ b/packages/ai/src/auth/select.ts
 @@ -4,7 +4,7 @@ import { getOAuthApiKey, getOAuthProvider } from "../registry/oauth";
@@ -311,7 +311,7 @@ index bcbb57c875..b327051de2 100644
 +			if (options.accountIds) return undefined;
 +			const strategy = this.#deps.strategies(provider);
 +			const context: CredentialRankingContext = { modelId: options.modelId, billingIntent: options.billingIntent };
-+			const scopes = credentialBlockScopesForRequest(provider, strategy, context, strategy?.blockScope?.(context));
++			const scopes = credentialBlockScopesForRequest(strategy, context, strategy?.blockScope?.(context));
 +			for (const selection of credentials) {
 +				if (!this.#deps.affinity.allows(provider, sessionId, selection.credential)) continue;
 +				if (this.#deps.blocks.isBlocked(provider, providerTypeKey(provider, "api_key"), selection.index, scopes))
@@ -560,7 +560,7 @@ index bcbb57c875..b327051de2 100644
  			if (options?.recordAffinity !== false) {
  				this.#deps.affinity.record(provider, sessionId, "oauth", selection.index);
 diff --git a/packages/ai/src/auth/types.ts b/packages/ai/src/auth/types.ts
-index 579b0d80ee..fa59eae9cd 100644
+index 6205e080f64cc01aa2b90ebb2249e8afe7978a3d..92125ae50a8621aed0ef2ab50e9688a161d3a64a 100644
 --- a/packages/ai/src/auth/types.ts
 +++ b/packages/ai/src/auth/types.ts
 @@ -12,6 +12,7 @@ import type {
@@ -571,7 +571,7 @@ index 579b0d80ee..fa59eae9cd 100644
  	UsageHistoryEntry,
  	UsageHistoryQuery,
  	UsageLogger,
-@@ -478,6 +479,8 @@ export interface ModelUsageHealthOptions {
+@@ -480,6 +481,8 @@ export interface ModelUsageHealthOptions {
  	sessionId?: string;
  	baseUrl?: string;
  	reserveFraction: number;
@@ -580,7 +580,7 @@ index 579b0d80ee..fa59eae9cd 100644
  	signal?: AbortSignal;
  }
  
-@@ -485,6 +488,7 @@ export interface ModelUsageHealthOptions {
+@@ -487,6 +490,7 @@ export interface ModelUsageHealthOptions {
  export type AuthApiKeyOptions = {
  	baseUrl?: string;
  	modelId?: string;
@@ -588,7 +588,7 @@ index 579b0d80ee..fa59eae9cd 100644
  	/**
  	 * {@link oauthAccountKey}s known to serve `modelId` from discovery.
  	 * Unblocked matches win, then other unblocked plan-eligible accounts, before blocked fallbacks.
-@@ -774,6 +778,7 @@ export type MarkUsageLimitOptions = {
+@@ -781,6 +785,7 @@ export type MarkUsageLimitOptions = {
  	providerTimed?: boolean;
  	baseUrl?: string;
  	modelId?: string;
@@ -596,16 +596,16 @@ index 579b0d80ee..fa59eae9cd 100644
  	apiKey?: string;
  	credentialId?: number;
  	signal?: AbortSignal;
-@@ -783,6 +788,7 @@ export type MarkUsageLimitOptions = {
+@@ -790,6 +795,7 @@ export type MarkUsageLimitOptions = {
  export type RotateCredentialOptions = {
  	error?: unknown;
  	modelId?: string;
 +	billingIntent?: RequestBillingIntent;
+ 	/** Provider base URL for usage-report probes during a usage-limit block. */
+ 	baseUrl?: string;
  	apiKey?: string;
- 	credentialId?: number;
- 	signal?: AbortSignal;
 diff --git a/packages/ai/src/usage.ts b/packages/ai/src/usage.ts
-index 18b080809b..cf1cc281cd 100644
+index 18b080809b18ae930715bcf81ff02177cc6741b5..cf1cc281cdbcb69ebfb0aff20256b64b6f4f61bc 100644
 --- a/packages/ai/src/usage.ts
 +++ b/packages/ai/src/usage.ts
 @@ -135,11 +135,26 @@ export interface UsageResetCredits {
@@ -644,7 +644,7 @@ index 18b080809b..cf1cc281cd 100644
  
  /** Classify an account report as eligible, ineligible, or unknown for a model's plan gate. */
 diff --git a/packages/ai/src/usage/cursor.ts b/packages/ai/src/usage/cursor.ts
-index 486b30b914..61beb3afd1 100644
+index 486b30b91467659a6cc65e95009fc67487056855..61beb3afd1e3c17a6fde72d95ab19fb7e329d7c5 100644
 --- a/packages/ai/src/usage/cursor.ts
 +++ b/packages/ai/src/usage/cursor.ts
 @@ -19,6 +19,7 @@ import type {
@@ -743,7 +743,7 @@ index 486b30b914..61beb3afd1 100644
  					authUsage: legacyReport.raw,
  					usageSummary: summaryReport.raw,
 diff --git a/packages/ai/test/auth-storage-model-usage-health.test.ts b/packages/ai/test/auth-storage-model-usage-health.test.ts
-index 922bf3803e..8ba036e3fe 100644
+index 922bf3803e54e7b7df13e58cd96121c02a754216..8ba036e3fe6b71422316368072ab37ccb919fe71 100644
 --- a/packages/ai/test/auth-storage-model-usage-health.test.ts
 +++ b/packages/ai/test/auth-storage-model-usage-health.test.ts
 @@ -3,12 +3,14 @@ import {
@@ -981,7 +981,7 @@ index 922bf3803e..8ba036e3fe 100644
  		const storage = await createStorage([oauthRow(1), oauthRow(2)], {
  			"account-1": report("account-1", [limit("short", 0.95)]),
 diff --git a/packages/ai/test/cursor-usage.test.ts b/packages/ai/test/cursor-usage.test.ts
-index 6b1cc0777f..3902514d18 100644
+index 6b1cc0777f2372eb58554677ddac5a832df1b85d..3902514d18df1c0d7a0eb5c5a048fc73a7a2497e 100644
 --- a/packages/ai/test/cursor-usage.test.ts
 +++ b/packages/ai/test/cursor-usage.test.ts
 @@ -18,6 +18,7 @@ import {
@@ -1043,7 +1043,7 @@ index 6b1cc0777f..3902514d18 100644
  		it("does not let an exhausted Other Models pool block Grok or Composer", () => {
  			const report = parseCursorIndividualUsage({
 diff --git a/packages/coding-agent/CHANGELOG.md b/packages/coding-agent/CHANGELOG.md
-index 684671834d..1936f8a6d1 100644
+index 1bc6d6e17afd80be521ef1425c298c6a7e1a29d1..f9a3c068d57cf5e13642b061e1127d9ec6c8ed5c 100644
 --- a/packages/coding-agent/CHANGELOG.md
 +++ b/packages/coding-agent/CHANGELOG.md
 @@ -2,6 +2,10 @@
@@ -1054,11 +1054,11 @@ index 684671834d..1936f8a6d1 100644
 +
 +- Added opt-in `retry.paidFallback` for session routing after all eligible configured included plans are depleted or unavailable, with automatic included-plan recovery on later prompts. Usage preflight preserves automatic thinking and defers interactive reserve confirmation until the first prompt.
 +
- ## [18.18.8] - 2026-11-11
+ ## [18.20.0] - 2026-11-12
  
- ### Changed
+ ### Breaking Changes
 diff --git a/packages/coding-agent/src/config/account-pools.ts b/packages/coding-agent/src/config/account-pools.ts
-index ed6d34b462..cb64845f9f 100644
+index ed6d34b4627bcf6b2a2dfa86752881629a7d759b..cb64845f9fdd81cd1677eb1e15d0cc11fe0dbcfb 100644
 --- a/packages/coding-agent/src/config/account-pools.ts
 +++ b/packages/coding-agent/src/config/account-pools.ts
 @@ -127,8 +127,11 @@ export class SessionAccountPoolScope {
@@ -1076,10 +1076,10 @@ index ed6d34b462..cb64845f9f 100644
  			target.getApiKeyWithCredentialForProvider(provider, this.#sessionIdFor(provider, sessionId), options);
  		const scoped: Partial<ModelRegistry> = {
 diff --git a/packages/coding-agent/src/config/api-key-resolver.ts b/packages/coding-agent/src/config/api-key-resolver.ts
-index 97dce40d71..dceafff650 100644
+index cd6e588211a18fcaae1c5067006e98f0295b1115..6b4c04f99850b1140b4e440565a9c89566175491 100644
 --- a/packages/coding-agent/src/config/api-key-resolver.ts
 +++ b/packages/coding-agent/src/config/api-key-resolver.ts
-@@ -19,6 +19,7 @@ export interface ApiKeyResolverOptions {
+@@ -18,6 +18,7 @@ export interface ApiKeyResolverOptions {
  	baseUrl?: string;
  	/** Provider model id forwarded to model-scoped usage ranking/backoff. */
  	modelId?: string;
@@ -1087,7 +1087,7 @@ index 97dce40d71..dceafff650 100644
  }
  
  /**
-@@ -72,6 +73,7 @@ export function createApiKeyResolver(
+@@ -71,6 +72,7 @@ export function createApiKeyResolver(
  		const resolved = await registry.getApiKeyWithCredentialForProvider(provider, sessionId, {
  			baseUrl,
  			modelId,
@@ -1095,19 +1095,19 @@ index 97dce40d71..dceafff650 100644
  			forceRefresh,
  			signal,
  			refreshReason,
-@@ -95,6 +97,7 @@ export function createApiKeyResolver(
+@@ -94,6 +96,7 @@ export function createApiKeyResolver(
  			const rotation = await registry.authStorage.limits.rotate(provider, sessionId, {
  				error,
  				modelId,
 +				billingIntent: options.billingIntent,
+ 				baseUrl,
  				signal,
  				apiKey: previousKey,
- 			});
 diff --git a/packages/coding-agent/src/config/model-registry.ts b/packages/coding-agent/src/config/model-registry.ts
-index e2c174ffbc..7f2fc2f81d 100644
+index de124ad0ac0bf5e82a36a7a816f9f9dd56be2148..99de042c366bae85df773374314ee171c464bb07 100644
 --- a/packages/coding-agent/src/config/model-registry.ts
 +++ b/packages/coding-agent/src/config/model-registry.ts
-@@ -3688,19 +3688,20 @@ export class ModelRegistry {
+@@ -3719,19 +3719,20 @@ export class ModelRegistry {
  	async getApiKey(
  		model: Model<Api>,
  		sessionId?: string,
@@ -1130,7 +1130,7 @@ index e2c174ffbc..7f2fc2f81d 100644
  		});
  	}
  
-@@ -3756,7 +3757,7 @@ export class ModelRegistry {
+@@ -3787,7 +3788,7 @@ export class ModelRegistry {
  		if (this.#isProviderDisabled(provider)) return undefined;
  		if (options?.forceRefresh) this.#invalidateProviderCommandConfigs(provider);
  		if (this.#isKeylessProvider(provider)) {
@@ -1139,7 +1139,7 @@ index e2c174ffbc..7f2fc2f81d 100644
  		}
  		const accountAccess = options?.modelId ? this.find(provider, options.modelId)?.accountAccess : undefined;
  		return this.authStorage.keys.getWithCredential(provider, sessionId, {
-@@ -3767,6 +3768,7 @@ export class ModelRegistry {
+@@ -3798,6 +3799,7 @@ export class ModelRegistry {
  			refreshReason: options?.refreshReason,
  			rejectedAccessToken: options?.rejectedAccessToken,
  			signal: options?.signal,
@@ -1148,7 +1148,7 @@ index e2c174ffbc..7f2fc2f81d 100644
  	}
  
 diff --git a/packages/coding-agent/src/sdk.ts b/packages/coding-agent/src/sdk.ts
-index ce08f43eff..d351f10cde 100644
+index ad253ff78074c59f9dc86b388a647c5c4d334ce5..7d88aa58fa0701052a0618837abee2ce186df315 100644
 --- a/packages/coding-agent/src/sdk.ts
 +++ b/packages/coding-agent/src/sdk.ts
 @@ -238,6 +238,15 @@ import {
@@ -1167,7 +1167,7 @@ index ce08f43eff..d351f10cde 100644
  import { describeUsageFallback } from "./session/retry-fallback-reason";
  import { kUsageLimitRequestProvider } from "./session/turn-recovery";
  import { getReadableCompactionEntry, getRestorableSessionModels } from "./session/session-context";
-@@ -279,10 +288,12 @@ import {
+@@ -285,10 +294,12 @@ import {
  	AUTO_THINKING,
  	type ConfiguredThinkingLevel,
  	concreteThinkingLevel,
@@ -1180,7 +1180,7 @@ index ce08f43eff..d351f10cde 100644
  	shouldDisableReasoning,
  	toReasoningEffort,
  } from "@oh-my-pi/pi-tui/thinking";
-@@ -384,6 +395,7 @@ import {
+@@ -391,6 +402,7 @@ import {
  	cfgProvidersKimiApiFormat,
  	cfgRetryFallbackChains,
  	cfgRetryModelFallback,
@@ -1188,7 +1188,7 @@ index ce08f43eff..d351f10cde 100644
  	cfgRetryUsageAwareFallback,
  	cfgRetryUsageReservePct,
  	cfgRetryUsageReservePolicy,
-@@ -2473,9 +2485,16 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
+@@ -2488,9 +2500,16 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
  	let contextFiles = initialContextFiles;
  
  	let agent: Agent;
@@ -1207,7 +1207,7 @@ index ce08f43eff..d351f10cde 100644
  	let hasSession = false;
  	let hasRegistered = false;
  	const restrictToolNames = options.restrictToolNames === true;
-@@ -3350,7 +3369,8 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
+@@ -3372,7 +3391,8 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
  				if (
  					((modelFallbackEnabled && (hasUsageFallbackCandidate || usageFallbackTriggered)) ||
  						usageReservePolicy === "fail-closed") &&
@@ -1217,7 +1217,7 @@ index ce08f43eff..d351f10cde 100644
  				) {
  					let usageHealth: ModelUsageHealth | undefined;
  					try {
-@@ -3709,6 +3729,69 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
+@@ -3731,6 +3751,69 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
  				adoptThinkingForModel(refreshedModel);
  			}
  		}
@@ -1287,7 +1287,7 @@ index ce08f43eff..d351f10cde 100644
  
  		// A first-turn user tail has no assistant metadata to copy. Once startup
  		// has selected its final model, use that model to terminate the
-@@ -5130,6 +5213,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
+@@ -5155,6 +5238,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
  			thinkingLevelCeiling: options.thinkingLevelCeiling,
  			disableModelFallback: options.disableModelFallback,
  			initialRetryFallback,
@@ -1296,10 +1296,10 @@ index ce08f43eff..d351f10cde 100644
  			prewalk,
  			suppressAutoPrewalk: options.suppressAutoPrewalk,
 diff --git a/packages/coding-agent/src/session/agent-session-types.ts b/packages/coding-agent/src/session/agent-session-types.ts
-index 7366d4ffc7..904f11542b 100644
+index 1ed1225ee37857c23c99576f015b546b08a2c88e..49696e9a357bb4c78d1c90444e3153dee1a9d42c 100644
 --- a/packages/coding-agent/src/session/agent-session-types.ts
 +++ b/packages/coding-agent/src/session/agent-session-types.ts
-@@ -15,6 +15,7 @@ import type {
+@@ -16,6 +16,7 @@ import type {
  	MessageAttribution,
  	Model,
  	OAuthAccountSummary,
@@ -1307,7 +1307,7 @@ index 7366d4ffc7..904f11542b 100644
  	ServiceTierByFamily,
  	SimpleStreamOptions,
  	ToolChoice,
-@@ -168,6 +169,7 @@ export interface InitialRetryFallbackState {
+@@ -170,6 +171,7 @@ export interface InitialRetryFallbackState {
  	originalThinkingLevel: ConfiguredThinkingLevel | undefined;
  	/** Prevent cooldown restoration when startup selected this fallback from live usage health. */
  	pinned?: boolean;
@@ -1315,7 +1315,7 @@ index 7366d4ffc7..904f11542b 100644
  }
  
  /** Dependencies and initial state used to construct an AgentSession. */
-@@ -221,6 +223,8 @@ export interface AgentSessionConfig {
+@@ -223,6 +225,8 @@ export interface AgentSessionConfig {
  	disableModelFallback?: boolean;
  	/** Retry chain ownership when startup selected one of its fallback entries. */
  	initialRetryFallback?: InitialRetryFallbackState;
@@ -1325,10 +1325,10 @@ index 7366d4ffc7..904f11542b 100644
  	deferRetryFallbackValidation?: boolean;
  	/**
 diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/coding-agent/src/session/agent-session.ts
-index be40f0fae0..375fe113dd 100644
+index 8fdbac39ace69b277c7c24dba235bab700c0cc67..ff42cf977c634163a0d99aa24c0851da91af2ec0 100644
 --- a/packages/coding-agent/src/session/agent-session.ts
 +++ b/packages/coding-agent/src/session/agent-session.ts
-@@ -2400,6 +2400,7 @@ export class AgentSession implements SettingsScope, AgentViewSession {
+@@ -2419,6 +2419,7 @@ export class AgentSession implements SettingsScope, AgentViewSession {
  		this.#fallbackChainValidationDeferred = config.deferRetryFallbackValidation === true;
  		this.#recovery = new TurnRecovery(recoveryHost, {
  			initialRetryFallback: config.initialRetryFallback,
@@ -1336,7 +1336,7 @@ index be40f0fae0..375fe113dd 100644
  			deferFallbackChainValidation: this.#fallbackChainValidationDeferred,
  			unexpectedStopJudgeTimeoutMs: config.unexpectedStopJudgeTimeoutMs,
  		});
-@@ -7234,6 +7235,10 @@ export class AgentSession implements SettingsScope, AgentViewSession {
+@@ -7255,6 +7256,10 @@ export class AgentSession implements SettingsScope, AgentViewSession {
  		return allowed;
  	}
  
@@ -1347,7 +1347,7 @@ index be40f0fae0..375fe113dd 100644
  	async #runUsageAwarePreflight(signal?: AbortSignal): Promise<boolean> {
  		if (signal?.aborted) return false;
  		const generation = this.#promptGeneration;
-@@ -9503,7 +9508,9 @@ export class AgentSession implements SettingsScope, AgentViewSession {
+@@ -9546,7 +9551,9 @@ export class AgentSession implements SettingsScope, AgentViewSession {
  			}
  
  			// Validate API key; a provider without one walks the retry fallback chain first.
@@ -1359,7 +1359,7 @@ index be40f0fae0..375fe113dd 100644
  				if (setupAbort.signal.aborted) return false;
  				throw new PromptPreflightError(
 diff --git a/packages/coding-agent/src/session/retry-fallback-chains.ts b/packages/coding-agent/src/session/retry-fallback-chains.ts
-index 3c8ff9dbcd..e8660f285a 100644
+index 1a3bf20d22fee6ec4b819df98bd0345e6f97654f..e5d5d013b121530c926e6283c08563f80009b728 100644
 --- a/packages/coding-agent/src/session/retry-fallback-chains.ts
 +++ b/packages/coding-agent/src/session/retry-fallback-chains.ts
 @@ -1,5 +1,5 @@
@@ -1377,7 +1377,7 @@ index 3c8ff9dbcd..e8660f285a 100644
  	/**
  	 * Set once a turn on the fallback target settles successfully. Until then the
  	 * switch is only a routing decision — nothing has been produced by the new
-@@ -138,8 +139,8 @@ export function parseRetryFallbackWildcard(
+@@ -148,8 +149,8 @@ export function parseRetryFallbackWildcard(
  	return { provider: template.slice(0, slash), idPrefix: template.slice(slash + 1) };
  }
  
@@ -1388,7 +1388,7 @@ index 3c8ff9dbcd..e8660f285a 100644
  	return formatModelSelectorValue(formatModelStringWithRouting(model), thinkingLevel);
  }
  
-@@ -544,7 +545,7 @@ export function resolveRetryFallbackChainKey(
+@@ -554,7 +555,7 @@ export function resolveRetryFallbackChainKey(
   * openrouter/google/x). Ids the target provider lacks are skipped by the
   * candidate loop's registry lookup.
   */
@@ -1398,10 +1398,10 @@ index 3c8ff9dbcd..e8660f285a 100644
  	entry: string,
  	current: RetryFallbackSelector | undefined,
 diff --git a/packages/coding-agent/src/session/settings.ts b/packages/coding-agent/src/session/settings.ts
-index af1b010735..64f9ec49f4 100644
+index ba8c21871b9bc8a5cbba64048a56c33f4fc2f47e..a7cd3d02c20d2eb1e8f7ad6cbe5fc84e98d35198 100644
 --- a/packages/coding-agent/src/session/settings.ts
 +++ b/packages/coding-agent/src/session/settings.ts
-@@ -885,6 +885,12 @@ export const cfgRetryUsageReservePolicy = register({
+@@ -952,6 +952,12 @@ export const cfgRetryUsageReservePolicy = register({
  	},
  });
  
@@ -1415,7 +1415,7 @@ index af1b010735..64f9ec49f4 100644
  	id: "retry.fallbackChains",
  	type: "record",
 diff --git a/packages/coding-agent/src/session/turn-recovery.ts b/packages/coding-agent/src/session/turn-recovery.ts
-index 1748e9513d..61070691e8 100644
+index 1748e9513ddac098a76ec2b7ae661c497275e8cb..61070691e81b2ae249faf8b0b46f6cc64c6bad42 100644
 --- a/packages/coding-agent/src/session/turn-recovery.ts
 +++ b/packages/coding-agent/src/session/turn-recovery.ts
 @@ -13,6 +13,7 @@ import type {
@@ -1845,7 +1845,7 @@ index 1748e9513d..61070691e8 100644
  					})
 diff --git a/packages/coding-agent/src/session/usage-aware-routing.ts b/packages/coding-agent/src/session/usage-aware-routing.ts
 new file mode 100644
-index 0000000000..f28f06915f
+index 0000000000000000000000000000000000000000..f28f06915fd4eceb6069760da342917d7fc16c8f
 --- /dev/null
 +++ b/packages/coding-agent/src/session/usage-aware-routing.ts
 @@ -0,0 +1,227 @@
@@ -2078,7 +2078,7 @@ index 0000000000..f28f06915f
 +}
 diff --git a/packages/coding-agent/test/paid-cursor-routing.test.ts b/packages/coding-agent/test/paid-cursor-routing.test.ts
 new file mode 100644
-index 0000000000..56e1a2a2d5
+index 0000000000000000000000000000000000000000..56e1a2a2d51dceb8f988980c86be18c622078469
 --- /dev/null
 +++ b/packages/coding-agent/test/paid-cursor-routing.test.ts
 @@ -0,0 +1,470 @@
