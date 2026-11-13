@@ -104,6 +104,31 @@ describe("Transcript", () => {
 		expect(t.items()).toEqual([{ id: "e3", kind: "user", text: "hi", skill: null, from: "probe", entryId: null }]);
 	});
 
+	test("a peer's message shows once, as a prompt from its sender, live and from its file entry", () => {
+		const t = new Transcript();
+		const details = { id: "irc1", from: "Main", message: "Rebase onto main first." };
+		const record = { role: "custom", customType: "irc:incoming", timestamp: 310, content: "<irc>wrapped</irc>", display: true, details };
+		const card = { id: "irc:irc1", kind: "user" as const, text: "Rebase onto main first.", skill: null, from: "Main", entryId: null };
+		expect(t.applyEvent({ type: "irc_message", message: record })).toEqual([card]);
+		t.applyEntry({ type: "custom_message", id: "e4", customType: "irc:incoming", content: "<irc>wrapped</irc>", display: true, details });
+		expect(t.items()).toEqual([card]);
+	});
+
+	test("a relay this session only observes and a hidden parent steer record show no card", () => {
+		const t = new Transcript();
+		const relay = { role: "custom", customType: "irc:relay", timestamp: 320, content: "x", details: { id: "r1", from: "A", to: "B", body: "hi" } };
+		const hidden = { role: "custom", customType: "irc:incoming", timestamp: 330, content: "x", display: false, details: { id: "irc2", from: "Main", message: "stop" } };
+		expect(t.applyEvent({ type: "irc_message", message: relay })).toEqual([]);
+		expect(t.applyEvent({ type: "irc_message", message: hidden })).toEqual([]);
+	});
+
+	test("a parent's steer shows its message from the parent, not omp's wrapper", () => {
+		const t = new Transcript();
+		const steer = { role: "user", timestamp: 340, content: "<parent>stop</parent>", parentIrc: { from: "Main", body: "stop" }, steering: true };
+		t.applyEntry({ type: "message", id: "e5", message: steer });
+		expect(t.items()).toEqual([{ id: "m340", kind: "user", text: "stop", skill: null, from: "Main", entryId: "e5" }]);
+	});
+
 	test("a prompt's images show inline until omp moves them to its blob store, then through the image route", () => {
 		const t = new Transcript();
 		const hash = "a".repeat(64);

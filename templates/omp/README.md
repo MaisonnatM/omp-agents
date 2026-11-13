@@ -45,7 +45,7 @@ Settings, in `config.yml`:
 - `retry.fallbackChains`: Codex first and Cursor Composer for cheap roles, with quota-aware skipping enabled.
   Cursor Grok is opt-in rather than an automatic fallback; existing fallback settings are preserved unless `--force` is used.
 - `modelProviderOrder`: the same three providers in the same order.
-- `task.isolation`: `isolated: true` subagents work in their own clone of the session's checkout, and successful changes apply back there as a patch; omp 18.18.1 has no per-task `checkout` or cwd, so a session on `main` spawns editing subagents without `isolated` and names its worktree's absolute path in their task.
+- `task.isolation`: `isolated: true` subagents work in their own clone of the session's checkout, and successful changes apply back there as a patch; omp 18.20.0 has no per-task `checkout` or cwd, so a session on `main` spawns editing subagents without `isolated` and names its worktree's absolute path in their task.
   At most two subagents run at once.
 - `task.perCallModel: on` with `task.perCallModelAllow`: a `task` call may pick its model per spawn, only among the council's three models.
 - `skills.customDirectories`: `~/.omp/plugins/pstack-skills`, where `extensions/pstack-skills.ts` links pstack's skills.
@@ -140,7 +140,7 @@ Files, in `agent/`:
   A file git ignores, such as `.env`, is in no worktree, so its edit there asks the user and goes ahead once approved; a declined edit, or one in a session that cannot ask, stays blocked.
   A clean checkout passes to the next session that changes it, and a session that ends gives up its claims.
   When HEAD is no longer where a session left it, because another process switched the branch, that session's changes there are blocked until a switch it runs as its own command succeeds, back or to the new branch.
-  The changes of an `isolated: true` subagent apply to the checkout its spawn names only where an edit could go, so an apply into the main checkout on its default branch, or into another live session's checkout with uncommitted changes, is refused and its patch kept; this needs an omp that fires `before_subagent_apply`, which 18.18.1 does not.
+  The changes of an `isolated: true` subagent apply to the checkout its spawn names only where an edit could go, so an apply into the main checkout on its default branch, or into another live session's checkout with uncommitted changes, is refused and its patch kept; this needs an omp that fires `before_subagent_apply`, which 18.20.0 does not.
   Reads, files outside git, and the clones omp makes for `isolated: true` subagents pass, and a change in a directory that a variable names is blocked until the command writes the directory out.
   If a session's process dies and you know its work is done, delete the claim file it names; the guard also replaces a claim whose process has ended.
   It reads HEAD and `origin/HEAD` from their files in the git dir and keeps each directory's checkout for a minute, so an edit or write in a checkout another session does not hold starts no `git`.

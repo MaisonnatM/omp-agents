@@ -1,0 +1,350 @@
+diff --git a/docs/rpc.md b/docs/rpc.md
+index b7913e8e2c1a1598c97659980bd5ad8df507108e..91927e45da0f7b21676e8ff92a5cc2a761041b24 100644
+--- a/docs/rpc.md
++++ b/docs/rpc.md
+@@ -739,7 +739,8 @@ The corresponding `get_state` result reports the same computed state:
+ `set_ask_dialog` opts the host in to the `ask` extension UI request (see
+ [Extension UI Sub-Protocol](#extension-ui-sub-protocol)). It is off by default
+ for every process; until a host enables it, the `ask` tool keeps prompting with
+-one `select` (plus `editor` for free text) per choice. Builds without the
++one `select` (plus `input` or `editor` for free text) per field. Once enabled,
++the `ask` tool sends its whole HTML form as one `ask` request. Builds without the
+ command answer with a failed `response`, so hosts should keep the `select`
+ fallback when enabling fails.
+ 
+@@ -1336,8 +1337,12 @@ Use `--mode rpc --no-ui` for a host without a tool UI surface; use `--mode rpc-u
+      host hint from `ExtensionUIDialogOptions.secret`; hosts that support
+      masked input should hide typed characters when `secret: true`.
+    - `ask` is emitted only after `set_ask_dialog` enables it. It carries every
+-     question of one extension `ui.askDialog` call (the `ask` tool instead walks
+-     its HTML form field by field through `select`, `input` and `editor`):
++     question of one extension `ui.askDialog` call, or of one `ask` tool form:
++     one question per named field, a choice field's enabled options with its
++     checked option as `recommended`, and no options for a text field, whose
++     answer is the free text (blank keeps its prefilled value). Fields whose
++     answers fail the form's checks come back in a second `ask` request with the
++     reason in their `question`:
+      `questions: Array<{ id: string, question: string, header?: string, options: Array<{ label: string, description?: string, preview?: string }>, multi?: boolean, recommended?: number }>`
+      plus `timeout?: number`. `options` never include an "Other" entry; hosts
+      always offer free text.
+diff --git a/packages/coding-agent/src/modes/rpc/rpc-mode.ts b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
+index 4408b13370c5d7448c80da2bfa412dddf784a577..8407726b7c74460c49b4abecf60c9afb61125519 100644
+--- a/packages/coding-agent/src/modes/rpc/rpc-mode.ts
++++ b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
+@@ -24,7 +24,9 @@ import { clearPluginRootsAndCaches, resolveActiveProjectRegistryPath } from "../
+ import {
+ 	type ExtensionAskDialogQuestion,
+ 	type ExtensionAskDialogResult,
++	type ExtensionAskDialogResultItem,
+ 	type ExtensionAskDialogSubmitResult,
++	type ExtensionFormDialogResult,
+ 	type ExtensionUIContext,
+ 	type ExtensionUIDialogOptions,
+ 	type ExtensionUISelectItem,
+@@ -32,6 +34,15 @@ import {
+ 	getExtensionUISelectOptionLabel,
+ 	timedOutAskDialogResult,
+ } from "../../extensibility/extensions";
++import {
++	choiceValue,
++	defaultFormData,
++	fieldError,
++	fieldQuestions,
++	type HtmlFormValue,
++	textValue,
++} from "@oh-my-pi/pi-tui/html-form/data";
++import { type ChoiceField, type FormField, parseHtmlForm, spansText } from "@oh-my-pi/pi-tui/html-form/parse";
+ import {
+ 	type BuiltSkillPromptMessage,
+ 	loadSkillPrompt,
+@@ -1195,6 +1206,104 @@ export async function requestRpcAskDialog(
+ 	return timedOut ? timedOutAskDialogResult(questions) : result;
+ }
+ 
++/** Each choice option's label in an `ask` question, made unique by its value when two read the same. */
++function formOptionLabels(field: ChoiceField): string[] {
++	const labels = field.options.map(option => spansText(option.label).replace(/\s+/g, " ").trim() || option.value);
++	return labels.map((label, index) =>
++		labels.indexOf(label) === index ? label : `${label} (${field.options[index]!.value})`,
++	);
++}
++
++/** One `ask` question for a named form field: a choice field's enabled options, or none for a text field, answered by typing. */
++function formFieldQuestion(field: FormField, question: string, error: string | undefined): ExtensionAskDialogQuestion {
++	const prefill = field.kind === "text" && field.value !== "" ? ` (default: ${field.value})` : "";
++	const text = `${question}${prefill}${error ? ` (${error})` : ""}`;
++	if (field.kind === "text") return { id: field.name, question: text, options: [] };
++	const labels = formOptionLabels(field);
++	const enabled = field.options.flatMap((option, index) => (option.disabled ? [] : [index]));
++	const checked = enabled.findIndex(index => field.options[index]!.checked);
++	return {
++		id: field.name,
++		question: text,
++		options: enabled.map(index => ({ label: labels[index]! })),
++		multi: field.multi,
++		...(checked >= 0 ? { recommended: checked } : {}),
++	};
++}
++
++/**
++ * A field's value from its `ask` answer, or an error to ask it again with. A blank typed answer keeps a
++ * text field's prefilled value; typed text answers a choice field only through its "Other" answer.
++ */
++function formFieldAnswer(
++	field: FormField,
++	answer: ExtensionAskDialogResultItem,
++): { value: HtmlFormValue | undefined; error?: string } {
++	if (field.kind === "text") {
++		const value = textValue(field, answer.customInput ?? field.value);
++		return { value, error: fieldError(field, value) };
++	}
++	const labels = formOptionLabels(field);
++	const checked = new Set(answer.selectedOptions.map(label => labels.indexOf(label)));
++	if (answer.customInput !== undefined && !field.other) {
++		return { value: undefined, error: "Pick one of the options" };
++	}
++	const value = choiceValue(field, checked, answer.customInput);
++	return { value, error: fieldError(field, value) };
++}
++
++/**
++ * Sends an HTML form as one RPC `ask` dialog, a question per named field, so a host that opted into
++ * `set_ask_dialog` answers the whole form at once. Fields whose answers fail the form's checks are asked
++ * again with the reason; a timeout submits the values gathered so far over the form's defaults.
++ */
++export async function requestRpcFormDialog(
++	pendingRequests: Map<string, PendingExtensionRequest>,
++	output: RpcOutput,
++	html: string,
++	dialogOptions?: ExtensionUIDialogOptions,
++): Promise<ExtensionFormDialogResult | undefined> {
++	const form = parseHtmlForm(html);
++	const questions = fieldQuestions(form);
++	const data = defaultFormData(form);
++	let asking = form.fields
++		.filter(field => field.name)
++		.map(field => ({ field, error: undefined as string | undefined }));
++	while (asking.length > 0) {
++		const askQuestions = asking.map(({ field, error }) =>
++			formFieldQuestion(field, questions.get(field) ?? field.name, error),
++		);
++		let timedOut = false;
++		const opts: ExtensionUIDialogOptions = {
++			...dialogOptions,
++			onTimeout: () => {
++				timedOut = true;
++				dialogOptions?.onTimeout?.();
++			},
++		};
++		const result = await requestRpcDialog(
++			pendingRequests,
++			output,
++			opts,
++			undefined,
++			{ method: "ask", questions: askQuestions, timeout: dialogOptions?.timeout },
++			response => parseAskDialogResponse(response, askQuestions, opts),
++		);
++		if (timedOut) return { data, timedOut: true };
++		if (!result) return undefined;
++		const retry: typeof asking = [];
++		result.results.forEach((answer, index) => {
++			const field = asking[index]!.field;
++			const { value, error } = formFieldAnswer(field, answer);
++			if (value === undefined) delete data[field.name];
++			else data[field.name] = value;
++			if (error) retry.push({ field, error });
++		});
++		asking = retry;
++	}
++	return { data };
++}
++
+ export function requestRpcEditor(
+ 	pendingRequests: Map<string, PendingExtensionRequest>,
+ 	output: RpcOutput,
+@@ -1534,6 +1643,12 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions
+ 				requestRpcAskDialog(this.pendingRequests, this.output, questions, dialogOptions);
+ 		}
+ 
++		/** The `ask` tool's form, as one `ask` dialog for hosts that opted in with `set_ask_dialog`. */
++		get formDialog(): ExtensionUIContext["formDialog"] {
++			if (!this.askDialogEnabled) return undefined;
++			return (html, dialogOptions) => requestRpcFormDialog(this.pendingRequests, this.output, html, dialogOptions);
++		}
++
+ 		select(
+ 			title: string,
+ 			options: ExtensionUISelectItem[],
+diff --git a/packages/coding-agent/test/rpc-extension-ui.test.ts b/packages/coding-agent/test/rpc-extension-ui.test.ts
+index c66027b1224520b69c6d3f20c1892a27469b3b4b..3d4ef68597681fc47c437388dccd38e04f5c7989 100644
+--- a/packages/coding-agent/test/rpc-extension-ui.test.ts
++++ b/packages/coding-agent/test/rpc-extension-ui.test.ts
+@@ -7,6 +7,7 @@ import {
+ 	type RpcExtensionUIResponse,
+ 	requestRpcAskDialog,
+ 	requestRpcDialog,
++	requestRpcFormDialog,
+ 	requestRpcInput,
+ 	requestRpcSelect,
+ } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-mode";
+@@ -736,7 +737,115 @@ describe("RPC ask dialog", () => {
+ 		expect(onTimeout).not.toHaveBeenCalled();
+ 	});
+ 
+-	it("walks the ask tool's form through select prompts, also after the host opts into ask dialogs", async () => {
++	const formHtml = `<form>
++		<p>Which database?</p>
++		<label><input type="radio" name="db" value="pg"> Postgres</label>
++		<label><input type="radio" name="db" value="sqlite" checked> SQLite</label>
++		<p>Which features?</p>
++		<label><input type="checkbox" name="features" value="auth"> Auth</label>
++		<label><input type="checkbox" name="features" value="search"> Search</label>
++		<label>Lifetime (days) <input type="number" name="ttl" value="30" min="1"></label>
++		<label>Owner <select name="owner"><option value="me">Me</option><option value="team">Team</option></select></label>
++		<input type="hidden" name="source" value="ask">
++	</form>`;
++
++	it("sends a form as one ask frame, a question per field, and returns its form data", async () => {
++		const pendingRequests = new Map<string, PendingExtensionRequest>();
++		const output = vi.fn<(frame: object) => void>();
++		const result = requestRpcFormDialog(pendingRequests, output, formHtml);
++		const request = requireRequest(output.mock.calls[0]?.[0]);
++
++		expect(output).toHaveBeenCalledTimes(1);
++		expect(output.mock.calls[0]?.[0]).toEqual({
++			type: "extension_ui_request",
++			id: request.id,
++			method: "ask",
++			questions: [
++				{
++					id: "db",
++					question: "Which database?",
++					options: [{ label: "Postgres" }, { label: "SQLite" }],
++					multi: false,
++					recommended: 1,
++				},
++				{
++					id: "features",
++					question: "Which features?",
++					options: [{ label: "Auth" }, { label: "Search" }],
++					multi: true,
++				},
++				{ id: "ttl", question: "Lifetime (days) (default: 30)", options: [] },
++				{
++					id: "owner",
++					question: "Owner",
++					options: [{ label: "Me" }, { label: "Team" }],
++					multi: false,
++					recommended: 0,
++				},
++			],
++			timeout: undefined,
++		});
++
++		respond(pendingRequests, request.id, {
++			answers: [
++				{ id: "db", selectedOptions: ["Postgres"] },
++				{ id: "features", selectedOptions: ["Search"], customInput: "Export" },
++				{ id: "ttl", selectedOptions: [] },
++				{ id: "owner", selectedOptions: ["Team"] },
++			],
++		});
++		expect(await result).toEqual({
++			data: { source: "ask", db: "pg", features: ["search", "Export"], ttl: 30, owner: "team" },
++		});
++	});
++
++	it("asks again, with the reason, only the fields whose answers fail the form's checks", async () => {
++		const pendingRequests = new Map<string, PendingExtensionRequest>();
++		const output = vi.fn<(frame: object) => void>();
++		const result = requestRpcFormDialog(pendingRequests, output, formHtml);
++
++		respond(pendingRequests, requireRequest(output.mock.calls[0]?.[0]).id, {
++			answers: [
++				{ id: "db", selectedOptions: ["SQLite"] },
++				{ id: "features", selectedOptions: [] },
++				{ id: "ttl", selectedOptions: [], customInput: "0" },
++				{ id: "owner", selectedOptions: [], customInput: "Nobody" },
++			],
++		});
++		await Promise.resolve();
++		const retry = output.mock.calls[1]?.[0];
++		expect(retry).toMatchObject({
++			method: "ask",
++			questions: [
++				{ id: "ttl", question: "Lifetime (days) (default: 30) (Must be at least 1)", options: [] },
++				{ id: "owner", question: "Owner (Pick one of the options)" },
++			],
++		});
++		respond(pendingRequests, requireRequest(retry).id, {
++			answers: [
++				{ id: "ttl", selectedOptions: [], customInput: "7" },
++				{ id: "owner", selectedOptions: ["Me"] },
++			],
++		});
++		expect(await result).toEqual({ data: { source: "ask", db: "sqlite", features: [], ttl: 7, owner: "me" } });
++	});
++
++	it("submits the form's defaults when the ask frame times out, and nothing when the host cancels", async () => {
++		const pendingRequests = new Map<string, PendingExtensionRequest>();
++		const output = vi.fn<(frame: object) => void>();
++		const onTimeout = vi.fn();
++		expect(await requestRpcFormDialog(pendingRequests, output, formHtml, { timeout: 5, onTimeout })).toEqual({
++			data: { source: "ask", db: "sqlite", features: [], ttl: 30, owner: "me" },
++			timedOut: true,
++		});
++		expect(onTimeout).toHaveBeenCalledTimes(1);
++
++		const cancelled = requestRpcFormDialog(pendingRequests, output, formHtml);
++		respond(pendingRequests, requireRequest(output.mock.calls.at(-1)?.[0]).id, { cancelled: true });
++		expect(await cancelled).toBeUndefined();
++	});
++
++	it("walks the ask tool's form through select prompts until the host opts into ask dialogs", async () => {
+ 		await using temp = await TempDir.create("@rpc-ask-dialog-");
+ 		const extensionPath = temp.join("scripted-ask.ts");
+ 		await Bun.write(extensionPath, scriptedAskProvider);
+@@ -797,7 +906,11 @@ describe("RPC ask dialog", () => {
+ 					await send({ type: "extension_ui_response", id: frame.id, value: "Postgres" });
+ 				} else if (frame.type === "extension_ui_request" && frame.method === "ask") {
+ 					askRequests.push(frame);
+-					await send({ type: "extension_ui_response", id: frame.id, cancelled: true });
++					await send({
++						type: "extension_ui_response",
++						id: frame.id,
++						answers: [{ id: "db", selectedOptions: ["Postgres"] }],
++					});
+ 				} else if (frame.type === "tool_execution_end" && frame.toolName === "ask") {
+ 					toolResults.push(frame.result);
+ 				} else if (frame.type === "prompt_result" && frame.id === "fallback") {
+@@ -818,7 +931,7 @@ describe("RPC ask dialog", () => {
+ 
+ 		if (!finished) throw new Error(`RPC ask fixture did not finish: ${await stderr}`);
+ 		await stderr;
+-		expect(selectRequests).toHaveLength(2);
++		expect(selectRequests).toHaveLength(1);
+ 		expect(selectRequests[0]).toMatchObject({ method: "select", title: "Which database?" });
+ 		expect(optInResponse).toEqual({
+ 			id: "opt-in",
+@@ -827,7 +940,20 @@ describe("RPC ask dialog", () => {
+ 			success: true,
+ 			data: { enabled: true },
+ 		});
+-		expect(askRequests).toEqual([]);
++		expect(askRequests).toEqual([
++			expect.objectContaining({
++				method: "ask",
++				questions: [
++					{
++						id: "db",
++						question: "Which database?",
++						options: [{ label: "Postgres" }, { label: "SQLite" }],
++						multi: false,
++						recommended: 1,
++					},
++				],
++			}),
++		]);
+ 		const answered = expect.objectContaining({
+ 			details: { answers: [{ name: "db", question: "Which database?", answer: "Postgres" }] },
+ 		});

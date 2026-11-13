@@ -14,7 +14,7 @@ import { type OptionLayout, type QuestionOption, QuestionOptions } from "./quest
 /** What a card asks: rows to pick one or several of, or a free-text answer. */
 export type Question = { title: string; description?: string } & (
 	| { kind: "options"; options: QuestionOption[]; layout: OptionLayout; multi?: boolean }
-	| { kind: "text"; field: TextField; placeholder?: string; submitLabel: string }
+	| { kind: "text"; field: TextField; placeholder?: string; submitLabel: string; allowEmpty?: boolean }
 );
 
 /** A picked row's index, or the typed text, trimmed. */
@@ -28,9 +28,11 @@ interface QuestionCardProps extends HTMLAttributes<HTMLDivElement> {
 	defaultText?: string;
 	/** The line above the title. */
 	header: ReactNode;
-	/** The row under an options question, such as the button that sends a multi-select's picks. */
+	/** Buttons beside the answer: under an options question, such as the one that sends a multi-select's picks, or before a text question's submit button. */
 	footer?: ReactNode;
 	onAnswer: (answer: QuestionAnswer) => void;
+	/** Each edit of the text field, so an owner that remounts the card can keep the draft. */
+	onTextChange?: (text: string) => void;
 }
 
 /** The keys that send a text answer: ⌘↵ on macOS, ⌃↵ elsewhere. */
@@ -41,16 +43,17 @@ const SUBMIT_CHORD = `${IS_MAC ? "⌘" : "⌃"}↵`;
  * owner's to bind. A text question focuses its field on mount and sends with the submit button, with ⌘↵ or ⌃↵, or with
  * Enter when it is one line. A secret field shows dots for what you type.
  */
-export function QuestionCard({ question, checked, defaultText = "", header, footer, onAnswer, className, onKeyDown, ...rest }: QuestionCardProps) {
+export function QuestionCard({ question, checked, defaultText = "", header, footer, onAnswer, onTextChange, className, onKeyDown, ...rest }: QuestionCardProps) {
 	const shape = useShape();
 	const size = useSize();
 	const compact = size.variant === "compact";
 	const titleId = useId();
 	const [text, setText] = useState(defaultText);
 
+	const empty = text.trim().length === 0 && !(question.kind === "text" && question.allowEmpty);
 	const submit = (): void => {
 		const trimmed = text.trim();
-		if (!trimmed) return;
+		if (empty) return;
 		setText(trimmed);
 		onAnswer({ kind: "text", text: trimmed });
 	};
@@ -114,7 +117,10 @@ export function QuestionCard({ question, checked, defaultText = "", header, foot
 								field={question.field}
 								placeholder={question.placeholder ?? "Type your answer…"}
 								labelledBy={titleId}
-								onChange={setText}
+								onChange={value => {
+									setText(value);
+									onTextChange?.(value);
+								}}
 								onSubmit={submit}
 							/>
 						)}
@@ -124,8 +130,9 @@ export function QuestionCard({ question, checked, defaultText = "", header, foot
 			{question.kind === "options" && footer && <div className={cn("pt-1", padX, compact ? "pb-1.5" : "pb-2")}>{footer}</div>}
 			{question.kind === "text" && (
 				<div className={cn("pt-1", padX, compact ? "pb-1.5" : "pb-2")}>
-					<div className="flex items-center justify-end -mx-2 sm:-mx-3">
-						<Button size="sm" onClick={submit} disabled={text.trim().length === 0} className="pr-3 sm:pr-2">
+					<div className="flex items-center justify-end gap-2 -mx-2 sm:-mx-3">
+						{footer}
+						<Button size="sm" onClick={submit} disabled={empty} className="pr-3 sm:pr-2">
 							<span className="inline-flex items-center gap-1.5">
 								{question.submitLabel}
 								<kbd
@@ -181,7 +188,8 @@ function TextAnswer({ value, field, placeholder, labelledBy, onChange, onSubmit 
 
 	const sendOnEnter = (event: KeyboardEvent): void => {
 		// ⌘↵ and ⌃↵ reach the card, which sends from either kind of field.
-		if (event.key !== "Enter" || event.shiftKey || event.metaKey || event.ctrlKey || field === "lines") return;
+		// A held Enter, such as one carried over from the question before, never sends; a blank field may be sendable.
+		if (event.key !== "Enter" || event.repeat || event.shiftKey || event.metaKey || event.ctrlKey || field === "lines") return;
 		event.preventDefault();
 		onSubmit();
 	};

@@ -24,6 +24,9 @@ The tested version is the one `.github/workflows/checks.yml` installs; the relea
 The script deletes its installs, so an omp line comes from a diff's `+` side, whose line numbers are the target's.
 For a file without a diff, run `bun add --linker hoisted @oh-my-pi/pi-coding-agent@<target>` in an empty temporary directory and read it under `node_modules/@oh-my-pi/`.
 
+Then compare Claude Code: omp sends `DEFAULT_CLAUDE_CODE_VERSION` from `@oh-my-pi/pi-ai`'s `src` (grep `CLAUDE_CODE_VERSION` in the target install) to Anthropic.
+When it is newer than `claude --version`, put "update Claude Code to at least <version> (`npm view @anthropic-ai/claude-code version` is the latest)" under MUST change; otherwise list it under No impact with both versions.
+
 ## 3. Check the patch
 
 `patches/*.patch` is written against a checkout of upstream omp, not the npm package.
