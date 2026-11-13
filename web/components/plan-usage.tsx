@@ -95,20 +95,11 @@ export function creditsLine({ count, nextExpiresAt }: ResetCredits): string {
 	return nextExpiresAt === null ? `${credits}.` : `${credits}, ${count === 1 ? "expires" : "next expires"} ${DAY_FORMAT.format(nextExpiresAt)}.`;
 }
 
-/**
- * A short tag per account of a provider with more than one: the email domain's first label, such as `yampa` for
- * `maxence@yampa.ai`, or the local part when another account of that provider shares the domain.
- */
+/** The account's full email, for each account of a provider with more than one. */
 export function accountTags(plans: readonly PlanUsage[]): Map<PlanUsage, string> {
 	const tags = new Map<PlanUsage, string>();
 	for (const plan of plans) {
-		if (!plan.account) continue;
-		const siblings = plans.filter(other => other.provider === plan.provider && other.account);
-		if (siblings.length < 2) continue;
-		const [local, domain = ""] = plan.account.split("@");
-		const label = domain.split(".")[0];
-		const shared = siblings.some(other => other !== plan && other.account!.split("@")[1]?.split(".")[0] === label);
-		tags.set(plan, label && !shared ? label : (local ?? plan.account));
+		if (plan.account && plans.some(other => other !== plan && other.provider === plan.provider && other.account)) tags.set(plan, plan.account);
 	}
 	return tags;
 }
@@ -218,7 +209,7 @@ function TileText({ gauge }: { gauge: PlanGauge }) {
 	return (
 		<>
 			<span className={cn("max-w-full truncate font-medium", TONE_CLASS[gauge.tone].text)}>{gauge.value ?? "—"}</span>
-			<span className="max-w-full truncate text-[10px] text-muted-foreground">{gauge.caption}</span>
+			<span title={gauge.caption} className="max-w-full truncate text-[10px] text-muted-foreground">{gauge.caption}</span>
 		</>
 	);
 }

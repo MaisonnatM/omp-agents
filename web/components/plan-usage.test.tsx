@@ -54,15 +54,13 @@ test("a plan with no windows shows its spend past the plan, amber past most of i
 	expect(tile({ ...claude, extra: { title: "Extra usage", used: 45, limit: 50, currency: "USD", exhausted: false } })).toMatchObject({ value: "$45.00 / $50.00", tone: "low" });
 });
 
-test("account tags tell apart the accounts of one provider, by domain or else by name", () => {
+test("a provider with several accounts names each by its full email; a lone account goes unnamed", () => {
 	const yampa = { ...claude };
 	const gmail = { ...claude, account: "max@gmail.com" };
-	const gmail2 = { ...claude, account: "ana@gmail.com" };
 	const openai = { ...claude, provider: "openai-codex", account: "maxence@yampa.ai" };
-	const tags = accountTags([yampa, gmail, gmail2, openai]);
-	expect([tags.get(yampa), tags.get(gmail), tags.get(gmail2), tags.get(openai)]).toEqual(["yampa", "max", "ana", undefined]);
+	const tags = accountTags([yampa, gmail, openai]);
+	expect([tags.get(yampa), tags.get(gmail), tags.get(openai)]).toEqual(["maxence@yampa.ai", "max@gmail.com", undefined]);
 });
-
 
 test("the card gives every window its share left and when it resets, with the date", () => {
 	const card = renderToStaticMarkup(<PlanCard plan={{ ...claude, windows: [planWindow("5h", 0.59, NOW + 4 * HOUR + 19 * 60_000), planWindow("7d", 0)] }} now={NOW} />).replaceAll("<!-- -->", "");
