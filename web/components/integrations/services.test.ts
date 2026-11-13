@@ -8,7 +8,7 @@ const signedOut: McpServerConnection = { kind: "signed-out", server };
 const setup = (configured: boolean) => ({ clientId: configured ? "30887206948-x.apps.googleusercontent.com" : null, hasClientSecret: configured, callbackPort: 3119, configured });
 const calendar = (configured: boolean, connections: McpServerConnection[], signIn: McpIntegration["signIn"] = null): McpIntegration => ({
 	id: "google-calendar",
-	accounts: connections.map((connection, at) => ({ name: `google-calendar-${at + 1}`, address: null, addressError: null, connection, space: "work" as const })),
+	accounts: connections.map((connection, at) => ({ name: `google-calendar-${at + 1}`, address: null, addressError: null, connection })),
 	signIn,
 	setup: setup(configured),
 });

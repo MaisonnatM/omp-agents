@@ -11,7 +11,6 @@ import { parseBotChange } from "../shared/bots";
 import {
 	GOOGLE_CLIENT_ID,
 	type GoogleClientInput,
-	type GoogleSpace,
 	holdsAccounts,
 	type IntegrationTarget,
 	MCP_INTEGRATIONS,
@@ -20,7 +19,7 @@ import {
 	slackRedirectError,
 } from "../shared/accounts";
 import { type McpServerAdd, type McpServerInput, REMOTE_TRANSPORTS } from "../shared/mcp-servers";
-import { type CalendarShownInput, type EventRef, type LocalEventSpace, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar, parseEventWhen } from "../shared/calendar";
+import { type CalendarShownInput, type EventRef, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar, parseEventWhen } from "../shared/calendar";
 import { MAX_MAIL_BODY, type MailDraft, type MailPerson, type MailReply, type MailSend, type MailTrash } from "../shared/gmail";
 import { parseImages, parseModel, parseNewSessionRequest, parseSkill, parseThinking } from "../shared/sessions";
 import { parseContextAction, parseGoalChange } from "../shared/session-controls";
@@ -66,7 +65,7 @@ import type { AskReply, CompletionScope, LiveView, StartRequest, UserAnswer, Vie
 import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues, TodoTicketRequest } from "../shared/tickets";
 import type { SportChange } from "../shared/sport";
 import type { TrustChange } from "../shared/project-trust";
-import { isSpace, type WorkspaceChange } from "../shared/workspaces";
+import type { WorkspaceChange } from "../shared/workspaces";
 import { parseSportChange } from "../sport-parse";
 import { MAX_TICKET_DESCRIPTION, MAX_TICKET_TITLE } from "../tickets";
 import { parseNoteChange } from "../user-notes-parse";
@@ -625,10 +624,6 @@ export function parseIntegrationTarget(body: unknown): Parsed<IntegrationTarget>
 	return holdsAccounts(body.id) && isNonEmpty(account) ? { ok: { id: body.id, account } } : null;
 }
 
-/** The body of `PUT /api/integrations/google-space`: `{ address, space }`, an address and the space its accounts go in. */
-export const parseGoogleSpace = (body: unknown): Parsed<GoogleSpace> =>
-	isObject(body) && isNonEmpty(body.address) && body.address.includes("@") && isSpace(body.space) ? { ok: { address: body.address, space: body.space } } : null;
-
 /** The body of `PUT /api/mcp-servers/sign-in`, `/sign-out`, and `/remove`: `{ name }` naming a server omp loads. */
 export const parseMcpServerName = (body: unknown): Parsed<string> => (isObject(body) && isNonEmpty(body.name) ? { ok: body.name } : null);
 
@@ -691,7 +686,7 @@ export const parseCalendarShown = (body: unknown): Parsed<CalendarShownInput> =>
 
 function parseNewEventCalendar(value: unknown): Parsed<NewEventCalendar> {
 	if (!isObject(value)) return null;
-	if (value.kind === "local") return isSpace(value.space) ? { ok: { kind: "local", space: value.space } } : null;
+	if (value.kind === "local") return { ok: { kind: "local" } };
 	return value.kind === "google" && isNonEmpty(value.account) && isNonEmpty(value.calendarId) ? { ok: { kind: "google", account: value.account, calendarId: value.calendarId } } : null;
 }
 
@@ -715,10 +710,6 @@ export function parseEventRef(body: unknown): Parsed<EventRef> {
 	}
 	return null;
 }
-
-/** The body of `PUT /api/calendar/events/space`: an event kept on this computer by its id, and the space it moves to. */
-export const parseLocalEventSpace = (body: unknown): Parsed<LocalEventSpace> =>
-	isObject(body) && isNonEmpty(body.id) && isSpace(body.space) ? { ok: { id: body.id, space: body.space } } : null;
 
 /** The most people one field of a sent mail names. */
 const MAX_RECIPIENTS = 100;
@@ -923,17 +914,13 @@ export function parseWorktreeRemoval(body: unknown): Parsed<WorktreeRemovalReque
 export const parseBranchRelease = (body: unknown): Parsed<{ cwd: string; branch: string }> =>
 	isObject(body) && isNonEmpty(body.cwd) && body.cwd.startsWith("/") && isNonEmpty(body.branch) ? { ok: { cwd: body.cwd, branch: body.branch } } : null;
 
-const isWorkspaceOp = oneOf(["add", "hide", "show", "space"] as const);
+const isWorkspaceOp = oneOf(["add", "hide", "show"] as const);
 
-/**
- * The body of `PUT /api/workspaces`: `{ op, cwd }`, or `{ op: "space", cwd, space }`. Adding takes any path a new session
- * takes; hiding, showing, and placing in a space name an absolute directory.
- */
+/** The body of `PUT /api/workspaces`: `{ op, cwd }`. Adding takes any path a new session takes; hiding and showing name an absolute directory. */
 export function parseWorkspaceChange(body: unknown): Parsed<WorkspaceChange> {
 	if (!isObject(body) || !isWorkspaceOp(body.op) || !isNonEmpty(body.cwd)) return null;
 	if (body.op !== "add" && !body.cwd.startsWith("/")) return null;
-	if (body.op !== "space") return { ok: { op: body.op, cwd: body.cwd } };
-	return isSpace(body.space) ? { ok: { op: "space", cwd: body.cwd, space: body.space } } : null;
+	return { ok: { op: body.op, cwd: body.cwd } };
 }
 
 /** The body of `PUT /api/project-trust`: `{ op: "trust", root, code: [{ id, hash }] }` or `{ op: "forget", root }`, `root` absolute. */

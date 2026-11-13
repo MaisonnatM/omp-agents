@@ -225,7 +225,7 @@ export function PullRequestsPage(props: PullRequestsPageProps) {
 }
 
 /**
- * The pull requests in the main area, as a table or a board: those of the sidebar's workspace, or of its space's workspaces,
+ * The pull requests in the main area, as a table or a board: those of the sidebar's workspace, or of every workspace,
  * read from GitHub. It keeps the sidebar list's order, folds, and keys; the browser keeps which view it shows.
  */
 function PullRequestsOverview({ hosts, past, section, route, view, onView, onExpand }: PullRequestsPageProps & { view: PullRequestsView; onView: (view: PullRequestsView) => void; onExpand: () => void }) {

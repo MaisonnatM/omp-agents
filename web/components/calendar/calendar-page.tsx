@@ -1,9 +1,8 @@
-import { ArrowLeftRight, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 import type { Routine } from "../../../src/routines";
 import type { Bot } from "../../../src/shared/bots";
-import type { EventRef, LocalEvent, LocalEventSpace } from "../../../src/shared/calendar";
-import { otherSpace, type Space, type Spaces, spaceIs } from "../../../src/shared/workspaces";
+import type { EventRef, LocalEvent } from "../../../src/shared/calendar";
 import type { UserTodoList } from "../../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -23,10 +22,9 @@ import {
 import { cn } from "@/lib/utils";
 import { putJson } from "../../api";
 import { type Action, useAction } from "../../use-action";
-import { type CalendarEntry, calendarEntries, routinesOf, todosIn } from "../../calendar-model";
+import { type CalendarEntry, calendarEntries, routinesOf } from "../../calendar-model";
 import { eventLink, type NoticeLink } from "../../notice-model";
 import { dateOfDay, localDay } from "../../../src/shared/days";
-import { SPACE_LABELS } from "../../labels";
 import { calendarEventsStore, localEventsStore, monthSpan, ticketsStore, useGoogleCalendars } from "../../reads";
 import { hashForBotRoutine, hashForOpenTodo, hashForTickets } from "../../routing";
 import { scheduleWords, timeWords } from "../../routines-model";
@@ -34,7 +32,6 @@ import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { useMinute } from "../../use-minute";
 import { useCalendarRoutines } from "../../use-calendar-display";
 import { PageFrame } from "../list-page";
-import { offerUndo } from "../toaster";
 import { NewEventDialog } from "./new-event";
 
 const WEEKDAYS = daysForLocale("en-US", 1);
@@ -213,32 +210,14 @@ function DeleteEvent({ eventRef, title, remove }: { eventRef: EventRef; title: s
 	);
 }
 
-/** Moves the event kept on this computer that `id` names, named `title` in what it says, to space `target`. */
-type EventMove = Action<[id: string, title: string, target: Space]>;
-
-/** The button that moves an event kept on this computer to space `to`, busy while it is the one moving. */
-function MoveEvent({ id, title, to, move }: { id: string; title: string; to: Space; move: EventMove }) {
-	const moving = move.state.kind === "pending" && move.state.args[0] === id;
-	return (
-		<Tooltip content={`Move to ${SPACE_LABELS[to]}`} side="left">
-			<Button variant="ghost" size="icon-compact" className="mt-0.5 shrink-0" aria-label={`Move ${title} to ${SPACE_LABELS[to]}`} loading={moving} disabled={move.pending && !moving} onClick={() => move.run(id, title, to)}>
-				<ArrowLeftRight />
-			</Button>
-		</Tooltip>
-	);
-}
-
-/** What a day's list does to its events: delete one, and move one kept on this computer to space `to`. */
+/** What a day's list does to its events: delete one. */
 interface EventActions {
 	remove: EventDelete;
-	move: EventMove;
-	to: Space;
 }
 
 /**
  * A day's entries, each with what it is, as the day's list and a day's hover card show them; with `actions`, an event
- * kept on this computer or of a Google calendar you may write to has a delete button, and one kept on this computer a
- * button that moves it to the other space.
+ * kept on this computer or of a Google calendar you may write to has a delete button.
  */
 function DayEntries({ entries, actions }: { entries: CalendarEntry[]; actions?: EventActions }) {
 	return (
@@ -252,7 +231,6 @@ function DayEntries({ entries, actions }: { entries: CalendarEntry[]; actions?: 
 							<span className="block truncate text-xs text-muted-foreground">{entryDetail(entry)}</span>
 						</span>
 					</EntryLink>
-					{actions && entry.kind === "event" && entry.event.source.kind === "local" && <MoveEvent id={entry.event.source.ref.id} title={entry.event.title} to={actions.to} move={actions.move} />}
 					{actions && entry.kind === "event" && entry.event.source.ref && <DeleteEvent eventRef={entry.event.source.ref} title={entry.event.title} remove={actions.remove} />}
 				</li>
 			))}
@@ -354,22 +332,17 @@ function gridDays(year: number, month: number): Date[] {
 interface CalendarPageProps {
 	/** Every Bot's routines; the page shows those of `bots`. */
 	routines: Routine[];
-	/** The Bots of the space on screen, `null` until they load. */
+	/** The Bots, `null` until they load. */
 	bots: Bot[] | null;
-	/** `null` until the server sends it; the page shows the todos of the space on screen. */
+	/** `null` until the server sends it. */
 	todos: UserTodoList | null;
 	/** The dashboard can read Linear, so tickets with a due date show. */
 	ticketsShown: boolean;
-	/** The space on screen, whose Google Calendar accounts, events kept on this computer, routine runs, and due todos the page shows, and which a new event kept here goes in. */
-	space: Space;
-	/** Which space each workspace is in, which places each todo. */
-	spaces: Spaces;
 }
 
-/** A month of the Google events, events kept on this computer, routine runs, and due todos of `space`, and Linear tickets, with one day's list beside it. */
-export function CalendarPage({ routines: allRoutines, bots, todos: allTodos, ticketsShown, space, spaces }: CalendarPageProps) {
+/** A month of the Google events, events kept on this computer, routine runs, due todos, and Linear tickets, with one day's list beside it. */
+export function CalendarPage({ routines: allRoutines, bots, todos, ticketsShown }: CalendarPageProps) {
 	const routines = useMemo(() => routinesOf(allRoutines, bots), [allRoutines, bots]);
-	const todos = useMemo(() => todosIn(allTodos, space, spaces), [allTodos, space, spaces]);
 	const now = useMinute();
 	const [showRoutines] = useCalendarRoutines();
 	const [month, setMonth] = useCalendarMonth();
@@ -378,7 +351,7 @@ export function CalendarPage({ routines: allRoutines, bots, todos: allTodos, tic
 	/** The day the new-event dialog opened on, while it is open. */
 	const [newEventDay, setNewEventDay] = useState<string | null>(null);
 	const tickets = ticketsStore.usePolling(null, ticketsShown).read?.data.tickets ?? null;
-	const { connected, accounts } = useGoogleCalendars(space);
+	const { connected, accounts } = useGoogleCalendars();
 	const span = monthSpan(year, month);
 	const eventsRead = calendarEventsStore.usePolling(span, connected);
 	const read = eventsRead.read?.data.events;
@@ -387,8 +360,7 @@ export function CalendarPage({ routines: allRoutines, bots, todos: allTodos, tic
 		return connected && read ? read.filter(event => shown.has(event.account)) : null;
 	}, [connected, read, accounts]);
 	const localRead = localEventsStore.usePolling();
-	const allLocal = localRead.read?.data.events;
-	const localEvents = useMemo(() => allLocal?.filter(spaceIs(space)) ?? null, [allLocal, space]);
+	const localEvents = localRead.read?.data.events ?? null;
 	const byDay = useMemo(() => {
 		const days = new Map<string, CalendarEntry[]>();
 		for (const entry of calendarEntries({ routines: showRoutines ? routines : [], todos, tickets: ticketsShown ? tickets : null, events, localEvents }, year, month, now)) {
@@ -427,13 +399,6 @@ export function CalendarPage({ routines: allRoutines, bots, todos: allTodos, tic
 			}
 		}
 	}, null);
-	const to = otherSpace(space);
-	/** Moves the event kept on this computer that `id` names to space `target`, which leaves it off the other space's page at once, with **Undo** to move it back. */
-	const move = useAction(async (id: string, title: string, target: Space): Promise<void> => {
-		await putJson<object>("/api/calendar/events/space", { id, space: target } satisfies LocalEventSpace);
-		localEventsStore.update(answer => ({ events: answer.events.map(event => (event.id === id ? { ...event, space: target } : event)) }));
-		offerUndo("event-move", `Moved “${title}” to ${SPACE_LABELS[target]}`, () => move.run(id, title, otherSpace(target)));
-	}, null);
 	/** Shows a new event, which starts on `day`: one kept on this computer at once, and one added to Google Calendar once its month is read again. */
 	const created = (day: string, kept: LocalEvent | null): void => {
 		const date = dateOfDay(day);
@@ -447,7 +412,6 @@ export function CalendarPage({ routines: allRoutines, bots, todos: allTodos, tic
 	if (connected && eventsRead.error) failures.push(`Cannot read Google Calendar: ${eventsRead.error}`);
 	if (localRead.error) failures.push(`Cannot read the events on this computer: ${localRead.error}`);
 	if (remove.state.kind === "failed") failures.push(`Cannot delete ${remove.state.args[1]}: ${remove.state.error}`);
-	if (move.state.kind === "failed") failures.push(`Cannot move ${move.state.args[1]} to ${SPACE_LABELS[move.state.args[2]]}: ${move.state.error}`);
 	return (
 		<PageFrame title="Calendar" meta={[showRoutines && "Routine runs", connected && "Google events", "events on this computer", "due todos", ticketsShown && "Linear tickets"].filter(Boolean).join(", ")}>
 			{failures.map(failure => (
@@ -495,9 +459,9 @@ export function CalendarPage({ routines: allRoutines, bots, todos: allTodos, tic
 						})}
 					</div>
 				</CalendarProvider>
-				<DayList day={shownDay === null ? null : selected} entries={shownDay === null ? [] : (byDay.get(shownDay) ?? [])} actions={{ remove, move, to }} />
+				<DayList day={shownDay === null ? null : selected} entries={shownDay === null ? [] : (byDay.get(shownDay) ?? [])} actions={{ remove }} />
 			</div>
-			{newEventDay !== null && <NewEventDialog day={newEventDay} space={space} onClose={() => setNewEventDay(null)} onCreated={created} />}
+			{newEventDay !== null && <NewEventDialog day={newEventDay} onClose={() => setNewEventDay(null)} onCreated={created} />}
 		</PageFrame>
 	);
 }

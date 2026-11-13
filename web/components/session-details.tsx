@@ -1,5 +1,5 @@
-/** The right sidebar for a session: its pull requests, its running app in the desktop app, once it has any its Linear issues and its artifacts, and a personal session's memory; a Bot's details share its Tickets tab. */
-import { AppWindow, Brain, GitPullRequest, Sparkles } from "lucide-react";
+/** The right sidebar for a session: its pull requests, its running app in the desktop app, and once it has any its Linear issues and its artifacts; a Bot's details share its Tickets tab. */
+import { AppWindow, GitPullRequest, Sparkles } from "lucide-react";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { LiveView, RosterHost, View } from "../../src/shared/sessions";
 import type { Artifact } from "../artifacts-model";
@@ -9,7 +9,6 @@ import { type DetailsTab, DetailsSidebarFrame } from "./details-sidebar-frame";
 import { isPhonePage } from "../api";
 import { ArtifactsPanel } from "./artifacts-panel";
 import { BROWSER_AVAILABLE, BrowserPanel } from "./browser-panel";
-import { MemoryList } from "./memory-list";
 import { SessionPullRequestsTab } from "./session-pull-requests-tab";
 import { SessionTicketsTab } from "./session-tickets-tab";
 
@@ -89,32 +88,12 @@ export function sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, 
 interface SessionDetailsProps extends Omit<SessionWork, "scope" | "live" | "artifacts"> {
 	/** The session's directory, which relative file paths in pull requests and issues resolve against. */
 	cwd: string | null;
-	/** What personal sessions remember, for a personal session; `null` for any other. */
-	personalMemory: string | null;
 }
 
-/** The right sidebar's content for the focused view: its session's pull requests, its running app, its Linear issues and its artifacts when it has any, and a personal session's **Memory**. */
-export function SessionDetails({ view, sessionId, working, cwd, personalMemory, pullRequests, tickets, hosts }: SessionDetailsProps) {
+/** The right sidebar's content for the focused view: its session's pull requests, its running app, and its Linear issues and its artifacts when it has any. */
+export function SessionDetails({ view, sessionId, working, cwd, pullRequests, tickets, hosts }: SessionDetailsProps) {
 	const scope = view.kind === "past" ? view.sessionId : (hosts.find(host => host.instanceId === view.instanceId)?.sessionId ?? view.instanceId);
 	const artifacts = useArtifacts(view);
-	const tabs = [
-		...sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, live: view.kind === "live" ? view : null, view, sessionId, artifacts }),
-		...(personalMemory !== null
-			? [
-					{
-						value: "memory",
-						icon: Brain,
-						name: "Memory",
-						control: "session-details.tab.memory",
-						count: 0,
-						content: (
-							<div className="px-4 pt-2 pb-4">
-								<MemoryList path="personal-memory.md" memory={personalMemory} empty="Nothing yet. Tell it something worth keeping, and it remembers it." />
-							</div>
-						),
-					} as const,
-				]
-			: []),
-	];
+	const tabs = sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, live: view.kind === "live" ? view : null, view, sessionId, artifacts });
 	return <DetailsSidebarFrame label="Session details" storageKey={TAB_KEY} defaultTab="pull-requests" cwd={cwd} tabs={tabs} />;
 }

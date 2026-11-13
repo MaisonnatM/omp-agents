@@ -1,19 +1,9 @@
 # Sessions sidebar
 
-- The account row at the foot of the sidebar names the space the dashboard shows, **Personal** or **Work**, and how many workspaces it lists; its menu switches to the other space and opens **Keyboard shortcuts**.
-  Personal holds the personal directory and the workspaces Settings › Workspaces placed in Personal; every other workspace is in Work, a workspace the page cannot place yet included.
-  The sidebar's sessions, its counts, the session search, the scheduled sends, the Todo page, the pull requests, the Bots, the Notes, the Calendar's events on this computer, the Google accounts that Email and Calendar show, the command menu's sessions, workspaces, and notes, Settings' workspace pickers, and New session's directory picker then hold only the space's.
-  Switching keeps the page you are on; on the panes it opens the space's most recently started running session, or the empty home when none runs there.
-  A page of the space you leave, Sport leaving Personal or Tickets leaving Work, gives way to the panes.
-  Cmd+Shift+P (Ctrl+Shift+P elsewhere) switches too.
-  Each window keeps its own space, and a new window or a reload opens in the last space picked on this computer, Work the first time.
-  Opening a link to a session of the other space, from a notification or another window, switches the window to that space.
-  So does a link to Sport, which shows only in Personal, or to Tickets, which shows only in Work.
-- While the space not shown has sessions that need you, each that asks you something or finished a turn you have not looked at, a blue dot sits on the account row's letter and the space's row in its menu counts them, so they do not wait unseen; a screen reader says how many sessions wait on you.
-  Their notifications still show while you work in the other space, and clicking one switches to its space; the Dock badge counts both spaces.
+- **Keyboard shortcuts** at the foot of the sidebar opens Settings › Keyboard, and shows its key, ?.
 - The sidebar runs the window's height on the window's background, and the page and the session details sidebar sit beside it as rounded panels.
   Its top row, 48 px tall at the default font size as the header's tabs beside it are, holds the omp mark, the command menu button, and the button that hides the sidebar.
-- Under it the page list shows **New session**, then **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Notes**, **Calendar**, **Todo**, **Sport**, and **Email** in the order Settings › Preferences gives them, then **Settings**; **Tickets** shows only in Work and **Sport** only in Personal.
+- Under it the page list shows **New session**, then **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Notes**, **Calendar**, **Todo**, **Sport**, and **Email** in the order Settings › Preferences gives them, then **Settings**.
   A row opens its page, and the open page's row stays highlighted with that page's own list nested under it, such as the Todo categories or the Settings sections.
   A page whose row you hid in Preferences shows its list after the last row.
   **Bots** lists your Bots and opens their conversations, which stay out of the roster.
@@ -29,29 +19,27 @@
 - The dot before each session shows when it waits on you.
   A running turn shows no dot, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
   A session waiting on its subagents shows no dot either, even when its turn has ended, and its row's tooltip says **waiting on subagents**.
-- Under **All of Personal** or **All of Work**, a session row with a title shows a badge that names its workspace, the last segment of the workspace's directory, on the right before its age.
+- Under **All workspaces**, a session row with a title shows a badge that names its workspace, the last segment of the workspace's directory, on the right before its age.
   With one workspace picked, the rows show no badge.
   A row without a title shows its directory's name as its label, and the badge only when it runs in a linked worktree, whose name is not its workspace's.
 - The **Workspaces** label above the roster is the workspace picker: it shows only the running, idle, waiting on subagents, interrupted, and past sessions from one workspace, and then reads that workspace's name.
   A workspace is a repository's main checkout, or a directory outside git: a session in a linked git worktree, such as `~/code/yampa-review-triage-3935ff7b`, counts in its repository's workspace, `~/code/yampa`, and still runs in its worktree.
   A session whose worktree was removed counts in the repository whose main checkout's path, followed by `-`, starts its directory, such as `~/code/yampa-wt/fix` in `~/code/yampa`, else in the only repository whose main checkout has its directory's name, such as Codex's `~/.codex/worktrees/f5e7/yampa`.
-  The picker lists the space's workspaces that a live or saved session ran in, live sessions' first, then the ones added in **Settings › Workspaces**, except temporary directories and hidden workspaces; in Personal the personal directory comes first, named **Personal**.
+  The picker lists the workspaces that a live or saved session ran in, live sessions' first, then the ones added in **Settings › Workspaces**, except temporary directories and hidden workspaces.
   The session counts then count that workspace's sessions only, such as `2 running` and `9 past`.
   Picking a workspace also opens its most recently started running session in the focused pane, unless that pane already shows a session from the workspace or a page such as a pull request, Settings, or the new-session draft covers the panes.
-  Choose **All of Personal** or **All of Work**, the first entry, to list every session of the space again.
-  With a workspace picked other than the personal directory, the picker's **Move <workspace> to Personal** or **Move <workspace> to Work** moves it to the other space, as the space picker in Settings › Workspaces does; it then leaves the space on screen, and the sidebar lists every session of the space.
+  Choose **All workspaces**, the first entry, to list every session again.
   The app keeps the choice.
-  If no session from the saved workspace is left, or it is not in the space on screen, the sidebar lists every session of the space.
-  Moving a workspace shows a toast that says where it went, with **Undo** for 8 seconds to move it back, or says the move failed and why.
+  If no session from the saved workspace is left, the sidebar lists every session.
 - **New session** at the top of the page list opens the new-session draft, in the selected workspace when there is one, and stays highlighted while the draft is open.
-  In Personal with no workspace picked, it reads **New session in Personal** and starts in the personal directory.
+  With a workspace picked, it reads **New session in** and the workspace's name.
   Hovering it shows its key, Cmd+N.
 - The **Search sessions** button at the right of the **Workspaces** label opens a search field under it, and so does Cmd+Shift+F while the sidebar shows.
   The field narrows every folder to the sessions whose title or working directory holds every word typed, in any order and any case, within the selected workspace.
   A folder left without a match hides, and `No sessions match` shows when none is left; Esc clears the field, and the field closes once it is empty and loses the cursor.
   While empty, it shows its key, Cmd+Shift+F, on its right.
   Cmd+F finds text in the open conversation instead, as [Conversations](conversations.md) says.
-  Cmd+K opens the command menu, which searches every workspace of the space instead.
+  Cmd+K opens the command menu, which searches every workspace instead.
 - Sessions in `/tmp`, `/private/tmp`, or macOS's temp folders under `/var/folders` (where `mktemp -d` puts its directories), including their subdirectories, are hidden from the workspace pickers, session lists and counts, and session search.
   Starting or opening one does not replace the saved workspace.
   Their saved transcripts remain available through a direct session link.

@@ -1,24 +1,23 @@
 /** The workspace picker: the searchable directory list for the roster and the new session's directory. */
 import { Folder, FolderPlus } from "lucide-react";
-import { useContext, useState } from "react";
+import { useState } from "react";
 import { errorText } from "../../src/json";
 import type { ControlId } from "../../src/shared/activity";
 import type { Workspace } from "../../src/shared/workspaces";
-import { sameDir, workspaceName } from "../labels";
+import { folderName, sameDir } from "../labels";
 import { createWorkspace } from "../reads";
 import type { ShortcutId } from "../shortcuts";
 import { CommandPicker, type PickerItem } from "./command-picker";
-import { PersonalContext } from "./dashboard-context";
 import { toasts } from "./toaster";
 
-/** The same visible directory row and search words for the roster and the new-session picker; `personal` reads as **Personal**. */
-export function workspaceItems(workspaces: Workspace[], current: string | null, personal: Workspace | null, onPick: (workspace: Workspace) => void): PickerItem[] {
+/** The same visible directory row and search words for the roster and the new-session picker. */
+export function workspaceItems(workspaces: Workspace[], current: string | null, onPick: (workspace: Workspace) => void): PickerItem[] {
 	return workspaces.map(workspace => ({
 		value: workspace.cwd,
 		keywords: [workspace.cwdDisplay],
 		label: (
 			<span className="flex min-w-0 flex-col">
-				<span className="truncate">{workspaceName(workspace.cwdDisplay, personal) ?? workspace.cwdDisplay}</span>
+				<span className="truncate">{folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay}</span>
 				<span className="truncate text-xs text-muted-foreground">{workspace.cwdDisplay}</span>
 			</span>
 		),
@@ -45,9 +44,8 @@ interface DirectoryPickerProps {
 	control?: ControlId;
 }
 
-/** A working directory: a workspace of the space, **Personal** first in Personal, or any directory typed into the search field, used as is or created as a new workspace. */
+/** A working directory: a workspace, or any directory typed into the search field, used as is or created as a new workspace. */
 export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shortcut, side = "top", open, onOpenChange, onPick, control }: DirectoryPickerProps) {
-	const personal = useContext(PersonalContext);
 	const [query, setQuery] = useState("");
 	const typed = query.trim();
 	const pick = (next: string): void => {
@@ -64,7 +62,7 @@ export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shor
 	};
 	return (
 		<CommandPicker
-			trigger={workspaceName(workspaces.find(workspace => workspace.cwd === cwd)?.cwdDisplay ?? cwd, personal) ?? cwd}
+			trigger={folderName(workspaces.find(workspace => workspace.cwd === cwd)?.cwdDisplay ?? cwd) ?? cwd}
 			icon={Folder}
 			control={control}
 			ariaLabel={`Working directory: ${cwd}`}
@@ -86,7 +84,7 @@ export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shor
 					{
 						key: "workspaces",
 						heading: "Workspaces",
-						items: workspaceItems(workspaces, cwd, personal, workspace => pick(workspace.cwdDisplay)),
+						items: workspaceItems(workspaces, cwd, workspace => pick(workspace.cwdDisplay)),
 					},
 					...(typed && !workspaces.some(w => sameDir(typed, w))
 						? [

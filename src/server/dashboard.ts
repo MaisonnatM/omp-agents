@@ -6,7 +6,7 @@
  * No constructor calls either; nothing follows the registry, watches a directory, or publishes before {@link Dashboard.start}.
  */
 import { randomUUID } from "node:crypto";
-import { mkdirSync, rmSync } from "node:fs";
+import { rmSync } from "node:fs";
 import { join } from "node:path";
 import type { Server } from "bun";
 import { ForeignUsage } from "../foreign/usage";
@@ -28,8 +28,9 @@ import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
+import { SPORT_FLAGS } from "../omp/sport-extension";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, machineFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, personalDir, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, signInInboxDir, sourceControlFile, sportFile, sportInboxDir, sportThumbsDir, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, machineFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, signInInboxDir, sourceControlFile, sportFile, sportInboxDir, sportThumbsDir, userNoteInboxDir, userNotesFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -45,7 +46,7 @@ import { modelUpdates, upgradeModel } from "../settings";
 import { MCP_SERVICES } from "../shared/accounts";
 import { agentOn } from "../shared/moves";
 import type { StartRequest, StartResult, View } from "../shared/sessions";
-import { inAppData, type Space, type SpaceOfSession, type Spaces, spaces } from "../shared/workspaces";
+import { inAppData } from "../shared/workspaces";
 import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
 import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
@@ -69,7 +70,6 @@ import { MergeCleanup } from "./merge-cleanup";
 import { MergeQueue } from "./merge-queue";
 import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, Notices, PROVIDER_KINDS, SIGN_IN_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
 import { OwnerLock } from "../../templates/omp/agent/extensions/github/owner-lock";
-import { personalJoin, personalMessage, personalWorkspace } from "./personal";
 import { PinsFile } from "./pins-file";
 import { SignInInbox } from "./sign-in-inbox";
 import { PrivateSessions } from "./private-sessions";
@@ -104,7 +104,7 @@ import { ACTIVITY_KEPT_DAYS, ActivityStore } from "./activity-store";
 import { DAY_MS } from "../shared/days";
 import { Dictation } from "./dictation";
 import { createClientHandler } from "./socket";
-import { botExtension, designerExtension, shepherdExtension } from "./resources";
+import { botExtension, designerExtension, shepherdExtension, sportExtension } from "./resources";
 import { createStarter, reattachAll, type SessionJoin } from "./start";
 import { EventInbox } from "./event-inbox";
 import { NoteInbox } from "./note-inbox";
@@ -126,6 +126,8 @@ type Publisher = Pick<Server<unknown>, "publish" | "subscriberCount">;
 const NO_HIDDEN: ReadonlySet<string> = new Set();
 /** How often the merge queue looks at the pull requests it waits on: checks take minutes, and a click shows its first step at once. */
 const MERGE_QUEUE_TICK_MS = 15_000;
+/** What every session joins with: the Sport extension and the paths of the Sport module it reads and writes. */
+const SPORT_JOIN: SessionJoin = { rpc: { args: ["-e", sportExtension, `--${SPORT_FLAGS.file}`, sportFile, `--${SPORT_FLAGS.inbox}`, sportInboxDir], tools: [] }, attach() {} };
 
 /** Everything the server serves, built once at startup; {@link Dashboard.start} sets it going and {@link Dashboard.stop} stops it. */
 export class Dashboard {
@@ -154,10 +156,7 @@ export class Dashboard {
 	readonly #admit = (dir: string): Promise<void> => this.#projectTrust.admit(dir);
 	readonly #moves = new SessionMoves({
 		session: instanceId => this.#sessions.started(instanceId),
-		staysPut: request => {
-			const cwd = this.#cwdOf(request);
-			return this.#bots.botOf(request) !== null || (cwd !== undefined && this.#spaces().isPersonalDir(cwd));
-		},
+		staysPut: request => this.#bots.botOf(request) !== null,
 		admit: this.#admit,
 	});
 	readonly #waits = new SessionWaits({
@@ -165,7 +164,6 @@ export class Dashboard {
 		reply: sessionId => this.#sessions.lastReply(sessionId, this.#files.pathOf),
 		isBot: request => this.#bots.botOf(request) !== null,
 	});
-	readonly #personalJoin = personalJoin(request => this.#bots.botOf(request) !== null);
 	readonly #sourceControl = new SourceControl(sourceControlFile);
 	readonly #settingsSync: SettingsSync;
 	readonly #calendars = new CalendarsFile(calendarsFile);
@@ -338,8 +336,8 @@ export class Dashboard {
 			scheduled: { msg: () => ({ t: "scheduled", sends: scheduled.value }), apply: change => scheduled.apply(change, Date.now()) },
 			workspaces: {
 				msg: () => {
-					const [added, hidden, personal] = [workspaces.value.added, workspaces.value.hidden, workspaces.value.personal].map(cwds => cwds.map(workspaceFor));
-					return { t: "workspaces", list: { added, hidden, personal } };
+					const [added, hidden] = [workspaces.value.added, workspaces.value.hidden].map(cwds => cwds.map(workspaceFor));
+					return { t: "workspaces", list: { added, hidden } };
 				},
 				apply: change => workspaces.apply(change),
 			},
@@ -348,7 +346,6 @@ export class Dashboard {
 			preferences: { msg: () => ({ t: "preferences", values: this.#preferences.value }), apply: change => this.#preferences.apply(change) },
 			notices: { msg: () => ({ t: "notices", list: notices.list }) },
 			merges: { msg: () => ({ t: "merges", list: [...this.#mergeQueue.list] }) },
-			personal: { msg: personalMessage },
 			"review-drafts": { msg: () => ({ t: "review-drafts", list: this.#reviewDrafts.list }), apply: edit => this.#reviewDrafts.edit(edit) },
 			bots: {
 				msg: () => this.#bots.msg(),
@@ -381,12 +378,8 @@ export class Dashboard {
 		}));
 		this.#usage = new UsagePoll({ refresh: () => broadcasts.refreshUsage(), checkNotices: () => notices.check(PROVIDER_KINDS) });
 		const workspaceOf = (cwd: string): Promise<string> => placement.workspaceOf(cwd, worktreeAt);
-		const spaceOfSession: SpaceOfSession = async sessionId => {
-			const cwd = sessions.bySessionId(sessionId)?.cwd ?? files.savedOf(sessionId)?.cwd;
-			return cwd === undefined ? "work" : this.#spaceOf(cwd);
-		};
 		const todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), workspaceOf, { active: () => ownerLock.held });
-		const noteInbox = new NoteInbox(userNoteInboxDir, change => lists.apply("user-notes", change), spaceOfSession, { active: () => ownerLock.held });
+		const noteInbox = new NoteInbox(userNoteInboxDir, change => lists.apply("user-notes", change), { active: () => ownerLock.held });
 		const sportInbox = new SportInbox(
 			sportInboxDir,
 			() => sport.value,
@@ -396,7 +389,7 @@ export class Dashboard {
 			},
 			{ active: () => ownerLock.held },
 		);
-		const eventInbox = new EventInbox(eventInboxDir, () => this.#localEvents.value, change => this.#localEvents.apply(change), spaceOfSession, { active: () => ownerLock.held });
+		const eventInbox = new EventInbox(eventInboxDir, () => this.#localEvents.value, change => this.#localEvents.apply(change), { active: () => ownerLock.held });
 		const signInInbox = new SignInInbox(
 			signInInboxDir,
 			{
@@ -656,7 +649,6 @@ export class Dashboard {
 			sessions: {
 				knownWorkspaces: () => this.knownWorkspaces(),
 				addedCwds: () => this.#workspaces.value.added,
-				spaces: () => this.#spaces(),
 				changeWorkspaces: change => void this.#lists.apply("workspaces", change),
 				changeProjectTrust: change => void this.#lists.apply("project-trust", change),
 				summaryOf(sessionId) {
@@ -737,7 +729,6 @@ export class Dashboard {
 	 */
 	async start(publisher: Publisher): Promise<void> {
 		this.#publisher = publisher;
-		mkdirSync(personalDir, { recursive: true });
 		// Before the runners recover, so a session that survived counts as neither interrupted nor stopped with the server.
 		await reattachAll(this.#sessions, (request, instanceId) => this.#joinFor(request, instanceId), instanceId => this.#privateSessions.has(instanceId), survived => this.#interrupted.recover(survived));
 		// A private session whose omp exited while no server ran is deleted, as its exit would have; one this server could not attach to runs on.
@@ -746,7 +737,7 @@ export class Dashboard {
 		this.#reattached.resolve();
 		this.#broadcasts.syncRoster();
 		this.#loops.watch();
-		// Before the owner lock, whose taking drains the inboxes: a note or a reminder an ended session left files under that session's space.
+		// Before the owner lock, whose taking drains the inboxes.
 		await this.#rescanFiles();
 		if (!this.#claimUnattendedWork()) {
 			const owner = this.#ownerLock.holder();
@@ -819,7 +810,7 @@ export class Dashboard {
 	knownWorkspaces(): string[] {
 		const { placement } = this.#files.facts;
 		const ran = [...this.#sessions.cwds(), ...this.#files.cwds()].filter(cwd => cwd && !placement.gone(cwd)).map(placement.cwdOf);
-		return [...new Set(ran.filter(cwd => cwd === personalDir || !inAppData(cwd)))];
+		return [...new Set(ran.filter(cwd => !inAppData(cwd)))];
 	}
 
 	#workspaceCwds(): string[] {
@@ -853,7 +844,6 @@ export class Dashboard {
 				// Its last turn may have remembered something.
 				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
 				this.#bots.exited(instanceId);
-				void this.#personalTurnEnded(this.#sessions.get(instanceId)?.cwd);
 				this.#sessions.remove(instanceId);
 				this.#waits.exited(instanceId);
 				// A private session lives exactly as long as its omp, so it is deleted rather than interrupted; the next server's sweep finishes a purge cut short.
@@ -894,7 +884,6 @@ export class Dashboard {
 				if (sessionId) this.#autoContinue.turnEnded(sessionId, update.failure);
 				this.#broadcasts.rosterChanged();
 				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
-				void this.#personalTurnEnded(this.#sessions.get(instanceId)?.cwd);
 				return;
 			}
 			default: {
@@ -902,21 +891,6 @@ export class Dashboard {
 				return unhandled;
 			}
 		}
-	}
-
-	/** The space each directory is in, as Settings › Workspaces places them now. */
-	#spaces(): Spaces {
-		return spaces(this.#workspaces.value.personal, personalWorkspace);
-	}
-
-	/** The space of a session in `cwd`, once git has placed `cwd`, so a worktree of a Personal workspace not placed yet counts. */
-	async #spaceOf(cwd: string): Promise<Space> {
-		return this.#spaces().of(cwd, await this.#files.facts.placement.workspaceOf(cwd, worktreeAt));
-	}
-
-	/** Tells the page the personal memory may have changed when a session in `cwd`, which ended a turn, runs in the Personal space. */
-	async #personalTurnEnded(cwd: string | undefined): Promise<void> {
-		if (cwd !== undefined && (await this.#spaceOf(cwd)) === "personal") this.#broadcasts.pushList("personal");
 	}
 
 	/** Moves todos checked over {@link DONE_KEPT_HOURS} ago to the archive. */
@@ -929,22 +903,15 @@ export class Dashboard {
 		this.#activity.prune(Date.now() - ACTIVITY_KEPT_DAYS * DAY_MS);
 	}
 
-	/** How `request` joins the server as session `instanceId`: as a Review session, as a Bot's conversation, both, or plain; any loads the personal extension, a Bot's without the personal memory, any but a Bot's can wait on another session, and any but a Bot's or one started in the personal directory can move itself. */
+	/** How `request` joins the server as session `instanceId`: as a Review session, as a Bot's conversation, both, or plain; any loads the Sport extension, and any but a Bot's can wait on another session and move itself. */
 	#joinFor(request: StartRequest, instanceId: string): SessionJoin {
-		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#moves.join(request, instanceId), this.#waits.join(request, instanceId), this.#personalJoin(request)];
+		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#moves.join(request, instanceId), this.#waits.join(request, instanceId), SPORT_JOIN];
 		return {
 			rpc: { args: joins.flatMap(join => join.rpc.args), tools: joins.flatMap(join => join.rpc.tools) },
 			attach: session => {
 				for (const join of joins) join.attach(session);
 			},
 		};
-	}
-
-	/** The directory `request`'s session starts in, `undefined` when the session it continues is gone. */
-	#cwdOf(request: StartRequest): string | undefined {
-		if (request.kind === "new") return request.cwd;
-		if (request.kind === "resume") return this.#files.savedOf(request.sessionId)?.cwd;
-		return request.view.kind === "live" ? this.#sessions.get(request.view.instanceId)?.cwd : this.#files.savedOf(request.view.sessionId)?.cwd;
 	}
 
 	/**

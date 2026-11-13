@@ -4,7 +4,6 @@ import type { QueuedMerge } from "../../src/shared/merge-queue";
 import type { ReviewDraft } from "../../src/shared/review-drafts";
 import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
-import type { Workspace } from "../../src/shared/workspaces";
 import type { FileTarget } from "../file-paths";
 import type { MentionLists } from "../mentions";
 import type { WindowScope } from "../sessions";
@@ -67,7 +66,7 @@ export interface DashboardStatus {
 	 * requests reads that entry, never another scope's: the unscoped entry asks GitHub about every repository.
 	 */
 	pullRequestsScope: string;
-	/** What this window shows: its space, which picks the Google accounts the `@` menu reads mail and events of, the sidebar's workspace, and Personal's home. */
+	/** What this window shows: the sidebar's workspace. */
 	scope: WindowScope;
 	/** The merges the server waits to make until GitHub allows them, which a pull request's row, its details, and a session's stack show. */
 	merges: readonly QueuedMerge[];
@@ -100,6 +99,3 @@ export const UserTodosContext = createContext<UserTodoList | null>(null);
 
 /** The Notes page's list as the server last sent it, `null` until it arrives, for a todo's details to list the notes that belong to it. */
 export const UserNotesContext = createContext<UserNoteList | null>(null);
-
-/** Where personal sessions run, `null` until the server says, for every place that names a workspace to call it **Personal**. */
-export const PersonalContext = createContext<Workspace | null>(null);

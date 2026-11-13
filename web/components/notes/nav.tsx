@@ -1,5 +1,4 @@
-/** The sidebar's Notes tab: the space's notes and the ones agents added, with how many each holds. */
-import type { Space } from "../../../src/shared/workspaces";
+/** The sidebar's Notes tab: every note and the ones agents added, with how many each holds. */
 import type { UserNoteList } from "../../../src/user-notes-shared";
 import { SidebarGroup, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { NOTES_LISTS, notesIn } from "../../notes-views";
@@ -10,18 +9,16 @@ interface NotesNavProps {
 	list: UserNoteList | null;
 	/** The list the Notes page shows. */
 	view: NotesListView;
-	/** The space on screen, whose notes each list counts. */
-	space: Space;
 }
 
-export function NotesNav({ list, view, space }: NotesNavProps) {
+export function NotesNav({ list, view }: NotesNavProps) {
 	if (list === null) return <SidebarGroup><p className="px-2 py-1 text-xs text-muted-foreground">Loading your notes…</p></SidebarGroup>;
 	return (
 		<SidebarGroup>
 			<SidebarMenu aria-label="Note lists">
 				{NOTES_LISTS.map(({ view: target, name, icon: Icon }) => {
 					const active = view.kind === target.kind;
-					const count = notesIn(list, target, space).length;
+					const count = notesIn(list, target).length;
 					return (
 						<SidebarMenuItem key={target.kind}>
 							<SidebarMenuButton asChild isActive={active}>

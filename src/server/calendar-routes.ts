@@ -6,7 +6,7 @@ import { DAY_MS } from "../shared/days";
 import { answer, checked, fail } from "./http";
 import type { LocalEventsFile } from "./local-events-file";
 import type { RouteKit, Routes } from "./route-kit";
-import { parseCalendarShown, parseEventRef, parseLocalEventSpace, parseNewEvent } from "./wire";
+import { parseCalendarShown, parseEventRef, parseNewEvent } from "./wire";
 
 /** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
 const MAX_EVENT_SPAN_MS = 62 * DAY_MS;
@@ -52,7 +52,7 @@ export function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv)
 		async ({ title, when, calendar }): Promise<NewEventAnswer> => {
 			switch (calendar.kind) {
 				case "local":
-					return { kept: localEvents.add(title, when, calendar.space) };
+					return { kept: localEvents.add(title, when) };
 				case "google":
 					await google.create(calendar.account, calendar.calendarId, title, when);
 					return { kept: null };
@@ -83,22 +83,12 @@ export function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv)
 		},
 	);
 
-	/** `PUT /api/calendar/events/space`: `LocalEventSpace`, moves an event kept on this computer to the other space; answers `{}`. */
-	const eventSpace = write(
-		body => checked(parseLocalEventSpace(body), 'Expected { id, space } naming an event kept on this computer and "personal" or "work"'),
-		async ({ id, space }): Promise<object> => {
-			localEvents.apply({ op: "set-space", id, space });
-			return {};
-		},
-	);
-
 	return {
 		"/api/google": { GET: googleStatus },
 		"/api/google/calendars": { PUT: calendarShown },
 		"/api/calendar/events": { GET: calendarEvents },
 		"/api/calendar/events/new": { PUT: eventCreate },
 		"/api/calendar/events/delete": { PUT: eventDelete },
-		"/api/calendar/events/space": { PUT: eventSpace },
 		"/api/calendar/local": { GET: localCalendarEvents },
 	};
 }

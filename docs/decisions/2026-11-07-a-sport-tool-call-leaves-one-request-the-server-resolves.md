@@ -12,4 +12,4 @@ We accept that the tool's check and the server's check can disagree when the sta
 
 ## Confirmation
 
-`src/server/sport-inbox.test.ts` applies two edits of one log in a row and keeps both, sets a refused request aside without its metrics, and applies a request already applied as nothing; `src/omp/sport-tool.test.ts` checks that one call leaves one request and an edit leaves only its fields.
+`src/server/sport-inbox.test.ts` applies two edits of one log in a row and keeps both, sets a refused request aside without its metrics, and applies a request already applied as nothing; `src/omp/sport-extension.test.ts` checks that one call leaves one request and an edit leaves only its fields.

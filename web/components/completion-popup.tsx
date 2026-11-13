@@ -106,9 +106,9 @@ export function useCompletion({ editorRef, draft, setDraft, completions, onCompl
 
 	const token = menu?.trigger.kind === "mention" ? menu.trigger.token : null;
 	const query = token && mentionQuery(token);
-	const { pullRequestsScope, scope: { space } } = useDashboardStatus();
+	const { pullRequestsScope } = useDashboardStatus();
 	const { tickets, pullRequestRepos } = useSearchSources(query !== null && wants(query, "ticket"), pullRequestsScope);
-	const { threads, events } = useMailAndEvents(query !== null && wants(query, "mail"), query !== null && wants(query, "event"), space);
+	const { threads, events } = useMailAndEvents(query !== null && wants(query, "mail"), query !== null && wants(query, "event"));
 	const linearUsers = useRead<TicketChoice[]>(query !== null && wants(query, "person") ? "/api/linear/users" : null).data ?? NO_USERS;
 	const answer = completions && completions.reqId === menu?.reqId ? completions : null;
 	// omp answers `/` with a `skill:` row besides its commands, and `/skill:` with skills only; each list keeps its own kind.

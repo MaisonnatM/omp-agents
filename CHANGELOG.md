@@ -5,6 +5,13 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-13
 
+- The Personal and Work spaces are gone: every page shows all your workspaces, sessions, Bots, notes, events, and accounts together, and the sidebar's Workspaces label still narrows the list to one workspace.
+- Keyboard shortcuts now live in Settings › Keyboard, and ? opens it.
+- The bottom of the sidebar now has a Keyboard shortcuts link, where the Personal and Work switch was.
+- Sport and Tickets now show all the time, and any session can read and log your training with its sport tool.
+- Personal sessions are gone, with the Memory tab and the remember tool they had; Bots keep their own memory.
+- Google accounts are no longer placed in a space: Email, the Calendar, and agents use every connected account.
+- Behind the scenes: removed the space code from the server, the agents' extensions, and the page, and files from older versions drop their space fields when they load.
 - The sidebar's page list, from New session to Settings, now stays in place while you scroll your sessions below it.
 - Agents no longer point you at `artifact://` or `local://` addresses the dashboard cannot open: the starter kit tells them to save what you should read to the Artifacts tab instead.
 - A session can now run up to 8 helper agents at once instead of 2: the starter kit sets the limit to 8.

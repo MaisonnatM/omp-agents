@@ -5,7 +5,7 @@ import { hashForSession } from "../../../src/shared/sessions";
 import type { TicketChoice, TodoTicketAnswer, TodoTicketRequest } from "../../../src/shared/tickets";
 import { addTodo } from "../../../src/user-todos";
 import { addNote } from "../../../src/user-notes";
-import { spaceIs, type Workspace } from "../../../src/shared/workspaces";
+import type { Workspace } from "../../../src/shared/workspaces";
 import type { UserTodo, UserTodoChange, UserTodoList } from "../../../src/user-todos-shared";
 import { badgeColors } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -290,15 +290,15 @@ function AgentCard({ todo, readOnly, sessions, newSessionCwd }: { todo: UserTodo
 function LinkedNotes({ todo }: { todo: UserTodo }) {
 	const list = useContext(UserNotesContext);
 	const { changeNote } = useDashboardActions();
-	const { connected, scope: { space } } = useDashboardStatus();
-	const notes = list?.notes.filter(spaceIs(space)).filter(note => note.todoId === todo.id) ?? [];
+	const { connected } = useDashboardStatus();
+	const notes = list?.notes.filter(note => note.todoId === todo.id) ?? [];
 	return (
 		<section className="flex flex-col gap-2" aria-label="Linked notes">
 			<div className="flex items-center justify-between">
 				<h3 className="text-xs font-medium text-muted-foreground">Notes</h3>
 				<Tooltip content="Write a note linked to this todo">
 					<Button variant="ghost" size="icon-compact" aria-label="New linked note" disabled={!connected || list === null} onClick={() => {
-						const change = addNote(space, { title: todo.text, todoId: todo.id });
+						const change = addNote({ title: todo.text, todoId: todo.id });
 						changeNote(change);
 						location.hash = hashForNotes({ kind: "all" }, change.note.id);
 					}}><Plus /></Button>

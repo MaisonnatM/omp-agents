@@ -69,10 +69,6 @@ export const botInboxDir = join(configDir, "bot-inbox");
 export const shepherdInboxDir = join(configDir, "shepherd-inbox");
 /** Each Bot's `<id>/memory.md`, which its own session writes, in the dashboard's data directory. */
 export const botsDir = join(dataDir, "bots");
-/** Where personal sessions run: the user's own directory, tied to no project, in the dashboard's data directory so the file dialog opens what they write there. */
-export const personalDir = join(dataDir, "personal");
-/** The facts every personal session shares, which their `remember` tool appends, beside {@link personalDir} so omp never reads it as a file of that directory. */
-export const personalMemoryFile = join(dataDir, "personal-memory.md");
 /**
  * Where this port's private sessions keep everything omp writes for them, one `<instance id>` directory each, as {@link keepersDir} is per port.
  * A directory's presence is the only record that its session is private; deleting it, last, is what deletes the session.
@@ -80,7 +76,7 @@ export const personalMemoryFile = join(dataDir, "personal-memory.md");
 export const privateSessionsDir = join(dataDir, "private-sessions", String(portFromEnv()));
 /** The messages and session starts that wait for their time, beside {@link tokenFile}. */
 export const scheduledFile = join(configDir, "scheduled.json");
-/** The directories Settings → Workspaces added, hid, and placed in the Personal space, beside {@link tokenFile}. */
+/** The directories Settings → Workspaces added and hid, beside {@link tokenFile}. */
 export const workspacesFile = join(configDir, "workspaces.json");
 /** Where an older version kept the {@link workspacesFile} list, beside {@link tokenFile}; the server moves it at startup. */
 export const oldWorkspacesFile = join(configDir, "projects.json");
@@ -98,7 +94,7 @@ export const modelProfilesFile = join(configDir, "model-profiles.json");
 export const extraUsageFile = join(configDir, "extra-usage.json");
 /** The Google calendars the Calendar page's sidebar unchecked, beside {@link tokenFile}. */
 export const calendarsFile = join(configDir, "calendars.json");
-/** The address each Google account signs in as and the addresses in the Personal space, beside {@link tokenFile}. */
+/** The address each Google account signs in as and when a session found each signed out, beside {@link tokenFile}. */
 export const googleAccountsFile = join(configDir, "google-accounts.json");
 /** The events the Calendar page keeps on this computer, beside {@link tokenFile}. */
 export const localEventsFile = join(configDir, "events.json");

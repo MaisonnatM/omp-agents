@@ -42,10 +42,6 @@ _Avoid_: Crashed session, orphan
 A dashboard session deleted with everything omp wrote for it once its omp stops, whether by **End session**, omp's `end_session` tool, or a crash; it never becomes a past or interrupted session.
 _Avoid_: Incognito session, temporary session, ephemeral session
 
-**Personal session**:
-A session whose workspace is in the Personal space, such as the dashboard's personal directory or a personal repository, for the user's own life, which reads and writes the **Personal memory**.
-_Avoid_: User session, assistant session, private session (see **Private session**)
-
 **Subagent**:
 A session that another session's `task` call spawned.
 _Avoid_: Child agent, worker
@@ -77,11 +73,6 @@ What omp itself recalls across sessions of a workspace, through the store its `m
 It is separate from project memory and from a Bot's memory.
 _Avoid_: Memory (bare), Agent memory, Long-term memory
 
-**Personal memory**:
-The facts about the user that every personal session reads at each turn and that only their `remember` tool appends, kept in `personal-memory.md`.
-It is separate from project memory, omp memory, and a Bot's memory.
-_Avoid_: User memory, profile
-
 ## Collab
 
 **Host**:
@@ -102,7 +93,7 @@ Its checks reflect real setup; only its dismissal, its closed state, and the ste
 _Avoid_: Onboarding, tour, checklist
 
 **Sidebar**:
-The column down the window's left side: the omp mark and the command menu at its top, the page list, the roster, and the account row at its foot, whose menu switches the space.
+The column down the window's left side: the omp mark and the command menu at its top, the page list, the roster, and the **Keyboard shortcuts** link at its foot.
 _Avoid_: Nav, navigation rail, left panel
 
 **Header tabs**:
@@ -114,12 +105,8 @@ _Avoid_: Title bar, tab strip, browser tabs
 The sessions in the sidebar under **Workspaces** and **Past**: each workspace's running, interrupted, and pinned sessions, and the ended ones.
 _Avoid_: Session list, inbox
 
-**Space**:
-One of the dashboard's two sides, **Personal** for the user's own life and **Work** for everything else, each with its own workspaces and the sessions, todos, notes, Bots, and accounts that belong to them.
-_Avoid_: Section (see **Section**), profile, mode, side
-
 **Workspace**:
-A repository's main checkout, or a directory outside git, that sessions run in, which belongs to one space and which the sidebar's **Workspaces** label filters by; a session in a linked git worktree counts in its repository's workspace.
+A repository's main checkout, or a directory outside git, that sessions run in, which the sidebar's **Workspaces** label filters by; a session in a linked git worktree counts in its repository's workspace.
 _Avoid_: Project, repo, folder
 
 **Project code**:
@@ -224,7 +211,7 @@ _Avoid_: Goal (see **Goal**), objective
 
 **Pain flag**:
 A pain the user rated 3 out of 10 or more, with where it hurts, which changes the coming days' workouts; finger pain drops the fingerboard for 7 days.
-It shows on the Sport page and in the personal session's prompt, never under the bell.
+It shows on the Sport page and in the week the `sport` tool reads, never under the bell.
 _Avoid_: Alert, notice (see **Notice**), injury
 
 **Measurement**:

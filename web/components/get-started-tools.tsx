@@ -46,7 +46,7 @@ function McpRow({ id, integrations: { read, error } }: { id: McpIntegrationId; i
 			</li>
 		);
 	}
-	return <McpIntegrationRow integration={read.data.integrations[id]} placeable={false} />;
+	return <McpIntegrationRow integration={read.data.integrations[id]} />;
 }
 
 export interface ToolsFacts {

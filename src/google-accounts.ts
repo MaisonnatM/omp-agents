@@ -2,7 +2,7 @@
  * Gmail's and Google Calendar's accounts: a server per account on the service's host in omp's MCP config. Google's
  * endpoints answer only their bare URL, so omp would file every account's sign-in under that URL; each sign-in here
  * lands on a credential id of its own instead, which the account's server names in its `auth` block. The address each
- * account signs in as, and the space each address is in, live in a {@link GoogleAccountsStore}.
+ * account signs in as lives in a {@link GoogleAccountsStore}.
  */
 import { randomBytes } from "node:crypto";
 import type { AccountClients } from "./account-clients";
@@ -27,30 +27,28 @@ import {
 	userMcpConfigPath,
 	writeMcpServer,
 } from "./omp/mcp";
-import { type AccountId, type AccountsService, type GoogleAccount, type GoogleSpace, MCP_SERVICES, serverConnection } from "./shared/accounts";
+import { type AccountId, type AccountsService, type GoogleAccount, MCP_SERVICES, serverConnection } from "./shared/accounts";
 import type { SignInSubject } from "./shared/notices";
 import { type SignedFetch, signedFetch } from "./signed-fetch";
 
 /**
- * What the dashboard keeps about Google accounts: each account's address, lowercased, by its server's name, the
- * lowercased addresses placed in the Personal space, and since when each account a session found signed out has been
- * reported so, by its server's name, until it works again or the user signs it out. An address not placed is in Work.
+ * What the dashboard keeps about Google accounts: each account's address, lowercased, by its server's name, and since
+ * when each account a session found signed out has been reported so, by its server's name, until it works again or the
+ * user signs it out.
  */
 export interface GoogleAccountsState {
 	addresses: ReadonlyMap<AccountId, string>;
-	personal: ReadonlySet<string>;
 	signedOut: ReadonlyMap<AccountId, number>;
 }
 
 /**
- * A change to {@link GoogleAccountsState}: an account's address learned, accounts whose servers are gone, an address
- * placed in a space, an account a session found signed out at `at`, or an account whose report is settled because it
- * signed in again or the user signed it out.
+ * A change to {@link GoogleAccountsState}: an account's address learned, accounts whose servers are gone, an account a
+ * session found signed out at `at`, or an account whose report is settled because it signed in again or the user
+ * signed it out.
  */
 export type GoogleAccountsChange =
 	| { kind: "learn"; account: AccountId; address: string }
 	| { kind: "forget"; accounts: readonly AccountId[] }
-	| ({ kind: "place" } & GoogleSpace)
 	| { kind: "signed-out"; account: AccountId; at: number }
 	| { kind: "settle"; account: AccountId };
 
@@ -61,8 +59,7 @@ export interface GoogleAccountsStore {
 }
 
 /**
- * `state` after `change`, or `state` itself when it changes nothing. Forgetting an account keeps its address's space,
- * so an account added again as the same address is in the space it was. A second report of an account already reported
+ * `state` after `change`, or `state` itself when it changes nothing. A second report of an account already reported
  * signed out keeps the first one's time, so the bell does not tell of it again.
  */
 export function applyGoogleAccounts(state: GoogleAccountsState, change: GoogleAccountsChange): GoogleAccountsState {
@@ -81,13 +78,6 @@ export function applyGoogleAccounts(state: GoogleAccountsState, change: GoogleAc
 				signedOut.delete(account);
 			}
 			return { ...state, addresses, signedOut };
-		}
-		case "place": {
-			if (state.personal.has(change.address) === (change.space === "personal")) return state;
-			const personal = new Set(state.personal);
-			if (change.space === "personal") personal.add(change.address);
-			else personal.delete(change.address);
-			return { ...state, personal };
 		}
 		case "signed-out": {
 			if (state.signedOut.has(change.account)) return state;
@@ -173,8 +163,6 @@ export interface GoogleAccounts {
 	of(id: AccountsService): IntegrationKind<{ accounts: GoogleAccount[] }>;
 	/** Forgets the addresses and reports of the accounts not in `live`, whose servers are gone. */
 	forgetGone(live: ReadonlySet<AccountId>): void;
-	/** Places Google address `address`'s accounts, Gmail's and Google Calendar's, in `space`. */
-	place(placed: GoogleSpace): void;
 	/** Keeps that a session found account `account` signed out at `at`; whether it is a Gmail or Google Calendar account whose report is new. */
 	reportSignedOut(account: AccountId, at: number): Promise<boolean>;
 	/**
@@ -216,7 +204,7 @@ export function createGoogleAccounts(store: GoogleAccountsStore, grant: typeof s
 						address => ({ address, addressError: null }),
 						(err: unknown) => ({ address: null, addressError: errorText(err) }),
 					);
-		return { name: server.name, address, addressError, connection: status, space: address !== null && store.value.personal.has(address) ? "personal" : "work" };
+		return { name: server.name, address, addressError, connection: status };
 	};
 
 	/*
@@ -310,10 +298,6 @@ export function createGoogleAccounts(store: GoogleAccountsStore, grant: typeof s
 		forgetGone(live) {
 			const gone = [...new Set([...store.value.addresses.keys(), ...store.value.signedOut.keys()])].filter(account => !live.has(account));
 			if (gone.length > 0) store.apply({ kind: "forget", accounts: gone });
-		},
-
-		place({ address, space }) {
-			store.apply({ kind: "place", address: address.toLowerCase(), space });
 		},
 
 		async reportSignedOut(account, at) {

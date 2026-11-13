@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { spaces } from "../shared/workspaces";
 import type { RouteKit, SessionRoutesEnv } from "./route-kit";
 import { sessionRoutes } from "./session-routes";
 
@@ -16,7 +15,6 @@ const unused = (): never => {
 const env: SessionRoutesEnv = {
 	knownWorkspaces: () => ["/w/app"],
 	addedCwds: () => [],
-	spaces: () => spaces([], null),
 	changeWorkspaces: unused,
 	changeProjectTrust: unused,
 	summaryOf: unused,
@@ -34,14 +32,6 @@ async function read(query: string): Promise<Response> {
 }
 
 describe("GET /api/pull-requests", () => {
-	test("refuses a space other than Personal or Work", async () => {
-		expect((await read("?space=home")).status).toBe(400);
-	});
-
-	test("refuses a workspace and a space together", async () => {
-		expect((await read("?cwd=/w/app&space=work")).status).toBe(400);
-	});
-
 	test("refuses a directory no session ran in", async () => {
 		expect((await read("?cwd=/w/other")).status).toBe(404);
 	});

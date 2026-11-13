@@ -3,18 +3,15 @@ import type { MouseEvent } from "react";
 import type { PullRequestLink } from "../src/shared/github";
 import { PROVIDER_NAMES } from "../src/shared/models";
 import type { PastSession, RosterHost, SessionSource } from "../src/shared/sessions";
-import type { Space, Workspace } from "../src/shared/workspaces";
+import type { Workspace } from "../src/shared/workspaces";
 import { IS_MAC, modHeld } from "./shortcuts";
 import type { OpenMode } from "./routing";
-
-/** The name of each space. */
-export const SPACE_LABELS: Record<Space, string> = { personal: "Personal", work: "Work" };
 
 /** A count of sessions that need you, as a badge's accessible name and tooltip say it: "1 session waiting on you". */
 export const sessionsWaiting = (count: number): string => `${count} ${count === 1 ? "session" : "sessions"} waiting on you`;
 
-/** What a workspace picker calls choosing no workspace: every workspace of the space. */
-export const ALL_OF_SPACE: Record<Space, string> = { personal: "All of Personal", work: "All of Work" };
+/** What a workspace picker calls choosing no workspace. */
+export const ALL_WORKSPACES = "All workspaces";
 
 /** Words that keep their own casing in a label. */
 const BRAND_WORDS: Record<string, string> = {
@@ -168,11 +165,7 @@ export const commandLabel = (command: string): string => command.replace(/(^|\s)
 /** A directory's last segment: `~/code/webapp` reads `webapp`. */
 export const folderName = (dir: string): string | undefined => dir.split("/").filter(Boolean).pop();
 
-/** What the page calls the workspace shown as `cwdDisplay`: **Personal** for where personal sessions run, else its last segment. */
-export const workspaceName = (cwdDisplay: string, personal: Workspace | null): string | undefined =>
-	cwdDisplay === personal?.cwdDisplay ? "Personal" : folderName(cwdDisplay);
-
-/** Directory `dir`, as typed or displayed, is `workspace`, such as the personal directory; never when there is none. */
+/** Directory `dir`, as typed or displayed, is `workspace`; never when there is none. */
 export const sameDir = (dir: string, workspace: Workspace | null): boolean => workspace !== null && (dir === workspace.cwd || dir === workspace.cwdDisplay);
 
 /** The tooltip of a private session's mark, which every place showing one repeats. */

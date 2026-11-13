@@ -34,27 +34,16 @@ describe("WorkspacesFile", () => {
 		expect(first.apply({ op: "add", cwd: "/b" })).toBe(true);
 		expect(first.apply({ op: "hide", cwd: "/a" })).toBe(true);
 		expect(first.apply({ op: "show", cwd: "/c" })).toBe(false);
-		expect(workspacesFile(path).value).toEqual({ added: ["/a", "/b"], hidden: ["/a"], personal: [] });
+		expect(workspacesFile(path).value).toEqual({ added: ["/a", "/b"], hidden: ["/a"] });
 		expect(first.apply({ op: "show", cwd: "/a" })).toBe(true);
-		expect(workspacesFile(path).value).toEqual({ added: ["/a", "/b"], hidden: [], personal: [] });
+		expect(workspacesFile(path).value).toEqual({ added: ["/a", "/b"], hidden: [] });
 	});
 
-	test("placing a directory in the Personal space lists it, placing it there again changes nothing, and placing it in Work takes it out", () => {
-		const path = workspacesPath();
-		const file = workspacesFile(path);
-		expect(file.apply({ op: "space", cwd: "/home", space: "personal" })).toBe(true);
-		expect(file.apply({ op: "space", cwd: "/home", space: "personal" })).toBe(false);
-		expect(file.apply({ op: "space", cwd: "/app", space: "work" })).toBe(false);
-		expect(workspacesFile(path).value).toEqual({ added: [], hidden: [], personal: ["/home"] });
-		expect(file.apply({ op: "space", cwd: "/home", space: "work" })).toBe(true);
-		expect(workspacesFile(path).value).toEqual({ added: [], hidden: [], personal: [] });
-	});
-
-	test("a file an older version wrote, without personal, reads as every workspace in Work", () => {
+	test("a file an older version wrote with a personal list reads without it", () => {
 		const path = workspacesPath();
 		mkdirSync(dirname(path), { recursive: true });
-		writeFileSync(path, JSON.stringify({ added: ["/a"], hidden: [] }));
-		expect(workspacesFile(path).value).toEqual({ added: ["/a"], hidden: [], personal: [] });
+		writeFileSync(path, JSON.stringify({ added: ["/a"], hidden: [], personal: ["/a"] }));
+		expect(workspacesFile(path).value).toEqual({ added: ["/a"], hidden: [] });
 		expect(existsSync(`${path}.invalid`)).toBe(false);
 	});
 
@@ -62,10 +51,8 @@ describe("WorkspacesFile", () => {
 		const path = workspacesPath();
 		mkdirSync(dirname(path), { recursive: true });
 		writeFileSync(path, JSON.stringify({ added: ["code/app"], hidden: [] }));
-		expect(workspacesFile(path).value).toEqual({ added: [], hidden: [], personal: [] });
+		expect(workspacesFile(path).value).toEqual({ added: [], hidden: [] });
 		expect(existsSync(`${path}.invalid`)).toBe(true);
-		writeFileSync(path, JSON.stringify({ added: [], hidden: [], personal: ["code/app"] }));
-		expect(workspacesFile(path).value).toEqual({ added: [], hidden: [], personal: [] });
 	});
 
 	test("takes over the list an older version saved in projects.json", () => {
@@ -73,7 +60,7 @@ describe("WorkspacesFile", () => {
 		const oldPath = oldPathOf(path);
 		mkdirSync(dirname(path), { recursive: true });
 		writeFileSync(oldPath, JSON.stringify({ added: ["/a"], hidden: ["/b"] }));
-		expect(workspacesFile(path).value).toEqual({ added: ["/a"], hidden: ["/b"], personal: [] });
+		expect(workspacesFile(path).value).toEqual({ added: ["/a"], hidden: ["/b"] });
 		expect(existsSync(oldPath)).toBe(false);
 		expect(existsSync(path)).toBe(true);
 	});
@@ -85,7 +72,7 @@ describe("WorkspacesFile", () => {
 		const saved = JSON.stringify({ added: ["/a"], hidden: [] });
 		writeFileSync(path, saved);
 		writeFileSync(oldPath, JSON.stringify({ added: ["/c"], hidden: [] }));
-		expect(workspacesFile(path).value).toEqual({ added: ["/a"], hidden: [], personal: [] });
+		expect(workspacesFile(path).value).toEqual({ added: ["/a"], hidden: [] });
 		expect(readFileSync(path, "utf8")).toBe(saved);
 		expect(existsSync(oldPath)).toBe(true);
 	});
@@ -96,7 +83,7 @@ describe("WorkspacesFile", () => {
 		mkdirSync(dirname(path), { recursive: true });
 		const other = JSON.stringify({ projects: [{ name: "Launch", cwds: ["/a"] }] });
 		writeFileSync(oldPath, other);
-		expect(workspacesFile(path).value).toEqual({ added: [], hidden: [], personal: [] });
+		expect(workspacesFile(path).value).toEqual({ added: [], hidden: [] });
 		expect(readFileSync(oldPath, "utf8")).toBe(other);
 		expect(existsSync(path)).toBe(false);
 	});
@@ -104,6 +91,6 @@ describe("WorkspacesFile", () => {
 	test("starts empty when neither file exists", () => {
 		const path = workspacesPath();
 		mkdirSync(dirname(path), { recursive: true });
-		expect(workspacesFile(path).value).toEqual({ added: [], hidden: [], personal: [] });
+		expect(workspacesFile(path).value).toEqual({ added: [], hidden: [] });
 	});
 });

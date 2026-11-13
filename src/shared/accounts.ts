@@ -1,7 +1,6 @@
 /** The integrations: omp's MCP sign-ins and the OAuth clients they use. */
 import { arrayOf, decoder, fields, type Guard, isBoolean, isNumber, isString, nullable, oneOf, tagged } from "../json";
 import type { McpRemoteStatus, McpTool } from "./mcp-status";
-import { isSpace, type Space } from "./workspaces";
 
 /** A sign-in that the integrations page started: waiting for the browser at the provider's authorization `url`, or why it failed. */
 export type SignInState = { phase: "waiting"; url: string } | { phase: "failed"; error: string } | null;
@@ -229,28 +228,20 @@ export const callable = (connection: McpConnection): boolean => connection.kind 
 export const anyCallable = (accounts: readonly { connection: McpConnection }[]): boolean => accounts.some(account => callable(account.connection));
 
 /**
- * One account of a Google service: its server, the address Google says it signs in as once a read learned it, why the
- * latest read of that address failed, and the space whose Calendar and Email show it.
+ * One account of a Google service: its server, the address Google says it signs in as once a read learned it, and why
+ * the latest read of that address failed.
  */
 export interface GoogleAccount {
 	name: AccountId;
 	address: string | null;
 	addressError: string | null;
 	connection: McpServerConnection;
-	/** Work for an account no one placed, as every account was before spaces. */
-	space: Space;
 }
 
 /** `PUT /api/integrations/sign-in` and `/remove`: the service, and the account, `null` to add one; a service with one server takes `null`. */
 export interface IntegrationTarget {
 	id: McpIntegrationId;
 	account: AccountId | null;
-}
-
-/** `PUT /api/integrations/google-space`: the space Google `address`'s accounts, Gmail's and Google Calendar's, go in. */
-export interface GoogleSpace {
-	address: string;
-	space: Space;
 }
 
 /** The saved OAuth client of each kind, without the secret: `null` for a service that registers its own. */
@@ -307,7 +298,7 @@ const isServerConnection = tagged<McpServerConnection, "kind">("kind", {
 
 const isConnection = (value: unknown): value is McpConnection => fields<{ kind: "absent" }>({ kind: oneOf(["absent"]) })(value) || isServerConnection(value);
 
-const isAccount = fields<GoogleAccount>({ name: isString, address: nullable(isString), addressError: nullable(isString), connection: isServerConnection, space: isSpace });
+const isAccount = fields<GoogleAccount>({ name: isString, address: nullable(isString), addressError: nullable(isString), connection: isServerConnection });
 
 const isSignIn = nullable(
 	(value: unknown): value is NonNullable<IntegrationSignIn> =>

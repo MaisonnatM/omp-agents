@@ -22,12 +22,12 @@ describe("LocalEventsFile", () => {
 	test("an added event is kept for the next server, and a removed one is gone for it", () => {
 		const path = eventsPath();
 		const first = new LocalEventsFile(path);
-		const lunch = first.add("Lunch", timed("2026-10-07T10:30:00Z", "2026-10-07T11:30:00Z"), "work");
-		const trip = first.add("Trip", allDay("2026-10-14", "2026-10-16"), "personal");
+		const lunch = first.add("Lunch", timed("2026-10-07T10:30:00Z", "2026-10-07T11:30:00Z"));
+		const trip = first.add("Trip", allDay("2026-10-14", "2026-10-16"));
 		expect(lunch.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
 		expect(new LocalEventsFile(path).value).toEqual([
-			{ id: lunch.id, title: "Lunch", when: { allDay: false, start: Date.parse("2026-10-07T10:30:00Z"), end: Date.parse("2026-10-07T11:30:00Z") }, sessionId: null, space: "work" },
-			{ id: trip.id, title: "Trip", when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-16" }, sessionId: null, space: "personal" },
+			{ id: lunch.id, title: "Lunch", when: { allDay: false, start: Date.parse("2026-10-07T10:30:00Z"), end: Date.parse("2026-10-07T11:30:00Z") }, sessionId: null },
+			{ id: trip.id, title: "Trip", when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-16" }, sessionId: null },
 		]);
 
 		first.apply({ op: "remove", id: lunch.id });
@@ -36,18 +36,11 @@ describe("LocalEventsFile", () => {
 		expect(new LocalEventsFile(path).value.map(event => event.title)).toEqual(["Trip"]);
 	});
 
-	test("an event saved before spaces reads as Work, and a move to the other space is kept for the next server", () => {
+	test("an event an older version saved with a space reads without it", () => {
 		const path = eventsPath();
 		mkdirSync(dirname(path), { recursive: true });
-		writeFileSync(path, JSON.stringify({ events: [{ id: "a", title: "Old", when: allDay("2026-10-02", "2026-10-02"), sessionId: null }] }));
-		const file = new LocalEventsFile(path);
-		expect(file.value.map(event => event.space)).toEqual(["work"]);
-		const before = file.value;
-		file.apply({ op: "set-space", id: "a", space: "work" });
-		file.apply({ op: "set-space", id: "gone", space: "personal" });
-		expect(file.value).toBe(before);
-		file.apply({ op: "set-space", id: "a", space: "personal" });
-		expect(new LocalEventsFile(path).value.map(event => event.space)).toEqual(["personal"]);
+		writeFileSync(path, JSON.stringify({ events: [{ id: "a", title: "Old", when: allDay("2026-10-02", "2026-10-02"), sessionId: null, space: "personal" }] }));
+		expect(new LocalEventsFile(path).value).toEqual([{ id: "a", title: "Old", when: allDay("2026-10-02", "2026-10-02"), sessionId: null }]);
 	});
 
 	test("a file holding something else moves aside rather than being written over", () => {
@@ -56,7 +49,7 @@ describe("LocalEventsFile", () => {
 		writeFileSync(path, JSON.stringify({ events: [{ id: "a", title: "Backward", when: allDay("2026-10-02", "2026-10-01") }] }));
 		const file = new LocalEventsFile(path);
 		expect(existsSync(`${path}.invalid`)).toBe(true);
-		file.add("Fresh", allDay("2026-10-05", "2026-10-05"), "work");
+		file.add("Fresh", allDay("2026-10-05", "2026-10-05"));
 		expect(new LocalEventsFile(path).value.map(event => event.title)).toEqual(["Fresh"]);
 	});
 

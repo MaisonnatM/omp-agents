@@ -3,8 +3,6 @@
  * The omp extension `templates/omp/agent/extensions/notes.ts` reads the same file and writes the changes it adds but cannot import `src/`, so it keeps its own copy of these shapes: change it with this one.
  */
 
-import type { Space } from "./shared/workspaces";
-
 /** A note of your own, on the Notes page. */
 export interface UserNote {
 	id: string;
@@ -16,8 +14,6 @@ export interface UserNote {
 	todoId: string | null;
 	/** The omp session whose agent added it, `null` when you did. */
 	addedBy: string | null;
-	/** The space it is filed in: an agent's takes its session's, yours the one on screen, and one saved before spaces is Work. */
-	space: Space;
 	createdAt: string;
 	/** When its title or body last changed, which orders the list. */
 	updatedAt: string;
@@ -40,8 +36,6 @@ export type UserNoteChange =
 	/** Adds `text` as a paragraph after the body. */
 	| { op: "append"; id: string; text: string; at: string }
 	| { op: "set-todo"; id: string; todoId: string | null }
-	/** Moves it to the other space, without marking it updated. */
-	| { op: "set-space"; id: string; space: Space }
 	| { op: "remove"; id: string }
 	/** Undoes a `remove`, putting `note` back at `index`. */
 	| { op: "restore"; note: UserNote; index: number };

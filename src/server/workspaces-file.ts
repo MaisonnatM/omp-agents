@@ -1,9 +1,24 @@
-/** The directories Settings → Workspaces added, hid, and placed in the Personal space, saved in `workspaces.json`. */
-import { linkSync, unlinkSync } from "node:fs";
+/** The directories Settings → Workspaces added and hid, saved in `workspaces.json`. */
+import { linkSync, readFileSync, unlinkSync } from "node:fs";
 import { ReducerFile } from "../fs";
 import { errorText, isObject } from "../json";
 import { applyWorkspace, NO_WORKSPACES, type WorkspaceChange, type WorkspaceList } from "../shared/workspaces";
-import { parseWorkspaces, readWorkspaces } from "../workspace-list";
+
+const isPaths = (value: unknown): value is string[] => Array.isArray(value) && value.every(entry => typeof entry === "string" && entry.startsWith("/"));
+
+/** The list `value` holds; a `personal` list an older version wrote is dropped. */
+function parseWorkspaces(value: unknown): WorkspaceList | null {
+	return isObject(value) && isPaths(value.added) && isPaths(value.hidden) ? { added: value.added, hidden: value.hidden } : null;
+}
+
+/** Whether the file at `path` holds a workspace list. */
+function holdsWorkspaces(path: string): boolean {
+	try {
+		return parseWorkspaces(JSON.parse(readFileSync(path, "utf8"))) !== null;
+	} catch {
+		return false;
+	}
+}
 
 /**
  * Moves `oldPath`, where an older version saved the list, to `path`, when it holds a workspace list; a file there in any
@@ -12,7 +27,7 @@ import { parseWorkspaces, readWorkspaces } from "../workspace-list";
  * Runs before anything reads either file.
  */
 export function adoptOldWorkspaces(oldPath: string, path: string): void {
-	if (readWorkspaces(oldPath) === null) return;
+	if (!holdsWorkspaces(oldPath)) return;
 	try {
 		linkSync(oldPath, path);
 		unlinkSync(oldPath);

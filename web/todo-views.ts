@@ -4,7 +4,6 @@ import type { TodoStatus, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList }
 import { everyWord } from "../src/shared/every-word";
 import type { BadgeColor } from "@/components/ui/badge";
 import { localDay } from "../src/shared/days";
-import type { Space } from "../src/shared/workspaces";
 import { DAY_FORMAT } from "./labels";
 import type { WindowScope } from "./sessions";
 import type { TodoListView } from "./routing";
@@ -87,14 +86,9 @@ export function earliestDue(todo: UserTodo): string | null {
 /** Where a session for top-level `todo` starts: its Workspace, else `fallback`, the directory a new session would start in anyway. */
 export const todoCwd = (todo: Pick<UserTodo, "workspace">, fallback: string): string => todo.workspace ?? fallback;
 
-/** What the sidebar narrows the todos to: its workspace, else its space. */
-export type TodoScope = Pick<WindowScope, "workspace" | "space" | "spaces">;
-
-/** The top-level `todos` in `scope`: those naming its workspace, else those whose workspace is in its space, where a todo naming no workspace counts as Work. */
-export function inScope(todos: UserTodo[], { workspace, space, spaces }: TodoScope): UserTodo[] {
-	if (workspace !== null) return todos.filter(todo => todo.workspace === workspace);
-	const spaceOfTodo = ({ workspace }: UserTodo): Space => (workspace === null ? "work" : spaces.of(workspace, workspace));
-	return todos.filter(todo => spaceOfTodo(todo) === space);
+/** The top-level `todos` in `scope`: those naming its workspace, else all of them. */
+export function inScope(todos: UserTodo[], { workspace }: WindowScope): UserTodo[] {
+	return workspace === null ? todos : todos.filter(todo => todo.workspace === workspace);
 }
 
 /**
@@ -126,7 +120,7 @@ export function todosOf(list: UserTodoList, view: TodoListView, day: string, ses
 }
 
 /** How many of the top-level todos `view` lists in `scope` are still open; for Archive, how many it holds. */
-export function leftIn(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions, hidden: ReadonlySet<string>, scope: TodoScope): number {
+export function leftIn(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions, hidden: ReadonlySet<string>, scope: WindowScope): number {
 	const todos = inScope(todosOf(list, view, day, sessions, hidden), scope);
 	return view.kind === "archive" ? todos.length : todos.filter(todo => todo.doneAt === null).length;
 }

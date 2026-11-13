@@ -25,7 +25,7 @@ export interface SessionLists {
 	latest: View | null;
 }
 
-/** The sidebar's session lists for the selected workspace, or every workspace of the space, its search, and the server's pins, which `changePins` changes. */
+/** The sidebar's session lists for the selected workspace, or every workspace, its search, and the server's pins, which `changePins` changes. */
 export function useSessionLists(
 	{ visible, workspace, workspaces }: Pick<WorkspaceScope, "visible" | "workspace" | "workspaces">,
 	pins: string[],

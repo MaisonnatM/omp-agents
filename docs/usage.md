@@ -20,7 +20,6 @@ For which file draws each part of the screen, see the [Interface map](code-layou
   - [Continue after a usage limit or a connection error](usage/send-later.md#continue-after-a-usage-limit-or-a-connection-error)
 - [Questions](usage/questions.md)
 - [Starting, ending, resuming, and forking](usage/starting-ending-resuming-and-forking.md)
-- [Personal sessions](usage/personal-sessions.md)
 - [Per-project agent setup](usage/per-project-agent-setup.md)
 - [Pull requests](usage/pull-requests.md)
 - [Pull request details](usage/pull-request-details.md)

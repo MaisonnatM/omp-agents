@@ -8,12 +8,9 @@ import {
 	hideTab,
 	moveTab,
 	navRowOf,
-	pageSpace,
 	positionKey,
 	shortcutRows,
 	shownTabs,
-	tabSpace,
-	tabsOutOfSpace,
 	tabsSignedOut,
 	tabShortcutLabels,
 	type TabLayout,
@@ -145,37 +142,6 @@ test("until the integrations answer, the tabs that wait on one are signed out", 
 	expect(tabsSignedOut(undefined)).toEqual(["tickets", "email"]);
 });
 
-test("Tickets shows only in Work and Sport only in Personal; every other tab shows in both", () => {
-	expect(tabsOutOfSpace("personal")).toEqual(["tickets"]);
-	expect(tabsOutOfSpace("work")).toEqual(["sport"]);
-	expect(DEFAULT_TAB_LAYOUT.map(({ tab }) => tabSpace(tab))).toEqual([null, "work", null, null, null, null, null, "personal", null]);
-});
-
-const pageAt = (hash: string): Page => {
-	const route = routeFromHash(hash);
-	if (route.kind !== "page") throw new Error(`${hash} names no page`);
-	return route.page;
-};
-
-test("a link to Sport takes the window to Personal and a link to Tickets to Work, whichever of their pages it opens", () => {
-	expect(pageSpace(pageAt("#sport"))).toBe("personal");
-	expect(pageSpace(pageAt("#sport/journal"))).toBe("personal");
-	expect(pageSpace(pageAt("#tickets"))).toBe("work");
-	expect(pageSpace(pageAt("#tickets/ENG-12"))).toBe("work");
-});
-
-test("every other page shows in both spaces and leaves the window's space as it is", () => {
-	for (const hash of ["#todo", "#notes", "#calendar", "#pull-requests", "#bots", "#settings/models", "#get-started", "#scheduled"]) expect(pageSpace(pageAt(hash))).toBeNull();
-});
-
-test("in Personal the page list closes up over the absent Tickets tab, so Cmd+1 onward still go to the rows it shows in order", () => {
-	const personal = shownTabs(DEFAULT_TAB_LAYOUT, new Set(tabsOutOfSpace("personal")));
-	expect(personal).toEqual(["pull-requests", "bots", "sessions", "notes", "calendar", "todo", "sport", "email"]);
-	expect(personal.map(tab => positionKey(tab, personal))).toEqual(["tab1", "tab2", "tab3", "tab4", "tab5", undefined, undefined, undefined]);
-	expect(positionKey("tickets", personal)).toBeUndefined();
-	expect(shownTabs(DEFAULT_TAB_LAYOUT, new Set(tabsOutOfSpace("work")))).not.toContain("sport");
-});
-
 test("the first five shown tabs take the position keys", () => {
 	const shown = shownTabs(DEFAULT_TAB_LAYOUT, new Set());
 	expect(shown.map(tab => positionKey(tab, shown))).toEqual(["tab1", "tab2", "tab3", "tab4", "tab5", undefined, undefined, undefined, undefined]);
@@ -213,6 +179,12 @@ test("shortcutRows folds each shown tab's position key into its row, drops the p
 	expect(tabShortcutLabels("sessions", shown)).toEqual([`${mod}3`]);
 	expect(tabShortcutLabels("email", shown)).toEqual(["G then M"]);
 });
+
+const pageAt = (hash: string): Page => {
+	const route = routeFromHash(hash);
+	if (route.kind !== "page") throw new Error(`${hash} names no page`);
+	return route.page;
+};
 
 test("the page list's current row is the page's tab, Sessions for the panes, and none for a page without a row", () => {
 	const none = new Set<never>();

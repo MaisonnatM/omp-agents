@@ -33,7 +33,7 @@ interface SportPageProps {
 	onChange: (changes: SportChange[]) => Promise<void>;
 }
 
-/** What to ask the personal agent for when there is no plan yet. */
+/** What to ask a session for when there is no plan yet. */
 const ASK_FOR_PLAN = "Crée-moi un plan d'escalade de 4 semaines : poutre, bloc et routine hanche, avec mes charges de départ.";
 
 export function SportPage({ state, route, disabled, onChange }: SportPageProps) {
@@ -110,9 +110,9 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 							(plan === null ? (
 								<div className="mx-auto flex max-w-xl flex-col gap-2 px-6 py-10 text-sm">
 									<h2 className="text-base font-semibold">Pas encore de plan</h2>
-									<p className="text-muted-foreground">Ton agent personnel écrit le plan. Demande-lui par exemple :</p>
+									<p className="text-muted-foreground">Une session écrit le plan avec son outil sport. Demande-lui par exemple :</p>
 									<blockquote className="rounded-lg border border-border bg-card px-4 py-3">« {ASK_FOR_PLAN} »</blockquote>
-									<p className="text-muted-foreground">La semaine s'affiche ici dès qu'il l'enregistre. En attendant, « Séance libre » note une séance au journal.</p>
+									<p className="text-muted-foreground">La semaine s'affiche ici dès qu'elle l'enregistre. En attendant, « Séance libre » note une séance au journal.</p>
 								</div>
 							) : (
 								<WeekTab

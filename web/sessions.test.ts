@@ -1,10 +1,7 @@
 import { fromPartial } from "@total-typescript/shoehorn";
 import { describe, expect, test } from "bun:test";
-import type { ScheduledSend } from "../src/shared/scheduled";
 import type { AgentRow, AgentStatus, HostStatus, PastSession, RosterHost, UnreadTurn, View } from "../src/shared/sessions";
-import { spaces } from "../src/shared/workspaces";
-import type { Layout, Page } from "./routing";
-import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, rosterFolders, rowPlacement, scheduledIn, searchSessions, sessionsIn, sidebarSessions, spaceSession, spaceSwitchPanes, waitingCount, waitingIn, workspaceGroups, workspaceSession, workspacesIn, workspaceSwitch } from "./sessions";
+import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, rosterFolders, rowPlacement, searchSessions, sidebarSessions, waitingCount, workspaceGroups, workspaceSession, workspaceSwitch } from "./sessions";
 
 const host = (sessionId: string, cwd: string) => fromPartial<RosterHost>({ instanceId: `i-${sessionId}`, sessionId, cwd, agents: [], turnWaits: false });
 const subagents = (...statuses: AgentStatus[]): AgentRow[] => statuses.map(status => fromPartial<AgentRow>({ status }));
@@ -105,89 +102,6 @@ describe("workspaceSession", () => {
 	});
 });
 
-describe("spaces", () => {
-	const personalDir = { cwd: "/home/me/personal", cwdDisplay: "~/personal" };
-	const placed = spaces(["/code/garden"], personalDir);
-	const running = (sessionId: string, cwd: string, startedAt: number, workspace: string | null = null) =>
-		fromPartial<RosterHost>({ ...host(sessionId, cwd), startedAt, workspace: workspace === null ? null : { cwd: workspace, cwdDisplay: workspace } });
-
-	test("a session counts in the space of its workspace, the personal directory and a linked worktree of a Personal workspace in Personal", () => {
-		const hosts = [running("life", "/home/me/personal", 1), running("tree", "/code/garden-wt", 2, "/code/garden"), running("job", "/code/app", 3), running("unplaced", "/code/garden", 4)];
-		const lists = { hosts, past: [past("old", "/code/garden", false), past("work", "/code/app", false)] };
-		expect(ids(sessionsIn(lists, "personal", placed).hosts)).toEqual(["life", "tree", "unplaced"]);
-		expect(ids(sessionsIn(lists, "personal", placed).past)).toEqual(["old"]);
-		expect(ids(sessionsIn(lists, "work", placed).hosts)).toEqual(["job"]);
-	});
-
-	test("before the server names the personal directory, a session there counts as Work", () => {
-		const lists = { hosts: [running("life", "/home/me/personal", 1)], past: [] };
-		const unnamed = spaces(["/code/garden"], null);
-		expect(ids(sessionsIn(lists, "work", unnamed).hosts)).toEqual(["life"]);
-		expect(sessionsIn(lists, "personal", unnamed).hosts).toEqual([]);
-	});
-
-	test("Personal's workspaces start at the personal directory, even before a session ran there", () => {
-		const workspaces = [{ cwd: "/code/app", cwdDisplay: "~/app" }, { cwd: "/code/garden", cwdDisplay: "~/garden" }, personalDir];
-		expect(workspacesIn(workspaces, "personal", placed, personalDir)).toEqual([personalDir, { cwd: "/code/garden", cwdDisplay: "~/garden" }]);
-		expect(workspacesIn(workspaces.slice(0, 2), "personal", placed, personalDir)).toEqual([personalDir, { cwd: "/code/garden", cwdDisplay: "~/garden" }]);
-		expect(workspacesIn(workspaces, "work", placed, personalDir)).toEqual([{ cwd: "/code/app", cwdDisplay: "~/app" }]);
-	});
-
-	test("switching space follows the space's most recently started running session, or nothing when none runs there", () => {
-		const hosts = [running("old", "/code/garden", 1), running("new", "/home/me/personal", 5), running("job", "/code/app", 9)];
-		expect(spaceSession("personal", hosts, placed)).toEqual({ kind: "live", instanceId: "i-new", agentId: null });
-		expect(spaceSession("work", hosts, placed)).toEqual({ kind: "live", instanceId: "i-job", agentId: null });
-		expect(spaceSession("personal", [running("job", "/code/app", 9)], placed)).toBeNull();
-	});
-
-	test("a scheduled start is in its directory's space, a message or a continue in its session's, and one for a session no list holds in Work", () => {
-		const byPage = spaces([{ cwd: "/code/garden", cwdDisplay: "~/garden" }], personalDir);
-		const send = (id: string, target: ScheduledSend["target"]) => fromPartial<ScheduledSend>({ id, target });
-		const sends = [
-			send("home", fromPartial({ kind: "start", request: { cwd: "~/personal" } })),
-			send("garden", fromPartial({ kind: "start", request: { cwd: "~/garden" } })),
-			send("job", fromPartial({ kind: "start", request: { cwd: "~/app" } })),
-			send("life", { kind: "message", sessionId: "life", text: "hi" }),
-			send("old", { kind: "continue", sessionId: "old", provider: "Anthropic", cause: "usage-limit" }),
-			send("gone", { kind: "message", sessionId: "gone", text: "hi" }),
-		];
-		const sessions = { hosts: [running("life", "/code/garden-wt", 1, "/code/garden")], past: [past("old", "/home/me/personal", false)] };
-		expect(scheduledIn(sends, "personal", sessions, byPage).map(({ id }) => id)).toEqual(["home", "garden", "life", "old"]);
-		expect(scheduledIn(sends, "work", sessions, byPage).map(({ id }) => id)).toEqual(["job", "gone"]);
-	});
-
-	test("a space counts the sessions it lists that need you, not those of a hidden workspace or a Bot", () => {
-		const turn = fromPartial<UnreadTurn>({ at: 1, reply: "Done." });
-		const asks = (sessionId: string, cwd: string) => ({ ...running(sessionId, cwd, 1), status: "needs-input" as const, unread: null, requests: [] });
-		const hosts = [
-			asks("life", "/home/me/personal"),
-			{ ...running("garden", "/code/garden", 2), status: "idle" as const, unread: turn, requests: [] },
-			asks("secret", "/home/me/personal/hidden"),
-			asks("bot", "/home/me/personal"),
-			asks("job", "/code/app"),
-			{ ...running("busy", "/code/app", 3), status: "working" as const, unread: null, requests: [] },
-		];
-		const everySpace = discoverableSessions(hosts, [], new Set(["/home/me/personal/hidden"]), new Set(["bot"]));
-		expect(waitingIn(everySpace, "personal", placed)).toBe(2);
-		expect(waitingIn(everySpace, "work", placed)).toBe(1);
-	});
-
-	test("a switch of space keeps a page of both spaces, and otherwise opens the newest session of the space it goes to", () => {
-		const hosts = [running("life", "/home/me/personal", 5), running("job", "/code/app", 9)];
-		const panes = fromPartial<Layout>({ panes: [{}] });
-		const empty = fromPartial<Layout>({ panes: [] });
-		const sport: Page = { kind: "sport", tab: "week", day: null };
-		const todo: Page = { kind: "todo", list: { kind: "all" }, open: null };
-		expect(spaceSwitchPanes(todo, panes, "work", "personal", hosts, placed)).toBe("stay");
-		expect(spaceSwitchPanes(sport, panes, "work", "personal", hosts, placed)).toBe("stay");
-		expect(spaceSwitchPanes(null, panes, "work", "personal", hosts, placed)).toEqual({ kind: "live", instanceId: "i-life", agentId: null });
-		expect(spaceSwitchPanes(sport, panes, "personal", "work", hosts, placed)).toEqual({ kind: "live", instanceId: "i-job", agentId: null });
-		expect(spaceSwitchPanes(null, panes, "personal", "work", [hosts[0]!], placed)).toBe("empty");
-		expect(spaceSwitchPanes(sport, empty, "personal", "work", hosts, placed)).toBe("empty");
-		expect(spaceSwitchPanes(null, empty, "work", "personal", hosts, placed)).toBe("empty");
-	});
-});
-
 describe("latestSession", () => {
 	const running = (sessionId: string, cwd: string, startedAt: number) => ({ ...host(sessionId, cwd), startedAt }) as RosterHost;
 	const saved = (sessionId: string, cwd: string, modifiedAt: number) => ({ ...past(sessionId, cwd, false), modifiedAt }) as PastSession;
@@ -210,8 +124,7 @@ describe("defaultCwd", () => {
 	const past = (sessionId: string, cwdDisplay: string) => ({ sessionId, cwd: cwdDisplay, cwdDisplay }) as PastSession;
 	const hosts = [host("a", "~/old", 1), host("b", "~/new", 2)];
 	const sessions = [past("s1", ""), past("s2", "~/saved")];
-	const all = { workspace: null, home: null };
-	const personal = { cwd: "/home/me/personal", cwdDisplay: "~/personal" };
+	const all = { workspace: null };
 
 	test("prefers the open session, then the newest live one, then the newest past one with a directory", () => {
 		expect(defaultCwd({ kind: "live", instanceId: "a", agentId: null }, hosts, sessions, all)).toBe("~/old");
@@ -222,13 +135,8 @@ describe("defaultCwd", () => {
 	});
 
 	test("stays in the selected workspace, so the new session is listed under it", () => {
-		expect(defaultCwd({ kind: "live", instanceId: "b", agentId: null }, hosts, sessions, { workspace: "~/old", home: null })).toBe("~/old");
-		expect(defaultCwd(null, hosts, sessions, { workspace: "~/saved", home: null })).toBe("~/saved");
-	});
-
-	test("in Personal with no workspace picked, starts in the personal directory whatever session is open", () => {
-		expect(defaultCwd({ kind: "live", instanceId: "a", agentId: null }, hosts, sessions, { workspace: null, home: personal })).toBe("~/personal");
-		expect(defaultCwd(null, hosts, sessions, { workspace: "~/saved", home: personal })).toBe("~/saved");
+		expect(defaultCwd({ kind: "live", instanceId: "b", agentId: null }, hosts, sessions, { workspace: "~/old" })).toBe("~/old");
+		expect(defaultCwd(null, hosts, sessions, { workspace: "~/saved" })).toBe("~/saved");
 	});
 });
 
@@ -353,7 +261,7 @@ describe("a session in a linked worktree", () => {
 	test("counts in its repository's workspace, which lists it, while its directory is no workspace", () => {
 		expect(listWorkspaces([inWorktree], [], [])).toEqual([app]);
 		expect(ids(sidebarSessions([inWorktree, inMain], [], "/code/app", new Set()).running)).toEqual(["w", "m"]);
-		expect(defaultCwd({ kind: "live", instanceId: "i-w", agentId: null }, [inWorktree], [], { workspace: "/code/app", home: null })).toBe("~/code/app");
+		expect(defaultCwd({ kind: "live", instanceId: "i-w", agentId: null }, [inWorktree], [], { workspace: "/code/app" })).toBe("~/code/app");
 	});
 
 	test("leaves the lists with its hidden workspace", () => {

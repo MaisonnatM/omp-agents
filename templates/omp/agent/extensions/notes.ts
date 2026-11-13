@@ -20,7 +20,6 @@ interface Note {
 	createdAt: string;
 	updatedAt?: string;
 }
-// The dashboard files an added note in the space of the session that added it.
 type Change = { op: "add"; note: Note } | { op: "append"; id: string; text: string; at: string };
 
 /** Pending changes participate in reads so agents see their writes while the dashboard is stopped. */

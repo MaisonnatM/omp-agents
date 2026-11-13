@@ -83,7 +83,7 @@ Its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/serve
 ## Packaging and releases
 
 `scripts/build-desktop-artifact.ts`, modeled on T3 Code's script of the same name, builds `desktop/dist/resources`: the server bundled into `server.js` with Tailwind left out, the page prebuilt by `buildPage`, the keeper bundled into `keeper.js`, and the starter kit's `agent/`, `config.yml`, and installer bundled into `install.js`.
-It bundles the session visuals, Bot, shepherd, designer, and personal extensions beside them, into `session-visuals-extension.js`, `bot-extension.js`, `shepherd-extension.js`, `designer-extension.js`, and `personal-extension.js`.
+It bundles the session visuals, Bot, shepherd, designer, and Sport extensions beside them, into `session-visuals-extension.js`, `bot-extension.js`, `shepherd-extension.js`, `designer-extension.js`, and `sport-extension.js`.
 It then downloads the Bun of the build's own version for each architecture into `desktop/dist/bun-<arch>`, and runs electron-builder with a config it generates.
 That writes a DMG, a zip, their blockmaps, and `latest-mac.yml` to `desktop/release`, or with `--os linux` one AppImage per architecture with `latest-linux.yml` and `latest-linux-arm64.yml`.
 It signs and notarizes when `CSC_LINK` and the `APPLE_API_KEY*` variables are set, with the hardened runtime and `desktop/entitlements.mac.plist`, which lets Bun JIT; otherwise it signs ad hoc.

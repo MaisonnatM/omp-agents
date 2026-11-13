@@ -1,19 +1,19 @@
-import { Search } from "lucide-react";
+import { Keyboard, Search } from "lucide-react";
 import { memo, type ReactNode, useContext, useMemo } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
-import type { BotId, BotLast } from "../../src/shared/bots";
+import type { Bot, BotId, BotLast } from "../../src/shared/bots";
 import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import { agentOn } from "../../src/shared/moves";
 import { Button } from "@/components/ui/button";
-import { SidebarContent } from "@/components/ui/sidebar";
+import { SidebarContent, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
 import { botRows, botsNeedingYou } from "../bots-model";
-import { SPACE_LABELS, sessionsWaiting, workspaceName } from "../labels";
+import { folderName, sessionsWaiting } from "../labels";
 import { yourMoveCount } from "../pull-requests-model";
 import { pullRequestsStore } from "../reads";
-import type { NotesListView, PullRequestsRoute, Page, SettingsRoute, SidebarTab, TodoListView } from "../routing";
+import { hashForPage, type NotesListView, type PullRequestsRoute, type Page, type SettingsRoute, type SidebarTab, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import { shortcutLabels } from "../shortcuts";
 import type { NavRow } from "../sidebar-tabs";
@@ -22,11 +22,13 @@ import type { WorkspaceScope } from "../use-workspace-scope";
 import { AppMark } from "./app-mark";
 import { BotsNav } from "./bots/bots-nav";
 import { CalendarNav } from "./calendar/calendar-nav";
-import { PersonalContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
+import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
+import { ShortcutChip } from "./kbd";
 import { EmailNav } from "./email/email-nav";
 import { NotesNav } from "./notes/nav";
 import { pullRequestsPageShows, usePullRequestDetailsPlacement, usePullRequestsView } from "./pull-requests/pull-requests-board";
 import { PullRequestsBoardIndex, PullRequestsIndex, PullRequestsNav } from "./pull-requests/pull-requests-nav";
+import { ScheduledSends } from "./scheduled";
 import { Roster } from "./roster";
 import { SettingsNav } from "./settings/settings-nav";
 import { type NavCount, SidebarNav } from "./sidebar-nav";
@@ -58,23 +60,23 @@ interface AppSidebarProps {
 	past: PastSession[];
 	/** Each Bot's conversation's last words, `null` for a Bot with none yet. */
 	botLasts: Readonly<Record<BotId, BotLast | null>>;
+	/** The Bots, `null` until the server first lists them. */
+	bots: Bot[] | null;
 	todoView: TodoListView;
 	settings: SettingsRoute;
 	sectionTarget: SectionTarget | null;
 	onSectionTarget: (target: SectionTarget) => void;
 	onPickWorkspace: (cwd: string | null) => void;
 	onSearch: () => void;
-	/** The account row at the bottom: the space, and what else the app offers. */
-	foot: ReactNode;
 }
 
 /**
  * The left sidebar: the app's row with the command menu, the page list with the open page's own list, the roster, and
- * the space as an account row. The nodes it hands down are memoized, so a roster message that changes nothing the
+ * the keyboard shortcuts link. The nodes it hands down are memoized, so a roster message that changes nothing the
  * sidebar shows leaves it alone.
  */
 export const AppSidebar = memo(function AppSidebar({
-	scope: { visible, workspaces, workspace, bots, scheduled, space },
+	scope: { visible, workspaces, workspace },
 	sessions: { lists, groups, waiting, query, setQuery, togglePin },
 	page,
 	panes,
@@ -88,17 +90,17 @@ export const AppSidebar = memo(function AppSidebar({
 	hosts,
 	past,
 	botLasts,
+	bots,
 	todoView,
 	settings,
 	sectionTarget,
 	onSectionTarget,
 	onPickWorkspace,
 	onSearch,
-	foot,
 }: AppSidebarProps) {
 	const { changeTodo, openNewSession } = useDashboardActions();
 	const { connected, pullRequestsScope } = useDashboardStatus();
-	const personal = useContext(PersonalContext);
+	const scheduled = useContext(ScheduledSends);
 	const [pullRequestsView] = usePullRequestsView();
 	const [detailsPlacement] = usePullRequestDetailsPlacement();
 	const pullRequestRead = pullRequestsStore.use(pullRequestsScope).read;
@@ -136,11 +138,11 @@ export const AppSidebar = memo(function AppSidebar({
 			case "todo":
 				return <TodoCategories list={userTodos} view={todoView} disabled={!connected} onChange={changeTodo} sessions={todoSessions} />;
 			case "notes":
-				return <NotesNav list={userNotes} view={notesView} space={space} />;
+				return <NotesNav list={userNotes} view={notesView} />;
 			case "calendar":
-				return <CalendarNav open={page?.kind === "calendar"} space={space} />;
+				return <CalendarNav open={page?.kind === "calendar"} />;
 			case "email":
-				return <EmailNav space={space} />;
+				return <EmailNav />;
 			case "sport":
 				return <SportNav open={page?.kind === "sport" ? page : null} />;
 			case "settings":
@@ -150,11 +152,9 @@ export const AppSidebar = memo(function AppSidebar({
 				return never;
 			}
 		}
-	}, [row, listed, page, pullRequestsView, detailsPlacement, visible, sectionTarget, onSectionTarget, botList, userTodos, todoView, connected, changeTodo, todoSessions, userNotes, notesView, space, settings]);
+	}, [row, listed, page, pullRequestsView, detailsPlacement, visible, sectionTarget, onSectionTarget, botList, userTodos, todoView, connected, changeTodo, todoSessions, userNotes, notesView, settings]);
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
-	const newSessionLabel = selectedWorkspace
-		? `New session in ${workspaceName(selectedWorkspace.cwdDisplay, personal) ?? selectedWorkspace.cwdDisplay}`
-		: space === "personal" ? `New session in ${SPACE_LABELS.personal}` : "New session";
+	const newSessionLabel = selectedWorkspace ? `New session in ${folderName(selectedWorkspace.cwdDisplay) ?? selectedWorkspace.cwdDisplay}` : "New session";
 	return (
 		<div className="flex min-h-0 flex-1 flex-col">
 			<div className="flex h-(--page-header-height) shrink-0 items-center gap-1.5 pr-2 pl-[max(0.75rem,env(titlebar-area-x,0px))] select-none [-webkit-app-region:drag] *:[-webkit-app-region:no-drag]">
@@ -194,9 +194,18 @@ export const AppSidebar = memo(function AppSidebar({
 					onPickWorkspace={onPickWorkspace}
 				/>
 			</SidebarContent>
-			<div className="shrink-0 px-2 pt-1 pb-2">
-				{foot}
-			</div>
+			<SidebarMenu className="shrink-0 px-2 pt-1 pb-2">
+				<SidebarMenuItem>
+					<SidebarMenuButton size="short" asChild icon={Keyboard} isActive={page?.kind === "settings" && page.section === "keyboard"}>
+						<a {...activityControl("shortcuts.open")} href={hashForPage({ kind: "settings", section: "keyboard" })}>
+							Keyboard shortcuts
+						</a>
+					</SidebarMenuButton>
+					<SidebarMenuBadge>
+						<ShortcutChip id="help" />
+					</SidebarMenuBadge>
+				</SidebarMenuItem>
+			</SidebarMenu>
 		</div>
 	);
 });

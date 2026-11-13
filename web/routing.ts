@@ -1,11 +1,10 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { BarChart3, Blocks, Brain, FileText, Folders, GitBranch, GitMerge, HardDrive, KeyRound, type LucideIcon, MousePointerClick, Plug, RefreshCcw, Route as RouteIcon, Scale, Settings2, SlidersHorizontal, Smartphone, Workflow } from "lucide-react";
+import { BarChart3, Blocks, Brain, FileText, Folders, GitBranch, GitMerge, HardDrive, Keyboard, KeyRound, type LucideIcon, MousePointerClick, Plug, RefreshCcw, Route as RouteIcon, Scale, Settings2, SlidersHorizontal, Smartphone, Workflow } from "lucide-react";
 import { isDay } from "../src/json";
 import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
 import { hashForSession, type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
 import { TICKET_ID } from "../src/shared/tickets";
-import type { Space } from "../src/shared/workspaces";
 import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import type { StartOp } from "./starts";
 import { PAGE_ICON } from "./page-icons";
@@ -13,20 +12,19 @@ import { PAGE_ICON } from "./page-icons";
 /**
  * The sidebar's tabs, in order, each a row of its page list. A tab with an `integration` shows, and its
  * shortcut applies, only while omp holds a sign-in to that service, even one the service refuses, which the page then
- * offers to reconnect. A tab with a `space` shows, and its page and shortcut apply, only in that space: Tickets in Work,
- * Sport in Personal. Settings is no tab: the row after them and the header's button open it.
+ * offers to reconnect. Settings is no tab: the row after them and the header's button open it.
  */
 export const SIDEBAR_TABS = [
 	{ value: "pull-requests", label: "Pull requests", icon: PAGE_ICON["pull-requests"] },
-	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, integration: "linear", space: "work" },
+	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, integration: "linear" },
 	{ value: "bots", label: "Bots", icon: PAGE_ICON.bots },
 	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions },
 	{ value: "notes", label: "Notes", icon: PAGE_ICON.notes },
 	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar },
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo },
-	{ value: "sport", label: "Sport", icon: PAGE_ICON.sport, space: "personal" },
+	{ value: "sport", label: "Sport", icon: PAGE_ICON.sport },
 	{ value: "email", label: "Email", icon: PAGE_ICON.email, integration: "gmail" },
-] as const satisfies readonly { value: string; label: string; icon: LucideIcon; integration?: McpIntegrationId; space?: Space }[];
+] as const satisfies readonly { value: string; label: string; icon: LucideIcon; integration?: McpIntegrationId }[];
 
 /** A sidebar tab, a row of the sidebar's page list; the tickets, Bots, todo, notes, calendar, email, and sport tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
@@ -83,6 +81,7 @@ export const SETTINGS_SECTIONS = [
 	{ value: "analytics", label: "Analytics", icon: BarChart3, group: "usage", keywords: ["usage", "cost", "tokens", "spend"] },
 	{ value: "activity", label: "Activity", icon: MousePointerClick, group: "usage", keywords: ["features", "used", "time"] },
 	{ value: "preferences", label: "Preferences", icon: SlidersHorizontal, group: "general", keywords: ["theme", "dark mode", "notifications", "sound", "sidebar tabs", "transcript", "idle processes"] },
+	{ value: "keyboard", label: "Keyboard", icon: Keyboard, group: "general", keywords: ["shortcuts", "keys", "hotkeys", "keybindings"] },
 	{ value: "workspaces", label: "Workspaces", icon: Folders, group: "general", keywords: ["directories", "folders", "hide"] },
 	{ value: "sync", label: "Sync", icon: RefreshCcw, group: "general", keywords: ["git", "remote", "machines"] },
 	{ value: "phone", label: "Phone access", icon: Smartphone, group: "general", keywords: ["tailscale", "mobile", "pair", "qr"] },
@@ -98,7 +97,7 @@ export const SETTINGS_SECTIONS = [
 	{ value: "files", label: "Files", icon: FileText, group: "workspace", keywords: ["AGENTS.md", "config", "skills", "rules"], meta: AS_LOADED },
 	{ value: "extensions", label: "Extensions", icon: Blocks, group: "workspace", meta: { none: "Packages installed for your user, all workspaces", workspace: "As a session in this workspace discovers them" }, keywords: ["plugins", "marketplaces", "registry skills", "contributions", "install"] },
 	{ value: "workflows", label: "Workflows", icon: Workflow, group: "workspace", keywords: ["workflow"], meta: { ...AS_LOADED, none: "Your user skills only, for all workspaces" } },
-	{ value: "decisions", label: "Decisions", icon: Scale, group: "workspace", keywords: ["records", "adr"], meta: { workspace: "The repository's decision records, read-only", none: "Every workspace in this space, grouped by workspace" } },
+	{ value: "decisions", label: "Decisions", icon: Scale, group: "workspace", keywords: ["records", "adr"], meta: { workspace: "The repository's decision records, read-only", none: "Every workspace, grouped by workspace" } },
 	{ value: "worktrees", label: "Worktrees", icon: GitBranch, group: "workspace", keywords: ["branches", "cleanup"], meta: AS_LOADED },
 ] as const satisfies readonly { value: string; label: string; icon: LucideIcon; group: SettingsGroup; keywords: readonly string[]; meta?: { workspace: string; none: string } }[];
 

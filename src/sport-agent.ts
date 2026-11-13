@@ -1,5 +1,5 @@
 /**
- * What a personal session may change in the Sport module. Each `sport` tool call leaves one request, the session that
+ * What a session may change in the Sport module. Each `sport` tool call leaves one request, the session that
  * left it, the metrics it adds or replaces by id, and one change, which the tool checks before it leaves the file and
  * the server's sport inbox checks again against the state it applies to. An agent sets the targets and the plan, adds
  * measurements and workout logs in its session's name, and edits only the ones its session wrote; an edit names the
@@ -126,7 +126,7 @@ function agentChange(state: SportState, sessionId: string, value: unknown): Pars
 }
 
 /**
- * `value`, the request a personal session left, as an agent may make it to `state`: the request as the tool leaves it,
+ * `value`, the request a session left, as an agent may make it to `state`: the request as the tool leaves it,
  * the changes the server applies for it, and the state they leave, or why it is refused whole.
  */
 export function agentSportChanges(state: SportState, value: unknown): Parsed<{ request: AgentSportRequest; changes: SportChange[]; state: SportState }, Refusal> {
@@ -147,7 +147,7 @@ export function agentSportChanges(state: SportState, value: unknown): Parsed<{ r
 	return { ok: { request: { sessionId, metrics: metrics.ok, change: change.ok.change }, changes, state: next } };
 }
 
-/** `state` after the requests `values`, oldest first, the ones the server takes from a personal session, as it will apply them. */
+/** `state` after the requests `values`, oldest first, the ones the server takes from a session, as it will apply them. */
 export const withAgentChanges = (state: SportState, values: unknown[]): SportState =>
 	values.reduce<SportState>((next, value) => {
 		const result = agentSportChanges(next, value);

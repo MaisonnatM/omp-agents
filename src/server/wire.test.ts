@@ -11,7 +11,7 @@ import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, type PullRe
 import type { ReviewDraftEdit } from "../shared/review-drafts";
 import type { SportChange } from "../shared/sport";
 import { log } from "../sport-fixtures";
-import { MAX_QUEUED_STACK, parseAccountOrder, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseLocalEventSpace, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parseProcessStop, parsePromptDocument, parsePullRequestAttachment, parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestRebase, parsePullRequestViewedEdit, parseRepoQuery, parseReviewDraftEdit, parseReviewDraftPost, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseTrustChange, parseWorkspaceChange } from "./wire";
+import { MAX_QUEUED_STACK, parseAccountOrder, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parseProcessStop, parsePromptDocument, parsePullRequestAttachment, parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestRebase, parsePullRequestViewedEdit, parseRepoQuery, parseReviewDraftEdit, parseReviewDraftPost, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseTrustChange, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientFrame | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -449,16 +449,8 @@ describe("parseWorkspaceChange", () => {
 		expect(parseWorkspaceChange({ op: "hide", cwd: "~/code/app" })).toBeNull();
 		expect(parseWorkspaceChange({ op: "show", cwd: "app" })).toBeNull();
 		expect(parseWorkspaceChange({ op: "remove", cwd: "/home/user/app" })).toBeNull();
+		expect(parseWorkspaceChange({ op: "space", cwd: "/home/user/app", space: "personal" })).toBeNull();
 		expect(parseWorkspaceChange({ op: "add", cwd: "" })).toBeNull();
-	});
-
-	test("places a directory in a space by its absolute path, and rejects a relative path or another space", () => {
-		expect(parseWorkspaceChange({ op: "space", cwd: "/home/user/garden", space: "personal", extra: 1 })?.ok).toEqual({ op: "space", cwd: "/home/user/garden", space: "personal" });
-		expect(parseWorkspaceChange({ op: "space", cwd: "/home/user/garden", space: "work" })?.ok).toEqual({ op: "space", cwd: "/home/user/garden", space: "work" });
-		expect(parseWorkspaceChange({ op: "hide", cwd: "/home/user/garden", space: "personal" })?.ok).toEqual({ op: "hide", cwd: "/home/user/garden" });
-		expect(parseWorkspaceChange({ op: "space", cwd: "~/garden", space: "personal" })).toBeNull();
-		expect(parseWorkspaceChange({ op: "space", cwd: "/home/user/garden", space: "family" })).toBeNull();
-		expect(parseWorkspaceChange({ op: "space", cwd: "/home/user/garden" })).toBeNull();
 	});
 });
 describe("parseTrustChange", () => {
@@ -739,23 +731,22 @@ describe("parseCalendarShown", () => {
 describe("parseNewEvent", () => {
 	const timed = { allDay: false, start: Date.parse("2026-10-09T13:00:00Z"), end: Date.parse("2026-10-09T14:00:00Z") };
 
-	test("takes a trimmed title, all-day days or a timed span, and this computer in a space or a Google calendar", () => {
+	test("takes a trimmed title, all-day days or a timed span, and this computer or a Google calendar", () => {
 		expect(parseNewEvent({ title: "  Offsite ", when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-15" }, calendar: { kind: "local", space: "personal" }, extra: 1 })?.ok).toEqual({
 			title: "Offsite",
 			when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-15" },
-			calendar: { kind: "local", space: "personal" },
+			calendar: { kind: "local" },
 		});
 		expect(parseNewEvent({ title: "Retro", when: timed, calendar: { kind: "google", account: "google-calendar", calendarId: "max@example.com" } })?.ok).toEqual({
 			title: "Retro",
 			when: { allDay: false, start: Date.parse("2026-10-09T13:00:00Z"), end: Date.parse("2026-10-09T14:00:00Z") },
 			calendar: { kind: "google", account: "google-calendar", calendarId: "max@example.com" },
 		});
-		expect(parseNewEvent({ title: "One day", when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-14" }, calendar: { kind: "local", space: "work" } })?.ok.title).toBe("One day");
-		expect(parseNewEvent({ title: "No space", when: timed, calendar: { kind: "local" } })).toBeNull();
+		expect(parseNewEvent({ title: "One day", when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-14" }, calendar: { kind: "local" } })?.ok.title).toBe("One day");
 	});
 
 	test("refuses an empty or overlong title, an end at or before the start, a last day before the first, a bad day, or an unknown calendar", () => {
-		const local = { kind: "local", space: "work" };
+		const local = { kind: "local" };
 		expect(parseNewEvent({ title: "  ", when: timed, calendar: local })).toBeNull();
 		expect(parseNewEvent({ title: "x".repeat(501), when: timed, calendar: local })).toBeNull();
 		expect(parseNewEvent({ title: "Retro", when: { ...timed, end: timed.start }, calendar: local })).toBeNull();
@@ -788,15 +779,6 @@ describe("parseEventRef", () => {
 		expect(parseEventRef({ kind: "google", calendarId: "", eventId: "e1" })).toBeNull();
 		expect(parseEventRef({ kind: "outlook", id: "e1" })).toBeNull();
 		expect(parseEventRef("e1")).toBeNull();
-	});
-});
-
-describe("parseLocalEventSpace", () => {
-	test("names an event kept on this computer and the space it moves to, and refuses an empty id or an unknown space", () => {
-		expect(parseLocalEventSpace({ id: "e1", space: "personal", extra: 1 })?.ok).toEqual({ id: "e1", space: "personal" });
-		expect(parseLocalEventSpace({ id: "", space: "work" })).toBeNull();
-		expect(parseLocalEventSpace({ id: "e1", space: "home" })).toBeNull();
-		expect(parseLocalEventSpace({ id: "e1" })).toBeNull();
 	});
 });
 

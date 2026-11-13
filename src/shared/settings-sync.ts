@@ -53,7 +53,7 @@ export const SYNC_ITEMS: readonly SyncItem[] = [
 		source: { kind: "store", store: "preferences" },
 		json: true,
 	},
-	{ id: "workspaces", label: "Workspaces", detail: "The directories Settings › Workspaces added, hid, and placed in Personal", path: "dashboard/workspaces.json", source: { kind: "store", store: "workspaces" }, json: true },
+	{ id: "workspaces", label: "Workspaces", detail: "The directories Settings › Workspaces added and hid", path: "dashboard/workspaces.json", source: { kind: "store", store: "workspaces" }, json: true },
 	{ id: "calendars", label: "Hidden calendars", detail: "The Google calendars the Calendar page leaves out", path: "dashboard/calendars.json", source: { kind: "store", store: "calendars" }, json: true },
 	{ id: "bots", label: "Bots", detail: "Each Bot's name, job, type, look, model, skill, workspace, pin, and section, without its conversation", path: "dashboard/bots.json", source: { kind: "store", store: "bots" }, json: true },
 ];

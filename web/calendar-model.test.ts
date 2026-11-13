@@ -5,8 +5,7 @@ import type { BotId } from "../src/shared/bots";
 import type { CalendarEvent, GoogleCalendar, LocalEvent } from "../src/shared/calendar";
 import type { Ticket } from "../src/shared/tickets";
 import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
-import { spaces } from "../src/shared/workspaces";
-import { type CalendarEntry, calendarChoices, calendarEntries, keptChoice, routinesOf, todosIn } from "./calendar-model";
+import { type CalendarEntry, calendarChoices, calendarEntries, keptChoice, routinesOf } from "./calendar-model";
 
 // Weekly slots are local wall-clock times; Paris leaves DST on 2026-10-25, inside the month below.
 const savedTz = process.env.TZ;
@@ -145,21 +144,11 @@ describe("todos and tickets", () => {
 	});
 });
 
-describe("the space on screen", () => {
-	test("a routine shows only in its Bot's space, and none shows until the Bots load", () => {
+describe("the Bots' routines", () => {
+	test("a routine shows only while its Bot exists, and none shows until the Bots load", () => {
 		const routines = [routine({ id: "home", botId: "chef" as BotId }), routine({ id: "office", botId: "scout" as BotId })];
 		expect(routinesOf(routines, [{ id: "chef" as BotId }]).map(({ id }) => id)).toEqual(["home"]);
 		expect(routinesOf(routines, null)).toEqual([]);
-	});
-
-	test("a todo shows in its workspace's space, one naming no workspace in Work, with its own todos", () => {
-		const placed = spaces(["/code/garden"], { cwd: "/home/me/personal", cwdDisplay: "~/personal" });
-		const child = todo({ id: "seed", due: "2026-10-03" });
-		const todos = list([todo({ id: "garden", workspace: "/code/garden", children: [child] }), todo({ id: "life", workspace: "/home/me/personal" }), todo({ id: "yampa", workspace: "/code/yampa" }), todo({ id: "none" })]);
-		expect(todosIn(todos, "personal", placed)?.todos.map(({ id }) => id)).toEqual(["garden", "life"]);
-		expect(todosIn(todos, "work", placed)?.todos.map(({ id }) => id)).toEqual(["yampa", "none"]);
-		expect(october({ todos: todosIn(todos, "personal", placed) }).map(entry => entry.kind === "todo" && entry.todoId)).toEqual(["seed"]);
-		expect(todosIn(null, "work", placed)).toBeNull();
 	});
 });
 
@@ -200,7 +189,7 @@ describe("Google events", () => {
 });
 
 describe("events kept on this computer", () => {
-	const local = (when: LocalEvent["when"], id = "e1"): LocalEvent => ({ id, title: "Dentist", when, sessionId: null, space: "work" });
+	const local = (when: LocalEvent["when"], id = "e1"): LocalEvent => ({ id, title: "Dentist", when, sessionId: null });
 
 	test("an all-day event spanning the previous month and the next shows once on every day of October", () => {
 		const entries = october({ localEvents: [local({ allDay: true, firstDay: "2026-09-28", lastDay: "2026-11-03" })] });
@@ -218,9 +207,9 @@ describe("events kept on this computer", () => {
 });
 
 describe("the new event's calendars", () => {
-	const account = (name: string): GoogleAccount => ({ name, address: `${name}@example.com`, addressError: null, connection: { kind: "signed-out", server: { name, url: "https://calendarmcp.googleapis.com/mcp/v1", host: "calendarmcp.googleapis.com" } }, space: "work" });
+	const account = (name: string): GoogleAccount => ({ name, address: `${name}@example.com`, addressError: null, connection: { kind: "signed-out", server: { name, url: "https://calendarmcp.googleapis.com/mcp/v1", host: "calendarmcp.googleapis.com" } } });
 	const calendar = (account: string, id: string, group: GoogleCalendar["group"] = "mine"): GoogleCalendar => ({ account, id, name: id, color: "#4285f4", group, writable: true, shown: true, error: null });
-	const choices = calendarChoices([calendar("google-calendar", "team", "other"), calendar("google-calendar", "me"), calendar("google-calendar-2", "team")], [account("google-calendar"), account("google-calendar-2")], "personal");
+	const choices = calendarChoices([calendar("google-calendar", "team", "other"), calendar("google-calendar", "me"), calendar("google-calendar-2", "team")], [account("google-calendar"), account("google-calendar-2")]);
 	const named = (choice: { label: string }) => choice.label;
 
 	test("go account by account, yours first in each, each named with its account's address, then this computer", () => {

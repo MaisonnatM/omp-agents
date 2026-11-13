@@ -26,7 +26,6 @@ import { GOOGLE_SERVICES, type GoogleService, type IntegrationTarget, type McpIn
 import { answer, checked, fail } from "./http";
 import {
 	parseGoogleClient,
-	parseGoogleSpace,
 	parseIntegrationTarget,
 	parseMcpServerAdd,
 	parseMcpServerEnabled,
@@ -57,12 +56,6 @@ export function integrationRoutes({ get, media, write }: RouteKit, integrations:
 
 	/** `PUT /api/integrations/remove`: signs out of the integration's server, as `/mcp unauth` does, and removes an account's server unless it is the last. */
 	const integrationRemove = integrationWrite(integrations.remove);
-
-	/** `PUT /api/integrations/google-space`: `{ address, space }`, the space a Google address's accounts go in; answers every integration. */
-	const googleSpace = write(
-		(body) => checked(parseGoogleSpace(body), "Expected { address, space } naming a Google address and personal or work"),
-		integrations.placeGoogleAccount,
-	);
 
 	const refuseClient = (err: unknown): Response | null => (err instanceof ClientConfigError ? fail(400, err.message) : null);
 
@@ -161,7 +154,6 @@ export function integrationRoutes({ get, media, write }: RouteKit, integrations:
 		"/api/integrations": { GET: loaded },
 		"/api/integrations/sign-in": { PUT: integrationSignIn },
 		"/api/integrations/remove": { PUT: integrationRemove },
-		"/api/integrations/google-space": { PUT: googleSpace },
 		"/api/mcp-servers": { GET: mcpServers },
 		"/api/mcp-servers/add": { PUT: mcpServerAdd },
 		"/api/mcp-servers/sign-in": { PUT: mcpServerWrite(startMcpServerSignIn) },

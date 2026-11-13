@@ -57,5 +57,4 @@ An occupied session is not ended by the cleanup after a merge, which tries it ag
 The page reads the roster, so a held session shows idle.
 Every change to the sends tells every socket through the list registry's `pushList("scheduled")`: the page's edits, through the list registry's push, the runner's claims, sends, and failures, `AutoContinue`'s own continues and cancels, and the minute tick's read of the file, which brings in what another server did.
 
-`scheduledIn` in `web/sessions.ts` keeps the sends of the window's space for the sidebar's `ScheduledGroup`: a start by its request's `cwd`, a message or continue by its session's space, and a send for a session the page does not know in Work.
-The scheduled-session page and the composer's scheduled messages read every send through the `ScheduledSends` context.
+The sidebar's `ScheduledGroup`, the scheduled-session page, and the composer's scheduled messages read every send through the `ScheduledSends` context.

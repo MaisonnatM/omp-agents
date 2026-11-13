@@ -18,7 +18,7 @@ import { answerExtensionApproval, readExtensionContribution, readExtensionOperat
 import { discoverExtensions, loadExtensions } from "../omp/extensions";
 import { isAnalyticsRange } from "../shared/analytics";
 import type { ConversationSearchAnswer } from "../shared/sessions";
-import { isSpace, type WorkspaceChange } from "../shared/workspaces";
+import type { WorkspaceChange } from "../shared/workspaces";
 import { answer, checked, fail } from "./http";
 import { parseSourceControlChange, parseTrustChange, parseWorkspaceChange } from "./wire";
 import type { Handler, RouteKit, Routes, SessionRoutesEnv } from "./route-kit";
@@ -146,34 +146,25 @@ export function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): 
 	});
 
 	/**
-	 * `GET /api/pull-requests[?cwd=<dir>|?space=personal|work][&fresh]`: the pull requests of that workspace's repository, or of the
-	 * repositories of the space's workspaces, else of every workspace's; `cwd` and `space` together are a 400.
+	 * `GET /api/pull-requests[?cwd=<dir>][&fresh]`: the pull requests of that workspace's repository, else of every workspace's.
 	 * Each answer also tells the pull-request index which branch heads which PR, which links the sessions that pushed them.
 	 */
 	const pullRequests = get((params) => {
 		const cwd = workspaceCwd(params);
 		if (cwd instanceof Response) return cwd;
-		const space = params.get("space");
-		if (space !== null && !isSpace(space)) return fail(400, "Expected space personal or work");
-		if (cwd !== null && space !== null) return fail(400, "Expected cwd or space, not both");
 		const fresh = params.has("fresh");
 		return answer(async () => {
-			const dirs = cwd !== null ? [cwd] : space !== null ? env.spaces().inSpace(env.knownWorkspaces(), space) : env.knownWorkspaces();
-			const loaded = await loadPullRequests(dirs, fresh);
+			const loaded = await loadPullRequests(cwd !== null ? [cwd] : env.knownWorkspaces(), fresh);
 			for (const repo of loaded.repos) if ("pullRequests" in repo) env.learnHeads(repo, repo.pullRequests);
 			return loaded;
 		});
 	});
 
-	/**
-	 * `PUT /api/workspaces` `{ op, cwd }` or `{ op: "space", cwd, space }`: add a directory as a workspace, creating it first with
-	 * `{ op: "add", cwd, create: true }`, hide or show one, or place one in the Personal or the Work space; the personal directory is always Personal.
-	 */
+	/** `PUT /api/workspaces` `{ op, cwd }`: add a directory as a workspace, creating it first with `{ op: "add", cwd, create: true }`, or hide or show one. */
 	const workspaceChange = write(
 		async (body): Promise<WorkspaceChange | Response> => {
-			const change = checked(parseWorkspaceChange(body), 'Expected { op, cwd } with op add, hide, or show, or { op: "space", cwd, space } with space personal or work');
+			const change = checked(parseWorkspaceChange(body), "Expected { op, cwd } with op add, hide, or show");
 			if (change instanceof Response) return change;
-			if (change.op === "space" && env.spaces().isPersonalDir(change.cwd)) return fail(400, "The personal directory is always in the Personal space.");
 			if (change.op !== "add") return change;
 			const cwd = isObject(body) && body.create === true ? await createdDirectoryOf(change.cwd) : await directoryOf(change.cwd);
 			return cwd ? { op: "add", cwd } : fail(400, `${change.cwd.trim()} is not a directory.`);

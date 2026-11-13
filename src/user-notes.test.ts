@@ -6,7 +6,7 @@ import type { UserNote, UserNoteChange, UserNoteList } from "./user-notes-shared
 const CREATED = "2026-10-01T08:00:00.000Z";
 const AT = "2026-10-05T09:00:00.000Z";
 
-const note = (id: string, fields: Partial<UserNote> = {}): UserNote => ({ id, title: id, body: "", todoId: null, addedBy: null, space: "work", createdAt: CREATED, updatedAt: CREATED, ...fields });
+const note = (id: string, fields: Partial<UserNote> = {}): UserNote => ({ id, title: id, body: "", todoId: null, addedBy: null, createdAt: CREATED, updatedAt: CREATED, ...fields });
 const listOf = (...notes: UserNote[]): UserNoteList => ({ notes });
 const after = (list: UserNoteList, ...changes: UserNoteChange[]): UserNoteList => changes.reduce(applyUserNote, list);
 const ids = ({ notes }: UserNoteList): string => notes.map(entry => entry.id).join(" ");
@@ -55,28 +55,20 @@ describe("applyUserNote", () => {
 		expect(after(removed, { op: "restore", note: note("b"), index: 1 })).toEqual(list);
 	});
 
-	test("a new note is untitled, empty, in the space it was written in, and linked to no todo unless given more", () => {
-		expect(addNote("personal").note).toMatchObject({ title: "", body: "", todoId: null, addedBy: null, space: "personal" });
-		expect(addNote("work", { todoId: "t1" }).note.todoId).toBe("t1");
-	});
-
-	test("a move to the other space keeps the note where it is in the list and when it last changed", () => {
-		const list = listOf(note("a"), note("b"));
-		const moved = after(list, { op: "set-space", id: "b", space: "personal" });
-		expect(moved.notes).toEqual([note("a"), note("b", { space: "personal" })]);
-		expect(after(list, { op: "set-space", id: "b", space: "work" })).toBe(list);
+	test("a new note is untitled, empty, and linked to no todo unless given more", () => {
+		expect(addNote().note).toMatchObject({ title: "", body: "", todoId: null, addedBy: null });
+		expect(addNote({ todoId: "t1" }).note.todoId).toBe("t1");
 	});
 });
 
 describe("parseUserNoteList", () => {
-	test("reads a note with only an id, a title, and an added time, as in no todo and in Work, most recently updated first", () => {
+	test("reads a note with only an id, a title, and an added time, as in no todo, most recently updated first", () => {
 		const list = parseUserNoteList({ notes: [{ id: "a", title: "A", createdAt: CREATED }, note("b", { updatedAt: AT })] });
 		expect(list?.notes).toEqual([note("b", { updatedAt: AT }), note("a", { title: "A" })]);
 	});
 
-	test("reads a note's space, and holds none for a space it does not know", () => {
-		expect(parseUserNoteList({ notes: [note("a", { space: "personal" })] })?.notes).toEqual([note("a", { space: "personal" })]);
-		expect(parseUserNoteList({ notes: [{ ...note("a"), space: "home" }] })).toBeNull();
+	test("drops the space an older version saved on a note", () => {
+		expect(parseUserNoteList({ notes: [{ ...note("a"), space: "personal" }] })?.notes).toEqual([note("a")]);
 	});
 
 	test("drops the project an older version saved on a note", () => {

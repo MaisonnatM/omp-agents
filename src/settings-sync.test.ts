@@ -242,7 +242,7 @@ async function pair() {
 	return { remote, a: machine(join(root, "a"), remote), b: machine(join(root, "b"), remote) };
 }
 
-const addNote = (id: string): UserNoteChange => ({ op: "add", note: { id, title: id, body: "", todoId: null, addedBy: null, space: "work", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" } });
+const addNote = (id: string): UserNoteChange => ({ op: "add", note: { id, title: id, body: "", todoId: null, addedBy: null, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" } });
 
 test("a failed sync names the GitHub repository it could not find, and nothing for another failure or host", () => {
 	expect(missingGithubRepo("git@github.com:ann/omp-settings.git", "ERROR: Repository not found.")).toBe("ann/omp-settings");
@@ -363,7 +363,7 @@ describe("SettingsSync", () => {
 		expect(b.routines.value.map(({ id }) => id)).toEqual(["r1"]);
 	});
 
-	test("keeps the todos and notes two machines each added, carries the preferences, workspaces and their spaces, and each todo's Workspace, and settles both on one list", async () => {
+	test("keeps the todos and notes two machines each added, carries the preferences, workspaces, and each todo's Workspace, and settles both on one list", async () => {
 		const { remote, a, b } = await pair();
 		const [notes, preferences, todos, workspaces] = ["notes", "preferences", "todos", "workspaces"].map(name => `dashboard/${name}.json`);
 		await a.sync.sync();
@@ -372,7 +372,6 @@ describe("SettingsSync", () => {
 		a.notes.apply(addNote("note-a"));
 		a.preferences.apply({ op: "set", key: "omp-agents.theme", value: "dark" });
 		a.workspaces.apply({ op: "add", cwd: join(a.home, "code", "app") });
-		a.workspaces.apply({ op: "space", cwd: join(a.home, "code", "app"), space: "personal" });
 		b.todos.apply(addTodo({ id: "from-b", text: "From B", status: "done" }));
 		b.notes.apply(addNote("note-b"));
 
@@ -388,7 +387,6 @@ describe("SettingsSync", () => {
 		}
 		expect(b.preferences.value).toEqual({ "omp-agents.theme": "dark" });
 		expect(b.workspaces.value.added).toEqual([join(b.home, "code", "app")]);
-		expect(b.workspaces.value.personal).toEqual([join(b.home, "code", "app")]);
 		expect(b.todos.value.todos.map(todo => todo.workspace)).toEqual([join(b.home, "code", "app"), null]);
 		expect([...b.changed].sort()).toEqual(["preferences", "user-notes", "user-todos", "workspaces"]);
 		expect([...a.changed].sort()).toEqual(["user-notes", "user-todos"]);

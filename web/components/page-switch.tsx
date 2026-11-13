@@ -50,7 +50,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "sport" | "routines" | "bots" | "botLasts" | "workspaceList" | "personal" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "sport" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -69,7 +69,7 @@ interface PageSwitchProps extends PageState {
 	linear: McpIntegration | null;
 	/** The dashboard reads and writes Linear. */
 	linearCallable: boolean;
-	/** Linear answers and the space shows Tickets, Work: the Calendar shows tickets' due days and a todo can become a ticket. */
+	/** Linear answers and Tickets is signed in: the Calendar shows tickets' due days and a todo can become a ticket. */
 	ticketsCallable: boolean;
 	maximized: boolean;
 	/** The right sidebar shows the focused session's details. */
@@ -98,7 +98,6 @@ export const PageSwitch = memo(function PageSwitch({
 	botLasts,
 	openBot,
 	workspaceList,
-	personal,
 	trustedProjects,
 	newSessionCompletions,
 	connected,
@@ -122,7 +121,7 @@ export const PageSwitch = memo(function PageSwitch({
 }: PageSwitchProps) {
 	const { send, start, dismissStart, changeTodo, changeNote, changeSport } = useDashboardActions();
 	const scheduleSend = useScheduleSend();
-	const { visible, workspaces, allWorkspaces, workspace, pickWorkspace } = scope;
+	const { visible, workspaces, workspace, pickWorkspace } = scope;
 	switch (page?.kind) {
 		case "new": {
 			const seed = todoSeed(userTodos, page.todoId);
@@ -152,7 +151,7 @@ export const PageSwitch = memo(function PageSwitch({
 			);
 		}
 		case "scheduled":
-			return <ScheduledSession id={page.id} workspaces={allWorkspaces} connected={connected} completions={newSessionCompletions} todoOf={todoId => todoSeed(userTodos, todoId)} />;
+			return <ScheduledSession id={page.id} workspaces={workspaces} connected={connected} completions={newSessionCompletions} todoOf={todoId => todoSeed(userTodos, todoId)} />;
 		case "settings":
 			return (
 				<SettingsPage
@@ -160,9 +159,7 @@ export const PageSwitch = memo(function PageSwitch({
 					cwd={workspace}
 					onPickWorkspace={pickWorkspace}
 					workspaces={workspaces}
-					allWorkspaces={allWorkspaces}
 					workspaceList={workspaceList}
-					spaces={personal && scope.spaces}
 					trustedProjects={trustedProjects}
 				/>
 			);
@@ -190,11 +187,11 @@ export const PageSwitch = memo(function PageSwitch({
 				/>
 			);
 		case "notes":
-			return <NotesPage list={userNotes} todos={userTodos} view={page.list} openId={page.open} hosts={hosts} past={past} disabled={!connected} onChange={changeNote} space={scope.space} />;
+			return <NotesPage list={userNotes} todos={userTodos} view={page.list} openId={page.open} hosts={hosts} past={past} disabled={!connected} onChange={changeNote} />;
 		case "bots": {
 			if (page.target === null) {
 				if (page.adding) return <NewBot workspaces={workspaces} defaultCwd={defaultWorkspace} connected={connected} />;
-				return <BotsGallery rows={scope.bots === null ? null : botRows(scope.bots, hosts, botLasts)} routines={routines} />;
+				return <BotsGallery rows={bots === null ? null : botRows(bots, hosts, botLasts)} routines={routines} />;
 			}
 			if (!openBot) return <p className="m-auto text-sm text-muted-foreground">{bots === null ? "Loading the Bots…" : "No Bot has this address. It may have been deleted."}</p>;
 			return (
@@ -208,16 +205,16 @@ export const PageSwitch = memo(function PageSwitch({
 					past={past}
 					lastHosts={lastHosts}
 					models={models}
-					workspaces={allWorkspaces}
+					workspaces={workspaces}
 					connected={connected}
 					completions={newSessionCompletions}
 				/>
 			);
 		}
 		case "calendar":
-			return <CalendarPage routines={routines} bots={scope.bots} todos={userTodos} ticketsShown={ticketsCallable} space={scope.space} spaces={scope.spaces} />;
+			return <CalendarPage routines={routines} bots={bots} todos={userTodos} ticketsShown={ticketsCallable} />;
 		case "email":
-			return <EmailPage target={page.target} space={scope.space} />;
+			return <EmailPage target={page.target} />;
 		case "sport":
 			return <SportPage state={sport} route={page} disabled={!connected} onChange={changeSport} />;
 		// Get started is a dialog over the home, which `GetStarted` in `web/app.tsx` draws.

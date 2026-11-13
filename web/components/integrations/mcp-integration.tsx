@@ -160,8 +160,6 @@ function ServerIntegrationRow({ integration }: { integration: McpIntegration<Sin
 
 interface McpIntegrationRowProps {
 	integration: McpIntegration;
-	/** Whether a Google account's space is chosen here; `false` on a page that offers to connect. */
-	placeable: boolean;
 	/** What shows once above a Google service's accounts, such as why none of their calendars could be listed. */
 	notice?: ReactNode;
 	/** What shows under each Google account, such as its calendars. */
@@ -169,9 +167,9 @@ interface McpIntegrationRowProps {
 }
 
 /** One service whose MCP server omp signs in to, or whose accounts it signs in to, one server each. */
-export function McpIntegrationRow({ integration, placeable, notice, details }: McpIntegrationRowProps) {
+export function McpIntegrationRow({ integration, notice, details }: McpIntegrationRowProps) {
 	return hasAccounts(integration) ? (
-		<GoogleAccountsRow integration={integration} placeable={placeable} notice={notice} details={details} />
+		<GoogleAccountsRow integration={integration} notice={notice} details={details} />
 	) : (
 		<ServerIntegrationRow integration={integration} />
 	);

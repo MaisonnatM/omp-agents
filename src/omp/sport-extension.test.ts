@@ -7,7 +7,7 @@ import { MAX_PLAN_BYTES } from "../sport-agent";
 import { log, measurement, SEMI, STATE, withLogs } from "../sport-fixtures";
 import { loadFor } from "../sport-week";
 import { loadExtension } from "./fake-extension-api";
-import { MAX_TODAY_LINE, readSport, type SportParams, sportTool, todayLine } from "./sport-tool";
+import sportExtension, { readSport, SPORT_FLAGS, type SportParams } from "./sport-extension";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -21,7 +21,7 @@ function sport(state: SportState | null = STATE) {
 	dirs.push(root);
 	const paths = { file: join(root, "sport.json"), inbox: join(root, "sport-inbox") };
 	if (state) writeFileSync(paths.file, JSON.stringify(state));
-	const session = loadExtension(pi => pi.registerTool(sportTool(pi, async () => paths)), new Map());
+	const session = loadExtension(sportExtension, new Map([[SPORT_FLAGS.file, paths.file], [SPORT_FLAGS.inbox, paths.inbox]]));
 	const call = async (params: SportParams) => (await session.call("sport", params)).content.map(({ text }) => text).join("\n");
 	const left = () => readdirSync(paths.inbox).sort().map(name => JSON.parse(readFileSync(join(paths.inbox, name), "utf8")));
 	return { paths, call, left, state: () => readSport(paths) };
@@ -68,10 +68,15 @@ test("week shows each day's phase, workouts, and loads from the newest test, and
 });
 
 test("the reads run on read approval, and every action that leaves a request on write approval", () => {
-	const session = loadExtension(pi => pi.registerTool(sportTool(pi, async () => ({ file: "", inbox: "" }))), new Map());
+	const session = loadExtension(sportExtension, new Map());
 	const tiers = (["read", "week", "history", "log", "measure", "set_plan", "set_targets"] as const).map(action => session.approval("sport", { action }));
 	expect(tiers).toEqual(["read", "read", "read", "write", "write", "write", "write"]);
 	expect(session.approval("sport", { action: "constructor" })).toBe("write");
+});
+
+test("a session the dashboard named no Sport files for says so", async () => {
+	const session = loadExtension(sportExtension, new Map());
+	await expect(session.call("sport", { action: "read" })).rejects.toThrow("this session has no Sport module");
 });
 
 test("history draws a metric's measurements as a chart, and an unknown metric names the known ones", async () => {
@@ -116,15 +121,4 @@ test("a plan over 64 KB is refused before anything is left", async () => {
 	const plan = { ...STATE.plan, title: "x".repeat(MAX_PLAN_BYTES) };
 	await expect(tool.call({ action: "set_plan", plan })).rejects.toThrow(`keep it to at most ${MAX_PLAN_BYTES}.`);
 	expect(() => tool.left()).toThrow("ENOENT");
-});
-
-test("today's line names the phase, the deload, each workout and its log, and stays under 300 characters", () => {
-	expect(todayLine({ ...STATE, plan: null }, "2026-11-17")).toBeNull();
-	expect(todayLine(STATE, "2026-12-02")).toBe("Today 2026-12-02, sport: phase transition, deload week; Mobilité hanche; no pain flag.");
-	expect(todayLine(withLogs(STATE, log("v", "2026-11-22", { workout: "voie", status: "skipped" })), "2026-11-22")).toBe("Today 2026-11-22, sport: phase transition; Voie (optional) (skipped); no pain flag.");
-	expect(todayLine(STATE, "2027-03-01")).toBe("Today 2027-03-01, sport: no phase; rest day; no pain flag.");
-	const flagged = withLogs(STATE, ...Array.from({ length: 20 }, (_, index) => log(`p${index}`, "2026-11-16", { pain: { level: 5, where: "shoulder" } })));
-	const line = todayLine(flagged, "2026-11-17") ?? "";
-	expect(line).toHaveLength(MAX_TODAY_LINE);
-	expect(line).toEndWith("…");
 });

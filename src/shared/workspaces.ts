@@ -1,13 +1,4 @@
-/** The directories Settings → Workspaces adds to the ones sessions ran in, the ones it hides, and the ones it places in the Personal space. */
-import { oneOf } from "../json";
-
-/** The two halves of the dashboard, in the order the page lists them: the user's own life, and their job. */
-export const SPACES = ["personal", "work"] as const;
-export type Space = (typeof SPACES)[number];
-
-export const isSpace = oneOf(SPACES);
-
-export const otherSpace = (space: Space): Space => (space === "personal" ? "work" : "personal");
+/** The directories Settings → Workspaces adds to the ones sessions ran in, and the ones it hides. */
 
 /** Absolute directories, or the page's rows for them; one in both lists is hidden, and showing it offers it again as added. */
 export interface WorkspaceList<Entry = string> {
@@ -15,11 +6,9 @@ export interface WorkspaceList<Entry = string> {
 	added: Entry[];
 	/** Left out of the pickers and the sidebar, with their sessions. */
 	hidden: Entry[];
-	/** Main checkouts placed in the Personal space; every other workspace is Work, but the personal directory, which is always Personal and never listed. */
-	personal: Entry[];
 }
 
-export type WorkspaceChange = { op: "add" | "hide" | "show"; cwd: string } | { op: "space"; cwd: string; space: Space };
+export type WorkspaceChange = { op: "add" | "hide" | "show"; cwd: string };
 
 /** A directory as the page shows it, `~` for the home directory. */
 export interface Workspace {
@@ -27,7 +16,7 @@ export interface Workspace {
 	cwdDisplay: string;
 }
 
-export const NO_WORKSPACES: WorkspaceList = { added: [], hidden: [], personal: [] };
+export const NO_WORKSPACES: WorkspaceList = { added: [], hidden: [] };
 
 // `/var/folders` holds macOS's per-user `$TMPDIR`, where `mktemp -d` puts its directories.
 const TEMP_ROOTS = ["/tmp", "/private/tmp", "/var/folders", "/private/var/folders"];
@@ -42,16 +31,13 @@ export const inAppData = (dir: string): boolean => dir.split("/").some(part => p
 const withEntry = (entries: string[], entry: string): string[] => (entries.includes(entry) ? entries : [...entries, entry]);
 const withoutEntry = (entries: string[], entry: string): string[] => entries.filter(other => other !== entry);
 
-/**
- * `list` after `change`, or `list` itself when it changes nothing. Adding also shows a hidden directory. Hiding or showing a
- * workspace keeps its space, so a Personal workspace hidden and shown again is still Personal.
- */
+/** `list` after `change`, or `list` itself when it changes nothing. Adding also shows a hidden directory. */
 export function applyWorkspace(list: WorkspaceList, change: WorkspaceChange): WorkspaceList {
 	const { cwd } = change;
 	let next: WorkspaceList;
 	switch (change.op) {
 		case "add":
-			next = { ...list, added: withEntry(list.added, cwd), hidden: withoutEntry(list.hidden, cwd) };
+			next = { added: withEntry(list.added, cwd), hidden: withoutEntry(list.hidden, cwd) };
 			break;
 		case "hide":
 			next = { ...list, hidden: withEntry(list.hidden, cwd) };
@@ -59,64 +45,11 @@ export function applyWorkspace(list: WorkspaceList, change: WorkspaceChange): Wo
 		case "show":
 			next = { ...list, hidden: withoutEntry(list.hidden, cwd) };
 			break;
-		case "space":
-			next = { ...list, personal: change.space === "personal" ? withEntry(list.personal, cwd) : withoutEntry(list.personal, cwd) };
-			break;
 		default: {
-			const unhandled: never = change;
+			const unhandled: never = change.op;
 			return unhandled;
 		}
 	}
 	// Each list only gains or loses `cwd`, so equal lengths mean nothing changed.
-	return next.added.length === list.added.length && next.hidden.length === list.hidden.length && next.personal.length === list.personal.length ? list : next;
+	return next.added.length === list.added.length && next.hidden.length === list.hidden.length ? list : next;
 }
-
-/** Which space each directory is in, from the `personal` list and the personal directory, the one rule the server, the personal extension, and the page share. */
-export interface Spaces {
-	/**
-	 * Whether `cwd` is the personal directory itself, named as omp names it or as the page shows it, `~` included, with any
-	 * trailing `/`. It is always Personal, so the server refuses to move it to Work and Settings › Workspaces offers no picker for it.
-	 */
-	isPersonalDir(cwd: string): boolean;
-	/**
-	 * The space of a session in `cwd` that counts in `workspace`, the main checkout of a linked worktree as `WorkspacePlacement`
-	 * places it, else `cwd` itself: Personal in the personal directory or in a workspace `personal` lists, else Work.
-	 */
-	of(cwd: string, workspace: string): Space;
-	/** The items of `items` in `space`, each a directory or something in one, such as a workspace's row or a Bot, placed by its `cwd`. */
-	inSpace<W extends string | { cwd: string }>(items: readonly W[], space: Space): W[];
-}
-
-/**
- * The {@link Spaces} of the workspaces `personal` lists and `personalDir`. The server names each workspace by its directory; the
- * page's rows also carry how a `~` path names it, as `personalDir`'s `cwdDisplay` does, so a Bot's or a scheduled start's `~/garden`
- * finds the workspace too. Until the page hears the personal directory, `personalDir` is `null` and only the listed workspaces are Personal.
- */
-export function spaces(personal: readonly (string | Workspace)[], personalDir: Workspace | null): Spaces {
-	const named = new Set(personal.flatMap(entry => (typeof entry === "string" ? [entry] : [entry.cwd, entry.cwdDisplay])));
-	const isPersonalDir = (cwd: string): boolean => {
-		if (!personalDir) return false;
-		// The root keeps its `/`.
-		const dir = cwd.trim().replace(/(?<=.)\/+$/, "");
-		return dir === personalDir.cwd || dir === personalDir.cwdDisplay;
-	};
-	const of = (cwd: string, workspace: string): Space => (isPersonalDir(cwd) || named.has(workspace) ? "personal" : "work");
-	return {
-		isPersonalDir,
-		of,
-		inSpace: (items, space) =>
-			items.filter(item => {
-				const cwd = typeof item === "string" ? item : item.cwd;
-				return of(cwd, cwd) === space;
-			}),
-	};
-}
-
-/** Whether a note, an event, or an account is in `space`, for a filter of what carries its own space. */
-export const spaceIs =
-	(space: Space) =>
-	(item: { space: Space }): boolean =>
-		item.space === space;
-
-/** The space of omp session `sessionId`'s directory, Work for a session the dashboard does not know. */
-export type SpaceOfSession = (sessionId: string) => Promise<Space>;

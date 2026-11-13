@@ -16,11 +16,11 @@ export interface PageShortcutInput {
 	/** The views of the Sessions tab, in order, and the focused one: what the session shortcuts step through. */
 	listed: View[];
 	view: View | null;
-	/** The sidebar tabs whose service omp holds no sign-in to, or that belong to the other space; their shortcuts and commands do not apply. */
+	/** The sidebar tabs whose service omp holds no sign-in to; their shortcuts and commands do not apply. */
 	absentTabs: ReadonlySet<SidebarTab>;
 	/** The shown tabs the sidebar's bar draws, in order: Cmd+1 goes to the first. */
 	tabs: readonly SidebarTab[];
-	/** The dashboard can create Linear issues, and the space shows Tickets, so the new-ticket shortcut applies. */
+	/** The dashboard can create Linear issues, and the sidebar shows Tickets, so the new-ticket shortcut applies. */
 	ticketsCallable: boolean;
 	/** The right sidebar has a session to show. */
 	hasDetails: boolean;
@@ -30,11 +30,8 @@ export interface PageShortcutInput {
 	setGoal: (() => void) | null;
 	palette: PaletteState | null;
 	dispatchPalette: Dispatch<PaletteEvent>;
-	setShortcutsOpen: Dispatch<SetStateAction<boolean>>;
 	setNewTicket: Dispatch<SetStateAction<string | null>>;
 	openNewSession: (cwd?: string) => void;
-	/** Switches the window to the other space. */
-	toggleSpace: () => void;
 	open: (view: View, mode: "replace") => void;
 	show: (layout: Layout) => void;
 	navigate: (page: Page) => void;
@@ -88,10 +85,13 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 		};
 		const positions = positionHandlers(() => latest.current.tabs, goTo);
 		return {
-			help: () => latest.current.setShortcutsOpen(open => !open),
+			help: () => {
+				const { page, layout, navigate, show } = latest.current;
+				if (page?.kind === "settings" && page.section === "keyboard") show(layout);
+				else navigate({ kind: "settings", section: "keyboard" });
+			},
 			switcher: () => latest.current.dispatchPalette(latest.current.palette ? { type: "close" } : { type: "open" }),
 			newSession: () => latest.current.openNewSession(),
-			switchSpace: () => latest.current.toggleSpace(),
 			getStarted: () => latest.current.navigate({ kind: "get-started" }),
 			previousSession: () => step(-1),
 			nextSession: () => step(1),

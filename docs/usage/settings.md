@@ -174,7 +174,6 @@
   Cmd+1 goes to the first tab the sidebar's page list shows, and a tab after the fifth takes no number.
   A hidden tab only leaves the sidebar's page list and loses its number: its page, its command in the command menu, its G pair, and links to it still work.
   While omp holds no sign-in to Linear or Gmail, the **Tickets** or **Email** row says that tab shows only once the service is connected.
-  **Tickets** shows only in Work and **Sport** only in Personal, and their rows say so in both spaces.
   Putting every tab back in its default order and shown forgets the choice, so the sidebar follows the default again.
   **Notifications** turns the [session notifications](notifications.md#session-notifications) on or off, picks whether finished turns notify too, and picks their sound and whether it plays while the window is focused.
   **Stop idle processes** picks when the server stops the dev servers, watchers, and services that sessions start besides omp: **Off**, or after 15 minutes, 30 minutes, 1 hour, or 2 hours, 30 minutes by default.
@@ -184,6 +183,7 @@
   Every session that you start from the dashboard, from the new-session draft or from a quick action on a pull request, a Linear issue, or a todo, then sends its first message through that skill.
   The picker lists the skills of the sidebar's workspace, and says which, or your own skills with **All workspaces**.
   Choose **None** to unpin.
+- **Keyboard** lists every keyboard shortcut by category, and `?` outside a text field opens it; see [Keyboard shortcuts](keyboard-shortcuts.md).
 - **Providers** signs omp in to the model providers its sessions call, as `/login` and `omp login` do; see [Providers](providers.md).
 - **Integrations** connects omp to Linear and Slack and the dashboard to Google Calendar and Gmail; see [Integrations](integrations.md).
 - **MCP servers** lists every MCP server omp loads and adds more from a catalog or by address; see [MCP servers](mcp-servers.md).
@@ -197,23 +197,18 @@
   A session still working when its pull request merges, or waiting to continue after a usage limit or a connection error, ends once it is idle with no continue waiting; one whose other pull request closes later ends then, and one the dashboard could not end is tried again two minutes later.
   Ending it removes its linked worktree as **End session** does, so a worktree with changes stays, then deletes the local branch of the merged pull request, but only when the merge took every commit of the branch and no worktree has it checked out.
   **Default merge method** picks the method a pull request's merge button starts with; **Last selected** reuses the method of your last confirmed merge in the app, and a method the repository does not allow falls back to the first one it does.
-- **Workspaces** lists the directories that the sidebar's workspace picker and the directory pickers offer, those of both spaces.
+- **Workspaces** lists the directories that the sidebar's workspace picker and the directory pickers offer.
   Type a path in **Directory** and choose **Add workspace** to offer a directory no session ran in yet; `~` works, and a path that is not a directory shows an error.
   In the desktop app, **Choose folder…** opens the system's folder picker and adds the folder you pick.
   **Hide** drops a workspace and its sessions from the pickers, the session lists and counts, and session search, as for `/tmp`; a direct session link still opens them.
   Hidden workspaces list under **Hidden**, and **Show** offers one again.
-  Each workspace has a space, **Personal** or **Work**, picked beside it; a session in a Personal workspace, or in a worktree of one, is a [personal session](personal-sessions.md) with your personal memory, `remember`, and `sport`.
-  The sidebar's workspace picker moves the picked workspace to the other space too; see [Sessions sidebar](sessions-sidebar.md).
-  The personal directory is always **Personal**, so its row shows a **Personal** badge instead of the picker.
-  Hiding a workspace and showing it again keeps its space.
-  The server keeps the list and the spaces in `workspaces.json` beside its access token, so every window of the app shows the same workspaces.
+  The server keeps the list in `workspaces.json` beside its access token, so every window of the app shows the same workspaces.
   **Trusted projects** lists the projects whose own agent code you trusted, with **Stop trusting** to ask again; see [Per-project agent setup](per-project-agent-setup.md#stop-trusting).
 - **Sync** carries your omp settings and files to your other machines through a Git repository of yours; see [Settings sync](settings-sync.md).
 - **Phone access** serves the dashboard to your phone through Tailscale and pairs phones with a one-time code; see [Phone access](phone-access.md).
   A paired phone does not list the section.
 - Settings follows the workspace picked in the sidebar header, so it includes that workspace's project files and its `.omp/config.yml` overrides.
   With no workspace picked, which the header's picker reads as **All workspaces**, **Models**, **Agents**, **omp settings**, **Files**, **Extensions**, **Workflows**, and the **New sessions** skill picker show user files and packages only, **omp memory** shows only its settings, and **Worktrees** lists every repository.
-  That header picker lists the workspaces of the space the window shows.
   The picker in the header of a Workspace section is the same choice: picking a workspace there switches the sidebar to it too.
   Pressing the gear button while Settings is open closes it, so pick a section from the sidebar to change sections.
   A session's **Workspace settings** switches the sidebar to that session's workspace and opens **Models**; a session in `/tmp` or a hidden workspace does not offer it.

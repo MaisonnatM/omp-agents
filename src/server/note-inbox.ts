@@ -2,10 +2,9 @@
  * The changes omp's `user_note` tool leaves for the Notes page's list, one JSON file each in a directory, so the server
  * stays the only writer of `notes.json` and a session can note something while the dashboard is down. An agent may add
  * a note in its own name or append to one; the inbox sets aside any other change, so it cannot rewrite or remove what
- * you wrote. An added note goes into the space of the session that added it, whatever space the file names.
+ * you wrote.
  */
 import { errorText } from "../json";
-import type { SpaceOfSession } from "../shared/workspaces";
 import { parseNoteChange } from "../user-notes-parse";
 import type { UserNoteChange } from "../user-notes-shared";
 import { type InboxEntry, type InboxOptions, JsonInboxDir } from "./json-inbox";
@@ -24,20 +23,14 @@ function parseAgentNoteChange(value: unknown): InboxEntry<UserNoteChange> {
 	return change.note.addedBy === null ? { invalid: "an agent's note must name the session that added it" } : { item: change };
 }
 
-/** `change` with an added note in the space of the session that added it, whatever space the file named. */
-async function inSessionSpace(change: UserNoteChange, spaceOf: SpaceOfSession): Promise<UserNoteChange> {
-	if (change.op !== "add" || change.note.addedBy === null) return change;
-	return { ...change, note: { ...change.note, space: await spaceOf(change.note.addedBy) } };
-}
-
 export class NoteInbox extends JsonInboxDir<UserNoteChange> {
-	constructor(dir: string, apply: (change: UserNoteChange) => void, spaceOf: SpaceOfSession, options?: InboxOptions) {
+	constructor(dir: string, apply: (change: UserNoteChange) => void, options?: InboxOptions) {
 		super(
 			dir,
 			{
 				parse: (_name, value) => parseAgentNoteChange(value),
-				async apply(change) {
-					apply(await inSessionSpace(change, spaceOf));
+				apply(change) {
+					apply(change);
 					return true;
 				},
 			},

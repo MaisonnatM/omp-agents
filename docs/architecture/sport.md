@@ -49,9 +49,8 @@ The page keeps the latest snapshot in `DashboardState.sport`, `null` until the f
 
 ## The agent
 
-A personal session's `sport` tool never writes `sport.json`; it leaves one request per call as a JSON file in `sportInboxDir`, `<config dir>/sport-inbox`, and the server stays the file's only writer.
+Every dashboard session loads `src/omp/sport-extension.ts`, whose `sport` tool never writes `sport.json`; it leaves one request per call as a JSON file in `sportInboxDir`, `<config dir>/sport-inbox`, and the server stays the file's only writer.
 A request holds the id of the session that left it, the metrics the call adds or replaces by id, and one change, and an edit names the entry and only the fields it changes.
-See [Personal sessions](personal-sessions.md) for the tool's actions.
 `SportInbox` in `src/server/sport-inbox.ts` builds on `JsonInboxDir`, so the dashboard that holds the owner lock applies the files oldest first, through the same `ListRegistry` path as the page, and a stopped dashboard leaves them for the next start.
 
 `agentSportChanges` in `src/sport-agent.ts` turns a request into the changes it applies, the same for the tool before it leaves a file and for the inbox before it applies one.

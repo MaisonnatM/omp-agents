@@ -8,7 +8,7 @@ import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useShortcuts } from "../../shortcuts";
 import { useClipboard } from "../../use-copy";
-import { SPACE_LABELS } from "../../labels";
+import { ALL_WORKSPACES } from "../../labels";
 import { listedPullRequest } from "../../pull-requests-model";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, pullRequestStart, quickOn } from "../../quick-actions";
@@ -21,15 +21,15 @@ import { QuickStartNotice } from "../quick-actions";
 import { type Placement, PullRequestDetailContent, type PullRequestDetailTab } from "./pr-details";
 import { rowId } from "./pr-row";
 
-/** Why the pull request list does not hold the PR a link named, when the sidebar shows all of the space's workspaces, or one alone. */
-function whyMissing(target: PullRequest, list: PullRequestList, { space, workspace }: Pick<WindowScope, "space" | "workspace">): string {
+/** Why the pull request list does not hold the PR a link named, when the sidebar shows all workspaces, or one alone. */
+function whyMissing(target: PullRequest, list: PullRequestList, { workspace }: WindowScope): string {
 	const repo = `${target.owner}/${target.repo}`;
 	const covered = list.repos.some(other => repoKey(other) === repoKey(target));
 	if (covered) {
 		return `${repo}#${target.number} is not among these pull requests. The Pull requests page lists your open pull requests, your merges from the last seven days, and the pull requests that wait for your review.`;
 	}
-	if (workspace === null) return `${repo}#${target.number} is not among these pull requests, because no session in ${SPACE_LABELS[space]} ran in ${repo}.`;
-	return `${repo}#${target.number} is not among these pull requests, which cover only the workspace that the sidebar shows. Choose All of ${SPACE_LABELS[space]} in the sidebar to include ${repo}.`;
+	if (workspace === null) return `${repo}#${target.number} is not among these pull requests, because no session ran in ${repo}.`;
+	return `${repo}#${target.number} is not among these pull requests, which cover only the workspace that the sidebar shows. Choose ${ALL_WORKSPACES} in the sidebar to include ${repo}.`;
 }
 
 interface PullRequestDetailsProps {

@@ -268,7 +268,6 @@ export function useDashboard(): Dashboard {
 					case "sport":
 					case "routines":
 					case "bots":
-					case "personal":
 					case "scheduled":
 					case "workspaces":
 					case "project-trust":
