@@ -51,14 +51,17 @@ function otherSources(sources: AgentSource[], facts: ChangesSession["facts"]): A
 
 const NONE: never[] = [];
 
-/** The view's changes for `session`, or `null` while there is nothing to list. */
-export function useChanges(view: View, session: ChangesSession): Changes | null {
-	const files = useChangedFiles(view) ?? NONE;
-	const media = useMedia(view) ?? NONE;
+/** The view's changes for `session`: `undefined` until the server sent all three lists, then `null` while there is nothing to list. */
+export function useChanges(view: View, session: ChangesSession): Changes | null | undefined {
+	const sentFiles = useChangedFiles(view);
+	const sentMedia = useMedia(view);
 	const allSources = useSources(view);
+	const files = sentFiles ?? NONE;
+	const media = sentMedia ?? NONE;
 	const facts = session.facts;
 	const sources = useMemo(() => (allSources ? otherSources(allSources, facts) : NONE), [allSources, facts]);
 	const changes = useMemo(() => ({ files, media, sources }), [files, media, sources]);
+	if (sentFiles === null || sentMedia === null || allSources === null) return undefined;
 	if (files.length === 0 && media.length === 0 && sources.length === 0) return null;
 	return changes;
 }
@@ -86,15 +89,17 @@ export function ChangesSection({ title, count, detail, open, onToggle, fold, act
 	return (
 		<Collapsible open={open} onOpenChange={onToggle}>
 			<div className="flex h-9 items-center rounded-lg bg-muted">
-				<CollapsibleTrigger
-					{...activityControl(fold)}
-					className="flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-lg px-3 text-left text-[13px] font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-				>
-					<span className="truncate">{title}</span>
-					<span className="shrink-0 font-normal text-muted-foreground tabular-nums">{count}</span>
-					{detail}
-					<IconChevronBottom aria-hidden className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none", !open && "-rotate-90")} />
-				</CollapsibleTrigger>
+				<h3 className="flex h-full min-w-0 flex-1">
+					<CollapsibleTrigger
+						{...activityControl(fold)}
+						className="flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-lg px-3 text-left text-[13px] font-medium text-foreground outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+					>
+						<span className="truncate">{title}</span>
+						<span className="shrink-0 font-normal text-muted-foreground tabular-nums">{count}</span>
+						{detail}
+						<IconChevronBottom aria-hidden className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none", !open && "-rotate-90")} />
+					</CollapsibleTrigger>
+				</h3>
 				{action}
 			</div>
 			<CollapsibleContent keepMounted className="h-(--collapsible-panel-height) overflow-hidden transition-[height] duration-200 ease-out data-ending-style:h-0 data-starting-style:h-0 motion-reduce:transition-none">

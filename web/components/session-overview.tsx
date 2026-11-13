@@ -16,12 +16,14 @@ interface SessionOverviewProps {
 	changes: ChangesSession;
 }
 
-/** Each section shows once it has something to list, and the tab says so while none does. */
+/** Each section shows once it has something to list, and the tab says so once the server has sent the lists and none has. */
 export function SessionOverview({ view, working, links, changes }: SessionOverviewProps) {
 	const nodes = links ? subagentTree(links.agents, view.kind === "live" ? view.agentId : null) : [];
 	const found = useChanges(view, changes);
+	if (nodes.length === 0 && found === undefined) return null;
 	if (nodes.length === 0 && found === null) {
-		return <DetailsEmpty icon={IconBulletList} title="Nothing yet" description="The session's subagents, and the files, images, and pages its agents touch, show here." />;
+		const description = links ? "The session's subagents, and the files, images, and pages its agents touch, show here." : "The files, images, and pages this session's agents touched show here.";
+		return <DetailsEmpty icon={IconBulletList} title="Nothing yet" description={description} />;
 	}
 	return (
 		<div className="flex flex-col gap-2 px-2 pb-4">

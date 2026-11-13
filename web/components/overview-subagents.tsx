@@ -33,7 +33,13 @@ export function SubagentsSection({ links, nodes, arenas }: { links: SubagentLink
 		<ChangesSection
 			title="Subagents"
 			count={nodes.length}
-			detail={running > 0 && <span className="shrink-0 font-normal text-muted-foreground">· {running} running</span>}
+			detail={
+				running > 0 && (
+					<span className="shrink-0 font-normal text-muted-foreground">
+						<span aria-hidden>·</span> {running} running
+					</span>
+				)
+			}
 			open={!closed}
 			onToggle={() => setClosed(shut => !shut)}
 			fold="transcript.subagents"
@@ -66,7 +72,8 @@ function agentLink(links: SubagentLinksValue, agentId: string) {
 	};
 }
 
-const tooltipOf = (agent: AgentRow, verdict?: string) => `${[agent.id, agent.kind, statusLabel(agent.status), agent.activity, verdict].filter(Boolean).join(" · ")}. ${SPLIT_CLICK} to open in a split`;
+const tooltipOf = (agent: AgentRow, verdict?: string) =>
+	`${[agent.id, agent.kind, agent.model && modelLabel(agent.model), statusLabel(agent.status), agent.activity, verdict].filter(Boolean).join(" · ")}. ${SPLIT_CLICK} to open in a split`;
 
 /** The badge each verdict of the pick shows on a runner's card. */
 const VERDICTS = {
@@ -77,28 +84,30 @@ const VERDICTS = {
 
 const verdictText = (verdict: ArenaVerdict) => (verdict.kind === "graft" ? `${VERDICTS.graft.label}: ${verdict.what}` : VERDICTS[verdict.kind].label);
 
-/** A subagent's second line: its model after its maker's logo, its type, and how long it ran. */
-function SubagentMeta({ agent }: { agent: AgentRow }) {
+/** A subagent's model after its maker's logo, then its type and how long it ran: on one line in a row, `stacked` on two in a narrow runner card. */
+function SubagentMeta({ agent, stacked = false }: { agent: AgentRow; stacked?: boolean }) {
 	const time = runTime(agent, useMinute());
 	return (
-		<span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+		<span className={cn("flex min-w-0 text-xs text-muted-foreground", stacked ? "flex-col gap-0.5" : "items-center gap-1.5")}>
 			{agent.model && (
-				<>
+				<span className="flex min-w-0 items-center gap-1.5">
 					<OrgIcon org={modelOrg(agent.model)} className="size-3.5" />
 					<span className="truncate">{modelLabel(agent.model)}</span>
-					<span aria-hidden>·</span>
-				</>
+					{!stacked && <span aria-hidden>·</span>}
+				</span>
 			)}
-			<span className="shrink-0">{agent.kind}</span>
-			{time && (
-				<>
-					<span aria-hidden>·</span>
-					<span className="shrink-0 tabular-nums">
-						<span className="sr-only">{agent.status === "running" ? "running for " : "ran for "}</span>
-						{time}
-					</span>
-				</>
-			)}
+			<span className="flex min-w-0 items-center gap-1.5">
+				<span className="truncate">{agent.kind}</span>
+				{time && (
+					<>
+						<span aria-hidden>·</span>
+						<span className="shrink-0 tabular-nums">
+							<span className="sr-only">{agent.status === "running" ? "running for " : "ran for "}</span>
+							{time}
+						</span>
+					</>
+				)}
+			</span>
 		</span>
 	);
 }
@@ -111,20 +120,20 @@ function SubagentRow({ agent, depth, links, lead }: { agent: AgentRow; depth: nu
 			<Tooltip content={tooltipOf(agent)} side="left">
 				<a
 					href={href}
-					className="grid min-w-0 flex-1 grid-cols-[1rem_minmax(0,1fr)] gap-x-2.5 gap-y-0.5 rounded-md px-2 py-1.5 text-[13px] leading-5 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+					className="group/row grid min-w-0 flex-1 grid-cols-[1rem_minmax(0,1fr)] gap-x-2.5 gap-y-0.5 rounded-md px-2 py-1.5 text-[13px] leading-5 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
 					onClick={onClick}
 				>
-					{/* The status dot sits on the icon's bottom-right corner; a running subagent draws none. */}
+					{/* The status dot sits on the icon's bottom-right corner, cut out of it as an avatar's is; a running subagent draws none. */}
 					<span className="relative flex h-5 items-center text-muted-foreground">
 						{lead ?? <IconAiBotHead className="size-4" />}
-						<span className="absolute top-2.5 -right-0.5">
+						<span className="absolute -right-1 -bottom-0.5 flex size-2.5 items-center justify-center rounded-full has-[[role=img]]:bg-background group-hover/row:has-[[role=img]]:bg-muted">
 							<StatusDot status={agent.status} />
 						</span>
 					</span>
 					<span className="flex min-w-0 gap-2">
-						<span className="shrink-0 text-muted-foreground">{agent.id}</span>
+						<span className="max-w-[60%] shrink-0 truncate text-muted-foreground">{agent.id}</span>
 						{depth > 0 && <span className="sr-only">, started by {agent.parentId}</span>}
-						{agent.activity && <span className="truncate text-foreground">{agent.activity}</span>}
+						{agent.activity && <span className="min-w-0 truncate text-foreground">{agent.activity}</span>}
 					</span>
 					<span className="col-start-2 min-w-0">
 						<SubagentMeta agent={agent} />
@@ -184,14 +193,14 @@ function RunnerCard({ seat, links }: { seat: ArenaSeat; links: SubagentLinksValu
 					<div className="flex min-w-0 items-center gap-1.5 text-[13px]">
 						<span className="sr-only">Runner </span>
 						<span className={cn("inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-0.5 text-2xs font-semibold tabular-nums", won ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>{seat.seat}</span>
-						<span className="truncate text-foreground">{agent.id}</span>
+						<span className="truncate text-muted-foreground">{agent.id}</span>
 						<span className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
 							<StatusDot status={agent.status} />
 							{statusLabel(agent.status).toLowerCase()}
 						</span>
 					</div>
-					<SubagentMeta agent={agent} />
-					{agent.activity && <div className="line-clamp-2 text-xs text-muted-foreground">{agent.activity}</div>}
+					{agent.activity && <div className="line-clamp-2 text-[13px] text-foreground">{agent.activity}</div>}
+					<SubagentMeta agent={agent} stacked />
 					{verdict && <Verdict verdict={verdict} />}
 				</a>
 			</Tooltip>
