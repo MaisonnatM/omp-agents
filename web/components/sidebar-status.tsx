@@ -7,7 +7,6 @@ import type { SystemLoad } from "../../src/shared/system";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 import { isPhonePage } from "../api";
 import { activityControl } from "../activity";
 import type { DashboardState } from "../dashboard-state";
@@ -16,26 +15,32 @@ import { sessionProcessesStore, useRead, writeProcessStop } from "../reads";
 import { hashForSettings } from "../routing";
 import { useAction } from "../use-action";
 import { useHoverPopover } from "../use-hover-popover";
-import { PlanUsageList } from "./plan-usage";
+import { GaugeRing, GaugeText, PlanUsageList, TILE, type Tone } from "./plan-usage";
 import { LoadNote } from "./sheet-details";
 
 /** How often the sidebar reads the machine's load again while the page is visible. */
 const POLL_MS = 5000;
 
-const FACT = "flex items-center gap-1 whitespace-nowrap rounded-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring";
+const ICON = "size-3.5 text-muted-foreground";
+
+/** A machine ring's tone from the share in use: amber past 80%, red past 95%. */
+const usedTone = (used: number): Tone => (used > 0.95 ? "out" : used > 0.8 ? "low" : "ok");
 
 /** A `ps` CPU percent, of one core, rounded; a share that rounds to nothing but is not idle reads `<1%`. */
 const cpuLabel = (percent: number): string => (percent > 0 && percent < 0.5 ? "<1%" : `${Math.round(percent)}%`);
 
 /** The CPU fact, whose popover lists what every live session runs, busiest session first, read again every few seconds while it is open. */
-function CpuFact({ cpu, titles }: { cpu: string; titles: SessionTitles }) {
+function CpuFact({ percent, titles }: { percent: number; titles: SessionTitles }) {
 	const popover = useHoverPopover();
+	const cpu = `${Math.round(percent)}%`;
 	return (
 		<Popover {...popover.root}>
 			<PopoverTrigger asChild>
-				<button {...activityControl("sidebar.cpu")} {...popover.trigger} type="button" aria-label={`CPU ${cpu} busy`} className={cn(FACT, "hover:text-foreground")}>
-					<IconProcessor className="size-3 shrink-0" />
-					{cpu}
+				<button {...activityControl("sidebar.cpu")} {...popover.trigger} type="button" aria-label={`CPU ${cpu} busy`} className={TILE}>
+					<GaugeRing fill={percent / 100} tone={usedTone(percent / 100)}>
+						<IconProcessor className={ICON} />
+					</GaugeRing>
+					<GaugeText value={cpu} caption="CPU" tone={usedTone(percent / 100)} />
 				</button>
 			</PopoverTrigger>
 			<PopoverContent {...popover.content} side="top" align="start" aria-label="Sessions' processes" className="w-96 p-0">
@@ -126,12 +131,15 @@ function DiskFact({ available, total }: { available: number; total: number }) {
 	const popover = useHoverPopover();
 	const used = total - available;
 	const percent = total > 0 ? Math.round((used / total) * 100) : 0;
+	const tone = usedTone(total > 0 ? used / total : 0);
 	return (
 		<Popover {...popover.root}>
 			<PopoverTrigger asChild>
-				<button {...activityControl("sidebar.disk")} {...popover.trigger} type="button" aria-label={`${formatBytes(available)} of ${formatBytes(total)} disk space available`} className={cn(FACT, "hover:text-foreground")}>
-					<IconStorage className="size-3 shrink-0" />
-					{formatBytes(available)}
+				<button {...activityControl("sidebar.disk")} {...popover.trigger} type="button" aria-label={`${formatBytes(available)} of ${formatBytes(total)} disk space available`} className={TILE}>
+					<GaugeRing fill={total > 0 ? used / total : null} tone={tone}>
+						<IconStorage className={ICON} />
+					</GaugeRing>
+					<GaugeText value={formatBytes(available)} caption="Disk free" tone={tone} />
 				</button>
 			</PopoverTrigger>
 			<PopoverContent {...popover.content} side="top" align="start" aria-label="Disk space" className="w-64 space-y-3 text-xs">
@@ -160,15 +168,17 @@ function MachineLoad({ titles }: { titles: SessionTitles }) {
 	}, []);
 	const load = useRead<SystemLoad>("/api/system", tick).data;
 	if (!load) return null;
-	const cpu = load.cpuPercent === null ? null : `${Math.round(load.cpuPercent)}%`;
 	const memory = `${formatBytes(load.memoryAvailable)} of ${formatBytes(load.memoryTotal)} memory available`;
+	const memoryUsed = load.memoryTotal > 0 ? 1 - load.memoryAvailable / load.memoryTotal : 0;
 	return (
 		<>
-			{cpu !== null && <CpuFact cpu={cpu} titles={titles} />}
+			{load.cpuPercent !== null && <CpuFact percent={load.cpuPercent} titles={titles} />}
 			<Tooltip content={memory} side="top">
-				<span tabIndex={0} aria-label={memory} className={FACT}>
-					<IconSdCard className="size-3 shrink-0" />
-					{formatBytes(load.memoryAvailable)}
+				<span tabIndex={0} aria-label={memory} className={TILE}>
+					<GaugeRing fill={memoryUsed} tone={usedTone(memoryUsed)}>
+						<IconSdCard className={ICON} />
+					</GaugeRing>
+					<GaugeText value={formatBytes(load.memoryAvailable)} caption="Memory free" tone={usedTone(memoryUsed)} />
 				</span>
 			</Tooltip>
 			<DiskFact available={load.diskAvailable} total={load.diskTotal} />
@@ -187,7 +197,7 @@ interface SidebarStatusProps {
 	bots: readonly Bot[] | null;
 }
 
-/** The sidebar's foot: plan quota, one plan per row, then the machine's load, left out on a paired phone, where it would describe the Mac. */
+/** The sidebar's foot: plan quota, then the machine's load in the same rings, left out on a paired phone, where it would describe the Mac. */
 export function SidebarStatus({ usage, hosts, bots }: SidebarStatusProps) {
 	const titles = useMemo(() => {
 		const botNames = new Map((bots ?? []).flatMap(bot => (bot.sessionId === null ? [] : [[bot.sessionId, bot.name] as const])));
@@ -200,7 +210,7 @@ export function SidebarStatus({ usage, hosts, bots }: SidebarStatusProps) {
 		<footer className="mx-3 flex shrink-0 flex-col gap-2 border-t border-border pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] text-xs">
 			<PlanUsageList usage={usage} />
 			{!isPhonePage() && (
-				<div className="flex min-w-0 items-center gap-3 text-muted-foreground">
+				<div aria-label="Machine load" className="grid grid-cols-4 gap-1">
 					<MachineLoad titles={titles} />
 				</div>
 			)}

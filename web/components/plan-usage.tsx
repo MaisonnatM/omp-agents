@@ -1,5 +1,5 @@
 /** How much of each provider plan's usage windows is left, shown at the sidebar's foot and in the model menu. */
-import { createContext } from "react";
+import { createContext, type ReactNode } from "react";
 import { type CreditBalance, type ExtraUsage, isNameOnlyPlan, type PlanUsage, type PlanWindow, type ResetCredits } from "../../src/shared/models";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -188,30 +188,45 @@ export function PlanCard({ plan, now }: { plan: PlanUsage; now: number }) {
 const RING_STROKE: Record<Tone, string> = { out: "stroke-red-500", low: "stroke-amber-500", ok: "stroke-foreground/60" };
 const RING_RADIUS = 13;
 const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
-const TILE = "flex min-w-0 flex-col items-center gap-0.5 rounded-md px-0.5 py-1 tabular-nums hover:bg-hover";
+/** One tile of the sidebar foot's grids: a ring, its figure, and its caption, stacked. */
+export const TILE = "flex min-w-0 flex-col items-center gap-0.5 rounded-md px-0.5 py-1 tabular-nums outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring";
 
-/** A provider's logo inside a ring that empties as the plan is used. */
-function Ring({ plan, gauge }: { plan: PlanUsage; gauge: PlanGauge }) {
+/** An icon inside a ring filled to `fill`, 0 to 1, or left empty for `null`. */
+export function GaugeRing({ fill, tone, children }: { fill: number | null; tone: Tone; children: ReactNode }) {
 	return (
 		<span aria-hidden className="relative grid size-8 place-items-center">
 			<svg viewBox="0 0 32 32" className="absolute inset-0 -rotate-90">
 				<circle cx="16" cy="16" r={RING_RADIUS} fill="none" strokeWidth="2.5" className="stroke-foreground/10" />
-				{gauge.left !== null && (
-					<circle cx="16" cy="16" r={RING_RADIUS} fill="none" strokeWidth="2.5" strokeLinecap="round" className={RING_STROKE[gauge.tone]} strokeDasharray={`${Math.max(0.02, gauge.left) * RING_LENGTH} ${RING_LENGTH}`} />
+				{fill !== null && (
+					<circle cx="16" cy="16" r={RING_RADIUS} fill="none" strokeWidth="2.5" strokeLinecap="round" className={RING_STROKE[tone]} strokeDasharray={`${Math.max(0.02, fill) * RING_LENGTH} ${RING_LENGTH}`} />
 				)}
 			</svg>
-			<OrgIcon org={providerOrg(plan.provider)} className="size-3.5" fallback={<span className="text-[10px] font-medium">{plan.name.slice(0, 2)}</span>} />
+			{children}
 		</span>
 	);
 }
 
-function TileText({ gauge }: { gauge: PlanGauge }) {
+/** A tile's figure in its tone, then its muted caption, whole on hover. */
+export function GaugeText({ value, caption, tone }: { value: string | null; caption: string; tone: Tone }) {
 	return (
 		<>
-			<span className={cn("max-w-full truncate font-medium", TONE_CLASS[gauge.tone].text)}>{gauge.value ?? "—"}</span>
-			<span title={gauge.caption} className="max-w-full truncate text-[10px] text-muted-foreground">{gauge.caption}</span>
+			<span className={cn("max-w-full truncate font-medium", TONE_CLASS[tone].text)}>{value ?? "—"}</span>
+			<span title={caption} className="max-w-full truncate text-[10px] text-muted-foreground">{caption}</span>
 		</>
 	);
+}
+
+/** A provider's logo inside a ring that empties as the plan is used. */
+function Ring({ plan, gauge }: { plan: PlanUsage; gauge: PlanGauge }) {
+	return (
+		<GaugeRing fill={gauge.left} tone={gauge.tone}>
+			<OrgIcon org={providerOrg(plan.provider)} className="size-3.5" fallback={<span className="text-[10px] font-medium">{plan.name.slice(0, 2)}</span>} />
+		</GaugeRing>
+	);
+}
+
+function TileText({ gauge }: { gauge: PlanGauge }) {
+	return <GaugeText value={gauge.value} caption={gauge.caption} tone={gauge.tone} />;
 }
 
 /** A plan with windows or spend; hovering or clicking opens {@link PlanCard} with its resets and credits. */
@@ -221,7 +236,7 @@ function PlanTile({ plan, gauge }: { plan: PlanUsage; gauge: PlanGauge }) {
 	return (
 		<Popover {...popover.root}>
 			<PopoverTrigger asChild>
-				<button {...popover.trigger} type="button" aria-label={`${plan.name} ${plan.account ?? ""} ${gauge.caption} ${gauge.value ?? ""}`} className={cn(TILE, FOCUS)}>
+				<button {...popover.trigger} type="button" aria-label={`${plan.name} ${plan.account ?? ""} ${gauge.caption} ${gauge.value ?? ""}`} className={TILE}>
 					<Ring plan={plan} gauge={gauge} />
 					<TileText gauge={gauge} />
 				</button>
@@ -239,7 +254,7 @@ function NamedTile({ plan, gauge }: { plan: PlanUsage; gauge: PlanGauge }) {
 	const tooltip = plan.outOfCreditSince === undefined ? balance : `${balance}${refusedSince(plan.outOfCreditSince)}`;
 	return (
 		<Tooltip content={tooltip}>
-			<span tabIndex={0} aria-label={tooltip} className={cn(TILE, FOCUS)}>
+			<span tabIndex={0} aria-label={tooltip} className={TILE}>
 				<Ring plan={plan} gauge={gauge} />
 				<TileText gauge={gauge} />
 			</span>
