@@ -8,7 +8,7 @@ import { hashForSession } from "../src/shared/sessions";
 import { folderName, providerLabel } from "./labels";
 import { moveAction } from "./pull-requests-model";
 import type { PullRequestActionId } from "../src/pull-request-actions";
-import { hashForCalendar, hashForPullRequests, hashForSettings } from "./routing";
+import { hashForPage, hashForPullRequests, hashForSettings } from "./routing";
 
 /** The bell's filters, each a source of notices. */
 export type NoticeSource = "github" | "slack" | "providers" | "integrations" | "calendar" | "sessions" | "updates";
@@ -155,7 +155,7 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 				source: "calendar",
 				headline: `${notice.title} ${notice.start > now ? "starts" : "started"} at ${SAME_DAY.format(notice.start)}`,
 				preview: `${SAME_DAY.format(notice.start)} – ${SAME_DAY.format(notice.end)} · ${notice.calendar ?? "This computer"}`,
-				link: eventLink(notice.sessionId, notice.url) ?? { href: hashForCalendar(), external: false },
+				link: eventLink(notice.sessionId, notice.url) ?? { href: hashForPage({ kind: "calendar" }), external: false },
 				face: { kind: "event", color: notice.color },
 				toast: { kind: "news", timeout: 0 },
 			};

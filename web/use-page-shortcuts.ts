@@ -1,6 +1,7 @@
 import { type Dispatch, type SetStateAction, useMemo, useRef } from "react";
 import type { View } from "../src/shared/sessions";
 import type { PaletteEvent, PaletteState } from "./command-palette";
+import { MODULE_LIST, type WebModuleId } from "./modules";
 import { adjacentSession, closePane, type Layout, type Page, type SettingsRoute, type SidebarTab } from "./routing";
 import { type ShortcutHandler, type ShortcutHandlers, type ShortcutId, useShortcuts } from "./shortcuts";
 import { positionHandlers } from "./sidebar-tabs";
@@ -64,6 +65,7 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			if (page?.kind === tab) return;
 			showTab(tab);
 		};
+		const moduleGoTo = Object.fromEntries(MODULE_LIST.map(({ id }) => [id, goToTab(id)])) as Record<WebModuleId, ShortcutHandler>;
 		const goTo: Record<SidebarTab, ShortcutHandler> = {
 			"pull-requests": () => {
 				const { page } = latest.current;
@@ -71,12 +73,9 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				if (page?.kind === "pull-requests" && !page.target) return;
 				latest.current.showTab("pull-requests");
 			},
-			tickets: goToTab("tickets"),
 			bots: goToTab("bots"),
 			todo: goToTab("todo"),
-			calendar: goToTab("calendar"),
-			email: goToTab("email"),
-			sport: goToTab("sport"),
+			...moduleGoTo,
 		};
 		const positions = positionHandlers(() => latest.current.tabs, goTo);
 		return {
@@ -109,7 +108,6 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			back: () => history.back(),
 			forward: () => history.forward(),
 			"pull-requests": goTo["pull-requests"],
-			tickets: goTo.tickets,
 			newTicket: () => {
 				const { ticketsCallable, setNewTicket } = latest.current;
 				if (!ticketsCallable) return false;
@@ -121,9 +119,7 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				latest.current.showTab("sessions");
 			},
 			todo: goTo.todo,
-			calendar: goTo.calendar,
-			email: goTo.email,
-			sport: goTo.sport,
+			...moduleGoTo,
 			...positions,
 			restore: () => {
 				const { page, maximized, layout, show } = latest.current;

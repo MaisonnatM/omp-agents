@@ -67,7 +67,7 @@ const ALL_TODOS: TodoListView = { kind: "all" };
  * slice, and the two dashboard contexts split what is stable, the actions, from what changes, the connection and the starts.
  */
 export function App() {
-	const { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeSport, changePins, changeBot, trustAndStart, dismissTrust } = useDashboard();
+	const { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeModule, changePins, changeBot, trustAndStart, dismissTrust } = useDashboard();
 
 	const { layout } = state;
 	const sidebars = useSidebarPanels();
@@ -86,13 +86,10 @@ export function App() {
 	const editGoal = useCallback((instanceId: string, focus: "objective" | "budget") => setGoalEditor({ instanceId, focus }), []);
 	const goalHost = goalEditor ? state.hosts.find(host => host.instanceId === goalEditor.instanceId) : null;
 	const editedGoal = goalHost?.source === "dashboard" && goalHost.goal.kind !== "off" && goalHost.control.phase === "live" && !goalHost.control.readOnly ? goalHost : null;
-	const integrations = integrationsStore.usePolling().read?.data.integrations;
-	const linear = integrations?.linear ?? null;
+	const linear = integrationsStore.usePolling().read?.data.integrations.linear ?? null;
 	const { signedOut: absentTabs, shown: tabs } = useSidebarTabs();
-	/** The dashboard reads and writes Linear: the tickets page lists issues, the Todo page creates them, and the Calendar shows their due days. */
-	const linearCallable = linear !== null && callable(linear.connection);
-	/** Linear answers and the sidebar shows Tickets: the new-ticket shortcut and the palette's tickets apply. */
-	const ticketsCallable = linearCallable && !absentTabs.has("tickets");
+	/** Linear answers and the sidebar shows Tickets: the new-ticket shortcut, the palette's tickets, a todo's ticket, and the Calendar's due days apply. */
+	const ticketsCallable = linear !== null && callable(linear.connection) && !absentTabs.has("tickets");
 	const settings = useSettingsRoute(page);
 	const botList = useMemo(() => (state.bots === null ? null : botRows(state.bots, state.hosts, state.botLasts)), [state.bots, state.hosts, state.botLasts]);
 	const latestBot = botList?.[0]?.bot.id ?? null;
@@ -214,8 +211,8 @@ export function App() {
 	});
 
 	const actions = useMemo(
-		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeSport, changeBot, end: endHost, openFile: setOpenedFile, openNewTicket: setNewTicket, editGoal, workspaceSettings }),
-		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeSport, changeBot, endHost, setOpenedFile, setNewTicket, editGoal, workspaceSettings],
+		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeModule, changeBot, end: endHost, openFile: setOpenedFile, openNewTicket: setNewTicket, editGoal, workspaceSettings }),
+		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeModule, changeBot, endHost, setOpenedFile, setNewTicket, editGoal, workspaceSettings],
 	);
 	const fork = startOf(state.starts, "fork");
 	const resume = startOf(state.starts, "resume");
@@ -311,7 +308,7 @@ export function App() {
 																	splits={state.splits}
 																	models={state.models}
 																	userTodos={state.userTodos}
-																	sport={state.sport}
+																	modules={state.modules}
 																	routines={state.routines}
 																	bots={state.bots}
 																	botLasts={state.botLasts}
@@ -328,8 +325,6 @@ export function App() {
 																	defaultWorkspace={defaultWorkspace}
 																	sectionTarget={sectionTarget}
 																	todoView={todoView}
-																	linear={linear}
-																	linearCallable={linearCallable}
 																	ticketsCallable={ticketsCallable}
 																	maximized={maximized}
 																	hasDetails={detailsView !== null}

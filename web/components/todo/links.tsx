@@ -4,7 +4,8 @@ import { hashForSession, type PastSession, type RosterHost } from "../../../src/
 import type { UserTodoLink } from "../../../src/user-todos-shared";
 import { hostLabel, pastLabel } from "../../labels";
 import { PAGE_ICON } from "../../page-icons";
-import { hashForPullRequests, hashForTickets } from "../../routing";
+import { hashForPullRequests } from "../../routing";
+import { hashForTickets } from "../../tickets-model";
 import type { TodoWorkState } from "../../todo-work-state";
 import { Tooltip } from "@/components/ui/tooltip";
 import { StatusDot } from "../status-dot";

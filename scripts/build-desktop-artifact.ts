@@ -15,6 +15,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { $ } from "bun";
+import { SHIPPED_FILES } from "../src/modules";
 import { buildPage } from "../src/server/page";
 
 const ROOT = join(import.meta.dir, "..");
@@ -43,7 +44,7 @@ async function bundle(entry: string, outdir: string, naming: string, options: Pa
 	if (!build.success) throw new AggregateError(build.logs, `cannot bundle ${entry}`);
 }
 
-/** The server, its page, the session visuals extension, and the starter kit, the same for every architecture. */
+/** The server, its page, the session visuals extension, the modules' files, and the starter kit, the same for every architecture. */
 async function buildResources(): Promise<void> {
 	rmSync(RESOURCES, { recursive: true, force: true });
 	const pageDir = join(RESOURCES, "page");
@@ -56,7 +57,7 @@ async function buildResources(): Promise<void> {
 	await bundle(join(ROOT, "src", "omp", "bot-extension.ts"), RESOURCES, "bot-extension.js", { target: "bun" });
 	await bundle(join(ROOT, "src", "omp", "shepherd-extension.ts"), RESOURCES, "shepherd-extension.js", { target: "bun" });
 	await bundle(join(ROOT, "src", "omp", "designer-extension.ts"), RESOURCES, "designer-extension.js", { target: "bun" });
-	await bundle(join(ROOT, "src", "omp", "sport-extension.ts"), RESOURCES, "sport-extension.js", { target: "bun" });
+	for (const { source, bundle: name } of SHIPPED_FILES) await bundle(source, RESOURCES, name, { target: "bun" });
 	// The installer reads its layers beside itself, as `templates/omp/install.ts` does in a checkout.
 	const kitOut = join(RESOURCES, "templates", "omp");
 	cpSync(join(KIT, "agent"), join(kitOut, "agent"), { recursive: true });

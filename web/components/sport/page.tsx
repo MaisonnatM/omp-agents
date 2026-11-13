@@ -8,7 +8,6 @@ import { dayPlan, phaseOn } from "../../../src/sport-week";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../../activity";
-import { hashForSport, type SportRoute } from "../../routing";
 import { useShortcuts } from "../../shortcuts";
 import { bodyweightOf, type LogTarget, phaseLabel, type Saved } from "../../sport-view";
 import { TimerSound } from "../../sport-timer-sound";
@@ -20,7 +19,8 @@ import { DemoDialog } from "./demo-dialog";
 import { JournalTab } from "./journal";
 import { LogForm, WeighForm } from "./log-form";
 import { SummaryDialog } from "./log-summary";
-import { SPORT_TABS } from "./nav";
+import type { SportRoute } from "./module";
+import { SPORT_TABS, sportHash } from "./nav";
 import { ProgressTab } from "./progress";
 import { RoutineTimer, type TimerChecklist } from "./routine-timer";
 import { WeekTab } from "./week";
@@ -48,7 +48,7 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 	// A dialog's popup keeps only the arrows, Home, and End from the page, so Esc and keys in a picker outside the popup would still reach the week's and journal's shortcuts.
 	const dialogOpen = demo !== null || timer !== null || target !== null || saved !== null || weighing;
 	const stepDay = (by: -1 | 1) => {
-		location.hash = hashForSport({ tab: "week", day: addDays(selected, by) });
+		location.hash = sportHash({ tab: "week", day: addDays(selected, by) });
 	};
 	useShortcuts(route.tab === "week" && plan && !dialogOpen ? { sportPreviousDay: () => stepDay(-1), sportNextDay: () => stepDay(1) } : {});
 	if (state === null) {
@@ -177,7 +177,7 @@ function ViewTabs({ tab, className, fill = false }: { tab: SportRoute["tab"]; cl
 			value={tab}
 			onValueChange={next => {
 				const view = SPORT_TABS.find(({ route }) => route.tab === next);
-				if (view) location.hash = hashForSport(view.route);
+				if (view) location.hash = sportHash(view.route);
 			}}
 			activationMode="manual"
 			className={className}

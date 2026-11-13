@@ -6,7 +6,8 @@ import { fields, isSafeInteger, isString, parseJson } from "../src/json";
 import { ACTION_MESSAGES, type ActivityEvent, type ActivityKind, type ActivityVia, type ControlId, isActivityEvent, MAX_ACTIVITY_BATCH } from "../src/shared/activity";
 import type { ClientMsg } from "../src/shared/protocol";
 import type { DashboardState } from "./dashboard-state";
-import type { Layout, Page, SettingsSection, SidebarTab } from "./routing";
+import { isModulePage, isWebModuleId, type ModuleControlId, moduleOf, type ModuleView, type WebModuleId } from "./modules";
+import { type Layout, type Page, type SettingsSection, SIDEBAR_TABS, type SidebarTab } from "./routing";
 
 /** The outbox's `localStorage` key; it keeps what earlier page loads have not yet sent. */
 export const OUTBOX_STORAGE_KEY = "omp-agents.activity-outbox";
@@ -148,8 +149,8 @@ export function commandKey(id: string): string {
 	return id.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
 }
 
-/** The tag that makes a click on a page-only control count, by its id in `CONTROLS`. */
-export function activityControl(id: ControlId): { "data-activity": ControlId } {
+/** The tag that makes a click on a page-only control count, by its id in `CONTROLS` or a module's `controls`. */
+export function activityControl(id: ControlId | ModuleControlId): { "data-activity": ControlId | ModuleControlId } {
 	return { "data-activity": id };
 }
 
@@ -168,69 +169,79 @@ export function listenForControls(doc: Pick<Document, "addEventListener" | "remo
 	return () => doc.removeEventListener("click", onClick, { capture: true });
 }
 
+/** The views of the core's tabs. */
+const TAB_VIEWS = {
+	"pull-requests": [
+		{ key: "pull-requests", label: "Pull requests" },
+		{ key: "pull-requests/item", label: "A pull request" },
+		{ key: "pull-requests/files", label: "A pull request's files" },
+	],
+	bots: [
+		{ key: "bots", label: "Bots" },
+		{ key: "bots/new", label: "New Bot" },
+		{ key: "bots/item", label: "A Bot" },
+		{ key: "bots/routines", label: "A Bot's routines" },
+		{ key: "bots/routine", label: "A Bot's routine" },
+	],
+	todo: [
+		{ key: "todo", label: "Todo" },
+		{ key: "todo/item", label: "A todo" },
+	],
+} as const satisfies { [T in Exclude<SidebarTab, WebModuleId>]: readonly { key: string; label: string }[] };
+
+type PageViewKey =
+	| "home"
+	| "get-started"
+	| "session"
+	| "past"
+	| "split"
+	| (typeof TAB_VIEWS)[keyof typeof TAB_VIEWS][number]["key"]
+	| ModuleView
+	| "notifications"
+	| "scheduled"
+	| "scheduled/item"
+	| "new";
+
 /**
  * Every view but the settings sections, which {@link ViewKey} adds: the panes by how many there are and of what kind, and
- * each page by its kind and whether it shows one item, never an id or a path. `tab` is the sidebar tab a view goes with,
- * so Settings › Activity sets apart a view whose tab's service omp is not signed in to.
+ * each page by its kind and whether it shows one item, never an id or a path; each tab's views come in the sidebar's order.
+ * `tab` is the sidebar tab a view goes with, so Settings › Activity sets apart a view whose tab's service omp is not signed in to.
  */
-export const VIEWS = [
+export const VIEWS: readonly { key: PageViewKey; label: string; tab?: SidebarTab }[] = [
 	{ key: "home", label: "Home" },
 	{ key: "get-started", label: "Get started" },
 	{ key: "session", label: "A session" },
 	{ key: "past", label: "A past session" },
 	{ key: "split", label: "Split panes" },
-	{ key: "pull-requests", label: "Pull requests" },
-	{ key: "pull-requests/item", label: "A pull request" },
-	{ key: "pull-requests/files", label: "A pull request's files" },
-	{ key: "tickets", label: "Tickets", tab: "tickets" },
-	{ key: "tickets/item", label: "A ticket", tab: "tickets" },
-	{ key: "todo", label: "Todo" },
-	{ key: "todo/item", label: "A todo" },
-	{ key: "calendar", label: "Calendar" },
+	...SIDEBAR_TABS.flatMap(({ value, integration }): readonly { key: PageViewKey; label: string; tab?: SidebarTab }[] => {
+		if (!isWebModuleId(value)) return TAB_VIEWS[value];
+		const { views } = moduleOf({ kind: value });
+		return integration ? views.map(view => ({ ...view, tab: value })) : views;
+	}),
 	{ key: "notifications", label: "Notifications" },
-	{ key: "bots", label: "Bots" },
-	{ key: "bots/new", label: "New Bot" },
-	{ key: "bots/item", label: "A Bot" },
-	{ key: "bots/routines", label: "A Bot's routines" },
-	{ key: "bots/routine", label: "A Bot's routine" },
-	{ key: "email", label: "Email", tab: "email" },
-	{ key: "email/new", label: "New mail", tab: "email" },
-	{ key: "email/item", label: "A mail conversation", tab: "email" },
 	{ key: "scheduled", label: "Scheduled sends" },
 	{ key: "scheduled/item", label: "A scheduled send" },
-	{ key: "sport", label: "Sport week" },
-	{ key: "sport/journal", label: "Sport journal" },
-	{ key: "sport/journal/item", label: "A workout log" },
-	{ key: "sport/progress", label: "Sport progress" },
 	{ key: "new", label: "New session" },
-] as const satisfies readonly { key: string; label: string; tab?: SidebarTab }[];
+];
 
 /** A view's key: one of {@link VIEWS}, or a settings section. */
-export type ViewKey = (typeof VIEWS)[number]["key"] | `settings/${SettingsSection}`;
+export type ViewKey = PageViewKey | `settings/${SettingsSection}`;
 
 function pageView(page: Page): ViewKey {
+	if (isModulePage(page)) return moduleOf(page).view(page);
 	switch (page.kind) {
 		case "settings":
 			return `settings/${page.section}`;
 		case "pull-requests":
 			return page.target === null ? "pull-requests" : page.files === null ? "pull-requests/item" : "pull-requests/files";
-		case "tickets":
-			return page.target === null ? "tickets" : "tickets/item";
 		case "bots":
 			if (page.target === null) return page.adding ? "bots/new" : "bots";
 			if (page.routine === null) return "bots/item";
 			return page.routine.kind === "list" ? "bots/routines" : "bots/routine";
 		case "todo":
 			return page.open === null ? "todo" : "todo/item";
-		case "email":
-			return page.target === null ? "email" : page.target === "new" ? "email/new" : "email/item";
 		case "scheduled":
 			return page.id === null ? "scheduled" : "scheduled/item";
-		case "sport":
-			if (page.tab === "week") return "sport";
-			if (page.tab === "progress") return "sport/progress";
-			return page.open === null ? "sport/journal" : "sport/journal/item";
-		case "calendar":
 		case "notifications":
 		case "get-started":
 		case "new":

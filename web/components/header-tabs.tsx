@@ -1,5 +1,5 @@
 /** `HeaderTabs`, the row across the top of the page and the details sidebar: Back and Forward, the tabs you browse in, and a + that opens a new one. */
-import { IconBubbleText, IconDotGrid2x3, IconEditBig, IconHome, IconPlusLarge, IconSparklesTwo } from "central-icons";
+import { IconBubbleText, IconCalendarClock, IconDotGrid2x3, IconEditBig, IconHome, IconPlusLarge, IconSparklesTwo } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useEffect, useRef } from "react";
 import { awaitsSubagents, type PastSession, type RosterHost } from "../../src/shared/sessions";
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { record } from "../activity";
 import { pageTitle, viewTitle } from "../document-title";
 import { closeHeaderTab, decodeHeaderTabs, encodeHeaderTabs, type HeaderTab, HEADER_TABS_KEY, type HeaderTabTarget, headerTabTarget, NEW_TAB_HASH, reorderHeaderTabs, visitHeaderTab } from "../header-tabs";
+import { MODULE_LIST, type WebModuleId } from "../modules";
 import { moveBy, SIDE_DROP_LINE, stepTarget, type Where } from "../order";
 import { PAGE_ICON } from "../page-icons";
 import type { Page } from "../routing";
@@ -20,7 +21,13 @@ import { useDashboardActions } from "./dashboard-context";
 import { HistoryButtons } from "./header-controls";
 import { StatusDot } from "./status-dot";
 
-const PAGE_TAB_ICON: Record<Page["kind"], IconComponent> = { ...PAGE_ICON, "get-started": IconSparklesTwo, new: IconEditBig, scheduled: PAGE_ICON.calendar };
+const PAGE_TAB_ICON: Record<Page["kind"], IconComponent> = {
+	...PAGE_ICON,
+	...(Object.fromEntries(MODULE_LIST.map(({ id, tab }) => [id, tab.icon])) as Record<WebModuleId, IconComponent>),
+	"get-started": IconSparklesTwo,
+	new: IconEditBig,
+	scheduled: IconCalendarClock,
+};
 
 const ICON = "size-3.5 shrink-0";
 

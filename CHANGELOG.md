@@ -5,6 +5,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-13
 
+- Settings › Keyboard and Settings › Activity now list each page's shortcuts and views in the same order as the sidebar.
+- Behind the scenes: Sport, Calendar, Email, and Tickets are now separate modules, so a page like them can be added or removed without touching the rest of the app.
 - The **+** menu in a session's right sidebar now lists its subagents, each opening its view, and **New terminal**, which opens the terminal on a new shell.
 - ⇧⌘G shows the right sidebar's Overview tab and ⇧⌘L opens its Browser tab in the desktop app, as in Capy; the + menu lists both keys.
 - The right sidebar's tabs now work as Capy's: it starts with Overview, + lists PRs, Browser, Tickets, and Artifacts to open as tabs, and each opened tab has an × to close it. A Bot's details do the same with Routines and Tickets.

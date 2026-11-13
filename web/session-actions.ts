@@ -4,7 +4,8 @@ import type { PastSession, RosterHost, View } from "../src/shared/sessions";
 import type { ActionGroup, ActionRun } from "./command-palette";
 import { CONFIRM_PRIVATE_END } from "./labels";
 import { PAGE_ICON } from "./page-icons";
-import { hashForTickets, type OpenMode } from "./routing";
+import type { OpenMode } from "./routing";
+import { hashForTickets } from "./tickets-model";
 import { isPrivateHost } from "./sessions";
 
 /** A session as a row lists it: running, or past. */
