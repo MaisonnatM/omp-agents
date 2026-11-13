@@ -99,7 +99,7 @@ export function useOpenPullRequest(view: View | null, host: RosterHost | null | 
 			},
 			(error: unknown) => {
 				if (presses.get(key) === sent) presses.set(key, null);
-				toasts.add({ title: "Could not send Open PR", description: errorText(error) });
+				toasts.add({ title: "Could not send Open pull request", description: errorText(error) });
 			},
 		);
 	};
