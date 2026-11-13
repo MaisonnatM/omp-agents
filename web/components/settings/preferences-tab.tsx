@@ -15,7 +15,6 @@ import { playSound, useSessionNotifications } from "../../use-attention";
 import { useSkills } from "../../use-skills";
 import { SkillPicker } from "../skill-picker";
 import { ActivityVisibility } from "../transcript";
-import { useSessionCardShown } from "../session-card";
 import { OrderButton, Section } from "./editor";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { putJson } from "../../api";
@@ -187,7 +186,6 @@ function IdleProcessStop() {
 export function PreferencesTab({ cwd, workspace }: { cwd: string | null; workspace: string | null }) {
 	const [theme, setTheme] = useTheme();
 	const { hideTools, hideThinking, toggleTools, toggleThinking } = useContext(ActivityVisibility);
-	const [cardShown, setCardShown] = useSessionCardShown();
 	return (
 		<>
 			<Section title="Theme" meta="System follows your computer's light or dark setting. Saved in this app.">
@@ -212,11 +210,10 @@ export function PreferencesTab({ cwd, workspace }: { cwd: string | null; workspa
 					})}
 				</RadioGroup>
 			</Section>
-			<Section title="Transcript" meta="What each activity group shows under its heading, and whether the Session card shows beside or above the messages, in every pane. Saved in this app.">
+			<Section title="Transcript" meta="What each activity group shows under its heading, in every pane. Saved in this app.">
 				<div className="space-y-2">
 					<ActivitySwitch label="Show tool calls" shortcut="hideTools" checked={!hideTools} onToggle={toggleTools} />
 					<ActivitySwitch label="Show thinking" shortcut="hideThinking" checked={!hideThinking} onToggle={toggleThinking} />
-					<ActivitySwitch label="Show session card" checked={cardShown} onToggle={() => setCardShown(shown => !shown)} />
 				</div>
 			</Section>
 			<SidebarTabs />

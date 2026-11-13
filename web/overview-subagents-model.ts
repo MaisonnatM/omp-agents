@@ -1,5 +1,12 @@
-/** The Session card's **Subagents** section as a tree: which subagents a view lists, in what order, and how deep each sits. */
+/** The Overview tab's **Subagents** section as a tree: which subagents a view lists, in what order, and how deep each sits, and how long each ran. */
 import type { AgentRow, ArenaRecord } from "../src/shared/sessions";
+import { age } from "./labels";
+
+/** How long `agent` has run, as `5m`: up to `now` while it runs, else up to when it stopped; `null` when the dashboard never learned its start or saw it stop. */
+export function runTime({ status, startedAt, endedAt }: Pick<AgentRow, "status" | "startedAt" | "endedAt">, now: number): string | null {
+	const end = status === "running" ? now : endedAt;
+	return startedAt === null || end === null ? null : age(startedAt, { compact: true, now: end });
+}
 
 export interface SubagentNode {
 	agent: AgentRow;

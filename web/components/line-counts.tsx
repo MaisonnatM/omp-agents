@@ -4,14 +4,14 @@ export function LineCounts({ added, removed }: { added: number | null; removed: 
 	return (
 		<span className="shrink-0 font-mono text-[11px] whitespace-nowrap tabular-nums">
 			{!!added && (
-				<span className="text-emerald-600 dark:text-emerald-400">
+				<span className="text-emerald-700 dark:text-emerald-400">
 					+{added}
 					<span className="sr-only"> added</span>
 				</span>
 			)}
 			{!!added && !!removed && " "}
 			{!!removed && (
-				<span className="text-red-600 dark:text-red-400">
+				<span className="text-red-700 dark:text-red-400">
 					−{removed}
 					<span className="sr-only"> removed</span>
 				</span>

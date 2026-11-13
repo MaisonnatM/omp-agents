@@ -37,7 +37,7 @@ async function repository(names: string[]): Promise<{ root: string; main: string
 }
 
 function agent(id: string, status: AgentRow["status"] = "running", parentId: string | null = null): AgentRow {
-	return { id, kind: "task", parentId, status, activity: null, canMessage: true, queue: { steering: [], followUp: [] } };
+	return { id, kind: "task", parentId, status, activity: null, model: null, startedAt: null, endedAt: null, canMessage: true, queue: { steering: [], followUp: [] } };
 }
 
 function terminal(cwd: string, agents: AgentRow[] = [agent("Child")], overrides: Partial<Extract<RosterHost, { source: "terminal" }>> = {}): Extract<RosterHost, { source: "terminal" }> {

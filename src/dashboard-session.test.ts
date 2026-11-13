@@ -711,6 +711,31 @@ describe("DashboardSession action failures", () => {
 		expect(updates.filter(update => update.kind === "note").map(update => update.text)).toEqual(["Cancel failed: cancel unavailable"]);
 	});
 
+	test("a subagent's row keeps its model, its earliest start, and the time it first stopped, until it runs again", async () => {
+		const client = new FakeClient();
+		let lifecycle: (payload: unknown) => void = () => {};
+		client.onSubagentLifecycle = listener => {
+			lifecycle = listener;
+			return () => {};
+		};
+		fakeOmp(client);
+		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, LAUNCH, () => {}, false);
+		// RPC snapshots, as an attach reads them, each dated by its last update.
+		const snapshot = (status: string, lastUpdate: number, durationMs: number) => lifecycle({ id: "a1", agent: "task", status, lastUpdate, progress: { id: "a1", resolvedModel: "anthropic/claude-haiku-5-5", durationMs } });
+		const row = () => {
+			const [{ model, startedAt, endedAt }] = session.agents();
+			return { model, startedAt, endedAt };
+		};
+		snapshot("running", 10_000, 4000);
+		snapshot("running", 12_000, 5000);
+		expect(row()).toEqual({ model: "anthropic/claude-haiku-5-5", startedAt: 6000, endedAt: null });
+		snapshot("completed", 20_000, 14_000);
+		snapshot("completed", 25_000, 14_000);
+		expect(row()).toEqual({ model: "anthropic/claude-haiku-5-5", startedAt: 6000, endedAt: 20_000 });
+		snapshot("running", 30_000, 24_000);
+		expect(row().endedAt).toBeNull();
+	});
+
 	test("a message a subagent refuses shows a note on that agent and rejects with PromptRefused", async () => {
 		const { session, client, updates } = await startSession();
 		client.steerSubagent = async () => { throw new Error("not running"); };

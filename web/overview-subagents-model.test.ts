@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { type AgentRow, EMPTY_QUEUE } from "../src/shared/sessions";
-import { arenaGroups, type SubagentNode, subagentTree } from "./session-card-subagents-model";
+import { arenaGroups, runTime, type SubagentNode, subagentTree } from "./overview-subagents-model";
 
-const agent = (id: string, parentId: string | null): AgentRow => ({ id, kind: "task", parentId, status: "running", activity: null, canMessage: true, queue: EMPTY_QUEUE });
+const agent = (id: string, parentId: string | null): AgentRow => ({ id, kind: "task", parentId, status: "running", activity: null, model: null, startedAt: null, endedAt: null, canMessage: true, queue: EMPTY_QUEUE });
 const rows = (tree: SubagentNode[]) => tree.map(node => `${node.depth} ${node.agent.id}`);
 
 // A child listed after a later sibling of its parent, as a registry in spawn order holds them.
@@ -21,6 +21,21 @@ describe("subagentTree", () => {
 		expect(rows(subagentTree([], null))).toEqual([]);
 		expect(rows(subagentTree(agents, "A.2"))).toEqual([]);
 		expect(rows(subagentTree(agents, "A.1"))).toEqual(["0 A.1.a"]);
+	});
+});
+
+describe("runTime", () => {
+	const MIN = 60_000;
+
+	test("a running subagent counts up to now, and a stopped one stops at the time it stopped", () => {
+		expect(runTime({ status: "running", startedAt: 0, endedAt: null }, 5 * MIN)).toBe("5m");
+		expect(runTime({ status: "idle", startedAt: 0, endedAt: 2 * MIN }, 90 * MIN)).toBe("2m");
+		expect(runTime({ status: "aborted", startedAt: 0, endedAt: 20_000 }, 90 * MIN)).toBe("<1m");
+	});
+
+	test("shows no time when the start is unknown, or a stopped subagent was never seen stopping", () => {
+		expect(runTime({ status: "running", startedAt: null, endedAt: null }, 5 * MIN)).toBeNull();
+		expect(runTime({ status: "idle", startedAt: 0, endedAt: null }, 5 * MIN)).toBeNull();
 	});
 });
 

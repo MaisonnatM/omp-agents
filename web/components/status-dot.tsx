@@ -20,6 +20,9 @@ const DOTS: Record<Status, { label: string; className: string | null }> = {
 
 export const statusLabel = (status: Status): string => DOTS[status].label;
 
+/** Whether `status` draws a dot; a running agent's draws none. */
+export const drawsDot = (status: Status): boolean => DOTS[status].className !== null;
+
 /** Exactly the dot's width: its halo spills into the row's gap rather than widening it. */
 export function StatusDot({ status }: { status: Status }) {
 	const { label, className } = DOTS[status];

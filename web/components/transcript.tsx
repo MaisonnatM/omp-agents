@@ -44,9 +44,7 @@ import { StatusDot, statusLabel } from "./status-dot";
 import { RoutineRunCard } from "./routines/routine-run-card";
 import { BotMessageCard } from "./bots/bot-message-card";
 import { PromptHistory } from "./prompt-history";
-import { SessionCard } from "./session-card";
 import { CancelAgentButton, SubagentLinks } from "./subagent-links";
-import type { ChangesSession } from "./session-card-changes";
 import { FindBar, PaneFocused } from "./find-bar";
 import { TranscriptMinimap } from "./transcript-minimap";
 import { latestReviewPages, requestReview } from "../review-pages";
@@ -122,7 +120,7 @@ export const ActivityVisibility = createContext<ActivityVisibility>({
 	toggleThinking: () => {},
 });
 
-/** Whether the transcript draws its tool and thinking groups and the Session card's subagents, files, images, and sources; a Bot's page turns it off, so its conversation reads as a chat, keeping only the chips of {@link ToolChipsContext}. */
+/** Whether the transcript draws its tool and thinking groups; a Bot's page turns it off, so its conversation reads as a chat, keeping only the chips of {@link ToolChipsContext}. */
 export const ActivityShown = createContext(true);
 
 export const HIDE_TOOL_CALLS_KEY = "omp-agents.hide-tool-calls";
@@ -495,8 +493,6 @@ interface TranscriptProps {
 	onEdit?: (entryId: string, text: string) => Promise<void>;
 	/** Shown in place of the transcript, once it loaded, until its first item or turn. */
 	empty?: ReactNode;
-	/** The session whose files, images, and sources the Session card lists; omitted, the card lists none. */
-	changes?: ChangesSession;
 }
 
 /** A prompt or a reply: the user's and the agent's words. */
@@ -606,11 +602,11 @@ const MessageRow = memo(function MessageRow({
 
 /**
  * The scrolling message list. It follows new output until the reader scrolls up; the button jumps back to the end.
- * It reads the view's items itself and builds their model once, from the one before, for its rows, its minimap, its chat
- * history, and its Session card, so a streamed token redoes the last turn alone and renders only the rows whose message
+ * It reads the view's items itself and builds their model once, from the one before, for its rows, its minimap, and its
+ * chat history, so a streamed token redoes the last turn alone and renders only the rows whose message
  * changed. It renders again for fork state or callbacks, not with the page around it.
  */
-export const Transcript = memo(function Transcript({ view, working, fork, onFork, onEdit, empty, changes }: TranscriptProps) {
+export const Transcript = memo(function Transcript({ view, working, fork, onFork, onEdit, empty }: TranscriptProps) {
 	const items = useTranscript(view);
 	const loaded = usePaneLoaded(view);
 	const last = items.at(-1);
@@ -705,7 +701,6 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	const revealId = useReveal(view);
 	const toolChips = useContext(ToolChipsContext);
 	const activityShown = useContext(ActivityShown);
-	const subagents = useContext(SubagentLinks);
 	const { scrollToMessage } = useMessageScroller();
 	// The command palette opened this view at a match. Scroll once the whole transcript has loaded, a frame after the
 	// scroller places it at its end, so that placement does not undo the scroll. The reveal ends when the scroll lands,
@@ -722,13 +717,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	return (
 		<OpenImage.Provider value={openImage}>
 		<OpenFile.Provider value={setFile}>
-			<div className="@container/conversation relative flex min-h-0 flex-1 flex-col" data-conversation>
-				<SessionCard
-					view={view}
-					working={working}
-					changes={activityShown ? changes : undefined}
-					subagents={activityShown ? subagents : null}
-				/>
+			<div className="@container/conversation relative flex min-h-0 flex-1 flex-col">
 				<MessageScroller className="@container min-h-0 flex-1">
 					<MessageScrollerViewport>
 						<MessageScrollerContent

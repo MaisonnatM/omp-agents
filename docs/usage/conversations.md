@@ -18,9 +18,6 @@
   A turn's tokens add up its requests and its side calls, each from the usage omp recorded for it.
   A subagent's turns show in the subagent's own pane, not its parent's.
   The pane goes back to the transcript when it opens another conversation.
-- The **Session card** toggle, a list icon in a session's header between **Open PR** and End session, or before **Resume** in a past session, hides or shows the Session card in every pane, the same choice as **Show session card** in Settings › Preferences.
-  It looks pressed while the card shows.
-  It appears only while the card has something to show, subagents, files, images, or sources, and leaves with the card while the trajectory takes the transcript's place.
 - The transcript fades at its top or bottom edge only while more of it lies past that edge, so a conversation that fits the pane shows no fade.
 - Each tool call in a tool group is a line with an icon for its tool, such as a terminal for `bash`, a page for `read`, and a plug for an MCP tool; a tool without its own icon shows a wrench.
   A call that is running shimmers, a call that failed is red, and the group's heading counts the failures.
@@ -40,7 +37,7 @@
   The arrows, or the Left and Right keys, step to the previous and next image of the conversation, across calls and the images your messages carried, and the external-link button opens the image in your default browser.
   An image you sent opens the same way from its thumbnail above your message, captioned "Your message".
   A tool group that returned images stays open.
-  Hiding tool calls hides them too; the Session card's **Images** section still lists every one.
+  Hiding tool calls hides them too; the **Images** section of the sidebar's **Overview** still lists every one.
 - Each artifact the agent saves shows as its own line between the tool groups, **Saved** with its title **as version N**, and an **Open** button that shows that version in the sidebar's **Artifacts** tab; see [Artifacts](artifacts.md).
   While the tab shows that version, a blue **Showing** badge takes the button's place.
   A save whose bytes equal the version before it names that version's number.
@@ -74,20 +71,17 @@
   Enter and Shift+Enter, or the bar's arrows, step to the next and previous match and scroll the conversation to it; Esc or the close button closes the bar.
   It searches the text the conversation shows, so folded tool calls and hidden thinking are left out, and it keeps counting as new output streams in.
   Focusing another pane closes it; while no conversation shows, Cmd+F keeps the browser's own Find.
-- The Session card holds the agent's **Subagents** and the **Files**, **Images**, and **Sources** sections of [Changed files and images](changed-files-and-images.md), each shown once it has something to list; a past session's conversation shows it too.
-  It floats at the conversation's top right once the conversation is wide enough, and the messages move left to make room for it; in a narrower conversation it sits above them, so it never covers a message.
-  It scrolls as a whole when its sections outgrow it.
-  Closing a file or an image opened from the card puts the focus back on the row or thumbnail you opened it from.
-  **Show session card** in Settings › Preferences, or the **Session card** toggle in the session's header, before End session or Resume, hides the whole card, its **Subagents**, **Files**, **Images**, and **Sources** sections too.
-- In a live session, the Session card's **Subagents** section, at the top of the card, lists the session's subagents, so you can reach one without scrolling back to the `task` call that started it.
+- In a live session, the **Subagents** section of the [session details sidebar](session-details-sidebar.md)'s **Overview** tab lists the session's subagents, so you can reach one without scrolling back to the `task` call that started it.
   A subagent that another subagent started sits indented under it.
-  Each row shows the subagent's status dot, the same as on its link in the conversation, its id, its type, and, on one line under them, what it is doing now; hover that line for all of it.
+  Each row shows a robot icon with the subagent's status dot on its corner, the same dot as on its link in the conversation, then its id and what it is doing now.
+  A second line names its model after the logo of the org that makes it, labeled as the composer labels models, then its type and how long it has run, such as `Haiku 5.5 · task · 5m`; the time counts up while the subagent runs and stops when it does.
+  A subagent the dashboard did not see start, or saw stopped without seeing when, shows no time; hover a row for its full activity.
   The section's title counts the subagents, and how many are running.
   Click a row to open the subagent in this pane, in place of the conversation, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split beside the conversation, or middle-click to open it in the app window in place of what it shows.
   The stop button after a running subagent cancels it, as the one after its link in the conversation does, in every room the dashboard can write to.
   A subagent's own view lists only the subagents it started, and theirs; a past session shows no section, because the dashboard opens subagents only of a running session.
   When the agent gives two or more subagents the same task and records them with the kit's `arena` tool, those runners show above the other rows in an **Arena** box with the task, as cards side by side lettered A, B, C in the order it started them.
-  Each card shows the runner's id, its status, its type, and what it is doing; the judge, once the agent records one, sits on a row under the cards.
+  Each card shows the runner's id, its status, what it is doing, and the same model, type, and time line as a row; the judge, once the agent records one, sits on a row under the cards.
   Once the agent records its pick, the card it kept turns green with a **Base** badge, a runner it took something from shows **Graft** and what it took, and the others show **Not used**.
   Click a card to open that runner, as with a row; hover a running one for its stop button.
   The section starts open, and the app remembers whether you folded it.

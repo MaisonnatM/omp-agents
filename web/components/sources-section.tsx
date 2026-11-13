@@ -1,4 +1,4 @@
-/** The Session card's Sources section: a row per web page or remote item the view's agents opened, which opens it in the browser. */
+/** The Overview tab's Sources section: a row per web page or remote item the view's agents opened, which opens it in the browser. */
 import { IconGlobe } from "central-icons";
 import { useState } from "react";
 import type { AgentSource } from "../../src/shared/transcript";

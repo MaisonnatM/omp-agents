@@ -169,7 +169,7 @@
   The server keeps them too, so every window you open shows the same, and **Sync** carries them to your other machines; **Stop idle processes** is the server's own and stays on this machine.
   The width of a sidebar or a split, a folded section, and what you last picked in a menu stay with the browser that set them.
   **Theme**: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one; it applies at once and does not change omp's terminal theme.
-  **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts, and **Show session card** shows or hides the whole Session card, its **Subagents**, **Files**, **Images**, and **Sources** sections included, beside or above the messages of every transcript, the same choice as the **Session card** toggle in a session's header.
+  **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts.
   **Sidebar tabs** lists the nine sidebar tabs in the order they show, each with the Cmd+number it takes, a switch that shows or hides it, and buttons that move it up or down.
   Cmd+1 goes to the first tab the sidebar's page list shows, and a tab after the fifth takes no number.
   A hidden tab only leaves the sidebar's page list and loses its number: its page, its command in the command menu, its G pair, and links to it still work.

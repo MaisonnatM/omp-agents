@@ -10,12 +10,16 @@ import { activityControl } from "../activity";
 import { useStoredState } from "../stored-state";
 import { FileBaseContext } from "./file-link";
 
-/** Four labeled tabs fit the sidebar's default width only with tighter padding than Fluid's, and only without their icons. */
-const TAB_CLASS = "px-2 @max-[23rem]/sidebar:[&>svg]:hidden";
-
-/** Five tabs fit it only as icons, whose labels the screen reader and the tooltip still name, until the sidebar is widened past them. */
-const CROWDED_TAB_CLASS = "px-2";
-const CROWDED_LABEL_CLASS = "@max-[30rem]/sidebar:sr-only";
+/**
+ * How the tabs fit the sidebar. Up to four fit its default width labeled, only with tighter padding than Fluid's and only
+ * without their icons. Five fit it only as icons, whose labels the screen reader and the tooltip still name, until the
+ * sidebar is widened past them; six or more need tighter padding still to fit its narrowest width, and a wider sidebar for their labels.
+ */
+const TAB_FIT = {
+	four: { tab: "px-2 @max-[23rem]/sidebar:[&>svg]:hidden", label: undefined },
+	five: { tab: "px-2", label: "@max-[30rem]/sidebar:sr-only" },
+	sixOrMore: { tab: "px-1.5", label: "@max-[36rem]/sidebar:sr-only" },
+} as const;
 
 /** Keeps each tab's content off the header's hairline at rest, and scrolls away with it. */
 const PANEL_VIEWPORT = "pt-2";
@@ -74,7 +78,7 @@ export function DetailsSidebarFrame<T extends string>({ label, storageKey, defau
 	const tab = tabs.find(each => each.value === stored)?.value ?? defaultTab;
 	const [shown, setShown] = useState<ReadonlySet<string>>(() => new Set([tab]));
 	if (!shown.has(tab)) setShown(new Set(shown).add(tab));
-	const crowded = tabs.length > 4;
+	const fit = tabs.length > 5 ? TAB_FIT.sixOrMore : tabs.length > 4 ? TAB_FIT.five : TAB_FIT.four;
 	const fileBase = useMemo(() => (cwd === null ? null : { dir: cwd, session: null }), [cwd]);
 	return (
 		<FileBaseContext.Provider value={fileBase}>
@@ -89,8 +93,8 @@ export function DetailsSidebarFrame<T extends string>({ label, storageKey, defau
 									key={each.value}
 									value={each.value}
 									icon={each.icon}
-									className={crowded ? CROWDED_TAB_CLASS : TAB_CLASS}
-									labelClassName={crowded ? CROWDED_LABEL_CLASS : undefined}
+									className={fit.tab}
+									labelClassName={fit.label}
 									{...tabLabel(each.name, each.count)}
 								/>
 							))}

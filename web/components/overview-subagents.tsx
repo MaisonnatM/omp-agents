@@ -1,40 +1,44 @@
 /**
- * The Session card's Subagents section: the view's subagents as a tree, each a link to its own view with its status and what it is doing.
+ * The Overview tab's Subagents section: the view's subagents as a tree, each a link to its own view with what it is doing, its model, and how long it ran.
  * The runners of an arena the session recorded sit side by side above the tree, with the judge under them and the base marked.
  */
-import { IconJudgeGavel, IconSword, IconTrophy } from "central-icons";
+import { IconAiBotHead, IconJudgeGavel, IconSword, IconTrophy } from "central-icons";
 import type { MouseEvent, ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { AgentRow, ArenaRecord } from "../../src/shared/sessions";
-import { SPLIT_CLICK, subagentModeOf } from "../labels";
+import { modelLabel, modelOrg, SPLIT_CLICK, subagentModeOf } from "../labels";
 import { hashForView } from "../routing";
 import { useStoredState } from "../stored-state";
-import { type ArenaGroup, type ArenaSeat, type ArenaVerdict, arenaGroups, type SubagentNode } from "../session-card-subagents-model";
-import { countLabel } from "../session-card-model";
-import { StatusDot, statusLabel } from "./status-dot";
+import { type ArenaGroup, type ArenaSeat, type ArenaVerdict, arenaGroups, runTime, type SubagentNode } from "../overview-subagents-model";
+import { useMinute } from "../use-minute";
+import { OrgIcon } from "./org-icon";
+import { drawsDot, StatusDot, statusLabel } from "./status-dot";
 import { CancelAgentButton, type SubagentLinksValue } from "./subagent-links";
-import { ChangesSection } from "./session-card-changes";
+import { OverviewSection } from "./overview-section";
 
-/** Whether the section is folded shut, kept for every view; it starts open. The key keeps the card's old name, so earlier folds carry over. */
+/** Whether the section is folded shut, kept for every view; it starts open. The key keeps an earlier name, so earlier folds carry over. */
 const CLOSED_KEY = "omp-agents.todos-card-subagents-closed";
 
 /** Each level of nesting indents a row by this many pixels. */
 const INDENT_PX = 12;
 
-/** `nodes`, the rows of `subagentTree` for the view, which the card shows this section for only while it has any; `arenas`, the session's. */
+/** `nodes`, the rows of `subagentTree` for the view, which the Overview tab shows this section for only while it has any; `arenas`, the session's. */
 export function SubagentsSection({ links, nodes, arenas }: { links: SubagentLinksValue; nodes: readonly SubagentNode[]; arenas: readonly ArenaRecord[] }) {
 	const [closed, setClosed] = useStoredState(CLOSED_KEY, raw => raw === "true");
 	const running = nodes.filter(node => node.agent.status === "running").length;
 	const { groups, rest } = arenaGroups(nodes, arenas);
 	return (
-		<ChangesSection
-			title={
-				<span className="truncate">
-					{countLabel(nodes.length, "Subagent", "Subagents")}
-					{running > 0 && <span className="font-normal text-muted-foreground"> · {running} running</span>}
-				</span>
+		<OverviewSection
+			title="Subagents"
+			count={nodes.length}
+			detail={
+				running > 0 && (
+					<span className="shrink-0 font-normal text-muted-foreground">
+						<span aria-hidden>·</span> {running} running
+					</span>
+				)
 			}
 			open={!closed}
 			onToggle={() => setClosed(shut => !shut)}
@@ -44,13 +48,13 @@ export function SubagentsSection({ links, nodes, arenas }: { links: SubagentLink
 				<ArenaLanes key={group.seats[0].agent.id} group={group} links={links} />
 			))}
 			{rest.length > 0 && (
-				<ul aria-label="Subagents" className="max-h-[min(30vh,12.5rem)] overflow-y-auto px-1 py-1">
+				<ul aria-label="Subagents" className="px-1 py-1">
 					{rest.map(({ agent, depth }) => (
 						<SubagentRow key={agent.id} agent={agent} depth={depth} links={links} />
 					))}
 				</ul>
 			)}
-		</ChangesSection>
+		</OverviewSection>
 	);
 }
 
@@ -68,7 +72,8 @@ function agentLink(links: SubagentLinksValue, agentId: string) {
 	};
 }
 
-const tooltipOf = (agent: AgentRow, verdict?: string) => `${[agent.id, agent.kind, statusLabel(agent.status), agent.activity, verdict].filter(Boolean).join(" · ")}. ${SPLIT_CLICK} to open in a split`;
+const tooltipOf = (agent: AgentRow, verdict?: string) =>
+	`${[agent.id, agent.kind, agent.model && modelLabel(agent.model), statusLabel(agent.status), agent.activity, verdict].filter(Boolean).join(" · ")}. ${SPLIT_CLICK} to open in a split`;
 
 /** The badge each verdict of the pick shows on a runner's card. */
 const VERDICTS = {
@@ -79,28 +84,64 @@ const VERDICTS = {
 
 const verdictText = (verdict: ArenaVerdict) => (verdict.kind === "graft" ? `${VERDICTS.graft.label}: ${verdict.what}` : VERDICTS[verdict.kind].label);
 
-/** One subagent as a row of the tree, with an optional `lead` icon before its name. */
+/** A subagent's model after its maker's logo, then its type and how long it ran: on one line in a row, `stacked` on two in a narrow runner card. */
+function SubagentMeta({ agent, stacked = false }: { agent: AgentRow; stacked?: boolean }) {
+	const time = runTime(agent, useMinute());
+	return (
+		<span className={cn("flex min-w-0 text-xs text-muted-foreground", stacked ? "flex-col gap-0.5" : "items-center gap-1.5")}>
+			{agent.model && (
+				<span className="flex min-w-0 items-center gap-1.5">
+					<OrgIcon org={modelOrg(agent.model)} className="size-3.5" />
+					<span className="truncate">{modelLabel(agent.model)}</span>
+					{!stacked && <span aria-hidden>·</span>}
+				</span>
+			)}
+			<span className="flex min-w-0 items-center gap-1.5">
+				<span className="truncate">{agent.kind}</span>
+				{time && (
+					<>
+						<span aria-hidden>·</span>
+						<span className="shrink-0 tabular-nums">
+							<span className="sr-only">{agent.status === "running" ? "running for " : "ran for "}</span>
+							{time}
+						</span>
+					</>
+				)}
+			</span>
+		</span>
+	);
+}
+
+/** One subagent as a row of the tree: its icon, or a `lead` one, then its name and what it is doing, over {@link SubagentMeta}. */
 function SubagentRow({ agent, depth, links, lead }: { agent: AgentRow; depth: number; links: SubagentLinksValue; lead?: ReactNode }) {
 	const { view, href, onClick } = agentLink(links, agent.id);
 	return (
-		<li className="flex min-w-0 items-center gap-0.5" style={{ paddingLeft: depth * INDENT_PX }}>
+		<li className="flex min-w-0 items-start gap-0.5" style={{ paddingLeft: depth * INDENT_PX }}>
 			<Tooltip content={tooltipOf(agent)} side="left">
 				<a
 					href={href}
-					className="grid min-w-0 flex-1 grid-cols-[0.375rem_minmax(0,1fr)] items-center gap-x-2 rounded-md px-2 py-1 text-[13px] outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+					className="group/row grid min-w-0 flex-1 grid-cols-[1rem_minmax(0,1fr)] gap-x-2.5 gap-y-0.5 rounded-md px-2 py-1.5 text-[13px] leading-5 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
 					onClick={onClick}
 				>
-					{/* A running subagent draws no dot, so the column keeps names aligned with the rows that do. */}
-					<span className="flex">
-						<StatusDot status={agent.status} />
+					{/* The status dot sits on the icon's bottom-right corner, cut out of it as an avatar's is; a running subagent draws none. */}
+					<span className="relative flex h-5 items-center text-muted-foreground">
+						{lead ?? <IconAiBotHead className="size-4" />}
+						{drawsDot(agent.status) ? (
+							<span className="absolute -right-1 -bottom-0.5 flex size-2.5 items-center justify-center rounded-full bg-background group-hover/row:bg-muted">
+								<StatusDot status={agent.status} />
+							</span>
+						) : (
+							<StatusDot status={agent.status} />
+						)}
 					</span>
-					<span className="flex min-w-0 items-center gap-2">
-						{lead}
-						<span className="truncate text-foreground">{agent.id}</span>
+					<span className="flex min-w-0 gap-2">
+						<span className="max-w-[60%] shrink-0 truncate text-muted-foreground">{agent.id}</span>
 						{depth > 0 && <span className="sr-only">, started by {agent.parentId}</span>}
-						<span className="shrink-0 text-xs text-muted-foreground">{agent.kind}</span>
+						{agent.activity && <span className="min-w-0 truncate text-foreground">{agent.activity}</span>}
 					</span>
-					{agent.activity && <span className="col-start-2 truncate text-xs text-muted-foreground">{agent.activity}</span>}
+					<span className="col-start-2 min-w-0">
+						<SubagentMeta agent={agent} />
+					</span>
 				</a>
 			</Tooltip>
 			{links.onCancel && <CancelAgentButton view={view} onCancel={links.onCancel} running={agent.status === "running"} />}
@@ -128,7 +169,7 @@ function ArenaLanes({ group, links }: { group: ArenaGroup; links: SubagentLinksV
 			</ul>
 			{(group.judge || group.descendants.length > 0) && (
 				<ul aria-label="Arena judge and helpers" className="mt-1">
-					{group.judge && <SubagentRow agent={group.judge} depth={0} links={links} lead={<IconJudgeGavel aria-hidden={false} aria-label="Judge" className="size-3.5 shrink-0 text-muted-foreground" />} />}
+					{group.judge && <SubagentRow agent={group.judge} depth={0} links={links} lead={<IconJudgeGavel aria-hidden={false} aria-label="Judge" className="size-4" />} />}
 					{group.descendants.map(({ agent, depth }) => (
 						<SubagentRow key={agent.id} agent={agent} depth={depth} links={links} />
 					))}
@@ -156,14 +197,14 @@ function RunnerCard({ seat, links }: { seat: ArenaSeat; links: SubagentLinksValu
 					<div className="flex min-w-0 items-center gap-1.5 text-[13px]">
 						<span className="sr-only">Runner </span>
 						<span className={cn("inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-0.5 text-2xs font-semibold tabular-nums", won ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>{seat.seat}</span>
-						<span className="truncate text-foreground">{agent.id}</span>
+						<span className="truncate text-muted-foreground">{agent.id}</span>
 						<span className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
 							<StatusDot status={agent.status} />
 							{statusLabel(agent.status).toLowerCase()}
 						</span>
 					</div>
-					<div className="truncate text-xs text-muted-foreground">{agent.kind}</div>
-					{agent.activity && <div className="line-clamp-2 text-xs text-muted-foreground">{agent.activity}</div>}
+					{agent.activity && <div className="line-clamp-2 text-[13px] text-foreground">{agent.activity}</div>}
+					<SubagentMeta agent={agent} stacked />
 					{verdict && <Verdict verdict={verdict} />}
 				</a>
 			</Tooltip>

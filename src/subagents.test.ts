@@ -70,23 +70,32 @@ describe("parseAgents", () => {
 });
 
 describe("parseSubagentFrame", () => {
-	test("a lifecycle frame names the subagent, its type, status, description, and file", () => {
+	test("a lifecycle frame names the subagent, its type, status, description, and file, and when it started or stopped", () => {
 		expect(
-			parseSubagentFrame(SUBAGENT_LIFECYCLE, { id: "s1", agent: "explore", status: "started", description: "  find\nthe   bug ", sessionFile: "/tmp/s1.jsonl" }),
-		).toEqual({ id: "s1", kind: "explore", status: "running", activity: "find the bug", sessionFile: "/tmp/s1.jsonl" });
-		expect(parseSubagentFrame(SUBAGENT_LIFECYCLE, { id: "s1", status: "failed" })).toEqual({ id: "s1", status: "aborted" });
+			parseSubagentFrame(SUBAGENT_LIFECYCLE, { id: "s1", agent: "explore", status: "started", description: "  find\nthe   bug ", sessionFile: "/tmp/s1.jsonl" }, 5000),
+		).toEqual({ id: "s1", kind: "explore", status: "running", activity: "find the bug", sessionFile: "/tmp/s1.jsonl", startedAt: 5000 });
+		expect(parseSubagentFrame(SUBAGENT_LIFECYCLE, { id: "s1", status: "failed" }, 9000)).toEqual({ id: "s1", status: "aborted", endedAt: 9000 });
 	});
 
 	test("a progress frame reads its status and activity from the progress record, the most specific intent first", () => {
 		const progress = { id: "s1", status: "completed", currentToolIntent: "reading", lastIntent: "planning", task: "the task" };
-		expect(parseSubagentFrame(SUBAGENT_PROGRESS, { agent: "task", assignment: "assigned", progress })).toEqual({
+		expect(parseSubagentFrame(SUBAGENT_PROGRESS, { agent: "task", assignment: "assigned", progress }, 9000)).toEqual({
 			id: "s1",
 			kind: "task",
 			status: "idle",
 			activity: "reading",
+			endedAt: 9000,
 		});
 		expect(parseSubagentFrame(SUBAGENT_PROGRESS, { assignment: "assigned", progress: { id: "s1", task: "the task" } })?.activity).toBe("assigned");
 		expect(parseSubagentFrame(SUBAGENT_PROGRESS, { progress: { id: "s1" } })).toEqual({ id: "s1" });
+	});
+
+	test("a progress record gives the model and dates the start back by its run time, from an RPC snapshot's last update when it has one", () => {
+		const progress = { id: "s1", status: "running", resolvedModel: "anthropic/claude-haiku-5-5:low", durationMs: 4000 };
+		expect(parseSubagentFrame(SUBAGENT_PROGRESS, { progress }, 10_000)).toMatchObject({ model: "anthropic/claude-haiku-5-5:low", startedAt: 6000 });
+		expect(parseSubagentFrame(SUBAGENT_LIFECYCLE, { id: "s1", status: "running", lastUpdate: 8000, progress }, 10_000)).toMatchObject({ startedAt: 4000 });
+		// A run time of 0 comes before omp's first tick and says nothing of the start.
+		expect(parseSubagentFrame(SUBAGENT_PROGRESS, { progress: { ...progress, durationMs: 0 } }, 10_000)?.startedAt).toBeUndefined();
 	});
 
 	test("a payload that names no subagent, or arrives on another channel, is ignored", () => {
