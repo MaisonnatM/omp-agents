@@ -21,10 +21,11 @@ Maxence asked that clicking a session or a page stop opening a new tab, as in Ca
 
 ## Consequences
 
-- A tab has an id of its own and the address it shows now, so it keeps its place and its drag order while you move through pages in it.
-- Going to a page or session another tab already shows focuses that tab, so no two tabs show the same thing.
-- The + opens New session in a new tab; the sidebar's **New session** row and Cmd+N open it in the tab on screen.
-- The row has no limit: it grows only when you ask for a tab.
+- The row stores its tabs and which one is on screen, as Capy's desktop app stores `{ tabs, active }`; a tab has an id of its own and the address it shows now, so it keeps its place and its drag order while you move through pages in it.
+- As in Capy, only a session is kept to one tab: going to a session another tab shows focuses that tab, while a page such as Todo may show in two tabs.
+- The + opens New session in a new tab, as Capy's New Tab opens `/new`; the sidebar's **New session** row and Cmd+N open it in the tab on screen.
+- Closing the last tab leaves a fresh tab on New session, as Capy does, rather than an empty row.
+- The row has no limit: it grows only when you ask for a tab. Capy's per-tab Back history, pinned tabs, and Reopen closed tab are not copied; Back and Forward stay the window's.
 
 ## Confirmation
 

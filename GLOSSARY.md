@@ -107,7 +107,7 @@ _Avoid_: Nav, navigation rail, left panel
 
 **Header tabs**:
 The row across the top of the window, right of the sidebar, that holds Back and Forward, your tabs, a + that opens a new one, and What's new, the bell, and Settings at its end.
-Opening a page or session shows it in the tab on screen, or focuses the tab already showing it; × closes a tab, and a drag reorders it; this browser keeps them.
+Opening a page or session shows it in the tab on screen, and a session another tab shows switches to that tab; × closes a tab, and a drag reorders it; this browser keeps them.
 _Avoid_: Title bar, tab strip, browser tabs
 
 **Roster**:
