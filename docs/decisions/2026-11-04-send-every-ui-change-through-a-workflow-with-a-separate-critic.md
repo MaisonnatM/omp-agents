@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-13-run-the-design-critic-once-the-direction-is-approved
 date: 2026-11-04
 decision-makers: Maxence
 ---
