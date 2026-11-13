@@ -1,7 +1,6 @@
 # Notifications
 
-- The bell sits between What's new and the Settings gear at the right end of the header's tabs, the row across the top of the window.
-  With split panes off macOS, only the top right pane's header shows them, before its details toggle.
+- The sidebar's **Notifications** row, right under **New session**, counts the unread notices and opens the Notifications page, `#notifications`, which lists them under **New** and **Earlier**, with chips that filter them by source.
 - Seven sources feed it.
   - **GitHub**: a pull request on the Pull requests page whose move is yours, one notice per move: **Review requested**, **Ready to merge**, **Checks failed**, **Conflicts to resolve**, or **Comments to address**.
     A pull request that a running session works on, or whose session asks you something, is not one, and its notice goes once the pull request leaves the move.
@@ -26,7 +25,7 @@
     The server checks each such account again every minute; signing it in again in **Settings › Integrations**, or removing it there, ends the notice.
   - **Calendar**: an event with a start time, kept on this computer or of a Google calendar the Calendar page shows, from ten minutes before it starts until it ends, checked every minute.
     All-day events give none, and Google events need the Google Calendar sign-in of **Settings › Integrations**.
-  - **Sessions**: the sessions the dashboard started that stopped mid-turn, working or waiting on a question, without **End session**, as one notice, **2 sessions stopped mid-turn**, that names them as the sidebar's past sessions do.
+  - **Sessions**: the sessions the dashboard started that stopped mid-turn, working or waiting on a question, without **Archive session**, as one notice, **2 sessions stopped mid-turn**, that names them as the sidebar's past sessions do.
     They are the interrupted sessions of the sessions sidebar whose turn ran, checked as the dashboard starts, every minute, and each time one stops, resumes, or moves to past.
 - **All**, **GitHub**, **Slack**, **Providers**, **Integrations**, **Calendar**, **Sessions**, and **Updates** filter the list, each but **All** with its source's logo and each with its count of unread notices.
   The tabs scroll sideways when they do not fit, and the one you pick scrolls into view.
@@ -34,10 +33,10 @@
   A pull request's or Slack message's notice shows the picture of who it comes from, or their initial when Slack's sign-in cannot read profiles without `users:read`.
 - A notice you open is read: a pull request's opens its details on the Pull requests page, a Slack message's opens it in Slack in your default browser, a provider's opens **Settings › Providers**, a sign-in notice opens **Settings › Integrations**, where you sign in yourself, and an event's opens it in Google Calendar in your default browser, or the **Calendar** page for an event on this computer.
   Selecting an update's notice marks it read, and a stopped sessions' notice opens the first session it names.
-  The check mark in the header marks every notice in the filter read.
+  **Mark all as read**, at the top right of the page, marks every notice in the filter read.
 - Each pull request notice offers the move's quick action, such as **Review** or **Fix CI**, which starts a session on it and opens its page, or **Merge** for one ready to merge.
   **Merge** asks before it merges, with the merge methods the repository allows, as the pull request's details do, and marks the notice read once the dashboard took the merge, which it makes at once or once GitHub allows it; when the dashboard refuses it, a toast says why.
-- The stopped sessions' notice offers **Continue all**, on the toast or in the bell, which resumes every session it lists and sends each the prompt `continue`, as the sidebar's **Resume all** does, and marks the notice read.
+- The stopped sessions' notice offers **Continue all**, on the toast or on the Notifications page, which resumes every session it lists and sends each the prompt `continue`, as the sidebar's **Resume all** does, and marks the notice read.
 - A notice that no page has shown yet shows as a toast at the bottom right; closing it marks it seen, so it does not show as a toast again in any tab or after a reload.
   Over its title, a toast names where it came from beside that source's logo: GitHub, Slack, the provider, Google Calendar or Gmail for a sign-in, Google Calendar or **Calendar** for an event kept on this computer, omp for an update of omp or a model, or omp-agents for its own and for stopped sessions.
   A pull request's, Slack message's, provider's, sign-in, event's, or stopped sessions' toast shows only within 15 minutes of its news, and **Open** opens what it is about; an event's news is ten minutes before it starts, and a sign-in's is the first report.

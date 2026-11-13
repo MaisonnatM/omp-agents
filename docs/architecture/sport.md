@@ -44,8 +44,8 @@ A workout's `kind` is required in the file and in a change alike, since no file 
 A `set-plan` is refused when its slots, habits, or `opensAs` lists name nothing, its ids or override days repeat, a phase ends before it starts or overlaps another, or a deload Monday is not a Monday of its phase; a `set-targets` or `set-metrics` is refused when its ids repeat.
 A refused change says why, with the path of the first wrong field and the rule it broke, such as `plan.routines[0].items[0].demo.youtubeId must be 11 characters`.
 A file that does not read, or that comes from a newer version, moves aside to `sport.json.invalid` rather than being overwritten.
-The `ListRegistry` connects `sport-changes` client messages to `sport` snapshots on the roster topic; `SportFile` applies each message's list through `applySportChanges` and throws its refusal, so the registry resends the state to the page that sent it and the page's request fails with the reason.
-The page keeps the latest snapshot in `DashboardState.sport`, `null` until the first one comes.
+The `ListRegistry` connects `module-change` client messages for `sport` to `module` snapshots on the roster topic, as [Modules](modules.md) says; `SportFile` applies each message's list through `applySportChanges` and throws its refusal, so the registry resends the state to the page that sent it and the page's request fails with the reason.
+The page keeps the latest snapshot in `DashboardState.modules.sport`, `null` until the first one comes.
 
 ## The agent
 
@@ -88,11 +88,11 @@ A finger pain flag removes every `hang` exercise for the 7 days after its log; `
 
 ## The page
 
-The Sport page, `SportPage` in `web/components/sport/page.tsx`, draws `DashboardState.sport` and reads from `src/sport-week.ts` every date, load, pain flag and the hangs it removes, tested and bodyweight metric, and record with the log that set it.
+The Sport page, `SportPage` in `web/components/sport/page.tsx`, draws `DashboardState.modules.sport` and reads from `src/sport-week.ts` every date, load, pain flag and the hangs it removes, tested and bodyweight metric, and record with the log that set it.
 `web/sport-view.ts` words them and builds the lists of changes the page sends, and `web/sport-progress.ts` turns them into the progress tab's cards and chart.
-Its route is a `SportRoute` from `web/routing.ts`: `#sport` and `#sport?day=<YYYY-MM-DD>` for the week, `#sport/journal` and `#sport/journal?open=<log id>` for the journal, and `#sport/progress`.
+Its route is a `SportRoute` from `web/components/sport/module.ts`: `#sport` and `#sport?day=<YYYY-MM-DD>` for the week, `#sport/journal` and `#sport/journal?open=<log id>` for the journal, and `#sport/progress`.
 A change the page makes is a `SportChange`, the same the agent's tool sends.
-The page dispatches a list of them as a `sport-changes` action, which applies `applySportChanges` to the state at once and keeps the state as it was when the list is refused, then sends `{ t: "sport-changes", changes }` on the socket; the server applies the list to the file whole or not at all, and every socket then gets the state as it is after.
+The page dispatches a list of them as a `module-change` action, which applies `applySportChanges` to the state at once and keeps the state as it was when the list is refused, then sends `{ t: "module-change", id: "sport", change }` on the socket; the server applies the list to the file whole or not at all, and every socket then gets the state as it is after.
 The Fait dialog saves the log, a test's max, and its weigh-in as one list built by `logSave` in `web/sport-view.ts`, stays open and busy until the server answers, and shows a refusal's reason without closing; the Pesée dialog does the same with its one measurement.
 A routine tick sends one `set-check` with the day's ticks of that routine, applied at once like the others, and a refusal shows in a toast.
 

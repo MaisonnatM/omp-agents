@@ -1,10 +1,11 @@
-import { IconArchive, IconFolder1, IconLayoutColumn, IconPin, IconPlay, IconPullRequest, IconSettingsGear1, IconSquareBehindSquare1, IconStopCircle, IconUnpin, IconWindowApp } from "central-icons";
+import { IconArchive, IconFolder1, IconLayoutColumn, IconPin, IconPlay, IconPullRequest, IconSettingsGear1, IconSquareBehindSquare1, IconUnpin, IconWindowApp } from "central-icons";
 import { pullRequestUrl } from "../src/shared/github";
 import type { PastSession, RosterHost, View } from "../src/shared/sessions";
 import type { ActionGroup, ActionRun } from "./command-palette";
 import { CONFIRM_PRIVATE_END } from "./labels";
 import { PAGE_ICON } from "./page-icons";
-import { hashForTickets, type OpenMode } from "./routing";
+import type { OpenMode } from "./routing";
+import { hashForTickets } from "./tickets-model";
 import { isPrivateHost } from "./sessions";
 
 /** A session as a row lists it: running, or past. */
@@ -100,8 +101,8 @@ export function sessionActions(entry: SessionEntry, context: SessionActionContex
 		[
 			{
 				id: "end",
-				title: context.ending ? "Ending…" : "End session",
-				icon: IconStopCircle,
+				title: context.ending ? "Archiving…" : "Archive session",
+				icon: IconArchive,
 				disabled: context.ending,
 				tone: "destructive",
 				...(isPrivateHost(entry.host) ? { confirm: CONFIRM_PRIVATE_END } : {}),

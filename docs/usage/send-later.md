@@ -34,11 +34,11 @@
 - When a connection or provider fault ends a turn of a session the dashboard started, after omp's own retries inside the turn gave up, such as `Couldn't reach chatgpt.com (getaddrinfo ENOTFOUND)` or `Anthropic stream stalled while waiting for the next event`, the dashboard schedules `continue` too, one minute later, such as **Retries after a connection error to Anthropic · Today at 14:32**.
   Each fault in a row waits twice as long as the one before: 1, 2, 4, 8, then 16 minutes.
   After five retries in a row that each ended the same way, the dashboard schedules nothing and leaves the session idle; a fault after that starts over at one minute.
-  A turn that ends any other way, an edited prompt, and **End session** start the count over, and so does a dashboard restart.
+  A turn that ends any other way, an edited prompt, and **Archive session** start the count over, and so does a dashboard restart.
   A usage limit wins over a fault, so a `429` that names a used-up plan waits for the reset instead.
 - The row has **Send now**, **Edit**, and **Cancel**, as a scheduled message does, and the sidebar's **Scheduled** group lists it as a continue after the provider's usage limit or a retry after the provider's connection error.
 - A session waits on one continue at most: a later limit moves it to the new reset, and a later fault to its next retry.
-  Any new turn of that session cancels it, whoever sends the prompt: you or a scheduled message; so do an edited prompt and **End session**.
+  Any new turn of that session cancels it, whoever sends the prompt: you or a scheduled message; so do an edited prompt and **Archive session**.
 - Until the continue goes, fails, or you cancel it, the session stays on its task: **After a merge** does not end it.
   The sidebar still shows it idle, and it stays on its task when the dashboard restarts.
 - omp's own `retry.waitForUsageReset` setting instead keeps the turn waiting inside omp, so a turn it holds never ends on the limit.

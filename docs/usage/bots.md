@@ -36,7 +36,7 @@
 - A Bot's page shows its avatar and name in the header, the first sentence of its job under them, and its conversation below.
   The conversation reads as a chat with your messages, the Bot's replies, folded [routine run cards](routines.md), and the cards of [Bot messages](#bot-messages) other Bots sent it.
   It never shows the Bot's tool calls, its thinking, or the card of files it changed, whatever **Show tool calls** and **Show thinking** say.
-  The Bot's conversation stays in the **Bots** tab and is not listed in the command menu, the workspace list, or the **Sessions** tab, whether running or saved.
+  The Bot's conversation stays in the **Bots** tab and is not listed in the command menu, or the workspace list, whether running or saved.
   A new Bot greets you and offers three starters, built from its job, or asking what its job should be while it has none, which the composer lists under its action bar as it lists suggested prompts.
   The composer reads **Message** and the Bot's name.
   While its session runs, the conversation and its composer work as in a pane.
@@ -48,7 +48,7 @@
   Open the card to read its prompt or command, any output, what started it, and the **Open routine** link.
 - The right sidebar shows the Bot's details, as it shows a session's on the panes.
   Click the Bot's name in the header, the button at the header's end, or press Cmd+Alt+B to show or hide it; it keeps the width and open state of the session details sidebar.
-  Its tabs are **Details**, **Routines**, which counts the Bot's routines, and, once the Bot's conversation worked on a Linear issue, **Tickets**, which shows those issues as a session's does; it remembers the one you last picked, apart from a session's.
+  It shows its tabs as a session's does, with **Details** always open and **+** listing **Routines**, which counts the Bot's routines, and, once the Bot's conversation worked on a Linear issue, **Tickets**, which shows those issues as a session's does; it remembers the tabs you opened, apart from a session's.
   **Details** starts with the avatar, the name, the Bot's type and whether its session runs, and its workspace.
   Click the avatar to change its shape and color; the avatar follows each pick, and closing the popover saves the last one.
   Click the name to rename it: Enter or leaving the field saves, and Escape puts the name back.
@@ -64,7 +64,7 @@
   Click a routine to open it in place of the conversation, `#bots/<id>/routines/<routine id>`, and the **Routines** tab marks it; **Edit** in its menu opens its editor at `#bots/<id>/routines/<routine id>/edit`, so Back returns to the routine.
   An address that names a routine the Bot does not have, such as one deleted, shows that, with a link back to the conversation.
   Saving a routine opens it once the server has saved it; a save it refuses says why and keeps the editor open.
-  The page offers no **End session**, so the Bot's one conversation stays open; a session that ended another way resumes with your next message.
+  The page offers no **Archive session**, so the Bot's one conversation stays open; a session that ended another way resumes with your next message.
   A conversation with no turn running whose file nothing wrote for a day ends by itself, so an idle Bot holds no omp process; your next message resumes it.
 - **Delete**, in red, asks first, and says that the Bot's routines go with it.
   Deleting a Bot forgets it and deletes its routines, but its conversation stays one of your sessions, and its memory file stays.

@@ -28,6 +28,7 @@ import {
 } from "../../command-palette";
 import { localDay } from "../../../src/shared/days";
 import { age, ALL_WORKSPACES, folderName, hostLabel, pastLabel } from "../../labels";
+import { MODULE_LIST } from "../../modules";
 import { PAGE_ICON } from "../../page-icons";
 import { conversationItems, recordItems } from "../../palette-records";
 import { useConversationHits, useRead, useSearchSources } from "../../reads";
@@ -62,14 +63,11 @@ const COMMAND_ICON: Partial<Record<ShortcutId, IconComponent>> = {
 	settings: PAGE_ICON.settings,
 	help: IconKeyboard,
 	"pull-requests": PAGE_ICON["pull-requests"],
-	tickets: PAGE_ICON.tickets,
 	newTicket: PAGE_ICON.tickets,
 	bots: PAGE_ICON.bots,
 	sessions: PAGE_ICON.sessions,
 	todo: PAGE_ICON.todo,
-	calendar: PAGE_ICON.calendar,
-	email: PAGE_ICON.email,
-	sport: PAGE_ICON.sport,
+	...Object.fromEntries(MODULE_LIST.map(({ id, tab }) => [id, tab.icon])),
 };
 
 interface CommandPaletteProps {

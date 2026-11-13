@@ -6,7 +6,7 @@ import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, Sideba
 import { putJson } from "../../api";
 import { activityControl } from "../../activity";
 import { calendarEventsStore, googleStore, monthSpan, useGoogleCalendars } from "../../reads";
-import { hashForCalendar } from "../../routing";
+import { hashForPage } from "../../routing";
 import { useAction } from "../../use-action";
 import { useCalendarRoutines } from "../../use-calendar-display";
 
@@ -106,7 +106,7 @@ export function CalendarNav() {
 				<SidebarMenu aria-label="Calendar">
 					<SidebarMenuItem>
 						<SidebarMenuButton asChild isActive>
-							<a href={hashForCalendar()} aria-current="page">
+							<a href={hashForPage({ kind: "calendar" })} aria-current="page">
 								<span className="truncate">Calendar</span>
 							</a>
 						</SidebarMenuButton>

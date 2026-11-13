@@ -1,17 +1,32 @@
 # What's new in omp-agents
 
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
-The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
+The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-13
 
 - The bottom of the sidebar now shows how much of each model plan is left, as a grid of rings with the provider's logo inside and the percent left below, one per account, and your Mac's CPU, free memory, and free disk in the same rings, where the Keyboard shortcuts link was. Reset times and reset credits show when you hover a ring. Hover or click CPU to see each session's processes, or the disk to clean up. Settings › Keyboard and ? still open the shortcuts.
 - The strip along the bottom of the window is gone, so the page runs to the window's edge.
-- The terminal is removed for now: its button, its Ctrl+` shortcut, and its command in the command menu are gone.
+- The terminal's button, its Ctrl+` shortcut, and its command in the command menu are gone; New terminal in a session's right sidebar + menu still opens it on a new shell.
 - Behind the scenes: the sidebar's foot is its own piece under the sessions list, plan and machine tiles share one tile, and the Activity history for the CPU and disk clicks starts over under new names.
+- Settings › Keyboard and Settings › Activity now list each page's shortcuts and views in the same order as the sidebar.
+- Behind the scenes: Sport, Calendar, Email, and Tickets are now separate modules, so a page like them can be added or removed without touching the rest of the app.
+- The **+** menu in a session's right sidebar now lists its subagents, each opening its view, and **New terminal**, which opens the terminal on a new shell.
+- ⇧⌘G shows the right sidebar's Overview tab and ⇧⌘L opens its Browser tab in the desktop app, as in Capy; the + menu lists both keys.
+- The right sidebar's tabs now work as Capy's: it starts with Overview, + lists PRs, Browser, Tickets, and Artifacts to open as tabs, and each opened tab has an × to close it. A Bot's details do the same with Routines and Tickets.
+- Notifications moved from the bell at the top right to a Notifications row in the sidebar, before Settings, with its unread count; it opens a full page with the same filters and Mark all as read.
+- The omp logo and the search button moved down out of the window's top bar to their own row in the sidebar, just above New session.
+- Notifications moved from the bell at the top right to a Notifications row in the sidebar, right under New session, with its unread count; it opens a full page with the same filters and Mark all as read.
+- The header no longer has a Settings button; the sidebar's Settings row and G then , still open Settings.
+- What's new moved from the sparkles button at the top right to Settings › What's new, with Update dashboard. The header now holds only your tabs.
+- Archive session now shows an archive icon in the header and the sidebar's right-click menu, and the header button is plain instead of filled.
+- A session's header no longer shows its branch or its pull request and Linear issue buttons.
 - The Personal and Work spaces are gone: every page shows all your workspaces, sessions, Bots, events, and accounts together, and the sidebar's Workspaces label still narrows the list to one workspace.
 - Keyboard shortcuts now live in Settings › Keyboard, and ? opens it.
-- The bottom of the sidebar now has a Keyboard shortcuts link, where the Personal and Work switch was.
+- The sidebar no longer has a Keyboard shortcuts link at its bottom; ? still opens Settings › Keyboard.
+- End session is now called Archive session.
+- The details sidebar now joins the page with no gap: one line, which you drag to resize it, sits between them.
+- The sidebar's page list no longer has a Sessions tab; the workspace list below it already holds the sessions, and the tabs after it move up a number key.
 - Sport and Tickets now show all the time, and any session can read and log your training with its sport tool.
 - Personal sessions are gone, with the Memory tab and the remember tool they had; Bots keep their own memory.
 - Google accounts are no longer placed in a space: Email, the Calendar, and agents use every connected account.

@@ -1,6 +1,8 @@
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { isTypingTarget } from "../src/shared/desktop-bridge";
 import { commandKey, record } from "./activity";
+import { isWebModuleId, MODULE_LIST, type ModuleShortcutId, moduleOf, type WebModuleId } from "./modules";
+import { SIDEBAR_TABS, type SidebarTab } from "./routing";
 
 /** The keys that go to the sidebar's tabs by position: Cmd+1 goes to the first page row of the sidebar, whichever it is, through Cmd+5 for the fifth. */
 export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4", "tab5"] as const;
@@ -47,15 +49,10 @@ export type ShortcutId =
 	| "browserPickErase"
 	| "focusComposer"
 	| "pull-requests"
-	| "tickets"
 	| "newTicket"
-	| "ticketsNew"
 	| "bots"
 	| "sessions"
 	| "todo"
-	| "calendar"
-	| "email"
-	| "sport"
 	| "workspace"
 	| "nextPullRequest"
 	| "previousPullRequest"
@@ -75,30 +72,14 @@ export type ShortcutId =
 	| "todoDue"
 	| "todoNew"
 	| "todoClose"
-	| "calendarNewEvent"
-	| "emailNext"
-	| "emailPrevious"
-	| "emailClose"
-	| "emailOnGmail"
-	| "emailReply"
-	| "emailReplyAll"
-	| "emailTrash"
-	| "emailCompose"
-	| "sportPreviousDay"
-	| "sportNextDay"
-	| "sportPreviousDemo"
-	| "sportNextDemo"
-	| "sportJournalNext"
-	| "sportJournalPrevious"
-	| "sportJournalClose"
-	| "sportTimerPause"
-	| "sportTimerPrevious"
-	| "sportTimerNext"
 	| "nextChangedFile"
 	| "previousChangedFile"
 	| "moveUp"
 	| "moveDown"
+	| "detailsOverview"
+	| "detailsBrowser"
 	| "answer"
+	| ModuleShortcutId
 	| TabShortcut;
 
 /**
@@ -128,19 +109,18 @@ export type Binding = { chord: Chord; scope: Scope } | { goTo: string };
 /** Closes the header tab on screen, leaving its session running. */
 export const CLOSE_TAB: Chord = { key: "w", mod: true };
 
-/** The categories Settings › Keyboard lists the shortcuts under, in order. */
-export const SHORTCUT_CATEGORIES = [
+/** A category of Settings › Keyboard: the core's, a tab's but Bots', which has no shortcuts of its own, or Changes. */
+export type ShortcutCategory = "general" | "sessions" | Exclude<SidebarTab, "bots"> | "changes";
+
+/** The categories Settings › Keyboard lists the shortcuts under, in order: the core's, then each tab's in the sidebar's order, then Changes. */
+export const SHORTCUT_CATEGORIES: readonly { id: ShortcutCategory; label: string }[] = [
 	{ id: "general", label: "General" },
 	{ id: "sessions", label: "Sessions" },
-	{ id: "pull-requests", label: "Pull requests" },
-	{ id: "todo", label: "Todo" },
-	{ id: "email", label: "Email" },
-	{ id: "calendar", label: "Calendar" },
-	{ id: "sport", label: "Sport" },
+	...SIDEBAR_TABS.flatMap(({ value, label }): { id: ShortcutCategory; label: string }[] =>
+		isWebModuleId(value) ? [{ id: value, label: moduleOf({ kind: value }).shortcuts.category }] : value === "bots" ? [] : [{ id: value, label }],
+	),
 	{ id: "changes", label: "Changes" },
-] as const;
-
-export type ShortcutCategory = (typeof SHORTCUT_CATEGORIES)[number]["id"];
+];
 
 export interface Shortcut {
 	id: ShortcutId;
@@ -151,6 +131,13 @@ export interface Shortcut {
 	/** What the command palette lists the shortcut as, for the page-wide actions it runs: `Go to pull requests`. */
 	command?: string;
 }
+
+/** The go-to shortcuts of the core's tabs, each under its tab's id. */
+const TAB_GO_TO = {
+	"pull-requests": { label: "Go to Pull requests", command: "Go to pull requests", keys: [] },
+	bots: { label: "Go to your Bots", command: "Go to Bots", keys: [] },
+	todo: { label: "Go to your todo list", command: "Go to todo list", keys: [] },
+} satisfies { [T in Exclude<SidebarTab, WebModuleId>]: Pick<Shortcut, "label" | "command" | "keys"> };
 
 /**
  * Every dashboard shortcut, in the order a key tries them: every binding the key listeners match, and the commands the
@@ -238,6 +225,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		command: "Toggle details sidebar",
 		keys: [{ chord: { key: "b", mod: true, alt: true }, scope: "anywhere" }],
 	},
+	{ id: "detailsOverview", category: "sessions", label: "Show the details sidebar's Overview tab", keys: [{ chord: { key: "g", mod: true, shift: true }, scope: "anywhere" }] },
+	{ id: "detailsBrowser", category: "sessions", label: "Open the details sidebar's Browser tab, in the desktop app", keys: [{ chord: { key: "l", mod: true, shift: true }, scope: "anywhere" }] },
 	{ id: "settings", category: "general", label: "Open or close settings", command: "Toggle settings", keys: [{ goTo: "," }] },
 	{ id: "back", category: "general", label: "Go back", command: "Go back", keys: [{ chord: { key: "[", mod: true }, scope: "anywhere" }] },
 	{ id: "forward", category: "general", label: "Go forward", command: "Go forward", keys: [{ chord: { key: "]", mod: true }, scope: "anywhere" }] },
@@ -267,16 +256,9 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	},
 	// No one reads these rows' labels, by design: the dialog lists each position key on the tab it goes to, and the palette lists no command for them.
 	...TAB_SHORTCUTS.map((id, index): Shortcut => ({ id, category: "general", label: `Go to tab ${index + 1} of the sidebar`, keys: [{ chord: { key: String(index + 1), mod: true }, scope: "anywhere" }] })),
-	{ id: "pull-requests", category: "general", label: "Go to Pull requests", command: "Go to pull requests", keys: [] },
-	{ id: "tickets", category: "general", label: "Go to your Linear tickets", command: "Go to tickets", keys: [] },
+	...SIDEBAR_TABS.map(({ value }): Shortcut => ({ id: value, category: "general", ...(isWebModuleId(value) ? moduleOf({ kind: value }).shortcuts.goTo : TAB_GO_TO[value]) })),
 	{ id: "newTicket", category: "general", label: "Create a Linear ticket, except on the Todo, Calendar, and Email pages", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
-	{ id: "ticketsNew", category: "general", label: "Tickets page: create a Linear ticket, in place of a new session", keys: [{ chord: { key: "n", mod: true }, scope: "anywhere" }] },
-	{ id: "bots", category: "general", label: "Go to your Bots", command: "Go to Bots", keys: [] },
 	{ id: "sessions", category: "general", label: "Go to the sessions", command: "Go to sessions", keys: [] },
-	{ id: "todo", category: "general", label: "Go to your todo list", command: "Go to todo list", keys: [] },
-	{ id: "calendar", category: "general", label: "Go to your calendar", command: "Go to calendar", keys: [] },
-	{ id: "email", category: "general", label: "Go to your email", command: "Go to email", keys: [{ goTo: "m" }] },
-	{ id: "sport", category: "general", label: "Go to your sport week", command: "Go to sport", keys: [] },
 	{ id: "workspace", category: "general", label: "Choose the sidebar's workspace", keys: [{ goTo: "w" }] },
 	{ id: "nextPullRequest", category: "pull-requests", label: "Pull requests: move to the next pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "previousPullRequest", category: "pull-requests", label: "Pull requests: move to the previous pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
@@ -301,25 +283,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "todoDue", category: "todo", label: "Change the focused or open todo's due day", keys: [{ chord: { key: "d", shift: true }, scope: "outside-fields" }] },
 	{ id: "todoNew", category: "todo", label: "Add a todo to the Todo group", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "todoClose", category: "todo", label: "Close the open todo", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
-	{ id: "calendarNewEvent", category: "calendar", label: "Calendar: add an event", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
-	{ id: "emailNext", category: "email", label: "Email: focus the next conversation, or open it while a conversation is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
-	{ id: "emailPrevious", category: "email", label: "Email: focus the previous conversation, or open it while a conversation is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
-	{ id: "emailClose", category: "email", label: "Email: close the open conversation", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
-	{ id: "emailOnGmail", category: "email", label: "Email: open the focused or open conversation in Gmail", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
-	{ id: "emailReply", category: "email", label: "Email: reply to the open conversation's last message", keys: [{ chord: { key: "r" }, scope: "outside-fields" }] },
-	{ id: "emailReplyAll", category: "email", label: "Email: reply to everyone on the open conversation's last message", keys: [{ chord: { key: "a" }, scope: "outside-fields" }] },
-	{ id: "emailTrash", category: "email", label: "Email: move the open conversation to Gmail's Trash", keys: [{ chord: { key: "#" }, scope: "outside-fields" }] },
-	{ id: "emailCompose", category: "email", label: "Email: write a new mail", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
-	{ id: "sportPreviousDay", category: "sport", label: "Sport week: open the day before", keys: [{ chord: { key: "ArrowLeft" }, scope: "outside-fields" }] },
-	{ id: "sportNextDay", category: "sport", label: "Sport week: open the day after", keys: [{ chord: { key: "ArrowRight" }, scope: "outside-fields" }] },
-	{ id: "sportPreviousDemo", category: "sport", label: "Sport demo: show the workout's previous demo", keys: [{ chord: { key: "ArrowLeft" }, scope: "outside-fields" }] },
-	{ id: "sportNextDemo", category: "sport", label: "Sport demo: show the workout's next demo", keys: [{ chord: { key: "ArrowRight" }, scope: "outside-fields" }] },
-	{ id: "sportJournalNext", category: "sport", label: "Sport journal: focus the next, older session, or open it while a session is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
-	{ id: "sportJournalPrevious", category: "sport", label: "Sport journal: focus the previous, newer session, or open it while a session is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
-	{ id: "sportJournalClose", category: "sport", label: "Sport journal: close the open session", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
-	{ id: "sportTimerPause", category: "sport", label: "Sport timer: pause or resume the routine", keys: [{ chord: { key: " " }, scope: "outside-fields" }] },
-	{ id: "sportTimerPrevious", category: "sport", label: "Sport timer: go back to the previous step", keys: [{ chord: { key: "ArrowLeft" }, scope: "outside-fields" }] },
-	{ id: "sportTimerNext", category: "sport", label: "Sport timer: end this step and go to the next", keys: [{ chord: { key: "ArrowRight" }, scope: "outside-fields" }] },
+	...MODULE_LIST.flatMap(({ id, shortcuts }) => shortcuts.rows.map((row): Shortcut => ({ ...row, category: id }))),
 	{ id: "nextChangedFile", category: "changes", label: "Changes: open the next changed file", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "previousChangedFile", category: "changes", label: "Changes: open the previous changed file", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "moveUp", category: "todo", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },

@@ -1,33 +1,40 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { IconAgentNetwork, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconKeyboard, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconStorage } from "central-icons";
+import { IconAgentNetwork, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconKeyboard, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconSparklesTwo, IconStorage } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
-import { isDay } from "../src/json";
 import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
 import { hashForSession, type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
-import { TICKET_ID } from "../src/shared/tickets";
 import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import type { StartOp } from "./starts";
+import { decodeSegment } from "./hash-segment";
 import { PAGE_ICON } from "./page-icons";
+import { isModulePage, isWebModuleId, MODULE_LIST, type ModulePage, moduleOf, modulePage, type WebModuleId } from "./modules";
+
+/** A sidebar tab's row: its label, its icon, its `place` among the tabs, lowest first, and the integration it waits on. */
+export interface SidebarTabRow {
+	value: SidebarTab;
+	label: string;
+	icon: IconComponent;
+	place: number;
+	integration?: McpIntegrationId;
+}
+
+/** The core's tabs, which the modules' tabs join by `place`. */
+const CORE_TABS = [
+	{ value: "pull-requests", label: "Pull requests", icon: PAGE_ICON["pull-requests"], place: 10 },
+	{ value: "bots", label: "Bots", icon: PAGE_ICON.bots, place: 30 },
+	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo, place: 50 },
+] as const satisfies readonly { value: string; label: string; icon: IconComponent; place: number; integration?: McpIntegrationId }[];
 
 /**
  * The sidebar's tabs, in order, each a row of its page list. A tab with an `integration` shows, and its
  * shortcut applies, only while omp holds a sign-in to that service, even one the service refuses, which the page then
  * offers to reconnect. Settings is no tab: the row after them and the header's button open it.
  */
-export const SIDEBAR_TABS = [
-	{ value: "pull-requests", label: "Pull requests", icon: PAGE_ICON["pull-requests"] },
-	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, integration: "linear" },
-	{ value: "bots", label: "Bots", icon: PAGE_ICON.bots },
-	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions },
-	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar },
-	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo },
-	{ value: "sport", label: "Sport", icon: PAGE_ICON.sport },
-	{ value: "email", label: "Email", icon: PAGE_ICON.email, integration: "gmail" },
-] as const satisfies readonly { value: string; label: string; icon: IconComponent; integration?: McpIntegrationId }[];
+export const SIDEBAR_TABS: readonly SidebarTabRow[] = [...CORE_TABS, ...MODULE_LIST.map(({ id, tab }) => ({ value: id, ...tab }))].sort((a, b) => a.place - b.place);
 
-/** A sidebar tab, a row of the sidebar's page list; the tickets, Bots, todo, calendar, email, and sport tabs go with their pages, the sessions and pull requests tabs with the panes. */
-export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
+/** A sidebar tab, a row of the sidebar's page list; the Bots, todo, and module tabs go with their pages, the sessions and pull requests tabs with the panes. */
+export type SidebarTab = (typeof CORE_TABS)[number]["value"] | WebModuleId;
 
 const PAST_PREFIX = "past/";
 
@@ -36,25 +43,6 @@ const PAST_PREFIX = "past/";
  * on the file at `path`, `null` for the first. A `null` target keeps the panes.
  */
 export type PullRequestsRoute = { target: null } | { target: PullRequest; files: { path: string | null } | null };
-
-/** The tickets list, or the Linear issue whose details replace it when `target` is non-null. */
-export interface TicketsRoute {
-	/** The issue's identifier: `ENG-2368`. */
-	target: string | null;
-}
-
-/** A Gmail conversation, by the account whose inbox holds it and its thread id. */
-export interface EmailThread {
-	/** The account's server name in omp's config: `gmail`, `gmail-2`. */
-	account: string;
-	/** Gmail's thread id: `18f2a3c4d5e6f708`. */
-	thread: string;
-}
-
-/** The Email page's list, beside the Gmail conversation `target` names, or the new mail when it is `new`. */
-export interface EmailRoute {
-	target: EmailThread | "new" | null;
-}
 
 /** What a workspace section's header says it shows: `workspace` with a workspace picked, `none` with all workspaces. */
 const AS_LOADED = { workspace: "As a session in this workspace loads them", none: "Your user files only, for all workspaces" };
@@ -86,6 +74,7 @@ export const SETTINGS_SECTIONS = [
 	{ value: "sync", label: "Sync", icon: IconArrowRotateCounterClockwise, group: "general", keywords: ["git", "remote", "machines"] },
 	{ value: "phone", label: "Phone access", icon: IconPhone, group: "general", keywords: ["tailscale", "mobile", "pair", "qr"] },
 	{ value: "storage", label: "Storage", icon: IconStorage, group: "general", keywords: ["disk", "space", "gc", "cleanup", "archive", "compress", "sandboxes"] },
+	{ value: "whats-new", label: "What's new", icon: IconSparklesTwo, group: "general", keywords: ["changelog", "update", "release notes"] },
 	{ value: "providers", label: "Providers", icon: IconKey1, group: "connections", keywords: ["login", "sign in", "accounts", "api key", "quota"] },
 	{ value: "integrations", label: "Integrations", icon: IconPlugin1, group: "connections", keywords: ["linear", "slack", "github", "gmail", "calendar", "connect"] },
 	{ value: "mcp-servers", label: "MCP servers", icon: IconBlocks, group: "connections", keywords: ["mcp", "tools"] },
@@ -161,43 +150,24 @@ export interface ScheduledRoute {
 	id: string | null;
 }
 
-/**
- * The Sport page's tab: the week with day `day` open (`null` for today), the journal with log `open` beside it (`null` for
- * none), or the progress charts.
- */
-export type SportRoute = { tab: "week"; day: string | null } | { tab: "journal"; open: string | null } | { tab: "progress" };
-
-/** A page that covers the panes. */
-export type Page =
+/** A page of the core that covers the panes. */
+export type CorePage =
 	| { kind: "get-started" }
 	| ({ kind: "settings" } & SettingsRoute)
 	| ({ kind: "pull-requests" } & PullRequestsRoute)
-	| ({ kind: "tickets" } & TicketsRoute)
 	| ({ kind: "todo" } & TodoRoute)
 	| ({ kind: "bots" } & BotsRoute)
-	| { kind: "calendar" }
-	| ({ kind: "email" } & EmailRoute)
+	| { kind: "notifications" }
 	| ({ kind: "new" } & NewSessionRoute)
-	| ({ kind: "scheduled" } & ScheduledRoute)
-	| ({ kind: "sport" } & SportRoute);
+	| ({ kind: "scheduled" } & ScheduledRoute);
+
+/** A page that covers the panes: the core's, or a module's. */
+export type Page = CorePage | ModulePage;
 
 /** What the hash names: a page over the panes, a session by its id, or the panes themselves. */
 export type Route = { kind: "page"; page: Page } | { kind: "session"; sessionId: string } | { kind: "panes"; layout: Layout };
 
-type PageOf<K extends Page["kind"]> = Extract<Page, { kind: K }>;
-
-/**
- * A hash segment decoded, `null` for a malformed percent-escape (`%E0`, `%zz`), which a hand-edited or cut link may
- * hold; each parser reads `null` as naming nothing, so such a link opens what the hash names without it instead of throwing.
- */
-function decodeSegment(raw: string): string | null {
-	try {
-		return decodeURIComponent(raw);
-	} catch (error) {
-		if (error instanceof URIError) return null;
-		throw error;
-	}
-}
+type PageOf<K extends CorePage["kind"]> = Extract<CorePage, { kind: K }>;
 
 /** The settings page and the new-session draft both name an optional directory, encoded so it keeps its slashes and tilde. */
 const decodeCwd = (rest: string | null): string | null => (rest === null ? null : decodeSegment(rest));
@@ -218,21 +188,16 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   and `#pull-requests/<owner>/<repo>/<number>` shows that pull request's details in the main content.
  *   `#pull-requests/<owner>/<repo>/<number>/files` opens its changes page on the first file, and `…/files/<path>` on the file
  *   at that encoded path. Any other `#pull-requests/…` shows the tab alone.
- * - `#tickets` opens the tickets page, which lists the viewer's assigned Linear issues, and `#tickets/<identifier>`
- *   opens that issue's details in the main content. Any other `#tickets/…` opens the list alone.
  * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/archive` with the todos due by
  *   today, waiting on you, added by agents, or in the archive; `#todo/<category id>` shows that category alone, and `?open=<id>` opens that todo.
  * - `#bots` opens the gallery of every Bot, `#bots/new` the New Bot form, `#bots/<id>` that Bot's page, `#bots/<id>/routines` the card of that
  *   Bot's routines in place of its conversation, `#bots/<id>/routines/<routine id>` that card with that routine open,
  *   `#bots/<id>/routines/<routine id>/edit` that routine's editor, and `#bots/<id>/routines/new` a new routine's editor; Bot and routine ids
  *   are UUIDs, so none reads as `new`.
- * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
- * - `#email` opens the Email page, your Gmail inboxes' latest conversations, `#email/new` a new mail, and
- *   `#email/<account>/<thread id>` that account's conversation in full in the main content.
- * - `#sport` opens the Sport page on this week, `?day=<YYYY-MM-DD>` on that day's week with that day open, `#sport/journal` on
- *   the workout journal, `?open=<log id>` with that log open, and `#sport/progress` on the progress charts.
+ * - `#notifications` opens the Notifications page, every notice by source, unread first.
+ * - A module's page, `#<id>`, reads the rest of its hash as its module's address does.
  */
-const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
+const PAGES: { [K in CorePage["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
 	"get-started": () => ({ kind: "get-started" }),
 	settings: rest => ({ kind: "settings", section: settingsSection(rest?.split("/")[0] ?? null) }),
 	new: (rest, query) => ({ kind: "new", cwd: decodeCwd(rest), todoId: query.get("todo") || null }),
@@ -243,7 +208,6 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		const files = match[4] ? { path: match[5] ? decodeSegment(match[5]) : null } : null;
 		return { kind: "pull-requests", target: { owner: match[1]!, repo: match[2]!, number: Number(match[3]) }, files };
 	},
-	tickets: rest => ({ kind: "tickets", target: rest !== null && TICKET_ID.test(rest) ? rest : null }),
 	todo: (rest, query) => {
 		const open = query.get("open") || null;
 		if (!rest) return { kind: "todo", list: { kind: "all" }, open };
@@ -257,24 +221,13 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		if (!target) return { kind: "bots", target: null, adding: false };
 		return { kind: "bots", target, routine: routines === "routines" ? botRoutineRoute(routine, more) : null };
 	},
-	calendar: () => ({ kind: "calendar" }),
-	email: rest => {
-		if (rest === "new") return { kind: "email", target: "new" };
-		const [account, thread, ...more] = (rest ?? "").split("/").map(decodeSegment);
-		return { kind: "email", target: account && thread && more.length === 0 ? { account, thread } : null };
-	},
-	sport: (rest, query) => {
-		if (rest === "journal") return { kind: "sport", tab: "journal", open: query.get("open") || null };
-		if (rest === "progress") return { kind: "sport", tab: "progress" };
-		const day = query.get("day");
-		return { kind: "sport", tab: "week", day: isDay(day) ? day : null };
-	},
+	notifications: () => ({ kind: "notifications" }),
 };
 
-const isPageKind = (head: string): head is Page["kind"] => Object.hasOwn(PAGES, head);
+const isPageKind = (head: string): head is CorePage["kind"] => Object.hasOwn(PAGES, head);
 
 /** What follows `#<kind>/` in `page`'s hash; `null` for the page alone. */
-function restOfPage(page: Page): string | null {
+function restOfPage(page: CorePage): string | null {
 	switch (page.kind) {
 		case "settings":
 			return page.section;
@@ -286,20 +239,14 @@ function restOfPage(page: Page): string | null {
 			if (page.files === null) return pr;
 			return page.files.path === null ? `${pr}/files` : `${pr}/files/${encodeURIComponent(page.files.path)}`;
 		}
-		case "tickets":
-			return page.target || null;
 		case "todo":
 			return page.list.kind === "all" ? null : page.list.kind === "category" ? encodeURIComponent(page.list.id) : page.list.kind;
 		case "bots":
 			if (page.target === null) return page.adding ? "new" : null;
 			return page.routine === null ? encodeURIComponent(page.target) : `${encodeURIComponent(page.target)}/${restOfBotRoutine(page.routine)}`;
-		case "email":
-			return page.target === null || page.target === "new" ? page.target : `${encodeURIComponent(page.target.account)}/${encodeURIComponent(page.target.thread)}`;
 		case "scheduled":
 			return page.id === null ? null : encodeURIComponent(page.id);
-		case "sport":
-			return page.tab === "week" ? null : page.tab;
-		case "calendar":
+		case "notifications":
 		case "get-started":
 			return null;
 		default: {
@@ -310,22 +257,17 @@ function restOfPage(page: Page): string | null {
 }
 
 /** The `?name=value` that follows `page`'s path: the todo a new session works on, or the todo its page opens; `null` for none. */
-function queryOfPage(page: Page): string | null {
+function queryOfPage(page: CorePage): string | null {
 	switch (page.kind) {
 		case "new":
 			return page.todoId === null ? null : `todo=${encodeURIComponent(page.todoId)}`;
 		case "todo":
 			return page.open === null ? null : `open=${encodeURIComponent(page.open)}`;
-		case "sport":
-			if (page.tab === "week") return page.day === null ? null : `day=${page.day}`;
-			return page.tab === "journal" && page.open !== null ? `open=${encodeURIComponent(page.open)}` : null;
 		case "settings":
 		case "pull-requests":
-		case "tickets":
 		case "bots":
-		case "calendar":
+		case "notifications":
 		case "get-started":
-		case "email":
 		case "scheduled":
 			return null;
 		default: {
@@ -336,15 +278,13 @@ function queryOfPage(page: Page): string | null {
 }
 
 export function hashForPage(page: Page): string {
-	const rest = restOfPage(page);
-	const query = queryOfPage(page);
+	const rest = isModulePage(page) ? moduleOf(page).address.rest(page) : restOfPage(page);
+	const query = isModulePage(page) ? moduleOf(page).address.query(page) : queryOfPage(page);
 	return `#${page.kind}${rest === null ? "" : `/${rest}`}${query === null ? "" : `?${query}`}`;
 }
 
 export const hashForPullRequests = (target: PullRequest | null): string => hashForPage(target ? { kind: "pull-requests", target, files: null } : { kind: "pull-requests", target: null });
 export const hashForPullRequestFiles = (pr: PullRequest, path: string | null = null): string => hashForPage({ kind: "pull-requests", target: pr, files: { path } });
-export const hashForTickets = (target: string | null): string => hashForPage({ kind: "tickets", target });
-export const hashForEmail = (target: EmailRoute["target"]): string => hashForPage({ kind: "email", target });
 export const hashForTodo = (list: TodoListView, open: string | null = null): string => hashForPage({ kind: "todo", list, open });
 /** A todo opened in its category's list, else in every todo's; `categoryId` is its own, or its parent's for a todo under another. */
 export const hashForOpenTodo = (id: string, categoryId: string | null): string => hashForTodo(categoryId === null ? { kind: "all" } : { kind: "category", id: categoryId }, id);
@@ -358,11 +298,10 @@ export function hashForTodoId({ todos, archive }: UserTodoList, id: string): str
 export const hashForBots = (target: string | null): string => hashForPage(target === null ? { kind: "bots", target, adding: false } : { kind: "bots", target, routine: null });
 export const hashForNewBot = (): string => hashForPage({ kind: "bots", target: null, adding: true });
 export const hashForBotRoutine = (botId: string, routine: BotRoutineRoute): string => hashForPage({ kind: "bots", target: botId, routine });
-export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
+export const hashForNotifications = (): string => hashForPage({ kind: "notifications" });
 export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
 export const hashForScheduled = (id: string): string => hashForPage({ kind: "scheduled", id });
-export const hashForSport = (route: SportRoute): string => hashForPage({ kind: "sport", ...route });
 
 /**
  * The route a hash names. A page's kind is its first segment. `#session/<id>` names a session by its id, which outlives
@@ -378,6 +317,7 @@ export function routeFromHash(hash: string): Route {
 	const head = slash < 0 ? raw : raw.slice(0, slash);
 	const rest = slash < 0 ? null : raw.slice(slash + 1);
 	if (isPageKind(head)) return { kind: "page", page: PAGES[head](rest, query) };
+	if (isWebModuleId(head)) return { kind: "page", page: modulePage(head, rest, query) };
 	if (`${head}/` === SESSION_HASH_PREFIX && rest) {
 		const sessionId = decodeSegment(rest);
 		return sessionId === null ? { kind: "panes", layout: EMPTY_LAYOUT } : { kind: "session", sessionId };

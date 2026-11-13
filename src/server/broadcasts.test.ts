@@ -53,7 +53,6 @@ function setup(initial: PastSession[]) {
 	const bots = new BotsFile(join(dir, "bots.json"));
 	const lists = new ListRegistry({
 		"user-todos": { msg: () => ({ t: "user-todos", list: todos.value }), apply: change => todos.apply(change) },
-		sport: { msg: () => ({ t: "sport", state: sport.value }), apply: changes => sport.apply(changes) },
 		routines: { msg: () => ({ t: "routines", routines: routines.value }), apply: change => routines.apply(change, 1000) },
 		scheduled: { msg: () => ({ t: "scheduled", sends: scheduled.value }), apply: change => scheduled.apply(change, 1000) },
 		workspaces: {
@@ -73,7 +72,7 @@ function setup(initial: PastSession[]) {
 		bots: { msg: () => ({ t: "bots", bots: bots.value, memories: {}, lasts: {} }), apply: change => bots.apply(change, "2026-01-01T00:00:00.000Z") },
 		notices: { msg: () => ({ t: "notices", list: [] }) },
 		merges: { msg: () => ({ t: "merges", list: [] }) },
-	}, kind => broadcasts.pushList(kind));
+	}, { sport }, kind => broadcasts.pushList(kind));
 	const broadcasts = new Broadcasts({
 		roster: () => roster,
 		past: () => sessions,
@@ -199,7 +198,6 @@ describe("registered whole-list broadcasts", () => {
 		const replies: ServerMsg[] = [];
 		const peer = { send: (msg: ServerMsg) => void replies.push(msg) };
 		expect(lists.apply("user-todos", { op: "remove", id: "missing" }, peer)).toBe(false);
-		expect(lists.apply("sport", [{ op: "remove-log", id: "missing" }], peer)).toBe(false);
 		expect(lists.apply("routines", { op: "remove", id: "missing" }, peer)).toBe(false);
 		expect(lists.apply("scheduled", { op: "remove", id: "missing" }, peer)).toBe(false);
 		expect(lists.apply("workspaces", { op: "show", cwd: "/missing" }, peer)).toBe(false);
@@ -208,15 +206,16 @@ describe("registered whole-list broadcasts", () => {
 		expect(lists.apply("preferences", { op: "set", key: "omp-agents.split-columns", value: "0.4" }, peer)).toBe(false);
 		expect(lists.apply("review-drafts", { op: "discard", pr: { owner: "o", repo: "r", number: 1 } }, peer)).toBe(false);
 		expect(lists.apply("bots", { op: "remove", id: "missing" as BotId }, peer)).toBe(false);
+		expect(lists.applyModule("sport", [{ op: "remove-log", id: "missing" }], peer)).toBe(false);
 		expect(replies).toEqual([...lists.messages()].filter(msg => msg.t !== "notices" && msg.t !== "merges"));
 		expect(published).toEqual([]);
 	});
 
-	test("a refused sport batch resends the state to its page before it throws", () => {
+	test("a refused module change resends the module's state to its page before it throws", () => {
 		const { lists, published } = setup([]);
 		const replies: ServerMsg[] = [];
 		const peer = { send: (msg: ServerMsg) => void replies.push(msg) };
-		expect(() => lists.apply("sport", [{ op: "add-measurement", measurement: { id: "m", metric: "max", value: 117, at: "2026-11-17", note: "", addedBy: null } }], peer)).toThrow("max");
+		expect(() => lists.applyModule("sport", [{ op: "add-measurement", measurement: { id: "m", metric: "max", value: 117, at: "2026-11-17", note: "", addedBy: null } }], peer)).toThrow("max");
 		expect(replies).toEqual([lists.message("sport")]);
 		expect(published).toEqual([]);
 	});

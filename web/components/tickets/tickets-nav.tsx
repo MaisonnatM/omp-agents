@@ -1,19 +1,13 @@
 import { SidebarGroup, SidebarMenu } from "@/components/ui/sidebar";
-import { hashForTickets } from "../../routing";
 import type { SectionTarget } from "../../section";
 import { ticketsStore } from "../../reads";
-import { ticketGroups, ticketSection } from "../../tickets-model";
+import { hashForTickets, ticketGroups, ticketSection } from "../../tickets-model";
 import { SectionLink } from "../section-link";
 
 const navNote = (text: string) => <p className="px-2 py-1 text-xs text-muted-foreground">{text}</p>;
 
-interface TicketsNavProps {
-	target: SectionTarget | null;
-	onTarget: (target: SectionTarget) => void;
-}
-
 /** The tickets page's status groups with their issue counts, each a link to its group on the page. */
-export function TicketsNav({ target, onTarget }: TicketsNavProps) {
+export function TicketsNav({ section: chosen, onSection }: { section: SectionTarget | null; onSection: (section: SectionTarget) => void }) {
 	const { read, error } = ticketsStore.use();
 	if (!read) return <SidebarGroup>{navNote(error ? `Cannot load the tickets: ${error}` : "Asking Linear for your issues…")}</SidebarGroup>;
 	const groups = ticketGroups(read.data.tickets);
@@ -26,13 +20,13 @@ export function TicketsNav({ target, onTarget }: TicketsNavProps) {
 						key={status}
 						href={hashForTickets(null)}
 						section={ticketSection(status)}
-						chosen={target}
+						chosen={chosen}
 						title={status}
 						label={`${status}, ${length} issue${length === 1 ? "" : "s"}`}
 						count={length}
 						onChoose={section => {
 							location.hash = hashForTickets(null);
-							onTarget(section);
+							onSection(section);
 						}}
 					/>
 				))}

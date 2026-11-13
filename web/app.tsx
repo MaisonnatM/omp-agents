@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { callable } from "../src/shared/accounts";
 import type { View } from "../src/shared/sessions";
@@ -6,7 +7,6 @@ import { errorText } from "../src/json";
 import { AppSidebar } from "./components/app-sidebar";
 import { BotDetails } from "./components/bots/bot-details";
 import { CommandPalette } from "./components/command-palette/command-palette";
-import { HeaderControls } from "./components/header-controls";
 import { HeaderTabs } from "./components/header-tabs";
 import {
 	type DashboardActions,
@@ -35,6 +35,7 @@ import { DashboardSidebar, useSidebarPanels } from "./components/sidebar-panel";
 import { SidebarStatus } from "./components/sidebar-status";
 import { subjectOf } from "./components/subject";
 import { NewTicketDialog } from "./components/tickets/new-ticket";
+import { TerminalPanel, useTerminalPanel } from "./components/terminal/terminal-panel";
 import { ActivityVisibility, ToolsExpanded } from "./components/transcript";
 import { toasts } from "./components/toaster";
 import { botRows } from "./bots-model";
@@ -43,7 +44,7 @@ import { useOpenPullRequest } from "./open-pull-request";
 import { integrationsStore } from "./reads";
 import { onArtifactOpen, onArtifactsReveal } from "./artifact-requests";
 import { onReviewRequest } from "./review-pages";
-import { storeOrRemove } from "./stored-state";
+import { revealDetailsTab } from "./details-tabs";
 import { hashForLayout, hashForPage, hashForRoute, hashForView, type OpenMode, sameView, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, type WindowScope, workspaceSession, workspaceSwitch } from "./sessions";
@@ -66,7 +67,7 @@ const ALL_TODOS: TodoListView = { kind: "all" };
  * slice, and the two dashboard contexts split what is stable, the actions, from what changes, the connection and the starts.
  */
 export function App() {
-	const { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeSport, changePins, changeBot, trustAndStart, dismissTrust } = useDashboard();
+	const { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeModule, changePins, changeBot, trustAndStart, dismissTrust } = useDashboard();
 
 	const { layout } = state;
 	const sidebars = useSidebarPanels();
@@ -77,6 +78,7 @@ export function App() {
 	const sessions = useSessionLists(scope, state.pins, changePins);
 	const overlays = useOverlays();
 	const display = useTranscriptDisplay();
+	const terminal = useTerminalPanel();
 	useNoticeToasts(state.notices, state.connected, send, start);
 	useAttention(state, openBot?.view ?? null, send);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
@@ -84,13 +86,10 @@ export function App() {
 	const editGoal = useCallback((instanceId: string, focus: "objective" | "budget") => setGoalEditor({ instanceId, focus }), []);
 	const goalHost = goalEditor ? state.hosts.find(host => host.instanceId === goalEditor.instanceId) : null;
 	const editedGoal = goalHost?.source === "dashboard" && goalHost.goal.kind !== "off" && goalHost.control.phase === "live" && !goalHost.control.readOnly ? goalHost : null;
-	const integrations = integrationsStore.usePolling().read?.data.integrations;
-	const linear = integrations?.linear ?? null;
+	const linear = integrationsStore.usePolling().read?.data.integrations.linear ?? null;
 	const { signedOut: absentTabs, shown: tabs } = useSidebarTabs();
-	/** The dashboard reads and writes Linear: the tickets page lists issues, the Todo page creates them, and the Calendar shows their due days. */
-	const linearCallable = linear !== null && callable(linear.connection);
-	/** Linear answers and the sidebar shows Tickets: the new-ticket shortcut and the palette's tickets apply. */
-	const ticketsCallable = linearCallable && !absentTabs.has("tickets");
+	/** Linear answers and the sidebar shows Tickets: the new-ticket shortcut, the palette's tickets, a todo's ticket, and the Calendar's due days apply. */
+	const ticketsCallable = linear !== null && callable(linear.connection) && !absentTabs.has("tickets");
 	const settings = useSettingsRoute(page);
 	const botList = useMemo(() => (state.bots === null ? null : botRows(state.bots, state.hosts, state.botLasts)), [state.bots, state.hosts, state.botLasts]);
 	const latestBot = botList?.[0]?.bot.id ?? null;
@@ -123,7 +122,7 @@ export function App() {
 		sidebars.setOpen(side, !sidebars.panels[side].open);
 	}, []);
 	const showDetailsTab = useCallback((tab: "browser" | "artifacts"): void => {
-		storeOrRemove(TAB_KEY, tab, "pull-requests");
+		revealDetailsTab(TAB_KEY, tab, "overview");
 		latest.current.sidebars.setOpen("right", true);
 	}, []);
 	// A reply's **Review visuals** shows the Browser, whose panel then opens the reply's pages.
@@ -211,8 +210,8 @@ export function App() {
 	});
 
 	const actions = useMemo(
-		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeSport, changeBot, end: endHost, openFile: setOpenedFile, openNewTicket: setNewTicket, editGoal, workspaceSettings }),
-		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeSport, changeBot, endHost, setOpenedFile, setNewTicket, editGoal, workspaceSettings],
+		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeModule, changeBot, end: endHost, openFile: setOpenedFile, openNewTicket: setNewTicket, editGoal, workspaceSettings }),
+		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeModule, changeBot, endHost, setOpenedFile, setNewTicket, editGoal, workspaceSettings],
 	);
 	const fork = startOf(state.starts, "fork");
 	const resume = startOf(state.starts, "resume");
@@ -256,8 +255,7 @@ export function App() {
 		[listPage, state.listed, visible, state.hosts, state.past, botList, state.userTodos, todoView, sectionTarget],
 	);
 	const showSearch = useCallback(() => dispatchPalette({ type: "open" }), [dispatchPalette]);
-	const toggleSettings = useCallback(() => void handlers.settings?.(0), [handlers]);
-	const headerControls = useMemo(() => <HeaderControls notices={state.notices} settingsOpen={page?.kind === "settings"} onToggleSettings={toggleSettings} />, [state.notices, page?.kind, toggleSettings]);
+	const unreadNotices = useMemo(() => state.notices.filter(notice => !notice.read).length, [state.notices]);
 
 	return (
 		<DashboardActionsContext.Provider value={actions}>
@@ -281,13 +279,14 @@ export function App() {
 										botList={botList}
 										list={placement?.at === "sidebar" ? pageList : null}
 										settings={settings}
+										unreadNotices={unreadNotices}
 										onPickWorkspace={switchWorkspace}
 										onSearch={showSearch}
 									/>
 									<SidebarStatus usage={state.usage} hosts={state.hosts} bots={state.bots} />
 								</DashboardSidebar>
-								<HeaderTabs className="[grid-area:tabs]" address={address} hosts={state.hosts} past={state.past} controls={headerControls} />
-								<SidebarInset className="inset-panel [grid-area:page] group-has-[#sessions-sidebar[inert]]/window:ml-1.5">
+								<HeaderTabs className="[grid-area:tabs]" address={address} hosts={state.hosts} past={state.past} />
+								<SidebarInset className={cn("inset-panel [grid-area:page] group-has-[#sessions-sidebar[inert]]/window:ml-1.5", (detailsView || openBot) && sidebars.panels.right.open && !sidebars.panels.right.floating && "rounded-r-none border-r-0")}>
 									<div ref={pageArea} className="flex min-h-0 flex-1">
 										{listPage && placement?.at === "column" && (
 											<PageListColumn page={listPage} max={placement.max}>
@@ -309,7 +308,7 @@ export function App() {
 																	splits={state.splits}
 																	models={state.models}
 																	userTodos={state.userTodos}
-																	sport={state.sport}
+																	modules={state.modules}
 																	routines={state.routines}
 																	bots={state.bots}
 																	botLasts={state.botLasts}
@@ -320,13 +319,12 @@ export function App() {
 																	connected={state.connected}
 																	listed={state.listed}
 																	rosterError={state.rosterError}
+																	notices={state.notices}
 																	newStart={startOf(state.starts, "new")}
 																	scope={scope}
 																	defaultWorkspace={defaultWorkspace}
 																	sectionTarget={sectionTarget}
 																	todoView={todoView}
-																	linear={linear}
-																	linearCallable={linearCallable}
 																	ticketsCallable={ticketsCallable}
 																	maximized={maximized}
 																	hasDetails={detailsView !== null}
@@ -343,6 +341,7 @@ export function App() {
 											</Plans>
 										</div>
 									</div>
+									<TerminalPanel panel={terminal} cwd={focused.workDir ?? workspace ?? "~"} />
 								</SidebarInset>
 								{(detailsView || openBot) && (
 									<DashboardSidebar side="right" className="[grid-area:details]" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")} address={address}>

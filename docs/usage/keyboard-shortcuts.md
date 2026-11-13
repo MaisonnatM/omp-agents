@@ -73,7 +73,7 @@ Alt is Option on macOS.
 - **Settings › Keyboard** lists the keyboard shortcuts; press `?` outside a text field to open it, and `?` there goes back to the panes.
   It lists them in sections by category: General, Sessions, Pull requests, Todo, Email, Calendar, Sport, and Changes.
   Its first line states the rule for where a key works: chords with Cmd, Alt, or Ctrl work anywhere, even while you type, and single keys and G pairs work outside text fields; a **Composer only** tag marks the keys that work only in the composer.
-  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar's top row and page list, the header's tabs' buttons, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the open Sport journal session's ↑, ↓, and **×**, the Sport demo dialog's **Précédent** and **Suivant**, the Calendar page's **New event**, and an Email conversation's **Reply**, **Reply all**, **Delete**, and **Open in Gmail**.
+  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar's top row and page list, the header's tabs' buttons, the workspace, model, directory, and thinking pickers, **New session**, **Archive session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the open Sport journal session's ↑, ↓, and **×**, the Sport demo dialog's **Précédent** and **Suivant**, the Calendar page's **New event**, and an Email conversation's **Reply**, **Reply all**, **Delete**, and **Open in Gmail**.
 - Cmd+1 through Cmd+5 go to the first through fifth tab of the sidebar's page list, even while typing.
   The numbers count the shown tabs, in the order **Settings › Preferences** sets: a tab you hide, or Tickets without a Linear sign-in, takes no number, and the tabs after it move up one.
   A number with no tab is left to the window.
@@ -113,7 +113,7 @@ Alt is Option on macOS.
 - Cmd+N opens the new-session draft, as **New session** at the top of the session list does; on the tickets page it opens the new-issue dialog instead.
   S outside a text field does it too; on the Todo page, S changes a focused or open todo's status instead.
   Cmd+W closes the header tab on screen and leaves its session running; it does nothing when the page has no header tab.
-  **End session** in a session's header ends it; **Resume** continues it from the past sessions.
+  **Archive session** in a session's header ends it; **Resume** continues it from the past sessions.
   `/` or Cmd+I puts the cursor in the focused pane's composer.
 - Inside the command menu, Cmd+Shift+P pins or unpins the highlighted session.
 - Cmd+Alt+/ opens the model picker, and Shift+Tab in a composer moves to the next thinking level, in sessions that the dashboard started and in the new-session draft.

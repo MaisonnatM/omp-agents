@@ -1,10 +1,10 @@
 import { memo } from "react";
-import type { McpIntegration } from "../../src/shared/accounts";
 import { newSessionRequest } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import { botRows, type OpenBot } from "../bots-model";
 import { newDraftKey } from "../composer-drafts";
 import type { DashboardState } from "../dashboard-state";
+import { isModulePage } from "../modules";
 import type { SplitAxis } from "../pane-navigation";
 import type { Layout, Page, TodoListView } from "../routing";
 import { hashForNewSession } from "../routing";
@@ -12,22 +12,19 @@ import type { SectionTarget } from "../section";
 import type { StartOf } from "../starts";
 import { todoCwd } from "../todo-views";
 import type { WorkspaceScope } from "../use-workspace-scope";
-import { CalendarPage } from "./calendar/calendar-page";
 import { useDashboardActions } from "./dashboard-context";
-import { EmailPage } from "./email/email-page";
 import { EmptyHome } from "./empty-home";
-import { DisconnectedPage } from "./integrations/disconnected-page";
+import { ModulePageView } from "./module-views";
 import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { NewSession } from "./new-session";
+import { NotificationsPage } from "./notices";
 
 import { PaneGrid } from "./pane-grid";
 import { BotPage, NewBot } from "./bots/bot-page";
 import { BotsGallery } from "./bots/bots-gallery";
 import { SettingsPage } from "./settings/settings-page";
 import { ScheduledSession } from "./scheduled-session";
-import { SportPage } from "./sport/page";
 import { useScheduleSend } from "./scheduled";
-import { TICKETS_META, TICKETS_TITLE, TicketsPage } from "./tickets/tickets-page";
 import { TodoPage } from "./todo/page";
 
 /** The directory a New session draft on `page` starts in: the route's, else its todo's Workspace, else `defaultWorkspace`. */
@@ -49,7 +46,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "sport" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "modules" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError" | "notices"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -62,13 +59,10 @@ interface PageSwitchProps extends PageState {
 	scope: WorkspaceScope;
 	/** Where a new session starts when nothing picks a directory. */
 	defaultWorkspace: string;
-	/** The tickets section a sidebar link last chose. */
+	/** The page section a sidebar link last chose. */
 	sectionTarget: SectionTarget | null;
 	todoView: TodoListView;
-	linear: McpIntegration | null;
-	/** The dashboard reads and writes Linear. */
-	linearCallable: boolean;
-	/** Linear answers and Tickets is signed in: the Calendar shows tickets' due days and a todo can become a ticket. */
+	/** Linear answers and Tickets is signed in: a module's page shows tickets and a todo can become a ticket. */
 	ticketsCallable: boolean;
 	maximized: boolean;
 	/** The right sidebar shows the focused session's details. */
@@ -90,7 +84,7 @@ export const PageSwitch = memo(function PageSwitch({
 	splits,
 	models,
 	userTodos,
-	sport,
+	modules,
 	routines,
 	bots,
 	botLasts,
@@ -101,13 +95,12 @@ export const PageSwitch = memo(function PageSwitch({
 	connected,
 	listed,
 	rosterError,
+	notices,
 	newStart,
 	scope,
 	defaultWorkspace,
 	sectionTarget,
 	todoView,
-	linear,
-	linearCallable,
 	ticketsCallable,
 	maximized,
 	hasDetails,
@@ -117,9 +110,13 @@ export const PageSwitch = memo(function PageSwitch({
 	resize,
 	toggleSidebar,
 }: PageSwitchProps) {
-	const { send, start, dismissStart, changeTodo, changeSport } = useDashboardActions();
+	const { send, start, dismissStart, changeTodo } = useDashboardActions();
 	const scheduleSend = useScheduleSend();
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
+	if (page && isModulePage(page)) {
+		const core = { routines, bots, todos: userTodos, ticketsShown: ticketsCallable, listed, cwd: defaultWorkspace, hosts: visible.hosts, section: sectionTarget };
+		return <ModulePageView page={page} states={modules} disabled={!connected} core={core} />;
+	}
 	switch (page?.kind) {
 		case "new": {
 			const seed = todoSeed(userTodos, page.todoId);
@@ -163,11 +160,6 @@ export const PageSwitch = memo(function PageSwitch({
 			);
 		case "pull-requests":
 			return <PullRequestsPage hosts={visible.hosts} past={visible.past} section={sectionTarget} route={page} />;
-		case "tickets":
-			if (linear && !linearCallable) return <DisconnectedPage title={TICKETS_TITLE} meta={TICKETS_META} integration={linear} />;
-			// Until the sessions are listed, the workspace a quick action starts in is not known yet.
-			if (!listed) return <p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>;
-			return <TicketsPage target={page.target} section={sectionTarget} cwd={defaultWorkspace} hosts={visible.hosts} />;
 		case "todo":
 			// A linked session resolves wherever it ran, even in a directory the sidebar does not list.
 			return (
@@ -208,12 +200,8 @@ export const PageSwitch = memo(function PageSwitch({
 				/>
 			);
 		}
-		case "calendar":
-			return <CalendarPage routines={routines} bots={bots} todos={userTodos} ticketsShown={ticketsCallable} />;
-		case "email":
-			return <EmailPage target={page.target} />;
-		case "sport":
-			return <SportPage state={sport} route={page} disabled={!connected} onChange={changeSport} />;
+		case "notifications":
+			return <NotificationsPage notices={notices} />;
 		// Get started is a dialog over the home, which `GetStarted` in `web/app.tsx` draws.
 		case "get-started":
 		case undefined:

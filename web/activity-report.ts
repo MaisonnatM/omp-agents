@@ -1,6 +1,7 @@
 /** Settings › Activity's report: every feature the page has, from its registries, split by how often the range used it. */
 import { ACTION_MESSAGES, type ActivityKind, type ActivityRead, type ActivityUse, CONTROLS, featureId } from "../src/shared/activity";
 import { commandKey, VIEWS } from "./activity";
+import { MODULE_LIST } from "./modules";
 import { SETTINGS_SECTIONS, type SidebarTab } from "./routing";
 import { SHORTCUTS, type Shortcut, type ShortcutId } from "./shortcuts";
 
@@ -33,14 +34,21 @@ const RARELY = 3;
 /** How many features **Most used** lists. */
 const MOST_USED = 20;
 
-/** The commands that go with a tab gated on a service, besides the Email page's own. */
-const COMMAND_TABS: Partial<Record<ShortcutId, SidebarTab>> = { tickets: "tickets", newTicket: "tickets", ticketsNew: "tickets", email: "email" };
+/** The core's commands that go with a tab gated on a service: creating a ticket waits on Linear, as the Tickets tab does. */
+const COMMAND_TABS: Partial<Record<ShortcutId, SidebarTab>> = { newTicket: "tickets" };
 
-/** The `PUT` routes that go with a tab gated on a service, by path prefix. */
-const ROUTE_TABS: Record<string, SidebarTab> = { "/api/ticket": "tickets", "/api/gmail/": "email" };
+/** The core's `PUT` routes that go with a tab gated on a service, by path prefix: the ticket routes wait on Linear, as the Tickets tab does. */
+const ROUTE_TABS: Record<string, SidebarTab> = { "/api/ticket": "tickets" };
 
-const commandTab = ({ id, category }: Shortcut): SidebarTab | undefined => (category === "email" ? "email" : COMMAND_TABS[id]);
-const routeTab = (path: string): SidebarTab | undefined => Object.entries(ROUTE_TABS).find(([prefix]) => path.startsWith(prefix))?.[1];
+/** The modules whose tab is gated on a service. */
+const GATED_MODULES = MODULE_LIST.filter(module => module.tab.integration);
+
+/** Module `id`'s tab, while that module's tab is gated on a service. */
+const gatedModule = (id: string): SidebarTab | undefined => GATED_MODULES.find(module => module.id === id)?.id;
+
+const commandTab = ({ id, category }: Shortcut): SidebarTab | undefined => COMMAND_TABS[id] ?? gatedModule(category) ?? gatedModule(id);
+const routeTab = (path: string): SidebarTab | undefined =>
+	Object.entries(ROUTE_TABS).find(([prefix]) => path.startsWith(prefix))?.[1] ?? GATED_MODULES.find(({ api }) => api !== undefined && path.startsWith(api))?.id;
 
 /** Every feature the page has: views, commands, actions, and tagged controls, from the registries that define them. */
 export function inventory(serverActions: readonly string[]): Feature[] {
@@ -51,7 +59,7 @@ export function inventory(serverActions: readonly string[]): Feature[] {
 		...SHORTCUTS.map((shortcut): Feature => ({ kind: "command", key: commandKey(shortcut.id), label: shortcut.command ?? shortcut.label, ...gated(commandTab(shortcut)) })),
 		...Object.entries(ACTION_MESSAGES).filter(([, action]) => action).map(([t]): Feature => ({ kind: "action", key: t, label: t })),
 		...serverActions.map((path): Feature => ({ kind: "action", key: `put ${path}`, label: `PUT ${path}`, ...gated(routeTab(path)) })),
-		...CONTROLS.map(({ id, label }): Feature => ({ kind: "control", key: id, label })),
+		...[...CONTROLS, ...MODULE_LIST.flatMap(module => module.controls)].map(({ id, label }): Feature => ({ kind: "control", key: id, label })),
 	];
 }
 

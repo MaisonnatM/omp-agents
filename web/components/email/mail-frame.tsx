@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { mediaSrc } from "../../api";
-import type { EmailThread } from "../../routing";
+import type { EmailThread } from "./module";
 
 const WEB_LINK = /^(?:https?|mailto):/i;
 

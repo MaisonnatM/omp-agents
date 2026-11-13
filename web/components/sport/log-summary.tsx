@@ -2,10 +2,10 @@
 import { IconGauge, IconStar } from "central-icons";
 import type { Plan } from "../../../src/shared/sport";
 import { Button } from "@/components/ui/button";
-import { hashForSport } from "../../routing";
 import { amount, duration, effortWord, exerciseName, type Saved, sendsText, shortDate, signedAmount, signedKg } from "../../sport-view";
 import { Callout } from "../integrations/integration-row";
 import { SportDialog } from "./sport-dialog";
+import { sportHash } from "./nav";
 
 /** A row of labelled figures, such as a session's load, sends, pain, and effort. */
 export function Stats({ cells }: { cells: { label: string; value: string }[] }) {
@@ -68,7 +68,7 @@ export function SummaryDialog({ saved: { log, minutes, beaten, test }, plan, onC
 			</div>
 			<div className="flex items-center justify-end gap-3 border-t border-border px-4 py-3">
 				<Button variant="tertiary" size="compact" className="rounded-full" asChild>
-					<a href={hashForSport({ tab: "journal", open: log.id })} onClick={onClose}>Voir le journal</a>
+					<a href={sportHash({ tab: "journal", open: log.id })} onClick={onClose}>Voir le journal</a>
 				</Button>
 				<Button size="compact" className="rounded-full" onClick={onClose}>Fermer</Button>
 			</div>

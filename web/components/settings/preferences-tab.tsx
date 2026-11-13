@@ -53,7 +53,7 @@ function SidebarTabs() {
 							<row.icon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
 							<div className="min-w-0 flex-1">
 								{row.label}
-								{"integration" in row && signedOut.has(tab) && (
+								{row.integration !== undefined && signedOut.has(tab) && (
 									<p className="text-xs text-muted-foreground">Shows only while {MCP_SERVICES[row.integration].label} is connected.</p>
 								)}
 							</div>

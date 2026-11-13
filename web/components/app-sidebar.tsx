@@ -38,6 +38,7 @@ interface AppSidebarProps {
 	/** The open page's own list, shown beneath its row while the sidebar floats, as on a phone; otherwise the page holds it. */
 	list: ReactNode;
 	settings: SettingsRoute;
+	unreadNotices: number;
 	onPickWorkspace: (cwd: string | null) => void;
 	onSearch: () => void;
 }
@@ -48,7 +49,7 @@ interface AppSidebarProps {
  */
 export const AppSidebar = memo(function AppSidebar({
 	scope: { visible, workspaces, workspace },
-	sessions: { lists, groups, waiting, query, setQuery, togglePin },
+	sessions: { lists, groups, query, setQuery, togglePin },
 	page,
 	panes,
 	row,
@@ -57,6 +58,7 @@ export const AppSidebar = memo(function AppSidebar({
 	botList,
 	list,
 	settings,
+	unreadNotices,
 	onPickWorkspace,
 	onSearch,
 }: AppSidebarProps) {
@@ -66,18 +68,21 @@ export const AppSidebar = memo(function AppSidebar({
 	const pullRequestRead = pullRequestsStore.use(pullRequestsScope).read;
 	const counts = useMemo(
 		(): Partial<Record<SidebarTab, NavCount>> => ({
-			sessions: { count: waiting, says: sessionsWaiting },
 			bots: { count: botList ? botsNeedingYou(botList) : 0, says: sessionsWaiting },
 			"pull-requests": { count: pullRequestRead ? yourMoveCount(pullRequestRead.data, agentOn(visible.hosts)) : 0, says: count => `${count} your move` },
 		}),
-		[waiting, botList, pullRequestRead, visible.hosts],
+		[botList, pullRequestRead, visible.hosts],
 	);
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
 	const newSessionLabel = selectedWorkspace ? `New session in ${folderName(selectedWorkspace.cwdDisplay) ?? selectedWorkspace.cwdDisplay}` : "New session";
 	return (
 		<div className="flex min-h-0 flex-1 flex-col">
-			<div className="flex h-(--page-header-height) shrink-0 items-center gap-1.5 pr-2 pl-[max(0.75rem,env(titlebar-area-x,0px))] select-none [-webkit-app-region:drag] *:[-webkit-app-region:no-drag]">
+			<div className="flex h-(--page-header-height) shrink-0 items-center justify-end pr-2 select-none [-webkit-app-region:drag] *:[-webkit-app-region:no-drag]">
 				<h1 className="sr-only">omp sessions</h1>
+				{/* The sidebar's toggle rides over this corner, from `DashboardSidebar`, so it can glide to the strip a hidden sidebar leaves. */}
+				<span aria-hidden className="size-7 shrink-0" />
+			</div>
+			<div className="mx-2 flex h-8 shrink-0 items-center gap-1.5 pl-2">
 				<AppMark className="size-4 shrink-0" />
 				<span aria-hidden className="text-[15px] font-semibold tracking-tight">omp</span>
 				<Tooltip content="Command menu" shortcut={shortcutLabels("switcher")} side="bottom">
@@ -85,8 +90,6 @@ export const AppSidebar = memo(function AppSidebar({
 						<IconMagnifyingGlass />
 					</Button>
 				</Tooltip>
-				{/* The sidebar's toggle rides over this corner, from `DashboardSidebar`, so it can glide to the strip a hidden sidebar leaves. */}
-				<span aria-hidden className="size-7 shrink-0" />
 			</div>
 			{!connected && <p className="mx-3 mb-1 rounded-md bg-red-500/10 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">Lost the dashboard server. Retrying…</p>}
 			<SidebarNav
@@ -98,6 +101,7 @@ export const AppSidebar = memo(function AppSidebar({
 				onNewSession={() => openNewSession()}
 				onTab={onTab}
 				settingsRoute={settings}
+				unreadNotices={unreadNotices}
 			/>
 			<SidebarContent>
 				<Roster

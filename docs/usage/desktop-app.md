@@ -16,7 +16,7 @@ omp-agents runs as a desktop app: the packaged app, or `bun run desktop` from a 
 - On macOS, closing the window hides it: the server, the sessions it started, and its Collab guests keep running.
   Click the app in the Dock, or run `bun run desktop` again, to show it.
   Cmd+Q quits the app; when the app started the server, it waits for the server to write what it keeps and let go of its sessions.
-  The sessions it started keep running, a running turn included, and show live again when the app opens; **End session** is how a session stops.
+  The sessions it started keep running, a running turn included, and show live again when the app opens; **Archive session** is how a session stops.
   Off macOS, closing the window quits.
 - In the packaged app on macOS, **omp agents › Open at Login** starts the app, and with it the server, when you log in.
   The app reads `PATH` and the rest of its environment from your login shell at each start, so a change to your shell profile applies at the next launch.

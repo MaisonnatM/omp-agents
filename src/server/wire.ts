@@ -59,14 +59,13 @@ import { MERGE_METHODS, type SourceControlChange } from "../shared/source-contro
 import { isSyncSide, type SyncSide } from "../shared/settings-sync";
 import { type ActivityEvent, isActivityEvent, MAX_ACTIVITY_BATCH } from "../shared/activity";
 import { MAX_CAPTURE_ID } from "../shared/dictation";
-import type { AckedFrame, ClientFrame, ClientMsg } from "../shared/protocol";
+import type { AckedFrame, ClientFrame, ClientMsg, ModuleChangeMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
 import type { AskReply, CompletionScope, LiveView, StartRequest, UserAnswer, View } from "../shared/sessions";
 import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues, TodoTicketRequest } from "../shared/tickets";
-import type { SportChange } from "../shared/sport";
 import type { TrustChange } from "../shared/project-trust";
 import type { WorkspaceChange } from "../shared/workspaces";
-import { parseSportChange } from "../sport-parse";
+import { isStoredModuleId, parseModuleChange, type StoredModuleId } from "../modules";
 import { MAX_TICKET_DESCRIPTION, MAX_TICKET_TITLE } from "../tickets";
 import { isTodoId, parseTodoChange } from "../user-todos-parse";
 import { MAX_WORKTREE_BATCH, type WorktreeConfirmation, type WorktreeRemovalRequest, type WorktreeTarget } from "../worktrees-shared";
@@ -259,6 +258,12 @@ const isCaptureId = (value: unknown): value is string => withinLength(value, MAX
 /** One activity event, {@link isActivityEvent}'s fields only. */
 const parseActivityEvent = (value: unknown): ActivityEvent | null => (isActivityEvent(value) ? { kind: value.kind, key: value.key, via: value.via, at: value.at } : null);
 
+/** A change to stored module `id`, which that module parses, so `id` and `change` stay paired. */
+function parseModuleChangeMsg<I extends StoredModuleId>(id: I, value: unknown): ModuleChangeMsg<I> | null {
+	const change = parseModuleChange(id, value);
+	return change === null ? null : { t: "module-change", id, change };
+}
+
 /** Each socket message's parser, by its `t`. */
 const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) => Parsed<MsgOf<T>> } = {
 	watch(value) {
@@ -359,15 +364,9 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 		const change = parseTodoChange(value.change);
 		return change && { ok: { t: "user-todo", change } };
 	},
-	"sport-changes"({ changes }) {
-		if (!Array.isArray(changes) || changes.length === 0) return null;
-		const parsed: SportChange[] = [];
-		for (const value of changes) {
-			const change = parseSportChange(value);
-			if (!("ok" in change)) return null;
-			parsed.push(change.ok);
-		}
-		return { ok: { t: "sport-changes", changes: parsed } };
+	"module-change"({ id, change }) {
+		const msg = isStoredModuleId(id) ? parseModuleChangeMsg(id, change) : null;
+		return msg && { ok: msg };
 	},
 	routine(value) {
 		const change = parseRoutineChange(value.change);

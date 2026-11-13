@@ -1,4 +1,4 @@
-import { IconStopCircle } from "central-icons";
+import { IconArchive } from "central-icons";
 import type { ReactNode } from "react";
 import type { ControlPhase, LiveView } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,7 @@ import { shortcutLabels } from "../shortcuts";
 import { useInlineConfirm } from "../use-inline-confirm";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Header } from "./page-header";
-import { CRUMB_SEPARATOR, PARENT_CRUMB, SessionIdCopy, SessionMeta } from "./session-meta";
+import { CRUMB_SEPARATOR, PARENT_CRUMB, SessionIdCopy } from "./session-meta";
 import { SessionTitle } from "./session-title";
 import type { Subject } from "./subject";
 import { SessionGoalControl } from "./session-goal";
@@ -37,8 +37,7 @@ interface ConversationHeaderProps {
 
 /**
  * A live session's title, which a session this dashboard runs renames when clicked, or a subagent's trail, `title / subagent` with its agent type as a badge, whose title opens its session;
- * the connection status; a session's Linear issues, pull requests, and the branch it works on, which copies a `cd` into its
- * linked worktree when clicked; **Open PR** while its branch can take one; its directory in Cursor;
+ * the connection status; **Open PR** while its branch can take one; its directory in Cursor;
  * and End session, which shows it is ending until the server answers, though the session may leave the roster before then.
  * A private session shows a lock, and its End, which deletes it, asks for a second click.
  */
@@ -47,7 +46,7 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 	const { open, request, editGoal } = useDashboardActions();
 	const ending = useDashboardStatus().ending.has(view.instanceId);
 	const status = ending
-		? "Ending…"
+		? "Archiving…"
 		: phase.phase === "live"
 			? undefined
 			: phase.phase === "connecting"
@@ -106,25 +105,24 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 				</Tooltip>
 			)}
 			{goalSet && goal}
-			{subject.kind === "session" && shown && <SessionMeta facts={shown} />}
 			{subject.kind === "session" && <OpenPullRequestButton view={view} host={host} />}
 			{subject.kind === "session" && endable && (
 				<Tooltip
 					content={
 						isPrivate
 							? "Deletes this conversation and everything it wrote. Nothing moves to Past sessions."
-							: `End session. Stops the omp process ${endable.source === "dashboard" ? "this dashboard started" : `running in its terminal (pid ${endable.pid})`}. Its transcript moves to Past sessions, where Resume continues it.`
+							: `Archive session. Stops the omp process ${endable.source === "dashboard" ? "this dashboard started" : `running in its terminal (pid ${endable.pid})`}. Its transcript moves to Past sessions, where Resume continues it.`
 					}
 					side="bottom"
 				>
 					<Button
-						variant={confirming ? "destructive-outline" : "primary"}
+						variant={confirming ? "destructive-outline" : "ghost"}
 						size={confirming ? "compact" : "icon-compact"}
 						loading={ending}
-						aria-label={ending ? "Ending…" : confirming ? CONFIRM_PRIVATE_END : "End session"}
+						aria-label={ending ? "Archiving…" : confirming ? CONFIRM_PRIVATE_END : "Archive session"}
 						{...(isPrivate ? confirm.props("end", endNow) : { onClick: endNow })}
 					>
-						<IconStopCircle />
+						<IconArchive />
 						{confirming && CONFIRM_PRIVATE_END}
 					</Button>
 				</Tooltip>
