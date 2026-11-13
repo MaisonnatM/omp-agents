@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-13
 
+- A session can now run up to 8 helper agents at once instead of 2: the starter kit sets the limit to 8.
 - UI changes come back faster: the starter kit's design workflow now has agents check their own screenshots on each round, and the separate design critic runs once, when you approve the direction, instead of on every tweak.
 - When an agent asks you several questions at once, you get them again in one card that you go through with Next and Back, instead of one card per question. This needs the new omp patch for asking.
 - A question that only takes typed text now opens straight on the text field, and you can send it blank to keep the answer already filled in.

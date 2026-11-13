@@ -58,7 +58,7 @@ task:
     enabled: true
     merge: patch
   eager: default
-  maxConcurrency: 2
+  maxConcurrency: 8
   perCallModel: "on"
   perCallModelAllow:
     - anthropic/claude-opus-5-5
