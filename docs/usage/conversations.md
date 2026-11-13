@@ -73,13 +73,15 @@
   Focusing another pane closes it; while no conversation shows, Cmd+F keeps the browser's own Find.
 - In a live session, the **Subagents** section of the [session details sidebar](session-details-sidebar.md)'s **Overview** tab lists the session's subagents, so you can reach one without scrolling back to the `task` call that started it.
   A subagent that another subagent started sits indented under it.
-  Each row shows the subagent's status dot, the same as on its link in the conversation, its id, its type, and, on one line under them, what it is doing now; hover that line for all of it.
+  Each row shows a robot icon with the subagent's status dot on its corner, the same dot as on its link in the conversation, then its id and what it is doing now.
+  A second line names its model after the logo of the org that makes it, labeled as the composer labels models, then its type and how long it has run, such as `Haiku 5.5 · task · 5m`; the time counts up while the subagent runs and stops when it does.
+  A subagent the dashboard did not see start, or saw stopped without seeing when, shows no time; hover a row for its full activity.
   The section's title counts the subagents, and how many are running.
   Click a row to open the subagent in this pane, in place of the conversation, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split beside the conversation, or middle-click to open it in the app window in place of what it shows.
   The stop button after a running subagent cancels it, as the one after its link in the conversation does, in every room the dashboard can write to.
   A subagent's own view lists only the subagents it started, and theirs; a past session shows no section, because the dashboard opens subagents only of a running session.
   When the agent gives two or more subagents the same task and records them with the kit's `arena` tool, those runners show above the other rows in an **Arena** box with the task, as cards side by side lettered A, B, C in the order it started them.
-  Each card shows the runner's id, its status, its type, and what it is doing; the judge, once the agent records one, sits on a row under the cards.
+  Each card shows the runner's id, its status, what it is doing, and the same model, type, and time line as a row; the judge, once the agent records one, sits on a row under the cards.
   Once the agent records its pick, the card it kept turns green with a **Base** badge, a runner it took something from shows **Graft** and what it took, and the others show **Not used**.
   Click a card to open that runner, as with a row; hover a running one for its stop button.
   The section starts open, and the app remembers whether you folded it.

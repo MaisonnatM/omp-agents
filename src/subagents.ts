@@ -58,10 +58,19 @@ export interface SubagentFrame {
 	/** One line saying what the subagent is doing. */
 	activity?: string;
 	sessionFile?: string;
+	/** omp's resolved model, `provider/id` with an optional `:level`. */
+	model?: string;
+	/** When the subagent started, in ms since the epoch, from a `started` frame or the run time a progress record reports. */
+	startedAt?: number;
+	/** When the subagent stopped, for a frame whose status is not running. */
+	endedAt?: number;
 }
 
-/** A `task:subagent:lifecycle` or `task:subagent:progress` payload (a Collab `bus` frame or an RPC subagent frame), or `null` when it names no subagent. */
-export function parseSubagentFrame(channel: unknown, payload: unknown): SubagentFrame | null {
+/**
+ * A `task:subagent:lifecycle` or `task:subagent:progress` payload (a Collab `bus` frame or an RPC subagent frame), or `null` when it names no subagent.
+ * The frame speaks of `now`, or of the `lastUpdate` an RPC snapshot carries.
+ */
+export function parseSubagentFrame(channel: unknown, payload: unknown, now = Date.now()): SubagentFrame | null {
 	if ((channel !== SUBAGENT_LIFECYCLE && channel !== SUBAGENT_PROGRESS) || !isObject(payload)) return null;
 	const progress = channel === SUBAGENT_PROGRESS && isObject(payload.progress) ? payload.progress : null;
 	const body = progress ?? payload;
@@ -83,6 +92,15 @@ export function parseSubagentFrame(channel: unknown, payload: unknown): Subagent
 	if (text) frame.activity = oneLine(text);
 	const sessionFile = str(payload.sessionFile);
 	if (sessionFile !== undefined) frame.sessionFile = sessionFile;
+	// An RPC snapshot, read on attach, carries its progress record on the lifecycle channel too.
+	const record = isObject(payload.progress) ? payload.progress : null;
+	const model = nonEmptyStr(record?.resolvedModel);
+	if (model !== undefined) frame.model = model;
+	const at = typeof payload.lastUpdate === "number" ? payload.lastUpdate : now;
+	// omp reports a run time of 0 until its first progress tick, which says nothing of the start.
+	if (typeof record?.durationMs === "number" && record.durationMs > 0) frame.startedAt = at - record.durationMs;
+	else if (body.status === "started") frame.startedAt = at;
+	if (status && status !== "running") frame.endedAt = at;
 	return frame;
 }
 

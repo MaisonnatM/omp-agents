@@ -28,11 +28,7 @@ function withSessionVisuals(launch: AdmittedLaunch): AdmittedLaunch {
 	return { ...launch, args: ["-e", sessionVisualsExtension, ...launch.args] };
 }
 
-interface RpcAgent {
-	id: string;
-	kind: string;
-	status: AgentStatus;
-	activity: string | null;
+interface RpcAgent extends Pick<AgentRow, "id" | "kind" | "status" | "activity" | "model" | "startedAt" | "endedAt"> {
 	sessionFile: string | null;
 }
 
@@ -428,12 +424,9 @@ export class DashboardSession implements LiveSession {
 	}
 
 	agents(): AgentRow[] {
-		return [...this.#agents.values()].map(agent => ({
-			id: agent.id,
-			kind: agent.kind,
+		return [...this.#agents.values()].map(({ sessionFile, ...agent }) => ({
+			...agent,
 			parentId: null,
-			status: agent.status,
-			activity: agent.activity,
 			// omp's `steer_subagent` reaches only a running subagent.
 			canMessage: agent.status === "running",
 			queue: EMPTY_QUEUE,
@@ -853,11 +846,18 @@ export class DashboardSession implements LiveSession {
 		const frame = parseSubagentFrame(channel, payload);
 		if (!frame) return;
 		const prev = this.#agents.get(frame.id);
+		const status = frame.status ?? prev?.status ?? "running";
+		const starts = [frame.startedAt, prev?.startedAt].filter(at => at !== undefined && at !== null);
 		this.#agents.set(frame.id, {
 			id: frame.id,
 			kind: frame.kind ?? prev?.kind ?? "agent",
-			status: frame.status ?? prev?.status ?? "running",
+			status,
 			activity: frame.activity ?? prev?.activity ?? null,
+			model: frame.model ?? prev?.model ?? null,
+			// The earliest start any frame reported, so a later progress tick, timed a little after, does not move it.
+			startedAt: starts.length > 0 ? Math.min(...starts) : null,
+			// A subagent that stays stopped keeps the time it first stopped at; one that runs again has none.
+			endedAt: status === "running" ? null : (prev?.endedAt ?? frame.endedAt ?? null),
 			sessionFile: frame.sessionFile ?? prev?.sessionFile ?? null,
 		});
 		this.#emit({ kind: "roster" });

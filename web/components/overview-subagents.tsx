@@ -1,17 +1,19 @@
 /**
- * The Overview tab's Subagents section: the view's subagents as a tree, each a link to its own view with its status and what it is doing.
+ * The Overview tab's Subagents section: the view's subagents as a tree, each a link to its own view with what it is doing, its model, and how long it ran.
  * The runners of an arena the session recorded sit side by side above the tree, with the judge under them and the base marked.
  */
-import { IconJudgeGavel, IconSword, IconTrophy } from "central-icons";
+import { IconAiBotHead, IconJudgeGavel, IconSword, IconTrophy } from "central-icons";
 import type { MouseEvent, ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { AgentRow, ArenaRecord } from "../../src/shared/sessions";
-import { SPLIT_CLICK, subagentModeOf } from "../labels";
+import { modelLabel, modelOrg, SPLIT_CLICK, subagentModeOf } from "../labels";
 import { hashForView } from "../routing";
 import { useStoredState } from "../stored-state";
-import { type ArenaGroup, type ArenaSeat, type ArenaVerdict, arenaGroups, type SubagentNode } from "../overview-subagents-model";
+import { type ArenaGroup, type ArenaSeat, type ArenaVerdict, arenaGroups, runTime, type SubagentNode } from "../overview-subagents-model";
+import { useMinute } from "../use-minute";
+import { OrgIcon } from "./org-icon";
 import { StatusDot, statusLabel } from "./status-dot";
 import { CancelAgentButton, type SubagentLinksValue } from "./subagent-links";
 import { ChangesSection } from "./overview-changes";
@@ -75,28 +77,58 @@ const VERDICTS = {
 
 const verdictText = (verdict: ArenaVerdict) => (verdict.kind === "graft" ? `${VERDICTS.graft.label}: ${verdict.what}` : VERDICTS[verdict.kind].label);
 
-/** One subagent as a row of the tree, with an optional `lead` icon before its name. */
+/** A subagent's second line: its model after its maker's logo, its type, and how long it ran. */
+function SubagentMeta({ agent }: { agent: AgentRow }) {
+	const time = runTime(agent, useMinute());
+	return (
+		<span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+			{agent.model && (
+				<>
+					<OrgIcon org={modelOrg(agent.model)} className="size-3.5" />
+					<span className="truncate">{modelLabel(agent.model)}</span>
+					<span aria-hidden>·</span>
+				</>
+			)}
+			<span className="shrink-0">{agent.kind}</span>
+			{time && (
+				<>
+					<span aria-hidden>·</span>
+					<span className="shrink-0 tabular-nums">
+						<span className="sr-only">{agent.status === "running" ? "running for " : "ran for "}</span>
+						{time}
+					</span>
+				</>
+			)}
+		</span>
+	);
+}
+
+/** One subagent as a row of the tree: its icon, or a `lead` one, then its name and what it is doing, over {@link SubagentMeta}. */
 function SubagentRow({ agent, depth, links, lead }: { agent: AgentRow; depth: number; links: SubagentLinksValue; lead?: ReactNode }) {
 	const { view, href, onClick } = agentLink(links, agent.id);
 	return (
-		<li className="flex min-w-0 items-center gap-0.5" style={{ paddingLeft: depth * INDENT_PX }}>
+		<li className="flex min-w-0 items-start gap-0.5" style={{ paddingLeft: depth * INDENT_PX }}>
 			<Tooltip content={tooltipOf(agent)} side="left">
 				<a
 					href={href}
-					className="grid min-w-0 flex-1 grid-cols-[0.375rem_minmax(0,1fr)] items-center gap-x-2 rounded-md px-2 py-1 text-[13px] outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+					className="grid min-w-0 flex-1 grid-cols-[1rem_minmax(0,1fr)] gap-x-2.5 gap-y-0.5 rounded-md px-2 py-1.5 text-[13px] leading-5 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
 					onClick={onClick}
 				>
-					{/* A running subagent draws no dot, so the column keeps names aligned with the rows that do. */}
-					<span className="flex">
-						<StatusDot status={agent.status} />
+					{/* The status dot sits on the icon's bottom-right corner; a running subagent draws none. */}
+					<span className="relative flex h-5 items-center text-muted-foreground">
+						{lead ?? <IconAiBotHead className="size-4" />}
+						<span className="absolute top-2.5 -right-0.5">
+							<StatusDot status={agent.status} />
+						</span>
 					</span>
-					<span className="flex min-w-0 items-center gap-2">
-						{lead}
-						<span className="truncate text-foreground">{agent.id}</span>
+					<span className="flex min-w-0 gap-2">
+						<span className="shrink-0 text-muted-foreground">{agent.id}</span>
 						{depth > 0 && <span className="sr-only">, started by {agent.parentId}</span>}
-						<span className="shrink-0 text-xs text-muted-foreground">{agent.kind}</span>
+						{agent.activity && <span className="truncate text-foreground">{agent.activity}</span>}
 					</span>
-					{agent.activity && <span className="col-start-2 truncate text-xs text-muted-foreground">{agent.activity}</span>}
+					<span className="col-start-2 min-w-0">
+						<SubagentMeta agent={agent} />
+					</span>
 				</a>
 			</Tooltip>
 			{links.onCancel && <CancelAgentButton view={view} onCancel={links.onCancel} running={agent.status === "running"} />}
@@ -124,7 +156,7 @@ function ArenaLanes({ group, links }: { group: ArenaGroup; links: SubagentLinksV
 			</ul>
 			{(group.judge || group.descendants.length > 0) && (
 				<ul aria-label="Arena judge and helpers" className="mt-1">
-					{group.judge && <SubagentRow agent={group.judge} depth={0} links={links} lead={<IconJudgeGavel aria-hidden={false} aria-label="Judge" className="size-3.5 shrink-0 text-muted-foreground" />} />}
+					{group.judge && <SubagentRow agent={group.judge} depth={0} links={links} lead={<IconJudgeGavel aria-hidden={false} aria-label="Judge" className="size-4" />} />}
 					{group.descendants.map(({ agent, depth }) => (
 						<SubagentRow key={agent.id} agent={agent} depth={depth} links={links} />
 					))}
@@ -158,7 +190,7 @@ function RunnerCard({ seat, links }: { seat: ArenaSeat; links: SubagentLinksValu
 							{statusLabel(agent.status).toLowerCase()}
 						</span>
 					</div>
-					<div className="truncate text-xs text-muted-foreground">{agent.kind}</div>
+					<SubagentMeta agent={agent} />
 					{agent.activity && <div className="line-clamp-2 text-xs text-muted-foreground">{agent.activity}</div>}
 					{verdict && <Verdict verdict={verdict} />}
 				</a>

@@ -102,7 +102,8 @@ export class SessionGuest implements LiveSession {
 	/** The registry's latest listing of this session, replaced on every poll. */
 	#host: HostSnapshot;
 	#agents: HostAgent[] = [];
-	#activity = new Map<string, string>();
+	/** What the host's `bus` frames and agent lists told this guest of each agent beyond the list itself. */
+	#learned = new Map<string, Pick<AgentRow, "activity" | "model" | "endedAt">>();
 	readonly #subagentFiles = new SubagentFiles(() => this.#emit({ kind: "roster" }));
 	readonly #emit: (update: LiveUpdate) => void;
 	/** The host's `ui-request`s; the host sends them to writable guests only. */
@@ -220,10 +221,16 @@ export class SessionGuest implements LiveSession {
 			kind: agent.type,
 			parentId: agent.parentId && ids.has(agent.parentId) ? agent.parentId : null,
 			status: agent.status,
-			activity: this.#activity.get(agent.id) ?? null,
+			...this.#learnedOf(agent.id),
+			// A host that sends no creation time sends 0.
+			startedAt: agent.createdAt || null,
 			canMessage: this.canWrite && agent.status !== "aborted",
 			queue: this.queue(agent.id),
 		}));
+	}
+
+	#learnedOf(id: string): Pick<AgentRow, "activity" | "model" | "endedAt"> {
+		return this.#learned.get(id) ?? { activity: null, model: null, endedAt: null };
 	}
 
 	/** What waits on the turn of the main agent (`null`) or a subagent. The host shows no guest its own queue. */
@@ -471,8 +478,11 @@ export class SessionGuest implements LiveSession {
 				return;
 			case "bus": {
 				const update = parseSubagentFrame(frame.channel, frame.data);
-				if (update?.activity && this.#activity.get(update.id) !== update.activity) {
-					this.#activity.set(update.id, update.activity);
+				if (!update) return;
+				const known = this.#learnedOf(update.id);
+				const next = { ...known, activity: update.activity ?? known.activity, model: update.model ?? known.model };
+				if (next.activity !== known.activity || next.model !== known.model) {
+					this.#learned.set(update.id, next);
 					this.#emit({ kind: "roster" });
 				}
 				return;
@@ -500,9 +510,16 @@ export class SessionGuest implements LiveSession {
 		}
 	}
 
-	/** Replace the host's agent list; what the guest learned of an agent that left goes with it. */
+	/** Replace the host's agent list, noting when each subagent stops running; what the guest learned of an agent that left goes with it. */
 	#setAgents(agents: HostAgent[]): void {
-		for (const { id } of this.#agents) if (!agents.some(agent => agent.id === id)) this.#activity.delete(id);
+		const now = Date.now();
+		for (const { id } of this.#agents) if (!agents.some(agent => agent.id === id)) this.#learned.delete(id);
+		for (const agent of agents) {
+			const known = this.#learnedOf(agent.id);
+			const wasRunning = this.#agents.some(prev => prev.id === agent.id && prev.status === "running");
+			const endedAt = agent.status === "running" ? null : wasRunning ? now : known.endedAt;
+			if (endedAt !== known.endedAt) this.#learned.set(agent.id, { ...known, endedAt });
+		}
 		this.#subagentFiles.update(this.#agents, agents);
 		this.#agents = agents;
 	}

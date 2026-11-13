@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { afterEach, describe, expect, mock, setSystemTime, spyOn, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -391,6 +391,27 @@ describe("SessionGuest subagents", () => {
 		socket.frame({ t: "agents", agents: [MAIN] });
 		socket.frame({ t: "agents", agents: [MAIN, agent("p", "running")] });
 		expect(guest.agents()[0]?.activity).toBeNull();
+	});
+
+	test("a row carries the subagent's creation time, the model a bus frame names, and the time the guest saw it stop", async () => {
+		const { guest, socket } = await joinRoom({ welcome: { agents: [MAIN, agent("p", "running", { createdAt: 1000 })] } });
+		socket.frame({ t: "bus", channel: "task:subagent:progress", data: { progress: { id: "p", resolvedModel: "openai-codex/gpt-6.1-sol" } } });
+		const row = () => {
+			const [{ model, startedAt, endedAt }] = guest.agents();
+			return { model, startedAt, endedAt };
+		};
+		expect(row()).toEqual({ model: "openai-codex/gpt-6.1-sol", startedAt: 1000, endedAt: null });
+		setSystemTime(new Date(50_000));
+		try {
+			socket.frame({ t: "agents", agents: [MAIN, agent("p", "idle", { createdAt: 1000 })] });
+			setSystemTime(new Date(90_000));
+			socket.frame({ t: "agents", agents: [MAIN, agent("p", "idle", { createdAt: 1000 })] });
+		} finally {
+			setSystemTime();
+		}
+		expect(row()).toEqual({ model: "openai-codex/gpt-6.1-sol", startedAt: 1000, endedAt: 50_000 });
+		socket.frame({ t: "agents", agents: [MAIN, agent("p", "running", { createdAt: 1000 })] });
+		expect(row().endedAt).toBeNull();
 	});
 });
 
