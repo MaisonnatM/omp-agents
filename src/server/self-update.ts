@@ -4,11 +4,11 @@
  * fast-forward stays as it was, and the answer says why.
  */
 import { join } from "node:path";
-import { gitCause } from "../git";
 import { agentDir } from "../omp/config";
 import { run, runChecked } from "../proc";
 import { SerialLane } from "../serial-lane";
 import type { ChangelogEntry, DashboardChangelog, DashboardUpdateOutcome, DashboardUpdateStatus } from "../shared/dashboard-update";
+import { gitCause } from "../shared/git";
 import { packagedResources, sourceDir } from "./resources";
 
 /** The checkout the server started from: its top directory, the branch it had checked out, and that branch's commit. */

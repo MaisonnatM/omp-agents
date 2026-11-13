@@ -3,11 +3,12 @@
  * keep each workspace repository's default branch current while it has no local changes or commits, and whether a
  * merge cleans up after itself.
  */
-import { canonical, git, gitCause, worktreesOf } from "./git";
+import { canonical, git, worktreesOf } from "./git";
 import { JsonFile } from "./fs";
 import { errorText, isObject } from "./json";
 import { displayPath } from "./paths";
 import { run } from "./proc";
+import { gitCause } from "./shared/git";
 import { applySourceControl, DEFAULT_SOURCE_CONTROL, type GithubStatus, type PullOutcome, type PullRepo, type SourceControlAnswer, type SourceControlChange, type SourceControlSettings } from "./shared/source-control";
 import { inTempDir } from "./shared/workspaces";
 import { SerialLane } from "./serial-lane";

@@ -1,5 +1,8 @@
 /** **Update dashboard**: what `GET` and `PUT /api/dashboard/update` answer. */
 
+/** A commit as git shows it short, by its first seven characters. */
+export const shortCommit = (commit: string): string => commit.slice(0, 7);
+
 /**
  * Whether the server can update itself, and if so where it stands: the branch it follows, the commit it runs, and how
  * many commits `origin/<branch>` holds past it as of the last fetch.

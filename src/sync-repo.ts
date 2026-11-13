@@ -5,8 +5,8 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { gitCause } from "./git";
 import { run, runChecked, type RunOptions } from "./proc";
+import { gitCause } from "./shared/git";
 import { MISSING_REPOSITORY } from "./shared/settings-sync";
 
 /** A text file as the repository holds it. */
