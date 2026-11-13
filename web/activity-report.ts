@@ -34,17 +34,21 @@ const RARELY = 3;
 /** How many features **Most used** lists. */
 const MOST_USED = 20;
 
-/** The commands that go with a tab gated on a service, besides the Email page's own. */
-const COMMAND_TABS: Partial<Record<ShortcutId, SidebarTab>> = { tickets: "tickets", newTicket: "tickets", ticketsNew: "tickets", email: "email" };
+/** The commands that go with a tab gated on a service, besides a gated module's own. */
+const COMMAND_TABS: Partial<Record<ShortcutId, SidebarTab>> = { tickets: "tickets", newTicket: "tickets", ticketsNew: "tickets" };
 
-/** The `PUT` routes that go with a tab gated on a service, by path prefix. */
-const ROUTE_TABS: Record<string, SidebarTab> = { "/api/ticket": "tickets", "/api/gmail/": "email" };
+/** The `PUT` routes that go with a tab gated on a service, by path prefix, besides a gated module's own. */
+const ROUTE_TABS: Record<string, SidebarTab> = { "/api/ticket": "tickets" };
+
+/** The modules whose tab is gated on a service. */
+const GATED_MODULES = MODULE_LIST.filter(module => module.tab.integration);
 
 /** Module `id`'s tab, while that module's tab is gated on a service. */
-const gatedModule = (id: string): SidebarTab | undefined => MODULE_LIST.find(module => module.id === id && module.tab.integration)?.id;
+const gatedModule = (id: string): SidebarTab | undefined => GATED_MODULES.find(module => module.id === id)?.id;
 
-const commandTab = ({ id, category }: Shortcut): SidebarTab | undefined => (category === "email" ? "email" : (COMMAND_TABS[id] ?? gatedModule(category) ?? gatedModule(id)));
-const routeTab = (path: string): SidebarTab | undefined => Object.entries(ROUTE_TABS).find(([prefix]) => path.startsWith(prefix))?.[1];
+const commandTab = ({ id, category }: Shortcut): SidebarTab | undefined => COMMAND_TABS[id] ?? gatedModule(category) ?? gatedModule(id);
+const routeTab = (path: string): SidebarTab | undefined =>
+	Object.entries(ROUTE_TABS).find(([prefix]) => path.startsWith(prefix))?.[1] ?? GATED_MODULES.find(({ api }) => api !== undefined && path.startsWith(api))?.id;
 
 /** Every feature the page has: views, commands, actions, and tagged controls, from the registries that define them. */
 export function inventory(serverActions: readonly string[]): Feature[] {

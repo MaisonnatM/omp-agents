@@ -13,9 +13,11 @@ The core lists the modules in two registries and iterates them, so no hub file n
 | --- | --- | --- | --- |
 | Calendar | none | `CALENDAR_PAGE` in `web/components/calendar/module.ts` | `CalendarPage` and `CalendarNav` |
 | Sport | `SPORT_MODULE` in `src/sport-module.ts` | `SPORT_PAGE` in `web/components/sport/module.ts` | `SportPage` and `SportNav` |
+| Email | none | `EMAIL_PAGE` in `web/components/email/module.ts` | `EmailPage` and `EmailNav` |
 
 A module without a server definition keeps its server side in the core.
 Calendar's routes, its Google and local event stores, and its calendar choices stay in `Dashboard`, because the bell's event notices, routine event triggers, and settings sync share those same instances.
+Email's Gmail routes and accounts stay there too, because routine mail triggers read the same `GmailAccounts`.
 
 The list is fixed when the code is built.
 There is no runtime plugin loading and no dynamic import.
@@ -48,6 +50,8 @@ A `PageModule` describes the module's page.
 - `views` and `view`: the views Settings › Activity counts, keyed under the module's id.
 - `shortcuts`: the Settings › Keyboard category, the go-to shortcut whose id is the module's, and the module's own rows.
 - `controls`: the page-only controls Settings › Activity counts.
+- `split`: the page splits its list from its open item, so the page column leaves it room for both.
+- `api`: the path prefix of the module's `PUT` routes, which Settings › Activity sets apart with a gated tab.
 
 A `StoredPageModule` adds `store.apply`, which shows a change at once and returns `null` when the state refuses it.
 The page keeps each stored module's state in `DashboardState.modules`, `null` until the server first sends it.

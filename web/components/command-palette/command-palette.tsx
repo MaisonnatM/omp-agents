@@ -68,7 +68,6 @@ const COMMAND_ICON: Partial<Record<ShortcutId, IconComponent>> = {
 	bots: PAGE_ICON.bots,
 	sessions: PAGE_ICON.sessions,
 	todo: PAGE_ICON.todo,
-	email: PAGE_ICON.email,
 	...Object.fromEntries(MODULE_LIST.map(({ id, tab }) => [id, tab.icon])),
 	terminal: IconConsole,
 };

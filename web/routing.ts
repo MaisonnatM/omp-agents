@@ -7,6 +7,7 @@ import { hashForSession, type LiveView, type RosterHost, SESSION_HASH_PREFIX, ty
 import { TICKET_ID } from "../src/shared/tickets";
 import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import type { StartOp } from "./starts";
+import { decodeSegment } from "./hash-segment";
 import { PAGE_ICON } from "./page-icons";
 import { isModulePage, isWebModuleId, MODULE_LIST, type ModulePage, moduleOf, modulePage, type WebModuleId } from "./modules";
 
@@ -25,7 +26,6 @@ const CORE_TABS = [
 	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, place: 20, integration: "linear" },
 	{ value: "bots", label: "Bots", icon: PAGE_ICON.bots, place: 30 },
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo, place: 50 },
-	{ value: "email", label: "Email", icon: PAGE_ICON.email, place: 70, integration: "gmail" },
 ] as const satisfies readonly { value: string; label: string; icon: IconComponent; place: number; integration?: McpIntegrationId }[];
 
 /**
@@ -50,19 +50,6 @@ export type PullRequestsRoute = { target: null } | { target: PullRequest; files:
 export interface TicketsRoute {
 	/** The issue's identifier: `ENG-2368`. */
 	target: string | null;
-}
-
-/** A Gmail conversation, by the account whose inbox holds it and its thread id. */
-export interface EmailThread {
-	/** The account's server name in omp's config: `gmail`, `gmail-2`. */
-	account: string;
-	/** Gmail's thread id: `18f2a3c4d5e6f708`. */
-	thread: string;
-}
-
-/** The Email page's list, beside the Gmail conversation `target` names, or the new mail when it is `new`. */
-export interface EmailRoute {
-	target: EmailThread | "new" | null;
 }
 
 /** What a workspace section's header says it shows: `workspace` with a workspace picked, `none` with all workspaces. */
@@ -178,7 +165,6 @@ export type CorePage =
 	| ({ kind: "tickets" } & TicketsRoute)
 	| ({ kind: "todo" } & TodoRoute)
 	| ({ kind: "bots" } & BotsRoute)
-	| ({ kind: "email" } & EmailRoute)
 	| ({ kind: "new" } & NewSessionRoute)
 	| ({ kind: "scheduled" } & ScheduledRoute);
 
@@ -189,19 +175,6 @@ export type Page = CorePage | ModulePage;
 export type Route = { kind: "page"; page: Page } | { kind: "session"; sessionId: string } | { kind: "panes"; layout: Layout };
 
 type PageOf<K extends CorePage["kind"]> = Extract<CorePage, { kind: K }>;
-
-/**
- * A hash segment decoded, `null` for a malformed percent-escape (`%E0`, `%zz`), which a hand-edited or cut link may
- * hold; each parser reads `null` as naming nothing, so such a link opens what the hash names without it instead of throwing.
- */
-function decodeSegment(raw: string): string | null {
-	try {
-		return decodeURIComponent(raw);
-	} catch (error) {
-		if (error instanceof URIError) return null;
-		throw error;
-	}
-}
 
 /** The settings page and the new-session draft both name an optional directory, encoded so it keeps its slashes and tilde. */
 const decodeCwd = (rest: string | null): string | null => (rest === null ? null : decodeSegment(rest));
@@ -230,8 +203,6 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   Bot's routines in place of its conversation, `#bots/<id>/routines/<routine id>` that card with that routine open,
  *   `#bots/<id>/routines/<routine id>/edit` that routine's editor, and `#bots/<id>/routines/new` a new routine's editor; Bot and routine ids
  *   are UUIDs, so none reads as `new`.
- * - `#email` opens the Email page, your Gmail inboxes' latest conversations, `#email/new` a new mail, and
- *   `#email/<account>/<thread id>` that account's conversation in full in the main content.
  * - A module's page, `#<id>`, reads the rest of its hash as its module's address does.
  */
 const PAGES: { [K in CorePage["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
@@ -259,11 +230,6 @@ const PAGES: { [K in CorePage["kind"]]: (rest: string | null, query: URLSearchPa
 		if (!target) return { kind: "bots", target: null, adding: false };
 		return { kind: "bots", target, routine: routines === "routines" ? botRoutineRoute(routine, more) : null };
 	},
-	email: rest => {
-		if (rest === "new") return { kind: "email", target: "new" };
-		const [account, thread, ...more] = (rest ?? "").split("/").map(decodeSegment);
-		return { kind: "email", target: account && thread && more.length === 0 ? { account, thread } : null };
-	},
 };
 
 const isPageKind = (head: string): head is CorePage["kind"] => Object.hasOwn(PAGES, head);
@@ -288,8 +254,6 @@ function restOfPage(page: CorePage): string | null {
 		case "bots":
 			if (page.target === null) return page.adding ? "new" : null;
 			return page.routine === null ? encodeURIComponent(page.target) : `${encodeURIComponent(page.target)}/${restOfBotRoutine(page.routine)}`;
-		case "email":
-			return page.target === null || page.target === "new" ? page.target : `${encodeURIComponent(page.target.account)}/${encodeURIComponent(page.target.thread)}`;
 		case "scheduled":
 			return page.id === null ? null : encodeURIComponent(page.id);
 		case "get-started":
@@ -313,7 +277,6 @@ function queryOfPage(page: CorePage): string | null {
 		case "tickets":
 		case "bots":
 		case "get-started":
-		case "email":
 		case "scheduled":
 			return null;
 		default: {
@@ -332,7 +295,6 @@ export function hashForPage(page: Page): string {
 export const hashForPullRequests = (target: PullRequest | null): string => hashForPage(target ? { kind: "pull-requests", target, files: null } : { kind: "pull-requests", target: null });
 export const hashForPullRequestFiles = (pr: PullRequest, path: string | null = null): string => hashForPage({ kind: "pull-requests", target: pr, files: { path } });
 export const hashForTickets = (target: string | null): string => hashForPage({ kind: "tickets", target });
-export const hashForEmail = (target: EmailRoute["target"]): string => hashForPage({ kind: "email", target });
 export const hashForTodo = (list: TodoListView, open: string | null = null): string => hashForPage({ kind: "todo", list, open });
 /** A todo opened in its category's list, else in every todo's; `categoryId` is its own, or its parent's for a todo under another. */
 export const hashForOpenTodo = (id: string, categoryId: string | null): string => hashForTodo(categoryId === null ? { kind: "all" } : { kind: "category", id: categoryId }, id);

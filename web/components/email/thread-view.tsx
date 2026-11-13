@@ -11,12 +11,16 @@ import { colorIndex, foldMessages, foldsAfter, initialOf, linkParts, NO_FOLDS, p
 import { useReplyDraft } from "../../mail-draft";
 import { formatBytes, mailTime } from "../../labels";
 import { gmailStore, mailThreadScope, mailThreadStore, useMailThread } from "../../reads";
-import { hashForEmail, type EmailThread } from "../../routing";
+import { hashForPage } from "../../routing";
 import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { useAction } from "../../use-action";
 import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, type BarAction } from "../list-split";
 import { LoadNote } from "../sheet-details";
 import { MailFrame } from "./mail-frame";
+import type { EmailRoute, EmailThread } from "./module";
+
+/** The Email page's address for `target`: its list, a new mail, or a conversation. */
+export const hashForEmail = (target: EmailRoute["target"]): string => hashForPage({ kind: "email", target });
 
 /** When mail arrived, as Gmail's list dates it, with the full date and time on hover. */
 export function MailTime({ at }: { at: number }) {

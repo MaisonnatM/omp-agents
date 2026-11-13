@@ -11,7 +11,6 @@ const TAB_PAGE: Record<Exclude<SidebarTab, WebModuleId>, CorePage> = {
 	tickets: { kind: "tickets", target: null },
 	bots: { kind: "bots", target: null, adding: false },
 	todo: { kind: "todo", list: { kind: "all" }, open: null },
-	email: { kind: "email", target: null },
 };
 
 /** The settings section the header's Settings button, `G ,`, and the sidebar keep: the open page's, else the last one open, which this browser remembers, else Analytics. */

@@ -12,7 +12,6 @@ import type { SectionTarget } from "../section";
 import { TAB_ROWS } from "../sidebar-tabs";
 import { BotsNav } from "./bots/bots-nav";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
-import { EmailNav } from "./email/email-nav";
 import { ModuleNavView } from "./module-views";
 import { pullRequestsPageShows, usePullRequestDetailsPlacement, usePullRequestsView } from "./pull-requests/pull-requests-board";
 import { PullRequestsBoardIndex, PullRequestsIndex, PullRequestsNav } from "./pull-requests/pull-requests-nav";
@@ -61,8 +60,6 @@ export function PageList({ page, listed, hosts, past, todoSessions, botList, use
 			return <BotsNav rows={botList} openId={page.target === null ? (page.adding ? null : undefined) : page.target} />;
 		case "todo":
 			return <TodoCategories list={userTodos} view={todoView} disabled={!connected} onChange={changeTodo} sessions={todoSessions} />;
-		case "email":
-			return <EmailNav />;
 		case "settings":
 			return <SettingsNav route={page} />;
 		default: {

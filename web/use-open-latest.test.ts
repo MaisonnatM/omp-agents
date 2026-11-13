@@ -13,7 +13,8 @@ Object.assign(globalThis, { window: globalThis, document, HTMLIFrameElement: cla
 // Imported only after the stubs above, since a static import would load React DOM before the document exists.
 const { createRoot } = await import("react-dom/client");
 const { useOpenLatest } = await import("./use-open-latest.ts");
-const { hashForEmail } = await import("./routing.ts");
+const { hashForPage } = await import("./routing.ts");
+const hashForEmail = target => hashForPage({ kind: "email", target });
 
 const older = { account: "gmail", thread: "a1" };
 const newer = { account: "gmail", thread: "q1" };

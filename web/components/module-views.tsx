@@ -11,6 +11,8 @@ import type { ModulePage, ModuleRoutes, ModuleStates, WebModuleId } from "../mod
 import { CalendarNav } from "./calendar/calendar-nav";
 import { CalendarPage } from "./calendar/calendar-page";
 import { useDashboardActions } from "./dashboard-context";
+import { EmailNav } from "./email/email-nav";
+import { EmailPage } from "./email/email-page";
 import { SportNav } from "./sport/nav";
 import { SportPage } from "./sport/page";
 
@@ -44,6 +46,7 @@ interface ModuleViews<I extends WebModuleId> {
 const MODULE_VIEWS: { readonly [I in WebModuleId]: ModuleViews<I> } = {
 	calendar: { Page: CalendarPage, Nav: CalendarNav },
 	sport: { Page: SportPage, Nav: SportNav },
+	email: { Page: EmailPage, Nav: EmailNav },
 };
 
 /** Module `page.kind`'s page, given the stored modules' states and the core's data. */

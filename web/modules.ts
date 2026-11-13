@@ -8,6 +8,7 @@ import type { IconComponent } from "@/lib/icon-context";
 import type { ModuleChanges, ModuleValues, StoredModuleId } from "../src/modules";
 import type { McpIntegrationId } from "../src/shared/accounts";
 import { CALENDAR_PAGE } from "./components/calendar/module";
+import { EMAIL_PAGE } from "./components/email/module";
 import { SPORT_PAGE } from "./components/sport/module";
 import type { Binding } from "./shortcuts";
 
@@ -54,6 +55,10 @@ export interface PageModule<Id extends string, Route, Shortcut extends string = 
 	};
 	/** The controls only the page sees, as `CONTROLS` in `src/shared/activity.ts` lists the core's. */
 	readonly controls: readonly { id: Control; label: string; area: string }[];
+	/** The page splits its list from its open item, so beside the page column it needs a list's width and the item's. */
+	readonly split?: true;
+	/** The path prefix of the module's `PUT` routes, which Settings › Activity sets apart with the tab while it is signed out. */
+	readonly api?: string;
 }
 
 /** A module whose state the server keeps, `ModuleValues[Id]` changed by `ModuleChanges[Id]`. */
@@ -62,7 +67,7 @@ export type StoredPageModule<Id extends string, Route, Value, Change, Shortcut e
 };
 
 /** Every module, in the order the hubs list them: adding one is adding its definition here and its server half to `SERVER_MODULES` in `src/modules.ts`. */
-export const WEB_MODULES = { calendar: CALENDAR_PAGE, sport: SPORT_PAGE };
+export const WEB_MODULES = { calendar: CALENDAR_PAGE, sport: SPORT_PAGE, email: EMAIL_PAGE };
 
 type WebModules = typeof WEB_MODULES;
 export type WebModuleId = keyof WebModules;

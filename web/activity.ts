@@ -188,9 +188,6 @@ const CORE_VIEWS = [
 	{ key: "bots/item", label: "A Bot" },
 	{ key: "bots/routines", label: "A Bot's routines" },
 	{ key: "bots/routine", label: "A Bot's routine" },
-	{ key: "email", label: "Email", tab: "email" },
-	{ key: "email/new", label: "New mail", tab: "email" },
-	{ key: "email/item", label: "A mail conversation", tab: "email" },
 	{ key: "scheduled", label: "Scheduled sends" },
 	{ key: "scheduled/item", label: "A scheduled send" },
 ] as const satisfies readonly { key: string; label: string; tab?: SidebarTab }[];
@@ -226,8 +223,6 @@ function pageView(page: Page): ViewKey {
 			return page.routine.kind === "list" ? "bots/routines" : "bots/routine";
 		case "todo":
 			return page.open === null ? "todo" : "todo/item";
-		case "email":
-			return page.target === null ? "email" : page.target === "new" ? "email/new" : "email/item";
 		case "scheduled":
 			return page.id === null ? "scheduled" : "scheduled/item";
 		case "get-started":

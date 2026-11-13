@@ -14,7 +14,6 @@ import type { StartOf } from "../starts";
 import { todoCwd } from "../todo-views";
 import type { WorkspaceScope } from "../use-workspace-scope";
 import { useDashboardActions } from "./dashboard-context";
-import { EmailPage } from "./email/email-page";
 import { EmptyHome } from "./empty-home";
 import { DisconnectedPage } from "./integrations/disconnected-page";
 import { ModulePageView } from "./module-views";
@@ -209,8 +208,6 @@ export const PageSwitch = memo(function PageSwitch({
 				/>
 			);
 		}
-		case "email":
-			return <EmailPage target={page.target} />;
 		// Get started is a dialog over the home, which `GetStarted` in `web/app.tsx` draws.
 		case "get-started":
 		case undefined:

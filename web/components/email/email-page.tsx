@@ -8,7 +8,7 @@ import { putJson } from "../../api";
 import { cn } from "@/lib/utils";
 import { type MailDocument, useMailDraft } from "../../mail-draft";
 import { gmailStore, mailThreadScope, mailThreadStore, useEmail } from "../../reads";
-import { hashForEmail, type EmailRoute, routeFromHash } from "../../routing";
+import { routeFromHash } from "../../routing";
 import { shortcutKeys, shortcutLabels, useShortcuts } from "../../shortcuts";
 import { useOpenLatest } from "../../use-open-latest";
 import { DisconnectedPage } from "../integrations/disconnected-page";
@@ -19,7 +19,8 @@ import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem, MenuLink
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip } from "@/components/ui/tooltip";
 import { MailEditor } from "./mail-editor";
-import { MailTime, ThreadDetail } from "./thread-view";
+import type { EmailRoute } from "./module";
+import { hashForEmail, MailTime, ThreadDetail } from "./thread-view";
 
 const TITLE = "Email";
 const META = "Your Gmail inboxes";
@@ -149,7 +150,7 @@ const NEW_MAIL: MailDocument = { to: [], cc: [], bcc: [], subject: "", body: "" 
  * with one open, they open the next and previous one and focus its row, which they read ahead. Esc closes it, and O
  * opens the focused row in Gmail, else the open conversation.
  */
-export function EmailPage({ target }: { target: EmailRoute["target"] }) {
+export function EmailPage({ route: { target } }: { route: EmailRoute }) {
 	const { gmail, poll, accounts, picked, pick, threads: shownThreads } = useEmail();
 	const threads = picked === null ? shownThreads : shownThreads.filter(thread => thread.account === picked);
 	const unread = threads.filter(thread => thread.unread).length;
