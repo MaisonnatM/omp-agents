@@ -44,7 +44,7 @@ interface AppSidebarProps {
 }
 
 /**
- * The left sidebar: the app's row with the command menu, the page list, and the roster.
+ * The left sidebar above its foot: the app's row with the command menu, the page list, and the roster; `SidebarStatus` sits under it.
  * The nodes it hands down are memoized, so a roster message that changes nothing the sidebar shows leaves it alone.
  */
 export const AppSidebar = memo(function AppSidebar({

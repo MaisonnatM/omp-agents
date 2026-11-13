@@ -6,6 +6,10 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-13
 
 - With the sidebar open, the back and forward buttons now sit beside its toggle at the sidebar's right edge, and the tabs start right where the page does.
+- The bottom of the sidebar now shows how much of each model plan is left, as a grid of rings with the provider's logo inside and the percent left below, one per account, and your Mac's CPU, free memory, and free disk in the same rings, where the Keyboard shortcuts link was. Reset times and reset credits show when you hover a ring. Hover or click CPU to see each session's processes, or the disk to clean up. Settings › Keyboard and ? still open the shortcuts.
+- The strip along the bottom of the window is gone, so the page runs to the window's edge.
+- The terminal's button, its Ctrl+` shortcut, and its command in the command menu are gone; New terminal in a session's right sidebar + menu still opens it on a new shell.
+- Behind the scenes: the sidebar's foot is its own piece under the sessions list, plan and machine tiles share one tile, and the Activity history for the CPU and disk clicks starts over under new names.
 - Settings › Keyboard and Settings › Activity now list each page's shortcuts and views in the same order as the sidebar.
 - Behind the scenes: Sport, Calendar, Email, and Tickets are now separate modules, so a page like them can be added or removed without touching the rest of the app.
 - The **+** menu in a session's right sidebar now lists its subagents, each opening its view, and **New terminal**, which opens the terminal on a new shell.

@@ -29,7 +29,6 @@ const STEP = 16;
 export interface TerminalPanelState {
 	open: boolean;
 	setOpen: (open: boolean) => void;
-	toggle: () => void;
 	height: number;
 	setHeight: (height: number) => void;
 }
@@ -40,8 +39,7 @@ export function useTerminalPanel(): TerminalPanelState {
 		const stored = Number(raw);
 		return Number.isFinite(stored) && stored >= MIN_HEIGHT ? stored : DEFAULT_HEIGHT;
 	});
-	const toggle = useCallback(() => setOpen(shown => !shown), [setOpen]);
-	return { open, setOpen, toggle, height, setHeight };
+	return { open, setOpen, height, setHeight };
 }
 
 interface TerminalPanelProps {

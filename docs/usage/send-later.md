@@ -3,7 +3,7 @@
 - The clock button beside the attach button sends the composer's message later instead of now, in a live session or in the new-session draft; it shows only once the composer holds text.
   Its menu offers each plan window that resets later, such as **When Anthropic 5h resets**, used-up windows first, then **In 1 hour**, **Tomorrow morning** at 9:00, and a date and time field with **Schedule**.
   A reset sends one minute after the window resets, so the provider counts the new window when the message arrives.
-  The plans are the ones the status bar shows; see [Plan quota](../architecture/plan-quota.md).
+  The plans are the ones the sidebar's foot shows; see [Plan quota](../architecture/plan-quota.md).
 - Scheduling saves the message on the server and clears the composer.
   The send goes whether or not a page is open, as long as the dashboard runs.
 - A message scheduled in a session shows above its composer, with its time, or the plan window and the time it resets.

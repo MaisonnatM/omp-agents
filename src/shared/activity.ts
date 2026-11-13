@@ -100,6 +100,8 @@ export const CONTROLS = [
 	{ id: "sidebar.right.toggle", label: "Right sidebar toggle", area: "Sidebar" },
 	{ id: "sidebar.workspace", label: "Sidebar workspace picker", area: "Sidebar" },
 	{ id: "sidebar.command-menu", label: "Command menu button", area: "Sidebar" },
+	{ id: "sidebar.cpu", label: "Sidebar CPU card", area: "Sidebar" },
+	{ id: "sidebar.disk", label: "Sidebar disk card", area: "Sidebar" },
 	{ id: "bots.delete", label: "Bot Delete, before it is confirmed", area: "Bots" },
 	{ id: "bots.restart", label: "Bot Restart conversation, before it is confirmed", area: "Bots" },
 	{ id: "bots.details", label: "Bot details sidebar, shown or hidden from its name", area: "Bots" },
@@ -167,9 +169,6 @@ export const CONTROLS = [
 	{ id: "pr-details.tab.code", label: "Pull request Code tab", area: "Pull requests" },
 	{ id: "pr-details.tab.review", label: "Pull request Review draft tab", area: "Pull requests" },
 	{ id: "pr-details.checkout", label: "Check out menu", area: "Pull requests" },
-	{ id: "status-bar.terminal", label: "Terminal button", area: "Status bar" },
-	{ id: "status-bar.cpu", label: "CPU card", area: "Status bar" },
-	{ id: "status-bar.disk", label: "Disk card", area: "Status bar" },
 	{ id: "storage.stop", label: "Stop after this step", area: "Settings" },
 ] as const satisfies readonly { id: string; label: string; area: string }[];
 

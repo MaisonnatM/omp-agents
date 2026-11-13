@@ -67,7 +67,7 @@ export function fileRoutes({ get, media, write }: RouteKit, env: FileRoutesEnv):
 	);
 
 	const systemLoad = new SystemLoadReader();
-	/** `GET /api/system`: the CPU percent since the previous read, the memory available, and the disk space free, for the status bar. */
+	/** `GET /api/system`: the CPU percent since the previous read, the memory available, and the disk space free, for the sidebar's foot. */
 	const system = get(() => answer(() => systemLoad.read()));
 	/** `GET /api/terminals`: the shells the terminal panel runs, oldest first, so a reloaded page reopens their tabs. */
 	const terminals = get(() => Response.json(env.terminals.list()));

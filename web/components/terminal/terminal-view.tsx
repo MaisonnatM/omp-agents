@@ -4,7 +4,7 @@ import { type ITheme, Terminal } from "@xterm/xterm";
 import { type Ref, useEffect, useImperativeHandle, useRef } from "react";
 import { openSocket } from "../../api";
 import { type TerminalClientMsg, type TerminalInfo, type TerminalServerMsg, terminalSocketPath } from "../../../src/shared/terminals";
-import { IS_MAC, pressesChord, SHORTCUTS } from "../../shortcuts";
+import { IS_MAC } from "../../shortcuts";
 import { terminalSender } from "./terminal-socket";
 
 /** VS Code's ANSI colors, light and dark: xterm's own suit only a dark background. */
@@ -54,14 +54,6 @@ function themeOf(element: HTMLElement): ITheme {
 	return { ...ANSI[dark ? "dark" : "light"], background: backgroundColor, foreground: color, cursor: color, cursorAccent: backgroundColor, selectionBackground: dark ? "#264f78" : "#add6ff" };
 }
 
-const TOGGLE = SHORTCUTS.find(({ id }) => id === "terminal")!.keys.flatMap(binding => ("chord" in binding ? [binding.chord] : []));
-
-/**
- * Keys the page takes before the shell: the terminal's own toggle, and on macOS every ⌘ chord, which a shell never
- * reads, so ⌘K and ⌘B still work from the terminal. Elsewhere Ctrl chords are the shell's.
- */
-const pageKey = (event: KeyboardEvent): boolean => TOGGLE.some(chord => pressesChord(event, chord)) || (IS_MAC && event.metaKey);
-
 interface TerminalViewProps {
 	/** The shell to attach to, or the directory to open a new one in. */
 	target: { id: string } | { cwd: string };
@@ -91,7 +83,8 @@ export function TerminalView({ target, active, onOpened, onClosed, ref }: Termin
 		const fit = new FitAddon();
 		terminal.loadAddon(fit);
 		terminal.open(element);
-		terminal.attachCustomKeyEventHandler(event => !pageKey(event));
+		// On macOS the page takes every ⌘ chord, which a shell never reads, so ⌘K and ⌘B still work from the terminal; elsewhere Ctrl chords are the shell's.
+		terminal.attachCustomKeyEventHandler(event => !(IS_MAC && event.metaKey));
 		if (element.clientWidth > 0) fit.fit();
 
 		const encoder = new TextEncoder();

@@ -1,6 +1,6 @@
 # Session processes
 
-The status bar's CPU card lists what every live session runs besides omp, and the server stops those processes on request, once their sessions have been idle long enough, and once their session leaves the roster.
+The sidebar's CPU card lists what every live session runs besides omp, and the server stops those processes on request, once their sessions have been idle long enough, and once their session leaves the roster.
 `SessionProcessWatch` in `src/server/session-processes.ts` does all three, so there is one path that stops a session's processes.
 
 ## What counts as a session's process

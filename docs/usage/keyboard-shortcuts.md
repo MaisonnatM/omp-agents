@@ -29,7 +29,6 @@ Alt is Option on macOS.
 | Alt+T | Anywhere | Show or hide thinking |
 | Cmd+B | Anywhere | Show or hide the sessions sidebar |
 | Cmd+Alt+B | Anywhere | Show or hide the details sidebar, on the right: a session's, or a Bot's |
-| Ctrl+\` | Anywhere, the terminal too, on every platform | Show or hide the terminal |
 | Esc | Maximized pane | Restore the split |
 | Esc | Maximized Browser, the app in it too | Put the Browser back in the sidebar |
 | V / R / D / E | Browser while picking, outside text fields, the app in it too | Switch to Select, Region, Draw, or Erase |

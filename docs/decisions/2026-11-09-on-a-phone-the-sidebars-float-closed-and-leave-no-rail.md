@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-13-plan-quota-and-machine-load-move-to-the-sidebars-foot
 date: 2026-11-09
 decision-makers: Maxence Maisonnat
 ---

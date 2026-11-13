@@ -6,13 +6,13 @@
 - It works as Capy's side panel: its header shows the tabs you opened, and **+** after them lists every tab the view can show, the one on screen checked, with its item count.
   The tabs are **Overview**, **PRs**, **Tickets**, which shows only for a session with a Linear issue, **Browser**, which shows only in the [desktop app](desktop-app.md) for a live session or subagent, and **Artifacts**, which shows only once the agent saved an artifact.
   Pick one in the **+** menu to open it as a tab, or to show it when it is already open; **Overview** is always open.
-  Below the tabs, the menu lists a running session's subagents, each opening its view, then **New terminal**, which opens the terminal panel on a new shell; a paired phone leaves **New terminal** out.
+  Below the tabs, the menu lists a running session's subagents, each opening its view, then **New terminal**, which opens the [terminal](terminal.md) panel on a new shell; a paired phone leaves **New terminal** out.
   Each other tab shows its count after its name, and its ×, on hover and always on the tab on screen, closes it; so does Delete on a focused tab, and closing the one on screen shows the tab before it.
   The left and right arrows move between the open tabs.
   ⇧⌘G shows **Overview** and ⇧⌘L opens **Browser** while the sidebar shows, and the **+** menu lists both keys.
   The sidebar remembers the tabs you opened and the one you chose, for every view; a tab the view cannot show, such as **Browser** for a past session, stays open but hidden until it can.
   **Review visuals** opens and shows the **Browser** tab, and saving an artifact the **Artifacts** tab.
-  What a live session runs besides omp shows in the status bar's CPU card; see [Sessions sidebar](sessions-sidebar.md).
+  What a live session runs besides omp shows in the sidebar's CPU card; see [Sessions sidebar](sessions-sidebar.md).
 - **Overview** lists the view's **Subagents**, then the **Files**, **Images**, and **Sources** of [Changed files and images](changed-files-and-images.md), each under a filled header with its count that folds on a click; see [Conversations](conversations.md) for the **Subagents** section.
   A section shows once it has something to list, and the tab says **Nothing yet** once the session's lists have loaded and none has.
   A past session's view shows its files, images, and sources but no subagents.

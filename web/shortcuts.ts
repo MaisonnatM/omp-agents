@@ -76,7 +76,6 @@ export type ShortcutId =
 	| "previousChangedFile"
 	| "moveUp"
 	| "moveDown"
-	| "terminal"
 	| "detailsOverview"
 	| "detailsBrowser"
 	| "answer"
@@ -289,7 +288,6 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "previousChangedFile", category: "changes", label: "Changes: open the previous changed file", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "moveUp", category: "todo", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
 	{ id: "moveDown", category: "todo", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, down", keys: [{ chord: { key: "ArrowDown", alt: true, shift: true }, scope: "anywhere" }] },
-	{ id: "terminal", category: "general", label: "Show or hide the terminal", command: "Toggle terminal", keys: [{ chord: { key: "`", ctrl: true }, scope: "anywhere" }] },
 ];
 
 const GO = "g";
