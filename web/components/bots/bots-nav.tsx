@@ -7,7 +7,7 @@ import { type DragEvent, type HTMLAttributes, type LiHTMLAttributes, useState } 
 import type { Bot } from "../../../src/shared/bots";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
-import { SidebarContent, SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { botAsking, type BotGroup, botGroupKey, botGroupLabel, botGroupListName, botGroups, botMovesTo, type BotPlace, botSections, botsGrouped, botStatus, type BotRow } from "../../bots-model";
@@ -107,7 +107,7 @@ export function BotsNav({ rows, openId }: BotsNavProps) {
 					</Button>
 				</Tooltip>
 			</SidebarGroup>
-			<SidebarContent>
+			<div className="flex w-full min-w-0 flex-col">
 				{drag && connected && !groups?.some(({ kind }) => kind === "pinned") && (
 					<SidebarGroup {...target(PINNED)}>
 						<SidebarGroupLabel icon={GROUP_ICONS.pinned}>{botGroupLabel(PINNED)}</SidebarGroupLabel>
@@ -144,7 +144,7 @@ export function BotsNav({ rows, openId }: BotsNavProps) {
 						);
 					})
 				)}
-			</SidebarContent>
+			</div>
 			{naming && <SectionNameDialog naming={naming} onClose={() => setNaming(null)} />}
 		</>
 	);

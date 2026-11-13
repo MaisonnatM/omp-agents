@@ -9,6 +9,7 @@ import { BotDetails } from "./components/bots/bot-details";
 import { CommandPalette } from "./components/command-palette/command-palette";
 import { HeaderControls } from "./components/header-controls";
 import { HeaderTabs } from "./components/header-tabs";
+import { SpaceSwitch } from "./components/space-switch";
 import {
 	type DashboardActions,
 	DashboardActionsContext,
@@ -33,7 +34,7 @@ import { ProjectTrustDialog } from "./components/project-trust-dialog";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { GetStarted } from "./components/get-started";
 import { firstSessionFact } from "./get-started-model";
-import { DashboardSidebar, useSidebarPanels } from "./components/sidebar-panel";
+import { DashboardSidebar, SIDEBAR_VARS, useSidebarPanels } from "./components/sidebar-panel";
 import { StatusBar } from "./components/status-bar";
 import { subjectOf } from "./components/subject";
 import { NewTicketDialog } from "./components/tickets/new-ticket";
@@ -103,7 +104,7 @@ export function App() {
 	const ticketsCallable = linearCallable && !absentTabs.has("tickets");
 	const settings = useSettingsRoute(page);
 	const latestBot = useMemo(() => (bots === null ? null : (botRows(bots, state.hosts, state.botLasts)[0]?.bot.id ?? null)), [bots, state.hosts, state.botLasts]);
-	const { tab, showTab } = useSidebarTab({ page, absentTabs, layout, latestSession: sessions.latest, latestBot, navigate, show });
+	const { row, showTab } = useSidebarTab({ page, absentTabs, layout, latestSession: sessions.latest, latestBot, navigate, show });
 	const maximized = layout.maximized && !page;
 	const address = page ? hashForPage(page) : hashForLayout(layout);
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
@@ -209,7 +210,6 @@ export function App() {
 		page,
 		layout,
 		maximized,
-		tab,
 		settings,
 		listed: sessions.listed,
 		view: focused.view,
@@ -264,7 +264,10 @@ export function App() {
 	const showSearch = useCallback(() => dispatchPalette({ type: "open" }), [dispatchPalette]);
 	const toggleSettings = useCallback(() => void handlers.settings?.(0), [handlers]);
 	const headerControls = useMemo(() => <HeaderControls notices={state.notices} settingsOpen={page?.kind === "settings"} onToggleSettings={toggleSettings} />, [state.notices, page?.kind, toggleSettings]);
-	const newSession = useCallback(() => openNewSession(), [openNewSession]);
+	const sidebarFoot = useMemo(
+		() => <SpaceSwitch space={space} onSpace={switchSpace} otherWaiting={otherWaiting} workspaces={workspaces.length} onShowShortcuts={() => setShortcutsOpen(true)} />,
+		[space, switchSpace, otherWaiting, workspaces.length, setShortcutsOpen],
+	);
 
 	return (
 		<DashboardActionsContext.Provider value={actions}>
@@ -275,14 +278,17 @@ export function App() {
 							<PersonalContext.Provider value={state.personal}>
 								<div className="flex h-svh flex-col bg-sidebar">
 									{/* The sidebar runs the window's height; the header's tabs sit right of it, above the page and the details sidebar, each an inset panel on the sidebar's color. */}
-									<SidebarProvider className="grid min-h-0 flex-1 grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[var(--page-header-height)_minmax(0,1fr)] pr-1.5 pb-1.5">
-										<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")} address={address}>
+									<SidebarProvider
+										className="group/window grid min-h-0 flex-1 grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[var(--page-header-height)_minmax(0,1fr)] pr-1.5 pb-1.5 [grid-template-areas:'sidebar_tabs_tabs'_'sidebar_page_details']"
+										style={SIDEBAR_VARS}
+									>
+										<DashboardSidebar side="left" className="[grid-area:sidebar]" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")} address={address}>
 											<AppSidebar
 												scope={scope}
 												sessions={sessions}
 												page={page}
 												panes={layout.panes}
-												tab={tab}
+												row={row}
 												onTab={showTab}
 												tabs={tabs}
 												listed={state.listed}
@@ -298,13 +304,11 @@ export function App() {
 												onSectionTarget={setSectionTarget}
 												onPickWorkspace={switchWorkspace}
 												onSearch={showSearch}
-												onSpace={switchSpace}
-												otherWaiting={otherWaiting}
-												setShortcutsOpen={setShortcutsOpen}
+												foot={sidebarFoot}
 											/>
 										</DashboardSidebar>
-										<HeaderTabs address={address} hosts={state.hosts} past={state.past} sidebarDocked={sidebars.panels.left.open && !sidebars.panels.left.floating} onNewSession={newSession} controls={headerControls} />
-										<SidebarInset className="col-start-2 row-start-2 overflow-hidden rounded-panel border border-border shadow-raised">
+										<HeaderTabs className="[grid-area:tabs]" address={address} hosts={state.hosts} past={state.past} controls={headerControls} />
+										<SidebarInset className="inset-panel [grid-area:page]">
 											<Plans value={state.usage?.plans ?? NO_PLANS}>
 												<ActivityVisibility.Provider value={display.activityVisibility}>
 													<ToolsExpanded value={display.toolsExpanded}>
@@ -356,7 +360,7 @@ export function App() {
 											<TerminalPanel panel={terminal} cwd={focused.workDir ?? workspace ?? "~"} />
 										</SidebarInset>
 										{(detailsView || openBot) && (
-											<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")} address={address}>
+											<DashboardSidebar side="right" className="[grid-area:details]" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")} address={address}>
 												{detailsView ? (
 													<SessionDetails
 														key={hashForView(detailsView)}

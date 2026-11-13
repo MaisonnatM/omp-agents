@@ -249,12 +249,31 @@ export function useMenuScope(
     );
   }, [containerRef]);
 
+  // A `SidebarMenuNested` region holds content of its own between the rows,
+  // such as another menu: the scope's hover, gap clicks, focus ring, and
+  // arrow keys pass over it. A menu inside the region is its own scope.
+  const inNested = useCallback(
+    (node: EventTarget | null) => {
+      const nested = node instanceof Element ? node.closest('[data-sidebar="menu-nested"]') : null;
+      return nested !== null && !!containerRef.current?.contains(nested);
+    },
+    [containerRef]
+  );
+
   const onMouseMove = useCallback(
     (e: React.MouseEvent) => {
       if (popupOpen()) return;
+      if (inNested(e.target)) return handlers.onMouseLeave();
       handlers.onMouseMove(e);
     },
-    [popupOpen, handlers]
+    [popupOpen, inNested, handlers]
+  );
+
+  const onClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!inNested(e.target)) handlers.onClick(e);
+    },
+    [inNested, handlers]
   );
 
   const onFocus = useCallback(
@@ -279,11 +298,11 @@ export function useMenuScope(
 
   const onBlur = useCallback(
     (e: React.FocusEvent) => {
-      if (containerRef.current?.contains(e.relatedTarget as Node)) return;
+      if (containerRef.current?.contains(e.relatedTarget as Node) && !inNested(e.relatedTarget)) return;
       setFocusedRowEl(null);
       setActiveIndex(null);
     },
-    [containerRef, setActiveIndex]
+    [containerRef, inNested, setActiveIndex]
   );
 
   // Arrow/Home/End over every row button in DOM order.
@@ -295,7 +314,7 @@ export function useMenuScope(
       if (!container) return;
       const items = Array.from(
         container.querySelectorAll<HTMLElement>('[data-sidebar="menu-button"]')
-      );
+      ).filter((item) => !inNested(item));
       const currentIdx = items.indexOf(e.target as HTMLElement);
       if (currentIdx === -1) return;
       e.preventDefault();
@@ -311,7 +330,7 @@ export function useMenuScope(
         items[next]?.focus();
       }
     },
-    [containerRef]
+    [containerRef, inNested]
   );
 
   const hoveredRowEl = activeIndex !== null ? orderedRows[activeIndex] ?? null : null;
@@ -436,7 +455,7 @@ export function useMenuScope(
       onMouseEnter: handlers.onMouseEnter,
       onMouseMove,
       onMouseLeave: handlers.onMouseLeave,
-      onClick: handlers.onClick,
+      onClick,
       onFocus,
       onBlur,
       // Pointer interaction switches modality back to pointer. Clicking the

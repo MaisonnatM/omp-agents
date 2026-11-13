@@ -26,6 +26,7 @@ import { useSurface } from "@/lib/surface-context";
 import { surfaceClasses } from "@/lib/surface-classes";
 import { useFluidHover } from "@/hooks/use-fluid-hover";
 import { Tooltip } from "@/components/ui/tooltip";
+import { CountPill } from "@/components/count-pill";
 
 // ---------------------------------------------------------------------------
 // Tabs is a segmented control: a muted track (TabsList) holding one raised
@@ -601,13 +602,10 @@ const TabItem = forwardRef<HTMLButtonElement, TabItemProps>(
           </span>
         </span>
         {badge !== undefined && (
-          <span
-            aria-hidden
-            className="min-w-4 rounded-full bg-foreground/10 px-1 text-center text-[10px] leading-4 tabular-nums text-foreground"
+          <CountPill
+            count={badge}
             style={{ fontVariationSettings: fontWeights.medium }}
-          >
-            {badge}
-          </span>
+          />
         )}
       </TabsPrimitive.Trigger>
     );

@@ -26,14 +26,14 @@ export function Header({ title, meta, status, alert = false, leading, trailing, 
 	return (
 		<header className="@container/header shrink-0 border-b border-border">
 			<div className="flex min-h-(--page-header-height) flex-wrap items-center gap-x-4 px-6 max-phone:px-3">
-				<div className="group/title flex min-h-(--page-header-height) max-w-max min-w-0 grow basis-64 items-center gap-2">
+				<div className="group/reveal flex min-h-(--page-header-height) max-w-max min-w-0 grow basis-64 items-center gap-2">
 					{leading}
 					<div className="min-w-0">
 						<h2 className="truncate text-sm font-semibold">{title}</h2>
 						{meta !== undefined && <p className="truncate text-xs text-muted-foreground">{meta}</p>}
 					</div>
 					{trailing !== undefined && (
-						<div className="pointer-events-none flex max-w-0 shrink-0 items-center gap-2 overflow-hidden opacity-0 group-focus-within/title:pointer-events-auto group-focus-within/title:max-w-none group-focus-within/title:overflow-visible group-focus-within/title:opacity-100 group-hover/title:pointer-events-auto group-hover/title:max-w-none group-hover/title:overflow-visible group-hover/title:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:max-w-none [@media(hover:none)]:overflow-visible [@media(hover:none)]:opacity-100">
+						<div className="pointer-events-none flex max-w-0 shrink-0 items-center gap-2 overflow-hidden opacity-0 revealed:pointer-events-auto revealed:max-w-none revealed:overflow-visible revealed:opacity-100">
 							{trailing}
 						</div>
 					)}

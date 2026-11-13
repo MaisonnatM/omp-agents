@@ -110,8 +110,10 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 - `ui/message-scroller.tsx`: the scroll button's default `variant` is `tertiary`, where the registry's is `secondary`.
 - `ui/tooltip.tsx`: `disabled` anchors hover to a non-focusable wrapper around a disabled child, `wrapperClassName` styles that wrapper, and the trigger ignores a focus that `isReturnedFocus` in `web/use-return-focus.ts` reports.
 - `ui/button.tsx`: `data-pressed` while `active`; the label truncates with an ellipsis and the icons do not shrink.
-- `ui/sidebar-menu.tsx`: `SidebarMenuButton` takes `size="dense"`, a 28px row at the surrounding text size, which the sessions sidebar's page and session rows use.
-- `ui/tabs.tsx`: `labelClassName` on `TabItem`, and `TabsList` scrolls sideways with a hidden scrollbar.
+- `ui/sidebar-menu.tsx`: `SidebarMenuButton` takes `size="short"`, `sm`'s 28px row at the surrounding text size, which `sm` drops to 12px; the sessions sidebar's page and session rows use it.
+  `SidebarMenuNested` is an item that holds a list under a row of its menu, such as the open page's list in the sidebar's page list.
+- `ui/sidebar-menu-scope.tsx`: the menu's sliding hover leaves a `SidebarMenuNested` region alone: it fades out there instead of snapping to the nearest row, a click on a gap there opens no outer row, and arrow keys skip the nested rows.
+- `ui/tabs.tsx`: `labelClassName` on `TabItem`, `TabsList` scrolls sideways with a hidden scrollbar, and a `TabItem`'s badge is the app's `CountPill` from `web/components/count-pill.tsx`.
 - `ui/file-thumbnail.tsx`: a text file shows its first 400 characters as its thumbnail.
 - `ui/chat-message.tsx`: `onOpenImage` turns each image above the bubble into a button.
 

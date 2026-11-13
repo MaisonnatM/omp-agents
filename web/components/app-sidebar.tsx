@@ -1,8 +1,7 @@
 import { Search } from "lucide-react";
-import { type Dispatch, memo, type ReactNode, type SetStateAction, useCallback, useContext, useMemo } from "react";
+import { memo, type ReactNode, useContext, useMemo } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { BotId, BotLast } from "../../src/shared/bots";
-import type { Space } from "../../src/shared/workspaces";
 import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import { agentOn } from "../../src/shared/moves";
@@ -14,10 +13,10 @@ import { botRows, botsNeedingYou } from "../bots-model";
 import { SPACE_LABELS, sessionsWaiting, workspaceName } from "../labels";
 import { yourMoveCount } from "../pull-requests-model";
 import { pullRequestsStore } from "../reads";
-import type { NotesListView, PullRequestsRoute, Page, SettingsRoute, SidebarPanel, SidebarTab, TodoListView } from "../routing";
+import type { NotesListView, PullRequestsRoute, Page, SettingsRoute, SidebarTab, TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import { shortcutLabels } from "../shortcuts";
-import { TAB_ROWS } from "../sidebar-tabs";
+import type { NavRow } from "../sidebar-tabs";
 import type { SessionLists } from "../use-session-lists";
 import type { WorkspaceScope } from "../use-workspace-scope";
 import { AppMark } from "./app-mark";
@@ -30,8 +29,7 @@ import { pullRequestsPageShows, usePullRequestDetailsPlacement, usePullRequestsV
 import { PullRequestsBoardIndex, PullRequestsIndex, PullRequestsNav } from "./pull-requests/pull-requests-nav";
 import { Roster } from "./roster";
 import { SettingsNav } from "./settings/settings-nav";
-import { type NavCount, type NavRow, SidebarNav } from "./sidebar-nav";
-import { SpaceSwitch } from "./space-switch";
+import { type NavCount, SidebarNav } from "./sidebar-nav";
 import { SportNav } from "./sport/nav";
 import { TicketsNav } from "./tickets/tickets-nav";
 import { TodoCategories } from "./todo/categories";
@@ -45,7 +43,8 @@ interface AppSidebarProps {
 	page: Page | null;
 	/** The panes on screen. */
 	panes: View[];
-	tab: SidebarPanel;
+	/** The row of the page list the page on screen selects, which holds its own list. */
+	row: NavRow | null;
 	onTab: (tab: SidebarTab) => void;
 	/** The shown tabs, in the user's order. */
 	tabs: readonly SidebarTab[];
@@ -65,17 +64,8 @@ interface AppSidebarProps {
 	onSectionTarget: (target: SectionTarget) => void;
 	onPickWorkspace: (cwd: string | null) => void;
 	onSearch: () => void;
-	onSpace: (space: Space) => void;
-	/** How many sessions of the other space need you. */
-	otherWaiting: number;
-	setShortcutsOpen: Dispatch<SetStateAction<boolean>>;
-}
-
-/** The row of the page list `page` names: the panes are the Sessions page, and the empty home and a page with no row name none. */
-function navRowOf(page: Page | null, panes: readonly View[]): NavRow | null {
-	if (page === null) return panes.length > 0 ? "sessions" : null;
-	if (page.kind === "new" || page.kind === "settings") return page.kind;
-	return page.kind in TAB_ROWS ? (page.kind as SidebarTab) : null;
+	/** The account row at the bottom: the space, and what else the app offers. */
+	foot: ReactNode;
 }
 
 /**
@@ -88,7 +78,7 @@ export const AppSidebar = memo(function AppSidebar({
 	sessions: { lists, groups, waiting, query, setQuery, togglePin },
 	page,
 	panes,
-	tab,
+	row,
 	onTab,
 	tabs,
 	listed,
@@ -104,9 +94,7 @@ export const AppSidebar = memo(function AppSidebar({
 	onSectionTarget,
 	onPickWorkspace,
 	onSearch,
-	onSpace,
-	otherWaiting,
-	setShortcutsOpen,
+	foot,
 }: AppSidebarProps) {
 	const { changeTodo, openNewSession } = useDashboardActions();
 	const { connected, pullRequestsScope } = useDashboardStatus();
@@ -116,7 +104,6 @@ export const AppSidebar = memo(function AppSidebar({
 	const pullRequestRead = pullRequestsStore.use(pullRequestsScope).read;
 	const todoSessions = useMemo(() => ({ hosts, past }), [hosts, past]);
 	const botList = useMemo(() => (bots === null ? null : botRows(bots, hosts, botLasts)), [bots, hosts, botLasts]);
-	const onShowShortcuts = useCallback(() => setShortcutsOpen(true), [setShortcutsOpen]);
 	const counts = useMemo(
 		(): Partial<Record<SidebarTab, NavCount>> => ({
 			sessions: { count: waiting, says: sessionsWaiting },
@@ -125,9 +112,11 @@ export const AppSidebar = memo(function AppSidebar({
 		}),
 		[waiting, botList, pullRequestRead, visible.hosts],
 	);
-	// The open page's own list: the Sessions page has the roster below instead.
+	// The open page's own list: the Sessions page has the roster below instead, and New session and no row have none.
 	const list = useMemo((): ReactNode => {
-		switch (tab) {
+		switch (row) {
+			case null:
+			case "new":
 			case "sessions":
 				return null;
 			case "pull-requests": {
@@ -157,11 +146,11 @@ export const AppSidebar = memo(function AppSidebar({
 			case "settings":
 				return <SettingsNav route={settings} />;
 			default: {
-				const never: never = tab;
+				const never: never = row;
 				return never;
 			}
 		}
-	}, [tab, listed, page, pullRequestsView, detailsPlacement, visible, sectionTarget, onSectionTarget, botList, userTodos, todoView, connected, changeTodo, todoSessions, userNotes, notesView, space, settings]);
+	}, [row, listed, page, pullRequestsView, detailsPlacement, visible, sectionTarget, onSectionTarget, botList, userTodos, todoView, connected, changeTodo, todoSessions, userNotes, notesView, space, settings]);
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
 	const newSessionLabel = selectedWorkspace
 		? `New session in ${workspaceName(selectedWorkspace.cwdDisplay, personal) ?? selectedWorkspace.cwdDisplay}`
@@ -184,9 +173,8 @@ export const AppSidebar = memo(function AppSidebar({
 			<SidebarContent>
 				<SidebarNav
 					tabs={tabs}
-					current={navRowOf(page, panes)}
+					current={row}
 					counts={counts}
-					listOf={tab === "sessions" ? null : tab}
 					list={list}
 					newSessionLabel={newSessionLabel}
 					onNewSession={() => openNewSession()}
@@ -207,7 +195,7 @@ export const AppSidebar = memo(function AppSidebar({
 				/>
 			</SidebarContent>
 			<div className="shrink-0 px-2 pt-1 pb-2">
-				<SpaceSwitch space={space} onSpace={onSpace} otherWaiting={otherWaiting} workspaces={workspaces.length} onShowShortcuts={onShowShortcuts} />
+				{foot}
 			</div>
 		</div>
 	);

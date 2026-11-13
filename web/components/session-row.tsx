@@ -78,7 +78,7 @@ function SessionButton({ view, label, title, badge, facts, when, dot, placement,
 	);
 	return (
 		<Tooltip content={`${label}. ${title}. ${split ? "In a split." : `${SPLIT_CLICK} to open in a split`}`} side="right">
-			<SidebarMenuButton isActive={placement !== "hidden"} size="dense" onClick={event => onOpen(view, modeOf(event))}>
+			<SidebarMenuButton isActive={placement !== "hidden"} size="short" onClick={event => onOpen(view, modeOf(event))}>
 				<RowLine dot={dot} badge={badge} label={label} facts={facts} end={end} />
 			</SidebarMenuButton>
 		</Tooltip>

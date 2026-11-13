@@ -5,6 +5,21 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* What shows only while its `group/reveal` is hovered or holds the focus, and always on a touch screen, which has no hover: a header tab's ×, a page title's trailing controls. */
+@custom-variant revealed {
+  @media (hover: hover) {
+    &:is(:where(.group\/reveal):hover *) {
+      @slot;
+    }
+  }
+  &:is(:where(.group\/reveal):focus-within *) {
+    @slot;
+  }
+  @media (hover: none) {
+    @slot;
+  }
+}
+
 /* The surface tokens, from --background to --active, are Capy's: the window and the sidebar sit on --sidebar, the work on --background, in inset panels with --border hairlines.
    The rest are T3 Code's (apps/web/src/index.css), so its pull request panel and this one draw from one palette.
    Their color-mix()es name palette colors where T3's name other tokens: Bun's CSS build keeps one color-mix() override per rule and serves the rest their first color. */
@@ -14,6 +29,8 @@
   --page-header-height: 3rem;
   /* How far past a header's own padding its content starts on a phone, where the floating Sessions sidebar's toggle sits over its left corner. */
   --sidebar-toggle-clearance: 2.25rem;
+  /* The desktop window's title bar over the top row, which `startDesktopTitleBar` in `web/desktop-title-bar.ts` marks; none in a browser. */
+  --title-bar-height: 0px;
   --background: #ffffff;
   --foreground: #1c1c1e;
   --card: #ffffff;
@@ -87,6 +104,11 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
+}
+
+/* In the desktop app on macOS the top row is the window's title bar, its buttons over the row's left end. */
+:root[data-title-bar] {
+  --title-bar-height: var(--page-header-height);
 }
 
 .dark {
@@ -380,6 +402,11 @@
   color: var(--color-zinc-950);
 }
 
+/* A panel inset on the window's sidebar color: the page and the docked details sidebar. */
+@utility inset-panel {
+  @apply overflow-hidden rounded-panel border border-border shadow-raised;
+}
+
 @utility surface-glass {
   background: color-mix(in srgb, var(--background) var(--glass-opacity), transparent);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
@@ -644,5 +671,3 @@
 }
 /* A removed row's gutter mark, hatched so it reads apart from an added row's solid one. */
 .diff-mark-removed { background: repeating-linear-gradient(45deg, var(--diff-deletion) 0 2px, transparent 2px 4px); opacity: .8; }
-/* A page's own list under its sidebar row scrolls as one: the lists inside it, which fill a column elsewhere, take their content's height. */
-.sidebar-subnav [data-slot="scroll-area"], .sidebar-subnav > * { flex: none; min-height: 0; }

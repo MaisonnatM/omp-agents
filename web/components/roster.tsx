@@ -1,6 +1,6 @@
 /** The left sidebar's roster: the Workspaces section, whose label picks the workspace, and its search, then the scheduled sends, the pinned sessions, each workspace's sessions, and the past ones. */
 import { ArrowLeftRight, Folder, FolderOpen, ListRestart, Loader, MoreHorizontal, Pin, Plus, Search } from "lucide-react";
-import { useContext, useState } from "react";
+import { type ReactNode, useContext, useState } from "react";
 import type { ScheduledSend } from "../../src/shared/scheduled";
 import type { PastSession, View } from "../../src/shared/sessions";
 import { otherSpace, type Space, type Workspace } from "../../src/shared/workspaces";
@@ -11,7 +11,7 @@ import { errorText } from "../../src/json";
 import { needsYou } from "../attention";
 import { ALL_OF_SPACE, SPACE_LABELS, sessionsWaiting, workspaceName } from "../labels";
 import { writeWorkspace } from "../reads";
-import { rosterFolders, rowPlacement, type SidebarSessions, type WorkspaceGroup } from "../sessions";
+import { type RosterFolder, rosterFolders, rowPlacement, type SidebarSessions, type WorkspaceGroup } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useStoredKeys, useStoredState } from "../stored-state";
 import { CommandPicker } from "./command-picker";
@@ -101,6 +101,52 @@ function SidebarWorkspacePicker({ workspaces, onPick }: SidebarWorkspacePickerPr
 	);
 }
 
+interface WorkspaceFolderProps {
+	folder: RosterFolder;
+	/** The workspace's name, yours if you gave it one, else its path. */
+	name: string;
+	/** The folder shows its rows; you fold it with its label. */
+	open: boolean;
+	onOpenChange: () => void;
+	onNewSession: () => void;
+	/** The folder's session rows, in order. */
+	children: ReactNode;
+}
+
+/** A workspace in the roster: a folder of its session rows, or with none its name alone; hovering it offers a new session there. */
+function WorkspaceFolder({ folder: { group, rows }, name, open, onOpenChange, onNewSession, children }: WorkspaceFolderProps) {
+	const waiting = group.hosts.filter(needsYou).length;
+	const newHere = (
+		<SidebarGroupActions className={cn("opacity-0 transition-opacity group-hover/workspace:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100", rows === 0 ? "top-0" : "top-0.5")}>
+			<Tooltip content={`New session in ${name}`} side="right">
+				<SidebarGroupAction aria-label={`New session in ${name}`} onClick={onNewSession}>
+					<Plus />
+				</SidebarGroupAction>
+			</Tooltip>
+		</SidebarGroupActions>
+	);
+	return (
+		<SidebarGroup className="group/workspace py-0" collapsible={rows > 0} open={open} onOpenChange={onOpenChange} headerActions={rows > 0 && newHere}>
+			<SidebarGroupLabel icon={rows > 0 && open ? FolderOpen : Folder} title={group.workspace.cwdDisplay} className="h-7 text-[13px] text-foreground/85 hover:text-foreground">
+				{name}
+				{waiting > 0 && (
+					<>
+						<CountPill count={waiting} />
+						<span className="sr-only">{`, ${sessionsWaiting(waiting)}`}</span>
+					</>
+				)}
+			</SidebarGroupLabel>
+			{rows > 0 ? (
+				<SidebarMenu aria-label={`omp sessions in ${name}`} className="ml-[15px] w-auto gap-px border-l border-border pl-1">
+					{children}
+				</SidebarMenu>
+			) : (
+				newHere
+			)}
+		</SidebarGroup>
+	);
+}
+
 interface RosterProps {
 	/** The space's workspaces, as {@link workspacesIn} lists them, which the picker offers. */
 	workspaces: Workspace[];
@@ -163,7 +209,7 @@ export function Roster({ workspaces, lists, groups, query, onQuery, onTogglePin,
 		<PastRow key={session.sessionId} session={session} pinned={isPinned} placement={rowPlacement(open, { kind: "past", sessionId: session.sessionId })} showWorkspace={badged} onTogglePin={onTogglePin} />
 	);
 	const hiddenPast = ended.length - pastShown;
-	const nothing = pinned.hosts.length + pinned.past.length + folders.shown.reduce((sum, { group, under }) => sum + group.hosts.length + group.interrupted.length + under.length, 0) + ended.length === 0;
+	const nothing = pinned.hosts.length + pinned.past.length === 0 && folders.shown.every(folder => folder.rows === 0) && ended.length === 0;
 	return (
 		<>
 			<SidebarGroup className="gap-1 pt-4 pb-1">
@@ -226,53 +272,18 @@ export function Roster({ workspaces, lists, groups, query, onQuery, onTogglePin,
 					</SidebarMenu>
 				</SidebarGroup>
 			)}
-			{folders.shown.map(({ group, under }) => {
-				const { cwd, cwdDisplay } = group.workspace;
-				const name = workspaceName(cwdDisplay, personal) ?? cwdDisplay;
-				const waiting = group.hosts.filter(needsYou).length;
+			{folders.shown.map(folder => {
+				const { cwd, cwdDisplay } = folder.group.workspace;
 				const key = `workspace:${cwd}`;
-				const rows = group.hosts.length + group.interrupted.length + under.length;
-				const newHere = (
-					<SidebarGroupActions className={cn("opacity-0 transition-opacity group-hover/workspace:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100", rows === 0 ? "top-0" : "top-0.5")}>
-						<Tooltip content={`New session in ${name}`} side="right">
-							<SidebarGroupAction aria-label={`New session in ${name}`} onClick={() => openNewSession(cwd)}>
-								<Plus />
-							</SidebarGroupAction>
-						</Tooltip>
-					</SidebarGroupActions>
-				);
-				const unfolded = rows > 0 && !collapsed.has(key);
-				const label = (
-					<SidebarGroupLabel icon={unfolded ? FolderOpen : Folder} title={cwdDisplay} className="h-7 text-[13px] text-foreground/85 hover:text-foreground">
-						{name}
-						{waiting > 0 && (
-							<>
-								<CountPill count={waiting} />
-								<span className="sr-only">{`, ${sessionsWaiting(waiting)}`}</span>
-							</>
-						)}
-					</SidebarGroupLabel>
-				);
-				if (rows === 0) {
-					return (
-						<SidebarGroup key={cwd} className="group/workspace py-0">
-							{label}
-							{newHere}
-						</SidebarGroup>
-					);
-				}
 				return (
-					<SidebarGroup key={cwd} className="group/workspace py-0" collapsible open={!collapsed.has(key)} onOpenChange={() => toggleGroup(key)} headerActions={newHere}>
-						{label}
-						<SidebarMenu aria-label={`omp sessions in ${name}`} className="ml-[15px] w-auto gap-px border-l border-border pl-1">
-							{group.hosts.map(host => hostRow(host, false, false))}
-							{group.interrupted.map(session => pastRow(session, false, false))}
-							{under.map(session => pastRow(session, false, false))}
-						</SidebarMenu>
-					</SidebarGroup>
+					<WorkspaceFolder key={cwd} folder={folder} name={workspaceName(cwdDisplay, personal) ?? cwdDisplay} open={!collapsed.has(key)} onOpenChange={() => toggleGroup(key)} onNewSession={() => openNewSession(cwd)}>
+						{folder.group.hosts.map(host => hostRow(host, false, false))}
+						{folder.group.interrupted.map(session => pastRow(session, false, false))}
+						{folder.under.map(session => pastRow(session, false, false))}
+					</WorkspaceFolder>
 				);
 			})}
-			{(folders.more > 0 || (allGroups && folders.matching > GROUPS_SHOWN)) && (
+			{(folders.more > 0 || (allGroups && folders.foldable)) && (
 				<SidebarGroup className="py-0">
 					<SidebarMenu>
 						<SidebarMenuItem>

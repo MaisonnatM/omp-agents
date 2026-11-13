@@ -110,6 +110,18 @@ const SidebarMenuItem = forwardRef<HTMLLIElement, SidebarMenuItemProps>(
 );
 SidebarMenuItem.displayName = "SidebarMenuItem";
 
+// ─── SidebarMenuNested ───────────────────────────────────────────────────────
+
+/** An item between a menu's rows that holds content of its own, such as a
+ *  page's list under its row: the menu's hover, gap clicks, focus ring, and
+ *  arrow keys pass over it, and a menu inside it is a scope of its own. */
+const SidebarMenuNested = forwardRef<HTMLLIElement, LiHTMLAttributes<HTMLLIElement>>(
+  ({ className, ...props }, ref) => (
+    <li ref={ref} data-sidebar="menu-nested" className={cn("min-w-0", className)} {...props} />
+  )
+);
+SidebarMenuNested.displayName = "SidebarMenuNested";
+
 // ─── Row label (ghost-span weight animation) ─────────────────────────────────
 
 /** A resting row's text: muted, lit while the fluid hover marks its button. */
@@ -218,8 +230,8 @@ interface SidebarMenuButtonProps
   extends ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof sidebarMenuButtonVariants> {
   isActive?: boolean;
-  /** `dense` is the compact step's 28px row at the surrounding text size. */
-  size?: "default" | "sm" | "lg" | "dense";
+  /** `short` is `sm`'s 28px row, keeping the surrounding text size, which `sm` drops to 12px. */
+  size?: "default" | "sm" | "lg" | "short";
   icon?: IconComponent;
   /** Semantic thread state for status-dot navigation. Drives the dot
    *  visuals (`active`/`unread` → filled, `idle` → ring), stamps
@@ -275,7 +287,7 @@ const SidebarMenuButton = forwardRef<HTMLButtonElement, SidebarMenuButtonProps>(
     const resolvedDot =
       dot ?? (status ? (status === "idle" ? "ring" : "filled") : undefined);
     const heightClass =
-      size === "sm" || size === "dense"
+      size === "sm" || size === "short"
         ? "h-7"
         : size === "lg"
           ? "h-12"
@@ -482,6 +494,7 @@ SidebarMenuBadge.displayName = "SidebarMenuBadge";
 export {
   SidebarMenu,
   SidebarMenuItem,
+  SidebarMenuNested,
   SidebarMenuButton,
   SidebarMenuAction,
   SidebarMenuBadge,

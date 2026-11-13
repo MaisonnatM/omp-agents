@@ -4,11 +4,13 @@ import { App } from "./app";
 import { SignedIn } from "./components/signed-in";
 import { Toaster } from "./components/toaster";
 import { TooltipProvider } from "./components/ui/tooltip";
+import { startDesktopTitleBar } from "./desktop-title-bar";
 import { startScrollFade } from "./scroll-fade";
 import { startTheme } from "./theme";
 
 startTheme();
 startScrollFade();
+startDesktopTitleBar();
 await exchangePairingCode();
 
 const root = document.getElementById("root");

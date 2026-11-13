@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { View } from "../src/shared/sessions";
-import { type Layout, openView, type Page, type SettingsRoute, settingsSection, type SidebarPanel, type SidebarTab } from "./routing";
+import { type Layout, openView, type Page, type SettingsRoute, settingsSection, type SidebarTab } from "./routing";
+import { type NavRow, navRowOf } from "./sidebar-tabs";
 import { useStoredState } from "./stored-state";
-
-/** The sidebar panel that goes with each page; the panes go with the sessions. */
-const PAGE_TAB: Partial<Record<Page["kind"], SidebarPanel>> = { "pull-requests": "pull-requests", tickets: "tickets", todo: "todo", bots: "bots", notes: "notes", calendar: "calendar", email: "email", sport: "sport", settings: "settings" };
 
 /** The page each tab shows, but for Sessions, which shows the panes, and Bots while it has one to open. */
 const TAB_PAGE: Record<Exclude<SidebarTab, "sessions">, Page> = {
@@ -31,7 +29,7 @@ export function useSettingsRoute(page: Page | null): SettingsRoute {
 
 interface SidebarTabInput {
 	page: Page | null;
-	/** The tabs that neither show nor apply, signed out or of the other space; a page of one selects Sessions. */
+	/** The tabs that neither show nor apply, signed out or of the other space; a page of one selects no row. */
 	absentTabs: ReadonlySet<SidebarTab>;
 	layout: Layout;
 	/** The session the Sessions tab opens when no pane shows one; `null` for none. */
@@ -43,17 +41,15 @@ interface SidebarTabInput {
 }
 
 /**
- * The panel the sidebar shows, and the way to show another tab: a page selects its tab, and the panes select Sessions.
+ * The row of the page list the page on screen selects, {@link navRowOf}, and the way to show another tab.
  * Sessions keeps the panes, or opens the latest session when no pane shows one; Bots opens the latest Bot's page.
- * `showTab` keeps its identity across renders. A page whose tab the user hid in Preferences still selects that tab, so
- * its panel shows after the page list's last row; a page whose tab is absent selects Sessions.
+ * `showTab` keeps its identity across renders.
  */
 export function useSidebarTab({ page, absentTabs, layout, latestSession, latestBot, navigate, show }: SidebarTabInput): {
-	tab: SidebarPanel;
+	row: NavRow | null;
 	showTab: (tab: SidebarTab) => void;
 } {
-	const pageTab = page ? PAGE_TAB[page.kind] : undefined;
-	const tab: SidebarPanel = pageTab && (pageTab === "settings" || !absentTabs.has(pageTab)) ? pageTab : "sessions";
+	const row = navRowOf(page, layout.panes, absentTabs);
 	const latest = useRef({ layout, latestSession, latestBot });
 	latest.current = { layout, latestSession, latestBot };
 	const showTab = useCallback(
@@ -66,5 +62,5 @@ export function useSidebarTab({ page, absentTabs, layout, latestSession, latestB
 		},
 		[navigate, show],
 	);
-	return { tab, showTab };
+	return { row, showTab };
 }

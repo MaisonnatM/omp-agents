@@ -1,17 +1,14 @@
 /** The left sidebar's page list: New session, each shown tab's page with its count, and Settings, the page on screen holding its own list beneath its row. */
 import { SquarePen } from "lucide-react";
-import type { ReactNode } from "react";
-import { SidebarGroup, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { Fragment, type ReactNode } from "react";
+import { SidebarGroup, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarMenuNested } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip } from "@/components/ui/tooltip";
 import { PAGE_ICON } from "../page-icons";
 import { hashForPage, type SettingsRoute, type SidebarTab } from "../routing";
 import { shortcutLabels } from "../shortcuts";
-import { TAB_ROWS, tabShortcutLabels } from "../sidebar-tabs";
+import { type NavRow, TAB_ROWS, tabShortcutLabels } from "../sidebar-tabs";
 import { CountPill } from "./count-pill";
-
-/** A row of the page list: a tab's page, Settings, or the New session draft. */
-export type NavRow = SidebarTab | "settings" | "new";
 
 /** A row's count and how its accessible name says it. */
 export interface NavCount {
@@ -26,8 +23,7 @@ interface SidebarNavProps {
 	current: NavRow | null;
 	/** The count after a row's label, for the rows that have one. */
 	counts: Partial<Record<SidebarTab, NavCount>>;
-	/** The row whose own list `list` is, shown beneath it; `null` for none. */
-	listOf: NavRow | null;
+	/** The current row's own list, shown beneath it, or after the last row for a tab the user hid; `null` for none. */
 	list: ReactNode;
 	/** The New session row's label, naming the selected workspace. */
 	newSessionLabel: string;
@@ -37,66 +33,57 @@ interface SidebarNavProps {
 	settingsRoute: SettingsRoute;
 }
 
-
-export function SidebarNav({ tabs, current, counts, listOf, list, newSessionLabel, onNewSession, onTab, settingsRoute }: SidebarNavProps) {
-	const row = (value: NavRow): ReactNode => {
-		const active = current === value;
-		if (value === "new") {
-			return (
-				<SidebarMenuItem key={value}>
-					<Tooltip content={newSessionLabel} shortcut={shortcutLabels("newSession")} side="right">
-						<SidebarMenuButton size="dense" icon={SquarePen} isActive={active} aria-label={newSessionLabel} onClick={onNewSession}>
-							{newSessionLabel}
-						</SidebarMenuButton>
-					</Tooltip>
-				</SidebarMenuItem>
-			);
-		}
-		if (value === "settings") {
-			return (
-				<SidebarMenuItem key={value}>
-					<Tooltip content="Settings" shortcut={shortcutLabels("settings")} side="right">
-						<SidebarMenuButton size="dense" asChild icon={PAGE_ICON.settings} isActive={active}>
-							<a href={hashForPage({ kind: "settings", ...settingsRoute })}>Settings</a>
-						</SidebarMenuButton>
-					</Tooltip>
-				</SidebarMenuItem>
-			);
-		}
-		const { label, icon } = TAB_ROWS[value];
-		const counted = counts[value];
-		const badge = counted && counted.count > 0 ? counted : undefined;
-		return (
-			<SidebarMenuItem key={value}>
-				<Tooltip content={label} shortcut={tabShortcutLabels(value, tabs)} side="right">
-					<SidebarMenuButton size="dense" icon={icon} isActive={active} aria-label={badge ? `${label}, ${badge.says(badge.count)}` : undefined} onClick={() => onTab(value)}>
-						{label}
-					</SidebarMenuButton>
-				</Tooltip>
-				{badge && (
-					<SidebarMenuBadge aria-hidden>
-						<CountPill count={badge.count} />
-					</SidebarMenuBadge>
-				)}
-			</SidebarMenuItem>
-		);
-	};
-	const rows: NavRow[] = ["new", ...tabs, "settings"];
-	// The open row's list sits between its row and the next, so the rows split into two menus around it; the page of a
-	// tab hidden in Preferences has no row, and its list follows the last one.
-	const split = list === null || listOf === null ? -1 : rows.includes(listOf) ? rows.indexOf(listOf) : rows.length - 1;
-	const before = split < 0 ? rows : rows.slice(0, split + 1);
-	const after = split < 0 ? [] : rows.slice(split + 1);
+export function SidebarNav({ tabs, current, counts, list, newSessionLabel, onNewSession, onTab, settingsRoute }: SidebarNavProps) {
+	const sub = list !== null && (
+		<SidebarMenuNested>
+			<ScrollArea className="ml-[15px] border-l border-border" viewportClassName="scroll-fade max-h-[45svh] pl-1 [&>div]:!block [&>div]:!min-w-0">
+				{list}
+			</ScrollArea>
+		</SidebarMenuNested>
+	);
 	return (
 		<SidebarGroup className="py-1">
-			<nav aria-label="Pages" className="flex flex-col gap-px">
-				<SidebarMenu className="gap-px">{before.map(row)}</SidebarMenu>
-				{split >= 0 && (
-					<ScrollArea className="sidebar-subnav ml-[15px] border-l border-border" viewportClassName="scroll-fade max-h-[45svh] pl-1">
-						{list}
-					</ScrollArea>
-				)}
-				{after.length > 0 && <SidebarMenu className="gap-px">{after.map(row)}</SidebarMenu>}
+			<nav aria-label="Pages">
+				<SidebarMenu className="gap-px">
+					<SidebarMenuItem>
+						<Tooltip content={newSessionLabel} shortcut={shortcutLabels("newSession")} side="right">
+							<SidebarMenuButton size="short" icon={SquarePen} isActive={current === "new"} aria-label={newSessionLabel} onClick={onNewSession}>
+								{newSessionLabel}
+							</SidebarMenuButton>
+						</Tooltip>
+					</SidebarMenuItem>
+					{tabs.map(tab => {
+						const { label, icon } = TAB_ROWS[tab];
+						const counted = counts[tab];
+						const badge = counted && counted.count > 0 ? counted : undefined;
+						return (
+							<Fragment key={tab}>
+								<SidebarMenuItem>
+									<Tooltip content={label} shortcut={tabShortcutLabels(tab, tabs)} side="right">
+										<SidebarMenuButton size="short" icon={icon} isActive={current === tab} aria-label={badge ? `${label}, ${badge.says(badge.count)}` : undefined} onClick={() => onTab(tab)}>
+											{label}
+										</SidebarMenuButton>
+									</Tooltip>
+									{badge && (
+										<SidebarMenuBadge aria-hidden>
+											<CountPill count={badge.count} />
+										</SidebarMenuBadge>
+									)}
+								</SidebarMenuItem>
+								{current === tab && sub}
+							</Fragment>
+						);
+					})}
+					<SidebarMenuItem>
+						<Tooltip content="Settings" shortcut={shortcutLabels("settings")} side="right">
+							<SidebarMenuButton size="short" asChild icon={PAGE_ICON.settings} isActive={current === "settings"}>
+								<a href={hashForPage({ kind: "settings", ...settingsRoute })}>Settings</a>
+							</SidebarMenuButton>
+						</Tooltip>
+					</SidebarMenuItem>
+					{/* Settings' list, and the list of a page whose tab the user hid in Preferences, which has no row of its own. */}
+					{current !== null && !tabs.some(tab => tab === current) && sub}
+				</SidebarMenu>
 			</nav>
 		</SidebarGroup>
 	);

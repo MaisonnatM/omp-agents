@@ -84,6 +84,7 @@ export {
 export {
   SidebarMenu,
   SidebarMenuItem,
+  SidebarMenuNested,
   SidebarMenuButton,
   SidebarMenuAction,
   SidebarMenuBadge,
