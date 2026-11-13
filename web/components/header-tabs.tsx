@@ -1,12 +1,12 @@
 /** `HeaderTabs`, the row across the top of the page and the details sidebar: Back and Forward, the tabs you browse in, and a + that opens a new one. */
-import { IconBubbleText, IconCrossMedium, IconDotGrid2x3, IconEditBig, IconHome, IconPlusLarge, IconSparklesTwo } from "central-icons";
+import { IconBubbleText, IconDotGrid2x3, IconEditBig, IconHome, IconPlusLarge, IconSparklesTwo } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { awaitsSubagents, type PastSession, type RosterHost } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { activityControl, record } from "../activity";
+import { record } from "../activity";
 import { pageTitle, viewTitle } from "../document-title";
 import { closeHeaderTab, decodeHeaderTabs, encodeHeaderTabs, type HeaderTab, HEADER_TABS_KEY, type HeaderTabTarget, headerTabTarget, NEW_TAB_HASH, reorderHeaderTabs, visitHeaderTab } from "../header-tabs";
 import { moveBy, SIDE_DROP_LINE, stepTarget, type Where } from "../order";
@@ -15,6 +15,7 @@ import type { Page } from "../routing";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useStoredState } from "../stored-state";
 import { type DragItem, useDragOrder } from "../use-drag-order";
+import { ClosableTab, useTabRowEdges } from "./closable-tab";
 import { useDashboardActions } from "./dashboard-context";
 import { HistoryButtons } from "./header-controls";
 import { StatusDot } from "./status-dot";
@@ -65,65 +66,47 @@ interface HeaderTabItemProps {
 	onClose: () => void;
 }
 
-/** One header tab: its link, the grip that says the focused tab drags, and its ×, which an inactive tab shows on hover, on focus, and on a touch screen. */
+/** One header tab: its link, the grip that says the focused tab drags, and its ×. */
 function HeaderTabItem({ tab, target, label, lead, active, drag, onSelect, onClose }: HeaderTabItemProps) {
 	return (
-		<div
+		<ClosableTab
 			data-tab-id={tab.id}
 			{...drag.handle}
 			{...drag.target}
+			name={label}
+			active={active}
+			onClose={onClose}
+			closeControl="header.tab.close"
+			activePadding="pr-11"
 			className={cn(
-				"group/reveal relative flex h-7 max-w-60 min-w-24 items-center rounded-lg border text-[13px]",
+				"max-w-60 min-w-24 border",
 				target?.kind === "view" ? "min-w-36 flex-[0_1_auto]" : "shrink-0",
-				active ? "border-border bg-background text-foreground shadow-raised" : "border-transparent text-muted-foreground hover:bg-hover hover:text-foreground",
+				active ? "border-border bg-background text-foreground shadow-raised" : "border-transparent",
 				drag.dragging && "opacity-50",
 				drag.dropAt && SIDE_DROP_LINE[drag.dropAt],
 			)}
 		>
-			<a
-				href={tab.hash || "#"}
-				aria-current={active ? "page" : undefined}
-				title={label}
-				draggable={false}
-				className={cn(
-					"flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-lg pl-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring",
-					// The label fades under the × where it shows.
-					active ? "pr-11" : "pr-2.5 revealed:[mask-image:linear-gradient(to_left,transparent_1.625rem,black_2rem)]",
-				)}
-				onClick={event => {
-					if (event.metaKey || event.ctrlKey || event.shiftKey) return;
-					event.preventDefault();
-					if (!active) onSelect();
-				}}
-				onMouseDown={event => {
-					// A middle press would start the browser's autoscroll before the click that closes the tab.
-					if (event.button === 1) event.preventDefault();
-				}}
-				onAuxClick={event => {
-					if (event.button !== 1) return;
-					event.preventDefault();
-					onClose();
-				}}
-			>
-				{lead}
-				<span className="truncate">{label}</span>
-			</a>
-			<IconDotGrid2x3 className={cn("pointer-events-none absolute right-[26px] size-3 text-muted-foreground/60", !active && "hidden")} />
-			<button
-				type="button"
-				{...activityControl("header.tab.close")}
-				aria-label={`Close ${label}`}
-				className={cn(
-					"group/close absolute right-0.5 grid size-6 place-items-center rounded-md text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
-					!active && "opacity-0 revealed:opacity-100",
-				)}
-				onClick={onClose}
-			>
-				<span className="grid size-4 place-items-center rounded-md group-hover/close:bg-active">
-					<IconCrossMedium className="size-3" />
-				</span>
-			</button>
-		</div>
+			{body => (
+				<>
+					<a
+						href={tab.hash || "#"}
+						aria-current={active ? "page" : undefined}
+						title={label}
+						draggable={false}
+						className={cn(body, "flex-1")}
+						onClick={event => {
+							if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+							event.preventDefault();
+							if (!active) onSelect();
+						}}
+					>
+						{lead}
+						<span className="truncate">{label}</span>
+					</a>
+					<IconDotGrid2x3 className={cn("pointer-events-none absolute right-[26px] size-3 text-muted-foreground/60", !active && "hidden")} />
+				</>
+			)}
+		</ClosableTab>
 	);
 }
 
@@ -153,27 +136,10 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 	const dragOrder = useDragOrder("x");
 	/** The tab a key press moved, which takes the focus back once the row is drawn again in its new order. */
 	const refocus = useRef<string | null>(null);
-	/** Which ends of the row hide tabs past them, faded so the row says it scrolls. */
-	const [edges, setEdges] = useState({ start: false, end: false });
-	const measureEdges = (): void => {
-		const element = list.current;
-		if (!element) return;
-		const start = element.scrollLeft > 0;
-		const end = element.scrollLeft + element.clientWidth < element.scrollWidth - 1;
-		setEdges(shown => (shown.start === start && shown.end === end ? shown : { start, end }));
-	};
+	const edges = useTabRowEdges(list, tabs);
 	useEffect(() => {
 		list.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
 	}, [activeId, tabs.length]);
-	// The row's width, and its tabs', which a resize of the window or a session's new title changes without a scroll.
-	useEffect(() => {
-		const element = list.current;
-		if (!element) return;
-		const observer = new ResizeObserver(measureEdges);
-		observer.observe(element);
-		for (const tab of element.children) observer.observe(tab);
-		return () => observer.disconnect();
-	}, [tabs]);
 	useEffect(() => {
 		const id = refocus.current;
 		refocus.current = null;
@@ -223,9 +189,9 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 			<nav
 				ref={list}
 				aria-label="Header tabs"
-				onScroll={measureEdges}
+				onScroll={edges.onScroll}
 				className="ml-1 flex min-w-0 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]"
-				style={{ maskImage: `linear-gradient(to right, ${edges.start ? "transparent, black 2rem" : "black"}, ${edges.end ? "black calc(100% - 2rem), transparent" : "black"})` }}
+				style={edges.style}
 			>
 				{tabs.map((tab, index) => {
 					const target = headerTabTarget(tab.hash);

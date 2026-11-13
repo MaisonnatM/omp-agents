@@ -19,6 +19,7 @@
   `web/components/notices.tsx` holds `NotificationsPage`, the `#notifications` page with its source filters and its list, and `NoticeOrigin`, the logo and name of where a notice came from.
   `web/components/header-controls.tsx` holds `HistoryButtons`, Back and Forward at the header tabs' left end.
   `web/components/header-tabs.tsx` holds `HeaderTabs`, the row across the top that `web/app.tsx` draws over the page, which drags the window when the desktop bridge's `titleBar` says the window hides the system's; `HeaderTabItem` there is one tab.
+  `web/components/closable-tab.tsx` holds `ClosableTab`, the shell, ×, label fade, and middle-click close that a header tab and a details sidebar tab share, and `useTabRowEdges`, which fades the ends of either row while it hides tabs past them.
   `Header` in `web/components/page-header.tsx` is the title, meta line, and buttons that head a page or a pane, which wrap under the title when they would leave it less than 16rem.
   `web/components/whats-new.tsx` holds `WhatsNewTab`, Settings › What's new, which reads `GET /api/dashboard/changelog` and lists the lines of `CHANGELOG.md` by day, with those the running build lacks under **Not loaded yet** and **Update dashboard**.
   `web/components/use-notice-toasts.tsx` holds `useNoticeToasts`, which `web/app.tsx` calls so a notice no page has shown toasts once under its `NoticeOrigin`, even with the sidebar hidden.

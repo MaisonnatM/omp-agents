@@ -78,6 +78,14 @@ export function storedNumber(key: string, valid: (value: number) => boolean, fal
 }
 
 /**
+ * Stores `change` of the value localStorage keeps under `key`, read through `decode` from the snapshot every reader shares
+ * and written through `encode`, as {@link useStoredState}'s setter does; for a write from outside a component.
+ */
+export function updateStored<T>(key: string, decode: (raw: string | null) => T, encode: (value: T) => string, change: (prev: T) => T): void {
+	storeOrRemove(key, encode(change(decode(readRaw(key)))), encode(decode(null)));
+}
+
+/**
  * A value that localStorage keeps under `key`, and its setter, which stores it at once and stays the same function
  * across renders. `decode` turns what is stored into a value; what it makes of `null`, when nothing is stored, is the
  * default. The default is removed rather than stored, so a value reset to it follows the default if it changes.
@@ -93,8 +101,7 @@ export function useStoredState<T>(key: string, decode: (raw: string | null) => T
 	const store = useCallback(
 		(next: T | ((prev: T) => T)): void => {
 			const { decode, encode } = codec.current;
-			const resolved = typeof next === "function" ? (next as (prev: T) => T)(decode(readRaw(key))) : next;
-			storeOrRemove(key, encode(resolved), encode(decode(null)));
+			updateStored(key, decode, encode, typeof next === "function" ? (next as (prev: T) => T) : () => next);
 		},
 		[key],
 	);
