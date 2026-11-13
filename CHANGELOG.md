@@ -5,6 +5,12 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-13
 
+- The shortcuts now match Capy's. Cmd+1 to Cmd+9 go to your tabs at the top, and Option+1 to Option+9 open the sidebar's first nine sessions.
+- Cmd+T opens a new tab, Cmd+Option+W closes all the other tabs, and Ctrl+Tab or Cmd+Option+→ and ← move between tabs.
+- New keys, the old ones no longer work: Cmd+Shift+O starts a new session, Cmd+. stops the turn, Option+M dictates, Cmd+, opens Settings, Cmd+Shift+B shows the details sidebar, and Cmd+Shift+, copies a pull request's link.
+- New keys: Cmd+/ attaches files, Cmd+Shift+L opens the Browser, Cmd+Shift+G opens Review from the Overview, Ctrl+Shift+F maximizes a pane, and J and K move through lists like ↓ and ↑.
+- The sidebar's pages no longer take Cmd+number keys; open them from the sidebar or the command menu.
+- The tab on screen no longer shows a dotted grip; you can still drag any tab from anywhere on it.
 - A session's header no longer shows Open PR; Open pull request in the command menu still asks the session to open one.
 - Notifications moved from the bell at the top right to a Notifications row in the sidebar, before Settings, with its unread count; it opens a full page with the same filters and Mark all as read.
 - The header no longer has a Settings button; the sidebar's Settings row and G then , still open Settings.

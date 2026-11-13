@@ -50,7 +50,7 @@
   Hover one to put it back last in the list, in its category if that still exists, or to delete it for good, or right-click it for **Open**, **Put back in the list**, and **Delete for good**; **Empty** deletes them all, after you confirm.
   The todo keys step through its rows as through any list's, and Enter opens the focused one.
 - Click a todo to open its details on the right of the list, as in Linear, and double-click it to rename it in the list.
-  Arriving at a list, from the **Todo** tab, its number, or a list in the sidebar, opens the todo on its top row.
+  Arriving at a list, from the **Todo** tab or a list in the sidebar, opens the todo on its top row.
   Closing it leaves the list with nothing open, and that side then says how to open one.
   Drag the line between the list and the details, or focus it and use the left and right arrow keys, to size the list; double-click it to reset, and the app keeps the width.
   A page too narrow for both shows the open todo in place of the list, and its **×** goes back to the list.

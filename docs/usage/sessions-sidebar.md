@@ -12,9 +12,10 @@
   A finished turn you have read leaves the count, though its session stays idle.
   So does a finished turn of a session waiting on its subagents, until they stop.
 - The header's tabs run across the top right of the sidebar: Back and Forward, your tabs, and a + that opens a new tab.
-  A tab works as in Capy: opening a page or a session, from the sidebar or anywhere else, shows it in the tab on screen, and a session another tab already shows switches to that tab; only the + adds a tab, on New session.
-  The × on a tab, or a middle-click, closes it, closing the one on screen shows its neighbor, and closing the last one leaves a new tab on New session.
-  Drag a tab to move it, or focus it and press Alt+Shift+← or →; this browser keeps the tabs and their order across reloads.
+  A tab works as in Capy: opening a page or a session, from the sidebar or anywhere else, shows it in the tab on screen, and a session another tab already shows switches to that tab; only the + or Cmd+T adds a tab, on New session.
+  Cmd+1 through Cmd+9 go to the first through ninth tab, and Ctrl+Tab and Ctrl+Shift+Tab, or Cmd+Alt+→ and Cmd+Alt+←, to the next and previous one.
+  The × on a tab, a middle-click, or Cmd+W closes it, closing the one on screen shows its neighbor, and closing the last one leaves a new tab on New session; Cmd+Alt+W closes every tab but the one on screen.
+  Drag a tab from anywhere on it to move it, or focus it and press Alt+Shift+← or →; this browser keeps the tabs and their order across reloads.
   In the desktop app on macOS the row is the window's title bar: it starts after the window's buttons and drags the window.
 - The dot before each session shows when it waits on you.
   A running turn shows no dot, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
@@ -33,7 +34,8 @@
   If no session from the saved workspace is left, the sidebar lists every session.
 - **New session** at the top of the page list opens the new-session draft, in the selected workspace when there is one, and stays highlighted while the draft is open.
   With a workspace picked, it reads **New session in** and the workspace's name.
-  Hovering it shows its key, Cmd+N.
+  Hovering it shows its keys, Cmd+Shift+O and S.
+  Alt+1 through Alt+9 (Option on macOS) open the first through ninth session of the list, in the order the sidebar shows them.
 - The **Search sessions** button at the right of the **Workspaces** label opens a search field under it, and so does Cmd+Shift+F while the sidebar shows.
   The field narrows every folder to the sessions whose title or working directory holds every word typed, in any order and any case, within the selected workspace.
   A folder left without a match hides, and `No sessions match` shows when none is left; Esc clears the field, and the field closes once it is empty and loses the cursor.
@@ -97,7 +99,7 @@
   The button at the right end of the sidebar's top row hides it: the sidebar slides shut and the button glides to the start of the header's tabs, where a click shows it again.
   Both sidebars slide open and shut in about a quarter second, or at once when the system asks for reduced motion.
   The session details sidebar's button stays at the end of the top-right pane's header, whether the sidebar is shown or hidden, and leaves with the sidebar while panes sit side by side.
-  Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Alt+B the details sidebar, which shows the session's details on the panes and a Bot's on its page.
+  Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Shift+B the details sidebar, which shows the session's details on the panes and a Bot's on its page.
   Each sidebar's width, and whether it is hidden, is saved in the app.
 - The left sidebar's session rows leave out the full working directory, the model, the /ship step, and the pull requests; hover the workspace in the pane header to see the directory, the composer shows the model, and the session details sidebar shows the pull requests.
 - A strip along the bottom of the window, under both sidebars, shows how much quota is left on each plan that `omp usage` reports, the plans side by side: each plan's provider logo, from [svgl](https://svgl.app), then each window, for example `5h 66%  7d 68%` for Anthropic.

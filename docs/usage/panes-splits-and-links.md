@@ -35,7 +35,7 @@
   The lines also take focus: the arrow keys move them, Shift with an arrow moves them further, and Home and End move them to either limit.
   Double-click a line to return it to the middle.
   Each split keeps its own sizes while the page is open, and the sizes of the split on screen are stored in the app, so they survive a reload.
-- The maximize button in a pane's header makes that pane fill the page.
+- The maximize button in a pane's header, or Ctrl+Shift+F, makes that pane fill the page, and Ctrl+Shift+F again restores the split.
   The other panes keep running behind it, with their drafts and scroll positions, and the restore button or Esc brings the split back exactly as it was.
   Esc on a split that is not maximized closes the pane that was added last, which undoes that split.
   Esc does this only while Sessions is showing the panes, so a dialog or another page still takes Esc first when it handles it.
