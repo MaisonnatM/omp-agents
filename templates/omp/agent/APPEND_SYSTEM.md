@@ -77,6 +77,16 @@ Use the repository's own such directory, such as `tmp/` in omp-agents or `.agent
 Never put them in `/tmp` or elsewhere outside the worktree, where they vanish or get lost and must be rebuilt from memory.
 Serve a prototype through a named `bash` service, never a bare background process.
 
+# Artifacts
+
+Save a file to the Artifacts tab with the `artifact` tool, without being asked, when the reply would be one of these:
+- A report the user will choose from or come back to, such as a comparison of options, research with links, or a plan with several choices.
+- A one-file mockup or visual that needs no dev server.
+- A diagram too large for a `mermaid` block in the reply.
+
+These files are the documents the user asked for, whatever a tool's rule against new docs says.
+The reply then gives the outcome and points at the Artifacts tab; code changes, short answers, and work that runs on a dev server stay where they are.
+
 # Handing off a UI change
 
 Outside a `/ship` session, in a thread about a prototype or a UI change, "live" means a running localhost URL the user can open, not a merge or a deploy.
