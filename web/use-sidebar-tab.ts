@@ -40,19 +40,19 @@ interface SidebarTabInput {
 }
 
 /**
- * The row of the page list the page on screen selects, {@link navRowOf}, and the way to show another tab.
+ * The row of the page list the page on screen selects, {@link navRowOf}, and the way to show another tab or the sessions.
  * Sessions keeps the panes, or opens the latest session when no pane shows one; Bots opens the latest Bot's page.
  * `showTab` keeps its identity across renders.
  */
 export function useSidebarTab({ page, absentTabs, layout, latestSession, latestBot, navigate, show }: SidebarTabInput): {
 	row: NavRow | null;
-	showTab: (tab: SidebarTab) => void;
+	showTab: (tab: SidebarTab | "sessions") => void;
 } {
-	const row = navRowOf(page, layout.panes, absentTabs);
+	const row = navRowOf(page, absentTabs);
 	const latest = useRef({ layout, latestSession, latestBot });
 	latest.current = { layout, latestSession, latestBot };
 	const showTab = useCallback(
-		(next: SidebarTab): void => {
+		(next: SidebarTab | "sessions"): void => {
 			const bot = latest.current.latestBot;
 			if (next === "bots" && bot !== null) return navigate({ kind: "bots", target: bot, routine: null });
 			if (next !== "sessions") return navigate(TAB_PAGE[next]);

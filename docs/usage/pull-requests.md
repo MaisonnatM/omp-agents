@@ -28,14 +28,13 @@
   The ticket step links the issue you named or one that matches the work, and passes without one rather than creating a ticket.
   In the plan step the agent compares up to three ways to build the change and posts the one it chose on the Linear issue, or in the PR body when there is no issue.
   omp writes each step to its session file, and the dashboard reads those entries for running and past sessions; a todo whose linked session's run reached merged shows **Shipped**, as [Todo list](todo-list.md) says.
-- The sidebar's page list switches pages: **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Calendar**, **Todo**, **Sport**, and **Email**, each with its page's own list in a column at the page's left while it is open.
+- The sidebar's page list switches pages: **Pull requests**, **Tickets**, **Bots**, **Calendar**, **Todo**, **Sport**, and **Email**, each with its page's own list in a column at the page's left while it is open.
   Click a tab or use the left and right arrow keys while a bar tab has focus to switch pages.
   **Tickets** shows only once Linear is connected; see [Linear tickets](linear-tickets.md).
   **Email** shows only once Gmail is connected; see [Email](email.md).
-  **Sessions** lists the running and past sessions, and **Todo** opens your own todo list, with its categories in the sidebar; see [Todo list](todo-list.md).
-  The **Sessions** tab counts the live sessions that wait on you, idle after a turn or with a question open, for the workspace that the sidebar's picker shows, pinned ones included, whatever the sidebar's search hides.
-  Choosing **Sessions**, by click or by its number, while no pane is open opens the selected workspace's live session started last, else its past session saved last; with a pane open it keeps the panes.
-  Closing that session leaves the panes empty until you choose **Sessions** again.
+  **Todo** opens your own todo list, with its categories in the sidebar; see [Todo list](todo-list.md).
+  The sessions live in the workspace list under the page list; click one to leave a page for its pane, and each workspace counts the live sessions that wait on you.
+  The command menu's **Go to sessions**, while a page shows, opens the panes, or with none open the selected workspace's live session started last, else its past session saved last.
   **Bots** lists your Bots, each with its routines; see [Bots](bots.md) and [Routines](routines.md).
   **Calendar** opens a month of Google events, routine runs, and due todos and tickets; see [Calendar](calendar.md).
   The tabs show their names, and when the sidebar is too narrow for every name, their icons alone, the row only as wide as its tabs; hover an icon for its name.

@@ -18,7 +18,7 @@ const SPLIT_PAGES: Partial<Record<ListPage["kind"], true>> = { todo: true, email
 
 /** The page `row` lists, `null` when the row has no list of its own or `page` is not its page. */
 export function listPageOf(page: Page | null, row: NavRow | null): ListPage | null {
-	if (page === null || row === null || row === "new" || row === "sessions" || page.kind !== row) return null;
+	if (page === null || row === null || row === "new" || page.kind !== row) return null;
 	return page as ListPage;
 }
 

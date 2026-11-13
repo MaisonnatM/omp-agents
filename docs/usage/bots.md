@@ -36,7 +36,7 @@
 - A Bot's page shows its avatar and name in the header, the first sentence of its job under them, and its conversation below.
   The conversation reads as a chat with your messages, the Bot's replies, folded [routine run cards](routines.md), and the cards of [Bot messages](#bot-messages) other Bots sent it.
   It never shows the Bot's tool calls, its thinking, or the card of files it changed, whatever **Show tool calls** and **Show thinking** say.
-  The Bot's conversation stays in the **Bots** tab and is not listed in the command menu, the workspace list, or the **Sessions** tab, whether running or saved.
+  The Bot's conversation stays in the **Bots** tab and is not listed in the command menu, or the workspace list, whether running or saved.
   A new Bot greets you and offers three starters, built from its job, or asking what its job should be while it has none, which the composer lists under its action bar as it lists suggested prompts.
   The composer reads **Message** and the Bot's name.
   While its session runs, the conversation and its composer work as in a pane.

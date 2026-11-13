@@ -48,7 +48,7 @@ interface AppSidebarProps {
  */
 export const AppSidebar = memo(function AppSidebar({
 	scope: { visible, workspaces, workspace },
-	sessions: { lists, groups, waiting, query, setQuery, togglePin },
+	sessions: { lists, groups, query, setQuery, togglePin },
 	page,
 	panes,
 	row,
@@ -66,11 +66,10 @@ export const AppSidebar = memo(function AppSidebar({
 	const pullRequestRead = pullRequestsStore.use(pullRequestsScope).read;
 	const counts = useMemo(
 		(): Partial<Record<SidebarTab, NavCount>> => ({
-			sessions: { count: waiting, says: sessionsWaiting },
 			bots: { count: botList ? botsNeedingYou(botList) : 0, says: sessionsWaiting },
 			"pull-requests": { count: pullRequestRead ? yourMoveCount(pullRequestRead.data, agentOn(visible.hosts)) : 0, says: count => `${count} your move` },
 		}),
-		[waiting, botList, pullRequestRead, visible.hosts],
+		[botList, pullRequestRead, visible.hosts],
 	);
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
 	const newSessionLabel = selectedWorkspace ? `New session in ${folderName(selectedWorkspace.cwdDisplay) ?? selectedWorkspace.cwdDisplay}` : "New session";

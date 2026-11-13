@@ -5,9 +5,9 @@ import type { Page } from "./routing";
 const BOTS: Page = { kind: "bots", target: null, adding: false };
 const TODO: Page = { kind: "todo", list: { kind: "all" }, open: null };
 
-test("only a tab's or Settings' own page has a list; Sessions, New session, and a page its row does not match have none", () => {
+test("only a tab's or Settings' own page has a list; the panes, New session, and a page its row does not match have none", () => {
 	expect(listPageOf(BOTS, "bots")).toBe(BOTS);
-	expect(listPageOf(null, "sessions")).toBeNull();
+	expect(listPageOf(null, null)).toBeNull();
 	expect(listPageOf({ kind: "new" } as Page, "new")).toBeNull();
 	expect(listPageOf(BOTS, null)).toBeNull();
 });

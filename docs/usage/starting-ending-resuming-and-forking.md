@@ -1,6 +1,6 @@
 # Starting, ending, resuming, and forking
 
-- To start a session, click **New session** at the top of the **Sessions** tab.
+- To start a session, click **New session** at the top of the sidebar.
   The page shows a new-session draft, its header reading `New session`; the directory picker in the composer's bottom row, left of the model menu, shows the directory that omp will run in.
   No omp process starts and no row appears in the sidebar until you send the first message, so leaving an empty draft leaves nothing running.
   The page shows the omp logo over the question "What should we work on in" and the folder's name, over a dithered retro grid with a rising sun, and keeps the composer at its bottom.

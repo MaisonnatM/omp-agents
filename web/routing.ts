@@ -19,7 +19,6 @@ export const SIDEBAR_TABS = [
 	{ value: "pull-requests", label: "Pull requests", icon: PAGE_ICON["pull-requests"] },
 	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, integration: "linear" },
 	{ value: "bots", label: "Bots", icon: PAGE_ICON.bots },
-	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions },
 	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar },
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo },
 	{ value: "sport", label: "Sport", icon: PAGE_ICON.sport },
