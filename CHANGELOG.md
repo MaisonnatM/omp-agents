@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-13
 
+- The right sidebar's tabs now work as Capy's: it starts with Overview, + lists PRs, Browser, Tickets, and Artifacts to open as tabs, and each opened tab has an × to close it. A Bot's details do the same with Routines and Tickets.
 - The Personal and Work spaces are gone: every page shows all your workspaces, sessions, Bots, events, and accounts together, and the sidebar's Workspaces label still narrows the list to one workspace.
 - Keyboard shortcuts now live in Settings › Keyboard, and ? opens it.
 - The sidebar no longer has a Keyboard shortcuts link at its bottom; ? still opens Settings › Keyboard.

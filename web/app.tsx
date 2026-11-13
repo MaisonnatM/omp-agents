@@ -45,7 +45,7 @@ import { useOpenPullRequest } from "./open-pull-request";
 import { integrationsStore } from "./reads";
 import { onArtifactOpen, onArtifactsReveal } from "./artifact-requests";
 import { onReviewRequest } from "./review-pages";
-import { storeOrRemove } from "./stored-state";
+import { revealDetailsTab } from "./details-tabs";
 import { hashForLayout, hashForPage, hashForRoute, hashForView, type OpenMode, sameView, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, type WindowScope, workspaceSession, workspaceSwitch } from "./sessions";
@@ -126,7 +126,7 @@ export function App() {
 		sidebars.setOpen(side, !sidebars.panels[side].open);
 	}, []);
 	const showDetailsTab = useCallback((tab: "browser" | "artifacts"): void => {
-		storeOrRemove(TAB_KEY, tab, "pull-requests");
+		revealDetailsTab(TAB_KEY, tab);
 		latest.current.sidebars.setOpen("right", true);
 	}, []);
 	// A reply's **Review visuals** shows the Browser, whose panel then opens the reply's pages.

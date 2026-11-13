@@ -16,7 +16,7 @@ import { SessionPullRequestsTab } from "./session-pull-requests-tab";
 import { SessionTicketsTab } from "./session-tickets-tab";
 import { useSubagentLinks } from "./subagent-links";
 
-/** The right sidebar's tab, kept across views; the key keeps its old name, and a tab that no longer exists reads as Overview. */
+/** The right sidebar's open tabs, kept across views; the key keeps its old name, and a single tab name stored before tabs could close opens that tab. */
 export const TAB_KEY = "omp-agents.plan-tab";
 
 /** What a session worked on, runs, and saved, which its **PRs**, **Browser**, **Tickets**, and **Artifacts** tabs show. */
