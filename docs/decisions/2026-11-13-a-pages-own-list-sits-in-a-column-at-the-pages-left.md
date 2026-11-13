@@ -26,7 +26,7 @@ Everything else that record chose stands: the inset sidebar, its page list and r
 
 - The sidebar's page list shows the same rows on every page, and the roster under it stays put.
 - Pages that already list their items, such as Todo and Email, show three columns: the page's list, its items, and the open item.
-- While the sidebar floats, as on a phone, the column would leave the page no room, so the list nests under its row there as before, and a page whose row the user hid shows its list after the last row.
+- While the sidebar floats, as on a phone, or the window is too narrow to leave the page 480 pixels beside the narrowest column, 768 for Todo, Email, and Tickets so they keep their items and the open item side by side, the list nests under its row as before, and a page whose row the user hid shows its list after the last row. The column also never grows past what leaves the page that room.
 - Dragging the column's right edge sizes it from 192 to 400 pixels, the arrow keys move that edge in 16-pixel steps, and a double-click puts it back to 256; one width serves every page and this browser keeps it, as it keeps the other list widths.
 
 ## Confirmation

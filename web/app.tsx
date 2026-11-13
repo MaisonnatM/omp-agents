@@ -23,7 +23,8 @@ import { DesktopLinkPreview } from "./components/desktop-link-preview";
 import { FileDialog } from "./components/file-dialog";
 import { textFileUrl } from "./file-paths";
 import { PageSwitch } from "./components/page-switch";
-import { hasPageList, PageList, PageListColumn } from "./components/page-list";
+import { PageList, PageListColumn, useWidth } from "./components/page-list";
+import { listPageOf, listPlacement } from "./page-list";
 import { NO_PLANS, Plans } from "./components/plan-usage";
 import { useNoticeToasts } from "./components/use-notice-toasts";
 import { RenderBoundary } from "./components/render-boundary";
@@ -259,30 +260,29 @@ export function App() {
 		(): TodoListView => (routedTodoList === null || (routedTodoList.kind === "category" && !categories?.some(({ id }) => id === routedTodoList.id)) ? ALL_TODOS : routedTodoList),
 		[routedTodoList, categories],
 	);
-	const todoSessions = useMemo(() => ({ hosts: state.hosts, past: state.past }), [state.hosts, state.past]);
+	const listPage = listPageOf(page, row);
+	const pageArea = useRef<HTMLDivElement>(null);
+	const pageAreaWidth = useWidth(pageArea);
+	const placement = listPage && listPlacement(listPage, sidebars.panels.left.floating, pageAreaWidth);
 	const pageList = useMemo(
 		() =>
-			hasPageList(row) ? (
+			listPage && (
 				<PageList
-					row={row}
-					page={page}
+					page={listPage}
 					listed={state.listed}
 					hosts={visible.hosts}
 					past={visible.past}
-					todoSessions={todoSessions}
+					todoSessions={{ hosts: state.hosts, past: state.past }}
 					botList={botList}
 					userTodos={state.userTodos}
 					todoView={todoView}
 					space={space}
-					settings={settings}
 					sectionTarget={sectionTarget}
 					onSectionTarget={setSectionTarget}
 				/>
-			) : null,
-		[row, page, state.listed, visible, todoSessions, botList, state.userTodos, todoView, space, settings, sectionTarget],
+			),
+		[listPage, state.listed, visible, state.hosts, state.past, botList, state.userTodos, todoView, space, sectionTarget],
 	);
-	// A floating sidebar, as on a phone, keeps the page's list under its row, since a column beside the page would leave the page no room.
-	const floating = sidebars.panels.left.floating;
 	const showSearch = useCallback(() => dispatchPalette({ type: "open" }), [dispatchPalette]);
 	const toggleSettings = useCallback(() => void handlers.settings?.(0), [handlers]);
 	const headerControls = useMemo(() => <HeaderControls notices={state.notices} settingsOpen={page?.kind === "settings"} onToggleSettings={toggleSettings} />, [state.notices, page?.kind, toggleSettings]);
@@ -313,7 +313,7 @@ export function App() {
 												onTab={showTab}
 												tabs={tabs}
 												botList={botList}
-												list={floating ? pageList : null}
+												list={placement?.at === "sidebar" ? pageList : null}
 												settings={settings}
 												onPickWorkspace={switchWorkspace}
 												onSearch={showSearch}
@@ -322,8 +322,12 @@ export function App() {
 										</DashboardSidebar>
 										<HeaderTabs className="[grid-area:tabs]" address={address} hosts={state.hosts} past={state.past} controls={headerControls} />
 										<SidebarInset className="inset-panel [grid-area:page]">
-											<div className="flex min-h-0 flex-1">
-												{!floating && hasPageList(row) && <PageListColumn row={row}>{pageList}</PageListColumn>}
+											<div ref={pageArea} className="flex min-h-0 flex-1">
+												{listPage && placement?.at === "column" && (
+													<PageListColumn page={listPage} max={placement.max}>
+														{pageList}
+													</PageListColumn>
+												)}
 												<div className="relative flex min-w-0 flex-1 flex-col">
 													<Plans value={state.usage?.plans ?? NO_PLANS}>
 														<ActivityVisibility.Provider value={display.activityVisibility}>

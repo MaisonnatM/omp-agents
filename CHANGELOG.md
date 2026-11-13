@@ -5,7 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-13
 
-- A page's own list, such as your Bots, the Pull requests sections, the Todo categories, or the Settings sections, now sits in a column at the page's left, as in Linear's inbox, instead of under its row in the sidebar. Drag the column's edge to size it. On a phone it stays under its row.
+- A page's own list, such as your Bots, the Pull requests sections, the Todo categories, or the Settings sections, now sits in a column at the page's left, as in Linear's inbox, instead of under its row in the sidebar. Drag the column's edge to size it. In a narrow window or on a phone it stays under its row.
 - The sidebar's page list, from New session to Settings, now stays in place while you scroll your sessions below it.
 - Bullets in an agent's reply read as a plain list again, with the bold word starting the sentence, instead of a two-column grid with lines between rows.
 - Agents now answer comparisons, such as which tickets match which pull requests, with a table: the starter kit's reply format asks for one.

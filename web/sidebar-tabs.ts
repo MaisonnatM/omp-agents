@@ -44,9 +44,9 @@ export const pageSpace = (page: Page): Space | null => (isSidebarTab(page.kind) 
 export type NavRow = SidebarTab | "settings" | "new";
 
 /**
- * The row of the page list that `page` selects, which holds the page's own list: the panes select Sessions, and the
- * empty home, a page with no row, and a page whose tab is absent, signed out or of the other space, select none.
- * A page whose tab the user hid in Preferences still selects it, so its list shows after the last row.
+ * The row of the page list that `page` selects: the panes select Sessions, and the empty home, a page with no row, and
+ * a page whose tab is absent, signed out or of the other space, select none.
+ * A page whose tab the user hid in Preferences still selects it, so while its list nests in the sidebar it shows after the last row.
  */
 export function navRowOf(page: Page | null, panes: readonly View[], absentTabs: ReadonlySet<SidebarTab>): NavRow | null {
 	if (page === null) return panes.length > 0 ? "sessions" : null;
