@@ -717,7 +717,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	return (
 		<OpenImage.Provider value={openImage}>
 		<OpenFile.Provider value={setFile}>
-			<div className="@container/conversation relative flex min-h-0 flex-1 flex-col" data-conversation>
+			<div className="@container/conversation relative flex min-h-0 flex-1 flex-col">
 				<MessageScroller className="@container min-h-0 flex-1">
 					<MessageScrollerViewport>
 						<MessageScrollerContent

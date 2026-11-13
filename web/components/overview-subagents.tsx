@@ -14,9 +14,9 @@ import { useStoredState } from "../stored-state";
 import { type ArenaGroup, type ArenaSeat, type ArenaVerdict, arenaGroups, runTime, type SubagentNode } from "../overview-subagents-model";
 import { useMinute } from "../use-minute";
 import { OrgIcon } from "./org-icon";
-import { StatusDot, statusLabel } from "./status-dot";
+import { drawsDot, StatusDot, statusLabel } from "./status-dot";
 import { CancelAgentButton, type SubagentLinksValue } from "./subagent-links";
-import { ChangesSection } from "./overview-changes";
+import { OverviewSection } from "./overview-section";
 
 /** Whether the section is folded shut, kept for every view; it starts open. The key keeps an earlier name, so earlier folds carry over. */
 const CLOSED_KEY = "omp-agents.todos-card-subagents-closed";
@@ -30,7 +30,7 @@ export function SubagentsSection({ links, nodes, arenas }: { links: SubagentLink
 	const running = nodes.filter(node => node.agent.status === "running").length;
 	const { groups, rest } = arenaGroups(nodes, arenas);
 	return (
-		<ChangesSection
+		<OverviewSection
 			title="Subagents"
 			count={nodes.length}
 			detail={
@@ -54,7 +54,7 @@ export function SubagentsSection({ links, nodes, arenas }: { links: SubagentLink
 					))}
 				</ul>
 			)}
-		</ChangesSection>
+		</OverviewSection>
 	);
 }
 
@@ -126,9 +126,13 @@ function SubagentRow({ agent, depth, links, lead }: { agent: AgentRow; depth: nu
 					{/* The status dot sits on the icon's bottom-right corner, cut out of it as an avatar's is; a running subagent draws none. */}
 					<span className="relative flex h-5 items-center text-muted-foreground">
 						{lead ?? <IconAiBotHead className="size-4" />}
-						<span className="absolute -right-1 -bottom-0.5 flex size-2.5 items-center justify-center rounded-full has-[[role=img]]:bg-background group-hover/row:has-[[role=img]]:bg-muted">
+						{drawsDot(agent.status) ? (
+							<span className="absolute -right-1 -bottom-0.5 flex size-2.5 items-center justify-center rounded-full bg-background group-hover/row:bg-muted">
+								<StatusDot status={agent.status} />
+							</span>
+						) : (
 							<StatusDot status={agent.status} />
-						</span>
+						)}
 					</span>
 					<span className="flex min-w-0 gap-2">
 						<span className="max-w-[60%] shrink-0 truncate text-muted-foreground">{agent.id}</span>

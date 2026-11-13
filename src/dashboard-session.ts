@@ -17,7 +17,7 @@ import { advisorCommand, contextCommand, goalCommand, type AdvisorState, type Co
 import { promptAuthor } from "./shared/transcript";
 import { PromptTurn } from "./prompt-turn";
 import { textOf } from "./session-entries";
-import { contextOf, parseSubagentFrame, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./subagents";
+import { contextOf, parseSubagentFrame, stoppedAt, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./subagents";
 import { isUserPrompt, SKILL_PROMPT, skillArgs, type StartingPrompt } from "./transcript";
 import { SerialLane } from "./serial-lane";
 import { ASK_DIALOG_OPT_IN, PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
@@ -847,7 +847,7 @@ export class DashboardSession implements LiveSession {
 		if (!frame) return;
 		const prev = this.#agents.get(frame.id);
 		const status = frame.status ?? prev?.status ?? "running";
-		const starts = [frame.startedAt, prev?.startedAt].filter(at => at !== undefined && at !== null);
+		const start = Math.min(frame.startedAt ?? Infinity, prev?.startedAt ?? Infinity);
 		this.#agents.set(frame.id, {
 			id: frame.id,
 			kind: frame.kind ?? prev?.kind ?? "agent",
@@ -855,9 +855,8 @@ export class DashboardSession implements LiveSession {
 			activity: frame.activity ?? prev?.activity ?? null,
 			model: frame.model ?? prev?.model ?? null,
 			// The earliest start any frame reported, so a later progress tick, timed a little after, does not move it.
-			startedAt: starts.length > 0 ? Math.min(...starts) : null,
-			// A subagent that stays stopped keeps the time it first stopped at; one that runs again has none.
-			endedAt: status === "running" ? null : (prev?.endedAt ?? frame.endedAt ?? null),
+			startedAt: Number.isFinite(start) ? start : null,
+			endedAt: stoppedAt(status, prev?.endedAt ?? null, frame.endedAt ?? null),
 			sessionFile: frame.sessionFile ?? prev?.sessionFile ?? null,
 		});
 		this.#emit({ kind: "roster" });

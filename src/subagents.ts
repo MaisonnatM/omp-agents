@@ -72,7 +72,9 @@ export interface SubagentFrame {
  */
 export function parseSubagentFrame(channel: unknown, payload: unknown, now = Date.now()): SubagentFrame | null {
 	if ((channel !== SUBAGENT_LIFECYCLE && channel !== SUBAGENT_PROGRESS) || !isObject(payload)) return null;
-	const progress = channel === SUBAGENT_PROGRESS && isObject(payload.progress) ? payload.progress : null;
+	// An RPC snapshot, read on attach, carries its progress record on the lifecycle channel too; only a progress frame's speaks for the subagent.
+	const record = isObject(payload.progress) ? payload.progress : null;
+	const progress = channel === SUBAGENT_PROGRESS ? record : null;
 	const body = progress ?? payload;
 	if (typeof body.id !== "string") return null;
 	const text = progress
@@ -88,21 +90,25 @@ export function parseSubagentFrame(channel: unknown, payload: unknown, now = Dat
 	const kind = str(payload.agent);
 	if (kind !== undefined) frame.kind = kind;
 	const status = typeof body.status === "string" ? FRAME_STATUSES[body.status] : undefined;
+	// Only a `started` frame dates a start: a pending or running one may arrive any time after it.
+	const started = body.status === "started";
 	if (status) frame.status = status;
 	if (text) frame.activity = oneLine(text);
 	const sessionFile = str(payload.sessionFile);
 	if (sessionFile !== undefined) frame.sessionFile = sessionFile;
-	// An RPC snapshot, read on attach, carries its progress record on the lifecycle channel too.
-	const record = isObject(payload.progress) ? payload.progress : null;
 	const model = nonEmptyStr(record?.resolvedModel);
 	if (model !== undefined) frame.model = model;
 	const at = typeof payload.lastUpdate === "number" ? payload.lastUpdate : now;
 	// omp reports a run time of 0 until its first progress tick, which says nothing of the start.
 	if (typeof record?.durationMs === "number" && record.durationMs > 0) frame.startedAt = at - record.durationMs;
-	else if (body.status === "started") frame.startedAt = at;
+	else if (started) frame.startedAt = at;
 	if (status && status !== "running") frame.endedAt = at;
 	return frame;
 }
+
+/** When a subagent stopped: `null` while it runs, else the stop already known, else `seenAt`, so one that stays stopped keeps the time it first stopped at. */
+export const stoppedAt = (status: AgentStatus, knownEndedAt: number | null, seenAt: number | null): number | null =>
+	status === "running" ? null : (knownEndedAt ?? seenAt);
 
 /** omp's `ContextUsage` (a Collab state frame or an RPC state), as the roster's context numbers. */
 export function contextOf(value: unknown): ContextUsage | null {

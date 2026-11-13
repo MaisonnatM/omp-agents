@@ -2,7 +2,7 @@
 import { IconBrain, IconBulletList, IconPullRequest, IconSparklesTwo, IconWindowApp } from "central-icons";
 import { useMemo } from "react";
 import type { LinkedPullRequest } from "../../src/shared/github";
-import type { LiveView, RosterHost, View } from "../../src/shared/sessions";
+import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Artifact } from "../artifacts-model";
 import { useArtifacts } from "../pane-store";
 import { PAGE_ICON } from "../page-icons";
@@ -90,23 +90,26 @@ export function sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, 
 	];
 }
 
-interface SessionDetailsProps extends Omit<SessionWork, "scope" | "live" | "artifacts"> {
-	/** The session's directory, which relative file paths in pull requests, issues, and changed files resolve against. */
+interface SessionDetailsProps extends Omit<SessionWork, "scope" | "live" | "artifacts" | "pullRequests" | "tickets"> {
+	/** The session's directory, which relative file paths in pull requests and issues resolve against. */
 	cwd: string | null;
 	/** What personal sessions remember, for a personal session; `null` for any other. */
 	personalMemory: string | null;
 	/** The live view's roster row, whose subagents the **Overview** tab lists; `null` for a past or ended one. */
 	host: RosterHost | null;
-	/** The session's facts, whose pull requests and Linear issues the **Overview** tab's sources leave out and whose arenas its subagents show. */
-	facts: ChangesSession["facts"];
+	/** The view's roster row, an ended session's last one, or its past entry: the pull requests, Linear issues, arenas, and directory the tabs show. */
+	row: RosterHost | PastSession | null;
 }
 
 /** The right sidebar's content for the focused view: its **Overview**, its session's pull requests, its running app, its Linear issues and its artifacts when it has any, and a personal session's **Memory**. */
-export function SessionDetails({ view, sessionId, working, cwd, personalMemory, pullRequests, tickets, hosts, host, facts }: SessionDetailsProps) {
+export function SessionDetails({ view, sessionId, working, cwd, personalMemory, hosts, host, row }: SessionDetailsProps) {
 	const scope = view.kind === "past" ? view.sessionId : (hosts.find(each => each.instanceId === view.instanceId)?.sessionId ?? view.instanceId);
 	const artifacts = useArtifacts(view);
 	const links = useSubagentLinks(view, host);
-	const changes = useMemo<ChangesSession>(() => ({ sessionId, cwd, facts }), [sessionId, cwd, facts]);
+	const pullRequests = row?.pullRequests ?? [];
+	const tickets = row?.tickets ?? [];
+	// The row's directory, unlike `cwd`, outlives an ended live session, whose changed files still resolve against it.
+	const session = useMemo<ChangesSession>(() => ({ sessionId, cwd: row?.cwd ?? null, facts: row }), [sessionId, row]);
 	const tabs = [
 		{
 			value: "overview",
@@ -114,7 +117,7 @@ export function SessionDetails({ view, sessionId, working, cwd, personalMemory, 
 			name: "Overview",
 			control: "session-details.tab.overview",
 			count: 0,
-			content: <SessionOverview view={view} working={working} links={links} changes={changes} />,
+			content: <SessionOverview view={view} working={working} links={links} session={session} />,
 		} as const,
 		...sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, live: view.kind === "live" ? view : null, view, sessionId, artifacts }),
 		...(personalMemory !== null

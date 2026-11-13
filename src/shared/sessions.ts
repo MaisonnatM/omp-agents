@@ -51,9 +51,9 @@ export interface AgentRow {
 	activity: string | null;
 	/** The model it runs on, as omp resolved it: `provider/id`, with `:level` when a thinking level was set; `null` until omp reports it. */
 	model: string | null;
-	/** When it started, in ms since the epoch; `null` when the dashboard never learned it. */
+	/** When it first started, in ms since the epoch, kept when it runs again, so a resumed subagent's run time counts its idle gap too; `null` when the dashboard never learned it. */
 	startedAt: number | null;
-	/** When it last stopped running, in ms since the epoch; `null` while it runs or when the dashboard never saw it stop. */
+	/** When it stopped running, in ms since the epoch, kept while it stays stopped; `null` while it runs or when the dashboard never saw it stop. */
 	endedAt: number | null;
 	/** Whether the dashboard can message it: a writable terminal room and an agent that is not aborted, or a running subagent of a session this dashboard started. */
 	canMessage: boolean;

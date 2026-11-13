@@ -388,12 +388,10 @@ export function App() {
 														working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
 														cwd={focused.cwd ?? null}
 														personalMemory={focused.cwd !== undefined && spaces.of(focused.cwd, focused.workspace ?? focused.cwd) === "personal" ? state.personalMemory : null}
-														pullRequests={focused.row?.pullRequests ?? []}
-														tickets={focused.row?.tickets ?? []}
 														hosts={visible.hosts}
 														sessionId={focused.sessionId}
 														host={focused.host ?? null}
-														facts={focused.row ?? null}
+														row={focused.row ?? null}
 													/>
 												) : (
 													openBot && (

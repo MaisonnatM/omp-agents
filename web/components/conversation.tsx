@@ -289,7 +289,7 @@ function LiveConversation({
 	const isPrivate = isPrivateHost(shown);
 
 	return (
-		<div className="@container/conversation flex h-full min-h-0 flex-1 flex-col" data-conversation>
+		<div className="@container/conversation flex h-full min-h-0 flex-1 flex-col">
 			{header && <ConversationHeader view={view} subject={subject} onEnd={onEnd} actions={actions} titleAction={titleAction} />}
 			{trajectory ? (
 				<Trajectory view={view} />

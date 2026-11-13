@@ -1,12 +1,8 @@
 /** The Overview tab's Files, Images, and Sources sections: the files the view's agent changed, the images its tools took, and the pages they opened, each a section that folds. */
-import { IconChevronBottom } from "central-icons";
-import { type ReactNode, useMemo, useState } from "react";
-import type { ControlId } from "../../src/shared/activity";
+import { useMemo, useState } from "react";
 import type { SessionFacts, View } from "../../src/shared/sessions";
 import { type AgentMedia, type AgentSource, type ChangedFile, lineTotals } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { useChangedFiles, useMedia, useSources } from "../pane-store";
 import { useStoredKeys } from "../stored-state";
@@ -14,6 +10,7 @@ import { ChangedFileList, FileChangesDialog } from "./changed-files-section";
 import { SessionChangesDialog } from "./changes/session-changes-dialog";
 import { LineCounts } from "./line-counts";
 import { MediaStrip } from "./media-section";
+import { OverviewSection } from "./overview-section";
 import { SourceList } from "./sources-section";
 
 /** The sections folded shut, `files`, `images`, and `sources`, which localStorage keeps for every view; each starts open. The key keeps an earlier name, so earlier folds carry over. */
@@ -25,8 +22,8 @@ export interface ChangesSession {
 	sessionId: string | null;
 	/** The session's directory, which the files' relative paths resolve against. */
 	cwd: string | null;
-	/** The session's pull requests and Linear issues, which selected images can be sent to and the sources leave out, its /ship run, and its arenas. */
-	facts: Pick<SessionFacts, "pullRequests" | "tickets" | "ship" | "arenas"> | null;
+	/** The session's pull requests and Linear issues, which selected images can be sent to and the sources leave out, and its arenas. */
+	facts: Pick<SessionFacts, "pullRequests" | "tickets" | "arenas"> | null;
 }
 
 /** What the view's agents changed, took, and opened, each list empty until the server sends it. */
@@ -51,8 +48,8 @@ function otherSources(sources: AgentSource[], facts: ChangesSession["facts"]): A
 
 const NONE: never[] = [];
 
-/** The view's changes for `session`: `undefined` until the server sent all three lists, then `null` while there is nothing to list. */
-export function useChanges(view: View, session: ChangesSession): Changes | null | undefined {
+/** The view's changes for `session`, each list empty until the server sends it, and whether it sent all three. */
+export function useChanges(view: View, session: ChangesSession): { changes: Changes; loaded: boolean } {
 	const sentFiles = useChangedFiles(view);
 	const sentMedia = useMedia(view);
 	const allSources = useSources(view);
@@ -61,53 +58,11 @@ export function useChanges(view: View, session: ChangesSession): Changes | null 
 	const facts = session.facts;
 	const sources = useMemo(() => (allSources ? otherSources(allSources, facts) : NONE), [allSources, facts]);
 	const changes = useMemo(() => ({ files, media, sources }), [files, media, sources]);
-	if (sentFiles === null || sentMedia === null || allSources === null) return undefined;
-	if (files.length === 0 && media.length === 0 && sources.length === 0) return null;
-	return changes;
+	return { changes, loaded: sentFiles !== null && sentMedia !== null && allSources !== null };
 }
 
 /** What the Overview tab opens over the page: the session's changes opened at a file, or one file's recorded changes for a subagent. */
 type Shown = { kind: "changes" | "history"; path: string } | null;
-
-interface ChangesSectionProps {
-	title: string;
-	/** How many items the section lists, after its title. */
-	count: number;
-	/** Shown after the count, such as the files' added and removed lines. */
-	detail?: ReactNode;
-	open: boolean;
-	onToggle: () => void;
-	/** The Activity control a click on the folding header records. */
-	fold: ControlId;
-	/** A control at the right of the header, outside the button that folds the section. */
-	action?: ReactNode;
-	children: ReactNode;
-}
-
-/** A section of the Overview tab: a filled folding header, its title then its count, with an optional action at its right. */
-export function ChangesSection({ title, count, detail, open, onToggle, fold, action, children }: ChangesSectionProps) {
-	return (
-		<Collapsible open={open} onOpenChange={onToggle}>
-			<div className="flex h-9 items-center rounded-lg bg-muted">
-				<h3 className="flex h-full min-w-0 flex-1">
-					<CollapsibleTrigger
-						{...activityControl(fold)}
-						className="flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-lg px-3 text-left text-[13px] font-medium text-foreground outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-					>
-						<span className="truncate">{title}</span>
-						<span className="shrink-0 font-normal text-muted-foreground tabular-nums">{count}</span>
-						{detail}
-						<IconChevronBottom aria-hidden className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none", !open && "-rotate-90")} />
-					</CollapsibleTrigger>
-				</h3>
-				{action}
-			</div>
-			<CollapsibleContent keepMounted className="h-(--collapsible-panel-height) overflow-hidden transition-[height] duration-200 ease-out data-ending-style:h-0 data-starting-style:h-0 motion-reduce:transition-none">
-				{children}
-			</CollapsibleContent>
-		</Collapsible>
-	);
-}
 
 interface ChangesSectionsProps {
 	view: View;
@@ -128,7 +83,7 @@ export function ChangesSections({ view, session: { sessionId, cwd, facts }, chan
 	return (
 		<>
 			{files.length > 0 && (
-				<ChangesSection
+				<OverviewSection
 					title="Files"
 					count={files.length}
 					detail={<LineCounts {...lineTotals(files.flatMap(file => file.changes))} />}
@@ -144,17 +99,17 @@ export function ChangesSections({ view, session: { sessionId, cwd, facts }, chan
 					}
 				>
 					<ChangedFileList files={files} onOpen={path => setShown({ kind: sessionId === null ? "history" : "changes", path })} />
-				</ChangesSection>
+				</OverviewSection>
 			)}
 			{media.length > 0 && (
-				<ChangesSection title="Images" count={media.length} open={!closed.has("images")} onToggle={() => toggle("images")} fold="changes-card.images.fold">
+				<OverviewSection title="Images" count={media.length} open={!closed.has("images")} onToggle={() => toggle("images")} fold="changes-card.images.fold">
 					<MediaStrip media={media} view={view} pullRequests={facts?.pullRequests ?? []} tickets={facts?.tickets ?? []} />
-				</ChangesSection>
+				</OverviewSection>
 			)}
 			{sources.length > 0 && (
-				<ChangesSection title="Sources" count={sources.length} open={!closed.has("sources")} onToggle={() => toggle("sources")} fold="changes-card.sources.fold">
+				<OverviewSection title="Sources" count={sources.length} open={!closed.has("sources")} onToggle={() => toggle("sources")} fold="changes-card.sources.fold">
 					<SourceList sources={sources} />
-				</ChangesSection>
+				</OverviewSection>
 			)}
 			{history && <FileChangesDialog file={history} onClose={() => setShown(null)} />}
 			{sessionId !== null && shown?.kind === "changes" && (

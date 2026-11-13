@@ -11,7 +11,7 @@ import { type LiveRow, type LiveSession, type LiveUpdate, PromptRefused, turnUpd
 import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, listHosts, openRoom, type Room } from "./omp/collab";
 import { selectorOf } from "./shared/models";
 import type { AgentRow, ContextUsage, ControlPhase, Delivery, HostStatus, MessageQueue, PromptImage, UserAnswer, UserRequest, WithdrawnMessage } from "./shared/sessions";
-import { contextOf, type HostAgent, parseAgents, parseSubagentFrame, SubagentFiles } from "./subagents";
+import { contextOf, type HostAgent, parseAgents, parseSubagentFrame, stoppedAt, SubagentFiles } from "./subagents";
 import { SerialLane } from "./serial-lane";
 import { PendingRequests, parseCollabRequest } from "./user-requests";
 
@@ -517,7 +517,7 @@ export class SessionGuest implements LiveSession {
 		for (const agent of agents) {
 			const known = this.#learnedOf(agent.id);
 			const wasRunning = this.#agents.some(prev => prev.id === agent.id && prev.status === "running");
-			const endedAt = agent.status === "running" ? null : wasRunning ? now : known.endedAt;
+			const endedAt = stoppedAt(agent.status, known.endedAt, wasRunning ? now : null);
 			if (endedAt !== known.endedAt) this.#learned.set(agent.id, { ...known, endedAt });
 		}
 		this.#subagentFiles.update(this.#agents, agents);
