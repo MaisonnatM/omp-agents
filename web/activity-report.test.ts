@@ -9,7 +9,7 @@ const FEATURES: Feature[] = [
 	{ kind: "command", key: "help", label: "Help" },
 	{ kind: "command", key: "tools", label: "Toggle tool calls" },
 	{ kind: "view", key: "todo", label: "Todo" },
-	{ kind: "view", key: "notes", label: "Notes" },
+	{ kind: "view", key: "calendar", label: "Calendar" },
 	{ kind: "view", key: "email", label: "Email", tab: "email" },
 ];
 
@@ -43,15 +43,15 @@ describe("inventory", () => {
 });
 
 describe("report", () => {
-	test("splits features into used, rarely used, never used with their last use, and not set up", () => {
+	test("splits features into used, rarely used, never used with their last use, and not set up, leaving out uses of no feature", () => {
 		const answer = {
-			uses: [use("command", "new-session", 5), use("view", "todo", 2)],
+			uses: [use("command", "new-session", 5), use("view", "todo", 2), use("view", "notes", 9)],
 			lastUsed: [{ kind: "command" as const, key: "help", at: 3 }],
 		};
 		const result = report(FEATURES, answer, new Set(["email"]));
 		expect(result.used.map(({ key }) => key)).toEqual(["new-session"]);
 		expect(result.rarely.map(({ key }) => key)).toEqual(["todo"]);
-		expect(result.never.map(({ key, lastAt }) => [key, lastAt])).toEqual([["help", 3], ["tools", null], ["notes", null]]);
+		expect(result.never.map(({ key, lastAt }) => [key, lastAt])).toEqual([["help", 3], ["tools", null], ["calendar", null]]);
 		expect(result.notSetUp.map(({ key }) => key)).toEqual(["email"]);
 	});
 
