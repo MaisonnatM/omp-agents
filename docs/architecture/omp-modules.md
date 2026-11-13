@@ -7,7 +7,7 @@ Those files hold only types, so the app imports a type from them directly and ev
 It finds the package through `omp` on `PATH`, or `OMP_PACKAGE_DIR` when set; with a Bun global install that is `~/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent`.
 `bun run omp-release` checks a new omp release against these modules and the files listed below; the [omp release skill](../../.agents/skills/omp-release/SKILL.md) says how to read its report.
 
-Five runtime patches change omp itself, each kept in `patches/` with its regression tests against upstream tag `v18.20.0`, commit `c308970263ae13744ea15ab67302e3dac840e266`; do not apply them to another release without porting and verifying them.
+Five runtime patches change omp itself, each kept in `patches/` with its regression tests against upstream tag `v18.20.0`, commit `c308970263ae`; port and verify them before applying them to another release.
 The dashboard applies none of them, so installing or upgrading stock omp removes them all.
 [omp runtime patches](omp-runtime-patches.md) says how to apply, test, build, and install all five.
 
@@ -19,7 +19,7 @@ The dashboard applies none of them, so installing or upgrading stock omp removes
   Cross-project callers pass the exact `file` returned by eval's archive as `sourceSession`; the Memory curator's saved job follows that handoff.
 - `omp-18.20.0-cursor-dynamic-tools-rule.patch` adds `cursorDynamicToolsRule` to `pi-ai/src/providers/cursor.ts`: a system-prompt entry naming the tools Cursor hides behind `GetDynamicTools`, all but its native ones; the dashboard's own [Cursor paragraph](front-end-components.md#session-visuals) still reaches its sessions without it.
 - `omp-18.20.0-credit-balance-fallback.patch` adds Anthropic's 400 `credit balance is too low` to `CREDITS_EXHAUSTED_PATTERN` in `pi-ai/src/error/rate-limit.ts`, so a spent API key is a usage limit that moves the session to the next fallback entry and keeps the key skipped until its backoff ends; [its record](../decisions/2026-11-07-a-spent-api-key-is-a-usage-limit-in-a-runtime-patch.md) says why.
-- `omp-18.20.0-rpc-ask-form.patch` adds `formDialog` to RPC mode (`requestRpcFormDialog` in `pi-coding-agent/src/modes/rpc/rpc-mode.ts`), so the `ask` tool's form reaches the dashboard as one `ask` frame; [its record](../decisions/2026-11-10-one-ask-card-per-form-through-a-runtime-patch.md) says why.
+- `omp-18.20.0-rpc-ask-form.patch` adds `formDialog` to RPC mode in `pi-coding-agent/src/modes/rpc/rpc-mode.ts`, so an `ask` form reaches the dashboard as one `ask` frame; [its record](../decisions/2026-11-10-one-ask-card-per-form-through-a-runtime-patch.md) says why.
 
 Paths in this document that start with `pi-coding-agent/`, `pi-ai/`, `pi-catalog/`, `pi-tui/`, `pi-utils/`, or `omp-stats/` are inside that install, in `@oh-my-pi/`.
 They are not in this repository.
