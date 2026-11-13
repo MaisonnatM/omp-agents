@@ -20,7 +20,6 @@ import { DisconnectedPage } from "./integrations/disconnected-page";
 import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { NewSession } from "./new-session";
 import { NotificationsPage } from "./notices";
-import { WhatsNewPage } from "./whats-new";
 
 import { PaneGrid } from "./pane-grid";
 import { BotPage, NewBot } from "./bots/bot-page";
@@ -215,8 +214,6 @@ export const PageSwitch = memo(function PageSwitch({
 			return <CalendarPage routines={routines} bots={bots} todos={userTodos} ticketsShown={ticketsCallable} />;
 		case "notifications":
 			return <NotificationsPage notices={notices} />;
-		case "whats-new":
-			return <WhatsNewPage />;
 		case "email":
 			return <EmailPage target={page.target} />;
 		case "sport":

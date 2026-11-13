@@ -18,8 +18,7 @@
   The 5th stop within 5 minutes shows the error page with the server's last output and **Retry**.
   A server you run with `bun start` in a terminal does neither.
 - Changes to `desktop/` load only when the desktop app starts again.
-- **What's new**, the sidebar row after **Notifications**, opens a page, `#whats-new`, that lists what changed in the build you run, in everyday words, newest day first: the lines of the repository's `CHANGELOG.md`, which every change to `main` adds to.
-  A blue dot on the row marks more lines than the page showed when it last opened on this machine; opening it clears the dot.
+- Settings › **What's new** lists what changed in the build you run, in everyday words, newest day first: the lines of the repository's `CHANGELOG.md`, which every change to `main` adds to.
   **Not loaded yet**, at its top, lists the lines in the `CHANGELOG.md` of the branch's origin, as last fetched, that the running build lacks, with **Update dashboard**.
   A packaged app, or a server outside a git checkout, has no `CHANGELOG.md` to read and says why.
 - Agents load new commits through `GET` and `PUT /api/dashboard/update` rather than by killing its processes, and the `PUT` restarts only when origin has new commits; the starter kit's `AGENTS.md` shows how, and [How omp-agents works](../architecture/updating-the-dashboard.md) describes the endpoint.

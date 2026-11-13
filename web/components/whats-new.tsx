@@ -1,17 +1,11 @@
-/** The What's new page: the lines of `CHANGELOG.md` in the running omp-agents build, and those **Update dashboard** would load. */
+/** Settings › What's new: the lines of `CHANGELOG.md` in the running omp-agents build, and those **Update dashboard** would load. */
 import { IconArrowInbox } from "central-icons";
-import { type ReactNode, useEffect } from "react";
+import type { ReactNode } from "react";
 import type { ChangelogEntry, DashboardChangelog } from "../../src/shared/dashboard-update";
 import { Button } from "@/components/ui/button";
 import { updateDashboard } from "../dashboard-update";
 import { dateLabel } from "../labels";
 import { useRead } from "../reads";
-import { useStoredState } from "../stored-state";
-import { PageFrame } from "./list-page";
-
-const SEEN_KEY = "omp-agents.whats-new-seen-lines";
-/** How many lines the page listed when it last opened on this machine; `0` before it ever opened. */
-const decodeSeen = (raw: string | null): number => (raw !== null && Number.isFinite(Number(raw)) ? Number(raw) : 0);
 
 /** `entries` in runs of one day each, newest first, as the server orders them. */
 function byDay(entries: ChangelogEntry[]): [string, ChangelogEntry[]][] {
@@ -63,33 +57,17 @@ function Body({ changelog }: { changelog: DashboardChangelog }) {
 	);
 }
 
-const CHANGELOG_URL = "/api/dashboard/changelog";
-
-/** The changelog has more lines than the page listed when it last opened on this machine, read once as the page loads. */
-export function useUnseenChangelog(): boolean {
-	const read = useRead<DashboardChangelog>(CHANGELOG_URL, 0);
-	const [seen] = useStoredState(SEEN_KEY, decodeSeen);
-	return read.data?.kind === "checkout" && read.data.entries.length > seen;
-}
-
-export function WhatsNewPage() {
-	const read = useRead<DashboardChangelog>(CHANGELOG_URL, 0);
-	const [, setSeen] = useStoredState(SEEN_KEY, decodeSeen);
-	const count = read.data?.kind === "checkout" ? read.data.entries.length : 0;
-	useEffect(() => {
-		if (count > 0) setSeen(count);
-	}, [count, setSeen]);
+export function WhatsNewTab() {
+	const read = useRead<DashboardChangelog>("/api/dashboard/changelog", 0);
 	return (
-		<PageFrame title="What's new" meta="What changed in omp-agents, newest day first">
-			<div className="mx-auto flex w-full max-w-3xl flex-col px-4 pt-2 pb-8">
-				{read.error ? (
-					<p className="px-3 py-4 text-sm text-destructive">Cannot read the changelog: {read.error}</p>
-				) : read.data ? (
-					<Body changelog={read.data} />
-				) : (
-					<p className="px-3 py-4 text-sm text-muted-foreground">Reading the changelog…</p>
-				)}
-			</div>
-		</PageFrame>
+		<div className="flex flex-col">
+			{read.error ? (
+				<p className="px-3 py-4 text-sm text-destructive">Cannot read the changelog: {read.error}</p>
+			) : read.data ? (
+				<Body changelog={read.data} />
+			) : (
+				<p className="px-3 py-4 text-sm text-muted-foreground">Reading the changelog…</p>
+			)}
+		</div>
 	);
 }

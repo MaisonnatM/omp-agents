@@ -1,5 +1,5 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { IconAgentNetwork, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconKeyboard, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconStorage } from "central-icons";
+import { IconAgentNetwork, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconKeyboard, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconSparklesTwo, IconStorage } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { isDay } from "../src/json";
 import type { McpIntegrationId } from "../src/shared/accounts";
@@ -85,6 +85,7 @@ export const SETTINGS_SECTIONS = [
 	{ value: "sync", label: "Sync", icon: IconArrowRotateCounterClockwise, group: "general", keywords: ["git", "remote", "machines"] },
 	{ value: "phone", label: "Phone access", icon: IconPhone, group: "general", keywords: ["tailscale", "mobile", "pair", "qr"] },
 	{ value: "storage", label: "Storage", icon: IconStorage, group: "general", keywords: ["disk", "space", "gc", "cleanup", "archive", "compress", "sandboxes"] },
+	{ value: "whats-new", label: "What's new", icon: IconSparklesTwo, group: "general", keywords: ["changelog", "update", "release notes"] },
 	{ value: "providers", label: "Providers", icon: IconKey1, group: "connections", keywords: ["login", "sign in", "accounts", "api key", "quota"] },
 	{ value: "integrations", label: "Integrations", icon: IconPlugin1, group: "connections", keywords: ["linear", "slack", "github", "gmail", "calendar", "connect"] },
 	{ value: "mcp-servers", label: "MCP servers", icon: IconBlocks, group: "connections", keywords: ["mcp", "tools"] },
@@ -176,7 +177,6 @@ export type Page =
 	| ({ kind: "bots" } & BotsRoute)
 	| { kind: "calendar" }
 	| { kind: "notifications" }
-	| { kind: "whats-new" }
 	| ({ kind: "email" } & EmailRoute)
 	| ({ kind: "new" } & NewSessionRoute)
 	| ({ kind: "scheduled" } & ScheduledRoute)
@@ -229,7 +229,6 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   are UUIDs, so none reads as `new`.
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
  * - `#notifications` opens the Notifications page, every notice by source, unread first.
- * - `#whats-new` opens the What's new page, the lines of `CHANGELOG.md` by day, with those **Update dashboard** would load.
  * - `#email` opens the Email page, your Gmail inboxes' latest conversations, `#email/new` a new mail, and
  *   `#email/<account>/<thread id>` that account's conversation in full in the main content.
  * - `#sport` opens the Sport page on this week, `?day=<YYYY-MM-DD>` on that day's week with that day open, `#sport/journal` on
@@ -262,7 +261,6 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 	},
 	calendar: () => ({ kind: "calendar" }),
 	notifications: () => ({ kind: "notifications" }),
-	"whats-new": () => ({ kind: "whats-new" }),
 	email: rest => {
 		if (rest === "new") return { kind: "email", target: "new" };
 		const [account, thread, ...more] = (rest ?? "").split("/").map(decodeSegment);
@@ -306,7 +304,6 @@ function restOfPage(page: Page): string | null {
 			return page.tab === "week" ? null : page.tab;
 		case "calendar":
 		case "notifications":
-		case "whats-new":
 		case "get-started":
 			return null;
 		default: {
@@ -332,7 +329,6 @@ function queryOfPage(page: Page): string | null {
 		case "bots":
 		case "calendar":
 		case "notifications":
-		case "whats-new":
 		case "get-started":
 		case "email":
 		case "scheduled":
@@ -369,7 +365,6 @@ export const hashForNewBot = (): string => hashForPage({ kind: "bots", target: n
 export const hashForBotRoutine = (botId: string, routine: BotRoutineRoute): string => hashForPage({ kind: "bots", target: botId, routine });
 export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
 export const hashForNotifications = (): string => hashForPage({ kind: "notifications" });
-export const hashForWhatsNew = (): string => hashForPage({ kind: "whats-new" });
 export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
 export const hashForScheduled = (id: string): string => hashForPage({ kind: "scheduled", id });

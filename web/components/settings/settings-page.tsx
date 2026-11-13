@@ -32,6 +32,7 @@ import { StorageTab } from "./storage-tab";
 import { Workflows } from "./workflows-tab";
 import { WorkspacesTab } from "./workspaces-tab";
 import { WorktreesTab } from "./worktrees-tab";
+import { WhatsNewTab } from "../whats-new";
 
 const workspaceLabel = (cwd: string, workspaces: Workspace[]): string => workspaces.find((workspace) => workspace.cwd === cwd)?.cwdDisplay ?? cwd;
 
@@ -197,6 +198,7 @@ export function SettingsPage({
 		phone: <PhoneAccessTab active={section === "phone"} />,
 		storage: <StorageTab cwd={cwd} active={section === "storage"} onSaved={settings.reload} />,
 		worktrees: <WorktreesTab cwd={cwd} active={section === "worktrees"} />,
+		"whats-new": <WhatsNewTab />,
 		decisions: <DecisionsTab cwd={cwd} workspaces={workspaces} active={section === "decisions"} />,
 		extensions: <ExtensionsTab cwd={cwd} active={section === "extensions"} onSaved={settings.reload} />,
 	};

@@ -29,8 +29,6 @@ export function pageTitle(page: Page): string {
 			return "Calendar";
 		case "notifications":
 			return "Notifications";
-		case "whats-new":
-			return "What's new";
 		case "email":
 			return "Email";
 		case "sport":

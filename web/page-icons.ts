@@ -12,6 +12,5 @@ export const PAGE_ICON = {
 	email: IconEmail1,
 	sport: IconDumbell,
 	notifications: IconBell,
-	"whats-new": IconSparklesTwo,
 	settings: IconSettingsGear1,
 } as const satisfies Record<string, IconComponent>;
