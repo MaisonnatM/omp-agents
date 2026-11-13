@@ -98,6 +98,8 @@ test("a layout stored before the Sport tab gets it at its default place, shown",
 test("a layout stored with the Notes tab drops it and keeps every other tab where it was", () => {
 	const saved = ["pull-requests", "tickets", "bots", "sessions", "notes", "calendar", "todo", "sport", "email"].map(tab => ({ tab, hidden: tab === "notes" }));
 	expect(decodeTabLayout(JSON.stringify(saved))).toEqual(DEFAULT);
+	const todoFirst = ["todo", "pull-requests", "notes", "tickets", "bots", "sessions", "calendar", "sport", "email"].map(tab => ({ tab, hidden: false }));
+	expect(decodeTabLayout(JSON.stringify(todoFirst)).map(({ tab }) => tab)).toEqual(["todo", "pull-requests", "tickets", "bots", "sessions", "calendar", "sport", "email"]);
 });
 
 test("a stored layout decodes back to itself", () => {

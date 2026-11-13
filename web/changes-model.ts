@@ -16,7 +16,7 @@ export interface TreeDir<T extends { path: string } = ChangedEntry> {
  * The files as folders, directories first and each level by name, as the changes explorer shows them.
  * An absolute path, a file the session changed outside its checkout, hangs under a `/` folder.
  */
-export function folderTree<T extends { path: string }>(files: readonly T[]): TreeDir<T> {
+function folderTree<T extends { path: string }>(files: readonly T[]): TreeDir<T> {
 	type Building = { name: string; path: string; dirs: Map<string, Building>; files: T[] };
 	const root: Building = { name: "", path: "", dirs: new Map(), files: [] };
 	for (const file of files) {

@@ -18,7 +18,7 @@ import type { ListKind } from "./server/list-registry";
 import type { Bot } from "./shared/bots";
 import type { PagePreferences } from "./shared/preferences";
 import type { ProcessSettings } from "./shared/processes";
-import { DEFAULT_SYNC_SETTINGS, isSyncOutcome, neverSynced, parseSyncSettings, SYNC_ITEMS, type SyncAnswer, type SyncConflict, type SyncItem, type SyncOutcome, type SyncSettings, type SyncSide, type SyncSkip, type SyncStoreId } from "./shared/settings-sync";
+import { DEFAULT_SYNC_SETTINGS, isSyncItemId, isSyncOutcome, neverSynced, parseSyncSettings, SYNC_ITEMS, type SyncAnswer, type SyncConflict, type SyncItem, type SyncOutcome, type SyncSettings, type SyncSide, type SyncSkip, type SyncStoreId } from "./shared/settings-sync";
 import type { SourceControlSettings } from "./shared/source-control";
 import type { WorkspaceList } from "./shared/workspaces";
 import { parseSourceControlSettings, type SourceControl } from "./source-control";
@@ -570,9 +570,11 @@ interface SyncState {
 /** Whether `next` points sync at another remote or branch than `before`, so an outcome about `before` says nothing about it. */
 const movedFrom = (before: SyncSettings, next: SyncSettings): boolean => next.remote !== before.remote || next.branch !== before.branch;
 
+/** The saved state; an excluded item an older version had, such as `notes`, drops out. */
 function parseState(value: unknown): SyncState | null {
-	if (!isObject(value)) return null;
-	const settings = parseSyncSettings(value.settings);
+	if (!isObject(value) || !isObject(value.settings)) return null;
+	const { excluded } = value.settings;
+	const settings = parseSyncSettings({ ...value.settings, excluded: Array.isArray(excluded) ? excluded.filter(isSyncItemId) : excluded });
 	if (!("ok" in settings)) return null;
 	return { settings: settings.ok, last: isSyncOutcome(value.last) ? value.last : null };
 }

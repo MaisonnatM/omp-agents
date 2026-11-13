@@ -69,14 +69,11 @@ export function decodeTabLayout(raw: string | null): TabLayout {
 		return DEFAULT_TAB_LAYOUT;
 	}
 	if (!Array.isArray(stored)) return DEFAULT_TAB_LAYOUT;
+	const ids = stored.map(entry => (isObject(entry) ? entry.tab : undefined)).filter(id => id === LEGACY_NOTES_TAB || SIDEBAR_TABS.some(({ value }) => value === id));
+	const todoInOldSlot = ids.some((id, index) => id === "todo" && ids[index + 1] === LEGACY_NOTES_TAB);
 	const layout: { tab: SidebarTab; hidden: boolean }[] = [];
-	let todoInOldSlot = false;
 	for (const entry of stored as unknown[]) {
 		if (!isObject(entry)) continue;
-		if (entry.tab === LEGACY_NOTES_TAB) {
-			todoInOldSlot ||= layout.at(-1)?.tab === "todo";
-			continue;
-		}
 		const id = entry.tab === LEGACY_EMAIL_TAB ? "email" : entry.tab;
 		const tab = SIDEBAR_TABS.find(({ value }) => value === id)?.value;
 		if (tab === undefined || layout.some(kept => kept.tab === tab)) continue;
@@ -88,7 +85,7 @@ export function decodeTabLayout(raw: string | null): TabLayout {
 	return todoInOldSlot ? todoBetweenCalendarAndSport(layout) : layout;
 }
 
-/** `layout` with Todo moved to between Calendar and Sport. Email leaves that gap for just after Sport. */
+/** `layout`, which held Todo in its old slot, with Todo moved to between Calendar and Sport. Email leaves that gap for just after Sport. */
 function todoBetweenCalendarAndSport(layout: { tab: SidebarTab; hidden: boolean }[]): TabLayout {
 	const todoAt = layout.findIndex(entry => entry.tab === "todo");
 	if (todoAt < 0) return layout;
@@ -143,7 +140,7 @@ export function useSignedOutTabs(): ReadonlySet<SidebarTab> {
 /**
  * The tab layout, kept in this browser, and the tabs it shows in `space`; every component that holds it sees a change at once.
  * `absent`, the {@link useSignedOutTabs} and the other space's tabs, stays the same set until one of those changes; and `shown` stays with them until the layout changes.
- * A stored layout that still names {@link LEGACY_EMAIL_TAB} or {@link LEGACY_NOTES_TAB} is stored again as it decodes, so the old ids leave this browser and Settings › Sync.
+ * A stored layout that differs from how it decodes, such as one naming {@link LEGACY_EMAIL_TAB} or {@link LEGACY_NOTES_TAB}, is stored again, so old ids leave this browser and Settings › Sync.
  */
 export function useSidebarTabs(space: Space): {
 	layout: TabLayout;
@@ -156,7 +153,7 @@ export function useSidebarTabs(space: Space): {
 	const [layout, setLayout] = useStoredState(KEY, decodeTabLayout, encodeTabLayout);
 	useEffect(() => {
 		const raw = localStorage.getItem(KEY);
-		if (raw !== null && [LEGACY_EMAIL_TAB, LEGACY_NOTES_TAB].some(tab => raw.includes(`"tab":"${tab}"`))) setLayout(layout);
+		if (raw !== null && raw !== encodeTabLayout(layout)) setLayout(layout);
 	}, [layout, setLayout]);
 	const signedOut = useSignedOutTabs();
 	const absent = useMemo((): ReadonlySet<SidebarTab> => new Set([...signedOut, ...tabsOutOfSpace(space)]), [signedOut, space]);

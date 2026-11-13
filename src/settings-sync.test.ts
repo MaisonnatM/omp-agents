@@ -207,8 +207,16 @@ describe("parseSyncSettings", () => {
 		expect(parseSyncSettings({ remote: "https://ann:hunter2@example.com/omp.git", branch: "main", excluded: [] })).toEqual({ error: "Leave the password out of the address; sync uses this machine's git credentials" });
 		expect(parseSyncSettings({ remote: "--upload-pack=touch", branch: "main", excluded: [] })).toEqual({ error: "That is not a Git remote address" });
 		expect(parseSyncSettings({ remote: "/tmp/r.git", branch: "../x", excluded: [] })).toEqual({ error: "That is not a branch name" });
-		expect(parseSyncSettings({ remote: "/tmp/r.git", branch: "main", excluded: ["notes", "todos"] })).toEqual({ ok: { remote: "/tmp/r.git", branch: "main", excluded: ["todos"] } });
+		expect(parseSyncSettings({ remote: "/tmp/r.git", branch: "main", excluded: ["notes"] })).toEqual({ error: "Unknown sync item" });
 	});
+});
+
+test("saved sync settings that exclude an item this version lacks, such as notes, load without it", () => {
+	const dir = scratch();
+	const file = join(dir, "settings-sync.json");
+	put(file, JSON.stringify({ settings: { remote: "/tmp/r.git", branch: "main", excluded: ["notes", "todos"] }, last: null }));
+	const sync = new SettingsSync(file, join(dir, "repo.git"), { omp: dir, home: dir, stores: fixedStores() });
+	expect(sync.answer().settings).toEqual({ remote: "/tmp/r.git", branch: "main", excluded: ["todos"] });
 });
 
 /** One machine: its home, omp's directory, the dashboard's files, the lists a sync rewrote, and its settings sync on `remote`. */

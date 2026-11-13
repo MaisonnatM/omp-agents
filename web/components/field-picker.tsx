@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { dateLabel } from "../labels";
 
 /** A field's button in a side column: the row's width, its value in the text's color, and room for wrapped labels. */
-export const FIELD_BUTTON = "h-auto min-h-8 w-full justify-start px-2 py-1 text-[13px] font-normal text-foreground";
+const FIELD_BUTTON = "h-auto min-h-8 w-full justify-start px-2 py-1 text-[13px] font-normal text-foreground";
 /** A field's button laid in a property row of a pull request's or issue's details: its text lines up with the row's, and it spans the row. */
 export const ROW_BUTTON = "-mx-2 -my-1 h-auto min-h-6 w-[calc(100%+1rem)] justify-start px-2 py-1 text-xs font-normal text-foreground";
 /** A field's pill in the new-issue dialog, as Linear's own dialog draws them. */

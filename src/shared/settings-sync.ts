@@ -118,8 +118,7 @@ const BRANCH = /^(?!-)(?!.*\.\.)(?!.*\/\/)(?!.*@\{)[A-Za-z0-9._/-]+(?<![./])$/;
 
 /**
  * The settings `value` names, or why not. The remote is any address git takes, without a password in it: sync uses this
- * machine's git credentials. An address that starts with `-` would read as an option. An excluded item this version
- * lacks, such as an older version's `notes`, drops out.
+ * machine's git credentials. An address that starts with `-` would read as an option.
  */
 export function parseSyncSettings(value: unknown): Parsed<SyncSettings, { error: string }> {
 	if (!isObject(value) || typeof value.remote !== "string" || typeof value.branch !== "string" || !Array.isArray(value.excluded)) return { error: "Expected { remote, branch, excluded }" };
@@ -128,6 +127,7 @@ export function parseSyncSettings(value: unknown): Parsed<SyncSettings, { error:
 	if (remote.startsWith("-") || /\s/.test(remote)) return { error: "That is not a Git remote address" };
 	if (/^[a-z][a-z0-9+.-]*:\/\/[^/@]*:[^/@]*@/i.test(remote)) return { error: "Leave the password out of the address; sync uses this machine's git credentials" };
 	if (!BRANCH.test(branch)) return { error: "That is not a branch name" };
+	if (!value.excluded.every(isSyncItemId)) return { error: "Unknown sync item" };
 	return { ok: { remote, branch, excluded: SYNC_ITEM_IDS.filter(id => (value.excluded as unknown[]).includes(id)) } };
 }
 
