@@ -1,5 +1,6 @@
 /** `DashboardSidebar`, one of the dashboard's two sidebars, resizable and closeable; `useSidebarPanels` keeps both panels' state and `SidebarToggle` shows or hides one. */
-import { type LucideIcon, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { IconSidebarHiddenLeftWide, IconSidebarHiddenRightWide, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { createContext, type CSSProperties, type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { Button } from "@/components/ui/button";
@@ -37,8 +38,8 @@ interface SidebarSpec {
 	widthKey: string;
 	openKey: string;
 	shortcut: ShortcutId;
-	hideIcon: LucideIcon;
-	showIcon: LucideIcon;
+	hideIcon: IconComponent;
+	showIcon: IconComponent;
 	/**
 	 * The strip the hidden sidebar leaves for its toggle, which then rides the sidebar's outer edge: 9 px in from it,
 	 * where the sidebar's top row puts its last button, and centered in the strip. 0 leaves none, and the toggle
@@ -58,8 +59,8 @@ const SIDEBARS: Record<SidebarSide, SidebarSpec> = {
 		widthKey: "omp-agents.sidebar-width",
 		openKey: "omp-agents.sidebar-open",
 		shortcut: "sessionsSidebar",
-		hideIcon: PanelLeftClose,
-		showIcon: PanelLeftOpen,
+		hideIcon: IconSidebarHiddenLeftWide,
+		showIcon: IconSidebarSimpleLeftWide,
 		rail: 46,
 		panel: "",
 	},
@@ -71,8 +72,8 @@ const SIDEBARS: Record<SidebarSide, SidebarSpec> = {
 		widthKey: "omp-agents.plan-width",
 		openKey: "omp-agents.plan-open",
 		shortcut: "detailsSidebar",
-		hideIcon: PanelRightClose,
-		showIcon: PanelRightOpen,
+		hideIcon: IconSidebarHiddenRightWide,
+		showIcon: IconSidebarSimpleRightWide,
 		rail: 0,
 		panel: "ml-1.5 inset-panel bg-background",
 	},

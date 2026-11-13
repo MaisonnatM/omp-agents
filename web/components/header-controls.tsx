@@ -1,5 +1,5 @@
 /** What's new, the notices' bell, and Settings, at the right end of the header tabs; and the Back and Forward buttons at their left end. */
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { IconChevronLeft, IconChevronRight } from "central-icons";
 import { memo } from "react";
 import type { Notice } from "../../src/shared/notices";
 import { Button } from "@/components/ui/button";
@@ -48,12 +48,12 @@ export function HistoryButtons() {
 		<div className="flex shrink-0 items-center gap-0.5">
 			<Tooltip content="Back" shortcut={shortcutLabels("back")} side="bottom" disabled={!canGoBack}>
 				<Button {...activityControl("header.back")} variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Back" disabled={!canGoBack} onClick={() => history.back()}>
-					<ChevronLeft />
+					<IconChevronLeft />
 				</Button>
 			</Tooltip>
 			<Tooltip content="Forward" shortcut={shortcutLabels("forward")} side="bottom" disabled={!canGoForward}>
 				<Button {...activityControl("header.forward")} variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Forward" disabled={!canGoForward} onClick={() => history.forward()}>
-					<ChevronRight />
+					<IconChevronRight />
 				</Button>
 			</Tooltip>
 		</div>

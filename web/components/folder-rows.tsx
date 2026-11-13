@@ -1,5 +1,5 @@
 /** `FolderRows`: a folder tree's rows, each folder a button that opens and closes it, which the changes explorer and the settings file rails share; `useFolders` keeps which folders are open. */
-import { ChevronDown, ChevronRight, Folder } from "lucide-react";
+import { IconChevronBottom, IconChevronRight, IconFolder1 } from "central-icons";
 import { Fragment, type ReactNode, useState } from "react";
 import { foldersAbove, type TreeDir } from "../changes-model";
 
@@ -58,7 +58,7 @@ export function FolderRows<T extends { path: string }>({
 		<>
 			{dir.dirs.map(child => {
 				const shut = folders.isShut(child.path);
-				const Chevron = shut ? ChevronRight : ChevronDown;
+				const Chevron = shut ? IconChevronRight : IconChevronBottom;
 				return (
 					<Fragment key={child.path}>
 						<li>
@@ -70,7 +70,7 @@ export function FolderRows<T extends { path: string }>({
 								onClick={() => folders.toggle(child.path)}
 							>
 								<Chevron aria-hidden className="size-3 shrink-0" />
-								<Folder aria-hidden className="size-3.5 shrink-0" />
+								<IconFolder1 className="size-3.5 shrink-0" />
 								<span className="truncate">{child.name}</span>
 							</button>
 						</li>

@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowLeft, ArrowRight, Check, CircleAlert, Plus, X } from "lucide-react";
+import { IconArrowLeft, IconArrowRight, IconCheckmark1, IconCrossMedium, IconExclamationCircle, IconPlusLarge } from "central-icons";
 import { useCallback, useEffect, useId } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -49,7 +49,7 @@ function Marker({ index, done, current }: { index: number; done: boolean; curren
 				done ? "bg-emerald-500/15 text-emerald-700 ring-emerald-500/30 dark:text-emerald-400" : current ? "bg-foreground text-background ring-foreground" : "text-muted-foreground ring-border",
 			)}
 		>
-			{done ? <Check className="size-3.5" /> : index + 1}
+			{done ? <IconCheckmark1 className="size-3.5" /> : index + 1}
 		</span>
 	);
 }
@@ -80,7 +80,7 @@ function CloseButton() {
 		<Tooltip content="Close" shortcut={["Esc"]} side="bottom">
 			<DialogPrimitive.Close asChild>
 				<Button variant="ghost" size="icon-compact" aria-label="Close" {...activityControl("get-started.close")}>
-					<X />
+					<IconCrossMedium />
 				</Button>
 			</DialogPrimitive.Close>
 		</Tooltip>
@@ -111,7 +111,7 @@ function Welcome({ titleId, done, onStart, onDismiss }: { titleId: string; done:
 					))}
 				</ol>
 				<div className="flex flex-wrap justify-center gap-2">
-					<Button trailingIcon={ArrowRight} onClick={onStart} {...activityControl("get-started.next")}>
+					<Button trailingIcon={IconArrowRight} onClick={onStart} {...activityControl("get-started.next")}>
 						Get started
 					</Button>
 					<Button variant="ghost" onClick={onDismiss} {...activityControl("get-started.dismiss")}>
@@ -140,7 +140,7 @@ function Bubble({ finished, onDismiss }: { finished: number; onDismiss: () => vo
 			</a>
 			<Tooltip content="Skip setup">
 				<Button variant="ghost" size="icon-compact" className="rounded-full" aria-label="Skip setup" onClick={onDismiss} {...activityControl("get-started.dismiss")}>
-					<X />
+					<IconCrossMedium />
 				</Button>
 			</Tooltip>
 		</div>
@@ -277,7 +277,7 @@ function Wizard({ place, titleId, done, requiredFinished, rosterError, body, onP
 	const next = STEPS[index + 1];
 	const forward = next ? (
 		done[step.id] ? (
-			<Button trailingIcon={ArrowRight} onClick={() => onPlace(next.id)} {...activityControl("get-started.next")}>
+			<Button trailingIcon={IconArrowRight} onClick={() => onPlace(next.id)} {...activityControl("get-started.next")}>
 				Next: {next.label}
 			</Button>
 		) : (
@@ -290,7 +290,7 @@ function Wizard({ place, titleId, done, requiredFinished, rosterError, body, onP
 			Finish setup
 		</Button>
 	) : (
-		<Button leadingIcon={Plus} onClick={onNewSession}>
+		<Button leadingIcon={IconPlusLarge} onClick={onNewSession}>
 			New session
 		</Button>
 	);
@@ -347,14 +347,14 @@ function Wizard({ place, titleId, done, requiredFinished, rosterError, body, onP
 						{step.summary}
 					</StepHeader>
 					{rosterError && (
-						<Callout tone="warning" icon={CircleAlert}>
+						<Callout tone="warning" icon={IconExclamationCircle}>
 							Registry error: {rosterError}
 						</Callout>
 					)}
 					{body[step.id]}
 				</div>
 				<footer className="flex flex-wrap items-center gap-2 border-t border-border px-8 py-4">
-					<Button variant="ghost" leadingIcon={ArrowLeft} onClick={() => onPlace(index === 0 ? "welcome" : STEPS[index - 1]!.id)} {...activityControl("get-started.back")}>
+					<Button variant="ghost" leadingIcon={IconArrowLeft} onClick={() => onPlace(index === 0 ? "welcome" : STEPS[index - 1]!.id)} {...activityControl("get-started.back")}>
 						Back
 					</Button>
 					<div className="ms-auto flex flex-wrap items-center justify-end gap-2">{forward}</div>

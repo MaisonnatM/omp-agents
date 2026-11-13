@@ -1,4 +1,4 @@
-import { Blocks, CircleAlert, Package, Plus, RefreshCw } from "lucide-react";
+import { IconArrowRotateClockwise, IconBlocks, IconExclamationCircle, IconPackage, IconPlusLarge } from "central-icons";
 import { useEffect, useId, useReducer, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -496,7 +496,7 @@ export function ExtensionsTab({ cwd, active, onSaved }: { cwd: string | null; ac
 						<Button
 							size="compact"
 							variant="ghost"
-							leadingIcon={RefreshCw}
+							leadingIcon={IconArrowRotateClockwise}
 							loading={read.refreshing}
 							disabled={busy}
 							onClick={() => {
@@ -506,7 +506,7 @@ export function ExtensionsTab({ cwd, active, onSaved }: { cwd: string | null; ac
 						>
 							Refresh
 						</Button>
-						<Button size="compact" variant="secondary" leadingIcon={Plus} disabled={busy} onClick={() => setInstall({ entry: null })}>
+						<Button size="compact" variant="secondary" leadingIcon={IconPlusLarge} disabled={busy} onClick={() => setInstall({ entry: null })}>
 							Install package
 						</Button>
 						<Button size="compact" variant="outline" render={<a href="#get-started" />}>
@@ -530,7 +530,7 @@ export function ExtensionsTab({ cwd, active, onSaved }: { cwd: string | null; ac
 						</p>
 					)}
 					{snapshot && snapshot.diagnostics.length > 0 && (
-						<Callout tone="warning" icon={CircleAlert}>
+						<Callout tone="warning" icon={IconExclamationCircle}>
 							<details>
 								<summary className="cursor-pointer">{snapshot.diagnostics.length} inventory warnings</summary>
 								<ul className="space-y-1 pt-2">
@@ -625,7 +625,7 @@ export function ExtensionsTab({ cwd, active, onSaved }: { cwd: string | null; ac
 						widthKey="omp-agents.extensions-split"
 						resizeLabel="Resize the extension list"
 						detailLabel="Open extension"
-						empty={{ icon: Package, title: "Select a package", hint: "Read its contributions or manage its installation." }}
+						empty={{ icon: IconPackage, title: "Select a package", hint: "Read its contributions or manage its installation." }}
 						list={
 							<div className="p-2">
 								{read.data === null && !read.error ? (
@@ -753,7 +753,7 @@ export function ExtensionsTab({ cwd, active, onSaved }: { cwd: string | null; ac
 						widthKey="omp-agents.extensions-discover-split"
 						resizeLabel="Resize the catalog list"
 						detailLabel="Open catalog package"
-						empty={{ icon: Blocks, title: "Select a catalog package", hint: "Review the package before installing it." }}
+						empty={{ icon: IconBlocks, title: "Select a catalog package", hint: "Review the package before installing it." }}
 						list={
 							<div className="p-2">
 								{!catalogRequest && (

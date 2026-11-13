@@ -1,5 +1,6 @@
 /** Quick actions on a pull request, an issue, or a todo: the row menu, the details' buttons, and the note when a start fails. */
-import { CircleX, Eye, GitMerge, Hammer, ListChecks, type LucideIcon, MessageSquare, Radiation, Wrench, Zap } from "lucide-react";
+import { IconBubbleText, IconChecklist, IconCircleX, IconEyeOpen, IconHammer, IconMerged, IconNuclearPowerPlant, IconToolbox, IconZap } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import type { RosterHost, View } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
@@ -12,15 +13,15 @@ import type { StartOf } from "../starts";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { LiveSessionsMenu } from "./session-chip";
 
-const ICON: Record<QuickActionId, LucideIcon> = {
-	"fix-ci-and-conflicts": Wrench,
-	"fix-ci": CircleX,
-	"resolve-conflicts": GitMerge,
-	"address-comments": MessageSquare,
-	review: Eye,
-	"thermonuclear-review": Radiation,
-	work: Hammer,
-	plan: ListChecks,
+const ICON: Record<QuickActionId, IconComponent> = {
+	"fix-ci-and-conflicts": IconToolbox,
+	"fix-ci": IconCircleX,
+	"resolve-conflicts": IconMerged,
+	"address-comments": IconBubbleText,
+	review: IconEyeOpen,
+	"thermonuclear-review": IconNuclearPowerPlant,
+	work: IconHammer,
+	plan: IconChecklist,
 };
 
 export interface QuickActionsProps {
@@ -41,12 +42,12 @@ export function QuickActionsMenu({ actions, pending, onRun, label, open, onOpenC
 		<DropdownMenu open={open} onOpenChange={onOpenChange}>
 			<Tooltip content={label}>
 				<DropdownMenuTrigger render={<Button variant="ghost" size="icon-compact" aria-label={label} loading={pending !== null} />}>
-					<Zap />
+					<IconZap />
 				</DropdownMenuTrigger>
 			</Tooltip>
 			<DropdownMenuContent align="end">
 				{actions.map(id => {
-					const Icon: LucideIcon = ICON[id];
+					const Icon: IconComponent = ICON[id];
 					return (
 						<MenuItem key={id} title={QUICK_ACTIONS[id].description} onClick={() => onRun(id)}>
 							<Icon />

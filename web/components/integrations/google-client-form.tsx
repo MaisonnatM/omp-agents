@@ -1,5 +1,5 @@
 /** `GoogleClientForm`: the steps to a Google OAuth client and the fields for its ID, secret, and redirect port. */
-import { CircleAlert } from "lucide-react";
+import { IconExclamationCircle } from "central-icons";
 import { type FormEvent, useId, useRef, useState } from "react";
 import { GOOGLE_CLIENT_ID, type GoogleClientInput, type GoogleService, type GoogleSetup, googleRedirectUri, MCP_SERVICES, type McpIntegration } from "../../../src/shared/accounts";
 import { Button } from "@/components/ui/button";
@@ -157,7 +157,7 @@ export function GoogleClientForm({ id, setup, connected, onDone }: GoogleClientF
 				</Field>
 			</div>
 			{write.error && (
-				<Callout tone="danger" icon={CircleAlert} role="alert">
+				<Callout tone="danger" icon={IconExclamationCircle} role="alert">
 					Cannot save the OAuth client: {write.error}
 				</Callout>
 			)}

@@ -259,7 +259,7 @@ export function QuestionOptions({ options, layout, selected, multi = false, labe
 					multi={multi}
 					active={activeIndex === index}
 					tabIndex={index === tabStop ? 0 : -1}
-					arrow={<ArrowRight size={14} strokeWidth={2} className="h-3.5 w-3.5" />}
+					arrow={<ArrowRight size={14} className="h-3.5 w-3.5 icon-shapes:stroke-2" />}
 					registerItem={registerItem}
 					onPick={() => onPick(index)}
 				/>

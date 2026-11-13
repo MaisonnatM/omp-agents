@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-13
 
+- Every icon in the dashboard now comes from Central Icons, with a lighter, rounder line than before.
+- In an email, Reply all is now a button with its name, since the new icons have no reply-all picture to tell it from Reply.
 - The sidebar's page list, from New session to Settings, now stays in place while you scroll your sessions below it.
 - Bullets in an agent's reply read as a plain list again, with the bold word starting the sentence, instead of a two-column grid with lines between rows.
 - Agents now answer comparisons, such as which tickets match which pull requests, with a table: the starter kit's reply format asks for one.

@@ -1,47 +1,6 @@
 /** `Transcript`, a session's messages, thinking, and tool calls as rendered in a pane. */
-import {
-	AppWindow,
-	Bot,
-	Braces,
-	Brain,
-	Bug,
-	CircleCheck,
-	Code,
-	CornerDownLeft,
-	Cpu,
-	FilePen,
-	FilePlus,
-	Eye,
-	FileText,
-	Flag,
-	FolderSearch,
-	GitPullRequest,
-	Globe,
-	GraduationCap,
-	History,
-	Hourglass,
-	Image,
-	Lightbulb,
-	Link,
-	ListTodo,
-	type LucideIcon,
-	MessageCircleQuestion,
-	MessageSquareWarning,
-	Monitor,
-	OctagonX,
-	Plug,
-	RefreshCcw,
-	Replace,
-	SearchCode,
-	ShieldCheck,
-	Ship,
-	Sparkles,
-	SquareTerminal,
-	StickyNote,
-	Target,
-	TextSearch,
-	Wrench,
-} from "lucide-react";
+import { IconAiBotHead, IconArrowCornerDownLeft, IconArrowRotateCounterClockwise, IconArrowsRepeat, IconBrain, IconBubbleAlert, IconBubbleQuestion, IconBug, IconChainLink1, IconChip, IconCircleCheck, IconCircleX, IconCode, IconCodeBrackets, IconConsole, IconEyeOpen, IconFileEdit, IconFileText, IconFlag1, IconFolderOpen, IconGlobe, IconGraduateCap, IconHistory, IconHourglass, IconImac, IconImages1, IconLightBulb, IconNote1, IconPageAdd, IconPageTextSearch, IconPlugin1, IconPullRequest, IconPageSearch, IconShieldCheck, IconShip, IconSparklesTwo, IconTarget, IconTodos, IconToolbox, IconWindowApp } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { createContext, Fragment, type KeyboardEvent, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ArtifactSave } from "../../src/shared/artifacts";
 import type { View } from "../../src/shared/sessions";
@@ -94,49 +53,49 @@ import { latestReviewPages, requestReview } from "../review-pages";
 import { BROWSER_AVAILABLE } from "./browser-panel";
 
 /** omp's tool names (`pi-coding-agent/src/tools/builtin-names.ts`, plus its optional and extension tools). */
-const TOOL_ICON: Record<string, LucideIcon> = {
-	read: FileText,
-	write: FilePlus,
-	edit: FilePen,
-	ast_edit: Replace,
-	ast_grep: SearchCode,
-	bash: SquareTerminal,
-	eval: Code,
-	grep: TextSearch,
-	glob: FolderSearch,
-	find: FolderSearch,
-	lsp: Braces,
-	debug: Bug,
-	ida: Cpu,
-	ask: MessageCircleQuestion,
-	task: Bot,
-	wait: Hourglass,
-	yield: CornerDownLeft,
-	todo: ListTodo,
-	goal: Target,
-	think: Lightbulb,
-	web_search: Globe,
-	web_fetch: Link,
-	fetch: Link,
-	browser: AppWindow,
-	computer: Monitor,
-	generate_image: Image,
-	github: GitPullRequest,
-	ship_stage: Ship,
-	artifact: Sparkles,
-	checkpoint: Flag,
-	rewind: History,
-	context_notes: StickyNote,
-	new_context: RefreshCcw,
-	security_scan: ShieldCheck,
-	memory_edit: Brain,
-	retain: Brain,
-	recall: Brain,
-	reflect: Brain,
-	learn: GraduationCap,
-	manage_skill: Sparkles,
-	proc_kill: OctagonX,
-	report_issue: MessageSquareWarning,
+const TOOL_ICON: Record<string, IconComponent> = {
+	read: IconFileText,
+	write: IconPageAdd,
+	edit: IconFileEdit,
+	ast_edit: IconArrowsRepeat,
+	ast_grep: IconPageSearch,
+	bash: IconConsole,
+	eval: IconCode,
+	grep: IconPageTextSearch,
+	glob: IconFolderOpen,
+	find: IconFolderOpen,
+	lsp: IconCodeBrackets,
+	debug: IconBug,
+	ida: IconChip,
+	ask: IconBubbleQuestion,
+	task: IconAiBotHead,
+	wait: IconHourglass,
+	yield: IconArrowCornerDownLeft,
+	todo: IconTodos,
+	goal: IconTarget,
+	think: IconLightBulb,
+	web_search: IconGlobe,
+	web_fetch: IconChainLink1,
+	fetch: IconChainLink1,
+	browser: IconWindowApp,
+	computer: IconImac,
+	generate_image: IconImages1,
+	github: IconPullRequest,
+	ship_stage: IconShip,
+	artifact: IconSparklesTwo,
+	checkpoint: IconFlag1,
+	rewind: IconHistory,
+	context_notes: IconNote1,
+	new_context: IconArrowRotateCounterClockwise,
+	security_scan: IconShieldCheck,
+	memory_edit: IconBrain,
+	retain: IconBrain,
+	recall: IconBrain,
+	reflect: IconBrain,
+	learn: IconGraduateCap,
+	manage_skill: IconSparklesTwo,
+	proc_kill: IconCircleX,
+	report_issue: IconBubbleAlert,
 };
 
 export const NOTICE_TONE: Record<Extract<Item, { kind: "notice" }>["level"], string> = {
@@ -265,7 +224,7 @@ export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries:
 		<TraceCollapsible open={open} onOpenChange={next => setToggle({ open: next, expanded })} className="max-w-2xl self-start">
 			<TraceCollapsibleTrigger {...activityControl("transcript.activity-group")}>
 				<TraceLine status={running ? "running" : undefined}>
-					<TraceIcon>{running ? <LoaderIcon className="animate-spin" /> : tools.length ? <CircleCheck /> : <Brain />}</TraceIcon>
+					<TraceIcon>{running ? <LoaderIcon className="animate-spin" /> : tools.length ? <IconCircleCheck /> : <IconBrain />}</TraceIcon>
 					<TraceTitle>{header}</TraceTitle>
 				</TraceLine>
 			</TraceCollapsibleTrigger>
@@ -278,7 +237,7 @@ export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries:
 									<TraceCollapsibleTrigger>
 										<TraceLine status={entry.streaming ? "running" : undefined}>
 											<TraceIcon>
-												<Brain />
+												<IconBrain />
 											</TraceIcon>
 											<TraceTitle>{entry.streaming ? "Thinking" : "Thought"}</TraceTitle>
 										</TraceLine>
@@ -291,7 +250,7 @@ export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries:
 								</TraceCollapsible>
 							);
 						}
-						const Icon = Object.hasOwn(TOOL_ICON, entry.name) ? TOOL_ICON[entry.name]! : entry.name.startsWith("mcp__") ? Plug : Wrench;
+						const Icon = Object.hasOwn(TOOL_ICON, entry.name) ? TOOL_ICON[entry.name]! : entry.name.startsWith("mcp__") ? IconPlugin1 : IconToolbox;
 						return (
 							<Fragment key={entry.id}>
 								<TraceLine status={entry.status === "ok" ? undefined : entry.status}>
@@ -368,7 +327,7 @@ function Row({ messageId, settled, className, children }: { messageId: string; s
 	);
 }
 
-type ToolChip = { name: string; label: string; href: string | null; icon: LucideIcon };
+type ToolChip = { name: string; label: string; href: string | null; icon: IconComponent };
 
 /** A group of tool calls and thinking, with a chip for each label `chips` gives a call that finished in it. Memoized on its block, so a token leaves a settled group as it is. */
 const ActivityRow = memo(function ActivityRow({ id, entries, settled, shown, chips }: { id: string; entries: ActivityItem[]; settled: boolean; shown: boolean; chips: ToolChipLabels }) {
@@ -461,7 +420,7 @@ function ReviewButton({ onReview }: { onReview: () => void }) {
 	return (
 		<Tooltip content="Review visuals in the Browser">
 			<Button {...activityControl("browser.review-visuals")} variant="ghost" size="icon-compact" aria-label="Review visuals" onClick={onReview}>
-				<Eye />
+				<IconEyeOpen />
 			</Button>
 		</Tooltip>
 	);

@@ -1,4 +1,4 @@
-import { AppWindow, Archive, CircleStop, Columns2, Copy, Folder, GitPullRequest, Pin, PinOff, Play, Settings } from "lucide-react";
+import { IconArchive, IconFolder1, IconLayoutColumn, IconPin, IconPlay, IconPullRequest, IconSettingsGear1, IconSquareBehindSquare1, IconStopCircle, IconUnpin, IconWindowApp } from "central-icons";
 import { pullRequestUrl } from "../src/shared/github";
 import type { PastSession, RosterHost, View } from "../src/shared/sessions";
 import type { ActionGroup, ActionRun } from "./command-palette";
@@ -47,14 +47,14 @@ export function sessionActions(entry: SessionEntry, context: SessionActionContex
 	const view = viewOf(entry);
 	const resuming = context.resuming === sessionId;
 	const opening: ActionGroup<SessionRun> = [
-		{ id: "open", title: "Open", icon: AppWindow, run: { kind: "do", fn: () => context.open(view, "replace") } },
-		...(context.onScreen ? [] : [{ id: "split", title: "Open in split", icon: Columns2, run: { kind: "do", fn: () => context.open(view, "split") } } as const]),
+		{ id: "open", title: "Open", icon: IconWindowApp, run: { kind: "do", fn: () => context.open(view, "replace") } },
+		...(context.onScreen ? [] : [{ id: "split", title: "Open in split", icon: IconLayoutColumn, run: { kind: "do", fn: () => context.open(view, "split") } } as const]),
 		...(entry.kind === "past" && entry.session.source === "omp"
 			? [
 					{
 						id: "resume",
 						title: resuming ? "Resuming…" : "Resume",
-						icon: Play,
+						icon: IconPlay,
 						disabled: context.resuming !== null,
 						run: {
 							kind: "do",
@@ -68,12 +68,12 @@ export function sessionActions(entry: SessionEntry, context: SessionActionContex
 				]
 			: []),
 		...(entry.kind === "past" && entry.session.interrupted
-			? [{ id: "dismiss", title: "Move to past", icon: Archive, run: { kind: "do", fn: () => context.dismissInterrupted(sessionId) } } as const]
+			? [{ id: "dismiss", title: "Move to past", icon: IconArchive, run: { kind: "do", fn: () => context.dismissInterrupted(sessionId) } } as const]
 			: []),
 		{
 			id: "pin",
 			title: context.pinned ? "Unpin" : "Pin",
-			icon: context.pinned ? PinOff : Pin,
+			icon: context.pinned ? IconUnpin : IconPin,
 			chord: { key: "p", mod: true, shift: true },
 			run: { kind: "do", fn: () => context.togglePin(sessionId) },
 		},
@@ -82,15 +82,15 @@ export function sessionActions(entry: SessionEntry, context: SessionActionContex
 		...row.pullRequests.map(pr => ({
 			id: `pr:${pullRequestUrl(pr)}`,
 			title: `Open ${pr.repo}#${pr.number}`,
-			icon: GitPullRequest,
+			icon: IconPullRequest,
 			run: { kind: "link", href: pullRequestUrl(pr), external: true } as const,
 		})),
 		...row.tickets.map(id => ({ id: `ticket:${id}`, title: `Open ${id}`, icon: PAGE_ICON.tickets, run: { kind: "link", href: hashForTickets(id) } as const })),
-		...(context.workspaceSettings ? [{ id: "settings", title: "Workspace settings", icon: Settings, run: { kind: "do", fn: context.workspaceSettings } } as const] : []),
+		...(context.workspaceSettings ? [{ id: "settings", title: "Workspace settings", icon: IconSettingsGear1, run: { kind: "do", fn: context.workspaceSettings } } as const] : []),
 	];
 	const copies: ActionGroup<SessionRun> = [
-		{ id: "copy-path", title: "Copy path", icon: Folder, chord: { key: "c", mod: true, shift: true }, run: { kind: "do", fn: () => void navigator.clipboard.writeText(row.cwd) } },
-		{ id: "copy-id", title: "Copy session ID", icon: Copy, run: { kind: "do", fn: () => void navigator.clipboard.writeText(sessionId) } },
+		{ id: "copy-path", title: "Copy path", icon: IconFolder1, chord: { key: "c", mod: true, shift: true }, run: { kind: "do", fn: () => void navigator.clipboard.writeText(row.cwd) } },
+		{ id: "copy-id", title: "Copy session ID", icon: IconSquareBehindSquare1, run: { kind: "do", fn: () => void navigator.clipboard.writeText(sessionId) } },
 	];
 	if (entry.kind === "past" || entry.host.control.phase !== "live" || entry.host.control.readOnly) return [opening, links, copies];
 	const { instanceId } = entry.host;
@@ -102,7 +102,7 @@ export function sessionActions(entry: SessionEntry, context: SessionActionContex
 			{
 				id: "end",
 				title: context.ending ? "Ending…" : "End session",
-				icon: CircleStop,
+				icon: IconStopCircle,
 				disabled: context.ending,
 				tone: "destructive",
 				chord: END_SESSION,

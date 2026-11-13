@@ -1,5 +1,5 @@
 /** The open day of the week: each workout with its demos, blocks, exercises, and loads, then the daily habits with their routines' checklists. */
-import { Check, Play, Plus, Timer } from "lucide-react";
+import { IconCheckmark1, IconPlay, IconPlusLarge, IconStopwatch } from "central-icons";
 import type { Exercise, Plan, Routine, RoutineCheck } from "../../../src/shared/sport";
 import type { PlannedDay, PlannedExercise, PlannedWorkout } from "../../../src/sport-week";
 import { Badge } from "@/components/ui/badge";
@@ -45,7 +45,7 @@ export function DayDetail({ plan, day, today, disabled, checks, onDemo, onTimer,
 					<p className="text-xs text-muted-foreground first-letter:uppercase">{kicker}</p>
 					<h2 className="text-xl font-semibold">Repos</h2>
 					<p className="mt-1 text-sm text-muted-foreground">Rien de prévu ce jour.</p>
-					<Button variant="tertiary" size="compact" leadingIcon={Plus} className="mt-3" disabled={disabled} onClick={() => onLog(null)} {...activityControl("sport.log.free")}>Séance libre</Button>
+					<Button variant="tertiary" size="compact" leadingIcon={IconPlusLarge} className="mt-3" disabled={disabled} onClick={() => onLog(null)} {...activityControl("sport.log.free")}>Séance libre</Button>
 				</section>
 			) : (
 				day.workouts.map(workout => <WorkoutCard key={workout.id} plan={plan} kicker={kicker} workout={workout} disabled={disabled} onDemo={onDemo} onTimer={onTimer} onLog={onLog} />)
@@ -75,7 +75,7 @@ function WorkoutCard({ plan, kicker, workout, disabled, onDemo, onTimer, onLog }
 				{log ? (
 					<Button variant="tertiary" size="compact" disabled={disabled} onClick={() => onLog(workout)} {...activityControl("sport.day.edit")}>Modifier…</Button>
 				) : (
-					<Button size="compact" leadingIcon={Check} disabled={disabled} onClick={() => onLog(workout)} {...activityControl("sport.log.open")}>Fait…</Button>
+					<Button size="compact" leadingIcon={IconCheckmark1} disabled={disabled} onClick={() => onLog(workout)} {...activityControl("sport.log.open")}>Fait…</Button>
 				)}
 			</header>
 			<DemoStrip demos={demos} onOpen={at => onDemo(workout.name, demos, at)} />
@@ -113,7 +113,7 @@ function ExerciseRow({ item: { exercise, load, removed }, onDemo, onTimer }: { i
 					{onDemo && !removed ? (
 						<button type="button" onClick={onDemo} {...activityControl("sport.demo.open")} className="inline-flex items-center gap-1 rounded-sm text-left underline decoration-dotted underline-offset-4 outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">
 							{exercise.name}
-							<Play aria-label="démo" className="size-3 fill-current text-muted-foreground" />
+							<IconPlay aria-hidden={false} aria-label="démo" className="size-3 icon-shapes:fill-current text-muted-foreground" />
 						</button>
 					) : (
 						<span className={removed ? "text-muted-foreground line-through" : undefined}>{exercise.name}</span>
@@ -126,7 +126,7 @@ function ExerciseRow({ item: { exercise, load, removed }, onDemo, onTimer }: { i
 				</div>
 			</div>
 			{onTimer && (
-				<Button variant="secondary" size="compact" leadingIcon={Timer} className="shrink-0" onClick={onTimer} {...activityControl("sport.timer.open")}>
+				<Button variant="secondary" size="compact" leadingIcon={IconStopwatch} className="shrink-0" onClick={onTimer} {...activityControl("sport.timer.open")}>
 					Lancer
 				</Button>
 			)}
@@ -185,9 +185,9 @@ function RoutineHabit({ plan, label, routine, ticked, disabled, onDemo, onTimer,
 				<span className="min-w-0 flex-[1_1_16rem]">{label}</span>
 				<span className="flex shrink-0 items-center gap-2">
 					{routine.items.length > 0 && <span className="text-xs text-muted-foreground tabular-nums">{ticked.length} / {routine.items.length}</span>}
-					{demos.length > 0 && <Button variant="ghost" size="compact" leadingIcon={Play} onClick={() => onDemo(routine.name, demos, 0)} {...activityControl("sport.demo.open")}>Démos</Button>}
+					{demos.length > 0 && <Button variant="ghost" size="compact" leadingIcon={IconPlay} onClick={() => onDemo(routine.name, demos, 0)} {...activityControl("sport.demo.open")}>Démos</Button>}
 					{routine.items.length > 0 && (
-						<Button variant="secondary" size="compact" leadingIcon={Timer} disabled={disabled} onClick={onTimer} {...activityControl("sport.timer.open")}>
+						<Button variant="secondary" size="compact" leadingIcon={IconStopwatch} disabled={disabled} onClick={onTimer} {...activityControl("sport.timer.open")}>
 							Lancer
 						</Button>
 					)}
@@ -229,13 +229,13 @@ function CheckRow({ exercise, done, disabled, onDemo, onToggle }: { exercise: Ex
 				onClick={onToggle}
 				className={cn("mt-px inline-flex size-5 shrink-0 items-center justify-center rounded-md border outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50", done ? "border-foreground bg-foreground text-background" : "border-border bg-background hover:bg-accent")}
 			>
-				{done && <Check aria-hidden className="size-3.5" />}
+				{done && <IconCheckmark1 className="size-3.5" />}
 			</button>
 			<div className="flex min-w-0 flex-1 flex-col gap-0.5 @md/sport:flex-row @md/sport:items-start @md/sport:justify-between @md/sport:gap-4">
 				{onDemo ? (
 					<button type="button" onClick={onDemo} {...activityControl("sport.demo.open")} className={cn("inline-flex items-center gap-1 self-start rounded-sm text-left underline decoration-dotted underline-offset-4 outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-ring", done && "text-muted-foreground")}>
 						{exercise.name}
-						<Play aria-label="démo" className="size-3 fill-current text-muted-foreground" />
+						<IconPlay aria-hidden={false} aria-label="démo" className="size-3 icon-shapes:fill-current text-muted-foreground" />
 					</button>
 				) : (
 					<span className={cn(done && "text-muted-foreground")}>{exercise.name}</span>

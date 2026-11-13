@@ -1,5 +1,5 @@
 /** The workspace picker: the searchable directory list for the roster and the new session's directory. */
-import { Folder, FolderPlus } from "lucide-react";
+import { IconFolder1, IconFolderAddRight } from "central-icons";
 import { useContext, useState } from "react";
 import { errorText } from "../../src/json";
 import type { ControlId } from "../../src/shared/activity";
@@ -65,7 +65,7 @@ export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shor
 	return (
 		<CommandPicker
 			trigger={workspaceName(workspaces.find(workspace => workspace.cwd === cwd)?.cwdDisplay ?? cwd, personal) ?? cwd}
-			icon={Folder}
+			icon={IconFolder1}
 			control={control}
 			ariaLabel={`Working directory: ${cwd}`}
 			tooltip={tooltip}
@@ -105,7 +105,7 @@ export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shor
 										},
 										{
 											value: `create ${typed}`,
-											icon: FolderPlus,
+											icon: IconFolderAddRight,
 											label: (
 												<span className="truncate">
 													Create folder <span className="font-mono">{typed}</span>

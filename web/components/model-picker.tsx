@@ -3,7 +3,7 @@ import { type ModelEntry, type ModelOption, type PlanUsage, selectorOf } from ".
 import type { FastMode } from "../../src/shared/sessions";
 import type { AdvisorState } from "../../src/shared/session-controls";
 import type { ControlId } from "../../src/shared/activity";
-import { ChevronDown } from "lucide-react";
+import { IconChevronBottom } from "central-icons";
 import { useContext, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -236,7 +236,7 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 						<Button
 							variant="ghost"
 							size="compact"
-							trailingIcon={ChevronDown}
+							trailingIcon={IconChevronBottom}
 							loading={pending}
 							aria-label={`Choose model and effort: ${current ? modelDescription(current) : unset}, effort ${effort.current ? levelLabel(effort.current) : "Default"}`}
 							active={open !== null}

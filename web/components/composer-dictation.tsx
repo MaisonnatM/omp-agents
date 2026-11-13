@@ -2,7 +2,7 @@
  * The composer's microphone: its button, the setup popover a capture opens where dictation is off, and the status row
  * above the text field while a capture runs or after it failed. The page's one capture lives in `web/dictation.ts`.
  */
-import { Mic } from "lucide-react";
+import { IconMicrophone } from "central-icons";
 import { type KeyboardEvent, type RefObject, useEffect, useRef, useState } from "react";
 import { errorText } from "../../src/json";
 import { blockedByWorkspace, DICTATION_BUSY, type DictationSettings, processingText } from "../../src/shared/dictation";
@@ -184,7 +184,7 @@ export function DictationButton({ dictation }: { dictation: ComposerDictation })
 							onKeyDown={onKeyDown}
 							onClick={toggle}
 						>
-							<Mic aria-hidden="true" />
+							<IconMicrophone aria-hidden="true" />
 						</Button>
 					</PopoverAnchor>
 				</span>

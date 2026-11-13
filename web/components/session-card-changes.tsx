@@ -1,5 +1,5 @@
 /** The Session card's Files, Images, and Sources sections: the files the view's agent changed, the images its tools took, and the pages they opened, each a section that folds. */
-import { ChevronRight } from "lucide-react";
+import { IconChevronRight } from "central-icons";
 import { type ReactNode, useMemo, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import type { SessionFacts, View } from "../../src/shared/sessions";
@@ -87,7 +87,7 @@ export function ChangesSection({ title, open, onToggle, fold, action, children }
 					{...activityControl(fold)}
 					className="grid h-9 min-w-0 flex-1 grid-cols-[1rem_minmax(0,1fr)] items-center gap-x-3 px-3 text-left text-xs font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
 				>
-					<ChevronRight aria-hidden className={cn("mx-auto size-3.5 transition-transform motion-reduce:transition-none", open && "rotate-90")} />
+					<IconChevronRight className={cn("mx-auto size-3.5 transition-transform motion-reduce:transition-none", open && "rotate-90")} />
 					<span className="flex min-w-0 items-center gap-2">{title}</span>
 				</CollapsibleTrigger>
 				{action}

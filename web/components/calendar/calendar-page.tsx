@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Plus, Trash2 } from "lucide-react";
+import { IconArrowLeftRight, IconPlusLarge, IconTrashCan } from "central-icons";
 import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 import type { Routine } from "../../../src/routines";
 import type { Bot } from "../../../src/shared/bots";
@@ -207,7 +207,7 @@ function DeleteEvent({ eventRef, title, remove }: { eventRef: EventRef; title: s
 				disabled={remove.pending && !deleting}
 				onClick={() => remove.run(eventRef, title)}
 			>
-				<Trash2 />
+				<IconTrashCan />
 			</Button>
 		</Tooltip>
 	);
@@ -222,7 +222,7 @@ function MoveEvent({ id, title, to, move }: { id: string; title: string; to: Spa
 	return (
 		<Tooltip content={`Move to ${SPACE_LABELS[to]}`} side="left">
 			<Button variant="ghost" size="icon-compact" className="mt-0.5 shrink-0" aria-label={`Move ${title} to ${SPACE_LABELS[to]}`} loading={moving} disabled={move.pending && !moving} onClick={() => move.run(id, title, to)}>
-				<ArrowLeftRight />
+				<IconArrowLeftRight />
 			</Button>
 		</Tooltip>
 	);
@@ -464,7 +464,7 @@ export function CalendarPage({ routines: allRoutines, bots, todos: allTodos, tic
 						</CalendarDatePicker>
 						<div className="flex items-center gap-1 max-phone:ms-auto">
 							<Tooltip content="Add an event to Google Calendar or this computer" shortcut={shortcutLabels("calendarNewEvent")} side="bottom">
-								<Button variant="tertiary" leadingIcon={Plus} onClick={openNewEvent} className="max-phone:size-11 max-phone:px-0">
+								<Button variant="tertiary" leadingIcon={IconPlusLarge} onClick={openNewEvent} className="max-phone:size-11 max-phone:px-0">
 									<span className="max-phone:sr-only">New event</span>
 								</Button>
 							</Tooltip>

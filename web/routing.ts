@@ -1,5 +1,6 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { BarChart3, Blocks, Brain, FileText, Folders, GitBranch, GitMerge, HardDrive, KeyRound, type LucideIcon, MousePointerClick, Plug, RefreshCcw, Route as RouteIcon, Scale, Settings2, SlidersHorizontal, Smartphone, Workflow } from "lucide-react";
+import { IconAgentNetwork, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconStorage } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { isDay } from "../src/json";
 import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
@@ -25,7 +26,7 @@ export const SIDEBAR_TABS = [
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo },
 	{ value: "sport", label: "Sport", icon: PAGE_ICON.sport, space: "personal" },
 	{ value: "email", label: "Email", icon: PAGE_ICON.email, integration: "gmail" },
-] as const satisfies readonly { value: string; label: string; icon: LucideIcon; integration?: McpIntegrationId; space?: Space }[];
+] as const satisfies readonly { value: string; label: string; icon: IconComponent; integration?: McpIntegrationId; space?: Space }[];
 
 /** A sidebar tab, a row of the sidebar's page list; the tickets, Bots, todo, calendar, email, and sport tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
@@ -79,27 +80,27 @@ export const SETTINGS_GROUP_LABEL = Object.fromEntries(SETTINGS_GROUPS.map(group
  * them, and its header says so in `meta`; a section of any other group is the same whatever the workspace.
  */
 export const SETTINGS_SECTIONS = [
-	{ value: "analytics", label: "Analytics", icon: BarChart3, group: "usage", keywords: ["usage", "cost", "tokens", "spend"] },
-	{ value: "activity", label: "Activity", icon: MousePointerClick, group: "usage", keywords: ["features", "used", "time"] },
-	{ value: "preferences", label: "Preferences", icon: SlidersHorizontal, group: "general", keywords: ["theme", "dark mode", "notifications", "sound", "sidebar tabs", "transcript", "idle processes"] },
-	{ value: "workspaces", label: "Workspaces", icon: Folders, group: "general", keywords: ["directories", "folders", "hide"] },
-	{ value: "sync", label: "Sync", icon: RefreshCcw, group: "general", keywords: ["git", "remote", "machines"] },
-	{ value: "phone", label: "Phone access", icon: Smartphone, group: "general", keywords: ["tailscale", "mobile", "pair", "qr"] },
-	{ value: "storage", label: "Storage", icon: HardDrive, group: "general", keywords: ["disk", "space", "gc", "cleanup", "archive", "compress", "sandboxes"] },
-	{ value: "providers", label: "Providers", icon: KeyRound, group: "connections", keywords: ["login", "sign in", "accounts", "api key", "quota"] },
-	{ value: "integrations", label: "Integrations", icon: Plug, group: "connections", keywords: ["linear", "slack", "github", "gmail", "calendar", "connect"] },
-	{ value: "mcp-servers", label: "MCP servers", icon: Blocks, group: "connections", keywords: ["mcp", "tools"] },
-	{ value: "source-control", label: "Source control", icon: GitMerge, group: "connections", keywords: ["github", "gh", "pull", "merge"] },
-	{ value: "models", label: "Models", icon: RouteIcon, group: "workspace", keywords: ["roles", "fallback", "retry"], meta: AS_LOADED },
+	{ value: "analytics", label: "Analytics", icon: IconChart3, group: "usage", keywords: ["usage", "cost", "tokens", "spend"] },
+	{ value: "activity", label: "Activity", icon: IconCursorClick, group: "usage", keywords: ["features", "used", "time"] },
+	{ value: "preferences", label: "Preferences", icon: IconSettingsSliderHor, group: "general", keywords: ["theme", "dark mode", "notifications", "sound", "sidebar tabs", "transcript", "idle processes"] },
+	{ value: "workspaces", label: "Workspaces", icon: IconFolders, group: "general", keywords: ["directories", "folders", "hide"] },
+	{ value: "sync", label: "Sync", icon: IconArrowRotateCounterClockwise, group: "general", keywords: ["git", "remote", "machines"] },
+	{ value: "phone", label: "Phone access", icon: IconPhone, group: "general", keywords: ["tailscale", "mobile", "pair", "qr"] },
+	{ value: "storage", label: "Storage", icon: IconStorage, group: "general", keywords: ["disk", "space", "gc", "cleanup", "archive", "compress", "sandboxes"] },
+	{ value: "providers", label: "Providers", icon: IconKey1, group: "connections", keywords: ["login", "sign in", "accounts", "api key", "quota"] },
+	{ value: "integrations", label: "Integrations", icon: IconPlugin1, group: "connections", keywords: ["linear", "slack", "github", "gmail", "calendar", "connect"] },
+	{ value: "mcp-servers", label: "MCP servers", icon: IconBlocks, group: "connections", keywords: ["mcp", "tools"] },
+	{ value: "source-control", label: "Source control", icon: IconMerged, group: "connections", keywords: ["github", "gh", "pull", "merge"] },
+	{ value: "models", label: "Models", icon: IconDirection1, group: "workspace", keywords: ["roles", "fallback", "retry"], meta: AS_LOADED },
 	{ value: "agents", label: "Agents", icon: PAGE_ICON.bots, group: "workspace", keywords: ["subagents", "delegation", "concurrency", "isolation"], meta: { workspace: "Preview of a new session in this workspace", none: "Preview of a new session with user defaults only" } },
-	{ value: "omp", label: "omp settings", icon: Settings2, group: "workspace", keywords: ["config", "thinking", "compaction", "advisor", "bash", "lsp", "tools"], meta: AS_LOADED },
-	{ value: "omp-memory", label: "omp memory", icon: Brain, group: "workspace", keywords: ["memory", "remember", "recall", "auto-learn", "mnemopi", "hindsight", "sharpshooter"], meta: { ...AS_LOADED, none: "Your user settings only; memory is kept per workspace" } },
-	{ value: "files", label: "Files", icon: FileText, group: "workspace", keywords: ["AGENTS.md", "config", "skills", "rules"], meta: AS_LOADED },
-	{ value: "extensions", label: "Extensions", icon: Blocks, group: "workspace", meta: { none: "Packages installed for your user, all workspaces", workspace: "As a session in this workspace discovers them" }, keywords: ["plugins", "marketplaces", "registry skills", "contributions", "install"] },
-	{ value: "workflows", label: "Workflows", icon: Workflow, group: "workspace", keywords: ["workflow"], meta: { ...AS_LOADED, none: "Your user skills only, for all workspaces" } },
-	{ value: "decisions", label: "Decisions", icon: Scale, group: "workspace", keywords: ["records", "adr"], meta: { workspace: "The repository's decision records, read-only", none: "Every workspace in this space, grouped by workspace" } },
-	{ value: "worktrees", label: "Worktrees", icon: GitBranch, group: "workspace", keywords: ["branches", "cleanup"], meta: AS_LOADED },
-] as const satisfies readonly { value: string; label: string; icon: LucideIcon; group: SettingsGroup; keywords: readonly string[]; meta?: { workspace: string; none: string } }[];
+	{ value: "omp", label: "omp settings", icon: IconSettingsSliderHor, group: "workspace", keywords: ["config", "thinking", "compaction", "advisor", "bash", "lsp", "tools"], meta: AS_LOADED },
+	{ value: "omp-memory", label: "omp memory", icon: IconBrain, group: "workspace", keywords: ["memory", "remember", "recall", "auto-learn", "mnemopi", "hindsight", "sharpshooter"], meta: { ...AS_LOADED, none: "Your user settings only; memory is kept per workspace" } },
+	{ value: "files", label: "Files", icon: IconFileText, group: "workspace", keywords: ["AGENTS.md", "config", "skills", "rules"], meta: AS_LOADED },
+	{ value: "extensions", label: "Extensions", icon: IconBlocks, group: "workspace", meta: { none: "Packages installed for your user, all workspaces", workspace: "As a session in this workspace discovers them" }, keywords: ["plugins", "marketplaces", "registry skills", "contributions", "install"] },
+	{ value: "workflows", label: "Workflows", icon: IconAgentNetwork, group: "workspace", keywords: ["workflow"], meta: { ...AS_LOADED, none: "Your user skills only, for all workspaces" } },
+	{ value: "decisions", label: "Decisions", icon: IconLaw, group: "workspace", keywords: ["records", "adr"], meta: { workspace: "The repository's decision records, read-only", none: "Every workspace in this space, grouped by workspace" } },
+	{ value: "worktrees", label: "Worktrees", icon: IconBranch, group: "workspace", keywords: ["branches", "cleanup"], meta: AS_LOADED },
+] as const satisfies readonly { value: string; label: string; icon: IconComponent; group: SettingsGroup; keywords: readonly string[]; meta?: { workspace: string; none: string } }[];
 
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["value"];
 

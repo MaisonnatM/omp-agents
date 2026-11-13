@@ -1,5 +1,5 @@
 /** `SubagentLinks`, where a live view's subagents open and stop, and `CancelAgentButton`, the stop button after a running subagent's link. */
-import { CircleStop } from "lucide-react";
+import { IconStopCircle } from "central-icons";
 import { createContext } from "react";
 import type { AgentRow, LiveView, View } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,7 @@ export function CancelAgentButton({ view, onCancel, running }: { view: SubagentV
 				disabled={cancel.pending}
 				onClick={() => cancel.run()}
 			>
-				{cancel.pending ? <LoaderIcon className="size-3.5 animate-spin" /> : <CircleStop className="size-3.5" />}
+				{cancel.pending ? <LoaderIcon className="size-3.5 animate-spin" /> : <IconStopCircle className="size-3.5" />}
 			</Button>
 		</Tooltip>
 	);

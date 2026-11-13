@@ -1,5 +1,5 @@
 /** The right sidebar for a session: its pull requests, its running app in the desktop app, once it has any its Linear issues and its artifacts, and a personal session's memory; a Bot's details share its Tickets tab. */
-import { AppWindow, Brain, GitPullRequest, Sparkles } from "lucide-react";
+import { IconBrain, IconPullRequest, IconSparklesTwo, IconWindowApp } from "central-icons";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { LiveView, RosterHost, View } from "../../src/shared/sessions";
 import type { Artifact } from "../artifacts-model";
@@ -48,7 +48,7 @@ export function sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, 
 	return [
 		{
 			value: "pull-requests",
-			icon: GitPullRequest,
+			icon: IconPullRequest,
 			name: "PRs",
 			control: "session-details.tab.pull-requests",
 			count: pullRequests.length,
@@ -60,7 +60,7 @@ export function sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, 
 			? [
 					{
 						value: "browser",
-						icon: AppWindow,
+						icon: IconWindowApp,
 						name: "Browser",
 						control: "session-details.tab.browser",
 						count: 0,
@@ -74,7 +74,7 @@ export function sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, 
 			? [
 					{
 						value: "artifacts",
-						icon: Sparkles,
+						icon: IconSparklesTwo,
 						name: "Artifacts",
 						control: "session-details.tab.artifacts",
 						count: artifacts.length,
@@ -103,7 +103,7 @@ export function SessionDetails({ view, sessionId, working, cwd, personalMemory, 
 			? [
 					{
 						value: "memory",
-						icon: Brain,
+						icon: IconBrain,
 						name: "Memory",
 						control: "session-details.tab.memory",
 						count: 0,

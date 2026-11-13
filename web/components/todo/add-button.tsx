@@ -1,4 +1,4 @@
-import { Check, ListPlus } from "lucide-react";
+import { IconCheckmark1, IconListAdd } from "central-icons";
 import { useEffect, useState } from "react";
 import { addTodo } from "../../../src/user-todos";
 import type { UserTodoLink } from "../../../src/user-todos-shared";
@@ -42,7 +42,7 @@ export function AddToTodo({ text, body, link, label }: AddToTodoProps) {
 					setAdded(true);
 				}}
 			>
-				{added ? <Check /> : <ListPlus />}
+				{added ? <IconCheckmark1 /> : <IconListAdd />}
 			</Button>
 		</Tooltip>
 	);

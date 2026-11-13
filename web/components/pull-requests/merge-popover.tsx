@@ -1,4 +1,4 @@
-import { GitMerge, Layers } from "lucide-react";
+import { IconLayersTwo, IconMerged } from "central-icons";
 import type { ReactElement } from "react";
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
@@ -156,7 +156,7 @@ export function MergePopover({ pr, stack, target, error = null, onQueued, open, 
 							<Button variant="ghost" size="compact" onClick={() => onOpenChange(false)}>
 								Cancel
 							</Button>
-							<Button variant="primary" size="compact" leadingIcon={stack ? Layers : GitMerge} disabled={method === null} loading={merging} onClick={confirm}>
+							<Button variant="primary" size="compact" leadingIcon={stack ? IconLayersTwo : IconMerged} disabled={method === null} loading={merging} onClick={confirm}>
 								{method ? MERGE_METHOD_LABELS[method] : "Merge"}
 								{later && " when ready"}
 							</Button>

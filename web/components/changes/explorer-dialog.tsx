@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
+import { IconCrossMedium } from "central-icons";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -23,7 +23,7 @@ export function ExplorerDialog({ title, actions, children, onClose }: { title: R
 						<Tooltip content="Close" shortcut={["Esc"]}>
 							<DialogPrimitive.Close asChild>
 								<Button variant="ghost" size="icon-compact" aria-label="Close">
-									<X />
+									<IconCrossMedium />
 								</Button>
 							</DialogPrimitive.Close>
 						</Tooltip>

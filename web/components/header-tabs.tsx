@@ -1,5 +1,6 @@
 /** `HeaderTabs`, the row across the top of the page and the details sidebar: Back and Forward, one tab per page or session you opened, New session, then the header's controls. */
-import { GripVertical, House, type LucideIcon, MessageSquare, Plus, Sparkles, SquarePen, X } from "lucide-react";
+import { IconBubbleText, IconCrossMedium, IconDotGrid2x3, IconEditBig, IconHome, IconPlusLarge, IconSparklesTwo } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { awaitsSubagents, type PastSession, type RosterHost } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ import { useDashboardActions } from "./dashboard-context";
 import { HistoryButtons } from "./header-controls";
 import { StatusDot } from "./status-dot";
 
-const PAGE_TAB_ICON: Record<Page["kind"], LucideIcon> = { ...PAGE_ICON, "get-started": Sparkles, new: SquarePen, scheduled: PAGE_ICON.calendar };
+const PAGE_TAB_ICON: Record<Page["kind"], IconComponent> = { ...PAGE_ICON, "get-started": IconSparklesTwo, new: IconEditBig, scheduled: PAGE_ICON.calendar };
 
 const ICON = "size-3.5 shrink-0";
 
@@ -26,7 +27,7 @@ const ICON = "size-3.5 shrink-0";
 function faceOf(target: HeaderTabTarget, hosts: readonly RosterHost[], past: readonly PastSession[]): { label: string; lead: ReactNode } {
 	switch (target.kind) {
 		case "home":
-			return { label: "Home", lead: <House className={ICON} /> };
+			return { label: "Home", lead: <IconHome className={ICON} /> };
 		case "page": {
 			const Icon = PAGE_TAB_ICON[target.page.kind];
 			return { label: pageTitle(target.page), lead: <Icon className={ICON} /> };
@@ -41,14 +42,14 @@ function faceOf(target: HeaderTabTarget, hosts: readonly RosterHost[], past: rea
 	const { view } = target;
 	if (view.kind === "past") {
 		const session = past.find(each => each.sessionId === view.sessionId) ?? null;
-		return { label: viewTitle(view, null, session) ?? "Past session", lead: <MessageSquare className={ICON} /> };
+		return { label: viewTitle(view, null, session) ?? "Past session", lead: <IconBubbleText className={ICON} /> };
 	}
 	const host = hosts.find(each => each.instanceId === view.instanceId) ?? null;
 	const label = viewTitle(view, host, null) ?? "Session";
-	if (!host) return { label, lead: <MessageSquare className={ICON} /> };
+	if (!host) return { label, lead: <IconBubbleText className={ICON} /> };
 	const status = awaitsSubagents(host) ? "awaiting-subagents" : host.status;
 	// A working session draws no mark, as its sidebar row's dot does not: the icon, and the status only for screen readers.
-	if (status === "working" || status === "awaiting-subagents") return { label, lead: <><MessageSquare className={ICON} /><StatusDot status={status} /></> };
+	if (status === "working" || status === "awaiting-subagents") return { label, lead: <><IconBubbleText className={ICON} /><StatusDot status={status} /></> };
 	return { label, lead: <span className="flex w-3.5 justify-center"><StatusDot status={status} /></span> };
 }
 
@@ -106,7 +107,7 @@ function HeaderTabItem({ tab, target, label, lead, active, drag, onClose }: Head
 				{lead}
 				<span className="truncate">{label}</span>
 			</a>
-			<GripVertical aria-hidden className={cn("pointer-events-none absolute right-[26px] size-3 text-muted-foreground/60", !active && "hidden")} />
+			<IconDotGrid2x3 className={cn("pointer-events-none absolute right-[26px] size-3 text-muted-foreground/60", !active && "hidden")} />
 			<button
 				type="button"
 				{...activityControl("header.tab.close")}
@@ -118,7 +119,7 @@ function HeaderTabItem({ tab, target, label, lead, active, drag, onClose }: Head
 				onClick={onClose}
 			>
 				<span className="grid size-4 place-items-center rounded-md group-hover/close:bg-active">
-					<X className="size-3" />
+					<IconCrossMedium className="size-3" />
 				</span>
 			</button>
 		</div>
@@ -221,7 +222,7 @@ export function HeaderTabs({ className, address, hosts, past, controls }: Header
 			>
 				{tabs.map(tab => {
 					const target = headerTabTarget(tab.hash);
-					const { label, lead } = target ? faceOf(target, hosts, past) : { label: "Session", lead: <MessageSquare className={ICON} /> };
+					const { label, lead } = target ? faceOf(target, hosts, past) : { label: "Session", lead: <IconBubbleText className={ICON} /> };
 					return (
 						<HeaderTabItem
 							key={tab.key}
@@ -238,7 +239,7 @@ export function HeaderTabs({ className, address, hosts, past, controls }: Header
 			</nav>
 			<Tooltip content="New session" shortcut={shortcutLabels("newSession")} side="bottom">
 				<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="New session" onClick={() => openNewSession()}>
-					<Plus />
+					<IconPlusLarge />
 				</Button>
 			</Tooltip>
 			<div className="ml-auto flex shrink-0 items-center pr-1.5">{controls}</div>

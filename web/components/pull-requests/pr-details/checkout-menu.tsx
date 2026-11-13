@@ -1,4 +1,5 @@
-import { ChevronDown, FolderGit2, GitBranch, type LucideIcon } from "lucide-react";
+import { IconBranch, IconChevronBottom, IconFolder2 } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import type { CheckedOutPullRequest, CheckoutPlace, PullRequest, PullRequestCheckout } from "../../../../src/shared/github";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
@@ -10,9 +11,9 @@ import { useAction } from "../../../use-action";
 import { toasts } from "../../toaster";
 import type { DetailContentProps } from "./detail-props";
 
-const PLACES: { place: CheckoutPlace; icon: LucideIcon; label: string; description: string }[] = [
-	{ place: "worktree", icon: GitBranch, label: "In a separate worktree", description: "Its own folder and thread. Nothing you have open moves." },
-	{ place: "here", icon: FolderGit2, label: "In this repository", description: "Switches the branch you are working in, like `gh pr checkout`." },
+const PLACES: { place: CheckoutPlace; icon: IconComponent; label: string; description: string }[] = [
+	{ place: "worktree", icon: IconBranch, label: "In a separate worktree", description: "Its own folder and thread. Nothing you have open moves." },
+	{ place: "here", icon: IconFolder2, label: "In this repository", description: "Switches the branch you are working in, like `gh pr checkout`." },
 ];
 
 const CHECKED_OUT: Record<CheckoutPlace, { title: string; description: string }> = {
@@ -43,7 +44,7 @@ export function CheckoutMenu({ pr, cwd, onOpen }: { pr: PullRequest; cwd: string
 			<Tooltip content="Check out this pull request">
 				<DropdownMenuTrigger
 					{...activityControl("pr-details.checkout")}
-					render={<Button size="xs" variant="outline" className="shrink-0 @max-[35rem]/pr-header:gap-0.5 [&_svg:last-child]:text-muted-foreground" leadingIcon={GitBranch} trailingIcon={ChevronDown} disabled={checkOut.pending} aria-label={label} />}
+					render={<Button size="xs" variant="outline" className="shrink-0 @max-[35rem]/pr-header:gap-0.5 [&_svg:last-child]:text-muted-foreground" leadingIcon={IconBranch} trailingIcon={IconChevronBottom} disabled={checkOut.pending} aria-label={label} />}
 				>
 					<span className="@max-[35rem]/pr-header:hidden">{label}</span>
 				</DropdownMenuTrigger>

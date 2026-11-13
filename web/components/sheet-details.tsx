@@ -1,5 +1,6 @@
 /** The parts shared by a pull request's details and the tickets page's issue details. */
-import { ExternalLink, type LucideIcon } from "lucide-react";
+import { IconSquareArrowTopRight } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import type { ReactNode } from "react";
 import type { PullRequestComment } from "../../src/shared/github";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -24,7 +25,7 @@ export function DetailSection({ title, children }: { title: ReactNode; children:
 }
 
 /** A property of the details: its icon and name in a narrow column, then its value, usually a picker that changes it. */
-export function MetaRow({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: ReactNode }) {
+export function MetaRow({ icon: Icon, label, children }: { icon: IconComponent; label: string; children: ReactNode }) {
 	return (
 		<div className="grid min-h-7 min-w-0 grid-cols-[6rem_minmax(0,1fr)] items-center gap-2 text-xs sm:min-h-6">
 			<span className="flex items-center gap-1.5 text-muted-foreground">
@@ -41,7 +42,7 @@ export function OutLink({ href, children }: { href: string; children: ReactNode 
 	return (
 		<a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline-offset-2 hover:text-foreground hover:underline">
 			{children}
-			<ExternalLink aria-hidden className="size-3" />
+			<IconSquareArrowTopRight className="size-3" />
 		</a>
 	);
 }
