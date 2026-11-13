@@ -192,12 +192,15 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 				className,
 			)}
 		>
-			<HistoryButtons />
+			{/* A docked open sidebar holds these at its right edge instead (`DashboardSidebar`). */}
+			<div className="contents phone:group-has-[#sessions-sidebar:not([inert])]/window:hidden">
+				<HistoryButtons />
+			</div>
 			<nav
 				ref={list}
 				aria-label="Header tabs"
 				onScroll={edges.onScroll}
-				className="ml-1 flex min-w-0 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]"
+				className="ml-1 flex min-w-0 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] phone:group-has-[#sessions-sidebar:not([inert])]/window:ml-0"
 				style={edges.style}
 			>
 				{tabs.map((tab, index) => {
