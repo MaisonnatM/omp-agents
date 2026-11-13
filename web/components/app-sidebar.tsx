@@ -20,7 +20,6 @@ import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Roster } from "./roster";
 import { ScheduledSends } from "./scheduled";
 import { type NavCount, SidebarNav } from "./sidebar-nav";
-import { useUnseenChangelog } from "./whats-new";
 
 const NO_VIEWS: View[] = [];
 
@@ -67,7 +66,6 @@ export const AppSidebar = memo(function AppSidebar({
 	const { connected, pullRequestsScope } = useDashboardStatus();
 	const scheduled = useContext(ScheduledSends);
 	const pullRequestRead = pullRequestsStore.use(pullRequestsScope).read;
-	const unseenChangelog = useUnseenChangelog();
 	const counts = useMemo(
 		(): Partial<Record<SidebarTab, NavCount>> => ({
 			bots: { count: botList ? botsNeedingYou(botList) : 0, says: sessionsWaiting },
@@ -102,7 +100,6 @@ export const AppSidebar = memo(function AppSidebar({
 				onTab={onTab}
 				settingsRoute={settings}
 				unreadNotices={unreadNotices}
-				unseenChangelog={unseenChangelog}
 			/>
 			<SidebarContent>
 				<Roster

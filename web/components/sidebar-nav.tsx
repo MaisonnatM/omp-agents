@@ -5,7 +5,7 @@ import { SidebarGroup, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, Sidebar
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip } from "@/components/ui/tooltip";
 import { PAGE_ICON } from "../page-icons";
-import { hashForNotifications, hashForPage, hashForWhatsNew, type SettingsRoute, type SidebarTab } from "../routing";
+import { hashForNotifications, hashForPage, type SettingsRoute, type SidebarTab } from "../routing";
 import { shortcutLabels } from "../shortcuts";
 import { type NavRow, TAB_ROWS, tabShortcutLabels } from "../sidebar-tabs";
 import { CountPill } from "./count-pill";
@@ -33,11 +33,9 @@ interface SidebarNavProps {
 	settingsRoute: SettingsRoute;
 	/** How many notices are unread, after the Notifications row's label. */
 	unreadNotices: number;
-	/** The changelog has lines the What's new page has not listed on this machine. */
-	unseenChangelog: boolean;
 }
 
-export function SidebarNav({ tabs, current, counts, list, newSessionLabel, onNewSession, onTab, settingsRoute, unreadNotices, unseenChangelog }: SidebarNavProps) {
+export function SidebarNav({ tabs, current, counts, list, newSessionLabel, onNewSession, onTab, settingsRoute, unreadNotices }: SidebarNavProps) {
 	const sub = list !== null && (
 		<SidebarMenuNested>
 			<ScrollArea className="ml-[15px] border-l border-border" viewportClassName="scroll-fade max-h-[30svh] pl-1 [&>div]:!block [&>div]:!min-w-0">
@@ -93,18 +91,6 @@ export function SidebarNav({ tabs, current, counts, list, newSessionLabel, onNew
 						{unreadNotices > 0 && (
 							<SidebarMenuBadge aria-hidden>
 								<CountPill count={unreadNotices} />
-							</SidebarMenuBadge>
-						)}
-					</SidebarMenuItem>
-					<SidebarMenuItem>
-						<Tooltip content="What's new" side="right">
-							<SidebarMenuButton size="short" asChild icon={PAGE_ICON["whats-new"]} isActive={current === "whats-new"} aria-label={unseenChangelog ? "What's new, unseen lines" : undefined}>
-								<a href={hashForWhatsNew()}>What's new</a>
-							</SidebarMenuButton>
-						</Tooltip>
-						{unseenChangelog && (
-							<SidebarMenuBadge aria-hidden>
-								<span className="mr-1 size-2 rounded-full bg-blue-500" />
 							</SidebarMenuBadge>
 						)}
 					</SidebarMenuItem>
