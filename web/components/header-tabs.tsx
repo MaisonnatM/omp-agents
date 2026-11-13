@@ -1,5 +1,5 @@
 /** `HeaderTabs`, the row across the top of the page and the details sidebar: Back and Forward, the tabs you browse in, and a + that opens a new one. */
-import { IconBubbleText, IconCrossMedium, IconDotGrid2x3, IconEditBig, IconHome, IconPlusLarge, IconSparklesTwo } from "central-icons";
+import { IconBubbleText, IconCrossMedium, IconEditBig, IconHome, IconPlusLarge, IconSparklesTwo } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { awaitsSubagents, type PastSession, type RosterHost } from "../../src/shared/sessions";
@@ -65,7 +65,7 @@ interface HeaderTabItemProps {
 	onClose: () => void;
 }
 
-/** One header tab: its link, the grip that says the focused tab drags, and its ×, which an inactive tab shows on hover, on focus, and on a touch screen. */
+/** One header tab, which drags from anywhere on it to reorder: its link, and its ×, which an inactive tab shows on hover, on focus, and on a touch screen. */
 function HeaderTabItem({ tab, target, label, lead, active, drag, onSelect, onClose }: HeaderTabItemProps) {
 	return (
 		<div
@@ -88,7 +88,7 @@ function HeaderTabItem({ tab, target, label, lead, active, drag, onSelect, onClo
 				className={cn(
 					"flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-lg pl-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring",
 					// The label fades under the × where it shows.
-					active ? "pr-11" : "pr-2.5 revealed:[mask-image:linear-gradient(to_left,transparent_1.625rem,black_2rem)]",
+					active ? "pr-7" : "pr-2.5 revealed:[mask-image:linear-gradient(to_left,transparent_1.625rem,black_2rem)]",
 				)}
 				onClick={event => {
 					if (event.metaKey || event.ctrlKey || event.shiftKey) return;
@@ -108,7 +108,6 @@ function HeaderTabItem({ tab, target, label, lead, active, drag, onSelect, onClo
 				{lead}
 				<span className="truncate">{label}</span>
 			</a>
-			<IconDotGrid2x3 className={cn("pointer-events-none absolute right-[26px] size-3 text-muted-foreground/60", !active && "hidden")} />
 			<button
 				type="button"
 				{...activityControl("header.tab.close")}
