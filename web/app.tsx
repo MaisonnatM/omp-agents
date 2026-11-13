@@ -35,7 +35,7 @@ import { ProjectTrustDialog } from "./components/project-trust-dialog";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { GetStarted } from "./components/get-started";
 import { firstSessionFact } from "./get-started-model";
-import { DashboardSidebar, SIDEBAR_VARS, useSidebarPanels } from "./components/sidebar-panel";
+import { DashboardSidebar, useSidebarPanels } from "./components/sidebar-panel";
 import { StatusBar } from "./components/status-bar";
 import { subjectOf } from "./components/subject";
 import { NewTicketDialog } from "./components/tickets/new-ticket";
@@ -301,7 +301,6 @@ export function App() {
 									{/* The sidebar runs the window's height; the header's tabs sit right of it, above the page and the details sidebar, each an inset panel on the sidebar's color. */}
 									<SidebarProvider
 										className="group/window grid min-h-0 flex-1 grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[var(--page-header-height)_minmax(0,1fr)] pr-1.5 pb-1.5 [grid-template-areas:'sidebar_tabs_tabs'_'sidebar_page_details']"
-										style={SIDEBAR_VARS}
 									>
 										<DashboardSidebar side="left" className="[grid-area:sidebar]" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")} address={address}>
 											<AppSidebar
@@ -321,7 +320,7 @@ export function App() {
 											/>
 										</DashboardSidebar>
 										<HeaderTabs className="[grid-area:tabs]" address={address} hosts={state.hosts} past={state.past} controls={headerControls} />
-										<SidebarInset className="inset-panel [grid-area:page]">
+										<SidebarInset className="inset-panel [grid-area:page] group-has-[#sessions-sidebar[inert]]/window:ml-1.5">
 											<div ref={pageArea} className="flex min-h-0 flex-1">
 												{listPage && placement?.at === "column" && (
 													<PageListColumn page={listPage} max={placement.max}>
