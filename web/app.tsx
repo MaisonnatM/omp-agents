@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { callable } from "../src/shared/accounts";
 import type { View } from "../src/shared/sessions";
@@ -289,7 +290,7 @@ export function App() {
 									/>
 								</DashboardSidebar>
 								<HeaderTabs className="[grid-area:tabs]" address={address} hosts={state.hosts} past={state.past} controls={headerControls} />
-								<SidebarInset className="inset-panel [grid-area:page] group-has-[#sessions-sidebar[inert]]/window:ml-1.5">
+								<SidebarInset className={cn("inset-panel [grid-area:page] group-has-[#sessions-sidebar[inert]]/window:ml-1.5", (detailsView || openBot) && sidebars.panels.right.open && !sidebars.panels.right.floating && "rounded-r-none border-r-0")}>
 									<div ref={pageArea} className="flex min-h-0 flex-1">
 										{listPage && placement?.at === "column" && (
 											<PageListColumn page={listPage} max={placement.max}>

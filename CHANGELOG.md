@@ -9,6 +9,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Keyboard shortcuts now live in Settings › Keyboard, and ? opens it.
 - The sidebar no longer has a Keyboard shortcuts link at its bottom; ? still opens Settings › Keyboard.
 - End session is now called Archive session.
+- The details sidebar now joins the page with no gap: one line, which you drag to resize it, sits between them.
 - Sport and Tickets now show all the time, and any session can read and log your training with its sport tool.
 - Personal sessions are gone, with the Memory tab and the remember tool they had; Bots keep their own memory.
 - Google accounts are no longer placed in a space: Email, the Calendar, and agents use every connected account.

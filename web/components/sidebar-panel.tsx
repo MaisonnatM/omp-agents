@@ -44,7 +44,7 @@ interface SidebarSpec {
 	showIcon: IconComponent;
 	/** Whether the toggle rides the sidebar's outer edge, 9 px in from it, and stays in the header row once the sidebar closes; otherwise it sits in the pane header. */
 	edgeToggle: boolean;
-	/** How the docked sidebar's panel draws: the sessions sidebar sits on the window with no border, the details sidebar is an inset panel like the page's. */
+	/** How the docked sidebar's panel draws: the sessions sidebar sits on the window with no border, the details sidebar continues the page's inset panel, its left border the only line between them. */
 	panel: string;
 }
 
@@ -73,7 +73,7 @@ const SIDEBARS: Record<SidebarSide, SidebarSpec> = {
 		hideIcon: IconSidebarHiddenRightWide,
 		showIcon: IconSidebarSimpleRightWide,
 		edgeToggle: false,
-		panel: "ml-1.5 inset-panel bg-background",
+		panel: "inset-panel rounded-l-none bg-background",
 	},
 };
 
