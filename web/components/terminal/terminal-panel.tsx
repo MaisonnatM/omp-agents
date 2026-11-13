@@ -43,6 +43,13 @@ export function useTerminalPanel(): TerminalPanelState {
 	return { open, setOpen, toggle, height, setHeight };
 }
 
+const newTerminalListeners = new Set<() => void>();
+
+/** Opens the terminal panel on a new shell, as the details sidebar's **New terminal** does. */
+export function requestNewTerminal(): void {
+	for (const listener of newTerminalListeners) listener();
+}
+
 interface TerminalPanelProps {
 	panel: TerminalPanelState;
 	/** Where a new tab's shell starts: the focused session's worktree, else the sidebar's workspace, else `~`. */
@@ -72,6 +79,23 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 		setTabs(current => [...current, tab]);
 		setActive(tab.key);
 	}, [setTabs]);
+
+	const [wantsNew, setWantsNew] = useState(false);
+	useEffect(() => {
+		const listener = (): void => {
+			setOpen(true);
+			setWantsNew(true);
+		};
+		newTerminalListeners.add(listener);
+		return () => void newTerminalListeners.delete(listener);
+	}, [setOpen]);
+	useEffect(() => {
+		if (!wantsNew || inventory.state === "loading") return;
+		setWantsNew(false);
+		// A panel that just loaded with no shell running already started a new one.
+		const startedOne = inventory.state === "ready" && inventory.tabs.length === 1 && inventory.tabs[0]!.state.phase === "starting";
+		if (inventory.state === "ready" && !startedOne) add();
+	}, [wantsNew, inventory, add]);
 
 	useEffect(() => {
 		if (!open || inventory.state !== "loading") return;

@@ -132,6 +132,8 @@ export const CONTROLS = [
 	{ id: "session-details.tab.artifacts", label: "Session details Artifacts tab", area: "Right sidebar" },
 	{ id: "details.tab.add", label: "Details sidebar + menu, which opens a tab", area: "Right sidebar" },
 	{ id: "details.tab.close", label: "Details sidebar tab closed", area: "Right sidebar" },
+	{ id: "details.menu.subagent", label: "Details sidebar + menu subagent opened", area: "Right sidebar" },
+	{ id: "details.menu.new-terminal", label: "Details sidebar + menu New terminal", area: "Right sidebar" },
 	{ id: "artifacts.artifact", label: "Artifacts tab artifact picked", area: "Artifacts" },
 	{ id: "artifacts.version", label: "Artifacts version picked", area: "Artifacts" },
 	{ id: "artifacts.latest", label: "Artifacts Go to latest", area: "Artifacts" },

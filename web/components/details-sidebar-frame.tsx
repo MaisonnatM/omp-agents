@@ -43,6 +43,8 @@ interface DetailsSidebarFrameProps<T extends string> {
 	cwd: string | null;
 	/** Every tab the view can show, in the + menu's order. */
 	tabs: readonly DetailsTab<T>[];
+	/** What the + menu lists after the tabs, such as a session's subagents and terminals, each section after a separator. */
+	menuSections?: ReactNode;
 }
 
 /** A tab with nothing to show yet. */
@@ -125,7 +127,7 @@ function DetailsTabChip({ tab, ids, active, onClose, onSelect }: DetailsTabChipP
 }
 
 /** The + menu: every tab the view can show, the one on screen checked; picking one opens it, or shows it when already open. */
-function OpenTabMenu<T extends string>({ tabs, active, onPick }: { tabs: readonly DetailsTab<T>[]; active: T; onPick: (value: T) => void }) {
+function OpenTabMenu<T extends string>({ tabs, active, onPick, sections }: { tabs: readonly DetailsTab<T>[]; active: T; onPick: (value: T) => void; sections: ReactNode }) {
 	const [open, setOpen] = useState(false);
 	return (
 		<DropdownMenu open={open} onOpenChange={setOpen}>
@@ -151,12 +153,13 @@ function OpenTabMenu<T extends string>({ tabs, active, onPick }: { tabs: readonl
 						</MenuItem>
 					);
 				})}
+				{sections}
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);
 }
 
-export function DetailsSidebarFrame<T extends string>({ label, storageKey, defaultTab, cwd, tabs }: DetailsSidebarFrameProps<T>) {
+export function DetailsSidebarFrame<T extends string>({ label, storageKey, defaultTab, cwd, tabs, menuSections }: DetailsSidebarFrameProps<T>) {
 	const [stored, setStored] = useStoredState(storageKey, decodeDetailsTabs, encodeDetailsTabs);
 	// Resolved each render: a stored tab that shows only once its items arrive, such as Tickets, comes back then.
 	const byValue = new Map<string, DetailsTab<T>>(tabs.map(each => [each.value, each]));
@@ -194,7 +197,7 @@ export function DetailsSidebarFrame<T extends string>({ label, storageKey, defau
 							/>
 						))}
 					</div>
-					<OpenTabMenu tabs={tabs} active={tab} onPick={show} />
+					<OpenTabMenu tabs={tabs} active={tab} onPick={show} sections={menuSections} />
 				</SidebarHeader>
 				{shown.map(value => {
 					const each = byValue.get(value)!;

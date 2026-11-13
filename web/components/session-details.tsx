@@ -1,11 +1,13 @@
 /** The right sidebar for a session: its overview, its pull requests, its running app in the desktop app, and once it has any its Linear issues and its artifacts; a Bot's details share its Tickets tab. */
-import { IconBulletList, IconPullRequest, IconSparklesTwo, IconWindowApp } from "central-icons";
+import { IconAiBotHead, IconBulletList, IconPlusLarge, IconPullRequest, IconSparklesTwo, IconWindowApp } from "central-icons";
 import { useMemo } from "react";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Artifact } from "../artifacts-model";
 import { useArtifacts } from "../pane-store";
 import { PAGE_ICON } from "../page-icons";
+import { MenuGroup, MenuGroupLabel, MenuItem, MenuSeparator } from "@/components/ui/menu";
+import { activityControl } from "../activity";
 import { type DetailsTab, DetailsSidebarFrame } from "./details-sidebar-frame";
 import { isPhonePage } from "../api";
 import { ArtifactsPanel } from "./artifacts-panel";
@@ -14,7 +16,50 @@ import type { ChangesSession } from "./overview-changes";
 import { SessionOverview } from "./session-overview";
 import { SessionPullRequestsTab } from "./session-pull-requests-tab";
 import { SessionTicketsTab } from "./session-tickets-tab";
-import { useSubagentLinks } from "./subagent-links";
+import { StatusDot } from "./status-dot";
+import { type SubagentLinksValue, useSubagentLinks } from "./subagent-links";
+import { requestNewTerminal } from "./terminal/terminal-panel";
+
+/** The + menu's sections after the tabs, as Capy's: the live view's subagents, each opening its own view, then **New terminal**, which a paired phone leaves out. */
+function SessionMenuSections({ links }: { links: SubagentLinksValue | null }) {
+	const agents = links?.agents ?? [];
+	return (
+		<>
+			{links && agents.length > 0 && (
+				<>
+					<MenuSeparator />
+					<MenuGroup>
+						<MenuGroupLabel>Subagents</MenuGroupLabel>
+						{agents.map(agent => (
+							<MenuItem key={agent.id} {...activityControl("details.menu.subagent")} onClick={() => links.onOpen({ kind: "live", instanceId: links.instanceId, agentId: agent.id }, "replace")} className="items-start">
+								<span className="relative mt-0.5 flex shrink-0 items-center text-muted-foreground">
+									<IconAiBotHead aria-hidden="true" />
+									<StatusDot status={agent.status} />
+								</span>
+								<span className="flex min-w-0 max-w-72 flex-col">
+									<span className="truncate">{agent.id}</span>
+									{agent.activity && <span className="truncate text-xs text-muted-foreground">{agent.activity}</span>}
+								</span>
+							</MenuItem>
+						))}
+					</MenuGroup>
+				</>
+			)}
+			{!isPhonePage() && (
+				<>
+					<MenuSeparator />
+					<MenuGroup>
+						<MenuGroupLabel>Terminals</MenuGroupLabel>
+						<MenuItem {...activityControl("details.menu.new-terminal")} onClick={requestNewTerminal}>
+							<IconPlusLarge aria-hidden="true" />
+							New terminal
+						</MenuItem>
+					</MenuGroup>
+				</>
+			)}
+		</>
+	);
+}
 
 /** The right sidebar's open tabs, kept across views; the key keeps its old name, and a single tab name stored before tabs could close opens that tab. */
 export const TAB_KEY = "omp-agents.plan-tab";
@@ -118,5 +163,5 @@ export function SessionDetails({ view, sessionId, working, cwd, hosts, host, row
 		} as const,
 		...sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, live: view.kind === "live" ? view : null, view, sessionId, artifacts }),
 	];
-	return <DetailsSidebarFrame label="Session details" storageKey={TAB_KEY} defaultTab="overview" cwd={cwd} tabs={tabs} />;
+	return <DetailsSidebarFrame label="Session details" storageKey={TAB_KEY} defaultTab="overview" cwd={cwd} tabs={tabs} menuSections={<SessionMenuSections links={links} />} />;
 }
