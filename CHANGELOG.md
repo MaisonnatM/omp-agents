@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-13
 
+- The sidebar's page list, from New session to Settings, now stays in place while you scroll your sessions below it.
 - Agents no longer point you at `artifact://` or `local://` addresses the dashboard cannot open: the starter kit tells them to save what you should read to the Artifacts tab instead.
 - A session can now run up to 8 helper agents at once instead of 2: the starter kit sets the limit to 8.
 - UI changes come back faster: the starter kit's design workflow now has agents check their own screenshots on each round, and the separate design critic runs once, when you approve the direction, instead of on every tweak.

@@ -170,17 +170,17 @@ export const AppSidebar = memo(function AppSidebar({
 				<span aria-hidden className="size-7 shrink-0" />
 			</div>
 			{!connected && <p className="mx-3 mb-1 rounded-md bg-red-500/10 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">Lost the dashboard server. Retrying…</p>}
+			<SidebarNav
+				tabs={tabs}
+				current={row}
+				counts={counts}
+				list={list}
+				newSessionLabel={newSessionLabel}
+				onNewSession={() => openNewSession()}
+				onTab={onTab}
+				settingsRoute={settings}
+			/>
 			<SidebarContent>
-				<SidebarNav
-					tabs={tabs}
-					current={row}
-					counts={counts}
-					list={list}
-					newSessionLabel={newSessionLabel}
-					onNewSession={() => openNewSession()}
-					onTab={onTab}
-					settingsRoute={settings}
-				/>
 				<Roster
 					workspaces={workspaces}
 					lists={lists}
