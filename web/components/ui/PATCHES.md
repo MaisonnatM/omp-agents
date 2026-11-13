@@ -63,6 +63,9 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 - `hooks/use-fluid-hover.ts`: `remeasure` called again before its frame runs does nothing, so a list of rows registering drops readiness and queues one measurement instead of one per row.
 - `hooks/use-fluid-hover.ts`: a click in the gap beside a row reaches the row with the click's modifier keys, instead of as a plain `element.click()`.
   A Cmd+click there marks a suggested prompt instead of sending it.
+- `ui/scroll-area.tsx`: the thumb drops Radix's inline size on its cross axis, so `w-1` and `h-1` size it.
+  Radix writes both `width` and `height` from variables it defines only for the scrolling axis, which left a vertical thumb 0px wide.
+- `ui/sidebar.tsx`: `panelClassName` replaces the inner panel's side border, so the dashboard draws the sessions sidebar with no border and the details sidebar as a rounded inset panel.
 - `ui/sidebar.tsx`: `scroll-fade-once-scrolled` on the scroll areas, so the fade shows only once scrolled.
 - `ui/sidebar-menu.tsx`: `gap-0.5` between rows, and the `FluidHoverHighlight` import points at `ui/fluid-hover-highlight.tsx`.
 - `ui/sidebar-menu.tsx`: `SidebarMenuActions`, `SidebarMenuSkeleton`, `SidebarMenuSub`, `SidebarMenuSubItem`, and `SidebarMenuSubButton` are removed, since nothing renders them.
