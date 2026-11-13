@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-13
+
+- When Obscura is installed (`brew install obscura`), the starter kit adds it as a browser agents use by default to read and click through pages. It loads a page several times faster than Chrome and uses about a tenth of the memory. Screenshots and design checks still use Chrome.
+
 ## 2026-11-12
 
 - The starter kit now tells agents to run builds, test suites, and browser runs through a small helper that lets only a few of them run at once across all sessions, a quarter of the computer's cores by default, so many sessions testing together no longer slow the computer until tools time out. A command that has to wait says it is queued and what it waits for.
