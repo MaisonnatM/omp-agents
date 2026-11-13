@@ -43,9 +43,10 @@ const HOUR = 3_600_000;
 const planWindow = (label: string, remaining: number, resetsAt: number | null = null): PlanWindow => ({ id: label, label, title: `Claude ${label}`, remaining, exhausted: remaining === 0, resetsAt });
 const claude: PlanUsage = { provider: "anthropic", name: "Anthropic", account: "maxence@yampa.ai", windows: [], extra: null, resetCredits: null };
 
-test("a tile reads the tightest open window, named by the account tag when the provider has several", () => {
+test("a tile reads the tightest open window, turns red when any window is used up, and names the account when the provider has several", () => {
 	const windows = [planWindow("7d", 0.9), planWindow("5h", 0.43), planWindow("fable", 0, NOW + HOUR)];
-	expect(planGauge({ ...claude, windows }, undefined)).toEqual({ left: 0.43, value: "43%", tone: "ok", caption: "5h" });
+	expect(planGauge({ ...claude, windows }, undefined)).toEqual({ left: 0.43, value: "43%", tone: "out", caption: "5h", usedUp: 1 });
+	expect(planGauge({ ...claude, windows: windows.slice(0, 2) }, undefined)).toMatchObject({ tone: "ok", usedUp: 0 });
 	expect(planGauge({ ...claude, windows: [planWindow("5h", 0.1)] }, "gmail")).toMatchObject({ tone: "low", caption: "gmail" });
 	expect(tile({ ...claude, windows: [planWindow("5h", 0, NOW + 3 * HOUR)] })).toMatchObject({ value: "used up", tone: "out", left: 0 });
 });

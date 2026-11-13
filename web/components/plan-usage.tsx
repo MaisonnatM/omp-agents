@@ -33,10 +33,10 @@ export function spendLabel({ used, limit, currency = "USD" }: Pick<ExtraUsage, "
 
 export type Tone = "out" | "low" | "ok";
 
-const TONE_CLASS: Record<Tone, { text: string; bar: string }> = {
-	out: { text: "text-red-600 dark:text-red-400", bar: "bg-red-500" },
-	low: { text: "text-amber-600 dark:text-amber-400", bar: "bg-amber-500" },
-	ok: { text: "text-foreground", bar: "bg-foreground/60" },
+const TONE_CLASS: Record<Tone, { text: string; bar: string; ring: string }> = {
+	out: { text: "text-red-600 dark:text-red-400", bar: "bg-red-500", ring: "stroke-red-500" },
+	low: { text: "text-amber-600 dark:text-amber-400", bar: "bg-amber-500", ring: "stroke-amber-500" },
+	ok: { text: "text-foreground", bar: "bg-foreground/60", ring: "stroke-foreground/60" },
 };
 
 const FOCUS = "rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -113,24 +113,27 @@ export interface PlanGauge {
 	tone: Tone;
 	/** What tells the tile apart: the account tag, else the window, else the plan's name. */
 	caption: string;
+	/** How many of the plan's windows are used up; any turns the tile red. */
+	usedUp: number;
 }
 
 export function planGauge(plan: PlanUsage, tag: string | undefined): PlanGauge {
 	const open = plan.windows.filter(window => !window.exhausted).sort((a, b) => a.remaining - b.remaining)[0];
-	if (open) return { left: open.remaining, value: `${percentLeft(open)}%`, tone: windowTone(open), caption: tag ?? open.label };
-	if (plan.windows.length > 0) return { left: 0, value: "used up", tone: "out", caption: tag ?? plan.name };
+	const usedUp = plan.windows.filter(window => window.exhausted).length;
+	if (open) return { left: open.remaining, value: `${percentLeft(open)}%`, tone: usedUp > 0 ? "out" : windowTone(open), caption: tag ?? open.label, usedUp };
+	if (usedUp > 0) return { left: 0, value: "used up", tone: "out", caption: tag ?? plan.name, usedUp };
 	if (plan.extra) {
 		const left = plan.extra.limit === null ? null : Math.max(0, 1 - plan.extra.used / plan.extra.limit);
-		return { left, value: spendLabel(plan.extra), tone: extraTone(plan.extra), caption: tag ?? "extra" };
+		return { left, value: spendLabel(plan.extra), tone: extraTone(plan.extra), caption: tag ?? "extra", usedUp };
 	}
 	const caption = tag ? `${plan.name} ${tag}` : plan.name;
 	if (plan.balance) {
 		const { amount, tone } = creditView(plan.balance);
 		const left = plan.balance.kind === "grant" && plan.balance.limit > 0 ? Math.max(0, 1 - plan.balance.used / plan.balance.limit) : null;
-		return { left, value: amount, tone: plan.outOfCreditSince === undefined ? tone : "out", caption };
+		return { left, value: amount, tone: plan.outOfCreditSince === undefined ? tone : "out", caption, usedUp };
 	}
-	if (plan.outOfCreditSince !== undefined) return { left: 0, value: "used up", tone: "out", caption };
-	return { left: null, value: null, tone: "ok", caption };
+	if (plan.outOfCreditSince !== undefined) return { left: 0, value: "used up", tone: "out", caption, usedUp };
+	return { left: null, value: null, tone: "ok", caption, usedUp };
 }
 
 /** The share of a window left, as a bar that empties as the window is used. */
@@ -185,11 +188,12 @@ export function PlanCard({ plan, now }: { plan: PlanUsage; now: number }) {
 	);
 }
 
-const RING_STROKE: Record<Tone, string> = { out: "stroke-red-500", low: "stroke-amber-500", ok: "stroke-foreground/60" };
 const RING_RADIUS = 13;
 const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
-/** One tile of the sidebar foot's grids: a ring, its figure, and its caption, stacked. */
-export const TILE = "flex min-w-0 flex-col items-center gap-0.5 rounded-md px-0.5 py-1 tabular-nums outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring";
+/** One tile of the sidebar foot's grid: a ring, its figure, and its caption, stacked. */
+export const TILE = "flex min-w-0 flex-col items-center gap-0.5 rounded-lg px-0.5 py-1 tabular-nums outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring";
+/** One cell of that grid, holding a tile. */
+export const TILE_CELL = "flex min-w-0 flex-col";
 
 /** An icon inside a ring filled to `fill`, 0 to 1, or left empty for `null`. */
 export function GaugeRing({ fill, tone, children }: { fill: number | null; tone: Tone; children: ReactNode }) {
@@ -198,7 +202,17 @@ export function GaugeRing({ fill, tone, children }: { fill: number | null; tone:
 			<svg viewBox="0 0 32 32" className="absolute inset-0 -rotate-90">
 				<circle cx="16" cy="16" r={RING_RADIUS} fill="none" strokeWidth="2.5" className="stroke-foreground/10" />
 				{fill !== null && (
-					<circle cx="16" cy="16" r={RING_RADIUS} fill="none" strokeWidth="2.5" strokeLinecap="round" className={RING_STROKE[tone]} strokeDasharray={`${Math.max(0.02, fill) * RING_LENGTH} ${RING_LENGTH}`} />
+					<circle
+						cx="16"
+						cy="16"
+						r={RING_RADIUS}
+						fill="none"
+						strokeWidth="2.5"
+						strokeLinecap="round"
+						strokeDasharray={RING_LENGTH}
+						strokeDashoffset={(1 - Math.max(0.02, fill)) * RING_LENGTH}
+						className={cn("transition-[stroke-dashoffset] duration-300 ease-out motion-reduce:transition-none", TONE_CLASS[tone].ring)}
+					/>
 				)}
 			</svg>
 			{children}
@@ -206,12 +220,12 @@ export function GaugeRing({ fill, tone, children }: { fill: number | null; tone:
 	);
 }
 
-/** A tile's figure in its tone, then its muted caption, whole on hover. */
+/** A tile's figure in its tone, then its muted caption, which wraps to a second line, as a long email does. */
 export function GaugeText({ value, caption, tone }: { value: string | null; caption: string; tone: Tone }) {
 	return (
 		<>
 			<span className={cn("max-w-full truncate font-medium", TONE_CLASS[tone].text)}>{value ?? "—"}</span>
-			<span title={caption} className="max-w-full truncate text-[10px] text-muted-foreground">{caption}</span>
+			<span className="line-clamp-2 max-w-full text-center text-3xs text-muted-foreground [overflow-wrap:anywhere]">{caption}</span>
 		</>
 	);
 }
@@ -220,14 +234,18 @@ export function GaugeText({ value, caption, tone }: { value: string | null; capt
 function Ring({ plan, gauge }: { plan: PlanUsage; gauge: PlanGauge }) {
 	return (
 		<GaugeRing fill={gauge.left} tone={gauge.tone}>
-			<OrgIcon org={providerOrg(plan.provider)} className="size-3.5" fallback={<span className="text-[10px] font-medium">{plan.name.slice(0, 2)}</span>} />
+			<OrgIcon org={providerOrg(plan.provider)} className="size-3.5" fallback={<span className="text-3xs font-medium">{plan.name.slice(0, 2)}</span>} />
 		</GaugeRing>
 	);
 }
 
-function TileText({ gauge }: { gauge: PlanGauge }) {
-	return <GaugeText value={gauge.value} caption={gauge.caption} tone={gauge.tone} />;
+/** What a screen reader says for a plan's tile, such as `Anthropic, max@gmail.com, 90% left`. */
+function planLabel(plan: PlanUsage, gauge: PlanGauge): string {
+	const value = gauge.value?.endsWith("%") ? `${gauge.value} left` : gauge.value;
+	const usedUp = gauge.usedUp > 0 && gauge.value !== "used up" ? `${gauge.usedUp} used up` : null;
+	return [plan.name, plan.account, gauge.caption === plan.account ? null : gauge.caption, value, usedUp].filter(Boolean).join(", ");
 }
+
 
 /** A plan with windows or spend; hovering or clicking opens {@link PlanCard} with its resets and credits. */
 function PlanTile({ plan, gauge }: { plan: PlanUsage; gauge: PlanGauge }) {
@@ -236,12 +254,12 @@ function PlanTile({ plan, gauge }: { plan: PlanUsage; gauge: PlanGauge }) {
 	return (
 		<Popover {...popover.root}>
 			<PopoverTrigger asChild>
-				<button {...popover.trigger} type="button" aria-label={`${plan.name} ${plan.account ?? ""} ${gauge.caption} ${gauge.value ?? ""}`} className={TILE}>
+				<button {...popover.trigger} type="button" aria-label={planLabel(plan, gauge)} className={TILE}>
 					<Ring plan={plan} gauge={gauge} />
-					<TileText gauge={gauge} />
+					<GaugeText value={gauge.value} caption={gauge.caption} tone={gauge.tone} />
 				</button>
 			</PopoverTrigger>
-			<PopoverContent {...popover.content} side="top" align="start" aria-label={`${plan.name} usage`} className="w-96 max-w-[calc(100vw-2rem)] p-0">
+			<PopoverContent {...popover.content} side="right" align="end" aria-label={`${plan.name} usage`} className="w-96 max-w-[calc(100vw-2rem)] p-0">
 				<PlanCard plan={plan} now={now} />
 			</PopoverContent>
 		</Popover>
@@ -250,13 +268,13 @@ function PlanTile({ plan, gauge }: { plan: PlanUsage; gauge: PlanGauge }) {
 
 /** A plan known by name, such as API credits: its balance, or `used up` once the provider refuses requests, explained on hover. */
 function NamedTile({ plan, gauge }: { plan: PlanUsage; gauge: PlanGauge }) {
-	const balance = plan.balance ? creditView(plan.balance).tooltip : `${gauge.caption}${gauge.value ? `: ${gauge.value}.` : "."}`;
+	const balance = plan.balance ? creditView(plan.balance).tooltip : `${gauge.caption}: ${gauge.value ?? "omp usage reports no balance"}.`;
 	const tooltip = plan.outOfCreditSince === undefined ? balance : `${balance}${refusedSince(plan.outOfCreditSince)}`;
 	return (
 		<Tooltip content={tooltip}>
-			<span tabIndex={0} aria-label={tooltip} className={TILE}>
+			<span tabIndex={0} role="img" aria-label={tooltip} className={TILE}>
 				<Ring plan={plan} gauge={gauge} />
-				<TileText gauge={gauge} />
+				<GaugeText value={gauge.value} caption={gauge.caption} tone={gauge.tone} />
 			</span>
 		</Tooltip>
 	);
@@ -265,7 +283,7 @@ function NamedTile({ plan, gauge }: { plan: PlanUsage; gauge: PlanGauge }) {
 /** The note that stands in for the plan tiles while they are read, failed, or absent; `null` once there are tiles. */
 function planNote(usage: DashboardState["usage"]): ReactNode {
 	if (usage === null) return <p className="text-muted-foreground">Checking plans…</p>;
-	if (usage.error !== null) return <p className="min-w-0 truncate text-red-600 dark:text-red-400">Cannot read plan usage: {usage.error}</p>;
+	if (usage.error !== null) return <p title={usage.error} className="line-clamp-3 min-w-0 break-words text-red-600 dark:text-red-400">Cannot read plan usage: {usage.error}</p>;
 	if (usage.plans.length === 0)
 		return (
 			<p className="text-muted-foreground">
@@ -275,7 +293,7 @@ function planNote(usage: DashboardState["usage"]): ReactNode {
 	return null;
 }
 
-/** The sidebar foot's grid of ring tiles: one per plan account, in `omp usage` order, then `after`, such as the machine's load. */
+/** The sidebar foot's grid of ring tiles: one per plan account, in `omp usage` order, then `after`, cells of the machine's load. */
 export function PlanUsageList({ usage, after }: { usage: DashboardState["usage"]; after?: ReactNode }) {
 	const tags = usage ? accountTags(usage.plans) : new Map<PlanUsage, string>();
 	return (
@@ -286,12 +304,12 @@ export function PlanUsageList({ usage, after }: { usage: DashboardState["usage"]
 					usage.plans.map((plan, index) => {
 						const gauge = planGauge(plan, tags.get(plan));
 						return (
-							<li key={`${plan.provider}:${plan.account ?? index}`} className="flex min-w-0 flex-col">
+							<li key={`${plan.provider}:${plan.account ?? index}`} className={TILE_CELL}>
 								{isNameOnlyPlan(plan) ? <NamedTile plan={plan} gauge={gauge} /> : <PlanTile plan={plan} gauge={gauge} />}
 							</li>
 						);
 					})}
-				{after && <li className="contents">{after}</li>}
+				{after}
 			</ul>
 		</>
 	);

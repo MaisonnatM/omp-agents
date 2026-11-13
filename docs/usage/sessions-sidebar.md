@@ -101,13 +101,13 @@
   Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Alt+B the details sidebar, which shows the session's details on the panes and a Bot's on its page.
   Each sidebar's width, and whether it is hidden, is saved in the app.
 - The left sidebar's session rows leave out the full working directory, the model, the /ship step, and the pull requests; hover the workspace in the pane header to see the directory, the composer shows the model, and the session details sidebar shows the pull requests.
-- The sidebar's foot, under the roster and a dividing line, shows how much quota is left on each plan account that `omp usage` reports, as a grid of four tiles per row: each tile is the provider's logo, from [svgl](https://svgl.app), inside a ring that empties as the plan is used, then the percent left of its tightest open window, then the account's email when the provider has several, cut short with its whole text on hover, else the window, such as `7d`.
+- The sidebar's foot, under the roster and a dividing line, shows how much quota is left on each plan account that `omp usage` reports, as a grid of four tiles per row: each tile is the provider's logo, from [svgl](https://svgl.app), inside a ring that empties as the plan is used, then the percent left of its tightest open window, then the account's email when the provider has several, on up to two lines, else the window, such as `7d`.
   A provider without a logo shows the first letters of the plan's name in the ring.
-  Amber means less than 20% is left, and red means the window is used up, as omp reports it.
+  Amber means less than 20% is left, and red means a window of the plan is used up, as omp reports it.
   Hover or click a tile to see every window of the plan with its bar and when it resets, the extra usage, and how many reset credits the plan holds with when the soonest one expires, such as `3 reset credits, next expires Oct 22.`; a reset credit, which omp redeems, clears a used-up window.
   A plan with extra usage and no windows, the pay-as-you-go spend past its plan such as Claude's, shows the amount spent and the cap, as `$12.40 / $50.00`.
   Extra usage keeps the provider's billing currency without conversion, so a euro account shows euros.
-  When the provider reports no cap, only the spend appears, as `extra €13.65`.
+  When the provider reports no cap, only the spend appears, as `€13.65` over the caption `extra`.
   Amber means less than 20% of a known cap is left, and red means the extra usage is used up.
   A connected provider that is not a sign-in plan, such as prepaid API credits configured with an API key, shows its name beside its logo and no percent.
   An Anthropic API key added under Settings, Providers shows as API credits too, even while you stay signed in to a Claude plan.
@@ -119,7 +119,7 @@
   A sign-in that exists only in Chrome stays a name, because that browser's cookies are encrypted.
   A window omp meters in dollars, such as Cursor's `Other Models`, adds the dollars spent to its hover.
   The server runs `omp usage --json` every minute while a page is open, and once when a page opens after a minute with none.
-- The sidebar's foot, below the plans, shows the machine's CPU, the percent of every core's time spent busy since the last read, the memory available, which macOS reads as `memory_pressure`'s free percentage of the physical memory, and the disk space free on the volume that holds your home directory.
+- The same grid continues after the plans with the machine's CPU, the percent of every core's time spent busy since the last read, the memory available, which macOS reads as `memory_pressure`'s free percentage of the physical memory, and the disk space free on the volume that holds your home directory, each as a ring that fills with the share in use, amber past 80% and red past 95%.
   The foot reads them again every five seconds while the page is visible.
   Hover or focus the memory for its full reading.
   Hover or click the disk space for that volume's percent used, a bar of it, and the space used, free, and in total.

@@ -1,6 +1,6 @@
 # Page: sidebar status, terminal, HTTP reads, shortcuts, and theme
 
-- `web/components/sidebar-status.tsx`: the sidebar's foot, under the roster, with `PlanUsageList` from `web/components/plan-usage.tsx` drawn as a grid of ring tiles, one per plan account, then a row with the machine's CPU, available memory, and free disk space from `GET /api/system`, left out on a paired phone.
+- `web/components/sidebar-status.tsx`: the sidebar's foot, under the roster, with `PlanUsageList` from `web/components/plan-usage.tsx` drawn as a grid of ring tiles, one per plan account, which the machine's CPU, available memory, and free disk space from `GET /api/system` continue in the same grid through `GaugeRing` and `GaugeText`, left out on a paired phone.
   In `plan-usage.tsx`, `planGauge` decides what a tile's ring, figure, tone, and caption say, and `creditView` decides how the API credits balance reads and is colored, for this foot and the model menu's heading alike.
   The CPU fact is a popover, opened by hover or click through `useHoverPopover`, that lists every live session's processes, busiest session first, each session named by `hostLabel` over the roster `app.tsx` passes, and each row with its own `useAction` for **Stop**, which `writeProcessStop` sends.
   The disk fact uses the same popover behavior, breaks down the volume that holds the home directory, and links **Clean up…** to Settings › Storage.
