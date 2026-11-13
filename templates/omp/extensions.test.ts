@@ -893,7 +893,7 @@ describe("checkout ownership", () => {
 		expect(results).toEqual([null, null, null]);
 	});
 
-	test("HEAD a background job of this session moves is its own while the job runs, and another process's switch after it ends blocks", () => {
+	test("HEAD a background job of this session moves is its own while the job runs, and another process's switch once it ended and the session moved on blocks", () => {
 		const dir = repo();
 		const script = join(root, `switch-${basename(dir)}.sh`);
 		writeFileSync(script, "git switch -q other\n");
@@ -908,6 +908,22 @@ describe("checkout ownership", () => {
 		]);
 		expect(results.map(drift)).toEqual([null, null, null, null, null, null, true]);
 		expect(git(dir, "log", "-1", "--format=%s", "other")).toBe("work");
+	});
+
+	test("a background job does not cover another process's switch in a checkout it neither runs in nor changes, nor one made before it started", () => {
+		const [dir, elsewhere, drifted] = [repo(), repo(), repo()];
+		const results = calls([
+			{ write: join(dir, "notes.txt") },
+			{ write: join(elsewhere, "notes.txt") },
+			{ write: join(drifted, "notes.txt") },
+			{ external: "git checkout -q main", cwd: drifted },
+			{ bash: "true", cwd: dir, background: "bg_1" },
+			{ bash: "true", cwd: drifted, background: "bg_2" },
+			{ external: "git checkout -q main", cwd: elsewhere },
+			{ write: join(elsewhere, "file.txt") },
+			{ write: join(drifted, "file.txt") },
+		]);
+		expect(results.map(drift)).toEqual([null, null, null, null, null, null, null, true, true]);
 	});
 
 	test("a subagent shares its session's checkout and its view of HEAD", () => {
