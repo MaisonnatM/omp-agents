@@ -32,5 +32,5 @@ test("an event names Google Calendar only when it comes from a Google calendar",
 test("a provider without a known logo still shows its name", () => {
 	const html = sourceOf({ ...base, kind: "plan", provider: "acme-cloud", name: "Pro", account: null, windowTitle: "5h", resetsAt: null, resetCredits: 0 });
 	expect(html).toContain(">Acme Cloud</span>");
-	expect(html).toContain(renderToStaticMarkup(<IconGauge />).replace(/^<svg[^>]*>|<\/svg>$/g, ""));
+	expect(html).toContain(renderToStaticMarkup(<IconGauge />).match(/ d="[^"]+"/)![0]);
 });

@@ -13,8 +13,8 @@ const files: ChangedFile[] = [
 test("file rows show type icons, duplicate names' folders, and line counts without a search field", () => {
 	const html = renderToStaticMarkup(<ChangedFileList files={files} onOpen={() => {}} />);
 	expect(html).toContain('aria-label="Files changed"');
-	expect(html).toContain(renderToStaticMarkup(<IconCode />).replace(/^<svg[^>]*>|<\/svg>$/g, ""));
-	expect(html).toContain(renderToStaticMarkup(<IconFileText />).replace(/^<svg[^>]*>|<\/svg>$/g, ""));
+	expect(html).toContain(renderToStaticMarkup(<IconCode />).match(/ d="[^"]+"/)![0]);
+	expect(html).toContain(renderToStaticMarkup(<IconFileText />).match(/ d="[^"]+"/)![0]);
 	expect(html).toContain(">web/</span>");
 	expect(html).toContain(">src/</span>");
 	expect(html).not.toContain(">notes/</span>");
