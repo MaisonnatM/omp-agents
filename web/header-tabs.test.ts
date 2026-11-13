@@ -1,63 +1,74 @@
 import { describe, expect, test } from "bun:test";
-import { decodeHeaderTabs, encodeHeaderTabs, type HeaderTab, headerTabKey, headerTabTarget, MAX_HEADER_TABS, visitHeaderTab } from "./header-tabs";
+import { closeHeaderTab, decodeHeaderTabs, encodeHeaderTabs, type HeaderTab, headerTabKeyOf, visitHeaderTab } from "./header-tabs";
 import { moveBy } from "./order";
 
-const visit = (hashes: string[]): readonly HeaderTab[] => hashes.reduce<readonly HeaderTab[]>((tabs, hash, at) => visitHeaderTab(tabs, hash, at), []);
-const hashes = (tabs: readonly HeaderTab[]): string[] => tabs.map(tab => tab.hash);
-const keyOf = (hash: string): string | null => {
-	const target = headerTabTarget(hash);
-	return target && headerTabKey(target);
+/** The row after going through `hashes` in turn from a first tab, a `null` asking for a new tab as + does. */
+const browse = (hashes: (string | null)[]): readonly HeaderTab[] => {
+	let tabs: readonly HeaderTab[] = [];
+	let from: string | null = null;
+	for (const [index, hash] of hashes.entries()) {
+		if (hash === null) {
+			from = null;
+			continue;
+		}
+		tabs = visitHeaderTab(tabs, from, hash, `t${index}`);
+		from = hash;
+	}
+	return tabs;
 };
+const hashes = (tabs: readonly HeaderTab[]): string[] => tabs.map(tab => tab.hash);
 
 describe("visitHeaderTab", () => {
-	test("opens a tab for each page and session you navigate to, in the order you opened them", () => {
-		expect(hashes(visit(["#pull-requests", "#past/a", "#todo"]))).toEqual(["#pull-requests", "#past/a", "#todo"]);
+	test("going to another page or session shows it in the same tab", () => {
+		const tabs = browse(["#pull-requests", "#past/a", "#todo"]);
+		expect(hashes(tabs)).toEqual(["#todo"]);
+		expect(tabs[0]?.id).toBe("t0");
 	});
 
-	test("focuses the page's tab where it stands when you come back, keeping where on the page you were", () => {
-		const tabs = visit(["#pull-requests", "#past/a", "#todo", "#past/a", "#settings/models", "#settings/models/github"]);
-		expect(hashes(tabs)).toEqual(["#pull-requests", "#past/a", "#todo", "#settings/models/github"]);
-		expect(keyOf("#settings/models")).toBe(keyOf("#settings/models/github"));
+	test("only a new tab, as + asks, adds one to the row", () => {
+		expect(hashes(browse(["#pull-requests", null, "#new", "#past/a"]))).toEqual(["#pull-requests", "#past/a"]);
 	});
 
-	test("drops the tab seen longest ago once more than the most it keeps are open", () => {
-		const opened = Array.from({ length: MAX_HEADER_TABS }, (_, index) => `#past/s${index}`);
-		const tabs = visit([...opened, "#past/s0", "#todo"]);
-		expect(tabs).toHaveLength(MAX_HEADER_TABS);
-		expect(hashes(tabs)).toEqual(["#past/s0", ...opened.slice(2), "#todo"]);
+	test("going to what another tab shows focuses that tab rather than opening it twice", () => {
+		const tabs = browse(["#pull-requests", null, "#todo", "#settings/models/github"]);
+		expect(hashes(visitHeaderTab(tabs, "#settings/models/github", "#pull-requests", "x"))).toEqual(["#pull-requests", "#settings/models/github"]);
+		expect(visitHeaderTab(tabs, "#pull-requests", "#settings/models", "x").map(tab => tab.id)).toEqual(tabs.map(tab => tab.id));
 	});
 
-	test("opens no tab for a session link, which the dashboard replaces with its panes", () => {
-		expect(visit(["#session/abc"])).toEqual([]);
-		expect(headerTabTarget("#session/abc")).toBeNull();
+	test("a session link, which the dashboard replaces with its panes, leaves the row as it is", () => {
+		const tabs = browse(["#todo"]);
+		expect(visitHeaderTab(tabs, "#todo", "#session/abc", "x")).toBe(tabs);
+		expect(headerTabKeyOf("#session/abc")).toBeNull();
 	});
 
-	test("a visit the row already holds gives back the same row, so a render stores nothing", () => {
-		const tabs = visit(["#pull-requests", "#todo"]);
-		expect(visitHeaderTab(tabs, "#todo", 1)).toBe(tabs);
-		expect(visitHeaderTab(tabs, "#todo", 2)).not.toBe(tabs);
+	test("a visit the row already shows gives back the same row, so a render stores nothing", () => {
+		const tabs = browse(["#pull-requests", null, "#todo"]);
+		expect(visitHeaderTab(tabs, "#pull-requests", "#todo", "x")).toBe(tabs);
 	});
+});
 
-	test("a page, the focused session, and the home each name their tab", () => {
-		expect(headerTabTarget("#todo")?.kind).toBe("page");
-		expect(keyOf("#todo")).toBe("page:todo");
-		expect(keyOf("#past/a")).toBe("view:#past/a");
-		expect(keyOf("")).toBe("home");
+describe("closeHeaderTab", () => {
+	test("closing the tab on screen shows the one now in its place, else the one before, else the home", () => {
+		const tabs = browse(["#pull-requests", null, "#todo", null, "#past/a"]);
+		expect(closeHeaderTab(tabs, "t2", "t2").go).toBe("#past/a");
+		expect(closeHeaderTab(tabs, "t4", "t4").go).toBe("#todo");
+		expect(closeHeaderTab(browse(["#todo"]), "t0", "t0").go).toBe("");
+		expect(closeHeaderTab(tabs, "t0", "t2")).toEqual({ tabs: tabs.slice(1), go: null });
 	});
 });
 
 describe("reordering", () => {
 	test("a reordered row survives being stored and read back, and a later visit keeps it", () => {
-		const tabs = visit(["#pull-requests", "#past/a", "#todo"]);
-		const moved = moveBy(tabs, tab => tab.key, keyOf("#todo")!, keyOf("#pull-requests")!, "before");
+		const tabs = browse(["#pull-requests", null, "#past/a", null, "#todo"]);
+		const moved = moveBy(tabs, tab => tab.id, "t4", "t0", "before");
 		expect(hashes(moved)).toEqual(["#todo", "#pull-requests", "#past/a"]);
 		const stored = decodeHeaderTabs(encodeHeaderTabs(moved));
 		expect(stored).toEqual(moved);
-		expect(hashes(visitHeaderTab(stored, "#pull-requests", 10))).toEqual(["#todo", "#pull-requests", "#past/a"]);
+		expect(hashes(visitHeaderTab(stored, "#todo", "#pull-requests", "x"))).toEqual(["#todo", "#pull-requests", "#past/a"]);
 	});
 
 	test("reads nothing from a stored value it cannot parse", () => {
 		expect(decodeHeaderTabs("not json")).toEqual([]);
-		expect(decodeHeaderTabs(JSON.stringify([{ key: 1 }]))).toEqual([]);
+		expect(decodeHeaderTabs(JSON.stringify([{ hash: "#todo" }]))).toEqual([]);
 	});
 });

@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-13
 
+- Clicking a session or a page no longer opens a new tab at the top: it shows in the tab you are on, as in a browser, or switches to the tab that already shows it. The + at the end of the tabs opens a new tab. Your open tabs reset once with this update.
 - The sidebar's page list, from New session to Settings, now stays in place while you scroll your sessions below it.
 - Bullets in an agent's reply read as a plain list again, with the bold word starting the sentence, instead of a two-column grid with lines between rows.
 - Agents now answer comparisons, such as which tickets match which pull requests, with a table: the starter kit's reply format asks for one.

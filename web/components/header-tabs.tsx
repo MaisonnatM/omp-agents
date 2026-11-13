@@ -1,4 +1,4 @@
-/** `HeaderTabs`, the row across the top of the page and the details sidebar: Back and Forward, one tab per page or session you opened, New session, then the header's controls. */
+/** `HeaderTabs`, the row across the top of the page and the details sidebar: Back and Forward, the tabs you browse in, a + that opens a new one, then the header's controls. */
 import { GripVertical, House, type LucideIcon, MessageSquare, Plus, Sparkles, SquarePen, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { awaitsSubagents, type PastSession, type RosterHost } from "../../src/shared/sessions";
@@ -7,7 +7,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl, record } from "../activity";
 import { pageTitle, viewTitle } from "../document-title";
-import { closeHeaderTab, decodeHeaderTabs, encodeHeaderTabs, type HeaderTab, HEADER_TABS_KEY, type HeaderTabTarget, headerTabKey, headerTabTarget, visitHeaderTab } from "../header-tabs";
+import { closeHeaderTab, decodeHeaderTabs, encodeHeaderTabs, type HeaderTab, HEADER_TABS_KEY, type HeaderTabTarget, headerTabShowing, headerTabTarget, visitHeaderTab } from "../header-tabs";
 import { moveBy, SIDE_DROP_LINE, stepTarget, type Where } from "../order";
 import { PAGE_ICON } from "../page-icons";
 import type { Page } from "../routing";
@@ -67,7 +67,7 @@ interface HeaderTabItemProps {
 function HeaderTabItem({ tab, target, label, lead, active, drag, onClose }: HeaderTabItemProps) {
 	return (
 		<div
-			data-tab-key={tab.key}
+			data-tab-id={tab.id}
 			{...drag.handle}
 			{...drag.target}
 			className={cn(
@@ -137,21 +137,22 @@ interface HeaderTabsProps {
 }
 
 /**
- * The row of header tabs: a tab for each page and focused session you open, at most eight, the one seen longest ago dropping out,
- * kept in this browser. Drag one, or press Alt+Shift+← or → on it, to reorder; its × or a middle-click closes it, and closing the one on screen shows its neighbour.
+ * The row of header tabs, kept in this browser. Going to a page or a session shows it in the tab on screen, as a browser tab follows a link,
+ * or focuses the tab that already shows it; only + opens a new tab. Drag one, or press Alt+Shift+← or → on it, to reorder;
+ * its × or a middle-click closes it, and closing the one on screen shows its neighbour.
  */
 export function HeaderTabs({ className, address, hosts, past, controls }: HeaderTabsProps) {
 	const { openNewSession } = useDashboardActions();
 	const [stored, setTabs] = useStoredState(HEADER_TABS_KEY, decodeHeaderTabs, encodeHeaderTabs);
-	// When the address was reached, kept for as long as it stays, so a render shows the visit the next one stores.
-	const [visit, setVisit] = useState(() => ({ address, at: Date.now() }));
-	if (visit.address !== address) setVisit({ address, at: Date.now() });
-	const tabs = useMemo(() => visitHeaderTab(stored, address, visit.at), [stored, address, visit.at]);
+	// The address the row last took, which the next one replaces in its tab; `null`, on load and once + asks, opens a tab for the next one unless one shows it.
+	// The row waits for a new address, so closing the tab on screen does not open it again before the dashboard leaves it.
+	const [from, setFrom] = useState<string | null>(null);
+	const tabs = useMemo(() => (from === address ? stored : visitHeaderTab(stored, from, address, crypto.randomUUID())), [stored, from, address]);
 	useEffect(() => {
 		if (tabs !== stored) setTabs(tabs);
-	}, [tabs, stored, setTabs]);
-	const activeTarget = headerTabTarget(address);
-	const activeKey = activeTarget && headerTabKey(activeTarget);
+		else if (from !== address && headerTabTarget(address) !== null) setFrom(address);
+	}, [tabs, stored, setTabs, from, address]);
+	const activeId = headerTabShowing(tabs, address)?.id ?? null;
 	const list = useRef<HTMLElement>(null);
 	const dragOrder = useDragOrder("x");
 	/** The tab a key press moved, which takes the focus back once the row is drawn again in its new order. */
@@ -167,7 +168,7 @@ export function HeaderTabs({ className, address, hosts, past, controls }: Header
 	};
 	useEffect(() => {
 		list.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
-	}, [activeKey, tabs.length]);
+	}, [activeId, tabs.length]);
 	// The row's width, and its tabs', which a resize of the window or a session's new title changes without a scroll.
 	useEffect(() => {
 		const element = list.current;
@@ -178,27 +179,27 @@ export function HeaderTabs({ className, address, hosts, past, controls }: Header
 		return () => observer.disconnect();
 	}, [tabs]);
 	useEffect(() => {
-		const key = refocus.current;
+		const id = refocus.current;
 		refocus.current = null;
-		if (key !== null) list.current?.querySelector<HTMLElement>(`[data-tab-key="${CSS.escape(key)}"] a`)?.focus();
+		if (id !== null) list.current?.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(id)}"] a`)?.focus();
 	}, [tabs]);
-	const move = (key: string, target: string, where: Where): void => {
-		setTabs(current => moveBy(current, tab => tab.key, key, target, where));
+	const move = (id: string, target: string, where: Where): void => {
+		setTabs(current => moveBy(current, tab => tab.id, id, target, where));
 		record("control", "header.tab.move");
 	};
 	/** Moves the focused tab one place `by`; a key press with no tab focused passes on. */
 	const moveFocused = (by: 1 | -1): boolean => {
-		const key = document.activeElement?.closest<HTMLElement>("[data-tab-key]")?.dataset.tabKey;
-		if (key === undefined || !list.current?.contains(document.activeElement)) return false;
-		const step = stepTarget(tabs.map(tab => tab.key), key, by);
+		const id = document.activeElement?.closest<HTMLElement>("[data-tab-id]")?.dataset.tabId;
+		if (id === undefined || !list.current?.contains(document.activeElement)) return false;
+		const step = stepTarget(tabs.map(tab => tab.id), id, by);
 		if (step === null) return true;
-		refocus.current = key;
-		move(key, step.target, step.where);
+		refocus.current = id;
+		move(id, step.target, step.where);
 		return true;
 	};
 	useShortcuts({ moveTabLeft: () => moveFocused(-1), moveTabRight: () => moveFocused(1) });
-	const close = (key: string): void => {
-		const { tabs: rest, go } = closeHeaderTab(tabs, key, activeKey);
+	const close = (id: string): void => {
+		const { tabs: rest, go } = closeHeaderTab(tabs, id, activeId);
 		setTabs(rest);
 		if (go !== null) location.hash = go;
 	};
@@ -224,20 +225,29 @@ export function HeaderTabs({ className, address, hosts, past, controls }: Header
 					const { label, lead } = target ? faceOf(target, hosts, past) : { label: "Session", lead: <MessageSquare className={ICON} /> };
 					return (
 						<HeaderTabItem
-							key={tab.key}
+							key={tab.id}
 							tab={tab}
 							target={target}
 							label={label}
 							lead={lead}
-							active={tab.key === activeKey}
-							drag={dragOrder("header-tabs", tab.key, (dragged, where) => move(dragged, tab.key, where))}
-							onClose={() => close(tab.key)}
+							active={tab.id === activeId}
+							drag={dragOrder("header-tabs", tab.id, (dragged, where) => move(dragged, tab.id, where))}
+							onClose={() => close(tab.id)}
 						/>
 					);
 				})}
 			</nav>
-			<Tooltip content="New session" shortcut={shortcutLabels("newSession")} side="bottom">
-				<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="New session" onClick={() => openNewSession()}>
+			<Tooltip content="New tab" side="bottom">
+				<Button
+					variant="ghost"
+					size="icon-compact"
+					className="shrink-0 text-muted-foreground"
+					aria-label="New tab"
+					onClick={() => {
+						setFrom(null);
+						openNewSession();
+					}}
+				>
 					<Plus />
 				</Button>
 			</Tooltip>
