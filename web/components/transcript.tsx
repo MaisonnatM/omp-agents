@@ -80,7 +80,7 @@ import { ArtifactCard } from "./artifact-card";
 import { AttachedFileDialog } from "./file-dialog";
 import { PromptFileChips } from "./prompt-file-chips";
 import { ImageViewer } from "./media-viewer";
-import { MessageMarkdown, SESSION_AGENT_PRESET, SESSION_PROMPT_PRESET, SESSION_STREAMING_PRESET } from "./message-markdown";
+import { AGENT_PRESET, MessageMarkdown, SESSION_AGENT_PRESET, SESSION_PROMPT_PRESET } from "./message-markdown";
 import { StatusDot, statusLabel } from "./status-dot";
 import { RoutineRunCard } from "./routines/routine-run-card";
 import { BotMessageCard } from "./bots/bot-message-card";
@@ -633,7 +633,7 @@ const MessageRow = memo(function MessageRow({
 					<MessageMarkdown text={copyText(item)} preset={SESSION_PROMPT_PRESET} />
 				) : item.text ? (
 					// A streaming reply keeps its fences as code, so a diagram or chart draws once, from its whole source.
-					<MessageMarkdown text={item.text} preset={item.kind === "assistant" && item.streaming ? SESSION_STREAMING_PRESET : SESSION_AGENT_PRESET} />
+					<MessageMarkdown text={item.text} preset={item.kind === "assistant" && item.streaming ? AGENT_PRESET : SESSION_AGENT_PRESET} />
 				) : null)}
 			</ChatMessage>
 			{failed && (
