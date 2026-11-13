@@ -1,7 +1,7 @@
 /** `DashboardSidebar`, one of the dashboard's two sidebars, resizable and closeable; `useSidebarPanels` keeps both panels' state and `SidebarToggle` shows or hides one. */
 import { IconSidebarHiddenLeftWide, IconSidebarHiddenRightWide, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
-import { createContext, type CSSProperties, type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createContext, type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Sidebar, type SidebarSide } from "@/components/ui/sidebar";
@@ -24,6 +24,8 @@ const PANE_MIN_WIDTH = 480;
 /** A phone's width, in px: a window narrower than this has no room for a sidebar beside a usable pane, so its sidebars float. `--breakpoint-phone` in `web/globals.css` draws the same line for `max-phone:`. */
 export const PHONE_MAX_WIDTH = MIN_WIDTH + PANE_MIN_WIDTH;
 const STEP = 16;
+/** What a floating sidebar leaves of the page beside it, in px, for a tap that closes it. */
+const FLOATING_TAP_STRIP = 46;
 /** The show and hide motion: a drawer's curve, fast out of the gate and settling without overshoot. */
 const MOTION_MS = 260;
 const MOTION = "ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none";
@@ -40,12 +42,8 @@ interface SidebarSpec {
 	shortcut: ShortcutId;
 	hideIcon: IconComponent;
 	showIcon: IconComponent;
-	/**
-	 * The strip the hidden sidebar leaves for its toggle, which then rides the sidebar's outer edge: 9 px in from it,
-	 * where the sidebar's top row puts its last button, and centered in the strip. 0 leaves none, and the toggle
-	 * sits in the pane header instead.
-	 */
-	rail: number;
+	/** Whether the toggle rides the sidebar's outer edge, 9 px in from it, and stays in the header row once the sidebar closes; otherwise it sits in the pane header. */
+	edgeToggle: boolean;
 	/** How the docked sidebar's panel draws: the sessions sidebar sits on the window with no border, the details sidebar is an inset panel like the page's. */
 	panel: string;
 }
@@ -61,7 +59,7 @@ const SIDEBARS: Record<SidebarSide, SidebarSpec> = {
 		shortcut: "sessionsSidebar",
 		hideIcon: IconSidebarHiddenLeftWide,
 		showIcon: IconSidebarSimpleLeftWide,
-		rail: 46,
+		edgeToggle: true,
 		panel: "",
 	},
 	right: {
@@ -74,13 +72,10 @@ const SIDEBARS: Record<SidebarSide, SidebarSpec> = {
 		shortcut: "detailsSidebar",
 		hideIcon: IconSidebarHiddenRightWide,
 		showIcon: IconSidebarSimpleRightWide,
-		rail: 0,
+		edgeToggle: false,
 		panel: "ml-1.5 inset-panel bg-background",
 	},
 };
-
-/** The window grid's sidebar sizes for its other rows: `--sidebar-rail`, the strip the closed sessions sidebar leaves, which the header tabs' padding counts. */
-export const SIDEBAR_VARS = { "--sidebar-rail": `${SIDEBARS.left.rail}px` } as CSSProperties;
 
 export interface SidebarPanel {
 	open: boolean;
@@ -136,11 +131,11 @@ export function useSidebarPanels(): SidebarPanels {
 	const windowWidth = useSyncExternalStore(subscribeResize, () => window.innerWidth);
 	const floating = windowWidth < PHONE_MAX_WIDTH;
 	const sides: Record<SidebarSide, StoredPanel> = { left: usePanel("left", floating), right: usePanel("right", floating) };
-	// A floating sidebar takes the whole window but a rail's width, which a tap closes it on, since its rows and the Details tabs cut to nothing in a desktop sidebar's width.
-	const floatingMax = Math.max(MIN_WIDTH, windowWidth - SIDEBARS.left.rail);
+	// A floating sidebar takes the whole window but a strip, which a tap closes it on, since its rows and the Details tabs cut to nothing in a desktop sidebar's width.
+	const floatingMax = Math.max(MIN_WIDTH, windowWidth - FLOATING_TAP_STRIP);
 	const panel = (side: SidebarSide, max: number): SidebarPanel => ({ open: sides[side].open, width: floating ? max : clamp(sides[side].width, max), max, floating });
 	const left = panel("left", floating ? floatingMax : SIDEBARS.left.maxWidth);
-	const leftShown = left.open ? left.width : SIDEBARS.left.rail;
+	const leftShown = left.open ? left.width : 0;
 	const panels = { left, right: panel("right", floating ? floatingMax : Math.max(MIN_WIDTH, Math.min(SIDEBARS.right.maxWidth, windowWidth - leftShown - PANE_MIN_WIDTH))) };
 	return {
 		panels,
@@ -250,12 +245,12 @@ interface DashboardSidebarProps {
 export const SidebarOpen = createContext(true);
 
 /**
- * A sidebar with its resize handle, sliding its width open and shut. A sidebar with a rail keeps its toggle on its
- * outer edge, so the toggle glides from the sidebar's top row to the rail with the edge and follows a resize drag. The
+ * A sidebar with its resize handle, sliding its width open and shut, to nothing. A sidebar with an edge toggle keeps it on
+ * its outer edge, so the toggle glides with the edge and follows a resize drag, and stays in the header row once closed. The
  * hidden sidebar stays mounted, so its filter and scroll survive; the right one's toggle sits in the pane header (see `App`).
  */
 export function DashboardSidebar({ side, panel, onResize, onToggle, address, className, children }: DashboardSidebarProps) {
-	const { id, rail, panel: panelStyle } = SIDEBARS[side];
+	const { id, edgeToggle, panel: panelStyle } = SIDEBARS[side];
 	// While the width moves: the transition applies only then, so a resize drag follows the pointer without lag.
 	const [moving, setMoving] = useState(false);
 	const [shownOpen, setShownOpen] = useState(panel.open);
@@ -279,41 +274,31 @@ export function DashboardSidebar({ side, panel, onResize, onToggle, address, cla
 	// While a resize drag runs: a page in a `<webview>`, the Browser's, would take the pointer from the handle's capture once it crosses into it.
 	const [dragging, setDragging] = useState(false);
 	const sliding = !panel.floating && moving;
-	// A floating sidebar leaves no rail: its toggle floats over the header tabs' left end, which `HeaderTabs` keeps clear, so the page gets the whole width.
-	const shownRail = panel.floating ? 0 : rail;
 	return (
-		<div
-			className={cn(
-				// The content stays put against the outer edge while the width slides.
-				"relative flex h-full shrink-0",
-				side === "right" && "justify-end",
-				className,
-				!panel.floating && (!panel.open || moving) && "overflow-hidden",
-				sliding && cn("transition-[width]", MOTION),
-			)}
-			style={{ width: panel.open && !panel.floating ? panel.width : shownRail, transitionDuration: `${MOTION_MS}ms` }}
-		>
+		<div className={cn("relative h-full shrink-0", className, sliding && cn("transition-[width]", MOTION))} style={{ width: panel.open && !panel.floating ? panel.width : 0, transitionDuration: `${MOTION_MS}ms` }}>
 			{floatingOpen && <button type="button" aria-label={`Hide the ${SIDEBARS[side].name.toLowerCase()} sidebar`} className="fixed inset-0 z-30 cursor-default bg-black/20" onClick={onToggle} />}
-			{/* Closing, it turns inert at once so focus and clicks leave it, and hidden once the width has slid shut. */}
-			<Sidebar
-				id={id}
-				side={side}
-				hidden={!panel.open && !sliding}
-				inert={!panel.open}
-				className={cn(panel.floating ? cn("absolute inset-y-0 z-40 shadow-xl", side === "left" ? "left-0 bg-sidebar" : "right-0 bg-background") : "relative", "h-full", dragging && "[&_webview]:pointer-events-none")}
-				panelClassName={panel.floating ? undefined : panelStyle}
-				style={{ width: panel.width }}
-			>
-				<SidebarOpen.Provider value={panel.open}>{children}</SidebarOpen.Provider>
-				<SidebarResizeHandle side={side} width={panel.width} max={panel.max} onWidth={onResize} onDragging={setDragging} />
-			</Sidebar>
-			{rail > 0 && (
+			{/* The content stays put against the outer edge while the width slides; the toggle sits outside it, so a closed sidebar's toggle is not clipped. */}
+			<div className={cn("flex h-full", side === "right" && "justify-end", !panel.floating && (!panel.open || moving) && "overflow-hidden")}>
+				{/* Closing, it turns inert at once so focus and clicks leave it, and hidden once the width has slid shut. */}
+				<Sidebar
+					id={id}
+					side={side}
+					hidden={!panel.open && !sliding}
+					inert={!panel.open}
+					className={cn(panel.floating ? cn("absolute inset-y-0 z-40 shadow-xl", side === "left" ? "left-0 bg-sidebar" : "right-0 bg-background") : "relative", "h-full", dragging && "[&_webview]:pointer-events-none")}
+					panelClassName={panel.floating ? undefined : panelStyle}
+					style={{ width: panel.width }}
+				>
+					<SidebarOpen.Provider value={panel.open}>{children}</SidebarOpen.Provider>
+					<SidebarResizeHandle side={side} width={panel.width} max={panel.max} onWidth={onResize} onDragging={setDragging} />
+				</Sidebar>
+			</div>
+			{edgeToggle && (
 				<div
 					className={cn(
-						"absolute",
-						// The desktop app's window buttons sit over the top row's left end, so a closed rail's toggle drops below them.
-						!panel.open && !panel.floating ? "top-[calc(var(--title-bar-height)+(var(--page-header-height)-1.75rem)/2)]" : "top-[calc((var(--page-header-height)-1.75rem)/2)]",
-						floatingOpen ? "z-50" : panel.floating ? "left-[9px] z-20" : "right-[9px] z-10",
+						"absolute top-[calc((var(--page-header-height)-1.75rem)/2)]",
+						// A closed sidebar leaves no strip: its toggle floats over the header tabs' left end, past the desktop app's window buttons, which `HeaderTabs` keeps clear.
+						floatingOpen ? "z-50" : panel.floating ? "left-[9px] z-20" : panel.open ? "right-[9px] z-10" : "left-[calc(env(titlebar-area-x,0px)+9px)] z-20",
 					)}
 					style={floatingOpen ? { left: panel.width - 9 - 28 } : undefined}
 				>
