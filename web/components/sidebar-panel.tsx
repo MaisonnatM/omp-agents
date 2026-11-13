@@ -11,6 +11,7 @@ import { activityControl } from "../activity";
 import { type ShortcutId, shortcutLabels } from "../shortcuts";
 import { useStoredState } from "../stored-state";
 import { Separator, useDragSeparator } from "./drag-separator";
+import { HistoryButtons } from "./header-controls";
 
 /**
  * The dashboard's two sidebars, each one resizable and closeable on its own. Fluid's provider holds a single width
@@ -296,13 +297,15 @@ export function DashboardSidebar({ side, panel, onResize, onToggle, address, cla
 			{edgeToggle && (
 				<div
 					className={cn(
-						"absolute top-[calc((var(--page-header-height)-1.75rem)/2)]",
+						"absolute top-[calc((var(--page-header-height)-1.75rem)/2)] flex items-center gap-0.5",
 						// A closed sidebar leaves no strip: its toggle floats over the header tabs' left end, past the desktop app's window buttons, which `HeaderTabs` keeps clear.
 						floatingOpen ? "z-50" : panel.floating ? "left-[9px] z-20" : panel.open ? "right-[9px] z-10" : "left-[calc(env(titlebar-area-x,0px)+9px)] z-20",
 					)}
 					style={floatingOpen ? { left: panel.width - 9 - 28 } : undefined}
 				>
 					<SidebarToggle side={side} open={panel.open} onToggle={onToggle} />
+					{/* A docked sidebar holds back and forward at its right edge, so the header tabs start where the page does; otherwise `HeaderTabs` shows them. */}
+					{panel.open && !panel.floating && <HistoryButtons />}
 				</div>
 			)}
 		</div>
