@@ -1,5 +1,6 @@
 /** The tickets page's status groups and the status picker's order. In Review leads; the rest follow Linear's My issues order. */
 import { TICKET_STATUS_TYPES, type Ticket, type TicketPriority, type TicketRelative, type TicketStatus } from "../src/shared/tickets";
+import { hashForPage } from "./routing";
 import { type SectionTarget, sectionId } from "./section";
 
 export const PRIORITY_LABEL: Record<TicketPriority, string> = {
@@ -87,6 +88,9 @@ export function ticketGroups(tickets: Ticket[]): TicketGroup[] {
 
 /** A status group of the tickets page, which a sidebar link scrolls to. */
 export const ticketSection = (status: string): SectionTarget => ({ id: sectionId("tickets", status), folds: [status] });
+
+/** The Tickets page's address: its list, or issue `target`'s details beside it. */
+export const hashForTickets = (target: string | null): string => hashForPage({ kind: "tickets", target });
 
 /**
  * Issue `id`'s Linear address: the listed issue's own, else one in the workspace of any listed issue, which Linear opens by

@@ -15,7 +15,7 @@ export const COLUMN_DEFAULT = 256;
 const PAGE_MIN = 480;
 /** Narrowest a page that splits its list from its open item gets, the width at which `ListSplit` shows both side by side. */
 const SPLIT_PAGE_MIN = 768;
-const SPLIT_PAGES: Partial<Record<ListPage["kind"], true>> = { todo: true, tickets: true };
+const SPLIT_PAGES: Partial<Record<ListPage["kind"], true>> = { todo: true };
 
 /** The page `row` lists, `null` when the row has no list of its own or `page` is not its page. */
 export function listPageOf(page: Page | null, row: NavRow | null): ListPage | null {

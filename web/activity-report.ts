@@ -34,10 +34,10 @@ const RARELY = 3;
 /** How many features **Most used** lists. */
 const MOST_USED = 20;
 
-/** The commands that go with a tab gated on a service, besides a gated module's own. */
-const COMMAND_TABS: Partial<Record<ShortcutId, SidebarTab>> = { tickets: "tickets", newTicket: "tickets", ticketsNew: "tickets" };
+/** The core's commands that go with a tab gated on a service: creating a ticket waits on Linear, as the Tickets tab does. */
+const COMMAND_TABS: Partial<Record<ShortcutId, SidebarTab>> = { newTicket: "tickets" };
 
-/** The `PUT` routes that go with a tab gated on a service, by path prefix, besides a gated module's own. */
+/** The core's `PUT` routes that go with a tab gated on a service, by path prefix: the ticket routes wait on Linear, as the Tickets tab does. */
 const ROUTE_TABS: Record<string, SidebarTab> = { "/api/ticket": "tickets" };
 
 /** The modules whose tab is gated on a service. */

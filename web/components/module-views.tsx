@@ -6,8 +6,10 @@ import type { ComponentType } from "react";
 import type { ModuleChanges, ModuleValues, StoredModuleId } from "../../src/modules";
 import type { Routine } from "../../src/routines";
 import type { Bot } from "../../src/shared/bots";
+import type { RosterHost } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import type { ModulePage, ModuleRoutes, ModuleStates, WebModuleId } from "../modules";
+import type { SectionTarget } from "../section";
 import { CalendarNav } from "./calendar/calendar-nav";
 import { CalendarPage } from "./calendar/calendar-page";
 import { useDashboardActions } from "./dashboard-context";
@@ -15,6 +17,8 @@ import { EmailNav } from "./email/email-nav";
 import { EmailPage } from "./email/email-page";
 import { SportNav } from "./sport/nav";
 import { SportPage } from "./sport/page";
+import { TicketsNav } from "./tickets/tickets-nav";
+import { TicketsPage } from "./tickets/tickets-page";
 
 /** The core's data a module's page reads but does not own. */
 export interface CoreData {
@@ -26,6 +30,21 @@ export interface CoreData {
 	todos: UserTodoList | null;
 	/** Linear answers and the sidebar shows Tickets, so a page may show tickets. */
 	ticketsShown: boolean;
+	/** The sessions are listed, so `cwd` names the workspace a new session starts in. */
+	listed: boolean;
+	/** The directory a new session starts in, which the sidebar's workspace decides. */
+	cwd: string;
+	/** The running sessions in the sidebar's workspace. */
+	hosts: RosterHost[];
+	/** The page section a sidebar link last chose, to unfold, scroll to, and focus. */
+	section: SectionTarget | null;
+}
+
+/** A module's list in the page column: the route its page shows, and the page section a link there last chose, which `onSection` sets. */
+interface NavProps<Route> {
+	route: Route;
+	section: SectionTarget | null;
+	onSection: (section: SectionTarget) => void;
 }
 
 /** A stored module's page: its state, `null` until the server first sends it, which `onChange` changes; `disabled` while the socket is down. */
@@ -40,10 +59,11 @@ type PageProps<I extends WebModuleId> = { route: ModuleRoutes[I]; core: CoreData
 interface ModuleViews<I extends WebModuleId> {
 	Page: ComponentType<PageProps<I>>;
 	/** The module's list in the page column, for the route its page shows. */
-	Nav: ComponentType<{ route: ModuleRoutes[I] }>;
+	Nav: ComponentType<NavProps<ModuleRoutes[I]>>;
 }
 
 const MODULE_VIEWS: { readonly [I in WebModuleId]: ModuleViews<I> } = {
+	tickets: { Page: TicketsPage, Nav: TicketsNav },
 	calendar: { Page: CalendarPage, Nav: CalendarNav },
 	sport: { Page: SportPage, Nav: SportNav },
 	email: { Page: EmailPage, Nav: EmailNav },
@@ -58,7 +78,7 @@ export function ModulePageView({ page, states, disabled, core }: { page: ModuleP
 }
 
 /** Module `page.kind`'s list in the page column. */
-export function ModuleNavView({ page }: { page: ModulePage }) {
+export function ModuleNavView({ page, section, onSection }: { page: ModulePage } & Omit<NavProps<unknown>, "route">) {
 	const { Nav } = MODULE_VIEWS[page.kind] as ModuleViews<WebModuleId>;
-	return <Nav route={page} />;
+	return <Nav route={page} section={section} onSection={onSection} />;
 }

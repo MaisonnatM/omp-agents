@@ -1,5 +1,4 @@
 import { memo } from "react";
-import type { McpIntegration } from "../../src/shared/accounts";
 import { newSessionRequest } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import { botRows, type OpenBot } from "../bots-model";
@@ -15,7 +14,6 @@ import { todoCwd } from "../todo-views";
 import type { WorkspaceScope } from "../use-workspace-scope";
 import { useDashboardActions } from "./dashboard-context";
 import { EmptyHome } from "./empty-home";
-import { DisconnectedPage } from "./integrations/disconnected-page";
 import { ModulePageView } from "./module-views";
 import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { NewSession } from "./new-session";
@@ -26,7 +24,6 @@ import { BotsGallery } from "./bots/bots-gallery";
 import { SettingsPage } from "./settings/settings-page";
 import { ScheduledSession } from "./scheduled-session";
 import { useScheduleSend } from "./scheduled";
-import { TICKETS_META, TICKETS_TITLE, TicketsPage } from "./tickets/tickets-page";
 import { TodoPage } from "./todo/page";
 
 /** The directory a New session draft on `page` starts in: the route's, else its todo's Workspace, else `defaultWorkspace`. */
@@ -61,12 +58,9 @@ interface PageSwitchProps extends PageState {
 	scope: WorkspaceScope;
 	/** Where a new session starts when nothing picks a directory. */
 	defaultWorkspace: string;
-	/** The tickets section a sidebar link last chose. */
+	/** The page section a sidebar link last chose. */
 	sectionTarget: SectionTarget | null;
 	todoView: TodoListView;
-	linear: McpIntegration | null;
-	/** The dashboard reads and writes Linear. */
-	linearCallable: boolean;
 	/** Linear answers and Tickets is signed in: a module's page shows tickets and a todo can become a ticket. */
 	ticketsCallable: boolean;
 	maximized: boolean;
@@ -105,8 +99,6 @@ export const PageSwitch = memo(function PageSwitch({
 	defaultWorkspace,
 	sectionTarget,
 	todoView,
-	linear,
-	linearCallable,
 	ticketsCallable,
 	maximized,
 	hasDetails,
@@ -119,7 +111,10 @@ export const PageSwitch = memo(function PageSwitch({
 	const { send, start, dismissStart, changeTodo } = useDashboardActions();
 	const scheduleSend = useScheduleSend();
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
-	if (page && isModulePage(page)) return <ModulePageView page={page} states={modules} disabled={!connected} core={{ routines, bots, todos: userTodos, ticketsShown: ticketsCallable }} />;
+	if (page && isModulePage(page)) {
+		const core = { routines, bots, todos: userTodos, ticketsShown: ticketsCallable, listed, cwd: defaultWorkspace, hosts: visible.hosts, section: sectionTarget };
+		return <ModulePageView page={page} states={modules} disabled={!connected} core={core} />;
+	}
 	switch (page?.kind) {
 		case "new": {
 			const seed = todoSeed(userTodos, page.todoId);
@@ -163,11 +158,6 @@ export const PageSwitch = memo(function PageSwitch({
 			);
 		case "pull-requests":
 			return <PullRequestsPage hosts={visible.hosts} past={visible.past} section={sectionTarget} route={page} />;
-		case "tickets":
-			if (linear && !linearCallable) return <DisconnectedPage title={TICKETS_TITLE} meta={TICKETS_META} integration={linear} />;
-			// Until the sessions are listed, the workspace a quick action starts in is not known yet.
-			if (!listed) return <p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>;
-			return <TicketsPage target={page.target} section={sectionTarget} cwd={defaultWorkspace} hosts={visible.hosts} />;
 		case "todo":
 			// A linked session resolves wherever it ran, even in a directory the sidebar does not list.
 			return (

@@ -24,9 +24,10 @@ import { type CalendarEntry, calendarEntries, routinesOf } from "../../calendar-
 import { eventLink, type NoticeLink } from "../../notice-model";
 import { dateOfDay, localDay } from "../../../src/shared/days";
 import { calendarEventsStore, localEventsStore, monthSpan, ticketsStore, useGoogleCalendars } from "../../reads";
-import { hashForBotRoutine, hashForOpenTodo, hashForTickets } from "../../routing";
+import { hashForBotRoutine, hashForOpenTodo } from "../../routing";
 import { scheduleWords, timeWords } from "../../routines-model";
 import { shortcutLabels, useShortcuts } from "../../shortcuts";
+import { hashForTickets } from "../../tickets-model";
 import { useMinute } from "../../use-minute";
 import { useCalendarRoutines } from "../../use-calendar-display";
 import { PageFrame } from "../list-page";

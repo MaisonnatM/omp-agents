@@ -10,6 +10,7 @@ import type { McpIntegrationId } from "../src/shared/accounts";
 import { CALENDAR_PAGE } from "./components/calendar/module";
 import { EMAIL_PAGE } from "./components/email/module";
 import { SPORT_PAGE } from "./components/sport/module";
+import { TICKETS_PAGE } from "./components/tickets/module";
 import type { Binding } from "./shortcuts";
 
 /** How a module's page reads and writes its address, `#<id>/<rest>?<query>`. */
@@ -66,8 +67,8 @@ export type StoredPageModule<Id extends string, Route, Value, Change, Shortcut e
 	readonly store: PageStore<Value, Change>;
 };
 
-/** Every module, in the order the hubs list them: adding one is adding its definition here and its server half to `SERVER_MODULES` in `src/modules.ts`. */
-export const WEB_MODULES = { calendar: CALENDAR_PAGE, sport: SPORT_PAGE, email: EMAIL_PAGE };
+/** Every module: adding one is adding its definition here and its server half to `SERVER_MODULES` in `src/modules.ts`. */
+export const WEB_MODULES = { tickets: TICKETS_PAGE, calendar: CALENDAR_PAGE, sport: SPORT_PAGE, email: EMAIL_PAGE };
 
 type WebModules = typeof WEB_MODULES;
 export type WebModuleId = keyof WebModules;
@@ -91,15 +92,15 @@ const STORES: { readonly [I in StoredModuleId]: { readonly store: PageStore<Modu
 type AnyPageModule = PageModule<WebModuleId, unknown, ModuleShortcutId, ModuleControlId>;
 const BY_ID: { readonly [I in WebModuleId]: AnyPageModule } = WEB_MODULES;
 
-/** Every module, in {@link WEB_MODULES} order. */
-export const MODULE_LIST: readonly AnyPageModule[] = Object.values(BY_ID);
+/** Every module by its tab's `place`, the order every hub lists them in. */
+export const MODULE_LIST: readonly AnyPageModule[] = Object.values(BY_ID).toSorted((a, b) => a.tab.place - b.tab.place);
 
 export const isWebModuleId = (id: string): id is WebModuleId => Object.hasOwn(WEB_MODULES, id);
 
 export const isModulePage = (page: { kind: string }): page is ModulePage => isWebModuleId(page.kind);
 
-/** Module `page.kind`'s definition, whose methods take `page` as their route, since a page's kind names the module whose route it holds. */
-export const moduleOf = (page: ModulePage): AnyPageModule => BY_ID[page.kind];
+/** Module `kind`'s definition, whose methods take a page of that kind as their route, since a page's kind names the module whose route it holds. */
+export const moduleOf = ({ kind }: { kind: WebModuleId }): AnyPageModule => BY_ID[kind];
 
 /** Module `id`'s page at the address `#<id>/<rest>?<query>`; TypeScript cannot pair `id` with its module's route, so the result is asserted. */
 export const modulePage = (id: WebModuleId, rest: string | null, query: URLSearchParams): ModulePage => ({ kind: id, ...WEB_MODULES[id].address.parse(rest, query) }) as ModulePage;

@@ -1,7 +1,8 @@
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { isTypingTarget } from "../src/shared/desktop-bridge";
 import { commandKey, record } from "./activity";
-import { MODULE_LIST, type ModuleShortcutId, type WebModuleId } from "./modules";
+import { isWebModuleId, MODULE_LIST, type ModuleShortcutId, moduleOf, type WebModuleId } from "./modules";
+import { SIDEBAR_TABS, type SidebarTab } from "./routing";
 
 /** The keys that go to the sidebar's tabs by position: Cmd+1 goes to the first page row of the sidebar, whichever it is, through Cmd+5 for the fifth. */
 export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4", "tab5"] as const;
@@ -48,9 +49,7 @@ export type ShortcutId =
 	| "browserPickErase"
 	| "focusComposer"
 	| "pull-requests"
-	| "tickets"
 	| "newTicket"
-	| "ticketsNew"
 	| "bots"
 	| "sessions"
 	| "todo"
@@ -109,20 +108,16 @@ export type Binding = { chord: Chord; scope: Scope } | { goTo: string };
 /** Closes the header tab on screen, leaving its session running. */
 export const CLOSE_TAB: Chord = { key: "w", mod: true };
 
-/** The core's categories, which the modules' categories join before Changes. */
-const CORE_CATEGORIES = [
+/** A category of Settings › Keyboard: the core's, a tab's but Bots', which has no shortcuts of its own, or Changes. */
+export type ShortcutCategory = "general" | "sessions" | Exclude<SidebarTab, "bots"> | "changes";
+
+/** The categories Settings › Keyboard lists the shortcuts under, in order: the core's, then each tab's in the sidebar's order, then Changes. */
+export const SHORTCUT_CATEGORIES: readonly { id: ShortcutCategory; label: string }[] = [
 	{ id: "general", label: "General" },
 	{ id: "sessions", label: "Sessions" },
-	{ id: "pull-requests", label: "Pull requests" },
-	{ id: "todo", label: "Todo" },
-] as const;
-
-export type ShortcutCategory = (typeof CORE_CATEGORIES)[number]["id"] | WebModuleId | "changes";
-
-/** The categories Settings › Keyboard lists the shortcuts under, in order. */
-export const SHORTCUT_CATEGORIES: readonly { id: ShortcutCategory; label: string }[] = [
-	...CORE_CATEGORIES,
-	...MODULE_LIST.map(({ id, shortcuts }) => ({ id, label: shortcuts.category })),
+	...SIDEBAR_TABS.flatMap(({ value, label }): { id: ShortcutCategory; label: string }[] =>
+		isWebModuleId(value) ? [{ id: value, label: moduleOf({ kind: value }).shortcuts.category }] : value === "bots" ? [] : [{ id: value, label }],
+	),
 	{ id: "changes", label: "Changes" },
 ];
 
@@ -135,6 +130,13 @@ export interface Shortcut {
 	/** What the command palette lists the shortcut as, for the page-wide actions it runs: `Go to pull requests`. */
 	command?: string;
 }
+
+/** The go-to shortcuts of the core's tabs, each under its tab's id. */
+const TAB_GO_TO = {
+	"pull-requests": { label: "Go to Pull requests", command: "Go to pull requests", keys: [] },
+	bots: { label: "Go to your Bots", command: "Go to Bots", keys: [] },
+	todo: { label: "Go to your todo list", command: "Go to todo list", keys: [] },
+} satisfies { [T in Exclude<SidebarTab, WebModuleId>]: Pick<Shortcut, "label" | "command" | "keys"> };
 
 /**
  * Every dashboard shortcut, in the order a key tries them: every binding the key listeners match, and the commands the
@@ -251,14 +253,9 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	},
 	// No one reads these rows' labels, by design: the dialog lists each position key on the tab it goes to, and the palette lists no command for them.
 	...TAB_SHORTCUTS.map((id, index): Shortcut => ({ id, category: "general", label: `Go to tab ${index + 1} of the sidebar`, keys: [{ chord: { key: String(index + 1), mod: true }, scope: "anywhere" }] })),
-	{ id: "pull-requests", category: "general", label: "Go to Pull requests", command: "Go to pull requests", keys: [] },
-	{ id: "tickets", category: "general", label: "Go to your Linear tickets", command: "Go to tickets", keys: [] },
+	...SIDEBAR_TABS.map(({ value }): Shortcut => ({ id: value, category: "general", ...(isWebModuleId(value) ? moduleOf({ kind: value }).shortcuts.goTo : TAB_GO_TO[value]) })),
 	{ id: "newTicket", category: "general", label: "Create a Linear ticket, except on the Todo, Calendar, and Email pages", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
-	{ id: "ticketsNew", category: "general", label: "Tickets page: create a Linear ticket, in place of a new session", keys: [{ chord: { key: "n", mod: true }, scope: "anywhere" }] },
-	{ id: "bots", category: "general", label: "Go to your Bots", command: "Go to Bots", keys: [] },
 	{ id: "sessions", category: "general", label: "Go to the sessions", command: "Go to sessions", keys: [] },
-	{ id: "todo", category: "general", label: "Go to your todo list", command: "Go to todo list", keys: [] },
-	...MODULE_LIST.map(({ id, shortcuts: { goTo } }): Shortcut => ({ id, category: "general", ...goTo })),
 	{ id: "workspace", category: "general", label: "Choose the sidebar's workspace", keys: [{ goTo: "w" }] },
 	{ id: "nextPullRequest", category: "pull-requests", label: "Pull requests: move to the next pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "previousPullRequest", category: "pull-requests", label: "Pull requests: move to the previous pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },

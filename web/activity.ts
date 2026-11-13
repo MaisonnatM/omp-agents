@@ -6,8 +6,8 @@ import { fields, isSafeInteger, isString, parseJson } from "../src/json";
 import { ACTION_MESSAGES, type ActivityEvent, type ActivityKind, type ActivityVia, type ControlId, isActivityEvent, MAX_ACTIVITY_BATCH } from "../src/shared/activity";
 import type { ClientMsg } from "../src/shared/protocol";
 import type { DashboardState } from "./dashboard-state";
-import { isModulePage, MODULE_LIST, type ModuleControlId, moduleOf, type ModuleView } from "./modules";
-import type { Layout, Page, SettingsSection, SidebarTab } from "./routing";
+import { isModulePage, isWebModuleId, type ModuleControlId, moduleOf, type ModuleView, type WebModuleId } from "./modules";
+import { type Layout, type Page, type SettingsSection, SIDEBAR_TABS, type SidebarTab } from "./routing";
 
 /** The outbox's `localStorage` key; it keeps what earlier page loads have not yet sent. */
 export const OUTBOX_STORAGE_KEY = "omp-agents.activity-outbox";
@@ -169,39 +169,56 @@ export function listenForControls(doc: Pick<Document, "addEventListener" | "remo
 	return () => doc.removeEventListener("click", onClick, { capture: true });
 }
 
-/** The core's views but New session, which comes after the modules' views. */
-const CORE_VIEWS = [
+/** The views of the core's tabs. */
+const TAB_VIEWS = {
+	"pull-requests": [
+		{ key: "pull-requests", label: "Pull requests" },
+		{ key: "pull-requests/item", label: "A pull request" },
+		{ key: "pull-requests/files", label: "A pull request's files" },
+	],
+	bots: [
+		{ key: "bots", label: "Bots" },
+		{ key: "bots/new", label: "New Bot" },
+		{ key: "bots/item", label: "A Bot" },
+		{ key: "bots/routines", label: "A Bot's routines" },
+		{ key: "bots/routine", label: "A Bot's routine" },
+	],
+	todo: [
+		{ key: "todo", label: "Todo" },
+		{ key: "todo/item", label: "A todo" },
+	],
+} as const satisfies { [T in Exclude<SidebarTab, WebModuleId>]: readonly { key: string; label: string }[] };
+
+type PageViewKey =
+	| "home"
+	| "get-started"
+	| "session"
+	| "past"
+	| "split"
+	| (typeof TAB_VIEWS)[keyof typeof TAB_VIEWS][number]["key"]
+	| ModuleView
+	| "scheduled"
+	| "scheduled/item"
+	| "new";
+
+/**
+ * Every view but the settings sections, which {@link ViewKey} adds: the panes by how many there are and of what kind, and
+ * each page by its kind and whether it shows one item, never an id or a path; each tab's views come in the sidebar's order.
+ * `tab` is the sidebar tab a view goes with, so Settings › Activity sets apart a view whose tab's service omp is not signed in to.
+ */
+export const VIEWS: readonly { key: PageViewKey; label: string; tab?: SidebarTab }[] = [
 	{ key: "home", label: "Home" },
 	{ key: "get-started", label: "Get started" },
 	{ key: "session", label: "A session" },
 	{ key: "past", label: "A past session" },
 	{ key: "split", label: "Split panes" },
-	{ key: "pull-requests", label: "Pull requests" },
-	{ key: "pull-requests/item", label: "A pull request" },
-	{ key: "pull-requests/files", label: "A pull request's files" },
-	{ key: "tickets", label: "Tickets", tab: "tickets" },
-	{ key: "tickets/item", label: "A ticket", tab: "tickets" },
-	{ key: "todo", label: "Todo" },
-	{ key: "todo/item", label: "A todo" },
-	{ key: "bots", label: "Bots" },
-	{ key: "bots/new", label: "New Bot" },
-	{ key: "bots/item", label: "A Bot" },
-	{ key: "bots/routines", label: "A Bot's routines" },
-	{ key: "bots/routine", label: "A Bot's routine" },
+	...SIDEBAR_TABS.flatMap(({ value, integration }): readonly { key: PageViewKey; label: string; tab?: SidebarTab }[] => {
+		if (!isWebModuleId(value)) return TAB_VIEWS[value];
+		const { views } = moduleOf({ kind: value });
+		return integration ? views.map(view => ({ ...view, tab: value })) : views;
+	}),
 	{ key: "scheduled", label: "Scheduled sends" },
 	{ key: "scheduled/item", label: "A scheduled send" },
-] as const satisfies readonly { key: string; label: string; tab?: SidebarTab }[];
-
-type PageViewKey = (typeof CORE_VIEWS)[number]["key"] | ModuleView | "new";
-
-/**
- * Every view but the settings sections, which {@link ViewKey} adds: the panes by how many there are and of what kind, and
- * each page by its kind and whether it shows one item, never an id or a path. `tab` is the sidebar tab a view goes with,
- * so Settings › Activity sets apart a view whose tab's service omp is not signed in to.
- */
-export const VIEWS: readonly { key: PageViewKey; label: string; tab?: SidebarTab }[] = [
-	...CORE_VIEWS,
-	...MODULE_LIST.flatMap(({ id, tab, views }) => (tab.integration ? views.map(view => ({ ...view, tab: id })) : views)),
 	{ key: "new", label: "New session" },
 ];
 
@@ -215,8 +232,6 @@ function pageView(page: Page): ViewKey {
 			return `settings/${page.section}`;
 		case "pull-requests":
 			return page.target === null ? "pull-requests" : page.files === null ? "pull-requests/item" : "pull-requests/files";
-		case "tickets":
-			return page.target === null ? "tickets" : "tickets/item";
 		case "bots":
 			if (page.target === null) return page.adding ? "bots/new" : "bots";
 			if (page.routine === null) return "bots/item";

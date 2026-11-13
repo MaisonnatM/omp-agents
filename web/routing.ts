@@ -4,7 +4,6 @@ import type { IconComponent } from "@/lib/icon-context";
 import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
 import { hashForSession, type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
-import { TICKET_ID } from "../src/shared/tickets";
 import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import type { StartOp } from "./starts";
 import { decodeSegment } from "./hash-segment";
@@ -23,7 +22,6 @@ export interface SidebarTabRow {
 /** The core's tabs, which the modules' tabs join by `place`. */
 const CORE_TABS = [
 	{ value: "pull-requests", label: "Pull requests", icon: PAGE_ICON["pull-requests"], place: 10 },
-	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, place: 20, integration: "linear" },
 	{ value: "bots", label: "Bots", icon: PAGE_ICON.bots, place: 30 },
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo, place: 50 },
 ] as const satisfies readonly { value: string; label: string; icon: IconComponent; place: number; integration?: McpIntegrationId }[];
@@ -35,7 +33,7 @@ const CORE_TABS = [
  */
 export const SIDEBAR_TABS: readonly SidebarTabRow[] = [...CORE_TABS, ...MODULE_LIST.map(({ id, tab }) => ({ value: id, ...tab }))].sort((a, b) => a.place - b.place);
 
-/** A sidebar tab, a row of the sidebar's page list; the tickets, Bots, todo, calendar, email, and module tabs go with their pages, the sessions and pull requests tabs with the panes. */
+/** A sidebar tab, a row of the sidebar's page list; the Bots, todo, and module tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof CORE_TABS)[number]["value"] | WebModuleId;
 
 const PAST_PREFIX = "past/";
@@ -45,12 +43,6 @@ const PAST_PREFIX = "past/";
  * on the file at `path`, `null` for the first. A `null` target keeps the panes.
  */
 export type PullRequestsRoute = { target: null } | { target: PullRequest; files: { path: string | null } | null };
-
-/** The tickets list, or the Linear issue whose details replace it when `target` is non-null. */
-export interface TicketsRoute {
-	/** The issue's identifier: `ENG-2368`. */
-	target: string | null;
-}
 
 /** What a workspace section's header says it shows: `workspace` with a workspace picked, `none` with all workspaces. */
 const AS_LOADED = { workspace: "As a session in this workspace loads them", none: "Your user files only, for all workspaces" };
@@ -162,7 +154,6 @@ export type CorePage =
 	| { kind: "get-started" }
 	| ({ kind: "settings" } & SettingsRoute)
 	| ({ kind: "pull-requests" } & PullRequestsRoute)
-	| ({ kind: "tickets" } & TicketsRoute)
 	| ({ kind: "todo" } & TodoRoute)
 	| ({ kind: "bots" } & BotsRoute)
 	| ({ kind: "new" } & NewSessionRoute)
@@ -195,8 +186,6 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   and `#pull-requests/<owner>/<repo>/<number>` shows that pull request's details in the main content.
  *   `#pull-requests/<owner>/<repo>/<number>/files` opens its changes page on the first file, and `…/files/<path>` on the file
  *   at that encoded path. Any other `#pull-requests/…` shows the tab alone.
- * - `#tickets` opens the tickets page, which lists the viewer's assigned Linear issues, and `#tickets/<identifier>`
- *   opens that issue's details in the main content. Any other `#tickets/…` opens the list alone.
  * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/archive` with the todos due by
  *   today, waiting on you, added by agents, or in the archive; `#todo/<category id>` shows that category alone, and `?open=<id>` opens that todo.
  * - `#bots` opens the gallery of every Bot, `#bots/new` the New Bot form, `#bots/<id>` that Bot's page, `#bots/<id>/routines` the card of that
@@ -216,7 +205,6 @@ const PAGES: { [K in CorePage["kind"]]: (rest: string | null, query: URLSearchPa
 		const files = match[4] ? { path: match[5] ? decodeSegment(match[5]) : null } : null;
 		return { kind: "pull-requests", target: { owner: match[1]!, repo: match[2]!, number: Number(match[3]) }, files };
 	},
-	tickets: rest => ({ kind: "tickets", target: rest !== null && TICKET_ID.test(rest) ? rest : null }),
 	todo: (rest, query) => {
 		const open = query.get("open") || null;
 		if (!rest) return { kind: "todo", list: { kind: "all" }, open };
@@ -247,8 +235,6 @@ function restOfPage(page: CorePage): string | null {
 			if (page.files === null) return pr;
 			return page.files.path === null ? `${pr}/files` : `${pr}/files/${encodeURIComponent(page.files.path)}`;
 		}
-		case "tickets":
-			return page.target || null;
 		case "todo":
 			return page.list.kind === "all" ? null : page.list.kind === "category" ? encodeURIComponent(page.list.id) : page.list.kind;
 		case "bots":
@@ -274,7 +260,6 @@ function queryOfPage(page: CorePage): string | null {
 			return page.open === null ? null : `open=${encodeURIComponent(page.open)}`;
 		case "settings":
 		case "pull-requests":
-		case "tickets":
 		case "bots":
 		case "get-started":
 		case "scheduled":
@@ -294,7 +279,6 @@ export function hashForPage(page: Page): string {
 
 export const hashForPullRequests = (target: PullRequest | null): string => hashForPage(target ? { kind: "pull-requests", target, files: null } : { kind: "pull-requests", target: null });
 export const hashForPullRequestFiles = (pr: PullRequest, path: string | null = null): string => hashForPage({ kind: "pull-requests", target: pr, files: { path } });
-export const hashForTickets = (target: string | null): string => hashForPage({ kind: "tickets", target });
 export const hashForTodo = (list: TodoListView, open: string | null = null): string => hashForPage({ kind: "todo", list, open });
 /** A todo opened in its category's list, else in every todo's; `categoryId` is its own, or its parent's for a todo under another. */
 export const hashForOpenTodo = (id: string, categoryId: string | null): string => hashForTodo(categoryId === null ? { kind: "all" } : { kind: "category", id: categoryId }, id);

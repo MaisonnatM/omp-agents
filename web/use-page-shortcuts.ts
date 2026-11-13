@@ -73,7 +73,6 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				if (page?.kind === "pull-requests" && !page.target) return;
 				latest.current.showTab("pull-requests");
 			},
-			tickets: goToTab("tickets"),
 			bots: goToTab("bots"),
 			todo: goToTab("todo"),
 			...moduleGoTo,
@@ -109,7 +108,6 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			back: () => history.back(),
 			forward: () => history.forward(),
 			"pull-requests": goTo["pull-requests"],
-			tickets: goTo.tickets,
 			newTicket: () => {
 				const { ticketsCallable, setNewTicket } = latest.current;
 				if (!ticketsCallable) return false;

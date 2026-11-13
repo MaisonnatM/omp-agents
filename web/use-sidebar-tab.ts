@@ -8,7 +8,6 @@ import { useStoredState } from "./stored-state";
 /** The page each core tab shows, but for Sessions, which shows the panes, and Bots while it has one to open; a module's tab shows its home. */
 const TAB_PAGE: Record<Exclude<SidebarTab, WebModuleId>, CorePage> = {
 	"pull-requests": { kind: "pull-requests", target: null },
-	tickets: { kind: "tickets", target: null },
 	bots: { kind: "bots", target: null, adding: false },
 	todo: { kind: "todo", list: { kind: "all" }, open: null },
 };

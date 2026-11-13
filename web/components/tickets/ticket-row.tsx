@@ -6,8 +6,7 @@ import type { Ticket, TicketPriority, TicketStatus } from "../../../src/shared/t
 import { cn } from "@/lib/utils";
 import { dateLabel, dayLabel } from "../../labels";
 import { type QuickActionId, ticketActions, type WorkActionId } from "../../quick-actions";
-import { hashForTickets } from "../../routing";
-import { PRIORITY_LABEL, type StatusKind, statusKind } from "../../tickets-model";
+import { hashForTickets, PRIORITY_LABEL, type StatusKind, statusKind } from "../../tickets-model";
 import { IconTip } from "../pull-requests/avatars";
 import { AddToTodo } from "../todo/add-button";
 import { QuickActionsMenu } from "../quick-actions";

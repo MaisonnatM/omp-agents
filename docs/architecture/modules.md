@@ -3,6 +3,7 @@
 A module is a feature the core runs without naming it, such as Sport.
 Its whole wiring sits behind two definitions, one for the server and one for the page.
 The core lists the modules in two registries and iterates them, so no hub file names a module.
+The core keeps the sessions, pull requests, todos, Bots and their routines, Settings, and the Google and Linear sign-ins.
 
 ## The module list
 
@@ -11,6 +12,7 @@ The core lists the modules in two registries and iterates them, so no hub file n
 
 | Module | Server definition | Page definition | Page components |
 | --- | --- | --- | --- |
+| Tickets | none | `TICKETS_PAGE` in `web/components/tickets/module.ts` | `TicketsPage` and `TicketsNav` |
 | Calendar | none | `CALENDAR_PAGE` in `web/components/calendar/module.ts` | `CalendarPage` and `CalendarNav` |
 | Sport | `SPORT_MODULE` in `src/sport-module.ts` | `SPORT_PAGE` in `web/components/sport/module.ts` | `SportPage` and `SportNav` |
 | Email | none | `EMAIL_PAGE` in `web/components/email/module.ts` | `EmailPage` and `EmailNav` |
@@ -18,10 +20,14 @@ The core lists the modules in two registries and iterates them, so no hub file n
 A module without a server definition keeps its server side in the core.
 Calendar's routes, its Google and local event stores, and its calendar choices stay in `Dashboard`, because the bell's event notices, routine event triggers, and settings sync share those same instances.
 Email's Gmail routes and accounts stay there too, because routine mail triggers read the same `GmailAccounts`.
+Tickets' Linear routes stay there as well, because ticket links, the new-ticket dialog, a session's Tickets tab, the Todo page, and the Calendar all read Linear without the Tickets page.
+So `hashForTickets` lives in `web/tickets-model.ts` with the core's ticket helpers, and the new-ticket shortcut, C, stays a core command that Settings › Activity gates on the Tickets tab.
 
 The list is fixed when the code is built.
 There is no runtime plugin loading and no dynamic import.
 Mapped types over the list give every hub its exact ids, routes, states, and changes.
+`MODULE_LIST` holds the modules by their tab's `place`.
+The hubs list each tab's go-to shortcut, Settings › Keyboard category, and Settings › Activity views in `SIDEBAR_TABS` order, so a module's entries sit among the core tabs' as its tab does.
 
 ## The server half
 
@@ -60,8 +66,10 @@ The page half is split in three files so that the pure registry never imports Re
 `web/modules.ts` holds the contract and the list, the module's `module.ts` holds its definition, and `web/components/module-views.tsx` maps each id to its `Page` and `Nav` components.
 
 Every module's `Page` takes its `route` and `core`, a `CoreData` that `PageSwitch` builds from the core's own state.
-`CoreData` holds the routines, the Bots, the todo list, and whether tickets show, so a module reads core data without importing the core's stores.
+`CoreData` holds the routines, the Bots, the todo list, whether tickets show, whether the sessions are listed, where a new session starts, the sidebar workspace's running sessions, and the page section a sidebar link last chose.
+A module reads core data through it without importing the core's stores.
 A stored module's `Page` also takes its `state`, `disabled`, and `onChange`.
+Every module's `Nav` takes its `route`, the chosen `section`, and `onSection`, which `PageList` passes so a list can scroll its page to a section.
 
 ## Adding a module
 
