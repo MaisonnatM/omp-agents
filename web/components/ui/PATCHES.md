@@ -86,16 +86,17 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
   `SidebarContent` always scrolls in a `ScrollArea`, since the native-scroll branch served only the mobile drawer.
 - `ui/file-thumbnail.tsx`: the PDF worker comes from the page bundle, not a CDN, which the page's Content-Security-Policy blocks.
   The generic glyph shows the file's extension under it, so attached `.md` and `.txt` files tell apart.
-- `lib/icon-context.tsx`: the `git-branch` and `file-text` icons.
+- `lib/icon-context.tsx`: the `git-branch` and `file-text` icons, and every default icon is Central Icons' instead of lucide's.
+- Every registry file draws Central Icons (`central-icons`, the round outlined 1.5 stroke style) where the registry uses lucide; a file added from a registry gets the same swap, since `components.json` still names lucide, the only icon set shadcn's CLI writes.
 - `ui/fluid-hover-highlight.tsx` is the registry file unchanged, moved from `web/components/` into `ui/`.
 - `ui/select.tsx` comes from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/select.json`).
-  Its icons are lucide's, its trigger has the settings fields' 28px height and border, and its popup and rows take the look of `ui/menu.tsx`.
+  Its trigger has the settings fields' 28px height and border, and its popup and rows take the look of `ui/menu.tsx`.
   `SelectGroup`, `SelectLabel`, `SelectSeparator`, and the exported scroll buttons and trigger `size` are removed, since nothing uses them; the popup keeps its scroll arrows.
   Its unused React namespace import is removed.
 - `ui/empty.tsx` comes from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/empty.json`).
   It imports `cn` from `@/lib/utils`, `EmptyContent` is removed, since nothing uses it, and `EmptyTitle` drops the registry's `cn-font-heading` hook, which this app's CSS does not define.
 - `ui/collapsible.tsx`, `ui/trace.tsx`, and `ui/code-block.tsx` come from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/<name>.json`).
-  They import `cn` from `@/lib/utils` and each other from `@/components/ui/`, and their icons are lucide's.
+  They import `cn` from `@/lib/utils` and each other from `@/components/ui/`.
   `CodeBlockCopyButton` is Fluid's `Button` at `icon-compact`, since Fluid's has no `icon-xs`, and `ui/code-block.tsx` drops `"use client"`.
   `CodeBlockLine` drops the `supports-[content:counter(line)_/_'']` alt text for line numbers, since Bun's CSS parser rejects `content: counter(line) / ''` and fails the page build; the dashboard shows no line numbers.
   The shadcn utilities they use are `web/shadcn.css`, with `scrollbar-thin`, which the registry's code block uses and no stylesheet defines.

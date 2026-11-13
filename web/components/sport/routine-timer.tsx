@@ -2,7 +2,7 @@
  * The routine timer: a list of items' holds counted down over the whole screen, its color telling a hold from the time
  * between, with beeps and a French voice; run from a habit, it ticks each item on the open day as its last hold ends.
  */
-import { CircleCheck, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
+import { IconCircleCheck, IconPause, IconPlay, IconStepBack, IconStepForwards, IconVolumeFull, IconVolumeOff } from "central-icons";
 import { useEffect, useRef, useState } from "react";
 import type { Exercise, Plan } from "../../../src/shared/sport";
 import { Button } from "@/components/ui/button";
@@ -267,7 +267,7 @@ export function RoutineTimer({ plan, name, items: given, checklist, sound, onClo
 			actions={
 				<Tooltip content={soundOn ? "Couper le son" : "Remettre le son"} side="bottom">
 					<Button variant="ghost" size="icon-compact" className={cn("text-foreground", HEADER_BUTTON)} aria-label="Son" aria-pressed={soundOn} onClick={toggleSound} {...activityControl("sport.timer.sound")}>
-						{soundOn ? <Volume2 /> : <VolumeX />}
+						{soundOn ? <IconVolumeFull /> : <IconVolumeOff />}
 					</Button>
 				</Tooltip>
 			}
@@ -280,7 +280,7 @@ export function RoutineTimer({ plan, name, items: given, checklist, sound, onClo
 					<div className="flex items-center gap-6">
 						<Tooltip content="Étape précédente" shortcut={shortcutLabels("sportTimerPrevious")}>
 							<Button variant="ghost" size="icon" className="size-12 rounded-full text-foreground [&_svg]:h-6 [&_svg]:w-6" aria-label="Étape précédente" onClick={previous} {...activityControl("sport.timer.step")}>
-								<SkipBack />
+								<IconStepBack />
 							</Button>
 						</Tooltip>
 						{reps ? (
@@ -293,13 +293,13 @@ export function RoutineTimer({ plan, name, items: given, checklist, sound, onClo
 						) : (
 							<Tooltip content={running ? "Pause" : "Reprendre"} shortcut={shortcutLabels("sportTimerPause")}>
 								<button type="button" className={cn(INVERTED, "grid size-20 place-items-center [&_svg]:size-8 [&_svg]:fill-current")} aria-label={running ? "Pause" : "Reprendre"} onClick={toggle} {...activityControl("sport.timer.pause")}>
-									{running ? <Pause /> : <Play />}
+									{running ? <IconPause /> : <IconPlay />}
 								</button>
 							</Tooltip>
 						)}
 						<Tooltip content="Étape suivante" shortcut={shortcutLabels("sportTimerNext")}>
 							<Button variant="ghost" size="icon" className="size-12 rounded-full text-foreground [&_svg]:h-6 [&_svg]:w-6" aria-label="Étape suivante" onClick={next} {...activityControl("sport.timer.step")}>
-								<SkipForward />
+								<IconStepForwards />
 							</Button>
 						</Tooltip>
 					</div>
@@ -423,7 +423,7 @@ interface DoneProps {
 function Done({ name, taken, complete, count, onClose }: DoneProps) {
 	return (
 		<div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 pb-[max(2.5rem,env(safe-area-inset-bottom))] text-center">
-			{complete && <CircleCheck aria-hidden className="size-14" strokeWidth={1.5} />}
+			{complete && <IconCircleCheck aria-hidden className="size-14" />}
 			<h2 aria-live="polite" className="text-4xl font-semibold">
 				{complete ? "Terminé" : "Arrêté"}
 			</h2>

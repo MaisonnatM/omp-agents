@@ -1,5 +1,5 @@
 /** `TerminalPanel`: the resizable panel under the panes holding the terminal tabs, and its shown/height state. */
-import { ChevronDown, LoaderIcon, Plus, X } from "lucide-react";
+import { IconChevronBottom, IconCrossMedium, IconLoader, IconPlusLarge } from "central-icons";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { TerminalInfo } from "../../../src/shared/terminals";
 import { Button } from "@/components/ui/button";
@@ -156,7 +156,7 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 										onClick={() => close(tab)}
 										className="mr-1 rounded-sm p-0.5 opacity-60 outline-none hover:bg-foreground/10 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
 									>
-										{closing ? <LoaderIcon aria-hidden className="size-3 animate-spin" /> : <X aria-hidden className="size-3" />}
+										{closing ? <IconLoader aria-hidden className="size-3 animate-spin" /> : <IconCrossMedium aria-hidden className="size-3" />}
 									</button>
 								</Tooltip>
 							</div>
@@ -166,13 +166,13 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 				{inventory.state === "ready" && (
 					<Tooltip content="New terminal">
 						<Button variant="ghost" size="icon-compact" aria-label="New terminal" onClick={add}>
-							<Plus />
+							<IconPlusLarge />
 						</Button>
 					</Tooltip>
 				)}
 				<Tooltip content="Hide the terminal">
 					<Button variant="ghost" size="icon-compact" aria-label="Hide the terminal" className="ml-auto" onClick={() => setOpen(false)}>
-						<ChevronDown />
+						<IconChevronBottom />
 					</Button>
 				</Tooltip>
 			</div>

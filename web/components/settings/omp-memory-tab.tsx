@@ -2,7 +2,7 @@
  * Settings › omp memory: the backend omp remembers with and Auto-learn, what a new session in the workspace gets, and
  * the store itself in its own shape, files in a rail like Files' and rows in a list, each edited or forgotten in place.
  */
-import { ChevronRight, Lock } from "lucide-react";
+import { IconChevronRight, IconLock } from "central-icons";
 import { type ReactNode, useId, useState } from "react";
 import type { AgentSettingOption, AgentSettingRow, AgentSettings } from "../../../src/shared/agent-settings";
 import { everyWord } from "../../../src/shared/every-word";
@@ -83,7 +83,7 @@ function SwitchRow({ row, busy, onSave, context }: { row: AgentSettingRow; busy:
 					{row.label}
 				</span>
 				<ToggleSwitch aria-labelledby={labelId} checked={valueOf(row) === true} disabled={busy || row.workspace !== undefined} onCheckedChange={onSave} />
-				{row.workspace !== undefined && <Lock aria-hidden className="size-3.5 text-muted-foreground" />}
+				{row.workspace !== undefined && <IconLock aria-hidden className="size-3.5 text-muted-foreground" />}
 			</div>
 			<p className="text-xs text-muted-foreground">{row.description}</p>
 			<RowNotes row={row} context={context} />
@@ -121,7 +121,7 @@ function MemoryBar({ rows, configPath, context }: { rows: BarRows; configPath: s
 							))}
 						</SelectContent>
 					</Select>
-					{backend.workspace !== undefined && <Lock aria-hidden className="size-3.5 text-muted-foreground" />}
+					{backend.workspace !== undefined && <IconLock aria-hidden className="size-3.5 text-muted-foreground" />}
 					{configPath && <p className="ml-auto text-xs text-muted-foreground">Saved to {configPath}</p>}
 				</div>
 				{picked?.description && (
@@ -149,7 +149,7 @@ function SessionPreview({ preview }: { preview: OmpMemory["preview"] }) {
 	return (
 		<Collapsible open={open} onOpenChange={setOpen} className="rounded-md border border-border">
 			<CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
-				<ChevronRight aria-hidden className={cn("size-3.5 text-muted-foreground transition-transform motion-reduce:transition-none", open && "rotate-90")} />
+				<IconChevronRight aria-hidden className={cn("size-3.5 text-muted-foreground transition-transform motion-reduce:transition-none", open && "rotate-90")} />
 				<span className="font-medium">What a new session gets</span>
 				<span className="text-xs text-muted-foreground tabular-nums">about {Math.ceil(preview.text.length / 4).toLocaleString()} tokens</span>
 			</CollapsibleTrigger>

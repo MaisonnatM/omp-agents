@@ -1,4 +1,4 @@
-import { BookOpen, Check, Copy, Ellipsis, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, Link, MessageCircleQuestion, RefreshCw, Users, X, Zap } from "lucide-react";
+import { IconArrowRotateClockwise, IconBook, IconBubbleQuestion, IconChainLink1, IconCheckmark1, IconCrossMedium, IconDotGrid1x3Horizontal, IconDraft, IconGroup1, IconMerged, IconPullRequest, IconPullRequestClosedSimple, IconSquareBehindSquare1, IconZap } from "central-icons";
 import { askPrompt, explainPrompt } from "../../../src/pull-request-actions";
 import { type PullRequest, type PullRequestDetail, type PullRequestSummary, prKey, pullRequestUrl, type SettableState } from "../../../src/shared/github";
 import type { QueuedMerge } from "../../../src/shared/merge-queue";
@@ -73,7 +73,7 @@ export function PullRequestMenu({ open, onOpenChange, label, ...items }: PullReq
 	return (
 		<DropdownMenu open={open} onOpenChange={onOpenChange}>
 			<Tooltip content={label}>
-				<DropdownMenuTrigger render={<Button variant="ghost-muted" size="icon-xs" aria-label={label} loading={items.quick.pending !== null || !!items.pending} />}><Ellipsis /></DropdownMenuTrigger>
+				<DropdownMenuTrigger render={<Button variant="ghost-muted" size="icon-xs" aria-label={label} loading={items.quick.pending !== null || !!items.pending} />}><IconDotGrid1x3Horizontal /></DropdownMenuTrigger>
 			</Tooltip>
 			<DropdownMenuContent align="end" className="min-w-56">
 				<PullRequestMenuItems {...items} />
@@ -88,7 +88,7 @@ function ReviewersSubmenu({ pr, options, onChange }: MenuReviewers) {
 	const requested = requestedLogins(pr.reviewers);
 	return (
 		<MenuSubmenu onOpenChange={next => { if (next) options.open(); }}>
-			<MenuSubmenuTrigger><Users />Reviewers</MenuSubmenuTrigger>
+			<MenuSubmenuTrigger><IconGroup1 />Reviewers</MenuSubmenuTrigger>
 			<MenuSubmenuContent>
 				{people === null && <MenuItem disabled className={cn(options.error && "text-red-600 dark:text-red-400")}>{options.error ?? "Loading reviewers…"}</MenuItem>}
 				{people?.length === 0 && <MenuItem disabled>No one to ask</MenuItem>}
@@ -100,7 +100,7 @@ function ReviewersSubmenu({ pr, options, onChange }: MenuReviewers) {
 							<span className="truncate">{person.name ?? person.login}</span>
 							{person.name && <span className="flex-1 truncate text-muted-foreground">{person.login}</span>}
 							{on && <span className="sr-only">, review requested</span>}
-							<Check aria-hidden className={cn("ml-auto", on ? "opacity-100" : "opacity-0")} />
+							<IconCheckmark1 aria-hidden className={cn("ml-auto", on ? "opacity-100" : "opacity-0")} />
 						</MenuItem>
 					);
 				})}
@@ -127,38 +127,38 @@ export function PullRequestMenuItems({ pr, state, quick, onState, onApprove, mer
 	const endLabel = confirm.isArmed(endAction) ? confirmLabel : state === "closed" ? "Reopen pull request" : "Close pull request";
 	return (
 		<>
-			{quick.actions.map(id => <MenuItem key={id} title={QUICK_ACTIONS[id].description} disabled={quick.pending !== null} onClick={() => quick.onRun(id)}><Zap />{QUICK_ACTIONS[id].label}</MenuItem>)}
+			{quick.actions.map(id => <MenuItem key={id} title={QUICK_ACTIONS[id].description} disabled={quick.pending !== null} onClick={() => quick.onRun(id)}><IconZap />{QUICK_ACTIONS[id].label}</MenuItem>)}
 			{offersRebase && (
 				<MenuItem title="Rebase the branch on its base, run the repository's pre-push checks, and push it with --force-with-lease" disabled={rebasing !== null} onClick={rebase.run}>
-					{rebasing ? <Spinner /> : <RefreshCw />}
+					{rebasing ? <Spinner /> : <IconArrowRotateClockwise />}
 					{rebasing ? REBASE_WORDS[rebasing].label : `Rebase on ${rebase.facts.base}`}
 				</MenuItem>
 			)}
 			{ask && <>
-				<MenuItem title="Start a session that walks through its purpose, changes, and risks, without changing code" onClick={() => draft(ask, explainPrompt(ask.pr))}><BookOpen />Explain this PR</MenuItem>
-				<MenuItem title="Start a session about it, with your question still to type" onClick={() => draft(ask, askPrompt(ask.pr))}><MessageCircleQuestion />Ask a question</MenuItem>
+				<MenuItem title="Start a session that walks through its purpose, changes, and risks, without changing code" onClick={() => draft(ask, explainPrompt(ask.pr))}><IconBook />Explain this PR</MenuItem>
+				<MenuItem title="Start a session about it, with your question still to type" onClick={() => draft(ask, askPrompt(ask.pr))}><IconBubbleQuestion />Ask a question</MenuItem>
 			</>}
 			{(quick.actions.length > 0 || offersRebase || !!ask) && <MenuSeparator />}
 			{changesState && merge && merge.allowed.length > 1 && <>
 				<MenuRadioGroup aria-label="Merge method" value={merge.method ?? ""} onValueChange={value => { const method = merge.allowed.find(candidate => candidate === value); if (method) merge.onPick(method); }}>
-					{merge.allowed.map(method => <MenuRadioItem key={method} value={method} disabled={pending || !!merge.queued} closeOnClick><GitMerge />{MERGE_METHOD_LABELS[method]}</MenuRadioItem>)}
+					{merge.allowed.map(method => <MenuRadioItem key={method} value={method} disabled={pending || !!merge.queued} closeOnClick><IconMerged />{MERGE_METHOD_LABELS[method]}</MenuRadioItem>)}
 				</MenuRadioGroup>
 				<MenuSeparator />
 			</>}
-			{onApprove && <MenuItem disabled={pending} onClick={onApprove}><Check />Approve</MenuItem>}
+			{onApprove && <MenuItem disabled={pending} onClick={onApprove}><IconCheckmark1 />Approve</MenuItem>}
 			{changesState && <MenuItem disabled={pending} onClick={() => onState(state === "draft" ? "open" : "draft")}>
-				{state === "draft" ? <GitPullRequest /> : <GitPullRequestDraft />}{state === "draft" ? "Ready for review" : "Convert to draft"}
+				{state === "draft" ? <IconPullRequest /> : <IconDraft />}{state === "draft" ? "Ready for review" : "Convert to draft"}
 			</MenuItem>}
 			{changesState && reviewers && <ReviewersSubmenu {...reviewers} />}
-			{merge?.queued && <MenuItem disabled={pending} onClick={merge.onCancel}><X />{merge.queued.state.kind === "failed" ? "Dismiss stopped merge" : "Cancel merge when ready"}</MenuItem>}
+			{merge?.queued && <MenuItem disabled={pending} onClick={merge.onCancel}><IconCrossMedium />{merge.queued.state.kind === "failed" ? "Dismiss stopped merge" : "Cancel merge when ready"}</MenuItem>}
 			{(changesState || merge?.queued) && <MenuSeparator />}
 			<MenuLinkItem href={pullRequestUrl(pr)} target="_blank" rel="noreferrer"><OrgIcon org="github" className="size-4" />Open on GitHub</MenuLinkItem>
-			<MenuItem onClick={() => clipboard.run(pullRequestUrl(pr))}><Link />Copy link</MenuItem>
-			<MenuItem onClick={() => clipboard.run(`#${pr.number}`)}><Copy />Copy PR number</MenuItem>
+			<MenuItem onClick={() => clipboard.run(pullRequestUrl(pr))}><IconChainLink1 />Copy link</MenuItem>
+			<MenuItem onClick={() => clipboard.run(`#${pr.number}`)}><IconSquareBehindSquare1 />Copy PR number</MenuItem>
 			{state && state !== "merged" && <>
 				<MenuSeparator />
 				<MenuItem variant={state === "closed" ? "default" : "destructive"} disabled={pending} closeOnClick={confirm.isArmed(endAction)} aria-label={endLabel} {...confirm.props(endAction, () => onState(state === "closed" ? "open" : "closed"))}>
-					{state === "closed" ? <GitPullRequest /> : <GitPullRequestClosed />}{endLabel}
+					{state === "closed" ? <IconPullRequest /> : <IconPullRequestClosedSimple />}{endLabel}
 				</MenuItem>
 			</>}
 		</>

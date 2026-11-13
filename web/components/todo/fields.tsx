@@ -1,5 +1,6 @@
 /** A todo's status, priority, assignee, due day, and Workspace as pickers, as an icon on its row or a labeled button in its details. */
-import { BotMessageSquare, CalendarClock, CircleDashed, Folder, type LucideIcon, User } from "lucide-react";
+import { IconAiBotHead, IconCalendarClock, IconCircleDashed, IconFolder1, IconUser } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import type { Workspace } from "../../../src/shared/workspaces";
 import {
 	TODO_ASSIGNEES,
@@ -29,10 +30,10 @@ function PriorityIcon({ priority }: { priority: TodoPriority }) {
 	return <Icon aria-hidden className={cn("size-4 shrink-0", color)} />;
 }
 
-const ASSIGNEE: Record<TodoAssignee | "none", { label: string; icon: LucideIcon }> = {
-	none: { label: "No assignee", icon: CircleDashed },
-	user: { label: "You", icon: User },
-	agent: { label: "Agent", icon: BotMessageSquare },
+const ASSIGNEE: Record<TodoAssignee | "none", { label: string; icon: IconComponent }> = {
+	none: { label: "No assignee", icon: IconCircleDashed },
+	user: { label: "You", icon: IconUser },
+	agent: { label: "Agent", icon: IconAiBotHead },
 };
 
 function AssigneeIcon({ assignee }: { assignee: TodoAssignee | null }) {
@@ -150,7 +151,7 @@ export function DueText({ due, day }: { due: string; day: string }) {
 	const { text, overdue } = dueLabel(due, day);
 	return (
 		<span className={cn("inline-flex min-w-0 items-center gap-1 [&>svg]:shrink-0", overdue ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>
-			<CalendarClock aria-hidden />
+			<IconCalendarClock aria-hidden />
 			<span className="truncate">{text}</span>
 		</span>
 	);
@@ -167,7 +168,7 @@ export function TodoDuePicker({ todo, look, day, onChange, ...props }: TodoField
 					<DueText due={todo.due} day={day} />
 				) : (
 					<span className="inline-flex items-center gap-1 text-muted-foreground">
-						<CalendarClock aria-hidden />
+						<IconCalendarClock aria-hidden />
 						{look === "property" && "Due date"}
 					</span>
 				)
@@ -184,8 +185,8 @@ export function TodoWorkspacePicker({ todo, workspaces, disabled, onChange }: { 
 	const offered = workspace === null || workspaces.some(({ cwd }) => cwd === workspace) ? workspaces : [...workspaces, { cwd: workspace, cwdDisplay: workspace }];
 	const current = workspace === null ? "No workspace" : (folderName(workspace) ?? workspace);
 	const choices: Choice[] = [
-		{ value: "", label: "No workspace", icon: <Folder aria-hidden className="size-4 text-muted-foreground" /> },
-		...offered.map(({ cwd, cwdDisplay }) => ({ value: cwd, label: folderName(cwdDisplay) ?? cwdDisplay, detail: cwdDisplay, icon: <Folder aria-hidden className="size-4" /> })),
+		{ value: "", label: "No workspace", icon: <IconFolder1 aria-hidden className="size-4 text-muted-foreground" /> },
+		...offered.map(({ cwd, cwdDisplay }) => ({ value: cwd, label: folderName(cwdDisplay) ?? cwdDisplay, detail: cwdDisplay, icon: <IconFolder1 aria-hidden className="size-4" /> })),
 	];
 	return (
 		<FieldPicker
@@ -193,7 +194,7 @@ export function TodoWorkspacePicker({ todo, workspaces, disabled, onChange }: { 
 			current={current}
 			trigger={
 				<>
-					<Folder aria-hidden className={cn("size-4 shrink-0", workspace === null && "text-muted-foreground")} />
+					<IconFolder1 aria-hidden className={cn("size-4 shrink-0", workspace === null && "text-muted-foreground")} />
 					<span className="truncate">{current}</span>
 				</>
 			}

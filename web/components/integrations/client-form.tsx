@@ -1,5 +1,5 @@
 /** The pieces of a form that saves a service's OAuth client: numbered steps, labelled fields, and outside links. */
-import { ExternalLink } from "lucide-react";
+import { IconSquareArrowTopRight } from "central-icons";
 import type { ReactNode } from "react";
 
 export const CONTROL = "w-full rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -46,7 +46,7 @@ export function External({ href, children }: { href: string; children: string })
 	return (
 		<a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-medium underline decoration-border underline-offset-2 hover:decoration-foreground">
 			{children}
-			<ExternalLink aria-hidden className="size-3" />
+			<IconSquareArrowTopRight aria-hidden className="size-3" />
 		</a>
 	);
 }

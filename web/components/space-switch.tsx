@@ -1,4 +1,4 @@
-import { ChevronsUpDown, Keyboard } from "lucide-react";
+import { IconChevronGrabberVertical, IconKeyboard } from "central-icons";
 import { isSpace, type Space, SPACES } from "../../src/shared/workspaces";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuShortcut } from "@/components/ui/menu";
@@ -45,7 +45,7 @@ export function SpaceSwitch({ space, onSpace, otherWaiting, workspaces, onShowSh
 								{workspaces} workspace{workspaces === 1 ? "" : "s"}
 							</span>
 						</span>
-						<ChevronsUpDown aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+						<IconChevronGrabberVertical aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
 					</DropdownMenuTrigger>
 				</SidebarMenuItem>
 			</SidebarMenu>
@@ -72,7 +72,7 @@ export function SpaceSwitch({ space, onSpace, otherWaiting, workspaces, onShowSh
 				</MenuRadioGroup>
 				<MenuSeparator />
 				<MenuItem {...activityControl("shortcuts.open")} onClick={onShowShortcuts}>
-					<Keyboard />
+					<IconKeyboard />
 					Keyboard shortcuts
 					<MenuShortcut>{shortcutLabels("help").join(" ")}</MenuShortcut>
 				</MenuItem>

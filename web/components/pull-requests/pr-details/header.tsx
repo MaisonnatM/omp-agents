@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, ExternalLink, FileDiff, GitMerge, GitPullRequest, Layers, MessageSquare, Pencil, TriangleAlert } from "lucide-react";
+import { IconArrowLeft, IconBubbleText, IconCheckmark1, IconDifferenceModified, IconExclamationTriangle, IconLayersTwo, IconMerged, IconPencil, IconPullRequest, IconSquareArrowTopRight } from "central-icons";
 import { type RefObject, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, type PullRequestDetail, pullRequestName, pullRequestUrl, prKey, MAX_PULL_REQUEST_TITLE, samePullRequest, type StackedPullRequest, type UpdateMethod } from "../../../../src/shared/github";
 import type { RosterHost } from "../../../../src/shared/sessions";
@@ -32,7 +32,7 @@ function LinkedSessions({ sessions, onOpen }: { sessions: RosterHost[]; onOpen: 
 	const [open, setOpen] = useState(false);
 	if (sessions.length === 0) return null;
 	return <Popover open={open} onOpenChange={setOpen}>
-		<PopoverTrigger asChild><Button size="xs" variant="ghost-muted" leadingIcon={MessageSquare} aria-label={`Linked from ${sessions.length} ${sessions.length === 1 ? "session" : "sessions"}`}>{sessions.length}</Button></PopoverTrigger>
+		<PopoverTrigger asChild><Button size="xs" variant="ghost-muted" leadingIcon={IconBubbleText} aria-label={`Linked from ${sessions.length} ${sessions.length === 1 ? "session" : "sessions"}`}>{sessions.length}</Button></PopoverTrigger>
 		<PopoverContent align="start" className="max-h-(--radix-popover-content-available-height) w-64 space-y-2 overflow-y-auto p-3">
 			<p className="text-xs font-medium text-muted-foreground">Linked sessions</p>
 			<div className="flex flex-col items-start gap-2 text-xs">{sessions.map(host => <SessionChip key={host.instanceId} label={hostLabel(host)} status={host.status} title="Open the session" filled={false} onClick={event => { setOpen(false); onOpen({ kind: "live", instanceId: host.instanceId, agentId: null }, modeOf(event)); }} />)}</div>
@@ -66,7 +66,7 @@ function TitleEditor({ detail, headingRef, placement, send }: { detail: PullRequ
 		<div className="group flex min-h-7 min-w-0 items-center gap-1 sm:min-h-6">
 			<Heading ref={headingRef} tabIndex={-1} title={detail.title} className="min-w-0 flex-1 truncate text-base font-semibold leading-snug outline-none">{detail.title}</Heading>
 			<span className="flex shrink-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
-				<Button size="icon-xs" variant="ghost-muted" aria-label="Edit title" onClick={() => setTitle(detail.title)}><Pencil aria-hidden className="size-3" /></Button>
+				<Button size="icon-xs" variant="ghost-muted" aria-label="Edit title" onClick={() => setTitle(detail.title)}><IconPencil aria-hidden className="size-3" /></Button>
 			</span>
 		</div>
 	);
@@ -82,7 +82,7 @@ function BaseBranch({ detail, stacked, send }: { detail: PullRequestDetail; stac
 			<PopoverTrigger asChild>
 				<button {...popover.trigger} type="button" aria-label={`${detail.base}, behind by ${detail.behindBy} ${detail.behindBy === 1 ? "commit" : "commits"}`}
 					className="inline-flex min-w-0 max-w-[40%] shrink-0 cursor-help items-center gap-1 rounded-sm text-warning-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
-					<BranchLabel name={detail.base} /><TriangleAlert aria-hidden className="size-3.5 shrink-0" />
+					<BranchLabel name={detail.base} /><IconExclamationTriangle aria-hidden className="size-3.5 shrink-0" />
 				</button>
 			</PopoverTrigger>
 			<PopoverContent {...popover.content} align="start" aria-label="Update base branch" className="w-80 max-w-80 space-y-3 p-3 text-xs font-sans">
@@ -125,20 +125,20 @@ export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPi
 	const approvable = !!detail && canApprove(detail) && !detail.viewerApproved;
 	const [StateIcon, tone] = STATE_ICON[state];
 	const busy = useBusy(pr, quick.pending);
-	const badge = queued && <Tooltip content={queuedMergeText(queued)}><span role="status" className={cn(HEADER_BADGE, "font-medium", queued.state.kind === "failed" ? "border-destructive/32 bg-destructive/10 text-destructive-foreground" : "border-blue-500/32 bg-blue-500/10 text-blue-700 dark:border-blue-400/32 dark:bg-blue-400/15 dark:text-blue-300")}><GitMerge aria-hidden className="size-3.5" /><span className={ACTION_LABEL}>{queued.state.kind === "failed" ? "Merge stopped" : `Auto-merge (${MERGE_METHOD_LABELS[queued.method].toLowerCase()})`}</span></span></Tooltip>;
+	const badge = queued && <Tooltip content={queuedMergeText(queued)}><span role="status" className={cn(HEADER_BADGE, "font-medium", queued.state.kind === "failed" ? "border-destructive/32 bg-destructive/10 text-destructive-foreground" : "border-blue-500/32 bg-blue-500/10 text-blue-700 dark:border-blue-400/32 dark:bg-blue-400/15 dark:text-blue-300")}><IconMerged aria-hidden className="size-3.5" /><span className={ACTION_LABEL}>{queued.state.kind === "failed" ? "Merge stopped" : `Auto-merge (${MERGE_METHOD_LABELS[queued.method].toLowerCase()})`}</span></span></Tooltip>;
 	const mergeLabel = confirm.isArmed("merge") ? "Confirm merge?" : control.kind === "enable-auto-merge" ? `${method ? MERGE_METHOD_LABELS[method] : "Merge"} when ready` : method ? MERGE_METHOD_LABELS[method] : "Merge";
 	const stacked = !!detail && stack.length > 0 && stack.at(-1)?.number !== pr.number;
 	const branches = detail && (
 		<span className={cn("flex min-w-0 flex-1 items-center gap-1.5 font-mono text-muted-foreground/70", condensed ? "text-2xs" : "text-xs")}>
 			<BaseBranch detail={detail} stacked={stacked} send={send} />
-			<ArrowLeft aria-label="receives changes from" className={cn("shrink-0 opacity-60", condensed ? "size-3" : "size-3.5")} />
+			<IconArrowLeft aria-label="receives changes from" className={cn("shrink-0 opacity-60", condensed ? "size-3" : "size-3.5")} />
 			<CopyableCode key={detail.head} value={detail.head} label="Copy pull request branch" onCopy={cwd === null ? undefined : () => releaseBranch(cwd, detail.head)} />
 		</span>
 	);
 	const stats = detail && (
 		<span className="ml-auto inline-flex shrink-0 items-center justify-end gap-2">
 			<span aria-label={`${detail.changedFiles} changed files`} className="inline-flex min-w-16 items-center justify-end gap-1.5 tabular-nums">
-				<FileDiff aria-hidden className={condensed ? "size-3" : "size-3.5"} />
+				<IconDifferenceModified aria-hidden className={condensed ? "size-3" : "size-3.5"} />
 				{detail.changedFiles} <span className="@max-[30rem]/pr-header:hidden">{detail.changedFiles === 1 ? "file" : "files"}</span>
 			</span>
 			<span className={cn("shrink-0 font-mono", condensed ? "text-2xs" : "text-xs")}>
@@ -153,7 +153,7 @@ export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPi
 			<div className="grid h-7 min-w-0 items-center overflow-hidden pl-4">
 				<div className="col-start-1 row-start-1 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
 					{!condensed && <a href={`https://github.com/${pr.owner}/${pr.repo}`} target="_blank" rel="noreferrer" className="min-w-0 truncate text-left font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">{pr.owner}/{pr.repo}</a>}
-					<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" className={cn("inline-flex shrink-0 items-center gap-0.5 font-medium underline-offset-2 hover:underline", tone)}>#{pr.number}<ExternalLink aria-hidden className="size-2.5" /></a>
+					<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" className={cn("inline-flex shrink-0 items-center gap-0.5 font-medium underline-offset-2 hover:underline", tone)}>#{pr.number}<IconSquareArrowTopRight aria-hidden className="size-2.5" /></a>
 					{condensed && <span className="truncate font-medium text-foreground">{detail?.title}</span>}
 				</div>
 			</div>
@@ -166,7 +166,7 @@ export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPi
 						onPick={onPick}
 						align="end"
 						trigger={() => (
-							<Button variant="ghost-muted" size="xs" leadingIcon={Layers} aria-label={stack.length ? `Stack, layer ${layer} of ${stack.length}` : "Other pull requests of the session"}>
+							<Button variant="ghost-muted" size="xs" leadingIcon={IconLayersTwo} aria-label={stack.length ? `Stack, layer ${layer} of ${stack.length}` : "Other pull requests of the session"}>
 								{stack.length ? `${layer}/${stack.length}` : `+${others.length}`}
 							</Button>
 						)}
@@ -183,7 +183,7 @@ export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPi
 				<CheckoutMenu pr={pr} cwd={cwd} onOpen={onOpen} />
 				{approvable && (
 					<Tooltip content="Approve">
-						<Button size="xs" variant="outline" className={ACTION_BUTTON} leadingIcon={Check} aria-label="Approve" loading={approve.pending} onClick={() => approve.run()}>
+						<Button size="xs" variant="outline" className={ACTION_BUTTON} leadingIcon={IconCheckmark1} aria-label="Approve" loading={approve.pending} onClick={() => approve.run()}>
 							<span className={ACTION_LABEL}>Approve</span>
 						</Button>
 					</Tooltip>
@@ -191,7 +191,7 @@ export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPi
 				{control.kind === "resolve-conflicts" && (
 					<Tooltip content="Resolve conflicts">
 						<span className="inline-flex">
-							<Button size="xs" variant="destructive-outline" className={ACTION_BUTTON} leadingIcon={TriangleAlert} aria-label="Resolve conflicts"
+							<Button size="xs" variant="destructive-outline" className={ACTION_BUTTON} leadingIcon={IconExclamationTriangle} aria-label="Resolve conflicts"
 								disabled={quick.pending !== null || !quick.actions.includes("resolve-conflicts")} onClick={() => quick.onRun("resolve-conflicts")}>
 								<span className={ACTION_LABEL}>Resolve conflicts</span>
 							</Button>
@@ -200,14 +200,14 @@ export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPi
 				)}
 				{control.kind === "ready-for-review" && (
 					<Tooltip content="Ready for review">
-						<Button size="xs" variant="primary" className={ACTION_BUTTON} leadingIcon={GitPullRequest} aria-label="Ready for review" onClick={() => onSave({ field: "state", state: "open" }, { state: "open" })}>
+						<Button size="xs" variant="primary" className={ACTION_BUTTON} leadingIcon={IconPullRequest} aria-label="Ready for review" onClick={() => onSave({ field: "state", state: "open" }, { state: "open" })}>
 							<span className={ACTION_LABEL}>Ready for review</span>
 						</Button>
 					</Tooltip>
 				)}
 				{(control.kind === "merge" || control.kind === "enable-auto-merge") && (
 					<Tooltip content={mergeLabel} forceOpen={confirm.isArmed("merge") ? false : undefined} contentClassName="pointer-events-none">
-						<Button size="xs" variant="primary" className={ACTION_BUTTON} leadingIcon={GitMerge} aria-label={mergeLabel}
+						<Button size="xs" variant="primary" className={ACTION_BUTTON} leadingIcon={IconMerged} aria-label={mergeLabel}
 							loading={merging} disabled={!!queued} {...confirm.props("merge", merge)}>
 							<span className={ACTION_LABEL}>{merging ? "Merging..." : mergeLabel}</span>
 						</Button>

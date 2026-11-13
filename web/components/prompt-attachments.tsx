@@ -1,5 +1,5 @@
 /** The composer's attach button and the hook that reads attached files into a prompt's images and text. */
-import { Paperclip } from "lucide-react";
+import { IconPaperclip1 } from "central-icons";
 import { type ClipboardEvent, useState } from "react";
 import { plainText, type PromptDocument } from "../../src/shared/prompt-files";
 import { PROMPT_IMAGE_TYPES, type PromptImage } from "../../src/shared/sessions";
@@ -126,7 +126,7 @@ export function AttachButton({ onClick, disabled }: { onClick: () => void; disab
 	return (
 		<Tooltip content="Attach images, text files, or documents, or drop or paste them" side="top">
 			<Button variant="ghost" size="icon-sm" aria-label="Attach files" disabled={disabled} onClick={onClick}>
-				<Paperclip aria-hidden="true" />
+				<IconPaperclip1 aria-hidden="true" />
 			</Button>
 		</Tooltip>
 	);

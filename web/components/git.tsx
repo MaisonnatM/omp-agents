@@ -1,5 +1,5 @@
 /** Branch widgets: a branch label and copyable name, releasing a copied branch's worktree, and the new-session branch picker with the directory it starts in. */
-import { Check, GitBranch, GitBranchPlus } from "lucide-react";
+import { IconBranch, IconCheckmark1 } from "central-icons";
 import { useState } from "react";
 import { type BranchChoice, type BranchRelease, type GitCheckout, worktreeDir } from "../../src/shared/git";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -32,7 +32,7 @@ export function BranchLabel({ name, title = false, className }: { name: string; 
  */
 export function BranchName({ name, onCopy, className }: { name: string; onCopy?: () => void; className?: string }) {
 	const { copied, copy } = useCopy();
-	const Icon = copied ? Check : GitBranch;
+	const Icon = copied ? IconCheckmark1 : IconBranch;
 	const label = copied ? "Copied" : `Copy branch ${name}`;
 	return (
 		<Tooltip content={label}>
@@ -120,7 +120,7 @@ export function BranchPicker({ checkout, choice, onChoose, disabled = false }: B
 					)}
 				</span>
 			}
-			icon={choice?.kind === "new" ? GitBranchPlus : GitBranch}
+			icon={choice?.kind === "new" ? IconBranch : IconBranch}
 			control="composer.branch"
 			ariaLabel={`Branch: ${label}${choice?.kind === "new" ? `, new from ${choice.base}` : ""}`}
 			tooltip={`Branch: ${label}${choice?.kind === "new" ? `, new from ${choice.base}` : ""}. Choosing another branch uses its existing worktree or creates a new worktree.`}
@@ -161,7 +161,7 @@ export function BranchPicker({ checkout, choice, onChoose, disabled = false }: B
 											value: `create ${name}`,
 											label: (
 												<>
-													<GitBranchPlus aria-hidden />
+													<IconBranch aria-hidden />
 													<span className="flex min-w-0 items-center gap-1">
 														<span className="shrink-0">Create branch</span>
 														<BranchLabel name={name} title className="font-medium" />

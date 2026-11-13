@@ -1,5 +1,5 @@
 /** `McpIntegrationRow`: one MCP-backed service in Settings › Integrations, with its status, sign-in, and tool list, or its accounts. */
-import { KeyRound } from "lucide-react";
+import { IconKey1 } from "central-icons";
 import { type ReactNode, useState } from "react";
 import { type GoogleAccount, hasAccounts, MCP_SERVICES, type McpIntegration, type SignInState, type SingleService, signedIn } from "../../../src/shared/accounts";
 import { Button } from "@/components/ui/button";
@@ -46,7 +46,7 @@ function ServerIntegrationRow({ integration }: { integration: McpIntegration<Sin
 						{!needsSetup && <ReconnectItem signIn={signIn} />}
 						{setup !== null && (
 							<MenuItem onClick={() => setFormOpen(true)}>
-								<KeyRound />
+								<IconKey1 />
 								{setup.configured ? `Replace ${settingsLabel}` : "Set up"}
 							</MenuItem>
 						)}
@@ -62,7 +62,7 @@ function ServerIntegrationRow({ integration }: { integration: McpIntegration<Sin
 					{setup !== null && (
 						<MoreActionsMenu name={label} disabled={signIn.starting}>
 							<MenuItem onClick={() => setFormOpen(true)}>
-								<KeyRound />
+								<IconKey1 />
 								Replace {settingsLabel}
 							</MenuItem>
 						</MoreActionsMenu>
@@ -95,7 +95,7 @@ function ServerIntegrationRow({ integration }: { integration: McpIntegration<Sin
 						? {
 								message: `Complete the ${label} ${settingsLabel} before you reconnect.`,
 								fix: (
-									<Button variant="secondary" size="compact" leadingIcon={KeyRound} onClick={() => setFormOpen(true)}>
+									<Button variant="secondary" size="compact" leadingIcon={IconKey1} onClick={() => setFormOpen(true)}>
 										Set up
 									</Button>
 								),

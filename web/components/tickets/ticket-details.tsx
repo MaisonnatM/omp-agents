@@ -1,4 +1,4 @@
-import { CornerLeftUp, ExternalLink, GitPullRequest, Link2 } from "lucide-react";
+import { IconArrowCornerLeftUp, IconChainLink2, IconPullRequest, IconSquareArrowTopRight } from "central-icons";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import { pullRequestOfUrl } from "../../../src/shared/github";
 import type { Ticket, TicketDetail, TicketRelative } from "../../../src/shared/tickets";
@@ -104,7 +104,7 @@ function TicketHeader({ id, ticket, detail, actions, page, onPick, condensed, fo
 					>
 						{StatusIcon && <StatusIcon aria-hidden className={cn("size-3.5", tone)} />}
 						{id}
-						<ExternalLink aria-hidden className="size-2.5 text-muted-foreground" />
+						<IconSquareArrowTopRight aria-hidden className="size-2.5 text-muted-foreground" />
 					</a>
 					{condensed && <span className="truncate font-medium text-foreground">{ticket?.title}</span>}
 				</div>
@@ -158,7 +158,7 @@ function ParentLink({ id, parent, onPick }: { id: string; parent: TicketRelative
 		"flex h-5 w-fit max-w-full min-w-0 items-center gap-1.5 rounded-md text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring";
 	const content = (
 		<>
-			<CornerLeftUp aria-hidden className="size-3.5 shrink-0" />
+			<IconArrowCornerLeftUp aria-hidden className="size-3.5 shrink-0" />
 			<span className="shrink-0">Sub-issue of</span>
 			{parent && <IconTip icon={[...statusIcon(parent), parent.status]} />}
 			<span className="shrink-0 tabular-nums">{id}</span>
@@ -264,7 +264,7 @@ function TicketBody({ detail, page, onPick }: { detail: TicketDetail; page: bool
 				<SummarySection title={`Links (${attachments.length})`}>
 					<ul className="space-y-1.5 text-xs">
 						{attachments.map(({ title, url }, index) => {
-							const Icon = pullRequestOfUrl(url) ? GitPullRequest : Link2;
+							const Icon = pullRequestOfUrl(url) ? IconPullRequest : IconChainLink2;
 							return (
 								// Linear can attach one address twice.
 								<li key={index} className="flex min-w-0 items-center gap-2">

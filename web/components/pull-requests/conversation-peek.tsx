@@ -1,5 +1,5 @@
 /** A pull request's latest conversations in a card that opens on hover, read from GitHub only while it is open. */
-import { MessageSquare } from "lucide-react";
+import { IconBubbleText } from "central-icons";
 import type { ReactElement } from "react";
 import { type PullRequestDetail, type PullRequestSummary } from "../../../src/shared/github";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -73,7 +73,7 @@ export function ConversationPeek({ pr, children }: { pr: PullRequestSummary; chi
 			<HoverCardTrigger asChild>{children}</HoverCardTrigger>
 			<HoverCardContent side="bottom" align="start" sideOffset={6} collisionPadding={12} className="w-80 p-0" onDragStart={event => event.stopPropagation()}>
 				<p className="flex items-center gap-1.5 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
-					<MessageSquare aria-hidden className="size-3.5" />
+					<IconBubbleText aria-hidden className="size-3.5" />
 					Latest comments and reviews
 				</p>
 				<Conversations pr={pr} />

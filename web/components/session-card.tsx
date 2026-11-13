@@ -1,4 +1,4 @@
-import { LayoutList } from "lucide-react";
+import { IconBulletList } from "central-icons";
 import { memo, useLayoutEffect } from "react";
 import type { View } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,7 @@ export function SessionCardToggle({ view }: { view: View }) {
 				active={shown}
 				onClick={() => setShown(value => !value)}
 			>
-				<LayoutList />
+				<IconBulletList />
 			</Button>
 		</Tooltip>
 	);

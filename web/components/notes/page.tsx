@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Bot, NotebookPen, Pencil, Plus, SquareArrowOutUpRight, Trash2 } from "lucide-react";
+import { IconAiBotHead, IconArrowLeftRight, IconNotebook, IconPencil, IconPlusLarge, IconSquareArrowTopRight, IconTrashCan } from "central-icons";
 import { useEffect, useRef, useState } from "react";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { everyWord } from "../../../src/shared/every-word";
@@ -110,17 +110,17 @@ function LoadedNotesPage({ list, todos, view, openId, disabled, onChange, hosts,
 	return (
 		<PageFrame title={view.kind === "all" ? "Notes" : text.name} meta={`${listed.length} ${listed.length === 1 ? "note" : "notes"}`} actions={<>
 			<SearchField ref={search} label="Search notes" placeholder="Search" query={query} onQuery={setQuery} className="w-32" />
-			<Tooltip content="Write a new note" shortcut={shortcutLabels("notesNew")}><Button variant="tertiary" size="compact" leadingIcon={Plus} disabled={disabled} onClick={create}>New note</Button></Tooltip>
+			<Tooltip content="Write a new note" shortcut={shortcutLabels("notesNew")}><Button variant="tertiary" size="compact" leadingIcon={IconPlusLarge} disabled={disabled} onClick={create}>New note</Button></Tooltip>
 		</>}>
-			<ListSplit widthKey="omp-agents.notes-list-width" resizeLabel="Resize the note list" detailLabel="Open note" empty={{ icon: NotebookPen, title: "No note open", hint: "Click a note, or focus one with ↑ or ↓ and press Enter." }} list={
+			<ListSplit widthKey="omp-agents.notes-list-width" resizeLabel="Resize the note list" detailLabel="Open note" empty={{ icon: IconNotebook, title: "No note open", hint: "Click a note, or focus one with ↑ or ↓ and press Enter." }} list={
 				<ul aria-label="Notes" className="mx-auto w-full max-w-3xl space-y-0.5 px-3 py-2">
 					{shown.map(note => <NoteRow key={note.id} note={note} href={hashForNotes(view, note.id)} open={note.id === openId} todoHref={todos && note.todoId ? hashForTodoId(todos, note.todoId) : null} disabled={disabled} moveTo={to} onRename={rename} onMove={move} onRemove={remove} />)}
 					{shown.length === 0 && <li className="px-3 py-4 text-sm text-muted-foreground">{query ? `No note matches “${query}”.` : text.empty}</li>}
 				</ul>
 			} detail={open === null ? null : <section key={open.id} aria-label={open.title || "Untitled"}>
 				<DetailBar leading="Notes" previous={{ label: "Previous note", icon: CH_PREVIOUS, shortcut: "notesPrevious", onClick: at > 0 ? () => step(-1) : undefined }} next={{ label: "Next note", icon: CH_NEXT, shortcut: "notesNext", onClick: at >= 0 && at < shown.length - 1 ? () => step(1) : undefined }} close={{ label: "Close the note", icon: CH_CLOSE, shortcut: "notesClose", onClick: () => navigate(null) }}>
-					<Tooltip content={`Move to ${SPACE_LABELS[to]}`}><Button variant="ghost" size="icon-compact" aria-label={`Move note to ${SPACE_LABELS[to]}`} disabled={disabled} onClick={() => move(open)}><ArrowLeftRight /></Button></Tooltip>
-					<Tooltip content="Delete note"><Button variant="ghost" size="icon-compact" aria-label="Delete note" disabled={disabled} onClick={() => remove(open)}><Trash2 /></Button></Tooltip>
+					<Tooltip content={`Move to ${SPACE_LABELS[to]}`}><Button variant="ghost" size="icon-compact" aria-label={`Move note to ${SPACE_LABELS[to]}`} disabled={disabled} onClick={() => move(open)}><IconArrowLeftRight /></Button></Tooltip>
+					<Tooltip content="Delete note"><Button variant="ghost" size="icon-compact" aria-label="Delete note" disabled={disabled} onClick={() => remove(open)}><IconTrashCan /></Button></Tooltip>
 				</DetailBar>
 				<div className="flex flex-col gap-5 px-6 py-5">
 					<input ref={titleField} key={open.title} aria-label="Note title" placeholder="Untitled" maxLength={MAX_NOTE_TITLE} defaultValue={open.title} disabled={disabled} onKeyDown={event => {
@@ -158,18 +158,18 @@ function NoteRow({ note, href, open, todoHref, disabled, moveTo, onRename, onMov
 		<ContextMenu>
 			<ContextMenuTrigger render={<li id={`note-${note.id}`} />}>
 				<a href={href} aria-current={open ? "page" : undefined} className={cn("flex flex-col gap-1 rounded-md px-3 py-2 text-sm outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring", open && "bg-accent")}>
-					<span className="flex min-w-0 items-center gap-1.5"><span className="truncate font-medium">{note.title || "Untitled"}</span>{note.todoId && <PAGE_ICON.todo aria-label="Linked to a todo" className="size-3.5 shrink-0 text-muted-foreground" />}{note.addedBy && <Bot aria-label="Added by an agent" className="size-3.5 shrink-0 text-muted-foreground" />}</span>
+					<span className="flex min-w-0 items-center gap-1.5"><span className="truncate font-medium">{note.title || "Untitled"}</span>{note.todoId && <PAGE_ICON.todo aria-label="Linked to a todo" className="size-3.5 shrink-0 text-muted-foreground" />}{note.addedBy && <IconAiBotHead aria-label="Added by an agent" className="size-3.5 shrink-0 text-muted-foreground" />}</span>
 					<span className="truncate text-xs text-muted-foreground">{preview(note.body) || "No content"}</span>
 					<span className="text-xs text-muted-foreground">Updated {dayLabel(note.updatedAt)}</span>
 				</a>
 			</ContextMenuTrigger>
 			<ContextMenuContent className="min-w-48">
 				<MenuLinkItem href={href}>
-					<SquareArrowOutUpRight />
+					<IconSquareArrowTopRight />
 					Open
 				</MenuLinkItem>
 				<MenuItem disabled={disabled} onClick={() => onRename(note)}>
-					<Pencil />
+					<IconPencil />
 					Rename
 				</MenuItem>
 				{todoHref && (
@@ -179,12 +179,12 @@ function NoteRow({ note, href, open, todoHref, disabled, moveTo, onRename, onMov
 					</MenuLinkItem>
 				)}
 				<MenuItem disabled={disabled} onClick={() => onMove(note)}>
-					<ArrowLeftRight />
+					<IconArrowLeftRight />
 					Move to {SPACE_LABELS[moveTo]}
 				</MenuItem>
 				<MenuSeparator />
 				<MenuItem variant="destructive" disabled={disabled} onClick={() => onRemove(note)}>
-					<Trash2 />
+					<IconTrashCan />
 					Delete
 				</MenuItem>
 			</ContextMenuContent>

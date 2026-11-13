@@ -1,5 +1,5 @@
 import { Select as SelectPrimitive } from "@base-ui/react/select"
-import { Check, ChevronDown, ChevronUp } from "lucide-react"
+import { IconCheckmark1, IconChevronBottom, IconChevronTop } from "central-icons";
 
 import { cn } from "@/lib/utils"
 
@@ -31,7 +31,7 @@ function SelectTrigger({
     >
       {children}
       <SelectPrimitive.Icon className="pointer-events-none flex shrink-0 text-muted-foreground">
-        <ChevronDown aria-hidden className="size-3.5" />
+        <IconChevronBottom aria-hidden className="size-3.5" />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   )
@@ -70,11 +70,11 @@ function SelectContent({
           {...props}
         >
           <SelectPrimitive.ScrollUpArrow className="top-0 z-10 flex w-full cursor-default items-center justify-center bg-popover py-1">
-            <ChevronUp aria-hidden className="size-4" />
+            <IconChevronTop aria-hidden className="size-4" />
           </SelectPrimitive.ScrollUpArrow>
           <SelectPrimitive.List>{children}</SelectPrimitive.List>
           <SelectPrimitive.ScrollDownArrow className="bottom-0 z-10 flex w-full cursor-default items-center justify-center bg-popover py-1">
-            <ChevronDown aria-hidden className="size-4" />
+            <IconChevronBottom aria-hidden className="size-4" />
           </SelectPrimitive.ScrollDownArrow>
         </SelectPrimitive.Popup>
       </SelectPrimitive.Positioner>
@@ -98,7 +98,7 @@ function SelectItem({
     >
       <SelectPrimitive.ItemText className="flex-1 whitespace-nowrap">{children}</SelectPrimitive.ItemText>
       <SelectPrimitive.ItemIndicator className="pointer-events-none absolute right-2 flex size-4 items-center justify-center">
-        <Check aria-hidden className="size-4 text-muted-foreground" />
+        <IconCheckmark1 aria-hidden className="size-4 text-muted-foreground" />
       </SelectPrimitive.ItemIndicator>
     </SelectPrimitive.Item>
   )

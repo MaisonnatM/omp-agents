@@ -1,5 +1,5 @@
 /** The images and videos on this computer that agent text names, shown in the message and opened large. */
-import { Play } from "lucide-react";
+import { IconPlay } from "central-icons";
 import { useContext, useState } from "react";
 import { mediaSrc } from "../api";
 import { type FileBase, type FileTarget, fileTarget, linkedFile, mediaFileUrl } from "../file-paths";
@@ -52,7 +52,7 @@ function Thumbnail({ media, onFailed }: { media: Media; onFailed: () => void }) 
 	return (
 		<button type="button" title={media.target.path} aria-label={`Open ${media.name}`} disabled={!openFile} onClick={() => openFile?.(media.target)} className={THUMBNAIL}>
 			<video muted preload="metadata" src={mediaSrc(media.url)} onError={onFailed} className="h-32 max-w-60 bg-black object-contain" />
-			<Play aria-hidden className="absolute inset-0 m-auto size-8 rounded-full bg-black/60 p-2 text-white" />
+			<IconPlay aria-hidden className="absolute inset-0 m-auto size-8 rounded-full bg-black/60 p-2 text-white" />
 		</button>
 	);
 }

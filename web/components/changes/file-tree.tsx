@@ -1,5 +1,5 @@
 /** `FileTree`: the changes explorer's folder tree of changed files, each with its status letter, and the line that tells its keys. */
-import { FileText } from "lucide-react";
+import { IconFileText } from "central-icons";
 import { useEffect, useRef } from "react";
 import type { ChangedEntry } from "../../../src/shared/changes";
 import type { TreeDir } from "../../changes-model";
@@ -73,7 +73,7 @@ export function FileTree({ tree, open, hrefFor, onPick }: FileTreeProps) {
 		};
 		const body = (
 			<>
-				<FileText aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+				<IconFileText aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
 				<span className={cn("min-w-0 flex-1 truncate", file.status === "deleted" && "line-through opacity-70")}>{file.path.slice(file.path.lastIndexOf("/") + 1)}</span>
 				{file.session && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-sky-500" />}
 				<LineCounts added={file.added} removed={file.removed} />

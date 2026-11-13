@@ -1,4 +1,4 @@
-import { Maximize2, Minimize2, Route, X } from "lucide-react";
+import { IconCrossMedium, IconDirection1, IconExpand, IconMinimize } from "central-icons";
 import { memo, type ReactNode, useCallback, useMemo, useState } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
@@ -97,7 +97,7 @@ export const ViewConversation = memo(function ViewConversation({ view, focused, 
 				active={trajectory}
 				onClick={() => setTrajectoryOf(trajectory ? null : hashForView(view))}
 			>
-				<Route />
+				<IconDirection1 />
 			</Button>
 		</Tooltip>
 	);
@@ -162,12 +162,12 @@ export const Pane = memo(function Pane({
 				<>
 					<Tooltip content={maximized ? "Restore split" : "Maximize pane"} shortcut={maximized ? shortcutLabels("restore") : undefined} side="bottom">
 						<Button variant="ghost" size="icon-compact" aria-label={maximized ? "Restore split" : "Maximize pane"} onClick={onMaximize}>
-							{maximized ? <Minimize2 /> : <Maximize2 />}
+							{maximized ? <IconMinimize /> : <IconExpand />}
 						</Button>
 					</Tooltip>
 					<Tooltip content="Close pane" side="bottom">
 						<Button variant="ghost" size="icon-compact" aria-label="Close pane" onClick={onClose}>
-							<X />
+							<IconCrossMedium />
 						</Button>
 					</Tooltip>
 				</>

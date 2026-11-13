@@ -1,5 +1,5 @@
 /** A pull request's stack and its session's other pull requests: the popover that a session's header and the pull request header both open. */
-import { GitMerge, GitPullRequest } from "lucide-react";
+import { IconMerged, IconPullRequest } from "central-icons";
 import { type MouseEvent, type ReactNode, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, prKey, pullRequestUrl, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
 import { queuedMergeOf } from "../../../../src/shared/merge-queue";
@@ -54,7 +54,7 @@ export function StackPopover({ stack, others, current, onPick, align, trigger }:
 						<ul>
 							{others.map(pr => (
 								<li key={prKey(pr)} className="flex items-center gap-2 py-1.5 pr-3 pl-3 text-sm">
-									<GitPullRequest aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+									<IconPullRequest aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
 									{pick ? (
 										<button type="button" onClick={() => pick(pr)} className="min-w-0 flex-1 truncate text-left tabular-nums underline-offset-2 hover:underline">
 											{pr.repo} #{pr.number}
@@ -91,7 +91,7 @@ function MergeStack({ stack, align }: { stack: StackedPullRequest[]; align: "sta
 			) : (
 				<MergePopover pr={bottom} stack={stack} target={target.data} error={target.error} open={open} onOpenChange={setOpen} align={align}>
 					{({ pending }) => (
-						<Button variant="secondary" size="compact" leadingIcon={GitMerge} active={open} loading={pending}>
+						<Button variant="secondary" size="compact" leadingIcon={IconMerged} active={open} loading={pending}>
 							Merge stack
 						</Button>
 					)}

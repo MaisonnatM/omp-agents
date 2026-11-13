@@ -1,5 +1,5 @@
 /** The Sport page's week: the day list of this week and the next, beside the open day, under a pain flag that holds today. */
-import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { IconCheckmark1, IconChevronLeft, IconChevronRight } from "central-icons";
 import { useEffect } from "react";
 import { addDays, mondayOf } from "../../../src/shared/days";
 import type { Plan, RoutineCheck, SportState } from "../../../src/shared/sport";
@@ -47,13 +47,13 @@ export function WeekTab({ state, plan, selected, today, disabled, onDemo, onTime
 				<div className="flex items-center gap-1 px-1">
 					<Tooltip content="Semaine précédente">
 						<Button variant="ghost" size="icon-compact" aria-label="Semaine précédente" asChild>
-							<a href={step(-7)} {...activityControl("sport.week.step")}><ChevronLeft /></a>
+							<a href={step(-7)} {...activityControl("sport.week.step")}><IconChevronLeft /></a>
 						</Button>
 					</Tooltip>
 					<h2 className="min-w-0 flex-1 truncate text-center text-sm font-medium">{weekTitle(monday)}</h2>
 					<Tooltip content="Semaine suivante">
 						<Button variant="ghost" size="icon-compact" aria-label="Semaine suivante" asChild>
-							<a href={step(7)} {...activityControl("sport.week.step")}><ChevronRight /></a>
+							<a href={step(7)} {...activityControl("sport.week.step")}><IconChevronRight /></a>
 						</Button>
 					</Tooltip>
 				</div>
@@ -87,7 +87,7 @@ export function WeekTab({ state, plan, selected, today, disabled, onDemo, onTime
 												<span className={cn("block truncate text-sm", summary.kind ? "font-medium" : "text-muted-foreground")}>{summary.title}</span>
 												{summary.detail && <span className="block truncate text-xs text-muted-foreground">{summary.detail}</span>}
 											</span>
-											{summary.done && <Check aria-label="faite" className="size-4 shrink-0 text-success" />}
+											{summary.done && <IconCheckmark1 aria-label="faite" className="size-4 shrink-0 text-success" />}
 										</a>
 									</li>
 								);
@@ -103,7 +103,7 @@ export function WeekTab({ state, plan, selected, today, disabled, onDemo, onTime
 				</div>
 				{pending && (
 					<div className="sticky bottom-0 px-4 pb-4 @3xl/sport:hidden">
-						<Button className="w-full" leadingIcon={Check} disabled={disabled} onClick={() => onLog(day.date, pending)} {...activityControl("sport.log.open")}>
+						<Button className="w-full" leadingIcon={IconCheckmark1} disabled={disabled} onClick={() => onLog(day.date, pending)} {...activityControl("sport.log.open")}>
 							Séance faite…
 						</Button>
 					</div>

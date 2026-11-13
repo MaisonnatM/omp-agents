@@ -1,5 +1,6 @@
 /** What a Bot's details and its routines card mark a routine with: its task's icon, its triggers' logos, its runs' dots, icons, and ticks, and how an opened routine or run unfolds. */
-import { CalendarClock, CircleCheck, CircleDashed, CircleX, LoaderCircle, type LucideIcon, MessageSquareText, SquareTerminal } from "lucide-react";
+import { IconBubbleText, IconCalendarClock, IconCircleCheck, IconCircleDashed, IconCircleX, IconConsole, IconLoadingCircle } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import type { ReactNode } from "react";
 import type { RoutineRun, RoutineTask, TriggerKind } from "../../../src/routines";
 import { cn } from "@/lib/utils";
@@ -11,7 +12,7 @@ import { OrgIcon } from "../org-icon";
 export const OPEN_SPRING = { type: "spring", duration: 0.34, bounce: 0 } as const;
 export const INSTANT = { duration: 0 } as const;
 
-const TASK_ICON: Record<RoutineTask["kind"], LucideIcon> = { prompt: MessageSquareText, command: SquareTerminal };
+const TASK_ICON: Record<RoutineTask["kind"], IconComponent> = { prompt: IconBubbleText, command: IconConsole };
 
 /** A message's speech bubble, or a command's terminal. */
 export function TaskIcon({ task, className }: { task: RoutineTask; className?: string }) {
@@ -37,11 +38,11 @@ export function RunDot({ run }: { run: RoutineRun | undefined }) {
 }
 
 /** Each health's icon, so a run's result reads by its shape as well as its colour. */
-const HEALTH_ICON: Record<RunHealth, { icon: LucideIcon; tone: string }> = {
-	ok: { icon: CircleCheck, tone: "text-emerald-600 dark:text-emerald-400" },
-	failed: { icon: CircleX, tone: "text-red-600 dark:text-red-400" },
-	running: { icon: LoaderCircle, tone: "text-blue-600 dark:text-blue-400" },
-	waiting: { icon: CircleDashed, tone: "text-amber-600 dark:text-amber-400" },
+const HEALTH_ICON: Record<RunHealth, { icon: IconComponent; tone: string }> = {
+	ok: { icon: IconCircleCheck, tone: "text-emerald-600 dark:text-emerald-400" },
+	failed: { icon: IconCircleX, tone: "text-red-600 dark:text-red-400" },
+	running: { icon: IconLoadingCircle, tone: "text-blue-600 dark:text-blue-400" },
+	waiting: { icon: IconCircleDashed, tone: "text-amber-600 dark:text-amber-400" },
 };
 
 /** A result as its health's icon, labelled with its words. */
@@ -64,6 +65,6 @@ const MARK = "size-3.5 shrink-0";
 export const TRIGGER_MARKS: Record<TriggerKind, { name: string; logo: ReactNode }> = {
 	slack: { name: "Slack", logo: <BrandMark logo={SLACK_LOGO} className={MARK} /> },
 	"pull-request": { name: "GitHub pull requests", logo: <OrgIcon org="github" className={MARK} /> },
-	event: { name: "calendar events", logo: <CalendarClock aria-hidden className={MARK} /> },
+	event: { name: "calendar events", logo: <IconCalendarClock aria-hidden className={MARK} /> },
 	gmail: { name: "Gmail", logo: <BrandMark logo={GMAIL_LOGO} className={MARK} /> },
 };

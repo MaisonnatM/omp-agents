@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Folder } from "lucide-react";
+import { IconFolder1 } from "central-icons";
 import {
 	chordAction,
 	highlightOnFound,
@@ -20,13 +20,13 @@ const noop = (): void => {};
 const DAY = 86_400_000;
 const NOW = 1_000 * DAY;
 
-const action = (id: string, chord?: PaletteAction["chord"]): PaletteAction => ({ id, title: id, icon: Folder, chord, run: { kind: "do", fn: noop } });
+const action = (id: string, chord?: PaletteAction["chord"]): PaletteAction => ({ id, title: id, icon: IconFolder1, chord, run: { kind: "do", fn: noop } });
 const item = (id: string, section: HomeSection, title: string): PaletteItem => ({
 	id,
 	section,
 	title,
 	keywords: [],
-	icon: Folder,
+	icon: IconFolder1,
 	accessories: [],
 	kind: "Test",
 	actions: [[action("run")]],

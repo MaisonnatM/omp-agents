@@ -1,5 +1,6 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { type LucideIcon, X } from "lucide-react";
+import { IconCrossMedium } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -9,7 +10,7 @@ import { type Zoom, ZoomControls, zoomKey, ZoomPane } from "./zoom-pane";
 interface ViewerDialogProps {
 	title: string;
 	description: ReactNode;
-	icon?: LucideIcon;
+	icon?: IconComponent;
 	/** Shown before the close button. */
 	actions?: ReactNode;
 	/** What screen readers call the scrolling body. */
@@ -51,7 +52,7 @@ export function ViewerDialog({ title, description, icon: Icon, actions, bodyLabe
 							<Tooltip content="Close" shortcut={["Esc"]}>
 								<DialogPrimitive.Close asChild>
 									<Button variant="ghost" size="icon-compact" aria-label="Close">
-										<X />
+										<IconCrossMedium />
 									</Button>
 								</DialogPrimitive.Close>
 							</Tooltip>

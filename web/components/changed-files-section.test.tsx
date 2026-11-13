@@ -1,3 +1,4 @@
+import { IconCode, IconFileText } from "central-icons";
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ChangedFile } from "../../src/shared/transcript";
@@ -12,8 +13,8 @@ const files: ChangedFile[] = [
 test("file rows show type icons, duplicate names' folders, and line counts without a search field", () => {
 	const html = renderToStaticMarkup(<ChangedFileList files={files} onOpen={() => {}} />);
 	expect(html).toContain('aria-label="Files changed"');
-	expect(html).toContain("lucide-file-code");
-	expect(html).toContain("lucide-file-text");
+	expect(html).toContain(renderToStaticMarkup(<IconCode />).replace(/^<svg[^>]*>|<\/svg>$/g, ""));
+	expect(html).toContain(renderToStaticMarkup(<IconFileText />).replace(/^<svg[^>]*>|<\/svg>$/g, ""));
 	expect(html).toContain(">web/</span>");
 	expect(html).toContain(">src/</span>");
 	expect(html).not.toContain(">notes/</span>");

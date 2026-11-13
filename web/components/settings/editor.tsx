@@ -1,5 +1,5 @@
 /** Shared Settings editors, native setting rows and controls, queued writes, save errors, and sections. */
-import { ArrowDown, ArrowUp, Lock, Pencil, X } from "lucide-react";
+import { IconArrowDown, IconArrowUp, IconCrossMedium, IconLock, IconPencil } from "central-icons";
 import { type ComponentProps, type ReactNode, useId, useState } from "react";
 import type { AgentSettingChange, AgentSettingEdit, AgentSettingOption, AgentSettingRow } from "../../../src/shared/agent-settings";
 import type { CatalogModel, OmpFile, OmpSettings } from "../../../src/shared/models";
@@ -129,7 +129,7 @@ export function useEditor<T, R = OmpSettings>(original: T, save: (draft: T) => P
 export function EditBar<T>({ editor, label, start = "Edit" }: { editor: Editor<T>; label: string; start?: string }) {
 	if (editor.state.phase === "viewing") {
 		return (
-			<Button variant="ghost" size="compact" leadingIcon={Pencil} aria-label={`${start} ${label}`} onClick={editor.start}>
+			<Button variant="ghost" size="compact" leadingIcon={IconPencil} aria-label={`${start} ${label}`} onClick={editor.start}>
 				{start}
 			</Button>
 		);
@@ -187,7 +187,7 @@ export function OrderButton({ label, direction, disabled, onClick }: { label: st
 	const name = direction === "up" ? "up" : "down";
 	const button = (
 		<Button variant="ghost" size="icon-compact" aria-label={`Move ${label} ${name}`} disabled={disabled} onClick={onClick}>
-			{direction === "up" ? <ArrowUp /> : <ArrowDown />}
+			{direction === "up" ? <IconArrowUp /> : <IconArrowDown />}
 		</Button>
 	);
 	return (
@@ -227,7 +227,7 @@ export function OrderedList({
 						<OrderButton label={label(item)} direction="down" disabled={index === items.length - 1} onClick={() => move(index, index + 1)} />
 						<Tooltip content={`Remove ${label(item)}`}>
 							<Button variant="ghost" size="icon-compact" aria-label={`Remove ${label(item)}`} onClick={() => onChange(items.filter((_, other) => other !== index))}>
-								<X />
+								<IconCrossMedium />
 							</Button>
 						</Tooltip>
 					</li>
@@ -520,7 +520,7 @@ function ProviderLimitsControl({ labelId, value, disabled, onChange }: ControlPr
 					/>
 					<Tooltip content={`Remove the limit for ${name}`}>
 						<Button variant="ghost" size="icon-compact" aria-label={`Remove the limit for ${name}`} onClick={() => onChange({ value: without(name) })}>
-							<X />
+							<IconCrossMedium />
 						</Button>
 					</Tooltip>
 				</div>
@@ -650,7 +650,7 @@ export function SettingRow({ row, context: { editing, projectFile, onOpenFile },
 							</Button>
 						</Tooltip>
 					)}
-					{locked && <Lock aria-hidden className="size-3.5 text-muted-foreground" />}
+					{locked && <IconLock aria-hidden className="size-3.5 text-muted-foreground" />}
 					{placement === "inline" && !viewing && element}
 					{viewing && <span className="text-sm tabular-nums">{formatValue(row, value)}</span>}
 					{mode === "explicit" && <EditBar editor={editor} label={row.label} />}

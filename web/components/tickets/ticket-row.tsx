@@ -1,22 +1,6 @@
 /** `TicketRow`: a Linear issue's row on the Tickets page, with its status and priority icons and chips. */
-import {
-	Box,
-	Calendar,
-	Circle,
-	CircleAlert,
-	CircleArrowOutUpRight,
-	CircleCheck,
-	CircleDashed,
-	CircleDot,
-	CircleX,
-	Contrast,
-	CornerDownRight,
-	Ellipsis,
-	type LucideIcon,
-	SignalHigh,
-	SignalLow,
-	SignalMedium,
-} from "lucide-react";
+import { IconArrowCornerDownRight, IconArrowRightUpCircle, IconBox, IconCalendar1, IconCircle, IconCircleCheck, IconCircleDashed, IconCircleRecord, IconCircleX, IconContrast, IconDotGrid1x3Horizontal, IconExclamationCircle, IconSpeedHigh, IconSpeedLow, IconSpeedMiddle } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import type { ReactNode } from "react";
 import type { Ticket, TicketPriority, TicketStatus } from "../../../src/shared/tickets";
 import { cn } from "@/lib/utils";
@@ -29,24 +13,24 @@ import { AddToTodo } from "../todo/add-button";
 import { QuickActionsMenu } from "../quick-actions";
 
 /** Linear's glyph for each state type, and In Review's own green one. */
-export const STATUS_ICON: Record<StatusKind, [LucideIcon, string]> = {
-	review: [CircleDot, "text-green-600 dark:text-green-400"],
-	triage: [CircleArrowOutUpRight, "text-orange-500 dark:text-orange-400"],
-	started: [Contrast, "text-amber-500 dark:text-amber-400"],
-	unstarted: [Circle, "text-muted-foreground"],
-	backlog: [CircleDashed, "text-muted-foreground"],
-	completed: [CircleCheck, "text-indigo-500 dark:text-indigo-400"],
-	canceled: [CircleX, "text-muted-foreground"],
+export const STATUS_ICON: Record<StatusKind, [IconComponent, string]> = {
+	review: [IconCircleRecord, "text-green-600 dark:text-green-400"],
+	triage: [IconArrowRightUpCircle, "text-orange-500 dark:text-orange-400"],
+	started: [IconContrast, "text-amber-500 dark:text-amber-400"],
+	unstarted: [IconCircle, "text-muted-foreground"],
+	backlog: [IconCircleDashed, "text-muted-foreground"],
+	completed: [IconCircleCheck, "text-indigo-500 dark:text-indigo-400"],
+	canceled: [IconCircleX, "text-muted-foreground"],
 };
 
-export const statusIcon = (status: TicketStatus): [LucideIcon, string] => STATUS_ICON[statusKind(status)];
+export const statusIcon = (status: TicketStatus): [IconComponent, string] => STATUS_ICON[statusKind(status)];
 
-export const PRIORITY_ICON: Record<TicketPriority, [LucideIcon, string]> = {
-	0: [Ellipsis, "text-muted-foreground"],
-	1: [CircleAlert, "text-orange-500 dark:text-orange-400"],
-	2: [SignalHigh, "text-foreground"],
-	3: [SignalMedium, "text-foreground"],
-	4: [SignalLow, "text-foreground"],
+export const PRIORITY_ICON: Record<TicketPriority, [IconComponent, string]> = {
+	0: [IconDotGrid1x3Horizontal, "text-muted-foreground"],
+	1: [IconExclamationCircle, "text-orange-500 dark:text-orange-400"],
+	2: [IconSpeedHigh, "text-foreground"],
+	3: [IconSpeedMiddle, "text-foreground"],
+	4: [IconSpeedLow, "text-foreground"],
 };
 
 /** The element id of an issue's row, used to restore focus after its details close. */
@@ -102,12 +86,12 @@ export function TicketRow({ ticket, nested = false, open = false, pending, onQui
 				{/* Chips that do not fit wrap onto a second line that the fixed height hides, so the title keeps its room. */}
 				<span className="hidden h-6 min-w-0 shrink-[100] flex-wrap justify-end gap-1.5 overflow-hidden @2xl:flex">
 					{!nested && ticket.parentId && (
-						<TicketChip icon={<CornerDownRight aria-hidden className="size-3.5 shrink-0" />} title={`Sub-issue of ${ticket.parentId}`}>
+						<TicketChip icon={<IconArrowCornerDownRight aria-hidden className="size-3.5 shrink-0" />} title={`Sub-issue of ${ticket.parentId}`}>
 							{ticket.parentId}
 						</TicketChip>
 					)}
 					{ticket.dueDate && (
-						<TicketChip icon={<Calendar aria-hidden className="size-3.5 shrink-0" />} title={`Due ${ticket.dueDate}`}>
+						<TicketChip icon={<IconCalendar1 aria-hidden className="size-3.5 shrink-0" />} title={`Due ${ticket.dueDate}`}>
 							{dateLabel(ticket.dueDate)}
 						</TicketChip>
 					)}
@@ -117,7 +101,7 @@ export function TicketRow({ ticket, nested = false, open = false, pending, onQui
 						</TicketChip>
 					))}
 					{ticket.project && (
-						<TicketChip icon={<Box aria-hidden className="size-3.5 shrink-0" />} title={ticket.project}>
+						<TicketChip icon={<IconBox aria-hidden className="size-3.5 shrink-0" />} title={ticket.project}>
 							{ticket.project}
 						</TicketChip>
 					)}

@@ -1,5 +1,6 @@
 /** Which todos each of the Todo page's lists holds and what it lets you do, shared by the page and the sidebar. */
-import { Archive, Bot, CalendarClock, ListTodo, type LucideIcon, MessageCircleQuestionMark } from "lucide-react";
+import { IconAiBotHead, IconArchive, IconBubbleQuestion, IconCalendarClock, IconTodos } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import type { TodoStatus, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../src/user-todos-shared";
 import { everyWord } from "../src/shared/every-word";
 import type { BadgeColor } from "@/components/ui/badge";
@@ -35,12 +36,12 @@ export const LIST_KINDS: Record<TodoListView["kind"], ListKind> = {
 };
 
 /** The lists the sidebar shows above the categories, in its order, each with its name and icon. */
-export const SIDEBAR_LISTS: { view: Exclude<TodoListView, { kind: "category" }>; name: string; icon: LucideIcon }[] = [
-	{ view: { kind: "all" }, name: "All", icon: ListTodo },
-	{ view: { kind: "today" }, name: "Today", icon: CalendarClock },
-	{ view: { kind: "needs" }, name: "Needs you", icon: MessageCircleQuestionMark },
-	{ view: { kind: "agents" }, name: "From agents", icon: Bot },
-	{ view: { kind: "archive" }, name: "Archive", icon: Archive },
+export const SIDEBAR_LISTS: { view: Exclude<TodoListView, { kind: "category" }>; name: string; icon: IconComponent }[] = [
+	{ view: { kind: "all" }, name: "All", icon: IconTodos },
+	{ view: { kind: "today" }, name: "Today", icon: IconCalendarClock },
+	{ view: { kind: "needs" }, name: "Needs you", icon: IconBubbleQuestion },
+	{ view: { kind: "agents" }, name: "From agents", icon: IconAiBotHead },
+	{ view: { kind: "archive" }, name: "Archive", icon: IconArchive },
 ];
 
 /** Each status as the page names it and draws it, with the Linear state type whose glyph it takes. */

@@ -1,5 +1,6 @@
 /** The header's notices bell: pull request, Slack, provider, sign-in, calendar, stopped-session, and update notices in a popover, filtered by source, each drawn from its {@link presentNotice} projection. */
-import { Bell, CalendarClock, CheckCheck, CircleAlert, CircleX, Eye, Gauge, GitCompareArrows, GitMerge, KeyRound, ListRestart, type LucideIcon, MessageSquare, Plug, Sparkles, Wallet, X } from "lucide-react";
+import { IconArrowLoopDownLeft, IconArrowsRepeatRightLeft, IconBell, IconBubbleText, IconCalendarClock, IconCircleX, IconCrossMedium, IconDoubleCheckmark1, IconExclamationCircle, IconEyeOpen, IconGauge, IconKey1, IconMerged, IconPlugin1, IconSparklesTwo, IconWallet1 } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useRef, useState } from "react";
 import { type AccountsService, MCP_SERVICES } from "../../src/shared/accounts";
 import type { PullRequestSummary } from "../../src/shared/github";
@@ -30,20 +31,20 @@ const FILTERS: [NoticeSource | "all", string, ReactNode][] = [
 	["all", "All", null],
 	["github", "GitHub", <OrgIcon key="github" org="github" className={TAB_LOGO} />],
 	["slack", "Slack", <BrandMark key="slack" logo={SLACK_LOGO} className={TAB_LOGO} />],
-	["providers", "Providers", <Gauge key="providers" aria-hidden className={TAB_LOGO} />],
-	["integrations", "Integrations", <Plug key="integrations" aria-hidden className={TAB_LOGO} />],
-	["calendar", "Calendar", <CalendarClock key="calendar" aria-hidden className={TAB_LOGO} />],
-	["sessions", "Sessions", <CircleAlert key="sessions" aria-hidden className={TAB_LOGO} />],
-	["updates", "Updates", <Sparkles key="updates" aria-hidden className={cn(TAB_LOGO, "text-violet-600 dark:text-violet-400")} />],
+	["providers", "Providers", <IconGauge key="providers" aria-hidden className={TAB_LOGO} />],
+	["integrations", "Integrations", <IconPlugin1 key="integrations" aria-hidden className={TAB_LOGO} />],
+	["calendar", "Calendar", <IconCalendarClock key="calendar" aria-hidden className={TAB_LOGO} />],
+	["sessions", "Sessions", <IconExclamationCircle key="sessions" aria-hidden className={TAB_LOGO} />],
+	["updates", "Updates", <IconSparklesTwo key="updates" aria-hidden className={cn(TAB_LOGO, "text-violet-600 dark:text-violet-400")} />],
 ];
 
 /** Each of your moves with the icon and colours of the Pull requests page's badge for it. */
-const MOVE_BADGE: Record<YourMove, { icon: LucideIcon; tone: string }> = {
-	review: { icon: Eye, tone: "bg-blue-500 text-white" },
-	merge: { icon: GitMerge, tone: "bg-emerald-500 text-white" },
-	"fix-ci": { icon: CircleX, tone: "bg-red-500 text-white" },
-	rebase: { icon: GitCompareArrows, tone: "bg-orange-500 text-white" },
-	reply: { icon: MessageSquare, tone: "bg-amber-500 text-white" },
+const MOVE_BADGE: Record<YourMove, { icon: IconComponent; tone: string }> = {
+	review: { icon: IconEyeOpen, tone: "bg-blue-500 text-white" },
+	merge: { icon: IconMerged, tone: "bg-emerald-500 text-white" },
+	"fix-ci": { icon: IconCircleX, tone: "bg-red-500 text-white" },
+	rebase: { icon: IconArrowsRepeatRightLeft, tone: "bg-orange-500 text-white" },
+	reply: { icon: IconBubbleText, tone: "bg-amber-500 text-white" },
 };
 
 /** Each Google service's logo, which its sign-in notice shows. */
@@ -52,7 +53,7 @@ const SERVICE_LOGO: Record<AccountsService, BrandLogo> = { gmail: GMAIL_LOGO, "g
 /** Where a notice came from, as a logo and a name: GitHub, Slack, the provider, the Google service, Google Calendar or this computer's calendar, omp, or omp-agents. */
 function originOf(notice: Notice): { logo: ReactNode; label: string } {
 	const mark = "size-3.5 shrink-0";
-	const sparkles = <Sparkles aria-hidden className={cn(mark, "text-violet-600 dark:text-violet-400")} />;
+	const sparkles = <IconSparklesTwo aria-hidden className={cn(mark, "text-violet-600 dark:text-violet-400")} />;
 	switch (notice.kind) {
 		case "pull-request":
 			return { logo: <OrgIcon org="github" className={mark} />, label: "GitHub" };
@@ -60,12 +61,12 @@ function originOf(notice: Notice): { logo: ReactNode; label: string } {
 			return { logo: <BrandMark logo={SLACK_LOGO} className={mark} />, label: "Slack" };
 		case "plan":
 		case "credits": {
-			const Icon = notice.kind === "plan" ? Gauge : Wallet;
+			const Icon = notice.kind === "plan" ? IconGauge : IconWallet1;
 			return { logo: <OrgIcon org={providerOrg(notice.provider)} className={mark} fallback={<Icon aria-hidden className={mark} />} />, label: providerLabel(notice.provider) };
 		}
 		case "event":
 			return notice.calendar === null
-				? { logo: <CalendarClock aria-hidden className={mark} />, label: "Calendar" }
+				? { logo: <IconCalendarClock aria-hidden className={mark} />, label: "Calendar" }
 				: { logo: <BrandMark logo={GOOGLE_CALENDAR_LOGO} className={mark} />, label: "Google Calendar" };
 		case "omp":
 		case "model":
@@ -74,7 +75,7 @@ function originOf(notice: Notice): { logo: ReactNode; label: string } {
 		case "dashboard-failed":
 			return { logo: sparkles, label: "omp-agents" };
 		case "stopped":
-			return { logo: <CircleAlert aria-hidden className={cn(mark, "text-amber-600 dark:text-amber-400")} />, label: "omp-agents" };
+			return { logo: <IconExclamationCircle aria-hidden className={cn(mark, "text-amber-600 dark:text-amber-400")} />, label: "omp-agents" };
 		case "sign-in":
 			return { logo: <BrandMark logo={SERVICE_LOGO[notice.service]} className={mark} />, label: MCP_SERVICES[notice.service].label };
 		default: {
@@ -102,28 +103,28 @@ function Face({ face }: { face: NoticeFace }) {
 		case "update":
 			return (
 				<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-violet-500/10">
-					<Sparkles aria-hidden className="m-auto size-4 text-violet-600 dark:text-violet-400" />
+					<IconSparklesTwo aria-hidden className="m-auto size-4 text-violet-600 dark:text-violet-400" />
 				</span>
 			);
 		case "event":
 			return (
 				<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-muted">
-					<CalendarClock aria-hidden className="m-auto size-4" style={{ color: face.color ?? undefined }} />
+					<IconCalendarClock aria-hidden className="m-auto size-4" style={{ color: face.color ?? undefined }} />
 				</span>
 			);
 		case "stopped":
 			return (
 				<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-amber-500/10">
-					<CircleAlert aria-hidden className="m-auto size-4 text-amber-600 dark:text-amber-400" />
+					<IconExclamationCircle aria-hidden className="m-auto size-4 text-amber-600 dark:text-amber-400" />
 				</span>
 			);
 		case "provider": {
-			const Icon = face.window === "plan" ? Gauge : Wallet;
+			const Icon = face.window === "plan" ? IconGauge : IconWallet1;
 			return (
 				<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-muted">
 					<OrgIcon org={providerOrg(face.provider)} className="m-auto size-4" fallback={<Icon aria-hidden className="m-auto size-4 text-muted-foreground" />} />
 					<span className={cn(BADGE, "bg-red-500 text-white")}>
-						<Icon aria-hidden className="size-2.5" strokeWidth={2.5} />
+						<Icon aria-hidden className="size-2.5" />
 					</span>
 				</span>
 			);
@@ -133,7 +134,7 @@ function Face({ face }: { face: NoticeFace }) {
 				<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-muted">
 					<BrandMark logo={SERVICE_LOGO[face.service]} className="m-auto size-4" />
 					<span className={cn(BADGE, "bg-red-500 text-white")}>
-						<KeyRound aria-hidden className="size-2.5" strokeWidth={2.5} />
+						<IconKey1 aria-hidden className="size-2.5" />
 					</span>
 				</span>
 			);
@@ -149,7 +150,7 @@ function Face({ face }: { face: NoticeFace }) {
 			return (
 				<Avatar person={face.person}>
 					<span className={cn(BADGE, tone)}>
-						<Icon aria-hidden className="size-2.5" strokeWidth={2.5} />
+						<Icon aria-hidden className="size-2.5" />
 					</span>
 				</Avatar>
 			);
@@ -188,7 +189,7 @@ function NoticeMerge({ pr, onMerged }: { pr: PullRequestSummary; onMerged: () =>
 	return (
 		<MergePopover pr={pr} target={target.data} error={target.error} onQueued={onMerged} open={open} onOpenChange={setOpen} align="start">
 			{({ pending }) => (
-				<Button variant="secondary" size="compact" leadingIcon={GitMerge} loading={pending} disabled={!connected}>
+				<Button variant="secondary" size="compact" leadingIcon={IconMerged} loading={pending} disabled={!connected}>
 					Merge
 				</Button>
 			)}
@@ -251,7 +252,7 @@ function NoticeAction({ id, action, send, onDone }: { id: string; action: Action
 				<Button
 					variant="secondary"
 					size="compact"
-					leadingIcon={ListRestart}
+					leadingIcon={IconArrowLoopDownLeft}
 					loading={resuming}
 					disabled={!connected || resuming}
 					onClick={() => {
@@ -328,7 +329,7 @@ function NoticeRow({ notice, send, onDone }: { notice: Notice; send: Send; onDon
 					onClick={() => send({ t: "notice", ids: [notice.id], op: "clear" })}
 					className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
 				>
-					<X />
+					<IconCrossMedium />
 				</Button>
 			</Tooltip>
 		</li>
@@ -371,7 +372,7 @@ export function NoticesBell({ notices }: { notices: Notice[] }) {
 						data-state={open ? "open" : "closed"}
 						active={open}
 					>
-						<Bell />
+						<IconBell />
 						{unread.length > 0 && (
 							<span aria-hidden className="absolute -top-1 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-blue-500 px-1 text-[9px] font-semibold tabular-nums text-white ring-2 ring-background">
 								{unread.length > 9 ? "9+" : unread.length}
@@ -393,7 +394,7 @@ export function NoticesBell({ notices }: { notices: Notice[] }) {
 					<h2 className="flex-1 text-sm font-semibold">Notifications</h2>
 					<Tooltip content="Mark all as read">
 						<Button {...activityControl("notices.read-all")} variant="ghost" size="icon-compact" aria-label="Mark all as read" disabled={!connected || shownUnread.length === 0} onClick={() => send({ t: "notice", ids: shownUnread.map(({ id }) => id), op: "read" })}>
-							<CheckCheck />
+							<IconDoubleCheckmark1 />
 						</Button>
 					</Tooltip>
 				</header>
@@ -423,7 +424,7 @@ export function NoticesBell({ notices }: { notices: Notice[] }) {
 					{shown.length === 0 ? (
 						<div className="flex flex-col items-center gap-2 px-6 py-10 text-center">
 							<span className="flex size-9 items-center justify-center rounded-full bg-muted">
-								<Bell aria-hidden className="size-4 text-muted-foreground" />
+								<IconBell aria-hidden className="size-4 text-muted-foreground" />
 							</span>
 							<p className="text-sm font-medium">You're all caught up</p>
 							<p className="text-xs text-muted-foreground">Pull requests that wait on you, Slack messages for you, providers that stop serving, events about to start, and updates land here.</p>

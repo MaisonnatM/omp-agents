@@ -1,5 +1,5 @@
 /** The Email page's open conversation: its action bar, subject, messages folded as Gmail folds them, and the reply. */
-import { ChevronsUpDown, ExternalLink, Paperclip, RefreshCw, Reply, ReplyAll, Trash2 } from "lucide-react";
+import { IconArrowRotateClockwise, IconArrowShareLeft, IconChevronGrabberVertical, IconPaperclip1, IconSquareArrowTopRight, IconTrashCan } from "central-icons";
 import { useReducer, useState } from "react";
 import type { MailAttachment, MailMessage, MailPerson, MailReply, MailThread, MailTrash } from "../../../src/shared/gmail";
 import { MailEditor } from "./mail-editor";
@@ -37,7 +37,7 @@ function Attachments({ attachments }: { attachments: MailAttachment[] }) {
 			{attachments.map((attachment, index) => (
 				// Two files of one message may share a name.
 				<li key={index} title={attachment.type} className="inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-xs">
-					<Paperclip aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+					<IconPaperclip1 aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
 					<span className="truncate">{attachment.name}</span>
 					<span className="shrink-0 tabular-nums text-muted-foreground">{formatBytes(attachment.size)}</span>
 				</li>
@@ -165,10 +165,10 @@ function ReplyPrompt({ to, disabled, onReply }: { to: string; disabled: boolean;
 				onClick={() => onReply(false)}
 				className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-muted-foreground outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
 			>
-				<Reply className="size-4 shrink-0" />
+				<IconArrowShareLeft className="size-4 shrink-0" />
 				<span className="truncate">Reply to {to}…</span>
 			</button>
-			<Button type="button" variant="ghost" size="compact" leadingIcon={ReplyAll} disabled={disabled} onClick={() => onReply(true)}>
+			<Button type="button" variant="ghost" size="compact" leadingIcon={IconArrowShareLeft} disabled={disabled} onClick={() => onReply(true)}>
 				Reply all
 			</Button>
 		</div>
@@ -252,32 +252,32 @@ export function ThreadDetail({ target, listed, position, onPrevious, onNext, add
 			>
 				<Tooltip content="Reply" shortcut={shortcutLabels("emailReply")} disabled={!canReply}>
 					<Button variant="ghost" size="icon-compact" aria-label="Reply" disabled={!canReply} onClick={() => compose(false)}>
-						<Reply />
+						<IconArrowShareLeft />
 					</Button>
 				</Tooltip>
 				<Tooltip content="Reply all" shortcut={shortcutLabels("emailReplyAll")} disabled={!canReply}>
 					<Button variant="ghost" size="icon-compact" aria-label="Reply all" disabled={!canReply} onClick={() => compose(true)}>
-						<ReplyAll />
+						<IconArrowShareLeft />
 					</Button>
 				</Tooltip>
 				<Tooltip content="Delete" shortcut={shortcutLabels("emailTrash")} disabled={trashing}>
 					<Button variant="ghost" size="icon-compact" aria-label="Delete" disabled={trashing} onClick={() => trash.run()}>
-						<Trash2 />
+						<IconTrashCan />
 					</Button>
 				</Tooltip>
 				{expandAll && (
 					<Button variant="ghost" size="icon-compact" aria-label="Expand all" onClick={() => fold({ kind: "expand-all", messages })}>
-						<ChevronsUpDown />
+						<IconChevronGrabberVertical />
 					</Button>
 				)}
 				<Tooltip content={refreshing ? "Refreshing…" : "Refresh"} disabled={refreshing}>
 					<Button variant="ghost" size="icon-compact" aria-label="Refresh" disabled={refreshing} onClick={() => void mailThreadStore.refresh(scope, { fresh: true })}>
-						<RefreshCw className={cn(refreshing && "animate-spin")} />
+						<IconArrowRotateClockwise className={cn(refreshing && "animate-spin")} />
 					</Button>
 				</Tooltip>
 				<Tooltip content="Open in Gmail" shortcut={shortcutLabels("emailOnGmail")} disabled={!url}>
 					<Button variant="ghost" size="icon-compact" aria-label="Open in Gmail" disabled={!url} render={url ? <a href={url} target="_blank" rel="noreferrer" /> : undefined}>
-						<ExternalLink />
+						<IconSquareArrowTopRight />
 					</Button>
 				</Tooltip>
 			</DetailBar>

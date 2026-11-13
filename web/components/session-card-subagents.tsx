@@ -2,7 +2,7 @@
  * The Session card's Subagents section: the view's subagents as a tree, each a link to its own view with its status and what it is doing.
  * The runners of an arena the session recorded sit side by side above the tree, with the judge under them and the base marked.
  */
-import { Gavel, Swords, Trophy } from "lucide-react";
+import { IconJudgeGavel, IconSword, IconTrophy } from "central-icons";
 import type { MouseEvent, ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -114,7 +114,7 @@ function ArenaLanes({ group, links }: { group: ArenaGroup; links: SubagentLinksV
 	return (
 		<section aria-label={`Arena: ${group.task}`} className="mx-1 mt-1 rounded-xl border border-border/70 p-1">
 			<div className="flex min-w-0 items-center gap-2 px-2 pt-1 pb-1 text-[13px]">
-				<Swords aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+				<IconSword aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
 				<span className="shrink-0 font-medium text-foreground">Arena</span>
 				<Tooltip content={group.task} side="left">
 					<span className="min-w-0 truncate text-muted-foreground">{group.task}</span>
@@ -128,7 +128,7 @@ function ArenaLanes({ group, links }: { group: ArenaGroup; links: SubagentLinksV
 			</ul>
 			{(group.judge || group.descendants.length > 0) && (
 				<ul aria-label="Arena judge and helpers" className="mt-1">
-					{group.judge && <SubagentRow agent={group.judge} depth={0} links={links} lead={<Gavel aria-label="Judge" className="size-3.5 shrink-0 text-muted-foreground" />} />}
+					{group.judge && <SubagentRow agent={group.judge} depth={0} links={links} lead={<IconJudgeGavel aria-label="Judge" className="size-3.5 shrink-0 text-muted-foreground" />} />}
 					{group.descendants.map(({ agent, depth }) => (
 						<SubagentRow key={agent.id} agent={agent} depth={depth} links={links} />
 					))}
@@ -182,7 +182,7 @@ function Verdict({ verdict }: { verdict: ArenaVerdict }) {
 		<div className="mt-auto flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 pt-0.5">
 			<Badge variant="dot" size="compact" color={color}>
 				<span className="flex items-center gap-1">
-					{verdict.kind === "base" && <Trophy aria-hidden className="size-3" />}
+					{verdict.kind === "base" && <IconTrophy aria-hidden className="size-3" />}
 					{label}
 				</span>
 			</Badge>

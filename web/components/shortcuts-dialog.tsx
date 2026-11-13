@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
+import { IconCrossMedium } from "central-icons";
 import { type CSSProperties, Fragment, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -78,7 +78,7 @@ export function ShortcutsDialog({ open, onOpenChange, tabs }: { open: boolean; o
 						<Tooltip content="Close" shortcut={["Esc"]} side="bottom">
 							<DialogPrimitive.Close asChild>
 								<Button variant="ghost" size="icon-compact" aria-label="Close">
-									<X />
+									<IconCrossMedium />
 								</Button>
 							</DialogPrimitive.Close>
 						</Tooltip>

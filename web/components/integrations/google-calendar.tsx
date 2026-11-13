@@ -1,4 +1,4 @@
-import { CircleAlert } from "lucide-react";
+import { IconExclamationCircle } from "central-icons";
 import type { AccountId } from "../../../src/shared/accounts";
 import type { GoogleStatus } from "../../../src/shared/calendar";
 import { cn } from "@/lib/utils";
@@ -9,7 +9,7 @@ import { Callout } from "./integration-row";
 export function GoogleCalendarsError({ entry }: { entry: PolledEntry<GoogleStatus> }) {
 	if (entry.read || !entry.error) return null;
 	return (
-		<Callout tone="danger" icon={CircleAlert}>
+		<Callout tone="danger" icon={IconExclamationCircle}>
 			Cannot list your calendars: {entry.error}
 		</Callout>
 	);
@@ -27,7 +27,7 @@ export function GoogleCalendarList({ entry, account }: { entry: PolledEntry<Goog
 	return (
 		<>
 			{failed && (
-				<Callout tone="danger" icon={CircleAlert}>
+				<Callout tone="danger" icon={IconExclamationCircle}>
 					Cannot list this account's calendars: {failed}
 				</Callout>
 			)}

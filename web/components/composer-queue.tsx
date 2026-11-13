@@ -104,7 +104,7 @@ function RowActionButton({ action, text, isTouch }: { action: RowAction; text: s
 					"focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)]",
 				)}
 			>
-				<Icon size={13} strokeWidth={2.5} />
+				<Icon size={13} />
 			</button>
 		</Tooltip>
 	);

@@ -18,14 +18,13 @@ import {
   type CSSProperties,
   type HTMLAttributes,
   type Ref,
-  type ComponentType,
 } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { spring } from "@/lib/springs";
 import { useShape } from "@/lib/shape-context";
 import { useSize, useSizeVariant } from "@/lib/size-context";
-import { useIcon } from "@/lib/icon-context";
+import { type IconComponent, useIcon } from "@/lib/icon-context";
 import { resolveSlotTemplate, slotElement } from "@/components/ui/sidebar-slot";
 
 // ─── SidebarGroup family ─────────────────────────────────────────────────────
@@ -199,7 +198,7 @@ interface SidebarGroupLabelProps extends HTMLAttributes<HTMLDivElement> {
   render?: ReactElement;
   asChild?: boolean;
   /** Drawn before the label's text, such as the section's kind. */
-  icon?: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+  icon?: IconComponent;
 }
 
 const SidebarGroupLabel = forwardRef<HTMLDivElement, SidebarGroupLabelProps>(

@@ -1,4 +1,4 @@
-import { Check, LoaderCircle, Target } from "lucide-react";
+import { IconCheckmark1, IconLoadingCircle, IconTarget } from "central-icons";
 import { useEffect, useId, useRef, useState } from "react";
 import type { GoalChange, GoalSlot, SessionGoal } from "../../src/shared/session-controls";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +38,7 @@ export function SessionGoalControl({ instanceId, slot, onChange, onEdit }: {
 				<button {...activityControl("header.goal")} type="button" disabled={action.pending} aria-label={`Goal ${STATUS[goal.status]}: ${goal.objective}`} className="min-w-0 max-w-64 shrink rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
 					<Badge variant="dot" size="compact" color={goal.status === "active" ? "green" : goal.status === "budget-limited" ? "amber" : "gray"} className="min-w-0 max-w-full hover:bg-accent [&>span:last-child]:min-w-0">
 						<span className="flex min-w-0 items-center gap-1">
-							{action.pending ? <LoaderCircle aria-hidden className="size-3 motion-safe:animate-spin" /> : goal.status === "complete" ? <Check aria-hidden className="size-3" /> : null}
+							{action.pending ? <IconLoadingCircle aria-hidden className="size-3 motion-safe:animate-spin" /> : goal.status === "complete" ? <IconCheckmark1 aria-hidden className="size-3" /> : null}
 							<span className="min-w-0 truncate">{goal.status === "active" ? goal.objective : goal.status === "budget-limited" ? "Budget reached" : `${STATUS[goal.status]} · ${goal.objective}`}</span>
 							{slot.kind === "set" && slot.continues && goal.status === "active" && goal.tokenBudget !== null && <span className="shrink-0 tabular-nums text-muted-foreground">{tokens.format(goal.tokensUsed)}/{tokens.format(goal.tokenBudget)}</span>}
 						</span>
@@ -74,7 +74,7 @@ export function SessionGoalControl({ instanceId, slot, onChange, onEdit }: {
 		</Popover>
 	) : (
 		<Tooltip content={slot.kind === "off" ? slot.reason : "Set goal"}>
-			<Button {...activityControl("header.goal")} variant="ghost" size="icon-compact" disabled={slot.kind === "off" || action.pending} aria-label="Set goal" onClick={() => edit("objective")}><Target /></Button>
+			<Button {...activityControl("header.goal")} variant="ghost" size="icon-compact" disabled={slot.kind === "off" || action.pending} aria-label="Set goal" onClick={() => edit("objective")}><IconTarget /></Button>
 		</Tooltip>
 	);
 }

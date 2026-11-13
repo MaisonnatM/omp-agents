@@ -1,5 +1,5 @@
 /** The Todo page's rows: a todo's row, an archived todo's row, and a new todo's draft row. */
-import { Archive, GripVertical, NotebookText, Pencil, Plus, RotateCcw, SquareArrowOutUpRight, Trash2, X } from "lucide-react";
+import { IconArchive, IconArrowRotateCounterClockwise, IconCrossMedium, IconDotGrid2x3, IconNotebook, IconPencil, IconPlusLarge, IconSquareArrowTopRight, IconTrashCan } from "central-icons";
 import type { UserTodo, UserTodoCategory, UserTodoChange, UserTodoLeaf } from "../../../src/user-todos-shared";
 import { Badge } from "@/components/ui/badge";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem } from "@/components/ui/menu";
@@ -70,7 +70,7 @@ export function TodoRow({ section, entry, siblings, category, workspace, day, se
 				}
 			>
 				{rowProps.draggable && !isEditing && (
-					<GripVertical aria-hidden className="absolute -left-3 top-1.5 size-3.5 cursor-grab text-muted-foreground/50 opacity-0 group-hover/todo:opacity-100" />
+					<IconDotGrid2x3 aria-hidden className="absolute -left-3 top-1.5 size-3.5 cursor-grab text-muted-foreground/50 opacity-0 group-hover/todo:opacity-100" />
 				)}
 				<TodoPriorityPicker todo={todo} look="icon" disabled={disabled} {...pickerOf("priority")} onChange={onChange} />
 				<TodoStatusPicker todo={todo} look="icon" disabled={disabled} {...pickerOf("status")} onChange={onChange} />
@@ -120,7 +120,7 @@ export function TodoRow({ section, entry, siblings, category, workspace, day, se
 							onClick={() => onOpen(todo.id)}
 							className="shrink-0 text-muted-foreground hover:text-foreground [&>svg]:size-3.5"
 						>
-							<NotebookText />
+							<IconNotebook />
 						</button>
 					</Tooltip>
 				)}
@@ -135,7 +135,7 @@ export function TodoRow({ section, entry, siblings, category, workspace, day, se
 									onClick={() => editing.startDraft({ parentId: todo.id, afterId: null, categoryId: section.categoryId, status: "todo" })}
 									className="text-muted-foreground hover:text-foreground"
 								>
-									<Plus />
+									<IconPlusLarge />
 								</button>
 							</Tooltip>
 						)}
@@ -146,7 +146,7 @@ export function TodoRow({ section, entry, siblings, category, workspace, day, se
 								onClick={() => editing.remove(todo.id, todo.text)}
 								className="text-muted-foreground hover:text-foreground"
 							>
-								<X />
+								<IconCrossMedium />
 							</button>
 						</Tooltip>
 					</span>
@@ -154,21 +154,21 @@ export function TodoRow({ section, entry, siblings, category, workspace, day, se
 			</ContextMenuTrigger>
 			<ContextMenuContent className="min-w-48">
 				<MenuItem onClick={() => onOpen(todo.id)}>
-					<SquareArrowOutUpRight />
+					<IconSquareArrowTopRight />
 					Open
 				</MenuItem>
 				<MenuItem onClick={() => editing.edit(todo.id)}>
-					<Pencil />
+					<IconPencil />
 					Rename
 				</MenuItem>
 				{top && (
 					<MenuItem onClick={() => editing.startDraft({ parentId: todo.id, afterId: null, categoryId: section.categoryId, status: "todo" })}>
-						<Plus />
+						<IconPlusLarge />
 						Add a todo under it
 					</MenuItem>
 				)}
 				<MenuItem variant="destructive" onClick={() => editing.remove(todo.id, todo.text)}>
-					<X />
+					<IconCrossMedium />
 					Delete
 				</MenuItem>
 			</ContextMenuContent>
@@ -190,7 +190,7 @@ export function ArchivedRow({ todo, disabled, open, onOpen, onChange }: Archived
 	return (
 		<ContextMenu disabled={disabled}>
 			<ContextMenuTrigger render={<li />} data-todo-id={todo.id} className={cn("group/todo flex h-8 items-center gap-2 rounded-md px-2 text-sm hover:bg-accent/50", open && "bg-accent")}>
-				<Archive aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+				<IconArchive aria-hidden className="size-4 shrink-0 text-muted-foreground" />
 				<button
 					type="button"
 					data-todo-row
@@ -213,7 +213,7 @@ export function ArchivedRow({ todo, disabled, open, onOpen, onChange }: Archived
 								onClick={() => onChange({ op: "unarchive", id: todo.id })}
 								className="text-muted-foreground hover:text-foreground"
 							>
-								<RotateCcw />
+								<IconArrowRotateCounterClockwise />
 							</button>
 						</Tooltip>
 						<Tooltip content="Delete for good">
@@ -223,7 +223,7 @@ export function ArchivedRow({ todo, disabled, open, onOpen, onChange }: Archived
 								onClick={() => onChange({ op: "remove", id: todo.id })}
 								className="text-muted-foreground hover:text-foreground"
 							>
-								<Trash2 />
+								<IconTrashCan />
 							</button>
 						</Tooltip>
 					</span>
@@ -231,15 +231,15 @@ export function ArchivedRow({ todo, disabled, open, onOpen, onChange }: Archived
 			</ContextMenuTrigger>
 			<ContextMenuContent className="min-w-48">
 				<MenuItem onClick={() => onOpen(todo.id)}>
-					<SquareArrowOutUpRight />
+					<IconSquareArrowTopRight />
 					Open
 				</MenuItem>
 				<MenuItem onClick={() => onChange({ op: "unarchive", id: todo.id })}>
-					<RotateCcw />
+					<IconArrowRotateCounterClockwise />
 					Put back in the list
 				</MenuItem>
 				<MenuItem variant="destructive" onClick={() => onChange({ op: "remove", id: todo.id })}>
-					<Trash2 />
+					<IconTrashCan />
 					Delete for good
 				</MenuItem>
 			</ContextMenuContent>

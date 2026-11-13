@@ -1,5 +1,5 @@
 /** `BotsGallery`, the `#bots` page: each Bot as a card with its face, name, job's first sentence, and how it stands, under Pinned, its section, or Other Bots once any Bot is pinned or in one, then a card that makes a new one. */
-import { Plus } from "lucide-react";
+import { IconPlusLarge } from "central-icons";
 import { useState } from "react";
 import type { Routine } from "../../../src/routines";
 import { jobLine } from "../../../src/shared/bots";
@@ -59,7 +59,7 @@ function NewBotCard() {
 		<li>
 			<a href={hashForNewBot()} className={cn(CARD, "h-full justify-center border-dashed text-muted-foreground hover:bg-accent/50 hover:text-foreground")}>
 				<span className="flex size-16 items-center justify-center rounded-full border border-dashed border-current">
-					<Plus aria-hidden className="size-6" />
+					<IconPlusLarge aria-hidden className="size-6" />
 				</span>
 				<span className="font-medium">New Bot</span>
 				<span className="text-sm text-pretty">Start from a job, or write your own.</span>
@@ -86,7 +86,7 @@ export function BotsGallery({ rows, routines }: BotsGalleryProps) {
 			title="Bots"
 			meta="Teammates with one conversation you come back to, a job, and a memory"
 			actions={
-				<Button asChild size="compact" leadingIcon={Plus}>
+				<Button asChild size="compact" leadingIcon={IconPlusLarge}>
 					<a href={hashForNewBot()}>New Bot</a>
 				</Button>
 			}

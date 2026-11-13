@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { IconMagnifyingGlass } from "central-icons";
 import { useRef } from "react";
 import { SidebarInput } from "@/components/ui/sidebar";
 import { type ShortcutId, useShortcuts } from "../shortcuts";
@@ -32,7 +32,7 @@ export function SidebarSearch({ label, placeholder, query, onQuery, shortcut, au
 	const chip = shortcut !== undefined && query === "";
 	return (
 		<label className="relative block">
-			<Search aria-hidden className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+			<IconMagnifyingGlass aria-hidden className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
 			<SidebarInput
 				ref={ref}
 				type="search"

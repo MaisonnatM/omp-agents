@@ -1,5 +1,5 @@
 /** `HostRow` and `PastRow`, a running or past session's row in the sidebar, with its status, age, and actions menu. */
-import { CirclePause, Columns2, Loader } from "lucide-react";
+import { IconLayoutColumn, IconLoader, IconPause } from "central-icons";
 import { Fragment, memo, type ReactElement, type ReactNode, useContext } from "react";
 import { awaitsSubagents, type PastSession, type RosterHost, type View } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
@@ -72,7 +72,7 @@ function SessionButton({ view, label, title, badge, facts, when, dot, placement,
 	const split = placement === "split";
 	const end = (
 		<>
-			{split && <Columns2 role="img" aria-label="In a split" className="size-3 shrink-0 translate-y-0.5 text-muted-foreground/50" />}
+			{split && <IconLayoutColumn role="img" aria-label="In a split" className="size-3 shrink-0 translate-y-0.5 text-muted-foreground/50" />}
 			<Age at={when} compact className={cn(ROW_END, "w-7 text-right")} />
 		</>
 	);
@@ -209,7 +209,7 @@ export const PastRow = memo(function PastRow({ session, pinned, placement, showW
 				badge={showWorkspace && (session.title !== null || workspaceCwd(session) !== session.cwd) ? <WorkspaceBadge cwdDisplay={workspaceOf(session).cwdDisplay} /> : null}
 				facts={sessionFacts([session.source !== "omp" && SOURCE_LABELS[session.source]])}
 				when={session.modifiedAt}
-				dot={session.interrupted ? <CirclePause role="img" aria-label="Interrupted" className="size-3 shrink-0 text-warning-foreground" /> : undefined}
+				dot={session.interrupted ? <IconPause role="img" aria-label="Interrupted" className="size-3 shrink-0 text-warning-foreground" /> : undefined}
 				placement={placement}
 				onOpen={onOpen}
 			/>
@@ -220,7 +220,7 @@ export const PastRow = memo(function PastRow({ session, pinned, placement, showW
 function HostStatus({ host, status }: { host: RosterHost; status: RowStatus }) {
 	const ending = useDashboardStatus().ending.has(host.instanceId);
 	return ending
-		? <span role="img" aria-label="Ending session" aria-busy className="flex h-4 w-1.5 shrink-0 items-center justify-center"><Loader className="size-3 shrink-0 animate-spin" /></span>
+		? <span role="img" aria-label="Ending session" aria-busy className="flex h-4 w-1.5 shrink-0 items-center justify-center"><IconLoader className="size-3 shrink-0 animate-spin" /></span>
 		: <StatusDot status={status} />;
 }
 

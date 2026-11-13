@@ -1,4 +1,4 @@
-import { Copy, GitMerge, RefreshCw, Trash2 } from "lucide-react";
+import { IconArrowRotateClockwise, IconMerged, IconSquareBehindSquare1, IconTrashCan } from "central-icons";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { type WorktreeBlockerCode, type WorktreeEntry, type WorktreeInventory, type WorktreeMerge, type WorktreeMetrics, worktreeKey as keyOf } from "../../../src/worktrees-shared";
 import { Badge, type BadgeColor } from "@/components/ui/badge";
@@ -262,7 +262,7 @@ export function WorktreesTab({ cwd, active }: { cwd: string | null; active: bool
 					</Select>
 				</div>
 				<div className="ml-auto flex items-center gap-2">
-					<Button type="button" variant="ghost" size="compact" leadingIcon={RefreshCw} loading={reading} onClick={() => setRefresh(count => count + 1)}>
+					<Button type="button" variant="ghost" size="compact" leadingIcon={IconArrowRotateClockwise} loading={reading} onClick={() => setRefresh(count => count + 1)}>
 						Refresh
 					</Button>
 					<RemoveMergedButton entries={merged.filter(removable)} />
@@ -407,7 +407,7 @@ function RemoveMergedButton({ entries }: { entries: WorktreeEntry[] }) {
 	const label = removing ? "Removing…" : armed ? `Confirm removal of ${count}?` : `Remove ${count} merged`;
 	return (
 		<Tooltip content={`Remove each merged worktree nothing blocks, one at a time. ${REMOVAL_TERMS}`} forceOpen={armed ? false : undefined}>
-			<Button type="button" variant="secondary" size="compact" leadingIcon={removing ? Spinner : GitMerge} disabled={removing} aria-busy={removing} aria-label={label} {...confirm.props("remove", () => void removeWorktrees(entries, true))}>
+			<Button type="button" variant="secondary" size="compact" leadingIcon={removing ? Spinner : IconMerged} disabled={removing} aria-busy={removing} aria-label={label} {...confirm.props("remove", () => void removeWorktrees(entries, true))}>
 				{label}
 			</Button>
 		</Tooltip>
@@ -425,7 +425,7 @@ function DeleteChosenButton({ chosen, onQueued }: { chosen: WorktreeEntry[]; onQ
 	};
 	return (
 		<Tooltip content={`Delete each selected worktree, one at a time. ${REMOVAL_TERMS}`} forceOpen={armed ? false : undefined}>
-			<Button type="button" variant="destructive-outline" size="compact" leadingIcon={Trash2} aria-label={label} {...confirm.props("delete", queue)}>
+			<Button type="button" variant="destructive-outline" size="compact" leadingIcon={IconTrashCan} aria-label={label} {...confirm.props("delete", queue)}>
 				{label}
 			</Button>
 		</Tooltip>
@@ -493,7 +493,7 @@ function WorktreeRow({ entry, repositoryPath, measured, checked, onToggle }: { e
 			</td>
 			<td className="py-2 text-right whitespace-nowrap">
 				<Button type="button" variant="ghost" size="icon-compact" aria-label={`Copy ${entry.path}`} onClick={() => void navigator.clipboard.writeText(entry.path)}>
-					<Copy aria-hidden />
+					<IconSquareBehindSquare1 aria-hidden />
 				</Button>
 				<Tooltip content={blocked ? blockerText(entry.blockers) : REMOVAL_TERMS} forceOpen={armed ? false : undefined}>
 					<span className="inline-flex">
@@ -502,7 +502,7 @@ function WorktreeRow({ entry, repositoryPath, measured, checked, onToggle }: { e
 							variant="ghost"
 							size="compact"
 							className="w-24 justify-start"
-							leadingIcon={state === "removing" ? Spinner : Trash2}
+							leadingIcon={state === "removing" ? Spinner : IconTrashCan}
 							disabled={blocked || state !== null}
 							aria-busy={state !== null}
 							aria-label={armed ? `Confirm ${entry.missing ? "forgetting" : "deleting"} ${entry.path}` : `${entry.missing ? "Forget registration for" : "Delete"} ${entry.path}`}

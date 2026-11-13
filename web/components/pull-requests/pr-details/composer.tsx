@@ -2,7 +2,7 @@
  * The floating composer over a pull request's details: a glass button that opens a popover to comment, close or reopen
  * with a comment, or review it, the Review draft's pending findings posting as its line comments.
  */
-import { Check, CircleX, GitPullRequest, GitPullRequestClosed, MessageSquare, Send, Trash2, X } from "lucide-react";
+import { IconBubbleText, IconCheckmark1, IconCircleX, IconCrossMedium, IconPullRequest, IconPullRequestClosedSimple, IconSend, IconTrashCan } from "central-icons";
 import { type KeyboardEvent, type ReactNode, type RefObject, useRef, useState } from "react";
 import { MAX_COMMENT_BODY, type PullRequestDetail, prKey } from "../../../../src/shared/github";
 import { canSubmitReview, type ReviewDraft, type ReviewVerdict } from "../../../../src/shared/review-drafts";
@@ -26,9 +26,9 @@ type Mode = "comment" | "review";
 type Post = { kind: "comment"; then: FollowUp | null } | { kind: "review" };
 
 const VERDICT_ICONS: Record<ReviewVerdict, ReactNode> = {
-	comment: <MessageSquare aria-hidden className="size-3" />,
-	approve: <Check aria-hidden className="size-3" />,
-	"request-changes": <CircleX aria-hidden className="size-3" />,
+	comment: <IconBubbleText aria-hidden className="size-3" />,
+	approve: <IconCheckmark1 aria-hidden className="size-3" />,
+	"request-changes": <IconCircleX aria-hidden className="size-3" />,
 };
 
 const TEXTAREA = cn(FIELD, "resize-none disabled:opacity-60");
@@ -111,7 +111,7 @@ export function PullRequestComposer({ detail, openDraft, send, onDraftPosted }: 
 			<div className="relative">
 				<PopoverTrigger asChild>
 					<Button size="icon" variant="glass" aria-label={composerLabel({ pending, reviewStarted })}>
-						<MessageSquare aria-hidden className="size-4" />
+						<IconBubbleText aria-hidden className="size-4" />
 					</Button>
 				</PopoverTrigger>
 				{badge}
@@ -148,11 +148,11 @@ export function PullRequestComposer({ detail, openDraft, send, onDraftPosted }: 
 								disabled={busy}
 								onClick={() => sendSocket({ t: "review-draft", change: { op: "finding-state", pr: openDraft.pr, ids: pendingIds, state: "dismissed" } })}
 							>
-								<Trash2 aria-hidden />
+								<IconTrashCan aria-hidden />
 							</Button>
 						)}
 						<Button size="icon-xs" variant="ghost" aria-label="Close composer" onClick={() => setOpen(false)}>
-							<X aria-hidden />
+							<IconCrossMedium aria-hidden />
 						</Button>
 					</div>
 				</div>
@@ -216,7 +216,7 @@ function CommentForm({ scope, state, textareaRef, body, onBody, busy, loading, o
 			/>
 			<div className="flex flex-wrap justify-end gap-2">
 				{followUp === "close" && (
-					<Button size="xs" variant="destructive-outline" leadingIcon={GitPullRequestClosed} loading={loading === "close"} disabled={!ready} {...confirm.props("close", () => onSubmit("close"))}>
+					<Button size="xs" variant="destructive-outline" leadingIcon={IconPullRequestClosedSimple} loading={loading === "close"} disabled={!ready} {...confirm.props("close", () => onSubmit("close"))}>
 						<span className="inline-grid">
 							<span aria-hidden className="invisible col-start-1 row-start-1">
 								Close with comment
@@ -226,11 +226,11 @@ function CommentForm({ scope, state, textareaRef, body, onBody, busy, loading, o
 					</Button>
 				)}
 				{followUp === "reopen" && (
-					<Button size="xs" variant="outline" leadingIcon={GitPullRequest} loading={loading === "reopen"} disabled={!ready} onClick={() => onSubmit("reopen")}>
+					<Button size="xs" variant="outline" leadingIcon={IconPullRequest} loading={loading === "reopen"} disabled={!ready} onClick={() => onSubmit("reopen")}>
 						Reopen with comment
 					</Button>
 				)}
-				<Button size="xs" variant="outline" leadingIcon={Send} loading={loading === "comment"} disabled={!ready} onClick={() => onSubmit(null)}>
+				<Button size="xs" variant="outline" leadingIcon={IconSend} loading={loading === "comment"} disabled={!ready} onClick={() => onSubmit(null)}>
 					Comment
 				</Button>
 			</div>

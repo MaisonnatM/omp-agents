@@ -1,5 +1,6 @@
 /** The composer's `@` menu: the categories it offers, the query a token asks, and the rows it shows. */
-import { CalendarDays, File, Folder, GitPullRequest, ListTodo, type LucideIcon, Mail, MessageSquare, Slash, Sparkles, Ticket, UserRound } from "lucide-react";
+import { IconBubbleText, IconCalendarDays, IconEmail1, IconEyeSlash, IconFileBend, IconFolder1, IconPullRequest, IconSparklesTwo, IconTicket, IconTodos, IconUser } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { everyWord } from "../src/shared/every-word";
 import { isBotAuthor, pullRequestName, pullRequestUrl, type RepoPullRequests } from "../src/shared/github";
 import type { CompletionItem, PastSession, RosterHost } from "../src/shared/sessions";
@@ -48,7 +49,7 @@ export interface Edit {
 
 /** A row that picking applies; a row that `opens` a category keeps the menu open. */
 export interface MenuOption {
-	icon: LucideIcon;
+	icon: IconComponent;
 	label: string;
 	detail: string | null;
 	edit: Edit;
@@ -76,7 +77,7 @@ interface Category {
 	id: CategoryId;
 	prefix: string;
 	title: string;
-	icon: LucideIcon;
+	icon: IconComponent;
 	/** How many rows a search across every category shows. */
 	searchLimit: number;
 	/** The rows matching `words`. */
@@ -104,7 +105,7 @@ function source({ list, ...category }: Omit<Category, "searchLimit" | "options">
 	};
 }
 
-const COMPLETION_ICON: Record<CompletionItem["kind"], LucideIcon> = { command: Slash, skill: Sparkles, file: File, directory: Folder };
+const COMPLETION_ICON: Record<CompletionItem["kind"], IconComponent> = { command: IconEyeSlash, skill: IconSparklesTwo, file: IconFileBend, directory: IconFolder1 };
 
 /** omp's own suggestion, which carries the draft and caret it leaves; a skill's row reads as its name, since `$` already says skill. */
 export function completionOption(item: CompletionItem): MenuOption {
@@ -144,12 +145,12 @@ function pullRequestPeople(repos: RepoPullRequests[]): Mention[] {
 }
 
 const CATEGORIES: readonly Category[] = [
-	{ id: "file", prefix: "file", title: "Files & Folders", icon: Folder, searchLimit: 5, options: ({ files }) => files.map(completionOption) },
+	{ id: "file", prefix: "file", title: "Files & Folders", icon: IconFolder1, searchLimit: 5, options: ({ files }) => files.map(completionOption) },
 	source({
 		id: "todo",
 		prefix: "todo",
 		title: "Todos",
-		icon: ListTodo,
+		icon: IconTodos,
 		list: ({ todos }) =>
 			todos.flatMap(todo =>
 				[todo, ...todo.children]
@@ -161,14 +162,14 @@ const CATEGORIES: readonly Category[] = [
 		id: "ticket",
 		prefix: "ticket",
 		title: "Tickets",
-		icon: Ticket,
+		icon: IconTicket,
 		list: ({ tickets }) => tickets.map(ticket => ({ label: ticket.title, detail: ticket.id, reference: `[${linkText(`${ticket.id} ${ticket.title}`)}](${ticket.url})` })),
 	}),
 	source({
 		id: "pull-request",
 		prefix: "pr",
 		title: "Pull requests",
-		icon: GitPullRequest,
+		icon: IconPullRequest,
 		list: ({ pullRequestRepos }) =>
 			listedPullRequests(pullRequestRepos).map(pr => {
 				const name = pullRequestName(pr);
@@ -179,7 +180,7 @@ const CATEGORIES: readonly Category[] = [
 		id: "person",
 		prefix: "person",
 		title: "People",
-		icon: UserRound,
+		icon: IconUser,
 		list: ({ pullRequestRepos, linearUsers }) => [
 			...pullRequestPeople(pullRequestRepos),
 			...linearUsers.map(user => ({ label: user.name, detail: "Linear", reference: `Linear user ${JSON.stringify(user.name)} (id ${user.id})` })),
@@ -189,7 +190,7 @@ const CATEGORIES: readonly Category[] = [
 		id: "mail",
 		prefix: "mail",
 		title: "Email",
-		icon: Mail,
+		icon: IconEmail1,
 		list: ({ threads }) =>
 			threads.map(thread => {
 				const subject = thread.subject || "(no subject)";
@@ -200,7 +201,7 @@ const CATEGORIES: readonly Category[] = [
 		id: "event",
 		prefix: "event",
 		title: "Calendar",
-		icon: CalendarDays,
+		icon: IconCalendarDays,
 		list: ({ events }) =>
 			events.map(event => {
 				const detail = `${eventTime(event)} · ${event.calendar}`;
@@ -212,7 +213,7 @@ const CATEGORIES: readonly Category[] = [
 		id: "session",
 		prefix: "session",
 		title: "Sessions",
-		icon: MessageSquare,
+		icon: IconBubbleText,
 		list: ({ hosts, past }, { sessionId }) =>
 			[
 				...hosts.map(host => ({ id: host.sessionId, title: hostLabel(host), cwdDisplay: host.cwdDisplay })),
@@ -286,7 +287,7 @@ export function mentionMenu({ text, token, data, composer, files }: MenuInput): 
 	const query = mentionQuery(token);
 	if (query.kind === "home") {
 		const recent = recentlyChanged(composer.changed, 3).map(path => ({
-			icon: File,
+			icon: IconFileBend,
 			label: path,
 			detail: null,
 			// omp's own completion quotes a path with a space the same way.

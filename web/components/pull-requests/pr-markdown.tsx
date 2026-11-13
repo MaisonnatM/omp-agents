@@ -1,5 +1,5 @@
 /** A pull request's Markdown as GitHub shows it: GitHub's preset with the repository's autolinks and alerts, uploads drawn as images, videos, or attachments, images that open large, and `diff` fences as diffs. */
-import { ExternalLinkIcon, InfoIcon, LightbulbIcon, MessageSquareWarningIcon, OctagonAlertIcon, PaperclipIcon, TriangleAlertIcon } from "lucide-react";
+import { IconBubbleAlert, IconCircleInfo, IconExclamationTriangle, IconLightBulb, IconPaperclip1, IconSquareArrowTopRight } from "central-icons";
 import { memo, useMemo } from "react";
 import type { Components, ExtraProps } from "react-markdown";
 import { diffFence } from "../../../src/shared/changes";
@@ -10,19 +10,19 @@ import { FencedCode, fenceOf, GITHUB_PRESET, type MarkdownPreset, MessageMarkdow
 import { rehypePullRequestMarkdown, type GitHubAlert } from "./pr-markdown.logic";
 
 const ALERTS = {
-	note: { label: "Note", Icon: InfoIcon, border: "border-blue-500/70", title: "text-blue-600 dark:text-blue-400" },
-	tip: { label: "Tip", Icon: LightbulbIcon, border: "border-emerald-500/70", title: "text-emerald-600 dark:text-emerald-400" },
-	important: { label: "Important", Icon: MessageSquareWarningIcon, border: "border-purple-500/70", title: "text-purple-600 dark:text-purple-400" },
-	warning: { label: "Warning", Icon: TriangleAlertIcon, border: "border-amber-500/70", title: "text-amber-600 dark:text-amber-500" },
-	caution: { label: "Caution", Icon: OctagonAlertIcon, border: "border-red-500/70", title: "text-red-600 dark:text-red-400" },
-} satisfies Record<GitHubAlert, { label: string; Icon: typeof InfoIcon; border: string; title: string }>;
+	note: { label: "Note", Icon: IconCircleInfo, border: "border-blue-500/70", title: "text-blue-600 dark:text-blue-400" },
+	tip: { label: "Tip", Icon: IconLightBulb, border: "border-emerald-500/70", title: "text-emerald-600 dark:text-emerald-400" },
+	important: { label: "Important", Icon: IconBubbleAlert, border: "border-purple-500/70", title: "text-purple-600 dark:text-purple-400" },
+	warning: { label: "Warning", Icon: IconExclamationTriangle, border: "border-amber-500/70", title: "text-amber-600 dark:text-amber-500" },
+	caution: { label: "Caution", Icon: IconExclamationTriangle, border: "border-red-500/70", title: "text-red-600 dark:text-red-400" },
+} satisfies Record<GitHubAlert, { label: string; Icon: typeof IconCircleInfo; border: string; title: string }>;
 
 function Attachment({ url }: { url: string }) {
 	return (
 		<a href={url} rel="noreferrer noopener" target="_blank" className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm hover:bg-muted/60">
-			<PaperclipIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+			<IconPaperclip1 aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
 			<span className="min-w-0 flex-1 truncate">Open attachment on GitHub</span>
-			<ExternalLinkIcon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
+			<IconSquareArrowTopRight aria-hidden className="size-3 shrink-0 text-muted-foreground" />
 		</a>
 	);
 }

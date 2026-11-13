@@ -1,5 +1,5 @@
 /** What the views of the pull requests share, the sidebar's list and the page's list and board: their state, their keys, and the list's repositories, sections, and rows. */
-import { ArrowDownUp, Unplug } from "lucide-react";
+import { IconArrowBottomTop, IconCloudSimpleDisconnected } from "central-icons";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { PullRequestActionId } from "../../../src/pull-request-actions";
 import { type PullRequestList, type PullRequestSummary, type PullRequest, prKey, pullRequestUrl, type RepoPullRequests, repoKey, samePullRequest } from "../../../src/shared/github";
@@ -187,7 +187,7 @@ export function SortMenu({ order, onSort, onReset }: { order: PullRequestOrder; 
 		<DropdownMenu open={open} onOpenChange={setOpen}>
 			<Tooltip content={label} forceOpen={open ? false : undefined}>
 				<DropdownMenuTrigger render={<Button variant="ghost" size="icon-compact" aria-label={`${label}. Change the pull requests' order`} />}>
-					<ArrowDownUp />
+					<IconArrowBottomTop />
 				</DropdownMenuTrigger>
 			</Tooltip>
 			<DropdownMenuContent align="end" className="w-52">
@@ -230,7 +230,7 @@ export function UnmatchedTip({ unmatched }: { unmatched: string[] }) {
 	return (
 		<Tooltip content={`${label}:\n${unmatched.join("\n")}`}>
 			<span role="img" aria-label={label} className="flex size-6 shrink-0 items-center justify-center text-muted-foreground">
-				<Unplug aria-hidden className="size-3.5" />
+				<IconCloudSimpleDisconnected aria-hidden className="size-3.5" />
 			</span>
 		</Tooltip>
 	);

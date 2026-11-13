@@ -1,4 +1,4 @@
-import { ChevronRight, Play, Plus, Ticket } from "lucide-react";
+import { IconChevronRight, IconPlay, IconPlusLarge, IconTicket } from "central-icons";
 import { useContext, useState } from "react";
 import { errorText } from "../../../src/json";
 import { hashForSession } from "../../../src/shared/sessions";
@@ -75,7 +75,7 @@ function CreateTicket({ todo, onChange }: { todo: UserTodo; onChange: (change: U
 					Opened {identifier} in Linear, but this todo does not link it: {error}
 				</p>
 				<Tooltip content={`Link ${identifier} to this todo, without opening another issue`}>
-					<Button variant="tertiary" size="compact" leadingIcon={Ticket} onClick={() => onChange({ op: "link", id: todo.id, link: { kind: "ticket", identifier } })}>
+					<Button variant="tertiary" size="compact" leadingIcon={IconTicket} onClick={() => onChange({ op: "link", id: todo.id, link: { kind: "ticket", identifier } })}>
 						Link {identifier}
 					</Button>
 				</Tooltip>
@@ -85,7 +85,7 @@ function CreateTicket({ todo, onChange }: { todo: UserTodo; onChange: (change: U
 	if (step.kind === "idle" || step.kind === "loading" || step.kind === "failed") {
 		const loading = step.kind === "loading";
 		const createButton = (
-			<Button variant="tertiary" size="compact" leadingIcon={Ticket} disabled={loading} onClick={() => void start()}>
+			<Button variant="tertiary" size="compact" leadingIcon={IconTicket} disabled={loading} onClick={() => void start()}>
 				{loading ? "Reading teams…" : "Create Linear ticket"}
 			</Button>
 		);
@@ -170,7 +170,7 @@ function SubTodos({ todo, readOnly, onChange, onOpen }: { todo: UserTodo; readOn
 	};
 	if (children.length === 0 && (readOnly || adding === null)) {
 		return readOnly ? null : (
-			<Button variant="ghost" size="compact" leadingIcon={Plus} className="self-start text-muted-foreground" onClick={() => setAdding(0)}>
+			<Button variant="ghost" size="compact" leadingIcon={IconPlusLarge} className="self-start text-muted-foreground" onClick={() => setAdding(0)}>
 				Add sub-todos
 			</Button>
 		);
@@ -188,7 +188,7 @@ function SubTodos({ todo, readOnly, onChange, onOpen }: { todo: UserTodo; readOn
 				{!readOnly && (
 					<Tooltip content="Add a sub-todo">
 						<Button variant="ghost" size="icon-compact" aria-label="Add a sub-todo" className="ml-auto" onClick={() => setAdding(adding ?? 0)}>
-							<Plus />
+							<IconPlusLarge />
 						</Button>
 					</Tooltip>
 				)}
@@ -262,7 +262,7 @@ function AgentCard({ todo, readOnly, sessions, newSessionCwd }: { todo: UserTodo
 					<QuickActionButton key={action} action={action} primary={main === action} pending={pending} onRun={() => start(todoStart(todo, action, newSessionCwd, readPinnedSkill()))} />
 				))}
 				<Tooltip content="Open a new-session draft from this todo, to edit its prompt or pick its directory">
-					<Button variant={main === "draft" ? "primary" : actions.length > 0 ? "ghost" : "secondary"} size="compact" leadingIcon={Play} asChild>
+					<Button variant={main === "draft" ? "primary" : actions.length > 0 ? "ghost" : "secondary"} size="compact" leadingIcon={IconPlay} asChild>
 						<a href={hashForNewSession(todoCwd(todo, newSessionCwd), todo.id)}>{sessionId === null ? "Start session" : "Start another session"}</a>
 					</Button>
 				</Tooltip>
@@ -301,7 +301,7 @@ function LinkedNotes({ todo }: { todo: UserTodo }) {
 						const change = addNote(space, { title: todo.text, todoId: todo.id });
 						changeNote(change);
 						location.hash = hashForNotes({ kind: "all" }, change.note.id);
-					}}><Plus /></Button>
+					}}><IconPlusLarge /></Button>
 				</Tooltip>
 			</div>
 			{list === null ? <p className="text-xs text-muted-foreground">Loading notes…</p> : notes.length === 0 ? <p className="text-xs text-muted-foreground">No linked notes.</p> : (
@@ -332,11 +332,11 @@ export function TodoDetail({ list, open, readOnly, day, picker, onPicker, onChan
 						<span className="shrink-0">{category}</span>
 						{open.parent && (
 							<>
-								<ChevronRight aria-hidden className="size-3 shrink-0" />
+								<IconChevronRight aria-hidden className="size-3 shrink-0" />
 								<span className="truncate">{open.parent.text}</span>
 							</>
 						)}
-						<ChevronRight aria-hidden className="size-3 shrink-0" />
+						<IconChevronRight aria-hidden className="size-3 shrink-0" />
 						<StatusIcon status={todo.status} className="size-3.5" />
 						<span className="shrink-0">{TODO_STATUS[todo.status].label}</span>
 					</p>

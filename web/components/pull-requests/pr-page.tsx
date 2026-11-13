@@ -1,5 +1,5 @@
 /** `PullRequestDetailPage`: one pull request in the main area, with the quick actions that start a session on it. */
-import { ArrowLeft } from "lucide-react";
+import { IconArrowLeft } from "central-icons";
 import { useState } from "react";
 import { type PullRequestList, type LinkedPullRequest, type PullRequest, pullRequestUrl, repoKey } from "../../../src/shared/github";
 import type { RosterHost, WorkItem } from "../../../src/shared/sessions";
@@ -131,7 +131,7 @@ export function PullRequestDetailPage({ files, onDock, ...props }: PullRequestDe
 	const back = (
 		<Tooltip content="Back to Pull requests" side="bottom">
 			<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Back to Pull requests" onClick={onDock}>
-				<ArrowLeft />
+				<IconArrowLeft />
 			</Button>
 		</Tooltip>
 	);

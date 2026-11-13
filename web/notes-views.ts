@@ -1,12 +1,13 @@
 /** The Notes page's lists: what each shows, its name and icon in the sidebar, and what it says while empty. */
-import { Bot, type LucideIcon, NotebookPen } from "lucide-react";
+import { IconAiBotHead, IconNotebook } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { type Space, spaceIs } from "../src/shared/workspaces";
 import type { UserNote, UserNoteList } from "../src/user-notes-shared";
 import type { NotesListView } from "./routing";
 
-export const NOTES_LISTS: { view: NotesListView; name: string; icon: LucideIcon; empty: string }[] = [
-	{ view: { kind: "all" }, name: "All", icon: NotebookPen, empty: "No notes yet. Press C to write one." },
-	{ view: { kind: "agents" }, name: "From agents", icon: Bot, empty: "No agent has added a note. An omp session adds one with its `user_note` tool." },
+export const NOTES_LISTS: { view: NotesListView; name: string; icon: IconComponent; empty: string }[] = [
+	{ view: { kind: "all" }, name: "All", icon: IconNotebook, empty: "No notes yet. Press C to write one." },
+	{ view: { kind: "agents" }, name: "From agents", icon: IconAiBotHead, empty: "No agent has added a note. An omp session adds one with its `user_note` tool." },
 ];
 
 /** The notes of `space` that `view` lists, most recently updated first. */

@@ -1,5 +1,6 @@
 /** The Session card's Images section: a strip of the view's images, their viewer, and the bar that sends the selected ones on. */
-import { ChevronDown, GitPullRequest, type LucideIcon, MessageSquare, Paperclip } from "lucide-react";
+import { IconBubbleText, IconChevronBottom, IconPaperclip1, IconPullRequest } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import { type LinkedPullRequest, type PullRequestDetail, pullRequestName } from "../../src/shared/github";
@@ -72,7 +73,7 @@ function MediaViewer({ media, index, view, onShow }: { media: AgentMedia[]; inde
 					<Button
 						variant="ghost"
 						size="compact"
-						leadingIcon={MessageSquare}
+						leadingIcon={IconBubbleText}
 						onClick={() => {
 							onShow(null);
 							open(agentView, "replace");
@@ -91,7 +92,7 @@ function PullRequestItem({ pr, onPick }: { pr: LinkedPullRequest; onPick: () => 
 	const title = useRead<Pick<PullRequestDetail, "title">>(`/api/pull-request/title?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`);
 	return (
 		<MenuItem onClick={onPick} title={pullRequestName(pr)}>
-			<GitPullRequest />
+			<IconPullRequest />
 			<span className="min-w-0 flex-1 truncate">
 				#{pr.number} {title.data?.title}
 			</span>
@@ -111,7 +112,7 @@ interface MediaActionsProps {
 
 interface TargetMenuProps {
 	label: string;
-	icon: LucideIcon;
+	icon: IconComponent;
 	/** Why the menu has nothing to offer, shown on its disabled button; `null` when it has targets. */
 	none: string | null;
 	loading: boolean;
@@ -134,7 +135,7 @@ function TargetMenu({ label, icon, none, loading, disabled, control, children }:
 	}
 	return (
 		<DropdownMenu>
-			<DropdownMenuTrigger {...activityControl(control)} render={<Button variant="secondary" size="compact" leadingIcon={icon} trailingIcon={ChevronDown} loading={loading} disabled={disabled} />}>{label}</DropdownMenuTrigger>
+			<DropdownMenuTrigger {...activityControl(control)} render={<Button variant="secondary" size="compact" leadingIcon={icon} trailingIcon={IconChevronBottom} loading={loading} disabled={disabled} />}>{label}</DropdownMenuTrigger>
 			<DropdownMenuContent align="end">{children}</DropdownMenuContent>
 		</DropdownMenu>
 	);
@@ -174,12 +175,12 @@ function MediaActions({ picked, pullRequests, tickets, onSent, onClear }: MediaA
 			<span className="mr-auto text-xs text-muted-foreground tabular-nums" aria-live="polite">
 				{picked.length} selected
 			</span>
-			<TargetMenu label="Add to PR description" icon={GitPullRequest} none={pullRequests.length === 0 ? "This session has no pull request yet" : null} loading={toPullRequest.pending} disabled={pending} control="changes-card.image.to-pull-request">
+			<TargetMenu label="Add to PR description" icon={IconPullRequest} none={pullRequests.length === 0 ? "This session has no pull request yet" : null} loading={toPullRequest.pending} disabled={pending} control="changes-card.image.to-pull-request">
 				{pullRequests.map(pr => (
 					<PullRequestItem key={pullRequestName(pr)} pr={pr} onPick={() => toPullRequest.run(pr)} />
 				))}
 			</TargetMenu>
-			<TargetMenu label="Attach to Linear issue" icon={Paperclip} none={tickets.length === 0 ? "This session has no Linear issue yet" : null} loading={toTicket.pending} disabled={pending} control="changes-card.image.to-ticket">
+			<TargetMenu label="Attach to Linear issue" icon={IconPaperclip1} none={tickets.length === 0 ? "This session has no Linear issue yet" : null} loading={toTicket.pending} disabled={pending} control="changes-card.image.to-ticket">
 				{tickets.map(issue => (
 					<MenuItem key={issue} onClick={() => toTicket.run(issue)}>
 						{issue}

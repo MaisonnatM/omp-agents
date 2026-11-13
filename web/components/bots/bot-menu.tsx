@@ -1,5 +1,5 @@
 /** `BotMenu`, what right-clicking a Bot's sidebar row or gallery card offers: pin it and move it between sections; and `SectionNameDialog`, which names a new section or renames one. */
-import { Folder, FolderInput, FolderMinus, FolderPlus, Pin, PinOff } from "lucide-react";
+import { IconFolder1, IconFolderAddRight, IconFolderDelete, IconMoveFolderInside, IconPin, IconUnpin } from "central-icons";
 import { type ReactElement, type ReactNode, useState } from "react";
 import { type Bot, MAX_SECTION_LENGTH, parseSectionName } from "../../../src/shared/bots";
 import { Button } from "@/components/ui/button";
@@ -41,31 +41,31 @@ function BotMenuItems({ bot, sections, onName }: Omit<BotMenuProps, "render" | "
 	return (
 		<>
 			<MenuItem disabled={!connected} onClick={() => changeBot({ op: "pin", id: bot.id, pinned: !bot.pinned })}>
-				{bot.pinned ? <PinOff /> : <Pin />}
+				{bot.pinned ? <IconUnpin /> : <IconPin />}
 				{bot.pinned ? "Unpin" : "Pin"}
 			</MenuItem>
 			<MenuSubmenu>
 				<MenuSubmenuTrigger disabled={!connected} value={bot.section ?? undefined}>
-					<FolderInput />
+					<IconMoveFolderInside />
 					Move to section
 				</MenuSubmenuTrigger>
 				<MenuSubmenuContent>
 					{others.map(name => (
 						<MenuItem key={name} onClick={() => changeBot({ op: "move", id: bot.id, section: name })}>
-							<Folder />
+							<IconFolder1 />
 							<span className="truncate">{name}</span>
 						</MenuItem>
 					))}
 					{others.length > 0 && <MenuSeparator />}
 					<MenuItem onClick={() => onName({ kind: "new", bot })}>
-						<FolderPlus />
+						<IconFolderAddRight />
 						New section…
 					</MenuItem>
 				</MenuSubmenuContent>
 			</MenuSubmenu>
 			{bot.section !== null && (
 				<MenuItem disabled={!connected} onClick={() => changeBot({ op: "move", id: bot.id, section: null })}>
-					<FolderMinus />
+					<IconFolderDelete />
 					Remove from section
 				</MenuItem>
 			)}

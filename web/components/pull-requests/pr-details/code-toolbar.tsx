@@ -1,4 +1,5 @@
-import { ChevronDown, ChevronsDownUp, ChevronsUpDown, Columns2, FolderTree, type LucideIcon, Pilcrow, Rows3, Settings2, TextWrap } from "lucide-react";
+import { IconChevronBottom, IconChevronGrabberVertical, IconChevronGrabberVerticalToward, IconCodeTree, IconLayoutColumn, IconLayoutTopBottom, IconParagraph, IconSettingsSliderHor, IconTextIndentLeft } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { useState } from "react";
 import type { PullRequestCommit } from "../../../../src/shared/github";
 import { Button } from "@/components/ui/button";
@@ -9,11 +10,11 @@ import type { DiffPreferences } from "./diff-preferences";
 const COMMIT_PAGE = 10;
 
 /** The diff options, as icon buttons in a wide toolbar and as the items of its options menu in a narrow one. */
-const DIFF_OPTIONS: readonly { label: string; icon: LucideIcon; on: (options: DiffOptions) => boolean; pick: (options: DiffOptions) => Partial<DiffOptions> }[] = [
-	{ label: "Hide whitespace changes", icon: Pilcrow, on: options => options.ignoreWhitespace, pick: options => ({ ignoreWhitespace: !options.ignoreWhitespace }) },
-	{ label: "Stacked diff view", icon: Rows3, on: options => options.layout === "stacked", pick: () => ({ layout: "stacked" }) },
-	{ label: "Split diff view", icon: Columns2, on: options => options.layout === "split", pick: () => ({ layout: "split" }) },
-	{ label: "Wrap lines", icon: TextWrap, on: options => options.wrap, pick: options => ({ wrap: !options.wrap }) },
+const DIFF_OPTIONS: readonly { label: string; icon: IconComponent; on: (options: DiffOptions) => boolean; pick: (options: DiffOptions) => Partial<DiffOptions> }[] = [
+	{ label: "Hide whitespace changes", icon: IconParagraph, on: options => options.ignoreWhitespace, pick: options => ({ ignoreWhitespace: !options.ignoreWhitespace }) },
+	{ label: "Stacked diff view", icon: IconLayoutTopBottom, on: options => options.layout === "stacked", pick: () => ({ layout: "stacked" }) },
+	{ label: "Split diff view", icon: IconLayoutColumn, on: options => options.layout === "split", pick: () => ({ layout: "split" }) },
+	{ label: "Wrap lines", icon: IconTextIndentLeft, on: options => options.wrap, pick: options => ({ wrap: !options.wrap }) },
 ];
 
 interface CodeToolbarProps {
@@ -56,7 +57,7 @@ export function CodeToolbar({ commits, commit, onCommit, viewed, preferences, al
 				</div>
 				<DropdownMenu>
 					<DropdownMenuTrigger render={<Button size="icon-xs" variant="ghost-muted" aria-label="Diff options" className="@min-[36rem]/code:hidden" />}>
-						<Settings2 aria-hidden className="size-3.5" />
+						<IconSettingsSliderHor aria-hidden className="size-3.5" />
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="end">
 						{DIFF_OPTIONS.map(({ label, on, pick }) => (
@@ -67,10 +68,10 @@ export function CodeToolbar({ commits, commit, onCommit, viewed, preferences, al
 					</DropdownMenuContent>
 				</DropdownMenu>
 				<Button size="icon-xs" variant="ghost-muted" aria-label={collapseLabel} title={collapseLabel} onClick={onCollapseAll}>
-					{allCollapsed ? <ChevronsUpDown aria-hidden className="size-3.5" /> : <ChevronsDownUp aria-hidden className="size-3.5" />}
+					{allCollapsed ? <IconChevronGrabberVertical aria-hidden className="size-3.5" /> : <IconChevronGrabberVerticalToward aria-hidden className="size-3.5" />}
 				</Button>
 				<Button size="icon-xs" variant="ghost-muted" active={treeOpen} aria-label={treeLabel} title={treeLabel} aria-pressed={treeOpen} onClick={toggleTree}>
-					<FolderTree aria-hidden className="size-3.5" />
+					<IconCodeTree aria-hidden className="size-3.5" />
 				</Button>
 			</div>
 		</div>
@@ -88,7 +89,7 @@ function CommitScope({ commits, commit, onCommit }: Pick<CodeToolbarProps, "comm
 					<Button
 						size="xs"
 						variant="secondary"
-						trailingIcon={ChevronDown}
+						trailingIcon={IconChevronBottom}
 						className="min-w-0 max-w-64 [&>span.relative]:min-w-0 [&>span.relative>span]:min-w-0 [&_svg]:shrink-0"
 						aria-label={`Diff scope: ${label}`}
 					/>

@@ -179,7 +179,7 @@ function SuggestionRow({ label, index, active, marked, optionId, registerItem, o
 					isTouch || active ? "opacity-100" : "opacity-0",
 				)}
 			>
-				<PencilIcon size={13} strokeWidth={2.5} />
+				<PencilIcon size={13} />
 			</button>
 		</Row>
 	);

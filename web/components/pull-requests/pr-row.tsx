@@ -1,5 +1,6 @@
 /** A pull request's row in the lists, or its card on the board, with its move badge, review draft tag, who started the threads a **Reply** waits on, checks icon, reviewers picker, diff size, and `⋯` menu, whose actions also open on right-click. */
-import { CircleCheck, CircleX, ClipboardPen, Clock, Eye, GitCompareArrows, GitMerge, Layers, type LucideIcon, MessageCircleQuestionMark, MessageSquare, Sparkles, User, UserCheck, UserPlus, UserX } from "lucide-react";
+import { IconArrowsRepeatRightLeft, IconBubbleQuestion, IconBubbleText, IconCircleCheck, IconCircleX, IconClipboard, IconClock, IconEyeOpen, IconLayersTwo, IconMerged, IconSparklesTwo, IconUser, IconUserAdd, IconUserAdded, IconUserRemove } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { memo, type MouseEvent, type ReactElement, type ReactNode, useRef, useState } from "react";
 import { type PullRequestSummary, type LinkedPullRequest, prKey, type PullRequest, type PullRequestLink, pullRequestName, repoKey } from "../../../src/shared/github";
 import { type MoveId, readyOnceChecksPass } from "../../../src/shared/moves";
@@ -55,7 +56,7 @@ function ReviewDraftTag({ pr }: { pr: PullRequest }) {
 	return (
 		<Tooltip content="A review draft waits for you to post it">
 			<span className="flex shrink-0 items-center gap-0.5 rounded-full bg-violet-500/15 px-1.5 text-[10px] leading-4 font-medium text-violet-700 dark:text-violet-300">
-				<ClipboardPen aria-hidden className="size-3" />
+				<IconClipboard aria-hidden className="size-3" />
 				Review draft
 			</span>
 		</Tooltip>
@@ -65,13 +66,13 @@ function ReviewDraftTag({ pr }: { pr: PullRequest }) {
 const MUTED = "bg-muted text-muted-foreground";
 
 /** Each move's badge: its colour, and for a move that is yours, the icon that tells it apart at a glance. */
-const MOVE_LOOK: Record<MoveId, [string, LucideIcon | null]> = {
-	review: ["bg-blue-500/10 text-blue-700 dark:bg-blue-400/15 dark:text-blue-300", Eye],
-	merge: ["bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300", GitMerge],
-	"fix-ci": ["bg-red-500/10 text-red-700 dark:bg-red-400/15 dark:text-red-300", CircleX],
-	rebase: ["bg-orange-500/10 text-orange-700 dark:bg-orange-400/15 dark:text-orange-300", GitCompareArrows],
-	reply: ["bg-amber-500/10 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300", MessageSquare],
-	answer: ["bg-violet-500/10 text-violet-700 dark:bg-violet-400/15 dark:text-violet-300", MessageCircleQuestionMark],
+const MOVE_LOOK: Record<MoveId, [string, IconComponent | null]> = {
+	review: ["bg-blue-500/10 text-blue-700 dark:bg-blue-400/15 dark:text-blue-300", IconEyeOpen],
+	merge: ["bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300", IconMerged],
+	"fix-ci": ["bg-red-500/10 text-red-700 dark:bg-red-400/15 dark:text-red-300", IconCircleX],
+	rebase: ["bg-orange-500/10 text-orange-700 dark:bg-orange-400/15 dark:text-orange-300", IconArrowsRepeatRightLeft],
+	reply: ["bg-amber-500/10 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300", IconBubbleText],
+	answer: ["bg-violet-500/10 text-violet-700 dark:bg-violet-400/15 dark:text-violet-300", IconBubbleQuestion],
 	agent: [MUTED, null],
 	"in-review": [MUTED, null],
 	"checks-running": [MUTED, null],
@@ -160,7 +161,7 @@ function MergeBadge({ pr, move, open, onOpenChange }: { pr: PullRequestSummary; 
 				>
 					{queued ? (
 						<>
-							<GitMerge aria-hidden className="size-3 shrink-0" />
+							<IconMerged aria-hidden className="size-3 shrink-0" />
 							{queued.state.kind === "failed" ? "Stopped" : "Queued"}
 						</>
 					) : (
@@ -222,10 +223,10 @@ function RowMoveBadge({ pr, move, pending, cwd, onQuickAction, merge }: { pr: Pu
 	);
 }
 
-const CHECKS_ICON: Record<PullRequestSummary["checks"], [LucideIcon, string, string] | null> = {
-	passing: [CircleCheck, "text-emerald-600 dark:text-emerald-400", "Checks pass"],
-	failing: [CircleX, "text-red-600 dark:text-red-400", "Checks fail"],
-	pending: [Clock, "text-amber-600 dark:text-amber-400", "Checks are running"],
+const CHECKS_ICON: Record<PullRequestSummary["checks"], [IconComponent, string, string] | null> = {
+	passing: [IconCircleCheck, "text-emerald-600 dark:text-emerald-400", "Checks pass"],
+	failing: [IconCircleX, "text-red-600 dark:text-red-400", "Checks fail"],
+	pending: [IconClock, "text-amber-600 dark:text-amber-400", "Checks are running"],
 	none: null,
 };
 
@@ -235,10 +236,10 @@ export function ChecksIcon({ checks, className }: { checks: PullRequestSummary["
 	return icon && <IconTip icon={icon} className={className} />;
 }
 
-const REVIEW_ICON: Record<PullRequestSummary["review"], [LucideIcon, string, string] | null> = {
-	approved: [UserCheck, "text-emerald-600 dark:text-emerald-400", "Approved"],
-	"changes-requested": [UserX, "text-red-600 dark:text-red-400", "Changes requested"],
-	"review-required": [Eye, "text-muted-foreground", "Waiting on a review"],
+const REVIEW_ICON: Record<PullRequestSummary["review"], [IconComponent, string, string] | null> = {
+	approved: [IconUserAdded, "text-emerald-600 dark:text-emerald-400", "Approved"],
+	"changes-requested": [IconUserRemove, "text-red-600 dark:text-red-400", "Changes requested"],
+	"review-required": [IconEyeOpen, "text-muted-foreground", "Waiting on a review"],
 	none: null,
 };
 
@@ -255,7 +256,7 @@ function ReviewPicker({ options, review: { shown, send } }: { options: PullReque
 	const shows = shown.reviewers.length > 0 || REVIEW_ICON[shown.review] !== null;
 	return (
 		<ReviewersField pr={shown} options={options} onChange={send} className="-mx-1 h-6 px-1 font-normal">
-			{shows ? <ReviewState pr={shown} max={2} /> : <UserPlus aria-hidden className="size-4 text-muted-foreground/60" />}
+			{shows ? <ReviewState pr={shown} max={2} /> : <IconUserAdd aria-hidden className="size-4 text-muted-foreground/60" />}
 		</ReviewersField>
 	);
 }
@@ -267,7 +268,7 @@ function ConversationCount({ pr }: { pr: PullRequestSummary }) {
 	return (
 		<ConversationPeek pr={pr}>
 			<span role="img" aria-label={label} tabIndex={0} className="flex shrink-0 items-center gap-0.5 rounded-sm text-xs tabular-nums text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
-				<MessageSquare aria-hidden className="size-3.5" />
+				<IconBubbleText aria-hidden className="size-3.5" />
 				{pr.conversations}
 			</span>
 		</ConversationPeek>
@@ -281,8 +282,8 @@ function ThreadStartersTag({ pr, move }: { pr: PullRequestSummary; move: MoveId 
 	return (
 		<Tooltip content={starters.label}>
 			<span role="img" aria-label={starters.label} className="flex shrink-0 items-center gap-1.5 tabular-nums">
-				{starters.ai > 0 && <span className="flex items-center gap-0.5"><Sparkles aria-hidden className="size-3.5" />{starters.ai}</span>}
-				{starters.human > 0 && <span className="flex items-center gap-0.5"><User aria-hidden className="size-3.5" />{starters.human}</span>}
+				{starters.ai > 0 && <span className="flex items-center gap-0.5"><IconSparklesTwo aria-hidden className="size-3.5" />{starters.ai}</span>}
+				{starters.human > 0 && <span className="flex items-center gap-0.5"><IconUser aria-hidden className="size-3.5" />{starters.human}</span>}
 			</span>
 		</Tooltip>
 	);
@@ -396,7 +397,7 @@ function StackInfo({ stack, base }: { stack: StackPlace | null; base: string | n
 	return (
 		<Tooltip content={label}>
 			<span role="img" aria-label={label} className="flex min-w-0 items-center gap-1 tabular-nums">
-				<Layers aria-hidden className="size-3 shrink-0" />
+				<IconLayersTwo aria-hidden className="size-3 shrink-0" />
 				{stack ? `${stack.position}/${stack.size}` : base && <BranchLabel name={base} className="max-w-24 font-mono" />}
 			</span>
 		</Tooltip>

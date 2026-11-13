@@ -4,7 +4,7 @@
  */
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
-import { Code, Download, ExternalLink, Eye } from "lucide-react";
+import { IconArrowInbox, IconCode, IconEyeOpen, IconSquareArrowTopRight } from "central-icons";
 import { useContext, useEffect, useState } from "react";
 import type { View } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
@@ -110,14 +110,14 @@ function ArtifactBody({ view, sessionId, artifact, version, source, onSource }: 
 					<div className="flex h-7 shrink-0 items-center gap-1">
 						<CopyAction text={ready?.text ?? null} />
 						<Tooltip content="Download">
-							<Button {...activityControl("artifacts.download")} asChild variant="outline" size="xs" leadingIcon={Download} aria-label="Download" className={LINK_ACTION}>
+							<Button {...activityControl("artifacts.download")} asChild variant="outline" size="xs" leadingIcon={IconArrowInbox} aria-label="Download" className={LINK_ACTION}>
 								<a href={url ?? undefined} download={name} aria-disabled={url === null || undefined}>
 									<span className={ACTION_LABEL}>Download</span>
 								</a>
 							</Button>
 						</Tooltip>
 						<Tooltip content="Open in browser">
-							<Button {...activityControl("artifacts.open-in-browser")} asChild variant="outline" size="xs" leadingIcon={ExternalLink} aria-label="Open in browser" className={LINK_ACTION}>
+							<Button {...activityControl("artifacts.open-in-browser")} asChild variant="outline" size="xs" leadingIcon={IconSquareArrowTopRight} aria-label="Open in browser" className={LINK_ACTION}>
 								<a href={url ?? undefined} target="_blank" rel="noopener noreferrer" aria-disabled={url === null || undefined}>
 									<span className={ACTION_LABEL}>Open in browser</span>
 								</a>
@@ -165,13 +165,13 @@ function ArtifactBody({ view, sessionId, artifact, version, source, onSource }: 
 					<SegmentedTabsList aria-label="Show as" className="ml-auto">
 						<Tooltip content="Rendered">
 							<SegmentedTab {...activityControl("artifacts.rendered")} value="rendered" className="gap-1 px-2">
-								<Eye aria-hidden className="size-3.5" />
+								<IconEyeOpen aria-hidden className="size-3.5" />
 								<span className={ICONS_ONLY}>Rendered</span>
 							</SegmentedTab>
 						</Tooltip>
 						<Tooltip content="Source">
 							<SegmentedTab {...activityControl("artifacts.source")} value="source" className="gap-1 px-2">
-								<Code aria-hidden className="size-3.5" />
+								<IconCode aria-hidden className="size-3.5" />
 								<span className={ICONS_ONLY}>Source</span>
 							</SegmentedTab>
 						</Tooltip>

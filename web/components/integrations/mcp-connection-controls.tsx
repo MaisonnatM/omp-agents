@@ -3,7 +3,7 @@
  * status labels, the Connect button and Reconnect and Sign out items, the callout that says where the connection stands,
  * the sign-out question, and the tool list.
  */
-import { ChevronRight, CircleAlert, ExternalLink, LoaderCircle, LogOut, RefreshCw, WifiOff } from "lucide-react";
+import { IconArrowBoxLeft, IconArrowRotateClockwise, IconChevronRight, IconExclamationCircle, IconLoadingCircle, IconSquareArrowTopRight, IconWifiNoSignal } from "central-icons";
 import { type ReactNode, useId, useState } from "react";
 import type { McpRemoteStatus, McpTool } from "../../../src/shared/mcp-status";
 import { Badge, type BadgeColor } from "@/components/ui/badge";
@@ -47,7 +47,7 @@ export const ConnectButton = ({ signIn }: { signIn: SignInControls }) => (
 export const Reconnecting = ({ signIn }: { signIn: SignInControls }) =>
 	signIn.starting && (
 		<span role="status" aria-busy className="flex items-center gap-1.5 text-xs text-muted-foreground">
-			<LoaderCircle aria-hidden className="size-3.5 animate-spin" />
+			<IconLoadingCircle aria-hidden className="size-3.5 animate-spin" />
 			Reconnecting…
 		</span>
 	);
@@ -55,7 +55,7 @@ export const Reconnecting = ({ signIn }: { signIn: SignInControls }) =>
 /** The menu item that signs in again over the sign-in omp holds. */
 export const ReconnectItem = ({ signIn }: { signIn: SignInControls }) => (
 	<MenuItem onClick={() => void signIn.connect()}>
-		<RefreshCw />
+		<IconArrowRotateClockwise />
 		Reconnect
 	</MenuItem>
 );
@@ -63,13 +63,13 @@ export const ReconnectItem = ({ signIn }: { signIn: SignInControls }) => (
 /** The menu item that opens the {@link SignOutConfirm} question. */
 export const SignOutItem = ({ destructive = false, onClick }: { destructive?: boolean; onClick: () => void }) => (
 	<MenuItem variant={destructive ? "destructive" : undefined} onClick={onClick}>
-		<LogOut />
+		<IconArrowBoxLeft />
 		Sign out
 	</MenuItem>
 );
 
 interface ConfirmProps {
-	icon: typeof LogOut;
+	icon: typeof IconArrowBoxLeft;
 	question: string;
 	detail: string;
 	confirm: string;
@@ -113,7 +113,7 @@ export function Confirm({ icon, question, detail, confirm, run, onDone }: Confir
 
 /** Asks before `signOut` signs omp out of `name`, which answers once the row has read where omp stands again. */
 export const SignOutConfirm = ({ name, signOut, onDone }: { name: string; signOut: () => Promise<void>; onDone: () => void }) => (
-	<Confirm icon={LogOut} question={`Sign omp out of ${name}?`} detail="Its tools leave every omp session until you reconnect." confirm="Sign out" run={signOut} onDone={onDone} />
+	<Confirm icon={IconArrowBoxLeft} question={`Sign omp out of ${name}?`} detail="Its tools leave every omp session until you reconnect." confirm="Sign out" run={signOut} onDone={onDone} />
 );
 
 export interface ConnectionCalloutProps {
@@ -136,11 +136,11 @@ export function ConnectionCallout({ approveOn, signIn, question, error, refused,
 		return (
 			<Callout
 				tone="info"
-				icon={LoaderCircle}
+				icon={IconLoadingCircle}
 				role="status"
 				spin
 				action={
-					<Button variant="ghost" size="compact" leadingIcon={ExternalLink} render={<a href={signIn.waitingUrl} target="_blank" rel="noreferrer" />}>
+					<Button variant="ghost" size="compact" leadingIcon={IconSquareArrowTopRight} render={<a href={signIn.waitingUrl} target="_blank" rel="noreferrer" />}>
 						Open sign-in page
 					</Button>
 				}
@@ -152,7 +152,7 @@ export function ConnectionCallout({ approveOn, signIn, question, error, refused,
 	if (question) return question;
 	if (signIn.failure || error) {
 		return (
-			<Callout tone="danger" icon={CircleAlert} role="alert">
+			<Callout tone="danger" icon={IconExclamationCircle} role="alert">
 				{signIn.failure ? `Sign-in failed: ${signIn.failure}` : error}
 			</Callout>
 		);
@@ -161,10 +161,10 @@ export function ConnectionCallout({ approveOn, signIn, question, error, refused,
 		return (
 			<Callout
 				tone="danger"
-				icon={CircleAlert}
+				icon={IconExclamationCircle}
 				action={
 					refused.fix ?? (
-						<Button variant="secondary" size="compact" leadingIcon={RefreshCw} loading={signIn.starting} onClick={() => void signIn.connect()}>
+						<Button variant="secondary" size="compact" leadingIcon={IconArrowRotateClockwise} loading={signIn.starting} onClick={() => void signIn.connect()}>
 							Reconnect
 						</Button>
 					)
@@ -178,11 +178,11 @@ export function ConnectionCallout({ approveOn, signIn, question, error, refused,
 		return (
 			<Callout
 				tone="warning"
-				icon={WifiOff}
+				icon={IconWifiNoSignal}
 				action={
 					<div className="flex items-center gap-2">
 						{failing.fix}
-						<Button variant="ghost" size="compact" leadingIcon={RefreshCw} loading={failing.checking} onClick={failing.check}>
+						<Button variant="ghost" size="compact" leadingIcon={IconArrowRotateClockwise} loading={failing.checking} onClick={failing.check}>
 							Check again
 						</Button>
 					</div>
@@ -237,7 +237,7 @@ export function useToolList(ready: ReadyTools | null): { toggle: ReactNode; list
 				className="-mx-1 inline-flex items-center gap-0.5 rounded px-1 hover:bg-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:outline-none"
 			>
 				<span className="tabular-nums">{ready.tools.length}</span> tools
-				<ChevronRight aria-hidden className={cn("size-3 transition-transform duration-150 ease-out", open && "rotate-90")} />
+				<IconChevronRight aria-hidden className={cn("size-3 transition-transform duration-150 ease-out", open && "rotate-90")} />
 			</button>
 		),
 		list: open && <ToolList id={id} tools={ready.tools} server={ready.server} />,
