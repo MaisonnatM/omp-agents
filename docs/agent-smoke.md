@@ -86,7 +86,7 @@ Besides a live session's own hash, the routes are:
 - `#email`, `#email/new`, `#email/<account>/<thread id>`;
 - `#sport`, `#sport?day=<YYYY-MM-DD>`, `#sport/journal`, `#sport/journal?open=<log id>`, `#sport/progress`;
 - `#todo`, `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/archive`, `#todo/<category id>`, each with `?open=<todo id>` to open a todo;
-- `#calendar`, `#notifications`, `#bots`, `#bots/new`, `#bots/<id>`, `#bots/<id>/routines`, `#bots/<id>/routines/<routine id>`, `#bots/<id>/routines/<routine id>/edit`, `#bots/<id>/routines/new`;
+- `#calendar`, `#notifications`, `#whats-new`, `#bots`, `#bots/new`, `#bots/<id>`, `#bots/<id>/routines`, `#bots/<id>/routines/<routine id>`, `#bots/<id>/routines/<routine id>/edit`, `#bots/<id>/routines/new`;
 - `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`, `#scheduled/<send id>`;
 - `#get-started`, which always opens Get started's setup dialog over the home, even after local dismissal;
 - `#settings`, `#settings/<section>`, where `<section>` is `analytics`, `activity`, `preferences`, `keyboard`, `providers`, `integrations`, `mcp-servers`, `source-control`, `workspaces`, `sync`, `phone`, `storage`, `models`, `agents`, `omp`, `omp-memory`, `files`, `extensions`, `workflows`, `decisions`, or `worktrees`.

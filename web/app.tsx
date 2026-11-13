@@ -7,7 +7,6 @@ import { errorText } from "../src/json";
 import { AppSidebar } from "./components/app-sidebar";
 import { BotDetails } from "./components/bots/bot-details";
 import { CommandPalette } from "./components/command-palette/command-palette";
-import { WhatsNew } from "./components/whats-new";
 import { HeaderTabs } from "./components/header-tabs";
 import {
 	type DashboardActions,
@@ -260,7 +259,6 @@ export function App() {
 		[listPage, state.listed, visible, state.hosts, state.past, botList, state.userTodos, todoView, sectionTarget],
 	);
 	const showSearch = useCallback(() => dispatchPalette({ type: "open" }), [dispatchPalette]);
-	const headerControls = useMemo(() => <WhatsNew />, []);
 	const unreadNotices = useMemo(() => state.notices.filter(notice => !notice.read).length, [state.notices]);
 
 	return (
@@ -290,7 +288,7 @@ export function App() {
 										onSearch={showSearch}
 									/>
 								</DashboardSidebar>
-								<HeaderTabs className="[grid-area:tabs]" address={address} hosts={state.hosts} past={state.past} controls={headerControls} />
+								<HeaderTabs className="[grid-area:tabs]" address={address} hosts={state.hosts} past={state.past} />
 								<SidebarInset className={cn("inset-panel [grid-area:page] group-has-[#sessions-sidebar[inert]]/window:ml-1.5", (detailsView || openBot) && sidebars.panels.right.open && !sidebars.panels.right.floating && "rounded-r-none border-r-0")}>
 									<div ref={pageArea} className="flex min-h-0 flex-1">
 										{listPage && placement?.at === "column" && (
