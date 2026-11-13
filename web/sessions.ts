@@ -267,14 +267,16 @@ export function workspaceGroups(lists: SidebarSessions, workspaces: readonly Wor
 export interface RosterFolder {
 	group: WorkspaceGroup;
 	under: PastSession[];
+	/** How many session rows the folder holds: its live, interrupted, and ended ones. */
+	rows: number;
 }
 
 export interface RosterFolders {
 	shown: RosterFolder[];
 	/** How many matching folders stay behind "N more workspaces". */
 	more: number;
-	/** How many folders match, shown or not. */
-	matching: number;
+	/** More folders match than `limit`, so the full list can fold back to fewer. */
+	foldable: boolean;
 }
 
 /**
@@ -284,19 +286,28 @@ export interface RosterFolders {
  * one never moves a folder. `filtering` drops the folders a search leaves empty.
  */
 export function rosterFolders(groups: readonly WorkspaceGroup[], ended: readonly PastSession[], open: readonly View[], { pastListed, limit, all, filtering }: { pastListed: number; limit: number; all: boolean; filtering: boolean }): RosterFolders {
-	const listed = new Set(ended.slice(0, pastListed).map(session => session.sessionId));
+	// The ended sessions on screen past the ones Past lists, in `ended` order, each once.
+	const onScreen = open
+		.flatMap(view => (view.kind === "past" ? [ended.findIndex(session => session.sessionId === view.sessionId)] : []))
+		.filter(index => index >= pastListed)
+		.toSorted((a, b) => a - b);
 	const under = new Map<string, PastSession[]>();
-	for (const session of ended) {
-		if (listed.has(session.sessionId) || rowPlacement(open, { kind: "past", sessionId: session.sessionId }) === "hidden") continue;
+	for (const [at, index] of onScreen.entries()) {
+		const session = ended[index];
+		if (session === undefined || index === onScreen[at - 1]) continue;
 		const cwd = workspaceOf(session).cwd;
-		under.set(cwd, [...(under.get(cwd) ?? []), session]);
+		const folder = under.get(cwd);
+		if (folder) folder.push(session);
+		else under.set(cwd, [session]);
 	}
-	const folders = groups.map(group => ({ group, under: under.get(group.workspace.cwd) ?? [] }));
-	const rows = ({ group, under }: RosterFolder): number => group.hosts.length + group.interrupted.length + under.length;
-	const matching = filtering ? folders.filter(folder => rows(folder) > 0) : folders;
+	const folders = groups.map((group): RosterFolder => {
+		const held = under.get(group.workspace.cwd) ?? [];
+		return { group, under: held, rows: group.hosts.length + group.interrupted.length + held.length };
+	});
+	const matching = filtering ? folders.filter(folder => folder.rows > 0) : folders;
 	const busy = matching.filter(({ group }) => group.hosts.length + group.interrupted.length > 0).length;
 	const shown = all ? matching : matching.filter((folder, index) => index < Math.max(limit, busy) || folder.under.length > 0);
-	return { shown, more: matching.length - shown.length, matching: matching.length };
+	return { shown, more: matching.length - shown.length, foldable: matching.length > limit };
 }
 
 /** Every row of the sessions tab in its order, which the previous and next session keys walk: pinned, then each workspace's, then the ended ones. */

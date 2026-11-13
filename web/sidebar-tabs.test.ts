@@ -7,6 +7,7 @@ import {
 	encodeTabLayout,
 	hideTab,
 	moveTab,
+	navRowOf,
 	pageSpace,
 	positionKey,
 	shortcutRows,
@@ -211,4 +212,15 @@ test("shortcutRows folds each shown tab's position key into its row, drops the p
 	expect(keysOf("switcher")).toEqual([IS_MAC ? "⌘K" : "Ctrl+K"]);
 	expect(tabShortcutLabels("sessions", shown)).toEqual([`${mod}3`]);
 	expect(tabShortcutLabels("email", shown)).toEqual(["G then M"]);
+});
+
+test("the page list's current row is the page's tab, Sessions for the panes, and none for a page without a row", () => {
+	const none = new Set<never>();
+	expect(navRowOf(null, [], none)).toBeNull();
+	expect(navRowOf(null, [{ kind: "past", sessionId: "a" }], none)).toBe("sessions");
+	expect(navRowOf(pageAt("#todo"), [], none)).toBe("todo");
+	expect(navRowOf(pageAt("#settings"), [], none)).toBe("settings");
+	expect(navRowOf(pageAt("#new"), [], none)).toBe("new");
+	expect(navRowOf(pageAt("#todo"), [], new Set(["todo"] as const))).toBeNull();
+	expect(navRowOf(pageAt("#get-started"), [], none)).toBeNull();
 });

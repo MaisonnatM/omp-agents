@@ -1,6 +1,6 @@
 /** The header tabs' model: one tab per page or focused session you opened, kept in this browser in the order you dragged them. */
-import { focusedView, hashForView, routeFromHash } from "./routing";
-import { moveKey, type Where } from "./pull-requests-model";
+import type { View } from "../src/shared/sessions";
+import { focusedView, hashForView, type Page, routeFromHash } from "./routing";
 
 /** One header tab: `key` names what it shows, one per page kind or per focused session; `hash` is where you last saw it, and `at` when. */
 export interface HeaderTab {
@@ -14,17 +14,19 @@ export const HEADER_TABS_KEY = "omp-agents.header-tabs";
 /** The most tabs the header keeps; opening one more drops the one seen longest ago. */
 export const MAX_HEADER_TABS = 8;
 
-/** The tab `hash` belongs to; `null` for `#session/<id>`, which the dashboard replaces with the panes it opens. */
-export function headerTabKey(hash: string): string | null {
+/** What a tab's `hash` shows: a page, the session focused in the panes, or the home with no pane; `null` for `#session/<id>`, which the dashboard replaces with the panes it opens. */
+export type HeaderTabTarget = { kind: "page"; page: Page } | { kind: "view"; view: View } | { kind: "home" };
+
+export function headerTabTarget(hash: string): HeaderTabTarget | null {
 	const route = routeFromHash(hash);
 	switch (route.kind) {
 		case "page":
-			return `page:${route.page.kind}`;
+			return { kind: "page", page: route.page };
 		case "session":
 			return null;
 		case "panes": {
 			const view = focusedView(route.layout);
-			return view ? `view:${hashForView(view)}` : "home";
+			return view ? { kind: "view", view } : { kind: "home" };
 		}
 		default: {
 			const never: never = route;
@@ -33,22 +35,37 @@ export function headerTabKey(hash: string): string | null {
 	}
 }
 
-/** `tabs` with the one `hash` names brought up to date at `now`, or added at the end; past {@link MAX_HEADER_TABS}, the one seen longest ago goes. */
+/** The tab `target` belongs to, one per page kind or per focused session; stored tabs keep these strings. */
+export function headerTabKey(target: HeaderTabTarget): string {
+	switch (target.kind) {
+		case "page":
+			return `page:${target.page.kind}`;
+		case "view":
+			return `view:${hashForView(target.view)}`;
+		case "home":
+			return "home";
+		default: {
+			const never: never = target;
+			return never;
+		}
+	}
+}
+
+/**
+ * `tabs` with the one `hash` names brought up to date at `now`, or added at the end; past {@link MAX_HEADER_TABS}, the one seen longest ago goes.
+ * `tabs` itself when that tab already says so, so the row can work out the visit each render and store only a change.
+ */
 export function visitHeaderTab(tabs: readonly HeaderTab[], hash: string, now: number): readonly HeaderTab[] {
-	const key = headerTabKey(hash);
-	if (key === null) return tabs;
+	const target = headerTabTarget(hash);
+	if (target === null) return tabs;
+	const key = headerTabKey(target);
 	const known = tabs.find(tab => tab.key === key);
+	if (known?.hash === hash && known.at === now) return tabs;
 	const seen = { key, hash, at: now };
 	const next = known ? tabs.map(tab => (tab === known ? seen : tab)) : [...tabs, seen];
 	if (next.length <= MAX_HEADER_TABS) return next;
 	const oldest = next.reduce((a, b) => (b.at < a.at ? b : a));
 	return next.filter(tab => tab !== oldest);
-}
-
-/** `tabs` with the tab keyed `from` moved to just before or after the tab keyed `to`. */
-export function moveHeaderTab(tabs: readonly HeaderTab[], from: string, to: string, where: Where): readonly HeaderTab[] {
-	const order = moveKey(tabs.map(tab => tab.key), from, to, where);
-	return order.map(key => tabs.find(tab => tab.key === key)!);
 }
 
 /** `tabs` without the tab keyed `key`, and where to go when it was the one on screen, `activeKey`: the tab now in its place, else the one before it, else the home. `null` stays put. */

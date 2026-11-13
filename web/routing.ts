@@ -31,9 +31,6 @@ export const SIDEBAR_TABS = [
 /** A sidebar tab, a row of the sidebar's page list; the tickets, Bots, todo, notes, calendar, email, and sport tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
-/** What the sidebar shows: a tab's panel, or the settings sections while the Settings page is open. */
-export type SidebarPanel = SidebarTab | "settings";
-
 const PAST_PREFIX = "past/";
 
 /**

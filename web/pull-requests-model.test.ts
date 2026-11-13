@@ -18,7 +18,6 @@ import {
 	pullRequestSections,
 	listedPullRequests,
 	moveAction,
-	moveKey,
 	movesSummary,
 	orderedRepos,
 	placedManual,
@@ -28,7 +27,6 @@ import {
 	shownPullRequests,
 	rebaseOrder,
 	sessionStack,
-	stepTarget,
 	threadStarters,
 	withPullRequestReviewers,
 	withPullRequestState,
@@ -378,14 +376,6 @@ describe("pull request order", () => {
 		expect(sectionTitles(order({ sections: ["Recently merged"] }))).toEqual(["Recently merged", "Your move", "Agent on it", "Approved", "Waiting on others", "Drafts"]);
 		const repos = ["a", "b", "c"].map(repo => ({ owner: "acme", repo }));
 		expect(orderedRepos(repos, order({ repos: ["acme/c", "acme/gone", "acme/a"] })).map(({ repo }) => repo)).toEqual(["c", "a", "b"]);
-	});
-
-	test("moving a key puts it beside its target; a missing key or target changes nothing; a step at the edge has no target", () => {
-		expect(moveKey(["a", "b", "c", "d"], "a", "c", "after")).toEqual(["b", "c", "a", "d"]);
-		expect(moveKey(["a", "b", "c", "d"], "d", "b", "before")).toEqual(["a", "d", "b", "c"]);
-		expect(moveKey(["a", "b"], "x", "a", "before")).toEqual(["a", "b"]);
-		expect(stepTarget(["a", "b", "c"], "b", -1)).toEqual({ target: "a", where: "before" });
-		expect(stepTarget(["a", "b", "c"], "c", 1)).toBeNull();
 	});
 
 	test("placing a pull request fixes the repository's shown order, moves a stack as one, and keeps other repositories' places", () => {

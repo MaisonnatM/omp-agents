@@ -2,6 +2,7 @@
 import { useEffect, useMemo } from "react";
 import { isObject } from "../src/json";
 import { connectionsOf, type IntegrationsAnswer, signedIn } from "../src/shared/accounts";
+import type { View } from "../src/shared/sessions";
 import type { Space } from "../src/shared/workspaces";
 import { integrationsStore } from "./reads";
 import { type Page, SIDEBAR_TABS, type SidebarTab } from "./routing";
@@ -35,6 +36,20 @@ export const isSidebarTab = (kind: string): kind is SidebarTab => kind in TAB_RO
 
 /** The space page `page` shows in alone, its tab's {@link tabSpace}: Work for Tickets, Personal for Sport; `null` for a page of both. */
 export const pageSpace = (page: Page): Space | null => (isSidebarTab(page.kind) ? tabSpace(page.kind) : null);
+
+/** A row of the sidebar's page list: a tab's page, Settings, or the New session draft. */
+export type NavRow = SidebarTab | "settings" | "new";
+
+/**
+ * The row of the page list that `page` selects, which holds the page's own list: the panes select Sessions, and the
+ * empty home, a page with no row, and a page whose tab is absent, signed out or of the other space, select none.
+ * A page whose tab the user hid in Preferences still selects it, so its list shows after the last row.
+ */
+export function navRowOf(page: Page | null, panes: readonly View[], absentTabs: ReadonlySet<SidebarTab>): NavRow | null {
+	if (page === null) return panes.length > 0 ? "sessions" : null;
+	if (page.kind === "new" || page.kind === "settings") return page.kind;
+	return isSidebarTab(page.kind) && !absentTabs.has(page.kind) ? page.kind : null;
+}
 
 /**
  * The layout stored as `raw`. It keeps each known tab once, so a stored Settings tab from before the header's button drops out,

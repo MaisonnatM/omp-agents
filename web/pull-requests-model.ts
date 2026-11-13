@@ -3,6 +3,7 @@ import { PULL_REQUEST_ACTIONS, type PullRequestActionId, pullRequestActions } fr
 import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestChange, type PullRequestDetail, type Repo, type RepoPullRequests, type Reviewer, prKey, pullRequestName, repoKey, samePullRequest, type SettableState, type StackedPullRequest, unresolvedOf } from "../src/shared/github";
 import { type AgentOn, hasOpenThreads, type MoveId, moveOf, readyOnceChecksPass } from "../src/shared/moves";
 import type { ReviewDraft } from "../src/shared/review-drafts";
+import { moveKey, type Where } from "./order";
 
 /** A session's pull requests split into the stack two or more of them share, top first, and the rest; `null` when fewer than two sit in `stack`. */
 export function sessionStack(pullRequests: LinkedPullRequest[], stack: StackedPullRequest[]): { stack: StackedPullRequest[]; others: LinkedPullRequest[] } | null {
@@ -293,22 +294,6 @@ export function movesSummary({ title, rows }: PullRequestSection): string | null
 		// Sentence case, which keeps an acronym such as CI.
 		return count ? [`${count} ${MOVES[move].label.replace(/^[A-Z](?=[a-z])/, letter => letter.toLowerCase())}`] : [];
 	}).join(" · ");
-}
-
-export type Where = "before" | "after";
-
-/** `keys` with `key` moved to just before or after `target`; unchanged when either is missing or they are one. */
-export function moveKey(keys: readonly string[], key: string, target: string, where: Where): string[] {
-	if (key === target || !keys.includes(key) || !keys.includes(target)) return [...keys];
-	const rest = keys.filter(other => other !== key);
-	const at = rest.indexOf(target) + (where === "after" ? 1 : 0);
-	return [...rest.slice(0, at), key, ...rest.slice(at)];
-}
-
-/** The neighbor `key` swaps with when it moves one place `by`, and on which side; `null` at the edge. */
-export function stepTarget(keys: readonly string[], key: string, by: 1 | -1): { target: string; where: Where } | null {
-	const target = keys[keys.indexOf(key) + by];
-	return target === undefined || !keys.includes(key) ? null : { target, where: by === 1 ? "after" : "before" };
 }
 
 /**

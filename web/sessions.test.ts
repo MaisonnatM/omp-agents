@@ -412,4 +412,19 @@ describe("rosterFolders", () => {
 		expect(cwds(folders)).toEqual(["~/c", "~/a"]);
 		expect(folders.shown.every(({ under }) => under.length === 0)).toBe(true);
 	});
+
+	test("ended sessions on screen sit under their folder in Past's order, each once, and count as its rows", () => {
+		const both = [ended("p1", "~/a"), ended("p4", "~/a")];
+		const folders = rosterFolders(groups, both, [{ kind: "past", sessionId: "p4" }, { kind: "past", sessionId: "p1" }, { kind: "past", sessionId: "p4" }], options);
+		const a = folders.shown.find(({ group }) => group.workspace.cwd === "~/a");
+		expect(a && ids(a.under)).toEqual(["p1", "p4"]);
+		expect(a?.rows).toBe(2);
+		expect(folders.shown.find(({ group }) => group.workspace.cwd === "~/c")?.rows).toBe(1);
+	});
+
+	test("the full list folds back only when more folders match than the limit", () => {
+		expect(rosterFolders(groups, saved, [], { ...options, all: true }).foldable).toBe(true);
+		expect(rosterFolders(groups, saved, [], { ...options, all: true, limit: 4 }).foldable).toBe(false);
+		expect(rosterFolders(groups, saved, [], { ...options, all: true, filtering: true }).foldable).toBe(false);
+	});
 });
