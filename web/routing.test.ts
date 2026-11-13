@@ -9,18 +9,14 @@ import {
 	endSession,
 	hashForBots,
 	hashForNewBot,
-	hashForEmail,
 	hashForPullRequests,
 	hashForLayout,
 	hashForNewSession,
 	hashForPullRequestFiles,
 	hashForBotRoutine,
 	hashForSettings,
-	hashForTickets,
 	hashForOpenTodo,
 	hashForTodo,
-	hashForSport,
-	type SportRoute,
 	hashForTodoId,
 	hashForView,
 	type Layout,
@@ -36,22 +32,6 @@ import {
 } from "./routing";
 
 const todo = (fields: Partial<UserTodo>): UserTodo => ({ id: "t1", text: "Todo", body: "", status: "todo", priority: 0, assignee: null, doneAt: null, due: null, createdAt: null, categoryId: null, workspace: null, children: [], links: [], addedBy: null, ...fields });
-
-test("sport routes open the week on a day, the journal on a log, and the progress, and round-trip", () => {
-	const routes: [SportRoute, string][] = [
-		[{ tab: "week", day: null }, "#sport"],
-		[{ tab: "week", day: "2026-11-17" }, "#sport?day=2026-11-17"],
-		[{ tab: "journal", open: null }, "#sport/journal"],
-		[{ tab: "journal", open: "log / 1" }, "#sport/journal?open=log%20%2F%201"],
-		[{ tab: "progress" }, "#sport/progress"],
-	];
-	for (const [route, hash] of routes) {
-		expect(hashForSport(route)).toBe(hash);
-		expect(routeFromHash(hash)).toEqual({ kind: "page", page: { kind: "sport", ...route } });
-	}
-	for (const day of ["17-11-2026", "2026-02-30", "2026-13-01"]) expect(routeFromHash(`#sport?day=${day}`)).toEqual({ kind: "page", page: { kind: "sport", tab: "week", day: null } });
-	expect(routeFromHash("#sport/week")).toEqual({ kind: "page", page: { kind: "sport", tab: "week", day: null } });
-});
 
 describe("layout hash", () => {
 	const live = (instanceId: string, agentId: string | null = null) => ({ kind: "live", instanceId, agentId }) as const;
@@ -152,17 +132,6 @@ describe("layout hash", () => {
 		expect(routeFromHash("#pull-requests/acme/web.app/6596/filesx")).toEqual({ kind: "page", page: { kind: "pull-requests", target: null } });
 	});
 
-	test("the tickets hash opens the list or one issue's details, and no tickets hash is read as a layout", () => {
-		expect(hashForTickets(null)).toBe("#tickets");
-		expect(hashForTickets("ENG-2368")).toBe("#tickets/ENG-2368");
-		expect(routeFromHash("#tickets")).toEqual({ kind: "page", page: { kind: "tickets", target: null } });
-		expect(routeFromHash("#tickets/ENG-2368")).toEqual({ kind: "page", page: { kind: "tickets", target: "ENG-2368" } });
-		expect(routeFromHash("#tickets/not-an-issue")).toEqual({ kind: "page", page: { kind: "tickets", target: null } });
-		expect(routeFromHash("#ticketsx").kind).toBe("panes");
-		expect(routeFromHash("#7c51f77b2a1bf7ba").kind).toBe("panes");
-		for (const hash of ["#tickets", "#tickets/ENG-2368", "#tickets/x"]) expect(routeFromHash(hash).kind).toBe("page");
-	});
-
 	test("the todo hash opens every todo, a list that is not a category, or one category's, with a todo open or none, and no todo hash is read as a layout", () => {
 		expect(hashForTodo({ kind: "all" })).toBe("#todo");
 		expect(hashForTodo({ kind: "category", id: "a b/c" })).toBe("#todo/a%20b%2Fc");
@@ -208,23 +177,6 @@ describe("layout hash", () => {
 		expect(routeFromHash("#botsx").kind).toBe("panes");
 		expect(routeFromHash(`#routines/${id}`).kind).toBe("panes");
 	});
-
-	test("the email hash opens the list, a new mail, or one account's conversation, round-trips both ids, and is not read as a layout", () => {
-		const list: Route = { kind: "page", page: { kind: "email", target: null } };
-		expect(hashForEmail(null)).toBe("#email");
-		expect(hashForEmail("new")).toBe("#email/new");
-		expect(hashForEmail({ account: "gmail-2", thread: "18f2a3c4d5e6f708" })).toBe("#email/gmail-2/18f2a3c4d5e6f708");
-		expect(hashForEmail({ account: "a/b", thread: "c d" })).toBe("#email/a%2Fb/c%20d");
-		expect(routeFromHash("#email")).toEqual(list);
-		expect(routeFromHash("#email/")).toEqual(list);
-		expect(routeFromHash("#email/new")).toEqual({ kind: "page", page: { kind: "email", target: "new" } });
-		expect(routeFromHash("#email/gmail/18f2a3c4d5e6f708")).toEqual({ kind: "page", page: { kind: "email", target: { account: "gmail", thread: "18f2a3c4d5e6f708" } } });
-		expect(routeFromHash(hashForEmail({ account: "a/b", thread: "c d" }))).toEqual({ kind: "page", page: { kind: "email", target: { account: "a/b", thread: "c d" } } });
-		expect(routeFromHash("#email/18f2a3c4d5e6f708")).toEqual(list);
-		expect(routeFromHash("#email/gmail/%E0")).toEqual(list);
-		expect(routeFromHash("#emails").kind).toBe("panes");
-	});
-
 
 	test("every page hash names its page and route, and a session or layout hash names none", () => {
 		expect(routeFromHash(hashForSettings("files"))).toEqual({ kind: "page", page: { kind: "settings", section: "files" } });

@@ -44,7 +44,7 @@ interface AppSidebarProps {
 }
 
 /**
- * The left sidebar: the app's row with the command menu, the page list, and the roster.
+ * The left sidebar above its foot: the app's row with the command menu, the page list, and the roster; `SidebarStatus` sits under it.
  * The nodes it hands down are memoized, so a roster message that changes nothing the sidebar shows leaves it alone.
  */
 export const AppSidebar = memo(function AppSidebar({
@@ -77,8 +77,12 @@ export const AppSidebar = memo(function AppSidebar({
 	const newSessionLabel = selectedWorkspace ? `New session in ${folderName(selectedWorkspace.cwdDisplay) ?? selectedWorkspace.cwdDisplay}` : "New session";
 	return (
 		<div className="flex min-h-0 flex-1 flex-col">
-			<div className="flex h-(--page-header-height) shrink-0 items-center gap-1.5 pr-2 pl-[max(0.75rem,env(titlebar-area-x,0px))] select-none [-webkit-app-region:drag] *:[-webkit-app-region:no-drag]">
+			<div className="flex h-(--page-header-height) shrink-0 items-center justify-end pr-2 select-none [-webkit-app-region:drag] *:[-webkit-app-region:no-drag]">
 				<h1 className="sr-only">omp sessions</h1>
+				{/* The sidebar's toggle rides over this corner, from `DashboardSidebar`, so it can glide to the strip a hidden sidebar leaves. */}
+				<span aria-hidden className="size-7 shrink-0" />
+			</div>
+			<div className="mx-2 flex h-8 shrink-0 items-center gap-1.5 pl-2">
 				<AppMark className="size-4 shrink-0" />
 				<span aria-hidden className="text-[15px] font-semibold tracking-tight">omp</span>
 				<Tooltip content="Command menu" shortcut={shortcutLabels("switcher")} side="bottom">
@@ -86,8 +90,6 @@ export const AppSidebar = memo(function AppSidebar({
 						<IconMagnifyingGlass />
 					</Button>
 				</Tooltip>
-				{/* The sidebar's toggle rides over this corner, from `DashboardSidebar`, so it can glide to the strip a hidden sidebar leaves. */}
-				<span aria-hidden className="size-7 shrink-0" />
 			</div>
 			{!connected && <p className="mx-3 mb-1 rounded-md bg-red-500/10 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">Lost the dashboard server. Retrying…</p>}
 			<SidebarNav

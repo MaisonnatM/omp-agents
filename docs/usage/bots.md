@@ -48,7 +48,7 @@
   Open the card to read its prompt or command, any output, what started it, and the **Open routine** link.
 - The right sidebar shows the Bot's details, as it shows a session's on the panes.
   Click the Bot's name in the header, the button at the header's end, or press Cmd+Shift+B to show or hide it; it keeps the width and open state of the session details sidebar.
-  Its tabs are **Details**, **Routines**, which counts the Bot's routines, and, once the Bot's conversation worked on a Linear issue, **Tickets**, which shows those issues as a session's does; it remembers the one you last picked, apart from a session's.
+  It shows its tabs as a session's does, with **Details** always open and **+** listing **Routines**, which counts the Bot's routines, and, once the Bot's conversation worked on a Linear issue, **Tickets**, which shows those issues as a session's does; it remembers the tabs you opened, apart from a session's.
   **Details** starts with the avatar, the name, the Bot's type and whether its session runs, and its workspace.
   Click the avatar to change its shape and color; the avatar follows each pick, and closing the popover saves the last one.
   Click the name to rename it: Enter or leaving the field saves, and Escape puts the name back.

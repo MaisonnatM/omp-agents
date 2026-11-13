@@ -27,7 +27,8 @@ Capy's renderer bundle names its keys, with mod standing for Cmd on macOS and Ct
 - Cmd+1 through Cmd+9 go to the header tabs, and Alt+1 through Alt+9 open the sidebar's sessions in the order it lists them.
 - Capy's keys replace ours: Cmd+Shift+O starts a session, Cmd+. stops the turn, Alt+M dictates, Cmd+/ attaches files, Cmd+Shift+B shows the details sidebar, Cmd+, opens Settings, and Cmd+Shift+, copies a pull request's link.
 - Cmd+T, Cmd+Alt+W, Ctrl+Tab, Ctrl+Shift+Tab, and Cmd+Alt+← and → open, close the others of, and step through the header tabs.
-- Cmd+Shift+L opens the Browser, Cmd+Shift+G reviews the session's changes while the details sidebar shows its Overview, Ctrl+Shift+F maximizes a pane, and J and K step through the lists that ↓ and ↑ step through.
+- Cmd+Shift+L opens the details sidebar's Browser tab, opening the sidebar when it is closed, and Cmd+Shift+G shows its Overview tab and, pressed again there, reviews the session's changes, as Capy's diffs key opens its diffs.
+- Ctrl+Shift+F maximizes a pane, and J and K step through the lists that ↓ and ↑ step through.
 - Off macOS, Ctrl+Shift+F is also the session search's key, which takes it first while the sidebar shows.
 - The page rows keep their commands in the command menu and their G pairs, and Settings › Preferences no longer shows a number beside each tab.
 - Capy's Open in editor and Search files have no action here, so Cmd+O and Cmd+P stay unbound.

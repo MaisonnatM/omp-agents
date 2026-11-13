@@ -33,10 +33,11 @@ test("mod is ⌘ on macOS and Ctrl elsewhere, and a chord needs exactly its modi
 	expect(press("F", "KeyF", { ctrl: true, shift: true })).toEqual(["sessionSearch", "maximizePane"]);
 	expect(pressOn(true, "F", "KeyF", { meta: true, shift: true })).toEqual(["sessionSearch"]);
 	expect(pressOn(true, "F", "KeyF", { ctrl: true, shift: true })).toEqual(["maximizePane"]);
-	expect(press("L", "KeyL", { ctrl: true, shift: true })).toEqual(["openBrowser"]);
-	expect(pressOn(true, "L", "KeyL", { meta: true, shift: true })).toEqual(["openBrowser"]);
-	expect(press("G", "KeyG", { ctrl: true, shift: true })).toEqual(["reviewChanges"]);
-	expect(pressOn(true, "G", "KeyG", { meta: true, shift: true })).toEqual(["reviewChanges"]);
+	expect(press("L", "KeyL", { ctrl: true, shift: true })).toEqual(["detailsBrowser"]);
+	expect(pressOn(true, "L", "KeyL", { meta: true, shift: true })).toEqual(["detailsBrowser"]);
+	// The Overview mounts only while it shows, so a first press shows it and the next one, there, reviews the changes.
+	expect(press("G", "KeyG", { ctrl: true, shift: true })).toEqual(["detailsOverview", "reviewChanges"]);
+	expect(pressOn(true, "G", "KeyG", { meta: true, shift: true })).toEqual(["detailsOverview", "reviewChanges"]);
 	expect(press("k", "KeyK", { ctrl: true })).toEqual(["switcher"]);
 	expect(press("e", "KeyE", { ctrl: true })).toEqual(["tools"]);
 	expect(press("E", "KeyE", { ctrl: true, shift: true })).toEqual(["hideTools"]);
@@ -46,13 +47,6 @@ test("mod is ⌘ on macOS and Ctrl elsewhere, and a chord needs exactly its modi
 	expect(press("K", "KeyK", { ctrl: true, shift: true })).toEqual(["copyPullRequestNumber"]);
 	expect(press("k", "KeyK", { ctrl: true, alt: true })).toEqual([]);
 	expect(press("b", "KeyB")).toEqual([]);
-});
-
-test("Ctrl+` toggles the terminal on every platform, and ⌘` stays macOS's window switch", () => {
-	expect(press("`", "Backquote", { ctrl: true })).toEqual(["terminal"]);
-	expect(pressOn(true, "`", "Backquote", { ctrl: true })).toEqual(["terminal"]);
-	expect(pressOn(true, "`", "Backquote", { meta: true })).toEqual([]);
-	expect(pressOn(true, "`", "Backquote", { ctrl: true, meta: true })).toEqual([]);
 });
 
 test("browser-reserved chords stay the browser's, apart from the app's tab, settings, and pull request copy bindings", () => {
@@ -132,8 +126,8 @@ test("a key matches only its intended scope, with no Esc interrupt, and Cmd+/ at
 		{ id: "restore", scope: "anywhere", key: 0 },
 		{ id: "browserRestore", scope: "anywhere", key: 0 },
 		{ id: "todoClose", scope: "outside-fields", key: 0 },
-		{ id: "emailClose", scope: "outside-fields", key: 0 },
 		{ id: "sportJournalClose", scope: "outside-fields", key: 0 },
+		{ id: "emailClose", scope: "outside-fields", key: 0 },
 	]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true }), null, false)).toEqual([{ id: "attachFiles", scope: "composer", key: 0 }]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true, alt: true }), null, false)).toEqual([{ id: "model", scope: "anywhere", key: 0 }]);
@@ -149,11 +143,11 @@ test("a key matches only its intended scope, with no Esc interrupt, and Cmd+/ at
 	]);
 });
 
-test("↓ and ↑, or J and K, step through sessions, pull requests, todos, conversations, sport logs, and changed files, and ↑ also takes back a queued message", () => {
-	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "emailNext", "sportJournalNext", "nextChangedFile"]);
-	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "emailPrevious", "sportJournalPrevious", "previousChangedFile"]);
-	expect(press("j", "KeyJ")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "emailNext", "sportJournalNext", "nextChangedFile"]);
-	expect(press("k", "KeyK")).toEqual(["sessionsPrevious", "previousPullRequest", "todoPrevious", "emailPrevious", "sportJournalPrevious", "previousChangedFile"]);
+test("↓ and ↑, or J and K, step through sessions, pull requests, todos, sport logs, conversations, and changed files, and ↑ also takes back a queued message", () => {
+	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "sportJournalNext", "emailNext", "nextChangedFile"]);
+	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "sportJournalPrevious", "emailPrevious", "previousChangedFile"]);
+	expect(press("j", "KeyJ")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "sportJournalNext", "emailNext", "nextChangedFile"]);
+	expect(press("k", "KeyK")).toEqual(["sessionsPrevious", "previousPullRequest", "todoPrevious", "sportJournalPrevious", "emailPrevious", "previousChangedFile"]);
 	expect(shortcutsFor(keyEvent("j", "KeyJ"), null, false).map(({ scope }) => scope)).not.toContain("anywhere");
 });
 

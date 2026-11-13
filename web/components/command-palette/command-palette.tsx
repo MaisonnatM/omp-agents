@@ -1,6 +1,6 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Command as CommandPrimitive } from "cmdk";
-import { IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowRotateClockwise, IconArrowUp, IconCmd, IconConsole, IconCrossMedium, IconExpand, IconFolder1, IconHistory, IconKeyboard, IconLayersTwo, IconMagnifyingGlass, IconPlusLarge, IconPullRequest, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide, IconTarget, IconTodos, IconToolbox, IconWindowApp } from "central-icons";
+import { IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowRotateClockwise, IconArrowUp, IconCmd, IconCrossMedium, IconExpand, IconFolder1, IconHistory, IconKeyboard, IconLayersTwo, IconMagnifyingGlass, IconPlusLarge, IconPullRequest, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide, IconTarget, IconTodos, IconToolbox, IconWindowApp } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type DashboardUpdateStatus, didNotStart, shortCommit } from "../../../src/shared/dashboard-update";
@@ -28,6 +28,7 @@ import {
 } from "../../command-palette";
 import { localDay } from "../../../src/shared/days";
 import { age, ALL_WORKSPACES, folderName, hostLabel, pastLabel } from "../../labels";
+import { MODULE_LIST } from "../../modules";
 import { PAGE_ICON } from "../../page-icons";
 import { conversationItems, recordItems } from "../../palette-records";
 import { useConversationHits, useRead, useSearchSources } from "../../reads";
@@ -62,20 +63,16 @@ const COMMAND_ICON: Partial<Record<ShortcutId, IconComponent>> = {
 	tools: IconToolbox,
 	sessionsSidebar: IconSidebarSimpleLeftWide,
 	detailsSidebar: IconSidebarSimpleRightWide,
-	openBrowser: IconWindowApp,
+	detailsBrowser: IconWindowApp,
 	maximizePane: IconExpand,
 	settings: PAGE_ICON.settings,
 	help: IconKeyboard,
 	"pull-requests": PAGE_ICON["pull-requests"],
-	tickets: PAGE_ICON.tickets,
 	newTicket: PAGE_ICON.tickets,
 	bots: PAGE_ICON.bots,
 	sessions: PAGE_ICON.sessions,
 	todo: PAGE_ICON.todo,
-	calendar: PAGE_ICON.calendar,
-	email: PAGE_ICON.email,
-	sport: PAGE_ICON.sport,
-	terminal: IconConsole,
+	...Object.fromEntries(MODULE_LIST.map(({ id, tab }) => [id, tab.icon])),
 };
 
 interface CommandPaletteProps {

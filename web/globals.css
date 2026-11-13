@@ -511,7 +511,7 @@
     animation-timeline: --sf-scroller;
     animation-range: 0 var(--scroll-divider-size);
   }
-  /* A scroller at its container's top or bottom edge, or right under a sidebar header, draws no hairline there: the edge has its own border, such as the status bar's or the header's. */
+  /* A scroller at its container's top or bottom edge, or right under a sidebar header, draws no hairline there: the edge has its own border, such as the sidebar foot's or the header's. */
   .scroll-divider:first-child::before, [data-sidebar="header"] + .scroll-divider::before, .scroll-divider:last-child::after {
     content: none;
   }

@@ -1,9 +1,7 @@
 import { IconPlusLarge, IconTrashCan } from "central-icons";
 import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
-import type { Routine } from "../../../src/routines";
-import type { Bot } from "../../../src/shared/bots";
 import type { EventRef, LocalEvent } from "../../../src/shared/calendar";
-import type { UserTodoList } from "../../../src/user-todos-shared";
+import type { CoreData } from "../module-views";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -26,9 +24,10 @@ import { type CalendarEntry, calendarEntries, routinesOf } from "../../calendar-
 import { eventLink, type NoticeLink } from "../../notice-model";
 import { dateOfDay, localDay } from "../../../src/shared/days";
 import { calendarEventsStore, localEventsStore, monthSpan, ticketsStore, useGoogleCalendars } from "../../reads";
-import { hashForBotRoutine, hashForOpenTodo, hashForTickets } from "../../routing";
+import { hashForBotRoutine, hashForOpenTodo } from "../../routing";
 import { scheduleWords, timeWords } from "../../routines-model";
 import { shortcutLabels, useShortcuts } from "../../shortcuts";
+import { hashForTickets } from "../../tickets-model";
 import { useMinute } from "../../use-minute";
 import { useCalendarRoutines } from "../../use-calendar-display";
 import { PageFrame } from "../list-page";
@@ -329,19 +328,8 @@ function gridDays(year: number, month: number): Date[] {
 	return Array.from({ length: weeks * 7 }, (_, index) => new Date(year, month, 1 - lead + index));
 }
 
-interface CalendarPageProps {
-	/** Every Bot's routines; the page shows those of `bots`. */
-	routines: Routine[];
-	/** The Bots, `null` until they load. */
-	bots: Bot[] | null;
-	/** `null` until the server sends it. */
-	todos: UserTodoList | null;
-	/** The dashboard can read Linear, so tickets with a due date show. */
-	ticketsShown: boolean;
-}
-
-/** A month of the Google events, events kept on this computer, routine runs, due todos, and Linear tickets, with one day's list beside it. */
-export function CalendarPage({ routines: allRoutines, bots, todos, ticketsShown }: CalendarPageProps) {
+/** A month of the Google events, events kept on this computer, routine runs, due todos, and Linear tickets while `ticketsShown`, with one day's list beside it. */
+export function CalendarPage({ core: { routines: allRoutines, bots, todos, ticketsShown } }: { core: CoreData }) {
 	const routines = useMemo(() => routinesOf(allRoutines, bots), [allRoutines, bots]);
 	const now = useMinute();
 	const [showRoutines] = useCalendarRoutines();

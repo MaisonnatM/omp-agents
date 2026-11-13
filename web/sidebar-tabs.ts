@@ -115,7 +115,7 @@ export const shownTabs = (layout: TabLayout, absent: ReadonlySet<SidebarTab>): S
 
 /** The tabs whose service omp holds no sign-in to, on any of its accounts, which then neither show nor take their shortcuts; all of them until the integrations answer. */
 export const tabsSignedOut = (integrations: IntegrationsAnswer["integrations"] | undefined): SidebarTab[] =>
-	SIDEBAR_TABS.flatMap(row => ("integration" in row && !(integrations && connectionsOf(integrations[row.integration]).some(signedIn)) ? [row.value] : []));
+	SIDEBAR_TABS.flatMap(row => (row.integration !== undefined && !(integrations && connectionsOf(integrations[row.integration]).some(signedIn)) ? [row.value] : []));
 
 /** The tabs whose service omp holds no sign-in to, as {@link tabsSignedOut} names them; the same set until one signs in or out, whatever the integrations' polls answer. */
 export function useSignedOutTabs(): ReadonlySet<SidebarTab> {

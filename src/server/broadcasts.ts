@@ -35,7 +35,7 @@ export interface BroadcastDeps {
 export class Broadcasts {
 	readonly #deps: BroadcastDeps;
 	/** The last published message of each kind, absent until it first publishes. */
-	readonly #last = new Map<Broadcast["t"], string>();
+	readonly #last = new Map<ListKind | "usage", string>();
 	/** The roster as the listeners last heard it, and its registry error. */
 	readonly #roster = new HeardList<RosterHost>(host => host.instanceId);
 	#rosterError: string | null = null;
@@ -96,13 +96,13 @@ export class Broadcasts {
 		} catch (err) {
 			usage = { t: "usage", plans: [], error: errorText(err) };
 		}
-		this.#publishChanged(usage);
+		this.#publishChanged("usage", usage);
 		return usage;
 	}
 
 	/** Publish a registered whole list only when its message changed. */
 	pushList(kind: ListKind): void {
-		this.#publishChanged(this.#deps.lists.message(kind));
+		this.#publishChanged(kind, this.#deps.lists.message(kind));
 	}
 
 	/** Also stands in for a pending debounced push: a burst of roster updates costs one sync and one push. */
@@ -137,10 +137,10 @@ export class Broadcasts {
 		return sessions;
 	}
 
-	#publishChanged(msg: Broadcast): void {
+	#publishChanged(kind: ListKind | "usage", msg: Broadcast): void {
 		const json = JSON.stringify(msg);
-		if (json === this.#last.get(msg.t)) return;
-		this.#last.set(msg.t, json);
+		if (json === this.#last.get(kind)) return;
+		this.#last.set(kind, json);
 		this.#deps.publish(TOPIC, json);
 	}
 }

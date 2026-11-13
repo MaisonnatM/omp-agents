@@ -6,9 +6,10 @@ import type { Workspace } from "./shared/workspaces";
 
 export const HOME = homedir();
 
-const configDir = join(process.env.XDG_CONFIG_HOME || join(HOME, ".config"), "omp-agents");
+/** The dashboard's settings and lists: `$XDG_CONFIG_HOME/omp-agents`, else `~/.config/omp-agents`. */
+export const configDir = join(process.env.XDG_CONFIG_HOME || join(HOME, ".config"), "omp-agents");
 /** Files the dashboard keeps that the file dialog may open, unlike {@link configDir}: `$XDG_DATA_HOME/omp-agents`, else `~/.local/share/omp-agents`. */
-const dataDir = join(process.env.XDG_DATA_HOME || join(HOME, ".local", "share"), "omp-agents");
+export const dataDir = join(process.env.XDG_DATA_HOME || join(HOME, ".local", "share"), "omp-agents");
 
 /** Where the dashboard keeps its access token: `$XDG_CONFIG_HOME/omp-agents/token`, else `~/.config/omp-agents/token`. */
 export const tokenFile = join(configDir, "token");
@@ -39,12 +40,6 @@ export const userTodosFile = join(configDir, "todos.json");
  * The server applies and deletes them, so it stays the only writer of {@link userTodosFile}.
  */
 export const userTodoInboxDir = join(configDir, "todo-inbox");
-/** The Sport module's plan, measurements, and workout log, beside {@link tokenFile}. */
-export const sportFile = join(configDir, "sport.json");
-/** Where omp's `sport` tool leaves its changes to the Sport module, one JSON file each, so the server stays the only writer of {@link sportFile}. */
-export const sportInboxDir = join(configDir, "sport-inbox");
-/** The demo thumbnails YouTube served once, `<video id>.jpg` each, in the dashboard's data directory. */
-export const sportThumbsDir = join(dataDir, "sport-thumbs");
 /** Where omp's `user_event` tool leaves the reminders it adds and removes, one JSON file each, so the server stays the only writer of {@link localEventsFile}. */
 export const eventInboxDir = join(configDir, "event-inbox");
 /** Where omp's `end_session` tool asks the server to end a session, one `<session id>.json` each, beside {@link tokenFile}. */

@@ -52,7 +52,7 @@ function SidebarTabs() {
 							<row.icon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
 							<div className="min-w-0 flex-1">
 								{row.label}
-								{"integration" in row && signedOut.has(tab) && (
+								{row.integration !== undefined && signedOut.has(tab) && (
 									<p className="text-xs text-muted-foreground">Shows only while {MCP_SERVICES[row.integration].label} is connected.</p>
 								)}
 							</div>
@@ -153,7 +153,7 @@ function IdleProcessStop() {
 	return (
 		<Section
 			title="Stop idle processes"
-			meta="Dev servers, watchers, and services a session starts besides omp. A process stops once every session it serves has been idle that long; hover the CPU in the status bar to see when. Saved on the server."
+			meta="Dev servers, watchers, and services a session starts besides omp. A process stops once every session it serves has been idle that long; hover the CPU at the foot of the left sidebar to see when. Saved on the server."
 		>
 			{read.error && <p className="text-xs text-red-600 dark:text-red-400">{read.error}</p>}
 			{minutes !== undefined && (

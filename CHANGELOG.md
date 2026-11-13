@@ -8,11 +8,23 @@ The dashboard shows the same lines in Settings › What's new.
 - The shortcuts now match Capy's. Cmd+1 to Cmd+9 go to your tabs at the top, and Option+1 to Option+9 open the sidebar's first nine sessions.
 - Cmd+T opens a new tab, Cmd+Option+W closes all the other tabs, and Ctrl+Tab or Cmd+Option+→ and ← move between tabs.
 - New keys, the old ones no longer work: Cmd+Shift+O starts a new session, Cmd+. stops the turn, Option+M dictates, Cmd+, opens Settings, Cmd+Shift+B shows the details sidebar, and Cmd+Shift+, copies a pull request's link.
-- New keys: Cmd+/ attaches files, Cmd+Shift+L opens the Browser, Cmd+Shift+G opens Review from the Overview, Ctrl+Shift+F maximizes a pane, and J and K move through lists like ↓ and ↑.
+- New keys: Cmd+/ attaches files, Cmd+Shift+L also opens the right sidebar when it is closed, Cmd+Shift+G pressed again on the Overview opens Review, Ctrl+Shift+F maximizes a pane, and J and K move through lists like ↓ and ↑.
 - The sidebar's pages no longer take Cmd+number keys; open them from the sidebar or the command menu.
 - The tab on screen no longer shows a dotted grip; you can still drag any tab from anywhere on it.
 - A session's header no longer shows Open PR; Open pull request in the command menu still asks the session to open one.
+- With the sidebar open, the back and forward buttons now sit beside its toggle at the sidebar's right edge, and the tabs start right where the page does.
+- The bottom of the sidebar now shows how much of each model plan is left, as a grid of rings with the provider's logo inside and the percent left below, one per account, and your Mac's CPU, free memory, and free disk in the same rings, where the Keyboard shortcuts link was. Reset times and reset credits show when you hover a ring. Hover or click CPU to see each session's processes, or the disk to clean up. Settings › Keyboard and ? still open the shortcuts.
+- The strip along the bottom of the window is gone, so the page runs to the window's edge.
+- The terminal's button, its Ctrl+` shortcut, and its command in the command menu are gone; New terminal in a session's right sidebar + menu still opens it on a new shell.
+- Behind the scenes: the sidebar's foot is its own piece under the sessions list, plan and machine tiles share one tile, and the Activity history for the CPU and disk clicks starts over under new names.
+- Settings › Keyboard and Settings › Activity now list each page's shortcuts and views in the same order as the sidebar.
+- Behind the scenes: Sport, Calendar, Email, and Tickets are now separate modules, so a page like them can be added or removed without touching the rest of the app.
+- The **+** menu in a session's right sidebar now lists its subagents, each opening its view, and **New terminal**, which opens the terminal on a new shell.
+- ⇧⌘G shows the right sidebar's Overview tab and ⇧⌘L opens its Browser tab in the desktop app, as in Capy; the + menu lists both keys.
+- The right sidebar's tabs now work as Capy's: it starts with Overview, + lists PRs, Browser, Tickets, and Artifacts to open as tabs, and each opened tab has an × to close it. A Bot's details do the same with Routines and Tickets.
 - Notifications moved from the bell at the top right to a Notifications row in the sidebar, before Settings, with its unread count; it opens a full page with the same filters and Mark all as read.
+- The omp logo and the search button moved down out of the window's top bar to their own row in the sidebar, just above New session.
+- Notifications moved from the bell at the top right to a Notifications row in the sidebar, right under New session, with its unread count; it opens a full page with the same filters and Mark all as read.
 - The header no longer has a Settings button; the sidebar's Settings row and G then , still open Settings.
 - What's new moved from the sparkles button at the top right to Settings › What's new, with Update dashboard. The header now holds only your tabs.
 - Archive session now shows an archive icon in the header and the sidebar's right-click menu, and the header button is plain instead of filled.

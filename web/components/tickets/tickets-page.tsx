@@ -1,6 +1,7 @@
 /** `TicketsPage`: your assigned Linear issues grouped by workflow state, as Linear's My issues lists them, with the open one beside them. */
 import { IconPlusLarge, IconTodos } from "central-icons";
 import { useRef } from "react";
+import { callable } from "../../../src/shared/accounts";
 import type { RosterHost } from "../../../src/shared/sessions";
 import type { Ticket, TicketDetail } from "../../../src/shared/tickets";
 import { Button } from "@/components/ui/button";
@@ -8,26 +9,28 @@ import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, ticketActions, ticketStart, type WorkActionId } from "../../quick-actions";
 import { useEditableRead } from "../../editable-read";
-import { ticketsStore } from "../../reads";
-import { hashForTickets } from "../../routing";
+import { integrationsStore, ticketsStore } from "../../reads";
 import { sessionsOn } from "../../sessions";
 import type { SectionTarget } from "../../section";
 import type { StartOf } from "../../starts";
 import { shortcutLabels, useShortcuts } from "../../shortcuts";
-import { type TicketGroup, ticketGroups, ticketSection } from "../../tickets-model";
+import { hashForTickets, type TicketGroup, ticketGroups, ticketSection } from "../../tickets-model";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
+import { DisconnectedPage } from "../integrations/disconnected-page";
+import type { CoreData } from "../module-views";
 import { FoldButton, useFolds, useReveal } from "../fold";
 import { PolledContent, PolledPageFrame, useReturnFocus } from "../list-page";
 import { type BarAction, CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, ListSplit } from "../list-split";
 import { DetailQuickActions, QuickStartNotice } from "../quick-actions";
+import type { TicketsRoute } from "./module";
 import { TicketDetailContent } from "./ticket-details";
 import { statusIcon, TicketRow, ticketRowId } from "./ticket-row";
 
 /** Folded status groups, by status name. */
 const COLLAPSED_KEY = "omp-agents.tickets-collapsed";
 
-export const TICKETS_TITLE = "Tickets";
-export const TICKETS_META = "Your assigned issues on Linear";
+const TICKETS_TITLE = "Tickets";
+const TICKETS_META = "Your assigned issues on Linear";
 
 interface GroupProps {
 	group: TicketGroup;
@@ -73,7 +76,7 @@ function GroupSection({ group, open, target, onToggle, quick, onQuickAction }: G
 	);
 }
 
-interface TicketsPageProps {
+interface TicketsListProps {
 	/** The issue whose details show beside the list; `null` shows the list alone. */
 	target: string | null;
 	/** The group a sidebar link last chose, to unfold, scroll to, and focus. */
@@ -87,8 +90,17 @@ interface TicketsPageProps {
 	hosts: RosterHost[];
 }
 
+/** The Tickets page: Linear's integration row while Linear refuses omp's sign-in, else the viewer's assigned issues once the sessions are listed. */
+export function TicketsPage({ route: { target }, core }: { route: TicketsRoute; core: CoreData }) {
+	const linear = integrationsStore.use().read?.data.integrations.linear;
+	if (linear && !callable(linear.connection)) return <DisconnectedPage title={TICKETS_TITLE} meta={TICKETS_META} integration={linear} />;
+	// Until the sessions are listed, the workspace a quick action starts in is not known yet.
+	if (!core.listed) return <p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>;
+	return <TicketsList target={target} section={core.section} cwd={core.cwd} hosts={core.hosts} />;
+}
+
 /** The viewer's assigned Linear issues by workflow state, as Linear's My issues lists them, and beside them the issue `target` names. */
-export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
+function TicketsList({ target, section, cwd, hosts }: TicketsListProps) {
 	const { open, start: startSession, dismissStart, openNewTicket } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
 	const poll = ticketsStore.usePolling();

@@ -7,13 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { hashForSport } from "../../routing";
 import { useShortcuts } from "../../shortcuts";
 import { arkoseColor, CLIMB_LABEL, dayOfMonth, duration, exerciseName, journalWeeks, KIND_COLOR, logDetail, longDate, PAIN_PLACE_LABEL, painWord, PLACE_LABEL, recordLogs, sendsText, shortDate, signedKg, weekdayShort, workoutOf } from "../../sport-view";
 import { focusRow, stepRows, useReturnFocus } from "../list-page";
 import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, ListSplit } from "../list-split";
 import { toasts } from "../toaster";
 import { effortText, heaviest, Stats } from "./log-summary";
+import { sportHash } from "./nav";
 
 interface JournalTabProps {
 	state: SportState;
@@ -41,7 +41,7 @@ export function JournalTab({ state, open, disabled, onChange, onEdit, keys }: Jo
 	const at = logs.findIndex(({ id }) => id === open);
 	const shown = at === -1 ? null : logs[at]!;
 	const navigate = (id: string | null) => {
-		location.hash = hashForSport({ tab: "journal", open: id });
+		location.hash = sportHash({ tab: "journal", open: id });
 	};
 	const rowOf = (log: WorkoutLog): HTMLElement | null => document.getElementById(logRowId(log.id));
 	useReturnFocus(shown?.id ?? null, id => id, id => document.getElementById(logRowId(id))?.querySelector("a"), state);
@@ -89,7 +89,7 @@ export function JournalTab({ state, open, disabled, onChange, onEdit, keys }: Jo
 							const kind = workoutOf(state.plan, log.workout)?.kind ?? null;
 							return (
 								<li key={log.id} id={logRowId(log.id)}>
-									<a href={hashForSport({ tab: "journal", open: log.id })} aria-current={log.id === open ? "page" : undefined} className={cn("flex items-center gap-3 rounded-md px-2 py-1.5 outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring", log.id === open && "bg-accent")}>
+									<a href={sportHash({ tab: "journal", open: log.id })} aria-current={log.id === open ? "page" : undefined} className={cn("flex items-center gap-3 rounded-md px-2 py-1.5 outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring", log.id === open && "bg-accent")}>
 										<span aria-hidden className="h-8 w-1 shrink-0 rounded-full" style={{ background: kind && log.status === "done" ? KIND_COLOR[kind] : "var(--border)" }} />
 										<span className="w-8 shrink-0 text-center">
 											<span className="block text-[11px] text-muted-foreground uppercase">{weekdayShort(log.date)}</span>

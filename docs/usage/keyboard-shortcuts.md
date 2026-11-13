@@ -36,9 +36,8 @@ Alt is Option on macOS.
 | Alt+T | Anywhere | Show or hide thinking |
 | Cmd+B | Anywhere | Show or hide the sessions sidebar |
 | Cmd+Shift+B | Anywhere | Show or hide the details sidebar, on the right: a session's, or a Bot's |
-| Cmd+Shift+L | Anywhere a session's details can show | Open the Browser in the details sidebar |
-| Cmd+Shift+G | Session details sidebar's Overview | Review the session's changes from its first changed file |
-| Ctrl+\` | Anywhere, the terminal too, on every platform | Show or hide the terminal |
+| Cmd+Shift+L | Anywhere a session's details can show | Open the Browser tab of the details sidebar, in the desktop app |
+| Cmd+Shift+G | While the details sidebar shows | Show its Overview tab; pressed again on Overview, review the session's changes from its first changed file |
 | Ctrl+Shift+F | Panes split in two or more | Maximize the focused pane, or restore the split |
 | Esc | Maximized pane | Restore the split |
 | Esc | Maximized Browser, the app in it too | Put the Browser back in the sidebar |

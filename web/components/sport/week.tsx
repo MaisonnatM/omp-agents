@@ -8,9 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { hashForSport } from "../../routing";
 import { daySummary, dayOfMonth, KIND_COLOR, phaseLabel, weekdayShort, weekTitle } from "../../sport-view";
 import { DayDetail, type OpenDemo, type OpenTimer } from "./day-detail";
+import { sportHash } from "./nav";
 import { PainBanner } from "./pain-banner";
 
 interface WeekTabProps {
@@ -40,7 +40,7 @@ export function WeekTab({ state, plan, selected, today, disabled, onDemo, onTime
 	useEffect(() => {
 		document.getElementById(dayRowId(selected))?.scrollIntoView({ block: "nearest" });
 	}, [selected]);
-	const step = (days: number) => hashForSport({ tab: "week", day: addDays(selected, days) });
+	const step = (days: number) => sportHash({ tab: "week", day: addDays(selected, days) });
 	return (
 		<div className="flex h-full min-h-0 flex-col @3xl/sport:flex-row">
 			<nav aria-label="Jours" className="min-h-0 shrink-0 basis-[40%] overflow-y-auto border-b border-border px-3 py-3 @3xl/sport:w-80 @3xl/sport:basis-auto @3xl/sport:border-r @3xl/sport:border-b-0">
@@ -66,7 +66,7 @@ export function WeekTab({ state, plan, selected, today, disabled, onDemo, onTime
 					</div>
 				)}
 				{mondayOf(today) !== monday && (
-					<a href={hashForSport({ tab: "week", day: null })} className="mt-2 block px-1 text-xs text-primary underline-offset-2 hover:underline">Revenir à aujourd'hui</a>
+					<a href={sportHash({ tab: "week", day: null })} className="mt-2 block px-1 text-xs text-primary underline-offset-2 hover:underline">Revenir à aujourd'hui</a>
 				)}
 				{weeks.map(week => (
 					<div key={week[0]!.date} className="mt-3">
@@ -77,7 +77,7 @@ export function WeekTab({ state, plan, selected, today, disabled, onDemo, onTime
 								const open = planned.date === selected;
 								return (
 									<li key={planned.date}>
-										<a id={dayRowId(planned.date)} href={hashForSport({ tab: "week", day: planned.date })} aria-current={open ? "page" : undefined} className={cn("flex items-center gap-3 rounded-md px-2 py-1.5 outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring", open && "bg-accent")}>
+										<a id={dayRowId(planned.date)} href={sportHash({ tab: "week", day: planned.date })} aria-current={open ? "page" : undefined} className={cn("flex items-center gap-3 rounded-md px-2 py-1.5 outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring", open && "bg-accent")}>
 											<span aria-hidden className="h-8 w-1 shrink-0 rounded-full" style={{ background: summary.kind ? KIND_COLOR[summary.kind] : "var(--border)" }} />
 											<span className="w-8 shrink-0 text-center">
 												<span className={cn("block text-[11px] text-muted-foreground uppercase", planned.date === today && "font-semibold text-primary")}>{weekdayShort(planned.date)}</span>

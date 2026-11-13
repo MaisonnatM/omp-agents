@@ -28,9 +28,9 @@ import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
-import { SPORT_FLAGS } from "../omp/sport-extension";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, machineFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, signInInboxDir, sourceControlFile, sportFile, sportInboxDir, sportThumbsDir, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, machineFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, signInInboxDir, sourceControlFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { MODULE_JOINS, moduleInboxes, openModules } from "../modules";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -104,13 +104,11 @@ import { ACTIVITY_KEPT_DAYS, ActivityStore } from "./activity-store";
 import { DAY_MS } from "../shared/days";
 import { Dictation } from "./dictation";
 import { createClientHandler } from "./socket";
-import { botExtension, designerExtension, shepherdExtension, sportExtension } from "./resources";
+import { botExtension, designerExtension, shepherdExtension } from "./resources";
 import { createStarter, reattachAll, type SessionJoin } from "./start";
 import { EventInbox } from "./event-inbox";
 import { TodoInbox } from "./todo-inbox";
-import { SportFile } from "./sport-file";
 import type { JsonInboxDir } from "./json-inbox";
-import { SportInbox } from "./sport-inbox";
 import { UserTodosFile } from "./user-todos-file";
 import { UsagePoll } from "./usage-poll";
 import { type Socket, Views } from "./views";
@@ -124,8 +122,6 @@ type Publisher = Pick<Server<unknown>, "publish" | "subscriberCount">;
 const NO_HIDDEN: ReadonlySet<string> = new Set();
 /** How often the merge queue looks at the pull requests it waits on: checks take minutes, and a click shows its first step at once. */
 const MERGE_QUEUE_TICK_MS = 15_000;
-/** What every session joins with: the Sport extension and the paths of the Sport module it reads and writes. */
-const SPORT_JOIN: SessionJoin = { rpc: { args: ["-e", sportExtension, `--${SPORT_FLAGS.file}`, sportFile, `--${SPORT_FLAGS.inbox}`, sportInboxDir], tools: [] }, attach() {} };
 
 /** Everything the server serves, built once at startup; {@link Dashboard.start} sets it going and {@link Dashboard.stop} stops it. */
 export class Dashboard {
@@ -133,7 +129,7 @@ export class Dashboard {
 	readonly #foreignUsage = new ForeignUsage(SESSION_FORMATS, listPrice);
 	readonly #interrupted = new InterruptedSessions(interruptedFile, () => void this.#notices.check(STOPPED_KINDS));
 	readonly #todos = new UserTodosFile(userTodosFile);
-	readonly #sport = new SportFile(sportFile);
+	readonly #modules = openModules();
 	readonly #routines = new RoutinesFile(routinesFile);
 	readonly #scheduled = new ScheduledFile(scheduledFile);
 	readonly #workspaces: WorkspacesFile;
@@ -237,7 +233,7 @@ export class Dashboard {
 		this.#settingsSync = new SettingsSync(settingsSyncFile, settingsSyncRepo, { omp: agentDir, home: HOME, stores });
 		const files = this.#files;
 		const todos = this.#todos;
-		const sport = this.#sport;
+		const modules = this.#modules;
 		const routines = this.#routines;
 		const scheduled = this.#scheduled;
 		const pins = this.#pins;
@@ -322,7 +318,6 @@ export class Dashboard {
 		));
 		const lists = (this.#lists = new ListRegistry({
 			"user-todos": { msg: () => ({ t: "user-todos", list: todos.value }), apply: change => todos.apply(change) },
-			sport: { msg: () => ({ t: "sport", state: sport.value }), apply: changes => sport.apply(changes) },
 			// Every routine belongs to a Bot, so a save for a Bot that is gone saves nothing.
 			routines: {
 				msg: () => ({ t: "routines", routines: routines.value }),
@@ -355,7 +350,7 @@ export class Dashboard {
 					return true;
 				},
 			},
-		}, kind => this.#broadcasts.pushList(kind)));
+		}, modules, kind => this.#broadcasts.pushList(kind)));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(factsOf), error: this.#rosterError }),
 			past: () => files.past(sessions.sessionIds(), id => interrupted.has(id)),
@@ -374,13 +369,11 @@ export class Dashboard {
 		this.#usage = new UsagePoll({ refresh: () => broadcasts.refreshUsage(), checkNotices: () => notices.check(PROVIDER_KINDS) });
 		const workspaceOf = (cwd: string): Promise<string> => placement.workspaceOf(cwd, worktreeAt);
 		const todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), workspaceOf, { active: () => ownerLock.held });
-
-		const sportInbox = new SportInbox(
-			sportInboxDir,
-			() => sport.value,
-			changes => {
-				lists.apply("sport", changes);
-				return sport.flush();
+		const modulesInboxes = moduleInboxes(
+			modules,
+			(id, change) => {
+				lists.applyModule(id, change);
+				return modules[id].flush();
 			},
 			{ active: () => ownerLock.held },
 		);
@@ -542,7 +535,7 @@ export class Dashboard {
 			},
 			{ active: () => ownerLock.held },
 		);
-		this.#inboxes = [todoInbox, sportInbox, eventInbox, signInInbox, routineInbox, botInbox, shepherdInbox];
+		this.#inboxes = [todoInbox, eventInbox, signInInbox, routineInbox, botInbox, shepherdInbox, ...modulesInboxes];
 		// Private sessions' files poke the views that follow them, but no format lists them, so they never show as past sessions.
 		this.#loops = new Loops([...SESSION_FORMATS, { root: privateSessionsDir, createRoot: true }], {
 			onRegistryTick: async () => {
@@ -707,7 +700,6 @@ export class Dashboard {
 					return this.#processSettings.value;
 				},
 			},
-			sportThumbs: { dir: sportThumbsDir, fetch: url => fetch(url) },
 			phoneAccess,
 		});
 	}
@@ -898,9 +890,9 @@ export class Dashboard {
 		this.#activity.prune(Date.now() - ACTIVITY_KEPT_DAYS * DAY_MS);
 	}
 
-	/** How `request` joins the server as session `instanceId`: as a Review session, as a Bot's conversation, both, or plain; any loads the Sport extension, and any but a Bot's can wait on another session and move itself. */
+	/** How `request` joins the server as session `instanceId`: as a Review session, as a Bot's conversation, both, or plain; any loads what the modules join with, and any but a Bot's can wait on another session and move itself. */
 	#joinFor(request: StartRequest, instanceId: string): SessionJoin {
-		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#moves.join(request, instanceId), this.#waits.join(request, instanceId), SPORT_JOIN];
+		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#moves.join(request, instanceId), this.#waits.join(request, instanceId), ...MODULE_JOINS];
 		return {
 			rpc: { args: joins.flatMap(join => join.rpc.args), tools: joins.flatMap(join => join.rpc.tools) },
 			attach: session => {

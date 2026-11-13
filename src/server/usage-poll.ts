@@ -1,5 +1,5 @@
 /**
- * `omp usage` for the status bar, the model menu, the bell's plan notices, and a continue's time. The usage tick reads it
+ * `omp usage` for the sidebar's foot, the model menu, the bell's plan notices, and a continue's time. The usage tick reads it
  * and checks the plan notices while a page listens, a page that opens after a quiet tick does both at once, and a
  * continue reads it whatever the listeners without the notices.
  */

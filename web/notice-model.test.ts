@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import type { Notice, StoppedSession } from "../src/shared/notices";
 import { hashForSession } from "../src/shared/sessions";
 import { presentNotice, TOAST_MS } from "./notice-model";
-import { hashForCalendar, hashForSettings } from "./routing";
+import { hashForSettings } from "./routing";
 
 const NOW = 1791000000000;
 const flags = { at: NOW, seen: false, read: false };
@@ -23,7 +23,7 @@ test("an event stays toasted and opens the Calendar page when kept on this compu
 	const shown = presentNotice(event, NOW);
 	expect(shown.source).toBe("calendar");
 	expect(shown.headline).toStartWith("Standup starts at");
-	expect(shown.link).toEqual({ href: hashForCalendar(), external: false });
+	expect(shown.link).toEqual({ href: "#calendar", external: false });
 	expect(shown.toast).toEqual({ kind: "news", timeout: 0 });
 	expect(presentNotice({ ...event, sessionId: "s1" }, NOW).link).toEqual({ href: hashForSession("s1"), external: false });
 });

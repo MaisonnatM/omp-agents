@@ -1,4 +1,4 @@
-/** What each live session runs besides omp, as the status bar's CPU card lists it, and the idle stop's setting. */
+/** What each live session runs besides omp, as the sidebar foot's CPU card lists it, and the idle stop's setting. */
 import { isObject, type Parsed } from "../json";
 
 /** Something a live session runs besides omp itself. */

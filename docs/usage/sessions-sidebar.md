@@ -1,8 +1,9 @@
 # Sessions sidebar
 
+- The sidebar's foot shows how much quota is left on each plan account, as a grid of rings, and the Mac's CPU, free memory, and free disk: hover or click the CPU for each session's processes with **Stop**, or the disk for **Clean up…**.
 - The sidebar runs the window's height on the window's background, and the page and the session details sidebar sit beside it as rounded panels.
-  Its top row, 48 px tall at the default font size as the header's tabs beside it are, holds the omp mark, the command menu button, and the button that hides the sidebar.
-- Under it the page list shows **New session**, then **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Calendar**, **Todo**, **Sport**, and **Email** in the order Settings › Preferences gives them, then **Notifications** with its unread count, and **Settings**.
+  Its top row, 48 px tall at the default font size as the header's tabs beside it are, holds the button that hides the sidebar; under it a row holds the omp mark and the command menu button.
+- Under it the page list shows **New session**, then **Notifications** with its unread count, then **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Calendar**, **Todo**, **Sport**, and **Email** in the order Settings › Preferences gives them, and **Settings**.
   A row opens its page, and the open page's row stays highlighted while that page's own list, such as the Bots, the Todo categories, or the Settings sections, shows in a column at the page's left, as in Linear's inbox.
   Drag the column's right edge to widen or narrow it, or double-click the edge to reset it; every page's list keeps that width in this browser.
   On a phone, where the sidebar floats over the page, that list shows under the page's row instead, and a page whose row you hid in Preferences shows its list after the last row.
@@ -102,29 +103,28 @@
   Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Shift+B the details sidebar, which shows the session's details on the panes and a Bot's on its page.
   Each sidebar's width, and whether it is hidden, is saved in the app.
 - The left sidebar's session rows leave out the full working directory, the model, the /ship step, and the pull requests; hover the workspace in the pane header to see the directory, the composer shows the model, and the session details sidebar shows the pull requests.
-- A strip along the bottom of the window, under both sidebars, shows how much quota is left on each plan that `omp usage` reports, the plans side by side: each plan's provider logo, from [svgl](https://svgl.app), then each window, for example `5h 66%  7d 68%` for Anthropic.
-  Hover the logo to see the plan's name and account, and how many reset credits the plan holds with when the soonest one expires, such as `3 reset credits, next expires Oct 22.`; a reset credit, which omp redeems, clears a used-up window.
-  A provider without a logo shows the plan's name instead.
-  A window is named by its length plus its model tier (`7d fable`).
-  Two limits that would share a name, like Cursor's monthly limits, show omp's label instead.
-  Amber means less than 20% is left, and red means the window is used up, as omp reports it.
-  Hover or focus a window to see omp's full limit name and when it resets.
-  Next to the provider logo, before the windows, a plan with extra usage, the pay-as-you-go spend past its plan such as Claude's, shows the amount spent and the cap, as `extra $12.40 / $50.00`.
+- The sidebar's foot, under the roster and a dividing line, shows how much quota is left on each plan account that `omp usage` reports, as a grid of four tiles per row: each tile is the provider's logo, from [svgl](https://svgl.app), inside a ring that empties as the plan is used, then the percent left of its tightest open window, then the account's email when the provider has several, on up to two lines, else the window, such as `7d`.
+  A provider without a logo shows the first letters of the plan's name in the ring.
+  Amber means less than 20% is left, and red means a window of the plan is used up, as omp reports it.
+  Hover or click a tile to see every window of the plan with its bar and when it resets, the extra usage, and how many reset credits the plan holds with when the soonest one expires, such as `3 reset credits, next expires Oct 22.`; a reset credit, which omp redeems, clears a used-up window.
+  A plan with extra usage and no windows, the pay-as-you-go spend past its plan such as Claude's, shows the amount spent and the cap, as `$12.40 / $50.00`.
+  A plan with only reset credits shows `✦` and how many it holds, and opens the same card.
   Extra usage keeps the provider's billing currency without conversion, so a euro account shows euros.
-  When the provider reports no cap, only the spend appears, as `extra €13.65`.
+  When the provider reports no cap, only the spend appears, as `€13.65` over the caption `extra`.
   Amber means less than 20% of a known cap is left, and red means the extra usage is used up.
-  A connected provider that is not a sign-in plan, such as prepaid API credits configured with an API key, shows its name beside its logo and no percent.
+  A connected provider that is not a sign-in plan, such as prepaid API credits configured with an API key, shows its name under its logo and no percent; hover or focus it for what omp reports.
   An Anthropic API key added under Settings, Providers shows as API credits too, even while you stay signed in to a Claude plan.
-  When Firefox or Zen is signed in to the Claude Console, that row also shows the dollars spent of the monthly grant, as `$11.13 / $200.00`.
+  When Firefox or Zen is signed in to the Claude Console, that tile also shows the dollars spent of the monthly grant, as `$11.13 / $200.00`.
   Amber means less than 20% of the grant is left, and red means it is used up.
   Hover or focus it to see when the grant expires.
-  When the Console reports no grant, the row shows the prepaid dollars left instead, as `$4.50 left`, and `$0.00 left` in red once usage runs past the balance; the model menu's API credits heading shows the same.
-  When that provider refused a request in the last day because its credit balance ran out, such as Anthropic's `Your credit balance is too low` reply, the row turns red and reads `used up`, or keeps its amount in red when it shows a balance, and its hover says since when.
+  When the Console reports no grant, the tile shows the prepaid dollars left instead, as `$4.50 left`, and `$0.00 left` in red once usage runs past the balance; the model menu's API credits heading shows the same.
+  When that provider refused a request in the last day because its credit balance ran out, such as Anthropic's `Your credit balance is too low` reply, the tile turns red and reads `used up`, or keeps its amount in red when it shows a balance, and its hover says since when.
   A sign-in that exists only in Chrome stays a name, because that browser's cookies are encrypted.
   A window omp meters in dollars, such as Cursor's `Other Models`, adds the dollars spent to its hover.
   The server runs `omp usage --json` every minute while a page is open, and once when a page opens after a minute with none.
-- The strip's right side shows the machine's CPU, the percent of every core's time spent busy since the last read, the memory available, which macOS reads as `memory_pressure`'s free percentage of the physical memory, and the disk space free on the volume that holds your home directory.
-  The strip reads them again every five seconds while the page is visible.
+- The same grid continues after the plans with the machine's CPU, the percent of every core's time spent busy since the last read, the memory available, which macOS reads as `memory_pressure`'s free percentage of the physical memory, and the disk space free on the volume that holds your home directory, each as a ring that fills with the share in use, amber past 80% and red past 95%.
+  On a phone paired through Phone access the foot leaves these three out, since they describe the Mac, and the plan tiles show only while the floating sidebar is open.
+  The foot reads them again every five seconds while the page is visible.
   Hover or focus the memory for its full reading.
   Hover or click the disk space for that volume's percent used, a bar of it, and the space used, free, and in total.
   Click it or press Enter to move focus into the popover, then follow **Clean up…** to [Settings › Storage](settings.md).
@@ -144,4 +144,3 @@
   Only the server that runs unattended work, the first one started, stops processes, so another server shows no **Stops in** time.
 - When a session ends or its omp exits, the server stops the services it owned and the jobs it left running.
   A session started from the dashboard also has the rest of its processes ended when it ends, as before.
-- **Terminal**, at the start of the strip's right side, shows or hides the [terminal](terminal.md).

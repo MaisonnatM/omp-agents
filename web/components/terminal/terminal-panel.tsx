@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { getJson } from "../../api";
 import { folderName } from "../../labels";
 import { useStoredState } from "../../stored-state";
+import { onNewTerminalRequest } from "../../terminal-requests";
 import { Separator, useDragSeparator } from "../drag-separator";
 import { LOADING_TABS, readTerminalTabs, type TerminalTabs } from "./terminal-inventory";
 import { closeEndsShell, newTab, nextTabState, type Tab, type TabEvent, tabTerminal } from "./terminal-tab";
@@ -28,7 +29,6 @@ const STEP = 16;
 export interface TerminalPanelState {
 	open: boolean;
 	setOpen: (open: boolean) => void;
-	toggle: () => void;
 	height: number;
 	setHeight: (height: number) => void;
 }
@@ -39,8 +39,7 @@ export function useTerminalPanel(): TerminalPanelState {
 		const stored = Number(raw);
 		return Number.isFinite(stored) && stored >= MIN_HEIGHT ? stored : DEFAULT_HEIGHT;
 	});
-	const toggle = useCallback(() => setOpen(shown => !shown), [setOpen]);
-	return { open, setOpen, toggle, height, setHeight };
+	return { open, setOpen, height, setHeight };
 }
 
 interface TerminalPanelProps {
@@ -73,16 +72,33 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 		setActive(tab.key);
 	}, [setTabs]);
 
+	/** A **New terminal** asked for while the tabs were not ready yet, which the next read of the running shells adds. */
+	const pendingNew = useRef(false);
+	const ready = inventory.state === "ready";
+	useEffect(
+		() =>
+			onNewTerminalRequest(() => {
+				setOpen(true);
+				if (ready) add();
+				else pendingNew.current = true;
+			}),
+		[ready, setOpen, add],
+	);
+
 	useEffect(() => {
 		if (!open || inventory.state !== "loading") return;
 		let cancelled = false;
 		void readTerminalTabs(
 			() => getJson<TerminalInfo[]>("/api/terminals"),
 			() => latestCwd.current,
+			() => pendingNew.current,
 		).then(read => {
 			if (cancelled) return;
 			setInventory(read);
-			if (read.state === "ready") setActive(read.tabs.at(-1)!.key);
+			if (read.state !== "ready") return;
+			// A request kept through a failed read waits for the one that lands.
+			pendingNew.current = false;
+			setActive(read.tabs.at(-1)!.key);
 		});
 		return () => {
 			cancelled = true;

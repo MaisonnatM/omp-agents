@@ -1,6 +1,6 @@
 # Notifications
 
-- The sidebar's **Notifications** row, before **Settings**, counts the unread notices and opens the Notifications page, `#notifications`, which lists them under **New** and **Earlier**, with chips that filter them by source.
+- The sidebar's **Notifications** row, right under **New session**, counts the unread notices and opens the Notifications page, `#notifications`, which lists them under **New** and **Earlier**, with chips that filter them by source.
 - Seven sources feed it.
   - **GitHub**: a pull request on the Pull requests page whose move is yours, one notice per move: **Review requested**, **Ready to merge**, **Checks failed**, **Conflicts to resolve**, or **Comments to address**.
     A pull request that a running session works on, or whose session asks you something, is not one, and its notice goes once the pull request leaves the move.

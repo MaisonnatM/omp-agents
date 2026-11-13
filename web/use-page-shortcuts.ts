@@ -1,6 +1,7 @@
 import { type Dispatch, type SetStateAction, useMemo, useRef } from "react";
 import type { View } from "../src/shared/sessions";
 import type { PaletteEvent, PaletteState } from "./command-palette";
+import { MODULE_LIST, type WebModuleId } from "./modules";
 import { adjacentSession, closePane, type Layout, type Page, type SettingsRoute, type SidebarTab } from "./routing";
 import { type ShortcutHandler, type ShortcutHandlers, type ShortcutId, useShortcuts } from "./shortcuts";
 import { useHistoryPosition } from "./use-history-position";
@@ -39,7 +40,6 @@ export interface PageShortcutInput {
 	toggleTools: () => void;
 	toggleHideTools: () => void;
 	toggleHideThinking: () => void;
-	toggleTerminal: () => void;
 }
 
 /**
@@ -63,6 +63,7 @@ export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<Shortcut
 			if (page?.kind === tab) return;
 			showTab(tab);
 		};
+		const moduleGoTo = Object.fromEntries(MODULE_LIST.map(({ id }) => [id, goToTab(id)])) as Record<WebModuleId, ShortcutHandler>;
 		return {
 			help: () => {
 				const { page, layout, navigate, show } = latest.current;
@@ -91,7 +92,7 @@ export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<Shortcut
 				if (!latest.current.hasDetails) return false;
 				latest.current.toggleSidebar("right");
 			},
-			openBrowser: () => {
+			detailsBrowser: () => {
 				if (!latest.current.hasDetails) return false;
 				latest.current.showBrowser();
 			},
@@ -108,7 +109,6 @@ export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<Shortcut
 				if (page?.kind === "pull-requests" && !page.target) return;
 				latest.current.showTab("pull-requests");
 			},
-			tickets: goToTab("tickets"),
 			newTicket: () => {
 				const { ticketsCallable, setNewTicket } = latest.current;
 				if (!ticketsCallable) return false;
@@ -120,9 +120,7 @@ export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<Shortcut
 				latest.current.showTab("sessions");
 			},
 			todo: goToTab("todo"),
-			calendar: goToTab("calendar"),
-			email: goToTab("email"),
-			sport: goToTab("sport"),
+			...moduleGoTo,
 			restore: () => {
 				const { page, maximized, layout, show } = latest.current;
 				if (page) return false;
@@ -138,7 +136,6 @@ export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<Shortcut
 				if (page || layout.panes.length < 2) return false;
 				show({ ...layout, maximized: !maximized });
 			},
-			terminal: () => latest.current.toggleTerminal(),
 			openPullRequest: () => {
 				const { openPullRequest } = latest.current;
 				if (!openPullRequest) return false;
@@ -164,7 +161,7 @@ export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<Shortcut
 				// A sidebar tab's shortcut has the tab's id.
 				...(absentTabs satisfies ReadonlySet<ShortcutId>),
 				...(ticketsCallable ? [] : ["newTicket" as const]),
-				...(hasDetails ? [] : ["detailsSidebar" as const, "openBrowser" as const]),
+				...(hasDetails ? [] : ["detailsSidebar" as const, "detailsBrowser" as const]),
 				...(canMaximize ? [] : ["maximizePane" as const]),
 				...(canOpenPullRequest ? [] : ["openPullRequest" as const]),
 				...(canSetGoal ? [] : ["setGoal" as const]),

@@ -1,4 +1,4 @@
-import { IconConsole, IconProcessor, IconSdCard, IconStorage } from "central-icons";
+import { IconProcessor, IconSdCard, IconStorage } from "central-icons";
 import { useEffect, useMemo, useState } from "react";
 import type { Bot } from "../../src/shared/bots";
 import type { LiveSessionProcesses, SessionProcess } from "../../src/shared/processes";
@@ -7,39 +7,49 @@ import type { SystemLoad } from "../../src/shared/system";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 import { isPhonePage } from "../api";
 import { activityControl } from "../activity";
 import type { DashboardState } from "../dashboard-state";
 import { commandLabel, formatBytes, hostLabel } from "../labels";
 import { sessionProcessesStore, useRead, writeProcessStop } from "../reads";
 import { hashForSettings } from "../routing";
-import { shortcutLabels } from "../shortcuts";
 import { useAction } from "../use-action";
 import { useHoverPopover } from "../use-hover-popover";
-import { PlanUsageList } from "./plan-usage";
+import { GaugeCell, GaugeTile, type Tone } from "./gauge-tile";
+import { NO_PLANS, PlanNote, PlanTiles } from "./plan-usage";
 import { LoadNote } from "./sheet-details";
 
-/** How often the status bar reads the machine's load again while the page is visible. */
+/** How often the sidebar reads the machine's load again while the page is visible. */
 const POLL_MS = 5000;
 
-const FACT = "flex items-center gap-1 whitespace-nowrap rounded-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring";
+const ICON = "size-3.5 text-muted-foreground";
+
+/** A machine ring's tone from the share in use: amber past 80%, red past 95%. */
+const usedTone = (used: number): Tone => (used > 0.95 ? "out" : used > 0.8 ? "low" : "ok");
 
 /** A `ps` CPU percent, of one core, rounded; a share that rounds to nothing but is not idle reads `<1%`. */
 const cpuLabel = (percent: number): string => (percent > 0 && percent < 0.5 ? "<1%" : `${Math.round(percent)}%`);
 
-/** The CPU fact, whose popover lists what every live session runs, busiest session first, read again every few seconds while it is open. */
-function CpuFact({ cpu, titles }: { cpu: string; titles: SessionTitles }) {
+/** The CPU tile, whose popover lists what every live session runs, busiest session first, read again every few seconds while it is open. */
+function CpuFact({ percent, titles }: { percent: number; titles: SessionTitles }) {
 	const popover = useHoverPopover();
+	const cpu = `${Math.round(percent)}%`;
 	return (
 		<Popover {...popover.root}>
 			<PopoverTrigger asChild>
-				<button {...activityControl("status-bar.cpu")} {...popover.trigger} type="button" aria-label={`CPU ${cpu} busy`} className={cn(FACT, "hover:text-foreground")}>
-					<IconProcessor className="size-3 shrink-0" />
-					{cpu}
-				</button>
+				<GaugeTile
+					{...activityControl("sidebar.cpu")}
+					{...popover.trigger}
+					as="button"
+					label={`CPU: ${cpu} busy`}
+					fill={percent / 100}
+					tone={usedTone(percent / 100)}
+					icon={<IconProcessor className={ICON} />}
+					value={cpu}
+					caption="CPU"
+				/>
 			</PopoverTrigger>
-			<PopoverContent {...popover.content} side="top" align="end" aria-label="Sessions' processes" className="w-96 p-0">
+			<PopoverContent {...popover.content} side="right" align="end" aria-label="Sessions' processes" className="w-96 p-0">
 				<div className="border-b border-border px-3 py-2">
 					<p className="text-sm font-medium tabular-nums">{`CPU ${cpu} busy across all cores`}</p>
 					<p className="text-xs text-muted-foreground">Per process, 100% is one full core.</p>
@@ -126,16 +136,24 @@ function ProcessItem({ instanceId, process, readAt }: { instanceId: string; proc
 function DiskFact({ available, total }: { available: number; total: number }) {
 	const popover = useHoverPopover();
 	const used = total - available;
-	const percent = total > 0 ? Math.round((used / total) * 100) : 0;
+	const share = total > 0 ? used / total : null;
+	const percent = Math.round((share ?? 0) * 100);
 	return (
 		<Popover {...popover.root}>
 			<PopoverTrigger asChild>
-				<button {...activityControl("status-bar.disk")} {...popover.trigger} type="button" aria-label={`${formatBytes(available)} of ${formatBytes(total)} disk space available`} className={cn(FACT, "hover:text-foreground")}>
-					<IconStorage className="size-3 shrink-0" />
-					{formatBytes(available)}
-				</button>
+				<GaugeTile
+					{...activityControl("sidebar.disk")}
+					{...popover.trigger}
+					as="button"
+					label={`Disk free: ${formatBytes(available)} of ${formatBytes(total)}`}
+					fill={share}
+					tone={usedTone(share ?? 0)}
+					icon={<IconStorage className={ICON} />}
+					value={formatBytes(available)}
+					caption="Disk free"
+				/>
 			</PopoverTrigger>
-			<PopoverContent {...popover.content} side="top" align="end" aria-label="Disk space" className="w-64 space-y-3 text-xs">
+			<PopoverContent {...popover.content} side="right" align="end" aria-label="Disk space" className="w-64 space-y-3 text-xs">
 				<p className="text-sm font-medium tabular-nums">{`Disk ${percent}% used`}</p>
 				<div aria-hidden className="h-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-muted-foreground" style={{ width: `${percent}%` }} /></div>
 				<dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 tabular-nums">
@@ -150,29 +168,47 @@ function DiskFact({ available, total }: { available: number; total: number }) {
 	);
 }
 
-/** The machine's CPU percent, available memory, and free disk space, read again every few seconds while the page is visible. */
-function MachineLoad({ titles }: { titles: SessionTitles }) {
+/** The machine's load, read again every few seconds while the page is visible; never on a paired phone, where it would describe the Mac. */
+function useSystemLoad(): SystemLoad | null {
+	const phone = isPhonePage();
 	const [tick, setTick] = useState(0);
 	useEffect(() => {
+		if (phone) return;
 		const timer = setInterval(() => {
 			if (!document.hidden) setTick(count => count + 1);
 		}, POLL_MS);
 		return () => clearInterval(timer);
-	}, []);
-	const load = useRead<SystemLoad>("/api/system", tick).data;
-	if (!load) return null;
-	const cpu = load.cpuPercent === null ? null : `${Math.round(load.cpuPercent)}%`;
-	const memory = `${formatBytes(load.memoryAvailable)} of ${formatBytes(load.memoryTotal)} memory available`;
+	}, [phone]);
+	return useRead<SystemLoad>(phone ? null : "/api/system", tick).data;
+}
+
+/** The machine's CPU percent, available memory, and free disk space as cells of the foot's grid. */
+function MachineLoad({ load, titles }: { load: SystemLoad; titles: SessionTitles }) {
+	const memory = `Memory free: ${formatBytes(load.memoryAvailable)} of ${formatBytes(load.memoryTotal)}`;
+	const memoryUsed = load.memoryTotal > 0 ? 1 - load.memoryAvailable / load.memoryTotal : null;
 	return (
 		<>
-			{cpu !== null && <CpuFact cpu={cpu} titles={titles} />}
-			<Tooltip content={memory} side="top">
-				<span tabIndex={0} aria-label={memory} className={FACT}>
-					<IconSdCard className="size-3 shrink-0" />
-					{formatBytes(load.memoryAvailable)}
-				</span>
-			</Tooltip>
-			<DiskFact available={load.diskAvailable} total={load.diskTotal} />
+			{load.cpuPercent !== null && (
+				<GaugeCell>
+					<CpuFact percent={load.cpuPercent} titles={titles} />
+				</GaugeCell>
+			)}
+			<GaugeCell>
+				<Tooltip content={memory} side="top">
+					<GaugeTile
+						as="img"
+						label={memory}
+						fill={memoryUsed}
+						tone={usedTone(memoryUsed ?? 0)}
+						icon={<IconSdCard className={ICON} />}
+						value={formatBytes(load.memoryAvailable)}
+						caption="Memory free"
+					/>
+				</Tooltip>
+			</GaugeCell>
+			<GaugeCell>
+				<DiskFact available={load.diskAvailable} total={load.diskTotal} />
+			</GaugeCell>
 		</>
 	);
 }
@@ -180,18 +216,16 @@ function MachineLoad({ titles }: { titles: SessionTitles }) {
 /** Each live session's title in the CPU card, by instance id: its Bot's name for a Bot's conversation, else its own title. */
 type SessionTitles = ReadonlyMap<string, string>;
 
-interface StatusBarProps {
+interface SidebarStatusProps {
 	usage: DashboardState["usage"];
 	/** Every live session, which names the sessions in the CPU card. */
 	hosts: readonly RosterHost[];
 	/** The Bots, which name their conversations in the CPU card; `null` before the first list. */
 	bots: readonly Bot[] | null;
-	terminalOpen: boolean;
-	onToggleTerminal: () => void;
 }
 
-/** The window's bottom strip: plan quota on the left, on one row at a phone's width; the terminal's toggle and the machine's load on the right, left out on a paired phone, where they act on the Mac. */
-export function StatusBar({ usage, hosts, bots, terminalOpen, onToggleTerminal }: StatusBarProps) {
+/** The sidebar's foot: plan quota, then the machine's load in the same rings. */
+export function SidebarStatus({ usage, hosts, bots }: SidebarStatusProps) {
 	const titles = useMemo(() => {
 		const botNames = new Map((bots ?? []).flatMap(bot => (bot.sessionId === null ? [] : [[bot.sessionId, bot.name] as const])));
 		return new Map(hosts.map(host => {
@@ -199,20 +233,21 @@ export function StatusBar({ usage, hosts, bots, terminalOpen, onToggleTerminal }
 			return [host.instanceId, botName === undefined ? hostLabel(host) : `${botName} · Bot`];
 		}));
 	}, [hosts, bots]);
-	const pairedPhone = isPhonePage();
+	const load = useSystemLoad();
+	return <SidebarFoot usage={usage} load={load} titles={titles} />;
+}
+
+/** The foot's note on plan usage, then its grid of ring tiles: one per plan account, then the machine's load once read. */
+export function SidebarFoot({ usage, load, titles }: { usage: DashboardState["usage"]; load: SystemLoad | null; titles: SessionTitles }) {
+	const plans = usage?.error === null ? usage.plans : NO_PLANS;
 	return (
-		<footer className="flex min-h-7 shrink-0 items-center gap-4 border-t border-border px-3 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] text-xs">
-			<PlanUsageList usage={usage} />
-			{!pairedPhone && (
-				<div className="ml-auto flex min-w-0 shrink-0 items-center gap-3 text-muted-foreground">
-					<Tooltip content={terminalOpen ? "Hide the terminal" : "Show the terminal"} shortcut={shortcutLabels("terminal")} side="top">
-						<button {...activityControl("status-bar.terminal")} type="button" aria-pressed={terminalOpen} onClick={onToggleTerminal} className={cn(FACT, "hover:text-foreground", terminalOpen && "text-foreground")}>
-							<IconConsole className="size-3 shrink-0" />
-							Terminal
-						</button>
-					</Tooltip>
-					<MachineLoad titles={titles} />
-				</div>
+		<footer data-sidebar="footer" className="mx-2 flex shrink-0 flex-col gap-2 border-t border-border pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] text-xs">
+			<PlanNote usage={usage} />
+			{(plans.length > 0 || load) && (
+				<ul aria-label="Plan usage and machine load" className="grid grid-cols-4 gap-1">
+					<PlanTiles plans={plans} />
+					{load && <MachineLoad load={load} titles={titles} />}
+				</ul>
 			)}
 		</footer>
 	);

@@ -117,7 +117,7 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 - `ui/sidebar-menu.tsx`: `SidebarMenuButton` takes `size="short"`, `sm`'s 28px row at the surrounding text size, which `sm` drops to 12px; the sessions sidebar's page and session rows use it.
   `SidebarMenuNested` is an item that holds a list under a row of its menu, such as the open page's list in the sidebar's page list.
 - `ui/sidebar-menu-scope.tsx`: the menu's sliding hover leaves a `SidebarMenuNested` region alone: it fades out there instead of snapping to the nearest row, a click on a gap there opens no outer row, and arrow keys skip the nested rows.
-- `ui/tabs.tsx`: `labelClassName` on `TabItem`, `TabsList` scrolls sideways with a hidden scrollbar, and a `TabItem`'s badge is the app's `CountPill` from `web/components/count-pill.tsx`.
+- `ui/tabs.tsx`: `TabsList` scrolls sideways with a hidden scrollbar, and a `TabItem`'s badge is the app's `CountPill` from `web/components/count-pill.tsx`.
 - `ui/file-thumbnail.tsx`: a text file shows its first 400 characters as its thumbnail.
 - `ui/chat-message.tsx`: `onOpenImage` turns each image above the bubble into a button.
 

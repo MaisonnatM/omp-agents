@@ -226,6 +226,26 @@ function MenuSwitchItem({
   )
 }
 
+function MenuGroup({
+  ...props
+}: React.ComponentProps<typeof MenuPrimitive.Group>) {
+  return <MenuPrimitive.Group data-slot="menu-group" {...props} />
+}
+
+/** A {@link MenuGroup}'s heading, muted above its items, as Capy's menus name their sections. */
+function MenuGroupLabel({
+  className,
+  ...props
+}: React.ComponentProps<typeof MenuPrimitive.GroupLabel>) {
+  return (
+    <MenuPrimitive.GroupLabel
+      data-slot="menu-group-label"
+      className={cn("flex items-center px-2 pt-1.5 pb-1 text-xs text-muted-foreground", className)}
+      {...props}
+    />
+  )
+}
+
 function MenuRadioGroup({
   ...props
 }: React.ComponentProps<typeof MenuPrimitive.RadioGroup>) {
@@ -279,6 +299,8 @@ export {
   MenuSubmenu,
   MenuSubmenuTrigger,
   MenuSubmenuContent,
+  MenuGroup,
+  MenuGroupLabel,
   MenuSwitchItem,
   MenuRadioGroup,
   MenuRadioItem,
