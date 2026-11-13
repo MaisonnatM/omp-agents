@@ -212,11 +212,14 @@ describe("omp-template --files", () => {
 });
 
 describe("MCP servers", () => {
+	const none = () => null;
+	const installed = (bin: string) => `/opt/homebrew/bin/${bin}`;
+
 	test("adds chrome-devtools beside your servers and other keys, and never rewrites one you list", () => {
 		const agentDir = scratch();
 		const path = join(agentDir, "mcp.json");
 		writeFileSync(path, JSON.stringify({ note: "mine", mcpServers: { sentry: { type: "http", url: "https://mcp.sentry.dev/mcp" } } }));
-		const first = planMcpServers(agentDir);
+		const first = planMcpServers(agentDir, none);
 		expect(first.map(step => [step.name, step.action])).toEqual([["chrome-devtools", "create"]]);
 		writeMcpServers(path, first);
 		const written = JSON.parse(readFileSync(path, "utf8"));
@@ -224,15 +227,22 @@ describe("MCP servers", () => {
 		expect(Object.keys(written.mcpServers)).toEqual(["sentry", "chrome-devtools"]);
 
 		writeFileSync(path, JSON.stringify({ mcpServers: { "chrome-devtools": { type: "stdio", command: "my-chrome" } } }));
-		const again = planMcpServers(agentDir);
+		const again = planMcpServers(agentDir, none);
 		expect(again.map(step => step.action)).toEqual(["same"]);
 		writeMcpServers(path, again);
 		expect(JSON.parse(readFileSync(path, "utf8")).mcpServers["chrome-devtools"].command).toBe("my-chrome");
 	});
 
+	test("adds obscura only once its binary is on PATH", () => {
+		const agentDir = scratch();
+		expect(planMcpServers(agentDir, none).map(step => step.name)).toEqual(["chrome-devtools"]);
+		writeMcpServers(join(agentDir, "mcp.json"), planMcpServers(agentDir, installed));
+		expect(JSON.parse(readFileSync(join(agentDir, "mcp.json"), "utf8")).mcpServers.obscura).toEqual({ type: "stdio", command: "obscura", args: ["mcp"] });
+	});
+
 	test("creates mcp.json when you have none", () => {
 		const agentDir = scratch();
-		writeMcpServers(join(agentDir, "mcp.json"), planMcpServers(agentDir));
+		writeMcpServers(join(agentDir, "mcp.json"), planMcpServers(agentDir, none));
 		expect(Object.keys(JSON.parse(readFileSync(join(agentDir, "mcp.json"), "utf8")).mcpServers)).toEqual(["chrome-devtools"]);
 	});
 });

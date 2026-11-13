@@ -18,7 +18,8 @@ The installer:
 - with `--maintainer`, also copies [`maintainer/`](maintainer), and a file there replaces the `agent/` file with the same path;
 - applies each setting in [`config.yml`](config.yml) with `omp config set`, so omp writes it and every other key in your `config.yml` stays as it is;
 - adds the [`cursor/plugins`](https://github.com/cursor/plugins) marketplace and installs its `pstack` plugin, unless they are already there, then links pstack's skills where omp loads them, as `extensions/pstack-skills.ts` below explains;
-- adds the `chrome-devtools` MCP server, headless on a throwaway profile, to `mcp.json` in the agent directory, unless you already list a server by that name.
+- adds the `chrome-devtools` MCP server, headless on a throwaway profile, to `mcp.json` in the agent directory, unless you already list a server by that name;
+- adds the `obscura` MCP server, a lightweight headless browser that sessions use by default to read and drive pages, when `obscura` is on your `PATH` (`brew install obscura`), unless you already list a server by that name; Chrome stays for screenshots.
 
 A setting that you already have keeps your value, and the installer lists it as `keep yours`.
 A file that you already have is replaced, listed as `overwrite`, only when you never edited it: it matches what the last install wrote, which the installer records in `starter-kit-installed.json` in the agent directory, or a version the kit shipped before, which the kit's git history holds.

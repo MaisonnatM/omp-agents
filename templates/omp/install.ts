@@ -160,9 +160,15 @@ function pluginIds(listing: unknown): Set<string> {
 export const STARTER_KIT_MARKETPLACE = { name: "cursor-plugins", source: "cursor/plugins" };
 /** pstack provides the `poteto-mode` skill, which the kit's alias of the same name points at, and the `arena` and `technical-writing` skills `/ship` plans with. */
 const PLUGINS = ["pstack@cursor-plugins"];
-/** `chrome-devtools` drives headless Chrome on a throwaway profile, which the kit's `design-critic` and browser checks use. */
-const MCP_SERVERS: Record<string, Json> = {
-	"chrome-devtools": { type: "stdio", command: "npx", args: ["-y", "chrome-devtools-mcp@latest", "--headless", "--isolated"] },
+/**
+ * `chrome-devtools` drives headless Chrome on a throwaway profile, which the kit's `design-critic` and screenshot checks
+ * use. `obscura` is a lightweight headless browser that loads a page several times faster and in a tenth of Chrome's
+ * memory, for reading, scraping, and driving pages whose pixels do not matter; it lays pages out with its own engine, so
+ * it never replaces Chrome for screenshots. It is added only when its binary, `brew install obscura`, is on `PATH`.
+ */
+const MCP_SERVERS: Record<string, { config: Json; needs?: string }> = {
+	"chrome-devtools": { config: { type: "stdio", command: "npx", args: ["-y", "chrome-devtools-mcp@latest", "--headless", "--isolated"] } },
+	obscura: { config: { type: "stdio", command: "obscura", args: ["mcp"] }, needs: "obscura" },
 };
 
 export type McpStep = { name: string; config: Json; action: Action };
@@ -174,9 +180,12 @@ function readMcpServers(path: string): Json {
 	return parsed.mcpServers ?? {};
 }
 
-export function planMcpServers(agentDir: string): McpStep[] {
+/** `which` finds a server's binary; a server whose binary is missing is left out. */
+export function planMcpServers(agentDir: string, which: (bin: string) => string | null = Bun.which): McpStep[] {
 	const mine = readMcpServers(join(agentDir, "mcp.json"));
-	return Object.entries(MCP_SERVERS).map(([name, config]) => ({ name, config, action: mine[name] === undefined ? "create" : "same" }));
+	return Object.entries(MCP_SERVERS)
+		.filter(([, { needs }]) => needs === undefined || which(needs) !== null)
+		.map(([name, { config }]) => ({ name, config, action: mine[name] === undefined ? "create" : "same" }));
 }
 
 /** Adds only the servers you lack, keeping every other key of `mcp.json`. */
