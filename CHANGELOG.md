@@ -5,6 +5,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-13
 
+- Settings › Keyboard and Settings › Activity now list each page's shortcuts and views in the same order as the sidebar.
+- Behind the scenes: Sport, Calendar, Email, and Tickets are now separate modules, so a page like them can be added or removed without touching the rest of the app.
 - The Personal and Work spaces are gone: every page shows all your workspaces, sessions, Bots, events, and accounts together, and the sidebar's Workspaces label still narrows the list to one workspace.
 - Keyboard shortcuts now live in Settings › Keyboard, and ? opens it.
 - The sidebar no longer has a Keyboard shortcuts link at its bottom; ? still opens Settings › Keyboard.
