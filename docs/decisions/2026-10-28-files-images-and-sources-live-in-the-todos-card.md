@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 date: 2026-10-28
 decision-makers: Maxence Maisonnat, agent
+superseded-by: 2026-11-13-the-session-card-moves-to-an-overview-tab
 ---
 
 # Files, images, and sources live in the Todos card

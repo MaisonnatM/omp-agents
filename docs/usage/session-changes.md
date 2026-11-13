@@ -1,6 +1,6 @@
 # Session changes
 
-- Clicking a file in the Session card's **Files** section shows the session's changes in a dialog, at that file.
+- Clicking a file in the **Files** section of the session details sidebar's **Overview** tab shows the session's changes in a dialog, at that file.
   **Review** opens the same dialog at the first file.
   Esc or the close button closes it.
 - The dialog knows two sets of files.

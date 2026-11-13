@@ -101,7 +101,7 @@ Files, in `agent/`:
   In such a repository the extension blocks an agent's `git push` to `main`, `git merge` into a checked-out `main` other than `--ff-only` from `origin/main`, and `gh pr merge`, so an agent lands only through `land`; your own terminal is not affected, and a subagent cannot land.
 - `extensions/end-session.ts`: the `end_session` tool, with which an agent ends its own session once its turn is over, and the omp-agents dashboard removes its worktree as **End session** does, so a prompt such as "Merge on main, then end the session" runs to the end.
 - `extensions/arena.ts`: the `arena` tool, with which an agent that gives two or more subagents the same task records the runners, its judge, the runner it keeps as the base, and what it takes from the others.
-  The omp-agents dashboard shows those runners side by side in the Session card's Subagents section and marks the base.
+  The omp-agents dashboard shows those runners side by side in the Subagents section of a session's Overview tab and marks the base.
 - `extensions/artifact.ts`: the `artifact` tool saves an HTML, Markdown, or SVG file under `local://` as an immutable version for the dashboard's Artifacts tab.
   Call it with `path`, `title`, and an optional one-line `note` of at most 120 characters saying what this version changed.
   A file must be non-empty UTF-8 text of at most 2 MiB and stay within the local root after symlink resolution.

@@ -10,7 +10,6 @@ import { pastLabel, SOURCE_LABELS } from "../labels";
 import { Header } from "./page-header";
 import { SessionIdCopy, SessionMeta } from "./session-meta";
 import { SessionTitle } from "./session-title";
-import { SessionCardToggle } from "./session-card";
 import { Trajectory } from "./trajectory";
 import { NOTICE_TONE, Transcript } from "./transcript";
 
@@ -34,7 +33,6 @@ interface PastConversationProps {
 
 export function PastConversation({ sessionId, session, fork, onFork, resume, onResume, actions, titleAction, trajectory, header }: PastConversationProps) {
 	const view = useMemo(() => ({ kind: "past" as const, sessionId }), [sessionId]);
-	const changes = useMemo(() => ({ sessionId, cwd: session?.cwd ?? null, facts: session }), [sessionId, session]);
 	const title = session ? pastLabel(session) : "Past session";
 	const resuming = resume?.phase === "starting" && resume.op.sessionId === sessionId;
 	const failed = resume?.phase === "failed" && resume.op.sessionId === sessionId ? resume.error : null;
@@ -57,7 +55,6 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 						{session && (
 							<>
 								<SessionMeta facts={session} />
-								<SessionCardToggle view={view} />
 								{!foreign && (
 									<Tooltip content="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here.">
 										<Button
@@ -83,7 +80,7 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 				{trajectory && !foreign ? (
 					<Trajectory view={view} />
 				) : (
-					<Transcript view={view} working={false} fork={foreign ? null : fork} onFork={foreign ? undefined : onFork} changes={changes} />
+					<Transcript view={view} working={false} fork={foreign ? null : fork} onFork={foreign ? undefined : onFork} />
 				)}
 			</div>
 		</MessageScrollerProvider>

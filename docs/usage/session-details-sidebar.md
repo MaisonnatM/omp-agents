@@ -1,13 +1,17 @@
 # Session details sidebar
 
-- The right sidebar shows the focused view's session's pull requests, Linear issues, and artifacts, including the pull requests and issues of its subagents, and in the desktop app the app a live session runs.
+- The right sidebar shows the focused view's subagents and what its agents changed, its session's pull requests, Linear issues, and artifacts, including the pull requests and issues of its subagents, and in the desktop app the app a live session runs.
   It follows a live session, one of its subagents, or a past session.
   It hides for a pull request's details, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side; a maximized pane brings it back.
-- Its tabs are **PRs**, **Tickets**, which shows only for a session with a Linear issue, **Browser**, which shows only in the [desktop app](desktop-app.md) for a live session or subagent, and **Artifacts**, which shows only once the agent saved an artifact.
+- Its tabs are **Overview**, **PRs**, **Tickets**, which shows only for a session with a Linear issue, **Browser**, which shows only in the [desktop app](desktop-app.md) for a live session or subagent, and **Artifacts**, which shows only once the agent saved an artifact.
   Each tab shows its name, and **PRs**, **Tickets**, and **Artifacts** a badge with their item count.
-  The sidebar remembers the tab you chose, for every view, and defaults to **PRs**.
+  With five tabs or more, the sidebar's default width keeps only their icons.
+  The sidebar remembers the tab you chose, for every view, and defaults to **Overview**.
   A saved choice of the former **Todos**, **Files**, **Media**, **Processes**, or **Memory** tab falls back to that default.
   What a live session runs besides omp shows in the status bar's CPU card; see [Sessions sidebar](sessions-sidebar.md).
+- **Overview** lists the view's **Subagents**, then the **Files**, **Images**, and **Sources** of [Changed files and images](changed-files-and-images.md), each under a filled header with its count that folds on a click; see [Conversations](conversations.md) for the **Subagents** section.
+  A section shows once it has something to list, and the tab says **Nothing yet** once the session's lists have loaded and none has.
+  A past session's view shows its files, images, and sources but no subagents.
 - **PRs** shows the pull requests the session and its subagents submitted or worked on, as its header lists them, the session's own first; a subagent's view shows its session's.
   A pull request the session only read shows only when the session's own prompt names it, as `#7049` or `PR 7049`; see [Pull requests](pull-requests.md).
   The pull requests the session worked on, such as one it opened, pushed, or edited, come before those its prompt only links or names, so the one it opened shows before the one the prompt linked.

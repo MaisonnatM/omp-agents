@@ -16,7 +16,6 @@ import { CRUMB_SEPARATOR, PARENT_CRUMB, SessionIdCopy, SessionMeta } from "./ses
 import { SessionTitle } from "./session-title";
 import type { Subject } from "./subject";
 import { SessionGoalControl } from "./session-goal";
-import { SessionCardToggle } from "./session-card";
 
 /** A live session shows no status: the header speaks up only while the connection is not live. */
 const CONTROL_LABEL: Record<Exclude<ControlPhase["phase"], "live">, string> = {
@@ -109,7 +108,6 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 			{goalSet && goal}
 			{subject.kind === "session" && shown && <SessionMeta facts={shown} />}
 			{subject.kind === "session" && <OpenPullRequestButton view={view} host={host} />}
-			{subject.kind === "session" && <SessionCardToggle view={view} />}
 			{subject.kind === "session" && endable && (
 				<Tooltip
 					content={

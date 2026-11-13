@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: deprecated
 date: 2026-11-03
 decision-makers: agent
 ---

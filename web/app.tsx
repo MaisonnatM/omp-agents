@@ -355,10 +355,10 @@ export function App() {
 												view={detailsView}
 												working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
 												cwd={focused.cwd ?? null}
-												pullRequests={focused.row?.pullRequests ?? []}
-												tickets={focused.row?.tickets ?? []}
 												hosts={visible.hosts}
 												sessionId={focused.sessionId}
+												host={focused.host ?? null}
+												row={focused.row ?? null}
 											/>
 										) : (
 											openBot && (

@@ -17,7 +17,7 @@ function host(instanceId: string, sessionId = `session-${instanceId}`, agents: A
 
 const live = (instanceId: string, agentId: string | null = null): LiveView => ({ kind: "live", instanceId, agentId });
 const past = (sessionId: string): View => ({ kind: "past", sessionId });
-const worker = (status: AgentRow["status"] = "idle"): AgentRow => ({ id: "worker", kind: "task", parentId: null, status, activity: null, canMessage: true, queue: { steering: [], followUp: [] } });
+const worker = (status: AgentRow["status"] = "idle"): AgentRow => ({ id: "worker", kind: "task", parentId: null, status, activity: null, model: null, startedAt: null, endedAt: null, canMessage: true, queue: { steering: [], followUp: [] } });
 
 function roster(state: DashboardState, hosts: RosterHost[]): DashboardState {
 	return reduce(state, { t: "roster", reset: true, hosts, removed: [], error: null });

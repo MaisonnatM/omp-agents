@@ -18,9 +18,9 @@ type Scope = "all" | "session";
 
 interface SessionChangesDialogProps {
 	sessionId: string;
-	/** The session's directory, which the Session card's paths are relative to. */
+	/** The session's directory, which the Overview tab's paths are relative to. */
 	cwd: string | null;
-	/** The file to open first, as the Session card names it. */
+	/** The file to open first, as the Overview tab names it. */
 	path: string;
 	/** The session's own changed files: each change reads the list again. */
 	work: ChangedFile[] | null;

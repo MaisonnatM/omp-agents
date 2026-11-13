@@ -1,12 +1,11 @@
 # Changed files and images
 
-- The Session card at the top right of each live session's, subagent's, or past session's conversation, or above its messages when the conversation is narrow, lists what the agent changed, took, and opened under its subagents.
-  It has separate **Files**, **Images**, and **Sources** sections, each shown only when it has items; the card shows once any of them, or the **Subagents** section, has something to show.
+- The **Overview** tab of the [session details sidebar](session-details-sidebar.md), for a live session, a subagent, or a past session, lists what the agent changed, took, and opened under its subagents.
+  It has separate **Files**, **Images**, and **Sources** sections, each shown only when it has items.
   Click a section's header to fold or unfold it.
   Each starts open, and the app keeps each choice across sessions and reloads.
-  The card scrolls as a whole when its sections outgrow it.
-  **Show session card** in Settings › Preferences, or the **Session card** toggle in the session's header, before End session or Resume, hides the whole card, these sections included.
-  A Bot's page, which reads as a chat, leaves these sections out, and the card hides while the trajectory takes the transcript's place.
+  The tab scrolls as a whole when its sections outgrow it.
+  Closing a file or an image opened from **Overview** puts the focus back on the row or thumbnail you opened it from.
 - **Files** lists the files the agent's `edit` and `write` calls changed, in the order it first touched them.
   Each row shows a file-type icon, the file's name, and its lines added and removed, which the header totals.
   When files share a name, muted parent folders distinguish them.
@@ -23,8 +22,7 @@
   A write replaces the whole file and records no diff, so it shows how many lines it wrote instead.
   A write counts as creating the file when the session had not read or changed that path before, since omp does not record whether the file existed; a created file counts every line it wrote as added, and a later write over it counts none.
   A failed call, and a write to something other than a file, such as an `agent://` message, count for nothing.
-  The file list scrolls within the card, keeping its header visible.
-- Subagents are not listed here; open one from its link in the transcript, under the call that spawned it.
+- Subagents are listed in the **Subagents** section above these, and from their links in the transcript, under the call that spawned them.
 - **Images** shows a horizontal thumbnail strip of the images that the agent's tools returned and those of its subagents at any depth, newest first: browser screenshots from `eval`, and image files that `read` opened.
   It also shows the image files the session wrote that a tool call or its result named, such as the `page.png` a script saved; a named file counts as written when it changed after the session started, so paths in source code and older files stay out.
   Each file shows once, at the first time a tool named or returned it.
@@ -45,4 +43,4 @@
   A failed call, a page on this computer such as a dev server, and search results the agent never opened are left out, and so are the session's own pull requests and Linear issues, which the [session details sidebar](session-details-sidebar.md) shows.
   Each row shows the site's icon, the site, and the page's path; its tooltip names the full address, the agent and tool, what the call said it did, and how long ago.
   The dashboard's server fetches the icons from the sites themselves, so no outside icon service learns which sites a session opened; a site without one shows a globe.
-  Click a row to open the page in your browser; the list scrolls within the card.
+  Click a row to open the page in your browser.

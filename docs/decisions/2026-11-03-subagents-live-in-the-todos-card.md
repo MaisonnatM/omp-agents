@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 date: 2026-11-03
 decision-makers: Maxence Maisonnat, agent
+superseded-by: 2026-11-13-the-session-card-moves-to-an-overview-tab
 ---
 
 # Subagents live in the Todos card

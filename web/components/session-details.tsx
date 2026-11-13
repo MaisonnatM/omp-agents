@@ -1,7 +1,8 @@
-/** The right sidebar for a session: its pull requests, its running app in the desktop app, and once it has any its Linear issues and its artifacts; a Bot's details share its Tickets tab. */
-import { IconPullRequest, IconSparklesTwo, IconWindowApp } from "central-icons";
+/** The right sidebar for a session: its overview, its pull requests, its running app in the desktop app, and once it has any its Linear issues and its artifacts; a Bot's details share its Tickets tab. */
+import { IconBulletList, IconPullRequest, IconSparklesTwo, IconWindowApp } from "central-icons";
+import { useMemo } from "react";
 import type { LinkedPullRequest } from "../../src/shared/github";
-import type { LiveView, RosterHost, View } from "../../src/shared/sessions";
+import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Artifact } from "../artifacts-model";
 import { useArtifacts } from "../pane-store";
 import { PAGE_ICON } from "../page-icons";
@@ -9,10 +10,13 @@ import { type DetailsTab, DetailsSidebarFrame } from "./details-sidebar-frame";
 import { isPhonePage } from "../api";
 import { ArtifactsPanel } from "./artifacts-panel";
 import { BROWSER_AVAILABLE, BrowserPanel } from "./browser-panel";
+import type { ChangesSession } from "./overview-changes";
+import { SessionOverview } from "./session-overview";
 import { SessionPullRequestsTab } from "./session-pull-requests-tab";
 import { SessionTicketsTab } from "./session-tickets-tab";
+import { useSubagentLinks } from "./subagent-links";
 
-/** The right sidebar's tab, kept across views; the key keeps its old name, and a tab that no longer exists reads as PRs. */
+/** The right sidebar's tab, kept across views; the key keeps its old name, and a tab that no longer exists reads as Overview. */
 export const TAB_KEY = "omp-agents.plan-tab";
 
 /** What a session worked on, runs, and saved, which its **PRs**, **Browser**, **Tickets**, and **Artifacts** tabs show. */
@@ -85,15 +89,34 @@ export function sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, 
 	];
 }
 
-interface SessionDetailsProps extends Omit<SessionWork, "scope" | "live" | "artifacts"> {
+interface SessionDetailsProps extends Omit<SessionWork, "scope" | "live" | "artifacts" | "pullRequests" | "tickets"> {
 	/** The session's directory, which relative file paths in pull requests and issues resolve against. */
 	cwd: string | null;
+	/** The live view's roster row, whose subagents the **Overview** tab lists; `null` for a past or ended one. */
+	host: RosterHost | null;
+	/** The view's roster row, an ended session's last one, or its past entry: the pull requests, Linear issues, arenas, and directory the tabs show. */
+	row: RosterHost | PastSession | null;
 }
 
-/** The right sidebar's content for the focused view: its session's pull requests, its running app, and its Linear issues and its artifacts when it has any. */
-export function SessionDetails({ view, sessionId, working, cwd, pullRequests, tickets, hosts }: SessionDetailsProps) {
-	const scope = view.kind === "past" ? view.sessionId : (hosts.find(host => host.instanceId === view.instanceId)?.sessionId ?? view.instanceId);
+/** The right sidebar's content for the focused view: its **Overview**, its session's pull requests, its running app, and its Linear issues and its artifacts when it has any. */
+export function SessionDetails({ view, sessionId, working, cwd, hosts, host, row }: SessionDetailsProps) {
+	const scope = view.kind === "past" ? view.sessionId : (hosts.find(each => each.instanceId === view.instanceId)?.sessionId ?? view.instanceId);
 	const artifacts = useArtifacts(view);
-	const tabs = sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, live: view.kind === "live" ? view : null, view, sessionId, artifacts });
-	return <DetailsSidebarFrame label="Session details" storageKey={TAB_KEY} defaultTab="pull-requests" cwd={cwd} tabs={tabs} />;
+	const links = useSubagentLinks(view, host);
+	const pullRequests = row?.pullRequests ?? [];
+	const tickets = row?.tickets ?? [];
+	// The row's directory, unlike `cwd`, outlives an ended live session, whose changed files still resolve against it.
+	const session = useMemo<ChangesSession>(() => ({ sessionId, cwd: row?.cwd ?? null, facts: row }), [sessionId, row]);
+	const tabs = [
+		{
+			value: "overview",
+			icon: IconBulletList,
+			name: "Overview",
+			control: "session-details.tab.overview",
+			count: 0,
+			content: <SessionOverview view={view} working={working} links={links} session={session} />,
+		} as const,
+		...sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, live: view.kind === "live" ? view : null, view, sessionId, artifacts }),
+	];
+	return <DetailsSidebarFrame label="Session details" storageKey={TAB_KEY} defaultTab="overview" cwd={cwd} tabs={tabs} />;
 }
