@@ -191,7 +191,7 @@ function NewTicketForm({ title: initialTitle, submit, onSubmit: setSubmit, onCre
 								current={team.name}
 								trigger={
 									<>
-										<IconUserGroup aria-hidden className="size-3.5 text-violet-500" />
+										<IconUserGroup className="size-3.5 text-violet-500" />
 										<span className="font-medium">{team.key}</span>
 									</>
 								}
@@ -210,7 +210,7 @@ function NewTicketForm({ title: initialTitle, submit, onSubmit: setSubmit, onCre
 								{teams.error ? `Cannot read Linear's teams: ${teams.error}` : teams.data ? "Linear lists no team to open the issue in." : "Reading teams…"}
 							</span>
 						)}
-						<IconChevronRight aria-hidden className="size-3.5 text-muted-foreground" />
+						<IconChevronRight className="size-3.5 text-muted-foreground" />
 					</>
 				}
 			/>
@@ -246,7 +246,7 @@ function NewTicketForm({ title: initialTitle, submit, onSubmit: setSubmit, onCre
 					<ul aria-label="Files to attach" className="flex flex-wrap gap-1.5 py-1">
 						{files.map((file, index) => (
 							<li key={`${file.name}-${index}`} className="flex h-6 items-center gap-1 rounded-full border border-border pr-0.5 pl-2.5 text-xs">
-								<IconPaperclip1 aria-hidden className="size-3 text-muted-foreground" />
+								<IconPaperclip1 className="size-3 text-muted-foreground" />
 								<span className="max-w-48 truncate">{file.name}</span>
 								<Button type="button" variant="ghost" size="icon-compact" className="size-5 rounded-full" aria-label={`Remove ${file.name}`} disabled={creating} onClick={() => setFiles(current => current.filter((_, at) => at !== index))}>
 									<IconCrossMedium />

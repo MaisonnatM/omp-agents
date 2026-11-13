@@ -86,12 +86,12 @@ export function TicketRow({ ticket, nested = false, open = false, pending, onQui
 				{/* Chips that do not fit wrap onto a second line that the fixed height hides, so the title keeps its room. */}
 				<span className="hidden h-6 min-w-0 shrink-[100] flex-wrap justify-end gap-1.5 overflow-hidden @2xl:flex">
 					{!nested && ticket.parentId && (
-						<TicketChip icon={<IconArrowCornerDownRight aria-hidden className="size-3.5 shrink-0" />} title={`Sub-issue of ${ticket.parentId}`}>
+						<TicketChip icon={<IconArrowCornerDownRight className="size-3.5 shrink-0" />} title={`Sub-issue of ${ticket.parentId}`}>
 							{ticket.parentId}
 						</TicketChip>
 					)}
 					{ticket.dueDate && (
-						<TicketChip icon={<IconCalendar1 aria-hidden className="size-3.5 shrink-0" />} title={`Due ${ticket.dueDate}`}>
+						<TicketChip icon={<IconCalendar1 className="size-3.5 shrink-0" />} title={`Due ${ticket.dueDate}`}>
 							{dateLabel(ticket.dueDate)}
 						</TicketChip>
 					)}
@@ -101,7 +101,7 @@ export function TicketRow({ ticket, nested = false, open = false, pending, onQui
 						</TicketChip>
 					))}
 					{ticket.project && (
-						<TicketChip icon={<IconBox aria-hidden className="size-3.5 shrink-0" />} title={ticket.project}>
+						<TicketChip icon={<IconBox className="size-3.5 shrink-0" />} title={ticket.project}>
 							{ticket.project}
 						</TicketChip>
 					)}

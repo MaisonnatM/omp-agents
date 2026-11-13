@@ -65,6 +65,6 @@ const MARK = "size-3.5 shrink-0";
 export const TRIGGER_MARKS: Record<TriggerKind, { name: string; logo: ReactNode }> = {
 	slack: { name: "Slack", logo: <BrandMark logo={SLACK_LOGO} className={MARK} /> },
 	"pull-request": { name: "GitHub pull requests", logo: <OrgIcon org="github" className={MARK} /> },
-	event: { name: "calendar events", logo: <IconCalendarClock aria-hidden className={MARK} /> },
+	event: { name: "calendar events", logo: <IconCalendarClock className={MARK} /> },
 	gmail: { name: "Gmail", logo: <BrandMark logo={GMAIL_LOGO} className={MARK} /> },
 };

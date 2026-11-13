@@ -15,7 +15,7 @@ export function PrivateFacts({ personal }: { personal: boolean }) {
 		<section aria-label="What a private session keeps" className="mt-4">
 			<div className="mb-2 px-1">
 				<h2 className="flex items-center gap-1.5 text-[13px] font-semibold">
-					<IconLock aria-hidden className="size-3.5 text-muted-foreground" />
+					<IconLock className="size-3.5 text-muted-foreground" />
 					{personal ? "Private, personal" : "Private session"}
 				</h2>
 			</div>

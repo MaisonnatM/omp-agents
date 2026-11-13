@@ -230,7 +230,7 @@ export function UnmatchedTip({ unmatched }: { unmatched: string[] }) {
 	return (
 		<Tooltip content={`${label}:\n${unmatched.join("\n")}`}>
 			<span role="img" aria-label={label} className="flex size-6 shrink-0 items-center justify-center text-muted-foreground">
-				<IconCloudSimpleDisconnected aria-hidden className="size-3.5" />
+				<IconCloudSimpleDisconnected className="size-3.5" />
 			</span>
 		</Tooltip>
 	);

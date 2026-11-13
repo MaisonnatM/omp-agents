@@ -121,7 +121,7 @@ export function FieldPicker({ field, current, trigger, look = "field", className
 											{choice.icon}
 											<span className="truncate">{choice.label}</span>
 											{choice.detail && <span className="flex-1 truncate text-muted-foreground">{choice.detail}</span>}
-											<IconCheckmark1 aria-hidden className={cn("ml-auto", selected.includes(choice.value) ? "opacity-100" : "opacity-0")} />
+											<IconCheckmark1 className={cn("ml-auto", selected.includes(choice.value) ? "opacity-100" : "opacity-0")} />
 											{firstKey !== undefined && <kbd className="text-xs text-muted-foreground tabular-nums">{firstKey + index}</kbd>}
 										</CommandItem>
 									))}
@@ -163,7 +163,7 @@ export function DuePicker({ dueDate, disabled, trigger, look = "field", classNam
 							<span className="flex min-w-0 items-center gap-2">
 								{trigger ?? (
 									<>
-										{look !== "row" && <IconCalendar1 aria-hidden className="size-4 text-muted-foreground" />}
+										{look !== "row" && <IconCalendar1 className="size-4 text-muted-foreground" />}
 										{dueDate ? dateLabel(dueDate) : <span className="text-muted-foreground">Set due date</span>}
 									</>
 								)}

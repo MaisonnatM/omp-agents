@@ -567,7 +567,7 @@ const TabItem = forwardRef<HTMLButtonElement, TabItemProps>(
           <Icon
             size={sizeClasses.icon}
             className={cn(
-              "transition-colors duration-80 icon-shapes:transition-[stroke-width] icon-shapes:duration-80",
+              "transition-colors duration-80",
               isActive ? "text-foreground icon-shapes:stroke-2" : "text-muted-foreground"
             )}
           />

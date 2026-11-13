@@ -21,9 +21,9 @@ const ALERTS = {
 function Attachment({ url }: { url: string }) {
 	return (
 		<a href={url} rel="noreferrer noopener" target="_blank" className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm hover:bg-muted/60">
-			<IconPaperclip1 aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+			<IconPaperclip1 className="size-3.5 shrink-0 text-muted-foreground" />
 			<span className="min-w-0 flex-1 truncate">Open attachment on GitHub</span>
-			<IconSquareArrowTopRight aria-hidden className="size-3 shrink-0 text-muted-foreground" />
+			<IconSquareArrowTopRight className="size-3 shrink-0 text-muted-foreground" />
 		</a>
 	);
 }

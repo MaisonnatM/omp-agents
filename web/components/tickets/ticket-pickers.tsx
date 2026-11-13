@@ -133,7 +133,7 @@ export function TicketLabelsPicker({ look, value, options, error, disabled, onOp
 								))}
 							</span>
 						) : (
-							<IconTag aria-hidden className="size-3.5 text-muted-foreground" />
+							<IconTag className="size-3.5 text-muted-foreground" />
 						)}
 						<span className="truncate">{value.length === 0 ? "Labels" : value.length === 1 ? names[0] : `${value.length} labels`}</span>
 					</>

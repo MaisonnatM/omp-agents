@@ -170,7 +170,7 @@ export function LogForm({ state, target, disabled, onChange, onSaved, onClose }:
 											</td>
 											<td className="py-2 text-right">
 												<button type="button" role="checkbox" aria-checked={done} aria-label={`Fait, ${item.exercise.name}`} onClick={() => update({ done: !done })} className={cn("inline-flex size-7 items-center justify-center rounded-md border outline-none focus-visible:ring-2 focus-visible:ring-ring", done ? "border-foreground bg-foreground text-background" : "border-border bg-background")}>
-													{done && <IconCheckmark1 aria-hidden className="size-4" />}
+													{done && <IconCheckmark1 className="size-4" />}
 												</button>
 											</td>
 										</tr>

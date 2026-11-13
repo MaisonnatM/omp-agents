@@ -151,7 +151,7 @@ export function DueText({ due, day }: { due: string; day: string }) {
 	const { text, overdue } = dueLabel(due, day);
 	return (
 		<span className={cn("inline-flex min-w-0 items-center gap-1 [&>svg]:shrink-0", overdue ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>
-			<IconCalendarClock aria-hidden />
+			<IconCalendarClock />
 			<span className="truncate">{text}</span>
 		</span>
 	);
@@ -168,7 +168,7 @@ export function TodoDuePicker({ todo, look, day, onChange, ...props }: TodoField
 					<DueText due={todo.due} day={day} />
 				) : (
 					<span className="inline-flex items-center gap-1 text-muted-foreground">
-						<IconCalendarClock aria-hidden />
+						<IconCalendarClock />
 						{look === "property" && "Due date"}
 					</span>
 				)
@@ -185,8 +185,8 @@ export function TodoWorkspacePicker({ todo, workspaces, disabled, onChange }: { 
 	const offered = workspace === null || workspaces.some(({ cwd }) => cwd === workspace) ? workspaces : [...workspaces, { cwd: workspace, cwdDisplay: workspace }];
 	const current = workspace === null ? "No workspace" : (folderName(workspace) ?? workspace);
 	const choices: Choice[] = [
-		{ value: "", label: "No workspace", icon: <IconFolder1 aria-hidden className="size-4 text-muted-foreground" /> },
-		...offered.map(({ cwd, cwdDisplay }) => ({ value: cwd, label: folderName(cwdDisplay) ?? cwdDisplay, detail: cwdDisplay, icon: <IconFolder1 aria-hidden className="size-4" /> })),
+		{ value: "", label: "No workspace", icon: <IconFolder1 className="size-4 text-muted-foreground" /> },
+		...offered.map(({ cwd, cwdDisplay }) => ({ value: cwd, label: folderName(cwdDisplay) ?? cwdDisplay, detail: cwdDisplay, icon: <IconFolder1 className="size-4" /> })),
 	];
 	return (
 		<FieldPicker
@@ -194,7 +194,7 @@ export function TodoWorkspacePicker({ todo, workspaces, disabled, onChange }: { 
 			current={current}
 			trigger={
 				<>
-					<IconFolder1 aria-hidden className={cn("size-4 shrink-0", workspace === null && "text-muted-foreground")} />
+					<IconFolder1 className={cn("size-4 shrink-0", workspace === null && "text-muted-foreground")} />
 					<span className="truncate">{current}</span>
 				</>
 			}

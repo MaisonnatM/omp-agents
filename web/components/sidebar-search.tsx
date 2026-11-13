@@ -32,7 +32,7 @@ export function SidebarSearch({ label, placeholder, query, onQuery, shortcut, au
 	const chip = shortcut !== undefined && query === "";
 	return (
 		<label className="relative block">
-			<IconMagnifyingGlass aria-hidden className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+			<IconMagnifyingGlass className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
 			<SidebarInput
 				ref={ref}
 				type="search"

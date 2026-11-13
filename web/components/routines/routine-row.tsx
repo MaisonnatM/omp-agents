@@ -173,7 +173,7 @@ export function RoutineRow({ routine, botName, open, connected, now }: RoutineRo
 						className="-ml-1.5 inline-flex min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
 					>
 						<span className="truncate">{name}</span>
-						<IconChevronRight aria-hidden className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", open && "rotate-90")} />
+						<IconChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", open && "rotate-90")} />
 					</button>
 					<div className="ml-auto flex shrink-0 items-center gap-3">
 						<Button

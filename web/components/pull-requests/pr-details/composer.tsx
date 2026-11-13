@@ -26,9 +26,9 @@ type Mode = "comment" | "review";
 type Post = { kind: "comment"; then: FollowUp | null } | { kind: "review" };
 
 const VERDICT_ICONS: Record<ReviewVerdict, ReactNode> = {
-	comment: <IconBubbleText aria-hidden className="size-3" />,
-	approve: <IconCheckmark1 aria-hidden className="size-3" />,
-	"request-changes": <IconCircleX aria-hidden className="size-3" />,
+	comment: <IconBubbleText className="size-3" />,
+	approve: <IconCheckmark1 className="size-3" />,
+	"request-changes": <IconCircleX className="size-3" />,
 };
 
 const TEXTAREA = cn(FIELD, "resize-none disabled:opacity-60");
@@ -111,7 +111,7 @@ export function PullRequestComposer({ detail, openDraft, send, onDraftPosted }: 
 			<div className="relative">
 				<PopoverTrigger asChild>
 					<Button size="icon" variant="glass" aria-label={composerLabel({ pending, reviewStarted })}>
-						<IconBubbleText aria-hidden className="size-4" />
+						<IconBubbleText className="size-4" />
 					</Button>
 				</PopoverTrigger>
 				{badge}
@@ -148,11 +148,11 @@ export function PullRequestComposer({ detail, openDraft, send, onDraftPosted }: 
 								disabled={busy}
 								onClick={() => sendSocket({ t: "review-draft", change: { op: "finding-state", pr: openDraft.pr, ids: pendingIds, state: "dismissed" } })}
 							>
-								<IconTrashCan aria-hidden />
+								<IconTrashCan />
 							</Button>
 						)}
 						<Button size="icon-xs" variant="ghost" aria-label="Close composer" onClick={() => setOpen(false)}>
-							<IconCrossMedium aria-hidden />
+							<IconCrossMedium />
 						</Button>
 					</div>
 				</div>

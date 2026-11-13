@@ -43,7 +43,7 @@ function Reactions({ comment }: { comment: PullRequestComment }) {
 }
 
 function HostLink({ url }: { url: string | null }) {
-	return url ? <a href={url} target="_blank" rel="noreferrer" aria-label="Open activity on GitHub" className={cn("flex size-6 shrink-0 items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground", FOCUS_CLASS)}><IconSquareArrowTopRight aria-hidden className="size-3" /></a> : null;
+	return url ? <a href={url} target="_blank" rel="noreferrer" aria-label="Open activity on GitHub" className={cn("flex size-6 shrink-0 items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground", FOCUS_CLASS)}><IconSquareArrowTopRight className="size-3" /></a> : null;
 }
 
 function ConversationCard({ detail, comment, action = "commented" }: { detail: PullRequestDetail; comment: PullRequestComment; action?: string }) {
@@ -78,7 +78,7 @@ function ConversationGroup({ detail, events }: { detail: PullRequestDetail; even
 					<span className="block text-sm font-semibold">{events.length} {events.length === 1 ? "comment" : "comments"}</span>
 					<span className="block truncate text-2xs text-muted-foreground">{authors.size} {authors.size === 1 ? "author" : "authors"} · <RelativeTime at={first.at} /></span>
 				</span>
-				<IconChevronBottom aria-hidden className={cn("size-3.5 shrink-0 text-muted-foreground", open && "rotate-180")} />
+				<IconChevronBottom className={cn("size-3.5 shrink-0 text-muted-foreground", open && "rotate-180")} />
 			</button>
 			<div id={id} hidden={!open} className="mt-1 space-y-1">
 				{open && events.map((event, index) => <ConversationCard key={event.url ?? index} detail={detail} comment={event} action={event.review ? "reviewed" : "commented"} />)}
@@ -98,14 +98,14 @@ function Thread({ detail, thread, root, replies }: { detail: PullRequestDetail; 
 		<li className={ROW_CLASS}>
 			<Marker author={root.author} muted={!expanded} top />
 			<div className="flex min-w-0 flex-wrap items-center gap-2 px-2 py-2 text-xs text-muted-foreground">
-				<IconCode aria-hidden className="size-3 shrink-0" />
+				<IconCode className="size-3 shrink-0" />
 				<span className="min-w-0 flex-1 truncate"><ThreadPlace detail={detail} thread={thread} /></span>
-				{thread.resolved && <span className="inline-flex shrink-0 items-center gap-1 font-medium text-success-foreground"><IconCircleCheck aria-hidden className="size-3" />Resolved</span>}
+				{thread.resolved && <span className="inline-flex shrink-0 items-center gap-1 font-medium text-success-foreground"><IconCircleCheck className="size-3" />Resolved</span>}
 				{thread.dismissed && <span className="font-medium">Review dismissed</span>}
 				{thread.outdated && <span className="font-medium">Outdated</span>}
 				<button type="button" aria-label={`${expanded ? "Collapse" : "Expand"} thread on ${thread.path}`} aria-expanded={expanded} aria-controls={id} onClick={() => setExpanded(value => !value)} className={cn("ml-auto flex min-h-6 items-center gap-1 hover:text-foreground", FOCUS_CLASS)}>
 					{!expanded && <span className="text-2xs">· {root.author.login}{replyCount > 0 && ` · ${replyCount} ${replyCount === 1 ? "reply" : "replies"}`}</span>}
-					<IconChevronBottom aria-hidden className={cn("size-3.5 shrink-0", expanded && "rotate-180")} />
+					<IconChevronBottom className={cn("size-3.5 shrink-0", expanded && "rotate-180")} />
 				</button>
 			</div>
 			<div id={id} hidden={!expanded}>
@@ -114,7 +114,7 @@ function Thread({ detail, thread, root, replies }: { detail: PullRequestDetail; 
 					{replies.length > 0 && <div className="ml-2 border-l border-border/60 pl-3">
 						<button type="button" aria-expanded={repliesOpen} aria-controls={repliesId} onClick={() => setRepliesOpen(value => !value)} className={cn("flex min-h-6 items-center gap-2 py-1 text-sm text-muted-foreground hover:text-foreground", FOCUS_CLASS)}>
 							{repliesOpen ? "Hide replies" : `${replies.length} more ${replies.length === 1 ? "reply" : "replies"}`}
-							<IconChevronBottom aria-hidden className={cn("size-3", repliesOpen && "rotate-180")} />
+							<IconChevronBottom className={cn("size-3", repliesOpen && "rotate-180")} />
 						</button>
 						<div id={repliesId} hidden={!repliesOpen} className="space-y-1">
 							{repliesOpen && replies.map((reply, index) => <ConversationCard key={reply.url ?? index} detail={detail} comment={reply} action="replied" />)}
@@ -133,7 +133,7 @@ function Thread({ detail, thread, root, replies }: { detail: PullRequestDetail; 
 function CommitRow({ detail, commit }: { detail: PullRequestDetail; commit: PullRequestCommit }) {
 	return (
 		<li className={ROW_CLASS}>
-			<Marker author={commit.author}><IconCommits aria-hidden className="size-3.5" /></Marker>
+			<Marker author={commit.author}><IconCommits className="size-3.5" /></Marker>
 			<a href={`https://github.com/${detail.owner}/${detail.repo}/commit/${commit.sha}`} target="_blank" rel="noreferrer" aria-label={`View commit ${commit.sha}`} className={cn("group flex min-w-0 items-center gap-2.5 py-1.5", FOCUS_CLASS)}>
 				<div className="min-w-0 flex-1">
 					<div title={commit.headline} className="truncate text-sm font-semibold text-foreground group-hover:text-primary">{commit.headline || "Untitled commit"}</div>
@@ -239,9 +239,9 @@ export function Timeline({ detail, placement }: { detail: PullRequestDetail; pla
 	return (
 		<div data-pr-timeline className={cn("py-1", placement === "page" && "-mx-2")}>
 			<div className="mx-auto mb-5 flex max-w-3xl flex-wrap items-center justify-end gap-3 text-xs text-muted-foreground">
-				<span aria-label={`${comments} comments`} className="flex items-center gap-1"><IconBubbleText aria-hidden className="size-3" />{comments}</span>
-				<span aria-label={`${detail.commits.length} commits`} className="flex items-center gap-1"><IconCommits aria-hidden className="size-3" />{detail.commits.length}</span>
-				<span aria-label={`${approvals} approvals`} className="flex items-center gap-1"><IconThumbsUp aria-hidden className="size-3" />{approvals}</span>
+				<span aria-label={`${comments} comments`} className="flex items-center gap-1"><IconBubbleText className="size-3" />{comments}</span>
+				<span aria-label={`${detail.commits.length} commits`} className="flex items-center gap-1"><IconCommits className="size-3" />{detail.commits.length}</span>
+				<span aria-label={`${approvals} approvals`} className="flex items-center gap-1"><IconThumbsUp className="size-3" />{approvals}</span>
 				<Button variant="ghost-muted" size="xs" leadingIcon={IconArrowBottomTop} onClick={() => setNewestFirst(value => !value)}>{newestFirst ? "Newest first" : "Oldest first"}</Button>
 			</div>
 			<ul className="relative mx-auto max-w-3xl">

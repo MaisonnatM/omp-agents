@@ -1,8 +1,16 @@
 import { IconCode, IconFileText } from "central-icons";
 import { expect, test } from "bun:test";
+import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ChangedFile } from "../../src/shared/transcript";
 import { ChangedFileList } from "./changed-files-section";
+
+/** An icon's drawing, which its markup holds whatever mask id the render gives it. */
+function iconPath(icon: ReactElement): string {
+	const path = renderToStaticMarkup(icon).match(/ d="[^"]+"/)?.[0];
+	if (!path) throw new Error("The icon drew no path");
+	return path;
+}
 
 const files: ChangedFile[] = [
 	{ path: "web/app.tsx", changes: [{ tool: "edit", kind: "edited", at: null, added: 12, removed: 3, diff: "+1|hello" }] },
@@ -13,8 +21,8 @@ const files: ChangedFile[] = [
 test("file rows show type icons, duplicate names' folders, and line counts without a search field", () => {
 	const html = renderToStaticMarkup(<ChangedFileList files={files} onOpen={() => {}} />);
 	expect(html).toContain('aria-label="Files changed"');
-	expect(html).toContain(renderToStaticMarkup(<IconCode />).match(/ d="[^"]+"/)![0]);
-	expect(html).toContain(renderToStaticMarkup(<IconFileText />).match(/ d="[^"]+"/)![0]);
+	expect(html).toContain(iconPath(<IconCode />));
+	expect(html).toContain(iconPath(<IconFileText />));
 	expect(html).toContain(">web/</span>");
 	expect(html).toContain(">src/</span>");
 	expect(html).not.toContain(">notes/</span>");

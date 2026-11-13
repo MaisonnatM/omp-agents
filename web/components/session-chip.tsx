@@ -35,7 +35,7 @@ export function SessionChip({ label, status, title, filled, compact = false, onC
 					compact && "gap-1 px-1",
 				)}
 			>
-				{compact && <IconAiBotHead aria-hidden className="size-3 shrink-0 text-muted-foreground" />}
+				{compact && <IconAiBotHead className="size-3 shrink-0 text-muted-foreground" />}
 				{status && <StatusDot status={status} />}
 				<span className={compact ? "sr-only" : "truncate"}>{label}</span>
 			</button>

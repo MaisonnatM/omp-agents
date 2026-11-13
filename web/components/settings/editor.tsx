@@ -650,7 +650,7 @@ export function SettingRow({ row, context: { editing, projectFile, onOpenFile },
 							</Button>
 						</Tooltip>
 					)}
-					{locked && <IconLock aria-hidden className="size-3.5 text-muted-foreground" />}
+					{locked && <IconLock className="size-3.5 text-muted-foreground" />}
 					{placement === "inline" && !viewing && element}
 					{viewing && <span className="text-sm tabular-nums">{formatValue(row, value)}</span>}
 					{mode === "explicit" && <EditBar editor={editor} label={row.label} />}

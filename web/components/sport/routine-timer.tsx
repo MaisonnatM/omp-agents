@@ -423,7 +423,7 @@ interface DoneProps {
 function Done({ name, taken, complete, count, onClose }: DoneProps) {
 	return (
 		<div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 pb-[max(2.5rem,env(safe-area-inset-bottom))] text-center">
-			{complete && <IconCircleCheck aria-hidden className="size-14" />}
+			{complete && <IconCircleCheck className="size-14" />}
 			<h2 aria-live="polite" className="text-4xl font-semibold">
 				{complete ? "Terminé" : "Arrêté"}
 			</h2>

@@ -165,13 +165,13 @@ function ArtifactBody({ view, sessionId, artifact, version, source, onSource }: 
 					<SegmentedTabsList aria-label="Show as" className="ml-auto">
 						<Tooltip content="Rendered">
 							<SegmentedTab {...activityControl("artifacts.rendered")} value="rendered" className="gap-1 px-2">
-								<IconEyeOpen aria-hidden className="size-3.5" />
+								<IconEyeOpen className="size-3.5" />
 								<span className={ICONS_ONLY}>Rendered</span>
 							</SegmentedTab>
 						</Tooltip>
 						<Tooltip content="Source">
 							<SegmentedTab {...activityControl("artifacts.source")} value="source" className="gap-1 px-2">
-								<IconCode aria-hidden className="size-3.5" />
+								<IconCode className="size-3.5" />
 								<span className={ICONS_ONLY}>Source</span>
 							</SegmentedTab>
 						</Tooltip>

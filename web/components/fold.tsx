@@ -75,7 +75,7 @@ export function FoldButton({ open, onToggle, controls, children, className }: Fo
 			onClick={onToggle}
 			className={cn("-ml-1 flex min-w-0 items-baseline gap-2 rounded px-1 text-left outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring", className)}
 		>
-			<IconChevronRight aria-hidden className={cn("size-3.5 shrink-0 self-center transition-transform", open && "rotate-90")} />
+			<IconChevronRight className={cn("size-3.5 shrink-0 self-center transition-transform", open && "rotate-90")} />
 			{children}
 		</button>
 	);

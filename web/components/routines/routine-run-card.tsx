@@ -65,7 +65,7 @@ export function RoutineRunCard({ item, copy }: { item: Extract<Item, { kind: "ro
 						<HealthIcon health={health} label={words} />
 						<span className={cn("@max-[440px]/conversation:sr-only", item.pending && !reduceMotion && "shimmer-text")}>{words}</span>
 					</span>
-					<IconChevronRight aria-hidden className={cn("size-3.5 shrink-0 transition-transform duration-200 motion-reduce:transition-none", open && "rotate-90")} />
+					<IconChevronRight className={cn("size-3.5 shrink-0 transition-transform duration-200 motion-reduce:transition-none", open && "rotate-90")} />
 				</span>
 			</button>
 			{reason && (

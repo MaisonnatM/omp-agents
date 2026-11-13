@@ -196,7 +196,7 @@ export function FindBar({ root: rootRef, enabled, label, className }: FindBarPro
 					missing && "border-destructive/60 focus-within:ring-destructive/60",
 				)}
 			>
-				<IconMagnifyingGlass aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+				<IconMagnifyingGlass className="size-3.5 shrink-0 text-muted-foreground" />
 				<input
 					ref={input}
 					type="text"

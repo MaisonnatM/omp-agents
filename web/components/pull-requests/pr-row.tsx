@@ -56,7 +56,7 @@ function ReviewDraftTag({ pr }: { pr: PullRequest }) {
 	return (
 		<Tooltip content="A review draft waits for you to post it">
 			<span className="flex shrink-0 items-center gap-0.5 rounded-full bg-violet-500/15 px-1.5 text-[10px] leading-4 font-medium text-violet-700 dark:text-violet-300">
-				<IconClipboard aria-hidden className="size-3" />
+				<IconClipboard className="size-3" />
 				Review draft
 			</span>
 		</Tooltip>
@@ -161,7 +161,7 @@ function MergeBadge({ pr, move, open, onOpenChange }: { pr: PullRequestSummary; 
 				>
 					{queued ? (
 						<>
-							<IconMerged aria-hidden className="size-3 shrink-0" />
+							<IconMerged className="size-3 shrink-0" />
 							{queued.state.kind === "failed" ? "Stopped" : "Queued"}
 						</>
 					) : (
@@ -256,7 +256,7 @@ function ReviewPicker({ options, review: { shown, send } }: { options: PullReque
 	const shows = shown.reviewers.length > 0 || REVIEW_ICON[shown.review] !== null;
 	return (
 		<ReviewersField pr={shown} options={options} onChange={send} className="-mx-1 h-6 px-1 font-normal">
-			{shows ? <ReviewState pr={shown} max={2} /> : <IconUserAdd aria-hidden className="size-4 text-muted-foreground/60" />}
+			{shows ? <ReviewState pr={shown} max={2} /> : <IconUserAdd className="size-4 text-muted-foreground/60" />}
 		</ReviewersField>
 	);
 }
@@ -268,7 +268,7 @@ function ConversationCount({ pr }: { pr: PullRequestSummary }) {
 	return (
 		<ConversationPeek pr={pr}>
 			<span role="img" aria-label={label} tabIndex={0} className="flex shrink-0 items-center gap-0.5 rounded-sm text-xs tabular-nums text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
-				<IconBubbleText aria-hidden className="size-3.5" />
+				<IconBubbleText className="size-3.5" />
 				{pr.conversations}
 			</span>
 		</ConversationPeek>
@@ -282,8 +282,8 @@ function ThreadStartersTag({ pr, move }: { pr: PullRequestSummary; move: MoveId 
 	return (
 		<Tooltip content={starters.label}>
 			<span role="img" aria-label={starters.label} className="flex shrink-0 items-center gap-1.5 tabular-nums">
-				{starters.ai > 0 && <span className="flex items-center gap-0.5"><IconSparklesTwo aria-hidden className="size-3.5" />{starters.ai}</span>}
-				{starters.human > 0 && <span className="flex items-center gap-0.5"><IconUser aria-hidden className="size-3.5" />{starters.human}</span>}
+				{starters.ai > 0 && <span className="flex items-center gap-0.5"><IconSparklesTwo className="size-3.5" />{starters.ai}</span>}
+				{starters.human > 0 && <span className="flex items-center gap-0.5"><IconUser className="size-3.5" />{starters.human}</span>}
 			</span>
 		</Tooltip>
 	);
@@ -397,7 +397,7 @@ function StackInfo({ stack, base }: { stack: StackPlace | null; base: string | n
 	return (
 		<Tooltip content={label}>
 			<span role="img" aria-label={label} className="flex min-w-0 items-center gap-1 tabular-nums">
-				<IconLayersTwo aria-hidden className="size-3 shrink-0" />
+				<IconLayersTwo className="size-3 shrink-0" />
 				{stack ? `${stack.position}/${stack.size}` : base && <BranchLabel name={base} className="max-w-24 font-mono" />}
 			</span>
 		</Tooltip>

@@ -9,7 +9,7 @@ import { ARTIFACT_KIND } from "./artifact-view";
 export function ArtifactCard({ save, number, showing, onOpen }: { save: ArtifactSave; number: number; showing: boolean; onOpen: () => void }) {
 	return (
 		<div className="flex max-w-full items-center gap-2 self-start text-sm text-muted-foreground" data-item="artifact">
-			<IconSparklesTwo aria-hidden className="size-4 shrink-0" />
+			<IconSparklesTwo className="size-4 shrink-0" />
 			<span className="min-w-0">
 				Saved <span className="font-medium text-foreground">{save.title}</span> as version {number}
 			</span>

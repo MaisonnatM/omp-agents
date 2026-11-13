@@ -21,7 +21,7 @@ const captionOf = (source: AgentSource): string =>
 /** The site's icon, fetched by the server, or a globe when the server finds none. */
 function SiteIcon({ hostname }: { hostname: string }) {
 	const [failed, setFailed] = useState(false);
-	if (failed) return <IconGlobe aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />;
+	if (failed) return <IconGlobe className="size-3.5 shrink-0 text-muted-foreground" />;
 	return <img alt="" src={mediaSrc(`/api/favicon?${new URLSearchParams({ host: hostname })}`)} onError={() => setFailed(true)} className="size-3.5 shrink-0 rounded-[3px] object-contain" />;
 }
 

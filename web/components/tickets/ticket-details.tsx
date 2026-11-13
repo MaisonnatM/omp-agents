@@ -104,7 +104,7 @@ function TicketHeader({ id, ticket, detail, actions, page, onPick, condensed, fo
 					>
 						{StatusIcon && <StatusIcon aria-hidden className={cn("size-3.5", tone)} />}
 						{id}
-						<IconSquareArrowTopRight aria-hidden className="size-2.5 text-muted-foreground" />
+						<IconSquareArrowTopRight className="size-2.5 text-muted-foreground" />
 					</a>
 					{condensed && <span className="truncate font-medium text-foreground">{ticket?.title}</span>}
 				</div>
@@ -158,7 +158,7 @@ function ParentLink({ id, parent, onPick }: { id: string; parent: TicketRelative
 		"flex h-5 w-fit max-w-full min-w-0 items-center gap-1.5 rounded-md text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring";
 	const content = (
 		<>
-			<IconArrowCornerLeftUp aria-hidden className="size-3.5 shrink-0" />
+			<IconArrowCornerLeftUp className="size-3.5 shrink-0" />
 			<span className="shrink-0">Sub-issue of</span>
 			{parent && <IconTip icon={[...statusIcon(parent), parent.status]} />}
 			<span className="shrink-0 tabular-nums">{id}</span>

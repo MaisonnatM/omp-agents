@@ -75,9 +75,9 @@ function ChecklistRow({ row, status, loading, finished, disabled, checked, onChe
 			</label>
 			{status && (
 				<p role="status" className="mt-2 flex items-center gap-2 pl-6 text-xs tabular-nums">
-					{status.state === "running" ? <IconLoadingCircle aria-hidden className="size-3 motion-safe:animate-spin" />
-						: status.state === "done" ? <IconCheckmark1 aria-hidden className="size-3" />
-						: status.state === "failed" ? <IconCrossMedium aria-hidden className="size-3" /> : <IconFormCircle aria-hidden className="size-3" />}
+					{status.state === "running" ? <IconLoadingCircle className="size-3 motion-safe:animate-spin" />
+						: status.state === "done" ? <IconCheckmark1 className="size-3" />
+						: status.state === "failed" ? <IconCrossMedium className="size-3" /> : <IconFormCircle className="size-3" />}
 					{status.state === "waiting" && finished ? "Not run" : status.text}
 				</p>
 			)}

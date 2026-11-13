@@ -1,5 +1,6 @@
 import { IconGauge } from "central-icons";
 import { expect, test } from "bun:test";
+import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { Notice } from "../../src/shared/notices";
 import { NoticeOrigin } from "./notices";
@@ -8,6 +9,13 @@ const base = { id: "n", at: 0, seen: false, read: false };
 const event = { ...base, kind: "event", title: "Standup", start: 0, end: 1, color: null, sessionId: null } as const;
 
 const sourceOf = (notice: Notice) => renderToStaticMarkup(<NoticeOrigin notice={notice} />);
+
+/** An icon's drawing, which its markup holds whatever mask id the render gives it. */
+function iconPath(icon: ReactElement): string {
+	const path = renderToStaticMarkup(icon).match(/ d="[^"]+"/)?.[0];
+	if (!path) throw new Error("The icon drew no path");
+	return path;
+}
 
 test("a toast names the source of its notice beside that source's logo", () => {
 	const slack = sourceOf({ ...base, kind: "slack", from: "Ana", avatarUrl: null, text: "hi", permalink: "https://slack.test", type: "dm", count: 1 });
@@ -32,5 +40,5 @@ test("an event names Google Calendar only when it comes from a Google calendar",
 test("a provider without a known logo still shows its name", () => {
 	const html = sourceOf({ ...base, kind: "plan", provider: "acme-cloud", name: "Pro", account: null, windowTitle: "5h", resetsAt: null, resetCredits: 0 });
 	expect(html).toContain(">Acme Cloud</span>");
-	expect(html).toContain(renderToStaticMarkup(<IconGauge />).match(/ d="[^"]+"/)![0]);
+	expect(html).toContain(iconPath(<IconGauge />));
 });

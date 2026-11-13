@@ -73,7 +73,7 @@ export function ConversationPeek({ pr, children }: { pr: PullRequestSummary; chi
 			<HoverCardTrigger asChild>{children}</HoverCardTrigger>
 			<HoverCardContent side="bottom" align="start" sideOffset={6} collisionPadding={12} className="w-80 p-0" onDragStart={event => event.stopPropagation()}>
 				<p className="flex items-center gap-1.5 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
-					<IconBubbleText aria-hidden className="size-3.5" />
+					<IconBubbleText className="size-3.5" />
 					Latest comments and reviews
 				</p>
 				<Conversations pr={pr} />

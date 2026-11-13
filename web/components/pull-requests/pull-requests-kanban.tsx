@@ -126,7 +126,7 @@ function Column({ column: { title, cards }, open, toggle, drop, slotHeight, card
 					onClick={toggle}
 					className="sticky top-2 flex flex-col items-center gap-2 rounded px-1 py-0.5 text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:hover:text-muted-foreground"
 				>
-					{cards.length > 0 && <IconChevronRight aria-hidden className="size-3.5" />}
+					{cards.length > 0 && <IconChevronRight className="size-3.5" />}
 					<span className="tabular-nums">{cards.length}</span>
 					<span className={cn("font-medium [writing-mode:vertical-rl]", lands && "text-primary", drop?.kind === "refused" && "text-red-600 dark:text-red-400")}>{drop ? dropText(drop) : title}</span>
 				</button>

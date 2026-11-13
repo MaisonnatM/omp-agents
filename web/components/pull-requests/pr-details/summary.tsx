@@ -48,7 +48,7 @@ function Description({ detail, send }: { detail: PullRequestDetail; send: SendPu
 			actions={
 				!editing && (
 					<Button size="icon-xs" variant="ghost-muted" aria-label="Edit description" onClick={() => setDraft({ body: detail.body, original: detail.body })}>
-						<IconPencil aria-hidden className="size-3" />
+						<IconPencil className="size-3" />
 					</Button>
 				)
 			}

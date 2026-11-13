@@ -5,7 +5,9 @@ import { createContext, useContext, useMemo, type ComponentType, type ReactNode 
 import type { CentralIconBaseProps } from "central-icons";
 import { IconArrowCornerDownLeft, IconArrowCornerDownRight, IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowRotateCounterClockwise, IconArrowUp, IconBarsThree, IconBell, IconBrain, IconBranch, IconBubble2, IconCalendar1, IconChainLink1, IconCheckmark1, IconChevronBottom, IconChevronGrabberVertical, IconChevronRight, IconFormCircle, IconCircleInfo, IconRecord, IconClock, IconColorPalette, IconCrossMedium, IconDotGrid1x3Horizontal, IconDotGrid1x3Vertical, IconEmail1, IconEyedropper, IconFileText, IconFolder1, IconFormRectangle, IconGlobe, IconGroup1, IconHeart, IconHome, IconImac, IconImages1, IconInboxEmpty, IconLibrary, IconLightBulb, IconLoader, IconLock, IconMagnifyingGlass, IconMoon, IconPaintBrush, IconPause, IconPencil, IconPlay, IconPlusLarge, IconResize, IconRocket, IconSettingsGear1, IconSettingsSliderHor, IconShield, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide, IconSquareBehindSquare1, IconStar, IconStepForwards, IconSun, IconUser } from "central-icons";
 
-export type IconComponent = ComponentType<CentralIconBaseProps>;
+/** A Central icon's props without the svg-level stroke and fill, which never reach its masked shapes; style them with the `icon-shapes` variant instead. */
+export type IconComponentProps = Omit<CentralIconBaseProps, "strokeWidth" | "stroke" | "fill">;
+export type IconComponent = ComponentType<IconComponentProps>;
 
 export type IconName =
   | "chevron-right" | "chevron-down" | "x" | "copy" | "menu" | "dot"

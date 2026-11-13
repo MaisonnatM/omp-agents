@@ -59,7 +59,7 @@ function NewBotCard() {
 		<li>
 			<a href={hashForNewBot()} className={cn(CARD, "h-full justify-center border-dashed text-muted-foreground hover:bg-accent/50 hover:text-foreground")}>
 				<span className="flex size-16 items-center justify-center rounded-full border border-dashed border-current">
-					<IconPlusLarge aria-hidden className="size-6" />
+					<IconPlusLarge className="size-6" />
 				</span>
 				<span className="font-medium">New Bot</span>
 				<span className="text-sm text-pretty">Start from a job, or write your own.</span>

@@ -100,7 +100,7 @@ function ReviewersSubmenu({ pr, options, onChange }: MenuReviewers) {
 							<span className="truncate">{person.name ?? person.login}</span>
 							{person.name && <span className="flex-1 truncate text-muted-foreground">{person.login}</span>}
 							{on && <span className="sr-only">, review requested</span>}
-							<IconCheckmark1 aria-hidden className={cn("ml-auto", on ? "opacity-100" : "opacity-0")} />
+							<IconCheckmark1 className={cn("ml-auto", on ? "opacity-100" : "opacity-0")} />
 						</MenuItem>
 					);
 				})}

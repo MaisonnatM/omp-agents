@@ -54,7 +54,7 @@ export function StackPopover({ stack, others, current, onPick, align, trigger }:
 						<ul>
 							{others.map(pr => (
 								<li key={prKey(pr)} className="flex items-center gap-2 py-1.5 pr-3 pl-3 text-sm">
-									<IconPullRequest aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+									<IconPullRequest className="size-3.5 shrink-0 text-muted-foreground" />
 									{pick ? (
 										<button type="button" onClick={() => pick(pr)} className="min-w-0 flex-1 truncate text-left tabular-nums underline-offset-2 hover:underline">
 											{pr.repo} #{pr.number}

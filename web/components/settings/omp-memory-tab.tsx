@@ -83,7 +83,7 @@ function SwitchRow({ row, busy, onSave, context }: { row: AgentSettingRow; busy:
 					{row.label}
 				</span>
 				<ToggleSwitch aria-labelledby={labelId} checked={valueOf(row) === true} disabled={busy || row.workspace !== undefined} onCheckedChange={onSave} />
-				{row.workspace !== undefined && <IconLock aria-hidden className="size-3.5 text-muted-foreground" />}
+				{row.workspace !== undefined && <IconLock className="size-3.5 text-muted-foreground" />}
 			</div>
 			<p className="text-xs text-muted-foreground">{row.description}</p>
 			<RowNotes row={row} context={context} />
@@ -121,7 +121,7 @@ function MemoryBar({ rows, configPath, context }: { rows: BarRows; configPath: s
 							))}
 						</SelectContent>
 					</Select>
-					{backend.workspace !== undefined && <IconLock aria-hidden className="size-3.5 text-muted-foreground" />}
+					{backend.workspace !== undefined && <IconLock className="size-3.5 text-muted-foreground" />}
 					{configPath && <p className="ml-auto text-xs text-muted-foreground">Saved to {configPath}</p>}
 				</div>
 				{picked?.description && (
@@ -149,7 +149,7 @@ function SessionPreview({ preview }: { preview: OmpMemory["preview"] }) {
 	return (
 		<Collapsible open={open} onOpenChange={setOpen} className="rounded-md border border-border">
 			<CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
-				<IconChevronRight aria-hidden className={cn("size-3.5 text-muted-foreground transition-transform motion-reduce:transition-none", open && "rotate-90")} />
+				<IconChevronRight className={cn("size-3.5 text-muted-foreground transition-transform motion-reduce:transition-none", open && "rotate-90")} />
 				<span className="font-medium">What a new session gets</span>
 				<span className="text-xs text-muted-foreground tabular-nums">about {Math.ceil(preview.text.length / 4).toLocaleString()} tokens</span>
 			</CollapsibleTrigger>

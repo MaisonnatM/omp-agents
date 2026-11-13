@@ -327,7 +327,7 @@ const SidebarMenuButton = forwardRef<HTMLButtonElement, SidebarMenuButtonProps>(
           <Icon
             size={sizeClasses.icon}
             className={cn(
-              "shrink-0 transition-colors duration-80 icon-shapes:transition-[stroke-width] icon-shapes:duration-80",
+              "shrink-0 transition-colors duration-80 ",
               effectiveActive
                 ? "text-foreground icon-shapes:stroke-2"
                 : "text-muted-foreground group-data-[fluid-hover-active]/menu-button:text-foreground group-data-[fluid-hover-active]/menu-button:icon-shapes:stroke-2"
@@ -432,7 +432,7 @@ const SidebarMenuAction = forwardRef<HTMLButtonElement, SidebarMenuActionProps>(
           // icons and the section header's actions, all on the size ladder.
           // Thicken a bare icon's 1.5 stroke to 2 on hover, Button's
           // icon-only treatment.
-          "[&_svg]:size-[var(--icon-size)] [&_svg]:shrink-0 icon-shapes:transition-[stroke-width] icon-shapes:duration-80 hover:icon-shapes:stroke-2",
+          "[&_svg]:size-[var(--icon-size)] [&_svg]:shrink-0 hover:icon-shapes:stroke-2",
           shape.item,
           // Reveal on the OWN row only: tracks the row's button (its peer).
           showOnHover &&

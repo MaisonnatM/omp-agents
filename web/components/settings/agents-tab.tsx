@@ -188,7 +188,7 @@ function AgentRow({
 	return (
 		<article className="border-b border-border py-3 last:border-b-0">
 			<button type="button" aria-expanded={open} aria-controls={id} className={cn(RAIL_BUTTON, "items-start")} onClick={() => setOpen(!open)}>
-				<IconChevronRight aria-hidden className={cn("mt-0.5 size-4 shrink-0 transition-transform", open && "rotate-90")} />
+				<IconChevronRight className={cn("mt-0.5 size-4 shrink-0 transition-transform", open && "rotate-90")} />
 				<span className="grid min-w-0 flex-1 gap-x-5 gap-y-1 sm:grid-cols-3">
 					<span className="flex flex-wrap items-baseline gap-x-3 gap-y-1 sm:col-span-2">
 						<span className="font-medium">{agent.name}</span>

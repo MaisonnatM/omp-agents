@@ -116,7 +116,7 @@ function DiffLines({ path, rows, tokens }: { path: string; rows: readonly DiffRo
 							onClick={() => setOpened(prev => new Set(prev).add(item.start))}
 							className="sticky left-0 flex w-full items-center gap-2 bg-sky-500/8 px-3 py-0.5 text-left font-sans text-[11px] text-sky-700 hover:bg-sky-500/15 dark:text-sky-300"
 						>
-							<IconChevronGrabberVertical aria-hidden className="size-3" />
+							<IconChevronGrabberVertical className="size-3" />
 							Show {count} unchanged {count === 1 ? "line" : "lines"}
 						</button>
 					);

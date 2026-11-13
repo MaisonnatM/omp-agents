@@ -35,7 +35,7 @@ function CpuFact({ cpu, titles }: { cpu: string; titles: SessionTitles }) {
 		<Popover {...popover.root}>
 			<PopoverTrigger asChild>
 				<button {...activityControl("status-bar.cpu")} {...popover.trigger} type="button" aria-label={`CPU ${cpu} busy`} className={cn(FACT, "hover:text-foreground")}>
-					<IconProcessor aria-hidden className="size-3 shrink-0" />
+					<IconProcessor className="size-3 shrink-0" />
 					{cpu}
 				</button>
 			</PopoverTrigger>
@@ -131,7 +131,7 @@ function DiskFact({ available, total }: { available: number; total: number }) {
 		<Popover {...popover.root}>
 			<PopoverTrigger asChild>
 				<button {...activityControl("status-bar.disk")} {...popover.trigger} type="button" aria-label={`${formatBytes(available)} of ${formatBytes(total)} disk space available`} className={cn(FACT, "hover:text-foreground")}>
-					<IconStorage aria-hidden className="size-3 shrink-0" />
+					<IconStorage className="size-3 shrink-0" />
 					{formatBytes(available)}
 				</button>
 			</PopoverTrigger>
@@ -168,7 +168,7 @@ function MachineLoad({ titles }: { titles: SessionTitles }) {
 			{cpu !== null && <CpuFact cpu={cpu} titles={titles} />}
 			<Tooltip content={memory} side="top">
 				<span tabIndex={0} aria-label={memory} className={FACT}>
-					<IconSdCard aria-hidden className="size-3 shrink-0" />
+					<IconSdCard className="size-3 shrink-0" />
 					{formatBytes(load.memoryAvailable)}
 				</span>
 			</Tooltip>
@@ -207,7 +207,7 @@ export function StatusBar({ usage, hosts, bots, terminalOpen, onToggleTerminal }
 				<div className="ml-auto flex min-w-0 shrink-0 items-center gap-3 text-muted-foreground">
 					<Tooltip content={terminalOpen ? "Hide the terminal" : "Show the terminal"} shortcut={shortcutLabels("terminal")} side="top">
 						<button {...activityControl("status-bar.terminal")} type="button" aria-pressed={terminalOpen} onClick={onToggleTerminal} className={cn(FACT, "hover:text-foreground", terminalOpen && "text-foreground")}>
-							<IconConsole aria-hidden className="size-3 shrink-0" />
+							<IconConsole className="size-3 shrink-0" />
 							Terminal
 						</button>
 					</Tooltip>

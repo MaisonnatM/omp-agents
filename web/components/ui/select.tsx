@@ -31,7 +31,7 @@ function SelectTrigger({
     >
       {children}
       <SelectPrimitive.Icon className="pointer-events-none flex shrink-0 text-muted-foreground">
-        <IconChevronBottom aria-hidden className="size-3.5" />
+        <IconChevronBottom className="size-3.5" />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   )
@@ -70,11 +70,11 @@ function SelectContent({
           {...props}
         >
           <SelectPrimitive.ScrollUpArrow className="top-0 z-10 flex w-full cursor-default items-center justify-center bg-popover py-1">
-            <IconChevronTop aria-hidden className="size-4" />
+            <IconChevronTop className="size-4" />
           </SelectPrimitive.ScrollUpArrow>
           <SelectPrimitive.List>{children}</SelectPrimitive.List>
           <SelectPrimitive.ScrollDownArrow className="bottom-0 z-10 flex w-full cursor-default items-center justify-center bg-popover py-1">
-            <IconChevronBottom aria-hidden className="size-4" />
+            <IconChevronBottom className="size-4" />
           </SelectPrimitive.ScrollDownArrow>
         </SelectPrimitive.Popup>
       </SelectPrimitive.Positioner>
@@ -98,7 +98,7 @@ function SelectItem({
     >
       <SelectPrimitive.ItemText className="flex-1 whitespace-nowrap">{children}</SelectPrimitive.ItemText>
       <SelectPrimitive.ItemIndicator className="pointer-events-none absolute right-2 flex size-4 items-center justify-center">
-        <IconCheckmark1 aria-hidden className="size-4 text-muted-foreground" />
+        <IconCheckmark1 className="size-4 text-muted-foreground" />
       </SelectPrimitive.ItemIndicator>
     </SelectPrimitive.Item>
   )

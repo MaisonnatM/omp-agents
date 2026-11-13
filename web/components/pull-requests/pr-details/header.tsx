@@ -66,7 +66,7 @@ function TitleEditor({ detail, headingRef, placement, send }: { detail: PullRequ
 		<div className="group flex min-h-7 min-w-0 items-center gap-1 sm:min-h-6">
 			<Heading ref={headingRef} tabIndex={-1} title={detail.title} className="min-w-0 flex-1 truncate text-base font-semibold leading-snug outline-none">{detail.title}</Heading>
 			<span className="flex shrink-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
-				<Button size="icon-xs" variant="ghost-muted" aria-label="Edit title" onClick={() => setTitle(detail.title)}><IconPencil aria-hidden className="size-3" /></Button>
+				<Button size="icon-xs" variant="ghost-muted" aria-label="Edit title" onClick={() => setTitle(detail.title)}><IconPencil className="size-3" /></Button>
 			</span>
 		</div>
 	);
@@ -82,7 +82,7 @@ function BaseBranch({ detail, stacked, send }: { detail: PullRequestDetail; stac
 			<PopoverTrigger asChild>
 				<button {...popover.trigger} type="button" aria-label={`${detail.base}, behind by ${detail.behindBy} ${detail.behindBy === 1 ? "commit" : "commits"}`}
 					className="inline-flex min-w-0 max-w-[40%] shrink-0 cursor-help items-center gap-1 rounded-sm text-warning-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
-					<BranchLabel name={detail.base} /><IconExclamationTriangle aria-hidden className="size-3.5 shrink-0" />
+					<BranchLabel name={detail.base} /><IconExclamationTriangle className="size-3.5 shrink-0" />
 				</button>
 			</PopoverTrigger>
 			<PopoverContent {...popover.content} align="start" aria-label="Update base branch" className="w-80 max-w-80 space-y-3 p-3 text-xs font-sans">
@@ -125,7 +125,7 @@ export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPi
 	const approvable = !!detail && canApprove(detail) && !detail.viewerApproved;
 	const [StateIcon, tone] = STATE_ICON[state];
 	const busy = useBusy(pr, quick.pending);
-	const badge = queued && <Tooltip content={queuedMergeText(queued)}><span role="status" className={cn(HEADER_BADGE, "font-medium", queued.state.kind === "failed" ? "border-destructive/32 bg-destructive/10 text-destructive-foreground" : "border-blue-500/32 bg-blue-500/10 text-blue-700 dark:border-blue-400/32 dark:bg-blue-400/15 dark:text-blue-300")}><IconMerged aria-hidden className="size-3.5" /><span className={ACTION_LABEL}>{queued.state.kind === "failed" ? "Merge stopped" : `Auto-merge (${MERGE_METHOD_LABELS[queued.method].toLowerCase()})`}</span></span></Tooltip>;
+	const badge = queued && <Tooltip content={queuedMergeText(queued)}><span role="status" className={cn(HEADER_BADGE, "font-medium", queued.state.kind === "failed" ? "border-destructive/32 bg-destructive/10 text-destructive-foreground" : "border-blue-500/32 bg-blue-500/10 text-blue-700 dark:border-blue-400/32 dark:bg-blue-400/15 dark:text-blue-300")}><IconMerged className="size-3.5" /><span className={ACTION_LABEL}>{queued.state.kind === "failed" ? "Merge stopped" : `Auto-merge (${MERGE_METHOD_LABELS[queued.method].toLowerCase()})`}</span></span></Tooltip>;
 	const mergeLabel = confirm.isArmed("merge") ? "Confirm merge?" : control.kind === "enable-auto-merge" ? `${method ? MERGE_METHOD_LABELS[method] : "Merge"} when ready` : method ? MERGE_METHOD_LABELS[method] : "Merge";
 	const stacked = !!detail && stack.length > 0 && stack.at(-1)?.number !== pr.number;
 	const branches = detail && (
@@ -138,7 +138,7 @@ export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPi
 	const stats = detail && (
 		<span className="ml-auto inline-flex shrink-0 items-center justify-end gap-2">
 			<span aria-label={`${detail.changedFiles} changed files`} className="inline-flex min-w-16 items-center justify-end gap-1.5 tabular-nums">
-				<IconDifferenceModified aria-hidden className={condensed ? "size-3" : "size-3.5"} />
+				<IconDifferenceModified className={condensed ? "size-3" : "size-3.5"} />
 				{detail.changedFiles} <span className="@max-[30rem]/pr-header:hidden">{detail.changedFiles === 1 ? "file" : "files"}</span>
 			</span>
 			<span className={cn("shrink-0 font-mono", condensed ? "text-2xs" : "text-xs")}>
@@ -153,7 +153,7 @@ export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPi
 			<div className="grid h-7 min-w-0 items-center overflow-hidden pl-4">
 				<div className="col-start-1 row-start-1 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
 					{!condensed && <a href={`https://github.com/${pr.owner}/${pr.repo}`} target="_blank" rel="noreferrer" className="min-w-0 truncate text-left font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">{pr.owner}/{pr.repo}</a>}
-					<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" className={cn("inline-flex shrink-0 items-center gap-0.5 font-medium underline-offset-2 hover:underline", tone)}>#{pr.number}<IconSquareArrowTopRight aria-hidden className="size-2.5" /></a>
+					<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" className={cn("inline-flex shrink-0 items-center gap-0.5 font-medium underline-offset-2 hover:underline", tone)}>#{pr.number}<IconSquareArrowTopRight className="size-2.5" /></a>
 					{condensed && <span className="truncate font-medium text-foreground">{detail?.title}</span>}
 				</div>
 			</div>

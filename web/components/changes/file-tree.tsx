@@ -73,7 +73,7 @@ export function FileTree({ tree, open, hrefFor, onPick }: FileTreeProps) {
 		};
 		const body = (
 			<>
-				<IconFileText aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+				<IconFileText className="size-3.5 shrink-0 text-muted-foreground" />
 				<span className={cn("min-w-0 flex-1 truncate", file.status === "deleted" && "line-through opacity-70")}>{file.path.slice(file.path.lastIndexOf("/") + 1)}</span>
 				{file.session && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-sky-500" />}
 				<LineCounts added={file.added} removed={file.removed} />

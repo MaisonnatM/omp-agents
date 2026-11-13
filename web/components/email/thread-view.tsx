@@ -37,7 +37,7 @@ function Attachments({ attachments }: { attachments: MailAttachment[] }) {
 			{attachments.map((attachment, index) => (
 				// Two files of one message may share a name.
 				<li key={index} title={attachment.type} className="inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-xs">
-					<IconPaperclip1 aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+					<IconPaperclip1 className="size-3.5 shrink-0 text-muted-foreground" />
 					<span className="truncate">{attachment.name}</span>
 					<span className="shrink-0 tabular-nums text-muted-foreground">{formatBytes(attachment.size)}</span>
 				</li>

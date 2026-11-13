@@ -114,7 +114,7 @@ function ArenaLanes({ group, links }: { group: ArenaGroup; links: SubagentLinksV
 	return (
 		<section aria-label={`Arena: ${group.task}`} className="mx-1 mt-1 rounded-xl border border-border/70 p-1">
 			<div className="flex min-w-0 items-center gap-2 px-2 pt-1 pb-1 text-[13px]">
-				<IconSword aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+				<IconSword className="size-3.5 shrink-0 text-muted-foreground" />
 				<span className="shrink-0 font-medium text-foreground">Arena</span>
 				<Tooltip content={group.task} side="left">
 					<span className="min-w-0 truncate text-muted-foreground">{group.task}</span>
@@ -182,7 +182,7 @@ function Verdict({ verdict }: { verdict: ArenaVerdict }) {
 		<div className="mt-auto flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 pt-0.5">
 			<Badge variant="dot" size="compact" color={color}>
 				<span className="flex items-center gap-1">
-					{verdict.kind === "base" && <IconTrophy aria-hidden className="size-3" />}
+					{verdict.kind === "base" && <IconTrophy className="size-3" />}
 					{label}
 				</span>
 			</Badge>

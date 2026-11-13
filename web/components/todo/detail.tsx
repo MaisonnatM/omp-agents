@@ -332,11 +332,11 @@ export function TodoDetail({ list, open, readOnly, day, picker, onPicker, onChan
 						<span className="shrink-0">{category}</span>
 						{open.parent && (
 							<>
-								<IconChevronRight aria-hidden className="size-3 shrink-0" />
+								<IconChevronRight className="size-3 shrink-0" />
 								<span className="truncate">{open.parent.text}</span>
 							</>
 						)}
-						<IconChevronRight aria-hidden className="size-3 shrink-0" />
+						<IconChevronRight className="size-3 shrink-0" />
 						<StatusIcon status={todo.status} className="size-3.5" />
 						<span className="shrink-0">{TODO_STATUS[todo.status].label}</span>
 					</p>

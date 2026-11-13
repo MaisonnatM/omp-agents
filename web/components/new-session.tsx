@@ -324,9 +324,9 @@ function PrivatePill({ on, onToggle, disabled }: { on: boolean; onToggle: () => 
 					on ? "bg-foreground text-background ring-foreground" : "text-muted-foreground hover:bg-hover hover:text-foreground",
 				)}
 			>
-				{on ? <IconLock aria-hidden className="size-3.5" /> : <IconUnlocked aria-hidden className="size-3.5" />}
+				{on ? <IconLock className="size-3.5" /> : <IconUnlocked className="size-3.5" />}
 				Private
-				{on && <IconCrossMedium aria-hidden className="size-3" />}
+				{on && <IconCrossMedium className="size-3" />}
 			</button>
 		</Tooltip>
 	);

@@ -48,7 +48,7 @@ export const ConnectButton = ({ signIn }: { signIn: SignInControls }) => (
 export const Reconnecting = ({ signIn }: { signIn: SignInControls }) =>
 	signIn.starting && (
 		<span role="status" aria-busy className="flex items-center gap-1.5 text-xs text-muted-foreground">
-			<IconLoadingCircle aria-hidden className="size-3.5 animate-spin" />
+			<IconLoadingCircle className="size-3.5 animate-spin" />
 			Reconnecting…
 		</span>
 	);
@@ -238,7 +238,7 @@ export function useToolList(ready: ReadyTools | null): { toggle: ReactNode; list
 				className="-mx-1 inline-flex items-center gap-0.5 rounded px-1 hover:bg-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:outline-none"
 			>
 				<span className="tabular-nums">{ready.tools.length}</span> tools
-				<IconChevronRight aria-hidden className={cn("size-3 transition-transform duration-150 ease-out", open && "rotate-90")} />
+				<IconChevronRight className={cn("size-3 transition-transform duration-150 ease-out", open && "rotate-90")} />
 			</button>
 		),
 		list: open && <ToolList id={id} tools={ready.tools} server={ready.server} />,

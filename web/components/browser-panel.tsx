@@ -52,7 +52,7 @@ const AI_SPARKLES = "text-violet-600 dark:text-violet-400";
 
 /** The sparkles on an icon button's top right corner, for an action on what the agent made. */
 function AiBadge() {
-	return <IconSparklesTwo aria-hidden className={cn("pointer-events-none absolute -top-1.5 -right-1.5 size-2.5! icon-shapes:fill-current", AI_SPARKLES)} />;
+	return <IconSparklesTwo className={cn("pointer-events-none absolute -top-1.5 -right-1.5 size-2.5! icon-shapes:fill-current", AI_SPARKLES)} />;
 }
 
 /** A toolbar control of the Browser, named by its tooltip. */
@@ -248,7 +248,7 @@ function BrowserTabStrip({ pages, active, onClose }: { pages: readonly ReviewPag
 								className="group/close absolute top-1/2 right-0.5 grid size-6 -translate-y-1/2 place-items-center rounded-full text-muted-foreground opacity-0 group-focus-within/tab:opacity-100 group-hover/tab:opacity-100 hover:text-foreground"
 							>
 								<span className="grid size-4 place-items-center rounded-full group-hover/close:bg-foreground/10">
-									<IconCrossMedium aria-hidden className="size-3" />
+									<IconCrossMedium className="size-3" />
 								</span>
 							</button>
 						)}
@@ -521,7 +521,7 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 			)}
 			{webview.src === null ? (
 				<div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-sm text-muted-foreground">
-					<IconServer aria-hidden className="size-6 text-muted-foreground/60" />
+					<IconServer className="size-6 text-muted-foreground/60" />
 					<p>No dev server found for this session.</p>
 					<p className="text-xs text-muted-foreground/80">Start one, or type its address above.</p>
 					<Button

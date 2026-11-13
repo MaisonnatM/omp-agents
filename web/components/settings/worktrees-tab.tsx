@@ -493,7 +493,7 @@ function WorktreeRow({ entry, repositoryPath, measured, checked, onToggle }: { e
 			</td>
 			<td className="py-2 text-right whitespace-nowrap">
 				<Button type="button" variant="ghost" size="icon-compact" aria-label={`Copy ${entry.path}`} onClick={() => void navigator.clipboard.writeText(entry.path)}>
-					<IconSquareBehindSquare1 aria-hidden />
+					<IconSquareBehindSquare1 />
 				</Button>
 				<Tooltip content={blocked ? blockerText(entry.blockers) : REMOVAL_TERMS} forceOpen={armed ? false : undefined}>
 					<span className="inline-flex">

@@ -51,7 +51,7 @@ function CatalogCard({ entry, added }: { entry: McpCatalogEntry; added: McpServe
 					</Button>
 				) : added ? (
 					<span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-						<IconCheckmark1 aria-hidden className="size-3.5 shrink-0" />
+						<IconCheckmark1 className="size-3.5 shrink-0" />
 						<span className="truncate">
 							Added as <code className="font-mono">{added.name}</code>
 						</span>

@@ -42,7 +42,7 @@ export function OutLink({ href, children }: { href: string; children: ReactNode 
 	return (
 		<a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline-offset-2 hover:text-foreground hover:underline">
 			{children}
-			<IconSquareArrowTopRight aria-hidden className="size-3" />
+			<IconSquareArrowTopRight className="size-3" />
 		</a>
 	);
 }

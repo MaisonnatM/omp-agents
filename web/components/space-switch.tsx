@@ -45,7 +45,7 @@ export function SpaceSwitch({ space, onSpace, otherWaiting, workspaces, onShowSh
 								{workspaces} workspace{workspaces === 1 ? "" : "s"}
 							</span>
 						</span>
-						<IconChevronGrabberVertical aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+						<IconChevronGrabberVertical className="size-3.5 shrink-0 text-muted-foreground" />
 					</DropdownMenuTrigger>
 				</SidebarMenuItem>
 			</SidebarMenu>

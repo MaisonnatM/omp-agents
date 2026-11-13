@@ -229,7 +229,7 @@ function CheckRow({ exercise, done, disabled, onDemo, onToggle }: { exercise: Ex
 				onClick={onToggle}
 				className={cn("mt-px inline-flex size-5 shrink-0 items-center justify-center rounded-md border outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50", done ? "border-foreground bg-foreground text-background" : "border-border bg-background hover:bg-accent")}
 			>
-				{done && <IconCheckmark1 aria-hidden className="size-3.5" />}
+				{done && <IconCheckmark1 className="size-3.5" />}
 			</button>
 			<div className="flex min-w-0 flex-1 flex-col gap-0.5 @md/sport:flex-row @md/sport:items-start @md/sport:justify-between @md/sport:gap-4">
 				{onDemo ? (

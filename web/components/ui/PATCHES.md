@@ -90,6 +90,7 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 - Every registry file draws Central Icons (`central-icons`, the round outlined 1.5 stroke style) where the registry uses lucide; a file added from a registry gets the same swap, since `components.json` still names lucide, the only icon set shadcn's CLI writes.
   A Central icon hides itself from screen readers even with an `aria-label`, so an icon that carries meaning also takes `aria-hidden={false}`.
   Its shapes carry their own stroke width inside a mask, so a heavier stroke or a solid fill targets them with the `icon-shapes` variant from `web/globals.css`, such as `icon-shapes:stroke-2`, never `strokeWidth` or `fill-*` on the `<svg>`.
+  The package's install script checks for a `CENTRAL_LICENSE_KEY`; Bun skips untrusted install scripts, so `bun install` needs no key, while `npm install` would stop on it.
 - `ui/fluid-hover-highlight.tsx` is the registry file unchanged, moved from `web/components/` into `ui/`.
 - `ui/select.tsx` comes from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/select.json`).
   Its trigger has the settings fields' 28px height and border, and its popup and rows take the look of `ui/menu.tsx`.

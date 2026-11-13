@@ -249,7 +249,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
               </span>
             </>
           ) : isIconOnly ? (
-            <span className="icon-shapes:transition-[stroke-width] icon-shapes:duration-80 group-hover:icon-shapes:stroke-2">
+            <span className="group-hover:icon-shapes:stroke-2">
               {label}
             </span>
           ) : (
@@ -257,7 +257,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
               {LeadingIcon && (
                 <LeadingIcon
                   size={iconSize}
-                  className="shrink-0 icon-shapes:transition-[stroke-width] icon-shapes:duration-80 group-hover:icon-shapes:stroke-2"
+                  className="shrink-0 group-hover:icon-shapes:stroke-2"
                 />
               )}
               {/* text-box only applies to block containers, so the trim lives
@@ -273,7 +273,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
               {TrailingIcon && (
                 <TrailingIcon
                   size={iconSize}
-                  className="shrink-0 icon-shapes:transition-[stroke-width] icon-shapes:duration-80 group-hover:icon-shapes:stroke-2"
+                  className="shrink-0 group-hover:icon-shapes:stroke-2"
                 />
               )}
             </>

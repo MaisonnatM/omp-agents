@@ -53,7 +53,7 @@ const SERVICE_LOGO: Record<AccountsService, BrandLogo> = { gmail: GMAIL_LOGO, "g
 /** Where a notice came from, as a logo and a name: GitHub, Slack, the provider, the Google service, Google Calendar or this computer's calendar, omp, or omp-agents. */
 function originOf(notice: Notice): { logo: ReactNode; label: string } {
 	const mark = "size-3.5 shrink-0";
-	const sparkles = <IconSparklesTwo aria-hidden className={cn(mark, "text-violet-600 dark:text-violet-400")} />;
+	const sparkles = <IconSparklesTwo className={cn(mark, "text-violet-600 dark:text-violet-400")} />;
 	switch (notice.kind) {
 		case "pull-request":
 			return { logo: <OrgIcon org="github" className={mark} />, label: "GitHub" };
@@ -66,7 +66,7 @@ function originOf(notice: Notice): { logo: ReactNode; label: string } {
 		}
 		case "event":
 			return notice.calendar === null
-				? { logo: <IconCalendarClock aria-hidden className={mark} />, label: "Calendar" }
+				? { logo: <IconCalendarClock className={mark} />, label: "Calendar" }
 				: { logo: <BrandMark logo={GOOGLE_CALENDAR_LOGO} className={mark} />, label: "Google Calendar" };
 		case "omp":
 		case "model":
@@ -75,7 +75,7 @@ function originOf(notice: Notice): { logo: ReactNode; label: string } {
 		case "dashboard-failed":
 			return { logo: sparkles, label: "omp-agents" };
 		case "stopped":
-			return { logo: <IconExclamationCircle aria-hidden className={cn(mark, "text-amber-600 dark:text-amber-400")} />, label: "omp-agents" };
+			return { logo: <IconExclamationCircle className={cn(mark, "text-amber-600 dark:text-amber-400")} />, label: "omp-agents" };
 		case "sign-in":
 			return { logo: <BrandMark logo={SERVICE_LOGO[notice.service]} className={mark} />, label: MCP_SERVICES[notice.service].label };
 		default: {
@@ -103,19 +103,19 @@ function Face({ face }: { face: NoticeFace }) {
 		case "update":
 			return (
 				<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-violet-500/10">
-					<IconSparklesTwo aria-hidden className="m-auto size-4 text-violet-600 dark:text-violet-400" />
+					<IconSparklesTwo className="m-auto size-4 text-violet-600 dark:text-violet-400" />
 				</span>
 			);
 		case "event":
 			return (
 				<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-muted">
-					<IconCalendarClock aria-hidden className="m-auto size-4" style={{ color: face.color ?? undefined }} />
+					<IconCalendarClock className="m-auto size-4" style={{ color: face.color ?? undefined }} />
 				</span>
 			);
 		case "stopped":
 			return (
 				<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-amber-500/10">
-					<IconExclamationCircle aria-hidden className="m-auto size-4 text-amber-600 dark:text-amber-400" />
+					<IconExclamationCircle className="m-auto size-4 text-amber-600 dark:text-amber-400" />
 				</span>
 			);
 		case "provider": {
@@ -134,7 +134,7 @@ function Face({ face }: { face: NoticeFace }) {
 				<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-muted">
 					<BrandMark logo={SERVICE_LOGO[face.service]} className="m-auto size-4" />
 					<span className={cn(BADGE, "bg-red-500 text-white")}>
-						<IconKey1 aria-hidden className="size-2.5 icon-shapes:stroke-[2.5]" />
+						<IconKey1 className="size-2.5 icon-shapes:stroke-[2.5]" />
 					</span>
 				</span>
 			);
@@ -424,7 +424,7 @@ export function NoticesBell({ notices }: { notices: Notice[] }) {
 					{shown.length === 0 ? (
 						<div className="flex flex-col items-center gap-2 px-6 py-10 text-center">
 							<span className="flex size-9 items-center justify-center rounded-full bg-muted">
-								<IconBell aria-hidden className="size-4 text-muted-foreground" />
+								<IconBell className="size-4 text-muted-foreground" />
 							</span>
 							<p className="text-sm font-medium">You're all caught up</p>
 							<p className="text-xs text-muted-foreground">Pull requests that wait on you, Slack messages for you, providers that stop serving, events about to start, and updates land here.</p>

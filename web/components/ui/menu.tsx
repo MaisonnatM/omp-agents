@@ -178,7 +178,7 @@ function MenuSubmenuTrigger({
       {children}
       <span className="ml-auto flex min-w-0 items-center gap-1 pl-4 text-muted-foreground">
         {value !== undefined && <span className="truncate">{value}</span>}
-        <IconChevronRight aria-hidden />
+        <IconChevronRight />
       </span>
     </MenuPrimitive.SubmenuTrigger>
   )
@@ -246,7 +246,7 @@ function MenuRadioItem({
     >
       {children}
       <MenuPrimitive.RadioItemIndicator keepMounted className="ml-auto pl-4 data-unchecked:invisible">
-        <IconCheckmark1 aria-hidden />
+        <IconCheckmark1 />
       </MenuPrimitive.RadioItemIndicator>
     </MenuPrimitive.RadioItem>
   )

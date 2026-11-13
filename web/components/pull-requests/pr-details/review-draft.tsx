@@ -46,11 +46,11 @@ export function ReviewDraftPanel({ draft, headOid }: { draft: ReviewDraft; headO
 		<div className="space-y-6">
 			{posted ? (
 				<p className="text-sm">
-					<IconCheckmark1 aria-hidden className="mr-1 inline size-4 align-[-3px] text-emerald-600" />
+					<IconCheckmark1 className="mr-1 inline size-4 align-[-3px] text-emerald-600" />
 					Posted <Age at={posted.at} exact className="tabular-nums" /> ago as {VERDICT_LABELS[draft.verdict].toLowerCase()}.{" "}
 					<a href={posted.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-muted-foreground underline-offset-2 hover:underline">
 						View on GitHub
-						<IconSquareArrowTopRight aria-hidden className="size-3" />
+						<IconSquareArrowTopRight className="size-3" />
 					</a>
 				</p>
 			) : stale ? (

@@ -374,7 +374,7 @@ export function SessionStep({ sessions }: { sessions: Observation<boolean> }) {
 								<span className="block text-[13px] font-medium">{title}</span>
 								<span className="block text-[13px] text-pretty text-muted-foreground">{prompt}</span>
 							</span>
-							<IconArrowRight aria-hidden className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-out group-hover:translate-x-0.5 motion-reduce:transition-none" />
+							<IconArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-out group-hover:translate-x-0.5 motion-reduce:transition-none" />
 						</button>
 					</li>
 				))}

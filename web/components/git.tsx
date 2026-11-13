@@ -161,7 +161,7 @@ export function BranchPicker({ checkout, choice, onChoose, disabled = false }: B
 											value: `create ${name}`,
 											label: (
 												<>
-													<IconBranch aria-hidden />
+													<IconBranch />
 													<span className="flex min-w-0 items-center gap-1">
 														<span className="shrink-0">Create branch</span>
 														<BranchLabel name={name} title className="font-medium" />

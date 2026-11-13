@@ -70,7 +70,7 @@ export function FolderRows<T extends { path: string }>({
 								onClick={() => folders.toggle(child.path)}
 							>
 								<Chevron aria-hidden className="size-3 shrink-0" />
-								<IconFolder1 aria-hidden className="size-3.5 shrink-0" />
+								<IconFolder1 className="size-3.5 shrink-0" />
 								<span className="truncate">{child.name}</span>
 							</button>
 						</li>

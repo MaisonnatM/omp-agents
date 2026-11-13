@@ -361,7 +361,7 @@ const SidebarGroupAction = forwardRef<HTMLButtonElement, SidebarGroupActionProps
           "focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)]",
           // Thicken a bare icon's 1.5 stroke to 2 on hover, the same
           // treatment Button's icon-only span applies.
-          "[&_svg]:size-[var(--icon-size)] [&_svg]:shrink-0 icon-shapes:transition-[stroke-width] icon-shapes:duration-80 hover:icon-shapes:stroke-2",
+          "[&_svg]:size-[var(--icon-size)] [&_svg]:shrink-0 hover:icon-shapes:stroke-2",
           shape.item,
           className
         ),

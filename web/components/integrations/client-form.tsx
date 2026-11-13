@@ -46,7 +46,7 @@ export function External({ href, children }: { href: string; children: string })
 	return (
 		<a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-medium underline decoration-border underline-offset-2 hover:decoration-foreground">
 			{children}
-			<IconSquareArrowTopRight aria-hidden className="size-3" />
+			<IconSquareArrowTopRight className="size-3" />
 		</a>
 	);
 }

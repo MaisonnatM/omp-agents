@@ -45,7 +45,7 @@ export function DemoStrip({ demos, onOpen }: { demos: Exercise[]; onOpen: (at: n
 									className="size-full"
 									badge={
 										<span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm group-hover:bg-background">
-											<IconPlay aria-hidden className="size-3.5 icon-shapes:fill-current" />
+											<IconPlay className="size-3.5 icon-shapes:fill-current" />
 										</span>
 									}
 								/>

@@ -5,8 +5,15 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* A Central icon's shapes, which carry their own stroke-width="1.5" and sit in a mask, so a stroke or fill set on the <svg> never reaches them: `icon-shapes:stroke-2`, `icon-shapes:fill-current`. Leaves out rect, the mask's own backdrop. */
-@custom-variant icon-shapes (& :is(path, circle, ellipse, line, polyline, polygon));
+/* A Central icon's shapes, which carry their own stroke-width="1.5" inside the icon's mask, so a stroke or fill set on the <svg> never reaches them: `icon-shapes:stroke-2`, `icon-shapes:fill-current`. Matches only the mask's shape group, not its backdrop rect or a hand-drawn svg such as the spinner. */
+@custom-variant icon-shapes (& mask > g :is(path, circle, ellipse, rect, line, polyline, polygon));
+
+/* A Central icon's stroke thickens over the label's 80ms, wherever a hover or selection sets `icon-shapes:stroke-2`. */
+@layer base {
+  mask > g :is(path, circle, ellipse, rect, line, polyline, polygon) {
+    transition: stroke-width 80ms;
+  }
+}
 
 /* What shows only while its `group/reveal` is hovered or holds the focus, and always on a touch screen, which has no hover: a header tab's ×, a page title's trailing controls. */
 @custom-variant revealed {

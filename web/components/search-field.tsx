@@ -17,7 +17,7 @@ interface SearchFieldProps {
 export function SearchField({ label, placeholder, query, onQuery, className, ref }: SearchFieldProps) {
 	return (
 		<label className="flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-sm text-muted-foreground focus-within:ring-2 focus-within:ring-ring [&>svg]:size-3.5">
-			<IconMagnifyingGlass aria-hidden />
+			<IconMagnifyingGlass />
 			<input
 				ref={ref}
 				type="search"

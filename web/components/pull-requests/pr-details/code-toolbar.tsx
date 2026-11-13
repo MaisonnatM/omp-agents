@@ -57,7 +57,7 @@ export function CodeToolbar({ commits, commit, onCommit, viewed, preferences, al
 				</div>
 				<DropdownMenu>
 					<DropdownMenuTrigger render={<Button size="icon-xs" variant="ghost-muted" aria-label="Diff options" className="@min-[36rem]/code:hidden" />}>
-						<IconSettingsSliderHor aria-hidden className="size-3.5" />
+						<IconSettingsSliderHor className="size-3.5" />
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="end">
 						{DIFF_OPTIONS.map(({ label, on, pick }) => (
@@ -68,10 +68,10 @@ export function CodeToolbar({ commits, commit, onCommit, viewed, preferences, al
 					</DropdownMenuContent>
 				</DropdownMenu>
 				<Button size="icon-xs" variant="ghost-muted" aria-label={collapseLabel} title={collapseLabel} onClick={onCollapseAll}>
-					{allCollapsed ? <IconChevronGrabberVertical aria-hidden className="size-3.5" /> : <IconChevronGrabberVerticalToward aria-hidden className="size-3.5" />}
+					{allCollapsed ? <IconChevronGrabberVertical className="size-3.5" /> : <IconChevronGrabberVerticalToward className="size-3.5" />}
 				</Button>
 				<Button size="icon-xs" variant="ghost-muted" active={treeOpen} aria-label={treeLabel} title={treeLabel} aria-pressed={treeOpen} onClick={toggleTree}>
-					<IconCodeTree aria-hidden className="size-3.5" />
+					<IconCodeTree className="size-3.5" />
 				</Button>
 			</div>
 		</div>

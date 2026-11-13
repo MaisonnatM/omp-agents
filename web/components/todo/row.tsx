@@ -70,7 +70,7 @@ export function TodoRow({ section, entry, siblings, category, workspace, day, se
 				}
 			>
 				{rowProps.draggable && !isEditing && (
-					<IconDotGrid2x3 aria-hidden className="absolute -left-3 top-1.5 size-3.5 cursor-grab text-muted-foreground/50 opacity-0 group-hover/todo:opacity-100" />
+					<IconDotGrid2x3 className="absolute -left-3 top-1.5 size-3.5 cursor-grab text-muted-foreground/50 opacity-0 group-hover/todo:opacity-100" />
 				)}
 				<TodoPriorityPicker todo={todo} look="icon" disabled={disabled} {...pickerOf("priority")} onChange={onChange} />
 				<TodoStatusPicker todo={todo} look="icon" disabled={disabled} {...pickerOf("status")} onChange={onChange} />
@@ -190,7 +190,7 @@ export function ArchivedRow({ todo, disabled, open, onOpen, onChange }: Archived
 	return (
 		<ContextMenu disabled={disabled}>
 			<ContextMenuTrigger render={<li />} data-todo-id={todo.id} className={cn("group/todo flex h-8 items-center gap-2 rounded-md px-2 text-sm hover:bg-accent/50", open && "bg-accent")}>
-				<IconArchive aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+				<IconArchive className="size-4 shrink-0 text-muted-foreground" />
 				<button
 					type="button"
 					data-todo-row

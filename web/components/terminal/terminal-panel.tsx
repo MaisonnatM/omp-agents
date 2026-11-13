@@ -156,7 +156,7 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 										onClick={() => close(tab)}
 										className="mr-1 rounded-sm p-0.5 opacity-60 outline-none hover:bg-foreground/10 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
 									>
-										{closing ? <IconLoader aria-hidden className="size-3 animate-spin" /> : <IconCrossMedium aria-hidden className="size-3" />}
+										{closing ? <IconLoader className="size-3 animate-spin" /> : <IconCrossMedium className="size-3" />}
 									</button>
 								</Tooltip>
 							</div>

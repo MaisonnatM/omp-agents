@@ -107,7 +107,7 @@ function HeaderTabItem({ tab, target, label, lead, active, drag, onClose }: Head
 				{lead}
 				<span className="truncate">{label}</span>
 			</a>
-			<IconDotGrid2x3 aria-hidden className={cn("pointer-events-none absolute right-[26px] size-3 text-muted-foreground/60", !active && "hidden")} />
+			<IconDotGrid2x3 className={cn("pointer-events-none absolute right-[26px] size-3 text-muted-foreground/60", !active && "hidden")} />
 			<button
 				type="button"
 				{...activityControl("header.tab.close")}
