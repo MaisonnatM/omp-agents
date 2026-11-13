@@ -176,7 +176,7 @@ describe("paletteSections", () => {
 
 describe("paletteCommands", () => {
 	test("lists the shortcuts with a command title and a handler, less those unavailable now", () => {
-		const handlers: ShortcutHandlers = { tickets: noop, "pull-requests": noop, restore: noop, endSession: noop, help: noop };
+		const handlers: ShortcutHandlers = { tickets: noop, "pull-requests": noop, restore: noop, closeTab: noop, help: noop };
 		expect(paletteCommands(handlers, new Set()).map(({ id }) => id)).toEqual(["help", "pull-requests", "tickets"]);
 		expect(paletteCommands(handlers, new Set(["tickets"])).map(({ id }) => id)).toEqual(["help", "pull-requests"]);
 	});

@@ -195,7 +195,14 @@ export function HeaderTabs({ className, address, hosts, past, controls }: Header
 		move(id, step.target, step.where);
 		return true;
 	};
-	useShortcuts({ moveTabLeft: () => moveFocused(-1), moveTabRight: () => moveFocused(1) });
+	useShortcuts({
+		moveTabLeft: () => moveFocused(-1),
+		moveTabRight: () => moveFocused(1),
+		closeTab: () => {
+			if (activeId === null) return false;
+			close(activeId);
+		},
+	});
 	const select = (index: number): void => {
 		setRow(current => ({ tabs: current.tabs, active: index }));
 		location.hash = tabs[index]?.hash ?? "";

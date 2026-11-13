@@ -6,7 +6,6 @@ import { CONFIRM_PRIVATE_END } from "./labels";
 import { PAGE_ICON } from "./page-icons";
 import { hashForTickets, type OpenMode } from "./routing";
 import { isPrivateHost } from "./sessions";
-import { END_SESSION } from "./shortcuts";
 
 /** A session as a row lists it: running, or past. */
 export type SessionEntry = { kind: "live"; host: RosterHost } | { kind: "past"; session: PastSession };
@@ -105,7 +104,6 @@ export function sessionActions(entry: SessionEntry, context: SessionActionContex
 				icon: IconStopCircle,
 				disabled: context.ending,
 				tone: "destructive",
-				chord: END_SESSION,
 				...(isPrivateHost(entry.host) ? { confirm: CONFIRM_PRIVATE_END } : {}),
 				run: { kind: "do", fn: () => context.end(instanceId) },
 			},
