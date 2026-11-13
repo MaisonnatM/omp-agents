@@ -277,13 +277,30 @@ export async function checkoutDir(cwd: string, choice: BranchChoice): Promise<st
 	const dir = worktreeDir(main.path, choice.name);
 	// `worktree add -b` creates the branch before it checks the path, so a taken path would leave the branch behind.
 	if (existsSync(dir)) throw new Error(`${dir} already exists.`);
-	if (existing) {
-		await runChecked(["git", "-C", cwd, "worktree", "add", "--", dir, choice.name]);
-	} else if (choice.kind === "new") {
-		await runChecked(["git", "-C", cwd, "worktree", "add", "-b", choice.name, "--", dir, choice.base]);
-	} else {
-		const source = await workSource(cwd, choice.name, main.branch);
-		await runChecked(["git", "-C", cwd, "worktree", "add", source.track ? "--track" : "--no-track", "-b", choice.name, "--", dir, source.ref]);
-	}
+	if (choice.kind === "new") await runChecked(["git", "-C", cwd, "worktree", "add", "-b", choice.name, "--", dir, choice.base]);
+	else await addOnBranch(cwd, dir, choice.name, existing, main.branch);
 	return dir;
+}
+
+/**
+ * Adds a worktree of `cwd`'s repository at `dir` on branch `name`: the local branch when `local`, else a new branch from
+ * {@link workSource}, given `mainBranch`, the main worktree's branch.
+ */
+async function addOnBranch(cwd: string, dir: string, name: string, local: boolean, mainBranch: string | null): Promise<void> {
+	if (local) {
+		await runChecked(["git", "-C", cwd, "worktree", "add", "--", dir, name]);
+		return;
+	}
+	const source = await workSource(cwd, name, mainBranch);
+	await runChecked(["git", "-C", cwd, "worktree", "add", source.track ? "--track" : "--no-track", "-b", name, "--", dir, source.ref]);
+}
+
+/**
+ * Adds back at `dir` a linked worktree of `repository` that was removed, on branch `name` as {@link checkoutDir} checks
+ * out a work branch: the local branch while one has that name, else a new one from origin's branch or else from the default branch.
+ * @throws Error with git's reason when the branch is checked out elsewhere or the worktree cannot be added.
+ */
+export async function restoreWorktree(repository: string, dir: string, name: string): Promise<void> {
+	const [worktrees, names] = await Promise.all([worktreesOf(repository), branchesOf(repository)]);
+	await addOnBranch(repository, dir, name, names.includes(name), worktrees[0]?.branch ?? null);
 }

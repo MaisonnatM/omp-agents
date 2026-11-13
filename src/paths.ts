@@ -22,6 +22,8 @@ export const phoneAccessFile = join(configDir, "phone-access.json");
 
 /** The sessions this dashboard started that stopped without End session, beside {@link tokenFile}. */
 export const interruptedFile = join(configDir, "interrupted.json");
+/** The worktrees that ending sessions removed, by session id, which a resume adds back, beside {@link tokenFile}. */
+export const endedWorktreesFile = join(configDir, "ended-worktrees.json");
 /** Active explicit task owners shared by every dashboard port, beside {@link tokenFile}. */
 export const taskClaimsFile = join(configDir, "task-claims.json");
 /**

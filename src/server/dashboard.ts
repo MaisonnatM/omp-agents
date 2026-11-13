@@ -29,7 +29,7 @@ import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, machineFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, signInInboxDir, sourceControlFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, endedWorktreesFile, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, machineFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, signInInboxDir, sourceControlFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
 import { MODULE_JOINS, moduleInboxes, openModules } from "../modules";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
@@ -94,7 +94,7 @@ import type { Routes } from "./route-kit";
 import type { PhoneAccessRoutesEnv } from "./phone-access-routes";
 import { createRoutes } from "./routes";
 import type { SelfUpdate } from "./self-update";
-import { endSession } from "./session-end";
+import { EndedWorktrees, endSession, restoreEndedWorktree } from "./session-end";
 import { ProjectTrustFile } from "./project-trust-file";
 import { SessionMoves } from "./session-moves";
 import { SessionWaits } from "./session-waits";
@@ -128,6 +128,7 @@ export class Dashboard {
 	readonly #files = new SessionFiles();
 	readonly #foreignUsage = new ForeignUsage(SESSION_FORMATS, listPrice);
 	readonly #interrupted = new InterruptedSessions(interruptedFile, () => void this.#notices.check(STOPPED_KINDS));
+	readonly #endedWorktrees = new EndedWorktrees(endedWorktreesFile);
 	readonly #todos = new UserTodosFile(userTodosFile);
 	readonly #modules = openModules();
 	readonly #routines = new RoutinesFile(routinesFile);
@@ -405,6 +406,7 @@ export class Dashboard {
 			},
 			joinFor: (request, instanceId) => this.#joinFor(request, instanceId),
 			admit: this.#admit,
+			restoreWorktree: sessionIds => this.#worktrees.checkout(() => restoreEndedWorktree(this.#endedWorktrees.of(sessionIds))),
 			privateSessions: this.#privateSessions,
 		});
 		const occupants = new WorktreeOccupants();
@@ -907,7 +909,11 @@ export class Dashboard {
 	 */
 	async #endLive(session: LiveSession): Promise<void> {
 		const { sessionId } = session;
-		await endSession({ sessionId, workDir: this.#files.factsOf(sessionId).worktree ?? session.cwd, end: () => session.end() }, dir => this.#worktrees.removeCheckout(dir, `ended session ${sessionId}`));
+		await endSession(
+			{ sessionId, workDir: this.#files.factsOf(sessionId).worktree ?? session.cwd, end: () => session.end() },
+			dir => this.#worktrees.removeCheckout(dir, `ended session ${sessionId}`),
+			worktree => this.#endedWorktrees.record(sessionId, worktree),
+		);
 		this.#autoContinue.cancel(sessionId);
 	}
 

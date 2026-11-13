@@ -657,7 +657,7 @@ describe("DashboardSession action failures", () => {
 				if (target) await endSession({ sessionId: target.sessionId, workDir: target.cwd, end: () => target.end() }, async () => {
 					removed = true;
 					return null;
-				});
+				}, () => {});
 			},
 		} as SocketEnv), (_t, error) => failures.push(errorText(error)));
 		ledger.open(ws);

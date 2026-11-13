@@ -73,7 +73,9 @@
   **Archive session** stops its omp process: one that the dashboard started stops with every process it started, its background jobs, kernels, and subagents included, and a terminal session gets `SIGTERM`, as when its terminal closes, so its terminal returns to the shell.
   A session the dashboard started that exits on its own takes those processes with it too.
   omp records the exit in the session file, and the session moves to the past sessions, where **Resume** continues it.
-  The dashboard then removes the linked git worktree the session works in, the one whose branch its header names, with the checks of **Settings → Worktrees**, and keeps its branch; **Resume** then reports that the directory no longer exists until you check the branch out there again.
+  The dashboard then removes the linked git worktree the session works in, the one whose branch its header names, with the checks of **Settings → Worktrees**, and keeps its branch.
+  **Resume**, or a message sent to the past session, first puts that worktree back at the same path: on its branch while that branch exists, else on a new branch of that name from origin's branch of that name, or else from origin's default branch.
+  When the repository itself is gone, **Resume** says so and does not start the session.
   A worktree that those checks keep, such as one with uncommitted changes or one another session uses, stays in **Settings → Worktrees**, whose **Delete** applies the same checks; a session in a main checkout or outside git leaves its directory as it is.
   The header shows **Archiving…** until the process stops and the worktree check finishes.
   Each pane that showed the session, or one of its subagents, moves to the next running session the sidebar lists, else the previous one, skipping sessions already open in a pane.
