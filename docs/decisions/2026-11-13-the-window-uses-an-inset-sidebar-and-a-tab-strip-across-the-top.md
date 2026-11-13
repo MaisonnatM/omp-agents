@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-13-a-pages-own-list-sits-in-a-column-at-the-pages-left
 date: 2026-11-13
 decision-makers: Maxence
 supersedes:

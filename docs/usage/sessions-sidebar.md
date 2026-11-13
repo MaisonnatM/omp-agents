@@ -14,8 +14,8 @@
 - The sidebar runs the window's height on the window's background, and the page and the session details sidebar sit beside it as rounded panels.
   Its top row, 48 px tall at the default font size as the header's tabs beside it are, holds the omp mark, the command menu button, and the button that hides the sidebar.
 - Under it the page list shows **New session**, then **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Notes**, **Calendar**, **Todo**, **Sport**, and **Email** in the order Settings › Preferences gives them, then **Settings**; **Tickets** shows only in Work and **Sport** only in Personal.
-  A row opens its page, and the open page's row stays highlighted with that page's own list nested under it, such as the Todo categories or the Settings sections.
-  A page whose row you hid in Preferences shows its list after the last row.
+  A row opens its page, and the open page's row stays highlighted while that page's own list, such as the Bots, the Todo categories, or the Settings sections, shows in a column at the page's left, as in Linear's inbox.
+  On a phone, where the sidebar floats over the page, that list shows under the page's row instead, and a page whose row you hid in Preferences shows its list after the last row.
   **Bots** lists your Bots and opens their conversations, which stay out of the roster.
   See [Bots](bots.md).
   **Sessions** counts the sessions of the picked workspace that need you: each that asks you something, or finished a turn you have not looked at since.

@@ -24,6 +24,7 @@ import { DesktopLinkPreview } from "./components/desktop-link-preview";
 import { FileDialog } from "./components/file-dialog";
 import { textFileUrl } from "./file-paths";
 import { PageSwitch } from "./components/page-switch";
+import { hasPageList, PageList, PageListColumn } from "./components/page-list";
 import { NO_PLANS, Plans } from "./components/plan-usage";
 import { useNoticeToasts } from "./components/use-notice-toasts";
 import { RenderBoundary } from "./components/render-boundary";
@@ -103,7 +104,8 @@ export function App() {
 	/** Linear answers and the space shows Tickets: the new-ticket shortcut and the palette's tickets apply. */
 	const ticketsCallable = linearCallable && !absentTabs.has("tickets");
 	const settings = useSettingsRoute(page);
-	const latestBot = useMemo(() => (bots === null ? null : (botRows(bots, state.hosts, state.botLasts)[0]?.bot.id ?? null)), [bots, state.hosts, state.botLasts]);
+	const botList = useMemo(() => (bots === null ? null : botRows(bots, state.hosts, state.botLasts)), [bots, state.hosts, state.botLasts]);
+	const latestBot = botList?.[0]?.bot.id ?? null;
 	const { row, showTab } = useSidebarTab({ page, absentTabs, layout, latestSession: sessions.latest, latestBot, navigate, show });
 	const maximized = layout.maximized && !page;
 	const address = page ? hashForPage(page) : hashForLayout(layout);
@@ -261,6 +263,32 @@ export function App() {
 		[routedTodoList, categories],
 	);
 	const notesView = page?.kind === "notes" ? page.list : ALL_NOTES;
+	const todoSessions = useMemo(() => ({ hosts: state.hosts, past: state.past }), [state.hosts, state.past]);
+	const pageList = useMemo(
+		() =>
+			hasPageList(row) ? (
+				<PageList
+					row={row}
+					page={page}
+					listed={state.listed}
+					hosts={visible.hosts}
+					past={visible.past}
+					todoSessions={todoSessions}
+					botList={botList}
+					userTodos={state.userTodos}
+					todoView={todoView}
+					userNotes={state.userNotes}
+					notesView={notesView}
+					space={space}
+					settings={settings}
+					sectionTarget={sectionTarget}
+					onSectionTarget={setSectionTarget}
+				/>
+			) : null,
+		[row, page, state.listed, visible, todoSessions, botList, state.userTodos, todoView, state.userNotes, notesView, space, settings, sectionTarget],
+	);
+	// A floating sidebar, as on a phone, keeps the page's list under its row, since a column beside the page would leave the page no room.
+	const floating = sidebars.panels.left.floating;
 	const showSearch = useCallback(() => dispatchPalette({ type: "open" }), [dispatchPalette]);
 	const toggleSettings = useCallback(() => void handlers.settings?.(0), [handlers]);
 	const headerControls = useMemo(() => <HeaderControls notices={state.notices} settingsOpen={page?.kind === "settings"} onToggleSettings={toggleSettings} />, [state.notices, page?.kind, toggleSettings]);
@@ -291,17 +319,9 @@ export function App() {
 												row={row}
 												onTab={showTab}
 												tabs={tabs}
-												listed={state.listed}
-												userTodos={state.userTodos}
-												userNotes={state.userNotes}
-												notesView={notesView}
-												hosts={state.hosts}
-												past={state.past}
-												botLasts={state.botLasts}
-												todoView={todoView}
+												botList={botList}
+												list={floating ? pageList : null}
 												settings={settings}
-												sectionTarget={sectionTarget}
-												onSectionTarget={setSectionTarget}
 												onPickWorkspace={switchWorkspace}
 												onSearch={showSearch}
 												foot={sidebarFoot}
@@ -309,54 +329,59 @@ export function App() {
 										</DashboardSidebar>
 										<HeaderTabs className="[grid-area:tabs]" address={address} hosts={state.hosts} past={state.past} controls={headerControls} />
 										<SidebarInset className="inset-panel [grid-area:page]">
-											<Plans value={state.usage?.plans ?? NO_PLANS}>
-												<ActivityVisibility.Provider value={display.activityVisibility}>
-													<ToolsExpanded value={display.toolsExpanded}>
-														<MentionListsContext.Provider value={mentionLists}>
-															<RenderBoundary resetKey={hashForRoute(routeOf(state))}>
-																<PageSwitch
-																	page={page}
-																	hosts={state.hosts}
-																	past={state.past}
-																	lastHosts={state.lastHosts}
-																	layout={layout}
-																	splits={state.splits}
-																	models={state.models}
-																	userTodos={state.userTodos}
-																	userNotes={state.userNotes}
-																	sport={state.sport}
-																	routines={state.routines}
-																	bots={state.bots}
-																	botLasts={state.botLasts}
-																	openBot={openBot}
-																	workspaceList={state.workspaceList}
-																	personal={state.personal}
-																	trustedProjects={state.trustedProjects}
-																	newSessionCompletions={state.newSessionCompletions}
-																	connected={state.connected}
-																	listed={state.listed}
-																	rosterError={state.rosterError}
-																	newStart={startOf(state.starts, "new")}
-																	scope={scope}
-																	defaultWorkspace={defaultWorkspace}
-																	sectionTarget={sectionTarget}
-																	todoView={todoView}
-																	linear={linear}
-																	linearCallable={linearCallable}
-																	ticketsCallable={ticketsCallable}
-																	maximized={maximized}
-																	hasDetails={detailsView !== null}
-																	rightOpen={sidebars.panels.right.open}
-																	show={show}
-																	close={close}
-																	resize={resize}
-																	toggleSidebar={toggleSidebar}
-																/>
-															</RenderBoundary>
-														</MentionListsContext.Provider>
-													</ToolsExpanded>
-												</ActivityVisibility.Provider>
-											</Plans>
+											<div className="flex min-h-0 flex-1">
+												{!floating && hasPageList(row) && <PageListColumn row={row}>{pageList}</PageListColumn>}
+												<div className="relative flex min-w-0 flex-1 flex-col">
+													<Plans value={state.usage?.plans ?? NO_PLANS}>
+														<ActivityVisibility.Provider value={display.activityVisibility}>
+															<ToolsExpanded value={display.toolsExpanded}>
+																<MentionListsContext.Provider value={mentionLists}>
+																	<RenderBoundary resetKey={hashForRoute(routeOf(state))}>
+																		<PageSwitch
+																			page={page}
+																			hosts={state.hosts}
+																			past={state.past}
+																			lastHosts={state.lastHosts}
+																			layout={layout}
+																			splits={state.splits}
+																			models={state.models}
+																			userTodos={state.userTodos}
+																			userNotes={state.userNotes}
+																			sport={state.sport}
+																			routines={state.routines}
+																			bots={state.bots}
+																			botLasts={state.botLasts}
+																			openBot={openBot}
+																			workspaceList={state.workspaceList}
+																			personal={state.personal}
+																			trustedProjects={state.trustedProjects}
+																			newSessionCompletions={state.newSessionCompletions}
+																			connected={state.connected}
+																			listed={state.listed}
+																			rosterError={state.rosterError}
+																			newStart={startOf(state.starts, "new")}
+																			scope={scope}
+																			defaultWorkspace={defaultWorkspace}
+																			sectionTarget={sectionTarget}
+																			todoView={todoView}
+																			linear={linear}
+																			linearCallable={linearCallable}
+																			ticketsCallable={ticketsCallable}
+																			maximized={maximized}
+																			hasDetails={detailsView !== null}
+																			rightOpen={sidebars.panels.right.open}
+																			show={show}
+																			close={close}
+																			resize={resize}
+																			toggleSidebar={toggleSidebar}
+																		/>
+																	</RenderBoundary>
+																</MentionListsContext.Provider>
+															</ToolsExpanded>
+														</ActivityVisibility.Provider>
+													</Plans>
+												</div>
+											</div>
 											<TerminalPanel panel={terminal} cwd={focused.workDir ?? workspace ?? "~"} />
 										</SidebarInset>
 										{(detailsView || openBot) && (

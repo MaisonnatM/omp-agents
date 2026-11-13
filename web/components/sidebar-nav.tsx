@@ -1,4 +1,4 @@
-/** The left sidebar's page list: New session, each shown tab's page with its count, and Settings, the page on screen holding its own list beneath its row. */
+/** The left sidebar's page list: New session, each shown tab's page with its count, and Settings; while the sidebar floats, the page on screen holds its own list beneath its row. */
 import { SquarePen } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 import { SidebarGroup, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarMenuNested } from "@/components/ui/sidebar";
@@ -23,7 +23,7 @@ interface SidebarNavProps {
 	current: NavRow | null;
 	/** The count after a row's label, for the rows that have one. */
 	counts: Partial<Record<SidebarTab, NavCount>>;
-	/** The current row's own list, shown beneath it, or after the last row for a tab the user hid; `null` for none. */
+	/** The current row's own list, shown beneath it, or after the last row for a tab the user hid; `null` for none, as when the page holds its list itself. */
 	list: ReactNode;
 	/** The New session row's label, naming the selected workspace. */
 	newSessionLabel: string;
