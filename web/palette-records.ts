@@ -1,15 +1,14 @@
 /** The todos, Linear tickets, pull requests, and conversation matches the command palette searches, each opening where the dashboard shows it. */
-import { AppWindow, Bot, Columns2, User } from "lucide-react";
+import { IconAiBotHead, IconLayoutColumn, IconUser, IconWindowApp } from "central-icons";
 import { prKey, pullRequestName, pullRequestUrl, type RepoPullRequests } from "../src/shared/github";
 import type { ConversationHit, PastSession, RosterHost, View } from "../src/shared/sessions";
 import type { Ticket } from "../src/shared/tickets";
 import type { UserTodo } from "../src/user-todos-shared";
-import type { UserNote } from "../src/user-notes-shared";
 import type { Accessory, PaletteItem } from "./command-palette";
 import { hostLabel, pastLabel } from "./labels";
 import { PAGE_ICON } from "./page-icons";
 import { listedPullRequests } from "./pull-requests-model";
-import { hashForNotes, hashForOpenTodo, hashForPullRequests, hashForTickets, type OpenMode } from "./routing";
+import { hashForOpenTodo, hashForPullRequests, hashForTickets, type OpenMode } from "./routing";
 import { type SessionEntry, viewOf } from "./session-actions";
 import { workspaceCwd } from "./sessions";
 import { TODO_STATUS } from "./todo-views";
@@ -17,7 +16,6 @@ import { TODO_STATUS } from "./todo-views";
 export interface PaletteRecords {
 	/** The todo list's top-level todos, each with its own. */
 	todos: readonly UserTodo[];
-	notes: readonly UserNote[];
 	/** The Linear issues assigned to you. */
 	tickets: readonly Ticket[];
 	/** The open pull requests of the sidebar's workspace. */
@@ -25,7 +23,7 @@ export interface PaletteRecords {
 }
 
 /** One palette item for every todo, closed ones too, ticket, and pull request; a todo under another names its parent below its title. */
-export function recordItems({ todos, notes, tickets, pullRequestRepos }: PaletteRecords): PaletteItem[] {
+export function recordItems({ todos, tickets, pullRequestRepos }: PaletteRecords): PaletteItem[] {
 	const todoItems = todos.flatMap(todo =>
 		[todo, ...todo.children].map(
 			(leaf): PaletteItem => ({
@@ -78,17 +76,7 @@ export function recordItems({ todos, notes, tickets, pullRequestRepos }: Palette
 			],
 		};
 	});
-	const noteItems = notes.map((note): PaletteItem => ({
-		id: `note:${note.id}`,
-		section: "notes",
-		title: note.title || "Untitled",
-		keywords: [note.body],
-		icon: PAGE_ICON.notes,
-		accessories: [{ kind: "age", at: Date.parse(note.updatedAt) }],
-		kind: "Note",
-		actions: [[{ id: "open", title: "Open note", icon: PAGE_ICON.notes, run: { kind: "link", href: hashForNotes({ kind: "all" }, note.id) } }]],
-	}));
-	return [...todoItems, ...noteItems, ...ticketItems, ...pullRequestItems];
+	return [...todoItems, ...ticketItems, ...pullRequestItems];
 }
 
 /** Open `view`, whose session counts in workspace `workspace`, in the focused pane or a split, scrolled to message `messageId`. */
@@ -121,13 +109,13 @@ export function conversationItems(hits: readonly ConversationHit[], hosts: reado
 				title: hit.snippet,
 				subtitle: entry.kind === "live" ? hostLabel(entry.host) : pastLabel(entry.session),
 				keywords: [],
-				icon: hit.role === "user" ? User : Bot,
+				icon: hit.role === "user" ? IconUser : IconAiBotHead,
 				accessories: [matches, state],
 				kind: "Message",
 				actions: [
 					[
-						{ id: "open", title: "Open at this message", icon: AppWindow, run: { kind: "do", fn: () => openAt(view, cwd, "replace", hit.messageId) } },
-						{ id: "split", title: "Open in split at this message", icon: Columns2, run: { kind: "do", fn: () => openAt(view, cwd, "split", hit.messageId) } },
+						{ id: "open", title: "Open at this message", icon: IconWindowApp, run: { kind: "do", fn: () => openAt(view, cwd, "replace", hit.messageId) } },
+						{ id: "split", title: "Open in split at this message", icon: IconLayoutColumn, run: { kind: "do", fn: () => openAt(view, cwd, "split", hit.messageId) } },
 					],
 				],
 			},

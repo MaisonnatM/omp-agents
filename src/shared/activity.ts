@@ -296,7 +296,6 @@ export const ACTION_MESSAGES: Record<ClientMsg["t"], boolean> = {
 	answer: true,
 	"cancel-agent": true,
 	"user-todo": true,
-	"user-note": true,
 	"sport-changes": true,
 	routine: true,
 	bot: true,

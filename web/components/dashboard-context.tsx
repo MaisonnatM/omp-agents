@@ -2,7 +2,6 @@
 import { createContext, useContext } from "react";
 import type { QueuedMerge } from "../../src/shared/merge-queue";
 import type { ReviewDraft } from "../../src/shared/review-drafts";
-import type { UserNoteList } from "../../src/user-notes-shared";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import type { FileTarget } from "../file-paths";
 import type { MentionLists } from "../mentions";
@@ -23,7 +22,6 @@ export interface DashboardActions {
 	dismissStart: Dashboard["dismissStart"];
 	openNewSession: Dashboard["openNewSession"];
 	changeTodo: Dashboard["changeTodo"];
-	changeNote: Dashboard["changeNote"];
 	changeSport: Dashboard["changeSport"];
 	changeBot: Dashboard["changeBot"];
 	/**
@@ -96,6 +94,3 @@ export function useMentionLists(): MentionLists {
 
 /** The Todo page's list as the server last sent it, `null` until it arrives, for a prompt's todo chips to find where each todo is now. */
 export const UserTodosContext = createContext<UserTodoList | null>(null);
-
-/** The Notes page's list as the server last sent it, `null` until it arrives, for a todo's details to list the notes that belong to it. */
-export const UserNotesContext = createContext<UserNoteList | null>(null);

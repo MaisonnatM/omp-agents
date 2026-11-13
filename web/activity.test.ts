@@ -17,8 +17,6 @@ describe("viewOf", () => {
 		expect(pageView({ kind: "tickets", target: "ENG-12" })).toBe("tickets/item");
 		expect(pageView({ kind: "todo", list: { kind: "all" }, open: null })).toBe("todo");
 		expect(pageView({ kind: "todo", list: { kind: "today" }, open: "t1" })).toBe("todo/item");
-		expect(pageView({ kind: "notes", list: { kind: "all" }, open: null })).toBe("notes");
-		expect(pageView({ kind: "notes", list: { kind: "agents" }, open: "n1" })).toBe("notes/item");
 		expect(pageView({ kind: "bots", target: null, adding: false })).toBe("bots");
 		expect(pageView({ kind: "bots", target: null, adding: true })).toBe("bots/new");
 		expect(pageView({ kind: "bots", target: "b1", routine: null })).toBe("bots/item");

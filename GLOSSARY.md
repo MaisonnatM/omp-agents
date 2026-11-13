@@ -97,13 +97,14 @@ The column down the window's left side: the omp mark and the command menu at its
 _Avoid_: Nav, navigation rail, left panel
 
 **Header tabs**:
-The row across the top of the window, right of the sidebar, that holds Back and Forward, a tab for each page or session you visited lately, and What's new, the bell, and Settings at its end.
-A tab focuses its page, × closes it, and a drag reorders it; this browser keeps them.
+The row across the top of the window, right of the sidebar, that holds Back and Forward, your tabs, a + that opens a new one, and What's new, the bell, and Settings at its end.
+Opening a page or session shows it in the tab on screen, and a session another tab shows switches to that tab; × closes a tab, and a drag reorders it; this browser keeps them.
 _Avoid_: Title bar, tab strip, browser tabs
 
 **Roster**:
 The sessions in the sidebar under **Workspaces** and **Past**: each workspace's running, interrupted, and pinned sessions, and the ended ones.
 _Avoid_: Session list, inbox
+
 
 **Workspace**:
 A repository's main checkout, or a directory outside git, that sessions run in, which the sidebar's **Workspaces** label filters by; a session in a linked git worktree counts in its repository's workspace.
@@ -141,10 +142,6 @@ _Avoid_: Pending review (GitHub's own unsubmitted review), draft review
 A standalone HTML page, Markdown document, or SVG image an agent made in a session for the user to view and reuse apart from its replies, with every version the agent saved of it.
 It is not omp's artifacts directory, where omp keeps a session's tool output and subagent files.
 _Avoid_: Canvas, document, attachment
-
-**Note**:
-A Markdown entry on the Notes page, optionally linked to a top-level todo.
-It is separate from a todo's notes field.
 
 **Activity**:
 What the page records of how its user uses the dashboard, by registry id only, which Settings › Activity reports.

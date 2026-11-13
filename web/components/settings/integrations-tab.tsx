@@ -1,4 +1,4 @@
-import { RefreshCw } from "lucide-react";
+import { IconArrowRotateClockwise } from "central-icons";
 import { Fragment, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { anyCallable, callable, connectionsOf, type IntegrationsAnswer, MCP_INTEGRATIONS, signedIn } from "../../../src/shared/accounts";
@@ -75,7 +75,7 @@ export function IntegrationsTab({ active }: { active: boolean }) {
 				<Button
 					variant="ghost"
 					size="compact"
-					leadingIcon={RefreshCw}
+					leadingIcon={IconArrowRotateClockwise}
 					disabled={refreshing}
 					onClick={() => {
 						void integrationsStore.refresh(null, { fresh: true });

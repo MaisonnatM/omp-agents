@@ -16,6 +16,9 @@ const KEY = "omp-agents.sidebar-tabs";
 /** The Email tab's id before its rename, which a layout stored before it still names. */
 const LEGACY_EMAIL_TAB = "inbox";
 
+/** The Notes tab's id, which a layout stored before the Notes page left still names. */
+const LEGACY_NOTES_TAB = "notes";
+
 /** The user's sidebar tabs: every tab once, in the order the sidebar's page list shows them, and whether the user hid it. */
 export type TabLayout = readonly { tab: SidebarTab; hidden: boolean }[];
 
@@ -31,9 +34,9 @@ export const isSidebarTab = (kind: string): kind is SidebarTab => kind in TAB_RO
 export type NavRow = SidebarTab | "settings" | "new";
 
 /**
- * The row of the page list that `page` selects, which holds the page's own list: the panes select Sessions, and the
- * empty home, a page with no row, and a page whose tab is absent, signed out, select none.
- * A page whose tab the user hid in Preferences still selects it, so its list shows after the last row.
+ * The row of the page list that `page` selects: the panes select Sessions, and the empty home, a page with no row, and
+ * a page whose tab is absent, signed out, select none.
+ * A page whose tab the user hid in Preferences still selects it, so while its list nests in the sidebar it shows after the last row.
  */
 export function navRowOf(page: Page | null, panes: readonly View[], absentTabs: ReadonlySet<SidebarTab>): NavRow | null {
 	if (page === null) return panes.length > 0 ? "sessions" : null;
@@ -42,11 +45,11 @@ export function navRowOf(page: Page | null, panes: readonly View[], absentTabs: 
 }
 
 /**
- * The layout stored as `raw`. It keeps each known tab once, so a stored Settings tab from before the header's button drops out,
+ * The layout stored as `raw`. It keeps each known tab once, so a stored Settings or Notes tab from before they left drops out,
  * and reads a stored {@link LEGACY_EMAIL_TAB} as the Email tab, in its place and hidden as it was.
  * A tab missing from what is stored, such as one added since, takes its default place; anything unreadable gives the default.
- * A layout that still has Todo immediately before Notes, the slot it took in the old tab bar, puts Todo between Calendar and Sport,
- * and moves Email out from between them to just after Sport. Putting Todo back immediately before Notes moves it again.
+ * A layout that still has Todo immediately before {@link LEGACY_NOTES_TAB}, the slot it took in the old tab bar, puts Todo between
+ * Calendar and Sport, and moves Email out from between them to just after Sport.
  */
 export function decodeTabLayout(raw: string | null): TabLayout {
 	let stored: unknown;
@@ -56,6 +59,8 @@ export function decodeTabLayout(raw: string | null): TabLayout {
 		return DEFAULT_TAB_LAYOUT;
 	}
 	if (!Array.isArray(stored)) return DEFAULT_TAB_LAYOUT;
+	const ids = stored.map(entry => (isObject(entry) ? entry.tab : undefined)).filter(id => id === LEGACY_NOTES_TAB || SIDEBAR_TABS.some(({ value }) => value === id));
+	const todoInOldSlot = ids.some((id, index) => id === "todo" && ids[index + 1] === LEGACY_NOTES_TAB);
 	const layout: { tab: SidebarTab; hidden: boolean }[] = [];
 	for (const entry of stored as unknown[]) {
 		if (!isObject(entry)) continue;
@@ -67,14 +72,13 @@ export function decodeTabLayout(raw: string | null): TabLayout {
 	for (const [index, { value }] of SIDEBAR_TABS.entries()) {
 		if (!layout.some(kept => kept.tab === value)) layout.splice(Math.min(index, layout.length), 0, { tab: value, hidden: false });
 	}
-	return todoBetweenCalendarAndSport(layout);
+	return todoInOldSlot ? todoBetweenCalendarAndSport(layout) : layout;
 }
 
-/** `layout` with Todo moved from immediately before Notes to between Calendar and Sport. Email leaves that gap for just after Sport. */
+/** `layout`, which held Todo in its old slot, with Todo moved to between Calendar and Sport. Email leaves that gap for just after Sport. */
 function todoBetweenCalendarAndSport(layout: { tab: SidebarTab; hidden: boolean }[]): TabLayout {
 	const todoAt = layout.findIndex(entry => entry.tab === "todo");
-	const notesAt = layout.findIndex(entry => entry.tab === "notes");
-	if (todoAt < 0 || notesAt !== todoAt + 1) return layout;
+	if (todoAt < 0) return layout;
 	const todo = layout[todoAt]!;
 	const next = layout.filter((_, index) => index !== todoAt);
 	const calendarAt = next.findIndex(entry => entry.tab === "calendar");
@@ -123,7 +127,7 @@ export function useSignedOutTabs(): ReadonlySet<SidebarTab> {
 /**
  * The tab layout, kept in this browser, and the tabs it shows; every component that holds it sees a change at once.
  * `signedOut`, the {@link useSignedOutTabs}, stays the same set until one signs in or out; and `shown` stays with it until the layout changes.
- * A stored layout that still names {@link LEGACY_EMAIL_TAB} is stored again as it decodes, so the old id leaves this browser and Settings › Sync.
+ * A stored layout that differs from how it decodes, such as one naming {@link LEGACY_EMAIL_TAB} or {@link LEGACY_NOTES_TAB}, is stored again, so old ids leave this browser and Settings › Sync.
  */
 export function useSidebarTabs(): {
 	layout: TabLayout;
@@ -135,20 +139,7 @@ export function useSidebarTabs(): {
 	const [layout, setLayout] = useStoredState(KEY, decodeTabLayout, encodeTabLayout);
 	useEffect(() => {
 		const raw = localStorage.getItem(KEY);
-		let legacyTodo = false;
-		if (raw !== null) {
-			try {
-				const stored: unknown = JSON.parse(raw);
-				if (Array.isArray(stored)) {
-					const tabs = stored.flatMap(entry => (isObject(entry) && typeof entry.tab === "string" ? [entry.tab] : []));
-					const todoAt = tabs.indexOf("todo");
-					legacyTodo = todoAt >= 0 && tabs[todoAt + 1] === "notes";
-				}
-			} catch {
-				legacyTodo = false;
-			}
-		}
-		if ((raw !== null && raw.includes(`"tab":"${LEGACY_EMAIL_TAB}"`)) || legacyTodo) setLayout(layout);
+		if (raw !== null && raw !== encodeTabLayout(layout)) setLayout(layout);
 	}, [layout, setLayout]);
 	const signedOut = useSignedOutTabs();
 	const shown = useMemo(() => shownTabs(layout, signedOut), [layout, signedOut]);

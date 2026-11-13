@@ -1,18 +1,19 @@
 /** People and state on pull requests: avatars, reviewer pictures marked by their review, and icon tooltips. */
-import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, type LucideIcon } from "lucide-react";
+import { IconDraft, IconMerged, IconPullRequest, IconPullRequestClosedSimple } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import type { Person, PullRequestDetail, Reviewer, ReviewerState } from "../../../src/shared/github";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-export const STATE_ICON: Record<PullRequestDetail["state"], [LucideIcon, string, string]> = {
-	open: [GitPullRequest, "text-emerald-600 dark:text-emerald-400", "Open pull request"],
-	draft: [GitPullRequestDraft, "text-muted-foreground", "Draft pull request, not ready for review"],
-	merged: [GitMerge, "text-violet-600 dark:text-violet-400", "Merged pull request"],
-	closed: [GitPullRequestClosed, "text-red-600 dark:text-red-400", "Closed pull request"],
+export const STATE_ICON: Record<PullRequestDetail["state"], [IconComponent, string, string]> = {
+	open: [IconPullRequest, "text-emerald-600 dark:text-emerald-400", "Open pull request"],
+	draft: [IconDraft, "text-muted-foreground", "Draft pull request, not ready for review"],
+	merged: [IconMerged, "text-violet-600 dark:text-violet-400", "Merged pull request"],
+	closed: [IconPullRequestClosedSimple, "text-red-600 dark:text-red-400", "Closed pull request"],
 };
 
 /** An icon with its meaning on hover, and to screen readers. */
-export function IconTip({ icon: [Icon, color, label], className }: { icon: [LucideIcon, string, string]; className?: string }) {
+export function IconTip({ icon: [Icon, color, label], className }: { icon: [IconComponent, string, string]; className?: string }) {
 	return (
 		<Tooltip content={label}>
 			<span role="img" aria-label={label} className={cn("flex shrink-0", className)}>

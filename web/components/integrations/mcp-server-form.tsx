@@ -1,4 +1,4 @@
-import { CircleAlert } from "lucide-react";
+import { IconExclamationCircle } from "central-icons";
 import { type FormEvent, useId, useState } from "react";
 import { REMOTE_TRANSPORTS, type McpServerRow, type RemoteTransport } from "../../../src/shared/mcp-servers";
 import { Button } from "@/components/ui/button";
@@ -117,7 +117,7 @@ export function McpServerForm({ onDone }: { onDone: () => void }) {
 				</Field>
 			</div>
 			{save.error && (
-				<Callout tone="danger" icon={CircleAlert} role="alert">
+				<Callout tone="danger" icon={IconExclamationCircle} role="alert">
 					Cannot add the server: {save.error}
 				</Callout>
 			)}

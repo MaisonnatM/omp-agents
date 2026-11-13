@@ -1,5 +1,5 @@
 /** A log's figures as a row of cells, and the dialog that sums a session up once it is logged, with the records it beat. */
-import { Gauge, Star } from "lucide-react";
+import { IconGauge, IconStar } from "central-icons";
 import type { Plan } from "../../../src/shared/sport";
 import { Button } from "@/components/ui/button";
 import { hashForSport } from "../../routing";
@@ -47,7 +47,7 @@ export function SummaryDialog({ saved: { log, minutes, beaten, test }, plan, onC
 					]}
 				/>
 				{test && (
-					<Callout tone="info" icon={Gauge}>
+					<Callout tone="info" icon={IconGauge}>
 						Nouveau {test.metric.label.toLowerCase()} : <span className="font-medium">{amount(test.value, test.metric.unit)}</span>
 						{test.was && `, ${signedAmount(test.value - test.was.value, test.metric.unit)} depuis le test du ${shortDate(test.was.at)}`}. Les charges de la phase sont recalculées.
 					</Callout>
@@ -56,7 +56,7 @@ export function SummaryDialog({ saved: { log, minutes, beaten, test }, plan, onC
 					<ul aria-label="Records" className="flex flex-col gap-1.5">
 						{beaten.map(record => (
 							<li key={record.label} className="flex items-center gap-2 text-sm">
-								<Star aria-hidden className="size-4 shrink-0 fill-warning text-warning" />
+								<IconStar className="size-4 shrink-0 text-warning icon-shapes:fill-current" />
 								<span className="min-w-0 flex-1">
 									Record · {record.label} <span className="font-medium tabular-nums">{record.now}</span>
 								</span>

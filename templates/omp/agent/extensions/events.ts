@@ -94,7 +94,6 @@ export default function events(pi: ExtensionAPI) {
 			"Do not add one, for example:",
 			"- Tests passed and the PR is open: nothing waits on time; the user reviews it anyway.",
 			"- A step the user must take with no time attached, such as setting up an account: that is user_todo.",
-			"- A finding to keep: that is user_note.",
 			"You can remove only the events this session added.",
 		].join("\n"),
 		parameters: params,

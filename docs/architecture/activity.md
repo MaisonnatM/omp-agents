@@ -94,7 +94,6 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Pages: Pull requests | view, control | `pull-requests`; `pull-requests.view.list`, `pull-requests.view.board`; Rebase N behind is a `PUT` |
 | Pages: Tickets | view | `tickets`, `tickets/item` |
 | Pages: Todo | view | `todo`, `todo/item` |
-| Pages: Notes | view | `notes`, `notes/item` |
 | Pages: Calendar | view, control | `calendar`; `calendar.routines.toggle` |
 | Pages: Email | view | `email`, `email/new`, `email/item` |
 | Pages: Sport | view, control, action | `sport`, `sport/journal`, `sport/journal/item`, `sport/progress`; `sport.tab.week`, `sport.tab.journal`, `sport.tab.progress`, `sport.week.step`, `sport.log.open`, `sport.log.free` for the header's and a rest day's **Séance libre**, `sport.log.save`, `sport.demo.open`, `sport.demo.play`, `sport.demo.step` for the demo dialog's **Précédent** and **Suivant**, `sport.day.edit` for the day's **Modifier…**, `sport.journal.edit`, `sport.journal.remove`, `sport.weigh.open`, `sport.weigh.save`, `sport.progress.card`, `sport.progress.range`; `sport-changes` |

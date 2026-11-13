@@ -3,17 +3,18 @@
 - **Keyboard shortcuts** at the foot of the sidebar opens Settings › Keyboard, and shows its key, ?.
 - The sidebar runs the window's height on the window's background, and the page and the session details sidebar sit beside it as rounded panels.
   Its top row, 48 px tall at the default font size as the header's tabs beside it are, holds the omp mark, the command menu button, and the button that hides the sidebar.
-- Under it the page list shows **New session**, then **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Notes**, **Calendar**, **Todo**, **Sport**, and **Email** in the order Settings › Preferences gives them, then **Settings**.
-  A row opens its page, and the open page's row stays highlighted with that page's own list nested under it, such as the Todo categories or the Settings sections.
-  A page whose row you hid in Preferences shows its list after the last row.
+- Under it the page list shows **New session**, then **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Calendar**, **Todo**, **Sport**, and **Email** in the order Settings › Preferences gives them, then **Settings**.
+  A row opens its page, and the open page's row stays highlighted while that page's own list, such as the Bots, the Todo categories, or the Settings sections, shows in a column at the page's left, as in Linear's inbox.
+  Drag the column's right edge to widen or narrow it, or double-click the edge to reset it; every page's list keeps that width in this browser.
+  On a phone, where the sidebar floats over the page, that list shows under the page's row instead, and a page whose row you hid in Preferences shows its list after the last row.
   **Bots** lists your Bots and opens their conversations, which stay out of the roster.
   See [Bots](bots.md).
   **Sessions** counts the sessions of the picked workspace that need you: each that asks you something, or finished a turn you have not looked at since.
   A finished turn you have read leaves the count, though its session stays idle.
   So does a finished turn of a session waiting on its subagents, until they stop.
-- The header's tabs run across the top right of the sidebar: Back and Forward, a tab for each page and session you opened lately, **New session** as a +, and What's new, the bell, and Settings at the right end.
-  Clicking a tab focuses its page or session, and opening a page or a session that has no tab adds one at the end; the row keeps eight, dropping the one seen longest ago.
-  The × on a tab, or a middle-click, closes it, and closing the one on screen shows its neighbor.
+- The header's tabs run across the top right of the sidebar: Back and Forward, your tabs, a + that opens a new tab, and What's new, the bell, and Settings at the right end.
+  A tab works as in Capy: opening a page or a session, from the sidebar or anywhere else, shows it in the tab on screen, and a session another tab already shows switches to that tab; only the + adds a tab, on New session.
+  The × on a tab, or a middle-click, closes it, closing the one on screen shows its neighbor, and closing the last one leaves a new tab on New session.
   Drag a tab to move it, or focus it and press Alt+Shift+← or →; this browser keeps the tabs and their order across reloads.
   In the desktop app on macOS the row is the window's title bar: it starts after the window's buttons and drags the window.
 - The dot before each session shows when it waits on you.

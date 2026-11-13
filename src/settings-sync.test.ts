@@ -11,14 +11,12 @@ import type { ListKind } from "./server/list-registry";
 import { PreferencesFile } from "./server/preferences-file";
 import { ProcessSettingsFile } from "./server/process-settings-file";
 import { RoutinesFile } from "./server/routines-file";
-import { UserNotesFile } from "./server/user-notes-file";
 import { UserTodosFile } from "./server/user-todos-file";
 import { WorkspacesFile } from "./server/workspaces-file";
 import { applyLocal, localPath, mergeFile, mergeJson, planSync, portablePath, portableText, readLocal, SettingsSync, type SyncStore, sourceControlStore, syncStores } from "./settings-sync";
 import { missingGithubRepo, neverSynced, parseSyncSettings, SYNC_ITEMS, type SyncStoreId } from "./shared/settings-sync";
 import { type BotId, parseBotId } from "./shared/bots";
 import { SourceControl } from "./source-control";
-import type { UserNoteChange } from "./user-notes-shared";
 import { addTodo } from "./user-todos";
 
 const dirs: string[] = [];
@@ -42,7 +40,7 @@ const text = (value: string) => ({ text: value, executable: false });
 /** Stores that read `values`, `{}` for the rest, and take whatever sync writes. */
 const fixedStores = (values: Partial<Record<SyncStoreId, unknown>> = {}): Record<SyncStoreId, SyncStore> => {
 	const store = (id: SyncStoreId): SyncStore => ({ read: () => values[id] ?? {}, parse: value => ({ ok: value }), write: () => {} });
-	return { "source-control": store("source-control"), notes: store("notes"), todos: store("todos"), preferences: store("preferences"), workspaces: store("workspaces"), calendars: store("calendars"), bots: store("bots") };
+	return { "source-control": store("source-control"), todos: store("todos"), preferences: store("preferences"), workspaces: store("workspaces"), calendars: store("calendars"), bots: store("bots") };
 };
 
 describe("what syncs", () => {
@@ -73,22 +71,21 @@ describe("what syncs", () => {
 		put(join(elsewhere, "SKILL.md"), "# Gamma\n");
 		symlinkSync(elsewhere, join(omp, "skills", "gamma"));
 		const settings = { on: false, repos: {}, cleanUp: true };
-		const notes = { notes: { n: { title: "GitHub", body: `ghp_${"b".repeat(36)}` } } };
-		const { files, skipped } = await readLocal(SYNC_ITEMS, { omp, home: "/Users/nobody", stores: fixedStores({ "source-control": settings, notes }) });
+		const todos = { todos: [{ id: "t", text: "GitHub", notes: `ghp_${"b".repeat(36)}` }] };
+		const { files, skipped } = await readLocal(SYNC_ITEMS, { omp, home: "/Users/nobody", stores: fixedStores({ "source-control": settings, todos }) });
 		expect(Object.fromEntries(files)).toEqual({
 			"omp/config.yml": text("theme: dark\n"),
 			"omp/AGENTS.md": text("Be brief.\n"),
 			"omp/skills/alpha/SKILL.md": text("# Alpha\n"),
 			"omp/skills/alpha/run.sh": { text: "#!/bin/sh\n", executable: true },
 			"dashboard/source-control.json": text('{\n\t"cleanUp": true,\n\t"on": false,\n\t"repos": {}\n}\n'),
-			"dashboard/todos.json": text("{}\n"),
 			"dashboard/preferences.json": text("{}\n"),
 			"dashboard/workspaces.json": text("{}\n"),
 			"dashboard/bots.json": text("{}\n"),
 			"dashboard/calendars.json": text("{}\n"),
 		});
 		expect(skipped.sort((a, b) => a.path.localeCompare(b.path))).toEqual([
-			{ path: "dashboard/notes.json", reason: "credential" },
+			{ path: "dashboard/todos.json", reason: "credential" },
 			{ path: "omp/skills/alpha/logo.png", reason: "binary" },
 			{ path: "omp/skills/beta/SKILL.md", reason: "credential" },
 			{ path: "omp/skills/gamma", reason: "link" },
@@ -103,6 +100,12 @@ describe("a remote's paths", () => {
 		const remote = new Map(["omp/skills/../../../.zshrc", "omp/skills//x", "omp/skills/./x", "omp/skills/a/SKILL.md"].map(path => [path, text("x\n")]));
 		const plan = planSync({ items: SYNC_ITEMS, base: new Map(), local: new Map(), remote, skipped: [], choices: {} });
 		expect(plan.conflicts === null && [...plan.toLocal.keys()]).toEqual(["omp/skills/a/SKILL.md"]);
+	});
+
+	test("a file no item names, such as an older version's dashboard/notes.json, stays on the remote as it is", () => {
+		const notes = new Map([["dashboard/notes.json", text("{}\n")]]);
+		const plan = planSync({ items: SYNC_ITEMS, base: notes, local: new Map(), remote: notes, skipped: [], choices: {} });
+		expect(plan.conflicts === null && [...plan.toLocal.keys(), ...plan.toRemote.keys()]).toEqual([]);
 	});
 
 	test("a write that would land outside its item's directory is refused before it touches the disk", async () => {
@@ -204,7 +207,16 @@ describe("parseSyncSettings", () => {
 		expect(parseSyncSettings({ remote: "https://ann:hunter2@example.com/omp.git", branch: "main", excluded: [] })).toEqual({ error: "Leave the password out of the address; sync uses this machine's git credentials" });
 		expect(parseSyncSettings({ remote: "--upload-pack=touch", branch: "main", excluded: [] })).toEqual({ error: "That is not a Git remote address" });
 		expect(parseSyncSettings({ remote: "/tmp/r.git", branch: "../x", excluded: [] })).toEqual({ error: "That is not a branch name" });
+		expect(parseSyncSettings({ remote: "/tmp/r.git", branch: "main", excluded: ["notes"] })).toEqual({ error: "Unknown sync item" });
 	});
+});
+
+test("saved sync settings that exclude an item this version lacks, such as notes, load without it", () => {
+	const dir = scratch();
+	const file = join(dir, "settings-sync.json");
+	put(file, JSON.stringify({ settings: { remote: "/tmp/r.git", branch: "main", excluded: ["notes", "todos"] }, last: null }));
+	const sync = new SettingsSync(file, join(dir, "repo.git"), { omp: dir, home: dir, stores: fixedStores() });
+	expect(sync.answer().settings).toEqual({ remote: "/tmp/r.git", branch: "main", excluded: ["todos"] });
 });
 
 /** One machine: its home, omp's directory, the dashboard's files, the lists a sync rewrote, and its settings sync on `remote`. */
@@ -216,7 +228,6 @@ function machine(root: string, remote: string) {
 	mkdirSync(config(""), { recursive: true });
 	const files = {
 		sourceControl: new SourceControl(config("source-control.json")),
-		notes: new UserNotesFile(config("notes.json")),
 		todos: new UserTodosFile(config("todos.json")),
 		preferences: new PreferencesFile(config("preferences.json")),
 		processes: new ProcessSettingsFile(config("processes.json")),
@@ -242,7 +253,6 @@ async function pair() {
 	return { remote, a: machine(join(root, "a"), remote), b: machine(join(root, "b"), remote) };
 }
 
-const addNote = (id: string): UserNoteChange => ({ op: "add", note: { id, title: id, body: "", todoId: null, addedBy: null, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" } });
 
 test("a failed sync names the GitHub repository it could not find, and nothing for another failure or host", () => {
 	expect(missingGithubRepo("git@github.com:ann/omp-settings.git", "ERROR: Repository not found.")).toBe("ann/omp-settings");
@@ -265,7 +275,7 @@ describe("SettingsSync", () => {
 		put(agentsMd(a), `Notes live in ${a.home}/notes.\n`);
 		put(join(a.omp, "skills", "alpha", "SKILL.md"), "# Alpha\n");
 		a.sourceControl.apply({ op: "repo", repo: join(a.home, "code", "app"), on: true });
-		const sent = ["bots", "calendars", "notes", "preferences", "source-control", "todos", "workspaces"].map(name => `dashboard/${name}.json`);
+		const sent = ["bots", "calendars", "preferences", "source-control", "todos", "workspaces"].map(name => `dashboard/${name}.json`);
 		expect((await a.sync.sync()).last).toMatchObject({ kind: "synced", received: [], sent: [...sent, "omp/AGENTS.md", "omp/skills/alpha/SKILL.md"] });
 		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: ["dashboard/source-control.json", "omp/AGENTS.md", "omp/skills/alpha/SKILL.md"], sent: [] });
 		expect(readFileSync(agentsMd(b), "utf8")).toBe("Notes live in ~/notes.\n");
@@ -363,33 +373,28 @@ describe("SettingsSync", () => {
 		expect(b.routines.value.map(({ id }) => id)).toEqual(["r1"]);
 	});
 
-	test("keeps the todos and notes two machines each added, carries the preferences, workspaces, and each todo's Workspace, and settles both on one list", async () => {
+	test("keeps the todos two machines each added, carries the preferences, workspaces, and each todo's Workspace, and settles both on one list", async () => {
 		const { remote, a, b } = await pair();
-		const [notes, preferences, todos, workspaces] = ["notes", "preferences", "todos", "workspaces"].map(name => `dashboard/${name}.json`);
+		const [preferences, todos, workspaces] = ["preferences", "todos", "workspaces"].map(name => `dashboard/${name}.json`);
 		await a.sync.sync();
 		await b.sync.sync();
 		a.todos.apply(addTodo({ id: "from-a", text: "From A", workspace: join(a.home, "code", "app") }));
-		a.notes.apply(addNote("note-a"));
 		a.preferences.apply({ op: "set", key: "omp-agents.theme", value: "dark" });
 		a.workspaces.apply({ op: "add", cwd: join(a.home, "code", "app") });
 		b.todos.apply(addTodo({ id: "from-b", text: "From B", status: "done" }));
-		b.notes.apply(addNote("note-b"));
 
-		expect((await a.sync.sync()).last).toMatchObject({ kind: "synced", received: [], sent: [notes, preferences, todos, workspaces] });
+		expect((await a.sync.sync()).last).toMatchObject({ kind: "synced", received: [], sent: [preferences, todos, workspaces] });
 		for (const synced of [workspaces, todos]) expect(await runChecked(["git", "--git-dir", remote, "show", `main:${synced}`])).toContain('"~/code/app"');
-		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: [notes, preferences, todos, workspaces], sent: [notes, todos] });
-		expect((await a.sync.sync()).last).toMatchObject({ kind: "synced", received: [notes, todos], sent: [] });
+		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: [preferences, todos, workspaces], sent: [todos] });
+		expect((await a.sync.sync()).last).toMatchObject({ kind: "synced", received: [todos], sent: [] });
 		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: [], sent: [] });
 
-		for (const side of [a, b]) {
-			expect(side.todos.value.todos.map(todo => todo.id)).toEqual(["from-a", "from-b"]);
-			expect(side.notes.value.notes.map(note => note.id).sort()).toEqual(["note-a", "note-b"]);
-		}
+		for (const side of [a, b]) expect(side.todos.value.todos.map(todo => todo.id)).toEqual(["from-a", "from-b"]);
 		expect(b.preferences.value).toEqual({ "omp-agents.theme": "dark" });
 		expect(b.workspaces.value.added).toEqual([join(b.home, "code", "app")]);
 		expect(b.todos.value.todos.map(todo => todo.workspace)).toEqual([join(b.home, "code", "app"), null]);
-		expect([...b.changed].sort()).toEqual(["preferences", "user-notes", "user-todos", "workspaces"]);
-		expect([...a.changed].sort()).toEqual(["user-notes", "user-todos"]);
+		expect([...b.changed].sort()).toEqual(["preferences", "user-todos", "workspaces"]);
+		expect([...a.changed].sort()).toEqual(["user-todos"]);
 	});
 
 	test("stops on a todo one machine removed and the other edited, until a side is chosen", async () => {

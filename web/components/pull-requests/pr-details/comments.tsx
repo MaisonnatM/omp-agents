@@ -1,5 +1,5 @@
 /** Summary's **Comments**: the pull request's conversations, filtered, ordered, and paged, each thread with its replies, resolve toggle, and reply composer. */
-import { ArrowDownUp, Check, ListFilter, RotateCcw } from "lucide-react";
+import { IconArrowBottomTop, IconArrowRotateCounterClockwise, IconCheckmark1, IconFilter1 } from "central-icons";
 import { type ReactNode, useState } from "react";
 import { MAX_COMMENT_BODY, type PullRequestComment, type PullRequestDetail, type PullRequestEvent, type PullRequestThread } from "../../../../src/shared/github";
 import { Button } from "@/components/ui/button";
@@ -115,7 +115,7 @@ function ThreadCard({ detail, thread, save, send }: ThreadProps) {
 						<div className="flex items-center gap-2 px-3 pb-2 text-xs text-muted-foreground">
 							<ThreadPlace detail={detail} thread={thread} />
 							{(thread.resolved ? thread.can.unresolve : thread.can.resolve) && (
-								<Button variant="ghost" size="xs" className="ml-auto shrink-0" leadingIcon={thread.resolved ? RotateCcw : Check} onClick={toggle}>
+								<Button variant="ghost" size="xs" className="ml-auto shrink-0" leadingIcon={thread.resolved ? IconArrowRotateCounterClockwise : IconCheckmark1} onClick={toggle}>
 									{thread.resolved ? "Unresolve" : "Resolve"}
 								</Button>
 							)}
@@ -171,7 +171,7 @@ export function Comments({ detail, save, send }: CommentsProps) {
 	const actions = (
 		<div className="flex shrink-0 items-center gap-1">
 			<DropdownMenu>
-				<DropdownMenuTrigger render={<Button size="xs" variant="ghost-muted" aria-label="Filter comments" leadingIcon={ListFilter} />}>
+				<DropdownMenuTrigger render={<Button size="xs" variant="ghost-muted" aria-label="Filter comments" leadingIcon={IconFilter1} />}>
 					{hiddenComments ? `${hiddenComments} hidden` : "Filter"}
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end">
@@ -200,7 +200,7 @@ export function Comments({ detail, save, send }: CommentsProps) {
 			<Button
 				size="xs"
 				variant="ghost-muted"
-				leadingIcon={ArrowDownUp}
+				leadingIcon={IconArrowBottomTop}
 				aria-label={order === "newest" ? "Show oldest comments first" : "Show newest comments first"}
 				onClick={() => setOrder(order === "newest" ? "oldest" : "newest")}
 			>

@@ -21,8 +21,6 @@ export function pageTitle(page: Page): string {
 			return page.target ?? "Tickets";
 		case "todo":
 			return "Todo";
-		case "notes":
-			return "Notes";
 		case "bots":
 			if (page.target === null) return page.adding ? "New Bot" : "Bots";
 			if (page.routine === null) return "Bot";

@@ -7,6 +7,8 @@ line still has the answer:
    No label in front of it, and no recap of the steps taken.
 2. **Body, only when needed:** at most about five bullets, each opening with
    its key word in bold, such as "**Time.** Nothing says how to pick it."
+   When the items share the same fields, such as ticket, PR, and verdict,
+   use a table with one row per item instead of bullets.
    Details go after the conclusion, background last.
 3. **Closing lines, each only when it has content:**
    - **Needs you:** the one decision or step waiting on the user.

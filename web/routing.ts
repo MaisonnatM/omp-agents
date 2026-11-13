@@ -1,5 +1,6 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { BarChart3, Blocks, Brain, FileText, Folders, GitBranch, GitMerge, HardDrive, Keyboard, KeyRound, type LucideIcon, MousePointerClick, Plug, RefreshCcw, Route as RouteIcon, Scale, Settings2, SlidersHorizontal, Smartphone, Workflow } from "lucide-react";
+import { IconAgentNetwork, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconKeyboard, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconStorage } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { isDay } from "../src/json";
 import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
@@ -19,14 +20,13 @@ export const SIDEBAR_TABS = [
 	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, integration: "linear" },
 	{ value: "bots", label: "Bots", icon: PAGE_ICON.bots },
 	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions },
-	{ value: "notes", label: "Notes", icon: PAGE_ICON.notes },
 	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar },
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo },
 	{ value: "sport", label: "Sport", icon: PAGE_ICON.sport },
 	{ value: "email", label: "Email", icon: PAGE_ICON.email, integration: "gmail" },
-] as const satisfies readonly { value: string; label: string; icon: LucideIcon; integration?: McpIntegrationId }[];
+] as const satisfies readonly { value: string; label: string; icon: IconComponent; integration?: McpIntegrationId }[];
 
-/** A sidebar tab, a row of the sidebar's page list; the tickets, Bots, todo, notes, calendar, email, and sport tabs go with their pages, the sessions and pull requests tabs with the panes. */
+/** A sidebar tab, a row of the sidebar's page list; the tickets, Bots, todo, calendar, email, and sport tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 const PAST_PREFIX = "past/";
@@ -78,28 +78,28 @@ export const SETTINGS_GROUP_LABEL = Object.fromEntries(SETTINGS_GROUPS.map(group
  * them, and its header says so in `meta`; a section of any other group is the same whatever the workspace.
  */
 export const SETTINGS_SECTIONS = [
-	{ value: "analytics", label: "Analytics", icon: BarChart3, group: "usage", keywords: ["usage", "cost", "tokens", "spend"] },
-	{ value: "activity", label: "Activity", icon: MousePointerClick, group: "usage", keywords: ["features", "used", "time"] },
-	{ value: "preferences", label: "Preferences", icon: SlidersHorizontal, group: "general", keywords: ["theme", "dark mode", "notifications", "sound", "sidebar tabs", "transcript", "idle processes"] },
-	{ value: "keyboard", label: "Keyboard", icon: Keyboard, group: "general", keywords: ["shortcuts", "keys", "hotkeys", "keybindings"] },
-	{ value: "workspaces", label: "Workspaces", icon: Folders, group: "general", keywords: ["directories", "folders", "hide"] },
-	{ value: "sync", label: "Sync", icon: RefreshCcw, group: "general", keywords: ["git", "remote", "machines"] },
-	{ value: "phone", label: "Phone access", icon: Smartphone, group: "general", keywords: ["tailscale", "mobile", "pair", "qr"] },
-	{ value: "storage", label: "Storage", icon: HardDrive, group: "general", keywords: ["disk", "space", "gc", "cleanup", "archive", "compress", "sandboxes"] },
-	{ value: "providers", label: "Providers", icon: KeyRound, group: "connections", keywords: ["login", "sign in", "accounts", "api key", "quota"] },
-	{ value: "integrations", label: "Integrations", icon: Plug, group: "connections", keywords: ["linear", "slack", "github", "gmail", "calendar", "connect"] },
-	{ value: "mcp-servers", label: "MCP servers", icon: Blocks, group: "connections", keywords: ["mcp", "tools"] },
-	{ value: "source-control", label: "Source control", icon: GitMerge, group: "connections", keywords: ["github", "gh", "pull", "merge"] },
-	{ value: "models", label: "Models", icon: RouteIcon, group: "workspace", keywords: ["roles", "fallback", "retry"], meta: AS_LOADED },
+	{ value: "analytics", label: "Analytics", icon: IconChart3, group: "usage", keywords: ["usage", "cost", "tokens", "spend"] },
+	{ value: "activity", label: "Activity", icon: IconCursorClick, group: "usage", keywords: ["features", "used", "time"] },
+	{ value: "preferences", label: "Preferences", icon: IconSettingsSliderHor, group: "general", keywords: ["theme", "dark mode", "notifications", "sound", "sidebar tabs", "transcript", "idle processes"] },
+	{ value: "keyboard", label: "Keyboard", icon: IconKeyboard, group: "general", keywords: ["shortcuts", "keys", "hotkeys", "keybindings"] },
+	{ value: "workspaces", label: "Workspaces", icon: IconFolders, group: "general", keywords: ["directories", "folders", "hide"] },
+	{ value: "sync", label: "Sync", icon: IconArrowRotateCounterClockwise, group: "general", keywords: ["git", "remote", "machines"] },
+	{ value: "phone", label: "Phone access", icon: IconPhone, group: "general", keywords: ["tailscale", "mobile", "pair", "qr"] },
+	{ value: "storage", label: "Storage", icon: IconStorage, group: "general", keywords: ["disk", "space", "gc", "cleanup", "archive", "compress", "sandboxes"] },
+	{ value: "providers", label: "Providers", icon: IconKey1, group: "connections", keywords: ["login", "sign in", "accounts", "api key", "quota"] },
+	{ value: "integrations", label: "Integrations", icon: IconPlugin1, group: "connections", keywords: ["linear", "slack", "github", "gmail", "calendar", "connect"] },
+	{ value: "mcp-servers", label: "MCP servers", icon: IconBlocks, group: "connections", keywords: ["mcp", "tools"] },
+	{ value: "source-control", label: "Source control", icon: IconMerged, group: "connections", keywords: ["github", "gh", "pull", "merge"] },
+	{ value: "models", label: "Models", icon: IconDirection1, group: "workspace", keywords: ["roles", "fallback", "retry"], meta: AS_LOADED },
 	{ value: "agents", label: "Agents", icon: PAGE_ICON.bots, group: "workspace", keywords: ["subagents", "delegation", "concurrency", "isolation"], meta: { workspace: "Preview of a new session in this workspace", none: "Preview of a new session with user defaults only" } },
-	{ value: "omp", label: "omp settings", icon: Settings2, group: "workspace", keywords: ["config", "thinking", "compaction", "advisor", "bash", "lsp", "tools"], meta: AS_LOADED },
-	{ value: "omp-memory", label: "omp memory", icon: Brain, group: "workspace", keywords: ["memory", "remember", "recall", "auto-learn", "mnemopi", "hindsight", "sharpshooter"], meta: { ...AS_LOADED, none: "Your user settings only; memory is kept per workspace" } },
-	{ value: "files", label: "Files", icon: FileText, group: "workspace", keywords: ["AGENTS.md", "config", "skills", "rules"], meta: AS_LOADED },
-	{ value: "extensions", label: "Extensions", icon: Blocks, group: "workspace", meta: { none: "Packages installed for your user, all workspaces", workspace: "As a session in this workspace discovers them" }, keywords: ["plugins", "marketplaces", "registry skills", "contributions", "install"] },
-	{ value: "workflows", label: "Workflows", icon: Workflow, group: "workspace", keywords: ["workflow"], meta: { ...AS_LOADED, none: "Your user skills only, for all workspaces" } },
-	{ value: "decisions", label: "Decisions", icon: Scale, group: "workspace", keywords: ["records", "adr"], meta: { workspace: "The repository's decision records, read-only", none: "Every workspace, grouped by workspace" } },
-	{ value: "worktrees", label: "Worktrees", icon: GitBranch, group: "workspace", keywords: ["branches", "cleanup"], meta: AS_LOADED },
-] as const satisfies readonly { value: string; label: string; icon: LucideIcon; group: SettingsGroup; keywords: readonly string[]; meta?: { workspace: string; none: string } }[];
+	{ value: "omp", label: "omp settings", icon: IconSettingsSliderHor, group: "workspace", keywords: ["config", "thinking", "compaction", "advisor", "bash", "lsp", "tools"], meta: AS_LOADED },
+	{ value: "omp-memory", label: "omp memory", icon: IconBrain, group: "workspace", keywords: ["memory", "remember", "recall", "auto-learn", "mnemopi", "hindsight", "sharpshooter"], meta: { ...AS_LOADED, none: "Your user settings only; memory is kept per workspace" } },
+	{ value: "files", label: "Files", icon: IconFileText, group: "workspace", keywords: ["AGENTS.md", "config", "skills", "rules"], meta: AS_LOADED },
+	{ value: "extensions", label: "Extensions", icon: IconBlocks, group: "workspace", meta: { none: "Packages installed for your user, all workspaces", workspace: "As a session in this workspace discovers them" }, keywords: ["plugins", "marketplaces", "registry skills", "contributions", "install"] },
+	{ value: "workflows", label: "Workflows", icon: IconAgentNetwork, group: "workspace", keywords: ["workflow"], meta: { ...AS_LOADED, none: "Your user skills only, for all workspaces" } },
+	{ value: "decisions", label: "Decisions", icon: IconLaw, group: "workspace", keywords: ["records", "adr"], meta: { workspace: "The repository's decision records, read-only", none: "Every workspace, grouped by workspace" } },
+	{ value: "worktrees", label: "Worktrees", icon: IconBranch, group: "workspace", keywords: ["branches", "cleanup"], meta: AS_LOADED },
+] as const satisfies readonly { value: string; label: string; icon: IconComponent; group: SettingsGroup; keywords: readonly string[]; meta?: { workspace: string; none: string } }[];
 
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["value"];
 
@@ -117,15 +117,6 @@ export type TodoListView = { kind: "all" } | { kind: "category"; id: string } | 
 /** The Todo page, listing `list`, with todo `open` beside it when it is non-null and in the list. */
 export interface TodoRoute {
 	list: TodoListView;
-	open: string | null;
-}
-
-/** Which notes the Notes page lists: every one, or those agents added. */
-export type NotesListView = { kind: "all" } | { kind: "agents" };
-
-/** The Notes page, listing `list`, with note `open` beside it when it is non-null and in the list. */
-export interface NotesRoute {
-	list: NotesListView;
 	open: string | null;
 }
 
@@ -183,7 +174,6 @@ export type Page =
 	| ({ kind: "pull-requests" } & PullRequestsRoute)
 	| ({ kind: "tickets" } & TicketsRoute)
 	| ({ kind: "todo" } & TodoRoute)
-	| ({ kind: "notes" } & NotesRoute)
 	| ({ kind: "bots" } & BotsRoute)
 	| { kind: "calendar" }
 	| ({ kind: "email" } & EmailRoute)
@@ -232,7 +222,6 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   opens that issue's details in the main content. Any other `#tickets/…` opens the list alone.
  * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/archive` with the todos due by
  *   today, waiting on you, added by agents, or in the archive; `#todo/<category id>` shows that category alone, and `?open=<id>` opens that todo.
- * - `#notes` opens the Notes page with every note, `#notes/agents` with the notes agents added, and `?open=<id>` opens that note.
  * - `#bots` opens the gallery of every Bot, `#bots/new` the New Bot form, `#bots/<id>` that Bot's page, `#bots/<id>/routines` the card of that
  *   Bot's routines in place of its conversation, `#bots/<id>/routines/<routine id>` that card with that routine open,
  *   `#bots/<id>/routines/<routine id>/edit` that routine's editor, and `#bots/<id>/routines/new` a new routine's editor; Bot and routine ids
@@ -262,7 +251,6 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		const id = named ? null : decodeSegment(rest);
 		return { kind: "todo", list: named ?? (id === null ? { kind: "all" } : { kind: "category", id }), open };
 	},
-	notes: (rest, query) => ({ kind: "notes", list: rest === "agents" ? { kind: "agents" } : { kind: "all" }, open: query.get("open") || null }),
 	bots: rest => {
 		if (rest === "new") return { kind: "bots", target: null, adding: true };
 		const [target, routines, routine, ...more] = (rest ?? "").split("/").map(decodeSegment);
@@ -302,8 +290,6 @@ function restOfPage(page: Page): string | null {
 			return page.target || null;
 		case "todo":
 			return page.list.kind === "all" ? null : page.list.kind === "category" ? encodeURIComponent(page.list.id) : page.list.kind;
-		case "notes":
-			return page.list.kind === "all" ? null : page.list.kind;
 		case "bots":
 			if (page.target === null) return page.adding ? "new" : null;
 			return page.routine === null ? encodeURIComponent(page.target) : `${encodeURIComponent(page.target)}/${restOfBotRoutine(page.routine)}`;
@@ -323,13 +309,12 @@ function restOfPage(page: Page): string | null {
 	}
 }
 
-/** The `?name=value` that follows `page`'s path: the todo a new session works on, or the todo or note its page opens; `null` for none. */
+/** The `?name=value` that follows `page`'s path: the todo a new session works on, or the todo its page opens; `null` for none. */
 function queryOfPage(page: Page): string | null {
 	switch (page.kind) {
 		case "new":
 			return page.todoId === null ? null : `todo=${encodeURIComponent(page.todoId)}`;
 		case "todo":
-		case "notes":
 			return page.open === null ? null : `open=${encodeURIComponent(page.open)}`;
 		case "sport":
 			if (page.tab === "week") return page.day === null ? null : `day=${page.day}`;
@@ -370,7 +355,6 @@ export function hashForTodoId({ todos, archive }: UserTodoList, id: string): str
 	if (open) return hashForOpenTodo(id, open.categoryId);
 	return archive.some(holds) ? hashForTodo({ kind: "archive" }, id) : null;
 }
-export const hashForNotes = (list: NotesListView, open: string | null = null): string => hashForPage({ kind: "notes", list, open });
 export const hashForBots = (target: string | null): string => hashForPage(target === null ? { kind: "bots", target, adding: false } : { kind: "bots", target, routine: null });
 export const hashForNewBot = (): string => hashForPage({ kind: "bots", target: null, adding: true });
 export const hashForBotRoutine = (botId: string, routine: BotRoutineRoute): string => hashForPage({ kind: "bots", target: botId, routine });
@@ -438,7 +422,7 @@ function paneForView(view: View): string {
 	return view.agentId === null ? session : `${session}/${encodeURIComponent(view.agentId)}`;
 }
 
-/** Instance ids are hex, so none reads as `past`, `settings`, `pull-requests`, `tickets`, `todo`, `notes`, `bots`, `session`, or `new`. `null` for a pane whose ids do not decode. */
+/** Instance ids are hex, so none reads as `past`, `settings`, `pull-requests`, `tickets`, `todo`, `bots`, `session`, or `new`. `null` for a pane whose ids do not decode. */
 function viewFromPane(pane: string): View | null {
 	if (pane.startsWith(PAST_PREFIX)) {
 		const sessionId = decodeSegment(pane.slice(PAST_PREFIX.length));

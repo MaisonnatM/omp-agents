@@ -1,5 +1,5 @@
 /** The sidebar's Todo tab: the todo views and categories, with counts left to do (`TodoCategories`). */
-import { Check, Ellipsis, Pencil, Plus, Trash2 } from "lucide-react";
+import { IconCheckmark1, IconDotGrid1x3Horizontal, IconPencil, IconPlusLarge, IconTrashCan } from "central-icons";
 import { type ReactNode, useRef, useState } from "react";
 import type { UserTodoChange, UserTodoList } from "../../../src/user-todos-shared";
 import { badgeColors } from "@/components/ui/badge";
@@ -76,16 +76,16 @@ function CategoryMenu({ name, onRename, onDelete }: { name: string; onRename: ()
 		<DropdownMenu open={open} onOpenChange={setOpen}>
 			<Tooltip content="More actions" forceOpen={open ? false : undefined}>
 				<DropdownMenuTrigger render={<SidebarMenuAction showOnHover aria-label={`More actions for ${name}`} />}>
-					<Ellipsis />
+					<IconDotGrid1x3Horizontal />
 				</DropdownMenuTrigger>
 			</Tooltip>
 			<DropdownMenuContent align="end">
 				<MenuItem onClick={onRename}>
-					<Pencil />
+					<IconPencil />
 					Rename
 				</MenuItem>
 				<MenuItem variant="destructive" onClick={onDelete}>
-					<Trash2 />
+					<IconTrashCan />
 					Delete, keeping its todos
 				</MenuItem>
 			</DropdownMenuContent>
@@ -108,7 +108,7 @@ function ShownCheckbox({ id, name, shown, onToggle }: { id: string; name: string
 				className="absolute left-[3px] top-1/2 z-20 flex size-6 -translate-y-1/2 items-center justify-center rounded-md outline-none hover:bg-hover focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)]"
 			>
 				<span aria-hidden className="flex size-3.5 items-center justify-center rounded-[3px] border-2" style={{ borderColor: color, backgroundColor: shown ? color : undefined }}>
-					{shown && <Check className="size-2.5 text-white" strokeWidth={3.5} />}
+					{shown && <IconCheckmark1 className="size-2.5 text-white icon-shapes:stroke-[3.5]" />}
 				</span>
 			</button>
 		</Tooltip>
@@ -151,7 +151,7 @@ export function TodoCategories({ list, view, disabled, onChange, sessions }: Tod
 				{!disabled && (
 					<Tooltip content="New category">
 						<SidebarGroupAction aria-label="New category" onClick={() => setNaming({ kind: "add" })}>
-							<Plus />
+							<IconPlusLarge />
 						</SidebarGroupAction>
 					</Tooltip>
 				)}

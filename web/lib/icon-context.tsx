@@ -2,76 +2,11 @@
 
 import { createContext, useContext, useMemo, type ComponentType, type ReactNode } from "react";
 
-import {
-  ChevronRight,
-  ChevronDown,
-  X,
-  Copy,
-  Menu,
-  Dot,
-  Monitor,
-  Sun,
-  Moon,
-  RectangleHorizontal,
-  Circle,
-  SquareLibrary,
-  Clock,
-  Star,
-  Settings,
-  Plus,
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
-  ArrowDown,
-  Search,
-  Loader,
-  Users,
-  Lock,
-  Mail,
-  Bell,
-  Shield,
-  Palette,
-  Lightbulb,
-  Rocket,
-  Heart,
-  Paintbrush,
-  Brain,
-  Globe,
-  User,
-  ImageIcon,
-  FileText,
-  Link,
-  Check,
-  RotateCcw,
-  Play,
-  Pause,
-  Pipette,
-  Home,
-  MessageCircle,
-  Inbox,
-  Pencil,
-  Scaling,
-  SkipForward,
-  CornerDownRight,
-  CornerDownLeft,
-  PanelLeft,
-  PanelRight,
-  ChevronsUpDown,
-  Ellipsis,
-  EllipsisVertical,
-  Calendar,
-  Folder,
-  SlidersHorizontal,
-  Info,
-  GitBranch,
-} from "lucide-react";
+import type { CentralIconBaseProps } from "central-icons";
+import { IconArrowCornerDownLeft, IconArrowCornerDownRight, IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowRotateCounterClockwise, IconArrowUp, IconBarsThree, IconBell, IconBrain, IconBranch, IconBubble2, IconCalendar1, IconChainLink1, IconCheckmark1, IconChevronBottom, IconChevronGrabberVertical, IconChevronRight, IconFormCircle, IconCircleInfo, IconRecord, IconClock, IconColorPalette, IconCrossMedium, IconDotGrid1x3Horizontal, IconDotGrid1x3Vertical, IconEmail1, IconEyedropper, IconFileText, IconFolder1, IconFormRectangle, IconGlobe, IconGroup1, IconHeart, IconHome, IconImac, IconImages1, IconInboxEmpty, IconLibrary, IconLightBulb, IconLoader, IconLock, IconMagnifyingGlass, IconMoon, IconPaintBrush, IconPause, IconPencil, IconPlay, IconPlusLarge, IconResize, IconRocket, IconSettingsGear1, IconSettingsSliderHor, IconShield, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide, IconSquareBehindSquare1, IconStar, IconStepForwards, IconSun, IconUser } from "central-icons";
 
-export interface IconComponentProps {
-  size?: number;
-  strokeWidth?: number;
-  className?: string;
-}
-
+/** A Central icon's props without the svg-level stroke and fill, which never reach its masked shapes; style them with the `icon-shapes` variant instead. */
+export type IconComponentProps = Omit<CentralIconBaseProps, "strokeWidth" | "stroke" | "fill">;
 export type IconComponent = ComponentType<IconComponentProps>;
 
 export type IconName =
@@ -91,74 +26,74 @@ export type IconName =
   | "sliders-horizontal" | "info" | "git-branch";
 
 export const defaultIcons: Record<IconName, IconComponent> = {
-  "chevron-right": ChevronRight,
-  "chevron-down": ChevronDown,
-  "pipette": Pipette,
-  "x": X,
-  "copy": Copy,
-  "menu": Menu,
-  "dot": Dot,
-  "monitor": Monitor,
-  "sun": Sun,
-  "moon": Moon,
-  "rectangle-horizontal": RectangleHorizontal,
-  "circle": Circle,
-  "square-library": SquareLibrary,
-  "clock": Clock,
-  "star": Star,
-  "settings": Settings,
-  "plus": Plus,
-  "arrow-left": ArrowLeft,
-  "arrow-right": ArrowRight,
-  "arrow-up": ArrowUp,
-  "arrow-down": ArrowDown,
-  "search": Search,
-  "loader": Loader,
-  "users": Users,
-  "lock": Lock,
-  "mail": Mail,
-  "bell": Bell,
-  "shield": Shield,
-  "palette": Palette,
-  "lightbulb": Lightbulb,
-  "rocket": Rocket,
-  "heart": Heart,
-  "paintbrush": Paintbrush,
-  "brain": Brain,
-  "globe": Globe,
-  "user": User,
-  "image": ImageIcon,
-  "file-text": FileText,
-  "link": Link,
-  "check": Check,
-  "rotate-ccw": RotateCcw,
-  "play": Play,
-  "pause": Pause,
-  "home": Home,
-  "message-circle": MessageCircle,
-  "inbox": Inbox,
-  "pencil": Pencil,
-  "scaling": Scaling,
-  "skip-forward": SkipForward,
-  "corner-down-right": CornerDownRight,
-  "corner-down-left": CornerDownLeft,
-  "panel-left": PanelLeft,
-  "panel-right": PanelRight,
-  "chevrons-up-down": ChevronsUpDown,
-  "more-horizontal": Ellipsis,
-  "more-vertical": EllipsisVertical,
-  "calendar": Calendar,
-  "folder": Folder,
-  "sliders-horizontal": SlidersHorizontal,
-  "info": Info,
-  "git-branch": GitBranch,
+  "chevron-right": IconChevronRight,
+  "chevron-down": IconChevronBottom,
+  "pipette": IconEyedropper,
+  "x": IconCrossMedium,
+  "copy": IconSquareBehindSquare1,
+  "menu": IconBarsThree,
+  "dot": IconRecord,
+  "monitor": IconImac,
+  "sun": IconSun,
+  "moon": IconMoon,
+  "rectangle-horizontal": IconFormRectangle,
+  "circle": IconFormCircle,
+  "square-library": IconLibrary,
+  "clock": IconClock,
+  "star": IconStar,
+  "settings": IconSettingsGear1,
+  "plus": IconPlusLarge,
+  "arrow-left": IconArrowLeft,
+  "arrow-right": IconArrowRight,
+  "arrow-up": IconArrowUp,
+  "arrow-down": IconArrowDown,
+  "search": IconMagnifyingGlass,
+  "loader": IconLoader,
+  "users": IconGroup1,
+  "lock": IconLock,
+  "mail": IconEmail1,
+  "bell": IconBell,
+  "shield": IconShield,
+  "palette": IconColorPalette,
+  "lightbulb": IconLightBulb,
+  "rocket": IconRocket,
+  "heart": IconHeart,
+  "paintbrush": IconPaintBrush,
+  "brain": IconBrain,
+  "globe": IconGlobe,
+  "user": IconUser,
+  "image": IconImages1,
+  "file-text": IconFileText,
+  "link": IconChainLink1,
+  "check": IconCheckmark1,
+  "rotate-ccw": IconArrowRotateCounterClockwise,
+  "play": IconPlay,
+  "pause": IconPause,
+  "home": IconHome,
+  "message-circle": IconBubble2,
+  "inbox": IconInboxEmpty,
+  "pencil": IconPencil,
+  "scaling": IconResize,
+  "skip-forward": IconStepForwards,
+  "corner-down-right": IconArrowCornerDownRight,
+  "corner-down-left": IconArrowCornerDownLeft,
+  "panel-left": IconSidebarSimpleLeftWide,
+  "panel-right": IconSidebarSimpleRightWide,
+  "chevrons-up-down": IconChevronGrabberVertical,
+  "more-horizontal": IconDotGrid1x3Horizontal,
+  "more-vertical": IconDotGrid1x3Vertical,
+  "calendar": IconCalendar1,
+  "folder": IconFolder1,
+  "sliders-horizontal": IconSettingsSliderHor,
+  "info": IconCircleInfo,
+  "git-branch": IconBranch,
 };
 
 const IconContext = createContext<Record<IconName, IconComponent> | null>(null);
 
 /**
  * Returns a single icon component for the given name.
- * Falls back to the default (Lucide) set if no provider is present.
+ * Falls back to the default (Central) set if no provider is present.
  */
 function useIcon(name: IconName): IconComponent {
   const icons = useContext(IconContext);
@@ -167,7 +102,7 @@ function useIcon(name: IconName): IconComponent {
 
 /**
  * Returns the full icon map.
- * Falls back to the default (Lucide) set if no provider is present.
+ * Falls back to the default (Central) set if no provider is present.
  */
 function useIcons(): Record<IconName, IconComponent> {
   const icons = useContext(IconContext);
@@ -176,7 +111,7 @@ function useIcons(): Record<IconName, IconComponent> {
 
 /**
  * Swap some or all icons for components from another library.
- * Names left out of `icons` keep their default (Lucide) component.
+ * Names left out of `icons` keep their default (Central) component.
  */
 function IconProvider({
   children,

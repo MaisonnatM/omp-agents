@@ -21,7 +21,6 @@ import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { NewSession } from "./new-session";
 
 import { PaneGrid } from "./pane-grid";
-import { NotesPage } from "./notes/page";
 import { BotPage, NewBot } from "./bots/bot-page";
 import { BotsGallery } from "./bots/bots-gallery";
 import { SettingsPage } from "./settings/settings-page";
@@ -50,7 +49,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "userNotes" | "sport" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "sport" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -91,7 +90,6 @@ export const PageSwitch = memo(function PageSwitch({
 	splits,
 	models,
 	userTodos,
-	userNotes,
 	sport,
 	routines,
 	bots,
@@ -119,7 +117,7 @@ export const PageSwitch = memo(function PageSwitch({
 	resize,
 	toggleSidebar,
 }: PageSwitchProps) {
-	const { send, start, dismissStart, changeTodo, changeNote, changeSport } = useDashboardActions();
+	const { send, start, dismissStart, changeTodo, changeSport } = useDashboardActions();
 	const scheduleSend = useScheduleSend();
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
 	switch (page?.kind) {
@@ -186,8 +184,7 @@ export const PageSwitch = memo(function PageSwitch({
 					linearConnected={ticketsCallable}
 				/>
 			);
-		case "notes":
-			return <NotesPage list={userNotes} todos={userTodos} view={page.list} openId={page.open} hosts={hosts} past={past} disabled={!connected} onChange={changeNote} />;
+
 		case "bots": {
 			if (page.target === null) {
 				if (page.adding) return <NewBot workspaces={workspaces} defaultCwd={defaultWorkspace} connected={connected} />;

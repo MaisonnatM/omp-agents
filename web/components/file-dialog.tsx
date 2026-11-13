@@ -1,4 +1,4 @@
-import { Check, Copy } from "lucide-react";
+import { IconCheckmark1, IconSquareBehindSquare1 } from "central-icons";
 import { type ReactNode, useMemo, useState } from "react";
 import type { PromptFile } from "../../src/shared/prompt-files";
 import { MAX_TEXT_FILE_BYTES, type TextFile } from "../../src/shared/transcript";
@@ -141,7 +141,7 @@ function CopyAction({ control, label, text }: { control: Parameters<typeof activ
 	return (
 		<Tooltip content={copied ? "Copied" : label}>
 			<Button {...activityControl(control)} variant="ghost" size="icon-compact" aria-label={label} onClick={() => copy(text)}>
-				{copied ? <Check /> : <Copy />}
+				{copied ? <IconCheckmark1 /> : <IconSquareBehindSquare1 />}
 			</Button>
 		</Tooltip>
 	);

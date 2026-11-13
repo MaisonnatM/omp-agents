@@ -1,5 +1,5 @@
 /** Polled lists under a page header. */
-import { RefreshCw } from "lucide-react";
+import { IconArrowRotateClockwise } from "central-icons";
 import { useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -54,7 +54,7 @@ interface ListPageProps<Data> {
 /** A page header's Refresh button, which reads the page's data again now. */
 function RefreshButton({ refreshing, onRefresh }: { refreshing: boolean; onRefresh: () => void }) {
 	return (
-		<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={onRefresh}>
+		<Button variant="ghost" size="compact" leadingIcon={IconArrowRotateClockwise} disabled={refreshing} onClick={onRefresh}>
 			{refreshing ? "Refreshing…" : "Refresh"}
 		</Button>
 	);

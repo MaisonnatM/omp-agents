@@ -1,5 +1,5 @@
 /** `BotDetails`, the right sidebar on a Bot's page: its Details tab with its look and name, both editable in place, where it works, its job, memory, and its conversation's token usage, then Restart conversation and Delete; its Routines tab; and its conversation's Tickets tab once it worked on any. */
-import { Plus, Repeat, RotateCcw, Trash2 } from "lucide-react";
+import { IconArrowRotateCounterClockwise, IconPlusLarge, IconRepeat, IconTrashCan } from "central-icons";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { type Routine, runsHere } from "../../../src/routines";
 import { type Bot, BOT_KIND_INFO, type BotLook, type BotSpec, MAX_JOB_LENGTH } from "../../../src/shared/bots";
@@ -56,7 +56,7 @@ function RestartConversation({ bot, connected }: { bot: Bot; connected: boolean 
 		);
 	}
 	return (
-		<Button {...activityControl("bots.restart")} variant="outline" size="compact" leadingIcon={RotateCcw} disabled={!connected} onClick={() => setConfirming(true)}>
+		<Button {...activityControl("bots.restart")} variant="outline" size="compact" leadingIcon={IconArrowRotateCounterClockwise} disabled={!connected} onClick={() => setConfirming(true)}>
 			Restart conversation
 		</Button>
 	);
@@ -90,7 +90,7 @@ function DeleteBot({ bot, connected }: { bot: Bot; connected: boolean }) {
 		);
 	}
 	return (
-		<Button {...activityControl("bots.delete")} variant="destructive-outline" size="compact" leadingIcon={Trash2} disabled={!connected} onClick={() => setConfirming(true)}>
+		<Button {...activityControl("bots.delete")} variant="destructive-outline" size="compact" leadingIcon={IconTrashCan} disabled={!connected} onClick={() => setConfirming(true)}>
 			Delete
 		</Button>
 	);
@@ -205,19 +205,19 @@ function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: r
 					All routines
 				</a>
 				{connected ? (
-					<Button {...activityControl("bots.routine.new")} asChild variant="ghost" size="compact" leadingIcon={Plus}>
+					<Button {...activityControl("bots.routine.new")} asChild variant="ghost" size="compact" leadingIcon={IconPlusLarge}>
 						<a href={hashForBotRoutine(bot.id, { kind: "new" })} aria-current={open.kind === "new" ? "page" : undefined}>
 							New routine
 						</a>
 					</Button>
 				) : (
-					<Button variant="ghost" size="compact" leadingIcon={Plus} disabled>
+					<Button variant="ghost" size="compact" leadingIcon={IconPlusLarge} disabled>
 						New routine
 					</Button>
 				)}
 			</div>
 			{routines.length === 0 ? (
-				<DetailsEmpty icon={Repeat} title="No routine yet" description={`A routine messages ${bot.name} or runs a command in its workspace on its schedules, its triggers, or both.`} />
+				<DetailsEmpty icon={IconRepeat} title="No routine yet" description={`A routine messages ${bot.name} or runs a command in its workspace on its schedules, its triggers, or both.`} />
 			) : (
 				<ul className="space-y-1.5">
 					{routines.map(routine => {
@@ -340,7 +340,7 @@ export function BotDetails({ open: { bot, host, routines, routine, status }, ses
 				},
 				{
 					value: "routines",
-					icon: Repeat,
+					icon: IconRepeat,
 					name: "Routines",
 					control: "bots.tab.routines",
 					count: routines.length,

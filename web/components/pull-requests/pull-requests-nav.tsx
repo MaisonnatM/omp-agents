@@ -1,5 +1,5 @@
 /** The sidebar's Pull requests tab: the workspace's pull requests by repository and whose move it is. */
-import { RefreshCw } from "lucide-react";
+import { IconArrowRotateClockwise } from "central-icons";
 import type { ReactNode } from "react";
 import { repoKey } from "../../../src/shared/github";
 import { agentOn } from "../../../src/shared/moves";
@@ -132,7 +132,7 @@ export function PullRequestsNav({ hosts, past, route }: PullRequestsNavProps) {
 				<SortMenu order={pulls.order} onSort={pulls.onSort} onReset={pulls.onReset} />
 				<Tooltip content="Refresh pull requests">
 					<Button variant="ghost" size="icon-compact" aria-label="Refresh pull requests" loading={refreshing} onClick={pulls.refresh}>
-						<RefreshCw />
+						<IconArrowRotateClockwise />
 					</Button>
 				</Tooltip>
 			</div>

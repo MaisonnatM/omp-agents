@@ -1,4 +1,4 @@
-import { Power, PowerOff, Trash2 } from "lucide-react";
+import { IconPlay, IconStopCircle, IconTrashCan } from "central-icons";
 import { type ReactNode, useState } from "react";
 import type { SignInState } from "../../../src/shared/accounts";
 import { catalogEntry } from "../../../src/shared/mcp-catalog";
@@ -74,7 +74,7 @@ export function McpServerItem({ server }: { server: OwnServer }) {
 		if (status.kind !== "disabled") {
 			menuItems.push(
 				<MenuItem key="disable" onClick={() => setEnabled.run(false)}>
-					<PowerOff />
+					<IconStopCircle />
 					Disable
 				</MenuItem>,
 			);
@@ -82,7 +82,7 @@ export function McpServerItem({ server }: { server: OwnServer }) {
 		menuItems.push(
 			<MenuSeparator key="separator" />,
 			<MenuItem key="remove" variant="destructive" onClick={() => setConfirming("remove")}>
-				<Trash2 />
+				<IconTrashCan />
 				Remove
 			</MenuItem>,
 		);
@@ -94,7 +94,7 @@ export function McpServerItem({ server }: { server: OwnServer }) {
 			<>
 				{status.kind === "signed-out" ? <ConnectButton signIn={signIn} /> : <Reconnecting signIn={signIn} />}
 				{status.kind === "disabled" && source.editable && (
-					<Button variant="secondary" size="compact" leadingIcon={Power} loading={toggling} onClick={() => setEnabled.run(true)}>
+					<Button variant="secondary" size="compact" leadingIcon={IconPlay} loading={toggling} onClick={() => setEnabled.run(true)}>
 						Enable
 					</Button>
 				)}
@@ -124,7 +124,7 @@ export function McpServerItem({ server }: { server: OwnServer }) {
 				) : (
 					confirming === "remove" && (
 						<Confirm
-							icon={Trash2}
+							icon={IconTrashCan}
 							question={`Remove ${name} from omp's mcp.json?`}
 							detail="New omp sessions stop loading its tools. omp keeps its sign-in, as /mcp remove does."
 							confirm="Remove"

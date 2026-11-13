@@ -72,11 +72,11 @@ Only the server that holds the owner lock runs the unattended work, and sessions
 ```mermaid
 flowchart LR
   subgraph sessions["omp sessions"]
-    kit["Starter kit extensions<br/>todos, notes, events, end-session, google-accounts"]
+    kit["Starter kit extensions<br/>todos, events, end-session, google-accounts"]
     dashx["Dashboard extensions<br/>bots, routines, shepherds"]
   end
   subgraph inboxes["~/.config/omp-agents/*-inbox/"]
-    i1["todo-inbox, note-inbox, event-inbox,<br/>end-inbox, sign-in-inbox"]
+    i1["todo-inbox, event-inbox,<br/>end-inbox, sign-in-inbox"]
     i2["bot-inbox, routine-inbox, shepherd-inbox,<br/>sport-inbox"]
   end
   kit -->|writes a file| i1

@@ -1,8 +1,8 @@
 /** `ListSplit`, a page's list on the left and its open item on the right with a draggable divider, plus the item's top bar. */
-import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { IconChevronBottom, IconChevronTop, IconCrossMedium } from "central-icons";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { useLayoutEffect, useRef } from "react";
-import type { LucideIcon } from "lucide-react";
+import type { IconComponent } from "@/lib/icon-context";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -21,7 +21,7 @@ const clampWidth = (width: number, size: number): number => Math.round(Math.max(
 
 /** What the open item's side shows with nothing open: an icon, a line naming what is missing, and how to open one. */
 export interface SplitEmpty {
-	icon: LucideIcon;
+	icon: IconComponent;
 	title: string;
 	hint: ReactNode;
 }
@@ -67,9 +67,9 @@ export function DetailBar({ leading, previous, next, children, close }: { leadin
 }
 
 /** Chevron icons for {@link DetailBar} `previous` and `next`; the Email and Todo pages use them. */
-export const CH_PREVIOUS: BarAction["icon"] = <ChevronUp />;
-export const CH_NEXT: BarAction["icon"] = <ChevronDown />;
-export const CH_CLOSE: BarAction["icon"] = <X />;
+export const CH_PREVIOUS: BarAction["icon"] = <IconChevronTop />;
+export const CH_NEXT: BarAction["icon"] = <IconChevronBottom />;
+export const CH_CLOSE: BarAction["icon"] = <IconCrossMedium />;
 
 interface ListSplitProps {
 	/** The localStorage key that keeps the list's width. */

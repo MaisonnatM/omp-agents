@@ -60,6 +60,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Scroll-to-bottom arrow: `MessageScrollerButton` in `web/components/ui/message-scroller.tsx`, placed by `web/components/transcript.tsx`; button variants live in `web/components/ui/button.tsx`.
 - Left sidebar: `AppSidebar` in `web/components/app-sidebar.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which slides it open and shut and draws its toggle at the end of the sidebar's top row.
   The top row holds `AppMark` from `web/components/app-mark.tsx`, which draws `web/favicon.svg`, and the command menu button; the page list is `SidebarNav` in `web/components/sidebar-nav.tsx`, whose current row `navRowOf` in `web/sidebar-tabs.ts` picks, the roster under it `Roster` in `web/components/roster.tsx`, whose folders `rosterFolders` in `web/sessions.ts` lays out and `WorkspaceFolder` there draws, and a row is `web/components/session-row.tsx`.
+  The open page's own list, such as the Bots or the Settings sections, is `PageList` in `web/components/page-list.tsx`, which `web/app.tsx` draws in `PageListColumn` at the page's left, or hands `SidebarNav` to nest under its row while the sidebar floats.
 - Right sidebar, the session details: `SessionDetails` in `web/components/session-details.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which `web/app.tsx` mounts.
   Its tabs are **PRs** in `session-pull-requests-tab.tsx`, **Browser** in `browser-panel.tsx`, **Tickets** in `session-tickets-tab.tsx`, and **Artifacts** in `artifacts-panel.tsx`, all in `web/components/`.
   The **Images** section, the transcript, and a pull request's Markdown share `ImageViewer` from `web/components/media-viewer.tsx`, with the image, its caption, `N of M`, previous and next buttons and arrow keys, zoom, open in the default browser, and Close.
@@ -101,7 +102,6 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - Pull requests: `web/components/pull-requests/pull-requests-page.tsx`, with the **Rebase N behind** button at its top, its board view `PullRequestsKanban` in `pull-requests-kanban.tsx` with each card `PullRequestCard` in `pr-row.tsx`, and one pull request in `pr-page.tsx` beside it.
   - Tickets: `web/components/tickets/tickets-page.tsx`.
   - Todo: `web/components/todo/page.tsx`.
-  - Notes: `web/components/notes/page.tsx`, with its sidebar lists in `web/components/notes/nav.tsx`.
   - Calendar: `web/components/calendar/calendar-page.tsx`, with **Show routines** in `web/components/calendar/calendar-nav.tsx`, both reading the saved display preference in `web/use-calendar-display.ts`.
   - Email: `web/components/email/email-page.tsx`.
   - Sport: `web/components/sport/page.tsx`, with its sidebar tab in `web/components/sport/nav.tsx`, the week in `week.tsx` and `day-detail.tsx`, the demos in `demo-dialog.tsx`, the Fait dialog in `log-form.tsx`, the journal in `journal.tsx`, and the progress in `progress.tsx`, all in `web/components/sport/`.
@@ -147,6 +147,6 @@ Its files, listed by area:
 - [Shell, state, and models](code-layout/page-core.md)
 - [List models, sidebar tabs, model menu, and mentions](code-layout/page-models.md)
 - [Status bar, terminal, HTTP reads, shortcuts, and theme](code-layout/page-reads-and-chrome.md)
-- [Sidebar, Todo, Notes, Bots, Routines, Calendar, Email, and Sport](code-layout/page-pages.md)
+- [Sidebar, Todo, Bots, Routines, Calendar, Email, and Sport](code-layout/page-pages.md)
 - [Panes, session details, and changes](code-layout/page-panes.md)
 - [Pull requests, tickets, settings, integrations, and primitives](code-layout/page-pull-requests-and-settings.md)

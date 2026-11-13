@@ -1,18 +1,23 @@
-/** The header tabs' model: one tab per page or focused session you opened, kept in this browser in the order you dragged them. */
+/** The header tabs' model, after Capy's desktop tabs: the tab on screen follows where you go, a session already open in another tab is focused there, and only a new-tab request adds one. */
 import type { View } from "../src/shared/sessions";
 import { focusedView, hashForView, type Page, routeFromHash } from "./routing";
 
-/** One header tab: `key` names what it shows, one per page kind or per focused session; `hash` is where you last saw it, and `at` when. */
+/** One header tab: `id` stays while you move from page to page in it; `hash` is what it shows now. */
 export interface HeaderTab {
-	key: string;
+	id: string;
 	hash: string;
-	at: number;
+}
+
+/** The row and the tab on screen, `active` an index into `tabs`. */
+export interface HeaderTabs {
+	tabs: readonly HeaderTab[];
+	active: number;
 }
 
 export const HEADER_TABS_KEY = "omp-agents.header-tabs";
 
-/** The most tabs the header keeps; opening one more drops the one seen longest ago. */
-export const MAX_HEADER_TABS = 8;
+/** What a fresh tab shows, and what closing the last tab leaves, as Capy's `/new`. */
+export const NEW_TAB_HASH = "#new";
 
 /** What a tab's `hash` shows: a page, the session focused in the panes, or the home with no pane; `null` for `#session/<id>`, which the dashboard replaces with the panes it opens. */
 export type HeaderTabTarget = { kind: "page"; page: Page } | { kind: "view"; view: View } | { kind: "home" };
@@ -35,55 +40,54 @@ export function headerTabTarget(hash: string): HeaderTabTarget | null {
 	}
 }
 
-/** The tab `target` belongs to, one per page kind or per focused session; stored tabs keep these strings. */
-export function headerTabKey(target: HeaderTabTarget): string {
-	switch (target.kind) {
-		case "page":
-			return `page:${target.page.kind}`;
-		case "view":
-			return `view:${hashForView(target.view)}`;
-		case "home":
-			return "home";
-		default: {
-			const never: never = target;
-			return never;
-		}
-	}
+/** The session `hash` focuses, the one thing two tabs never both show; `null` for a page or the home. */
+function sessionOf(hash: string): string | null {
+	const target = headerTabTarget(hash);
+	return target?.kind === "view" ? hashForView(target.view) : null;
 }
 
 /**
- * `tabs` with the one `hash` names brought up to date at `now`, or added at the end; past {@link MAX_HEADER_TABS}, the one seen longest ago goes.
- * `tabs` itself when that tab already says so, so the row can work out the visit each render and store only a change.
+ * The row once the dashboard went to `to`: a session another tab shows focuses that tab, `newTab` or an empty row adds a tab `newId` at the end,
+ * and anything else shows in the tab on screen. The same object when nothing changes, so a render stores only a change.
  */
-export function visitHeaderTab(tabs: readonly HeaderTab[], hash: string, now: number): readonly HeaderTab[] {
-	const target = headerTabTarget(hash);
-	if (target === null) return tabs;
-	const key = headerTabKey(target);
-	const known = tabs.find(tab => tab.key === key);
-	if (known?.hash === hash && known.at === now) return tabs;
-	const seen = { key, hash, at: now };
-	const next = known ? tabs.map(tab => (tab === known ? seen : tab)) : [...tabs, seen];
-	if (next.length <= MAX_HEADER_TABS) return next;
-	const oldest = next.reduce((a, b) => (b.at < a.at ? b : a));
-	return next.filter(tab => tab !== oldest);
+export function visitHeaderTab(row: HeaderTabs, to: string, newTab: boolean, newId: string): HeaderTabs {
+	if (headerTabTarget(to) === null) return row;
+	const session = sessionOf(to);
+	const showing = session === null ? -1 : row.tabs.findIndex(tab => sessionOf(tab.hash) === session);
+	const current = row.tabs[row.active];
+	if (showing !== -1 && (newTab || showing !== row.active)) return { tabs: row.tabs.map((tab, index) => (index === showing ? { id: tab.id, hash: to } : tab)), active: showing };
+	if (newTab || !current) return { tabs: [...row.tabs, { id: newId, hash: to }], active: row.tabs.length };
+	if (current.hash === to) return row;
+	return { tabs: row.tabs.map((tab, index) => (index === row.active ? { id: tab.id, hash: to } : tab)), active: row.active };
 }
 
-/** `tabs` without the tab keyed `key`, and where to go when it was the one on screen, `activeKey`: the tab now in its place, else the one before it, else the home. `null` stays put. */
-export function closeHeaderTab(tabs: readonly HeaderTab[], key: string, activeKey: string | null): { tabs: readonly HeaderTab[]; go: string | null } {
-	const index = tabs.findIndex(tab => tab.key === key);
-	const rest = tabs.filter(tab => tab.key !== key);
-	if (key !== activeKey) return { tabs: rest, go: null };
-	return { tabs: rest, go: rest[Math.min(index, rest.length - 1)]?.hash ?? "" };
+/** The row without tab `id`, and where to go when it was on screen: the tab now in its place, else the one before; closing the last tab leaves a fresh one on New session. */
+export function closeHeaderTab(row: HeaderTabs, id: string, newId: string): { row: HeaderTabs; go: string | null } {
+	const index = row.tabs.findIndex(tab => tab.id === id);
+	if (index === -1) return { row, go: null };
+	const tabs = row.tabs.filter(tab => tab.id !== id);
+	if (tabs.length === 0) return { row: { tabs: [{ id: newId, hash: NEW_TAB_HASH }], active: 0 }, go: NEW_TAB_HASH };
+	if (index !== row.active) return { row: { tabs, active: row.active > index ? row.active - 1 : row.active }, go: null };
+	const active = Math.min(index, tabs.length - 1);
+	return { row: { tabs, active }, go: tabs[active]?.hash ?? null };
 }
 
-export function decodeHeaderTabs(raw: string | null): readonly HeaderTab[] {
+/** `row` with its tabs reordered to `tabs`, the same tab still on screen. */
+export function reorderHeaderTabs(row: HeaderTabs, tabs: readonly HeaderTab[]): HeaderTabs {
+	const id = row.tabs[row.active]?.id;
+	return { tabs, active: Math.max(0, tabs.findIndex(tab => tab.id === id)) };
+}
+
+export function decodeHeaderTabs(raw: string | null): HeaderTabs {
 	try {
-		const parsed: unknown = JSON.parse(raw ?? "[]");
-		if (!Array.isArray(parsed)) return [];
-		return parsed.filter((tab): tab is HeaderTab => typeof tab?.key === "string" && typeof tab.hash === "string" && typeof tab.at === "number").slice(0, MAX_HEADER_TABS);
+		const parsed: unknown = JSON.parse(raw ?? "null");
+		if (typeof parsed !== "object" || parsed === null || !("tabs" in parsed) || !Array.isArray(parsed.tabs)) return { tabs: [], active: 0 };
+		const tabs = parsed.tabs.filter((tab): tab is HeaderTab => typeof tab?.id === "string" && typeof tab.hash === "string");
+		const active = "active" in parsed && typeof parsed.active === "number" ? parsed.active : 0;
+		return { tabs, active: Math.min(Math.max(active, 0), Math.max(tabs.length - 1, 0)) };
 	} catch {
-		return [];
+		return { tabs: [], active: 0 };
 	}
 }
 
-export const encodeHeaderTabs = (tabs: readonly HeaderTab[]): string => JSON.stringify(tabs);
+export const encodeHeaderTabs = (row: HeaderTabs): string => JSON.stringify(row);

@@ -1,5 +1,5 @@
 /** The Sport page: the plan's week, the journal of logged sessions, and the progress charts, under one header. */
-import { Plus, Scale } from "lucide-react";
+import { IconLaw, IconPlusLarge } from "central-icons";
 import { type ReactNode, useState } from "react";
 import { errorText } from "../../../src/json";
 import { addDays, localDay } from "../../../src/shared/days";
@@ -74,13 +74,13 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 	const entries = (
 		<>
 			<Tooltip content="Noter une séance hors du plan">
-				<Button variant="ghost" size="compact" leadingIcon={Plus} disabled={disabled} onClick={() => logFor(selected, null)} {...activityControl("sport.log.free")}>
+				<Button variant="ghost" size="compact" leadingIcon={IconPlusLarge} disabled={disabled} onClick={() => logFor(selected, null)} {...activityControl("sport.log.free")}>
 					<span className="sr-only max-phone:not-sr-only @3xl/sport:not-sr-only">Séance libre</span>
 				</Button>
 			</Tooltip>
 			{bodyweight && (
 				<Tooltip content="Noter ton poids du jour">
-					<Button variant="ghost" size="compact" leadingIcon={Scale} disabled={disabled} onClick={() => setWeighing(true)} {...activityControl("sport.weigh.open")}>
+					<Button variant="ghost" size="compact" leadingIcon={IconLaw} disabled={disabled} onClick={() => setWeighing(true)} {...activityControl("sport.weigh.open")}>
 						<span className="sr-only max-phone:not-sr-only @3xl/sport:not-sr-only">Pesée</span>
 					</Button>
 				</Tooltip>

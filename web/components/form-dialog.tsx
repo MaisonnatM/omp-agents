@@ -1,6 +1,6 @@
 /** `FormDialog`, the dialog shell the dashboard's forms share, with its header, error line, and Cmd+Enter submit chord. */
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
-import { X } from "lucide-react";
+import { IconCrossMedium } from "central-icons";
 import { type KeyboardEvent, type ReactNode, type RefObject, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -86,7 +86,7 @@ export function FormDialogHeader({ title, busy, lead, actions, closeLabel = "Clo
 				{actions}
 				<Tooltip content={closeLabel} shortcut={["Esc"]} side="bottom">
 					<DialogPrimitive.Close render={<Button variant="ghost" size="icon-compact" className={closeClassName} aria-label={closeLabel} disabled={busy} />}>
-						<X />
+						<IconCrossMedium />
 					</DialogPrimitive.Close>
 				</Tooltip>
 			</div>

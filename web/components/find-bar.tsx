@@ -3,7 +3,7 @@
  * conversation or a pull request's details, steps through them with Enter and Shift+Enter, and follows that part as it changes.
  */
 import { useReducedMotion } from "framer-motion";
-import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
+import { IconChevronBottom, IconChevronTop, IconCrossMedium, IconMagnifyingGlass } from "central-icons";
 import { createContext, type RefObject, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -196,7 +196,7 @@ export function FindBar({ root: rootRef, enabled, label, className }: FindBarPro
 					missing && "border-destructive/60 focus-within:ring-destructive/60",
 				)}
 			>
-				<Search aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+				<IconMagnifyingGlass className="size-3.5 shrink-0 text-muted-foreground" />
 				<input
 					ref={input}
 					type="text"
@@ -220,18 +220,18 @@ export function FindBar({ root: rootRef, enabled, label, className }: FindBarPro
 				</span>
 				<Tooltip content="Previous match" shortcut={[chordLabel({ key: "Enter", shift: true })]} side="bottom" disabled={count === 0}>
 					<Button {...activityControl("find-bar.step")} variant="ghost" size="icon-compact" aria-label="Previous match" disabled={count === 0} onClick={() => step(-1)}>
-						<ChevronUp />
+						<IconChevronTop />
 					</Button>
 				</Tooltip>
 				<Tooltip content="Next match" shortcut={[chordLabel({ key: "Enter" })]} side="bottom" disabled={count === 0}>
 					<Button {...activityControl("find-bar.step")} variant="ghost" size="icon-compact" aria-label="Next match" disabled={count === 0} onClick={() => step(1)}>
-						<ChevronDown />
+						<IconChevronBottom />
 					</Button>
 				</Tooltip>
 				<span aria-hidden className="mx-0.5 h-4 w-px shrink-0 bg-border" />
 				<Tooltip content="Close" shortcut={[chordLabel({ key: "Escape" })]} side="bottom">
 					<Button {...activityControl("find-bar.close")} variant="ghost" size="icon-compact" aria-label="Close" onClick={() => setOpen(false)}>
-						<X />
+						<IconCrossMedium />
 					</Button>
 				</Tooltip>
 			</div>

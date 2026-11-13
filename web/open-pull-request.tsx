@@ -2,7 +2,7 @@
  * **Open PR**: the prompt that has a live session commit, review, push, and open a pull request for its branch, which
  * sessions offer it, where a press of it stands, and the header's button; the command menu shares the same press.
  */
-import { GitPullRequestCreate } from "lucide-react";
+import { IconPullRequest } from "central-icons";
 import { useEffect } from "react";
 import type { LiveView, RosterHost, View } from "../src/shared/sessions";
 import { Button } from "@/components/ui/button";
@@ -125,7 +125,7 @@ export function OpenPullRequestButton({ view, host }: { view: LiveView; host: Ro
 			content={busy ? "The session is reviewing, pushing, and opening the pull request" : "Commit, review, push, and open a pull request for this branch, as the session's next turn"}
 			side="bottom"
 		>
-			<Button variant="secondary" size="compact" leadingIcon={GitPullRequestCreate} disabled={busy} aria-busy={busy || undefined} onClick={run}>
+			<Button variant="secondary" size="compact" leadingIcon={IconPullRequest} disabled={busy} aria-busy={busy || undefined} onClick={run}>
 				{busy ? "Opening PR…" : "Open PR"}
 			</Button>
 		</Tooltip>

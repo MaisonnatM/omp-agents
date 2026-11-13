@@ -5,6 +5,16 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* A Central icon's shapes, which carry their own stroke-width="1.5" inside the icon's mask, so a stroke or fill set on the <svg> never reaches them: `icon-shapes:stroke-2`, `icon-shapes:fill-current`. Matches only the mask's shape group, not its backdrop rect or a hand-drawn svg such as the spinner. */
+@custom-variant icon-shapes (& mask > g :is(path, circle, ellipse, rect, line, polyline, polygon));
+
+/* A Central icon's stroke thickens over the label's 80ms, wherever a hover or selection sets `icon-shapes:stroke-2`. */
+@layer base {
+  mask > g :is(path, circle, ellipse, rect, line, polyline, polygon) {
+    transition: stroke-width 80ms;
+  }
+}
+
 /* What shows only while its `group/reveal` is hovered or holds the focus, and always on a touch screen, which has no hover: a header tab's ×, a page title's trailing controls. */
 @custom-variant revealed {
   @media (hover: hover) {
@@ -659,15 +669,5 @@
 [data-item=assistant] .message-markdown { container-type: inline-size; line-height: 1.65; }
 [data-item=assistant] .message-markdown :is(p, ul, ol) { margin-block: 1em; }
 [data-item=assistant] .message-markdown li { margin-block: .6em; }
-/* Its bullets that open with a bold key lay out as a two-column table: keys share one column, at most 12rem wide. */
-[data-item=assistant] .message-markdown > ul:has(> [data-part="keyed"]) { display: grid; grid-template-columns: fit-content(12rem) 1fr; column-gap: 1rem; list-style: none; padding-left: 0; border-top: 1px solid var(--border); }
-[data-item=assistant] .message-markdown > ul:has(> [data-part="keyed"]) > li { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; margin: 0; border-bottom: 1px solid var(--border); padding-block: .6em; }
-[data-item=assistant] .message-markdown > ul:has(> [data-part="keyed"]) > li:not([data-part="keyed"]) > * { grid-column: 1 / -1; }
-[data-item=assistant] .message-markdown [data-part="keyed"] > strong { font-weight: 600; }
-/* A narrow pane leaves too little room for two columns, so the key runs inline again. */
-@container (width < 30rem) {
-	[data-item=assistant] .message-markdown > ul:has(> [data-part="keyed"]) > li { display: block; }
-	[data-item=assistant] .message-markdown [data-part="keyed"] > strong { margin-right: .35em; }
-}
 /* A removed row's gutter mark, hatched so it reads apart from an added row's solid one. */
 .diff-mark-removed { background: repeating-linear-gradient(45deg, var(--diff-deletion) 0 2px, transparent 2px 4px); opacity: .8; }

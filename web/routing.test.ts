@@ -19,7 +19,6 @@ import {
 	hashForTickets,
 	hashForOpenTodo,
 	hashForTodo,
-	hashForNotes,
 	hashForSport,
 	type SportRoute,
 	hashForTodoId,
@@ -37,15 +36,6 @@ import {
 } from "./routing";
 
 const todo = (fields: Partial<UserTodo>): UserTodo => ({ id: "t1", text: "Todo", body: "", status: "todo", priority: 0, assignee: null, doneAt: null, due: null, createdAt: null, categoryId: null, workspace: null, children: [], links: [], addedBy: null, ...fields });
-
-test("notes routes address each list and encode the open note", () => {
-	expect(hashForNotes({ kind: "all" }, "note / one")).toBe("#notes?open=note%20%2F%20one");
-	expect(routeFromHash("#notes?open=note%20%2F%20one")).toEqual({ kind: "page", page: { kind: "notes", list: { kind: "all" }, open: "note / one" } });
-	expect(hashForNotes({ kind: "agents" }, "n1")).toBe("#notes/agents?open=n1");
-	expect(routeFromHash("#notes/agents?open=n1")).toEqual({ kind: "page", page: { kind: "notes", list: { kind: "agents" }, open: "n1" } });
-	expect(routeFromHash("#notes/unknown")).toEqual({ kind: "page", page: { kind: "notes", list: { kind: "all" }, open: null } });
-	expect(routeFromHash("#notes/project/p%2F1?open=n1")).toMatchObject({ kind: "page", page: { kind: "notes", list: { kind: "all" } } });
-});
 
 test("sport routes open the week on a day, the journal on a log, and the progress, and round-trip", () => {
 	const routes: [SportRoute, string][] = [

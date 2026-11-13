@@ -57,5 +57,5 @@ It also reads the pending changes, so a session sees its own reminders while the
 `EventInbox` in `src/server/event-inbox.ts` uses `JsonInboxDir` to apply them through `LocalEventsFile` in filename order.
 It sets aside an add that names no session and a removal whose event another session or you added, checked against the kept events when it applies the change.
 An add of an id already kept adds nothing, so a replayed change never shows an event twice.
-Only the server holding `OwnerLock` drains the inbox, and it reloads `events.json` before taking ownership, as it does `notes.json`.
+Only the server holding `OwnerLock` drains the inbox, and it reloads `events.json` before taking ownership.
 A kept event's notice and its Calendar page entry link to `hashForSession(sessionId)` when it names a session; see [Notifications](notifications.md).

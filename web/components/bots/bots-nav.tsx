@@ -2,7 +2,8 @@
  * The Bots tab: a search field, All Bots, and New Bot, then each Bot as a messaging app lists a conversation, under Pinned, its section, or Other Bots once any Bot is pinned or in one.
  * Dragging a Bot's row onto a group pins it or moves it there.
  */
-import { Ellipsis, Folder, FolderMinus, LayoutGrid, type LucideIcon, Pencil, Pin, Plus, UsersRound } from "lucide-react";
+import { IconDotGrid1x3Horizontal, IconFolder1, IconFolderDelete, IconLayoutGrid1, IconPencil, IconPin, IconPlusLarge, IconUserGroup } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { type DragEvent, type HTMLAttributes, type LiHTMLAttributes, useState } from "react";
 import type { Bot } from "../../../src/shared/bots";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,7 @@ import { BotMenu, type SectionNaming, SectionNameDialog } from "./bot-menu";
 
 const COLLAPSED_GROUPS_KEY = "omp-agents.bots-collapsed-groups";
 
-const GROUP_ICONS: Record<BotGroup["kind"], LucideIcon> = { pinned: Pin, section: Folder, rest: UsersRound };
+const GROUP_ICONS: Record<BotGroup["kind"], IconComponent> = { pinned: IconPin, section: IconFolder1, rest: IconUserGroup };
 
 const PINNED: BotPlace = { kind: "pinned" };
 
@@ -95,14 +96,14 @@ export function BotsNav({ rows, openId }: BotsNavProps) {
 				<Tooltip content="All Bots" side="bottom">
 					<Button asChild variant="ghost" size="icon-compact" className="shrink-0">
 						<a href={hashForBots(null)} aria-label="All Bots">
-							<LayoutGrid />
+							<IconLayoutGrid1 />
 						</a>
 					</Button>
 				</Tooltip>
 				<Tooltip content="New Bot" side="bottom">
 					<Button asChild variant="ghost" size="icon-compact" className="shrink-0">
 						<a href={hashForNewBot()} aria-label="New Bot" aria-current={openId === null ? "page" : undefined}>
-							<Plus />
+							<IconPlusLarge />
 						</a>
 					</Button>
 				</Tooltip>
@@ -160,16 +161,16 @@ function SectionMenu({ name, onName }: { name: string; onName: (naming: SectionN
 			<DropdownMenu open={open} onOpenChange={setOpen}>
 				<Tooltip content="Section actions" forceOpen={open ? false : undefined}>
 					<DropdownMenuTrigger render={<SidebarGroupAction aria-label={`Actions for the ${name} section`} />}>
-						<Ellipsis />
+						<IconDotGrid1x3Horizontal />
 					</DropdownMenuTrigger>
 				</Tooltip>
 				<DropdownMenuContent align="end">
 					<MenuItem disabled={!connected} onClick={() => onName({ kind: "rename", from: name })}>
-						<Pencil />
+						<IconPencil />
 						Rename section…
 					</MenuItem>
 					<MenuItem disabled={!connected} onClick={() => changeBot({ op: "rename-section", from: name, to: null })}>
-						<FolderMinus />
+						<IconFolderDelete />
 						Remove section
 					</MenuItem>
 				</DropdownMenuContent>

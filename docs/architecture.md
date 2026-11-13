@@ -38,7 +38,6 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Bots](architecture/bots.md)
 - [Pins](architecture/pins.md)
 - [Preferences](architecture/preferences.md)
-- [User notes](architecture/user-notes.md)
 - [Sport](architecture/sport.md)
 - [Notifications](architecture/notifications.md)
   - [Session notifications](architecture/notifications.md#session-notifications)

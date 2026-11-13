@@ -1,5 +1,5 @@
 /** The Code tab's controls inside the shared diff, which reach the pull request through {@link CodeControlsContext}. */
-import { MessageSquarePlus } from "lucide-react";
+import { IconBubblePlus } from "central-icons";
 import { createContext, useContext, useState } from "react";
 import { MAX_COMMENT_BODY } from "../../../../src/shared/github";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,7 @@ export function LineCommentBox({ path, range, onClose }: LineCommentSlotProps) {
 				<span>
 					{range.side === "LEFT" ? "Old" : "New"} {lines}
 				</span>
-				<Button size="xs" variant="outline" leadingIcon={MessageSquarePlus} onClick={() => setBody(open => open ?? "")}>
+				<Button size="xs" variant="outline" leadingIcon={IconBubblePlus} onClick={() => setBody(open => open ?? "")}>
 					Add comment
 				</Button>
 				<Button size="xs" variant="ghost" onClick={onClose}>

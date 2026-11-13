@@ -9,7 +9,7 @@ Its `obsolete` list holds each file the record or that history names that neithe
 The dashboard supplies read-only native snapshots instead of running CLI config initialization, and installation uses the exact resolved omp command, including `OMP_PACKAGE_DIR`.
 Packaged resources include `agent/`, `config.yml`, and `install.js`.
 `templates/omp/README.md` lists what each of its extensions does.
-`end-session.ts`, `arena.ts`, `artifact.ts`, `land.ts`, `ship.ts`, `todos.ts`, `notes.ts`, and `events.ts` each drop their own tool from a subagent's active tools in a `session_start` handler that checks `ctx.agent.kind`, so those schemas stay out of subagent requests.
+`end-session.ts`, `arena.ts`, `artifact.ts`, `land.ts`, `ship.ts`, `todos.ts`, and `events.ts` each drop their own tool from a subagent's active tools in a `session_start` handler that checks `ctx.agent.kind`, so those schemas stay out of subagent requests.
 `agent/extensions/arena.ts` registers the `arena` tool, whose every call appends an `omp-arena.state` entry with the whole arena, which `src/session-facts.ts` folds into `SessionFacts.arenas`, one per set of runners; `templates/omp/extensions.test.ts` runs its calls and refusals.
 `agent/extensions/artifact.ts` registers `artifact`, which validates a file under `local://`, writes a content-addressed version copy before returning its `ArtifactSave` details, and accepts an optional short change note.
 `templates/omp/extensions.test.ts` checks refusals, symlink containment, equal-content copies, subagent hiding, note validation, and agreement between every source extension and the shared parser.

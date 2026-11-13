@@ -1,10 +1,11 @@
 /** What the New session page shows under the composer in place of its starters for a private draft: what ending it deletes, and what stays. */
-import { FileCode, History, Lock, type LucideIcon, Trash2 } from "lucide-react";
+import { IconCode, IconHistory, IconLock, IconTrashCan } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 
-const FACTS: readonly { icon: LucideIcon; title: string; text: string }[] = [
-	{ icon: History, title: "Not in Past sessions", text: "It never shows there, and you cannot resume it." },
-	{ icon: Trash2, title: "Deleted when it ends", text: "Its conversation, its subagents, and its prompts in history go with it." },
-	{ icon: FileCode, title: "Your files stay", text: "Files it changes and commits it makes stay in the project." },
+const FACTS: readonly { icon: IconComponent; title: string; text: string }[] = [
+	{ icon: IconHistory, title: "Not in Past sessions", text: "It never shows there, and you cannot resume it." },
+	{ icon: IconTrashCan, title: "Deleted when it ends", text: "Its conversation, its subagents, and its prompts in history go with it." },
+	{ icon: IconCode, title: "Your files stay", text: "Files it changes and commits it makes stay in the project." },
 ];
 
 /** A private draft's facts: what ending it deletes, and what stays. */
@@ -13,7 +14,7 @@ export function PrivateFacts() {
 		<section aria-label="What a private session keeps" className="mt-4">
 			<div className="mb-2 px-1">
 				<h2 className="flex items-center gap-1.5 text-[13px] font-semibold">
-					<Lock aria-hidden className="size-3.5 text-muted-foreground" />
+					<IconLock className="size-3.5 text-muted-foreground" />
 					Private session
 				</h2>
 			</div>

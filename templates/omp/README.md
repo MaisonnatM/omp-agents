@@ -106,7 +106,7 @@ Files, in `agent/`:
   Call it with `path`, `title`, and an optional one-line `note` of at most 120 characters saying what this version changed.
   A file must be non-empty UTF-8 text of at most 2 MiB and stay within the local root after symlink resolution.
   Equal bytes share one copy under the session's `artifact-versions/` directory.
-- In a task subagent, `end-session.ts`, `arena.ts`, `artifact.ts`, `land.ts`, `ship.ts`, `todos.ts`, `notes.ts`, and `events.ts` remove their tools when its session starts, since those tools act for the session you talk to; each subagent request then carries fewer tokens of tool schemas.
+- In a task subagent, `end-session.ts`, `arena.ts`, `artifact.ts`, `land.ts`, `ship.ts`, `todos.ts`, and `events.ts` remove their tools when its session starts, since those tools act for the session you talk to; each subagent request then carries fewer tokens of tool schemas.
 - `extensions/google-accounts.ts`: when omp is signed in to two or more Gmail or Google Calendar accounts, one MCP server each, tells a session at every prompt each account's server, address, and tool prefix.
   No tool is blocked: a session may use any account.
   When a Gmail or Google Calendar server answers a tool call with HTTP 401, the session is told the account is signed out, not to retry or sign in itself, and to ask you to sign in again in the dashboard's Settings › Integrations, and the dashboard's bell shows a sign-in notice.
@@ -145,11 +145,9 @@ Files, in `agent/`:
   It reads HEAD and `origin/HEAD` from their files in the git dir and keeps each directory's checkout for a minute, so an edit or write in a checkout another session does not hold starts no `git`.
 - `extensions/todos.ts`: `user_todo` reads the dashboard list and queues add, check, edit, and delete changes; `add` and `edit` take the name of an existing section, and an `add` naming one that does not exist files the todo in none.
   On `add`, an omitted or empty `due` value means no due date, and on `edit` an empty one clears it; a nonempty value must use `YYYY-MM-DD`.
-- `extensions/notes.ts`: `user_note` lists and reads the dashboard's notes and queues add/append changes.
-  An empty parameter reads as left out, and a session that adds a title it already added gets that note's id back.
 - `extensions/events.ts`: `user_event` lists the upcoming events kept on this computer for the dashboard's Calendar page, queues a timed reminder in the session's name, and removes one that session added.
   A start without an offset is local time, a start in the past is refused, and a session that adds the same title and start again gets that event's id back.
-- `extensions/inbox/client.ts`: what `todos.ts`, `notes.ts`, and `events.ts` share to read their inboxes and leave a change there, one file each, for the dashboard to apply; the dashboard's own extensions import it too.
+- `extensions/inbox/client.ts`: what `todos.ts` and `events.ts` share to read their inboxes and leave a change there, one file each, for the dashboard to apply; the dashboard's own extensions import it too.
 - `skills/design-workflow/SKILL.md`: the steps `AGENTS.md` sends every UI change through: references before the first edit, five structurally different variants for a structural ask, a screenshot check every round, and the `design-critic` agent once the user approves the direction.
 - `skills/`: `apple-design`, `emil-design-eng`, and `beautiful-shadows` for interface work; `thermo-nuclear-code-quality-review` for the reviewer; `app-consistency-review`, which the interface reviewer autoloads to check a PR against the app's shared components, tokens, and sibling screens; `decision-records`, which keeps each choice made in a project as one dated file in its `docs/decisions/`, with a `check.ts` that checks them; `ship`, the `/ship` workflow above; and `poteto-mode`, which says where pstack's skill of the same name keeps its file.
   The alias maps Cursor-only cleanup and runtime-control instructions to omp's available tools without editing the plugin cache.

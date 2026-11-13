@@ -1,15 +1,15 @@
-import { Bot, CalendarClock, Dumbbell, GitPullRequest, ListTodo, type LucideIcon, Mail, MessagesSquare, NotebookPen, Settings, SquareKanban } from "lucide-react";
+import { IconAiBotHead, IconBubbles, IconCalendarClock, IconDumbell, IconEmail1, IconKanbanView, IconPullRequest, IconSettingsGear1, IconTodos } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 
 /** The icon of each page of the dashboard: its sidebar tab shows it, and so does every link that opens something on it. */
 export const PAGE_ICON = {
-	"pull-requests": GitPullRequest,
-	tickets: SquareKanban,
-	bots: Bot,
-	sessions: MessagesSquare,
-	todo: ListTodo,
-	notes: NotebookPen,
-	calendar: CalendarClock,
-	email: Mail,
-	sport: Dumbbell,
-	settings: Settings,
-} as const satisfies Record<string, LucideIcon>;
+	"pull-requests": IconPullRequest,
+	tickets: IconKanbanView,
+	bots: IconAiBotHead,
+	sessions: IconBubbles,
+	todo: IconTodos,
+	calendar: IconCalendarClock,
+	email: IconEmail1,
+	sport: IconDumbell,
+	settings: IconSettingsGear1,
+} as const satisfies Record<string, IconComponent>;

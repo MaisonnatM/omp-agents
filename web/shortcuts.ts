@@ -53,7 +53,6 @@ export type ShortcutId =
 	| "bots"
 	| "sessions"
 	| "todo"
-	| "notes"
 	| "calendar"
 	| "email"
 	| "sport"
@@ -76,11 +75,6 @@ export type ShortcutId =
 	| "todoDue"
 	| "todoNew"
 	| "todoClose"
-	| "notesSearch"
-	| "notesNext"
-	| "notesPrevious"
-	| "notesNew"
-	| "notesClose"
 	| "calendarNewEvent"
 	| "emailNext"
 	| "emailPrevious"
@@ -141,7 +135,6 @@ export const SHORTCUT_CATEGORIES = [
 	{ id: "sessions", label: "Sessions" },
 	{ id: "pull-requests", label: "Pull requests" },
 	{ id: "todo", label: "Todo" },
-	{ id: "notes", label: "Notes" },
 	{ id: "email", label: "Email" },
 	{ id: "calendar", label: "Calendar" },
 	{ id: "sport", label: "Sport" },
@@ -277,12 +270,11 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	...TAB_SHORTCUTS.map((id, index): Shortcut => ({ id, category: "general", label: `Go to tab ${index + 1} of the sidebar`, keys: [{ chord: { key: String(index + 1), mod: true }, scope: "anywhere" }] })),
 	{ id: "pull-requests", category: "general", label: "Go to Pull requests", command: "Go to pull requests", keys: [] },
 	{ id: "tickets", category: "general", label: "Go to your Linear tickets", command: "Go to tickets", keys: [] },
-	{ id: "newTicket", category: "general", label: "Create a Linear ticket, except on the Todo, Notes, Calendar, and Email pages", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
+	{ id: "newTicket", category: "general", label: "Create a Linear ticket, except on the Todo, Calendar, and Email pages", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "ticketsNew", category: "general", label: "Tickets page: create a Linear ticket, in place of a new session", keys: [{ chord: { key: "n", mod: true }, scope: "anywhere" }] },
 	{ id: "bots", category: "general", label: "Go to your Bots", command: "Go to Bots", keys: [] },
 	{ id: "sessions", category: "general", label: "Go to the sessions", command: "Go to sessions", keys: [] },
 	{ id: "todo", category: "general", label: "Go to your todo list", command: "Go to todo list", keys: [] },
-	{ id: "notes", category: "general", label: "Go to your notes", command: "Go to notes", keys: [{ goTo: "n" }] },
 	{ id: "calendar", category: "general", label: "Go to your calendar", command: "Go to calendar", keys: [] },
 	{ id: "email", category: "general", label: "Go to your email", command: "Go to email", keys: [{ goTo: "m" }] },
 	{ id: "sport", category: "general", label: "Go to your sport week", command: "Go to sport", keys: [] },
@@ -310,11 +302,6 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "todoDue", category: "todo", label: "Change the focused or open todo's due day", keys: [{ chord: { key: "d", shift: true }, scope: "outside-fields" }] },
 	{ id: "todoNew", category: "todo", label: "Add a todo to the Todo group", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "todoClose", category: "todo", label: "Close the open todo", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
-	{ id: "notesSearch", category: "notes", label: "Search the Notes page's notes", keys: [{ chord: { key: "/" }, scope: "outside-fields" }] },
-	{ id: "notesNext", category: "notes", label: "Focus the next note, or open it while a note is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
-	{ id: "notesPrevious", category: "notes", label: "Focus the previous note, or open it while a note is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
-	{ id: "notesNew", category: "notes", label: "Add a note and open it", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
-	{ id: "notesClose", category: "notes", label: "Close the open note", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
 	{ id: "calendarNewEvent", category: "calendar", label: "Calendar: add an event", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "emailNext", category: "email", label: "Email: focus the next conversation, or open it while a conversation is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "emailPrevious", category: "email", label: "Email: focus the previous conversation, or open it while a conversation is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },

@@ -1,5 +1,5 @@
 /** `PullRequestDetailContent`: a pull request's header and Summary, Timeline, Code, and Review draft tabs. */
-import { ClipboardPen, FileDiff, FileText, History } from "lucide-react";
+import { IconClipboard, IconDifferenceModified, IconFileText, IconHistory } from "central-icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type PullRequestChange, type PullRequestDetail, type StackedPullRequest, prKey, samePullRequest } from "../../../../src/shared/github";
 import { reviewDraftOf } from "../../../../src/shared/review-drafts";
@@ -94,10 +94,10 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 				<nav aria-label="Pull request tabs" className="flex min-w-0 flex-wrap items-center gap-2 border-t border-border/60 px-4 py-2">
 					<SegmentedTabsList aria-label="Pull request details">
 						{([
-							{ value: "summary", label: "Summary", Icon: FileText, name: "Summary", control: "pr-details.tab.summary" as const },
-							{ value: "timeline", label: "Timeline", Icon: History, name: `Timeline, ${comments} comments`, control: "pr-details.tab.timeline" as const },
-							{ value: "code", label: "Code", Icon: FileDiff, name: "Code", control: "pr-details.tab.code" as const },
-							...(draft ? [{ value: "review", label: "Review draft", Icon: ClipboardPen, name: `Review draft, ${pendingFindings} pending findings${draft.posted ? ", posted" : ""}`, control: "pr-details.tab.review" as const }] : []),
+							{ value: "summary", label: "Summary", Icon: IconFileText, name: "Summary", control: "pr-details.tab.summary" as const },
+							{ value: "timeline", label: "Timeline", Icon: IconHistory, name: `Timeline, ${comments} comments`, control: "pr-details.tab.timeline" as const },
+							{ value: "code", label: "Code", Icon: IconDifferenceModified, name: "Code", control: "pr-details.tab.code" as const },
+							...(draft ? [{ value: "review", label: "Review draft", Icon: IconClipboard, name: `Review draft, ${pendingFindings} pending findings${draft.posted ? ", posted" : ""}`, control: "pr-details.tab.review" as const }] : []),
 						]).map(({ value, label, Icon, name, control }) => (
 							<Tooltip key={value} content={name} side="bottom">
 								<SegmentedTab {...activityControl(control)} value={value} className={TAB_CLASS} aria-label={name}>

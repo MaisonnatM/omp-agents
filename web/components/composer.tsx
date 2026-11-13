@@ -1,5 +1,5 @@
 /** Shared parts of the composer: its directory label, empty-conversation view, and the check that holds back `!` and `$` drafts. */
-import { Folder, MessageCircle } from "lucide-react";
+import { IconBubble2, IconFolder1 } from "central-icons";
 import { createContext, type ReactNode, type RefObject } from "react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { folderName } from "../labels";
@@ -34,7 +34,7 @@ export const ComposerNote = ({ text }: { text: string }) => (
 export const DirectoryLabel = ({ cwd }: { cwd: string }) => (
 	<Tooltip content={cwd} side="top">
 		<span tabIndex={0} className="flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
-			<Folder aria-hidden="true" className="size-4 shrink-0" />
+			<IconFolder1 aria-hidden="true" className="size-4 shrink-0" />
 			<span className="truncate">{folderName(cwd) ?? cwd}</span>
 		</span>
 	</Tooltip>
@@ -45,7 +45,7 @@ export function EmptyConversation({ title, children }: { title: string; children
 	return (
 		<div className="m-auto flex max-w-sm flex-col items-center gap-4 px-6 py-8 text-center" data-empty-conversation>
 			<span className="flex size-10 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
-				<MessageCircle aria-hidden="true" className="size-5" />
+				<IconBubble2 aria-hidden="true" className="size-5" />
 			</span>
 			<div className="space-y-1">
 				<h2 className="text-sm font-medium">{title}</h2>

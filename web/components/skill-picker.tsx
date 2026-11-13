@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react";
+import { IconSparklesTwo } from "central-icons";
 import type { SkillOption } from "../../src/shared/sessions";
 import type { ReadState } from "../reads";
 import { CommandPicker, fromList } from "./command-picker";
@@ -18,7 +18,7 @@ export function SkillPicker({ label, skills, value, onPick }: SkillPickerProps) 
 	return (
 		<CommandPicker
 			trigger={<span className="max-w-64 truncate">{value ?? "None"}</span>}
-			icon={Sparkles}
+			icon={IconSparklesTwo}
 			ariaLabel={`${label}: ${value ?? "none"}`}
 			tooltip={value ?? "Choose a skill"}
 			search={{ label: "Search skills" }}

@@ -1,5 +1,5 @@
 /** Linear's field pickers: a button that opens a searchable list of a field's choices, and the due date's. The issue detail, the new-issue dialog, the Todo page, and a pull request's details share them. */
-import { Calendar, Check, Ellipsis } from "lucide-react";
+import { IconCalendar1, IconCheckmark1, IconDotGrid1x3Horizontal } from "central-icons";
 import { type KeyboardEvent, type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { dateLabel } from "../labels";
 
 /** A field's button in a side column: the row's width, its value in the text's color, and room for wrapped labels. */
-export const FIELD_BUTTON = "h-auto min-h-8 w-full justify-start px-2 py-1 text-[13px] font-normal text-foreground";
+const FIELD_BUTTON = "h-auto min-h-8 w-full justify-start px-2 py-1 text-[13px] font-normal text-foreground";
 /** A field's button laid in a property row of a pull request's or issue's details: its text lines up with the row's, and it spans the row. */
 export const ROW_BUTTON = "-mx-2 -my-1 h-auto min-h-6 w-[calc(100%+1rem)] justify-start px-2 py-1 text-xs font-normal text-foreground";
 /** A field's pill in the new-issue dialog, as Linear's own dialog draws them. */
@@ -121,7 +121,7 @@ export function FieldPicker({ field, current, trigger, look = "field", className
 											{choice.icon}
 											<span className="truncate">{choice.label}</span>
 											{choice.detail && <span className="flex-1 truncate text-muted-foreground">{choice.detail}</span>}
-											<Check aria-hidden className={cn("ml-auto", selected.includes(choice.value) ? "opacity-100" : "opacity-0")} />
+											<IconCheckmark1 className={cn("ml-auto", selected.includes(choice.value) ? "opacity-100" : "opacity-0")} />
 											{firstKey !== undefined && <kbd className="text-xs text-muted-foreground tabular-nums">{firstKey + index}</kbd>}
 										</CommandItem>
 									))}
@@ -156,14 +156,14 @@ export function DuePicker({ dueDate, disabled, trigger, look = "field", classNam
 				<PopoverTrigger asChild>
 					{look === "chip" && !dueDate && trigger === undefined ? (
 						<Button variant="tertiary" size="icon-compact" className="rounded-full" aria-label="More fields: set a due date" data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
-							<Ellipsis />
+							<IconDotGrid1x3Horizontal />
 						</Button>
 					) : (
 						<Button size="compact" {...pickerButton(look, className)} aria-label={`Due date: ${dueDate ?? "none"}`} data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
 							<span className="flex min-w-0 items-center gap-2">
 								{trigger ?? (
 									<>
-										{look !== "row" && <Calendar aria-hidden className="size-4 text-muted-foreground" />}
+										{look !== "row" && <IconCalendar1 className="size-4 text-muted-foreground" />}
 										{dueDate ? dateLabel(dueDate) : <span className="text-muted-foreground">Set due date</span>}
 									</>
 								)}

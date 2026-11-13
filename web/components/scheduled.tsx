@@ -1,5 +1,5 @@
 /** Scheduled sends: the sidebar group listing them, their edit menu, and the context that holds and adds them. */
-import { AlarmClock, Ellipsis, Pencil, Send, X } from "lucide-react";
+import { IconClockAlert, IconCrossMedium, IconDotGrid1x3Horizontal, IconPencil, IconSend } from "central-icons";
 import { createContext, useContext, useState } from "react";
 import { promptLabel } from "../../src/shared/prompt-files";
 import { CONTINUE_PROMPT, type ScheduledChange, type ScheduledSend, type ScheduledTarget } from "../../src/shared/scheduled";
@@ -93,7 +93,7 @@ function ScheduleMenu({ draft, files, disabled, pending, onSchedule }: ScheduleB
 							data-state={open ? "open" : "closed"}
 							active={open}
 						>
-							<AlarmClock aria-hidden="true" />
+							<IconClockAlert aria-hidden="true" />
 						</Button>
 					</PopoverTrigger>
 				</span>
@@ -200,13 +200,13 @@ function ScheduledRow({ send, text, now, editing, onEdit }: ScheduledRowProps) {
 	const failed = send.state.phase === "failed";
 	const busy = send.state.phase === "sending" || change.pending || editing;
 	const actions = [
-		{ name: failed ? "Try again" : "Send now", icon: <Send aria-hidden="true" />, run: () => change.run({ op: "send-now", id: send.id }) },
-		{ name: "Edit", icon: <Pencil aria-hidden="true" />, run: onEdit },
-		{ name: failed ? "Dismiss" : "Cancel", icon: <X aria-hidden="true" />, run: () => change.run({ op: "remove", id: send.id }) },
+		{ name: failed ? "Try again" : "Send now", icon: <IconSend aria-hidden="true" />, run: () => change.run({ op: "send-now", id: send.id }) },
+		{ name: "Edit", icon: <IconPencil aria-hidden="true" />, run: onEdit },
+		{ name: failed ? "Dismiss" : "Cancel", icon: <IconCrossMedium aria-hidden="true" />, run: () => change.run({ op: "remove", id: send.id }) },
 	];
 	return (
 		<li className="flex items-center gap-2 rounded-lg bg-muted px-2.5 py-1 text-[13px]">
-			<AlarmClock aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
+			<IconClockAlert aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
 			<span className="min-w-0 flex-1">
 				<span className="block truncate">{label}</span>
 				<span className={cn("block truncate text-xs", failed ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>{stateLabel(send) ?? whenLabel(send, now)}</span>
@@ -265,20 +265,20 @@ function ScheduledMenu({ send, label }: { send: ScheduledSend; label: string }) 
 		<DropdownMenu open={open} onOpenChange={setOpen}>
 			<Tooltip content="More actions" forceOpen={open ? false : undefined}>
 				<DropdownMenuTrigger render={<SidebarMenuAction showOnHover aria-label={`More actions for ${label}`} disabled={send.state.phase === "sending" || change.pending} />}>
-					<Ellipsis />
+					<IconDotGrid1x3Horizontal />
 				</DropdownMenuTrigger>
 			</Tooltip>
 			<DropdownMenuContent align="end">
 				<MenuItem onClick={() => change.run({ op: "send-now", id: send.id })}>
-					<Send />
+					<IconSend />
 					{failed ? "Try again" : "Send now"}
 				</MenuItem>
 				<MenuItem onClick={() => (location.hash = hashOf(send))}>
-					<Pencil />
+					<IconPencil />
 					Edit
 				</MenuItem>
 				<MenuItem variant="destructive" onClick={() => change.run({ op: "remove", id: send.id })}>
-					<X />
+					<IconCrossMedium />
 					{failed ? "Dismiss" : "Cancel"}
 				</MenuItem>
 			</DropdownMenuContent>
@@ -295,7 +295,7 @@ export function ScheduledGroup({ sends, openId, showWorkspace, open, onOpenChang
 	if (sends.length === 0) return null;
 	return (
 		<SidebarGroup collapsible open={open} onOpenChange={onOpenChange}>
-			<SidebarGroupLabel icon={AlarmClock}>{`${sends.length} scheduled`}</SidebarGroupLabel>
+			<SidebarGroupLabel icon={IconClockAlert}>{`${sends.length} scheduled`}</SidebarGroupLabel>
 			<SidebarMenu aria-label="Scheduled messages and sessions">
 				{sends.map(send => {
 					const { target } = send;

@@ -57,7 +57,7 @@ Cache writes by cause, from consecutive requests of one session:
 
 ## Changes made
 
-- **Subagents no longer carry the user's session tools.** `end_session`, `land`, `ship_stage`, `user_todo`, `user_note`, and `user_event` drop out of a subagent at its start; in 30 days no subagent called any of them.
+- **Subagents no longer carry the user's session tools.** `end_session`, `land`, `ship_stage`, `user_todo`, and `user_event` drop out of a subagent at its start; in 30 days no subagent called any of them.
   A scout's request went from 11 tools and 14.6k chars of schemas to 5 tools and 5.2k chars, about 2,600 fewer tokens per subagent request, worth about $20 per 14 days in cache reads and first-request writes.
   `pr_description` and `project_memory` stay, since subagents call them.
 - **`skill://Poteto Mode` no longer fails 37 times per 14 days.** pstack renamed its skill `poteto-mode`, and the kit's alias still told agents the old name; it now says that `skill://poteto-mode` opens pstack's file.
@@ -73,7 +73,7 @@ Ranked by expected saving; none is applied, because each needs an evaluation of 
 | Fewer, smaller worker turns: workers average 120 requests at 108k tokens | unknown until measured | lost context | pstack prompts, `task.agentCompactionThresholdOverrides` |
 | Resolve an edit's relative path to the checkout its hash came from, and stop stale-anchor edits | about $35 from 885 failed edits at 12 to 16% | none for users | omp's edit tool |
 | Give an agent file a skill allow-list, so a scout skips the 9.5k-char skill list | about $19 | an agent misses a skill it needed | omp's task executor |
-| Mount `user_event`, `user_note`, `user_todo`, and `ship_stage` as `xd://` devices in the main session | about $5 | models think the tool is missing, as `2026-11-07-tell-cursor-models-where-dashboard-tools-are` found | kit extensions |
+| Mount `user_event`, `user_todo`, and `ship_stage` as `xd://` devices in the main session | about $5 | models think the tool is missing, as `2026-11-07-tell-cursor-models-where-dashboard-tools-are` found | kit extensions |
 | Move PR-review and design-handoff rules from the kit's `APPEND_SYSTEM.md` into skills | about $4 | an agent skips the review gate | kit `APPEND_SYSTEM.md` |
 
 ### Audit of the kit's `APPEND_SYSTEM.md`

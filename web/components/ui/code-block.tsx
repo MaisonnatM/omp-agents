@@ -1,6 +1,6 @@
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { CheckIcon, CopyIcon } from "lucide-react"
+import { IconCheckmark1, IconSquareBehindSquare1 } from "central-icons";
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -119,7 +119,7 @@ function CodeBlockCopyButton({
         }}
         {...props}
       >
-        {copied ? <CheckIcon /> : <CopyIcon />}
+        {copied ? <IconCheckmark1 /> : <IconSquareBehindSquare1 />}
       </Button>
       <span aria-live="polite" className="sr-only">
         {copied ? "Copied" : ""}

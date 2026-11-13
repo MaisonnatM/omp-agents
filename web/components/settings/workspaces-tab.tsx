@@ -1,4 +1,4 @@
-import { Eye, EyeOff, FolderOpen, FolderPlus, ShieldOff } from "lucide-react";
+import { IconEyeOpen, IconEyeSlash, IconFolderAddRight, IconFolderOpen, IconShieldCrossed } from "central-icons";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { TrustChange, TrustedProject } from "../../../src/shared/project-trust";
@@ -72,7 +72,7 @@ function TrustedProjects({ projects }: { projects: TrustedProject[] }) {
 							workspace={{ cwd: root, cwdDisplay: rootDisplay }}
 							note={pieces === 1 ? "1 piece of agent code" : `${pieces} pieces of agent code`}
 							action={
-								<Button variant="ghost" size="compact" leadingIcon={ShieldOff} loading={pending?.root === root} disabled={pending !== null} onClick={() => change({ op: "forget", root })}>
+								<Button variant="ghost" size="compact" leadingIcon={IconShieldCrossed} loading={pending?.root === root} disabled={pending !== null} onClick={() => change({ op: "forget", root })}>
 									Stop trusting
 								</Button>
 							}
@@ -110,11 +110,11 @@ export function WorkspacesTab({ workspaces, list: { added, hidden }, trustedProj
 							className="block h-7 w-80 max-w-full rounded-md border border-border bg-transparent px-2"
 						/>
 					</label>
-					<Button type="submit" variant="secondary" size="compact" leadingIcon={FolderPlus} loading={pending?.op === "add"} disabled={pending !== null || path.trim() === ""}>
+					<Button type="submit" variant="secondary" size="compact" leadingIcon={IconFolderAddRight} loading={pending?.op === "add"} disabled={pending !== null || path.trim() === ""}>
 						Add workspace
 					</Button>
 					{desktop?.pickDirectory && (
-						<Button type="button" variant="ghost" size="compact" leadingIcon={FolderOpen} disabled={pending !== null} onClick={() => void choose()}>
+						<Button type="button" variant="ghost" size="compact" leadingIcon={IconFolderOpen} disabled={pending !== null} onClick={() => void choose()}>
 							Choose folder…
 						</Button>
 					)}
@@ -130,7 +130,7 @@ export function WorkspacesTab({ workspaces, list: { added, hidden }, trustedProj
 								workspace={workspace}
 								note={addedCwds.has(workspace.cwd) ? "Added" : null}
 								action={
-									<Button variant="ghost" size="compact" leadingIcon={EyeOff} loading={pending?.op === "hide" && pending.cwd === workspace.cwd} disabled={pending !== null} onClick={() => change({ op: "hide", cwd: workspace.cwd })}>
+									<Button variant="ghost" size="compact" leadingIcon={IconEyeSlash} loading={pending?.op === "hide" && pending.cwd === workspace.cwd} disabled={pending !== null} onClick={() => change({ op: "hide", cwd: workspace.cwd })}>
 										Hide
 									</Button>
 								}
@@ -148,7 +148,7 @@ export function WorkspacesTab({ workspaces, list: { added, hidden }, trustedProj
 								workspace={workspace}
 								note={null}
 								action={
-									<Button variant="ghost" size="compact" leadingIcon={Eye} loading={pending?.op === "show" && pending.cwd === workspace.cwd} disabled={pending !== null} onClick={() => change({ op: "show", cwd: workspace.cwd })}>
+									<Button variant="ghost" size="compact" leadingIcon={IconEyeOpen} loading={pending?.op === "show" && pending.cwd === workspace.cwd} disabled={pending !== null} onClick={() => change({ op: "show", cwd: workspace.cwd })}>
 										Show
 									</Button>
 								}

@@ -1,5 +1,5 @@
-/** The sidebar's Calendar tab: the calendar, the Google calendars it can show by account, and whether it shows routine runs (`CalendarNav`). */
-import { Check } from "lucide-react";
+/** The Calendar page's own list: the calendar, the Google calendars it can show by account, and whether it shows routine runs (`CalendarNav`). */
+import { IconCheckmark1 } from "central-icons";
 import { type CalendarShownInput, calendarKey, type GoogleCalendar, type GoogleStatus } from "../../../src/shared/calendar";
 import { useCalendarMonth, useCalendarYear } from "@/components/kibo-ui/calendar";
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
@@ -81,7 +81,7 @@ function CalendarItem({ calendar }: { calendar: GoogleCalendar }) {
 					className="flex size-3.5 shrink-0 items-center justify-center rounded-[3px] border-2"
 					style={{ borderColor: calendar.color, backgroundColor: shown ? calendar.color : undefined }}
 				>
-					{shown && <Check className="size-2.5 text-white" strokeWidth={3.5} />}
+					{shown && <IconCheckmark1 className="size-2.5 text-white icon-shapes:stroke-[3.5]" />}
 				</span>
 				<span className="truncate">{name}</span>
 			</SidebarMenuButton>
@@ -95,18 +95,18 @@ function CalendarItem({ calendar }: { calendar: GoogleCalendar }) {
 }
 
 /**
- * The Calendar tab of the sidebar: the calendar, active while `open`, the Google calendars of the Google accounts,
- * then whether the calendar shows routine runs.
+ * The Calendar page's own list: the calendar, the Google calendars of the Google accounts, then whether the calendar
+ * shows routine runs. It shows only while the Calendar page is open, so its row is always the current one.
  */
-export function CalendarNav({ open }: { open: boolean }) {
+export function CalendarNav() {
 	const [showRoutines, setShowRoutines] = useCalendarRoutines();
 	return (
 		<>
 			<SidebarGroup>
 				<SidebarMenu aria-label="Calendar">
 					<SidebarMenuItem>
-						<SidebarMenuButton asChild isActive={open}>
-							<a href={hashForCalendar()} aria-current={open ? "page" : undefined}>
+						<SidebarMenuButton asChild isActive>
+							<a href={hashForCalendar()} aria-current="page">
 								<span className="truncate">Calendar</span>
 							</a>
 						</SidebarMenuButton>

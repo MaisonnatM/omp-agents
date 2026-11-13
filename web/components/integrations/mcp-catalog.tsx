@@ -1,4 +1,4 @@
-import { Check, ExternalLink, Plus } from "lucide-react";
+import { IconCheckmark1, IconPlusLarge, IconSquareArrowTopRight } from "central-icons";
 import { useId, useState } from "react";
 import { MCP_CATALOG, MCP_CATEGORIES, type McpCatalogEntry, type McpCategory } from "../../../src/shared/mcp-catalog";
 import type { McpServerRow } from "../../../src/shared/mcp-servers";
@@ -46,12 +46,12 @@ function CatalogCard({ entry, added }: { entry: McpCatalogEntry; added: McpServe
 			<div className="flex items-center justify-between gap-2">
 				<span className="text-xs text-muted-foreground">{entry.auth === "oauth" ? "Signs in with OAuth" : "No sign-in"}</span>
 				{waitingUrl ? (
-					<Button variant="ghost" size="compact" leadingIcon={ExternalLink} render={<a href={waitingUrl} target="_blank" rel="noreferrer" />}>
+					<Button variant="ghost" size="compact" leadingIcon={IconSquareArrowTopRight} render={<a href={waitingUrl} target="_blank" rel="noreferrer" />}>
 						Finish sign-in
 					</Button>
 				) : added ? (
 					<span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-						<Check aria-hidden className="size-3.5 shrink-0" />
+						<IconCheckmark1 className="size-3.5 shrink-0" />
 						<span className="truncate">
 							Added as <code className="font-mono">{added.name}</code>
 						</span>
@@ -60,7 +60,7 @@ function CatalogCard({ entry, added }: { entry: McpCatalogEntry; added: McpServe
 					<Button
 						variant="secondary"
 						size="compact"
-						leadingIcon={Plus}
+						leadingIcon={IconPlusLarge}
 						loading={starting || addOpen.pending}
 						aria-label={`Add ${entry.label}`}
 						onClick={() => (entry.auth === "oauth" ? void connect() : addOpen.run())}

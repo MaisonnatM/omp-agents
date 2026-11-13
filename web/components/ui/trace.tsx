@@ -1,5 +1,5 @@
 import * as React from "react"
-import { ChevronRightIcon } from "lucide-react"
+import { IconChevronRight } from "central-icons";
 
 import { cn } from "@/lib/utils"
 import {
@@ -119,7 +119,7 @@ function TraceCollapsibleTrigger({
     >
       {children}
       <TraceIcon className="transition-transform group-aria-expanded/trace-collapsible-trigger:rotate-90">
-        <ChevronRightIcon />
+        <IconChevronRight />
       </TraceIcon>
     </CollapsibleTrigger>
   )

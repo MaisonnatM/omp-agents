@@ -1,5 +1,5 @@
 /** `GoogleAccountsRow`: a Google service in Settings › Integrations with its accounts, each signed in, reconnected, and removed on its own. */
-import { ExternalLink, KeyRound, Plus, Trash2 } from "lucide-react";
+import { IconKey1, IconPlusLarge, IconSquareArrowTopRight, IconTrashCan } from "central-icons";
 import { type ReactNode, useState } from "react";
 import {
 	type AccountsService,
@@ -80,7 +80,7 @@ function AccountRow({ integration, account, last, children }: AccountRowProps) {
 							<ReconnectItem signIn={signIn} />
 							<MenuSeparator />
 							<MenuItem variant="destructive" onClick={() => setRemoving(true)}>
-								<Trash2 />
+								<IconTrashCan />
 								Remove
 							</MenuItem>
 						</MoreActionsMenu>
@@ -93,7 +93,7 @@ function AccountRow({ integration, account, last, children }: AccountRowProps) {
 				question={
 					removing && (
 						<Confirm
-							icon={Trash2}
+							icon={IconTrashCan}
 							question={`Remove ${shown} from ${label}?`}
 							detail={
 								last
@@ -120,7 +120,7 @@ function AccountRow({ integration, account, last, children }: AccountRowProps) {
 								checking: refreshing,
 								check: () => void integrationsStore.refresh(null, { fresh: true }),
 								fix: apiOff && (
-									<Button variant="secondary" size="compact" leadingIcon={ExternalLink} render={<a href={apiOff.url} target="_blank" rel="noreferrer" />}>
+									<Button variant="secondary" size="compact" leadingIcon={IconSquareArrowTopRight} render={<a href={apiOff.url} target="_blank" rel="noreferrer" />}>
 										Enable {apiOff.api}
 									</Button>
 								),
@@ -163,12 +163,12 @@ export function GoogleAccountsRow({ integration, notice, details }: GoogleAccoun
 			</Button>
 		) : (
 			<>
-				<Button variant="secondary" size="compact" leadingIcon={firstSignIn ? undefined : Plus} loading={adding.starting} onClick={() => void adding.connect()}>
+				<Button variant="secondary" size="compact" leadingIcon={firstSignIn ? undefined : IconPlusLarge} loading={adding.starting} onClick={() => void adding.connect()}>
 					{firstSignIn ? "Connect" : "Add account"}
 				</Button>
 				<MoreActionsMenu name={label} disabled={adding.starting}>
 					<MenuItem onClick={() => setFormOpen(true)}>
-						<KeyRound />
+						<IconKey1 />
 						Replace OAuth client
 					</MenuItem>
 				</MoreActionsMenu>

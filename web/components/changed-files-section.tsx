@@ -1,19 +1,6 @@
 /** The Session card's Files section: a row per changed file, and the dialog of one file's recorded changes that a subagent's row opens. */
-import {
-	File as FileIcon,
-	FileCode,
-	FileCog,
-	FileImage,
-	FileJson,
-	FileLock,
-	FileMinus,
-	FilePen,
-	FilePlus,
-	FileSpreadsheet,
-	FileTerminal,
-	FileText,
-	type LucideIcon,
-} from "lucide-react";
+import { IconCode, IconConsole, IconFileBend, IconFileEdit, IconFileLock, IconFileText, IconImages1, IconJson, IconPageAdd, IconPageCross, IconTable } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useMemo } from "react";
 import { type ChangedFile, editHunks, type FileChange, type FileChangeKind, type FileStatus, fileStatus, lineTotals } from "../../src/shared/transcript";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -26,23 +13,23 @@ import { ViewerDialog } from "./viewer-dialog";
 
 const CHANGE_LABEL: Record<FileChangeKind, string> = { created: "Created", edited: "Edited", rewritten: "Rewritten", deleted: "Deleted" };
 
-const ICON_GROUPS: [LucideIcon, string[]][] = [
-	[FileCode, ["ts", "tsx", "js", "jsx", "mjs", "cjs", "py", "rs", "go", "swift", "kt", "java", "rb", "c", "h", "cc", "cpp", "hpp", "cs", "php", "css", "scss", "html", "vue", "svelte", "sql"]],
-	[FileJson, ["json", "jsonc", "json5", "jsonl"]],
-	[FileText, ["md", "mdx", "txt", "rst"]],
-	[FileImage, ["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "avif"]],
-	[FileTerminal, ["sh", "bash", "zsh", "fish"]],
-	[FileCog, ["yml", "yaml", "toml", "ini", "env", "conf", "cfg"]],
-	[FileSpreadsheet, ["csv", "tsv", "xlsx"]],
-	[FileLock, ["lock", "lockb"]],
+const ICON_GROUPS: [IconComponent, string[]][] = [
+	[IconCode, ["ts", "tsx", "js", "jsx", "mjs", "cjs", "py", "rs", "go", "swift", "kt", "java", "rb", "c", "h", "cc", "cpp", "hpp", "cs", "php", "css", "scss", "html", "vue", "svelte", "sql"]],
+	[IconJson, ["json", "jsonc", "json5", "jsonl"]],
+	[IconFileText, ["md", "mdx", "txt", "rst"]],
+	[IconImages1, ["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "avif"]],
+	[IconConsole, ["sh", "bash", "zsh", "fish"]],
+	[IconFileEdit, ["yml", "yaml", "toml", "ini", "env", "conf", "cfg"]],
+	[IconTable, ["csv", "tsv", "xlsx"]],
+	[IconFileLock, ["lock", "lockb"]],
 ];
 
 /** A file's icon by its extension, which a `Map` holds so that a name such as `constructor` finds none. */
 const ICON_BY_EXTENSION = new Map(ICON_GROUPS.flatMap(([icon, extensions]) => extensions.map(extension => [extension, icon] as const)));
 
-function iconOf(name: string): LucideIcon {
+function iconOf(name: string): IconComponent {
 	const dot = name.lastIndexOf(".");
-	return (dot >= 0 && ICON_BY_EXTENSION.get(name.slice(dot + 1).toLowerCase())) || FileIcon;
+	return (dot >= 0 && ICON_BY_EXTENSION.get(name.slice(dot + 1).toLowerCase())) || IconFileBend;
 }
 
 const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? "" : "s"}`;
@@ -89,14 +76,14 @@ function Change({ path, change }: { path: string; change: FileChange }) {
 }
 
 interface FileLook {
-	icon: LucideIcon;
+	icon: IconComponent;
 	label: string;
 }
 
 const FILE_LOOK: Record<FileStatus, FileLook> = {
-	created: { icon: FilePlus, label: "New file" },
-	edited: { icon: FilePen, label: "Edited" },
-	deleted: { icon: FileMinus, label: "Deleted" },
+	created: { icon: IconPageAdd, label: "New file" },
+	edited: { icon: IconFileEdit, label: "Edited" },
+	deleted: { icon: IconPageCross, label: "Deleted" },
 };
 
 /** A changed file's look and what happened to it: its kind, how often, and when last. */

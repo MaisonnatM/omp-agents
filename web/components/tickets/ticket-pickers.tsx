@@ -1,5 +1,6 @@
 /** The pickers for a Linear issue's status, priority, assignee, labels, and project, shared by the issue's side column and the new-issue dialog. */
-import { Box, CircleUser, type LucideIcon, Tag } from "lucide-react";
+import { IconBox, IconCirclePerson, IconTag } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import type { ReactNode } from "react";
 import type { TicketChoice, TicketLabel, TicketOptions, TicketPriority, TicketStatus } from "../../../src/shared/tickets";
 import { cn } from "@/lib/utils";
@@ -24,7 +25,7 @@ interface TeamPickerProps {
 const iconSize = (look: PickerLook): string => (look === "field" ? "size-4" : "size-3.5");
 
 /** A property row names its field beside the picker, so the picker leaves out the field's generic icon. */
-const fieldIcon = (look: PickerLook, Icon: LucideIcon): ReactNode => look !== "row" && <Icon aria-hidden className={cn(iconSize(look), "text-muted-foreground")} />;
+const fieldIcon = (look: PickerLook, Icon: IconComponent): ReactNode => look !== "row" && <Icon aria-hidden className={cn(iconSize(look), "text-muted-foreground")} />;
 
 /** The workflow status, `null` while it is the team's default and not yet known. */
 export function TicketStatusPicker({ look, value, options, error, disabled, onOpen, onChange }: TeamPickerProps & { value: TicketStatus | null; onChange: (status: TicketStatus) => void }) {
@@ -97,7 +98,7 @@ export function TicketAssigneePicker({ look, value, offerMe = false, options, er
 			current={value === undefined ? "loading" : (name ?? "unassigned")}
 			trigger={
 				<>
-					{fieldIcon(look, CircleUser)}
+					{fieldIcon(look, IconCirclePerson)}
 					<span className="truncate">{name ?? (look === "chip" || value === undefined ? "Assignee" : "Unassigned")}</span>
 				</>
 			}
@@ -132,7 +133,7 @@ export function TicketLabelsPicker({ look, value, options, error, disabled, onOp
 								))}
 							</span>
 						) : (
-							<Tag aria-hidden className="size-3.5 text-muted-foreground" />
+							<IconTag className="size-3.5 text-muted-foreground" />
 						)}
 						<span className="truncate">{value.length === 0 ? "Labels" : value.length === 1 ? names[0] : `${value.length} labels`}</span>
 					</>
@@ -146,7 +147,7 @@ export function TicketLabelsPicker({ look, value, options, error, disabled, onOp
 					</span>
 				) : (
 					<>
-						{fieldIcon(look, Tag)}
+						{fieldIcon(look, IconTag)}
 						<span className="text-muted-foreground">Add label</span>
 					</>
 				)
@@ -173,7 +174,7 @@ export function TicketProjectPicker({ look, value, options, error, disabled, onO
 			current={value ?? "none"}
 			trigger={
 				<>
-					{fieldIcon(look, Box)}
+					{fieldIcon(look, IconBox)}
 					<span className={cn("truncate", look !== "chip" && !value && "text-muted-foreground")}>{value ?? (look === "chip" ? "Project" : "Add to project")}</span>
 				</>
 			}

@@ -2,7 +2,7 @@
 
 `SettingsSync` in `src/settings-sync.ts` keeps the portable settings the same on several machines through one branch of a Git remote.
 What is portable is data, `SYNC_ITEMS` in `src/shared/settings-sync.ts`: omp's `config.yml`, `AGENTS.md`, and `APPEND_SYSTEM.md`, the `skills`, `rules`, `agents`, and `commands` trees of omp's agent directory, and the dashboard's stores, each under its path in the repository (`omp/…` and `dashboard/…`).
-The stores are the source control settings, the notes, the todos with their categories and archive, the preferences, the workspace list, the hidden calendars, and the Bots, each a `SyncStore` that `syncStores` builds over the server's own file.
+The stores are the source control settings, the todos with their categories and archive, the preferences, the workspace list, the hidden calendars, and the Bots, each a `SyncStore` that `syncStores` builds over the server's own file.
 The Bots store carries each Bot of `bots.json` without its `sessionId`, with its `cwd` as a `~` path, its `memory.md` as `memory`, one entry per line, so facts two machines remembered merge entry by entry, and its routines as `routines`; a Bot arriving keeps this machine's session id for it, else none.
 Each carried routine is the routine of `routines.json` without its `botId`, `runs`, and `scheduledAt`, which stay on the machine that ran them, and with `enabled` and `machine` folded into `runsOn`: the machine that runs it, `{ id, name }`, or `null` while it is paused, so the carried form cannot hold a routine enabled on no machine, and two machines changing it conflict.
 `thisMachine` names this machine: an id that `machine.json` beside the access token keeps, made on first use since a Mac's name can change, and its host name.
@@ -42,7 +42,6 @@ A path the plan did not consider, one of an item that is off, a skipped file, or
 A sync with nothing changed on either side writes nothing and makes no commit.
 
 Paths under the home directory travel as `~`: `portableText` rewrites the home directory in text files on their way to the remote, and the source control and workspace stores map each directory with `portablePath` and `localPath`.
-Notes travel as an object keyed by id rather than the list the file keeps, since each edit moves its note first, and two machines editing two notes would otherwise disagree on the order.
 A text file arrives with its `~` form as written, so the comparison on the next sync, which normalizes this machine's text again, sees no change.
 
 `settings-sync.json`, beside the access token with mode `0600`, holds the remote, the branch, the items turned off, and the last `SyncOutcome`: `synced` with the paths received, sent, and skipped, `conflict` with each conflict's path, item, and the first 20,000 characters of both versions, or `failed` with git's message.

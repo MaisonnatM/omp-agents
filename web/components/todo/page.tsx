@@ -1,4 +1,4 @@
-import { ListTodo, ListX, Plus, Trash2 } from "lucide-react";
+import { IconPlusLarge, IconSquareX, IconTodos, IconTrashCan } from "central-icons";
 import { Fragment, type ReactNode, useRef, useState } from "react";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -180,7 +180,7 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 							<Button
 								variant="ghost"
 								size="compact"
-								leadingIcon={Trash2}
+								leadingIcon={IconTrashCan}
 								onClick={() => {
 									if (window.confirm(`Delete the ${list.archive.length} archived todos for good?`)) onChange({ op: "empty-archive" });
 								}}
@@ -191,7 +191,7 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 					)}
 					{!kind.readOnly && anyClosed && !disabled && (
 						<Tooltip content="Move Done and Canceled todos to Archive">
-							<Button variant="ghost" size="compact" leadingIcon={ListX} onClick={() => onChange({ op: "clear-done", categoryId: view.kind === "category" ? view.id : null })}>
+							<Button variant="ghost" size="compact" leadingIcon={IconSquareX} onClick={() => onChange({ op: "clear-done", categoryId: view.kind === "category" ? view.id : null })}>
 								Clear done
 							</Button>
 						</Tooltip>
@@ -203,7 +203,7 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 				widthKey="omp-agents.todo-list-width"
 				resizeLabel="Resize the todo list"
 				detailLabel="Open todo"
-				empty={{ icon: ListTodo, title: "No todo open", hint: `Click a todo, or focus one with ${shortcutKeys("todoNext")} and press Enter.` }}
+				empty={{ icon: IconTodos, title: "No todo open", hint: `Click a todo, or focus one with ${shortcutKeys("todoNext")} and press Enter.` }}
 				list={
 					<section ref={listRef} aria-label={title} className="mx-auto w-full max-w-3xl space-y-2 px-3 py-2">
 						{kind.readOnly ? (
@@ -228,7 +228,7 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 											{canAdd && (
 												<Tooltip content={`Add a todo to ${label}`}>
 													<Button variant="ghost" size="icon-compact" aria-label={`Add a todo to ${label}`} className={isClosed(status) ? undefined : "ml-auto"} onClick={() => startDraft(status)}>
-														<Plus />
+														<IconPlusLarge />
 													</Button>
 												</Tooltip>
 											)}
@@ -246,7 +246,7 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 																onClick={() => startDraft("todo")}
 																className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm text-muted-foreground hover:bg-accent/50 hover:text-foreground [&>svg]:size-4"
 															>
-																<Plus />
+																<IconPlusLarge />
 																{kind.add.label}
 															</button>
 														</Tooltip>

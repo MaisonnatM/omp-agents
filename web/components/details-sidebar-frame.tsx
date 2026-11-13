@@ -1,5 +1,5 @@
 /** The right sidebar's shell for a focused view: the directory its file references resolve against, a header of counted tabs, and each tab's panel. */
-import type { LucideIcon } from "lucide-react";
+import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useMemo, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
@@ -18,7 +18,7 @@ const PANEL_VIEWPORT = "pt-2";
 
 export interface DetailsTab<T extends string> {
 	value: T;
-	icon: LucideIcon;
+	icon: IconComponent;
 	name: string;
 	/** The Activity control a click on the tab records. */
 	control: ControlId;
@@ -50,7 +50,7 @@ function tabLabel(name: string, count: number): { label: string; badge: number |
 
 
 /** A tab with nothing to show yet. */
-export function DetailsEmpty({ icon: Icon, title, description }: { icon: LucideIcon; title: string; description: string }) {
+export function DetailsEmpty({ icon: Icon, title, description }: { icon: IconComponent; title: string; description: string }) {
 	return (
 		<Empty className="py-10">
 			<EmptyHeader>

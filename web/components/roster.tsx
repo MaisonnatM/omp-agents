@@ -1,5 +1,5 @@
 /** The left sidebar's roster: the Workspaces section, whose label picks the workspace, and its search, then the scheduled sends, the pinned sessions, each workspace's sessions, and the past ones. */
-import { Folder, FolderOpen, ListRestart, Loader, MoreHorizontal, Pin, Plus, Search } from "lucide-react";
+import { IconArrowLoopDownLeft, IconDotGrid1x3Horizontal, IconFolder1, IconFolderOpen, IconLoader, IconMagnifyingGlass, IconPin, IconPlusLarge } from "central-icons";
 import { type ReactNode, useContext, useState } from "react";
 import type { ScheduledSend } from "../../src/shared/scheduled";
 import type { PastSession, View } from "../../src/shared/sessions";
@@ -45,6 +45,7 @@ function SidebarWorkspacePicker({ workspaces, onPick }: SidebarWorkspacePickerPr
 	const pick = (cwd: string | null) => (): void => {
 		if (cwd !== current) onPick(cwd);
 	};
+
 	return (
 		<CommandPicker
 			trigger={selected ? label : "Workspaces"}
@@ -92,14 +93,14 @@ function WorkspaceFolder({ folder: { group, rows }, name, open, onOpenChange, on
 		<SidebarGroupActions className={cn("opacity-0 transition-opacity group-hover/workspace:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100", rows === 0 ? "top-0" : "top-0.5")}>
 			<Tooltip content={`New session in ${name}`} side="right">
 				<SidebarGroupAction aria-label={`New session in ${name}`} onClick={onNewSession}>
-					<Plus />
+					<IconPlusLarge />
 				</SidebarGroupAction>
 			</Tooltip>
 		</SidebarGroupActions>
 	);
 	return (
 		<SidebarGroup className="group/workspace py-0" collapsible={rows > 0} open={open} onOpenChange={onOpenChange} headerActions={rows > 0 && newHere}>
-			<SidebarGroupLabel icon={rows > 0 && open ? FolderOpen : Folder} title={group.workspace.cwdDisplay} className="h-7 text-[13px] text-foreground/85 hover:text-foreground">
+			<SidebarGroupLabel icon={rows > 0 && open ? IconFolderOpen : IconFolder1} title={group.workspace.cwdDisplay} className="h-7 text-[13px] text-foreground/85 hover:text-foreground">
 				{name}
 				{waiting > 0 && (
 					<>
@@ -191,7 +192,7 @@ export function Roster({ workspaces, lists, groups, query, onQuery, onTogglePin,
 							<Tooltip content="Search sessions" shortcut={shortcutLabels("sessionSearch")}>
 								<SidebarGroupAction asChild>
 									<button type="button" aria-label="Search sessions" onClick={() => setSearching(true)}>
-										<Search />
+										<IconMagnifyingGlass />
 									</button>
 								</SidebarGroupAction>
 							</Tooltip>
@@ -205,7 +206,7 @@ export function Roster({ workspaces, lists, groups, query, onQuery, onTogglePin,
 										disabled={resumingAll || !connected}
 										onClick={() => start({ kind: "resume-all", sessionIds: interrupted.map(session => session.sessionId) })}
 									>
-										{resumingAll ? <Loader className="animate-spin" /> : <ListRestart />}
+										{resumingAll ? <IconLoader className="animate-spin" /> : <IconArrowLoopDownLeft />}
 									</button>
 								</SidebarGroupAction>
 							</Tooltip>
@@ -236,7 +237,7 @@ export function Roster({ workspaces, lists, groups, query, onQuery, onTogglePin,
 			{!filtering && <ScheduledGroup sends={scheduled} openId={scheduledOpen} showWorkspace={showWorkspace} open={!collapsed.has("scheduled")} onOpenChange={() => toggleGroup("scheduled")} />}
 			{pinned.hosts.length + pinned.past.length > 0 && (
 				<SidebarGroup collapsible open={!collapsed.has("pinned")} onOpenChange={() => toggleGroup("pinned")}>
-					<SidebarGroupLabel icon={Pin}>{`${pinned.hosts.length + pinned.past.length} pinned`}</SidebarGroupLabel>
+					<SidebarGroupLabel icon={IconPin}>{`${pinned.hosts.length + pinned.past.length} pinned`}</SidebarGroupLabel>
 					<SidebarMenu aria-label="Pinned omp sessions" className="gap-px">
 						{pinned.hosts.map(host => hostRow(host, true, showWorkspace))}
 						{pinned.past.map(session => pastRow(session, true, showWorkspace))}
@@ -258,7 +259,7 @@ export function Roster({ workspaces, lists, groups, query, onQuery, onTogglePin,
 				<SidebarGroup className="py-0">
 					<SidebarMenu>
 						<SidebarMenuItem>
-							<SidebarMenuButton icon={MoreHorizontal} className="text-muted-foreground" onClick={() => setAllGroups(all => !all)}>
+							<SidebarMenuButton icon={IconDotGrid1x3Horizontal} className="text-muted-foreground" onClick={() => setAllGroups(all => !all)}>
 								{folders.more > 0 ? `${folders.more} more workspace${folders.more === 1 ? "" : "s"}` : "Fewer workspaces"}
 							</SidebarMenuButton>
 						</SidebarMenuItem>

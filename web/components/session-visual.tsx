@@ -1,4 +1,4 @@
-import { Maximize2 } from "lucide-react";
+import { IconExpand } from "central-icons";
 import { lazy, type ReactNode, Suspense, useEffect, useMemo, useState } from "react";
 import { errorText } from "../../src/json";
 import { type ChartSpec, type ChartType, type MermaidKind, MERMAID_KIND_NAMES, mermaidKind, parseChartSpec } from "../../src/shared/session-visuals";
@@ -112,7 +112,7 @@ function VisualFrame({ language, title, description = null, source, code, body }
 					{copy}
 					<Tooltip content="Expand">
 						<Button variant="ghost" size="icon-compact" aria-label={`Expand ${title}`} onClick={() => setExpanded(true)}>
-							<Maximize2 />
+							<IconExpand />
 						</Button>
 					</Tooltip>
 				</CodeBlockActions>

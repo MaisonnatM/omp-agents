@@ -2,7 +2,7 @@
  * The Pull requests page: every pull request in a table, by repository, in a card per section named after whose move it
  * is; or on a board, a column per section. Either docks the details of the pull request it shows beside it.
  */
-import { Maximize2, RefreshCw, X } from "lucide-react";
+import { IconArrowRotateClockwise, IconCrossMedium, IconExpand } from "central-icons";
 import { type PullRequest, prKey, repoKey } from "../../../src/shared/github";
 import { useState } from "react";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
@@ -167,12 +167,12 @@ function DockedDetails({ hosts, route, onExpand }: { hosts: RosterHost[]; route:
 				<div className="flex h-(--page-header-height) shrink-0 items-center justify-end gap-1 border-b border-border px-3">
 					<Tooltip content="Open as a page" side="bottom">
 						<Button variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Open as a page" onClick={expand}>
-							<Maximize2 />
+							<IconExpand />
 						</Button>
 					</Tooltip>
 					<Tooltip content="Close the details" side="bottom">
 						<Button variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Close the details" render={<a href={hashForPullRequests(null)} />}>
-							<X />
+							<IconCrossMedium />
 						</Button>
 					</Tooltip>
 				</div>
@@ -197,7 +197,7 @@ function RebaseBehindButton({ pulls }: { pulls: PullRequests }) {
 	const label = rebasing ? "Rebasing…" : armed ? `Confirm rebase of ${count}?` : `Rebase ${count} behind`;
 	return (
 		<Tooltip content="Rebase each of your pull requests behind its base, and the ones stacked on them, bottom first: each runs the repository's pre-push checks and pushes with --force-with-lease" forceOpen={armed ? false : undefined}>
-			<Button size="compact" variant="outline" leadingIcon={rebasing ? Spinner : RefreshCw} disabled={rebasing} aria-busy={rebasing} aria-label={label} {...confirm.props("rebase", pulls.onRebaseBehind)}>
+			<Button size="compact" variant="outline" leadingIcon={rebasing ? Spinner : IconArrowRotateClockwise} disabled={rebasing} aria-busy={rebasing} aria-label={label} {...confirm.props("rebase", pulls.onRebaseBehind)}>
 				{label}
 			</Button>
 		</Tooltip>

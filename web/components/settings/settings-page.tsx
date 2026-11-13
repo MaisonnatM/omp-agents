@@ -1,4 +1,4 @@
-import { FolderOpen } from "lucide-react";
+import { IconFolderOpen } from "central-icons";
 import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
 import type { TrustedProject } from "../../../src/shared/project-trust";
@@ -44,7 +44,7 @@ function WorkspacePicker({ cwd, workspaces, onPick }: { cwd: string | null; work
 	return (
 		<CommandPicker
 			trigger={<span className="max-w-64 truncate">{label}</span>}
-			icon={FolderOpen}
+			icon={IconFolderOpen}
 			ariaLabel={`Workspace: ${label}`}
 			search={{ label: "Search workspaces" }}
 			width="lg"

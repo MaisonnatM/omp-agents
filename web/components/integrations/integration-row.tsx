@@ -1,11 +1,11 @@
 /** The building blocks of an integration row: its brand tile, the list surface, the row itself, and its callouts. */
-import type { LucideIcon } from "lucide-react";
+import type { IconComponent } from "@/lib/icon-context";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { type BrandLogo, BrandMark } from "./brand-logos";
 
 /** A row's mark on its tile: a brand's mark in its colors, else `icon`, else `name`'s first letter. */
-export function MarkTile({ logo = null, icon: Icon, name }: { logo?: BrandLogo | null; icon?: LucideIcon; name: string }) {
+export function MarkTile({ logo = null, icon: Icon, name }: { logo?: BrandLogo | null; icon?: IconComponent; name: string }) {
 	return (
 		<span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-surface-5 text-foreground shadow-surface-2">
 			{logo ? (
@@ -77,7 +77,7 @@ const TONE = {
 
 interface CalloutProps {
 	tone: keyof typeof TONE;
-	icon: LucideIcon;
+	icon: IconComponent;
 	/** `status` for progress, `alert` for the outcome of what you just did, `group` with a `label` for a question; none for a standing state. */
 	role?: "status" | "alert" | "group";
 	label?: string;

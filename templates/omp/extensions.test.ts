@@ -135,7 +135,7 @@ if (input.subToolStart) {
 }
 `;
 
-function exercise(name: "artifact" | "ship" | "todos" | "notes" | "events" | "worktree-guard" | "google-accounts" | "pr-description" | "headless-mark" | "arena" | "chrome-devtools-page", input: object, env: Record<string, string> = {}): {
+function exercise(name: "artifact" | "ship" | "todos" | "events" | "worktree-guard" | "google-accounts" | "pr-description" | "headless-mark" | "arena" | "chrome-devtools-page", input: object, env: Record<string, string> = {}): {
 	result: { block?: boolean; reason?: string; input?: Record<string, unknown> } | null;
 	confirmations: number;
 	valid: boolean;
@@ -947,55 +947,6 @@ describe("user_todo Workspace", () => {
 
 	test("list names each todo's Workspace by its folder", () => {
 		expect(call({ action: "list" }).text?.split("\n").slice(0, 2)).toEqual(["- Ship the release (id t1, Workspace app)", "  - Tag it (id c1)"]);
-	});
-});
-
-describe("user_note", () => {
-	const root = mkdtempSync(join(tmpdir(), "notes-extension-"));
-	afterAll(() => rmSync(root, { recursive: true, force: true }));
-	const env = { XDG_CONFIG_HOME: join(root, "config") };
-	const config = join(root, "config", "omp-agents");
-	const inbox = join(config, "note-inbox");
-	const at = "2026-10-05T09:00:00.000Z";
-	mkdirSync(config, { recursive: true });
-	writeFileSync(
-		join(config, "notes.json"),
-		JSON.stringify({
-			notes: [
-				{ id: "n1", title: "Deploy checklist", body: "Run the staging smoke first.", todoId: "t1", addedBy: null, createdAt: at, updatedAt: at },
-				{ id: "n2", title: "Reading list", body: "Designing Data-Intensive Applications", todoId: null, addedBy: null, createdAt: at, updatedAt: at },
-			],
-		}),
-	);
-	writeFileSync(join(config, "todos.json"), JSON.stringify({ todos: [{ id: "t1", text: "Ship the release" }] }));
-	const call = (params: object, sessionId = "s1") => exercise("notes", { run: true, params, sessionId }, env);
-	const left = () => readdirSync(inbox).sort().map(name => JSON.parse(readFileSync(join(inbox, name), "utf8")));
-
-	test("list keeps the notes holding every word of the query, in any case, and names the todo each belongs to", () => {
-		const { text } = call({ action: "list", query: "SMOKE staging" });
-		expect(text?.split("\n")).toEqual([`- Deploy checklist (id n1, updated ${new Date(at).toLocaleDateString("en-CA")}, todo "Ship the release")`]);
-		expect(call({ action: "list", query: "" }).text?.split("\n")).toHaveLength(2);
-	});
-
-	test("a session adding a note it already added gets the first one's id, and the note lists before the dashboard applies it", () => {
-		const first = call({ action: "add", title: "Findings", body: "The cache misses." });
-		const again = call({ action: "add", title: " Findings ", todo_id: "" });
-		const [added] = left();
-		expect(first.text).toBe(`Added to the user's notes (id ${added.note.id}).`);
-		expect(again.text).toContain(`already added it (id ${added.note.id})`);
-		expect(added.note).toMatchObject({ title: "Findings", body: "The cache misses.", todoId: null, addedBy: "s1" });
-		call({ action: "add", title: "Findings" }, "s2");
-		expect(left()).toHaveLength(2);
-		expect(call({ action: "list", query: "cache" }).text).toContain(`Findings (id ${added.note.id}`);
-	});
-
-	test("append needs a note that exists, and read shows its title and body", () => {
-		expect(call({ action: "append", id: "gone", text: "More" }).run.isError).toBe(true);
-		expect(call({ action: "append", id: "n2", text: "Thinking in Systems" }).run.isError).toBe(false);
-		expect(left().at(-1)).toMatchObject({ op: "append", id: "n2", text: "Thinking in Systems" });
-		expect(call({ action: "read", id: "n1" }).text).toBe("Deploy checklist\n\nRun the staging smoke first.");
-		expect(call({ action: "read", id: "n2" }).text).toBe("Reading list\n\nDesigning Data-Intensive Applications\n\nThinking in Systems");
-		expect(call({ action: "list", query: "thinking systems" }).text).toContain("Reading list (id n2");
 	});
 });
 

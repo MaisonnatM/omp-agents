@@ -1,4 +1,4 @@
-import { CircleStop } from "lucide-react";
+import { IconStopCircle } from "central-icons";
 import type { ReactNode } from "react";
 import type { ControlPhase, LiveView } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
@@ -127,7 +127,7 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 						aria-label={ending ? "Ending…" : confirming ? CONFIRM_PRIVATE_END : "End session"}
 						{...(isPrivate ? confirm.props("end", endNow) : { onClick: endNow })}
 					>
-						<CircleStop />
+						<IconStopCircle />
 						{confirming && CONFIRM_PRIVATE_END}
 					</Button>
 				</Tooltip>
