@@ -111,6 +111,7 @@ function LiveConversation({
 }: ConversationProps) {
 	const { scrollToEnd } = useMessageScroller();
 	const editorRef = useRef<PromptEditorHandle>(null);
+	const pickFiles = useRef<(accept?: string) => void>(null);
 	const { completions, withdrawn } = useComposerData(view);
 	const changed = useChangedFiles(view) ?? NO_FILES;
 	const [draft, setDraft] = useComposerDraft(liveDraftKey(view), "");
@@ -221,6 +222,10 @@ function LiveConversation({
 
 	const onComposerKey = useShortcuts({
 		dictate: dictation.toggle,
+		attachFiles: () => {
+			if (!writable || !pickFiles.current) return false;
+			pickFiles.current();
+		},
 		// The text field's own keys, so they need no focused pane.
 		steer: () => {
 			if (!steerable) return false;
@@ -306,6 +311,7 @@ function LiveConversation({
 				<ComposerEditor value={editorRef}>
 					<InputMessage
 						editorRef={editorRef}
+						filePickerRef={pickFiles}
 						value={draft}
 						onValueChange={completion.onValueChange}
 						editorProps={{

@@ -13,6 +13,10 @@ export type ShortcutId =
 	| "sessionSearch"
 	| "find"
 	| "closeTab"
+	| "closeOtherTabs"
+	| "newTab"
+	| "nextTab"
+	| "previousTab"
 	| "selectTab"
 	| "openPullRequest"
 	| "setGoal"
@@ -29,6 +33,10 @@ export type ShortcutId =
 	| "hideThinking"
 	| "sessionsSidebar"
 	| "detailsSidebar"
+	| "openBrowser"
+	| "maximizePane"
+	| "attachFiles"
+	| "reviewChanges"
 	| "settings"
 	| "getStarted"
 	| "back"
@@ -115,7 +123,7 @@ export interface Chord {
 	mod?: true;
 	ctrl?: true;
 	alt?: true;
-	/** For letters, digits, and named keys only: which symbols need Shift depends on the layout. */
+	/** For letters, digits, the comma, and named keys only: which other symbols need Shift depends on the layout. */
 	shift?: true;
 }
 
@@ -158,7 +166,7 @@ export interface Shortcut {
  * palette lists. Settings › Keyboard shows each shortcut that has a key, by category.
  */
 export const SHORTCUTS: readonly Shortcut[] = [
-	{ id: "interrupt", category: "sessions", label: "Stop the running turn", keys: [{ chord: { key: "Backspace", mod: true, shift: true }, scope: "composer" }] },
+	{ id: "interrupt", category: "sessions", label: "Stop the running turn", keys: [{ chord: { key: ".", mod: true }, scope: "composer" }] },
 	{
 		id: "steer",
 		category: "sessions",
@@ -172,7 +180,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		keys: [{ chord: { key: "Enter", mod: true }, scope: "composer" }],
 	},
 	{ id: "dequeue", category: "sessions", label: "Move the last queued message back into the empty composer", keys: [{ chord: { key: "ArrowUp" }, scope: "composer" }] },
-	{ id: "dictate", category: "sessions", label: "Dictate a prompt, or stop dictating", keys: [{ chord: { key: "m", mod: true, shift: true }, scope: "composer" }] },
+	{ id: "dictate", category: "sessions", label: "Dictate a prompt, or stop dictating", keys: [{ chord: { key: "m", alt: true }, scope: "composer" }] },
+	{ id: "attachFiles", category: "sessions", label: "Attach files to the prompt", keys: [{ chord: { key: "/", mod: true }, scope: "composer" }] },
 	{ id: "switcher", category: "general", label: "Open the command menu", keys: [{ chord: { key: "k", mod: true }, scope: "anywhere" }] },
 	{ id: "getStarted", category: "general", label: "Open Get started, the step-by-step setup", command: "Get started", keys: [] },
 	{
@@ -181,13 +190,35 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		label: "Start a new session",
 		command: "New session",
 		keys: [
-			{ chord: { key: "n", mod: true }, scope: "anywhere" },
+			{ chord: { key: "o", mod: true, shift: true }, scope: "anywhere" },
 			{ chord: { key: "s" }, scope: "outside-fields" },
 		],
 	},
 	{ id: "sessionSearch", category: "sessions", label: "Search the sidebar's sessions", keys: [{ chord: { key: "f", mod: true, shift: true }, scope: "anywhere" }] },
 	{ id: "find", category: "general", label: "Find text in the focused conversation, or in the pull request the page shows", keys: [{ chord: { key: "f", mod: true }, scope: "anywhere" }] },
 	{ id: "closeTab", category: "general", label: "Close the header tab on screen; its session keeps running", keys: [{ chord: CLOSE_TAB, scope: "anywhere" }] },
+	{ id: "closeOtherTabs", category: "general", label: "Close every header tab but the one on screen", command: "Close other tabs", keys: [{ chord: { key: "w", mod: true, alt: true }, scope: "anywhere" }] },
+	{ id: "newTab", category: "general", label: "Open a new header tab on a new session", command: "New tab", keys: [{ chord: { key: "t", mod: true }, scope: "anywhere" }] },
+	{
+		id: "nextTab",
+		category: "general",
+		label: "Go to the next header tab",
+		command: "Next tab",
+		keys: [
+			{ chord: { key: "Tab", ctrl: true }, scope: "anywhere" },
+			{ chord: { key: "ArrowRight", mod: true, alt: true }, scope: "anywhere" },
+		],
+	},
+	{
+		id: "previousTab",
+		category: "general",
+		label: "Go to the previous header tab",
+		command: "Previous tab",
+		keys: [
+			{ chord: { key: "Tab", ctrl: true, shift: true }, scope: "anywhere" },
+			{ chord: { key: "ArrowLeft", mod: true, alt: true }, scope: "anywhere" },
+		],
+	},
 	{ id: "selectTab", category: "general", label: "Go to header tab 1–9", keys: digitKeys({ mod: true }, "anywhere") },
 	{ id: "openPullRequest", category: "sessions", label: "Review, push, and open a pull request for the focused session's branch", command: "Open pull request", keys: [] },
 	{ id: "setGoal", category: "sessions", label: "Set or edit the focused session's objective and token budget", command: "Set or edit goal", keys: [] },
@@ -206,8 +237,24 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		keys: [{ chord: { key: "ArrowDown", mod: true, alt: true }, scope: "anywhere" }],
 	},
 	{ id: "jumpToSession", category: "sessions", label: "Open the sidebar's session 1–9", keys: digitKeys({ alt: true }, "anywhere") },
-	{ id: "sessionsNext", category: "sessions", label: "Sessions: open the next session in the sidebar", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
-	{ id: "sessionsPrevious", category: "sessions", label: "Sessions: open the previous session in the sidebar", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
+	{
+		id: "sessionsNext",
+		category: "sessions",
+		label: "Sessions: open the next session in the sidebar",
+		keys: [
+			{ chord: { key: "ArrowDown" }, scope: "outside-fields" },
+			{ chord: { key: "j" }, scope: "outside-fields" },
+		],
+	},
+	{
+		id: "sessionsPrevious",
+		category: "sessions",
+		label: "Sessions: open the previous session in the sidebar",
+		keys: [
+			{ chord: { key: "ArrowUp" }, scope: "outside-fields" },
+			{ chord: { key: "k" }, scope: "outside-fields" },
+		],
+	},
 	{ id: "model", category: "sessions", label: "Choose the session's model", keys: [{ chord: { key: "/", mod: true, alt: true }, scope: "anywhere" }] },
 	{ id: "directory", category: "sessions", label: "Choose the session's working directory", keys: [{ chord: { key: "p", mod: true, alt: true }, scope: "anywhere" }] },
 	{ id: "thinking", category: "sessions", label: "Cycle the thinking level", keys: [{ chord: { key: "Tab", shift: true }, scope: "composer" }] },
@@ -238,9 +285,17 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		category: "sessions",
 		label: "Show or hide the details sidebar, on the right: a session's, or a Bot's",
 		command: "Toggle details sidebar",
-		keys: [{ chord: { key: "b", mod: true, alt: true }, scope: "anywhere" }],
+		keys: [{ chord: { key: "b", mod: true, shift: true }, scope: "anywhere" }],
 	},
-	{ id: "settings", category: "general", label: "Open or close settings", command: "Toggle settings", keys: [{ goTo: "," }] },
+	{ id: "openBrowser", category: "sessions", label: "Open the Browser in the details sidebar", command: "Open Browser", keys: [{ chord: { key: "l", mod: true, shift: true }, scope: "anywhere" }] },
+	{
+		id: "maximizePane",
+		category: "sessions",
+		label: "Maximize the focused pane of a split, or put it back",
+		command: "Maximize or restore pane",
+		keys: [{ chord: { key: "f", ctrl: true, shift: true }, scope: "anywhere" }],
+	},
+	{ id: "settings", category: "general", label: "Open or close settings", command: "Toggle settings", keys: [{ chord: { key: ",", mod: true }, scope: "anywhere" }] },
 	{ id: "back", category: "general", label: "Go back", command: "Go back", keys: [{ chord: { key: "[", mod: true }, scope: "anywhere" }] },
 	{ id: "forward", category: "general", label: "Go forward", command: "Go forward", keys: [{ chord: { key: "]", mod: true }, scope: "anywhere" }] },
 	{ id: "moveTabLeft", category: "general", label: "Move the focused header tab left", keys: [{ chord: { key: "ArrowLeft", alt: true, shift: true }, scope: "anywhere" }] },
@@ -270,7 +325,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "pull-requests", category: "general", label: "Go to Pull requests", command: "Go to pull requests", keys: [] },
 	{ id: "tickets", category: "general", label: "Go to your Linear tickets", command: "Go to tickets", keys: [] },
 	{ id: "newTicket", category: "general", label: "Create a Linear ticket, except on the Todo, Calendar, and Email pages", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
-	{ id: "ticketsNew", category: "general", label: "Tickets page: create a Linear ticket, in place of a new session", keys: [{ chord: { key: "n", mod: true }, scope: "anywhere" }] },
+	{ id: "ticketsNew", category: "general", label: "Tickets page: create a Linear ticket, in place of a new session", keys: [{ chord: { key: "o", mod: true, shift: true }, scope: "anywhere" }] },
 	{ id: "bots", category: "general", label: "Go to your Bots", command: "Go to Bots", keys: [] },
 	{ id: "sessions", category: "general", label: "Go to the sessions", command: "Go to sessions", keys: [] },
 	{ id: "todo", category: "general", label: "Go to your todo list", command: "Go to todo list", keys: [] },
@@ -278,8 +333,24 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "email", category: "general", label: "Go to your email", command: "Go to email", keys: [{ goTo: "m" }] },
 	{ id: "sport", category: "general", label: "Go to your sport week", command: "Go to sport", keys: [] },
 	{ id: "workspace", category: "general", label: "Choose the sidebar's workspace", keys: [{ goTo: "w" }] },
-	{ id: "nextPullRequest", category: "pull-requests", label: "Pull requests: move to the next pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
-	{ id: "previousPullRequest", category: "pull-requests", label: "Pull requests: move to the previous pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
+	{
+		id: "nextPullRequest",
+		category: "pull-requests",
+		label: "Pull requests: move to the next pull request, or show its details while one shows",
+		keys: [
+			{ chord: { key: "ArrowDown" }, scope: "outside-fields" },
+			{ chord: { key: "j" }, scope: "outside-fields" },
+		],
+	},
+	{
+		id: "previousPullRequest",
+		category: "pull-requests",
+		label: "Pull requests: move to the previous pull request, or show its details while one shows",
+		keys: [
+			{ chord: { key: "ArrowUp" }, scope: "outside-fields" },
+			{ chord: { key: "k" }, scope: "outside-fields" },
+		],
+	},
 	{ id: "pullRequestOnGitHub", category: "pull-requests", label: "Pull requests: open the pull request on GitHub", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
 	{ id: "pullRequestActions", category: "pull-requests", label: "Pull requests: open the pull request's actions menu", keys: [{ chord: { key: "." }, scope: "outside-fields" }] },
 	{
@@ -290,10 +361,26 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	},
 	{ id: "giveToAgent", category: "pull-requests", label: "Pull requests: give the pull request's next move to an agent, through its quick action", keys: [{ chord: { key: "e" }, scope: "outside-fields" }] },
 	{ id: "copyPullRequestNumber", category: "pull-requests", label: "Open pull request: copy #N", keys: [{ chord: { key: "k", mod: true, shift: true }, scope: "anywhere" }] },
-	{ id: "copyPullRequestLink", category: "pull-requests", label: "Open pull request: copy its GitHub link", keys: [{ chord: { key: "c", mod: true, shift: true }, scope: "anywhere" }] },
+	{ id: "copyPullRequestLink", category: "pull-requests", label: "Open pull request: copy its GitHub link", keys: [{ chord: { key: ",", mod: true, shift: true }, scope: "anywhere" }] },
 	{ id: "todoSearch", category: "todo", label: "Search the Todo page's todos", keys: [{ chord: { key: "/" }, scope: "outside-fields" }] },
-	{ id: "todoNext", category: "todo", label: "Focus the next todo, or open it while a todo is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
-	{ id: "todoPrevious", category: "todo", label: "Focus the previous todo, or open it while a todo is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
+	{
+		id: "todoNext",
+		category: "todo",
+		label: "Focus the next todo, or open it while a todo is open",
+		keys: [
+			{ chord: { key: "ArrowDown" }, scope: "outside-fields" },
+			{ chord: { key: "j" }, scope: "outside-fields" },
+		],
+	},
+	{
+		id: "todoPrevious",
+		category: "todo",
+		label: "Focus the previous todo, or open it while a todo is open",
+		keys: [
+			{ chord: { key: "ArrowUp" }, scope: "outside-fields" },
+			{ chord: { key: "k" }, scope: "outside-fields" },
+		],
+	},
 	{ id: "todoCheck", category: "todo", label: "Mark the focused or open todo Done, or a closed one Todo again", keys: [{ chord: { key: "x" }, scope: "outside-fields" }] },
 	{ id: "todoStatus", category: "todo", label: "Change the focused or open todo's status", keys: [{ chord: { key: "s" }, scope: "outside-fields" }] },
 	{ id: "todoPriority", category: "todo", label: "Change the focused or open todo's priority", keys: [{ chord: { key: "p" }, scope: "outside-fields" }] },
@@ -302,8 +389,24 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "todoNew", category: "todo", label: "Add a todo to the Todo group", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "todoClose", category: "todo", label: "Close the open todo", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
 	{ id: "calendarNewEvent", category: "calendar", label: "Calendar: add an event", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
-	{ id: "emailNext", category: "email", label: "Email: focus the next conversation, or open it while a conversation is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
-	{ id: "emailPrevious", category: "email", label: "Email: focus the previous conversation, or open it while a conversation is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
+	{
+		id: "emailNext",
+		category: "email",
+		label: "Email: focus the next conversation, or open it while a conversation is open",
+		keys: [
+			{ chord: { key: "ArrowDown" }, scope: "outside-fields" },
+			{ chord: { key: "j" }, scope: "outside-fields" },
+		],
+	},
+	{
+		id: "emailPrevious",
+		category: "email",
+		label: "Email: focus the previous conversation, or open it while a conversation is open",
+		keys: [
+			{ chord: { key: "ArrowUp" }, scope: "outside-fields" },
+			{ chord: { key: "k" }, scope: "outside-fields" },
+		],
+	},
 	{ id: "emailClose", category: "email", label: "Email: close the open conversation", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
 	{ id: "emailOnGmail", category: "email", label: "Email: open the focused or open conversation in Gmail", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
 	{ id: "emailReply", category: "email", label: "Email: reply to the open conversation's last message", keys: [{ chord: { key: "r" }, scope: "outside-fields" }] },
@@ -314,14 +417,52 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "sportNextDay", category: "sport", label: "Sport week: open the day after", keys: [{ chord: { key: "ArrowRight" }, scope: "outside-fields" }] },
 	{ id: "sportPreviousDemo", category: "sport", label: "Sport demo: show the workout's previous demo", keys: [{ chord: { key: "ArrowLeft" }, scope: "outside-fields" }] },
 	{ id: "sportNextDemo", category: "sport", label: "Sport demo: show the workout's next demo", keys: [{ chord: { key: "ArrowRight" }, scope: "outside-fields" }] },
-	{ id: "sportJournalNext", category: "sport", label: "Sport journal: focus the next, older session, or open it while a session is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
-	{ id: "sportJournalPrevious", category: "sport", label: "Sport journal: focus the previous, newer session, or open it while a session is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
+	{
+		id: "sportJournalNext",
+		category: "sport",
+		label: "Sport journal: focus the next, older session, or open it while a session is open",
+		keys: [
+			{ chord: { key: "ArrowDown" }, scope: "outside-fields" },
+			{ chord: { key: "j" }, scope: "outside-fields" },
+		],
+	},
+	{
+		id: "sportJournalPrevious",
+		category: "sport",
+		label: "Sport journal: focus the previous, newer session, or open it while a session is open",
+		keys: [
+			{ chord: { key: "ArrowUp" }, scope: "outside-fields" },
+			{ chord: { key: "k" }, scope: "outside-fields" },
+		],
+	},
 	{ id: "sportJournalClose", category: "sport", label: "Sport journal: close the open session", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
 	{ id: "sportTimerPause", category: "sport", label: "Sport timer: pause or resume the routine", keys: [{ chord: { key: " " }, scope: "outside-fields" }] },
 	{ id: "sportTimerPrevious", category: "sport", label: "Sport timer: go back to the previous step", keys: [{ chord: { key: "ArrowLeft" }, scope: "outside-fields" }] },
 	{ id: "sportTimerNext", category: "sport", label: "Sport timer: end this step and go to the next", keys: [{ chord: { key: "ArrowRight" }, scope: "outside-fields" }] },
-	{ id: "nextChangedFile", category: "changes", label: "Changes: open the next changed file", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
-	{ id: "previousChangedFile", category: "changes", label: "Changes: open the previous changed file", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
+	{
+		id: "nextChangedFile",
+		category: "changes",
+		label: "Changes: open the next changed file",
+		keys: [
+			{ chord: { key: "ArrowDown" }, scope: "outside-fields" },
+			{ chord: { key: "j" }, scope: "outside-fields" },
+		],
+	},
+	{
+		id: "previousChangedFile",
+		category: "changes",
+		label: "Changes: open the previous changed file",
+		keys: [
+			{ chord: { key: "ArrowUp" }, scope: "outside-fields" },
+			{ chord: { key: "k" }, scope: "outside-fields" },
+		],
+	},
+	{
+		id: "reviewChanges",
+		category: "changes",
+		label: "Review the focused session's changes from its first changed file, while the details sidebar shows its Overview",
+		keys: [{ chord: { key: "g", mod: true, shift: true }, scope: "anywhere" }],
+	},
 	{ id: "moveUp", category: "todo", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
 	{ id: "moveDown", category: "todo", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, down", keys: [{ chord: { key: "ArrowDown", alt: true, shift: true }, scope: "anywhere" }] },
 	{ id: "terminal", category: "general", label: "Show or hide the terminal", command: "Toggle terminal", keys: [{ chord: { key: "`", ctrl: true }, scope: "anywhere" }] },
@@ -338,6 +479,8 @@ function keyOf({ key, code, metaKey, ctrlKey, altKey }: KeyEvent): string {
 	// AZERTY needs physical number-row keys for shortcuts, and macOS Option turns a digit into a symbol (Option+1 types
 	// ¡); unmodified symbols must still match as typed.
 	if ((metaKey || ctrlKey || altKey) && /^Digit[0-9]$/.test(code)) return code.slice(5);
+	// ⌘⇧, types `<` on a US layout, so a held ⌘ or Ctrl reads the comma key by its place.
+	if ((metaKey || ctrlKey) && code === "Comma") return ",";
 	if (/^[a-z]$/i.test(key)) return key.toLowerCase();
 	// A letter key, or the / key, that types no ASCII character, on a Cyrillic layout or with macOS Option (Option+B
 	// types ∫, Option+/ types ÷), matches by its physical key. An ASCII symbol matches as typed: AZERTY types `,` and `?`
@@ -368,8 +511,9 @@ export interface Match {
 /** Whether `event` presses `chord`. `mac` reads ⌘ as `mod` instead of Ctrl. */
 export function pressesChord(event: KeyEvent, chord: Chord, mac = IS_MAC): boolean {
 	const key = keyOf(event);
-	// Which symbols need Shift depends on the layout (`?` is Shift+/ in US, Shift+, in AZERTY), so symbols ignore it.
-	const symbol = key.length === 1 && !/[a-z0-9]/.test(key);
+	// Which symbols need Shift depends on the layout (`?` is Shift+/ in US, Shift+, in AZERTY), so symbols ignore it,
+	// apart from the comma, which ⌘, and ⌘⇧, tell apart.
+	const symbol = key.length === 1 && !/[a-z0-9,]/.test(key);
 	return (
 		chord.key === key &&
 		event.metaKey === (mac && !!chord.mod) &&
@@ -508,7 +652,7 @@ export function createShortcutStack(): ShortcutStack {
 			}
 		},
 		handlers() {
-			const ids = new Set(entries.flatMap(({ read }) => Object.entries(read()).flatMap(([id, handler]) => (handler ? [id as ShortcutId] : []))));
+			const ids = new Set(entries.flatMap(({ read }) => Object.entries(read()).flatMap(([id, handler]) => (handler === undefined ? [] : [id as ShortcutId]))));
 			return Object.fromEntries(
 				[...ids].map((id): [ShortcutId, ShortcutHandler] => [
 					id,

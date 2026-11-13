@@ -34,6 +34,8 @@ export interface PageShortcutInput {
 	navigate: (page: Page) => void;
 	showTab: (tab: SidebarTab | "sessions") => void;
 	toggleSidebar: (side: "left" | "right") => void;
+	/** Opens the details sidebar on its Browser tab. */
+	showBrowser: () => void;
 	toggleTools: () => void;
 	toggleHideTools: () => void;
 	toggleHideThinking: () => void;
@@ -89,6 +91,10 @@ export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<Shortcut
 				if (!latest.current.hasDetails) return false;
 				latest.current.toggleSidebar("right");
 			},
+			openBrowser: () => {
+				if (!latest.current.hasDetails) return false;
+				latest.current.showBrowser();
+			},
 			settings: () => {
 				const { page, layout, settings, navigate, show } = latest.current;
 				if (page?.kind === "settings") show(layout);
@@ -127,6 +133,11 @@ export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<Shortcut
 				if (layout.panes.length < 2) return false;
 				show(closePane(layout, layout.panes.length - 1));
 			},
+			maximizePane: () => {
+				const { page, maximized, layout, show } = latest.current;
+				if (page || layout.panes.length < 2) return false;
+				show({ ...layout, maximized: !maximized });
+			},
 			terminal: () => latest.current.toggleTerminal(),
 			openPullRequest: () => {
 				const { openPullRequest } = latest.current;
@@ -144,6 +155,7 @@ export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<Shortcut
 	const { absentTabs, ticketsCallable, hasDetails } = input;
 	const canOpenPullRequest = input.openPullRequest !== null;
 	const canSetGoal = input.setGoal !== null;
+	const canMaximize = input.page === null && input.layout.panes.length > 1;
 	const { canGoBack, canGoForward } = useHistoryPosition();
 	/** Commands that would do nothing now. */
 	const unavailable = useMemo(
@@ -152,13 +164,14 @@ export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<Shortcut
 				// A sidebar tab's shortcut has the tab's id.
 				...(absentTabs satisfies ReadonlySet<ShortcutId>),
 				...(ticketsCallable ? [] : ["newTicket" as const]),
-				...(hasDetails ? [] : ["detailsSidebar" as const]),
+				...(hasDetails ? [] : ["detailsSidebar" as const, "openBrowser" as const]),
+				...(canMaximize ? [] : ["maximizePane" as const]),
 				...(canOpenPullRequest ? [] : ["openPullRequest" as const]),
 				...(canSetGoal ? [] : ["setGoal" as const]),
 				...(canGoBack ? [] : ["back" as const]),
 				...(canGoForward ? [] : ["forward" as const]),
 			]),
-		[absentTabs, ticketsCallable, hasDetails, canOpenPullRequest, canSetGoal, canGoBack, canGoForward],
+		[absentTabs, ticketsCallable, hasDetails, canMaximize, canOpenPullRequest, canSetGoal, canGoBack, canGoForward],
 	);
 	return unavailable;
 }

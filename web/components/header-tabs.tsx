@@ -137,9 +137,9 @@ interface HeaderTabsProps {
 
 /**
  * The row of header tabs, kept in this browser, working as Capy's desktop tabs do: going to a page shows it in the tab on screen,
- * a session another tab shows focuses that tab, and only + opens a new tab. ⌘1 to ⌘9 go to the tab of that place. Drag one, or press
- * Alt+Shift+← or → on it, to reorder; its × or a middle-click closes it, closing the one on screen shows its neighbour, and closing the
- * last leaves a new one.
+ * a session another tab shows focuses that tab, and only + or ⌘T opens a new tab. ⌘1 to ⌘9 go to the tab of that place, and ⌃⇥
+ * and ⌃⇧⇥ to the next and previous. Drag one, or press Alt+Shift+← or → on it, to reorder; its × or a middle-click closes it,
+ * closing the one on screen shows its neighbour, closing the last leaves a new one, and ⌥⌘W closes all but the one on screen.
  */
 export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps) {
 	const { openNewSession } = useDashboardActions();
@@ -193,6 +193,20 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 		move(id, step.target, step.where);
 		return true;
 	};
+	const select = (index: number): void => {
+		setRow(current => ({ tabs: current.tabs, active: index }));
+		location.hash = tabs[index]?.hash ?? "";
+	};
+	/** Opens a new tab on the new-session page, as + does. */
+	const openTab = (): void => {
+		setRow(current => visitHeaderTab(current, NEW_TAB_HASH, true, crypto.randomUUID()));
+		openNewSession();
+	};
+	const close = (id: string): void => {
+		const { row: rest, go } = closeHeaderTab(row, id, crypto.randomUUID());
+		setRow(rest);
+		if (go !== null) location.hash = go;
+	};
 	useShortcuts({
 		moveTabLeft: () => moveFocused(-1),
 		moveTabRight: () => moveFocused(1),
@@ -204,16 +218,15 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 			if (index >= tabs.length) return false;
 			select(index);
 		},
+		nextTab: () => select((row.active + 1) % tabs.length),
+		previousTab: () => select((row.active - 1 + tabs.length) % tabs.length),
+		newTab: openTab,
+		closeOtherTabs: () => {
+			const active = tabs[row.active];
+			if (!active || tabs.length < 2) return false;
+			setRow({ tabs: [active], active: 0 });
+		},
 	});
-	const select = (index: number): void => {
-		setRow(current => ({ tabs: current.tabs, active: index }));
-		location.hash = tabs[index]?.hash ?? "";
-	};
-	const close = (id: string): void => {
-		const { row: rest, go } = closeHeaderTab(row, id, crypto.randomUUID());
-		setRow(rest);
-		if (go !== null) location.hash = go;
-	};
 	return (
 		<div
 			className={cn(
@@ -249,17 +262,8 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 					);
 				})}
 			</nav>
-			<Tooltip content="New tab" side="bottom">
-				<Button
-					variant="ghost"
-					size="icon-compact"
-					className="shrink-0 text-muted-foreground"
-					aria-label="New tab"
-					onClick={() => {
-						setRow(current => visitHeaderTab(current, NEW_TAB_HASH, true, crypto.randomUUID()));
-						openNewSession();
-					}}
-				>
+			<Tooltip content="New tab" shortcut={shortcutLabels("newTab")} side="bottom">
+				<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="New tab" onClick={openTab}>
 					<IconPlusLarge />
 				</Button>
 			</Tooltip>

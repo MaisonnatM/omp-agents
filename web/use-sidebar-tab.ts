@@ -15,7 +15,7 @@ const TAB_PAGE: Record<Exclude<SidebarTab, "sessions">, Page> = {
 	sport: { kind: "sport", tab: "week", day: null },
 };
 
-/** The settings section the header's Settings button, `G ,`, and the sidebar keep: the open page's, else the last one open, which this browser remembers, else Analytics. */
+/** The settings section the header's Settings button, ⌘,, and the sidebar keep: the open page's, else the last one open, which this browser remembers, else Analytics. */
 export function useSettingsRoute(page: Page | null): SettingsRoute {
 	const [last, setLast] = useStoredState("omp-agents.settings-section", settingsSection);
 	const open = page?.kind === "settings" ? page.section : null;

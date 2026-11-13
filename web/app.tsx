@@ -206,6 +206,7 @@ export function App() {
 		navigate,
 		showTab,
 		toggleSidebar,
+		showBrowser: () => showDetailsTab("browser"),
 		toggleTools: display.toggleTools,
 		toggleHideTools: display.toggleHideTools,
 		toggleHideThinking: display.toggleHideThinking,

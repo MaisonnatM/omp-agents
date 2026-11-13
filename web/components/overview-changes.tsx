@@ -4,6 +4,7 @@ import type { SessionFacts, View } from "../../src/shared/sessions";
 import { type AgentMedia, type AgentSource, type ChangedFile, lineTotals } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { activityControl } from "../activity";
+import { useShortcuts } from "../shortcuts";
 import { useChangedFiles, useMedia, useSources } from "../pane-store";
 import { useStoredKeys } from "../stored-state";
 import { ChangedFileList, FileChangesDialog } from "./changed-files-section";
@@ -80,6 +81,13 @@ export function ChangesSections({ view, session: { sessionId, cwd, facts }, chan
 	const [closed, toggle] = useStoredKeys(CLOSED_KEY);
 	const [shown, setShown] = useState<Shown>(null);
 	const history = shown?.kind === "history" ? files.find(file => file.path === shown.path) : undefined;
+	useShortcuts({
+		reviewChanges: () => {
+			const first = files[0];
+			if (sessionId === null || !first) return false;
+			setShown({ kind: "changes", path: first.path });
+		},
+	});
 	return (
 		<>
 			{files.length > 0 && (

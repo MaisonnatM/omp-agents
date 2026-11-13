@@ -4,6 +4,7 @@ import {
   forwardRef,
   memo,
   useCallback,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -93,6 +94,8 @@ interface InputMessageProps
   >;
   /** The text field's caret and focus, for a consumer that moves either. */
   editorRef?: Ref<PromptEditorHandle>;
+  /** What opens the file picker, for a consumer whose shortcut opens it. */
+  filePickerRef?: Ref<(acceptOverride?: string) => void>;
   /** Assistant response state. When `"streaming"`, the send button becomes a
    *  Stop control while the draft is empty. */
   status?: "idle" | "streaming";
@@ -131,6 +134,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
       accept = DEFAULT_ACCEPT,
       editorProps,
       editorRef,
+      filePickerRef,
       status,
       onStop,
       stopping = false,
@@ -308,6 +312,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
       },
       [accept]
     );
+    useImperativeHandle(filePickerRef, () => openFilePicker, [openFilePicker]);
 
     // ── Slot rendering ────────────────────────────────────────────────
     const slotCtx = useMemo<InputMessageSlotContext>(
