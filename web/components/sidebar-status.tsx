@@ -208,12 +208,7 @@ export function SidebarStatus({ usage, hosts, bots }: SidebarStatusProps) {
 	}, [hosts, bots]);
 	return (
 		<footer className="mx-3 flex shrink-0 flex-col gap-2 border-t border-border pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] text-xs">
-			<PlanUsageList usage={usage} />
-			{!isPhonePage() && (
-				<div aria-label="Machine load" className="grid grid-cols-4 gap-1">
-					<MachineLoad titles={titles} />
-				</div>
-			)}
+			<PlanUsageList usage={usage} after={isPhonePage() ? null : <MachineLoad titles={titles} />} />
 		</footer>
 	);
 }

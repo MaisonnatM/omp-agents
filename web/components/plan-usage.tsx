@@ -262,8 +262,8 @@ function NamedTile({ plan, gauge }: { plan: PlanUsage; gauge: PlanGauge }) {
 	);
 }
 
-/** Plan quota for the sidebar's foot: a grid of ring tiles, one per account, in `omp usage` order. */
-export function PlanUsageList({ usage }: { usage: DashboardState["usage"] }) {
+/** The note that stands in for the plan tiles while they are read, failed, or absent; `null` once there are tiles. */
+function planNote(usage: DashboardState["usage"]): ReactNode {
 	if (usage === null) return <p className="text-muted-foreground">Checking plans…</p>;
 	if (usage.error !== null) return <p className="min-w-0 truncate text-red-600 dark:text-red-400">Cannot read plan usage: {usage.error}</p>;
 	if (usage.plans.length === 0)
@@ -272,17 +272,27 @@ export function PlanUsageList({ usage }: { usage: DashboardState["usage"] }) {
 				<code>omp usage</code> reports no plan limits.
 			</p>
 		);
-	const tags = accountTags(usage.plans);
+	return null;
+}
+
+/** The sidebar foot's grid of ring tiles: one per plan account, in `omp usage` order, then `after`, such as the machine's load. */
+export function PlanUsageList({ usage, after }: { usage: DashboardState["usage"]; after?: ReactNode }) {
+	const tags = usage ? accountTags(usage.plans) : new Map<PlanUsage, string>();
 	return (
-		<ul aria-label="Plan usage" className="grid grid-cols-4 gap-1">
-			{usage.plans.map((plan, index) => {
-				const gauge = planGauge(plan, tags.get(plan));
-				return (
-					<li key={`${plan.provider}:${plan.account ?? index}`} className="flex min-w-0 flex-col">
-						{isNameOnlyPlan(plan) ? <NamedTile plan={plan} gauge={gauge} /> : <PlanTile plan={plan} gauge={gauge} />}
-					</li>
-				);
-			})}
-		</ul>
+		<>
+			{planNote(usage)}
+			<ul aria-label="Plan usage and machine load" className="grid grid-cols-4 gap-1">
+				{usage?.error === null &&
+					usage.plans.map((plan, index) => {
+						const gauge = planGauge(plan, tags.get(plan));
+						return (
+							<li key={`${plan.provider}:${plan.account ?? index}`} className="flex min-w-0 flex-col">
+								{isNameOnlyPlan(plan) ? <NamedTile plan={plan} gauge={gauge} /> : <PlanTile plan={plan} gauge={gauge} />}
+							</li>
+						);
+					})}
+				{after && <li className="contents">{after}</li>}
+			</ul>
+		</>
 	);
 }
