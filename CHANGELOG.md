@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-13
 
+- The starter kit now tells agents when to save something to the Artifacts tab on their own: a report you will choose from or come back to, a one-file mockup, or a diagram too large for the reply.
 - When Update dashboard brings in a new version that does not start, the desktop app now goes back to the version you had and starts it again. The bell and the command menu say which update did not start and why, and Update dashboard waits for a newer one before it tries again.
 - When the dashboard stops on its own, the desktop app now starts it again after a few seconds, keeping your page. If it keeps stopping, the app shows what went wrong with a Retry button.
 - When Obscura is installed (`brew install obscura`), the starter kit adds it as a browser agents use by default to read and click through pages. It loads a page several times faster than Chrome and uses about a tenth of the memory. Screenshots and design checks still use Chrome.
