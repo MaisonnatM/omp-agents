@@ -4,6 +4,7 @@ import type { BotRow } from "../bots-model";
 import type { PastSession, RosterHost } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { isModulePage } from "../modules";
 import { COLUMN_DEFAULT, COLUMN_MAX, COLUMN_MIN, type ListPage } from "../page-list";
 import { useStoredState } from "../stored-state";
 import type { TodoListView } from "../routing";
@@ -13,10 +14,10 @@ import { BotsNav } from "./bots/bots-nav";
 import { CalendarNav } from "./calendar/calendar-nav";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { EmailNav } from "./email/email-nav";
+import { ModuleNavView } from "./module-views";
 import { pullRequestsPageShows, usePullRequestDetailsPlacement, usePullRequestsView } from "./pull-requests/pull-requests-board";
 import { PullRequestsBoardIndex, PullRequestsIndex, PullRequestsNav } from "./pull-requests/pull-requests-nav";
 import { SettingsNav } from "./settings/settings-nav";
-import { SportNav } from "./sport/nav";
 import { TicketsNav } from "./tickets/tickets-nav";
 import { TodoCategories } from "./todo/categories";
 import { Separator, useDragSeparator } from "./drag-separator";
@@ -44,6 +45,7 @@ export function PageList({ page, listed, hosts, past, todoSessions, botList, use
 	const { connected } = useDashboardStatus();
 	const [pullRequestsView] = usePullRequestsView();
 	const [detailsPlacement] = usePullRequestDetailsPlacement();
+	if (isModulePage(page)) return <ModuleNavView page={page} />;
 	switch (page.kind) {
 		case "pull-requests": {
 			// Until the sessions are listed, the saved workspace reads as all workspaces, which would ask GitHub about every repository.
@@ -64,8 +66,6 @@ export function PageList({ page, listed, hosts, past, todoSessions, botList, use
 			return <CalendarNav />;
 		case "email":
 			return <EmailNav />;
-		case "sport":
-			return <SportNav open={page} />;
 		case "settings":
 			return <SettingsNav route={page} />;
 		default: {

@@ -2,9 +2,9 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, u
 import type { BotChange } from "../src/shared/bots";
 import type { PinChange } from "../src/shared/pins";
 import type { TrustChange } from "../src/shared/project-trust";
-import type { ClientMsg, ServerMsg } from "../src/shared/protocol";
+import type { ModuleChanges, StoredModuleId } from "../src/modules";
+import type { ClientMsg, ModuleChangeMsg, ServerMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
-import type { SportChange } from "../src/shared/sport";
 import type { UserTodoChange } from "../src/user-todos-shared";
 import { errorText } from "../src/json";
 import { openSocket, putJson } from "./api";
@@ -96,8 +96,8 @@ export interface Dashboard {
 	 * while none is open; settles once the server has handled it, and rejects with the server's error.
 	 */
 	changeTodo: (change: UserTodoChange) => Promise<void>;
-	/** Change the Sport page's state by all of `changes` or none, as {@link Dashboard.changeTodo} does the Todo page's list. */
-	changeSport: (changes: SportChange[]) => Promise<void>;
+	/** Change stored module `id`'s state, all of `change` or none of it, as {@link Dashboard.changeTodo} does the Todo page's list. */
+	changeModule: <I extends StoredModuleId>(id: I, change: ModuleChanges[I]) => Promise<void>;
 	/** Pin or unpin sessions, which shows at once and reaches the server, on the next socket while none is open, and every other window. */
 	changePins: (change: PinChange) => void;
 	/** Add, change, or delete a Bot, which shows at once and reaches the server, on the next socket while none is open, and every other window. */
@@ -261,7 +261,7 @@ export function useDashboard(): Dashboard {
 					case "usage":
 					case "models":
 					case "user-todos":
-					case "sport":
+					case "module":
 					case "routines":
 					case "bots":
 					case "scheduled":
@@ -353,10 +353,12 @@ export function useDashboard(): Dashboard {
 		},
 		[write],
 	);
-	const changeSport = useCallback(
-		(changes: SportChange[]) => {
-			dispatch({ t: "sport-changes", changes });
-			return write({ t: "sport-changes", changes });
+	const changeModule = useCallback(
+		<I extends StoredModuleId>(id: I, change: ModuleChanges[I]) => {
+			// TypeScript cannot tie a generic `id` to its own change within the union of messages.
+			const msg = { t: "module-change", id, change } as ModuleChangeMsg;
+			dispatch(msg);
+			return write(msg);
 		},
 		[write],
 	);
@@ -383,5 +385,5 @@ export function useDashboard(): Dashboard {
 		[start],
 	);
 
-	return { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeSport, changePins, changeBot, trustAndStart, dismissTrust };
+	return { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeModule, changePins, changeBot, trustAndStart, dismissTrust };
 }

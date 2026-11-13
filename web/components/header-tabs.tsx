@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { activityControl, record } from "../activity";
 import { pageTitle, viewTitle } from "../document-title";
 import { closeHeaderTab, decodeHeaderTabs, encodeHeaderTabs, type HeaderTab, HEADER_TABS_KEY, type HeaderTabTarget, headerTabTarget, NEW_TAB_HASH, reorderHeaderTabs, visitHeaderTab } from "../header-tabs";
+import { MODULE_LIST, type WebModuleId } from "../modules";
 import { moveBy, SIDE_DROP_LINE, stepTarget, type Where } from "../order";
 import { PAGE_ICON } from "../page-icons";
 import type { Page } from "../routing";
@@ -19,7 +20,13 @@ import { useDashboardActions } from "./dashboard-context";
 import { HistoryButtons } from "./header-controls";
 import { StatusDot } from "./status-dot";
 
-const PAGE_TAB_ICON: Record<Page["kind"], IconComponent> = { ...PAGE_ICON, "get-started": IconSparklesTwo, new: IconEditBig, scheduled: PAGE_ICON.calendar };
+const PAGE_TAB_ICON: Record<Page["kind"], IconComponent> = {
+	...PAGE_ICON,
+	...(Object.fromEntries(MODULE_LIST.map(({ id, tab }) => [id, tab.icon])) as Record<WebModuleId, IconComponent>),
+	"get-started": IconSparklesTwo,
+	new: IconEditBig,
+	scheduled: PAGE_ICON.calendar,
+};
 
 const ICON = "size-3.5 shrink-0";
 

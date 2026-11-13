@@ -105,16 +105,16 @@ describe("dashboard state", () => {
 		expect(reduce(onPanes, { t: "end-success", instanceId: "a", listed: ["a"] }).cover).toBeNull();
 	});
 
-	test("the Sport state is null until the server first sends it, then the latest one sent", () => {
-		expect(blank().sport).toBeNull();
+	test("a stored module's state is null until the server first sends it, then the latest one sent", () => {
+		expect(blank().modules.sport).toBeNull();
 		const sent = { ...EMPTY_SPORT, metrics: [{ id: "max", label: "Max", unit: "kg", better: "higher" as const }] };
-		expect(reduce(blank(), { t: "sport", state: sent }).sport).toBe(sent);
+		expect(reduce(blank(), { t: "module", id: "sport", value: sent }).modules.sport).toBe(sent);
 	});
 
-	test("a Sport batch shows at once whole, and a refused one shows none of it", () => {
-		const loaded = reduce(blank(), { t: "sport", state: EMPTY_SPORT });
+	test("a module change shows at once whole, and a refused one shows none of it", () => {
+		const loaded = reduce(blank(), { t: "module", id: "sport", value: EMPTY_SPORT });
 		const done = log("a", "2026-11-17");
-		expect(reduce(loaded, { t: "sport-changes", changes: [{ op: "add-log", log: done }] }).sport?.log).toEqual([done]);
-		expect(reduce(loaded, { t: "sport-changes", changes: [{ op: "add-log", log: done }, { op: "add-measurement", measurement: measurement("m", "max", 117, "2026-11-17") }] })).toBe(loaded);
+		expect(reduce(loaded, { t: "module-change", id: "sport", change: [{ op: "add-log", log: done }] }).modules.sport?.log).toEqual([done]);
+		expect(reduce(loaded, { t: "module-change", id: "sport", change: [{ op: "add-log", log: done }, { op: "add-measurement", measurement: measurement("m", "max", 117, "2026-11-17") }] })).toBe(loaded);
 	});
 });

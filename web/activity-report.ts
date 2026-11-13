@@ -1,6 +1,7 @@
 /** Settings › Activity's report: every feature the page has, from its registries, split by how often the range used it. */
 import { ACTION_MESSAGES, type ActivityKind, type ActivityRead, type ActivityUse, CONTROLS, featureId } from "../src/shared/activity";
 import { commandKey, VIEWS } from "./activity";
+import { MODULE_LIST } from "./modules";
 import { SETTINGS_SECTIONS, type SidebarTab } from "./routing";
 import { SHORTCUTS, type Shortcut, type ShortcutId } from "./shortcuts";
 
@@ -39,7 +40,10 @@ const COMMAND_TABS: Partial<Record<ShortcutId, SidebarTab>> = { tickets: "ticket
 /** The `PUT` routes that go with a tab gated on a service, by path prefix. */
 const ROUTE_TABS: Record<string, SidebarTab> = { "/api/ticket": "tickets", "/api/gmail/": "email" };
 
-const commandTab = ({ id, category }: Shortcut): SidebarTab | undefined => (category === "email" ? "email" : COMMAND_TABS[id]);
+/** Module `id`'s tab, while that module's tab is gated on a service. */
+const gatedModule = (id: string): SidebarTab | undefined => MODULE_LIST.find(module => module.id === id && module.tab.integration)?.id;
+
+const commandTab = ({ id, category }: Shortcut): SidebarTab | undefined => (category === "email" ? "email" : (COMMAND_TABS[id] ?? gatedModule(category) ?? gatedModule(id)));
 const routeTab = (path: string): SidebarTab | undefined => Object.entries(ROUTE_TABS).find(([prefix]) => path.startsWith(prefix))?.[1];
 
 /** Every feature the page has: views, commands, actions, and tagged controls, from the registries that define them. */
@@ -51,7 +55,7 @@ export function inventory(serverActions: readonly string[]): Feature[] {
 		...SHORTCUTS.map((shortcut): Feature => ({ kind: "command", key: commandKey(shortcut.id), label: shortcut.command ?? shortcut.label, ...gated(commandTab(shortcut)) })),
 		...Object.entries(ACTION_MESSAGES).filter(([, action]) => action).map(([t]): Feature => ({ kind: "action", key: t, label: t })),
 		...serverActions.map((path): Feature => ({ kind: "action", key: `put ${path}`, label: `PUT ${path}`, ...gated(routeTab(path)) })),
-		...CONTROLS.map(({ id, label }): Feature => ({ kind: "control", key: id, label })),
+		...[...CONTROLS, ...MODULE_LIST.flatMap(module => module.controls)].map(({ id, label }): Feature => ({ kind: "control", key: id, label })),
 	];
 }
 

@@ -5,6 +5,7 @@ import type { UserTodoList } from "../../src/user-todos-shared";
 import { botRows, type OpenBot } from "../bots-model";
 import { newDraftKey } from "../composer-drafts";
 import type { DashboardState } from "../dashboard-state";
+import { isModulePage } from "../modules";
 import type { SplitAxis } from "../pane-navigation";
 import type { Layout, Page, TodoListView } from "../routing";
 import { hashForNewSession } from "../routing";
@@ -17,6 +18,7 @@ import { useDashboardActions } from "./dashboard-context";
 import { EmailPage } from "./email/email-page";
 import { EmptyHome } from "./empty-home";
 import { DisconnectedPage } from "./integrations/disconnected-page";
+import { ModulePageView } from "./module-views";
 import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { NewSession } from "./new-session";
 
@@ -25,7 +27,6 @@ import { BotPage, NewBot } from "./bots/bot-page";
 import { BotsGallery } from "./bots/bots-gallery";
 import { SettingsPage } from "./settings/settings-page";
 import { ScheduledSession } from "./scheduled-session";
-import { SportPage } from "./sport/page";
 import { useScheduleSend } from "./scheduled";
 import { TICKETS_META, TICKETS_TITLE, TicketsPage } from "./tickets/tickets-page";
 import { TodoPage } from "./todo/page";
@@ -49,7 +50,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "sport" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "modules" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -90,7 +91,7 @@ export const PageSwitch = memo(function PageSwitch({
 	splits,
 	models,
 	userTodos,
-	sport,
+	modules,
 	routines,
 	bots,
 	botLasts,
@@ -117,9 +118,10 @@ export const PageSwitch = memo(function PageSwitch({
 	resize,
 	toggleSidebar,
 }: PageSwitchProps) {
-	const { send, start, dismissStart, changeTodo, changeSport } = useDashboardActions();
+	const { send, start, dismissStart, changeTodo } = useDashboardActions();
 	const scheduleSend = useScheduleSend();
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
+	if (page && isModulePage(page)) return <ModulePageView page={page} states={modules} disabled={!connected} />;
 	switch (page?.kind) {
 		case "new": {
 			const seed = todoSeed(userTodos, page.todoId);
@@ -212,8 +214,6 @@ export const PageSwitch = memo(function PageSwitch({
 			return <CalendarPage routines={routines} bots={bots} todos={userTodos} ticketsShown={ticketsCallable} />;
 		case "email":
 			return <EmailPage target={page.target} />;
-		case "sport":
-			return <SportPage state={sport} route={page} disabled={!connected} onChange={changeSport} />;
 		// Get started is a dialog over the home, which `GetStarted` in `web/app.tsx` draws.
 		case "get-started":
 		case undefined:

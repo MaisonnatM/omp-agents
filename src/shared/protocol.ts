@@ -14,7 +14,7 @@ import type { ReviewDraft, ReviewDraftEdit } from "./review-drafts";
 import type { ScheduledChange, ScheduledSend } from "./scheduled";
 import type { ContextAction, GoalChange } from "./session-controls";
 import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View, WithdrawnMessage } from "./sessions";
-import type { SportChange, SportState } from "./sport";
+import type { ModuleChanges, ModuleValues, StoredModuleId } from "../modules";
 import type { AgentMedia, AgentSource, ChangedFile, Item } from "./transcript";
 import type { Turn } from "./trajectory";
 import type { Workspace, WorkspaceList } from "./workspaces";
@@ -51,8 +51,7 @@ export type ServerMsg =
 	| { t: "withdrawn"; view: LiveView; reqId: number; messages: WithdrawnMessage[] }
 	/** The Todo page's list, whole, sent when a socket opens and after every change. */
 	| { t: "user-todos"; list: UserTodoList }
-	/** The Sport module's state, whole, sent when a socket opens and after every change. */
-	| { t: "sport"; state: SportState }
+	| ModuleMsg
 	/** Every routine, whole, sent when a socket opens and after every change, including each run's progress. */
 	| { t: "routines"; routines: Routine[] }
 	/** Every Bot, whole, the newest of what each remembers, within `MAX_MEMORY_BYTES`, and the last words of its conversation, sent when a socket opens, after every change, and as each turn of a Bot's conversation starts and ends. */
@@ -77,6 +76,11 @@ export type ServerMsg =
 	| { t: "dictation"; captureId: string; event: DictationEvent }
 	/** Answers the page's message tagged `ack` once its handler settled: `error` is why it threw, `null` when it did not. */
 	| { t: "done"; ack: number; error: string | null };
+
+/** Stored module `id`'s state, whole, sent when a socket opens and after every change. */
+export type ModuleMsg<I extends StoredModuleId = StoredModuleId> = { [K in I]: { t: "module"; id: K; value: ModuleValues[K] } }[I];
+/** Change stored module `id`'s state by `change`, which that module parses; every socket then gets the state as it is after. A refused change changes nothing. */
+export type ModuleChangeMsg<I extends StoredModuleId = StoredModuleId> = { [K in I]: { t: "module-change"; id: K; change: ModuleChanges[K] } }[I];
 
 export type ClientMsg =
 	/**
@@ -135,8 +139,7 @@ export type ClientMsg =
 	| { t: "cancel-agent"; view: LiveView & { agentId: string } }
 	/** Change the Todo page's list; every socket then gets the list as it is after. */
 	| { t: "user-todo"; change: UserTodoChange }
-	/** Change the Sport module's state by all of `changes` or, when one is refused, none; every socket then gets the state as it is after. */
-	| { t: "sport-changes"; changes: SportChange[] }
+	| ModuleChangeMsg
 	/** Change the routines, or run one now; every socket then gets the routines as they are after. */
 	| { t: "routine"; change: RoutineChange }
 	/** Create, edit, or remove a Bot, or send one a message; every socket then gets the Bots as they are after. */

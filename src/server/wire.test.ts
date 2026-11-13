@@ -9,8 +9,6 @@ import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, type PullRequestChange } from "../shared/github";
 import type { ReviewDraftEdit } from "../shared/review-drafts";
-import type { SportChange } from "../shared/sport";
-import { log } from "../sport-fixtures";
 import { MAX_QUEUED_STACK, parseAccountOrder, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parseProcessStop, parsePromptDocument, parsePullRequestAttachment, parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestRebase, parsePullRequestViewedEdit, parseRepoQuery, parseReviewDraftEdit, parseReviewDraftPost, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseTrustChange, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientFrame | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
@@ -162,13 +160,10 @@ describe("parseClientMsg", () => {
 		expect(change({ op: "restore", parentId: null, todo: top, index: -1 })).toBeNull();
 	});
 
-	test("sport-changes takes a whole list of changes and refuses it when one is wrong", () => {
-		const restore: SportChange = { op: "restore-log", log: log("l1", "2026-11-17"), index: 0 };
-		expect(msg({ t: "sport-changes", changes: [{ op: "remove-log", id: "l1", extra: 1 }, restore] })).toEqual({ t: "sport-changes", changes: [{ op: "remove-log", id: "l1" }, restore] });
-		expect(msg({ t: "sport-changes", changes: [] })).toBeNull();
-		expect(msg({ t: "sport-changes", changes: [{ op: "remove-log", id: "l1" }, { op: "remove-log", id: "" }] })).toBeNull();
-		expect(msg({ t: "sport-changes", changes: { op: "remove-log", id: "l1" } })).toBeNull();
-		expect(msg({ t: "sport-changes" })).toBeNull();
+	test("module-change names a module, and a change for no module is refused before any module reads it", () => {
+		expect(msg({ t: "module-change", id: "no-such-module", change: [] })).toBeNull();
+		expect(msg({ t: "module-change", id: "toString", change: [] })).toBeNull();
+		expect(msg({ t: "module-change", change: [] })).toBeNull();
 	});
 
 	describe("routine", () => {

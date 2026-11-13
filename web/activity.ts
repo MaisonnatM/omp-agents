@@ -6,6 +6,7 @@ import { fields, isSafeInteger, isString, parseJson } from "../src/json";
 import { ACTION_MESSAGES, type ActivityEvent, type ActivityKind, type ActivityVia, type ControlId, isActivityEvent, MAX_ACTIVITY_BATCH } from "../src/shared/activity";
 import type { ClientMsg } from "../src/shared/protocol";
 import type { DashboardState } from "./dashboard-state";
+import { isModulePage, MODULE_LIST, type ModuleControlId, moduleOf, type ModuleView } from "./modules";
 import type { Layout, Page, SettingsSection, SidebarTab } from "./routing";
 
 /** The outbox's `localStorage` key; it keeps what earlier page loads have not yet sent. */
@@ -148,8 +149,8 @@ export function commandKey(id: string): string {
 	return id.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
 }
 
-/** The tag that makes a click on a page-only control count, by its id in `CONTROLS`. */
-export function activityControl(id: ControlId): { "data-activity": ControlId } {
+/** The tag that makes a click on a page-only control count, by its id in `CONTROLS` or a module's `controls`. */
+export function activityControl(id: ControlId | ModuleControlId): { "data-activity": ControlId | ModuleControlId } {
 	return { "data-activity": id };
 }
 
@@ -168,12 +169,8 @@ export function listenForControls(doc: Pick<Document, "addEventListener" | "remo
 	return () => doc.removeEventListener("click", onClick, { capture: true });
 }
 
-/**
- * Every view but the settings sections, which {@link ViewKey} adds: the panes by how many there are and of what kind, and
- * each page by its kind and whether it shows one item, never an id or a path. `tab` is the sidebar tab a view goes with,
- * so Settings › Activity sets apart a view whose tab's service omp is not signed in to.
- */
-export const VIEWS = [
+/** The core's views but New session, which comes after the modules' views. */
+const CORE_VIEWS = [
 	{ key: "home", label: "Home" },
 	{ key: "get-started", label: "Get started" },
 	{ key: "session", label: "A session" },
@@ -197,17 +194,26 @@ export const VIEWS = [
 	{ key: "email/item", label: "A mail conversation", tab: "email" },
 	{ key: "scheduled", label: "Scheduled sends" },
 	{ key: "scheduled/item", label: "A scheduled send" },
-	{ key: "sport", label: "Sport week" },
-	{ key: "sport/journal", label: "Sport journal" },
-	{ key: "sport/journal/item", label: "A workout log" },
-	{ key: "sport/progress", label: "Sport progress" },
-	{ key: "new", label: "New session" },
 ] as const satisfies readonly { key: string; label: string; tab?: SidebarTab }[];
 
+type PageViewKey = (typeof CORE_VIEWS)[number]["key"] | ModuleView | "new";
+
+/**
+ * Every view but the settings sections, which {@link ViewKey} adds: the panes by how many there are and of what kind, and
+ * each page by its kind and whether it shows one item, never an id or a path. `tab` is the sidebar tab a view goes with,
+ * so Settings › Activity sets apart a view whose tab's service omp is not signed in to.
+ */
+export const VIEWS: readonly { key: PageViewKey; label: string; tab?: SidebarTab }[] = [
+	...CORE_VIEWS,
+	...MODULE_LIST.flatMap(({ id, tab, views }) => (tab.integration ? views.map(view => ({ ...view, tab: id })) : views)),
+	{ key: "new", label: "New session" },
+];
+
 /** A view's key: one of {@link VIEWS}, or a settings section. */
-export type ViewKey = (typeof VIEWS)[number]["key"] | `settings/${SettingsSection}`;
+export type ViewKey = PageViewKey | `settings/${SettingsSection}`;
 
 function pageView(page: Page): ViewKey {
+	if (isModulePage(page)) return moduleOf(page).view(page);
 	switch (page.kind) {
 		case "settings":
 			return `settings/${page.section}`;
@@ -225,10 +231,6 @@ function pageView(page: Page): ViewKey {
 			return page.target === null ? "email" : page.target === "new" ? "email/new" : "email/item";
 		case "scheduled":
 			return page.id === null ? "scheduled" : "scheduled/item";
-		case "sport":
-			if (page.tab === "week") return "sport";
-			if (page.tab === "progress") return "sport/progress";
-			return page.open === null ? "sport/journal" : "sport/journal/item";
 		case "calendar":
 		case "get-started":
 		case "new":

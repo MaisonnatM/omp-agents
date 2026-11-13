@@ -68,7 +68,7 @@ const ALL_TODOS: TodoListView = { kind: "all" };
  * slice, and the two dashboard contexts split what is stable, the actions, from what changes, the connection and the starts.
  */
 export function App() {
-	const { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeSport, changePins, changeBot, trustAndStart, dismissTrust } = useDashboard();
+	const { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeModule, changePins, changeBot, trustAndStart, dismissTrust } = useDashboard();
 
 	const { layout } = state;
 	const sidebars = useSidebarPanels();
@@ -215,8 +215,8 @@ export function App() {
 	});
 
 	const actions = useMemo(
-		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeSport, changeBot, end: endHost, openFile: setOpenedFile, openNewTicket: setNewTicket, editGoal, workspaceSettings }),
-		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeSport, changeBot, endHost, setOpenedFile, setNewTicket, editGoal, workspaceSettings],
+		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeModule, changeBot, end: endHost, openFile: setOpenedFile, openNewTicket: setNewTicket, editGoal, workspaceSettings }),
+		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeModule, changeBot, endHost, setOpenedFile, setNewTicket, editGoal, workspaceSettings],
 	);
 	const fork = startOf(state.starts, "fork");
 	const resume = startOf(state.starts, "resume");
@@ -312,7 +312,7 @@ export function App() {
 																	splits={state.splits}
 																	models={state.models}
 																	userTodos={state.userTodos}
-																	sport={state.sport}
+																	modules={state.modules}
 																	routines={state.routines}
 																	bots={state.bots}
 																	botLasts={state.botLasts}

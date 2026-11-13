@@ -49,7 +49,7 @@
   A `start` of kind `new` may name a `todoId`; once omp starts, `src/server/start.ts` links the todo to the new session through `StartEnv.linkTodo`, before it sends the first message, and `src/server/dashboard.ts` applies the changes `startChanges` in `src/user-todos.ts` returns: the link, and `set-status` `in-progress` for a `backlog` or `todo` todo.
 - `src/shared/sport.ts`, `src/sport.ts`, and `src/sport-parse.ts` hold the Sport module's state, its reducer `applySport`, and its boundary parsers.
   `src/sport-week.ts` derives the week, each exercise's load, the pain flags, the best grades, the records, and the adherence from the state.
-  `src/server/sport-file.ts` keeps `sport.json` with `ReducerFile`, registered in `src/server/list-registry.ts` under `sport`.
+  `src/server/sport-file.ts` keeps `sport.json` with `ReducerFile`, which `SPORT_MODULE` in `src/sport-module.ts` opens as the Sport module's store; see [Modules](../architecture/modules.md).
   `src/sport-agent.ts` holds `agentSportChanges`, which turns a `sport` tool request into the changes an agent may make, and `withAgentChanges`, the state with the requests an inbox still holds.
   `src/server/sport-inbox.ts` drains the `sport` tool's requests from `sport-inbox/` through `JsonInboxDir` while its server owns the lock, and deletes a file only once the dashboard has written its changes to `sport.json`.
   `src/omp/sport-extension.ts`, which every dashboard session loads, registers `sport`, reads the state with pending requests, and leaves one request per call without writing `sport.json`.

@@ -1,11 +1,13 @@
 import type { PastSession, RosterHost, View } from "../src/shared/sessions";
 import { hostLabel, pastLabel } from "./labels";
+import { isModulePage, moduleOf } from "./modules";
 import type { Page } from "./routing";
 
 export const APP_NAME = "omp agents";
 
 /** What page `page` is called: its own name, or what it shows, such as a pull request or a ticket. The tab title and a header tab both read it. */
 export function pageTitle(page: Page): string {
+	if (isModulePage(page)) return moduleOf(page).title(page);
 	switch (page.kind) {
 		case "get-started":
 			return "Get started";
@@ -29,8 +31,6 @@ export function pageTitle(page: Page): string {
 			return "Calendar";
 		case "email":
 			return "Email";
-		case "sport":
-			return "Sport";
 		default: {
 			const never: never = page;
 			return never;

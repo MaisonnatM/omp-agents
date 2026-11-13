@@ -1,6 +1,7 @@
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { isTypingTarget } from "../src/shared/desktop-bridge";
 import { commandKey, record } from "./activity";
+import { MODULE_LIST, type ModuleShortcutId, type WebModuleId } from "./modules";
 
 /** The keys that go to the sidebar's tabs by position: Cmd+1 goes to the first page row of the sidebar, whichever it is, through Cmd+5 for the fifth. */
 export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4", "tab5"] as const;
@@ -55,7 +56,6 @@ export type ShortcutId =
 	| "todo"
 	| "calendar"
 	| "email"
-	| "sport"
 	| "workspace"
 	| "nextPullRequest"
 	| "previousPullRequest"
@@ -84,22 +84,13 @@ export type ShortcutId =
 	| "emailReplyAll"
 	| "emailTrash"
 	| "emailCompose"
-	| "sportPreviousDay"
-	| "sportNextDay"
-	| "sportPreviousDemo"
-	| "sportNextDemo"
-	| "sportJournalNext"
-	| "sportJournalPrevious"
-	| "sportJournalClose"
-	| "sportTimerPause"
-	| "sportTimerPrevious"
-	| "sportTimerNext"
 	| "nextChangedFile"
 	| "previousChangedFile"
 	| "moveUp"
 	| "moveDown"
 	| "terminal"
 	| "answer"
+	| ModuleShortcutId
 	| TabShortcut;
 
 /**
@@ -129,19 +120,24 @@ export type Binding = { chord: Chord; scope: Scope } | { goTo: string };
 /** Closes the header tab on screen, leaving its session running. */
 export const CLOSE_TAB: Chord = { key: "w", mod: true };
 
-/** The categories Settings › Keyboard lists the shortcuts under, in order. */
-export const SHORTCUT_CATEGORIES = [
+/** The core's categories, which the modules' categories join before Changes. */
+const CORE_CATEGORIES = [
 	{ id: "general", label: "General" },
 	{ id: "sessions", label: "Sessions" },
 	{ id: "pull-requests", label: "Pull requests" },
 	{ id: "todo", label: "Todo" },
 	{ id: "email", label: "Email" },
 	{ id: "calendar", label: "Calendar" },
-	{ id: "sport", label: "Sport" },
-	{ id: "changes", label: "Changes" },
 ] as const;
 
-export type ShortcutCategory = (typeof SHORTCUT_CATEGORIES)[number]["id"];
+export type ShortcutCategory = (typeof CORE_CATEGORIES)[number]["id"] | WebModuleId | "changes";
+
+/** The categories Settings › Keyboard lists the shortcuts under, in order. */
+export const SHORTCUT_CATEGORIES: readonly { id: ShortcutCategory; label: string }[] = [
+	...CORE_CATEGORIES,
+	...MODULE_LIST.map(({ id, shortcuts }) => ({ id, label: shortcuts.category })),
+	{ id: "changes", label: "Changes" },
+];
 
 export interface Shortcut {
 	id: ShortcutId;
@@ -277,7 +273,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "todo", category: "general", label: "Go to your todo list", command: "Go to todo list", keys: [] },
 	{ id: "calendar", category: "general", label: "Go to your calendar", command: "Go to calendar", keys: [] },
 	{ id: "email", category: "general", label: "Go to your email", command: "Go to email", keys: [{ goTo: "m" }] },
-	{ id: "sport", category: "general", label: "Go to your sport week", command: "Go to sport", keys: [] },
+	...MODULE_LIST.map(({ id, shortcuts: { goTo } }): Shortcut => ({ id, category: "general", ...goTo })),
 	{ id: "workspace", category: "general", label: "Choose the sidebar's workspace", keys: [{ goTo: "w" }] },
 	{ id: "nextPullRequest", category: "pull-requests", label: "Pull requests: move to the next pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "previousPullRequest", category: "pull-requests", label: "Pull requests: move to the previous pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
@@ -311,16 +307,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "emailReplyAll", category: "email", label: "Email: reply to everyone on the open conversation's last message", keys: [{ chord: { key: "a" }, scope: "outside-fields" }] },
 	{ id: "emailTrash", category: "email", label: "Email: move the open conversation to Gmail's Trash", keys: [{ chord: { key: "#" }, scope: "outside-fields" }] },
 	{ id: "emailCompose", category: "email", label: "Email: write a new mail", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
-	{ id: "sportPreviousDay", category: "sport", label: "Sport week: open the day before", keys: [{ chord: { key: "ArrowLeft" }, scope: "outside-fields" }] },
-	{ id: "sportNextDay", category: "sport", label: "Sport week: open the day after", keys: [{ chord: { key: "ArrowRight" }, scope: "outside-fields" }] },
-	{ id: "sportPreviousDemo", category: "sport", label: "Sport demo: show the workout's previous demo", keys: [{ chord: { key: "ArrowLeft" }, scope: "outside-fields" }] },
-	{ id: "sportNextDemo", category: "sport", label: "Sport demo: show the workout's next demo", keys: [{ chord: { key: "ArrowRight" }, scope: "outside-fields" }] },
-	{ id: "sportJournalNext", category: "sport", label: "Sport journal: focus the next, older session, or open it while a session is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
-	{ id: "sportJournalPrevious", category: "sport", label: "Sport journal: focus the previous, newer session, or open it while a session is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
-	{ id: "sportJournalClose", category: "sport", label: "Sport journal: close the open session", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
-	{ id: "sportTimerPause", category: "sport", label: "Sport timer: pause or resume the routine", keys: [{ chord: { key: " " }, scope: "outside-fields" }] },
-	{ id: "sportTimerPrevious", category: "sport", label: "Sport timer: go back to the previous step", keys: [{ chord: { key: "ArrowLeft" }, scope: "outside-fields" }] },
-	{ id: "sportTimerNext", category: "sport", label: "Sport timer: end this step and go to the next", keys: [{ chord: { key: "ArrowRight" }, scope: "outside-fields" }] },
+	...MODULE_LIST.flatMap(({ id, shortcuts }) => shortcuts.rows.map((row): Shortcut => ({ ...row, category: id }))),
 	{ id: "nextChangedFile", category: "changes", label: "Changes: open the next changed file", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "previousChangedFile", category: "changes", label: "Changes: open the previous changed file", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "moveUp", category: "todo", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },

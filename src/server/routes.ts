@@ -1,9 +1,10 @@
 /**
  * The HTTP API the page reads and writes omp's settings, analytics, pull requests, git checkouts, worktrees,
- * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, the model providers omp signs in to, Linear tickets and their files, the Linear issue a todo opens, Google Calendar and the events kept on this computer, your Gmail inbox, prompt images, the text files agent text names through, the Sport page's demo thumbnails, and the dashboard's own build and update.
+ * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, the model providers omp signs in to, Linear tickets and their files, the Linear issue a todo opens, Google Calendar and the events kept on this computer, your Gmail inbox, prompt images, the text files agent text names through, each module's own routes, and the dashboard's own build and update.
  * Every read goes through `get` and every write through `write`; each route group takes only the part of {@link RouteEnv} it reads.
  */
 import { isObject } from "../json";
+import { moduleRoutes } from "../modules";
 import type { GmailAccounts } from "../gmail";
 import type { Integrations } from "../integrations";
 import { readCollabAutoStart, shareTerminalSessions } from "../omp/config";
@@ -22,7 +23,6 @@ import { processRoutes, type ProcessRoutesEnv } from "./process-routes";
 import { providerRoutes } from "./provider-routes";
 import { pullRequestRoutes, type PullRequestRoutesEnv } from "./pull-request-routes";
 import { sessionRoutes } from "./session-routes";
-import { sportThumbRoutes, type SportThumbsEnv } from "./sport-thumbs";
 import { phoneAccessRoutes, type PhoneAccessRoutesEnv } from "./phone-access-routes";
 import { syncRoutes, type SyncRoutesEnv } from "./sync-routes";
 import { todoRoutes, type TodoRoutesEnv } from "./todo-routes";
@@ -46,7 +46,6 @@ export interface RouteEnv {
 	activity: ActivityRoutesEnv;
 	processes: ProcessRoutesEnv;
 	storage: StorageRoutesEnv;
-	sportThumbs: SportThumbsEnv;
 	phoneAccess: PhoneAccessRoutesEnv;
 }
 
@@ -78,7 +77,7 @@ export function createRoutes(env: RouteEnv): Routes {
 		...syncRoutes(kit, env.sync),
 		...processRoutes(kit, env.processes),
 		...storageRoutes(kit, env.storage, env.sessions),
-		...sportThumbRoutes(kit, env.sportThumbs),
+		...moduleRoutes(kit),
 		...phoneAccessRoutes(env.guards, env.phoneAccess),
 	};
 	return { ...routes, ...activityRoutes(kit, env.activity, routes) };

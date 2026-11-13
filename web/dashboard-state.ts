@@ -4,18 +4,17 @@ import type { PlanUsage } from "../src/shared/models";
 import type { QueuedMerge } from "../src/shared/merge-queue";
 import type { Notice } from "../src/shared/notices";
 import type { TrustedProject } from "../src/shared/project-trust";
-import type { ServerMsg } from "../src/shared/protocol";
+import type { ModuleChangeMsg, ServerMsg } from "../src/shared/protocol";
 import type { ReviewDraft } from "../src/shared/review-drafts";
 import { applyPins, type PinChange } from "../src/shared/pins";
 import type { ScheduledSend } from "../src/shared/scheduled";
-import type { SportChange, SportState } from "../src/shared/sport";
-import { applySportChanges } from "../src/sport";
 import { newestPastFirst, type PastSession, type RosterHost, type View } from "../src/shared/sessions";
 import type { Workspace, WorkspaceList } from "../src/shared/workspaces";
 import type { Routine } from "../src/routines";
 import { applyUserTodo } from "../src/user-todos";
 import type { UserTodoChange, UserTodoList } from "../src/user-todos-shared";
 import { applyDelta } from "./keyed-list";
+import { changeModuleState, EMPTY_MODULE_STATES, type ModuleStates } from "./modules";
 import type { Completions } from "./pane-store";
 import { changePanes, DEFAULT_SPLIT_RATIOS, type PaneCommand, type PaneNavigation, type SplitRatios } from "./pane-navigation";
 import type { ModelList } from "./reads";
@@ -48,8 +47,8 @@ export interface DashboardState extends PaneNavigation {
 	models: Map<string, ModelList>;
 	/** The Todo page's list, `null` until the server first sends it; a change shows here before the server answers. */
 	userTodos: UserTodoList | null;
-	/** The Sport module's state, `null` until the server first sends it. */
-	sport: SportState | null;
+	/** Each stored module's state, `null` until the server first sends it; a change shows here before the server answers. */
+	modules: ModuleStates;
 	/** Every routine, empty until the server first sends them. */
 	routines: Routine[];
 	/** Every Bot, `null` until the server first sends them; a change shows here before the server answers. */
@@ -77,7 +76,7 @@ export interface DashboardState extends PaneNavigation {
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "sport" | "routines" | "bots" | "scheduled" | "workspaces" | "project-trust" | "pins" | "notices" | "merges" | "review-drafts" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "module" | "routines" | "bots" | "scheduled" | "workspaces" | "project-trust" | "pins" | "notices" | "merges" | "review-drafts" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -96,7 +95,7 @@ export type Action =
 	| { t: "ended"; instanceId: string }
 	| { t: "new-session-completions"; completions: Completions }
 	| { t: "user-todo"; change: UserTodoChange }
-	| { t: "sport-changes"; changes: SportChange[] }
+	| ModuleChangeMsg
 	| { t: "pin"; change: PinChange }
 	| { t: "bot"; change: Exclude<BotChange, { op: "message" | "restart" }>; now: string }
 	/** The trust dialog of start `reqId` closed, by trusting or by **Cancel**. */
@@ -222,8 +221,8 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, models: new Map(state.models).set(action.instanceId, { data: { models: action.models }, error: action.error }) };
 		case "user-todos":
 			return { ...state, userTodos: action.list };
-		case "sport":
-			return { ...state, sport: action.state };
+		case "module":
+			return { ...state, modules: { ...state.modules, [action.id]: action.value } };
 		case "routines":
 			return { ...state, routines: action.routines };
 		case "bots":
@@ -250,9 +249,9 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, reviewDrafts: action.list };
 		case "user-todo":
 			return state.userTodos ? { ...state, userTodos: applyUserTodo(state.userTodos, action.change) } : state;
-		case "sport-changes": {
-			const applied = state.sport && applySportChanges(state.sport, action.changes);
-			return applied && "ok" in applied ? { ...state, sport: applied.ok } : state;
+		case "module-change": {
+			const modules = changeModuleState(state.modules, action.id, action.change);
+			return modules === state.modules ? state : { ...state, modules };
 		}
 		case "pin": {
 			const pins = applyPins(state.pins, action.change);
@@ -284,7 +283,7 @@ export function initialState(route: Route, ratios: SplitRatios = DEFAULT_SPLIT_R
 		usage: null,
 		models: new Map(),
 		userTodos: null,
-		sport: null,
+		modules: EMPTY_MODULE_STATES,
 		routines: [],
 		bots: null,
 		botMemories: {},
