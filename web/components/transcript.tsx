@@ -1,5 +1,5 @@
 /** `Transcript`, a session's messages, thinking, and tool calls as rendered in a pane. */
-import { IconAiBotHead, IconArrowCornerDownLeft, IconArrowRotateCounterClockwise, IconArrowsRepeat, IconBrain, IconBubbleAlert, IconBubbleQuestion, IconBug, IconChainLink1, IconChip, IconCircleCheck, IconCircleX, IconCode, IconCodeBrackets, IconConsole, IconEyeOpen, IconFileEdit, IconFileText, IconFlag1, IconFolderOpen, IconGlobe, IconGraduateCap, IconHistory, IconHourglass, IconImac, IconImages1, IconLightBulb, IconNote1, IconPageAdd, IconPageTextSearch, IconPlugin1, IconPullRequest, IconScanCode, IconShieldCheck, IconShip, IconSparklesTwo, IconTarget, IconTodos, IconToolbox, IconWindowApp } from "central-icons";
+import { IconAiBotHead, IconArrowCornerDownLeft, IconArrowRotateCounterClockwise, IconArrowsRepeat, IconBrain, IconBubbleAlert, IconBubbleQuestion, IconBug, IconChainLink1, IconChip, IconCircleCheck, IconCircleX, IconCode, IconCodeBrackets, IconConsole, IconEyeOpen, IconFileEdit, IconFileText, IconFlag1, IconFolderOpen, IconGlobe, IconGraduateCap, IconHistory, IconHourglass, IconImac, IconImages1, IconLightBulb, IconNote1, IconPageAdd, IconPageTextSearch, IconPlugin1, IconPullRequest, IconPageSearch, IconShieldCheck, IconShip, IconSparklesTwo, IconTarget, IconTodos, IconToolbox, IconWindowApp } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { createContext, Fragment, type KeyboardEvent, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ArtifactSave } from "../../src/shared/artifacts";
@@ -58,7 +58,7 @@ const TOOL_ICON: Record<string, IconComponent> = {
 	write: IconPageAdd,
 	edit: IconFileEdit,
 	ast_edit: IconArrowsRepeat,
-	ast_grep: IconScanCode,
+	ast_grep: IconPageSearch,
 	bash: IconConsole,
 	eval: IconCode,
 	grep: IconPageTextSearch,

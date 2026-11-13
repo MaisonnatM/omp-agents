@@ -87,7 +87,7 @@ export function WeekTab({ state, plan, selected, today, disabled, onDemo, onTime
 												<span className={cn("block truncate text-sm", summary.kind ? "font-medium" : "text-muted-foreground")}>{summary.title}</span>
 												{summary.detail && <span className="block truncate text-xs text-muted-foreground">{summary.detail}</span>}
 											</span>
-											{summary.done && <IconCheckmark1 aria-label="faite" className="size-4 shrink-0 text-success" />}
+											{summary.done && <IconCheckmark1 aria-hidden={false} aria-label="faite" className="size-4 shrink-0 text-success" />}
 										</a>
 									</li>
 								);

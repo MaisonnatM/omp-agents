@@ -158,7 +158,7 @@ function NoteRow({ note, href, open, todoHref, disabled, moveTo, onRename, onMov
 		<ContextMenu>
 			<ContextMenuTrigger render={<li id={`note-${note.id}`} />}>
 				<a href={href} aria-current={open ? "page" : undefined} className={cn("flex flex-col gap-1 rounded-md px-3 py-2 text-sm outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring", open && "bg-accent")}>
-					<span className="flex min-w-0 items-center gap-1.5"><span className="truncate font-medium">{note.title || "Untitled"}</span>{note.todoId && <PAGE_ICON.todo aria-label="Linked to a todo" className="size-3.5 shrink-0 text-muted-foreground" />}{note.addedBy && <IconAiBotHead aria-label="Added by an agent" className="size-3.5 shrink-0 text-muted-foreground" />}</span>
+					<span className="flex min-w-0 items-center gap-1.5"><span className="truncate font-medium">{note.title || "Untitled"}</span>{note.todoId && <PAGE_ICON.todo aria-hidden={false} aria-label="Linked to a todo" className="size-3.5 shrink-0 text-muted-foreground" />}{note.addedBy && <IconAiBotHead aria-hidden={false} aria-label="Added by an agent" className="size-3.5 shrink-0 text-muted-foreground" />}</span>
 					<span className="truncate text-xs text-muted-foreground">{preview(note.body) || "No content"}</span>
 					<span className="text-xs text-muted-foreground">Updated {dayLabel(note.updatedAt)}</span>
 				</a>

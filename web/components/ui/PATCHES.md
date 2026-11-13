@@ -88,6 +88,8 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
   The generic glyph shows the file's extension under it, so attached `.md` and `.txt` files tell apart.
 - `lib/icon-context.tsx`: the `git-branch` and `file-text` icons, and every default icon is Central Icons' instead of lucide's.
 - Every registry file draws Central Icons (`central-icons`, the round outlined 1.5 stroke style) where the registry uses lucide; a file added from a registry gets the same swap, since `components.json` still names lucide, the only icon set shadcn's CLI writes.
+  A Central icon hides itself from screen readers even with an `aria-label`, so an icon that carries meaning also takes `aria-hidden={false}`.
+  Its shapes carry their own stroke width inside a mask, so a heavier stroke or a solid fill targets them with the `icon-shapes` variant from `web/globals.css`, such as `icon-shapes:stroke-2`, never `strokeWidth` or `fill-*` on the `<svg>`.
 - `ui/fluid-hover-highlight.tsx` is the registry file unchanged, moved from `web/components/` into `ui/`.
 - `ui/select.tsx` comes from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/select.json`).
   Its trigger has the settings fields' 28px height and border, and its popup and rows take the look of `ui/menu.tsx`.

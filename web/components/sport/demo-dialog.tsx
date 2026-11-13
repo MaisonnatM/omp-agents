@@ -60,7 +60,7 @@ export function DemoDialog({ title, demos, at, onAt, onClose }: DemoDialogProps)
 								className="size-full text-sm"
 								badge={
 									<span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform group-hover:scale-105">
-										<IconPlay aria-hidden className="size-6 fill-current" />
+										<IconPlay aria-hidden className="size-6 icon-shapes:fill-current" />
 									</span>
 								}
 							/>

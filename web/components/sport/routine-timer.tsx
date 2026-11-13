@@ -292,7 +292,7 @@ export function RoutineTimer({ plan, name, items: given, checklist, sound, onClo
 							</Tooltip>
 						) : (
 							<Tooltip content={running ? "Pause" : "Reprendre"} shortcut={shortcutLabels("sportTimerPause")}>
-								<button type="button" className={cn(INVERTED, "grid size-20 place-items-center [&_svg]:size-8 [&_svg]:fill-current")} aria-label={running ? "Pause" : "Reprendre"} onClick={toggle} {...activityControl("sport.timer.pause")}>
+								<button type="button" className={cn(INVERTED, "grid size-20 place-items-center [&_svg]:size-8 icon-shapes:fill-current")} aria-label={running ? "Pause" : "Reprendre"} onClick={toggle} {...activityControl("sport.timer.pause")}>
 									{running ? <IconPause /> : <IconPlay />}
 								</button>
 							</Tooltip>

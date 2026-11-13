@@ -48,7 +48,7 @@ const HEALTH_ICON: Record<RunHealth, { icon: IconComponent; tone: string }> = {
 /** A result as its health's icon, labelled with its words. */
 export function HealthIcon({ health, label, className }: { health: RunHealth; label: string; className?: string }) {
 	const { icon: Icon, tone } = HEALTH_ICON[health];
-	return <Icon role="img" aria-label={label} className={cn("size-3.5 shrink-0", tone, className)} />;
+	return <Icon aria-hidden={false} aria-label={label} className={cn("size-3.5 shrink-0", tone, className)} />;
 }
 
 /** A run's result as an icon, labelled with the run's words. */

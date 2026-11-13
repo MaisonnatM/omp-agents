@@ -168,7 +168,7 @@ function ReplyPrompt({ to, disabled, onReply }: { to: string; disabled: boolean;
 				<IconArrowShareLeft className="size-4 shrink-0" />
 				<span className="truncate">Reply to {to}…</span>
 			</button>
-			<Button type="button" variant="ghost" size="compact" leadingIcon={IconArrowShareLeft} disabled={disabled} onClick={() => onReply(true)}>
+			<Button type="button" variant="ghost" size="compact" disabled={disabled} onClick={() => onReply(true)}>
 				Reply all
 			</Button>
 		</div>
@@ -256,8 +256,8 @@ export function ThreadDetail({ target, listed, position, onPrevious, onNext, add
 					</Button>
 				</Tooltip>
 				<Tooltip content="Reply all" shortcut={shortcutLabels("emailReplyAll")} disabled={!canReply}>
-					<Button variant="ghost" size="icon-compact" aria-label="Reply all" disabled={!canReply} onClick={() => compose(true)}>
-						<IconArrowShareLeft />
+					<Button variant="ghost" size="compact" disabled={!canReply} onClick={() => compose(true)}>
+						Reply all
 					</Button>
 				</Tooltip>
 				<Tooltip content="Delete" shortcut={shortcutLabels("emailTrash")} disabled={trashing}>

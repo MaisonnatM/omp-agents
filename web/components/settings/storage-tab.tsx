@@ -1,5 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { IconArrowRotateClockwise, IconCheckmark1, IconCircle, IconCrossMedium, IconLoadingCircle, IconTrashCan } from "central-icons";
+import { IconArrowRotateClockwise, IconCheckmark1, IconFormCircle, IconCrossMedium, IconLoadingCircle, IconTrashCan } from "central-icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorText } from "../../../src/json";
 import { CACHE_STEP, CLEANUP_STEPS, isSandboxStep, PREVIEW_SOURCE, PREVIEW_SOURCES, type CleanupStep, type PreviewSource, type Previews, type SandboxPlan, type StorageUsage } from "../../../src/shared/storage";
@@ -77,7 +77,7 @@ function ChecklistRow({ row, status, loading, finished, disabled, checked, onChe
 				<p role="status" className="mt-2 flex items-center gap-2 pl-6 text-xs tabular-nums">
 					{status.state === "running" ? <IconLoadingCircle aria-hidden className="size-3 motion-safe:animate-spin" />
 						: status.state === "done" ? <IconCheckmark1 aria-hidden className="size-3" />
-						: status.state === "failed" ? <IconCrossMedium aria-hidden className="size-3" /> : <IconCircle aria-hidden className="size-3" />}
+						: status.state === "failed" ? <IconCrossMedium aria-hidden className="size-3" /> : <IconFormCircle aria-hidden className="size-3" />}
 					{status.state === "waiting" && finished ? "Not run" : status.text}
 				</p>
 			)}

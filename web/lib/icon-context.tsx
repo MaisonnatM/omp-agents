@@ -3,7 +3,7 @@
 import { createContext, useContext, useMemo, type ComponentType, type ReactNode } from "react";
 
 import type { CentralIconBaseProps } from "central-icons";
-import { IconArrowCornerDownLeft, IconArrowCornerDownRight, IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowRotateCounterClockwise, IconArrowUp, IconBarsThree, IconBell, IconBrain, IconBranch, IconBubble2, IconCalendar1, IconChainLink1, IconCheckmark1, IconChevronBottom, IconChevronGrabberVertical, IconChevronRight, IconCircle, IconCircleInfo, IconCircleRecord, IconClock, IconColorPalette, IconCrossMedium, IconDotGrid1x3Horizontal, IconDotGrid1x3Vertical, IconEmail1, IconEyedropper, IconFileText, IconFolder1, IconFormRectangle, IconGlobe, IconGroup1, IconHeart, IconHome, IconImac, IconImages1, IconInboxEmpty, IconLibrary, IconLightBulb, IconLoader, IconLock, IconMagnifyingGlass, IconMoon, IconPaintBrush, IconPause, IconPencil, IconPlay, IconPlusLarge, IconResize, IconRocket, IconSettingsGear1, IconSettingsSliderHor, IconShield, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide, IconSquareBehindSquare1, IconStar, IconStepForwards, IconSun, IconUser } from "central-icons";
+import { IconArrowCornerDownLeft, IconArrowCornerDownRight, IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowRotateCounterClockwise, IconArrowUp, IconBarsThree, IconBell, IconBrain, IconBranch, IconBubble2, IconCalendar1, IconChainLink1, IconCheckmark1, IconChevronBottom, IconChevronGrabberVertical, IconChevronRight, IconFormCircle, IconCircleInfo, IconRecord, IconClock, IconColorPalette, IconCrossMedium, IconDotGrid1x3Horizontal, IconDotGrid1x3Vertical, IconEmail1, IconEyedropper, IconFileText, IconFolder1, IconFormRectangle, IconGlobe, IconGroup1, IconHeart, IconHome, IconImac, IconImages1, IconInboxEmpty, IconLibrary, IconLightBulb, IconLoader, IconLock, IconMagnifyingGlass, IconMoon, IconPaintBrush, IconPause, IconPencil, IconPlay, IconPlusLarge, IconResize, IconRocket, IconSettingsGear1, IconSettingsSliderHor, IconShield, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide, IconSquareBehindSquare1, IconStar, IconStepForwards, IconSun, IconUser } from "central-icons";
 
 export type IconComponent = ComponentType<CentralIconBaseProps>;
 
@@ -30,12 +30,12 @@ export const defaultIcons: Record<IconName, IconComponent> = {
   "x": IconCrossMedium,
   "copy": IconSquareBehindSquare1,
   "menu": IconBarsThree,
-  "dot": IconCircleRecord,
+  "dot": IconRecord,
   "monitor": IconImac,
   "sun": IconSun,
   "moon": IconMoon,
   "rectangle-horizontal": IconFormRectangle,
-  "circle": IconCircle,
+  "circle": IconFormCircle,
   "square-library": IconLibrary,
   "clock": IconClock,
   "star": IconStar,

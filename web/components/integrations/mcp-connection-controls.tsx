@@ -4,6 +4,7 @@
  * the sign-out question, and the tool list.
  */
 import { IconArrowBoxLeft, IconArrowRotateClockwise, IconChevronRight, IconExclamationCircle, IconLoadingCircle, IconSquareArrowTopRight, IconWifiNoSignal } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useId, useState } from "react";
 import type { McpRemoteStatus, McpTool } from "../../../src/shared/mcp-status";
 import { Badge, type BadgeColor } from "@/components/ui/badge";
@@ -69,7 +70,7 @@ export const SignOutItem = ({ destructive = false, onClick }: { destructive?: bo
 );
 
 interface ConfirmProps {
-	icon: typeof IconArrowBoxLeft;
+	icon: IconComponent;
 	question: string;
 	detail: string;
 	confirm: string;

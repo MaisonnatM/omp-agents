@@ -52,7 +52,7 @@ const AI_SPARKLES = "text-violet-600 dark:text-violet-400";
 
 /** The sparkles on an icon button's top right corner, for an action on what the agent made. */
 function AiBadge() {
-	return <IconSparklesTwo aria-hidden className={cn("pointer-events-none absolute -top-1.5 -right-1.5 size-2.5! fill-current", AI_SPARKLES)} />;
+	return <IconSparklesTwo aria-hidden className={cn("pointer-events-none absolute -top-1.5 -right-1.5 size-2.5! icon-shapes:fill-current", AI_SPARKLES)} />;
 }
 
 /** A toolbar control of the Browser, named by its tooltip. */

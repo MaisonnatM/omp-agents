@@ -131,7 +131,7 @@ export function DetailHeader({ pr, detail, stack, others, sessions, onOpen, onPi
 	const branches = detail && (
 		<span className={cn("flex min-w-0 flex-1 items-center gap-1.5 font-mono text-muted-foreground/70", condensed ? "text-2xs" : "text-xs")}>
 			<BaseBranch detail={detail} stacked={stacked} send={send} />
-			<IconArrowLeft aria-label="receives changes from" className={cn("shrink-0 opacity-60", condensed ? "size-3" : "size-3.5")} />
+			<IconArrowLeft aria-hidden={false} aria-label="receives changes from" className={cn("shrink-0 opacity-60", condensed ? "size-3" : "size-3.5")} />
 			<CopyableCode key={detail.head} value={detail.head} label="Copy pull request branch" onCopy={cwd === null ? undefined : () => releaseBranch(cwd, detail.head)} />
 		</span>
 	);

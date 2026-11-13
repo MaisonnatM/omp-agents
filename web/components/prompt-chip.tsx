@@ -1,5 +1,5 @@
 /** `PromptChip`, a skill, file, ticket, or other reference in a prompt drawn as one unit, in the composer and transcript: an icon and a label in its kind's color. */
-import { IconAiBotHead, IconAt, IconCircleRecord, IconConsole, IconCursorClick, IconFileText, IconFolderOpen, IconMagicWand, IconPullRequest, IconSquareCheck } from "central-icons";
+import { IconAiBotHead, IconAt, IconRecord, IconConsole, IconCursorClick, IconFileText, IconFolderOpen, IconMagicWand, IconPullRequest, IconSquareCheck } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -11,7 +11,7 @@ const CHIP: Record<ChipKind, { icon: IconComponent; name: string; tone: string }
 	command: { icon: IconConsole, name: "Command", tone: "text-violet-700 dark:text-violet-400" },
 	file: { icon: IconFileText, name: "File", tone: "text-sky-700 dark:text-sky-400" },
 	directory: { icon: IconFolderOpen, name: "Folder", tone: "text-sky-700 dark:text-sky-400" },
-	ticket: { icon: IconCircleRecord, name: "Ticket", tone: "text-fuchsia-700 dark:text-fuchsia-400" },
+	ticket: { icon: IconRecord, name: "Ticket", tone: "text-fuchsia-700 dark:text-fuchsia-400" },
 	"pull-request": { icon: IconPullRequest, name: "Pull request", tone: "text-emerald-700 dark:text-emerald-400" },
 	person: { icon: IconAt, name: "Person", tone: "text-rose-700 dark:text-rose-400" },
 	todo: { icon: IconSquareCheck, name: "Todo", tone: "text-amber-700 dark:text-amber-400" },

@@ -53,7 +53,7 @@ export function FilePreviewTile({ file, onRemove, size }: FilePreviewTileProps) 
           // instead of flipping with the surrounding surface.
           className="absolute top-1 right-1 w-5 h-5 rounded-full bg-neutral-900 text-white opacity-0 group-hover/tile:opacity-100 transition-opacity duration-80 flex items-center justify-center cursor-pointer outline-none focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)]"
         >
-          <XIcon size={12} strokeWidth={2.5} />
+          <XIcon size={12} className="icon-shapes:stroke-[2.5]" />
         </button>
       </Tooltip>
     </motion.div>

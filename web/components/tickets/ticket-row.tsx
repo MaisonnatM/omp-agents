@@ -1,5 +1,5 @@
 /** `TicketRow`: a Linear issue's row on the Tickets page, with its status and priority icons and chips. */
-import { IconArrowCornerDownRight, IconArrowRightUpCircle, IconBox, IconCalendar1, IconCircle, IconCircleCheck, IconCircleDashed, IconCircleRecord, IconCircleX, IconContrast, IconDotGrid1x3Horizontal, IconExclamationCircle, IconSpeedHigh, IconSpeedLow, IconSpeedMiddle } from "central-icons";
+import { IconArrowCornerDownRight, IconArrowRightUpCircle, IconBox, IconCalendar1, IconFormCircle, IconCircleCheck, IconCircleDashed, IconRecord, IconCircleX, IconContrast, IconDotGrid1x3Horizontal, IconExclamationCircle, IconSpeedHigh, IconSpeedLow, IconSpeedMiddle } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import type { ReactNode } from "react";
 import type { Ticket, TicketPriority, TicketStatus } from "../../../src/shared/tickets";
@@ -14,10 +14,10 @@ import { QuickActionsMenu } from "../quick-actions";
 
 /** Linear's glyph for each state type, and In Review's own green one. */
 export const STATUS_ICON: Record<StatusKind, [IconComponent, string]> = {
-	review: [IconCircleRecord, "text-green-600 dark:text-green-400"],
+	review: [IconRecord, "text-green-600 dark:text-green-400"],
 	triage: [IconArrowRightUpCircle, "text-orange-500 dark:text-orange-400"],
 	started: [IconContrast, "text-amber-500 dark:text-amber-400"],
-	unstarted: [IconCircle, "text-muted-foreground"],
+	unstarted: [IconFormCircle, "text-muted-foreground"],
 	backlog: [IconCircleDashed, "text-muted-foreground"],
 	completed: [IconCircleCheck, "text-indigo-500 dark:text-indigo-400"],
 	canceled: [IconCircleX, "text-muted-foreground"],

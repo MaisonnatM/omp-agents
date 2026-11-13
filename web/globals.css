@@ -5,6 +5,9 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* A Central icon's shapes, which carry their own stroke-width="1.5" and sit in a mask, so a stroke or fill set on the <svg> never reaches them: `icon-shapes:stroke-2`, `icon-shapes:fill-current`. Leaves out rect, the mask's own backdrop. */
+@custom-variant icon-shapes (& :is(path, circle, ellipse, line, polyline, polygon));
+
 /* What shows only while its `group/reveal` is hovered or holds the focus, and always on a touch screen, which has no hover: a header tab's ×, a page title's trailing controls. */
 @custom-variant revealed {
   @media (hover: hover) {

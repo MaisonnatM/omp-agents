@@ -1,4 +1,4 @@
-import { IconStop, IconStopCircle, IconTrashCan } from "central-icons";
+import { IconPlay, IconStopCircle, IconTrashCan } from "central-icons";
 import { type ReactNode, useState } from "react";
 import type { SignInState } from "../../../src/shared/accounts";
 import { catalogEntry } from "../../../src/shared/mcp-catalog";
@@ -94,7 +94,7 @@ export function McpServerItem({ server }: { server: OwnServer }) {
 			<>
 				{status.kind === "signed-out" ? <ConnectButton signIn={signIn} /> : <Reconnecting signIn={signIn} />}
 				{status.kind === "disabled" && source.editable && (
-					<Button variant="secondary" size="compact" leadingIcon={IconStop} loading={toggling} onClick={() => setEnabled.run(true)}>
+					<Button variant="secondary" size="compact" leadingIcon={IconPlay} loading={toggling} onClick={() => setEnabled.run(true)}>
 						Enable
 					</Button>
 				)}

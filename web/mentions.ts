@@ -1,5 +1,5 @@
 /** The composer's `@` menu: the categories it offers, the query a token asks, and the rows it shows. */
-import { IconBubbleText, IconCalendarDays, IconEmail1, IconEyeSlash, IconFileBend, IconFolder1, IconPullRequest, IconSparklesTwo, IconTicket, IconTodos, IconUser } from "central-icons";
+import { IconBubbleText, IconCalendarDays, IconEmail1, IconRunShortcut, IconFileBend, IconFolder1, IconPullRequest, IconSparklesTwo, IconTicket, IconTodos, IconUser } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { everyWord } from "../src/shared/every-word";
 import { isBotAuthor, pullRequestName, pullRequestUrl, type RepoPullRequests } from "../src/shared/github";
@@ -105,7 +105,7 @@ function source({ list, ...category }: Omit<Category, "searchLimit" | "options">
 	};
 }
 
-const COMPLETION_ICON: Record<CompletionItem["kind"], IconComponent> = { command: IconEyeSlash, skill: IconSparklesTwo, file: IconFileBend, directory: IconFolder1 };
+const COMPLETION_ICON: Record<CompletionItem["kind"], IconComponent> = { command: IconRunShortcut, skill: IconSparklesTwo, file: IconFileBend, directory: IconFolder1 };
 
 /** omp's own suggestion, which carries the draft and caret it leaves; a skill's row reads as its name, since `$` already says skill. */
 export function completionOption(item: CompletionItem): MenuOption {

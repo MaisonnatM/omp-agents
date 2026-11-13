@@ -1,5 +1,6 @@
 /** A pull request's Markdown as GitHub shows it: GitHub's preset with the repository's autolinks and alerts, uploads drawn as images, videos, or attachments, images that open large, and `diff` fences as diffs. */
 import { IconBubbleAlert, IconCircleInfo, IconExclamationTriangle, IconLightBulb, IconPaperclip1, IconSquareArrowTopRight } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { memo, useMemo } from "react";
 import type { Components, ExtraProps } from "react-markdown";
 import { diffFence } from "../../../src/shared/changes";
@@ -15,7 +16,7 @@ const ALERTS = {
 	important: { label: "Important", Icon: IconBubbleAlert, border: "border-purple-500/70", title: "text-purple-600 dark:text-purple-400" },
 	warning: { label: "Warning", Icon: IconExclamationTriangle, border: "border-amber-500/70", title: "text-amber-600 dark:text-amber-500" },
 	caution: { label: "Caution", Icon: IconExclamationTriangle, border: "border-red-500/70", title: "text-red-600 dark:text-red-400" },
-} satisfies Record<GitHubAlert, { label: string; Icon: typeof IconCircleInfo; border: string; title: string }>;
+} satisfies Record<GitHubAlert, { label: string; Icon: IconComponent; border: string; title: string }>;
 
 function Attachment({ url }: { url: string }) {
 	return (

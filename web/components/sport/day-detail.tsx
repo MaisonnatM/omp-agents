@@ -113,7 +113,7 @@ function ExerciseRow({ item: { exercise, load, removed }, onDemo, onTimer }: { i
 					{onDemo && !removed ? (
 						<button type="button" onClick={onDemo} {...activityControl("sport.demo.open")} className="inline-flex items-center gap-1 rounded-sm text-left underline decoration-dotted underline-offset-4 outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">
 							{exercise.name}
-							<IconPlay aria-label="démo" className="size-3 fill-current text-muted-foreground" />
+							<IconPlay aria-hidden={false} aria-label="démo" className="size-3 icon-shapes:fill-current text-muted-foreground" />
 						</button>
 					) : (
 						<span className={removed ? "text-muted-foreground line-through" : undefined}>{exercise.name}</span>
@@ -235,7 +235,7 @@ function CheckRow({ exercise, done, disabled, onDemo, onToggle }: { exercise: Ex
 				{onDemo ? (
 					<button type="button" onClick={onDemo} {...activityControl("sport.demo.open")} className={cn("inline-flex items-center gap-1 self-start rounded-sm text-left underline decoration-dotted underline-offset-4 outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-ring", done && "text-muted-foreground")}>
 						{exercise.name}
-						<IconPlay aria-label="démo" className="size-3 fill-current text-muted-foreground" />
+						<IconPlay aria-hidden={false} aria-label="démo" className="size-3 icon-shapes:fill-current text-muted-foreground" />
 					</button>
 				) : (
 					<span className={cn(done && "text-muted-foreground")}>{exercise.name}</span>

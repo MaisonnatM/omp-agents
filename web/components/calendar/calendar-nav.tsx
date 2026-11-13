@@ -82,7 +82,7 @@ function CalendarItem({ calendar }: { calendar: GoogleCalendar }) {
 					className="flex size-3.5 shrink-0 items-center justify-center rounded-[3px] border-2"
 					style={{ borderColor: calendar.color, backgroundColor: shown ? calendar.color : undefined }}
 				>
-					{shown && <IconCheckmark1 className="size-2.5 text-white" />}
+					{shown && <IconCheckmark1 className="size-2.5 text-white icon-shapes:stroke-[3.5]" />}
 				</span>
 				<span className="truncate">{name}</span>
 			</SidebarMenuButton>

@@ -1,4 +1,4 @@
-import { IconCircleBanSign, IconCircleCheck, IconCircleRecord, IconCircleX, IconLoadingCircle } from "central-icons";
+import { IconCircleBanSign, IconCircleCheck, IconRecord, IconCircleX, IconLoadingCircle } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { useState } from "react";
 import type { CheckRunState, PullRequestCheck } from "../../../../src/shared/github";
@@ -17,9 +17,9 @@ const CHECK_RUN: Record<CheckRunState, { Icon: IconComponent; color: string; lab
 
 const CHECKS_STATE = {
 	failing: CHECK_RUN.failing,
-	pending: { Icon: IconCircleRecord, color: "text-amber-600 dark:text-amber-400/90" },
+	pending: { Icon: IconRecord, color: "text-amber-600 dark:text-amber-400/90" },
 	passing: CHECK_RUN.passing,
-	none: { Icon: IconCircleRecord, color: "text-muted-foreground" },
+	none: { Icon: IconRecord, color: "text-muted-foreground" },
 };
 
 function CheckRow({ check: { name, state, url } }: { check: PullRequestCheck }) {

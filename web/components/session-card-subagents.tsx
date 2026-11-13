@@ -128,7 +128,7 @@ function ArenaLanes({ group, links }: { group: ArenaGroup; links: SubagentLinksV
 			</ul>
 			{(group.judge || group.descendants.length > 0) && (
 				<ul aria-label="Arena judge and helpers" className="mt-1">
-					{group.judge && <SubagentRow agent={group.judge} depth={0} links={links} lead={<IconJudgeGavel aria-label="Judge" className="size-3.5 shrink-0 text-muted-foreground" />} />}
+					{group.judge && <SubagentRow agent={group.judge} depth={0} links={links} lead={<IconJudgeGavel aria-hidden={false} aria-label="Judge" className="size-3.5 shrink-0 text-muted-foreground" />} />}
 					{group.descendants.map(({ agent, depth }) => (
 						<SubagentRow key={agent.id} agent={agent} depth={depth} links={links} />
 					))}

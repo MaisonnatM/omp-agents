@@ -1,4 +1,4 @@
-import { IconChip, IconConsole, IconStorage } from "central-icons";
+import { IconConsole, IconProcessor, IconSdCard, IconStorage } from "central-icons";
 import { useEffect, useMemo, useState } from "react";
 import type { Bot } from "../../src/shared/bots";
 import type { LiveSessionProcesses, SessionProcess } from "../../src/shared/processes";
@@ -35,7 +35,7 @@ function CpuFact({ cpu, titles }: { cpu: string; titles: SessionTitles }) {
 		<Popover {...popover.root}>
 			<PopoverTrigger asChild>
 				<button {...activityControl("status-bar.cpu")} {...popover.trigger} type="button" aria-label={`CPU ${cpu} busy`} className={cn(FACT, "hover:text-foreground")}>
-					<IconChip aria-hidden className="size-3 shrink-0" />
+					<IconProcessor aria-hidden className="size-3 shrink-0" />
 					{cpu}
 				</button>
 			</PopoverTrigger>
@@ -168,7 +168,7 @@ function MachineLoad({ titles }: { titles: SessionTitles }) {
 			{cpu !== null && <CpuFact cpu={cpu} titles={titles} />}
 			<Tooltip content={memory} side="top">
 				<span tabIndex={0} aria-label={memory} className={FACT}>
-					<IconChip aria-hidden className="size-3 shrink-0" />
+					<IconSdCard aria-hidden className="size-3 shrink-0" />
 					{formatBytes(load.memoryAvailable)}
 				</span>
 			</Tooltip>

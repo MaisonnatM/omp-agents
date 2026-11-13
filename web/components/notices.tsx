@@ -124,7 +124,7 @@ function Face({ face }: { face: NoticeFace }) {
 				<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-muted">
 					<OrgIcon org={providerOrg(face.provider)} className="m-auto size-4" fallback={<Icon aria-hidden className="m-auto size-4 text-muted-foreground" />} />
 					<span className={cn(BADGE, "bg-red-500 text-white")}>
-						<Icon aria-hidden className="size-2.5" />
+						<Icon aria-hidden className="size-2.5 icon-shapes:stroke-[2.5]" />
 					</span>
 				</span>
 			);
@@ -134,7 +134,7 @@ function Face({ face }: { face: NoticeFace }) {
 				<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-muted">
 					<BrandMark logo={SERVICE_LOGO[face.service]} className="m-auto size-4" />
 					<span className={cn(BADGE, "bg-red-500 text-white")}>
-						<IconKey1 aria-hidden className="size-2.5" />
+						<IconKey1 aria-hidden className="size-2.5 icon-shapes:stroke-[2.5]" />
 					</span>
 				</span>
 			);
@@ -150,7 +150,7 @@ function Face({ face }: { face: NoticeFace }) {
 			return (
 				<Avatar person={face.person}>
 					<span className={cn(BADGE, tone)}>
-						<Icon aria-hidden className="size-2.5" />
+						<Icon aria-hidden className="size-2.5 icon-shapes:stroke-[2.5]" />
 					</span>
 				</Avatar>
 			);

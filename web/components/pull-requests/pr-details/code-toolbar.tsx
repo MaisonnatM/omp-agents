@@ -1,4 +1,4 @@
-import { IconChevronBottom, IconChevronGrabberVertical, IconChevronGrabberVerticalToward, IconCodeTree, IconLayoutColumn, IconLayoutTopBottom, IconParagraph, IconSettingsSliderHor, IconTextIndentLeft } from "central-icons";
+import { IconChevronBottom, IconChevronGrabberVertical, IconChevronGrabberVerticalToward, IconCodeTree, IconLayoutColumn, IconLayoutTopBottom, IconParagraph, IconSettingsSliderHor, IconLinebreak } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { useState } from "react";
 import type { PullRequestCommit } from "../../../../src/shared/github";
@@ -14,7 +14,7 @@ const DIFF_OPTIONS: readonly { label: string; icon: IconComponent; on: (options:
 	{ label: "Hide whitespace changes", icon: IconParagraph, on: options => options.ignoreWhitespace, pick: options => ({ ignoreWhitespace: !options.ignoreWhitespace }) },
 	{ label: "Stacked diff view", icon: IconLayoutTopBottom, on: options => options.layout === "stacked", pick: () => ({ layout: "stacked" }) },
 	{ label: "Split diff view", icon: IconLayoutColumn, on: options => options.layout === "split", pick: () => ({ layout: "split" }) },
-	{ label: "Wrap lines", icon: IconTextIndentLeft, on: options => options.wrap, pick: options => ({ wrap: !options.wrap }) },
+	{ label: "Wrap lines", icon: IconLinebreak, on: options => options.wrap, pick: options => ({ wrap: !options.wrap }) },
 ];
 
 interface CodeToolbarProps {

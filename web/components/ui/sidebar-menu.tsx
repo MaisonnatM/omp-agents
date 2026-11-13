@@ -326,12 +326,11 @@ const SidebarMenuButton = forwardRef<HTMLButtonElement, SidebarMenuButtonProps>(
         {Icon && (
           <Icon
             size={sizeClasses.icon}
-            strokeWidth={effectiveActive ? 2 : 1.5}
             className={cn(
-              "shrink-0 transition-[color,stroke-width] duration-80",
+              "shrink-0 transition-colors duration-80 icon-shapes:transition-[stroke-width] icon-shapes:duration-80",
               effectiveActive
-                ? "text-foreground"
-                : "text-muted-foreground group-data-[fluid-hover-active]/menu-button:text-foreground group-data-[fluid-hover-active]/menu-button:stroke-2"
+                ? "text-foreground icon-shapes:stroke-2"
+                : "text-muted-foreground group-data-[fluid-hover-active]/menu-button:text-foreground group-data-[fluid-hover-active]/menu-button:icon-shapes:stroke-2"
             )}
           />
         )}
@@ -431,9 +430,9 @@ const SidebarMenuAction = forwardRef<HTMLButtonElement, SidebarMenuActionProps>(
           "focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)]",
           // One icon size across the sidebar: row actions match the leading
           // icons and the section header's actions, all on the size ladder.
-          // Normalize bare icons to the site's 1.5 stroke (library defaults
-          // vary), thickening to 2 on hover — Button's icon-only treatment.
-          "[&_svg]:size-[var(--icon-size)] [&_svg]:shrink-0 [&_svg]:stroke-[1.5] [&_svg]:transition-[stroke-width] [&_svg]:duration-80 hover:[&_svg]:stroke-[2]",
+          // Thicken a bare icon's 1.5 stroke to 2 on hover, Button's
+          // icon-only treatment.
+          "[&_svg]:size-[var(--icon-size)] [&_svg]:shrink-0 icon-shapes:transition-[stroke-width] icon-shapes:duration-80 hover:icon-shapes:stroke-2",
           shape.item,
           // Reveal on the OWN row only: tracks the row's button (its peer).
           showOnHover &&

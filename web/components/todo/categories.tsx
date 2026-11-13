@@ -108,7 +108,7 @@ function ShownCheckbox({ id, name, shown, onToggle }: { id: string; name: string
 				className="absolute left-[3px] top-1/2 z-20 flex size-6 -translate-y-1/2 items-center justify-center rounded-md outline-none hover:bg-hover focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)]"
 			>
 				<span aria-hidden className="flex size-3.5 items-center justify-center rounded-[3px] border-2" style={{ borderColor: color, backgroundColor: shown ? color : undefined }}>
-					{shown && <IconCheckmark1 className="size-2.5 text-white" />}
+					{shown && <IconCheckmark1 className="size-2.5 text-white icon-shapes:stroke-[3.5]" />}
 				</span>
 			</button>
 		</Tooltip>
