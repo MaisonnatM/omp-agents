@@ -13,7 +13,7 @@ export interface TreeDir<T extends { path: string } = ChangedEntry> {
 }
 
 /**
- * The files as folders, directories first and each level by name, which the changes explorer and the notes list share.
+ * The files as folders, directories first and each level by name, as the changes explorer shows them.
  * An absolute path, a file the session changed outside its checkout, hangs under a `/` folder.
  */
 export function folderTree<T extends { path: string }>(files: readonly T[]): TreeDir<T> {
