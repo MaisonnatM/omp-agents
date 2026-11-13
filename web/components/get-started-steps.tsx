@@ -1,5 +1,6 @@
 /** The body of each Get started step: what it sets up, its live state, and the controls that set it up here. */
-import { ArrowRight, Check, CircleAlert, Eye, GitPullRequest, type LucideIcon, Package, RefreshCw, SquareTerminal, Workflow } from "lucide-react";
+import { IconAgentNetwork, IconArrowRight, IconArrowRotateClockwise, IconCheckmark1, IconConsole, IconExclamationCircle, IconEyeOpen, IconPackage, IconPullRequest } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,7 @@ function Command({ value }: { value: string }) {
 function Unavailable({ fact }: { fact: Observation<unknown> }) {
 	if (fact.kind !== "unavailable") return null;
 	return (
-		<Callout tone="warning" icon={CircleAlert}>
+		<Callout tone="warning" icon={IconExclamationCircle}>
 			Cannot check this: {fact.message}
 		</Callout>
 	);
@@ -65,7 +66,7 @@ export function ProviderStep({ providers: { read, error } }: { providers: Polled
 	return (
 		<div className="space-y-5">
 			{connected !== null && connected > 0 && (
-				<Callout tone="info" icon={Check}>
+				<Callout tone="info" icon={IconCheckmark1}>
 					{connected === 1 ? "One provider is connected. Its models are ready for your first session." : `${connected} providers are connected. Their models are ready for your first session.`}
 				</Callout>
 			)}
@@ -78,9 +79,9 @@ export function ProviderStep({ providers: { read, error } }: { providers: Polled
 	);
 }
 
-const ACCESS: readonly { value: TerminalAccess; title: string; summary: string; icon: LucideIcon }[] = [
-	{ value: "control", title: "Control", summary: "Watch terminal sessions here and send them messages.", icon: SquareTerminal },
-	{ value: "view", title: "Read-only", summary: "Watch terminal sessions here without sending them anything.", icon: Eye },
+const ACCESS: readonly { value: TerminalAccess; title: string; summary: string; icon: IconComponent }[] = [
+	{ value: "control", title: "Control", summary: "Watch terminal sessions here and send them messages.", icon: IconConsole },
+	{ value: "view", title: "Read-only", summary: "Watch terminal sessions here without sending them anything.", icon: IconEyeOpen },
 ];
 
 /**
@@ -186,7 +187,7 @@ export function KitStep({ kit }: { kit: Observation<StarterKitStatus> }) {
 			<IntegrationList label="Starter kit">
 				<IntegrationRow
 					name="omp starter kit"
-					mark={<MarkTile icon={Package} name="omp starter kit" />}
+					mark={<MarkTile icon={IconPackage} name="omp starter kit" />}
 					status={<DoneBadge done={done} need="optional" />}
 					summary="Workflows, extensions, model settings, and plugins. Files you changed stay as they are."
 					meta={kitMeta(kit)}
@@ -202,7 +203,7 @@ export function KitStep({ kit }: { kit: Observation<StarterKitStatus> }) {
 					<Button size="compact" variant="outline" render={<a href={hashForSettings("extensions")} />}>Manage installed packages</Button>
 					<Unavailable fact={kit} />
 					{outcome && (
-						<Callout tone={outcome.ok ? "info" : "danger"} icon={outcome.ok ? Check : CircleAlert} role="alert">
+						<Callout tone={outcome.ok ? "info" : "danger"} icon={outcome.ok ? IconCheckmark1 : IconExclamationCircle} role="alert">
 							<p>{outcome.ok ? "Installed. New sessions load its files and settings." : "Installation failed. You can try again."}</p>
 							<details className="mt-1">
 								<summary className="cursor-pointer">Installer output</summary>
@@ -247,13 +248,13 @@ export function PstackRow({ kit, onKitStep }: { kit: Observation<StarterKitStatu
 	return (
 		<IntegrationRow
 			name="pstack"
-			mark={<MarkTile icon={Workflow} name="pstack" />}
+			mark={<MarkTile icon={IconAgentNetwork} name="pstack" />}
 			status={<StatusBadge {...pstackStatus(kit)} />}
 			summary={PSTACK_SUMMARY}
 			meta={pstackMeta(kit)}
 			actions={
 				missing && (
-					<Button size="compact" variant="secondary" trailingIcon={ArrowRight} onClick={onKitStep} {...activityControl("get-started.open-kit")}>
+					<Button size="compact" variant="secondary" trailingIcon={IconArrowRight} onClick={onKitStep} {...activityControl("get-started.open-kit")}>
 						Go to Starter kit
 					</Button>
 				)
@@ -302,7 +303,7 @@ export function GithubRow({ github }: { github: Observation<GithubStatus> }) {
 	return (
 		<IntegrationRow
 			name="GitHub"
-			mark={<MarkTile icon={GitPullRequest} name="GitHub" />}
+			mark={<MarkTile icon={IconPullRequest} name="GitHub" />}
 			status={<StatusBadge {...githubStatus(github)} />}
 			summary={GITHUB_SUMMARY}
 			meta={githubMeta(github)}
@@ -333,7 +334,7 @@ export function GithubRow({ github }: { github: Observation<GithubStatus> }) {
 export function CheckAgain({ onRefresh, refreshing }: { onRefresh: () => void; refreshing: boolean }) {
 	return (
 		<div className="flex justify-end">
-			<Button variant="ghost" size="compact" leadingIcon={RefreshCw} loading={refreshing} onClick={onRefresh} {...activityControl("get-started.refresh")}>
+			<Button variant="ghost" size="compact" leadingIcon={IconArrowRotateClockwise} loading={refreshing} onClick={onRefresh} {...activityControl("get-started.refresh")}>
 				Check again
 			</Button>
 		</div>
@@ -356,7 +357,7 @@ export function SessionStep({ sessions }: { sessions: Observation<boolean> }) {
 	return (
 		<div className="space-y-5">
 			{sessions.kind === "known" && sessions.value && (
-				<Callout tone="info" icon={Check}>
+				<Callout tone="info" icon={IconCheckmark1}>
 					A session is already here. Start another whenever you like.
 				</Callout>
 			)}
@@ -373,7 +374,7 @@ export function SessionStep({ sessions }: { sessions: Observation<boolean> }) {
 								<span className="block text-[13px] font-medium">{title}</span>
 								<span className="block text-[13px] text-pretty text-muted-foreground">{prompt}</span>
 							</span>
-							<ArrowRight aria-hidden className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-out group-hover:translate-x-0.5 motion-reduce:transition-none" />
+							<IconArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-out group-hover:translate-x-0.5 motion-reduce:transition-none" />
 						</button>
 					</li>
 				))}

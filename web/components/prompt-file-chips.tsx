@@ -1,4 +1,4 @@
-import { FileText } from "lucide-react";
+import { IconFileText } from "central-icons";
 import type { PromptFile } from "../../src/shared/prompt-files";
 import { useShape } from "@/lib/shape-context";
 import { cn } from "@/lib/utils";
@@ -23,7 +23,7 @@ export function PromptFileChips({ files, onOpen }: { files: readonly PromptFile[
 			onClick={() => onOpen(file)}
 			className={chip}
 		>
-			<FileText size={14} aria-hidden="true" className="shrink-0" />
+			<IconFileText size={14} aria-hidden="true" className="shrink-0" />
 			<span className="truncate">{file.name}</span>
 		</button>
 	));

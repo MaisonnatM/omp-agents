@@ -1,7 +1,7 @@
 /** What an open row of a Bot's routines card shows: the picked run, the task whole, the schedule to change in place, and Edit and Delete. */
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
-import { Pencil, Trash2 } from "lucide-react";
+import { IconPencil, IconTrashCan } from "central-icons";
 import { useId, useState } from "react";
 import type { Routine, RoutineRun, RoutineTask, TriggerEvent, Weekday } from "../../../src/routines";
 import { minutesOfTimeInput, timeInputValue } from "../../../src/shared/days";
@@ -255,10 +255,10 @@ function Footer({ routine, disabled }: { routine: Routine; disabled: boolean }) 
 	}
 	return (
 		<div className="flex items-center justify-end gap-1">
-			<Button asChild variant="ghost" size="compact" leadingIcon={Pencil}>
+			<Button asChild variant="ghost" size="compact" leadingIcon={IconPencil}>
 				<a href={hashForBotRoutine(botId, { kind: "edit", id })}>Edit</a>
 			</Button>
-			<Button {...activityControl("bots.routine.delete")} variant="ghost" size="compact" leadingIcon={Trash2} disabled={disabled} onClick={() => setConfirming(true)}>
+			<Button {...activityControl("bots.routine.delete")} variant="ghost" size="compact" leadingIcon={IconTrashCan} disabled={disabled} onClick={() => setConfirming(true)}>
 				Delete
 			</Button>
 		</div>

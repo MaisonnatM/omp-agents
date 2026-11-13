@@ -1,7 +1,7 @@
 import * as React from "react"
 import { ContextMenu as ContextMenuPrimitive } from "@base-ui/react/context-menu"
 import { Menu as MenuPrimitive } from "@base-ui/react/menu"
-import { Check, ChevronRight } from "lucide-react"
+import { IconCheckmark1, IconChevronRight } from "central-icons";
 
 import { cn } from "@/lib/utils"
 
@@ -178,7 +178,7 @@ function MenuSubmenuTrigger({
       {children}
       <span className="ml-auto flex min-w-0 items-center gap-1 pl-4 text-muted-foreground">
         {value !== undefined && <span className="truncate">{value}</span>}
-        <ChevronRight aria-hidden />
+        <IconChevronRight />
       </span>
     </MenuPrimitive.SubmenuTrigger>
   )
@@ -246,7 +246,7 @@ function MenuRadioItem({
     >
       {children}
       <MenuPrimitive.RadioItemIndicator keepMounted className="ml-auto pl-4 data-unchecked:invisible">
-        <Check aria-hidden />
+        <IconCheckmark1 />
       </MenuPrimitive.RadioItemIndicator>
     </MenuPrimitive.RadioItem>
   )

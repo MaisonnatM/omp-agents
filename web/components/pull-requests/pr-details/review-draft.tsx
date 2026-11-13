@@ -2,7 +2,7 @@
  * A pull request's Review draft tab: the review a Review session saved, to accept, dismiss, and edit finding by finding,
  * with its verdict and summary; **Preview** shows what posting sends, and **Post review** posts it after a confirmation.
  */
-import { Check, ExternalLink, Eye, Pencil, Send, Trash2, X } from "lucide-react";
+import { IconCheckmark1, IconCrossMedium, IconEyeOpen, IconPencil, IconSend, IconSquareArrowTopRight, IconTrashCan } from "central-icons";
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import { useId, useState } from "react";
@@ -46,11 +46,11 @@ export function ReviewDraftPanel({ draft, headOid }: { draft: ReviewDraft; headO
 		<div className="space-y-6">
 			{posted ? (
 				<p className="text-sm">
-					<Check aria-hidden className="mr-1 inline size-4 align-[-3px] text-emerald-600" />
+					<IconCheckmark1 className="mr-1 inline size-4 align-[-3px] text-emerald-600" />
 					Posted <Age at={posted.at} exact className="tabular-nums" /> ago as {VERDICT_LABELS[draft.verdict].toLowerCase()}.{" "}
 					<a href={posted.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-muted-foreground underline-offset-2 hover:underline">
 						View on GitHub
-						<ExternalLink aria-hidden className="size-3" />
+						<IconSquareArrowTopRight className="size-3" />
 					</a>
 				</p>
 			) : stale ? (
@@ -84,7 +84,7 @@ export function ReviewDraftPanel({ draft, headOid }: { draft: ReviewDraft; headO
 					<>
 						Findings <span className="tabular-nums">{draft.findings.length}</span>
 						{!posted && pending.length > 1 && (
-							<Button variant="ghost" size="compact" className="ml-auto" leadingIcon={Check} onClick={() => edit({ op: "finding-state", pr, ids: pending.map(finding => finding.id), state: "accepted" })}>
+							<Button variant="ghost" size="compact" className="ml-auto" leadingIcon={IconCheckmark1} onClick={() => edit({ op: "finding-state", pr, ids: pending.map(finding => finding.id), state: "accepted" })}>
 								Accept {pending.length} pending
 							</Button>
 						)}
@@ -102,11 +102,11 @@ export function ReviewDraftPanel({ draft, headOid }: { draft: ReviewDraft; headO
 				)}
 			</DetailSection>
 			<div className="flex flex-wrap items-center gap-2">
-				<Button variant="secondary" size="compact" leadingIcon={Eye} active={previewing} onClick={() => setPreviewing(open => !open)}>
+				<Button variant="secondary" size="compact" leadingIcon={IconEyeOpen} active={previewing} onClick={() => setPreviewing(open => !open)}>
 					Preview
 				</Button>
 				{!posted && <PostButton draft={draft} previewUrl={previewUrl} />}
-				<Button variant="ghost" size="compact" leadingIcon={Trash2} className="ml-auto" onClick={() => edit({ op: "discard", pr })}>
+				<Button variant="ghost" size="compact" leadingIcon={IconTrashCan} className="ml-auto" onClick={() => edit({ op: "discard", pr })}>
 					Discard draft
 				</Button>
 			</div>
@@ -157,7 +157,7 @@ function FindingCard({ pr, finding, locked, onEdit }: { pr: PullRequest; finding
 								Unaccept
 							</Button>
 						) : (
-							<Button variant="ghost" size="compact" leadingIcon={Check} onClick={() => setState("accepted")}>
+							<Button variant="ghost" size="compact" leadingIcon={IconCheckmark1} onClick={() => setState("accepted")}>
 								Accept
 							</Button>
 						)}
@@ -166,11 +166,11 @@ function FindingCard({ pr, finding, locked, onEdit }: { pr: PullRequest; finding
 								Restore
 							</Button>
 						) : (
-							<Button variant="ghost" size="compact" leadingIcon={X} onClick={() => setState("dismissed")}>
+							<Button variant="ghost" size="compact" leadingIcon={IconCrossMedium} onClick={() => setState("dismissed")}>
 								Dismiss
 							</Button>
 						)}
-						<Button variant="ghost" size="compact" leadingIcon={Pencil} onClick={() => setEditing(true)}>
+						<Button variant="ghost" size="compact" leadingIcon={IconPencil} onClick={() => setEditing(true)}>
 							Edit
 						</Button>
 					</span>
@@ -285,7 +285,7 @@ function PostButton({ draft, previewUrl }: { draft: ReviewDraft; previewUrl: str
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
 			<PopoverTrigger asChild>
-				<Button variant="primary" size="compact" leadingIcon={Send} loading={post.pending}>
+				<Button variant="primary" size="compact" leadingIcon={IconSend} loading={post.pending}>
 					Post review
 				</Button>
 			</PopoverTrigger>
@@ -306,7 +306,7 @@ function PostButton({ draft, previewUrl }: { draft: ReviewDraft; previewUrl: str
 					<Button variant="ghost" size="compact" onClick={() => setOpen(false)}>
 						Cancel
 					</Button>
-					<Button variant="primary" size="compact" leadingIcon={Send} disabled={!data || data.refusal !== null} loading={post.pending} onClick={() => post.run()}>
+					<Button variant="primary" size="compact" leadingIcon={IconSend} disabled={!data || data.refusal !== null} loading={post.pending} onClick={() => post.run()}>
 						Post review
 					</Button>
 				</div>

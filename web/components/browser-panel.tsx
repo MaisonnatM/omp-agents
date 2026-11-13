@@ -3,7 +3,8 @@
  * tab, where the elements selected and the marks drawn on the page land in the session's composer as one chip and its
  * picture, and a whole page as an image.
  */
-import { AppWindow, ArrowLeft, ArrowRight, Camera, CircleStop, ExternalLink, Eye, type LucideIcon, Maximize2, Minimize2, Monitor, MousePointerClick, Play, Proportions, RotateCw, RotateCwSquare, Server, Smartphone, Sparkles, Tablet, X } from "lucide-react";
+import { IconArrowLeft, IconArrowRight, IconArrowRotateClockwise, IconAspectRatio43, IconCamera1, IconCrossMedium, IconCursorClick, IconExpand, IconEyeOpen, IconImac, IconMinimize, IconPhone, IconPlay, IconRotate, IconServer, IconSparklesTwo, IconSquareArrowTopRight, IconStopCircle, IconTablet, IconWindowApp } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -44,14 +45,14 @@ const CAPTURE_AVAILABLE = typeof window !== "undefined" && typeof window.ompDesk
 const SCREEN_AVAILABLE = typeof window !== "undefined" && typeof window.ompDesktop?.screenBrowser === "function";
 
 /** Each **Screen size**'s icon, which the toolbar button shows for the size picked. */
-const SCREEN_ICONS: Record<ScreenSize, LucideIcon> = { fit: Proportions, mobile: Smartphone, tablet: Tablet, desktop: Monitor };
+const SCREEN_ICONS: Record<ScreenSize, IconComponent> = { fit: IconAspectRatio43, mobile: IconPhone, tablet: IconTablet, desktop: IconImac };
 
 /** The sparkles the page marks agent-made things with, as the notification bell's Updates do. */
 const AI_SPARKLES = "text-violet-600 dark:text-violet-400";
 
 /** The sparkles on an icon button's top right corner, for an action on what the agent made. */
 function AiBadge() {
-	return <Sparkles aria-hidden className={cn("pointer-events-none absolute -top-1.5 -right-1.5 size-2.5! fill-current", AI_SPARKLES)} />;
+	return <IconSparklesTwo className={cn("pointer-events-none absolute -top-1.5 -right-1.5 size-2.5! icon-shapes:fill-current", AI_SPARKLES)} />;
 }
 
 /** A toolbar control of the Browser, named by its tooltip. */
@@ -205,7 +206,7 @@ function BrowserTabStrip({ pages, active, onClose }: { pages: readonly ReviewPag
 				const selected = value === active;
 				// Chrome draws a divider between two tabs that are neither the selected one.
 				const divided = at > 0 && !selected && (tabs[at - 1]?.url ?? APP_TAB) !== active;
-				const Icon = page ? Sparkles : AppWindow;
+				const Icon = page ? IconSparklesTwo : IconWindowApp;
 				return (
 					<div
 						key={value}
@@ -247,7 +248,7 @@ function BrowserTabStrip({ pages, active, onClose }: { pages: readonly ReviewPag
 								className="group/close absolute top-1/2 right-0.5 grid size-6 -translate-y-1/2 place-items-center rounded-full text-muted-foreground opacity-0 group-focus-within/tab:opacity-100 group-hover/tab:opacity-100 hover:text-foreground"
 							>
 								<span className="grid size-4 place-items-center rounded-full group-hover/close:bg-foreground/10">
-									<X aria-hidden className="size-3" />
+									<IconCrossMedium className="size-3" />
 								</span>
 							</button>
 						)}
@@ -299,7 +300,7 @@ function ScreenSizeMenu({ screen, onScreen }: { screen: ScreenChoice; onScreen: 
 					<>
 						<MenuSeparator />
 						<MenuItem {...activityControl("browser.rotate")} onClick={() => onScreen({ ...screen, landscape: !screen.landscape })}>
-							<RotateCwSquare />
+							<IconRotate />
 							{screen.landscape ? "Rotate to portrait" : "Rotate to landscape"}
 						</MenuItem>
 					</>
@@ -401,13 +402,13 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 			{/* In a narrow Browser, such as the sidebar at its default width, the address field takes a row of its own below the buttons. */}
 			<div className="flex min-h-9 shrink-0 flex-wrap items-center gap-0.5 border-b border-border px-1.5 @max-[24rem]/browser:pt-1 @max-[16rem]/browser:gap-0">
 				<ToolbarButton label="Back" control="browser.back" disabled={!webview.ready || !webview.history.back} onClick={webview.back}>
-					<ArrowLeft />
+					<IconArrowLeft />
 				</ToolbarButton>
 				<ToolbarButton label="Forward" control="browser.forward" disabled={!webview.ready || !webview.history.forward} onClick={webview.forward}>
-					<ArrowRight />
+					<IconArrowRight />
 				</ToolbarButton>
 				<ToolbarButton label="Reload" control="browser.reload" disabled={!webview.ready} onClick={webview.reload}>
-					<RotateCw />
+					<IconArrowRotateClockwise />
 				</ToolbarButton>
 				<form
 					className="mx-1 min-w-0 flex-1 @max-[24rem]/browser:order-last @max-[24rem]/browser:mx-0 @max-[24rem]/browser:basis-full @max-[24rem]/browser:pb-1.5"
@@ -429,7 +430,7 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 				<DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
 					<Tooltip content="Dev servers this session runs" side="bottom">
 						<DropdownMenuTrigger {...activityControl("browser.server")} render={<Button variant="ghost" size="icon-compact" aria-label="Dev servers" />}>
-							<Server />
+							<IconServer />
 						</DropdownMenuTrigger>
 					</Tooltip>
 					<DropdownMenuContent align="end" className="max-w-96">
@@ -443,12 +444,12 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 						))}
 						<MenuSeparator />
 						<MenuItem {...activityControl("browser.start-server")} disabled={startServer.pending} onClick={() => startServer.run()}>
-							<Play />
+							<IconPlay />
 							{startServer.pending ? "Starting dev server…" : "Start dev server"}
 						</MenuItem>
 						{servers.length === 1 && (
 							<MenuItem {...activityControl("browser.stop-server")} disabled={stopServer.pending} onClick={() => stopServer.run(servers[0])}>
-								<CircleStop />
+								<IconStopCircle />
 								<span className="flex-1">{stopServer.pending ? "Stopping dev server…" : "Stop dev server"}</span>
 								<span className="font-mono text-xs text-muted-foreground">{servers[0].ports.map(port => `:${port}`).join(" ")}</span>
 							</MenuItem>
@@ -456,7 +457,7 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 						{servers.length > 1 && (
 							<MenuSubmenu>
 								<MenuSubmenuTrigger {...activityControl("browser.stop-server")} disabled={stopServer.pending}>
-									<CircleStop />
+									<IconStopCircle />
 									{stopServer.pending ? "Stopping dev server…" : "Stop dev server"}
 								</MenuSubmenuTrigger>
 								<MenuSubmenuContent className="max-w-96">
@@ -479,12 +480,12 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 						pressed={picking.mode !== null}
 						onClick={() => picking.stop() || picking.choose("select")}
 					>
-						<MousePointerClick />
+						<IconCursorClick />
 					</ToolbarButton>
 				)}
 				{CAPTURE_AVAILABLE && (
 					<ToolbarButton label="Screenshot" control="browser.screenshot" disabled={!webview.ready} onClick={() => void picking.screenshot()}>
-						<Camera />
+						<IconCamera1 />
 					</ToolbarButton>
 				)}
 				{SCREEN_AVAILABLE && <ScreenSizeMenu screen={screen} onScreen={onScreen} />}
@@ -496,18 +497,18 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 						disabled={false}
 						onClick={onReview}
 					>
-						<Eye />
+						<IconEyeOpen />
 					</ToolbarButton>
 				)}
 				<MoreActionsMenu name="the Browser">
 					<MenuItem {...activityControl("browser.maximize")} onClick={() => setMaximized(!maximized)}>
-						{maximized ? <Minimize2 /> : <Maximize2 />}
+						{maximized ? <IconMinimize /> : <IconExpand />}
 						{maximized ? "Restore Browser" : "Maximize Browser"}
 						{maximized && <MenuShortcut>{shortcutLabels("browserRestore").join(" ")}</MenuShortcut>}
 					</MenuItem>
 					{mounted && (
 						<MenuLinkItem {...activityControl("browser.open-in-browser")} href={webview.address} target="_blank" rel="noopener noreferrer">
-							<ExternalLink />
+							<IconSquareArrowTopRight />
 							Open in default browser
 						</MenuLinkItem>
 					)}
@@ -520,14 +521,14 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 			)}
 			{webview.src === null ? (
 				<div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-sm text-muted-foreground">
-					<Server aria-hidden className="size-6 text-muted-foreground/60" />
+					<IconServer className="size-6 text-muted-foreground/60" />
 					<p>No dev server found for this session.</p>
 					<p className="text-xs text-muted-foreground/80">Start one, or type its address above.</p>
 					<Button
 						{...activityControl("browser.start-server")}
 						variant="outline"
 						size="sm"
-						leadingIcon={Play}
+						leadingIcon={IconPlay}
 						loading={startServer.pending}
 						className="mt-1"
 						onClick={() => startServer.run()}

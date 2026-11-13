@@ -1,5 +1,5 @@
 /** The command palette's bottom bar, with its footer buttons. */
-import type { LucideIcon } from "lucide-react";
+import type { IconComponent } from "@/lib/icon-context";
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { ENTER } from "../../command-palette";
@@ -19,7 +19,7 @@ export function FooterButton({ className, ...props }: ComponentProps<"button">) 
 
 interface PaletteFooterProps {
 	/** The view's icon and title. */
-	icon: LucideIcon;
+	icon: IconComponent;
 	title: string;
 	/** The highlighted item's first action, which Enter runs, or `null` while none is highlighted. */
 	primary: string | null;

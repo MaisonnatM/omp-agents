@@ -1,4 +1,4 @@
-import { RefreshCw } from "lucide-react";
+import { IconArrowRotateClockwise } from "central-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -81,7 +81,7 @@ export function SourceControlTab({ active }: { active: boolean }) {
 				title="Command-line tools"
 				meta="The command-line tool the dashboard and your sessions reach GitHub through."
 				actions={
-					<Button variant="ghost" size="compact" leadingIcon={RefreshCw} onClick={read.reload}>
+					<Button variant="ghost" size="compact" leadingIcon={IconArrowRotateClockwise} onClick={read.reload}>
 						Check again
 					</Button>
 				}

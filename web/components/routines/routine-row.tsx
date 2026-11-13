@@ -1,6 +1,6 @@
 /** One row of a Bot's routines card: its name, Run now, and switch; when it runs; what starts it and what it does, with its run strip; and, open, the rest in place. */
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, ChevronRight, Play } from "lucide-react";
+import { IconArrowRight, IconChevronRight, IconPlay } from "central-icons";
 import { type KeyboardEvent, type MouseEvent, useId, useState } from "react";
 import { type Routine, type RoutineRun, runsHere } from "../../../src/routines";
 import { Button } from "@/components/ui/button";
@@ -173,13 +173,13 @@ export function RoutineRow({ routine, botName, open, connected, now }: RoutineRo
 						className="-ml-1.5 inline-flex min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
 					>
 						<span className="truncate">{name}</span>
-						<ChevronRight aria-hidden className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", open && "rotate-90")} />
+						<IconChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", open && "rotate-90")} />
 					</button>
 					<div className="ml-auto flex shrink-0 items-center gap-3">
 						<Button
 							variant="ghost"
 							size="compact"
-							leadingIcon={Play}
+							leadingIcon={IconPlay}
 							aria-label={`Run ${name} now`}
 							disabled={!connected || running}
 							loading={runNow.pending}
@@ -232,7 +232,7 @@ export function RoutineRow({ routine, botName, open, connected, now }: RoutineRo
 										{TRIGGER_MARKS[kind].logo}
 									</span>
 								))}
-								<ArrowRight className="size-3" />
+								<IconArrowRight className="size-3" />
 							</span>
 						)}
 						<span className="sr-only">{marksSentence(routine)}</span>

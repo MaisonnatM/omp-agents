@@ -3,7 +3,7 @@
  * highlights only once it nears the view, and the browser skips laying out the ones far from it, so a list of thousands
  * of files costs one placeholder each until you reach it.
  */
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { IconChevronBottom, IconChevronRight } from "central-icons";
 import { memo, type Ref, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import type { ChangedEntry } from "../../../src/shared/changes";
 import { CLICK_TO_LOAD_LINES, changedLines, estimatedRows, lastAtOrAbove, withMember } from "../../changes-model";
@@ -145,7 +145,7 @@ const FileSection = memo(function FileSection({ file, url, version, watchNear, f
 		if (reached || !ref.current) return;
 		return watchNear(ref.current, () => setReached(true));
 	}, [reached, watchNear]);
-	const Chevron = folded ? ChevronRight : ChevronDown;
+	const Chevron = folded ? IconChevronRight : IconChevronBottom;
 	const height = estimatedRows(file) * ROW_HEIGHT;
 	return (
 		<section ref={ref} aria-label={file.path} className="border-b border-border">

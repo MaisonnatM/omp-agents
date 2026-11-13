@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { IconMagnifyingGlass } from "central-icons";
 import { memo, type ReactNode, useContext, useMemo } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { BotId, BotLast } from "../../src/shared/bots";
@@ -155,7 +155,7 @@ export const AppSidebar = memo(function AppSidebar({
 				<span aria-hidden className="text-[15px] font-semibold tracking-tight">omp</span>
 				<Tooltip content="Command menu" shortcut={shortcutLabels("switcher")} side="bottom">
 					<Button {...activityControl("sidebar.command-menu")} variant="ghost" size="icon-compact" className="ml-auto shrink-0 text-muted-foreground" aria-label="Command menu" onClick={onSearch}>
-						<Search />
+						<IconMagnifyingGlass />
 					</Button>
 				</Tooltip>
 				{/* The sidebar's toggle rides over this corner, from `DashboardSidebar`, so it can glide to the strip a hidden sidebar leaves. */}

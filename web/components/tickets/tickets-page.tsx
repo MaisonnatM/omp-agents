@@ -1,5 +1,5 @@
 /** `TicketsPage`: your assigned Linear issues grouped by workflow state, as Linear's My issues lists them, with the open one beside them. */
-import { ListTodo, Plus } from "lucide-react";
+import { IconPlusLarge, IconTodos } from "central-icons";
 import { useRef } from "react";
 import type { RosterHost } from "../../../src/shared/sessions";
 import type { Ticket, TicketDetail } from "../../../src/shared/tickets";
@@ -116,7 +116,7 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 			onRefresh={() => void ticketsStore.refresh(null, { fresh: true })}
 			actions={
 				<Tooltip content="Create a Linear issue, assigned to you" shortcut={[...shortcutLabels("ticketsNew"), ...shortcutLabels("newTicket")]} side="bottom">
-					<Button variant="ghost" size="compact" leadingIcon={Plus} onClick={() => openNewTicket("")}>
+					<Button variant="ghost" size="compact" leadingIcon={IconPlusLarge} onClick={() => openNewTicket("")}>
 						New ticket
 					</Button>
 				</Tooltip>
@@ -127,7 +127,7 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 					widthKey="omp-agents.tickets-list-width"
 					resizeLabel="Resize the ticket list"
 					detailLabel="Open issue"
-					empty={{ icon: ListTodo, title: "No issue open", hint: "Click one to see its details here." }}
+					empty={{ icon: IconTodos, title: "No issue open", hint: "Click one to see its details here." }}
 					list={
 						<div className="space-y-1 px-2 pt-2 pb-6">
 							{quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}

@@ -1,5 +1,5 @@
 /** `TicketFields`: a Linear issue's status, priority, assignee, due date, labels, and project pickers. */
-import { Box, Calendar, CircleDashed, CircleUser, SignalHigh, Tag } from "lucide-react";
+import { IconBox, IconCalendar1, IconCircleDashed, IconCirclePerson, IconSpeedHigh, IconTag } from "central-icons";
 import { useState } from "react";
 import type { Ticket, TicketDetail, TicketFieldValues, TicketOptions } from "../../../src/shared/tickets";
 import { putJson } from "../../api";
@@ -53,13 +53,13 @@ export function TicketFields({ ticket, detail, edit, saveError }: TicketFieldsPr
 					Linear did not take the change: {saveError}
 				</p>
 			)}
-			<MetaRow icon={CircleDashed} label="Status">
+			<MetaRow icon={IconCircleDashed} label="Status">
 				<TicketStatusPicker {...team} value={ticket} onChange={status => save({ state: status.status }, status)} />
 			</MetaRow>
-			<MetaRow icon={SignalHigh} label="Priority">
+			<MetaRow icon={IconSpeedHigh} label="Priority">
 				<TicketPriorityPicker look="row" value={ticket.priority} disabled={!detail} onChange={priority => save({ priority }, { priority })} />
 			</MetaRow>
-			<MetaRow icon={CircleUser} label="Assignee">
+			<MetaRow icon={IconCirclePerson} label="Assignee">
 				<TicketAssigneePicker
 					{...team}
 					value={detail ? detail.assignee : undefined}
@@ -68,13 +68,13 @@ export function TicketFields({ ticket, detail, edit, saveError }: TicketFieldsPr
 					}}
 				/>
 			</MetaRow>
-			<MetaRow icon={Calendar} label="Due">
+			<MetaRow icon={IconCalendar1} label="Due">
 				<DuePicker look="row" dueDate={ticket.dueDate} disabled={!detail} onChange={dueDate => save({ dueDate }, { dueDate })} />
 			</MetaRow>
-			<MetaRow icon={Tag} label="Labels">
+			<MetaRow icon={IconTag} label="Labels">
 				<TicketLabelsPicker {...team} value={ticket.labels} onChange={labels => save({ labels: labels.map(label => label.name) }, { labels })} />
 			</MetaRow>
-			<MetaRow icon={Box} label="Project">
+			<MetaRow icon={IconBox} label="Project">
 				<TicketProjectPicker {...team} value={ticket.project} onChange={project => save({ project }, { project })} />
 			</MetaRow>
 		</section>

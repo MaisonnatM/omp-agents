@@ -1,5 +1,5 @@
 /** The subagent header's crumb styles, and a session header's controls: its branch, its Linear issues, and its pull requests. */
-import { Check, ChevronDown, Copy, GitPullRequest, Layers } from "lucide-react";
+import { IconCheckmark1, IconChevronBottom, IconLayersTwo, IconPullRequest, IconSquareBehindSquare1 } from "central-icons";
 import { Fragment, useEffect, useState } from "react";
 import { type LinkedPullRequest, prKey, type StackedPullRequest } from "../../src/shared/github";
 import type { SessionFacts } from "../../src/shared/sessions";
@@ -36,7 +36,7 @@ export function SessionMeta({ facts }: { facts: Pick<SessionFacts, "tickets" | "
 /** A session header's ID, as an icon button right after its title that copies the ID. */
 export function SessionIdCopy({ id }: { id: string }) {
 	const { copied, copy } = useCopy();
-	const Icon = copied ? Check : Copy;
+	const Icon = copied ? IconCheckmark1 : IconSquareBehindSquare1;
 	const label = copied ? "Copied" : `Copy session ID ${id}`;
 	return (
 		<Tooltip content={label}>
@@ -65,7 +65,7 @@ function PullRequestButton({ pullRequests }: { pullRequests: LinkedPullRequest[]
 			others={others}
 			align="end"
 			trigger={open => (
-				<Button variant="secondary" size="compact" leadingIcon={stacked ? Layers : GitPullRequest} trailingIcon={ChevronDown} active={open}>
+				<Button variant="secondary" size="compact" leadingIcon={stacked ? IconLayersTwo : IconPullRequest} trailingIcon={IconChevronBottom} active={open}>
 					{stacked ? (
 						<>
 							Stack <span className="text-muted-foreground tabular-nums">· {stacked.stack.length}</span>
@@ -100,7 +100,7 @@ function TicketMenu({ tickets }: { tickets: string[] }) {
 	return (
 		<DropdownMenu open={open} onOpenChange={setOpen}>
 			<Tooltip content={more > 0 ? `This session's ${tickets.length} Linear issues` : `Linear issue ${first}`} forceOpen={open ? false : undefined} side="bottom">
-				<DropdownMenuTrigger render={<Button variant="secondary" size="compact" leadingIcon={TicketsIcon} trailingIcon={ChevronDown} active={open} />}>
+				<DropdownMenuTrigger render={<Button variant="secondary" size="compact" leadingIcon={TicketsIcon} trailingIcon={IconChevronBottom} active={open} />}>
 					{first}
 					{more > 0 && <span className="text-muted-foreground">+{more}</span>}
 				</DropdownMenuTrigger>

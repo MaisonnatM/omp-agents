@@ -1,7 +1,8 @@
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import { ToggleSwitch } from "../toggle-switch";
-import { type LucideIcon, Monitor, Moon, Sun } from "lucide-react";
+import { IconImac, IconMoon, IconSun } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { useContext } from "react";
 import { MCP_SERVICES } from "../../../src/shared/accounts";
 import { usePinnedSkill } from "../../pinned-skill";
@@ -22,10 +23,10 @@ import { useEditableRead } from "../../editable-read";
 import { type ProcessSettings, STOP_IDLE_CHOICES } from "../../../src/shared/processes";
 import { NOTIFICATION_SOUNDS, type NotificationSound } from "../../../src/shared/desktop-bridge";
 
-const THEME_OPTIONS: Record<Theme, [string, LucideIcon]> = {
-	system: ["System", Monitor],
-	light: ["Light", Sun],
-	dark: ["Dark", Moon],
+const THEME_OPTIONS: Record<Theme, [string, IconComponent]> = {
+	system: ["System", IconImac],
+	light: ["Light", IconSun],
+	dark: ["Dark", IconMoon],
 };
 
 function ActivitySwitch({ label, shortcut, checked, onToggle }: { label: string; shortcut?: ShortcutId; checked: boolean; onToggle: () => void }) {

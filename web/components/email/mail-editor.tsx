@@ -20,7 +20,7 @@ import {
 	type LexicalNode,
 	type TextFormatType,
 } from "lexical";
-import { Bold, Italic, Link, List, ListOrdered, Maximize2, Minimize2, Quote, Trash2, Underline, X } from "lucide-react";
+import { IconBold, IconChainLink1, IconCrossMedium, IconExpand, IconItalic, IconListBullets, IconMinimize, IconNumberedList, IconOpenQuote1, IconTrashCan, IconUnderline } from "central-icons";
 import { type KeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useState } from "react";
 import type { MailDraft, MailPerson } from "../../../src/shared/gmail";
 import { Button } from "@/components/ui/button";
@@ -86,7 +86,7 @@ function PeopleField({ label, people, onChange, disabled, autoFocus, trailing }:
 							onClick={() => onChange(people.filter(other => other !== person))}
 							className="rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
 						>
-							<X className="size-3.5" />
+							<IconCrossMedium className="size-3.5" />
 						</button>
 					</li>
 				))}
@@ -192,25 +192,25 @@ function Toolbar({ editor, disabled }: { editor: LexicalEditor; disabled: boolea
 	return (
 		<div role="toolbar" aria-label="Formatting" className="flex items-center gap-0.5">
 			<ToolButton label="Bold" keys={["⌘", "B"]} pressed={formats.bold} disabled={disabled} onClick={format("bold")}>
-				<Bold />
+				<IconBold />
 			</ToolButton>
 			<ToolButton label="Italic" keys={["⌘", "I"]} pressed={formats.italic} disabled={disabled} onClick={format("italic")}>
-				<Italic />
+				<IconItalic />
 			</ToolButton>
 			<ToolButton label="Underline" keys={["⌘", "U"]} pressed={formats.underline} disabled={disabled} onClick={format("underline")}>
-				<Underline />
+				<IconUnderline />
 			</ToolButton>
 			<ToolButton label={formats.link ? "Remove link" : "Link"} pressed={formats.link} disabled={disabled} onClick={link}>
-				<Link />
+				<IconChainLink1 />
 			</ToolButton>
 			<ToolButton label="Bulleted list" pressed={formats.bullet} disabled={disabled} onClick={() => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined)}>
-				<List />
+				<IconListBullets />
 			</ToolButton>
 			<ToolButton label="Numbered list" pressed={formats.number} disabled={disabled} onClick={() => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined)}>
-				<ListOrdered />
+				<IconNumberedList />
 			</ToolButton>
 			<ToolButton label="Quote" pressed={formats.quote} disabled={disabled} onClick={quote}>
-				<Quote />
+				<IconOpenQuote1 />
 			</ToolButton>
 		</div>
 	);
@@ -327,7 +327,7 @@ function Editor({ draft: { document: mail, phase }, edit, toLabel, withSubject, 
 			{onExpand && (
 				<Tooltip content={expanded ? "Shrink" : "Expand"}>
 					<Button type="button" variant="ghost" size="icon-compact" aria-label={expanded ? "Shrink" : "Expand"} onClick={() => onExpand(!expanded)}>
-						{expanded ? <Minimize2 /> : <Maximize2 />}
+						{expanded ? <IconMinimize /> : <IconExpand />}
 					</Button>
 				</Tooltip>
 			)}
@@ -369,7 +369,7 @@ function Editor({ draft: { document: mail, phase }, edit, toLabel, withSubject, 
 				<Toolbar editor={editor} disabled={sending} />
 				<Tooltip content="Discard draft">
 					<Button type="button" variant="ghost" size="icon-compact" aria-label="Discard draft" disabled={sending} onClick={discard}>
-						<Trash2 />
+						<IconTrashCan />
 					</Button>
 				</Tooltip>
 				<span className="ml-auto hidden text-xs text-muted-foreground sm:inline">⌘↵ to send · Esc to close</span>

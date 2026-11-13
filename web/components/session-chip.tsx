@@ -1,5 +1,5 @@
 /** `SessionChip`, a small chip naming a session on a pull request or issue, and `LiveSessionsMenu`, a dropdown of the sessions on an item. */
-import { Bot, ChevronDown } from "lucide-react";
+import { IconAiBotHead, IconChevronBottom } from "central-icons";
 import type { MouseEvent } from "react";
 import type { HostStatus, RosterHost, View } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,7 @@ export function SessionChip({ label, status, title, filled, compact = false, onC
 					compact && "gap-1 px-1",
 				)}
 			>
-				{compact && <Bot aria-hidden className="size-3 shrink-0 text-muted-foreground" />}
+				{compact && <IconAiBotHead className="size-3 shrink-0 text-muted-foreground" />}
 				{status && <StatusDot status={status} />}
 				<span className={compact ? "sr-only" : "truncate"}>{label}</span>
 			</button>
@@ -49,7 +49,7 @@ export function LiveSessionsMenu({ hosts, onOpen }: { hosts: RosterHost[]; onOpe
 	const count = `${hosts.length} ${hosts.length === 1 ? "session" : "sessions"}`;
 	return (
 		<DropdownMenu>
-			<DropdownMenuTrigger render={<Button variant="secondary" size="compact" leadingIcon={Bot} trailingIcon={ChevronDown} aria-label={`${count} working on it`} />}>
+			<DropdownMenuTrigger render={<Button variant="secondary" size="compact" leadingIcon={IconAiBotHead} trailingIcon={IconChevronBottom} aria-label={`${count} working on it`} />}>
 				<span className="tabular-nums">{count}</span>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end" className="max-w-80">

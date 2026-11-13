@@ -1,4 +1,4 @@
-import { ExternalLink, Mail, SquareArrowOutUpRight, SquarePen, Trash2 } from "lucide-react";
+import { IconEditBig, IconEmail1, IconSquareArrowTopRight, IconTrashCan } from "central-icons";
 import { useEffect, useState } from "react";
 import { errorText } from "../../../src/json";
 import { type AccountId, anyCallable, callable, type GoogleAccount } from "../../../src/shared/accounts";
@@ -71,16 +71,16 @@ function ThreadRow({ thread, open, mailbox, onTrash }: { thread: MailThread; ope
 			</ContextMenuTrigger>
 			<ContextMenuContent className="min-w-48">
 				<MenuLinkItem href={href}>
-					<SquareArrowOutUpRight />
+					<IconSquareArrowTopRight />
 					Open
 				</MenuLinkItem>
 				<MenuLinkItem href={thread.url} target="_blank" rel="noreferrer">
-					<ExternalLink />
+					<IconSquareArrowTopRight />
 					Open in Gmail
 				</MenuLinkItem>
 				<MenuSeparator />
 				<MenuItem variant="destructive" onClick={() => onTrash(thread)}>
-					<Trash2 />
+					<IconTrashCan />
 					Delete
 				</MenuItem>
 			</ContextMenuContent>
@@ -250,7 +250,7 @@ export function EmailPage({ target, space }: { target: EmailRoute["target"]; spa
 			onRefresh={() => void gmailStore.refresh(null, { fresh: true })}
 			actions={
 				<Tooltip content="New mail" shortcut={shortcutLabels("emailCompose")}>
-					<Button variant="secondary" size="compact" leadingIcon={SquarePen} render={<a href={hashForEmail("new")} />}>
+					<Button variant="secondary" size="compact" leadingIcon={IconEditBig} render={<a href={hashForEmail("new")} />}>
 						Compose
 					</Button>
 				</Tooltip>
@@ -260,7 +260,7 @@ export function EmailPage({ target, space }: { target: EmailRoute["target"]; spa
 				widthKey="omp-agents.email-list-width"
 				resizeLabel="Resize the conversation list"
 				detailLabel={target === "new" ? "New mail" : "Open conversation"}
-				empty={{ icon: Mail, title: "No conversation open", hint: `Click one, or focus one with ${shortcutKeys("emailNext")} and press Enter.` }}
+				empty={{ icon: IconEmail1, title: "No conversation open", hint: `Click one, or focus one with ${shortcutKeys("emailNext")} and press Enter.` }}
 				list={
 					<div className="space-y-2 p-2">
 						{failed.map(account => (

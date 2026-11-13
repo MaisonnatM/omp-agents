@@ -1,7 +1,7 @@
 "use client";
 
 import { atom, useAtom } from "jotai";
-import { Check, ChevronDown, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { IconCheckmark1, IconChevronBottom, IconChevronLeft, IconChevronRight } from "central-icons";
 import {
   createContext,
   type ReactNode,
@@ -106,7 +106,7 @@ const Combobox = <T extends number,>({
         <Button
           aria-expanded={open}
           className={cn("px-2 font-semibold text-[15px] text-foreground capitalize", className)}
-          trailingIcon={ChevronDown}
+          trailingIcon={IconChevronBottom}
           variant="ghost"
         >
           {data.find((item) => item.value === value)?.label}
@@ -134,7 +134,7 @@ const Combobox = <T extends number,>({
                   }}
                   value={item.value.toString()}
                 >
-                  <Check
+                  <IconCheckmark1
                     className={cn(
                       "mr-2 h-4 w-4",
                       value === item.value ? "opacity-100" : "opacity-0"
@@ -264,7 +264,7 @@ export const CalendarDatePagination = ({
         size="icon"
         variant="ghost"
       >
-        <ChevronLeftIcon size={16} />
+        <IconChevronLeft size={16} />
       </Button>
       <Button
         aria-label="Next month"
@@ -272,7 +272,7 @@ export const CalendarDatePagination = ({
         size="icon"
         variant="ghost"
       >
-        <ChevronRightIcon size={16} />
+        <IconChevronRight size={16} />
       </Button>
     </div>
   );

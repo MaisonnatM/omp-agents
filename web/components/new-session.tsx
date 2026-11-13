@@ -1,4 +1,4 @@
-import { Lock, LockOpen, Sparkles, X } from "lucide-react";
+import { IconCrossMedium, IconLock, IconSparklesTwo, IconUnlocked } from "central-icons";
 import { type KeyboardEvent, useContext, useRef, useState } from "react";
 import { RetroGrid } from "@/components/dithercn/retro-grid";
 import type { BranchChoice } from "../../src/shared/git";
@@ -296,7 +296,7 @@ function SkillToggle({ name, state, onToggle, disabled }: { name: string; state:
 			<Button
 				variant="ghost"
 				size="compact"
-				leadingIcon={Sparkles}
+				leadingIcon={IconSparklesTwo}
 				aria-pressed={state === "on"}
 				aria-label={`Skill ${name}`}
 				onClick={onToggle}
@@ -324,9 +324,9 @@ function PrivatePill({ on, onToggle, disabled }: { on: boolean; onToggle: () => 
 					on ? "bg-foreground text-background ring-foreground" : "text-muted-foreground hover:bg-hover hover:text-foreground",
 				)}
 			>
-				{on ? <Lock aria-hidden className="size-3.5" /> : <LockOpen aria-hidden className="size-3.5" />}
+				{on ? <IconLock className="size-3.5" /> : <IconUnlocked className="size-3.5" />}
 				Private
-				{on && <X aria-hidden className="size-3" />}
+				{on && <IconCrossMedium className="size-3" />}
 			</button>
 		</Tooltip>
 	);
@@ -336,7 +336,7 @@ function PrivatePill({ on, onToggle, disabled }: { on: boolean; onToggle: () => 
 function NewSessionWelcome({ folder, personal, isPrivate }: { folder: string; personal: boolean; isPrivate: boolean }) {
 	return (
 		<div className="m-auto flex w-full max-w-conversation flex-col items-center px-6 py-10 text-center" data-empty-conversation>
-			{isPrivate ? <Lock aria-hidden="true" className="size-7" /> : <AppMark className="size-8" />}
+			{isPrivate ? <IconLock aria-hidden="true" className="size-7" /> : <AppMark className="size-8" />}
 			<h2 className="mt-5 max-w-lg font-serif text-[2rem] leading-tight font-normal tracking-tight text-balance">
 				{personal ? (
 					"What can I help with?"

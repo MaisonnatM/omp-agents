@@ -237,11 +237,11 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             <>
               <span className="flex items-center justify-center gap-[inherit] opacity-0">
                 {LeadingIcon && !isIconOnly && (
-                  <LeadingIcon size={iconSize} strokeWidth={2} />
+                  <LeadingIcon size={iconSize} className="icon-shapes:stroke-2" />
                 )}
                 {label}
                 {TrailingIcon && !isIconOnly && (
-                  <TrailingIcon size={iconSize} strokeWidth={2} />
+                  <TrailingIcon size={iconSize} className="icon-shapes:stroke-2" />
                 )}
               </span>
               <span className="absolute inset-0 flex items-center justify-center">
@@ -249,7 +249,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
               </span>
             </>
           ) : isIconOnly ? (
-            <span className="[&_svg]:stroke-[1.5] [&_svg]:transition-[stroke-width] [&_svg]:duration-80 group-hover:[&_svg]:stroke-[2]">
+            <span className="group-hover:icon-shapes:stroke-2">
               {label}
             </span>
           ) : (
@@ -257,8 +257,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
               {LeadingIcon && (
                 <LeadingIcon
                   size={iconSize}
-                  strokeWidth={1.5}
-                  className="shrink-0 transition-[stroke-width] duration-80 group-hover:stroke-[2]"
+                  className="shrink-0 group-hover:icon-shapes:stroke-2"
                 />
               )}
               {/* text-box only applies to block containers, so the trim lives
@@ -274,8 +273,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
               {TrailingIcon && (
                 <TrailingIcon
                   size={iconSize}
-                  strokeWidth={1.5}
-                  className="shrink-0 transition-[stroke-width] duration-80 group-hover:stroke-[2]"
+                  className="shrink-0 group-hover:icon-shapes:stroke-2"
                 />
               )}
             </>

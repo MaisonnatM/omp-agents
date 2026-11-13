@@ -1,5 +1,5 @@
 /** The header's **What's new**: the lines of `CHANGELOG.md` in the running omp-agents build, and those **Update dashboard** would load. */
-import { Download, Sparkles } from "lucide-react";
+import { IconArrowInbox, IconSparklesTwo } from "central-icons";
 import { type ReactNode, useEffect, useState } from "react";
 import type { ChangelogEntry, DashboardChangelog } from "../../src/shared/dashboard-update";
 import { Button } from "@/components/ui/button";
@@ -51,7 +51,7 @@ function Body({ changelog }: { changelog: DashboardChangelog }) {
 					title={`Not loaded yet, on origin/${changelog.branch}`}
 					entries={pending}
 					action={
-						<Button size="compact" leadingIcon={Download} onClick={() => void updateDashboard()}>
+						<Button size="compact" leadingIcon={IconArrowInbox} onClick={() => void updateDashboard()}>
 							Update dashboard
 						</Button>
 					}
@@ -85,7 +85,7 @@ export function WhatsNew() {
 			<Tooltip content="What's new" side="bottom" forceOpen={open ? false : undefined}>
 				<PopoverTrigger asChild>
 					<Button {...activityControl("header.whats-new")} variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label={unseen ? "What's new, unseen lines" : "What's new"} data-state={open ? "open" : "closed"} active={open}>
-						<Sparkles />
+						<IconSparklesTwo />
 						{unseen && <span aria-hidden className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-blue-500 ring-2 ring-background" />}
 					</Button>
 				</PopoverTrigger>

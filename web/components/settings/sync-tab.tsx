@@ -1,4 +1,4 @@
-import { RefreshCcw } from "lucide-react";
+import { IconArrowRotateCounterClockwise } from "central-icons";
 import { type FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -194,7 +194,7 @@ export function SyncTab({ active }: { active: boolean }) {
 				title="Last sync"
 				meta="Fetches the remote, merges each file with this machine's against the last sync, sends what changed here, and writes what changed there."
 				actions={
-					<Button variant="secondary" size="compact" leadingIcon={RefreshCcw} loading={pending === "sync"} disabled={!answer || pending !== null || settings.remote === ""} onClick={() => sync({})}>
+					<Button variant="secondary" size="compact" leadingIcon={IconArrowRotateCounterClockwise} loading={pending === "sync"} disabled={!answer || pending !== null || settings.remote === ""} onClick={() => sync({})}>
 						Sync
 					</Button>
 				}
@@ -222,7 +222,7 @@ export function SyncTab({ active }: { active: boolean }) {
 							))}
 						</IntegrationList>
 						<Skipped skipped={conflicted.skipped} />
-						<Button variant="primary" size="compact" leadingIcon={RefreshCcw} loading={pending === "sync"} disabled={pending !== null || !decided} onClick={() => sync(choices)}>
+						<Button variant="primary" size="compact" leadingIcon={IconArrowRotateCounterClockwise} loading={pending === "sync"} disabled={pending !== null || !decided} onClick={() => sync(choices)}>
 							Sync with these choices
 						</Button>
 					</div>

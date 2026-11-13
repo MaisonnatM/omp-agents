@@ -1,5 +1,5 @@
 /** A workout's demos as a row of thumbnails, each opening the demo dialog on its exercise. */
-import { Play } from "lucide-react";
+import { IconPlay } from "central-icons";
 import { type ReactNode, useState } from "react";
 import type { Exercise } from "../../../src/shared/sport";
 import { cn } from "@/lib/utils";
@@ -45,7 +45,7 @@ export function DemoStrip({ demos, onOpen }: { demos: Exercise[]; onOpen: (at: n
 									className="size-full"
 									badge={
 										<span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm group-hover:bg-background">
-											<Play aria-hidden className="size-3.5 fill-current" />
+											<IconPlay className="size-3.5 icon-shapes:fill-current" />
 										</span>
 									}
 								/>
