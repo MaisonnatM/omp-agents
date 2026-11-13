@@ -5,13 +5,11 @@
  */
 // First: a packaged app takes the login shell's environment before `src/paths.ts` reads it.
 import { refreshExecutableEnv } from "./shell-env";
-import { type ChildProcess, execFile, spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { createInterface, type Interface } from "node:readline";
-import type { Readable } from "node:stream";
 import {
 	app,
 	BrowserWindow,
@@ -32,12 +30,13 @@ import {
 import { errorText, isObject, num } from "../src/json";
 import { ACCESS_CHANNEL, INSTALL_STARTER_KIT_CHANNEL, isWebUrl, OPEN_DASHBOARD_CHANNEL, PICK_DIRECTORY_CHANNEL, PREVIEW_PARTITION, SIGN_IN_CHANNEL, type StarterKitInstallResult, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
 import { tokenFile } from "../src/paths";
-import { dashboardHosts, isListeningLine, originOf, portFromEnv, QUICK_TODO_EVENT } from "../src/server/address";
+import { dashboardHosts, originOf, portFromEnv, QUICK_TODO_EVENT } from "../src/server/address";
 import { helloProof, loadToken, pageAccess } from "../src/server/auth";
 import { showAttention } from "./attention";
 import { trackBrowserGuests } from "./browser-guests";
+import { ServerSupervisor, type SupervisorEvent } from "./server-supervisor";
 import { startUpdates, type Updates } from "./updates";
-import { OMP_INSTALL_COMMAND, OMP_MISSING_EXIT } from "../src/shared/startup";
+import { OMP_INSTALL_COMMAND } from "../src/shared/startup";
 
 /** The port and hash of `url` when it names an omp-agents page, `http://127.0.0.1:<port>/` with any hash, under any name the server answers to; else `null`. */
 function dashboardPageOf(url: string): { port: number; hash: string } | null {
@@ -70,13 +69,7 @@ const KIT_INSTALLER = RESOURCES ? join(RESOURCES, "templates", "omp", "install.j
 /** Where `bun run desktop`'s Open at Login wrote its LaunchAgents, before the packaged app used its own login item. */
 const OLD_LOGIN_AGENTS = join(homedir(), "Library", "LaunchAgents");
 const OLD_LOGIN_AGENT = /^dev\.omp-agents\.desktop\.port-\d+\.plist$/;
-/** The server builds the page before it listens. */
-const READY_TIMEOUT_MS = 60_000;
 const PROBE_TIMEOUT_MS = 2_000;
-/** How long the server gets after SIGTERM to write its stores and let go of its sessions, which keep running. */
-const STOP_TIMEOUT_MS = 10_000;
-/** The server output an error page shows. */
-const LOG_LINES = 40;
 /** The error page's Retry link, which never loads: `will-navigate` catches it. */
 const RETRY_URL = "omp-agents:retry";
 const COPY_OMP_URL = "omp-agents:copy-omp-install";
@@ -99,9 +92,8 @@ const HEADLESS = process.env.OMP_AGENTS_HEADLESS === "1";
 app.setPath("userData", join(app.getPath("userData"), `port-${PORT}`));
 const BOUNDS_FILE = join(app.getPath("userData"), "window.json");
 
-/** The server this shell started, from its spawn until it exits, so a quit during the launch stops it too. `null` when the shell uses a server started elsewhere. */
-let server: ChildProcess | null = null;
-const serverLog: string[] = [];
+/** The server this shell starts when nothing listens on the port; a checkout's server rolls back an update whose build does not start. */
+const supervisor = new ServerSupervisor({ command: { bun: SERVER.bun, args: [SERVER.script], cwd: SERVER.cwd, env: SERVER.env, port: PORT }, checkout: RESOURCES ? null : REPO_DIR });
 let quitting = false;
 
 /** Whether `url` is the dashboard's own page, under any name the server answers to. */
@@ -137,54 +129,6 @@ async function probe(token: string, port = PORT): Promise<"ours" | "free" | "tak
 	}
 }
 
-/** Copies one of the server's output streams through, and keeps its last {@link LOG_LINES} lines for an error page. */
-function tail(stream: Readable, out: NodeJS.WriteStream): Interface {
-	stream.pipe(out);
-	const lines = createInterface({ input: stream });
-	lines.on("line", line => {
-		serverLog.push(line);
-		if (serverLog.length > LOG_LINES) serverLog.shift();
-	});
-	return lines;
-}
-
-class ServerExit extends Error {
-	constructor(readonly code: number | null, signal: NodeJS.Signals | null) {
-		super(`The server exited with ${signal ?? `code ${code}`}.`);
-	}
-}
-
-/**
- * Starts the server and resolves once it listens, or rejects with why it did not. It listens when it prints
- * {@link isListeningLine}: an answer on the port alone could come from another server that took the port first.
- */
-function launch(): Promise<ChildProcess> {
-	serverLog.length = 0;
-	const child = spawn(SERVER.bun, [SERVER.script], {
-		cwd: SERVER.cwd,
-		// The server exits when its stdin ends, which it does however this process dies.
-		env: { ...process.env, ...SERVER.env, PORT: String(PORT), OMP_AGENTS_PARENT: "stdin" },
-		stdio: ["pipe", "pipe", "pipe"],
-	});
-	server = child;
-	child.once("exit", () => {
-		if (server === child) server = null;
-	});
-	const { promise, resolve: listening, reject } = Promise.withResolvers<ChildProcess>();
-	const deadline = setTimeout(() => {
-		child.kill("SIGTERM");
-		reject(new Error(`The server did not listen within ${READY_TIMEOUT_MS / 1000} s.`));
-	}, READY_TIMEOUT_MS);
-	void promise.finally(() => clearTimeout(deadline)).catch(() => {});
-	tail(child.stdout, process.stdout).on("line", line => {
-		if (isListeningLine(line, PORT)) listening(child);
-	});
-	tail(child.stderr, process.stderr);
-	child.once("error", (err: NodeJS.ErrnoException) => reject(new Error(err.code === "ENOENT" ? `\`${SERVER.bun}\` is not found.` : err.message)));
-	child.once("exit", (code, signal) => reject(new ServerExit(code, signal)));
-	return promise;
-}
-
 const HTML_ESCAPES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" };
 const escapeHtml = (text: string): string => text.replace(/[&<>"]/g, ch => HTML_ESCAPES[ch] ?? ch);
 
@@ -199,7 +143,7 @@ pre{font-size:12px;white-space:pre-wrap;padding:.75rem;border-radius:6px;backgro
 const isNotice = (url: string): boolean => url.startsWith("data:text/html");
 
 function showError(win: BrowserWindow, title: string, detail: string): void {
-	const log = serverLog.length ? `<pre>${escapeHtml(serverLog.join("\n"))}</pre>` : "";
+	const log = supervisor.log.length ? `<pre>${escapeHtml(supervisor.log.join("\n"))}</pre>` : "";
 	void win.loadURL(notice(title, `<p>${escapeHtml(detail)}</p>${log}<p><a href="${RETRY_URL}">Retry</a></p>`));
 }
 
@@ -211,41 +155,52 @@ async function showOmpMissing(win: BrowserWindow): Promise<void> {
 	const prerequisite = await bun
 		? "<p>Run this command in your terminal. It needs Bun.</p>"
 		: '<p>Install <a href="https://bun.sh">Bun</a> first, then run this command in your terminal.</p>';
-	const detail = serverLog.length ? `<details><summary>Technical details</summary><pre>${escapeHtml(serverLog.join("\n"))}</pre></details>` : "";
+	const detail = supervisor.log.length ? `<details><summary>Technical details</summary><pre>${escapeHtml(supervisor.log.join("\n"))}</pre></details>` : "";
 	void win.loadURL(notice("Install omp to get started", `<p>omp agents uses omp to run your sessions.</p>${prerequisite}<pre>${escapeHtml(OMP_INSTALL_COMMAND)}</pre><p><a href="${COPY_OMP_URL}" aria-live="polite">Copy command</a> · <a href="${RETRY_URL}">Retry</a></p><p>Once installation finishes, Retry looks for omp again. Nothing is installed automatically.</p>${detail}`));
 }
 
-/** Uses the server on the port, or starts one unless the app was launched on a page, then loads the dashboard, which the preload signs in with the token. */
+/** Shows what the supervisor tells: the dashboard each time its server listens, unless the window shows it already, or why it stopped trying. */
+function showServerEvent(win: BrowserWindow, event: SupervisorEvent): void {
+	if (quitting || win.isDestroyed()) return;
+	switch (event.kind) {
+		case "listening":
+			if (!isDashboard(win.webContents.getURL())) win.loadURL(`${ORIGIN}/`).catch(() => {});
+			return;
+		case "failed":
+			return showError(win, event.title, event.detail);
+		case "omp-missing":
+			return void showOmpMissing(win);
+		default: {
+			const never: never = event;
+			return never;
+		}
+	}
+}
+
+/** Uses the server on the port, or starts one unless the app was launched on a page; the dashboard loads once a server listens, and the preload signs it in with the token. */
 async function connect(win: BrowserWindow): Promise<void> {
 	void win.loadURL(notice("Starting omp agents…"));
+	let found: Awaited<ReturnType<typeof probe>>;
 	try {
 		// The same call the server makes: whichever runs first creates the token, and both read the same one.
-		const found = await probe(loadToken(tokenFile));
-		if (found === "taken") {
-			showError(
-				win,
-				`Port ${PORT} is taken`,
-				`Something other than omp-agents answers on ${ORIGIN}, or an omp-agents server that is older than this app or started before ${tokenFile} changed. Stop it, or start the app with another PORT.`,
-			);
-			return;
-		}
-		if (found === "free" && LAUNCH_PAGE) {
-			showError(win, `Nothing answers on ${ORIGIN}`, "This window shows a server started elsewhere, such as an agent's test server, and starts none of its own. Start that server again, then Retry.");
-			return;
-		}
-		if (found === "free") {
-			const child = await launch();
-			child.once("exit", (code, signal) => {
-				if (!quitting) showError(win, "The server stopped", `It exited with ${signal ?? `code ${code}`}.`);
-			});
-		}
+		found = await probe(loadToken(tokenFile));
 	} catch (err) {
-		// A quit stopped the launch: the window is closing, and its stop is no failure.
-		if (quitting) return;
-		if (err instanceof ServerExit && err.code === OMP_MISSING_EXIT) await showOmpMissing(win);
-		else showError(win, "The server did not start", errorText(err));
+		showError(win, "The server did not start", errorText(err));
 		return;
 	}
+	if (found === "taken") {
+		showError(
+			win,
+			`Port ${PORT} is taken`,
+			`Something other than omp-agents answers on ${ORIGIN}, or an omp-agents server that is older than this app or started before ${tokenFile} changed. Stop it, or start the app with another PORT.`,
+		);
+		return;
+	}
+	if (found === "free" && LAUNCH_PAGE) {
+		showError(win, `Nothing answers on ${ORIGIN}`, "This window shows a server started elsewhere, such as an agent's test server, and starts none of its own. Start that server again, then Retry.");
+		return;
+	}
+	if (found === "free") return supervisor.start(event => showServerEvent(win, event));
 	// A failed load reaches `did-fail-load`, which shows it.
 	win.loadURL(`${ORIGIN}/${LAUNCH_PAGE?.hash ?? ""}`).catch(() => {});
 }
@@ -434,22 +389,11 @@ async function installStarterKitFromMenu(): Promise<void> {
 /** The update check, in a packaged app alone: a checkout updates through the dashboard's **Update dashboard**, which pulls it and restarts the server. */
 let updates: Updates | null = null;
 
-/** Stops the server this shell started, letting it end its sessions first; resolves at once when it started none. */
-function stopServer(): Promise<void> {
-	const child = server;
-	if (!child) return Promise.resolve();
-	const { promise, resolve: stopped } = Promise.withResolvers<void>();
-	child.once("exit", () => stopped());
-	child.kill("SIGTERM");
-	setTimeout(() => child.kill("SIGKILL"), STOP_TIMEOUT_MS).unref();
-	return promise;
-}
-
 /** Stops the server, then installs; an install that fails starts nothing, so the window says why and its Retry starts the server again. */
 async function restartToUpdate(): Promise<void> {
 	if (!updates) return;
 	quitting = true;
-	await stopServer();
+	await supervisor.stop();
 	try {
 		await updates.install();
 	} catch (err) {
@@ -525,10 +469,10 @@ if (!app.requestSingleInstanceLock()) {
 	app.on("window-all-closed", () => app.quit());
 	app.on("before-quit", event => {
 		quitting = true;
-		if (!server) return;
+		if (!supervisor.running) return;
 		// Hold the quit until the server wrote its stores and let go of its sessions, which run on for the next launch.
 		event.preventDefault();
-		void stopServer().then(() => app.quit());
+		void supervisor.stop().then(() => app.quit());
 	});
 	for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => app.quit());
 
