@@ -82,14 +82,18 @@ if (input.subToolStart) {
 	// One omp process: its session, and a subagent session that loads the extension again, as omp does for each session.
 	const sub = load((await import(process.argv[3] + "?sub")).default);
 	const results = [];
+	// The background jobs still running, as omp's job snapshot lists them.
+	const running = new Set();
 	for (const call of input.calls) {
 		const cwd = call.cwd ?? process.cwd();
-		const ctx = { cwd, hasUI: false, sessionManager: { getSessionId: () => call.sessionId ?? "session" }, agent: { kind: call.agent ?? "main" } };
+		const ctx = { cwd, hasUI: false, sessionManager: { getSessionId: () => call.sessionId ?? "session" }, agent: { kind: call.agent ?? "main" }, getAsyncJobSnapshot: () => ({ running: [...running].map(id => ({ id, type: "bash" })), recent: [] }) };
 		const session = call.agent === "sub" ? sub : hooks;
 		let reason = null;
 		// external is another process changing the checkout outside omp.
 		if (call.external) spawnSync("bash", ["-c", call.external], { cwd, stdio: "ignore" });
 		else if (call.shutdown) await session.session_shutdown({ type: "session_shutdown" }, ctx);
+		// ended is a background job that finished.
+		else if (call.ended) running.delete(call.ended);
 		// apply is an isolated subagent's changes about to land in that checkout.
 		else if (call.apply) reason = (await session.before_subagent_apply({ type: "before_subagent_apply", agent: "task", agentId: "Child", invocationKind: "task", checkout: call.apply, merge: "patch" }, ctx))?.reason ?? null;
 		else {
@@ -98,7 +102,12 @@ if (input.subToolStart) {
 			// An allowed call runs, unless dry asks only for the guard's answer.
 			if (reason === null && !call.dry && !call.read) {
 				if (call.write) writeFileSync(call.write, ctx.sessionManager.getSessionId() + "\\n");
-				else await session.tool_result({ ...event, isError: spawnSync("bash", ["-c", call.bash], { cwd, stdio: "ignore" }).status !== 0 }, ctx);
+				// background is the id of the job omp moves the command to: its result comes back before the command runs.
+				else if (call.background) {
+					running.add(call.background);
+					await session.tool_result({ ...event, isError: false, details: { async: { state: "running", jobId: call.background, type: "bash" } } }, ctx);
+					spawnSync("bash", ["-c", call.bash], { cwd, stdio: "ignore" });
+				} else await session.tool_result({ ...event, isError: spawnSync("bash", ["-c", call.bash], { cwd, stdio: "ignore" }).status !== 0 }, ctx);
 			}
 		}
 		results.push(reason);
@@ -786,7 +795,7 @@ describe("checkout ownership", () => {
 		const dir = repo();
 		const blocked = {
 			"git checkout feat": false, "git checkout feat 2>/dev/null": false, "git switch feat": false, "gh pr checkout 7": false,
-			"git checkout -b x": true, "git checkout -- file.txt": true, "git checkout .": true, "git checkout feat file.txt": true, "git switch -c x": true,
+			"git checkout -b x": true, "git checkout -- file.txt": true, "git checkout .": true, "git checkout feat file.txt": true, "git checkout --theirs file.txt": true, "git switch -c x": true,
 			"git stash": true, "git stash pop": true, "git reset --hard": true, "git branch -m x": true,
 			"git -c core.pager=cat commit": true, "git switch feat; git commit": true,
 			"env GIT_EDITOR=true git rebase --continue": true, "env -u GIT_DIR git commit": true, "nohup env -i git commit": true,
@@ -815,6 +824,90 @@ describe("checkout ownership", () => {
 		]);
 		expect(results).toEqual([null, null, null, null, null]);
 		expect([git(dir, "branch", "--show-current"), git(dir, "log", "-1", "--format=%s")]).toEqual(["other", "work"]);
+	});
+
+	// `feat` and `main` each change file.txt, so rebasing `feat` onto `main` stops on a conflict with HEAD detached.
+	const conflicting = () => {
+		const dir = repo();
+		writeFileSync(join(dir, "file.txt"), "feat\n");
+		git(dir, "commit", "-qam", "feat");
+		git(dir, "switch", "-q", "main");
+		writeFileSync(join(dir, "file.txt"), "main\n");
+		git(dir, "commit", "-qam", "main");
+		git(dir, "switch", "-q", "feat");
+		return dir;
+	};
+	const drift = (reason: string | null) => reason?.includes("another process switched it") ?? null;
+
+	test("this session's own rebase, run by a script it started, passes through its conflict to the end", () => {
+		const dir = conflicting();
+		const script = join(root, `rebase-${basename(dir)}.sh`);
+		writeFileSync(script, "git rebase main\n");
+		const results = calls([
+			{ write: join(dir, "notes.txt") },
+			{ bash: `sh ${script}`, cwd: dir },
+			{ write: join(dir, "file.txt") },
+			{ bash: "git checkout --theirs file.txt", cwd: dir },
+			{ bash: "git add file.txt && GIT_EDITOR=true git rebase --continue", cwd: dir },
+			{ bash: "git commit -q --allow-empty -m after", cwd: dir },
+			{ write: join(dir, "file.txt") },
+		]);
+		expect(results).toEqual([null, null, null, null, null, null, null]);
+		expect([git(dir, "branch", "--show-current"), git(dir, "log", "-1", "--format=%s")]).toEqual(["feat", "after"]);
+	});
+
+	test("a rebase under way takes edits and its abort, even one HEAD moved for without this session", () => {
+		const dir = conflicting();
+		const results = calls([
+			{ write: join(dir, "notes.txt") },
+			{ external: "git rebase main", cwd: dir },
+			{ write: join(dir, "file.txt") },
+			{ bash: "git rebase --abort", cwd: dir },
+			{ write: join(dir, "notes.txt") },
+		]);
+		expect(results).toEqual([null, null, null, null, null]);
+		expect(git(dir, "branch", "--show-current")).toBe("feat");
+	});
+
+	test("another process's switch still blocks after this session's bash calls that left HEAD alone", () => {
+		const dir = repo();
+		const results = calls([
+			{ write: join(dir, "file.txt") },
+			{ external: "git checkout -q main", cwd: dir },
+			{ bash: "git status", cwd: dir },
+			{ bash: "sh -c true", cwd: dir },
+			{ write: join(dir, "file.txt") },
+		]);
+		expect(results.map(drift)).toEqual([null, null, null, null, true]);
+	});
+
+	test("HEAD a script of this session's bash call moved is its own once the call ends", () => {
+		const dir = repo();
+		const script = join(root, `switch-now-${basename(dir)}.sh`);
+		writeFileSync(script, "git switch -q other\n");
+		const results = calls([
+			{ write: join(dir, "notes.txt") },
+			{ bash: `sh ${script}`, cwd: dir },
+			{ write: join(dir, "file.txt") },
+		]);
+		expect(results).toEqual([null, null, null]);
+	});
+
+	test("HEAD a background job of this session moves is its own while the job runs, and another process's switch after it ends blocks", () => {
+		const dir = repo();
+		const script = join(root, `switch-${basename(dir)}.sh`);
+		writeFileSync(script, "git switch -q other\n");
+		const results = calls([
+			{ write: join(dir, "notes.txt") },
+			{ bash: `sh ${script}`, cwd: dir, background: "bg_1" },
+			{ write: join(dir, "file.txt") },
+			{ ended: "bg_1" },
+			{ bash: "git commit -qam work", cwd: dir },
+			{ external: "git checkout -q main", cwd: dir },
+			{ write: join(dir, "file.txt") },
+		]);
+		expect(results.map(drift)).toEqual([null, null, null, null, null, null, true]);
+		expect(git(dir, "log", "-1", "--format=%s", "other")).toBe("work");
 	});
 
 	test("a subagent shares its session's checkout and its view of HEAD", () => {
