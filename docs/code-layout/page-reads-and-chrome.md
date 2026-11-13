@@ -51,8 +51,8 @@
   A refused edit is undone, and the page names why.
   A pull request's details, a Linear issue's details and its fields, the settings page's omp settings, and the source control section read through it; the settings editors' saves go through its `write`.
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft's branch picker.
-  `web/components/git.tsx` holds the branch picker, the repository and branch in a header's meta line, and `BranchName`, the branch that copies itself on click, which the pull requests, the tickets, and a session's header also show, and its `onCopy` runs once a click has copied.
-  Its `releaseBranch` sends `releaseWorktree` and toasts the worktree it removed or kept, or the failure; the branch a pull request's details bring and a session header's branch call it after a copy.
+  `web/components/git.tsx` holds the branch picker, the repository and branch in a header's meta line, and `BranchName`, the branch that copies itself on click, which the pull requests and the tickets also show, and its `onCopy` runs once a click has copied.
+  Its `releaseBranch` sends `releaseWorktree` and toasts the worktree it removed or kept, or the failure; the branch a pull request's details bring calls it after a copy.
   `web/use-copy.ts` copies text to the clipboard, resolving once the copy lands, and holds the copied state behind a button's check mark.
   `web/use-draft-model.ts` holds `useDraftModelSelection`, the model and effort of the new-session draft: the model a start sends, `null` for omp's default, the model the picker shows, which until a pick is the one the `default` role names, and an effort kept only for the model it was picked on; it also reads the model list again whenever the menu opens.
   `web/use-skills.ts` reads a directory's skills, and `web/pinned-skill.ts` keeps the skill pinned for new sessions.

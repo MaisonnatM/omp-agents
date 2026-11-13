@@ -5,13 +5,6 @@ import { type AgentOn, hasOpenThreads, type MoveId, moveOf, readyOnceChecksPass 
 import type { ReviewDraft } from "../src/shared/review-drafts";
 import { moveKey, type Where } from "./order";
 
-/** A session's pull requests split into the stack two or more of them share, top first, and the rest; `null` when fewer than two sit in `stack`. */
-export function sessionStack(pullRequests: LinkedPullRequest[], stack: StackedPullRequest[]): { stack: StackedPullRequest[]; others: LinkedPullRequest[] } | null {
-	const inStack = (pr: PullRequest): boolean => stack.some(member => samePullRequest(member, pr));
-	const others = pullRequests.filter(pr => !inStack(pr));
-	return pullRequests.length - others.length >= 2 ? { stack, others } : null;
-}
-
 /** Whose move it is, or for your approved pull requests that need no fix, that they are approved; the list's sections, in page order. */
 export type MoveGroup = "Your move" | "Agent on it" | "Approved" | "Waiting on others" | "Drafts" | "Recently merged";
 

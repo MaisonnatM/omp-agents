@@ -5,7 +5,7 @@
   Below them are the title, author, last update, copyable `gh pr checkout <number>` command, branches, file count, and lines added and removed.
   Hover the title for **Edit title**, or focus its pencil with the keyboard.
   Enter saves the title and Escape cancels the edit.
-  Clicking the head branch copies its name and removes the linked worktree that has it checked out, as a session header's branch does.
+  Clicking the head branch copies its name and removes the linked worktree that has it checked out.
   A stacked base is amber.
   When GitHub reports that the branch is behind its base, the base turns orange and gains a warning icon.
   Hover or activate the warning for the commit count and **Update branch** or **Update with rebase**.
