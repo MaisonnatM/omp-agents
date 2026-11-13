@@ -91,9 +91,8 @@ function refusedSince(since: number): string {
 	return ` Requests refused for lack of credit since ${new Date(since).toLocaleString()}.`;
 }
 
-/** A plan shows as a {@link PlanChip} when it has windows or spend, or only reset credits with no balance or refusal to show; else by name. */
-const hasChip = (plan: PlanUsage): boolean =>
-	!isNameOnlyPlan(plan) || (plan.resetCredits !== null && !plan.balance && plan.outOfCreditSince === undefined);
+/** A plan shows as a {@link PlanChip} when it has windows or spend; else by name. */
+const hasChip = (plan: PlanUsage): boolean => !isNameOnlyPlan(plan);
 
 /** Time until `at`, in its two largest units: `3h24m`, `1d3h`, `12m`. */
 export function untilLabel(at: number, now: number): string {
@@ -143,26 +142,21 @@ export interface ChipPart {
 }
 
 /**
- * What a plan's chip says, in order: its tightest open window, or `used up` with the time until the last used-up window
- * resets; how many other windows are used up; the spend past the plan when it has no windows; its reset credits.
+ * What a plan's chip says, in order: its tightest open window, or `used up`; how many other windows are used up; the
+ * spend past the plan when it has no windows. Resets and reset credits show only in {@link PlanCard}.
  */
-export function chipParts(plan: PlanUsage, now: number): ChipPart[] {
+export function chipParts(plan: PlanUsage): ChipPart[] {
 	const parts: ChipPart[] = [];
 	let open: PlanWindow | undefined;
 	let usedUp = 0;
-	let backAt: number | null = null;
 	for (const window of plan.windows) {
 		if (!window.exhausted) {
 			if (!open || window.remaining < open.remaining) open = window;
-		} else {
-			usedUp++;
-			if (window.resetsAt !== null) backAt = Math.max(backAt ?? 0, window.resetsAt);
-		}
+		} else usedUp++;
 	}
-	if (open) parts.push({ label: open.label, text: `${percentLeft(open)}% left`, tone: windowTone(open) });
-	if (usedUp > 0) parts.push({ text: open ? `${usedUp} used up` : backAt === null ? "used up" : `used up, resets in ${untilLabel(backAt, now)}`, tone: "out" });
+	if (open) parts.push({ label: open.label, text: `${percentLeft(open)}%`, tone: windowTone(open) });
+	if (usedUp > 0) parts.push({ text: open ? `${usedUp} used up` : "used up", tone: "out" });
 	if (plan.windows.length === 0 && plan.extra) parts.push({ label: "extra", text: spendLabel(plan.extra), tone: extraTone(plan.extra) });
-	if (plan.resetCredits) parts.push({ text: `✦ ${plan.resetCredits.count}`, tone: "ok" });
 	return parts;
 }
 
@@ -218,28 +212,23 @@ export function PlanCard({ plan, now }: { plan: PlanUsage; now: number }) {
 	);
 }
 
-/** A plan with usage windows, spend, or reset credits: its logo, its account tag, and {@link chipParts}; hovering or clicking opens {@link PlanCard}. */
+/** A plan with usage windows or spend: its account tag and {@link chipParts}; hovering or clicking opens {@link PlanCard}. */
 function PlanChip({ plan, tag }: { plan: PlanUsage; tag: string | undefined }) {
 	const popover = useHoverPopover();
 	const now = useMinute();
-	const credits = plan.resetCredits?.count;
 	return (
 		<Popover {...popover.root}>
 			<PopoverTrigger asChild>
 				<button {...popover.trigger} type="button" className={cn("-mx-1 flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-sm px-1 tabular-nums hover:bg-hover", FOCUS)}>
-					<span aria-hidden className="flex shrink-0 items-center">
-						<OrgIcon org={providerOrg(plan.provider)} fallback={<span className="font-medium text-foreground">{plan.name}</span>} />
-					</span>
 					<span className="sr-only">{plan.account ? `${plan.name} ${plan.account}:` : `${plan.name}:`}</span>
 					{tag && <span aria-hidden className="text-muted-foreground">{tag}</span>}
-					{chipParts(plan, now).map((part, index) => (
+					{chipParts(plan).map((part, index) => (
 						<span key={part.text} className={TONE_CLASS[part.tone].text}>
 							{index > 0 && <span className="text-muted-foreground">· </span>}
 							{part.label && <span className="text-muted-foreground">{part.label} </span>}
 							{part.text}
 						</span>
 					))}
-					{credits && <span className="sr-only"> {credits === 1 ? "reset credit" : "reset credits"}</span>}
 				</button>
 			</PopoverTrigger>
 			<PopoverContent {...popover.content} side="top" align="start" aria-label={`${plan.name} usage`} className="w-96 max-w-[calc(100vw-2rem)] p-0">
@@ -259,7 +248,7 @@ function NamedPlan({ plan, tag }: { plan: PlanUsage; tag: string | undefined }) 
 	return <span className="whitespace-nowrap text-foreground">{name}</span>;
 }
 
-/** Plan quota, one row per account, for the sidebar's foot. */
+/** Plan quota for the sidebar's foot: one row per provider, its logo once, then each of its accounts. */
 export function PlanUsageList({ usage }: { usage: DashboardState["usage"] }) {
 	if (usage === null) return <p className="text-muted-foreground">Checking plans…</p>;
 	if (usage.error !== null) return <p className="min-w-0 truncate text-red-600 dark:text-red-400">Cannot read plan usage: {usage.error}</p>;
@@ -270,18 +259,19 @@ export function PlanUsageList({ usage }: { usage: DashboardState["usage"] }) {
 			</p>
 		);
 	const tags = accountTags(usage.plans);
+	const makers = Map.groupBy(usage.plans, plan => providerOrg(plan.provider) ?? plan.provider);
 	return (
 		<ul aria-label="Plan usage" className="flex min-w-0 flex-col items-start gap-1">
-			{usage.plans.map((plan, index) => (
-				<li key={`${plan.provider}:${plan.account ?? index}`} className="flex max-w-full min-w-0 items-center gap-2">
-					{hasChip(plan) ? (
-						<PlanChip plan={plan} tag={tags.get(plan)} />
-					) : (
-						<>
-							<OrgIcon org={providerOrg(plan.provider)} fallback={null} />
-							<NamedPlan plan={plan} tag={tags.get(plan)} />
-						</>
-					)}
+			{[...makers].map(([maker, plans]) => (
+				<li key={maker} className="flex max-w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+					<span aria-hidden className="flex shrink-0 items-center">
+						<OrgIcon org={providerOrg(plans[0]!.provider)} fallback={<span className="font-medium text-foreground">{plans[0]!.name}</span>} />
+					</span>
+					{plans.map((plan, index) => (
+						<span key={`${plan.provider}:${plan.account ?? index}`} className={cn("flex min-w-0 items-center", index > 0 && "border-l border-border pl-2")}>
+							{hasChip(plan) ? <PlanChip plan={plan} tag={tags.get(plan)} /> : <NamedPlan plan={plan} tag={tags.get(plan)} />}
+						</span>
+					))}
 				</li>
 			))}
 		</ul>
