@@ -197,7 +197,14 @@ export function HeaderTabs({ className, address, hosts, past, controls }: Header
 		move(key, step.target, step.where);
 		return true;
 	};
-	useShortcuts({ moveTabLeft: () => moveFocused(-1), moveTabRight: () => moveFocused(1) });
+	useShortcuts({
+		moveTabLeft: () => moveFocused(-1),
+		moveTabRight: () => moveFocused(1),
+		closeTab: () => {
+			if (activeKey === null || !tabs.some(tab => tab.key === activeKey)) return false;
+			close(activeKey);
+		},
+	});
 	const close = (key: string): void => {
 		const { tabs: rest, go } = closeHeaderTab(tabs, key, activeKey);
 		setTabs(rest);

@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded by [Cmd+W closes the tab](2026-11-13-cmd-w-closes-the-tab.md)
 date: 2026-10-30
 decision-makers: Maxence Maisonnat
 ---

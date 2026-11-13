@@ -18,7 +18,7 @@ export type ShortcutId =
 	| "switchSpace"
 	| "sessionSearch"
 	| "find"
-	| "endSession"
+	| "closeTab"
 	| "openPullRequest"
 	| "setGoal"
 	| "previousSession"
@@ -127,8 +127,8 @@ export interface Chord {
 /** A chord, or G then a key, as GitHub, Gmail, and Linear go to a page. Both keys of a pair type text, so pairs work only outside text fields. */
 export type Binding = { chord: Chord; scope: Scope } | { goTo: string };
 
-/** Ends the focused session from anywhere on the page, and the selected session from its command menu entry. */
-export const END_SESSION: Chord = { key: "w", mod: true };
+/** Closes the header tab on screen, leaving its session running. */
+export const CLOSE_TAB: Chord = { key: "w", mod: true };
 
 /** The shortcuts dialog's tabs, in order. */
 export const SHORTCUT_CATEGORIES = [
@@ -190,7 +190,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "switchSpace", category: "general", label: "Switch between the Personal and Work spaces", command: "Switch space", keys: [{ chord: { key: "p", mod: true, shift: true }, scope: "anywhere" }] },
 	{ id: "sessionSearch", category: "sessions", label: "Search the sidebar's sessions", keys: [{ chord: { key: "f", mod: true, shift: true }, scope: "anywhere" }] },
 	{ id: "find", category: "general", label: "Find text in the focused conversation, or in the pull request the page shows", keys: [{ chord: { key: "f", mod: true }, scope: "anywhere" }] },
-	{ id: "endSession", category: "sessions", label: "End the focused session", keys: [{ chord: END_SESSION, scope: "anywhere" }] },
+	{ id: "closeTab", category: "general", label: "Close the header tab on screen; its session keeps running", keys: [{ chord: CLOSE_TAB, scope: "anywhere" }] },
 	{ id: "openPullRequest", category: "sessions", label: "Review, push, and open a pull request for the focused session's branch", command: "Open pull request", keys: [] },
 	{ id: "setGoal", category: "sessions", label: "Set or edit the focused session's objective and token budget", command: "Set or edit goal", keys: [] },
 	{

@@ -52,7 +52,7 @@ test("Ctrl+` toggles the terminal on every platform, and ⌘` stays macOS's wind
 test("browser-reserved chords stay the browser's, apart from the app's new-session, end-session, and PR copy bindings", () => {
 	for (const mac of [false, true]) {
 		const mod = mac ? { meta: true } : { ctrl: true };
-		expect(pressOn(mac, "w", "KeyW", mod)).toEqual(["endSession"]);
+		expect(pressOn(mac, "w", "KeyW", mod)).toEqual(["closeTab"]);
 		expect(pressOn(mac, "W", "KeyW", { ...mod, shift: true })).toEqual([]);
 		expect(pressOn(mac, "X", "KeyX", { ...mod, shift: true })).toEqual([]);
 		for (const [key, code] of [["t", "KeyT"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["8", "Digit8"], ["9", "Digit9"], ["0", "Digit0"]]) {

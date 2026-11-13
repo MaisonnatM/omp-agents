@@ -237,10 +237,6 @@ function LiveConversation({
 						if (!session || !writable || !working || stop.pending) return false;
 						interrupt();
 					},
-					endSession: () => {
-						if (!header || !session || !subject.live) return false;
-						onEnd(view.instanceId);
-					},
 					// As ↑ edits the last message in a chat app; with a draft, ↑ keeps moving the caret.
 					dequeue: () => {
 						if (draft !== "") return false;
