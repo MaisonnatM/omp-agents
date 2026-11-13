@@ -7,7 +7,8 @@ import { errorText } from "../src/json";
 import { AppSidebar } from "./components/app-sidebar";
 import { BotDetails } from "./components/bots/bot-details";
 import { CommandPalette } from "./components/command-palette/command-palette";
-import { DESKTOP_TITLE_BAR, DesktopTitleBar, HeaderControls, HeaderControlsContext } from "./components/header-controls";
+import { HeaderControls } from "./components/header-controls";
+import { HeaderTabs } from "./components/header-tabs";
 import {
 	type DashboardActions,
 	DashboardActionsContext,
@@ -21,7 +22,7 @@ import {
 import { DesktopLinkPreview } from "./components/desktop-link-preview";
 import { FileDialog } from "./components/file-dialog";
 import { textFileUrl } from "./file-paths";
-import { newDraftCwd, PageSwitch } from "./components/page-switch";
+import { PageSwitch } from "./components/page-switch";
 import { NO_PLANS, Plans } from "./components/plan-usage";
 import { useNoticeToasts } from "./components/use-notice-toasts";
 import { RenderBoundary } from "./components/render-boundary";
@@ -49,7 +50,7 @@ import { storeOrRemove } from "./stored-state";
 import { EMPTY_LAYOUT, hashForLayout, hashForPage, hashForRoute, hashForView, type NotesListView, type OpenMode, sameView, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, spaceSwitchPanes, type WindowScope, waitingIn, workspaceSession, workspaceSwitch } from "./sessions";
-import { placedTabs, useSidebarTabs } from "./sidebar-tabs";
+import { useSidebarTabs } from "./sidebar-tabs";
 import { refusedStart, startOf } from "./starts";
 import { useAttention } from "./use-attention";
 import { useDashboard } from "./use-dashboard";
@@ -103,9 +104,6 @@ export function App() {
 	const settings = useSettingsRoute(page);
 	const latestBot = useMemo(() => (bots === null ? null : (botRows(bots, state.hosts, state.botLasts)[0]?.bot.id ?? null)), [bots, state.hosts, state.botLasts]);
 	const { tab, showTab } = useSidebarTab({ page, absentTabs, layout, latestSession: sessions.latest, latestBot, navigate, show });
-	/** The tabs the bar draws, which Cmd+1 onward go to in order. */
-	const barTabs = useMemo(() => placedTabs(tabs, "bar"), [tabs]);
-	const headerTabs = useMemo(() => placedTabs(tabs, "header"), [tabs]);
 	const maximized = layout.maximized && !page;
 	const address = page ? hashForPage(page) : hashForLayout(layout);
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
@@ -216,7 +214,7 @@ export function App() {
 		listed: sessions.listed,
 		view: focused.view,
 		absentTabs,
-		tabs: barTabs,
+		tabs,
 		ticketsCallable,
 		hasDetails: detailsView !== null || openBot !== null,
 		openPullRequest: openPullRequest.state.kind === "ready" ? openPullRequest.run : null,
@@ -265,24 +263,8 @@ export function App() {
 	const notesView = page?.kind === "notes" ? page.list : ALL_NOTES;
 	const showSearch = useCallback(() => dispatchPalette({ type: "open" }), [dispatchPalette]);
 	const toggleSettings = useCallback(() => void handlers.settings?.(0), [handlers]);
-	const headerControls = useMemo(
-		() => (
-			<HeaderControls
-				notices={state.notices}
-				onShowSearch={showSearch}
-				tabs={headerTabs}
-				allTabs={tabs}
-				tab={tab}
-				onTab={showTab}
-				settingsOpen={page?.kind === "settings"}
-				onToggleSettings={toggleSettings}
-				space={space}
-				onSpace={switchSpace}
-				otherWaiting={otherWaiting}
-			/>
-		),
-		[state.notices, showSearch, headerTabs, tab, showTab, page?.kind, toggleSettings, space, switchSpace, otherWaiting],
-	);
+	const headerControls = useMemo(() => <HeaderControls notices={state.notices} settingsOpen={page?.kind === "settings"} onToggleSettings={toggleSettings} />, [state.notices, page?.kind, toggleSettings]);
+	const newSession = useCallback(() => openNewSession(), [openNewSession]);
 
 	return (
 		<DashboardActionsContext.Provider value={actions}>
@@ -291,19 +273,18 @@ export function App() {
 					<UserTodosContext.Provider value={state.userTodos}>
 						<UserNotesContext.Provider value={state.userNotes}>
 							<PersonalContext.Provider value={state.personal}>
-								<div className="flex h-svh flex-col">
-									{DESKTOP_TITLE_BAR && <DesktopTitleBar title={focused.title} space={space} onSpace={switchSpace} otherWaiting={otherWaiting} controls={headerControls} />}
-									<SidebarProvider className="min-h-0 flex-1">
+								<div className="flex h-svh flex-col bg-sidebar">
+									{/* The sidebar runs the window's height; the header's tabs sit right of it, above the page and the details sidebar, each an inset panel on the sidebar's color. */}
+									<SidebarProvider className="grid min-h-0 flex-1 grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[var(--page-header-height)_minmax(0,1fr)] pr-1.5 pb-1.5">
 										<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")} address={address}>
 											<AppSidebar
 												scope={scope}
 												sessions={sessions}
 												page={page}
-												newDraftDir={page?.kind === "new" ? newDraftCwd(page, state.userTodos, defaultWorkspace) : null}
 												panes={layout.panes}
 												tab={tab}
 												onTab={showTab}
-												tabs={barTabs}
+												tabs={tabs}
 												listed={state.listed}
 												userTodos={state.userTodos}
 												userNotes={state.userNotes}
@@ -316,60 +297,62 @@ export function App() {
 												sectionTarget={sectionTarget}
 												onSectionTarget={setSectionTarget}
 												onPickWorkspace={switchWorkspace}
+												onSearch={showSearch}
+												onSpace={switchSpace}
+												otherWaiting={otherWaiting}
 												setShortcutsOpen={setShortcutsOpen}
 											/>
 										</DashboardSidebar>
-										<SidebarInset>
-											<HeaderControlsContext.Provider value={DESKTOP_TITLE_BAR ? null : headerControls}>
-												<Plans value={state.usage?.plans ?? NO_PLANS}>
-													<ActivityVisibility.Provider value={display.activityVisibility}>
-														<ToolsExpanded value={display.toolsExpanded}>
-															<MentionListsContext.Provider value={mentionLists}>
-																<RenderBoundary resetKey={hashForRoute(routeOf(state))}>
-																	<PageSwitch
-																		page={page}
-																		hosts={state.hosts}
-																		past={state.past}
-																		lastHosts={state.lastHosts}
-																		layout={layout}
-																		splits={state.splits}
-																		models={state.models}
-																		userTodos={state.userTodos}
-																		userNotes={state.userNotes}
-																		sport={state.sport}
-																		routines={state.routines}
-																		bots={state.bots}
-																		botLasts={state.botLasts}
-																		openBot={openBot}
-																		workspaceList={state.workspaceList}
-																		personal={state.personal}
-																		trustedProjects={state.trustedProjects}
-																		newSessionCompletions={state.newSessionCompletions}
-																		connected={state.connected}
-																		listed={state.listed}
-																		rosterError={state.rosterError}
-																		newStart={startOf(state.starts, "new")}
-																		scope={scope}
-																		defaultWorkspace={defaultWorkspace}
-																		sectionTarget={sectionTarget}
-																		todoView={todoView}
-																		linear={linear}
-																		linearCallable={linearCallable}
-																		ticketsCallable={ticketsCallable}
-																		maximized={maximized}
-																		hasDetails={detailsView !== null}
-																		rightOpen={sidebars.panels.right.open}
-																		show={show}
-																		close={close}
-																		resize={resize}
-																		toggleSidebar={toggleSidebar}
-																	/>
-																</RenderBoundary>
-															</MentionListsContext.Provider>
-														</ToolsExpanded>
-													</ActivityVisibility.Provider>
-												</Plans>
-											</HeaderControlsContext.Provider>
+										<HeaderTabs address={address} hosts={state.hosts} past={state.past} sidebarDocked={sidebars.panels.left.open && !sidebars.panels.left.floating} onNewSession={newSession} controls={headerControls} />
+										<SidebarInset className="col-start-2 row-start-2 overflow-hidden rounded-[10px] border border-border shadow-[0_1px_2px_rgb(0_0_0/0.03)]">
+											<Plans value={state.usage?.plans ?? NO_PLANS}>
+												<ActivityVisibility.Provider value={display.activityVisibility}>
+													<ToolsExpanded value={display.toolsExpanded}>
+														<MentionListsContext.Provider value={mentionLists}>
+															<RenderBoundary resetKey={hashForRoute(routeOf(state))}>
+																<PageSwitch
+																	page={page}
+																	hosts={state.hosts}
+																	past={state.past}
+																	lastHosts={state.lastHosts}
+																	layout={layout}
+																	splits={state.splits}
+																	models={state.models}
+																	userTodos={state.userTodos}
+																	userNotes={state.userNotes}
+																	sport={state.sport}
+																	routines={state.routines}
+																	bots={state.bots}
+																	botLasts={state.botLasts}
+																	openBot={openBot}
+																	workspaceList={state.workspaceList}
+																	personal={state.personal}
+																	trustedProjects={state.trustedProjects}
+																	newSessionCompletions={state.newSessionCompletions}
+																	connected={state.connected}
+																	listed={state.listed}
+																	rosterError={state.rosterError}
+																	newStart={startOf(state.starts, "new")}
+																	scope={scope}
+																	defaultWorkspace={defaultWorkspace}
+																	sectionTarget={sectionTarget}
+																	todoView={todoView}
+																	linear={linear}
+																	linearCallable={linearCallable}
+																	ticketsCallable={ticketsCallable}
+																	maximized={maximized}
+																	hasDetails={detailsView !== null}
+																	rightOpen={sidebars.panels.right.open}
+																	show={show}
+																	close={close}
+																	resize={resize}
+																	toggleSidebar={toggleSidebar}
+																/>
+															</RenderBoundary>
+														</MentionListsContext.Provider>
+													</ToolsExpanded>
+												</ActivityVisibility.Provider>
+											</Plans>
 											<TerminalPanel panel={terminal} cwd={focused.workDir ?? workspace ?? "~"} />
 										</SidebarInset>
 										{(detailsView || openBot) && (
@@ -399,7 +382,7 @@ export function App() {
 												)}
 											</DashboardSidebar>
 										)}
-										<ShortcutsDialog open={overlays.shortcutsOpen} onOpenChange={setShortcutsOpen} tabs={barTabs} />
+										<ShortcutsDialog open={overlays.shortcutsOpen} onOpenChange={setShortcutsOpen} tabs={tabs} />
 										{refused && <ProjectTrustDialog key={refused.reqId} ask={refused.trust} connected={state.connected} onTrust={() => trustAndStart(refused)} onCancel={() => dismissTrust(refused.reqId)} />}
 										<GetStarted
 											route={page?.kind === "get-started"}
@@ -433,7 +416,7 @@ export function App() {
 											onTogglePin={sessions.togglePin}
 											handlers={handlers}
 											unavailable={unavailable}
-											tabs={barTabs}
+											tabs={tabs}
 											todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
 											todos={mentionLists.todos}
 											notes={spaceNotes}

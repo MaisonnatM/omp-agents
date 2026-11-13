@@ -1,10 +1,10 @@
-/** The sidebar's tab bar as the user arranged it in Settings › Preferences: the tabs' order, which ones it leaves out, and the keys they take. */
+/** The sidebar's page list as the user arranged it in Settings › Preferences: the tabs' order, which ones it leaves out, and the keys they take. */
 import { useEffect, useMemo } from "react";
 import { isObject } from "../src/json";
 import { connectionsOf, type IntegrationsAnswer, signedIn } from "../src/shared/accounts";
 import type { Space } from "../src/shared/workspaces";
 import { integrationsStore } from "./reads";
-import { type Page, SIDEBAR_TABS, type SidebarTab, type TabPlace } from "./routing";
+import { type Page, SIDEBAR_TABS, type SidebarTab } from "./routing";
 import { type Binding, bindingLabel, SHORTCUTS, type ShortcutCategory, type ShortcutHandler, type ShortcutId, shortcutBindings, TAB_SHORTCUTS, type TabShortcut } from "./shortcuts";
 import { useStoredState } from "./stored-state";
 
@@ -16,12 +16,12 @@ const KEY = "omp-agents.sidebar-tabs";
 /** The Email tab's id before its rename, which a layout stored before it still names. */
 const LEGACY_EMAIL_TAB = "inbox";
 
-/** The user's sidebar tabs: every tab once, in the order the bar and the header show them, and whether the user hid it. */
+/** The user's sidebar tabs: every tab once, in the order the sidebar's page list shows them, and whether the user hid it. */
 export type TabLayout = readonly { tab: SidebarTab; hidden: boolean }[];
 
 export const DEFAULT_TAB_LAYOUT: TabLayout = SIDEBAR_TABS.map(({ value }) => ({ tab: value, hidden: false }));
 
-/** Each tab's row of {@link SIDEBAR_TABS}: its label, icon, place, the integration it waits on, and the space it shows in alone. */
+/** Each tab's row of {@link SIDEBAR_TABS}: its label, icon, the integration it waits on, and the space it shows in alone. */
 export const TAB_ROWS = Object.fromEntries(SIDEBAR_TABS.map(row => [row.value, row])) as Record<SidebarTab, (typeof SIDEBAR_TABS)[number]>;
 
 /** The space tab `tab` shows in alone, Work for Tickets and Personal for Sport; `null` for a tab of both. */
@@ -39,7 +39,7 @@ export const pageSpace = (page: Page): Space | null => (isSidebarTab(page.kind) 
  * The layout stored as `raw`. It keeps each known tab once, so a stored Settings tab from before the header's button drops out,
  * and reads a stored {@link LEGACY_EMAIL_TAB} as the Email tab, in its place and hidden as it was.
  * A tab missing from what is stored, such as one added since, takes its default place; anything unreadable gives the default.
- * A layout that still has Todo immediately before Notes, the slot it took in the bar, puts Todo between Calendar and Sport,
+ * A layout that still has Todo immediately before Notes, the slot it took in the old tab bar, puts Todo between Calendar and Sport,
  * and moves Email out from between them to just after Sport. Putting Todo back immediately before Notes moves it again.
  */
 export function decodeTabLayout(raw: string | null): TabLayout {
@@ -102,9 +102,6 @@ export const hideTab = (layout: TabLayout, tab: SidebarTab, hidden: boolean): Ta
 /** The tabs shown, in order: those the user did not hide, less the `absent` ones, whose service omp holds no sign-in to or that belong to the other space. */
 export const shownTabs = (layout: TabLayout, absent: ReadonlySet<SidebarTab>): SidebarTab[] =>
 	layout.filter(({ tab, hidden }) => !hidden && !absent.has(tab)).map(({ tab }) => tab);
-
-/** The tabs of `shown` whose triggers sit at `place`, in their order. */
-export const placedTabs = (shown: readonly SidebarTab[], place: TabPlace): SidebarTab[] => shown.filter(tab => TAB_ROWS[tab].place === place);
 
 /** The tabs whose service omp holds no sign-in to, on any of its accounts, which then neither show nor take their shortcuts; all of them until the integrations answer. */
 export const tabsSignedOut = (integrations: IntegrationsAnswer["integrations"] | undefined): SidebarTab[] =>

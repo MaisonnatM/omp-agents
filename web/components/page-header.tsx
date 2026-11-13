@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { useHeaderControls } from "./header-controls";
 
 interface HeaderProps {
 	title: ReactNode;
@@ -13,29 +12,28 @@ interface HeaderProps {
 	/** Controls right after the title, such as the switch to a session's trajectory, shown while the pointer is over the title or one of them has focus, and always on a touch screen. */
 	trailing?: ReactNode;
 	children?: ReactNode;
-	/** After the command menu and the bell, at the header's end, as the top-right pane puts the right sidebar's toggle. */
+	/** At the header's end, as the top-right pane puts the right sidebar's toggle. */
 	end?: ReactNode;
 }
 
 /**
- * The title, an optional meta line, and controls that head a pane or a page, ending with the command menu and the bell.
+ * The title, an optional meta line, and controls that head a pane or a page.
  * The title keeps at least 16rem beside the controls, or its whole width when shorter; when they would leave it less,
  * they wrap to a right-aligned row of their own under it, as on a phone.
+ * The trailing controls take no width until they show, so a title shares its row with them only while they do.
  */
 export function Header({ title, meta, status, alert = false, leading, trailing, children, end }: HeaderProps) {
-	const controls = useHeaderControls();
 	return (
 		<header className="@container/header shrink-0 border-b border-border">
 			<div className="flex min-h-(--page-header-height) flex-wrap items-center gap-x-4 px-6 max-phone:px-3">
-				{/* On a phone the Sessions sidebar's toggle floats over the header's left corner, so the title starts after it while the rows the controls wrap to keep the full width. */}
-				<div className="group/title flex min-h-(--page-header-height) max-w-max min-w-0 grow basis-64 items-center gap-2 max-phone:pl-(--sidebar-toggle-clearance)">
+				<div className="group/title flex min-h-(--page-header-height) max-w-max min-w-0 grow basis-64 items-center gap-2">
 					{leading}
 					<div className="min-w-0">
 						<h2 className="truncate text-sm font-semibold">{title}</h2>
 						{meta !== undefined && <p className="truncate text-xs text-muted-foreground">{meta}</p>}
 					</div>
 					{trailing !== undefined && (
-						<div className="pointer-events-none flex shrink-0 items-center gap-2 opacity-0 group-focus-within/title:pointer-events-auto group-focus-within/title:opacity-100 group-hover/title:pointer-events-auto group-hover/title:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100">
+						<div className="pointer-events-none flex max-w-0 shrink-0 items-center gap-2 overflow-hidden opacity-0 group-focus-within/title:pointer-events-auto group-focus-within/title:max-w-none group-focus-within/title:overflow-visible group-focus-within/title:opacity-100 group-hover/title:pointer-events-auto group-hover/title:max-w-none group-hover/title:overflow-visible group-hover/title:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:max-w-none [@media(hover:none)]:overflow-visible [@media(hover:none)]:opacity-100">
 							{trailing}
 						</div>
 					)}
@@ -47,7 +45,6 @@ export function Header({ title, meta, status, alert = false, leading, trailing, 
 						</span>
 					)}
 					{children}
-					{controls}
 					{end}
 				</div>
 			</div>

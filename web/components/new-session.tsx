@@ -19,6 +19,7 @@ import type { NewOp, StartOf } from "../starts";
 import { useGitCheckout } from "../use-git-checkout";
 import { useAction } from "../use-action";
 import { useSkills } from "../use-skills";
+import { AppMark } from "./app-mark";
 import { useCompletion } from "./completion-popup";
 import { blockedShortcut, ComposerEditor, ComposerNote, EmptyConversation } from "./composer";
 import { BranchPicker, targetOf } from "./git";
@@ -335,7 +336,7 @@ function PrivatePill({ on, onToggle, disabled }: { on: boolean; onToggle: () => 
 function NewSessionWelcome({ folder, personal, isPrivate }: { folder: string; personal: boolean; isPrivate: boolean }) {
 	return (
 		<div className="m-auto flex w-full max-w-conversation flex-col items-center px-6 py-10 text-center" data-empty-conversation>
-			{isPrivate ? <Lock aria-hidden="true" className="size-7" /> : <OmpMark className="size-8" />}
+			{isPrivate ? <Lock aria-hidden="true" className="size-7" /> : <AppMark className="size-8" />}
 			<h2 className="mt-5 max-w-lg font-serif text-[2rem] leading-tight font-normal tracking-tight text-balance">
 				{personal ? (
 					"What can I help with?"
@@ -347,21 +348,5 @@ function NewSessionWelcome({ folder, personal, isPrivate }: { folder: string; pe
 			</h2>
 			{isPrivate && <p className="mt-3 max-w-sm text-sm text-pretty text-muted-foreground">{PRIVATE_NOTE}</p>}
 		</div>
-	);
-}
-
-/** omp's mark, the gradient glyph of `web/favicon.svg`. */
-function OmpMark({ className }: { className?: string }) {
-	return (
-		<svg viewBox="8 12 48 46" aria-hidden="true" className={className}>
-			<defs>
-				<linearGradient id="omp-mark" x1="0" y1="0" x2="1" y2="1">
-					<stop offset="0" stopColor="oklch(0.7 0.24 340)" />
-					<stop offset=".5" stopColor="oklch(0.62 0.21 295)" />
-					<stop offset="1" stopColor="oklch(0.81 0.14 200)" />
-				</linearGradient>
-			</defs>
-			<path fill="url(#omp-mark)" d="M10 14h44v9H43v33h-9V23h-9v22h-9V23H10z" />
-		</svg>
 	);
 }

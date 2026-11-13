@@ -273,9 +273,9 @@ function createWindow(): BrowserWindow {
 		...savedBounds(),
 		show: false,
 		title: "omp agents",
-		// On macOS the page draws the title bar, `DesktopTitleBar`, with Back and Forward after these buttons, the command menu, and the bell.
-		// The buttons are 14px tall, so `y` 11 centers them in its 36px; `titleBarOverlay` tells the page where they end, `env(titlebar-area-x)`, since their width differs across macOS versions.
-		...(IS_MAC ? { titleBarStyle: "hidden" as const, titleBarOverlay: true, trafficLightPosition: { x: 14, y: 11 } } : {}),
+		// On macOS the page draws the title bar: these buttons sit over the sidebar's top row, which leaves room after them, and the header's tabs drag the window.
+		// The buttons are 14px tall, so `y` 17 centers them in the page header's 48px; `titleBarOverlay` tells the page where they end, `env(titlebar-area-x)`, since their width differs across macOS versions.
+		...(IS_MAC ? { titleBarStyle: "hidden" as const, titleBarOverlay: true, trafficLightPosition: { x: 14, y: 17 } } : {}),
 		// macOS takes the app's icon from the Dock instead.
 		icon: ICON,
 		webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, preload: PRELOAD, webviewTag: true },

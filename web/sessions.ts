@@ -164,7 +164,7 @@ const LIVE_LISTS = ["idle", "running", "awaitingSubagents"] as const satisfies r
 type LiveList = (typeof LIVE_LISTS)[number];
 
 /** Every live session `lists` holds outside pinned, in the sidebar's order. */
-export const liveHosts = (lists: Pick<SidebarSessions, LiveList>): RosterHost[] => LIVE_LISTS.flatMap(list => lists[list]);
+const liveHosts = (lists: Pick<SidebarSessions, LiveList>): RosterHost[] => LIVE_LISTS.flatMap(list => lists[list]);
 
 /** Where a sidebar row's session shows: in no pane, alone, or in a split with other panes. */
 export type RowPlacement = "hidden" | "alone" | "split";
@@ -232,10 +232,77 @@ export function latestSession(lists: SidebarSessions): View | null {
 	return saved ? { kind: "past", sessionId: saved.sessionId } : null;
 }
 
-/** Every row of the sessions tab in its order, which the previous and next session keys walk. */
-export function listedViews(lists: SidebarSessions): View[] {
-	const { pinned, interrupted, ended } = lists;
+/** One workspace of the roster: its unpinned live sessions, in the sidebar's order, and its interrupted ones. */
+export interface WorkspaceGroup {
+	workspace: Workspace;
+	hosts: RosterHost[];
+	interrupted: PastSession[];
+}
+
+/**
+ * The roster's workspaces, each with the live and interrupted sessions `lists` holds in it: one per workspace of
+ * `workspaces`, then one per other workspace a session runs in. Those with a session come first, then the rest, each
+ * in `workspaces` order, so opening a session never moves a workspace.
+ */
+export function workspaceGroups(lists: SidebarSessions, workspaces: readonly Workspace[]): WorkspaceGroup[] {
+	const groups = new Map<string, WorkspaceGroup>();
+	const groupOf = (row: RosterHost | PastSession): WorkspaceGroup => {
+		const workspace = workspaceOf(row);
+		let group = groups.get(workspace.cwd);
+		if (!group) {
+			group = { workspace, hosts: [], interrupted: [] };
+			groups.set(workspace.cwd, group);
+		}
+		return group;
+	};
+	for (const workspace of workspaces) groups.set(workspace.cwd, { workspace, hosts: [], interrupted: [] });
+	for (const host of liveHosts(lists)) groupOf(host).hosts.push(host);
+	for (const session of lists.interrupted) groupOf(session).interrupted.push(session);
+	const all = [...groups.values()];
+	const busy = (group: WorkspaceGroup): boolean => group.hosts.length > 0 || group.interrupted.length > 0;
+	return [...all.filter(busy), ...all.filter(group => !busy(group))];
+}
+
+/** A workspace the roster shows: its group, and the ended sessions on screen it holds because Past does not list them. */
+export interface RosterFolder {
+	group: WorkspaceGroup;
+	under: PastSession[];
+}
+
+export interface RosterFolders {
+	shown: RosterFolder[];
+	/** How many matching folders stay behind "N more workspaces". */
+	more: number;
+	/** How many folders match, shown or not. */
+	matching: number;
+}
+
+/**
+ * The roster's folders in `groups` order. Past lists the first `pastListed` of `ended`; an ended session on `open`
+ * screen beyond them shows under its folder instead. At most `limit` folders show, or as many as hold a live or
+ * interrupted session, unless `all`; a later folder holding an open ended session shows in its own place, so opening
+ * one never moves a folder. `filtering` drops the folders a search leaves empty.
+ */
+export function rosterFolders(groups: readonly WorkspaceGroup[], ended: readonly PastSession[], open: readonly View[], { pastListed, limit, all, filtering }: { pastListed: number; limit: number; all: boolean; filtering: boolean }): RosterFolders {
+	const listed = new Set(ended.slice(0, pastListed).map(session => session.sessionId));
+	const under = new Map<string, PastSession[]>();
+	for (const session of ended) {
+		if (listed.has(session.sessionId) || rowPlacement(open, { kind: "past", sessionId: session.sessionId }) === "hidden") continue;
+		const cwd = workspaceOf(session).cwd;
+		under.set(cwd, [...(under.get(cwd) ?? []), session]);
+	}
+	const folders = groups.map(group => ({ group, under: under.get(group.workspace.cwd) ?? [] }));
+	const rows = ({ group, under }: RosterFolder): number => group.hosts.length + group.interrupted.length + under.length;
+	const matching = filtering ? folders.filter(folder => rows(folder) > 0) : folders;
+	const busy = matching.filter(({ group }) => group.hosts.length + group.interrupted.length > 0).length;
+	const shown = all ? matching : matching.filter((folder, index) => index < Math.max(limit, busy) || folder.under.length > 0);
+	return { shown, more: matching.length - shown.length, matching: matching.length };
+}
+
+/** Every row of the sessions tab in its order, which the previous and next session keys walk: pinned, then each workspace's, then the ended ones. */
+export function listedViews(lists: SidebarSessions, groups: readonly WorkspaceGroup[]): View[] {
+	const { pinned, ended } = lists;
 	const live = (hosts: RosterHost[]): View[] => hosts.map(({ instanceId }) => ({ kind: "live", instanceId, agentId: null }));
 	const saved = (sessions: PastSession[]): View[] => sessions.map(({ sessionId }) => ({ kind: "past", sessionId }));
-	return [...live(pinned.hosts), ...saved(pinned.past), ...live(liveHosts(lists)), ...saved([...interrupted, ...ended])];
+	return [...live(pinned.hosts), ...saved(pinned.past), ...groups.flatMap(group => [...live(group.hosts), ...saved(group.interrupted)]), ...saved(ended)];
 }

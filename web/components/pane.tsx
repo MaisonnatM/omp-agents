@@ -14,7 +14,6 @@ import { Conversation } from "./conversation";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { FileBaseContext } from "./file-link";
 import type { FileBase } from "../file-paths";
-import { HeaderControlsContext, useHeaderControls } from "./header-controls";
 import { PastConversation } from "./past-conversation";
 import { RenderBoundary } from "./render-boundary";
 import { SidebarToggle } from "./sidebar-panel";
@@ -27,7 +26,7 @@ interface PaneProps {
 	count: number;
 	focused: boolean;
 	maximized: boolean;
-	/** The pane in the grid's top right corner, which ends its header with the command menu and the bell. */
+	/** The pane in the grid's top right corner, which ends its header with the right sidebar's toggle. */
 	topRight: boolean;
 	/** The right sidebar shows the focused session's details, so the top right pane carries its toggle. */
 	hasDetails: boolean;
@@ -137,17 +136,15 @@ export const ViewConversation = memo(function ViewConversation({ view, focused, 
 
 	const fileBase = useFileBase(view.kind === "past" ? session : (host ?? lastHost));
 	return (
-		<HeaderControlsContext.Provider value={null}>
-			<PaneFocused.Provider value={focused}>
-				<SubagentLinks.Provider value={links}>
-					<FileBaseContext.Provider value={fileBase}>
-						<RenderBoundary resetKey={hashForView(view)} actions={actions}>
-							{content}
-						</RenderBoundary>
-					</FileBaseContext.Provider>
-				</SubagentLinks.Provider>
-			</PaneFocused.Provider>
-		</HeaderControlsContext.Provider>
+		<PaneFocused.Provider value={focused}>
+			<SubagentLinks.Provider value={links}>
+				<FileBaseContext.Provider value={fileBase}>
+					<RenderBoundary resetKey={hashForView(view)} actions={actions}>
+						{content}
+					</RenderBoundary>
+				</FileBaseContext.Provider>
+			</SubagentLinks.Provider>
+		</PaneFocused.Provider>
 	);
 });
 
@@ -156,7 +153,6 @@ export const Pane = memo(function Pane({
 	view, index, count, focused, maximized, topRight, hasDetails, host, lastHost, session, models, workspaces, onLayout, toggleRight, rightOpen,
 }: PaneProps) {
 	const { focus } = useDashboardActions();
-	const controls = useHeaderControls();
 	const onMaximize = useCallback(() => onLayout(index, "max"), [index, onLayout]);
 	const onClose = useCallback(() => onLayout(index, "close"), [index, onLayout]);
 	const onFocus = useCallback(() => !focused && focus(index), [focus, focused, index]);
@@ -176,7 +172,6 @@ export const Pane = memo(function Pane({
 					</Tooltip>
 				</>
 			)}
-			{topRight && controls}
 			{topRight && hasDetails && <SidebarToggle side="right" open={rightOpen} onToggle={toggleRight} />}
 		</>
 	);

@@ -1,220 +1,35 @@
-/** The Personal and Work switch, the Notes, Calendar, Todo, Sport, and Email buttons, the command menu button, the notices' bell, and Settings: in the desktop app's title bar, else at the end of the page's header, where a header under 56rem, as on a phone, gets one menu of every tab instead; and the title bar's Back and Forward buttons. */
-import { ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
-import { createContext, memo, type ReactNode, useContext } from "react";
+/** What's new, the notices' bell, and Settings, at the right end of the header tabs; and the Back and Forward buttons at their left end. */
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { memo } from "react";
 import type { Notice } from "../../src/shared/notices";
-import { isSpace, type Space, SPACES } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuRadioGroup, MenuRadioItem, MenuSeparator } from "@/components/ui/menu";
-import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
-import { SizeProvider } from "@/lib/size-context";
-import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
-import { SPACE_LABELS, sessionsWaiting } from "../labels";
-import { PAGE_ICON, SPACE_ICONS } from "../page-icons";
-import type { SidebarPanel, SidebarTab } from "../routing";
+import { PAGE_ICON } from "../page-icons";
 import { shortcutLabels } from "../shortcuts";
-import { TAB_ROWS } from "../sidebar-tabs";
 import { useHistoryPosition } from "../use-history-position";
 import { NoticesBell } from "./notices";
 import { WhatsNew } from "./whats-new";
 
-/** The desktop app on macOS hides the system's title bar, so the page draws it, `DesktopTitleBar`, with these controls. */
-export const DESKTOP_TITLE_BAR = typeof window !== "undefined" && window.ompDesktop?.titleBar === true;
-
-/** What every `Header` ends with: `null` under the desktop title bar; a pane provides `null` and puts them before its sidebar toggle, in the top right pane only. */
-export const HeaderControlsContext = createContext<ReactNode>(null);
-
-export const useHeaderControls = (): ReactNode => useContext(HeaderControlsContext);
-
 interface HeaderControlsProps {
 	notices: Notice[];
-	onShowSearch: () => void;
-	/** The shown tabs whose triggers sit here, after the command menu button between two dividers, in order. */
-	tabs: readonly SidebarTab[];
-	/** Every shown tab, in order, which a header under 56rem lists in one menu in place of the header's buttons. */
-	allTabs: readonly SidebarTab[];
-	/** The panel the sidebar shows, whose button is pressed. */
-	tab: SidebarPanel;
-	onTab: (tab: SidebarTab) => void;
 	settingsOpen: boolean;
 	onToggleSettings: () => void;
-	/** The space the window shows, which the switch at the start of the controls changes, under the desktop title bar beside Back and Forward instead. */
-	space: Space;
-	onSpace: (space: Space) => void;
-	/** How many sessions of the other space need you, which the switch counts on that space's side. */
-	otherWaiting: number;
 }
-
-type SpaceSwitchProps = Pick<HeaderControlsProps, "space" | "onSpace" | "otherWaiting">;
 
 const SettingsIcon = PAGE_ICON.settings;
 
-/** Hides what the tab menu stands in for once the page's header is under 56rem; a parent without the `header` container, as the title bar, always shows it. */
-const FULL_ONLY = "@max-[56rem]/header:hidden";
-/** Shows the tab menu only where {@link FULL_ONLY} hides what it stands in for. */
-const MENU_ONLY = "@max-[56rem]/header:inline-flex";
-
-/**
- * Which space the window shows, Personal or Work; the switch shortcut's keys show on the space it goes to, and so does the count
- * of that space's sessions that need you, so they do not wait unseen. Each tab keeps its tooltip whichever space is on, so switching
- * leaves the tab mounted and the keyboard focus on it. In a page's header narrower than 64rem the labels leave the icons alone,
- * their names kept in the tooltip and for screen readers.
- */
-function SpaceSwitch({ space, onSpace, otherWaiting }: SpaceSwitchProps) {
-	return (
-		<SizeProvider size="compact">
-			<Tabs
-				value={space}
-				onValueChange={value => {
-					if (isSpace(value)) onSpace(value);
-				}}
-			>
-				<TabsList aria-label="Space">
-					{SPACES.map(value => {
-						const waiting = value === space ? 0 : otherWaiting;
-						return (
-							<TabItem
-								key={value}
-								{...activityControl(`header.space.${value}` as const)}
-								value={value}
-								icon={SPACE_ICONS[value]}
-								label={SPACE_LABELS[value]}
-								labelClassName="@max-[64rem]/header:sr-only"
-								tooltip={waiting > 0 ? `${SPACE_LABELS[value]} · ${sessionsWaiting(waiting)}` : SPACE_LABELS[value]}
-								shortcut={value === space ? undefined : shortcutLabels("switchSpace")}
-								badge={waiting > 0 ? waiting : undefined}
-								aria-label={waiting > 0 ? `${SPACE_LABELS[value]}, ${sessionsWaiting(waiting)}` : undefined}
-							/>
-						);
-					})}
-				</TabsList>
-			</Tabs>
-		</SizeProvider>
-	);
-}
-
-/**
- * One way to every tab in a header under 56rem, as on a phone or beside a wide sidebar: the button names the tab on, and its menu
- * lists every shown tab, then the space and Settings, so the header holds this menu, the command menu, and the bell. As the switch it
- * stands in for, it counts the other space's sessions that need you, on that space's row and as a dot on the button.
- */
-function TabMenu({ tabs, tab, onTab, settingsOpen, onToggleSettings, space, onSpace, otherWaiting }: Omit<HeaderControlsProps, "notices" | "onShowSearch" | "allTabs">) {
-	const current = tab === "settings" ? { label: "Settings", icon: SettingsIcon } : TAB_ROWS[tab];
-	const other = SPACES.find(value => value !== space)!;
-	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger
-				render={
-					<Button
-						{...activityControl("header.tab-menu")}
-						variant="ghost"
-						size="compact"
-						leadingIcon={current.icon}
-						trailingIcon={ChevronDown}
-						className={cn("hidden min-w-0 gap-1.5 px-2 font-medium text-foreground [&_svg:last-child]:text-muted-foreground", MENU_ONLY)}
-						aria-label={`${current.label}. Go to another tab${otherWaiting > 0 ? `. ${SPACE_LABELS[other]}, ${sessionsWaiting(otherWaiting)}` : ""}`}
-					/>
-				}
-			>
-				{current.label}
-				{otherWaiting > 0 && <span aria-hidden className="absolute -top-1 -right-1.5 size-2 rounded-full bg-blue-500 ring-2 ring-background" />}
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end" className="w-56">
-				<MenuRadioGroup value={tab} onValueChange={(value: SidebarTab) => onTab(value)}>
-					{tabs.map(value => {
-						const { label, icon: Icon } = TAB_ROWS[value];
-						return (
-							<MenuRadioItem key={value} value={value} closeOnClick>
-								<Icon />
-								{label}
-							</MenuRadioItem>
-						);
-					})}
-				</MenuRadioGroup>
-				<MenuSeparator />
-				<MenuRadioGroup
-					value={space}
-					onValueChange={(value: string) => {
-						if (isSpace(value)) onSpace(value);
-					}}
-				>
-					{SPACES.map(value => {
-						const Icon = SPACE_ICONS[value];
-						const waiting = value === other ? otherWaiting : 0;
-						return (
-							<MenuRadioItem key={value} value={value} closeOnClick aria-label={waiting > 0 ? `${SPACE_LABELS[value]}, ${sessionsWaiting(waiting)}` : undefined}>
-								<Icon />
-								{SPACE_LABELS[value]}
-								{waiting > 0 && (
-									<span aria-hidden className="min-w-4 rounded-full bg-foreground/10 px-1 text-center text-[10px] leading-4 tabular-nums text-foreground">
-										{waiting}
-									</span>
-								)}
-							</MenuRadioItem>
-						);
-					})}
-				</MenuRadioGroup>
-				<MenuSeparator />
-				<MenuItem onClick={onToggleSettings}>
-					<SettingsIcon />
-					{settingsOpen ? "Close settings" : "Settings"}
-				</MenuItem>
-			</DropdownMenuContent>
-		</DropdownMenu>
-	);
-}
-
-export const HeaderControls = memo(function HeaderControls({ notices, onShowSearch, tabs, allTabs, tab, onTab, settingsOpen, onToggleSettings, space, onSpace, otherWaiting }: HeaderControlsProps) {
+export const HeaderControls = memo(function HeaderControls({ notices, settingsOpen, onToggleSettings }: HeaderControlsProps) {
 	return (
 		<div className="flex shrink-0 items-center gap-1">
-			{!DESKTOP_TITLE_BAR && (
-				<>
-					<TabMenu tabs={allTabs} tab={tab} onTab={onTab} settingsOpen={settingsOpen} onToggleSettings={onToggleSettings} space={space} onSpace={onSpace} otherWaiting={otherWaiting} />
-					<div className={cn("flex", FULL_ONLY)}>
-						<SpaceSwitch space={space} onSpace={onSpace} otherWaiting={otherWaiting} />
-					</div>
-				</>
-			)}
-			<Tooltip content="Command menu" shortcut={shortcutLabels("switcher")} side="bottom">
-				<Button {...activityControl("header.command-menu")} variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Command menu" onClick={onShowSearch}>
-					<Search />
-				</Button>
-			</Tooltip>
-			<div className={cn("flex items-center gap-1", FULL_ONLY)}>
-				{tabs.length > 0 && (
-					<>
-						<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border" />
-						{tabs.map(value => {
-							const { label, icon: Icon } = TAB_ROWS[value];
-							return (
-								<Tooltip key={value} content={label} shortcut={shortcutLabels(value)} side="bottom">
-									<Button
-										{...activityControl("header.tab")}
-										variant="ghost"
-										size="icon-compact"
-										className="shrink-0 text-muted-foreground aria-pressed:bg-selected aria-pressed:text-foreground"
-										aria-label={label}
-										aria-pressed={tab === value}
-										onClick={() => onTab(value)}
-									>
-										<Icon />
-									</Button>
-								</Tooltip>
-							);
-						})}
-						<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border" />
-					</>
-				)}
-				<WhatsNew />
-			</div>
+			<WhatsNew />
 			<NoticesBell notices={notices} />
 			<Tooltip content={settingsOpen ? "Close settings" : "Settings"} shortcut={shortcutLabels("settings")} side="bottom">
 				<Button
 					{...activityControl("header.settings")}
 					variant="ghost"
 					size="icon-compact"
-					className={cn("shrink-0 text-muted-foreground aria-pressed:bg-selected aria-pressed:text-foreground", FULL_ONLY)}
+					className="shrink-0 text-muted-foreground aria-pressed:bg-selected aria-pressed:text-foreground"
 					aria-label="Settings"
 					aria-pressed={settingsOpen}
 					onClick={onToggleSettings}
@@ -227,10 +42,10 @@ export const HeaderControls = memo(function HeaderControls({ notices, onShowSear
 });
 
 /** The buttons act through `history`, as the shortcuts do in any browser. */
-function HistoryButtons() {
+export function HistoryButtons() {
 	const { canGoBack, canGoForward } = useHistoryPosition();
 	return (
-		<div className="flex items-center gap-1 [-webkit-app-region:no-drag]">
+		<div className="flex shrink-0 items-center gap-0.5">
 			<Tooltip content="Back" shortcut={shortcutLabels("back")} side="bottom" disabled={!canGoBack}>
 				<Button {...activityControl("header.back")} variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Back" disabled={!canGoBack} onClick={() => history.back()}>
 					<ChevronLeft />
@@ -241,25 +56,6 @@ function HistoryButtons() {
 					<ChevronRight />
 				</Button>
 			</Tooltip>
-		</div>
-	);
-}
-
-/** The window's title bar: a drag strip with the window's buttons inset at its left, then Back and Forward and the document title, the space switch centered, and the controls at its right. */
-export function DesktopTitleBar({ title, controls, ...spaceSwitch }: SpaceSwitchProps & { title: string; controls: ReactNode }) {
-	// `env(titlebar-area-x)` is where the window's buttons end, with a gap as wide as their inset; desktop/main.ts turns it on with `titleBarOverlay`.
-	// h-9 is also the `top-9` a maximized Browser leaves for it in browser-panel.tsx.
-	// Equal side columns keep the switch at the window's center whatever the title's length.
-	return (
-		<div className="grid h-9 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-b border-border bg-sidebar pr-3 pl-[env(titlebar-area-x)] select-none [-webkit-app-region:drag]">
-			<div className="flex min-w-0 items-center gap-2">
-				<HistoryButtons />
-				<p className="pointer-events-none min-w-0 truncate text-[13px] font-medium text-muted-foreground">{title}</p>
-			</div>
-			<div className="[-webkit-app-region:no-drag]">
-				<SpaceSwitch {...spaceSwitch} />
-			</div>
-			<div className="justify-self-end [-webkit-app-region:no-drag]">{controls}</div>
 		</div>
 	);
 }

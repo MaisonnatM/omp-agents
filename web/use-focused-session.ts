@@ -26,7 +26,7 @@ export interface FocusedSession {
 	workspace: string | undefined;
 	/** The directory the session works in: its worktree, else its directory; `null` without a session. */
 	workDir: string | null;
-	/** The document title, which the desktop title bar shows too. */
+	/** The document title. */
 	title: string;
 }
 
