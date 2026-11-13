@@ -30,7 +30,7 @@ export interface ReadSelector {
  * The model it names need not be listed; {@link resolveSelector} also requires that.
  */
 export function readSelector(selector: string, known: ReadonlySet<string>): ReadSelector | null {
-	const parsed = fallbackChains.parseRetryFallbackSelector(selector, { find: (provider, id) => (known.has(selectorOf({ provider, id })) ? true : undefined) });
+	const parsed = fallbackChains.parseRetryFallbackSelector(selector, { find: (provider, id) => (known.has(selectorOf({ provider, id })) ? { provider, id } : undefined) });
 	if (!parsed) return null;
 	const { provider, id } = parsed;
 	return { provider, id, suffix: selector.trim().slice(selectorOf(parsed).length) };
