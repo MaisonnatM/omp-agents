@@ -1,6 +1,6 @@
 ---
 name: design-workflow
-description: The steps for any UI change, from a one-value tweak to a redesign, with references before the first edit and a separate critic before the user sees it. Use before you build, restyle, or fix a screen, component, layout, or flow.
+description: The steps for any UI change, from a one-value tweak to a redesign, with references before the first edit, a screenshot check every round, and a separate critic once the user approves the direction. Use before you build, restyle, or fix a screen, component, layout, or flow.
 ---
 
 # Design workflow
@@ -8,6 +8,7 @@ description: The steps for any UI change, from a one-value tweak to a redesign, 
 Run these steps in order for every change to what a screen shows.
 Each step ends on its output; start the next step only once you have it.
 With variants, steps 1 to 3 run, then 5 and 6; once the user picks one, steps 4 to 6 run on the pick.
+Every round runs step 5's screenshot check; its critique runs once, when the user approves the direction.
 
 ## 1. Name the ask
 
@@ -48,8 +49,13 @@ When either skill is missing, tell the user to run `bunx skills add jakubkrehel/
 
 Output: the `state-machine` and `break` page URLs, with every break fixed or listed.
 
-## 5. Critique
+## 5. Check, then critique once
 
+Every round, screenshot each changed page, variant, and step 4 page in the state the user will check, beside one sibling screen from step 2.
+`read` each screenshot and fix what is visibly broken: misalignment, overflow, clipped or wrapped text, a blank or loading state, a component that departs from its sibling.
+
+The critique runs once the user approves the direction: by saying so, or by asking to merge, to mark the PR ready, or to ship.
+In `/ship` it runs before the Interface review stage.
 Spawn `task` with `agent: "design-critic"`; the builder never grades its own screenshots.
 The assignment holds:
 
@@ -61,12 +67,13 @@ The assignment holds:
 Fix every finding marked `bug`, then spawn a fresh critic with the same assignment.
 Stop after the second critique.
 
-Output: a critic report with no `bug`, or the second report's open findings.
+Output: each round, the checked screenshots; once approved, a critic report with no `bug`, or the second report's open findings.
 
 ## 6. Hand off
 
 Hand off as the Handing off a UI change rules in your system prompt say, and list:
 
+- before the direction is approved, the line "The design critic runs once you approve the direction.";
 - each critic finding you left open, with the reason;
 - each component or pattern you added where the app already had one, so the user decides whether the app should have two;
 - the step 4 pages still running, which you delete when the user says so.
