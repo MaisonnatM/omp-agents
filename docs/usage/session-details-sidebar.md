@@ -9,6 +9,7 @@
   Below the tabs, the menu lists a running session's subagents, each opening its view, then **New terminal**, which opens the terminal panel on a new shell; a paired phone leaves **New terminal** out.
   Each other tab shows its count after its name, and its ×, on hover and always on the tab on screen, closes it; so does Delete on a focused tab, and closing the one on screen shows the tab before it.
   The left and right arrows move between the open tabs.
+  ⇧⌘G shows **Overview** and ⇧⌘L opens **Browser** while the sidebar shows, and the **+** menu lists both keys.
   The sidebar remembers the tabs you opened and the one you chose, for every view; a tab the view cannot show, such as **Browser** for a past session, stays open but hidden until it can.
   **Review visuals** opens and shows the **Browser** tab, and saving an artifact the **Artifacts** tab.
   What a live session runs besides omp shows in the status bar's CPU card; see [Sessions sidebar](sessions-sidebar.md).

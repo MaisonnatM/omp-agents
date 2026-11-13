@@ -99,6 +99,8 @@ export type ShortcutId =
 	| "moveUp"
 	| "moveDown"
 	| "terminal"
+	| "detailsOverview"
+	| "detailsBrowser"
 	| "answer"
 	| TabShortcut;
 
@@ -326,6 +328,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "moveUp", category: "todo", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
 	{ id: "moveDown", category: "todo", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, down", keys: [{ chord: { key: "ArrowDown", alt: true, shift: true }, scope: "anywhere" }] },
 	{ id: "terminal", category: "general", label: "Show or hide the terminal", command: "Toggle terminal", keys: [{ chord: { key: "`", ctrl: true }, scope: "anywhere" }] },
+	{ id: "detailsOverview", category: "sessions", label: "Show the details sidebar's Overview tab", keys: [{ chord: { key: "g", mod: true, shift: true }, scope: "anywhere" }] },
+	{ id: "detailsBrowser", category: "sessions", label: "Open the details sidebar's Browser tab, in the desktop app", keys: [{ chord: { key: "l", mod: true, shift: true }, scope: "anywhere" }] },
 ];
 
 const GO = "g";

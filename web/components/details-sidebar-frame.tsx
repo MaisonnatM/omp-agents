@@ -11,6 +11,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { closeDetailsTab, decodeDetailsTabs, encodeDetailsTabs, openDetailsTab } from "../details-tabs";
+import { type ShortcutId, shortcutLabels, useShortcuts } from "../shortcuts";
 import { useStoredState } from "../stored-state";
 import { FileBaseContext } from "./file-link";
 
@@ -23,6 +24,8 @@ export interface DetailsTab<T extends string> {
 	name: string;
 	/** The Activity control opening or picking the tab records. */
 	control: ControlId;
+	/** The keys that open or show it while the sidebar shows, listed in the + menu, as Capy's ⇧⌘L opens its Browser. */
+	shortcut?: ShortcutId;
 	/** Shown after its name, which screen readers hear with it; zero shows none. */
 	count: number;
 	/** The content scrolls itself inside the panel's full height, as a pull request's details do below their header and tabs. */
@@ -148,6 +151,7 @@ function OpenTabMenu<T extends string>({ tabs, active, onPick, sections }: { tab
 							{each.name}
 							<MenuShortcut className="flex items-center gap-2 tabular-nums">
 								{each.count > 0 && each.count}
+								{each.shortcut && <span>{shortcutLabels(each.shortcut).join(" ")}</span>}
 								<IconCheckmark1 aria-hidden="true" className={cn("text-foreground", each.value !== active && "invisible")} />
 							</MenuShortcut>
 						</MenuItem>
@@ -171,6 +175,7 @@ export function DetailsSidebarFrame<T extends string>({ label, storageKey, defau
 	const prefix = useId();
 	const ids = (value: string) => ({ tab: `${prefix}-tab-${value}`, panel: `${prefix}-panel-${value}` });
 	const show = (value: T): void => setStored(current => (value === defaultTab ? { open: current.open, active: null } : openDetailsTab(current, value)));
+	useShortcuts(Object.fromEntries(tabs.flatMap(each => (each.shortcut ? [[each.shortcut, () => show(each.value)]] : []))));
 	const onListKey = (event: KeyboardEvent<HTMLDivElement>): void => {
 		const at = shown.indexOf(tab);
 		const step = { ArrowLeft: at - 1, ArrowRight: at + 1, Home: 0, End: shown.length - 1 }[event.key];
