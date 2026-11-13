@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { PrivateChip } from "./private-chip";
 import { CONFIRM_PRIVATE_END, hostLabel, PRIVATE_NOTE } from "../labels";
-import { OpenPullRequestButton } from "../open-pull-request";
 import { isPrivateHost } from "../sessions";
 import { shortcutLabels } from "../shortcuts";
 import { useInlineConfirm } from "../use-inline-confirm";
@@ -37,7 +36,7 @@ interface ConversationHeaderProps {
 
 /**
  * A live session's title, which a session this dashboard runs renames when clicked, or a subagent's trail, `title / subagent` with its agent type as a badge, whose title opens its session;
- * the connection status; **Open PR** while its branch can take one; its directory in Cursor;
+ * the connection status; its directory in Cursor;
  * and End session, which shows it is ending until the server answers, though the session may leave the roster before then.
  * A private session shows a lock, and its End, which deletes it, asks for a second click.
  */
@@ -105,7 +104,6 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 				</Tooltip>
 			)}
 			{goalSet && goal}
-			{subject.kind === "session" && <OpenPullRequestButton view={view} host={host} />}
 			{subject.kind === "session" && endable && (
 				<Tooltip
 					content={

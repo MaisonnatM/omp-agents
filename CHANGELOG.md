@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-13
 
+- A session's header no longer shows Open PR; Open pull request in the command menu still asks the session to open one.
 - Notifications moved from the bell at the top right to a Notifications row in the sidebar, before Settings, with its unread count; it opens a full page with the same filters and Mark all as read.
 - The header no longer has a Settings button; the sidebar's Settings row and G then , still open Settings.
 - What's new moved from the sparkles button at the top right to Settings › What's new, with Update dashboard. The header now holds only your tabs.

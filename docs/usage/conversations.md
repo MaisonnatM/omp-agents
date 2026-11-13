@@ -130,24 +130,14 @@
   Hover a chip for the full path or title, or the start of a Browser annotation's comment and elements.
   A todo, session, ticket, or pull request chip opens it here in the dashboard: the todo in its list, or in **Archive** once put away; a deleted todo's chip opens nothing.
 - A session's header shows its title, as in `Fix login`; a session without a title shows its workspace, the last segment of its working directory (`~/code/webapp` reads `webapp`).
-  First among the controls on the right, before the ticket and pull request buttons and **Archive session**, or **Resume** for a past session, the header shows the branch the session works on, such as `me/fix-login`.
-  In a linked worktree it is the branch checked out there now.
-  In a repository's main checkout it is the branch checked out there when the session last wrote, so a past session keeps its branch after the checkout moves to another one.
-  A session on a detached HEAD, outside git, or in a directory that is gone shows no branch.
 - Right after a session's title, live or past, before the trajectory switch, a copy button copies the session's ID, which its tooltip names; its icon turns into a check mark for a moment.
-- On the right of a session's header, the ticket button names the first Linear issue the session worked on, such as `ENG-2508`, with `+N` for the others.
-  Its menu opens each one on Linear, once your assigned issues have loaded and so name your Linear workspace, or in its details on the tickets page; the button shows only for a session with a Linear issue.
-- Next to it, the pull request button names the first pull request the session submitted or worked on, such as `#6595`, with `+N` for the others.
-  Its menu opens each one on GitHub or in its details on the Pull requests page; the button shows only for a session with a pull request.
-  Past sessions show both before **Resume**.
-- Next, before **Archive session**, a running session that the dashboard can prompt shows **Open PR** while it works on a branch other than its repository's default branch and GitHub names no pull request from that branch.
-  The default branch is the one `origin/HEAD` names, so a repository whose clone never recorded it shows no **Open PR** until `git remote set-head origin --auto` records it, which a session there notices at its next write.
-  **Open PR** sends the session one prompt: commit the finished work, collect the diff against `origin/<default branch>`, run one `thermo-nuclear-code-quality-review` subagent on it, apply its in-scope findings that keep behavior the same and list the skipped ones with a reason, run the project's checks again, push, open the pull request with `gh pr create`, and report its link.
+- **Open pull request** in the command menu acts on the focused pane's session while the panes show, and is offered while that session is running, the dashboard can prompt it, it works on a branch other than its repository's default branch, and GitHub names no pull request from that branch.
+  The default branch is the one `origin/HEAD` names, so a repository whose clone never recorded it offers no **Open pull request** until `git remote set-head origin --auto` records it, which a session there notices at its next write.
+  **Open pull request** sends the session one prompt: commit the finished work, collect the diff against `origin/<default branch>`, run one `thermo-nuclear-code-quality-review` subagent on it, apply its in-scope findings that keep behavior the same and list the skipped ones with a reason, run the project's checks again, push, open the pull request with `gh pr create`, and report its link.
   The prompt shows in the transcript as yours, and while a turn runs it waits as a queued follow-up, as a message the composer sends then does.
-  The button reads **Opening PR…** and takes no second press, there or in the command menu, from the press until the session is next idle after it took the prompt, through messages you steer or queue meanwhile and questions it asks.
-  Taking the queued prompt back out while a turn runs keeps **Opening PR…** until that turn ends.
+  The command is unavailable from the press until the session is next idle after it took the prompt, through messages you steer or queue meanwhile and questions it asks.
+  Taking the queued prompt back out while a turn runs keeps it unavailable until that turn ends.
   It goes once the dashboard learns of the new pull request: as soon as the session's transcript names it, such as by the link `gh pr create` prints, else at the next read of the pull request list; a second send before then reports the open pull request's link and stops.
-  **Open pull request** in the command menu does the same for the focused pane's session while the panes show.
 - The composer names a session's model by its label, next to the logo of the org that makes it (`anthropic/claude-opus-5-5` reads `Opus 5.5` with the Anthropic logo).
   The label leaves out the provider, the vendor prefix, and a release date, joins version parts with dots, and puts a `:` suffix such as a thinking level in parentheses (`Sonnet 5.5 (high)`).
   For a router model such as `openrouter/moonshotai/kimi-k3`, the org is the one the id names.

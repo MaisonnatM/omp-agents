@@ -125,7 +125,7 @@ Every transcript comes from the session files on this machine, not from a networ
   Session rows carry it as `workspace`, a `Workspace` from `src/shared/workspaces.ts`, `null` when it is the row's own `cwd`; the page reads it through `workspaceOf` and `workspaceCwd` in `web/sessions.ts`.
 - Each read of the pull request list tells the server which branch heads which pull request in that repository.
   The server then links each session whose `git push` updated one of those branches, or whose linked worktree has one of them checked out, to that PR, and sends the sidebar the new links.
-  It also sets the `pullRequest` of each such session's `branch`, the PR it heads, and so links the PR of a main checkout's branch other than the default one too; the header's **Open PR** shows only while it is `null`.
+  It also sets the `pullRequest` of each such session's `branch`, the PR it heads, and so links the PR of a main checkout's branch other than the default one too; the command menu offers **Open pull request** only while it is `null`.
 - The list names a new PR only at the page's next read, up to a minute after the session opened it, only once GitHub's search has indexed it, some seconds after, and not at all while the list's GraphQL budget is spent.
   So while the list names no PR for a session's branch, the server asks GitHub which PR that branch heads, through one `gh api` REST call outside the search and the GraphQL budget (`branchPullRequest` in `src/pull-requests.ts`), and sets `pullRequest` from the newest open or merged one, or `null` when there is none.
   It asks at once when the session's transcripts name a PR it did not link before, such as the URL `gh pr create` prints.

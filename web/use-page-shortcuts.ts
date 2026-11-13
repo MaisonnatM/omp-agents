@@ -24,7 +24,7 @@ export interface PageShortcutInput {
 	ticketsCallable: boolean;
 	/** The right sidebar has a session to show. */
 	hasDetails: boolean;
-	/** Sends the focused session **Open PR**'s prompt, or `null` while its header offers no **Open PR** to press. */
+	/** Sends the focused session **Open pull request**'s prompt, or `null` while its branch can take no pull request, as `offeredPrompt` says, or a press of it is under way. */
 	openPullRequest: (() => void) | null;
 	/** Opens the focused live dashboard session's goal editor, or `null` when unavailable. */
 	setGoal: (() => void) | null;

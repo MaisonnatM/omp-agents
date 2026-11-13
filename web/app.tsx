@@ -182,7 +182,7 @@ export function App() {
 	);
 
 	const { setOpenedFile, setNewTicket, dispatchPalette } = overlays;
-	// The command menu's **Open pull request** acts on the focused pane's session while the panes show, as its header's **Open PR** does.
+	// The command menu's **Open pull request** acts on the focused pane's session while the panes show and that session's branch can take a pull request, as `offeredPrompt` says.
 	const openPullRequest = useOpenPullRequest(page ? null : focused.view, focused.host, request);
 	const focusedGoal = page === null && focused.view?.kind === "live" && focused.view.agentId === null && focused.host?.source === "dashboard" && focused.host.goal.kind !== "off" && focused.host.control.phase === "live" && !focused.host.control.readOnly ? focused.host : null;
 	const { handlers, unavailable } = usePageShortcuts({
