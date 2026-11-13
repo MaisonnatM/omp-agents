@@ -1,11 +1,11 @@
-/** The sidebar's page list as the user arranged it in Settings › Preferences: the tabs' order, which ones it leaves out, and the keys they take. */
+/** The sidebar's page list as the user arranged it in Settings › Preferences: the tabs' order, and which ones it leaves out. */
 import { useEffect, useMemo } from "react";
 import { isObject } from "../src/json";
 import { connectionsOf, type IntegrationsAnswer, signedIn } from "../src/shared/accounts";
 import type { View } from "../src/shared/sessions";
 import { integrationsStore } from "./reads";
 import { type Page, SIDEBAR_TABS, type SidebarTab } from "./routing";
-import { type Binding, bindingLabel, SHORTCUTS, type ShortcutCategory, type ShortcutHandler, type ShortcutId, shortcutBindings, TAB_SHORTCUTS, type TabShortcut } from "./shortcuts";
+import type { ShortcutId } from "./shortcuts";
 import { useStoredState } from "./stored-state";
 
 // A tab's own shortcut, the command the palette lists for it and the row the dialog shows, has the tab's id.
@@ -145,50 +145,3 @@ export function useSidebarTabs(): {
 	const shown = useMemo(() => shownTabs(layout, signedOut), [layout, signedOut]);
 	return { layout, setLayout, signedOut, shown };
 }
-
-/** The position key `id` takes while the sidebar shows `shown`: Cmd+1 for the first tab; none for a tab not shown or a shortcut that is no tab. */
-export function positionKey(id: ShortcutId, shown: readonly SidebarTab[]): TabShortcut | undefined {
-	const ids: readonly ShortcutId[] = shown;
-	return TAB_SHORTCUTS[ids.indexOf(id)];
-}
-
-/** The keys that run `id` while the sidebar shows `shown`: its {@link positionKey}, if any, then its own keys. */
-function tabBindings(id: ShortcutId, shown: readonly SidebarTab[]): readonly Binding[] {
-	const position = positionKey(id, shown);
-	return position === undefined ? shortcutBindings(id) : [...shortcutBindings(position), ...shortcutBindings(id)];
-}
-
-/** {@link tabBindings} as a tooltip's chips draw them: `["⌘5", "G then M"]`. */
-export const tabShortcutLabels = (id: ShortcutId, shown: readonly SidebarTab[]): readonly string[] => tabBindings(id, shown).map(bindingLabel);
-
-const positions: readonly ShortcutId[] = TAB_SHORTCUTS;
-
-/** One row of Settings › Keyboard: the shortcut, the category that lists it, what it does, and the keys that run it. */
-export interface ShortcutRow {
-	id: ShortcutId;
-	category: ShortcutCategory;
-	label: string;
-	keys: readonly Binding[];
-}
-
-/**
- * Every shortcut's row of Settings › Keyboard while the sidebar shows `shown`, in {@link SHORTCUTS} order: each tab's
- * row carries the position key it takes, so the position keys have no rows of their own, and a row left with no key is out.
- */
-export const shortcutRows = (shown: readonly SidebarTab[]): ShortcutRow[] =>
-	SHORTCUTS.flatMap(({ id, category, label }) => {
-		const keys = positions.includes(id) ? [] : tabBindings(id, shown);
-		return keys.length > 0 ? [{ id, category, label, keys }] : [];
-	});
-
-/** A handler for each position key: it runs `goTo`'s handler for the tab at that place in `shown()`, as that tab's first key does, and declines past the last tab. */
-export const positionHandlers = (shown: () => readonly SidebarTab[], goTo: Record<SidebarTab, ShortcutHandler>): Record<TabShortcut, ShortcutHandler> =>
-	Object.fromEntries(
-		TAB_SHORTCUTS.map((id, index): [TabShortcut, ShortcutHandler] => [
-			id,
-			() => {
-				const tab: SidebarTab | undefined = shown()[index];
-				return tab === undefined ? false : goTo[tab](0);
-			},
-		]),
-	) as Record<TabShortcut, ShortcutHandler>;

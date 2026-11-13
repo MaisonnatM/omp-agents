@@ -41,7 +41,7 @@ describe("viewOf", () => {
 
 	test("a command's key is its shortcut id in kebab case", () => {
 		expect(commandKey("newSession")).toBe("new-session");
-		expect(commandKey("tab1")).toBe("tab1");
+		expect(commandKey("pull-requests")).toBe("pull-requests");
 	});
 });
 

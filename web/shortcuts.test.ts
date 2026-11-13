@@ -55,7 +55,7 @@ test("browser-reserved chords stay the browser's, apart from the app's new-sessi
 		expect(pressOn(mac, "w", "KeyW", mod)).toEqual(["closeTab"]);
 		expect(pressOn(mac, "W", "KeyW", { ...mod, shift: true })).toEqual([]);
 		expect(pressOn(mac, "X", "KeyX", { ...mod, shift: true })).toEqual([]);
-		for (const [key, code] of [["t", "KeyT"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["8", "Digit8"], ["9", "Digit9"], ["0", "Digit0"]]) {
+		for (const [key, code] of [["t", "KeyT"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["0", "Digit0"]]) {
 			expect(pressOn(mac, key, code, mod)).toEqual([]);
 		}
 		expect(pressOn(mac, "K", "KeyK", { ...mod, shift: true })).toEqual(["copyPullRequestNumber"]);
@@ -63,21 +63,25 @@ test("browser-reserved chords stay the browser's, apart from the app's new-sessi
 	}
 });
 
-test("Cmd+1–5 go to the sidebar's tabs by position on macOS, Ctrl+1–5 elsewhere, including AZERTY", () => {
-	const positions = ["tab1", "tab2", "tab3", "tab4", "tab5"] as const;
-	const azerty = ["&", "é", "\"", "'", "("];
+test("⌘1–9 go to the header tabs and ⌥1–9 open the sidebar's sessions on macOS, Ctrl and Alt elsewhere, including AZERTY", () => {
+	const azerty = ["&", "é", "\"", "'", "(", "-", "è", "_", "ç"];
+	// macOS Option turns each digit into a symbol.
+	const option = ["¡", "™", "£", "¢", "∞", "§", "¶", "•", "ª"];
 	for (const mac of [false, true]) {
 		const mod = mac ? { meta: true } : { ctrl: true };
-		for (const [index, id] of positions.entries()) {
+		for (let index = 0; index < 9; index++) {
 			const key = String(index + 1);
 			const code = `Digit${key}`;
-			expect(shortcutsFor(keyEvent(key, code, mod), null, mac)).toEqual([{ id, scope: "anywhere", key: 0 }]);
-			expect(pressOn(mac, azerty[index]!, code, mod)).toEqual([id]);
+			expect(shortcutsFor(keyEvent(key, code, mod), null, mac)).toEqual([{ id: "selectTab", scope: "anywhere", key: index }]);
+			expect(pressOn(mac, azerty[index]!, code, mod)).toEqual(["selectTab"]);
+			expect(shortcutsFor(keyEvent(mac ? option[index]! : key, code, { alt: true }), null, mac)).toEqual([{ id: "jumpToSession", scope: "anywhere", key: index }]);
 			expect(pressOn(mac, key, code)).toEqual(["answer"]);
 			expect(pressOn(mac, key, code, { ...mod, shift: true })).toEqual([]);
 			expect(pressOn(mac, key, code, { ...mod, alt: true })).toEqual([]);
 			expect(pressOn(mac, key, code, { meta: true, ctrl: true })).toEqual([]);
 		}
+		expect(pressOn(mac, "0", "Digit0", mod)).toEqual([]);
+		expect(pressOn(mac, "0", "Digit0", { alt: true })).toEqual([]);
 	}
 	expect(press(",", "Comma", { ctrl: true })).toEqual([]);
 	expect(press("J", "KeyJ", { ctrl: true, shift: true })).toEqual([]);
@@ -179,7 +183,6 @@ test("1 to 9 outside text fields answer the open question, and its handler learn
 			const key = String(digit);
 			expect(shortcutsFor(keyEvent(key, `Digit${key}`), null, mac)).toEqual([{ id: "answer", scope: "outside-fields", key: digit - 1 }]);
 			expect(pressOn(mac, key, `Digit${key}`, { shift: true })).toEqual([]);
-			expect(pressOn(mac, key, `Digit${key}`, { alt: true })).toEqual([]);
 		}
 		expect(pressOn(mac, "0", "Digit0")).toEqual([]);
 	}

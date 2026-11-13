@@ -3,7 +3,6 @@ import type { View } from "../src/shared/sessions";
 import type { PaletteEvent, PaletteState } from "./command-palette";
 import { adjacentSession, closePane, type Layout, type Page, type SettingsRoute, type SidebarTab } from "./routing";
 import { type ShortcutHandler, type ShortcutHandlers, type ShortcutId, useShortcuts } from "./shortcuts";
-import { positionHandlers } from "./sidebar-tabs";
 import { useHistoryPosition } from "./use-history-position";
 
 /** What the page-wide shortcuts read when a key arrives, and what they call. */
@@ -13,13 +12,11 @@ export interface PageShortcutInput {
 	/** A pane fills the grid. */
 	maximized: boolean;
 	settings: SettingsRoute;
-	/** The views of the Sessions tab, in order, and the focused one: what the session shortcuts step through. */
+	/** The views of the Sessions tab, in order, and the focused one: what the session shortcuts step through, and ⌥1 to ⌥9 count. */
 	listed: View[];
 	view: View | null;
 	/** The sidebar tabs whose service omp holds no sign-in to; their shortcuts and commands do not apply. */
 	absentTabs: ReadonlySet<SidebarTab>;
-	/** The shown tabs the sidebar's bar draws, in order: Cmd+1 goes to the first. */
-	tabs: readonly SidebarTab[];
 	/** The dashboard can create Linear issues, and the sidebar shows Tickets, so the new-ticket shortcut applies. */
 	ticketsCallable: boolean;
 	/** The right sidebar has a session to show. */
@@ -45,10 +42,10 @@ export interface PageShortcutInput {
 
 /**
  * The page-wide shortcuts, registered with the keyboard stack: App mounts first, so a page's own bindings take a key before these.
- * `handlers` keeps its identity across renders, as does `unavailable` until a command starts or stops applying, and a
- * handler reads what it needs from the render that last ran. The command palette runs the same `handlers`.
+ * The handlers keep their identity across renders, and each reads what it needs from the render that last ran. Returns
+ * the commands that would do nothing now, which keeps its identity until one starts or stops applying.
  */
-export function usePageShortcuts(input: PageShortcutInput): { handlers: ShortcutHandlers; unavailable: ReadonlySet<ShortcutId> } {
+export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<ShortcutId> {
 	const latest = useRef(input);
 	latest.current = input;
 	const handlers = useMemo((): ShortcutHandlers => {
@@ -64,21 +61,6 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			if (page?.kind === tab) return;
 			showTab(tab);
 		};
-		const goTo: Record<SidebarTab, ShortcutHandler> = {
-			"pull-requests": () => {
-				const { page } = latest.current;
-				// The Pull requests page lists the pull requests itself; its shortcut then has nothing to open.
-				if (page?.kind === "pull-requests" && !page.target) return;
-				latest.current.showTab("pull-requests");
-			},
-			tickets: goToTab("tickets"),
-			bots: goToTab("bots"),
-			todo: goToTab("todo"),
-			calendar: goToTab("calendar"),
-			email: goToTab("email"),
-			sport: goToTab("sport"),
-		};
-		const positions = positionHandlers(() => latest.current.tabs, goTo);
 		return {
 			help: () => {
 				const { page, layout, navigate, show } = latest.current;
@@ -90,6 +72,12 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			getStarted: () => latest.current.navigate({ kind: "get-started" }),
 			previousSession: () => step(-1),
 			nextSession: () => step(1),
+			jumpToSession: key => {
+				const { listed, open } = latest.current;
+				const next = listed[key];
+				if (!next) return false;
+				open(next, "replace");
+			},
 			// ↑ and ↓ step only while the panes show: a page's list, or its native scrolling, keeps them.
 			sessionsNext: () => (latest.current.page ? false : step(1)),
 			sessionsPrevious: () => (latest.current.page ? false : step(-1)),
@@ -108,23 +96,27 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			},
 			back: () => history.back(),
 			forward: () => history.forward(),
-			"pull-requests": goTo["pull-requests"],
-			tickets: goTo.tickets,
+			"pull-requests": () => {
+				const { page } = latest.current;
+				// The Pull requests page lists the pull requests itself; its shortcut then has nothing to open.
+				if (page?.kind === "pull-requests" && !page.target) return;
+				latest.current.showTab("pull-requests");
+			},
+			tickets: goToTab("tickets"),
 			newTicket: () => {
 				const { ticketsCallable, setNewTicket } = latest.current;
 				if (!ticketsCallable) return false;
 				setNewTicket(current => current ?? "");
 			},
-			bots: goTo.bots,
+			bots: goToTab("bots"),
 			sessions: () => {
 				if (!latest.current.page) return;
 				latest.current.showTab("sessions");
 			},
-			todo: goTo.todo,
-			calendar: goTo.calendar,
-			email: goTo.email,
-			sport: goTo.sport,
-			...positions,
+			todo: goToTab("todo"),
+			calendar: goToTab("calendar"),
+			email: goToTab("email"),
+			sport: goToTab("sport"),
 			restore: () => {
 				const { page, maximized, layout, show } = latest.current;
 				if (page) return false;
@@ -168,5 +160,5 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			]),
 		[absentTabs, ticketsCallable, hasDetails, canOpenPullRequest, canSetGoal, canGoBack, canGoForward],
 	);
-	return { handlers, unavailable };
+	return unavailable;
 }

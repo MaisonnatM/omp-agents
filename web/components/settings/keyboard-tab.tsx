@@ -1,14 +1,13 @@
 /** The Settings Keyboard section: every dashboard shortcut, from the table the key listeners read, by category. */
-import { Fragment, useMemo } from "react";
+import { Fragment } from "react";
 import { Badge } from "@/components/ui/badge";
-import { bindingLabel, IS_MAC, SHORTCUT_CATEGORIES, scopeOf } from "../../shortcuts";
-import { type ShortcutRow, shortcutRows, useSidebarTabs } from "../../sidebar-tabs";
+import { bindingLabel, IS_MAC, type Shortcut, SHORTCUT_CATEGORIES, SHORTCUTS, scopeOf } from "../../shortcuts";
 import { Kbd } from "../kbd";
 import { Section } from "./editor";
 
 const MODIFIERS = IS_MAC ? "⌘, ⌥, or ⌃" : "Ctrl or Alt";
 
-function ShortcutTable({ caption, rows }: { caption: string; rows: readonly ShortcutRow[] }) {
+function ShortcutTable({ caption, rows }: { caption: string; rows: readonly Shortcut[] }) {
 	return (
 		<table className="w-full border-separate border-spacing-0 text-sm" data-shortcuts>
 			<caption className="sr-only">{caption} shortcuts</caption>
@@ -46,10 +45,11 @@ function ShortcutTable({ caption, rows }: { caption: string; rows: readonly Shor
 	);
 }
 
-/** Every shortcut as {@link shortcutRows} lists it while the sidebar shows its tabs, one section per category. */
+/** The shortcuts that have a key, in {@link SHORTCUTS} order. */
+const ROWS = SHORTCUTS.filter(({ keys }) => keys.length > 0);
+
+/** Every shortcut that has a key, one section per category. */
 export function KeyboardTab() {
-	const { shown } = useSidebarTabs();
-	const rows = useMemo(() => shortcutRows(shown), [shown]);
 	return (
 		<>
 			<p className="max-w-prose text-sm text-muted-foreground">
@@ -57,7 +57,7 @@ export function KeyboardTab() {
 			</p>
 			{SHORTCUT_CATEGORIES.map(({ id, label }) => (
 				<Section key={id} title={label}>
-					<ShortcutTable caption={label} rows={rows.filter(row => row.category === id)} />
+					<ShortcutTable caption={label} rows={ROWS.filter(row => row.category === id)} />
 				</Section>
 			))}
 		</>

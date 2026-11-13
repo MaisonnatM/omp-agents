@@ -7,7 +7,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { PAGE_ICON } from "../page-icons";
 import { hashForNotifications, hashForPage, type SettingsRoute, type SidebarTab } from "../routing";
 import { shortcutLabels } from "../shortcuts";
-import { type NavRow, TAB_ROWS, tabShortcutLabels } from "../sidebar-tabs";
+import { type NavRow, TAB_ROWS } from "../sidebar-tabs";
 import { CountPill } from "./count-pill";
 
 /** A row's count and how its accessible name says it. */
@@ -17,7 +17,7 @@ export interface NavCount {
 }
 
 interface SidebarNavProps {
-	/** The shown tabs, in the user's order, which the position keys count. */
+	/** The shown tabs, in the user's order. */
 	tabs: readonly SidebarTab[];
 	/** The row of the page on screen; the panes are the Sessions page; `null` for a page with no row. */
 	current: NavRow | null;
@@ -61,7 +61,7 @@ export function SidebarNav({ tabs, current, counts, list, newSessionLabel, onNew
 						return (
 							<Fragment key={tab}>
 								<SidebarMenuItem>
-									<Tooltip content={label} shortcut={tabShortcutLabels(tab, tabs)} side="right">
+									<Tooltip content={label} shortcut={shortcutLabels(tab)} side="right">
 										<SidebarMenuButton size="short" icon={icon} isActive={current === tab} aria-label={badge ? `${label}, ${badge.says(badge.count)}` : undefined} onClick={() => onTab(tab)}>
 											{label}
 										</SidebarMenuButton>

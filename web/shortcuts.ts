@@ -2,11 +2,6 @@ import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRe
 import { isTypingTarget } from "../src/shared/desktop-bridge";
 import { commandKey, record } from "./activity";
 
-/** The keys that go to the sidebar's tabs by position: Cmd+1 goes to the first page row of the sidebar, whichever it is, through Cmd+5 for the fifth. */
-export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4", "tab5"] as const;
-
-export type TabShortcut = (typeof TAB_SHORTCUTS)[number];
-
 export type ShortcutId =
 	| "interrupt"
 	| "steer"
@@ -18,10 +13,12 @@ export type ShortcutId =
 	| "sessionSearch"
 	| "find"
 	| "closeTab"
+	| "selectTab"
 	| "openPullRequest"
 	| "setGoal"
 	| "previousSession"
 	| "nextSession"
+	| "jumpToSession"
 	| "sessionsNext"
 	| "sessionsPrevious"
 	| "model"
@@ -99,8 +96,7 @@ export type ShortcutId =
 	| "moveUp"
 	| "moveDown"
 	| "terminal"
-	| "answer"
-	| TabShortcut;
+	| "answer";
 
 /**
  * Where a binding fires. `composer`: from the composer's text field, before any page-wide binding sees the key.
@@ -129,6 +125,10 @@ export type Binding = { chord: Chord; scope: Scope } | { goTo: string };
 /** Closes the header tab on screen, leaving its session running. */
 export const CLOSE_TAB: Chord = { key: "w", mod: true };
 
+/** A binding for each of 1 to 9 with `modifiers` held, in order, so a handler's key is the digit less one. */
+const digitKeys = (modifiers: Omit<Chord, "key">, scope: Scope): Binding[] =>
+	["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((key): Binding => ({ chord: { key, ...modifiers }, scope }));
+
 /** The categories Settings › Keyboard lists the shortcuts under, in order. */
 export const SHORTCUT_CATEGORIES = [
 	{ id: "general", label: "General" },
@@ -155,8 +155,7 @@ export interface Shortcut {
 
 /**
  * Every dashboard shortcut, in the order a key tries them: every binding the key listeners match, and the commands the
- * palette lists. Settings › Keyboard shows `shortcutRows` in `web/sidebar-tabs.ts`, by category: these as the tabs the
- * sidebar shows take the position keys.
+ * palette lists. Settings › Keyboard shows each shortcut that has a key, by category.
  */
 export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "interrupt", category: "sessions", label: "Stop the running turn", keys: [{ chord: { key: "Backspace", mod: true, shift: true }, scope: "composer" }] },
@@ -189,6 +188,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "sessionSearch", category: "sessions", label: "Search the sidebar's sessions", keys: [{ chord: { key: "f", mod: true, shift: true }, scope: "anywhere" }] },
 	{ id: "find", category: "general", label: "Find text in the focused conversation, or in the pull request the page shows", keys: [{ chord: { key: "f", mod: true }, scope: "anywhere" }] },
 	{ id: "closeTab", category: "general", label: "Close the header tab on screen; its session keeps running", keys: [{ chord: CLOSE_TAB, scope: "anywhere" }] },
+	{ id: "selectTab", category: "general", label: "Go to header tab 1–9", keys: digitKeys({ mod: true }, "anywhere") },
 	{ id: "openPullRequest", category: "sessions", label: "Review, push, and open a pull request for the focused session's branch", command: "Open pull request", keys: [] },
 	{ id: "setGoal", category: "sessions", label: "Set or edit the focused session's objective and token budget", command: "Set or edit goal", keys: [] },
 	{
@@ -205,6 +205,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		command: "Open next session",
 		keys: [{ chord: { key: "ArrowDown", mod: true, alt: true }, scope: "anywhere" }],
 	},
+	{ id: "jumpToSession", category: "sessions", label: "Open the sidebar's session 1–9", keys: digitKeys({ alt: true }, "anywhere") },
 	{ id: "sessionsNext", category: "sessions", label: "Sessions: open the next session in the sidebar", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "sessionsPrevious", category: "sessions", label: "Sessions: open the previous session in the sidebar", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "model", category: "sessions", label: "Choose the session's model", keys: [{ chord: { key: "/", mod: true, alt: true }, scope: "anywhere" }] },
@@ -264,10 +265,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		id: "answer",
 		category: "sessions",
 		label: "Answer the focused session's question with the option of that number",
-		keys: ["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((key): Binding => ({ chord: { key }, scope: "outside-fields" })),
+		keys: digitKeys({}, "outside-fields"),
 	},
-	// No one reads these rows' labels, by design: the dialog lists each position key on the tab it goes to, and the palette lists no command for them.
-	...TAB_SHORTCUTS.map((id, index): Shortcut => ({ id, category: "general", label: `Go to tab ${index + 1} of the sidebar`, keys: [{ chord: { key: String(index + 1), mod: true }, scope: "anywhere" }] })),
 	{ id: "pull-requests", category: "general", label: "Go to Pull requests", command: "Go to pull requests", keys: [] },
 	{ id: "tickets", category: "general", label: "Go to your Linear tickets", command: "Go to tickets", keys: [] },
 	{ id: "newTicket", category: "general", label: "Create a Linear ticket, except on the Todo, Calendar, and Email pages", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
@@ -335,9 +334,10 @@ const GO_TO_MS = 1500;
 /** The parts of a DOM or React key press that a chord reads. */
 export type KeyEvent = Pick<KeyboardEvent, "key" | "code" | "ctrlKey" | "altKey" | "metaKey" | "shiftKey">;
 
-function keyOf({ key, code, metaKey, ctrlKey }: KeyEvent): string {
-	// AZERTY needs physical number-row keys for shortcuts; unmodified symbols must still match as typed.
-	if ((metaKey || ctrlKey) && /^Digit[0-9]$/.test(code)) return code.slice(5);
+function keyOf({ key, code, metaKey, ctrlKey, altKey }: KeyEvent): string {
+	// AZERTY needs physical number-row keys for shortcuts, and macOS Option turns a digit into a symbol (Option+1 types
+	// ¡); unmodified symbols must still match as typed.
+	if ((metaKey || ctrlKey || altKey) && /^Digit[0-9]$/.test(code)) return code.slice(5);
 	if (/^[a-z]$/i.test(key)) return key.toLowerCase();
 	// A letter key, or the / key, that types no ASCII character, on a Cyrillic layout or with macOS Option (Option+B
 	// types ∫, Option+/ types ÷), matches by its physical key. An ASCII symbol matches as typed: AZERTY types `,` and `?`
@@ -484,6 +484,8 @@ export interface ShortcutStack {
 	add(rank: number, read: () => ShortcutHandlers): () => void;
 	/** Offers a key press to each registration in turn. `outside` is whether no text field has focus; `previous` is the key a G pair completes with. */
 	dispatch(event: HandledEvent, outside: boolean, previous: string | null): void;
+	/** Every shortcut some registration handles, each running as its keys do: the highest registration first, until one takes it. */
+	handlers(): ShortcutHandlers;
 	readonly size: number;
 }
 
@@ -505,6 +507,19 @@ export function createShortcutStack(): ShortcutStack {
 				dispatch(event, read(), inScope, previous);
 			}
 		},
+		handlers() {
+			const ids = new Set(entries.flatMap(({ read }) => Object.entries(read()).flatMap(([id, handler]) => (handler ? [id as ShortcutId] : []))));
+			return Object.fromEntries(
+				[...ids].map((id): [ShortcutId, ShortcutHandler] => [
+					id,
+					key =>
+						entries.some(({ read }) => {
+							const handler = read()[id];
+							return handler !== undefined && handler(key) !== false;
+						}),
+				]),
+			);
+		},
 		get size() {
 			return entries.length;
 		},
@@ -514,6 +529,9 @@ export function createShortcutStack(): ShortcutStack {
 const stack = createShortcutStack();
 const nextKey = pairing();
 let ranks = 0;
+
+/** What the command palette runs: every shortcut the page's registrations handle now, as {@link ShortcutStack} `handlers` gives them. */
+export const registeredHandlers = (): ShortcutHandlers => stack.handlers();
 
 /** The page's one keydown listener, attached while any component registers shortcuts. */
 function onKeyDown(event: KeyboardEvent): void {

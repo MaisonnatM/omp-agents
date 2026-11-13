@@ -137,8 +137,9 @@ interface HeaderTabsProps {
 
 /**
  * The row of header tabs, kept in this browser, working as Capy's desktop tabs do: going to a page shows it in the tab on screen,
- * a session another tab shows focuses that tab, and only + opens a new tab. Drag one, or press Alt+Shift+← or → on it, to reorder;
- * its × or a middle-click closes it, closing the one on screen shows its neighbour, and closing the last leaves a new one.
+ * a session another tab shows focuses that tab, and only + opens a new tab. ⌘1 to ⌘9 go to the tab of that place. Drag one, or press
+ * Alt+Shift+← or → on it, to reorder; its × or a middle-click closes it, closing the one on screen shows its neighbour, and closing the
+ * last leaves a new one.
  */
 export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps) {
 	const { openNewSession } = useDashboardActions();
@@ -198,6 +199,10 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 		closeTab: () => {
 			if (activeId === null) return false;
 			close(activeId);
+		},
+		selectTab: index => {
+			if (index >= tabs.length) return false;
+			select(index);
 		},
 	});
 	const select = (index: number): void => {
