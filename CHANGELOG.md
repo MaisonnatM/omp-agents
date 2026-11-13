@@ -6,6 +6,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 ## 2026-11-13
 
 - Hiding the sessions sidebar now closes it all the way: the page takes the full width, and the button to bring it back stays at the left of the tabs.
+- A page's own list, such as your Bots, the Pull requests sections, the Todo categories, or the Settings sections, now sits in a column at the page's left, as in Linear's inbox, instead of under its row in the sidebar. Drag the column's edge to size it. In a narrow window or on a phone it stays under its row.
 - Clicking a session or a page no longer opens a new tab at the top: as in Capy, it shows in the tab you are on, or switches to the tab that already shows that session. The + at the end of the tabs opens a new tab, and closing the last tab leaves a new one on New session. Your open tabs reset once with this update.
 - Every icon in the dashboard now comes from Central Icons, with a lighter, rounder line than before.
 - In an email, Reply all is now a button with its name, since the new icons have no reply-all picture to tell it from Reply.

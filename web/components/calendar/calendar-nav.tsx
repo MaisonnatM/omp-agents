@@ -1,4 +1,4 @@
-/** The sidebar's Calendar tab: the calendar, the Google calendars it can show by account, and whether it shows routine runs (`CalendarNav`). */
+/** The Calendar page's own list: the calendar, the Google calendars it can show by account, and whether it shows routine runs (`CalendarNav`). */
 import { IconCheckmark1 } from "central-icons";
 import { type CalendarShownInput, calendarKey, type GoogleCalendar, type GoogleStatus } from "../../../src/shared/calendar";
 import type { Space } from "../../../src/shared/workspaces";
@@ -96,18 +96,18 @@ function CalendarItem({ calendar }: { calendar: GoogleCalendar }) {
 }
 
 /**
- * The Calendar tab of the sidebar: the calendar, active while `open`, the Google calendars of the accounts `space`
- * shows, then whether the calendar shows routine runs.
+ * The Calendar page's own list: the calendar, the Google calendars of the accounts `space` shows, then whether the
+ * calendar shows routine runs. It shows only while the Calendar page is open, so its row is always the current one.
  */
-export function CalendarNav({ open, space }: { open: boolean; space: Space }) {
+export function CalendarNav({ space }: { space: Space }) {
 	const [showRoutines, setShowRoutines] = useCalendarRoutines();
 	return (
 		<>
 			<SidebarGroup>
 				<SidebarMenu aria-label="Calendar">
 					<SidebarMenuItem>
-						<SidebarMenuButton asChild isActive={open}>
-							<a href={hashForCalendar()} aria-current={open ? "page" : undefined}>
+						<SidebarMenuButton asChild isActive>
+							<a href={hashForCalendar()} aria-current="page">
 								<span className="truncate">Calendar</span>
 							</a>
 						</SidebarMenuButton>
