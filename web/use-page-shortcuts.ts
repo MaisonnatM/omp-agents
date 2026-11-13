@@ -35,7 +35,7 @@ export interface PageShortcutInput {
 	open: (view: View, mode: "replace") => void;
 	show: (layout: Layout) => void;
 	navigate: (page: Page) => void;
-	showTab: (tab: SidebarTab) => void;
+	showTab: (tab: SidebarTab | "sessions") => void;
 	toggleSidebar: (side: "left" | "right") => void;
 	toggleTools: () => void;
 	toggleHideTools: () => void;
@@ -58,7 +58,7 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			if (next) open(next, "replace");
 			else if (!listed.length) return false;
 		};
-		const goToTab = (tab: Exclude<SidebarTab, "sessions" | "pull-requests">): ShortcutHandler => () => {
+		const goToTab = (tab: Exclude<SidebarTab, "pull-requests">): ShortcutHandler => () => {
 			const { absentTabs, page, showTab } = latest.current;
 			if (absentTabs.has(tab)) return false;
 			if (page?.kind === tab) return;
@@ -73,10 +73,6 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			},
 			tickets: goToTab("tickets"),
 			bots: goToTab("bots"),
-			sessions: () => {
-				if (!latest.current.page) return;
-				latest.current.showTab("sessions");
-			},
 			todo: goToTab("todo"),
 			calendar: goToTab("calendar"),
 			email: goToTab("email"),
@@ -120,7 +116,10 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				setNewTicket(current => current ?? "");
 			},
 			bots: goTo.bots,
-			sessions: goTo.sessions,
+			sessions: () => {
+				if (!latest.current.page) return;
+				latest.current.showTab("sessions");
+			},
 			todo: goTo.todo,
 			calendar: goTo.calendar,
 			email: goTo.email,

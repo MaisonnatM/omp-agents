@@ -7,7 +7,10 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 - The Personal and Work spaces are gone: every page shows all your workspaces, sessions, Bots, events, and accounts together, and the sidebar's Workspaces label still narrows the list to one workspace.
 - Keyboard shortcuts now live in Settings › Keyboard, and ? opens it.
-- The bottom of the sidebar now has a Keyboard shortcuts link, where the Personal and Work switch was.
+- The sidebar no longer has a Keyboard shortcuts link at its bottom; ? still opens Settings › Keyboard.
+- End session is now called Archive session.
+- The details sidebar now joins the page with no gap: one line, which you drag to resize it, sits between them.
+- The sidebar's page list no longer has a Sessions tab; the workspace list below it already holds the sessions, and the tabs after it move up a number key.
 - Sport and Tickets now show all the time, and any session can read and log your training with its sport tool.
 - Personal sessions are gone, with the Memory tab and the remember tool they had; Bots keep their own memory.
 - Google accounts are no longer placed in a space: Email, the Calendar, and agents use every connected account.

@@ -47,9 +47,9 @@ describe("sessionActions", () => {
 		expect(ids(past(), { onScreen: true })[0]).toEqual(["open", "resume", "pin"]);
 	});
 
-	test("End reads Ending… and is disabled while the server ends that session", () => {
+	test("End reads Archiving… and is disabled while the server ends that session", () => {
 		const action = sessionActions(live({ phase: "live", readOnly: false }), context({ ending: true })).flat().find(({ id }) => id === "end");
-		expect([action?.title, action?.disabled]).toEqual(["Ending…", true]);
+		expect([action?.title, action?.disabled]).toEqual(["Archiving…", true]);
 	});
 
 	test("one resume runs at a time, and only the starting one reads Resuming…", () => {

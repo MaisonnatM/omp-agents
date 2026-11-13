@@ -34,12 +34,12 @@ export const isSidebarTab = (kind: string): kind is SidebarTab => kind in TAB_RO
 export type NavRow = SidebarTab | "settings" | "new";
 
 /**
- * The row of the page list that `page` selects: the panes select Sessions, and the empty home, a page with no row, and
- * a page whose tab is absent, signed out, select none.
+ * The row of the page list that `page` selects: the panes, the empty home, a page with no row, and a page whose tab is
+ * absent, signed out, select none.
  * A page whose tab the user hid in Preferences still selects it, so while its list nests in the sidebar it shows after the last row.
  */
-export function navRowOf(page: Page | null, panes: readonly View[], absentTabs: ReadonlySet<SidebarTab>): NavRow | null {
-	if (page === null) return panes.length > 0 ? "sessions" : null;
+export function navRowOf(page: Page | null, absentTabs: ReadonlySet<SidebarTab>): NavRow | null {
+	if (page === null) return null;
 	if (page.kind === "new" || page.kind === "settings") return page.kind;
 	return isSidebarTab(page.kind) && !absentTabs.has(page.kind) ? page.kind : null;
 }

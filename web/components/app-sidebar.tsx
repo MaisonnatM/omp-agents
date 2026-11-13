@@ -1,23 +1,22 @@
-import { IconKeyboard, IconMagnifyingGlass } from "central-icons";
+import { IconMagnifyingGlass } from "central-icons";
 import { memo, type ReactNode, useContext, useMemo } from "react";
 import type { View } from "../../src/shared/sessions";
 import { agentOn } from "../../src/shared/moves";
 import { Button } from "@/components/ui/button";
-import { SidebarContent, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { SidebarContent } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
 import { type BotRow, botsNeedingYou } from "../bots-model";
 import { folderName, sessionsWaiting } from "../labels";
 import { yourMoveCount } from "../pull-requests-model";
 import { pullRequestsStore } from "../reads";
-import { hashForPage, type Page, type SettingsRoute, type SidebarTab } from "../routing";
+import type { Page, SettingsRoute, SidebarTab } from "../routing";
 import { shortcutLabels } from "../shortcuts";
 import type { NavRow } from "../sidebar-tabs";
 import type { SessionLists } from "../use-session-lists";
 import type { WorkspaceScope } from "../use-workspace-scope";
 import { AppMark } from "./app-mark";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
-import { ShortcutChip } from "./kbd";
 import { Roster } from "./roster";
 import { ScheduledSends } from "./scheduled";
 import { type NavCount, SidebarNav } from "./sidebar-nav";
@@ -44,12 +43,12 @@ interface AppSidebarProps {
 }
 
 /**
- * The left sidebar: the app's row with the command menu, the page list, the roster, and the keyboard shortcuts link.
+ * The left sidebar: the app's row with the command menu, the page list, and the roster.
  * The nodes it hands down are memoized, so a roster message that changes nothing the sidebar shows leaves it alone.
  */
 export const AppSidebar = memo(function AppSidebar({
 	scope: { visible, workspaces, workspace },
-	sessions: { lists, groups, waiting, query, setQuery, togglePin },
+	sessions: { lists, groups, query, setQuery, togglePin },
 	page,
 	panes,
 	row,
@@ -67,11 +66,10 @@ export const AppSidebar = memo(function AppSidebar({
 	const pullRequestRead = pullRequestsStore.use(pullRequestsScope).read;
 	const counts = useMemo(
 		(): Partial<Record<SidebarTab, NavCount>> => ({
-			sessions: { count: waiting, says: sessionsWaiting },
 			bots: { count: botList ? botsNeedingYou(botList) : 0, says: sessionsWaiting },
 			"pull-requests": { count: pullRequestRead ? yourMoveCount(pullRequestRead.data, agentOn(visible.hosts)) : 0, says: count => `${count} your move` },
 		}),
-		[waiting, botList, pullRequestRead, visible.hosts],
+		[botList, pullRequestRead, visible.hosts],
 	);
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
 	const newSessionLabel = selectedWorkspace ? `New session in ${folderName(selectedWorkspace.cwdDisplay) ?? selectedWorkspace.cwdDisplay}` : "New session";
@@ -114,18 +112,6 @@ export const AppSidebar = memo(function AppSidebar({
 					onPickWorkspace={onPickWorkspace}
 				/>
 			</SidebarContent>
-			<SidebarMenu className="shrink-0 px-2 pt-1 pb-2">
-				<SidebarMenuItem>
-					<SidebarMenuButton size="short" asChild icon={IconKeyboard} isActive={page?.kind === "settings" && page.section === "keyboard"}>
-						<a {...activityControl("shortcuts.open")} href={hashForPage({ kind: "settings", section: "keyboard" })}>
-							Keyboard shortcuts
-						</a>
-					</SidebarMenuButton>
-					<SidebarMenuBadge>
-						<ShortcutChip id="help" />
-					</SidebarMenuBadge>
-				</SidebarMenuItem>
-			</SidebarMenu>
 		</div>
 	);
 });

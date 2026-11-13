@@ -100,7 +100,7 @@ export function sessionActions(entry: SessionEntry, context: SessionActionContex
 		[
 			{
 				id: "end",
-				title: context.ending ? "Ending…" : "End session",
+				title: context.ending ? "Archiving…" : "Archive session",
 				icon: IconStopCircle,
 				disabled: context.ending,
 				tone: "destructive",
