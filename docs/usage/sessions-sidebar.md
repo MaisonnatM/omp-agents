@@ -73,7 +73,7 @@
   The app keeps each one's choice across workspaces, navigation, and reloads, even while it has no rows.
   **Past** starts folded, and its label counts the past sessions it holds.
 - **Past** lists every saved session that has no live host, newest first, with its title (else its first prompt) and how long ago it last changed; hover a row to see its working directory.
-  A past session you open while **Past** is folded, or beyond the rows it shows, shows under its workspace's folder instead, so its row stays in view.
+  A workspace's folder never lists past sessions, even one you open while **Past** is folded; it holds only running and interrupted ones.
   Select one to read its transcript.
   The page cannot write to it until you resume it.
   A session that runs without publishing itself to the registry also appears in this list, and its transcript keeps updating while it runs.

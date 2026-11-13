@@ -201,7 +201,7 @@ export function Roster({ workspaces, lists, groups, query, onQuery, onTogglePin,
 	/** The search field narrows the lists, so a workspace left empty hides rather than showing no sessions. */
 	const filtering = query.trim() !== "";
 	const showWorkspace = workspace === null;
-	const folders = rosterFolders(groups, ended, open, { pastListed: pastOpen ? pastShown : 0, limit: GROUPS_SHOWN, all: allGroups, filtering });
+	const folders = rosterFolders(groups, { limit: GROUPS_SHOWN, all: allGroups, filtering });
 	const hostRow = (host: SidebarSessions["running"][number], isPinned: boolean, badged: boolean) => (
 		<HostRow key={host.instanceId} session={host} pinned={isPinned} placement={rowPlacement(open, { kind: "live", instanceId: host.instanceId, agentId: null })} showWorkspace={badged} onTogglePin={onTogglePin} />
 	);
@@ -279,7 +279,6 @@ export function Roster({ workspaces, lists, groups, query, onQuery, onTogglePin,
 					<WorkspaceFolder key={cwd} folder={folder} name={workspaceName(cwdDisplay, personal) ?? cwdDisplay} open={!collapsed.has(key)} onOpenChange={() => toggleGroup(key)} onNewSession={() => openNewSession(cwd)}>
 						{folder.group.hosts.map(host => hostRow(host, false, false))}
 						{folder.group.interrupted.map(session => pastRow(session, false, false))}
-						{folder.under.map(session => pastRow(session, false, false))}
 					</WorkspaceFolder>
 				);
 			})}

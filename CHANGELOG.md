@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-13
 
+- A closed session you open no longer shows up inside its workspace in the sidebar; workspaces list only running and interrupted sessions, and closed ones stay in Past.
 - Every icon in the dashboard now comes from Central Icons, with a lighter, rounder line than before.
 - In an email, Reply all is now a button with its name, since the new icons have no reply-all picture to tell it from Reply.
 - The sidebar's page list, from New session to Settings, now stays in place while you scroll your sessions below it.
