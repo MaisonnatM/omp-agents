@@ -1,8 +1,9 @@
 ---
-status: accepted
+status: superseded
 date: 2026-11-10
 decision-makers: Maxence Maisonnat
 supersedes: 2026-11-04-the-todos-card-is-a-line-that-opens-over-the-messages
+superseded-by: 2026-11-13-the-session-card-moves-to-an-overview-tab
 ---
 
 # The Todos card floats beside the messages again

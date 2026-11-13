@@ -28,7 +28,7 @@ A tool row no longer carries `todos`, and the todo-list types in `src/shared/tra
 The ship progress the server records stays, for the Todo page's **Shipped** state.
 The Activity controls `transcript.todos` and `transcript.ship` are gone; Settings › Activity lists features from the page's registries, so rows already stored under those ids are no longer listed and break nothing.
 The stored folds `omp-agents.todos-card-open` and `omp-agents.todos-card-ship-open` stay in localStorage unread.
-The card is `SessionCard` in `web/components/session-card.tsx`, its toggle is `SessionCardToggle` with a list icon in place of the checklist, the preference reads **Show session card**, and the card's other files are named `session-card*`.
+The card is `SessionCard` in `session-card.tsx` under `web/components/`, its toggle is `SessionCardToggle` with a list icon in place of the checklist, the preference reads **Show session card**, and the card's other files are named `session-card*`; the card later moved to the session details sidebar's **Overview** tab, as `2026-11-13-the-session-card-moves-to-an-overview-tab` says.
 The stored keys keep the old name, so each user's choices survive the rename: `omp-agents.todos-card-shown`, which settings sync also carries, `omp-agents.todos-card-subagents-closed`, and the Activity control ids `todos-card.toggle` and `changes-card.*`, whose recorded counts would otherwise start over.
 
 This record replaces only what these records say about the todo list and the ship stepper inside the card, so they stay accepted:

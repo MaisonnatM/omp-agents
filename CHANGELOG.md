@@ -10,6 +10,8 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 - Clicking a session or a page no longer opens a new tab at the top: as in Capy, it shows in the tab you are on, or switches to the tab that already shows that session. The + at the end of the tabs opens a new tab, and closing the last tab leaves a new one on New session. Your open tabs reset once with this update.
 - Every icon in the dashboard now comes from Central Icons, with a lighter, rounder line than before.
 - In an email, Reply all is now a button with its name, since the new icons have no reply-all picture to tell it from Reply.
+- The right sidebar has a new first tab, Overview, with the session's subagents, changed files, images, and sources, each under a header that folds.
+- The Session card no longer floats over the conversation, so the messages keep their full width; its toggle in the session header and the Show session card switch in Settings are gone.
 - The sidebar's page list, from New session to Settings, now stays in place while you scroll your sessions below it.
 - Bullets in an agent's reply read as a plain list again, with the bold word starting the sentence, instead of a two-column grid with lines between rows.
 - Agents now answer comparisons, such as which tickets match which pull requests, with a table: the starter kit's reply format asks for one.
