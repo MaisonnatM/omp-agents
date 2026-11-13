@@ -5,6 +5,7 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-13
 
+- The starter kit's artifact tool now names the Artifacts tab in its description, so agents link it to the rule about when to save one.
 - Fixed: with omp 18.20, Settings › Models again reads your model roles and fallback chains, and offers model updates.
 - The starter kit now tells agents when to save something to the Artifacts tab on their own: a report you will choose from or come back to, a one-file mockup, or a diagram too large for the reply.
 - When Update dashboard brings in a new version that does not start, the desktop app now goes back to the version you had and starts it again. The bell and the command menu say which update did not start and why, and Update dashboard waits for a newer one before it tries again.

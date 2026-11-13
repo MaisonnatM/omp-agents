@@ -26,7 +26,7 @@ export default function artifact(pi: ExtensionAPI): void {
 		label: "Artifact",
 		loadMode: "essential",
 		parameters,
-		description: "Save a file as an artifact the user sees in a tab beside the conversation. Make one on your own for a page, an SVG image, or a document the user will look at again or reuse, and whenever the user asks. Never for a short answer, a code change, or a diagram that belongs in the reply. Write the file under local:// first, then call this tool; after each edit, call it again with the same path to save the new version, and say in a few words what this version changed in note. HTML must be one self-contained file, with CSS and JS inline or from a CDN.",
+		description: "Save a file to the Artifacts tab beside the conversation. Make one on your own for a page, an SVG image, or a document the user will look at again or reuse, and whenever the user asks. Never for a short answer, a code change, or a diagram that belongs in the reply. Write the file under local:// first, then call this tool; after each edit, call it again with the same path to save the new version, and say in a few words what this version changed in note. HTML must be one self-contained file, with CSS and JS inline or from a CDN.",
 		async execute(_id, raw, _signal, _onUpdate, ctx) {
 			const refuse = (text: string) => ({ content: [{ type: "text" as const, text }], isError: true });
 			const parsed = parameters.safeParse(raw);
