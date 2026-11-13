@@ -35,11 +35,11 @@ A past session that omp's cleanup gzipped into its archive; the roster, History,
 _Avoid_: Past session when referring to an archived file, deleted session
 
 **Interrupted session**:
-A dashboard session whose omp stopped while no dashboard server watched it, without **End session**, waiting to be resumed.
+A dashboard session whose omp stopped while no dashboard server watched it, without **Archive session**, waiting to be resumed.
 _Avoid_: Crashed session, orphan
 
 **Private session**:
-A dashboard session deleted with everything omp wrote for it once its omp stops, whether by **End session**, omp's `end_session` tool, or a crash; it never becomes a past or interrupted session.
+A dashboard session deleted with everything omp wrote for it once its omp stops, whether by **Archive session**, omp's `end_session` tool, or a crash; it never becomes a past or interrupted session.
 _Avoid_: Incognito session, temporary session, ephemeral session
 
 **Subagent**:
@@ -93,7 +93,7 @@ Its checks reflect real setup; only its dismissal, its closed state, and the ste
 _Avoid_: Onboarding, tour, checklist
 
 **Sidebar**:
-The column down the window's left side: the omp mark and the command menu at its top, the page list, the roster, and the **Keyboard shortcuts** link at its foot.
+The column down the window's left side: the omp mark and the command menu at its top, the page list, and the roster.
 _Avoid_: Nav, navigation rail, left panel
 
 **Header tabs**:

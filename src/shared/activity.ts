@@ -100,7 +100,6 @@ export const CONTROLS = [
 	{ id: "sidebar.right.toggle", label: "Right sidebar toggle", area: "Sidebar" },
 	{ id: "sidebar.workspace", label: "Sidebar workspace picker", area: "Sidebar" },
 	{ id: "sidebar.command-menu", label: "Command menu button", area: "Sidebar" },
-	{ id: "shortcuts.open", label: "Sidebar Keyboard shortcuts link", area: "Sidebar" },
 	{ id: "calendar.routines.toggle", label: "Calendar routine visibility", area: "Calendar" },
 	{ id: "bots.delete", label: "Bot Delete, before it is confirmed", area: "Bots" },
 	{ id: "bots.restart", label: "Bot Restart conversation, before it is confirmed", area: "Bots" },

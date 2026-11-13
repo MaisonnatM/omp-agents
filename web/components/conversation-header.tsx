@@ -47,7 +47,7 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 	const { open, request, editGoal } = useDashboardActions();
 	const ending = useDashboardStatus().ending.has(view.instanceId);
 	const status = ending
-		? "Ending…"
+		? "Archiving…"
 		: phase.phase === "live"
 			? undefined
 			: phase.phase === "connecting"
@@ -113,7 +113,7 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 					content={
 						isPrivate
 							? "Deletes this conversation and everything it wrote. Nothing moves to Past sessions."
-							: `End session. Stops the omp process ${endable.source === "dashboard" ? "this dashboard started" : `running in its terminal (pid ${endable.pid})`}. Its transcript moves to Past sessions, where Resume continues it.`
+							: `Archive session. Stops the omp process ${endable.source === "dashboard" ? "this dashboard started" : `running in its terminal (pid ${endable.pid})`}. Its transcript moves to Past sessions, where Resume continues it.`
 					}
 					side="bottom"
 				>
@@ -121,7 +121,7 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 						variant={confirming ? "destructive-outline" : "primary"}
 						size={confirming ? "compact" : "icon-compact"}
 						loading={ending}
-						aria-label={ending ? "Ending…" : confirming ? CONFIRM_PRIVATE_END : "End session"}
+						aria-label={ending ? "Archiving…" : confirming ? CONFIRM_PRIVATE_END : "Archive session"}
 						{...(isPrivate ? confirm.props("end", endNow) : { onClick: endNow })}
 					>
 						<IconStopCircle />

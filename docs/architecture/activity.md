@@ -86,7 +86,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | File dialog | control | `file-dialog.open`, `file-dialog.open-attached`, `file-dialog.source`, `file-dialog.copy-path`, `file-dialog.copy-text` |
 | Dictation | action, command | actions `dictation-start`, `dictation-stop`, `dictation-discard`; command `dictate`; Enable dictation is `put /api/dictation/settings` |
 | Command palette | command | the command each item runs |
-| Keyboard shortcuts | command, control, view | each shortcut's command key; `shortcuts.open`, the sidebar's Keyboard shortcuts link; `settings/keyboard` |
+| Keyboard shortcuts | command, view | each shortcut's command key; `settings/keyboard` |
 | Header tabs, What's new, notification bell, and Settings button | view, control, command | a tab's click records the view or page it opens; `header.tab.close`, the × or a middle-click; `header.tab.move`, a drag or Alt+Shift+← or → that reorders the tabs; `header.whats-new`, which opens What's new; `notices.open`, `notices.filter`, `notices.read-all`, `notices.item`, `notices.update`, `notices.clear`; the `notice` message is not an action, so these need the tags; `header.settings`, which opens or closes Settings as command `settings` does; `header.back` and `header.forward`, Back and Forward at the start of the header's tabs, which go back and forward as commands `back` and `forward` do |
 | System notifications and Dock badge | presence, action | clicking one brings the window to the foreground (presence); their switches and sound in Settings › Preferences are action `preference` |
 | Pages: New session | view, control | `new`; a starter's pick is `composer-suggestions.pick`, `composer.starter` before 2026-11-04 |

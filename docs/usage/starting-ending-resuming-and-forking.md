@@ -49,7 +49,7 @@
   It never shows under the past sessions, never resumes, and cannot be forked, and omp's memory and autolearn stay off for it.
   While it is on, the pill fills dark, the composer gets a dark outline, and the page shows under it what ending deletes and what stays: files it changes and commits it makes stay in the project.
   A private session shows a dark **Private** chip in its sidebar row and its header.
-  It ends when its omp process stops, whether through **End session**, `end_session`, or a crash; a dashboard that was not running then deletes it at its next start.
+  It ends when its omp process stops, whether through **Archive session**, `end_session`, or a crash; a dashboard that was not running then deletes it at its next start.
   The pill hides on a draft that starts from a todo, since nothing may link to a private session.
 - When a scheduled start's directory is in a git checkout, a branch picker sits after the directory picker; a new session's draft shows none and runs on the checked-out branch.
   The picker lists the local branches, the checked-out one first, then the most recently committed to, each with where it would run: `here`, the worktree that has it checked out, or `new worktree`.
@@ -69,19 +69,19 @@
   omp keeps the title as one that you set, so its automatic title never replaces it.
   A session running in a terminal takes `/rename` there, and a Claude Code or Codex session keeps its own title.
   A past session that another omp is writing to, such as one resumed in a terminal, keeps its title and says to rename it there with `/rename`.
-- A running session shows **End session** in its header, unless its room is read-only: a stop icon, whose tooltip names it and its Cmd+W shortcut.
-  **End session** stops its omp process: one that the dashboard started stops with every process it started, its background jobs, kernels, and subagents included, and a terminal session gets `SIGTERM`, as when its terminal closes, so its terminal returns to the shell.
+- A running session shows **Archive session** in its header, unless its room is read-only: a stop icon, whose tooltip names it and its Cmd+W shortcut.
+  **Archive session** stops its omp process: one that the dashboard started stops with every process it started, its background jobs, kernels, and subagents included, and a terminal session gets `SIGTERM`, as when its terminal closes, so its terminal returns to the shell.
   A session the dashboard started that exits on its own takes those processes with it too.
   omp records the exit in the session file, and the session moves to the past sessions, where **Resume** continues it.
   The dashboard then removes the linked git worktree the session works in, the one whose branch its header names, with the checks of **Settings → Worktrees**, and keeps its branch; **Resume** then reports that the directory no longer exists until you check the branch out there again.
   A worktree that those checks keep, such as one with uncommitted changes or one another session uses, stays in **Settings → Worktrees**, whose **Delete** applies the same checks; a session in a main checkout or outside git leaves its directory as it is.
-  The header shows **Ending…** until the process stops and the worktree check finishes.
+  The header shows **Archiving…** until the process stops and the worktree check finishes.
   Each pane that showed the session, or one of its subagents, moves to the next running session the sidebar lists, else the previous one, skipping sessions already open in a pane.
   With none left, the pane closes and the dashboard shows its empty state.
-  On a private session, **End session** in the header and in the row's menu asks again in place, since ending deletes it; Cmd+W ends it without asking.
+  On a private session, **Archive session** in the header and in the row's menu asks again in place, since ending deletes it; Cmd+W ends it without asking.
 - An agent ends its own session through the `end_session` tool, when you ask it to, for example "Merge on main, then end the session".
   It comes from `~/.omp/agent/extensions/end-session.ts`, which `bun run omp-template` installs.
-  The session ends once the agent's turn is over, so its last reply stays in the transcript, and it moves to the past sessions as with **End session**, not as interrupted, its worktree removed the same way.
+  The session ends once the agent's turn is over, so its last reply stays in the transcript, and it moves to the past sessions as with **Archive session**, not as interrupted, its worktree removed the same way.
   The tool leaves its request as `<session id>.json` in `end-inbox/` beside `todos.json`; a message sent before the dashboard acts withdraws it, and a request waits while the dashboard is down.
 - **Resume** in a past session's header starts omp on that session's file from the dashboard, as `omp --resume <session id>` does in a terminal.
   The pane then shows the live session, which carries on in the same file and moves to the running sessions.

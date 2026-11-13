@@ -27,7 +27,7 @@
   Closing the second-to-last pane returns to a single conversation.
 - Right-click a row in the sessions sidebar, or focus it and press the context-menu key or Shift+F10, for its quick actions.
   Every row offers **Open** and, when the row is not on screen yet, **Open in split**.
-  A running session adds **Pin** (**Unpin** once pinned), its pull requests on GitHub, **Workspace settings**, **Copy path**, **Copy session ID**, and **End session** when the dashboard can end it.
+  A running session adds **Pin** (**Unpin** once pinned), its pull requests on GitHub, **Workspace settings**, **Copy path**, **Copy session ID**, and **Archive session** when the dashboard can end it.
   A past session adds **Resume**, which opens its transcript and continues it as the header's **Resume** does, then the same pin, links, and copies.
   An interrupted session adds **Move to past** after **Resume**.
   Elsewhere on the page, right-click shows the window's own menu, as [Desktop app](desktop-app.md) describes.

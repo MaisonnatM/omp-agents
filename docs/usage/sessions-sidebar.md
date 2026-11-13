@@ -1,6 +1,5 @@
 # Sessions sidebar
 
-- **Keyboard shortcuts** at the foot of the sidebar opens Settings › Keyboard, and shows its key, ?.
 - The sidebar runs the window's height on the window's background, and the page and the session details sidebar sit beside it as rounded panels.
   Its top row, 48 px tall at the default font size as the header's tabs beside it are, holds the omp mark, the command menu button, and the button that hides the sidebar.
 - Under it the page list shows **New session**, then **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Calendar**, **Todo**, **Sport**, and **Email** in the order Settings › Preferences gives them, then **Settings**.
@@ -78,7 +77,7 @@
   An unknown or malformed line shows in the transcript as one warning with the line's start, alongside any text or tools the reader understood.
   Their subagents' sessions are left out of the list.
   **Past** lists the 100 newest at first, and **Show 100 more** at its end adds the next ones.
-- The interrupted sessions, at the end of their workspace's folder with an amber pause mark, list the sessions that the dashboard started and that stopped without **End session**: because omp exited on its own, or stopped while no dashboard ran, as when the computer restarted.
+- The interrupted sessions, at the end of their workspace's folder with an amber pause mark, list the sessions that the dashboard started and that stopped without **Archive session**: because omp exited on its own, or stopped while no dashboard ran, as when the computer restarted.
   A session the dashboard started keeps running when the dashboard server stops, restarts, or crashes, turn, background jobs, and subagents included, and the next server shows it live again, so it never shows here for that.
   It shows as working again when its turn ran or compacted as the server stopped; one that had replied and only waited on a background job's result shows idle.
   While any is listed, the **Resume all** button at the right of the **Workspaces** label resumes every one, under the selected workspace, as **Resume** does for one; a pane that shows one of them then shows it live.

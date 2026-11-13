@@ -26,7 +26,7 @@
     The server checks each such account again every minute; signing it in again in **Settings › Integrations**, or removing it there, ends the notice.
   - **Calendar**: an event with a start time, kept on this computer or of a Google calendar the Calendar page shows, from ten minutes before it starts until it ends, checked every minute.
     All-day events give none, and Google events need the Google Calendar sign-in of **Settings › Integrations**.
-  - **Sessions**: the sessions the dashboard started that stopped mid-turn, working or waiting on a question, without **End session**, as one notice, **2 sessions stopped mid-turn**, that names them as the sidebar's past sessions do.
+  - **Sessions**: the sessions the dashboard started that stopped mid-turn, working or waiting on a question, without **Archive session**, as one notice, **2 sessions stopped mid-turn**, that names them as the sidebar's past sessions do.
     They are the interrupted sessions of the sessions sidebar whose turn ran, checked as the dashboard starts, every minute, and each time one stops, resumes, or moves to past.
 - **All**, **GitHub**, **Slack**, **Providers**, **Integrations**, **Calendar**, **Sessions**, and **Updates** filter the list, each but **All** with its source's logo and each with its count of unread notices.
   The tabs scroll sideways when they do not fit, and the one you pick scrolls into view.
