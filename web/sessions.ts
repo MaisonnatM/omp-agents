@@ -208,11 +208,9 @@ export function workspaceGroups(lists: SidebarSessions, workspaces: readonly Wor
 	return [...all.filter(busy), ...all.filter(group => !busy(group))];
 }
 
-/** A workspace the roster shows: its group, and the ended sessions on screen it holds because Past does not list them. */
+/** A workspace the roster shows: its group, and how many session rows it holds, its live and interrupted ones. */
 export interface RosterFolder {
 	group: WorkspaceGroup;
-	under: PastSession[];
-	/** How many session rows the folder holds: its live, interrupted, and ended ones. */
 	rows: number;
 }
 
@@ -225,33 +223,14 @@ export interface RosterFolders {
 }
 
 /**
- * The roster's folders in `groups` order. Past lists the first `pastListed` of `ended`; an ended session on `open`
- * screen beyond them shows under its folder instead. At most `limit` folders show, or as many as hold a live or
- * interrupted session, unless `all`; a later folder holding an open ended session shows in its own place, so opening
- * one never moves a folder. `filtering` drops the folders a search leaves empty.
+ * The roster's folders in `groups` order. At most `limit` folders show, or as many as hold a live or interrupted
+ * session, unless `all`. Ended sessions stay in Past, never in a folder. `filtering` drops the folders a search leaves empty.
  */
-export function rosterFolders(groups: readonly WorkspaceGroup[], ended: readonly PastSession[], open: readonly View[], { pastListed, limit, all, filtering }: { pastListed: number; limit: number; all: boolean; filtering: boolean }): RosterFolders {
-	// The ended sessions on screen past the ones Past lists, in `ended` order, each once.
-	const onScreen = open
-		.flatMap(view => (view.kind === "past" ? [ended.findIndex(session => session.sessionId === view.sessionId)] : []))
-		.filter(index => index >= pastListed)
-		.toSorted((a, b) => a - b);
-	const under = new Map<string, PastSession[]>();
-	for (const [at, index] of onScreen.entries()) {
-		const session = ended[index];
-		if (session === undefined || index === onScreen[at - 1]) continue;
-		const cwd = workspaceOf(session).cwd;
-		const folder = under.get(cwd);
-		if (folder) folder.push(session);
-		else under.set(cwd, [session]);
-	}
-	const folders = groups.map((group): RosterFolder => {
-		const held = under.get(group.workspace.cwd) ?? [];
-		return { group, under: held, rows: group.hosts.length + group.interrupted.length + held.length };
-	});
+export function rosterFolders(groups: readonly WorkspaceGroup[], { limit, all, filtering }: { limit: number; all: boolean; filtering: boolean }): RosterFolders {
+	const folders = groups.map((group): RosterFolder => ({ group, rows: group.hosts.length + group.interrupted.length }));
 	const matching = filtering ? folders.filter(folder => folder.rows > 0) : folders;
-	const busy = matching.filter(({ group }) => group.hosts.length + group.interrupted.length > 0).length;
-	const shown = all ? matching : matching.filter((folder, index) => index < Math.max(limit, busy) || folder.under.length > 0);
+	const busy = matching.filter(folder => folder.rows > 0).length;
+	const shown = all ? matching : matching.slice(0, Math.max(limit, busy));
 	return { shown, more: matching.length - shown.length, foldable: matching.length > limit };
 }
 

@@ -299,40 +299,19 @@ describe("rowPlacement", () => {
 
 describe("rosterFolders", () => {
 	const workspace = (cwd: string) => ({ cwd, cwdDisplay: cwd });
-	const ended = (sessionId: string, cwd: string) => ({ sessionId, cwd, cwdDisplay: cwd, workspace: null, interrupted: false }) as PastSession;
 	const groups = workspaceGroups(sidebarSessions([host("h1", "~/c")], [], null, none), ["~/a", "~/b", "~/c", "~/d"].map(workspace));
-	const saved = [ended("p1", "~/a"), ended("p2", "~/d"), ended("p3", "~/b")];
 	const cwds = ({ shown }: { shown: { group: { workspace: { cwd: string } } }[] }) => shown.map(({ group }) => group.workspace.cwd);
-	const options = { pastListed: 0, limit: 2, all: false, filtering: false };
+	const options = { limit: 2, all: false, filtering: false };
 
-	test("an open ended session that Past does not list shows under its folder, and the folder keeps its place", () => {
-		const before = rosterFolders(groups, saved, [], options);
-		expect(cwds(before)).toEqual(["~/c", "~/a"]);
-		expect(before.more).toBe(2);
-		const opened = rosterFolders(groups, saved, [{ kind: "past", sessionId: "p2" }], options);
-		expect(cwds(opened)).toEqual(["~/c", "~/a", "~/d"]);
-		expect(opened.shown.map(({ under }) => ids(under))).toEqual([[], [], ["p2"]]);
-		expect(opened.more).toBe(1);
-	});
-
-	test("an open ended session that Past lists stays there and leaves the folders alone", () => {
-		const folders = rosterFolders(groups, saved, [{ kind: "past", sessionId: "p2" }], { ...options, pastListed: saved.length });
+	test("busy folders come first and the rest stay behind the limit", () => {
+		const folders = rosterFolders(groups, options);
 		expect(cwds(folders)).toEqual(["~/c", "~/a"]);
-		expect(folders.shown.every(({ under }) => under.length === 0)).toBe(true);
-	});
-
-	test("ended sessions on screen sit under their folder in Past's order, each once, and count as its rows", () => {
-		const both = [ended("p1", "~/a"), ended("p4", "~/a")];
-		const folders = rosterFolders(groups, both, [{ kind: "past", sessionId: "p4" }, { kind: "past", sessionId: "p1" }, { kind: "past", sessionId: "p4" }], options);
-		const a = folders.shown.find(({ group }) => group.workspace.cwd === "~/a");
-		expect(a && ids(a.under)).toEqual(["p1", "p4"]);
-		expect(a?.rows).toBe(2);
-		expect(folders.shown.find(({ group }) => group.workspace.cwd === "~/c")?.rows).toBe(1);
+		expect(folders.more).toBe(2);
 	});
 
 	test("the full list folds back only when more folders match than the limit", () => {
-		expect(rosterFolders(groups, saved, [], { ...options, all: true }).foldable).toBe(true);
-		expect(rosterFolders(groups, saved, [], { ...options, all: true, limit: 4 }).foldable).toBe(false);
-		expect(rosterFolders(groups, saved, [], { ...options, all: true, filtering: true }).foldable).toBe(false);
+		expect(rosterFolders(groups, { ...options, all: true }).foldable).toBe(true);
+		expect(rosterFolders(groups, { ...options, all: true, limit: 4 }).foldable).toBe(false);
+		expect(rosterFolders(groups, { ...options, all: true, filtering: true }).foldable).toBe(false);
 	});
 });

@@ -17,7 +17,7 @@ Alt is Option on macOS.
 | Cmd+N / S | Anywhere / outside text fields | Start a new session; on the tickets page, Cmd+N creates a Linear ticket |
 | Cmd+F | Anywhere | Find text in the focused session's conversation, or in the pull request the Pull requests page shows |
 | Cmd+Shift+F | Anywhere | Put the cursor in the sidebar's session search |
-| Cmd+W | Anywhere | End the focused session |
+| Cmd+W | Anywhere | Close the header tab on screen; its session keeps running |
 | Cmd+Alt+↑ | Anywhere | Open the previous session in the sidebar |
 | Cmd+Alt+↓ | Anywhere | Open the next session in the sidebar |
 | ↓ / ↑ | Sessions, outside text fields | Open the next or previous session in the sidebar |
@@ -99,7 +99,7 @@ Alt is Option on macOS.
   What you type ranks every match by how well it matches and how much you use it, and the app remembers that.
   Enter runs the highlighted entry's main action, which opens a session in the focused pane, and Cmd+Enter runs its second, which opens a session in a split.
   A session from another workspace switches the sidebar to that workspace.
-  Cmd+K inside the menu lists every action of the highlighted entry, as the session row's menu does, and you can search them; Cmd+Shift+P pins or unpins a session, Cmd+Shift+C copies its path, and Cmd+W ends it, without opening that list.
+  Cmd+K inside the menu lists every action of the highlighted entry, as the session row's menu does, and you can search them; Cmd+Shift+P pins or unpins a session and Cmd+Shift+C copies its path, without opening that list.
   **Choose workspace…** switches the sidebar's workspace, and **Create todo** asks for a todo's title; Esc or Backspace in the empty field goes back.
   **Update dashboard**, listed when the server runs from a git checkout, names the new commits on its branch and runs [Updating omp-agents](updating-omp-agents.md).
   The bar at the bottom names where you are, what Enter does, and **Actions**, which opens the same list as Cmd+K.
@@ -113,8 +113,8 @@ Alt is Option on macOS.
   From a subagent they step from its session's row.
 - Cmd+N opens the new-session draft, as **New session** at the top of the session list does; on the tickets page it opens the new-issue dialog instead.
   S outside a text field does it too; on the Todo page, S changes a focused or open todo's status instead.
-  Cmd+W ends the focused session, as **End session** in its header does, with no confirmation; **Resume** continues it from the past sessions.
-  It does nothing in a subagent, a read-only room, or a past session.
+  Cmd+W closes the header tab on screen and leaves its session running; it does nothing when the page has no header tab.
+  **End session** in a session's header ends it; **Resume** continues it from the past sessions.
   `/` or Cmd+I puts the cursor in the focused pane's composer.
 - Inside the command menu, Cmd+Shift+P pins or unpins the highlighted session.
 - Cmd+Alt+/ opens the model picker, and Shift+Tab in a composer moves to the next thinking level, in sessions that the dashboard started and in the new-session draft.

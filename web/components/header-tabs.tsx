@@ -195,7 +195,14 @@ export function HeaderTabs({ className, address, hosts, past, controls }: Header
 		move(id, step.target, step.where);
 		return true;
 	};
-	useShortcuts({ moveTabLeft: () => moveFocused(-1), moveTabRight: () => moveFocused(1) });
+	useShortcuts({
+		moveTabLeft: () => moveFocused(-1),
+		moveTabRight: () => moveFocused(1),
+		closeTab: () => {
+			if (activeId === null) return false;
+			close(activeId);
+		},
+	});
 	const select = (index: number): void => {
 		setRow(current => ({ tabs: current.tabs, active: index }));
 		location.hash = tabs[index]?.hash ?? "";
@@ -209,8 +216,8 @@ export function HeaderTabs({ className, address, hosts, past, controls }: Header
 		<div
 			className={cn(
 				"flex h-(--page-header-height) min-w-0 items-center gap-1 select-none [-webkit-app-region:drag] *:[-webkit-app-region:no-drag]",
-				// A closed sidebar's rail is narrower than the desktop window's buttons; on a phone the floating sidebar's toggle sits over the row's left end.
-				"phone:group-has-[#sessions-sidebar[inert]]/window:pl-[max(0px,calc(env(titlebar-area-x,0px)-var(--sidebar-rail)))] max-phone:pl-[max(var(--sidebar-toggle-clearance),env(titlebar-area-x,0px))]",
+				// A closed sidebar's toggle sits over the row's left end, past the desktop window's buttons.
+				"phone:group-has-[#sessions-sidebar[inert]]/window:pl-[calc(env(titlebar-area-x,0px)+var(--sidebar-toggle-clearance))] max-phone:pl-[max(var(--sidebar-toggle-clearance),env(titlebar-area-x,0px))]",
 				className,
 			)}
 		>

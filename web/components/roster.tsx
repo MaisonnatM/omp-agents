@@ -142,8 +142,8 @@ interface RosterProps {
 }
 
 /**
- * The roster: each workspace holds its live and interrupted sessions, the busy ones first, and Past lists the ended ones.
- * An ended session on screen that Past does not show, folded or beyond its page, shows under its workspace instead.
+ * The roster: each workspace holds its live and interrupted sessions, the busy ones first, and Past lists the ended ones,
+ * even one on screen that Past does not show.
  */
 export function Roster({ workspaces, lists, groups, query, onQuery, onTogglePin, open, scheduled, scheduledOpen, onPickWorkspace }: RosterProps) {
 	const { start, dismissStart, openNewSession } = useDashboardActions();
@@ -173,7 +173,7 @@ export function Roster({ workspaces, lists, groups, query, onQuery, onTogglePin,
 	/** The search field narrows the lists, so a workspace left empty hides rather than showing no sessions. */
 	const filtering = query.trim() !== "";
 	const showWorkspace = workspace === null;
-	const folders = rosterFolders(groups, ended, open, { pastListed: pastOpen ? pastShown : 0, limit: GROUPS_SHOWN, all: allGroups, filtering });
+	const folders = rosterFolders(groups, { limit: GROUPS_SHOWN, all: allGroups, filtering });
 	const hostRow = (host: SidebarSessions["running"][number], isPinned: boolean, badged: boolean) => (
 		<HostRow key={host.instanceId} session={host} pinned={isPinned} placement={rowPlacement(open, { kind: "live", instanceId: host.instanceId, agentId: null })} showWorkspace={badged} onTogglePin={onTogglePin} />
 	);
@@ -251,7 +251,6 @@ export function Roster({ workspaces, lists, groups, query, onQuery, onTogglePin,
 					<WorkspaceFolder key={cwd} folder={folder} name={folderName(cwdDisplay) ?? cwdDisplay} open={!collapsed.has(key)} onOpenChange={() => toggleGroup(key)} onNewSession={() => openNewSession(cwd)}>
 						{folder.group.hosts.map(host => hostRow(host, false, false))}
 						{folder.group.interrupted.map(session => pastRow(session, false, false))}
-						{folder.under.map(session => pastRow(session, false, false))}
 					</WorkspaceFolder>
 				);
 			})}

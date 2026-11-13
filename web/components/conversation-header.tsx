@@ -117,7 +117,6 @@ export function ConversationHeader({ view, subject, onEnd, actions, titleAction 
 							? "Deletes this conversation and everything it wrote. Nothing moves to Past sessions."
 							: `End session. Stops the omp process ${endable.source === "dashboard" ? "this dashboard started" : `running in its terminal (pid ${endable.pid})`}. Its transcript moves to Past sessions, where Resume continues it.`
 					}
-					shortcut={shortcutLabels("endSession")}
 					side="bottom"
 				>
 					<Button
