@@ -20,6 +20,7 @@ import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Roster } from "./roster";
 import { ScheduledSends } from "./scheduled";
 import { type NavCount, SidebarNav } from "./sidebar-nav";
+import { useUnseenChangelog } from "./whats-new";
 
 const NO_VIEWS: View[] = [];
 
@@ -38,6 +39,7 @@ interface AppSidebarProps {
 	/** The open page's own list, shown beneath its row while the sidebar floats, as on a phone; otherwise the page holds it. */
 	list: ReactNode;
 	settings: SettingsRoute;
+	unreadNotices: number;
 	onPickWorkspace: (cwd: string | null) => void;
 	onSearch: () => void;
 }
@@ -57,6 +59,7 @@ export const AppSidebar = memo(function AppSidebar({
 	botList,
 	list,
 	settings,
+	unreadNotices,
 	onPickWorkspace,
 	onSearch,
 }: AppSidebarProps) {
@@ -64,6 +67,7 @@ export const AppSidebar = memo(function AppSidebar({
 	const { connected, pullRequestsScope } = useDashboardStatus();
 	const scheduled = useContext(ScheduledSends);
 	const pullRequestRead = pullRequestsStore.use(pullRequestsScope).read;
+	const unseenChangelog = useUnseenChangelog();
 	const counts = useMemo(
 		(): Partial<Record<SidebarTab, NavCount>> => ({
 			bots: { count: botList ? botsNeedingYou(botList) : 0, says: sessionsWaiting },
@@ -97,6 +101,8 @@ export const AppSidebar = memo(function AppSidebar({
 				onNewSession={() => openNewSession()}
 				onTab={onTab}
 				settingsRoute={settings}
+				unreadNotices={unreadNotices}
+				unseenChangelog={unseenChangelog}
 			/>
 			<SidebarContent>
 				<Roster

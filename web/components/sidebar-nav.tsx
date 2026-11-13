@@ -1,11 +1,11 @@
-/** The left sidebar's page list: New session, each shown tab's page with its count, and Settings; while the sidebar floats, the page on screen holds its own list beneath its row. */
+/** The left sidebar's page list: New session, each shown tab's page with its count, Notifications with its unread count, What's new with a dot for unseen lines, and Settings; while the sidebar floats, the page on screen holds its own list beneath its row. */
 import { IconEditBig } from "central-icons";
 import { Fragment, type ReactNode } from "react";
 import { SidebarGroup, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarMenuNested } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip } from "@/components/ui/tooltip";
 import { PAGE_ICON } from "../page-icons";
-import { hashForPage, type SettingsRoute, type SidebarTab } from "../routing";
+import { hashForNotifications, hashForPage, hashForWhatsNew, type SettingsRoute, type SidebarTab } from "../routing";
 import { shortcutLabels } from "../shortcuts";
 import { type NavRow, TAB_ROWS, tabShortcutLabels } from "../sidebar-tabs";
 import { CountPill } from "./count-pill";
@@ -31,9 +31,13 @@ interface SidebarNavProps {
 	onTab: (tab: SidebarTab) => void;
 	/** The settings section and workspace the Settings row opens. */
 	settingsRoute: SettingsRoute;
+	/** How many notices are unread, after the Notifications row's label. */
+	unreadNotices: number;
+	/** The changelog has lines the What's new page has not listed on this machine. */
+	unseenChangelog: boolean;
 }
 
-export function SidebarNav({ tabs, current, counts, list, newSessionLabel, onNewSession, onTab, settingsRoute }: SidebarNavProps) {
+export function SidebarNav({ tabs, current, counts, list, newSessionLabel, onNewSession, onTab, settingsRoute, unreadNotices, unseenChangelog }: SidebarNavProps) {
 	const sub = list !== null && (
 		<SidebarMenuNested>
 			<ScrollArea className="ml-[15px] border-l border-border" viewportClassName="scroll-fade max-h-[30svh] pl-1 [&>div]:!block [&>div]:!min-w-0">
@@ -74,6 +78,36 @@ export function SidebarNav({ tabs, current, counts, list, newSessionLabel, onNew
 							</Fragment>
 						);
 					})}
+					<SidebarMenuItem>
+						<Tooltip content="Notifications" side="right">
+							<SidebarMenuButton
+								size="short"
+								asChild
+								icon={PAGE_ICON.notifications}
+								isActive={current === "notifications"}
+								aria-label={unreadNotices > 0 ? `Notifications, ${unreadNotices} unread` : undefined}
+							>
+								<a href={hashForNotifications()}>Notifications</a>
+							</SidebarMenuButton>
+						</Tooltip>
+						{unreadNotices > 0 && (
+							<SidebarMenuBadge aria-hidden>
+								<CountPill count={unreadNotices} />
+							</SidebarMenuBadge>
+						)}
+					</SidebarMenuItem>
+					<SidebarMenuItem>
+						<Tooltip content="What's new" side="right">
+							<SidebarMenuButton size="short" asChild icon={PAGE_ICON["whats-new"]} isActive={current === "whats-new"} aria-label={unseenChangelog ? "What's new, unseen lines" : undefined}>
+								<a href={hashForWhatsNew()}>What's new</a>
+							</SidebarMenuButton>
+						</Tooltip>
+						{unseenChangelog && (
+							<SidebarMenuBadge aria-hidden>
+								<span className="mr-1 size-2 rounded-full bg-blue-500" />
+							</SidebarMenuBadge>
+						)}
+					</SidebarMenuItem>
 					<SidebarMenuItem>
 						<Tooltip content="Settings" shortcut={shortcutLabels("settings")} side="right">
 							<SidebarMenuButton size="short" asChild icon={PAGE_ICON.settings} isActive={current === "settings"}>

@@ -187,6 +187,8 @@ export const VIEWS = [
 	{ key: "todo", label: "Todo" },
 	{ key: "todo/item", label: "A todo" },
 	{ key: "calendar", label: "Calendar" },
+	{ key: "notifications", label: "Notifications" },
+	{ key: "whats-new", label: "What's new" },
 	{ key: "bots", label: "Bots" },
 	{ key: "bots/new", label: "New Bot" },
 	{ key: "bots/item", label: "A Bot" },
@@ -230,6 +232,8 @@ function pageView(page: Page): ViewKey {
 			if (page.tab === "progress") return "sport/progress";
 			return page.open === null ? "sport/journal" : "sport/journal/item";
 		case "calendar":
+		case "notifications":
+		case "whats-new":
 		case "get-started":
 		case "new":
 			return page.kind;

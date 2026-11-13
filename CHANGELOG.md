@@ -1,10 +1,13 @@
 # What's new in omp-agents
 
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
-The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
+The dashboard shows the same lines on its What's new page, from the sidebar.
 
 ## 2026-11-13
 
+- Notifications moved from the bell at the top right to a Notifications row in the sidebar, before Settings, with its unread count; it opens a full page with the same filters and Mark all as read.
+- The header no longer has a Settings button; the sidebar's Settings row and G then , still open Settings.
+- What's new moved from the sparkles button at the top right to a What's new row in the sidebar, after Notifications, with a blue dot for new lines; it opens a full page with Update dashboard. The header now holds only your tabs.
 - Archive session now shows an archive icon in the header and the sidebar's right-click menu, and the header button is plain instead of filled.
 - A session's header no longer shows its branch or its pull request and Linear issue buttons.
 - The Personal and Work spaces are gone: every page shows all your workspaces, sessions, Bots, events, and accounts together, and the sidebar's Workspaces label still narrows the list to one workspace.
