@@ -12,7 +12,7 @@ Alt is Option on macOS.
 | ↑ | Empty composer | Move the last queued message back into the composer |
 | Cmd+Shift+M | Composer | Dictate a prompt, or stop dictating |
 | Cmd+K | Anywhere | Open the command menu |
-| Cmd+[ / Cmd+] | Anywhere | Go back or forward, as the title bar's Back and Forward buttons do |
+| Cmd+[ / Cmd+] | Anywhere | Go back or forward, as the Back and Forward buttons at the start of the header's tabs do |
 | Cmd+N / S | Anywhere / outside text fields | Start a new session; on the tickets page, Cmd+N creates a Linear ticket |
 | Cmd+Shift+P | Anywhere but the command menu | Switch between the Personal and Work spaces |
 | Cmd+F | Anywhere | Find text in the focused session's conversation, or in the pull request the Pull requests page shows |
@@ -80,12 +80,12 @@ Alt is Option on macOS.
   The dialog groups them in tabs by category: General, Sessions, Pull requests, Todo, Notes, Email, Calendar, Sport, and Changes.
   Its header states the rule for where a key works: chords with Cmd, Alt, or Ctrl work anywhere, even while you type, and single keys and G pairs work outside text fields; a **Composer only** tag marks the keys that work only in the composer.
   Each tab's column headings stay pinned while its list scrolls, and rows fade in under them.
-  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the header's **Notes** and **Email** buttons, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the open Sport journal session's ↑, ↓, and **×**, the Sport demo dialog's **Précédent** and **Suivant**, the Calendar page's **New event**, and an Email conversation's **Reply**, **Reply all**, **Delete**, and **Open in Gmail**.
-- Cmd+1 through Cmd+5 go to the first through fifth tab the sidebar's bar draws, even while typing.
-  The numbers count only the bar's tabs, in the order **Settings › Preferences** sets: a tab you hide, or Tickets in Personal or without a Linear sign-in, takes no number, and the tabs after it move up one.
+  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar's top row and page list, the header's tabs' buttons, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the open Sport journal session's ↑, ↓, and **×**, the Sport demo dialog's **Précédent** and **Suivant**, the Calendar page's **New event**, and an Email conversation's **Reply**, **Reply all**, **Delete**, and **Open in Gmail**.
+- Cmd+1 through Cmd+5 go to the first through fifth tab of the sidebar's page list, even while typing.
+  The numbers count the shown tabs, in the order **Settings › Preferences** sets: a tab you hide, or Tickets in Personal or without a Linear sign-in, takes no number, and the tabs after it move up one.
   A number with no tab is left to the window.
   In the default order in Work with Linear connected, Cmd+1 opens **Pull requests**, Cmd+2 **Tickets**, Cmd+3 **Bots**, and Cmd+4 **Sessions**; in Personal or without Linear, each tab after **Pull requests** takes the number one lower.
-  **Notes**, **Calendar**, **Todo**, **Sport**, and **Email**, the buttons in the header beside the command menu, take no number; Notes keeps G then N and Email keeps G then M, and Calendar, Todo, and Sport have no pair.
+  A tab after the fifth takes no number; Notes keeps G then N and Email keeps G then M, and Calendar, Todo, and Sport have no pair.
   In Work, **Go to sport** leaves the command menu; in Personal, **Go to tickets**, the tickets search, **Create ticket**, and C's new-ticket dialog leave too.
   Cmd with T, L, R, D, Q, O, P, S, Tab, or 6 through 0 is left to the window, whose menu takes Cmd+R, Cmd+Q, and Cmd+0, and Cmd+Shift+W to close it; see [Desktop app](desktop-app.md).
   Single keys and the G pairs work only while no text field has focus, so they never take what you type.

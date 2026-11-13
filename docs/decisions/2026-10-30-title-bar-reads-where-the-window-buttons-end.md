@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 date: 2026-10-30
 decision-makers: agent
+superseded-by: 2026-11-13-the-window-uses-an-inset-sidebar-and-a-tab-strip-across-the-top
 ---
 
 # The title bar reads where the window's buttons end

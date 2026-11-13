@@ -29,7 +29,7 @@
   Finger pain removes the fingerboard and every hang for the next 7 days; the open day shows them struck through.
 - On a narrow page, while the open day has a workout not noted yet, a **Séance faite…** button stays at the bottom of the day.
 - On a narrow page, the buttons for a free session and the weigh-in sit beside the view tabs, under the page title.
-- On a phone, the title and its phase and week read in full, with the header's buttons on a row under them, as on every page.
+- On a phone, the title and its phase and week read in full, with the page's buttons on a row under them, as on every page.
 
 ## Lancer
 

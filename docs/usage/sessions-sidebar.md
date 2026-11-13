@@ -1,9 +1,6 @@
 # Sessions sidebar
 
-- The **Personal** and **Work** switch at the top of the window picks the space the dashboard shows: in the desktop app it sits beside Back and Forward in the title bar, and in a browser at the right of the page header, or at the top right of the empty home.
-  In a page header narrower than 64rem the switch shows its two icons alone, and hovering one names its space.
-  In a header narrower than 56rem, as on a phone or beside a wide right sidebar, one menu named after the tab you are on holds every tab, the space, and Settings, beside the command menu and the bell.
-  While the other space has sessions that need you, a blue dot sits on that menu's button, and the space's row in the menu counts them.
+- The account row at the foot of the sidebar names the space the dashboard shows, **Personal** or **Work**, and how many workspaces it lists; its menu switches to the other space and opens **Keyboard shortcuts**.
   Personal holds the personal directory and the workspaces Settings › Workspaces placed in Personal; every other workspace is in Work, a workspace the page cannot place yet included.
   The sidebar's sessions, its counts, the session search, the scheduled sends, the Todo page, the pull requests, the Bots, the Notes, the Calendar's events on this computer, the Google accounts that Email and Calendar show, the command menu's sessions, workspaces, and notes, Settings' workspace pickers, and New session's directory picker then hold only the space's.
   Switching keeps the page you are on; on the panes it opens the space's most recently started running session, or the empty home when none runs there.
@@ -12,23 +9,30 @@
   Each window keeps its own space, and a new window or a reload opens in the last space picked on this computer, Work the first time.
   Opening a link to a session of the other space, from a notification or another window, switches the window to that space.
   So does a link to Sport, which shows only in Personal, or to Tickets, which shows only in Work.
-- The side of the switch for the space not shown counts that space's sessions that need you, each that asks you something or finished a turn you have not looked at, so they do not wait unseen; hovering the side, or a screen reader, says how many sessions wait on you.
+- While the space not shown has sessions that need you, each that asks you something or finished a turn you have not looked at, a blue dot sits on the account row's letter and the space's row in its menu counts them, so they do not wait unseen; a screen reader says how many sessions wait on you.
   Their notifications still show while you work in the other space, and clicking one switches to its space; the Dock badge counts both spaces.
-- The content header and both sidebar header rows are 48 px tall at the default font size, each with a hairline under it.
-- The sidebar's tab bar shows **Pull requests**, **Tickets**, **Bots**, and **Sessions**, above the list of the one open; **Tickets** shows only in Work.
-  **Notes**, **Calendar**, **Todo**, **Sport**, and **Email** are buttons in the header, right after the command menu button, between two dividers; each opens its page and shows its list in the sidebar below the tab bar, with no tab selected, and the open one's button stays pressed; **Sport** shows only in Personal.
-  The **Bots** tab lists your Bots and opens their conversations, which stay out of the **Sessions** tab.
+- The sidebar runs the window's height on the window's background, and the page and the session details sidebar sit beside it as rounded panels.
+  Its top row, 48 px tall at the default font size as the header's tabs beside it are, holds the omp mark, the command menu button, and the button that hides the sidebar.
+- Under it the page list shows **New session**, then **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Notes**, **Calendar**, **Todo**, **Sport**, and **Email** in the order Settings › Preferences gives them, then **Settings**; **Tickets** shows only in Work and **Sport** only in Personal.
+  A row opens its page, and the open page's row stays highlighted with that page's own list nested under it, such as the Todo categories or the Settings sections.
+  A page whose row you hid in Preferences shows its list after the last row.
+  **Bots** lists your Bots and opens their conversations, which stay out of the roster.
   See [Bots](bots.md).
-  The **Sessions** tab counts the sessions of the picked workspace that need you: each that asks you something, or finished a turn you have not looked at since.
+  **Sessions** counts the sessions of the picked workspace that need you: each that asks you something, or finished a turn you have not looked at since.
   A finished turn you have read leaves the count, though its session stays idle.
   So does a finished turn of a session waiting on its subagents, until they stop.
+- The header's tabs run across the top right of the sidebar: Back and Forward, a tab for each page and session you opened lately, **New session** as a +, and What's new, the bell, and Settings at the right end.
+  Clicking a tab focuses its page or session, and opening a page or a session that has no tab adds one at the end; the row keeps eight, dropping the one seen longest ago.
+  The × on a tab, or a middle-click, closes it, and closing the one on screen shows its neighbor.
+  Drag a tab to move it; this browser keeps the tabs and their order across reloads.
+  In the desktop app on macOS the row is the window's title bar: it starts after the window's buttons and drags the window.
 - The dot before each session shows when it waits on you.
   A running turn shows no dot, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
   A session waiting on its subagents shows no dot either, even when its turn has ended, and its row's tooltip says **waiting on subagents**.
 - Under **All of Personal** or **All of Work**, a session row with a title shows a badge that names its workspace, the last segment of the workspace's directory, on the right before its age.
   With one workspace picked, the rows show no badge.
   A row without a title shows its directory's name as its label, and the badge only when it runs in a linked worktree, whose name is not its workspace's.
-- The workspace picker in the sidebar header shows only the running, idle, waiting on subagents, interrupted, and past sessions from one workspace.
+- The **Workspaces** label above the roster is the workspace picker: it shows only the running, idle, waiting on subagents, interrupted, and past sessions from one workspace, and then reads that workspace's name.
   A workspace is a repository's main checkout, or a directory outside git: a session in a linked git worktree, such as `~/code/yampa-review-triage-3935ff7b`, counts in its repository's workspace, `~/code/yampa`, and still runs in its worktree.
   A session whose worktree was removed counts in the repository whose main checkout's path, followed by `-`, starts its directory, such as `~/code/yampa-wt/fix` in `~/code/yampa`, else in the only repository whose main checkout has its directory's name, such as Codex's `~/.codex/worktrees/f5e7/yampa`.
   The picker lists the space's workspaces that a live or saved session ran in, live sessions' first, then the ones added in **Settings › Workspaces**, except temporary directories and hidden workspaces; in Personal the personal directory comes first, named **Personal**.
@@ -39,36 +43,37 @@
   The app keeps the choice.
   If no session from the saved workspace is left, or it is not in the space on screen, the sidebar lists every session of the space.
   Moving a workspace shows a toast that says where it went, with **Undo** for 8 seconds to move it back, or says the move failed and why.
-- **New session** at the top of the **Sessions** tab opens the new-session draft, in the selected workspace when there is one, and stays highlighted while the draft is open.
+- **New session** at the top of the page list opens the new-session draft, in the selected workspace when there is one, and stays highlighted while the draft is open.
   In Personal with no workspace picked, it reads **New session in Personal** and starts in the personal directory.
-  It shows its key, Cmd+N, on its right.
-- The search field under it narrows every group to the sessions whose title or working directory holds every word typed, in any order and any case, within the selected workspace.
-  A group left without a match hides, and `No sessions match` shows when none is left; Esc clears the field.
+  Hovering it shows its key, Cmd+N.
+- The **Search sessions** button at the right of the **Workspaces** label, shown while the pointer is over the label, opens a search field under it, and so does Cmd+Shift+F while the sidebar shows.
+  The field narrows every folder to the sessions whose title or working directory holds every word typed, in any order and any case, within the selected workspace.
+  A folder left without a match hides, and `No sessions match` shows when none is left; Esc clears the field, and the field closes once it is empty and loses the cursor.
   While empty, it shows its key, Cmd+Shift+F, on its right.
-  Cmd+Shift+F puts the cursor in it while the **Sessions** tab shows; elsewhere, and while the sidebar is hidden, Cmd+Shift+F does nothing.
   Cmd+F finds text in the open conversation instead, as [Conversations](conversations.md) says.
   Cmd+K opens the command menu, which searches every workspace of the space instead.
 - Sessions in `/tmp`, `/private/tmp`, or macOS's temp folders under `/var/folders` (where `mktemp -d` puts its directories), including their subdirectories, are hidden from the workspace pickers, session lists and counts, and session search.
   Starting or opening one does not replace the saved workspace.
   Their saved transcripts remain available through a direct session link.
 - A workspace hidden in **Settings › Workspaces** is left out the same way, with the sessions of its linked worktrees, but only its own directory: sessions in a directory inside it stay listed.
-- **Pin** in a row's menu moves the session to the **Pinned** group at the top of the list, and **Unpin** moves it back.
+- **Pin** in a row's menu moves the session to the **Pinned** group at the top of the roster, and **Unpin** moves it back.
   The group lists pinned running sessions first, then pinned past ones, interrupted ones first, and shows only while it has a row.
-  A pinned session stays pinned when it ends, is resumed, or is interrupted, and an interrupted one says `interrupted` after its title.
+  A pinned session stays pinned when it ends, is resumed, or is interrupted.
   The selected workspace applies to the group too.
   The server keeps the pins in `pins.json` beside its access token, by session id, so every window of the app shows the same ones.
   Pins that an older version kept in the page move to the server the first time its page connects.
-- A live session whose turn ended, the blue dot, leaves **Running** for the **Idle** group above it, and moves back when its next turn starts.
-  A session waiting on a question stays under **Running**, and a pinned session stays under **Pinned** whatever its state.
-  The group shows only while it has a row.
-- A live session whose subagents still run while its main agent's turn has ended, or sits only in a `wait` or `task` call waiting on them, moves to the **Waiting on subagents** group after **Running**, such as **2 waiting on subagents**.
-  It moves back to **Idle** once its turn ends with no subagent running, and to **Running** once its main agent runs another tool or asks a question, or its last subagent finishes while its turn still runs.
-  Thinking or writing between two `wait` calls keeps it in the group.
-  A session whose server started watching it in the middle of a `wait` call stays under **Running** until its main agent's next tool call.
-  The group shows only while it has a row.
-- Click the **Pinned**, **Idle**, **Running**, **Waiting on subagents**, **Interrupted**, or **Past** group label to collapse or expand its rows.
-  The app keeps each group's choice across workspaces, navigation, and reloads, even while the group has no rows.
-- The past sessions list every saved session that has no live host, newest first, with its title (else its first prompt) and how long ago it last changed; hover a row to see its working directory.
+- Under the **Workspaces** label each workspace is a folder that holds its live and interrupted sessions, its idle ones first, then those running, then those waiting on subagents, and then the interrupted ones.
+  The folders that hold a session come first, then the others, each in the picker's order, so opening a session never moves a folder; eight show, or as many as hold a session, and **N more workspaces** shows the rest.
+  Hovering a folder shows its **New session in** button, and a blue count after its name says how many of its sessions need you.
+  A pinned session stays under **Pinned** whatever its state.
+  A live session whose subagents still run while its main agent's turn has ended, or sits only in a `wait` or `task` call waiting on them, counts as waiting on subagents until its turn ends with no subagent running, its main agent runs another tool or asks a question, or its last subagent finishes while its turn still runs.
+  Thinking or writing between two `wait` calls keeps it waiting.
+  A session whose server started watching it in the middle of a `wait` call counts as running until its main agent's next tool call.
+- Click a folder, or the **Pinned** or **Past** label, to fold or unfold its rows.
+  The app keeps each one's choice across workspaces, navigation, and reloads, even while it has no rows.
+  **Past** starts folded, and its label counts the past sessions it holds.
+- **Past** lists every saved session that has no live host, newest first, with its title (else its first prompt) and how long ago it last changed; hover a row to see its working directory.
+  A past session you open while **Past** is folded, or beyond the rows it shows, shows under its workspace's folder instead, so its row stays in view.
   Select one to read its transcript.
   The page cannot write to it until you resume it.
   A session that runs without publishing itself to the registry also appears in this list, and its transcript keeps updating while it runs.
@@ -83,26 +88,25 @@
   They are read-only: the pane's header reads `Read-only · Claude Code` or `Read-only · Codex`, and neither the header nor the row's menu offers **Resume** or **Fork from here**.
   An unknown or malformed line shows in the transcript as one warning with the line's start, alongside any text or tools the reader understood.
   Their subagents' sessions are left out of the list.
-  The group lists the 100 newest at first, and **Show 100 more** at its end adds the next ones.
-- The interrupted sessions, between the running and the past ones, list the sessions that the dashboard started and that stopped without **End session**: because omp exited on its own, or stopped while no dashboard ran, as when the computer restarted.
+  **Past** lists the 100 newest at first, and **Show 100 more** at its end adds the next ones.
+- The interrupted sessions, at the end of their workspace's folder with an amber pause mark, list the sessions that the dashboard started and that stopped without **End session**: because omp exited on its own, or stopped while no dashboard ran, as when the computer restarted.
   A session the dashboard started keeps running when the dashboard server stops, restarts, or crashes, turn, background jobs, and subagents included, and the next server shows it live again, so it never shows here for that.
   It shows as working again when its turn ran or compacted as the server stopped; one that had replied and only waited on a background job's result shows idle.
-  The group shows only while it has a row.
-  Its **Resume all** button resumes every session it lists, under the selected workspace, as **Resume** does for one; a pane that shows one of them then shows it live.
+  While any is listed, the **Resume all** button at the right of the **Workspaces** label resumes every one, under the selected workspace, as **Resume** does for one; a pane that shows one of them then shows it live.
   A session that was working when it stopped, or waiting on a question, also gets the prompt `continue`, so it picks its turn back up; an idle one waits for your next message.
   The notices bell's **Sessions** tab lists those that stopped mid-turn, and its **Continue all** resumes them the same way; see [Notifications](notifications.md).
-  When some fail to start, a note under the group label names how many and the first reason, until **Dismiss**.
+  When some fail to start, a note under the **Workspaces** label names how many and the first reason, until **Dismiss**.
   **Move to past** in a row's menu moves it to the past sessions.
-  A session that you end, resume, or move leaves the group.
+  A session that you end, resume, or move leaves its folder.
   The server keeps the list in `interrupted.json` beside its access token, so it survives a restart.
   Sessions started in a terminal keep running when the dashboard stops too, and never show here.
-- The sidebar list fades at its edges only after you scroll it: the top fades once rows pass under the header, and the bottom fades while more rows sit below.
+- The sidebar list fades at its edges only after you scroll it: the top fades once rows pass under its top row, and the bottom fades while more rows sit below.
 - Drag a sidebar's inner edge to resize it: the right edge of the sessions sidebar, between 240 and 560 pixels, or the left edge of the session details sidebar, between 240 and 960 pixels, so the Browser can show an app at a laptop's width.
   The session details sidebar stops where the conversation would get narrower than 480 pixels, and takes its width back once the window or the sessions sidebar leaves room.
   With the edge focused, the arrow keys move it in steps (hold Shift for bigger steps), and Home and End jump to the narrowest and widest sizes.
   Double-click the edge to reset the width.
   Resize handles show no tooltip on hover or while dragging.
-  The button at the outer corner of the sessions sidebar's header hides it: the sidebar slides shut and the button glides with its edge to the narrow strip it leaves, on the header's line, where a click shows it again.
+  The button at the right end of the sidebar's top row hides it: the sidebar slides shut and the button glides to the start of the header's tabs, where a click shows it again.
   Both sidebars slide open and shut in about a quarter second, or at once when the system asks for reduced motion.
   The session details sidebar's button stays at the end of the top-right pane's header, whether the sidebar is shown or hidden, and leaves with the sidebar while panes sit side by side.
   Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Alt+B the details sidebar, which shows the session's details on the panes and a Bot's on its page.

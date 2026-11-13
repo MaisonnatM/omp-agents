@@ -4,19 +4,19 @@
   It builds the two dashboard contexts and lays out the sidebars, the page, the command palette, and the dialogs, and leaves each slice of state to a hook of its own.
   `web/use-workspace-scope.ts` holds the window's space, which localStorage keeps as the last one picked on this computer, the sessions and workspaces of that space, the selected workspace, which it drops when the space does not hold it, and its pull request poll, scoped to the workspace, else to the space.
   `web/use-focused-session.ts` holds the focused pane's session, the document title, the sidebar following a `/move`, and the space following a session that opens from the other space.
-  `web/use-session-lists.ts` holds the Sessions tab's lists and search, the session `latestSession` from `web/sessions.ts` picks from the selected workspace's rows, and pins and unpins through the server's pins, and `web/use-sidebar-tab.ts` the tab and `showTab`, whose Sessions tab opens that session when no pane shows one.
+  `web/use-session-lists.ts` holds the roster's lists and search, the session `latestSession` from `web/sessions.ts` picks from the selected workspace's rows, and pins and unpins through the server's pins, and `web/use-sidebar-tab.ts` the tab and `showTab`, whose Sessions tab opens that session when no pane shows one.
   `web/use-overlays.ts` holds the shortcuts dialog, the command palette, the file dialog, and the new-ticket dialog.
   `web/use-transcript-display.ts` holds how transcripts show tool calls and thinking, and `web/use-page-shortcuts.ts` the page-wide shortcuts and the commands the palette runs.
-  `web/use-history-position.ts` follows whether history can go back and forward, which the title bar's Back and Forward buttons and the palette's Go back and Go forward read.
-  `web/components/app-sidebar.tsx` wires the roster to the page, `web/components/page-switch.tsx` picks the page or the panes, and `web/components/pane-grid.tsx` lays out the panes.
-  `#pull-requests` alone shows the Pull requests page, and the sidebar's Pull requests tab then lists its sections.
+  `web/use-history-position.ts` follows whether history can go back and forward, which the header tabs' Back and Forward buttons and the palette's Go back and Go forward read.
+  `web/components/app-sidebar.tsx` wires the sidebar's top row, page list, roster, and account row to the page, `web/components/header-tabs.tsx` draws the header's tabs above the page, `web/components/page-switch.tsx` picks the page or the panes, and `web/components/pane-grid.tsx` lays out the panes.
+  `#pull-requests` alone shows the Pull requests page, and the sidebar's Pull requests row then lists its sections under it.
 - `web/components/get-started.tsx`: the setup dialog, mounted once in `web/app.tsx`, with its welcome, five-step rail, and Back / Next / Skip, the vacant-home eligibility check, and the bottom-right bubble it closes into, drawn under the toasts through `UnderToasts`.
   `web/components/get-started-steps.tsx` draws each step's body, reusing the Settings provider list for the sign-in step, and the GitHub and pstack rows.
   `web/components/get-started-tools.tsx` draws the Tools and workflows step: GitHub, each Settings › Integrations row through `McpIntegrationRow`, and pstack, grouped under Action needed and Ready, each folding to its name, badge, and summary.
   `web/get-started-model.ts` holds what it decides without React: `Observation` and `observation()`, `firstSessionFact`, which reads the roster into the first-session fact `web/app.tsx` passes it, and `getStartedSurface`, which picks the dialog, the bubble, or nothing.
   It derives completion from the providers, terminal-session, starter-kit, and source-control reads and the existing global session/integration stores; only dismissal, the closed dialog, and the step on screen are stored locally, never portable completion ticks.
   `#get-started` and the command menu always open the dialog over the home or panes `PageSwitch` draws.
-- `web/components/empty-home.tsx`: `EmptyHome`, the neutral home `PageSwitch` draws when no session or page shows, with New session / Get started, any registry error, and, outside the desktop app's title bar, the header's controls at its top right, the space switch among them.
+- `web/components/empty-home.tsx`: `EmptyHome`, the neutral home `PageSwitch` draws when no session or page shows, with New session / Get started and any registry error.
 - `web/use-dashboard.ts`: the socket, the page state, and the URL hash.
   One exhaustive switch in the socket's `onmessage` sends each server message to the pane store or the reducer, and the hash is read once into a `Route` (a page, a `#session/<id>` link, or the panes).
   `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request, a Linear issue, or a todo, which runs in the background.

@@ -28,7 +28,7 @@
   The ticket step links the issue you named or one that matches the work, and passes without one rather than creating a ticket.
   In the plan step the agent compares up to three ways to build the change and posts the one it chose on the Linear issue, or in the PR body when there is no issue.
   omp writes each step to its session file, and the dashboard reads those entries for running and past sessions; a todo whose linked session's run reached merged shows **Shipped**, as [Todo list](todo-list.md) says.
-- Tabs under the sidebar header switch pages and what the sidebar lists: **Pull requests**, **Tickets**, **Bots**, and **Sessions** in the sidebar's tab bar, and **Notes**, **Calendar**, **Todo**, **Sport**, and **Email** as buttons in the header beside the command menu.
+- The sidebar's page list switches pages and what the sidebar lists: **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Notes**, **Calendar**, **Todo**, **Sport**, and **Email**, each with its page's own list under its row while it is open.
   Click a tab or use the left and right arrow keys while a bar tab has focus to switch pages.
   **Tickets** shows only once Linear is connected; see [Linear tickets](linear-tickets.md).
   **Email** shows only once Gmail is connected; see [Email](email.md).

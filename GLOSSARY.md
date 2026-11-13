@@ -101,8 +101,17 @@ The step-by-step setup for a model-provider sign-in and a first session, with op
 Its checks reflect real setup; only its dismissal, its closed state, and the step on screen stay on this computer.
 _Avoid_: Onboarding, tour, checklist
 
+**Sidebar**:
+The column down the window's left side: the omp mark and the command menu at its top, the page list, the roster, and the account row at its foot, whose menu switches the space.
+_Avoid_: Nav, navigation rail, left panel
+
+**Header tabs**:
+The row across the top of the window, right of the sidebar, that holds Back and Forward, a tab for each page or session you visited lately, and What's new, the bell, and Settings at its end.
+A tab focuses its page, × closes it, and a drag reorders it; this browser keeps them.
+_Avoid_: Title bar, tab strip, browser tabs
+
 **Roster**:
-The list of running, interrupted, pinned, and past sessions in the sidebar.
+The sessions in the sidebar under **Workspaces** and **Past**: each workspace's running, interrupted, and pinned sessions, and the ended ones.
 _Avoid_: Session list, inbox
 
 **Space**:
@@ -110,7 +119,7 @@ One of the dashboard's two sides, **Personal** for the user's own life and **Wor
 _Avoid_: Section (see **Section**), profile, mode, side
 
 **Workspace**:
-A repository's main checkout, or a directory outside git, that sessions run in, which belongs to one space and which the sidebar's picker filters by; a session in a linked git worktree counts in its repository's workspace.
+A repository's main checkout, or a directory outside git, that sessions run in, which belongs to one space and which the sidebar's **Workspaces** label filters by; a session in a linked git worktree counts in its repository's workspace.
 _Avoid_: Project, repo, folder
 
 **Project code**:

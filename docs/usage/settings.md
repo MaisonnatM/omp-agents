@@ -2,7 +2,7 @@
 
 - The gear button at the right end of the header, after the notifications bell, opens **Settings**; G then , does the same.
   It stays pressed while Settings is open, including through a session's **Workspace settings** menu item or a direct link, and pressing it again, or G then ,, returns to the panes.
-  While Settings is open the sidebar lists its sections below the tab bar, with no tab selected, in place of a tab's content; select a tab, such as **Sessions**, to leave.
+  While Settings is open the sidebar lists its sections under its **Settings** row; select another row, such as **Sessions**, to leave.
   The sidebar lists twenty sections in four groups.
   **Usage** holds **Analytics** and **Activity**, **General** holds **Preferences**, **Workspaces**, **Sync**, **Phone access**, and **Storage**, and **Connections** holds **Providers**, **Integrations**, **MCP servers**, and **Source control**; these are the same whatever the workspace.
   **This workspace** holds **Models**, **Agents**, **omp settings**, **omp memory**, **Files**, **Extensions**, **Workflows**, **Decisions**, and **Worktrees**, which show omp's config and files, package discovery, and the repository's records and worktrees, as a session in the sidebar's workspace sees them; only these sections show the workspace picker.
@@ -171,8 +171,8 @@
   **Theme**: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one; it applies at once and does not change omp's terminal theme.
   **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts, and **Show session card** shows or hides the whole Session card, its **Subagents**, **Files**, **Images**, and **Sources** sections included, beside or above the messages of every transcript, the same choice as the **Session card** toggle in a session's header.
   **Sidebar tabs** lists the nine sidebar tabs in the order they show, each with the Cmd+number it takes, a switch that shows or hides it, and buttons that move it up or down.
-  **Notes**, **Calendar**, **Todo**, **Email**, and **Sport** say **Header**: they sit in the header beside the command menu and take no number, and Cmd+1 goes to the first tab the sidebar's bar draws.
-  A hidden tab only leaves the sidebar's bar or the header and loses its number: its page, its command in the command menu, its G pair, and links to it still work.
+  Cmd+1 goes to the first tab the sidebar's page list shows, and a tab after the fifth takes no number.
+  A hidden tab only leaves the sidebar's page list and loses its number: its page, its command in the command menu, its G pair, and links to it still work.
   While omp holds no sign-in to Linear or Gmail, the **Tickets** or **Email** row says that tab shows only once the service is connected.
   **Tickets** shows only in Work and **Sport** only in Personal, and their rows say so in both spaces.
   Putting every tab back in its default order and shown forgets the choice, so the sidebar follows the default again.
