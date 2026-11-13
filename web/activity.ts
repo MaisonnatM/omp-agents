@@ -197,6 +197,7 @@ type PageViewKey =
 	| "split"
 	| (typeof TAB_VIEWS)[keyof typeof TAB_VIEWS][number]["key"]
 	| ModuleView
+	| "notifications"
 	| "scheduled"
 	| "scheduled/item"
 	| "new";
@@ -217,6 +218,7 @@ export const VIEWS: readonly { key: PageViewKey; label: string; tab?: SidebarTab
 		const { views } = moduleOf({ kind: value });
 		return integration ? views.map(view => ({ ...view, tab: value })) : views;
 	}),
+	{ key: "notifications", label: "Notifications" },
 	{ key: "scheduled", label: "Scheduled sends" },
 	{ key: "scheduled/item", label: "A scheduled send" },
 	{ key: "new", label: "New session" },
@@ -240,6 +242,7 @@ function pageView(page: Page): ViewKey {
 			return page.open === null ? "todo" : "todo/item";
 		case "scheduled":
 			return page.id === null ? "scheduled" : "scheduled/item";
+		case "notifications":
 		case "get-started":
 		case "new":
 			return page.kind;

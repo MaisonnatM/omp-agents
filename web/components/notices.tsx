@@ -1,14 +1,14 @@
-/** The header's notices bell: pull request, Slack, provider, sign-in, calendar, stopped-session, and update notices in a popover, filtered by source, each drawn from its {@link presentNotice} projection. */
+/** The Notifications page: pull request, Slack, provider, sign-in, calendar, stopped-session, and update notices, filtered by source, each drawn from its {@link presentNotice} projection. */
 import { IconArrowLoopDownLeft, IconArrowsRepeatRightLeft, IconBell, IconBubbleText, IconCalendarClock, IconCircleX, IconCrossMedium, IconDoubleCheckmark1, IconExclamationCircle, IconEyeOpen, IconGauge, IconKey1, IconMerged, IconPlugin1, IconSparklesTwo, IconWallet1 } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { type AccountsService, MCP_SERVICES } from "../../src/shared/accounts";
 import type { PullRequestSummary } from "../../src/shared/github";
 import type { YourMove } from "../../src/shared/moves";
 import type { Notice } from "../../src/shared/notices";
 import type { ClientMsg } from "../../src/shared/protocol";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { PageFrame } from "./list-page";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
@@ -272,7 +272,7 @@ function NoticeAction({ id, action, send, onDone }: { id: string; action: Action
 	}
 }
 
-function NoticeRow({ notice, send, onDone }: { notice: Notice; send: Send; onDone: () => void }) {
+function NoticeRow({ notice, send }: { notice: Notice; send: Send }) {
 	const { connected } = useDashboardStatus();
 	const { headline, preview, failed, busy, link, face, action } = presentNotice(notice, Date.now());
 	const read = () => {
@@ -280,13 +280,9 @@ function NoticeRow({ notice, send, onDone }: { notice: Notice; send: Send; onDon
 	};
 	const label = `${notice.read ? "" : "Unread: "}${headline}`;
 	// After its quick action, a pull request's notice opens the pull request, where the session it started shows.
-	const done =
-		action.kind === "quick"
-			? () => {
-					onDone();
-					follow(link);
-				}
-			: onDone;
+	const done = () => {
+		if (action.kind === "quick") follow(link);
+	};
 	return (
 		<li className="group relative flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/70 has-[>a:focus-visible]:bg-muted/70">
 			{link ? (
@@ -297,10 +293,7 @@ function NoticeRow({ notice, send, onDone }: { notice: Notice; send: Send; onDon
 					rel={link.external ? "noreferrer" : undefined}
 					aria-label={label}
 					className="absolute inset-0 rounded-lg focus-visible:outline-none"
-					onClick={() => {
-						read();
-						onDone();
-					}}
+					onClick={read}
 				/>
 			) : (
 				<button {...activityControl("notices.item")} type="button" aria-label={notice.read ? headline : `Mark read: ${headline}`} className="absolute inset-0 rounded-lg focus-visible:outline-none" onClick={read} />
@@ -336,69 +329,38 @@ function NoticeRow({ notice, send, onDone }: { notice: Notice; send: Send; onDon
 	);
 }
 
-/** The header's bell: how many notices are unread, and the list of them by source, unread first. */
-export function NoticesBell({ notices }: { notices: Notice[] }) {
+/** The Notifications page: how many notices are unread, and the list of them by source, unread first. */
+export function NotificationsPage({ notices }: { notices: Notice[] }) {
 	const { send } = useDashboardActions();
 	const { connected } = useDashboardStatus();
-	const [open, setOpen] = useState(false);
 	const [filter, setFilter] = useState<NoticeSource | "all">("all");
 	const now = Date.now();
 	const unread = notices.filter(notice => !notice.read);
 	const shown = notices.filter(notice => filter === "all" || presentNotice(notice, now).source === filter);
 	const shownUnread = shown.filter(notice => !notice.read);
-	const close = () => setOpen(false);
-	const body = useRef<HTMLDivElement>(null);
 	const section = (title: string, list: Notice[]) =>
 		list.length > 0 && (
 			<section aria-label={title}>
-				<h3 className="px-3 pt-2 pb-1 text-[11px] font-medium text-muted-foreground">{title}</h3>
+				<h3 className="px-3 pt-3 pb-1 text-[11px] font-medium text-muted-foreground">{title}</h3>
 				<ul className="flex flex-col">
 					{list.map(notice => (
-						<NoticeRow key={notice.id} notice={notice} send={send} onDone={close} />
+						<NoticeRow key={notice.id} notice={notice} send={send} />
 					))}
 				</ul>
 			</section>
 		);
 	return (
-		<Popover open={open} onOpenChange={setOpen}>
-			<Tooltip content="Notifications" side="bottom" forceOpen={open ? false : undefined}>
-				<PopoverTrigger asChild>
-					<Button
-						{...activityControl("notices.open")}
-						variant="ghost"
-						size="icon-compact"
-						className="shrink-0 text-muted-foreground"
-						aria-label={unread.length === 0 ? "Notifications" : `Notifications, ${unread.length} unread`}
-						data-state={open ? "open" : "closed"}
-						active={open}
-					>
-						<IconBell />
-						{unread.length > 0 && (
-							<span aria-hidden className="absolute -top-1 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-blue-500 px-1 text-[9px] font-semibold tabular-nums text-white ring-2 ring-background">
-								{unread.length > 9 ? "9+" : unread.length}
-							</span>
-						)}
-					</Button>
-				</PopoverTrigger>
-			</Tooltip>
-			<PopoverContent
-				align="end"
-				className="flex max-h-[min(560px,80vh)] w-[380px] flex-col p-0"
-				// The list takes focus, so no header tooltip opens and the arrow keys scroll it.
-				onOpenAutoFocus={event => {
-					event.preventDefault();
-					body.current?.focus();
-				}}
-			>
-				<header className="flex items-center gap-2 border-b px-3 pt-3 pb-2">
-					<h2 className="flex-1 text-sm font-semibold">Notifications</h2>
-					<Tooltip content="Mark all as read">
-						<Button {...activityControl("notices.read-all")} variant="ghost" size="icon-compact" aria-label="Mark all as read" disabled={!connected || shownUnread.length === 0} onClick={() => send({ t: "notice", ids: shownUnread.map(({ id }) => id), op: "read" })}>
-							<IconDoubleCheckmark1 />
-						</Button>
-					</Tooltip>
-				</header>
-				<div role="group" aria-label="Show" className="flex shrink-0 gap-1 overflow-x-auto scrollbar-hide border-b px-2 py-1.5">
+		<PageFrame
+			title="Notifications"
+			meta={unread.length === 0 ? "All read" : `${unread.length} unread`}
+			actions={
+				<Button {...activityControl("notices.read-all")} variant="ghost" size="compact" leadingIcon={IconDoubleCheckmark1} disabled={!connected || shownUnread.length === 0} onClick={() => send({ t: "notice", ids: shownUnread.map(({ id }) => id), op: "read" })}>
+					Mark all as read
+				</Button>
+			}
+		>
+			<div className="mx-auto flex w-full max-w-3xl flex-col px-4 pb-8">
+				<div role="group" aria-label="Show" className="sticky top-0 z-10 flex shrink-0 gap-1 overflow-x-auto scrollbar-hide bg-background py-2">
 					{FILTERS.map(([id, label, logo]) => {
 						const count = unread.filter(notice => id === "all" || presentNotice(notice, now).source === id).length;
 						return (
@@ -411,7 +373,7 @@ export function NoticesBell({ notices }: { notices: Notice[] }) {
 									setFilter(id);
 									event.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" });
 								}}
-								className={cn("inline-flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-xs transition-colors", filter === id ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground")}
+								className={cn("inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-xs transition-colors", filter === id ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground")}
 							>
 								{logo}
 								{label}
@@ -420,23 +382,21 @@ export function NoticesBell({ notices }: { notices: Notice[] }) {
 						);
 					})}
 				</div>
-				<div ref={body} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto p-1 outline-none">
-					{shown.length === 0 ? (
-						<div className="flex flex-col items-center gap-2 px-6 py-10 text-center">
-							<span className="flex size-9 items-center justify-center rounded-full bg-muted">
-								<IconBell className="size-4 text-muted-foreground" />
-							</span>
-							<p className="text-sm font-medium">You're all caught up</p>
-							<p className="text-xs text-muted-foreground">Pull requests that wait on you, Slack messages for you, providers that stop serving, events about to start, and updates land here.</p>
-						</div>
-					) : (
-						<>
-							{section("New", shownUnread)}
-							{section("Earlier", shown.filter(notice => notice.read))}
-						</>
-					)}
-				</div>
-			</PopoverContent>
-		</Popover>
+				{shown.length === 0 ? (
+					<div className="flex flex-col items-center gap-2 px-6 py-16 text-center">
+						<span className="flex size-9 items-center justify-center rounded-full bg-muted">
+							<IconBell className="size-4 text-muted-foreground" />
+						</span>
+						<p className="text-sm font-medium">You're all caught up</p>
+						<p className="max-w-sm text-xs text-muted-foreground">Pull requests that wait on you, Slack messages for you, providers that stop serving, events about to start, and updates land here.</p>
+					</div>
+				) : (
+					<>
+						{section("New", shownUnread)}
+						{section("Earlier", shown.filter(notice => notice.read))}
+					</>
+				)}
+			</div>
+		</PageFrame>
 	);
 }

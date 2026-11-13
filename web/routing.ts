@@ -1,5 +1,5 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { IconAgentNetwork, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconKeyboard, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconStorage } from "central-icons";
+import { IconAgentNetwork, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconKeyboard, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconSparklesTwo, IconStorage } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
@@ -74,6 +74,7 @@ export const SETTINGS_SECTIONS = [
 	{ value: "sync", label: "Sync", icon: IconArrowRotateCounterClockwise, group: "general", keywords: ["git", "remote", "machines"] },
 	{ value: "phone", label: "Phone access", icon: IconPhone, group: "general", keywords: ["tailscale", "mobile", "pair", "qr"] },
 	{ value: "storage", label: "Storage", icon: IconStorage, group: "general", keywords: ["disk", "space", "gc", "cleanup", "archive", "compress", "sandboxes"] },
+	{ value: "whats-new", label: "What's new", icon: IconSparklesTwo, group: "general", keywords: ["changelog", "update", "release notes"] },
 	{ value: "providers", label: "Providers", icon: IconKey1, group: "connections", keywords: ["login", "sign in", "accounts", "api key", "quota"] },
 	{ value: "integrations", label: "Integrations", icon: IconPlugin1, group: "connections", keywords: ["linear", "slack", "github", "gmail", "calendar", "connect"] },
 	{ value: "mcp-servers", label: "MCP servers", icon: IconBlocks, group: "connections", keywords: ["mcp", "tools"] },
@@ -156,6 +157,7 @@ export type CorePage =
 	| ({ kind: "pull-requests" } & PullRequestsRoute)
 	| ({ kind: "todo" } & TodoRoute)
 	| ({ kind: "bots" } & BotsRoute)
+	| { kind: "notifications" }
 	| ({ kind: "new" } & NewSessionRoute)
 	| ({ kind: "scheduled" } & ScheduledRoute);
 
@@ -192,6 +194,7 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   Bot's routines in place of its conversation, `#bots/<id>/routines/<routine id>` that card with that routine open,
  *   `#bots/<id>/routines/<routine id>/edit` that routine's editor, and `#bots/<id>/routines/new` a new routine's editor; Bot and routine ids
  *   are UUIDs, so none reads as `new`.
+ * - `#notifications` opens the Notifications page, every notice by source, unread first.
  * - A module's page, `#<id>`, reads the rest of its hash as its module's address does.
  */
 const PAGES: { [K in CorePage["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
@@ -218,6 +221,7 @@ const PAGES: { [K in CorePage["kind"]]: (rest: string | null, query: URLSearchPa
 		if (!target) return { kind: "bots", target: null, adding: false };
 		return { kind: "bots", target, routine: routines === "routines" ? botRoutineRoute(routine, more) : null };
 	},
+	notifications: () => ({ kind: "notifications" }),
 };
 
 const isPageKind = (head: string): head is CorePage["kind"] => Object.hasOwn(PAGES, head);
@@ -242,6 +246,7 @@ function restOfPage(page: CorePage): string | null {
 			return page.routine === null ? encodeURIComponent(page.target) : `${encodeURIComponent(page.target)}/${restOfBotRoutine(page.routine)}`;
 		case "scheduled":
 			return page.id === null ? null : encodeURIComponent(page.id);
+		case "notifications":
 		case "get-started":
 			return null;
 		default: {
@@ -261,6 +266,7 @@ function queryOfPage(page: CorePage): string | null {
 		case "settings":
 		case "pull-requests":
 		case "bots":
+		case "notifications":
 		case "get-started":
 		case "scheduled":
 			return null;
@@ -292,6 +298,7 @@ export function hashForTodoId({ todos, archive }: UserTodoList, id: string): str
 export const hashForBots = (target: string | null): string => hashForPage(target === null ? { kind: "bots", target, adding: false } : { kind: "bots", target, routine: null });
 export const hashForNewBot = (): string => hashForPage({ kind: "bots", target: null, adding: true });
 export const hashForBotRoutine = (botId: string, routine: BotRoutineRoute): string => hashForPage({ kind: "bots", target: botId, routine });
+export const hashForNotifications = (): string => hashForPage({ kind: "notifications" });
 export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
 export const hashForScheduled = (id: string): string => hashForPage({ kind: "scheduled", id });

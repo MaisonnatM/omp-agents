@@ -3,19 +3,18 @@
  * The runners of an arena the session recorded sit side by side above the tree, with the judge under them and the base marked.
  */
 import { IconAiBotHead, IconJudgeGavel, IconSword, IconTrophy } from "central-icons";
-import type { MouseEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { AgentRow, ArenaRecord } from "../../src/shared/sessions";
-import { modelLabel, modelOrg, SPLIT_CLICK, subagentModeOf } from "../labels";
-import { hashForView } from "../routing";
+import { modelLabel, modelOrg, SPLIT_CLICK } from "../labels";
 import { useStoredState } from "../stored-state";
 import { type ArenaGroup, type ArenaSeat, type ArenaVerdict, arenaGroups, runTime, type SubagentNode } from "../overview-subagents-model";
 import { useMinute } from "../use-minute";
 import { OrgIcon } from "./org-icon";
 import { drawsDot, StatusDot, statusLabel } from "./status-dot";
-import { CancelAgentButton, type SubagentLinksValue } from "./subagent-links";
+import { agentLink, CancelAgentButton, type SubagentLinksValue } from "./subagent-links";
 import { OverviewSection } from "./overview-section";
 
 /** Whether the section is folded shut, kept for every view; it starts open. The key keeps an earlier name, so earlier folds carry over. */
@@ -56,20 +55,6 @@ export function SubagentsSection({ links, nodes, arenas }: { links: SubagentLink
 			)}
 		</OverviewSection>
 	);
-}
-
-/** A link to `agentId`'s view that opens it on a plain click; shift- and middle-clicks keep the link's own new-window behavior. */
-function agentLink(links: SubagentLinksValue, agentId: string) {
-	const view = { kind: "live", instanceId: links.instanceId, agentId } as const;
-	return {
-		view,
-		href: hashForView(view),
-		onClick: (event: MouseEvent) => {
-			if (event.button !== 0 || event.shiftKey || event.altKey) return;
-			event.preventDefault();
-			links.onOpen(view, subagentModeOf(event));
-		},
-	};
 }
 
 const tooltipOf = (agent: AgentRow, verdict?: string) =>

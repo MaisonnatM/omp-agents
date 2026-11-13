@@ -1,22 +1,26 @@
 /** The right sidebar for a session: its overview, its pull requests, its running app in the desktop app, and once it has any its Linear issues and its artifacts; a Bot's details share its Tickets tab. */
-import { IconBulletList, IconPullRequest, IconSparklesTwo, IconWindowApp } from "central-icons";
+import { IconAiBotHead, IconBulletList, IconPlusLarge, IconPullRequest, IconSparklesTwo, IconWindowApp } from "central-icons";
 import { useMemo } from "react";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
+import { MenuGroup, MenuGroupLabel, MenuItem, MenuLinkItem, MenuSeparator } from "@/components/ui/menu";
+import { activityControl } from "../activity";
+import { isPhonePage } from "../api";
 import type { Artifact } from "../artifacts-model";
 import { useArtifacts } from "../pane-store";
 import { PAGE_ICON } from "../page-icons";
-import { type DetailsTab, DetailsSidebarFrame } from "./details-sidebar-frame";
-import { isPhonePage } from "../api";
+import { requestNewTerminal } from "../terminal-requests";
 import { ArtifactsPanel } from "./artifacts-panel";
 import { BROWSER_AVAILABLE, BrowserPanel } from "./browser-panel";
+import { type DetailsTab, DetailsSidebarFrame } from "./details-sidebar-frame";
 import type { ChangesSession } from "./overview-changes";
 import { SessionOverview } from "./session-overview";
 import { SessionPullRequestsTab } from "./session-pull-requests-tab";
 import { SessionTicketsTab } from "./session-tickets-tab";
-import { useSubagentLinks } from "./subagent-links";
+import { StatusDot } from "./status-dot";
+import { agentLink, type SubagentLinksValue, useSubagentLinks } from "./subagent-links";
 
-/** The right sidebar's tab, kept across views; the key keeps its old name, and a tab that no longer exists reads as Overview. */
+/** The right sidebar's open tabs, kept across views; the key keeps its old name, and a single tab name stored before tabs could close opens that tab. */
 export const TAB_KEY = "omp-agents.plan-tab";
 
 /** What a session worked on, runs, and saved, which its **PRs**, **Browser**, **Tickets**, and **Artifacts** tabs show. */
@@ -66,6 +70,7 @@ export function sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, 
 						icon: IconWindowApp,
 						name: "Browser",
 						control: "session-details.tab.browser",
+						shortcut: "detailsBrowser",
 						count: 0,
 						scrollsItself: true,
 						keepMounted: true,
@@ -87,6 +92,55 @@ export function sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, 
 				]
 			: []),
 	];
+}
+
+/** The + menu's Subagents section: the live view's subagents, each a link to its own view; none while it has none. */
+function SubagentsMenuGroup({ links }: { links: SubagentLinksValue }) {
+	if (links.agents.length === 0) return null;
+	return (
+		<>
+			<MenuSeparator />
+			<MenuGroup>
+				<MenuGroupLabel>Subagents</MenuGroupLabel>
+				{links.agents.map(agent => {
+					const { href, onClick } = agentLink(links, agent.id);
+					return (
+						<MenuLinkItem key={agent.id} {...activityControl("details.menu.subagent")} href={href} onClick={onClick} className="items-start">
+							<span className="relative mt-0.5 flex shrink-0 items-center text-muted-foreground">
+								<IconAiBotHead aria-hidden="true" />
+								<StatusDot status={agent.status} />
+							</span>
+							<span className="flex min-w-0 max-w-72 flex-col">
+								<span className="truncate">{agent.id}</span>
+								{agent.activity && <span className="truncate text-xs text-muted-foreground">{agent.activity}</span>}
+							</span>
+						</MenuLinkItem>
+					);
+				})}
+			</MenuGroup>
+		</>
+	);
+}
+
+/** The + menu's sections after the tabs, as Capy's: the live view's subagents, then **New terminal**, which a paired phone leaves out. */
+function SessionMenuSections({ links }: { links: SubagentLinksValue | null }) {
+	return (
+		<>
+			{links && <SubagentsMenuGroup links={links} />}
+			{!isPhonePage() && (
+				<>
+					<MenuSeparator />
+					<MenuGroup>
+						<MenuGroupLabel>Terminals</MenuGroupLabel>
+						<MenuItem {...activityControl("details.menu.new-terminal")} onClick={requestNewTerminal}>
+							<IconPlusLarge aria-hidden="true" />
+							New terminal
+						</MenuItem>
+					</MenuGroup>
+				</>
+			)}
+		</>
+	);
 }
 
 interface SessionDetailsProps extends Omit<SessionWork, "scope" | "live" | "artifacts" | "pullRequests" | "tickets"> {
@@ -113,10 +167,11 @@ export function SessionDetails({ view, sessionId, working, cwd, hosts, host, row
 			icon: IconBulletList,
 			name: "Overview",
 			control: "session-details.tab.overview",
+			shortcut: "detailsOverview",
 			count: 0,
 			content: <SessionOverview view={view} working={working} links={links} session={session} />,
 		} as const,
 		...sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, live: view.kind === "live" ? view : null, view, sessionId, artifacts }),
 	];
-	return <DetailsSidebarFrame label="Session details" storageKey={TAB_KEY} defaultTab="overview" cwd={cwd} tabs={tabs} />;
+	return <DetailsSidebarFrame label="Session details" storageKey={TAB_KEY} defaultTab="overview" cwd={cwd} tabs={tabs} menuSections={<SessionMenuSections links={links} />} />;
 }

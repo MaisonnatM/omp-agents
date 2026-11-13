@@ -4,9 +4,9 @@
   In `plan-usage.tsx`, `creditView` decides how the API credits balance reads and is colored, for this strip and the model menu's heading alike.
   The CPU fact is a popover, opened by hover or click through `useHoverPopover`, that lists every live session's processes, busiest session first, each session named by `hostLabel` over the roster `app.tsx` passes, and each row with its own `useAction` for **Stop**, which `writeProcessStop` sends.
   The disk fact uses the same popover behavior, breaks down the volume that holds the home directory, and links **Clean up…** to Settings › Storage.
-- `web/components/terminal/terminal-panel.tsx`: the terminal panel under the panes, its tabs, height, and open state, and `useTerminalPanel`, which saves the last two in localStorage.
+- `web/components/terminal/terminal-panel.tsx`: the terminal panel under the panes, its tabs, height, and open state, and `useTerminalPanel`, which saves the last two in localStorage; it opens on a new shell for each `requestNewTerminal` from `web/terminal-requests.ts`, as the details sidebar's **New terminal** sends.
   `terminal-tab.ts` holds the tab shape and its lifecycle, `TerminalTabState`, `starting`, `connected`, `closing`, or `disconnected`, which `nextTabState` moves through the socket's `opened` and close and the user's close; closing a starting or connected tab asks its shell to exit through the view and keeps the tab until its socket closes.
-  `terminal-inventory.ts` holds `readTerminalTabs`, which turns `GET /api/terminals` into the panel's loading, failed, or ready tabs: a tab per running shell, or one new shell only when the read succeeds and lists none.
+  `terminal-inventory.ts` holds `readTerminalTabs`, which turns `GET /api/terminals` into the panel's loading, failed, or ready tabs: a tab per running shell, then one new shell when the read succeeds and lists none or a **New terminal** waits for it.
   `terminal-view.tsx` draws one tab with xterm.js over its `/ws/terminal` socket, fits it to the panel, follows the page's theme, and passes the toggle chord, and every Cmd chord on macOS, to the page's shortcuts; the panel loads it with `React.lazy`, so xterm.js is a chunk of its own that loads when the panel first opens.
   `terminal-socket.ts` sends its commands and retains a kill requested while the socket connects, sending it when the socket opens.
 - `web/quick-actions.ts`: the quick actions of the Pull requests page, the tickets page, and the open todo, which pull requests, issues, and todos each applies to, and the start, with its prompt, that runs it; the pull request actions themselves come from `src/pull-request-actions.ts`.
@@ -51,8 +51,8 @@
   A refused edit is undone, and the page names why.
   A pull request's details, a Linear issue's details and its fields, the settings page's omp settings, and the source control section read through it; the settings editors' saves go through its `write`.
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft's branch picker.
-  `web/components/git.tsx` holds the branch picker, the repository and branch in a header's meta line, and `BranchName`, the branch that copies itself on click, which the pull requests, the tickets, and a session's header also show, and its `onCopy` runs once a click has copied.
-  Its `releaseBranch` sends `releaseWorktree` and toasts the worktree it removed or kept, or the failure; the branch a pull request's details bring and a session header's branch call it after a copy.
+  `web/components/git.tsx` holds the branch picker, the repository and branch in a header's meta line, and `BranchName`, the branch that copies itself on click, which the pull requests and the tickets also show, and its `onCopy` runs once a click has copied.
+  Its `releaseBranch` sends `releaseWorktree` and toasts the worktree it removed or kept, or the failure; the branch a pull request's details bring calls it after a copy.
   `web/use-copy.ts` copies text to the clipboard, resolving once the copy lands, and holds the copied state behind a button's check mark.
   `web/use-draft-model.ts` holds `useDraftModelSelection`, the model and effort of the new-session draft: the model a start sends, `null` for omp's default, the model the picker shows, which until a pick is the one the `default` role names, and an effort kept only for the model it was picked on; it also reads the model list again whenever the menu opens.
   `web/use-skills.ts` reads a directory's skills, and `web/pinned-skill.ts` keeps the skill pinned for new sessions.

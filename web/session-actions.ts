@@ -1,4 +1,4 @@
-import { IconArchive, IconFolder1, IconLayoutColumn, IconPin, IconPlay, IconPullRequest, IconSettingsGear1, IconSquareBehindSquare1, IconStopCircle, IconUnpin, IconWindowApp } from "central-icons";
+import { IconArchive, IconFolder1, IconLayoutColumn, IconPin, IconPlay, IconPullRequest, IconSettingsGear1, IconSquareBehindSquare1, IconUnpin, IconWindowApp } from "central-icons";
 import { pullRequestUrl } from "../src/shared/github";
 import type { PastSession, RosterHost, View } from "../src/shared/sessions";
 import type { ActionGroup, ActionRun } from "./command-palette";
@@ -102,7 +102,7 @@ export function sessionActions(entry: SessionEntry, context: SessionActionContex
 			{
 				id: "end",
 				title: context.ending ? "Archiving…" : "Archive session",
-				icon: IconStopCircle,
+				icon: IconArchive,
 				disabled: context.ending,
 				tone: "destructive",
 				...(isPrivateHost(entry.host) ? { confirm: CONFIRM_PRIVATE_END } : {}),

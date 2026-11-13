@@ -17,6 +17,7 @@ import { EmptyHome } from "./empty-home";
 import { ModulePageView } from "./module-views";
 import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { NewSession } from "./new-session";
+import { NotificationsPage } from "./notices";
 
 import { PaneGrid } from "./pane-grid";
 import { BotPage, NewBot } from "./bots/bot-page";
@@ -45,7 +46,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "modules" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "modules" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError" | "notices"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -94,6 +95,7 @@ export const PageSwitch = memo(function PageSwitch({
 	connected,
 	listed,
 	rosterError,
+	notices,
 	newStart,
 	scope,
 	defaultWorkspace,
@@ -198,6 +200,8 @@ export const PageSwitch = memo(function PageSwitch({
 				/>
 			);
 		}
+		case "notifications":
+			return <NotificationsPage notices={notices} />;
 		// Get started is a dialog over the home, which `GetStarted` in `web/app.tsx` draws.
 		case "get-started":
 		case undefined:

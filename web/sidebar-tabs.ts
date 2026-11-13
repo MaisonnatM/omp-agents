@@ -30,8 +30,8 @@ export const TAB_ROWS = Object.fromEntries(SIDEBAR_TABS.map(row => [row.value, r
 /** Whether a page kind is a sidebar tab's, with a row in {@link TAB_ROWS}. */
 export const isSidebarTab = (kind: string): kind is SidebarTab => kind in TAB_ROWS;
 
-/** A row of the sidebar's page list: a tab's page, Settings, or the New session draft. */
-export type NavRow = SidebarTab | "settings" | "new";
+/** A row of the sidebar's page list: a tab's page, Notifications, Settings, or the New session draft. */
+export type NavRow = SidebarTab | "notifications" | "settings" | "new";
 
 /**
  * The row of the page list that `page` selects: the panes, the empty home, a page with no row, and a page whose tab is
@@ -40,7 +40,7 @@ export type NavRow = SidebarTab | "settings" | "new";
  */
 export function navRowOf(page: Page | null, absentTabs: ReadonlySet<SidebarTab>): NavRow | null {
 	if (page === null) return null;
-	if (page.kind === "new" || page.kind === "settings") return page.kind;
+	if (page.kind === "new" || page.kind === "notifications" || page.kind === "settings") return page.kind;
 	return isSidebarTab(page.kind) && !absentTabs.has(page.kind) ? page.kind : null;
 }
 

@@ -25,6 +25,8 @@ export function pageTitle(page: Page): string {
 			if (page.target === null) return page.adding ? "New Bot" : "Bots";
 			if (page.routine === null) return "Bot";
 			return page.routine.kind === "list" || page.routine.kind === "open" ? "Routines" : "Routine";
+		case "notifications":
+			return "Notifications";
 		default: {
 			const never: never = page;
 			return never;

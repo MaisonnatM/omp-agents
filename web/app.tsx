@@ -7,7 +7,6 @@ import { errorText } from "../src/json";
 import { AppSidebar } from "./components/app-sidebar";
 import { BotDetails } from "./components/bots/bot-details";
 import { CommandPalette } from "./components/command-palette/command-palette";
-import { HeaderControls } from "./components/header-controls";
 import { HeaderTabs } from "./components/header-tabs";
 import {
 	type DashboardActions,
@@ -45,7 +44,7 @@ import { useOpenPullRequest } from "./open-pull-request";
 import { integrationsStore } from "./reads";
 import { onArtifactOpen, onArtifactsReveal } from "./artifact-requests";
 import { onReviewRequest } from "./review-pages";
-import { storeOrRemove } from "./stored-state";
+import { revealDetailsTab } from "./details-tabs";
 import { hashForLayout, hashForPage, hashForRoute, hashForView, type OpenMode, sameView, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, type WindowScope, workspaceSession, workspaceSwitch } from "./sessions";
@@ -123,7 +122,7 @@ export function App() {
 		sidebars.setOpen(side, !sidebars.panels[side].open);
 	}, []);
 	const showDetailsTab = useCallback((tab: "browser" | "artifacts"): void => {
-		storeOrRemove(TAB_KEY, tab, "pull-requests");
+		revealDetailsTab(TAB_KEY, tab, "overview");
 		latest.current.sidebars.setOpen("right", true);
 	}, []);
 	// A reply's **Review visuals** shows the Browser, whose panel then opens the reply's pages.
@@ -257,8 +256,7 @@ export function App() {
 		[listPage, state.listed, visible, state.hosts, state.past, botList, state.userTodos, todoView, sectionTarget],
 	);
 	const showSearch = useCallback(() => dispatchPalette({ type: "open" }), [dispatchPalette]);
-	const toggleSettings = useCallback(() => void handlers.settings?.(0), [handlers]);
-	const headerControls = useMemo(() => <HeaderControls notices={state.notices} settingsOpen={page?.kind === "settings"} onToggleSettings={toggleSettings} />, [state.notices, page?.kind, toggleSettings]);
+	const unreadNotices = useMemo(() => state.notices.filter(notice => !notice.read).length, [state.notices]);
 
 	return (
 		<DashboardActionsContext.Provider value={actions}>
@@ -282,11 +280,12 @@ export function App() {
 										botList={botList}
 										list={placement?.at === "sidebar" ? pageList : null}
 										settings={settings}
+										unreadNotices={unreadNotices}
 										onPickWorkspace={switchWorkspace}
 										onSearch={showSearch}
 									/>
 								</DashboardSidebar>
-								<HeaderTabs className="[grid-area:tabs]" address={address} hosts={state.hosts} past={state.past} controls={headerControls} />
+								<HeaderTabs className="[grid-area:tabs]" address={address} hosts={state.hosts} past={state.past} />
 								<SidebarInset className={cn("inset-panel [grid-area:page] group-has-[#sessions-sidebar[inert]]/window:ml-1.5", (detailsView || openBot) && sidebars.panels.right.open && !sidebars.panels.right.floating && "rounded-r-none border-r-0")}>
 									<div ref={pageArea} className="flex min-h-0 flex-1">
 										{listPage && placement?.at === "column" && (
@@ -320,6 +319,7 @@ export function App() {
 																	connected={state.connected}
 																	listed={state.listed}
 																	rosterError={state.rosterError}
+																	notices={state.notices}
 																	newStart={startOf(state.starts, "new")}
 																	scope={scope}
 																	defaultWorkspace={defaultWorkspace}

@@ -1,8 +1,8 @@
 # Sessions sidebar
 
 - The sidebar runs the window's height on the window's background, and the page and the session details sidebar sit beside it as rounded panels.
-  Its top row, 48 px tall at the default font size as the header's tabs beside it are, holds the omp mark, the command menu button, and the button that hides the sidebar.
-- Under it the page list shows **New session**, then **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Calendar**, **Todo**, **Sport**, and **Email** in the order Settings › Preferences gives them, then **Settings**.
+  Its top row, 48 px tall at the default font size as the header's tabs beside it are, holds the button that hides the sidebar; under it a row holds the omp mark and the command menu button.
+- Under it the page list shows **New session**, then **Notifications** with its unread count, then **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Calendar**, **Todo**, **Sport**, and **Email** in the order Settings › Preferences gives them, and **Settings**.
   A row opens its page, and the open page's row stays highlighted while that page's own list, such as the Bots, the Todo categories, or the Settings sections, shows in a column at the page's left, as in Linear's inbox.
   Drag the column's right edge to widen or narrow it, or double-click the edge to reset it; every page's list keeps that width in this browser.
   On a phone, where the sidebar floats over the page, that list shows under the page's row instead, and a page whose row you hid in Preferences shows its list after the last row.
@@ -11,7 +11,7 @@
   **Sessions** counts the sessions of the picked workspace that need you: each that asks you something, or finished a turn you have not looked at since.
   A finished turn you have read leaves the count, though its session stays idle.
   So does a finished turn of a session waiting on its subagents, until they stop.
-- The header's tabs run across the top right of the sidebar: Back and Forward, your tabs, a + that opens a new tab, and What's new, the bell, and Settings at the right end.
+- The header's tabs run across the top right of the sidebar: Back and Forward, your tabs, and a + that opens a new tab.
   A tab works as in Capy: opening a page or a session, from the sidebar or anywhere else, shows it in the tab on screen, and a session another tab already shows switches to that tab; only the + adds a tab, on New session.
   The × on a tab, or a middle-click, closes it, closing the one on screen shows its neighbor, and closing the last one leaves a new tab on New session.
   Drag a tab to move it, or focus it and press Alt+Shift+← or →; this browser keeps the tabs and their order across reloads.
@@ -82,7 +82,7 @@
   It shows as working again when its turn ran or compacted as the server stopped; one that had replied and only waited on a background job's result shows idle.
   While any is listed, the **Resume all** button at the right of the **Workspaces** label resumes every one, under the selected workspace, as **Resume** does for one; a pane that shows one of them then shows it live.
   A session that was working when it stopped, or waiting on a question, also gets the prompt `continue`, so it picks its turn back up; an idle one waits for your next message.
-  The notices bell's **Sessions** tab lists those that stopped mid-turn, and its **Continue all** resumes them the same way; see [Notifications](notifications.md).
+  The Notifications page's **Sessions** filter lists those that stopped mid-turn, and its **Continue all** resumes them the same way; see [Notifications](notifications.md).
   When some fail to start, a note under the **Workspaces** label names how many and the first reason, until **Dismiss**.
   **Move to past** in a row's menu moves it to the past sessions.
   A session that you end, resume, or move leaves its folder.
