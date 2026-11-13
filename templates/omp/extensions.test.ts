@@ -1003,12 +1003,12 @@ describe("google accounts", () => {
 	mkdirSync(join(root, "agent"));
 	writeFileSync(
 		join(root, "config", "omp-agents", "google-accounts.json"),
-		JSON.stringify({ addresses: { gmail: "ana@example.com", "gmail-2": "ana@work.example" }, personal: ["ana@example.com"] }),
+		JSON.stringify({ addresses: { gmail: "ana@example.com", "gmail-2": "ana@work.example" } }),
 	);
 	const servers = (names: string[]) =>
 		writeFileSync(join(root, "agent", "mcp.json"), JSON.stringify({ mcpServers: Object.fromEntries(names.map(name => [name, { type: "http", url: "https://gmailmcp.googleapis.com/mcp/v1" }])) }));
 
-	test("a session hears each account of omp's mcp.json, whatever its space; one account tells nothing", () => {
+	test("a session hears each account of omp's mcp.json; one account tells nothing", () => {
 		servers(["gmail", "gmail-2"]);
 		expect(exercise("google-accounts", { agentStart: true, omp: true }, env).prompt).toEqual([
 			"base",

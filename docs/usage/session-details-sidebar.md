@@ -3,11 +3,11 @@
 - The right sidebar shows the focused view's subagents and what its agents changed, its session's pull requests, Linear issues, and artifacts, including the pull requests and issues of its subagents, and in the desktop app the app a live session runs.
   It follows a live session, one of its subagents, or a past session.
   It hides for a pull request's details, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side; a maximized pane brings it back.
-- Its tabs are **Overview**, **PRs**, **Tickets**, which shows only for a session with a Linear issue, **Browser**, which shows only in the [desktop app](desktop-app.md) for a live session or subagent, **Artifacts**, which shows only once the agent saved an artifact, and **Memory**, which shows only for a [personal session](personal-sessions.md).
+- Its tabs are **Overview**, **PRs**, **Tickets**, which shows only for a session with a Linear issue, **Browser**, which shows only in the [desktop app](desktop-app.md) for a live session or subagent, and **Artifacts**, which shows only once the agent saved an artifact.
   Each tab shows its name, and **PRs**, **Tickets**, and **Artifacts** a badge with their item count.
   With five tabs or more, the sidebar's default width keeps only their icons.
   The sidebar remembers the tab you chose, for every view, and defaults to **Overview**.
-  A saved choice of the former **Todos**, **Files**, **Media**, or **Processes** tab falls back to that default.
+  A saved choice of the former **Todos**, **Files**, **Media**, **Processes**, or **Memory** tab falls back to that default.
   What a live session runs besides omp shows in the status bar's CPU card; see [Sessions sidebar](sessions-sidebar.md).
 - **Overview** lists the view's **Subagents**, then the **Files**, **Images**, and **Sources** of [Changed files and images](changed-files-and-images.md), each under a filled header with its count that folds on a click; see [Conversations](conversations.md) for the **Subagents** section.
   A section shows once it has something to list, and the tab says **Nothing yet** once the session's lists have loaded and none has.
@@ -28,7 +28,4 @@
   The issue shows as on the tickets page: its header with the team, the identifier linking to Linear, the title, who opened it, and its branch, then its status, priority, assignee, due date, labels, and project, which you can edit there, then its **Description**, **Sub-issues**, **Links**, and **Comments** as sections that fold.
   **Sub-issues** draws them as a pull request's **Stack** draws its pull requests, on a rail in a box, under how many are done of those not canceled: each row shows the state, identifier, title, and priority, and the rail ends at the issue's own identifier, as a stack's ends at its base branch.
   Opening the tab, picking another issue, and each start and end of the view's turn read it from Linear.
-- **Memory** lists what personal sessions, those in your Personal space, remember about you, each fact with the day it was kept, from `personal-memory.md`; see [Personal sessions](personal-sessions.md).
-  Before anything is kept it reads **Nothing yet. Tell it something worth keeping, and it remembers it.**
-  It reads the file again after each turn of a personal session ends.
 - A tab with nothing to show says so.

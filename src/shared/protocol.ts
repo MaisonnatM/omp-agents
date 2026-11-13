@@ -57,11 +57,9 @@ export type ServerMsg =
 	| { t: "routines"; routines: Routine[] }
 	/** Every Bot, whole, the newest of what each remembers, within `MAX_MEMORY_BYTES`, and the last words of its conversation, sent when a socket opens, after every change, and as each turn of a Bot's conversation starts and ends. */
 	| { t: "bots"; bots: Bot[]; memories: Record<BotId, string>; lasts: Record<BotId, BotLast | null> }
-	/** Where personal sessions run, as a path and as the page shows it, and the newest of what they remember, within `MAX_MEMORY_BYTES`, sent when a socket opens and as each personal turn ends. */
-	| { t: "personal"; cwd: string; cwdDisplay: string; memory: string }
 	/** Every scheduled send, whole, soonest first, sent when a socket opens and after every change. */
 	| { t: "scheduled"; sends: ScheduledSend[] }
-	/** The directories Settings → Workspaces added, hid, and placed in the Personal space, whole, sent when a socket opens and after every change. */
+	/** The directories Settings → Workspaces added and hid, whole, sent when a socket opens and after every change. */
 	| { t: "workspaces"; list: WorkspaceList<Workspace> }
 	/** The projects whose agent code the user trusted, whole, sent when a socket opens and after every change. */
 	| { t: "project-trust"; projects: TrustedProject[] }

@@ -60,7 +60,6 @@
   Clicking it brings the window up on that session.
 - Each question and each finished turn raises one notification, and a newer one of the same session replaces the one before; a session that asks while its turn is unread notifies the question.
   A turn that ends while a subagent of its session still runs notifies once that subagent stops, and not at all when the session's next turn starts first; the Dock badge leaves it out meanwhile.
-  A session of the space the window does not show notifies too, and clicking it switches the window to that space; the Dock badge counts the sessions of both spaces, and the switch counts the other space's on its side; see [Sessions sidebar](sessions-sidebar.md).
   A session that already waited when the page loads, or when the page reconnects, raises none.
 - A finished turn stays unread until a pane shows the session, not one of its subagents, in a focused window, or its next turn starts; the server keeps which turns are unread, so every window agrees, and keeps them when the dashboard restarts, as it does after an update.
   A turn that finishes while the dashboard is stopped shows unread once it starts again, in a session started from the dashboard or in a terminal.

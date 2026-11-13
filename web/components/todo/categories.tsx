@@ -118,7 +118,7 @@ function ShownCheckbox({ id, name, shown, onToggle }: { id: string; name: string
 export function TodoCategories({ list, view, disabled, onChange, sessions }: TodoCategoriesProps) {
 	const [naming, setNaming] = useState<Naming>({ kind: "none" });
 	const [hidden, toggleHidden] = useHiddenTodoCategories();
-	// The sidebar's workspace, else its space, narrows every count.
+	// The sidebar's workspace narrows every count.
 	const { scope } = useDashboardStatus();
 	if (list === null) return <SidebarGroup><p className="px-2 py-1 text-xs text-muted-foreground">Loading your todos…</p></SidebarGroup>;
 	const day = localDay();

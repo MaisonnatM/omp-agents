@@ -131,9 +131,9 @@ test("↓ and ↑ step through sessions, pull requests, todos, conversations, sp
 	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "emailPrevious", "sportJournalPrevious", "previousChangedFile"]);
 });
 
-test("Cmd+Shift+P switches space, apart from Cmd+Alt+P's directory picker and P's todo priority", () => {
-	expect(press("P", "KeyP", { ctrl: true, shift: true })).toEqual(["switchSpace"]);
-	expect(pressOn(true, "P", "KeyP", { meta: true, shift: true })).toEqual(["switchSpace"]);
+test("Cmd+Shift+P takes no shortcut, and Cmd+Alt+P opens the directory picker", () => {
+	expect(press("P", "KeyP", { ctrl: true, shift: true })).toEqual([]);
+	expect(pressOn(true, "P", "KeyP", { meta: true, shift: true })).toEqual([]);
 	expect(press("p", "KeyP", { ctrl: true })).toEqual([]);
 	expect(press("π", "KeyP", { ctrl: true, alt: true })).toEqual(["directory"]);
 });
@@ -295,12 +295,12 @@ test("a key something nearer already handled is left alone", () => {
 	expect(calls).toEqual([]);
 });
 
-test("every tab of the shortcuts dialog lists at least one shortcut", () => {
+test("every section of Settings › Keyboard lists at least one shortcut", () => {
 	const empty = SHORTCUT_CATEGORIES.filter(({ id }) => !SHORTCUTS.some(({ category }) => category === id)).map(({ id }) => id);
 	expect(empty).toEqual([]);
 });
 
-test("the shortcuts dialog's rule holds: modifier chords work anywhere, single keys and G pairs outside text fields, apart from composer keys and Esc", () => {
+test("the Keyboard tab's rule holds: modifier chords work anywhere, single keys and G pairs outside text fields, apart from composer keys and Esc", () => {
 	const broken = SHORTCUTS.flatMap(({ id, keys }) =>
 		keys.filter(binding => {
 			if ("goTo" in binding) return false;

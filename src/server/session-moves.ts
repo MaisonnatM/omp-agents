@@ -15,7 +15,7 @@ export const MOVE_SESSION_TOOL = "move_session";
 export interface SessionMovesDeps {
 	/** Dashboard session `instanceId`, while it runs. */
 	session(instanceId: string): Pick<DashboardSession, "moveAfterTurn"> | undefined;
-	/** Whether `request`'s session stays in its directory: a Bot's conversation stays in its Bot's, and a personal session in the personal directory. */
+	/** Whether `request`'s session stays in its directory: a Bot's conversation stays in its Bot's. */
 	staysPut(request: StartRequest): boolean;
 	/** Lets a session run in `dir`, or throws while the project code there is not trusted as it is now. */
 	admit(dir: string): Promise<void>;

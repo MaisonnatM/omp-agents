@@ -9,7 +9,7 @@
   `session-controls.ts` holds the context actions, compaction and advisor state, goal slots and changes, their socket parsers, and the composer's `/goal` translation.
   `agents.ts` holds the discovered-agent new-session preview, model-resolution states, override selectors and their guard, and the one `AGENT_SETTINGS` table of Settings › Agents' owned ids.
   `storage.ts` holds cleanup steps, parsed requests, the native report subset, sandbox plans and results, package cache plans and results, all twelve editable rule ids, and the shared `CleanupBusy` refusal; `storage.test.ts` checks the phase allowlist and sandbox request bounds.
-  `accounts.ts` also holds `AccountId`, `GoogleAccount` with the space it is in, and the `accounts` column of `MCP_SERVICES`.
+  `accounts.ts` also holds `AccountId`, `GoogleAccount`, and the `accounts` column of `MCP_SERVICES`.
   `transcript.ts` also holds `PromptAuthor` and `promptAuthor`, which distinguish the user's text, hidden dashboard prompts, and stamped routine messages, and `skillInvocation`, a `/skill:` prompt as typed, which every reader and writer of one joins with.
   The transcript, trajectory, queued rows, withdrawn messages, live title's `/rename`, and past title use that classification, so a routine is never presented as the user's own prompt.
   `routine-message.ts` holds `RoutineMessage`, the snapshot of what one routine run sent, `routineMessageText`, its body and trailing JSON stamp, `readRoutineMessage`, its checked decoder, `taskOf`, its prompt or command task, and `taskText`, that task's prompt or command as text.

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { callable } from "../src/shared/accounts";
 import type { View } from "../src/shared/sessions";
-import { otherSpace, type Space } from "../src/shared/workspaces";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { errorText } from "../src/json";
 import { AppSidebar } from "./components/app-sidebar";
@@ -9,14 +8,12 @@ import { BotDetails } from "./components/bots/bot-details";
 import { CommandPalette } from "./components/command-palette/command-palette";
 import { HeaderControls } from "./components/header-controls";
 import { HeaderTabs } from "./components/header-tabs";
-import { SpaceSwitch } from "./components/space-switch";
 import {
 	type DashboardActions,
 	DashboardActionsContext,
 	type DashboardStatus,
 	DashboardStatusContext,
 	MentionListsContext,
-	PersonalContext,
 	UserTodosContext,
 } from "./components/dashboard-context";
 import { DesktopLinkPreview } from "./components/desktop-link-preview";
@@ -32,7 +29,6 @@ import { ScheduledSends } from "./components/scheduled";
 import { SessionDetails, TAB_KEY } from "./components/session-details";
 import { GoalDialog } from "./components/session-goal";
 import { ProjectTrustDialog } from "./components/project-trust-dialog";
-import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { GetStarted } from "./components/get-started";
 import { firstSessionFact } from "./get-started-model";
 import { DashboardSidebar, useSidebarPanels } from "./components/sidebar-panel";
@@ -49,9 +45,9 @@ import { integrationsStore } from "./reads";
 import { onArtifactOpen, onArtifactsReveal } from "./artifact-requests";
 import { onReviewRequest } from "./review-pages";
 import { storeOrRemove } from "./stored-state";
-import { EMPTY_LAYOUT, hashForLayout, hashForPage, hashForRoute, hashForView, type OpenMode, sameView, type TodoListView } from "./routing";
+import { hashForLayout, hashForPage, hashForRoute, hashForView, type OpenMode, sameView, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
-import { defaultCwd, spaceSwitchPanes, type WindowScope, waitingIn, workspaceSession, workspaceSwitch } from "./sessions";
+import { defaultCwd, type WindowScope, workspaceSession, workspaceSwitch } from "./sessions";
 import { useSidebarTabs } from "./sidebar-tabs";
 import { refusedStart, startOf } from "./starts";
 import { useAttention } from "./use-attention";
@@ -76,8 +72,8 @@ export function App() {
 	const { layout } = state;
 	const sidebars = useSidebarPanels();
 	const scope = useWorkspaceScope(state);
-	const { visible, workspaces, workspace, pickWorkspace, hiddenCwds, space, pickSpace, pullRequestsScope, spaces, home, bots } = scope;
-	const windowScope = useMemo((): WindowScope => ({ space, spaces, workspace, home }), [space, spaces, workspace, home]);
+	const { visible, workspaces, workspace, pickWorkspace, hiddenCwds, pullRequestsScope } = scope;
+	const windowScope = useMemo((): WindowScope => ({ workspace }), [workspace]);
 	const focused = useFocusedSession(state, page, scope);
 	const sessions = useSessionLists(scope, state.pins, changePins);
 	const overlays = useOverlays();
@@ -85,11 +81,6 @@ export function App() {
 	const terminal = useTerminalPanel();
 	useNoticeToasts(state.notices, state.connected, send, start);
 	useAttention(state, openBot?.view ?? null, send);
-	/** How many sessions the space off screen lists need you, which the switch counts on its side; none until the spaces are known. */
-	const otherWaiting = useMemo(
-		() => (state.connected && scope.spacesKnown ? waitingIn(scope.everySpace, otherSpace(space), spaces) : 0),
-		[state.connected, scope.spacesKnown, scope.everySpace, space, spaces],
-	);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
 	const [goalEditor, setGoalEditor] = useState<{ instanceId: string; focus: "objective" | "budget" } | null>(null);
 	const editGoal = useCallback((instanceId: string, focus: "objective" | "budget") => setGoalEditor({ instanceId, focus }), []);
@@ -97,13 +88,13 @@ export function App() {
 	const editedGoal = goalHost?.source === "dashboard" && goalHost.goal.kind !== "off" && goalHost.control.phase === "live" && !goalHost.control.readOnly ? goalHost : null;
 	const integrations = integrationsStore.usePolling().read?.data.integrations;
 	const linear = integrations?.linear ?? null;
-	const { absent: absentTabs, shown: tabs } = useSidebarTabs(space);
+	const { signedOut: absentTabs, shown: tabs } = useSidebarTabs();
 	/** The dashboard reads and writes Linear: the tickets page lists issues, the Todo page creates them, and the Calendar shows their due days. */
 	const linearCallable = linear !== null && callable(linear.connection);
-	/** Linear answers and the space shows Tickets: the new-ticket shortcut and the palette's tickets apply. */
+	/** Linear answers and the sidebar shows Tickets: the new-ticket shortcut and the palette's tickets apply. */
 	const ticketsCallable = linearCallable && !absentTabs.has("tickets");
 	const settings = useSettingsRoute(page);
-	const botList = useMemo(() => (bots === null ? null : botRows(bots, state.hosts, state.botLasts)), [bots, state.hosts, state.botLasts]);
+	const botList = useMemo(() => (state.bots === null ? null : botRows(state.bots, state.hosts, state.botLasts)), [state.bots, state.hosts, state.botLasts]);
 	const latestBot = botList?.[0]?.bot.id ?? null;
 	const { row, showTab } = useSidebarTab({ page, absentTabs, layout, latestSession: sessions.latest, latestBot, navigate, show });
 	const maximized = layout.maximized && !page;
@@ -113,8 +104,8 @@ export function App() {
 	const defaultWorkspace = defaultCwd(focused.view, visible.hosts, visible.past, windowScope);
 	// The live rows of the sessions list, whose order ending a session moves its panes along.
 	const listedHosts = sessions.listed.flatMap(view => (view.kind === "live" ? view.instanceId : []));
-	const latest = useRef({ layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, shownWorkspace: focused.workspace, scope, detailsView });
-	latest.current = { layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, shownWorkspace: focused.workspace, scope, detailsView };
+	const latest = useRef({ layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, shownWorkspace: focused.workspace, detailsView });
+	latest.current = { layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, shownWorkspace: focused.workspace, detailsView };
 
 	const endHost = useCallback(
 		async (instanceId: string): Promise<boolean> => {
@@ -170,19 +161,6 @@ export function App() {
 		},
 		[pickWorkspace, open],
 	);
-	const switchSpace = useCallback(
-		(next: Space): void => {
-			const { page, layout, scope } = latest.current;
-			if (next === scope.space) return;
-			pickSpace(next);
-			// The route follows the space the user picks; `useFocusedSession` follows the route into its space the other way.
-			const panes = spaceSwitchPanes(page, layout, scope.space, next, scope.everySpace.hosts, scope.spaces);
-			if (panes === "empty") show(EMPTY_LAYOUT);
-			else if (panes !== "stay") open(panes, "replace");
-		},
-		[pickSpace, open, show],
-	);
-	const toggleSpace = useCallback(() => switchSpace(otherSpace(latest.current.scope.space)), [switchSpace]);
 	/** The palette opens a session from any workspace, so the sidebar switches to that workspace to keep it listed. */
 	const openFromPalette = useCallback(
 		(picked: View, sessionWorkspace: string, mode: OpenMode): void => {
@@ -203,7 +181,7 @@ export function App() {
 		[workspaces, pickWorkspace, navigate],
 	);
 
-	const { setShortcutsOpen, setOpenedFile, setNewTicket, dispatchPalette } = overlays;
+	const { setOpenedFile, setNewTicket, dispatchPalette } = overlays;
 	// The command menu's **Open pull request** acts on the focused pane's session while the panes show, as its header's **Open PR** does.
 	const openPullRequest = useOpenPullRequest(page ? null : focused.view, focused.host, request);
 	const focusedGoal = page === null && focused.view?.kind === "live" && focused.view.agentId === null && focused.host?.source === "dashboard" && focused.host.goal.kind !== "off" && focused.host.control.phase === "live" && !focused.host.control.readOnly ? focused.host : null;
@@ -222,10 +200,8 @@ export function App() {
 		setGoal: focusedGoal ? () => editGoal(focusedGoal.instanceId, "objective") : null,
 		palette: overlays.palette,
 		dispatchPalette,
-		setShortcutsOpen,
 		setNewTicket,
 		openNewSession,
-		toggleSpace,
 		open,
 		show,
 		navigate,
@@ -276,181 +252,170 @@ export function App() {
 					botList={botList}
 					userTodos={state.userTodos}
 					todoView={todoView}
-					space={space}
 					sectionTarget={sectionTarget}
 					onSectionTarget={setSectionTarget}
 				/>
 			),
-		[listPage, state.listed, visible, state.hosts, state.past, botList, state.userTodos, todoView, space, sectionTarget],
+		[listPage, state.listed, visible, state.hosts, state.past, botList, state.userTodos, todoView, sectionTarget],
 	);
 	const showSearch = useCallback(() => dispatchPalette({ type: "open" }), [dispatchPalette]);
 	const toggleSettings = useCallback(() => void handlers.settings?.(0), [handlers]);
 	const headerControls = useMemo(() => <HeaderControls notices={state.notices} settingsOpen={page?.kind === "settings"} onToggleSettings={toggleSettings} />, [state.notices, page?.kind, toggleSettings]);
-	const sidebarFoot = useMemo(
-		() => <SpaceSwitch space={space} onSpace={switchSpace} otherWaiting={otherWaiting} workspaces={workspaces.length} onShowShortcuts={() => setShortcutsOpen(true)} />,
-		[space, switchSpace, otherWaiting, workspaces.length, setShortcutsOpen],
-	);
 
 	return (
 		<DashboardActionsContext.Provider value={actions}>
 			<DashboardStatusContext.Provider value={status}>
 				<ScheduledSends.Provider value={state.scheduled}>
 					<UserTodosContext.Provider value={state.userTodos}>
-							<PersonalContext.Provider value={state.personal}>
-								<div className="flex h-svh flex-col bg-sidebar">
-									{/* The sidebar runs the window's height; the header's tabs sit right of it, above the page and the details sidebar, each an inset panel on the sidebar's color. */}
-									<SidebarProvider
-										className="group/window grid min-h-0 flex-1 grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[var(--page-header-height)_minmax(0,1fr)] pr-1.5 pb-1.5 [grid-template-areas:'sidebar_tabs_tabs'_'sidebar_page_details']"
-									>
-										<DashboardSidebar side="left" className="[grid-area:sidebar]" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")} address={address}>
-											<AppSidebar
-												scope={scope}
-												sessions={sessions}
-												page={page}
-												panes={layout.panes}
-												row={row}
-												onTab={showTab}
-												tabs={tabs}
-												botList={botList}
-												list={placement?.at === "sidebar" ? pageList : null}
-												settings={settings}
-												onPickWorkspace={switchWorkspace}
-												onSearch={showSearch}
-												foot={sidebarFoot}
-											/>
-										</DashboardSidebar>
-										<HeaderTabs className="[grid-area:tabs]" address={address} hosts={state.hosts} past={state.past} controls={headerControls} />
-										<SidebarInset className="inset-panel [grid-area:page] group-has-[#sessions-sidebar[inert]]/window:ml-1.5">
-											<div ref={pageArea} className="flex min-h-0 flex-1">
-												{listPage && placement?.at === "column" && (
-													<PageListColumn page={listPage} max={placement.max}>
-														{pageList}
-													</PageListColumn>
-												)}
-												<div className="relative flex min-w-0 flex-1 flex-col">
-													<Plans value={state.usage?.plans ?? NO_PLANS}>
-														<ActivityVisibility.Provider value={display.activityVisibility}>
-															<ToolsExpanded value={display.toolsExpanded}>
-																<MentionListsContext.Provider value={mentionLists}>
-																	<RenderBoundary resetKey={hashForRoute(routeOf(state))}>
-																		<PageSwitch
-																			page={page}
-																			hosts={state.hosts}
-																			past={state.past}
-																			lastHosts={state.lastHosts}
-																			layout={layout}
-																			splits={state.splits}
-																			models={state.models}
-																			userTodos={state.userTodos}
-																			sport={state.sport}
-																			routines={state.routines}
-																			bots={state.bots}
-																			botLasts={state.botLasts}
-																			openBot={openBot}
-																			workspaceList={state.workspaceList}
-																			personal={state.personal}
-																			trustedProjects={state.trustedProjects}
-																			newSessionCompletions={state.newSessionCompletions}
-																			connected={state.connected}
-																			listed={state.listed}
-																			rosterError={state.rosterError}
-																			newStart={startOf(state.starts, "new")}
-																			scope={scope}
-																			defaultWorkspace={defaultWorkspace}
-																			sectionTarget={sectionTarget}
-																			todoView={todoView}
-																			linear={linear}
-																			linearCallable={linearCallable}
-																			ticketsCallable={ticketsCallable}
-																			maximized={maximized}
-																			hasDetails={detailsView !== null}
-																			rightOpen={sidebars.panels.right.open}
-																			show={show}
-																			close={close}
-																			resize={resize}
-																			toggleSidebar={toggleSidebar}
-																		/>
-																	</RenderBoundary>
-																</MentionListsContext.Provider>
-															</ToolsExpanded>
-														</ActivityVisibility.Provider>
-													</Plans>
-												</div>
-											</div>
-											<TerminalPanel panel={terminal} cwd={focused.workDir ?? workspace ?? "~"} />
-										</SidebarInset>
-										{(detailsView || openBot) && (
-											<DashboardSidebar side="right" className="[grid-area:details]" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")} address={address}>
-												{detailsView ? (
-													<SessionDetails
-														key={hashForView(detailsView)}
-														view={detailsView}
-														working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
-														cwd={focused.cwd ?? null}
-														personalMemory={focused.cwd !== undefined && spaces.of(focused.cwd, focused.workspace ?? focused.cwd) === "personal" ? state.personalMemory : null}
-														hosts={visible.hosts}
-														sessionId={focused.sessionId}
-														host={focused.host ?? null}
-														row={focused.row ?? null}
-													/>
-												) : (
-													openBot && (
-														<BotDetails
-															key={openBot.bot.id}
-															open={openBot}
-															session={openBot.host ?? state.past.find(({ sessionId }) => sessionId === openBot.bot.sessionId) ?? null}
-															memory={state.botMemories[openBot.bot.id] ?? ""}
-															connected={state.connected}
-														/>
-													)
-												)}
-											</DashboardSidebar>
+						<div className="flex h-svh flex-col bg-sidebar">
+							{/* The sidebar runs the window's height; the header's tabs sit right of it, above the page and the details sidebar, each an inset panel on the sidebar's color. */}
+							<SidebarProvider
+								className="group/window grid min-h-0 flex-1 grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[var(--page-header-height)_minmax(0,1fr)] pr-1.5 pb-1.5 [grid-template-areas:'sidebar_tabs_tabs'_'sidebar_page_details']"
+							>
+								<DashboardSidebar side="left" className="[grid-area:sidebar]" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")} address={address}>
+									<AppSidebar
+										scope={scope}
+										sessions={sessions}
+										page={page}
+										panes={layout.panes}
+										row={row}
+										onTab={showTab}
+										tabs={tabs}
+										botList={botList}
+										list={placement?.at === "sidebar" ? pageList : null}
+										settings={settings}
+										onPickWorkspace={switchWorkspace}
+										onSearch={showSearch}
+									/>
+								</DashboardSidebar>
+								<HeaderTabs className="[grid-area:tabs]" address={address} hosts={state.hosts} past={state.past} controls={headerControls} />
+								<SidebarInset className="inset-panel [grid-area:page] group-has-[#sessions-sidebar[inert]]/window:ml-1.5">
+									<div ref={pageArea} className="flex min-h-0 flex-1">
+										{listPage && placement?.at === "column" && (
+											<PageListColumn page={listPage} max={placement.max}>
+												{pageList}
+											</PageListColumn>
 										)}
-										<ShortcutsDialog open={overlays.shortcutsOpen} onOpenChange={setShortcutsOpen} tabs={tabs} />
-										{refused && <ProjectTrustDialog key={refused.reqId} ask={refused.trust} connected={state.connected} onTrust={() => trustAndStart(refused)} onCancel={() => dismissTrust(refused.reqId)} />}
-										<GetStarted
-											route={page?.kind === "get-started"}
-											vacantHome={!page && layout.panes.length === 0}
-											firstSession={firstSessionFact({ hosts: state.hosts.length, past: state.past.length, listed: state.listed, connected: state.connected, rosterError: state.rosterError })}
-											rosterError={state.rosterError}
-											onClose={() => show(layout)}
-										/>
-										{overlays.openedFile !== null && <FileDialog key={textFileUrl(overlays.openedFile)} target={overlays.openedFile} onClose={() => setOpenedFile(null)} />}
-										{overlays.newTicket !== null && <NewTicketDialog title={overlays.newTicket} onClose={() => setNewTicket(null)} />}
-										{goalEditor && editedGoal && editedGoal.goal.kind !== "off" && (
-											<GoalDialog
-												key={goalEditor.instanceId}
-												goal={editedGoal.goal.kind === "set" && editedGoal.goal.goal.status !== "complete" ? editedGoal.goal.goal : null}
-												focus={goalEditor.focus}
-												continues={editedGoal.goal.continues}
-												onClose={() => setGoalEditor(null)}
-												onSave={async change => { await request({ t: "goal", instanceId: goalEditor.instanceId, change }); setGoalEditor(null); }}
+										<div className="relative flex min-w-0 flex-1 flex-col">
+											<Plans value={state.usage?.plans ?? NO_PLANS}>
+												<ActivityVisibility.Provider value={display.activityVisibility}>
+													<ToolsExpanded value={display.toolsExpanded}>
+														<MentionListsContext.Provider value={mentionLists}>
+															<RenderBoundary resetKey={hashForRoute(routeOf(state))}>
+																<PageSwitch
+																	page={page}
+																	hosts={state.hosts}
+																	past={state.past}
+																	lastHosts={state.lastHosts}
+																	layout={layout}
+																	splits={state.splits}
+																	models={state.models}
+																	userTodos={state.userTodos}
+																	sport={state.sport}
+																	routines={state.routines}
+																	bots={state.bots}
+																	botLasts={state.botLasts}
+																	openBot={openBot}
+																	workspaceList={state.workspaceList}
+																	trustedProjects={state.trustedProjects}
+																	newSessionCompletions={state.newSessionCompletions}
+																	connected={state.connected}
+																	listed={state.listed}
+																	rosterError={state.rosterError}
+																	newStart={startOf(state.starts, "new")}
+																	scope={scope}
+																	defaultWorkspace={defaultWorkspace}
+																	sectionTarget={sectionTarget}
+																	todoView={todoView}
+																	linear={linear}
+																	linearCallable={linearCallable}
+																	ticketsCallable={ticketsCallable}
+																	maximized={maximized}
+																	hasDetails={detailsView !== null}
+																	rightOpen={sidebars.panels.right.open}
+																	show={show}
+																	close={close}
+																	resize={resize}
+																	toggleSidebar={toggleSidebar}
+																/>
+															</RenderBoundary>
+														</MentionListsContext.Provider>
+													</ToolsExpanded>
+												</ActivityVisibility.Provider>
+											</Plans>
+										</div>
+									</div>
+									<TerminalPanel panel={terminal} cwd={focused.workDir ?? workspace ?? "~"} />
+								</SidebarInset>
+								{(detailsView || openBot) && (
+									<DashboardSidebar side="right" className="[grid-area:details]" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")} address={address}>
+										{detailsView ? (
+											<SessionDetails
+												key={hashForView(detailsView)}
+												view={detailsView}
+												working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
+												cwd={focused.cwd ?? null}
+												hosts={visible.hosts}
+												sessionId={focused.sessionId}
+												host={focused.host ?? null}
+												row={focused.row ?? null}
 											/>
+										) : (
+											openBot && (
+												<BotDetails
+													key={openBot.bot.id}
+													open={openBot}
+													session={openBot.host ?? state.past.find(({ sessionId }) => sessionId === openBot.bot.sessionId) ?? null}
+													memory={state.botMemories[openBot.bot.id] ?? ""}
+													connected={state.connected}
+												/>
+											)
 										)}
-										<CommandPalette
-											state={overlays.palette}
-											dispatch={dispatchPalette}
-											hosts={visible.hosts}
-											past={visible.past}
-											workspaces={workspaces}
-											workspace={workspace}
-											onOpenSession={openFromPalette}
-											onPickWorkspace={switchWorkspace}
-											pinned={sessions.pinned}
-											onTogglePin={sessions.togglePin}
-											handlers={handlers}
-											unavailable={unavailable}
-											tabs={tabs}
-											todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
-											todos={mentionLists.todos}
-											ticketsCallable={ticketsCallable}
-											onCreateTicket={setNewTicket}
-										/>
-									</SidebarProvider>
-									<StatusBar usage={state.usage} hosts={state.hosts} bots={state.bots} terminalOpen={terminal.open} onToggleTerminal={terminal.toggle} />
-									<DesktopLinkPreview />
-								</div>
-							</PersonalContext.Provider>
+									</DashboardSidebar>
+								)}
+								{refused && <ProjectTrustDialog key={refused.reqId} ask={refused.trust} connected={state.connected} onTrust={() => trustAndStart(refused)} onCancel={() => dismissTrust(refused.reqId)} />}
+								<GetStarted
+									route={page?.kind === "get-started"}
+									vacantHome={!page && layout.panes.length === 0}
+									firstSession={firstSessionFact({ hosts: state.hosts.length, past: state.past.length, listed: state.listed, connected: state.connected, rosterError: state.rosterError })}
+									rosterError={state.rosterError}
+									onClose={() => show(layout)}
+								/>
+								{overlays.openedFile !== null && <FileDialog key={textFileUrl(overlays.openedFile)} target={overlays.openedFile} onClose={() => setOpenedFile(null)} />}
+								{overlays.newTicket !== null && <NewTicketDialog title={overlays.newTicket} onClose={() => setNewTicket(null)} />}
+								{goalEditor && editedGoal && editedGoal.goal.kind !== "off" && (
+									<GoalDialog
+										key={goalEditor.instanceId}
+										goal={editedGoal.goal.kind === "set" && editedGoal.goal.goal.status !== "complete" ? editedGoal.goal.goal : null}
+										focus={goalEditor.focus}
+										continues={editedGoal.goal.continues}
+										onClose={() => setGoalEditor(null)}
+										onSave={async change => { await request({ t: "goal", instanceId: goalEditor.instanceId, change }); setGoalEditor(null); }}
+									/>
+								)}
+								<CommandPalette
+									state={overlays.palette}
+									dispatch={dispatchPalette}
+									hosts={visible.hosts}
+									past={visible.past}
+									workspaces={workspaces}
+									workspace={workspace}
+									onOpenSession={openFromPalette}
+									onPickWorkspace={switchWorkspace}
+									pinned={sessions.pinned}
+									onTogglePin={sessions.togglePin}
+									handlers={handlers}
+									unavailable={unavailable}
+									tabs={tabs}
+									todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
+									todos={mentionLists.todos}
+									ticketsCallable={ticketsCallable}
+									onCreateTicket={setNewTicket}
+								/>
+							</SidebarProvider>
+							<StatusBar usage={state.usage} hosts={state.hosts} bots={state.bots} terminalOpen={terminal.open} onToggleTerminal={terminal.toggle} />
+							<DesktopLinkPreview />
+						</div>
 					</UserTodosContext.Provider>
 				</ScheduledSends.Provider>
 			</DashboardStatusContext.Provider>

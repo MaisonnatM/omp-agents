@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { DONE_KEPT_HOURS } from "../../../src/user-todos";
 import { localDay } from "../../../src/shared/days";
-import { ALL_OF_SPACE, folderName } from "../../labels";
+import { ALL_WORKSPACES, folderName } from "../../labels";
 import { hashForTodo, type TodoListView } from "../../routing";
 import { shortcutKeys } from "../../shortcuts";
 import { byStatus, inScope, LIST_KINDS, lastOf, leftIn, placeIn, type Section, TODO_STATUS, type TodoEntry, titleOf, todoMatcher, todosOf } from "../../todo-views";
@@ -62,10 +62,10 @@ export function TodoPage({ list, ...props }: TodoPageProps) {
 }
 
 function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, newSessionCwd, workspaces, linearConnected }: TodoPageProps & { list: UserTodoList }) {
-	// The sidebar's workspace, else its space, narrows the list.
+	// The sidebar's workspace narrows the list.
 	const { scope } = useDashboardStatus();
-	/** The Workspace a todo added here names, which its sessions start in: the sidebar's, else Personal's home; `null` for none. */
-	const workspace = scope.workspace ?? scope.home?.cwd ?? null;
+	/** The Workspace a todo added here names, which its sessions start in: the sidebar's; `null` for none. */
+	const workspace = scope.workspace;
 	const openTodo = (id: string | null): void => {
 		location.hash = hashForTodo(view, id);
 	};
@@ -92,7 +92,7 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 	const anyClosed = section.todos.some(todo => todo.doneAt !== null || todo.children.some(child => child.doneAt !== null));
 	const emptyText = (): string | null => {
 		if (query) return `No todo matches “${query}”.`;
-		if (scope.workspace !== null) return `No todo here names ${folderName(scope.workspace) ?? scope.workspace}, the workspace the sidebar shows. Choose ${ALL_OF_SPACE[scope.space]} in the sidebar to see every todo of the space.`;
+		if (scope.workspace !== null) return `No todo here names ${folderName(scope.workspace) ?? scope.workspace}, the workspace the sidebar shows. Choose ${ALL_WORKSPACES} in the sidebar to see every todo.`;
 		return kind.empty;
 	};
 	const empty = section.todos.length > 0 ? null : emptyText();

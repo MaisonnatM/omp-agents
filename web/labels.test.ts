@@ -89,14 +89,14 @@ describe("command labels", () => {
 });
 
 describe("sameDir", () => {
-	const personal = { cwd: "/Users/me/.local/share/omp-agents/personal", cwdDisplay: "~/.local/share/omp-agents/personal" };
-	test("the personal directory matches as resolved or as displayed", () => {
-		expect(sameDir(personal.cwd, personal)).toBe(true);
-		expect(sameDir(personal.cwdDisplay, personal)).toBe(true);
+	const workspace = { cwd: "/Users/me/code/webapp", cwdDisplay: "~/code/webapp" };
+	test("a workspace matches as resolved or as displayed", () => {
+		expect(sameDir(workspace.cwd, workspace)).toBe(true);
+		expect(sameDir(workspace.cwdDisplay, workspace)).toBe(true);
 	});
-	test("another directory, or no personal directory yet, does not match", () => {
-		expect(sameDir("~/code/omp-agents", personal)).toBe(false);
-		expect(sameDir("", personal)).toBe(false);
-		expect(sameDir(personal.cwd, null)).toBe(false);
+	test("another directory, or no workspace, does not match", () => {
+		expect(sameDir("~/code/omp-agents", workspace)).toBe(false);
+		expect(sameDir("", workspace)).toBe(false);
+		expect(sameDir(workspace.cwd, null)).toBe(false);
 	});
 });

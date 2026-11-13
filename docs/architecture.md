@@ -36,7 +36,6 @@ For installation, see the [README](../README.md); for the interface, see [Using 
   - [Isolation sandboxes](architecture/routines.md#isolation-sandboxes)
 - [Scheduled sends](architecture/scheduled-sends.md)
 - [Bots](architecture/bots.md)
-- [Personal sessions](architecture/personal-sessions.md)
 - [Pins](architecture/pins.md)
 - [Preferences](architecture/preferences.md)
 - [Sport](architecture/sport.md)

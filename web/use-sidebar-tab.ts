@@ -28,7 +28,7 @@ export function useSettingsRoute(page: Page | null): SettingsRoute {
 
 interface SidebarTabInput {
 	page: Page | null;
-	/** The tabs that neither show nor apply, signed out or of the other space; a page of one selects no row. */
+	/** The tabs that neither show nor apply, since they are signed out; a page of one selects no row. */
 	absentTabs: ReadonlySet<SidebarTab>;
 	layout: Layout;
 	/** The session the Sessions tab opens when no pane shows one; `null` for none. */

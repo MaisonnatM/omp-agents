@@ -1,8 +1,8 @@
 /**
- * The `sport` tool of a personal session: it reads the Sport module's state with the requests its inbox still holds,
- * and leaves one request per call in that inbox for the dashboard, the one writer of `sport.json`. It checks the
- * request as the dashboard will, with `agentSportChanges`, before it leaves it, so a refusal reaches the agent with its
- * reason.
+ * omp-agents Sport in a session: the `sport` tool, which reads the Sport module's state with the requests its inbox
+ * still holds, and leaves one request per call in that inbox for the dashboard, the one writer of `sport.json`. It checks
+ * the request as the dashboard will, with `agentSportChanges`, before it leaves it, so a refusal reaches the agent with
+ * its reason. The dashboard loads it with `omp -e` into every session it starts, with the flags that name both paths.
  */
 import { randomUUID } from "node:crypto";
 import { inbox } from "../../templates/omp/agent/extensions/inbox/client";
@@ -12,12 +12,18 @@ import { MAX_CHART_ROWS } from "../shared/session-visuals";
 import { EMPTY_SPORT, type SportState, WORKOUT_KINDS } from "../shared/sport";
 import { type AgentSportRequest, agentSportChanges, MAX_PLAN_BYTES, withAgentChanges } from "../sport-agent";
 import { parseSportState } from "../sport-parse";
-import { dayPlan, painFlags, type PlannedDay, weekPlan } from "../sport-week";
-import { type ExtensionApi, type ExtensionTool, readText, reply, type ToolContext } from "./extension-kit";
+import { painFlags, type PlannedDay, weekPlan } from "../sport-week";
+import { type ExtensionApi, type ExtensionTool, flagValue, readText, reply } from "./extension-kit";
 
-export const SPORT_TOOL = "sport";
+const SPORT_TOOL = "sport";
 
-/** Where a personal session reads the Sport module and leaves its changes. */
+/** The flags that name the Sport module's file and the inbox a session leaves its changes in. */
+export const SPORT_FLAGS = {
+	file: "omp-agents-sport-file",
+	inbox: "omp-agents-sport-inbox",
+} as const;
+
+/** Where a session reads the Sport module and leaves its changes. */
 export interface SportPaths {
 	file: string;
 	inbox: string;
@@ -46,9 +52,6 @@ export interface SportParams {
 	targets?: unknown;
 	metrics?: unknown;
 }
-
-/** The longest line today's training takes in a personal turn's prompt. */
-export const MAX_TODAY_LINE = 299;
 
 const APPLIES = "The dashboard applies it, and while the dashboard is stopped the change waits for it.";
 
@@ -107,21 +110,15 @@ function entryChange(name: keyof typeof ENTRY_OPS, given: unknown, sessionId: st
 	return { change: { op: add, [name]: { [day]: localDay(), ...fields, id: added, addedBy: sessionId } }, id: added, edit: false };
 }
 
-/** The line a personal turn's prompt carries for today when there is a plan: the phase, the workouts, and the pain flags. */
-export function todayLine(state: SportState, day: string): string | null {
-	if (!state.plan) return null;
-	const { phase, deload, workouts } = dayPlan(state, day);
-	const flags = painFlags(state, day);
-	const line = [
-		`Today ${day}, sport: ${phase ? `phase ${phase.name}${deload ? ", deload week" : ""}` : "no phase"}`,
-		workouts.length === 0 ? "rest day" : workouts.map(({ name, optional, log }) => `${name}${optional ? " (optional)" : ""}${log ? ` (${log.status})` : ""}`).join(", "),
-		flags.length === 0 ? "no pain flag" : `pain flags: ${flags.map(({ where, level, until }) => `${where} ${level}/10 until ${until}`).join(", ")}`,
-	].join("; ");
-	return line.length < MAX_TODAY_LINE ? `${line}.` : `${line.slice(0, MAX_TODAY_LINE - 1)}…`;
+/** The paths the dashboard's flags name, or why the session has none. */
+function pathsOf(pi: ExtensionApi): SportPaths {
+	const file = flagValue(pi, SPORT_FLAGS.file);
+	const inbox = flagValue(pi, SPORT_FLAGS.inbox);
+	if (file === null || inbox === null) throw new Error("The dashboard did not name the Sport module's files, so this session has no Sport module.");
+	return { file, inbox };
 }
 
-/** The `sport` tool; `pathsOf` names the paths for the session calling it, or throws why it has none. */
-export function sportTool(pi: ExtensionApi, pathsOf: (ctx: ToolContext) => Promise<SportPaths>): ExtensionTool<SportParams> {
+function sportTool(pi: ExtensionApi): ExtensionTool<SportParams> {
 	const { Type } = pi.typebox;
 	const object = (description: string) => Type.Optional(Type.Unknown({ description }));
 	return {
@@ -147,7 +144,7 @@ export function sportTool(pi: ExtensionApi, pathsOf: (ctx: ToolContext) => Promi
 			return action !== undefined && Object.hasOwn(APPROVAL, action) ? APPROVAL[action] : "write";
 		},
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-			const paths = await pathsOf(ctx);
+			const paths = pathsOf(pi);
 			const state = readSport(paths);
 			const sessionId = ctx.sessionManager.getSessionId();
 			const leave = (change: Record<string, unknown>): void => {
@@ -196,4 +193,10 @@ export function sportTool(pi: ExtensionApi, pathsOf: (ctx: ToolContext) => Promi
 			}
 		},
 	};
+}
+
+export default function sportExtension(pi: ExtensionApi): void {
+	pi.registerFlag(SPORT_FLAGS.file, { type: "string", description: "The omp-agents Sport module's file, which the sport tool reads." });
+	pi.registerFlag(SPORT_FLAGS.inbox, { type: "string", description: "The directory the sport tool leaves its changes in for the dashboard." });
+	pi.registerTool(sportTool(pi));
 }

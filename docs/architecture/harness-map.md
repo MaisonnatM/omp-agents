@@ -35,7 +35,7 @@ flowchart TD
   agent --> skills["skills/, agents/, commands/"]
   agent --> mcp["mcp.json"]
   agent --> plugins["plugins/<br/>marketplace plugins"]
-  args --> dash["Dashboard extensions<br/>session visuals, bots, personal, designer, shepherd"]
+  args --> dash["Dashboard extensions<br/>session visuals, bots, sport, designer, shepherd"]
   args --> host["Host tools<br/>move_session, wait_for_session, save_review_draft"]
   start --> project["Workspace<br/>AGENTS.md, .omp/, project skills"]
 ```

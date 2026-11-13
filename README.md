@@ -57,8 +57,8 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 - **Email.**
   Your Gmail inbox's latest conversations, with a rich-text editor to reply and write new mail, and Delete to Trash, each opening in Gmail, read with omp's sign-in to Gmail's MCP server.
 - **Several Google accounts.**
-  Connect more than one Gmail and Google Calendar account; the Email page and the Calendar merge them, tagged by address, and each address shows only in the space you put it in, Personal or Work.
-  omp sessions are told, through the starter kit's `google-accounts` extension, which account each MCP server signs in as and which ones are in their space.
+  Connect more than one Gmail and Google Calendar account; the Email page and the Calendar merge them, tagged by address.
+  omp sessions are told, through the starter kit's `google-accounts` extension, which account each MCP server signs in as.
 - **Your own todo list.**
   Categories, due days with a Today list, drag-to-reorder, search, and an archive with undo.
   A todo links to the sessions, pull requests, and Linear issues it is about, starts a session or opens a Linear issue from its notes, and agents add the steps only you can take through the starter kit's `user_todo` tool, check off a todo once they finish its work, and edit or delete one when you ask.
@@ -70,7 +70,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 - **Phone access.**
   Open the dashboard on your phone from anywhere: turn on **Settings › Phone access** and scan the code, which signs that phone in through Tailscale with its own key.
 - **Keyboard-first.**
-  Shortcuts for every page and action; press `?` to list them.
+  Shortcuts for every page and action; press `?` to list them in Settings › Keyboard.
 - **omp starter kit.**
   An optional, ready-made omp setup (model routing, agent rules, a review agent, a `/ship` workflow, skills) that one command installs.
 

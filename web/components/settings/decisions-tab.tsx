@@ -216,7 +216,7 @@ function AllDecisions({
 	onToggle: (scope: string, name: string) => void;
 	onOpen: (scope: string, name: string) => void;
 }) {
-	if (workspaces.length === 0) return <p className="text-sm text-muted-foreground">No workspace in this space.</p>;
+	if (workspaces.length === 0) return <p className="text-sm text-muted-foreground">No workspace yet.</p>;
 	if (reads === null) return <p className="text-sm text-muted-foreground">Reading decision records…</p>;
 	const { groups, empty } = decisionGroups(reads);
 	const loaded = groups.filter((group): group is Extract<DecisionGroup, { error: null }> => group.error === null);

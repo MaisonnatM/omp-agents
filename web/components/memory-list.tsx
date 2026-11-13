@@ -1,4 +1,4 @@
-/** `MemoryList`, the facts a `remember` tool kept, for a Bot's details and a personal session's. */
+/** `MemoryList`, the facts a Bot's `remember` tool kept, for its details. */
 import { useId } from "react";
 import { memoryEntries } from "../bots-model";
 

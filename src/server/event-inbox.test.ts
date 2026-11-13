@@ -2,7 +2,6 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { SpaceOfSession } from "../shared/workspaces";
 import { EventInbox } from "./event-inbox";
 import { LocalEventsFile } from "./local-events-file";
 
@@ -24,12 +23,10 @@ function config(): Kit {
 }
 
 const when = { allDay: false, start: Date.parse("2026-11-05T09:00:00Z"), end: Date.parse("2026-11-05T09:30:00Z") } as const;
-const reminder = (id: string, sessionId: string | null = null, space: "personal" | "work" = "work") => ({ id, title: "Check the build time", when, sessionId, space });
-/** Session `s1` runs in the personal directory; every other session is Work. */
-const spaceOf: SpaceOfSession = async sessionId => (sessionId === "s1" ? "personal" : "work");
+const reminder = (id: string, sessionId: string | null = null) => ({ id, title: "Check the build time", when, sessionId });
 
 function drain({ inbox, events }: Kit): Promise<void> {
-	return new EventInbox(inbox, () => events.value, change => events.apply(change), spaceOf).drain();
+	return new EventInbox(inbox, () => events.value, change => events.apply(change)).drain();
 }
 
 describe("EventInbox", () => {
@@ -40,13 +37,13 @@ describe("EventInbox", () => {
 		writeFileSync(join(kit.inbox, "3-x.json"), JSON.stringify({ op: "add", event: reminder("c", "s1") }));
 		writeFileSync(join(kit.inbox, "4-x.json"), JSON.stringify({ op: "remove", id: "c", sessionId: "s1" }));
 		await drain(kit);
-		expect(kit.events.value).toEqual([reminder("a", "s1", "personal")]);
+		expect(kit.events.value).toEqual([reminder("a", "s1")]);
 		expect(readdirSync(kit.inbox)).toEqual(["2-x.json.invalid"]);
 	});
 
 	test("sets aside the removal of an event you or another session added", async () => {
 		const kit = config();
-		const yours = kit.events.add("Dentist", when, "work");
+		const yours = kit.events.add("Dentist", when);
 		kit.events.apply({ op: "add", event: reminder("theirs", "s2") });
 		writeFileSync(join(kit.inbox, "1-x.json"), JSON.stringify({ op: "remove", id: yours.id, sessionId: "s1" }));
 		writeFileSync(join(kit.inbox, "2-x.json"), JSON.stringify({ op: "remove", id: "theirs", sessionId: "s1" }));
@@ -69,15 +66,14 @@ describe("EventInbox", () => {
 		writeFileSync(join(kit.inbox, "1-x.json"), JSON.stringify({ op: "add", event: reminder("a", "s1") }));
 		writeFileSync(join(kit.inbox, "2-x.json"), JSON.stringify({ op: "add", event: reminder("a", "s1") }));
 		await drain(kit);
-		expect(kit.events.value).toEqual([reminder("a", "s1", "personal")]);
+		expect(kit.events.value).toEqual([reminder("a", "s1")]);
 		expect(readdirSync(kit.inbox)).toEqual([]);
 	});
 
-	test("files an agent's reminder in its session's space, whatever space the file names", async () => {
+	test("an event an older version wrote with a space keeps without it", async () => {
 		const kit = config();
-		writeFileSync(join(kit.inbox, "1-x.json"), JSON.stringify({ op: "add", event: reminder("a", "s1", "work") }));
-		writeFileSync(join(kit.inbox, "2-x.json"), JSON.stringify({ op: "add", event: reminder("b", "s2", "personal") }));
+		writeFileSync(join(kit.inbox, "1-x.json"), JSON.stringify({ op: "add", event: { ...reminder("a", "s1"), space: "personal" } }));
 		await drain(kit);
-		expect(kit.events.value.map(event => event.space)).toEqual(["personal", "work"]);
+		expect(kit.events.value).toEqual([reminder("a", "s1")]);
 	});
 });

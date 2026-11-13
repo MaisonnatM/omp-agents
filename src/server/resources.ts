@@ -34,5 +34,5 @@ export const shepherdExtension: string = packagedResources ? join(packagedResour
 /** The omp extension a Bot designer's session loads beside {@link botExtension} (`src/omp/designer-extension.ts`): its bundle in a packaged app. */
 export const designerExtension: string = packagedResources ? join(packagedResources, "designer-extension.js") : join(import.meta.dir, "..", "omp", "designer-extension.ts");
 
-/** The omp extension every session loads, which tells it which Google account its space uses and turns it personal in the Personal space (`src/omp/personal-extension.ts`): its bundle in a packaged app. */
-export const personalExtension: string = packagedResources ? join(packagedResources, "personal-extension.js") : join(import.meta.dir, "..", "omp", "personal-extension.ts");
+/** The omp extension every session loads, which gives it the `sport` tool (`src/omp/sport-extension.ts`): its bundle in a packaged app. */
+export const sportExtension: string = packagedResources ? join(packagedResources, "sport-extension.js") : join(import.meta.dir, "..", "omp", "sport-extension.ts");

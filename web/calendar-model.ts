@@ -9,8 +9,6 @@ import { type CalendarEvent, calendarKey, type EventWhen, type GoogleCalendar, t
 import type { Ticket, TicketStatusType } from "../src/shared/tickets";
 import type { UserTodoList } from "../src/user-todos-shared";
 import { daysBetween, localDay } from "../src/shared/days";
-import type { Space, Spaces } from "../src/shared/workspaces";
-import { inScope } from "./todo-views";
 
 /** The one color of the events kept on this computer, a neutral slate. */
 const LOCAL_EVENT_COLOR = "#64748b";
@@ -98,15 +96,11 @@ function eventDays(when: EventWhen, first: string, last: string): { day: string;
 	return daysBetween(start < first ? first : start, end > last ? last : end).map(day => ({ day, at: when.allDay || day !== start ? null : when.start }));
 }
 
-/** The routines of `bots`, the Bots of the space on screen, so each routine shows in its Bot's space; none until the Bots load. */
+/** The routines of `bots`, so a routine of a removed Bot never shows; none until the Bots load. */
 export const routinesOf = (routines: Routine[], bots: readonly Pick<Bot, "id">[] | null): Routine[] => {
 	const ids = new Set(bots?.map(bot => bot.id));
 	return routines.filter(routine => ids.has(routine.botId));
 };
-
-/** `list` with only the top-level todos of `space`, by the Todo page's rule, each with its own todos. */
-export const todosIn = (list: UserTodoList | null, space: Space, spaces: Spaces): UserTodoList | null =>
-	list && { ...list, todos: inScope(list.todos, { workspace: null, space, spaces }) };
 
 /** Everything the month of `year` and `month` (0 for January) holds, by day, then by time with the untimed first. */
 export function calendarEntries({ routines, todos, tickets, events, localEvents }: CalendarSources, year: number, month: number, now: number): CalendarEntry[] {
@@ -152,9 +146,9 @@ export interface CalendarChoice {
 
 /**
  * The picker's choices: the shown Google calendars you may write to, account by account and yours first in each, then
- * this computer, filing the event in `space`. With several accounts, each calendar's label names its account's address.
+ * this computer. With several accounts, each calendar's label names its account's address.
  */
-export function calendarChoices(calendars: GoogleCalendar[], accounts: GoogleAccount[], space: Space): CalendarChoice[] {
+export function calendarChoices(calendars: GoogleCalendar[], accounts: GoogleAccount[]): CalendarChoice[] {
 	const writable = calendars.filter(calendar => calendar.shown && calendar.writable);
 	const google = accounts.flatMap(account => {
 		const own = writable.filter(calendar => calendar.account === account.name);
@@ -163,7 +157,7 @@ export function calendarChoices(calendars: GoogleCalendar[], accounts: GoogleAcc
 			({ id, name }): CalendarChoice => ({ value: calendarKey(account.name, id), label: `${name}${suffix}`, calendar: { kind: "google", account: account.name, calendarId: id } }),
 		);
 	});
-	return [...google, { value: "local", label: "This computer", calendar: { kind: "local", space } }];
+	return [...google, { value: "local", label: "This computer", calendar: { kind: "local" } }];
 }
 
 /** How a value kept from before accounts starts: `google:<calendar id>`. */

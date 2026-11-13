@@ -1,27 +1,24 @@
 /** The left sidebar's roster: the Workspaces section, whose label picks the workspace, and its search, then the scheduled sends, the pinned sessions, each workspace's sessions, and the past ones. */
-import { IconArrowLeftRight, IconArrowLoopDownLeft, IconDotGrid1x3Horizontal, IconFolder1, IconFolderOpen, IconLoader, IconMagnifyingGlass, IconPin, IconPlusLarge } from "central-icons";
+import { IconArrowLoopDownLeft, IconDotGrid1x3Horizontal, IconFolder1, IconFolderOpen, IconLoader, IconMagnifyingGlass, IconPin, IconPlusLarge } from "central-icons";
 import { type ReactNode, useContext, useState } from "react";
 import type { ScheduledSend } from "../../src/shared/scheduled";
 import type { PastSession, View } from "../../src/shared/sessions";
-import { otherSpace, type Space, type Workspace } from "../../src/shared/workspaces";
+import type { Workspace } from "../../src/shared/workspaces";
 import { SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { errorText } from "../../src/json";
 import { needsYou } from "../attention";
-import { ALL_OF_SPACE, SPACE_LABELS, sessionsWaiting, workspaceName } from "../labels";
-import { writeWorkspace } from "../reads";
+import { ALL_WORKSPACES, folderName, sessionsWaiting } from "../labels";
 import { type RosterFolder, rosterFolders, rowPlacement, type SidebarSessions, type WorkspaceGroup } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useStoredKeys, useStoredState } from "../stored-state";
 import { CommandPicker } from "./command-picker";
 import { CountPill } from "./count-pill";
-import { PersonalContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
+import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { ScheduledGroup } from "./scheduled";
 import { HostRow, PastRow } from "./session-row";
 import { SidebarOpen } from "./sidebar-panel";
 import { SidebarSearch } from "./sidebar-search";
-import { offerUndo, toasts } from "./toaster";
 import { workspaceItems } from "./workspace-picker";
 
 const COLLAPSED_GROUPS_KEY = "omp-agents.sidebar-collapsed-groups";
@@ -33,50 +30,27 @@ const PAST_PAGE = 100;
 const GROUPS_SHOWN = 8;
 
 interface SidebarWorkspacePickerProps {
-	/** The space's workspaces, as {@link workspacesIn} lists them. */
+	/** The workspaces, as {@link listWorkspaces} lists them. */
 	workspaces: Workspace[];
 	onPick: (cwd: string | null) => void;
 }
 
-/**
- * Moves workspace `cwd`, called `name`, from space `from` to `to`, with **Undo** to move it back. Every page hears the list
- * after it over its socket, and the sidebar then leaves the workspace and its sessions out of this space.
- */
-async function moveWorkspace(name: string, cwd: string, from: Space, to: Space): Promise<void> {
-	try {
-		await writeWorkspace({ op: "space", cwd, space: to });
-	} catch (error) {
-		toasts.add({ title: `Could not move ${name} to ${SPACE_LABELS[to]}`, description: errorText(error) });
-		return;
-	}
-	offerUndo("workspace-move", `Moved ${name} to ${SPACE_LABELS[to]}`, () => void moveWorkspace(name, cwd, to, from));
-}
-
-/** The Workspaces section's label: scopes the roster to one directory's running and past sessions, or to all of the space's, and moves the selected workspace to the other space. */
+/** The Workspaces section's label: scopes the roster to one directory's running and past sessions, or to all of them. */
 function SidebarWorkspacePicker({ workspaces, onPick }: SidebarWorkspacePickerProps) {
 	const [open, setOpen] = useState(false);
-	const personal = useContext(PersonalContext);
-	const { workspace: current, space, spaces } = useDashboardStatus().scope;
+	const current = useDashboardStatus().scope.workspace;
 	useShortcuts({ workspace: () => setOpen(shown => !shown) });
 	const selected = workspaces.find(workspace => workspace.cwd === current);
-	const allLabel = ALL_OF_SPACE[space];
-	const label = selected ? (workspaceName(selected.cwdDisplay, personal) ?? selected.cwdDisplay) : allLabel;
+	const label = selected ? (folderName(selected.cwdDisplay) ?? selected.cwdDisplay) : ALL_WORKSPACES;
 	const pick = (cwd: string | null) => (): void => {
 		if (cwd !== current) onPick(cwd);
 	};
-	const other = otherSpace(space);
-	// The personal directory is Personal's home, so it never moves.
-	const moveItem = selected && !spaces.isPersonalDir(selected.cwd) && {
-		value: `Move to ${SPACE_LABELS[other]}`,
-		icon: IconArrowLeftRight,
-		label: <span className="truncate">Move {label} to {SPACE_LABELS[other]}</span>,
-		onSelect: () => void moveWorkspace(label, selected.cwd, space, other),
-	};
+
 	return (
 		<CommandPicker
 			trigger={selected ? label : "Workspaces"}
 			control="sidebar.workspace"
-			tooltip={selected?.cwdDisplay ?? allLabel}
+			tooltip={selected?.cwdDisplay ?? ALL_WORKSPACES}
 			shortcut="workspace"
 			ariaLabel={`Show sessions from: ${label}`}
 			className="h-6 min-w-0 gap-1 px-2 text-xs font-normal text-muted-foreground"
@@ -87,13 +61,12 @@ function SidebarWorkspacePicker({ workspaces, onPick }: SidebarWorkspacePickerPr
 			list={{
 				kind: "ready",
 				groups: [
-					{ key: "all", items: [{ value: allLabel, label: allLabel, selected: current === null, onSelect: pick(null) }] },
+					{ key: "all", items: [{ value: ALL_WORKSPACES, label: ALL_WORKSPACES, selected: current === null, onSelect: pick(null) }] },
 					{
 						key: "workspaces",
 						heading: "Workspaces",
-						items: workspaceItems(workspaces, current, personal, workspace => pick(workspace.cwd)()),
+						items: workspaceItems(workspaces, current, workspace => pick(workspace.cwd)()),
 					},
-					{ key: "move", items: moveItem ? [moveItem] : [] },
 				],
 			}}
 			empty="No workspace matches."
@@ -148,7 +121,7 @@ function WorkspaceFolder({ folder: { group, rows }, name, open, onOpenChange, on
 }
 
 interface RosterProps {
-	/** The space's workspaces, as {@link workspacesIn} lists them, which the picker offers. */
+	/** The workspaces, as {@link listWorkspaces} lists them, which the picker offers. */
 	workspaces: Workspace[];
 	/** The sessions under the selected workspace that match `query`. */
 	lists: SidebarSessions;
@@ -161,7 +134,7 @@ interface RosterProps {
 	onTogglePin: (sessionId: string) => void;
 	/** Views on screen; their sessions' rows are highlighted, and marked while they share the screen with another pane. */
 	open: View[];
-	/** The space's scheduled sends. */
+	/** The scheduled sends. */
 	scheduled: readonly ScheduledSend[];
 	/** The scheduled send whose page is open, highlighted in its group; `null` for none. */
 	scheduledOpen: string | null;
@@ -169,13 +142,12 @@ interface RosterProps {
 }
 
 /**
- * The roster: each workspace holds its live and interrupted sessions, the busy ones first, and Past lists the ended ones.
- * An ended session on screen that Past does not show, folded or beyond its page, shows under its workspace instead.
+ * The roster: each workspace holds its live and interrupted sessions, the busy ones first, and Past lists the ended ones,
+ * even one on screen that Past does not show.
  */
 export function Roster({ workspaces, lists, groups, query, onQuery, onTogglePin, open, scheduled, scheduledOpen, onPickWorkspace }: RosterProps) {
 	const { start, dismissStart, openNewSession } = useDashboardActions();
 	const { connected, starts: { resumeAll }, scope: { workspace } } = useDashboardStatus();
-	const personal = useContext(PersonalContext);
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
 	const [pastOpen, setPastOpen] = useStoredState(PAST_OPEN_KEY, raw => raw === "true");
 	const [pastShown, setPastShown] = useState(PAST_PAGE);
@@ -276,7 +248,7 @@ export function Roster({ workspaces, lists, groups, query, onQuery, onTogglePin,
 				const { cwd, cwdDisplay } = folder.group.workspace;
 				const key = `workspace:${cwd}`;
 				return (
-					<WorkspaceFolder key={cwd} folder={folder} name={workspaceName(cwdDisplay, personal) ?? cwdDisplay} open={!collapsed.has(key)} onOpenChange={() => toggleGroup(key)} onNewSession={() => openNewSession(cwd)}>
+					<WorkspaceFolder key={cwd} folder={folder} name={folderName(cwdDisplay) ?? cwdDisplay} open={!collapsed.has(key)} onOpenChange={() => toggleGroup(key)} onNewSession={() => openNewSession(cwd)}>
 						{folder.group.hosts.map(host => hostRow(host, false, false))}
 						{folder.group.interrupted.map(session => pastRow(session, false, false))}
 					</WorkspaceFolder>

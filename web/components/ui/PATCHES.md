@@ -57,7 +57,7 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
   Long labels wrap at 16rem.
 - `ui/tabs.tsx`: `tooltip` names compact tabs without needing a shortcut; `shortcut` adds keys and keeps the tab's `data-state`, since the tooltip trigger stamps its own.
   `badge` on `TabItem` draws a count after the label, which the Sessions tab uses for the sessions waiting on you and the Pull requests tab for the pull requests that wait on your move.
-  `TabItem` sets `aria-controls` only when a `TabPanel` of its value is mounted under the same `Tabs`, so a switch with no panels, such as the Personal and Work switch, names no missing element.
+  `TabItem` sets `aria-controls` only when a `TabPanel` of its value is mounted under the same `Tabs`, so a switch with no panels, such as the changes dialog's **All changes** and **This session**, names no missing element.
   The keyboard focus ring is 2px, not the registry's 1px.
 - `hooks/use-merge-split.tsx`, `ui/sidebar-group.tsx`, and the sidebar menu files use React's `useLayoutEffect`, since the dashboard never renders on a server.
 - `hooks/use-fluid-hover.ts`: `remeasure` called again before its frame runs does nothing, so a list of rows registering drops readiness and queues one measurement instead of one per row.

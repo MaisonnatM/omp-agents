@@ -4,6 +4,7 @@ import { errorText } from "../../../src/json";
 import { hashForSession } from "../../../src/shared/sessions";
 import type { TicketChoice, TodoTicketAnswer, TodoTicketRequest } from "../../../src/shared/tickets";
 import { addTodo } from "../../../src/user-todos";
+
 import type { Workspace } from "../../../src/shared/workspaces";
 import type { UserTodo, UserTodoChange, UserTodoList } from "../../../src/user-todos-shared";
 import { badgeColors } from "@/components/ui/badge";
@@ -285,6 +286,7 @@ function AgentCard({ todo, readOnly, sessions, newSessionCwd }: { todo: UserTodo
 		</div>
 	);
 }
+
 
 
 /**

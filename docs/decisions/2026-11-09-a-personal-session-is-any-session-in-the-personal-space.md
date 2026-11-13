@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-13-remove-the-personal-and-work-spaces
 date: 2026-11-09
 decision-makers: Maxence, agent
 supersedes: 2026-11-03-a-personal-session-is-one-that-runs-in-the-personal-directory

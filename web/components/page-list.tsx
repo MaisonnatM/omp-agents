@@ -3,7 +3,6 @@ import { type ReactNode, type RefObject, useLayoutEffect, useState } from "react
 import type { BotRow } from "../bots-model";
 import type { PastSession, RosterHost } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
-import type { Space } from "../../src/shared/workspaces";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { COLUMN_DEFAULT, COLUMN_MAX, COLUMN_MIN, type ListPage } from "../page-list";
 import { useStoredState } from "../stored-state";
@@ -28,7 +27,7 @@ interface PageListProps {
 	page: ListPage;
 	/** The server has sent the session lists. */
 	listed: boolean;
-	/** The space's sessions, live and past, which the pull request lists ask GitHub about. */
+	/** The sessions, live and past, which the pull request lists ask GitHub about. */
 	hosts: RosterHost[];
 	past: PastSession[];
 	/** Every session, including those in directories the sidebar hides, so a todo's linked session resolves. */
@@ -36,12 +35,11 @@ interface PageListProps {
 	botList: BotRow[] | null;
 	userTodos: UserTodoList | null;
 	todoView: TodoListView;
-	space: Space;
 	sectionTarget: SectionTarget | null;
 	onSectionTarget: (target: SectionTarget) => void;
 }
 
-export function PageList({ page, listed, hosts, past, todoSessions, botList, userTodos, todoView, space, sectionTarget, onSectionTarget }: PageListProps) {
+export function PageList({ page, listed, hosts, past, todoSessions, botList, userTodos, todoView, sectionTarget, onSectionTarget }: PageListProps) {
 	const { changeTodo } = useDashboardActions();
 	const { connected } = useDashboardStatus();
 	const [pullRequestsView] = usePullRequestsView();
@@ -63,9 +61,9 @@ export function PageList({ page, listed, hosts, past, todoSessions, botList, use
 		case "todo":
 			return <TodoCategories list={userTodos} view={todoView} disabled={!connected} onChange={changeTodo} sessions={todoSessions} />;
 		case "calendar":
-			return <CalendarNav space={space} />;
+			return <CalendarNav />;
 		case "email":
-			return <EmailNav space={space} />;
+			return <EmailNav />;
 		case "sport":
 			return <SportNav open={page} />;
 		case "settings":

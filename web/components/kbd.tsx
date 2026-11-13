@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 import { type ShortcutId, shortcutLabels } from "../shortcuts";
 
-/** A key chip, as the shortcuts dialog draws them. */
+/** A key chip, as Settings › Keyboard and the command menu draw them. */
 export function Kbd({ className, ...props }: ComponentProps<"kbd">) {
 	return (
 		<kbd

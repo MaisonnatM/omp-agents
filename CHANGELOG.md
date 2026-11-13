@@ -5,6 +5,13 @@ The dashboard shows the same lines when you click What's new, the sparkles butto
 
 ## 2026-11-13
 
+- The Personal and Work spaces are gone: every page shows all your workspaces, sessions, Bots, events, and accounts together, and the sidebar's Workspaces label still narrows the list to one workspace.
+- Keyboard shortcuts now live in Settings › Keyboard, and ? opens it.
+- The bottom of the sidebar now has a Keyboard shortcuts link, where the Personal and Work switch was.
+- Sport and Tickets now show all the time, and any session can read and log your training with its sport tool.
+- Personal sessions are gone, with the Memory tab and the remember tool they had; Bots keep their own memory.
+- Google accounts are no longer placed in a space: Email, the Calendar, and agents use every connected account.
+- Behind the scenes: removed the space code from the server, the agents' extensions, and the page, and files from older versions drop their space fields when they load.
 - Hiding the sessions sidebar now closes it all the way: the page takes the full width, and the button to bring it back stays at the left of the tabs.
 - A page's own list, such as your Bots, the Pull requests sections, the Todo categories, or the Settings sections, now sits in a column at the page's left, as in Linear's inbox, instead of under its row in the sidebar. Drag the column's edge to size it. In a narrow window or on a phone it stays under its row.
 - A closed session you open no longer shows up inside its workspace in the sidebar; workspaces list only running and interrupted sessions, and closed ones stay in Past.

@@ -1,7 +1,6 @@
 // omp-agents Google accounts: when omp is signed in to several Gmail or Google Calendar accounts, one MCP server each,
 // tells a session at every prompt which server signs in as which address. The dashboard keeps `google-accounts.json`;
-// this only reads it and omp's user `mcp.json`. Which account the session's space uses comes from the dashboard's own
-// personal extension, which every session it starts loads. It restricts no tool: a session may still use any account.
+// this only reads it and omp's user `mcp.json`. It restricts no tool: a session may still use any account.
 // When a Gmail or Google Calendar server answers a tool call with HTTP 401, it tells the session the account is signed
 // out and to ask the user to sign in again rather than retry, and reports the account once to the dashboard's
 // `sign-in-inbox`, whose bell asks the user to sign in again. It never signs in itself.

@@ -1,25 +1,20 @@
-/** `GoogleAccountsRow`: a Google service in Settings › Integrations with its accounts, each signed in, reconnected, removed, and placed in a space on its own. */
+/** `GoogleAccountsRow`: a Google service in Settings › Integrations with its accounts, each signed in, reconnected, and removed on its own. */
 import { IconKey1, IconPlusLarge, IconSquareArrowTopRight, IconTrashCan } from "central-icons";
 import { type ReactNode, useState } from "react";
 import {
 	type AccountsService,
 	type GoogleAccount,
-	type GoogleSpace,
-	type IntegrationsAnswer,
 	MCP_SERVICES,
 	type McpIntegration,
 	type SignInState,
 	signedIn,
 } from "../../../src/shared/accounts";
-import type { Space } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
-import { errorText } from "../../../src/json";
 import { putJson } from "../../api";
 import { integrationsStore } from "../../reads";
 import { useSignIn } from "../../use-sign-in";
 import { MoreActionsMenu } from "../more-actions-menu";
-import { SpacePicker } from "../space-picker";
 import { GoogleClientForm } from "./google-client-form";
 import { IntegrationRow, MarkTile, MetaDot } from "./integration-row";
 import { Confirm, ConnectionCallout, Reconnecting, ReconnectItem, StatusBadge, type StatusLabel, useToolList, WAITING_STATUS } from "./mcp-connection-controls";
@@ -30,46 +25,16 @@ type AccountsIntegration = McpIntegration<AccountsService>;
 const startSignIn = async (id: AccountsService, account: string | null): Promise<SignInState> =>
 	(await putJson<McpIntegration>("/api/integrations/sign-in", { id, account })).signIn;
 
-/** The space Google address `address`'s accounts are in, whose Calendar and Email pages show them; one pick moves them. */
-function AccountSpace({ address, space }: { address: string; space: Space }) {
-	const [error, setError] = useState<string | null>(null);
-	const [saving, setSaving] = useState(false);
-	const place = async (to: Space): Promise<void> => {
-		setError(null);
-		setSaving(true);
-		try {
-			const answer = await putJson<IntegrationsAnswer>("/api/integrations/google-space", { address, space: to } satisfies GoogleSpace);
-			integrationsStore.update(() => answer);
-		} catch (err) {
-			setError(errorText(err));
-		} finally {
-			setSaving(false);
-		}
-	};
-	return (
-		<>
-			{error && (
-				<span role="alert" className="text-xs text-red-600 dark:text-red-400">
-					{error}
-				</span>
-			)}
-			<SpacePicker label={`Space of ${address}`} space={space} disabled={saving} onPick={to => void place(to)} />
-		</>
-	);
-}
-
 interface AccountRowProps {
 	integration: AccountsIntegration;
 	account: GoogleAccount;
 	/** Whether it is the service's only server, which keeps the OAuth client and so stays, signed out, when removed. */
 	last: boolean;
-	/** Whether its space is chosen here; `false` on a page that offers to connect. */
-	placeable: boolean;
 	children?: ReactNode;
 }
 
-/** One account of a Google service: its address, where omp stands with it, Reconnect and Remove, its space, and its tools. */
-function AccountRow({ integration, account, last, placeable, children }: AccountRowProps) {
+/** One account of a Google service: its address, where omp stands with it, Reconnect and Remove, and its tools. */
+function AccountRow({ integration, account, last, children }: AccountRowProps) {
 	const { id } = integration;
 	const { label } = MCP_SERVICES[id];
 	const { name, address, addressError, connection } = account;
@@ -110,7 +75,6 @@ function AccountRow({ integration, account, last, placeable, children }: Account
 				</div>
 				{!signIn.waitingUrl && !removing && (
 					<div className="flex shrink-0 items-center gap-1.5">
-						{placeable && address && <AccountSpace address={address} space={account.space} />}
 						<Reconnecting signIn={signIn} />
 						<MoreActionsMenu name={shown} disabled={signIn.starting}>
 							<ReconnectItem signIn={signIn} />
@@ -171,8 +135,6 @@ function AccountRow({ integration, account, last, placeable, children }: Account
 
 interface GoogleAccountsRowProps {
 	integration: AccountsIntegration;
-	/** Whether each account's space is chosen here; `false` on a page that offers to connect. */
-	placeable: boolean;
 	/** What shows once above the accounts, such as why none of their calendars could be listed. */
 	notice?: ReactNode;
 	/** What shows under each account, such as its calendars. */
@@ -183,7 +145,7 @@ interface GoogleAccountsRowProps {
  * A Google service whose accounts omp signs in to, each a server of its own: Set up until its OAuth client is saved,
  * then Add account, which lets you pick another Google account, and the accounts, each with its own controls.
  */
-export function GoogleAccountsRow({ integration, placeable, notice, details }: GoogleAccountsRowProps) {
+export function GoogleAccountsRow({ integration, notice, details }: GoogleAccountsRowProps) {
 	const { id, accounts, setup } = integration;
 	const { label } = MCP_SERVICES[id];
 	const service = SERVICES[id];
@@ -243,7 +205,7 @@ export function GoogleAccountsRow({ integration, placeable, notice, details }: G
 			{connected.length > 0 && (
 				<ul aria-label={`${label} accounts`} className="divide-y divide-border rounded-lg bg-muted/40 px-3 py-3">
 					{accounts.map(account => (
-						<AccountRow key={account.name} integration={integration} account={account} last={accounts.length === 1} placeable={placeable}>
+						<AccountRow key={account.name} integration={integration} account={account} last={accounts.length === 1}>
 							{details?.(account)}
 						</AccountRow>
 					))}

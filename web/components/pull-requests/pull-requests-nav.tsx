@@ -115,8 +115,8 @@ interface PullRequestsNavProps {
 }
 
 /**
- * The sidebar's pull request list beside the panes or a pull request's details: the pull requests of its workspace, or of its
- * space's workspaces, by repository in sections named after whose move it is, read from GitHub.
+ * The sidebar's pull request list beside the panes or a pull request's details: the pull requests of its workspace, or of
+ * every workspace, by repository in sections named after whose move it is, read from GitHub.
  */
 export function PullRequestsNav({ hosts, past, route }: PullRequestsNavProps) {
 	const { dismissStart } = useDashboardActions();

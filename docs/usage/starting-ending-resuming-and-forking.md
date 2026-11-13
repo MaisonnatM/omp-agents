@@ -5,9 +5,9 @@
   No omp process starts and no row appears in the sidebar until you send the first message, so leaving an empty draft leaves nothing running.
   The page shows the omp logo over the question "What should we work on in" and the folder's name, over a dithered retro grid with a rising sun, and keeps the composer at its bottom.
   A private draft shows what ending it deletes under the composer, as **Private** below says.
-  The directory is the selected workspace, else in Personal the personal directory, else the open session's workspace, else the newest live session's, else the newest past session's, so a session in a linked worktree hands its repository's main checkout to the draft, which runs on its checked-out branch.
-  To start in another directory, under **All of Personal**, **All of Work**, or a workspace, pick it in the directory picker, or press Cmd+Alt+P.
-  It lists the workspaces of the space the window shows, as the sidebar does, and **Use** takes any directory typed into its search field.
+  The directory is the selected workspace, else the open session's workspace, else the newest live session's, else the newest past session's, so a session in a linked worktree hands its repository's main checkout to the draft, which runs on its checked-out branch.
+  To start in another directory, under **All workspaces** or a workspace, pick it in the directory picker, or press Cmd+Alt+P.
+  It lists the workspaces the sidebar lists, and **Use** takes any directory typed into its search field.
   The message you typed stays in the composer.
   Sending the first message starts omp there and sends it the message.
   The message stays in the composer while omp starts, and also if the start fails, with the error above it.
@@ -25,7 +25,7 @@
   A typed `/move <path>` works the same way; in a session with no reply yet, the dashboard follows the move once omp writes the first reply.
   A session's agent can ask for the move itself: when it finds the work belongs in another directory, its `move_session` tool queues the move, and the dashboard sends `/move <path>` once the turn ends, so the session, its header, and the sidebar's workspace picker follow as they do for the picker.
   A turn that a queued message starts at once keeps the move waiting for the next idle end, and a move omp refuses shows its reason as a note in the conversation.
-  Only a session the dashboard started has the tool, except a Bot's conversation and a session started in your personal directory, whose directory stays fixed; a session in a terminal still asks you to type `/move`.
+  Only a session the dashboard started has the tool, except a Bot's conversation, whose directory stays fixed; a session in a terminal still asks you to type `/move`.
 - A session the dashboard started can wait on another running session: name that session with an `@session:` mention and ask it to wait, such as waiting for the session that builds the importer, then reviewing its branch.
   Its `wait_for_session` tool holds its turn until that session ends its turn with no subagent it waits on still running, asks you a question, or no longer runs, then hands it what happened and that session's last reply.
   It stops waiting after 60 minutes unless you ask for another limit, up to 240 minutes, and stopping its turn stops the wait.
@@ -47,7 +47,7 @@
   A first message that starts with `/` keeps its own skill or command and skips the pinned skill, so the toggle hides while the message starts that way.
 - **Private**, the pill at the right of the page header, starts a session that is deleted with everything it wrote when it ends: its transcript, its subagents, its prompts in omp's history, its title, and its pins.
   It never shows under the past sessions, never resumes, and cannot be forked, and omp's memory and autolearn stay off for it.
-  While it is on, the pill fills dark, the composer gets a dark outline, and the page shows under it what ending deletes and what stays: files it changes and commits it makes stay in the project, and a personal one keeps its memory.
+  While it is on, the pill fills dark, the composer gets a dark outline, and the page shows under it what ending deletes and what stays: files it changes and commits it makes stay in the project.
   A private session shows a dark **Private** chip in its sidebar row and its header.
   It ends when its omp process stops, whether through **End session**, `end_session`, or a crash; a dashboard that was not running then deletes it at its next start.
   The pill hides on a draft that starts from a todo, since nothing may link to a private session.

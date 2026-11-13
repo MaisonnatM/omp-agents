@@ -108,8 +108,7 @@ Files, in `agent/`:
   Equal bytes share one copy under the session's `artifact-versions/` directory.
 - In a task subagent, `end-session.ts`, `arena.ts`, `artifact.ts`, `land.ts`, `ship.ts`, `todos.ts`, and `events.ts` remove their tools when its session starts, since those tools act for the session you talk to; each subagent request then carries fewer tokens of tool schemas.
 - `extensions/google-accounts.ts`: when omp is signed in to two or more Gmail or Google Calendar accounts, one MCP server each, tells a session at every prompt each account's server, address, and tool prefix.
-  When you put only some of the addresses in the session's space, Personal or Work, in the dashboard's Settings › Integrations, it also tells the session to use those for its mail and calendar unless you name another account.
-  A session's space is its workspace's, where a linked worktree counts as its repository's main checkout, and no tool is blocked.
+  No tool is blocked: a session may use any account.
   When a Gmail or Google Calendar server answers a tool call with HTTP 401, the session is told the account is signed out, not to retry or sign in itself, and to ask you to sign in again in the dashboard's Settings › Integrations, and the dashboard's bell shows a sign-in notice.
 - `extensions/pstack-skills.ts`: omp skips every pstack skill in the plugin, because pstack's `plugin.json` opts into a strict schema that refuses the `disable-model-invocation` key its skills carry.
   At each session start this links each skill of the installed pstack into `~/.omp/plugins/pstack-skills`, which `skills.customDirectories` lists and omp reads leniently, keeping them hidden from the model's skill list as pstack intends, and repoints the links after a marketplace update.

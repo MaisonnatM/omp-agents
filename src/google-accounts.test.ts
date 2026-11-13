@@ -200,22 +200,17 @@ test("a signed-in account whose address Google does not say shows why", async ()
 	expect(gmail.accounts.map(({ name, address, addressError }) => ({ name, address, addressError }))).toEqual([{ name: "gmail", address: null, addressError: "Google answered 500" }]);
 });
 
-test("a Gmail and a Google Calendar account whose addresses differ only in case share one space, Work until placed", async () => {
+test("a Gmail and a Google Calendar account read their addresses lowercased", async () => {
 	await configure({ gmail: ORIGINAL, "google-calendar": { type: "http", url: CALENDAR, oauth: OAUTH } });
 	const { integrations } = integrationsWith({});
 	browser.push("Ana@Example.com", "ana@EXAMPLE.com");
 	await integrations.startSignIn({ id: "gmail", account: null });
 	await integrations.startSignIn({ id: "google-calendar", account: null });
 	for (const { auth } of Object.values(config())) signedInIds.add(auth?.credentialId as string);
-	const placed = (answer: IntegrationsAnswer) =>
-		[...answer.integrations.gmail.accounts, ...answer.integrations["google-calendar"].accounts].map(({ name, address, space }) => ({ name, address, space }));
-	expect(placed(await integrations.load(false))).toEqual([
-		{ name: "gmail", address: "ana@example.com", space: "work" },
-		{ name: "google-calendar", address: "ana@example.com", space: "work" },
-	]);
-	expect(placed(await integrations.placeGoogleAccount({ address: "ANA@example.com", space: "personal" }))).toEqual([
-		{ name: "gmail", address: "ana@example.com", space: "personal" },
-		{ name: "google-calendar", address: "ana@example.com", space: "personal" },
+	const answer: IntegrationsAnswer = await integrations.load(false);
+	expect([...answer.integrations.gmail.accounts, ...answer.integrations["google-calendar"].accounts].map(({ name, address }) => ({ name, address }))).toEqual([
+		{ name: "gmail", address: "ana@example.com" },
+		{ name: "google-calendar", address: "ana@example.com" },
 	]);
 });
 

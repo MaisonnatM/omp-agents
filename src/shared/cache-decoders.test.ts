@@ -18,7 +18,7 @@ const integrations: IntegrationsAnswer = {
 			setup: { clientId: "1.2", hasClientSecret: true, redirectUri: "https://example.com/callback", callbackPort: 3120, scope: "chat:write", configured: true },
 		},
 		"google-calendar": { id: "google-calendar", accounts: [], signIn: { phase: "failed", error: "denied", account: null }, setup: googleSetup },
-		gmail: { id: "gmail", accounts: [{ name: "gmail-2", address: "me@example.com", addressError: null, connection: { kind: "signed-out", server }, space: "personal" }], signIn: null, setup: googleSetup },
+		gmail: { id: "gmail", accounts: [{ name: "gmail-2", address: "me@example.com", addressError: null, connection: { kind: "signed-out", server } }], signIn: null, setup: googleSetup },
 	},
 };
 
@@ -45,7 +45,7 @@ const events: CalendarEventsAnswer = {
 	],
 };
 
-const local: LocalEventsAnswer = { events: [{ id: "l1", title: "Dentist", when: { allDay: false, start: 1, end: 2 }, sessionId: null, space: "work" }] };
+const local: LocalEventsAnswer = { events: [{ id: "l1", title: "Dentist", when: { allDay: false, start: 1, end: 2 }, sessionId: null }] };
 
 const email: EmailAnswer = {
 	accounts: [{ account: "gmail", error: null }],
@@ -112,8 +112,7 @@ const cases: { name: string; decode: (raw: unknown) => unknown; whole: unknown; 
 			"every integration an empty record": { integrations: { linear: {}, slack: {}, "google-calendar": {}, gmail: {} } },
 			"an integration without its connection": { integrations: { ...integration, linear: { ...integration.linear, connection: undefined } } },
 			"a connection of an unknown kind": { integrations: { ...integration, slack: { ...integration.slack, connection: { kind: "maybe", server } } } },
-			"an account's connection that is absent": { integrations: { ...integration, gmail: { ...integration.gmail, accounts: [{ name: "gmail", address: null, connection: { kind: "absent" }, space: "work" }] } } },
-			"an account without a space": { integrations: { ...integration, gmail: { ...integration.gmail, accounts: [{ name: "gmail", address: null, addressError: null, connection: { kind: "signed-out", server } }] } } },
+			"an account's connection that is absent": { integrations: { ...integration, gmail: { ...integration.gmail, accounts: [{ name: "gmail", address: null, addressError: null, connection: { kind: "absent" } }] } } },
 			"a ready connection without its server": { integrations: { ...integration, linear: { ...integration.linear, connection: { kind: "ready", tools: [] } } } },
 			"a ready connection that lists tool names": { integrations: { ...integration, linear: { ...integration.linear, connection: { kind: "ready", server, tools: ["list_issues"] } } } },
 			"a Google setup without its callback port": { integrations: { ...integration, gmail: { ...integration.gmail, setup: { ...googleSetup, callbackPort: undefined } } } },
@@ -153,8 +152,7 @@ const cases: { name: string; decode: (raw: unknown) => unknown; whole: unknown; 
 		decode: decodeLocalEventsAnswer,
 		whole: local,
 		partial: {
-			"an event without its days": { events: [{ id: "l1", title: "Dentist", when: { allDay: true }, space: "work" }] },
-			"an event from before spaces": { events: [{ ...local.events[0], space: undefined }] },
+			"an event without its days": { events: [{ id: "l1", title: "Dentist", when: { allDay: true }, sessionId: null }] },
 		},
 	},
 	{

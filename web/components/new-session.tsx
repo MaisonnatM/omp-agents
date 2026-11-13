@@ -1,5 +1,5 @@
 import { IconCrossMedium, IconLock, IconSparklesTwo, IconUnlocked } from "central-icons";
-import { type KeyboardEvent, useContext, useRef, useState } from "react";
+import { type KeyboardEvent, useRef, useState } from "react";
 import { RetroGrid } from "@/components/dithercn/retro-grid";
 import type { BranchChoice } from "../../src/shared/git";
 import type { NewSessionRequest } from "../../src/shared/sessions";
@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useComposerDraft } from "../composer-drafts";
-import { folderName, sameDir, PRIVATE_NOTE } from "../labels";
+import { folderName, PRIVATE_NOTE } from "../labels";
 import type { Completions } from "../pane-store";
 import { usePinnedSkill } from "../pinned-skill";
 import { useDraftModelSelection } from "../use-draft-model";
@@ -25,7 +25,7 @@ import { blockedShortcut, ComposerEditor, ComposerNote, EmptyConversation } from
 import { BranchPicker, targetOf } from "./git";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
 import { DictationButton, DictationRow, useDictation } from "./composer-dictation";
-import { PersonalContext, useDashboardActions } from "./dashboard-context";
+import { useDashboardActions } from "./dashboard-context";
 import { PrivateFacts } from "./new-session-modes";
 import type { PromptEditorHandle } from "./prompt-editor";
 import { ModelPicker } from "./model-picker";
@@ -98,8 +98,6 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const [privateOn, setPrivate] = useState(initial?.private ?? false);
 	// A draft that starts from a todo is never private, since nothing may link to a private session.
 	const isPrivate = todo === null && privateOn;
-	const personal = useContext(PersonalContext);
-	const personalDraft = todo === null && sameDir(cwd, personal);
 	const skills = useSkills(cwd);
 	// The server decides whether the skill applies; the toggle only shows what it will decide.
 	const listedSkills = skills.error === null ? skills.data?.skills : [];
@@ -162,7 +160,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const name = folderName(target.dir) ?? target.dir;
 	const error = scheduled ? scheduled.error : launch?.phase === "failed" ? launch.error : null;
 	// A private draft lists what ending it deletes and what stays under the composer.
-	const panel = scheduled || !isPrivate ? null : <PrivateFacts personal={personalDraft} />;
+	const panel = scheduled || !isPrivate ? null : <PrivateFacts />;
 	// The grid fills the page's lower half and fades out under the title, its sun on the horizon.
 	const backdrop = <RetroGrid aria-hidden horizon={0.62} sun={0.42} className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[40%] opacity-70 [mask-image:linear-gradient(to_bottom,transparent,black_35%)]" />;
 	const pickers = (
@@ -210,7 +208,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			) : (
 				<>
 					{backdrop}
-					<NewSessionWelcome folder={name} personal={personalDraft} isPrivate={isPrivate} />
+					<NewSessionWelcome folder={name} isPrivate={isPrivate} />
 				</>
 			)}
 			{/* The composer docks at the page's bottom, with the project picker left of the model; only a scheduled start shows the branch. */}
@@ -230,7 +228,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 								if (scheduled) save.run(text.trim());
 								else void attachments.read(text, async (prompt, images) => onStart({ ...opOf(prompt), images }));
 							}}
-							placeholder={personalDraft ? "Ask about meals, plans, errands…" : scheduled ? "Message this session…" : "Describe the work; omp starts when you send it"}
+							placeholder={scheduled ? "Message this session…" : "Describe the work; omp starts when you send it"}
 							files={attachments.files}
 							onFilesChange={attachments.onFilesChange}
 							accept={ATTACH_ACCEPT}
@@ -333,18 +331,12 @@ function PrivatePill({ on, onToggle, disabled }: { on: boolean; onToggle: () => 
 }
 
 /** What a new session's empty page says above the docked composer: the omp mark over a serif question naming where the work happens. */
-function NewSessionWelcome({ folder, personal, isPrivate }: { folder: string; personal: boolean; isPrivate: boolean }) {
+function NewSessionWelcome({ folder, isPrivate }: { folder: string; isPrivate: boolean }) {
 	return (
 		<div className="m-auto flex w-full max-w-conversation flex-col items-center px-6 py-10 text-center" data-empty-conversation>
 			{isPrivate ? <IconLock aria-hidden="true" className="size-7" /> : <AppMark className="size-8" />}
 			<h2 className="mt-5 max-w-lg font-serif text-[2rem] leading-tight font-normal tracking-tight text-balance">
-				{personal ? (
-					"What can I help with?"
-				) : (
-					<>
-						What should we work on in <span className="underline decoration-[oklch(0.62_0.21_295)]/40 decoration-2 underline-offset-[6px]">{folder}</span>?
-					</>
-				)}
+				What should we work on in <span className="underline decoration-[oklch(0.62_0.21_295)]/40 decoration-2 underline-offset-[6px]">{folder}</span>?
 			</h2>
 			{isPrivate && <p className="mt-3 max-w-sm text-sm text-pretty text-muted-foreground">{PRIVATE_NOTE}</p>}
 		</div>

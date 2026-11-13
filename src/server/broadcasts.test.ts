@@ -62,7 +62,6 @@ function setup(initial: PastSession[]) {
 				list: {
 					added: workspaces.value.added.map(cwd => ({ cwd, cwdDisplay: cwd })),
 					hidden: workspaces.value.hidden.map(cwd => ({ cwd, cwdDisplay: cwd })),
-					personal: workspaces.value.personal.map(cwd => ({ cwd, cwdDisplay: cwd })),
 				},
 			}),
 			apply: change => workspaces.apply(change),
@@ -74,7 +73,6 @@ function setup(initial: PastSession[]) {
 		bots: { msg: () => ({ t: "bots", bots: bots.value, memories: {}, lasts: {} }), apply: change => bots.apply(change, "2026-01-01T00:00:00.000Z") },
 		notices: { msg: () => ({ t: "notices", list: [] }) },
 		merges: { msg: () => ({ t: "merges", list: [] }) },
-		personal: { msg: () => ({ t: "personal", cwd: "/personal", cwdDisplay: "/personal", memory: "" }) },
 	}, kind => broadcasts.pushList(kind));
 	const broadcasts = new Broadcasts({
 		roster: () => roster,
@@ -210,7 +208,7 @@ describe("registered whole-list broadcasts", () => {
 		expect(lists.apply("preferences", { op: "set", key: "omp-agents.split-columns", value: "0.4" }, peer)).toBe(false);
 		expect(lists.apply("review-drafts", { op: "discard", pr: { owner: "o", repo: "r", number: 1 } }, peer)).toBe(false);
 		expect(lists.apply("bots", { op: "remove", id: "missing" as BotId }, peer)).toBe(false);
-		expect(replies).toEqual([...lists.messages()].filter(msg => msg.t !== "notices" && msg.t !== "merges" && msg.t !== "personal"));
+		expect(replies).toEqual([...lists.messages()].filter(msg => msg.t !== "notices" && msg.t !== "merges"));
 		expect(published).toEqual([]);
 	});
 

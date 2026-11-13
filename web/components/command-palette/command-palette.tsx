@@ -1,8 +1,8 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Command as CommandPrimitive } from "cmdk";
-import { IconArrowDown, IconArrowLeft, IconArrowLeftRight, IconArrowRight, IconArrowRotateClockwise, IconArrowUp, IconCmd, IconConsole, IconFolder1, IconHistory, IconKeyboard, IconLayersTwo, IconMagnifyingGlass, IconPlusLarge, IconPullRequest, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide, IconTarget, IconTodos, IconToolbox } from "central-icons";
+import { IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowRotateClockwise, IconArrowUp, IconCmd, IconConsole, IconFolder1, IconHistory, IconKeyboard, IconLayersTwo, IconMagnifyingGlass, IconPlusLarge, IconPullRequest, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide, IconTarget, IconTodos, IconToolbox } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
-import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type DashboardUpdateStatus, didNotStart, shortCommit } from "../../../src/shared/dashboard-update";
 import type { PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -27,7 +27,7 @@ import {
 	topFrame,
 } from "../../command-palette";
 import { localDay } from "../../../src/shared/days";
-import { age, ALL_OF_SPACE, hostLabel, pastLabel, workspaceName } from "../../labels";
+import { age, ALL_WORKSPACES, folderName, hostLabel, pastLabel } from "../../labels";
 import { PAGE_ICON } from "../../page-icons";
 import { conversationItems, recordItems } from "../../palette-records";
 import { useConversationHits, useRead, useSearchSources } from "../../reads";
@@ -41,7 +41,7 @@ import { pressesChord, type ShortcutHandlers, type ShortcutId, shortcutLabels } 
 import { tabShortcutLabels } from "../../sidebar-tabs";
 import { useStoredState } from "../../stored-state";
 import { quickAddTodo } from "../../todo-quick-add";
-import { PersonalContext, useDashboardActions, useDashboardStatus } from "../dashboard-context";
+import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { Kbd } from "../kbd";
 import { StatusDot } from "../status-dot";
 import { ActionPanel } from "./action-panel";
@@ -50,7 +50,6 @@ import { commandKey, record } from "../../activity";
 
 const COMMAND_ICON: Partial<Record<ShortcutId, IconComponent>> = {
 	newSession: IconPlusLarge,
-	switchSpace: IconArrowLeftRight,
 	previousSession: IconArrowUp,
 	nextSession: IconArrowDown,
 	back: IconArrowLeft,
@@ -80,9 +79,9 @@ interface CommandPaletteProps {
 	dispatch: (event: PaletteEvent) => void;
 	hosts: RosterHost[];
 	past: PastSession[];
-	/** The space's workspaces, as the sidebar's workspace picker lists them. */
+	/** The workspaces, as the sidebar's workspace picker lists them. */
 	workspaces: Workspace[];
-	/** The sidebar's workspace, or `null` for all of the space's. */
+	/** The sidebar's workspace, or `null` for all of them. */
 	workspace: string | null;
 	/** Open `view`, whose session counts in workspace `workspace`, and keep it listed by switching the sidebar to that workspace. */
 	onOpenSession: (view: View, workspace: string, mode: OpenMode) => void;
@@ -100,7 +99,7 @@ interface CommandPaletteProps {
 	todoCategories: readonly UserTodoCategory[] | null;
 	/** The todo list's top-level todos, which a search lists. */
 	todos: readonly UserTodo[];
-	/** Linear answers and the space shows Tickets, Work, so a search lists the tickets assigned to you. */
+	/** Linear answers and the sidebar shows Tickets, so a search lists the tickets assigned to you. */
 	ticketsCallable: boolean;
 	/** Open the new-ticket dialog with a title, which a search offers while tickets are callable. */
 	onCreateTicket: (title: string) => void;
@@ -131,8 +130,7 @@ const SETTINGS_ITEMS: readonly PaletteItem[] = SETTINGS_SECTIONS.filter(({ value
 
 function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, tabs, todoCategories, todos, ticketsCallable, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
 	const { send, start, end, changeTodo, workspaceSettings } = useDashboardActions();
-	const { starts, ending, pullRequestsScope, scope: { space } } = useDashboardStatus();
-	const personal = useContext(PersonalContext);
+	const { starts, ending, pullRequestsScope } = useDashboardStatus();
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const focusInput = useCallback(() => inputRef.current?.focus(), []);
@@ -266,10 +264,10 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 			actions: [[{ id: "pick", title: "Show its sessions", icon, run: { kind: "do", fn: () => pickWorkspace(cwd) } }]],
 		});
 		return [
-			workspaceItem("workspace:all", ALL_OF_SPACE[space], undefined, IconLayersTwo, null),
-			...workspaces.map(({ cwd, cwdDisplay }) => workspaceItem(`workspace:${cwd}`, workspaceName(cwdDisplay, personal) ?? cwdDisplay, cwdDisplay, IconFolder1, cwd)),
+			workspaceItem("workspace:all", ALL_WORKSPACES, undefined, IconLayersTwo, null),
+			...workspaces.map(({ cwd, cwdDisplay }) => workspaceItem(`workspace:${cwd}`, folderName(cwdDisplay) ?? cwdDisplay, cwdDisplay, IconFolder1, cwd)),
 		];
-	}, [workspaces, workspace, space, personal, onPickWorkspace]);
+	}, [workspaces, workspace, onPickWorkspace]);
 
 	const records = useMemo((): PaletteItem[] => recordItems({ todos, tickets, pullRequestRepos }), [todos, tickets, pullRequestRepos]);
 	const conversations = useMemo(
@@ -318,6 +316,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 						},
 					]
 				: [];
+
 		const itemsOf: Record<PaletteViewId, () => PaletteItem[]> = {
 			root: () => [...sessionItems, ...records, ...conversations, ...commandItems, ...SETTINGS_ITEMS, ...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`), ...ticketItem()],
 			workspaces: () => workspaceItems,

@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { worktreeAt } from "./git";
 import { runChecked } from "./proc";
-import { spaces } from "./shared/workspaces";
 import { WorkspacePlacement } from "./workspace-placement";
 
 const dirs: string[] = [];
@@ -118,14 +117,13 @@ describe("WorkspacePlacement", () => {
 		expect([leftover, namesake].map(placement.cwdOf)).toEqual([main, namesake]);
 	});
 
-	test("a turn ending in a worktree of a Personal workspace git had not placed yet counts as Personal", async () => {
+	test("a worktree git had not placed yet counts in its main checkout once asked", async () => {
 		const parent = tempDir();
 		const main = await repoWithWorktree(parent);
 		const wip = join(parent, "app-wip");
 		const placement = new WorkspacePlacement();
-		const { of } = spaces([main], { cwd: join(parent, "personal"), cwdDisplay: join(parent, "personal") });
 
-		expect(of(wip, placement.cwdOf(wip))).toBe("work");
-		expect(of(wip, await placement.workspaceOf(wip, worktreeAt))).toBe("personal");
+		expect(placement.cwdOf(wip)).toBe(wip);
+		expect(await placement.workspaceOf(wip, worktreeAt)).toBe(main);
 	});
 });

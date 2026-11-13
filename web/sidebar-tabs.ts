@@ -3,7 +3,6 @@ import { useEffect, useMemo } from "react";
 import { isObject } from "../src/json";
 import { connectionsOf, type IntegrationsAnswer, signedIn } from "../src/shared/accounts";
 import type { View } from "../src/shared/sessions";
-import type { Space } from "../src/shared/workspaces";
 import { integrationsStore } from "./reads";
 import { type Page, SIDEBAR_TABS, type SidebarTab } from "./routing";
 import { type Binding, bindingLabel, SHORTCUTS, type ShortcutCategory, type ShortcutHandler, type ShortcutId, shortcutBindings, TAB_SHORTCUTS, type TabShortcut } from "./shortcuts";
@@ -25,27 +24,18 @@ export type TabLayout = readonly { tab: SidebarTab; hidden: boolean }[];
 
 export const DEFAULT_TAB_LAYOUT: TabLayout = SIDEBAR_TABS.map(({ value }) => ({ tab: value, hidden: false }));
 
-/** Each tab's row of {@link SIDEBAR_TABS}: its label, icon, the integration it waits on, and the space it shows in alone. */
+/** Each tab's row of {@link SIDEBAR_TABS}: its label, icon, and the integration it waits on. */
 export const TAB_ROWS = Object.fromEntries(SIDEBAR_TABS.map(row => [row.value, row])) as Record<SidebarTab, (typeof SIDEBAR_TABS)[number]>;
-
-/** The space tab `tab` shows in alone, Work for Tickets and Personal for Sport; `null` for a tab of both. */
-export function tabSpace(tab: SidebarTab): Space | null {
-	const row = TAB_ROWS[tab];
-	return "space" in row ? row.space : null;
-}
 
 /** Whether a page kind is a sidebar tab's, with a row in {@link TAB_ROWS}. */
 export const isSidebarTab = (kind: string): kind is SidebarTab => kind in TAB_ROWS;
-
-/** The space page `page` shows in alone, its tab's {@link tabSpace}: Work for Tickets, Personal for Sport; `null` for a page of both. */
-export const pageSpace = (page: Page): Space | null => (isSidebarTab(page.kind) ? tabSpace(page.kind) : null);
 
 /** A row of the sidebar's page list: a tab's page, Settings, or the New session draft. */
 export type NavRow = SidebarTab | "settings" | "new";
 
 /**
  * The row of the page list that `page` selects: the panes select Sessions, and the empty home, a page with no row, and
- * a page whose tab is absent, signed out or of the other space, select none.
+ * a page whose tab is absent, signed out, select none.
  * A page whose tab the user hid in Preferences still selects it, so while its list nests in the sidebar it shows after the last row.
  */
 export function navRowOf(page: Page | null, panes: readonly View[], absentTabs: ReadonlySet<SidebarTab>): NavRow | null {
@@ -119,16 +109,13 @@ export function moveTab(layout: TabLayout, tab: SidebarTab, by: -1 | 1): TabLayo
 /** `layout` with `tab` hidden or shown. */
 export const hideTab = (layout: TabLayout, tab: SidebarTab, hidden: boolean): TabLayout => layout.map(entry => (entry.tab === tab ? { tab, hidden } : entry));
 
-/** The tabs shown, in order: those the user did not hide, less the `absent` ones, whose service omp holds no sign-in to or that belong to the other space. */
+/** The tabs shown, in order: those the user did not hide, less the `absent` ones, whose service omp holds no sign-in to. */
 export const shownTabs = (layout: TabLayout, absent: ReadonlySet<SidebarTab>): SidebarTab[] =>
 	layout.filter(({ tab, hidden }) => !hidden && !absent.has(tab)).map(({ tab }) => tab);
 
 /** The tabs whose service omp holds no sign-in to, on any of its accounts, which then neither show nor take their shortcuts; all of them until the integrations answer. */
 export const tabsSignedOut = (integrations: IntegrationsAnswer["integrations"] | undefined): SidebarTab[] =>
 	SIDEBAR_TABS.flatMap(row => ("integration" in row && !(integrations && connectionsOf(integrations[row.integration]).some(signedIn)) ? [row.value] : []));
-
-/** The tabs of the space other than `space`, which then neither show nor take their shortcuts. */
-export const tabsOutOfSpace = (space: Space): SidebarTab[] => SIDEBAR_TABS.flatMap(row => ("space" in row && row.space !== space ? [row.value] : []));
 
 /** The tabs whose service omp holds no sign-in to, as {@link tabsSignedOut} names them; the same set until one signs in or out, whatever the integrations' polls answer. */
 export function useSignedOutTabs(): ReadonlySet<SidebarTab> {
@@ -138,16 +125,15 @@ export function useSignedOutTabs(): ReadonlySet<SidebarTab> {
 }
 
 /**
- * The tab layout, kept in this browser, and the tabs it shows in `space`; every component that holds it sees a change at once.
- * `absent`, the {@link useSignedOutTabs} and the other space's tabs, stays the same set until one of those changes; and `shown` stays with them until the layout changes.
+ * The tab layout, kept in this browser, and the tabs it shows; every component that holds it sees a change at once.
+ * `signedOut`, the {@link useSignedOutTabs}, stays the same set until one signs in or out; and `shown` stays with it until the layout changes.
  * A stored layout that differs from how it decodes, such as one naming {@link LEGACY_EMAIL_TAB} or {@link LEGACY_NOTES_TAB}, is stored again, so old ids leave this browser and Settings › Sync.
  */
-export function useSidebarTabs(space: Space): {
+export function useSidebarTabs(): {
 	layout: TabLayout;
 	setLayout: (next: TabLayout | ((prev: TabLayout) => TabLayout)) => void;
+	/** The tabs that neither show nor take their shortcuts, whose service omp holds no sign-in to. */
 	signedOut: ReadonlySet<SidebarTab>;
-	/** The tabs that neither show nor take their shortcuts: those signed out, and those of the other space. */
-	absent: ReadonlySet<SidebarTab>;
 	shown: readonly SidebarTab[];
 } {
 	const [layout, setLayout] = useStoredState(KEY, decodeTabLayout, encodeTabLayout);
@@ -156,9 +142,8 @@ export function useSidebarTabs(space: Space): {
 		if (raw !== null && raw !== encodeTabLayout(layout)) setLayout(layout);
 	}, [layout, setLayout]);
 	const signedOut = useSignedOutTabs();
-	const absent = useMemo((): ReadonlySet<SidebarTab> => new Set([...signedOut, ...tabsOutOfSpace(space)]), [signedOut, space]);
-	const shown = useMemo(() => shownTabs(layout, absent), [layout, absent]);
-	return { layout, setLayout, signedOut, absent, shown };
+	const shown = useMemo(() => shownTabs(layout, signedOut), [layout, signedOut]);
+	return { layout, setLayout, signedOut, shown };
 }
 
 /** The position key `id` takes while the sidebar shows `shown`: Cmd+1 for the first tab; none for a tab not shown or a shortcut that is no tab. */
@@ -178,7 +163,7 @@ export const tabShortcutLabels = (id: ShortcutId, shown: readonly SidebarTab[]):
 
 const positions: readonly ShortcutId[] = TAB_SHORTCUTS;
 
-/** One row of the reference dialog: the shortcut, the dialog tab that lists it, what it does, and the keys that run it. */
+/** One row of Settings › Keyboard: the shortcut, the category that lists it, what it does, and the keys that run it. */
 export interface ShortcutRow {
 	id: ShortcutId;
 	category: ShortcutCategory;
@@ -187,7 +172,7 @@ export interface ShortcutRow {
 }
 
 /**
- * Every shortcut's row of the reference dialog while the sidebar shows `shown`, in {@link SHORTCUTS} order: each tab's
+ * Every shortcut's row of Settings › Keyboard while the sidebar shows `shown`, in {@link SHORTCUTS} order: each tab's
  * row carries the position key it takes, so the position keys have no rows of their own, and a row left with no key is out.
  */
 export const shortcutRows = (shown: readonly SidebarTab[]): ShortcutRow[] =>

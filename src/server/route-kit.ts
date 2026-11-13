@@ -7,7 +7,7 @@ import type { PullRequest, Repo } from "../shared/github";
 import type { TrustChange } from "../shared/project-trust";
 import type { ConversationHit } from "../shared/sessions";
 import type { SourceControlAnswer, SourceControlChange } from "../shared/source-control";
-import type { Spaces, WorkspaceChange } from "../shared/workspaces";
+import type { WorkspaceChange } from "../shared/workspaces";
 import { answer, fail, type Guards } from "./http";
 
 /** What the session routes read: the workspaces sessions count in, their files, and the workspaces Settings keeps. */
@@ -16,8 +16,6 @@ export interface SessionRoutesEnv {
 	knownWorkspaces(): string[];
 	/** The directories Settings → Workspaces added, which the page names as workspaces before any session runs there. */
 	addedCwds(): string[];
-	/** The space each directory is in, as Settings › Workspaces places them now. */
-	spaces(): Spaces;
 	/** Apply `change` to the workspaces and send every socket the workspaces after it. */
 	changeWorkspaces(change: WorkspaceChange): void;
 	/** Apply `change` to the trusted project code and send every socket the trusted projects after it. */

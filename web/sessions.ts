@@ -1,11 +1,8 @@
 /** What the roster and past-session lists say about where sessions ran, and what they work on. */
-import type { ScheduledSend } from "../src/shared/scheduled";
 import { awaitsSubagents, newestPastFirst, type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
-import { inAppData, inTempDir, type Space, type Spaces, type Workspace } from "../src/shared/workspaces";
+import { inAppData, inTempDir, type Workspace } from "../src/shared/workspaces";
 import { everyWord } from "../src/shared/every-word";
 import { needsYou } from "./attention";
-import type { Layout, Page } from "./routing";
-import { pageSpace } from "./sidebar-tabs";
 
 /** A working directory outside the temp directories, and not one Settings → Workspaces hid. */
 export function discoverableCwd(cwd: string, hidden: ReadonlySet<string>): boolean {
@@ -21,18 +18,10 @@ export const workspaceOf = (row: { cwd: string; cwdDisplay: string; workspace: W
 /** The directory of the workspace a session counts in, {@link workspaceOf}'s `cwd`. */
 export const workspaceCwd = (row: { cwd: string; workspace: Workspace | null }): string => row.workspace?.cwd ?? row.cwd;
 
-/** The space session `row` counts in, as `spaces` places its workspace. */
-export const spaceOf = (row: { cwd: string; workspace: Workspace | null }, spaces: Spaces): Space => spaces.of(row.cwd, workspaceCwd(row));
-
-/** What a window shows: its space, the workspace selected in it, and where a session or todo of All of the space starts. */
+/** What a window shows: the workspace selected in it. */
 export interface WindowScope {
-	space: Space;
-	/** Which space each directory is in. */
-	spaces: Spaces;
-	/** The workspace `cwd` the sidebar and the Pull requests page show, `null` for all of the space's workspaces. */
+	/** The workspace `cwd` the sidebar and the Pull requests page show, `null` for all workspaces. */
 	workspace: string | null;
-	/** Where All of the space starts a new session or todo: the personal directory in Personal; `null` in Work, and before the server names it. */
-	home: Workspace | null;
 }
 
 /** Ending session `host` deletes it with everything it wrote, as for a private session this dashboard started. */
@@ -52,30 +41,6 @@ export function discoverableSessions(
 	return { hosts: hosts.filter(shown), past: past.filter(shown) };
 }
 
-/** The sessions of `lists` that count in `space`. */
-export function sessionsIn(lists: { hosts: RosterHost[]; past: PastSession[] }, space: Space, spaces: Spaces): { hosts: RosterHost[]; past: PastSession[] } {
-	const inSpace = (row: RosterHost | PastSession): boolean => spaceOf(row, spaces) === space;
-	return { hosts: lists.hosts.filter(inSpace), past: lists.past.filter(inSpace) };
-}
-
-/**
- * The scheduled sends of `sends` in `space`: a start in the space of the directory it starts in, a message or a continue in its
- * session's, as `sessions` lists it, and in Work when they do not.
- */
-export function scheduledIn(sends: readonly ScheduledSend[], space: Space, sessions: { hosts: RosterHost[]; past: PastSession[] }, spaces: Spaces): ScheduledSend[] {
-	const sessionSpace = (sessionId: string): Space => {
-		const row = sessions.hosts.find(host => host.sessionId === sessionId) ?? sessions.past.find(session => session.sessionId === sessionId);
-		return row ? spaceOf(row, spaces) : "work";
-	};
-	return sends.filter(({ target }) => (target.kind === "start" ? spaces.of(target.request.cwd, target.request.cwd) : sessionSpace(target.sessionId)) === space);
-}
-
-/** The workspaces of `workspaces` in `space`, with Personal's starting at the personal directory, where its new sessions start. */
-export function workspacesIn(workspaces: Workspace[], space: Space, spaces: Spaces, personalDir: Workspace | null): Workspace[] {
-	const inSpace = spaces.inSpace(workspaces, space);
-	if (space === "work" || !personalDir) return inSpace;
-	return [personalDir, ...inSpace.filter(({ cwd }) => !spaces.isPersonalDir(cwd))];
-}
 
 /**
  * The workspace a started or picked session switches to, so it stays listed: `cwd`, the workspace it counts in. `null` keeps the current
@@ -99,28 +64,11 @@ export function workspaceSession(cwd: string | null, hosts: RosterHost[], shownW
 }
 
 /**
- * What a switch from space `from` to `to` does to the panes under `page`: a page of both spaces, or of `to`, stays; otherwise the
- * panes leave, or a page of `from` such as Sport gives way to them, for the newest session running in `to`, else show none.
- */
-export function spaceSwitchPanes(page: Page | null, layout: Layout, from: Space, to: Space, hosts: RosterHost[], spaces: Spaces): View | "empty" | "stay" {
-	if (page && pageSpace(page) !== from) return "stay";
-	const session = layout.panes.length === 0 ? null : spaceSession(to, hosts, spaces);
-	return session ?? "empty";
-}
-
-/** The session the panes follow a switch to `space` into: its most recently started running one; `null` when none runs there. */
-export function spaceSession(space: Space, hosts: RosterHost[], spaces: Spaces): View | null {
-	const newest = hosts.filter(host => spaceOf(host, spaces) === space).toSorted(newestFirst)[0];
-	return newest ? { kind: "live", instanceId: newest.instanceId, agentId: null } : null;
-}
-
-/**
- * Where a new session starts unless the user picks another directory: `workspace` when one is selected, else `home`, the personal
- * directory in Personal, else the workspace of the open session, of the newest live one, or of the newest past one.
+ * Where a new session starts unless the user picks another directory: `workspace` when one is selected, else the workspace of the
+ * open session, of the newest live one, or of the newest past one.
  * With `workspace` selected, it is the directory of one of its sessions, so a linked worktree hands on its repository's main checkout.
  */
-export function defaultCwd(view: View | null, hosts: RosterHost[], past: PastSession[], { workspace, home }: Pick<WindowScope, "workspace" | "home">): string {
-	if (workspace === null && home !== null) return home.cwdDisplay;
+export function defaultCwd(view: View | null, hosts: RosterHost[], past: PastSession[], { workspace }: WindowScope): string {
 	const open =
 		view?.kind === "live"
 			? hosts.find(host => host.instanceId === view.instanceId)
@@ -219,9 +167,6 @@ export function searchSessions(lists: SidebarSessions, query: string): SidebarSe
 
 /** How many live sessions in `lists` need you: each that asks you something, or finished a turn you have not looked at since, as the Dock badge counts them. */
 export const waitingCount = (lists: SidebarSessions): number => [...lists.pinned.hosts, ...liveHosts(lists)].filter(needsYou).length;
-
-/** How many of `everySpace`'s live sessions listed in `space` need you, as its Sessions tab counts them. */
-export const waitingIn = (everySpace: { hosts: RosterHost[]; past: PastSession[] }, space: Space, spaces: Spaces): number => sessionsIn(everySpace, space, spaces).hosts.filter(needsYou).length;
 
 /** The session the Sessions tab opens when no pane shows one: of the rows `lists` holds, the live one started last, else the past one saved last. */
 export function latestSession(lists: SidebarSessions): View | null {

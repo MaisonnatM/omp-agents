@@ -1,6 +1,6 @@
 /** `HostRow` and `PastRow`, a running or past session's row in the sidebar, with its status, age, and actions menu. */
 import { IconLayoutColumn, IconLoader, IconPause } from "central-icons";
-import { Fragment, memo, type ReactElement, type ReactNode, useContext } from "react";
+import { Fragment, memo, type ReactElement, type ReactNode } from "react";
 import { awaitsSubagents, type PastSession, type RosterHost, type View } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem, MenuLinkItem, MenuSeparator, MenuShortcut } from "@/components/ui/menu";
@@ -9,13 +9,13 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { PrivateChip } from "./private-chip";
 import { cn } from "@/lib/utils";
 import type { PaletteAction } from "../command-palette";
-import { hostLabel, modeOf, pastLabel, PRIVATE_NOTE, SOURCE_LABELS, SPLIT_CLICK, workspaceName } from "../labels";
+import { folderName, hostLabel, modeOf, pastLabel, PRIVATE_NOTE, SOURCE_LABELS, SPLIT_CLICK } from "../labels";
 import type { OpenMode } from "../routing";
 import { sessionActions, type SessionEntry, type SessionRun } from "../session-actions";
 import { isPrivateHost, type RowPlacement, workspaceCwd, workspaceOf } from "../sessions";
 import { type InlineConfirm, useInlineConfirm } from "../use-inline-confirm";
 import { Age } from "./age";
-import { PersonalContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
+import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { type RowStatus, StatusDot, statusLabel } from "./status-dot";
 
 /** The muted facts after a session's name: the parts that apply. */
@@ -90,8 +90,7 @@ function SessionButton({ view, label, title, badge, facts, when, dot, placement,
  * whose label is its directory's name, when that directory is not its workspace's, as a linked worktree's is not.
  */
 export function WorkspaceBadge({ cwdDisplay }: { cwdDisplay: string }) {
-	const personal = useContext(PersonalContext);
-	const name = workspaceName(cwdDisplay, personal);
+	const name = folderName(cwdDisplay);
 	return name ? <Badge size="compact" className="shrink-0 self-center">{name}</Badge> : null;
 }
 

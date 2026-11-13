@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { TodoStatus, UserTodo, UserTodoList } from "../src/user-todos-shared";
-import { spaces } from "../src/shared/workspaces";
-import { inScope, leftIn, moveTo, type TodoScope, todosOf } from "./todo-views";
+import { inScope, leftIn, moveTo, todosOf } from "./todo-views";
+import type { WindowScope } from "./sessions";
 
 const todo = (id: string, status: TodoStatus): UserTodo => ({
 	id,
@@ -40,31 +40,24 @@ describe("inScope", () => {
 	const at = (id: string, workspace: string | null, categoryId: string | null = null): UserTodo => ({ ...todo(id, "todo"), workspace, categoryId });
 	const list: UserTodoList = {
 		categories: [{ id: "work", name: "Work" }],
-		todos: [at("yampa", "/code/yampa", "work"), at("agents", "/code/omp-agents", "work"), at("none", null), at("life", "/home/me/personal"), at("garden", "/code/garden")],
-		archive: [at("old-yampa", "/code/yampa"), at("old-none", null), at("old-life", "/home/me/personal")],
+		todos: [at("yampa", "/code/yampa", "work"), at("agents", "/code/omp-agents", "work"), at("none", null), at("life", "/home/me/life"), at("garden", "/code/garden")],
+		archive: [at("old-yampa", "/code/yampa"), at("old-none", null), at("old-life", "/home/me/life")],
 	};
 	const sessions = { hosts: [], past: [] };
-	const placed = spaces(["/code/garden"], { cwd: "/home/me/personal", cwdDisplay: "~/personal" });
-	const work = (workspace: string | null): TodoScope => ({ workspace, space: "work", spaces: placed });
-	const ids = (view: Parameters<typeof todosOf>[1], scope: TodoScope) => inScope(todosOf(list, view, "2026-10-30", sessions, new Set()), scope).map(({ id }) => id);
+	const scope = (workspace: string | null): WindowScope => ({ workspace });
+	const ids = (view: Parameters<typeof todosOf>[1], scope: WindowScope) => inScope(todosOf(list, view, "2026-10-30", sessions, new Set()), scope).map(({ id }) => id);
 
 	test("a selected workspace keeps only the todos naming it, in every list and the archive", () => {
-		expect(ids({ kind: "all" }, work("/code/yampa"))).toEqual(["yampa"]);
-		expect(ids({ kind: "category", id: "work" }, work("/code/omp-agents"))).toEqual(["agents"]);
-		expect(ids({ kind: "archive" }, work("/code/yampa"))).toEqual(["old-yampa"]);
-		expect(leftIn(list, { kind: "all" }, "2026-10-30", sessions, new Set(), work("/code/yampa"))).toBe(1);
-		expect(leftIn(list, { kind: "archive" }, "2026-10-30", sessions, new Set(), work("/code/yampa"))).toBe(1);
+		expect(ids({ kind: "all" }, scope("/code/yampa"))).toEqual(["yampa"]);
+		expect(ids({ kind: "category", id: "work" }, scope("/code/omp-agents"))).toEqual(["agents"]);
+		expect(ids({ kind: "archive" }, scope("/code/yampa"))).toEqual(["old-yampa"]);
+		expect(leftIn(list, { kind: "all" }, "2026-10-30", sessions, new Set(), scope("/code/yampa"))).toBe(1);
+		expect(leftIn(list, { kind: "archive" }, "2026-10-30", sessions, new Set(), scope("/code/yampa"))).toBe(1);
 	});
 
-	test("All of Work shows every Work todo, those naming no workspace included", () => {
-		expect(ids({ kind: "all" }, work(null))).toEqual(["yampa", "agents", "none"]);
-		expect(ids({ kind: "archive" }, work(null))).toEqual(["old-yampa", "old-none"]);
-	});
-
-	test("All of Personal shows the todos of the personal directory and the Personal workspaces", () => {
-		const personal: TodoScope = { workspace: null, space: "personal", spaces: placed };
-		expect(ids({ kind: "all" }, personal)).toEqual(["life", "garden"]);
-		expect(ids({ kind: "archive" }, personal)).toEqual(["old-life"]);
-		expect(leftIn(list, { kind: "all" }, "2026-10-30", sessions, new Set(), personal)).toBe(2);
+	test("All workspaces shows every todo, those naming no workspace included", () => {
+		expect(ids({ kind: "all" }, scope(null))).toEqual(["yampa", "agents", "none", "life", "garden"]);
+		expect(ids({ kind: "archive" }, scope(null))).toEqual(["old-yampa", "old-none", "old-life"]);
+		expect(leftIn(list, { kind: "all" }, "2026-10-30", sessions, new Set(), scope(null))).toBe(5);
 	});
 });

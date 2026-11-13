@@ -95,6 +95,7 @@ test("each todo, closed ones too, ticket, and pull request opens where the dashb
 	]);
 });
 
+
 test("a conversation match opens its live session or saved transcript at the matching message, and a match in a session the sidebar hides lists nothing", () => {
 	const hit = (sessionId: string, matches: number): ConversationHit => ({ sessionId, messageId: `m${matches}:0`, role: "assistant", snippet: `snippet ${sessionId}`, matches });
 	const host = { instanceId: "i1", sessionId: "live", sessionName: "Live work", cwd: "/w/live", status: "idle" } as RosterHost;

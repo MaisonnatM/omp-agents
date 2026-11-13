@@ -15,7 +15,6 @@ export type ShortcutId =
 	| "dictate"
 	| "switcher"
 	| "newSession"
-	| "switchSpace"
 	| "sessionSearch"
 	| "find"
 	| "closeTab"
@@ -130,7 +129,7 @@ export type Binding = { chord: Chord; scope: Scope } | { goTo: string };
 /** Closes the header tab on screen, leaving its session running. */
 export const CLOSE_TAB: Chord = { key: "w", mod: true };
 
-/** The shortcuts dialog's tabs, in order. */
+/** The categories Settings › Keyboard lists the shortcuts under, in order. */
 export const SHORTCUT_CATEGORIES = [
 	{ id: "general", label: "General" },
 	{ id: "sessions", label: "Sessions" },
@@ -146,7 +145,7 @@ export type ShortcutCategory = (typeof SHORTCUT_CATEGORIES)[number]["id"];
 
 export interface Shortcut {
 	id: ShortcutId;
-	/** The shortcuts dialog's tab that lists it. */
+	/** The category Settings › Keyboard lists it under. */
 	category: ShortcutCategory;
 	label: string;
 	keys: readonly Binding[];
@@ -156,7 +155,7 @@ export interface Shortcut {
 
 /**
  * Every dashboard shortcut, in the order a key tries them: every binding the key listeners match, and the commands the
- * palette lists. The reference dialog shows `shortcutRows` in `web/sidebar-tabs.ts`, by category: these as the tabs the
+ * palette lists. Settings › Keyboard shows `shortcutRows` in `web/sidebar-tabs.ts`, by category: these as the tabs the
  * sidebar shows take the position keys.
  */
 export const SHORTCUTS: readonly Shortcut[] = [
@@ -187,7 +186,6 @@ export const SHORTCUTS: readonly Shortcut[] = [
 			{ chord: { key: "s" }, scope: "outside-fields" },
 		],
 	},
-	{ id: "switchSpace", category: "general", label: "Switch between the Personal and Work spaces", command: "Switch space", keys: [{ chord: { key: "p", mod: true, shift: true }, scope: "anywhere" }] },
 	{ id: "sessionSearch", category: "sessions", label: "Search the sidebar's sessions", keys: [{ chord: { key: "f", mod: true, shift: true }, scope: "anywhere" }] },
 	{ id: "find", category: "general", label: "Find text in the focused conversation, or in the pull request the page shows", keys: [{ chord: { key: "f", mod: true }, scope: "anywhere" }] },
 	{ id: "closeTab", category: "general", label: "Close the header tab on screen; its session keeps running", keys: [{ chord: CLOSE_TAB, scope: "anywhere" }] },
@@ -246,7 +244,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "forward", category: "general", label: "Go forward", command: "Go forward", keys: [{ chord: { key: "]", mod: true }, scope: "anywhere" }] },
 	{ id: "moveTabLeft", category: "general", label: "Move the focused header tab left", keys: [{ chord: { key: "ArrowLeft", alt: true, shift: true }, scope: "anywhere" }] },
 	{ id: "moveTabRight", category: "general", label: "Move the focused header tab right", keys: [{ chord: { key: "ArrowRight", alt: true, shift: true }, scope: "anywhere" }] },
-	{ id: "help", category: "general", label: "Show keyboard shortcuts", command: "Show keyboard shortcuts", keys: [{ chord: { key: "?" }, scope: "outside-fields" }] },
+	{ id: "help", category: "general", label: "Open or close the keyboard shortcuts in Settings", command: "Show keyboard shortcuts", keys: [{ chord: { key: "?" }, scope: "outside-fields" }] },
 	{ id: "restore", category: "sessions", label: "Leave a maximized pane, or close the pane a split added", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },
 	{ id: "browserRestore", category: "sessions", label: "Put a maximized Browser back in the sidebar", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },
 	{ id: "browserPickSelect", category: "sessions", label: "Browser, while picking: select an element", keys: [{ chord: { key: "v" }, scope: "outside-fields" }] },

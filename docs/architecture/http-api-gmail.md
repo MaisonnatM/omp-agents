@@ -13,7 +13,7 @@ A thread without an id, messages, or an arrival time is left out, and one that c
 The client keeps the answer for a minute, unless `fresh` asks again.
 The signed-in address is kept for a minute too, so opening a conversation right after the inbox's read reads no profile.
 The Email page and its sidebar tab read it through `gmailStore` in `web/reads.ts` every minute while any Gmail account's connection is `ready` or `failing`; otherwise the page shows Gmail's integration row.
-The page lists the threads of the accounts placed in the space on screen, kept with `spaceIs` from `src/shared/workspaces.ts`, each tagged with its address while it lists several, and the sidebar's Email tab narrows the list to one account.
+The page lists the threads of every account, each tagged with its address while it lists several, and the sidebar's Email tab narrows the list to one account.
 
 `GET /api/gmail/thread?account=<account>&id=<thread id>[&fresh]` answers a `ThreadAnswer`, `{ account, id, subject, url, messages }`, from that account's `GmailClient.thread`, which reads `threads/<id>?format=full`; a request without an account or an id is a 400.
 Drafts are left out as the inbox leaves them out, the subject is the first message's, and the link is the inbox's.
