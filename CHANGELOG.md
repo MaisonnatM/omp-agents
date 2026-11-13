@@ -3,6 +3,11 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines when you click What's new, the sparkles button at the top right.
 
+## 2026-11-13
+
+- When Update dashboard brings in a new version that does not start, the desktop app now goes back to the version you had and starts it again. The bell and the command menu say which update did not start and why, and Update dashboard waits for a newer one before it tries again.
+- When the dashboard stops on its own, the desktop app now starts it again after a few seconds, keeping your page. If it keeps stopping, the app shows what went wrong with a Retry button.
+
 ## 2026-11-12
 
 - The starter kit now tells agents to run builds, test suites, and browser runs through a small helper that lets only a few of them run at once across all sessions, a quarter of the computer's cores by default, so many sessions testing together no longer slow the computer until tools time out. A command that has to wait says it is queued and what it waits for.

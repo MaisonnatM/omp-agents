@@ -4,6 +4,7 @@
  * event that starts soon, the dashboard sessions that stopped mid-turn, and a Google account a session found signed out.
  */
 import type { AccountId, AccountsService } from "./accounts";
+import type { DashboardCommits, DashboardFailed } from "./dashboard-update";
 import type { PullRequestSummary } from "./github";
 import type { YourMove } from "./moves";
 
@@ -35,12 +36,15 @@ export type NoticeStatus =
 
 /**
  * An omp release newer than the one installed, a newer version of a routed model, or `commits` new commits on `branch` at
- * origin past the commit the omp-agents server runs from its checkout.
+ * origin past the commit the omp-agents server runs from its checkout, `running`.
  */
 export type UpdateSubject =
 	| { kind: "omp"; current: string; latest: string }
 	| ({ kind: "model" } & ModelUpdate)
-	| { kind: "dashboard"; branch: string; commits: number };
+	| ({ kind: "dashboard" } & DashboardCommits);
+
+/** omp-agents went back to `running` from an update whose build did not start, while origin still holds its commit: no update to start. */
+export type UndoneSubject = { kind: "dashboard-failed" } & DashboardFailed;
 
 /** A pull request of a workspace whose next move is yours, with the workspace directory a quick action on it starts in. */
 export interface PullRequestSubject {
@@ -130,7 +134,7 @@ export interface SignInSubject {
 /** How long before an event starts its notice comes. */
 export const EVENT_LEAD_MS = 10 * 60_000;
 
-export type NoticeSubject = UpdateSubject | PullRequestSubject | SlackSubject | ProviderSubject | EventSubject | StoppedSubject | SignInSubject;
+export type NoticeSubject = UpdateSubject | UndoneSubject | PullRequestSubject | SlackSubject | ProviderSubject | EventSubject | StoppedSubject | SignInSubject;
 
 export type NoticeKind = NoticeSubject["kind"];
 
@@ -142,6 +146,7 @@ export type NoticeKind = NoticeSubject["kind"];
  */
 export type Notice = { id: string; at: number; seen: boolean; read: boolean } & (
 	| (UpdateSubject & { status: NoticeStatus })
+	| UndoneSubject
 	| PullRequestSubject
 	| SlackSubject
 	| ProviderSubject

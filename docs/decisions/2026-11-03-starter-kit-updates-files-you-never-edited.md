@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-13-an-updated-build-runs-the-starter-kit-file-update-at-its-first-start
 date: 2026-11-03
 decision-makers: Maxence Maisonnat
 ---

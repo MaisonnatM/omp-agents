@@ -14,5 +14,5 @@
       "@/*": ["./web/*"]
     }
   },
-  "include": ["src", "web", "scripts", "templates/omp/*.ts"]
+  "include": ["src", "web", "scripts", "templates/omp/*.ts", "desktop/*.test.ts"]
 }

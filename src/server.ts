@@ -1,11 +1,12 @@
 /** The dashboard server: builds the {@link Dashboard}, serves its HTTP API, page, and sockets, then sets it following omp's files and registry; **Update dashboard** runs it again in place. */
 import "./preflight";
 import type { Server, ServerWebSocket } from "bun";
+import { writeSync } from "node:fs";
 import { errorText } from "./json";
 import { ompVersion } from "./omp/install";
 import { adoptLegacyApiCredits } from "./omp/providers";
 import { displayPath, tokenFile } from "./paths";
-import { HOSTNAME, listeningLine, portFromEnv } from "./server/address";
+import { HOSTNAME, listeningLine, portFromEnv, restartingLine } from "./server/address";
 import { loadToken } from "./server/auth";
 import { Dashboard } from "./server/dashboard";
 import { PhoneAccess } from "./server/phone-access";
@@ -35,7 +36,8 @@ const source = prebuiltPageDir
 const page = await loadPage();
 const served: ServedBuild = { source, page: await pageBuild(page), pid: process.pid, startedAt };
 const buildMsg = JSON.stringify({ t: "build", id: served.page } satisfies ServerMsg);
-const dashboard = new Dashboard(PORT, await SelfUpdate.forServer(restart));
+const selfUpdate = await SelfUpdate.forServer(PORT, restart);
+const dashboard = new Dashboard(PORT, selfUpdate);
 // The port is bound before the sessions are attached, so a taken port fails before any keeper is joined, but no page
 // may start or resume a session until the server knows which ones survived.
 const notReattached = refuseUntil(dashboard.reattached, "The dashboard is still attaching to the sessions that kept running.");
@@ -118,6 +120,7 @@ try {
 // Also on a crash or `process.exit`, so a server that exits unannounced leaves no lock and no unwritten store; a killed one leaves a stale lock that the next server takes over.
 process.on("exit", () => dashboard.exited());
 await dashboard.start(server);
+selfUpdate.started();
 console.log(listeningLine(PORT, ompVersion));
 console.log(`Serving ${describeServed(served)}`);
 console.log(`The access token is in ${displayPath(tokenFile)}; delete the file and restart to rotate it.`);
@@ -139,6 +142,8 @@ function shutdown(): Promise<void> {
 		if (!rerun || !process.execve) process.exit(0);
 		// The owner lock stays: it names this pid and port, which the new server keeps, so no other server takes over the routines meanwhile.
 		try {
+			// Written synchronously, so the line is out before execve replaces the process.
+			writeSync(1, `${restartingLine(PORT)}\n`);
 			process.execve(process.execPath, [process.execPath, ...process.argv.slice(1)], process.env);
 		} catch (err) {
 			console.error(`omp-agents: cannot restart: ${errorText(err)}`);

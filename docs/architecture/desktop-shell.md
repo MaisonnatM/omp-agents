@@ -3,9 +3,9 @@
 `desktop/` is the desktop app: an Electron main process, `desktop/main.ts`, in its own package, so the root `bun install` never fetches Electron.
 Electron's main process runs on Node, which cannot load omp's TypeScript modules or the server's `Bun.*` calls, so the shell runs the server as a child process on Bun and never imports it: `bun src/server.ts` from a checkout, and in the packaged app the Bun binary it ships in `Contents/Resources/server/bin/bun` on the bundled `server.js`, with `OMP_AGENTS_RESOURCES` naming that directory (`src/server/resources.ts`) so the server reads its prebuilt page and the starter kit from it.
 omp's sessions run on that same Bun, through `process.execPath`.
-It imports only Node-safe helpers from `src/paths.ts`, `src/json.ts`, `src/server/auth.ts`, `src/server/address.ts`, `src/shared/desktop-bridge.ts`, and `src/shared/startup.ts`; `bun build` bundles them into `desktop/dist/main.cjs`, and `desktop/preload.ts` into `desktop/dist/preload.cjs`.
+It imports only Node-safe helpers from `src/paths.ts`, `src/json.ts`, `src/fs.ts`, `src/server/auth.ts`, `src/server/address.ts`, `src/server/update-journal.ts`, `src/shared/dashboard-update.ts`, `src/shared/git.ts`, `src/shared/desktop-bridge.ts`, and `src/shared/startup.ts`; `bun build` bundles them into `desktop/dist/main.cjs`, and `desktop/preload.ts` into `desktop/dist/preload.cjs`.
 Its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/server/address.ts`, in the page, which `web/app.tsx` answers by opening the command palette on its **Create todo** view.
-`src/server/address.ts` holds what the two processes must agree on: the port from `PORT`, the host names the server answers to, and the line it prints once it listens.
+`src/server/address.ts` holds what the two processes must agree on: the port from `PORT`, the host names the server answers to, the line it prints once it listens, and the line it prints before it restarts in place.
 `OMP_AGENTS_HEADLESS=1` keeps the window hidden and the app out of the Dock, shows no notification, badge, or sound, and a Dock click, a second launch, or the quick-capture shortcut does not show the window; agents' smoke checks drive it over CDP ([Agent smoke checks](../agent-smoke.md#desktop-smoke)).
 
 - At launch it calls `loadToken`, as the server does, so whichever runs first creates the token file, and asks `GET /api/hello?nonce=<nonce>` on the port with a fresh random nonce.
@@ -18,6 +18,15 @@ Its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/serve
   On a normal quit, the shell sends `SIGTERM` and waits up to 10 seconds for the server to write its stores and let go of its sessions.
   Quitting leaves the sessions the server started running, as a restart or a crash does: the server cannot tell a quit from a restart, **Restart to Install** quits too, and the next launch shows them live again, while **End session** stays the one way to stop a session.
 - **Update dashboard** runs the server again inside the same process ([Updating the dashboard](updating-the-dashboard.md)), so the shell keeps its child, its pipes, and the window; the page in the window reloads itself once its socket hears a new build.
+- `desktop/server-supervisor.ts`, free of Electron so a test runs it on Bun, starts the server and follows it; `desktop/main.ts` only turns what it reports into the window's page: the dashboard once a server listens, unless the window shows it already, the error page with the server's last 40 lines and **Retry**, or the missing-omp notice.
+  A server that prints no listening line within 60 seconds of its start, or of the `restartingLine` it prints before `process.execve`, is stopped and counts as stopped.
+  Each time the server stops while the app is not quitting, the supervisor first reads the checkout's update record: when the stop was an update's new build that was not listening, which a server that restarted in place is not until it prints its listening line again, or an update cut short mid-move, it takes the checkout back to the commit that ran before and starts that at once, as the record's states say.
+  A rollback that cannot finish, such as when `git reset --keep` refuses a changed file, shows the error page with git's reason, and its **Retry** tries again.
+  Otherwise a server that never listened since the last start or **Retry** shows the error page at once, and `OMP_MISSING_EXIT` (79) the missing-omp notice.
+  A server that listened is started again after 1, 2, 5, then 15 seconds, by how many times it stopped within the last 5 minutes (`afterLoss` in `desktop/restart-policy.ts`); the 5th stop within 5 minutes shows the error page with **Retry**, which starts it at once and forgets the stops so far.
+  The window keeps its page while the server is away, and the page reconnects by itself.
+  Quitting and **Restart to Install** stop the server, a rollback's `bun install`, and a wait before a restart alike, so nothing starts again after them.
+  The packaged app runs from no checkout, so it restarts its server but never rolls back.
 - The window loads `http://127.0.0.1:<port>/`, a navigation that sends `Sec-Fetch-Site: none`, so `servePage` answers it with the page, and the socket's `Origin` matches its `Host`.
   A custom scheme for the page would fail that check.
 - No address carries the token.

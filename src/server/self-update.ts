@@ -1,15 +1,17 @@
 /**
  * **Update dashboard**: fast-forwards the checkout the server runs from to its branch on `origin`, installs the packages
- * when `bun.lock` changed, brings the starter kit's files you never edited up to date, and has the server run again. It never stashes, resets, or merges: a checkout it cannot
- * fast-forward stays as it was, and the answer says why.
+ * when `bun.lock` changed, and has the server run again, whose first start brings the starter kit's files you never
+ * edited up to date. Its update record lets the desktop shell take the checkout back to the commit that ran when the new
+ * build does not start. It never stashes or merges: a checkout it cannot fast-forward stays as it was, and the answer says why.
  */
 import { join } from "node:path";
-import { gitCause } from "../git";
 import { agentDir } from "../omp/config";
 import { run, runChecked } from "../proc";
 import { SerialLane } from "../serial-lane";
-import type { ChangelogEntry, DashboardChangelog, DashboardUpdateOutcome, DashboardUpdateStatus } from "../shared/dashboard-update";
+import { type ChangelogEntry, type DashboardChangelog, type DashboardNews, type DashboardUpdateOutcome, type DashboardUpdateStatus, didNotStart, type FailedUpdate, shortCommit } from "../shared/dashboard-update";
+import { gitCause } from "../shared/git";
 import { packagedResources, sourceDir } from "./resources";
+import { GIT_TIMEOUT_MS, INSTALL_TIMEOUT_MS, type Move, UpdateJournal } from "./update-journal";
 
 /** The checkout the server started from: its top directory, the branch it had checked out, and that branch's commit. */
 export interface RunningBuild {
@@ -18,17 +20,16 @@ export interface RunningBuild {
 	commit: string;
 }
 
-/** The checkout the server runs from, or why it cannot update itself. */
-export type Checkout = { kind: "checkout"; build: RunningBuild } | { kind: "unavailable"; reason: string };
+type Unavailable = { kind: "unavailable"; reason: string };
 
-const unavailable = (reason: string): Checkout => ({ kind: "unavailable", reason });
+/** The checkout the server runs from with its update record, or why it cannot update itself. */
+export type Checkout = { kind: "checkout"; build: RunningBuild; journal: UpdateJournal } | Unavailable;
+
+const unavailable = (reason: string): Unavailable => ({ kind: "unavailable", reason });
 
 /** Why an update left the checkout as it was. */
 export class UpdateRefused extends Error {}
 
-/** Long enough for a fetch; any git call that takes longer is stuck. */
-const GIT_TIMEOUT_MS = 60_000;
-const INSTALL_TIMEOUT_MS = 5 * 60_000;
 /** Lets the answer that announced the restart reach the page or the agent that asked before the server stops. */
 const RESTART_DELAY_MS = 300;
 
@@ -59,7 +60,7 @@ async function branchOf(dir: string): Promise<string | null> {
 }
 
 /** The build checked out in `dir`, or why the server there cannot update itself. */
-export async function readBuild(dir: string): Promise<Checkout> {
+export async function readBuild(dir: string): Promise<RunningBuild | Unavailable> {
 	try {
 		const top = await gitIn(dir, ["rev-parse", "--show-toplevel"], [0, 128]);
 		if (top.code !== 0) return unavailable("omp-agents does not run from a git checkout.");
@@ -67,7 +68,7 @@ export async function readBuild(dir: string): Promise<Checkout> {
 		const branch = await branchOf(checkout);
 		if (branch === null) return unavailable(`${checkout} has a detached HEAD, so it follows no branch.`);
 		const commit = await commitOf(checkout, "HEAD");
-		return commit === null ? unavailable(`${branch} has no commit yet.`) : { kind: "checkout", build: { dir: checkout, branch, commit } };
+		return commit === null ? unavailable(`${branch} has no commit yet.`) : { dir: checkout, branch, commit };
 	} catch (err) {
 		if (err instanceof UpdateRefused) return unavailable(err.message);
 		throw err;
@@ -87,12 +88,17 @@ async function commitsPast({ dir, branch, commit }: RunningBuild): Promise<numbe
 	return Number((await gitIn(dir, ["rev-list", "--count", `${commit}..${originRef(branch)}`])).stdout.trim());
 }
 
+/** Where an update moves the checkout: origin's commit, and whether its `bun.lock` differs from the running build's. */
+export interface Aim {
+	to: string;
+	lockChanged: boolean;
+}
+
 /**
- * Fetches `origin/<branch>` and fast-forwards the checkout to it. Refuses, leaving the checkout as it was, when the
- * checkout moved to another branch, has changes to tracked files, has commits origin lacks, or git fails. Answers the
- * commit the checkout is at and whether its `bun.lock` differs from the running build's.
+ * Fetches `origin/<branch>` and answers where an update moves the checkout. Refuses, touching nothing but the fetched
+ * branch, when the checkout moved to another branch, has changes to tracked files, has commits origin lacks, or git fails.
  */
-export async function fastForward(build: RunningBuild): Promise<{ head: string; lockChanged: boolean }> {
+export async function aim(build: RunningBuild): Promise<Aim> {
 	const { dir, branch, commit } = build;
 	const now = await branchOf(dir);
 	if (now !== branch) throw new UpdateRefused(`${dir} is on ${now ?? "a detached HEAD"} now, not ${branch}, which the server runs.`);
@@ -105,12 +111,29 @@ export async function fastForward(build: RunningBuild): Promise<{ head: string; 
 	const [head, remote] = await Promise.all([commitOf(dir, "HEAD"), commitOf(dir, originRef(branch))]);
 	if (head === null || remote === null) throw new UpdateRefused(`${dir} lost its ${branch} branch.`);
 	const lock = await gitIn(dir, ["diff", "--quiet", commit, remote, "--", "bun.lock"], [0, 1]);
-	if (head !== remote) {
-		const ancestor = await gitIn(dir, ["merge-base", "--is-ancestor", head, remote], [0, 1]);
-		if (ancestor.code === 1) throw new UpdateRefused(`${branch} has commits origin/${branch} lacks, so it cannot fast-forward.`);
-		await gitIn(dir, ["merge", "--ff-only", "--quiet", remote]);
+	if (head !== remote && (await gitIn(dir, ["merge-base", "--is-ancestor", head, remote], [0, 1])).code === 1) {
+		throw new UpdateRefused(`${branch} has commits origin/${branch} lacks, so it cannot fast-forward.`);
 	}
-	return { head: remote, lockChanged: lock.code === 1 };
+	return { to: remote, lockChanged: lock.code === 1 };
+}
+
+/** Fast-forwards the checkout to `to`, which {@link aim} answered. */
+async function moveTo({ dir }: RunningBuild, to: string): Promise<void> {
+	if ((await commitOf(dir, "HEAD")) !== to) await gitIn(dir, ["merge", "--ff-only", "--quiet", to]);
+}
+
+/** The update that did not start while `origin/<branch>`, as last fetched, still holds its commit: what the bell and **Update dashboard** report. */
+async function failedUpdate({ build, journal }: Extract<Checkout, { kind: "checkout" }>): Promise<FailedUpdate | null> {
+	const remote = await commitOf(build.dir, originRef(build.branch));
+	const record = remote === null ? null : journal.blocking(remote);
+	return record && { commit: record.move.to, failure: record.failed.failure };
+}
+
+/** `err` with `more` after its message, keeping its class, so a refusal stays one. */
+function withMore(err: unknown, more: string): unknown {
+	if (!(err instanceof Error)) return new Error(`${String(err)} ${more}`);
+	err.message = `${err.message} ${more}`;
+	return err;
 }
 
 /** Installs the packages `bun.lock` names, as `bun install --frozen-lockfile` does. */
@@ -124,7 +147,7 @@ async function bunInstall(dir: string): Promise<void> {
 
 /**
  * Runs the updated checkout's starter kit installer with `--files`, which replaces only the kit files you never edited
- * and needs a recorded install. A failure is logged and does not stop the restart.
+ * and needs a recorded install. A failure is logged and does not stop the server.
  */
 async function installKitFiles(dir: string): Promise<void> {
 	try {
@@ -135,11 +158,11 @@ async function installKitFiles(dir: string): Promise<void> {
 	}
 }
 
-/** What an update runs in the fast-forwarded checkout before the restart. */
+/** What an update runs in the moved checkout. */
 export interface UpdateSteps {
-	/** Installs the packages, only when `bun.lock` changed. */
+	/** Installs the packages before the restart, only when `bun.lock` changed. */
 	install?: (dir: string) => Promise<void>;
-	/** Brings the starter kit's files up to date. */
+	/** Brings the starter kit's files up to date at the update's first start. */
 	installKit?: (dir: string) => Promise<void>;
 }
 
@@ -213,14 +236,27 @@ export class SelfUpdate {
 		this.#installKit = installKit;
 	}
 
-	/** The server's own: a packaged app updates through its own updater, and a checkout through this where the server can run itself again in place. */
-	static async forServer(restart: () => void): Promise<SelfUpdate> {
-		const checkout = packagedResources
-			? unavailable("The packaged app updates itself: choose Check for Updates in its app menu.")
-			: process.execve
-				? await readBuild(sourceDir)
-				: unavailable("This system cannot run the server again in place, so restart it by hand after a pull.");
-		return new SelfUpdate(checkout, restart);
+	/**
+	 * The server's own, on `port`: a packaged app updates through its own updater, and a checkout through this where the
+	 * server can run itself again in place, keeping its update record per port.
+	 */
+	static async forServer(port: number, restart: () => void): Promise<SelfUpdate> {
+		if (packagedResources) return new SelfUpdate(unavailable("The packaged app updates itself: choose Check for Updates in its app menu."), restart);
+		if (!process.execve) return new SelfUpdate(unavailable("This system cannot run the server again in place, so restart it by hand after a pull."), restart);
+		const build = await readBuild(sourceDir);
+		if ("reason" in build) return new SelfUpdate(build, restart);
+		const journal = await UpdateJournal.at(build.dir, port, process.execPath);
+		return new SelfUpdate(journal ? { kind: "checkout", build, journal } : unavailable(`${build.dir} has no git directory to keep its update record in.`), restart);
+	}
+
+	/**
+	 * Once the server listens: clears the update record, which tells the desktop shell this build started, and at an
+	 * update's first start brings the starter kit's files up to date in the background. Throws when the record cannot
+	 * be cleared, which makes this start a failed one.
+	 */
+	started(): void {
+		const checkout = this.#checkout;
+		if (checkout.kind === "checkout" && checkout.journal.started(checkout.build.commit)) void this.#installKit(checkout.build.dir);
 	}
 
 	/** Where the server stands, as of the last fetch: this asks origin nothing. */
@@ -229,20 +265,24 @@ export class SelfUpdate {
 			const checkout = this.#checkout;
 			if (checkout.kind === "unavailable") return checkout;
 			const { branch, commit } = checkout.build;
-			return { kind: "checkout", branch, running: commit, behind: await commitsPast(checkout.build) };
+			return { kind: "checkout", branch, running: commit, behind: await commitsPast(checkout.build), failed: await failedUpdate(checkout) };
 		});
 	}
 
 	/**
-	 * Fetches the branch and counts the commits past the running build; `null` when there are none, the server cannot
-	 * update, or it restarts: a fetch then would outlive `execve` and hold `.git`'s lock against the new server's check.
+	 * Fetches the branch and counts the commits past the running build, or names the update that did not start while
+	 * origin still holds its commit; `null` when there are no commits, the server cannot update, or it restarts: a fetch
+	 * then would outlive `execve` and hold `.git`'s lock against the new server's check.
 	 */
-	newCommits(): Promise<{ branch: string; running: string; commits: number } | null> {
+	news(): Promise<DashboardNews | null> {
 		return this.#lane.run(async () => {
 			const checkout = this.#checkout;
 			if (this.#restarting || checkout.kind === "unavailable" || !(await fetchBranch(checkout.build))) return null;
 			const commits = await commitsPast(checkout.build);
-			return commits > 0 ? { branch: checkout.build.branch, running: checkout.build.commit, commits } : null;
+			if (commits === 0) return null;
+			const { branch, commit: running } = checkout.build;
+			const failed = await failedUpdate(checkout);
+			return failed ? { kind: "dashboard-failed", branch, running, failed } : { kind: "dashboard", branch, running, commits };
 		});
 	}
 
@@ -256,21 +296,36 @@ export class SelfUpdate {
 	}
 
 	/**
-	 * Fast-forwards the checkout, installs the packages when `bun.lock` changed, brings the starter kit's files up to
-	 * date, and restarts the server shortly after answering, once the checkout holds another commit than the running one. Rejects with {@link UpdateRefused} when the
-	 * checkout cannot fast-forward.
+	 * Fast-forwards the checkout, installs the packages when `bun.lock` changed, and restarts the server shortly after
+	 * answering, once origin holds another commit than the running one. The update record goes from `moving` to
+	 * `starting` before the restart; a move or install that fails takes the checkout back first. Rejects with
+	 * {@link UpdateRefused} when the checkout cannot fast-forward, or origin still holds the commit that did not start.
 	 */
 	update(): Promise<DashboardUpdateOutcome> {
 		return this.#lane.run(async () => {
 			if (this.#restarting) return this.#restarting;
 			const checkout = this.#checkout;
 			if (checkout.kind === "unavailable") throw new UpdateRefused(checkout.reason);
-			const { build } = checkout;
-			const { head, lockChanged } = await fastForward(build);
-			if (head === build.commit) return { kind: "current" };
-			if (lockChanged) await this.#install(build.dir);
-			await this.#installKit(build.dir);
-			this.#restarting = { kind: "restarting", from: build.commit, to: head, installed: lockChanged };
+			const { build, journal } = checkout;
+			const { to, lockChanged } = await aim(build);
+			if (to === build.commit) return { kind: "current" };
+			const blocked = journal.blocking(to);
+			if (blocked) {
+				const { failure, error } = blocked.failed;
+				const last = error === null ? "" : ` Its last error was "${error}".`;
+				throw new UpdateRefused(`${didNotStart({ commit: to, failure })}, so omp-agents went back to ${shortCommit(blocked.move.from)}.${last} Update dashboard runs again once origin/${build.branch} has a newer commit.`);
+			}
+			const move: Move = { branch: build.branch, from: build.commit, to, lockChanged };
+			journal.begin(move);
+			try {
+				await moveTo(build, to);
+				if (lockChanged) await this.#install(build.dir);
+			} catch (err) {
+				const recovery = await journal.recover(null);
+				throw recovery.kind === "stuck" ? withMore(err, `omp-agents could not go back to ${shortCommit(build.commit)} either: ${recovery.reason}`) : err;
+			}
+			journal.handOver(move);
+			this.#restarting = { kind: "restarting", from: build.commit, to, installed: lockChanged };
 			setTimeout(this.#restart, RESTART_DELAY_MS);
 			return this.#restarting;
 		});

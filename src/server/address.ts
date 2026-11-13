@@ -22,3 +22,9 @@ export const listeningLine = (port: number, ompVersion: string): string => `omp-
 /** Whether `line` is {@link listeningLine} for `port`, whatever omp version the server runs. */
 export const isListeningLine = (line: string, port: number): boolean =>
 	line.startsWith("omp-agents (omp v") && line.endsWith(` on ${originOf(port)}`);
+
+/** The line the server prints as it runs itself again in place, after which the desktop shell waits for {@link listeningLine} anew. */
+export const restartingLine = (port: number): string => `omp-agents restarting on ${originOf(port)}`;
+
+/** Whether `line` is {@link restartingLine} for `port`. */
+export const isRestartingLine = (line: string, port: number): boolean => line === restartingLine(port);

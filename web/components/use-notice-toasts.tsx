@@ -56,13 +56,15 @@ export function useNoticeToasts(notices: Notice[], connected: boolean, send: (ms
 										send({ t: "notice", ids: [id], op: "read" });
 									},
 								}
-							: {
-									children: "Open",
-									onClick: () => {
-										follow(shown.link);
-										send({ t: "notice", ids: [id], op: "read" });
+							: shown.link === null
+								? undefined
+								: {
+										children: "Open",
+										onClick: () => {
+											follow(shown.link);
+											send({ t: "notice", ids: [id], op: "read" });
+										},
 									},
-								},
 				});
 				continue;
 			}

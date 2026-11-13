@@ -1,4 +1,4 @@
-/** Git checkouts and branches a new session can work on. */
+/** Git checkouts and branches a new session can work on, and git's own words for why a command failed. */
 
 /** A local branch, and the worktree that has it checked out, `null` when none has. */
 export interface LocalBranch {
@@ -14,6 +14,12 @@ export interface GitCheckout {
 	branches: LocalBranch[];
 	/** The repository's main worktree, beside which new worktrees go. */
 	mainWorktree: string;
+}
+
+/** Git's own line for why a command failed, its first `fatal:` or `error:` line, since a failed fetch ends its output with advice; else its last line. */
+export function gitCause(stderr: string): string | undefined {
+	const lines = stderr.split("\n").map(line => line.trim()).filter(Boolean);
+	return lines.find(line => line.startsWith("fatal:") || line.startsWith("error:")) ?? lines.at(-1);
 }
 
 /** Where a new worktree for `branch` goes: beside the main worktree, named after both (`~/code/app-fix-login` for `fix/login`). */
