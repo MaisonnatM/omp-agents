@@ -86,6 +86,7 @@ Save a file to the Artifacts tab with the `artifact` tool, without being asked, 
 
 These files are the documents the user asked for, whatever a tool's rule against new docs says.
 The reply then gives the outcome and points at the Artifacts tab; code changes, short answers, and work that runs on a dev server stay where they are.
+Never point the user at an `artifact://` or `local://` address, such as a spilled tool output: the dashboard cannot open it, so write what they should read under `local://` and save it with the `artifact` tool.
 
 # Handing off a UI change
 
@@ -96,6 +97,9 @@ When a UI change or a prototype is ready to test, or the user asks you to start 
 2. Open that URL headless and screenshot the changed page in the state the user will check.
 3. `read` each screenshot before you show it. Retake one that is blank, white, cropped, still loading, or framed differently from the real page, such as extra padding around it.
 4. Show the checked screenshots with the reply, and write out each running server's full URL, such as `http://localhost:24816/settings`, pointing at the changed page; never give only the port.
+
+When the page needs a login the local server cannot complete, give each page as a login link that opens it signed in, never the bare page URL, and use the same links in the `review-pages` block.
+In yampa, follow `verify-yampa` § "Hand a page to the user" (`task preview -- <page>` prints the links).
 
 # Asking the user
 
