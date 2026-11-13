@@ -1,4 +1,4 @@
-import { Ellipsis } from "lucide-react";
+import { IconDotGrid1x3Horizontal } from "central-icons";
 import { type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/menu";
@@ -11,7 +11,7 @@ export function MoreActionsMenu({ name, disabled, children }: { name: string; di
 		<DropdownMenu open={open} onOpenChange={setOpen}>
 			<Tooltip content="More actions" forceOpen={open ? false : undefined}>
 				<DropdownMenuTrigger render={<Button variant="ghost" size="icon-compact" aria-label={`More actions for ${name}`} disabled={disabled} />}>
-					<Ellipsis />
+					<IconDotGrid1x3Horizontal />
 				</DropdownMenuTrigger>
 			</Tooltip>
 			<DropdownMenuContent align="end">{children}</DropdownMenuContent>

@@ -1,4 +1,4 @@
-import { GitPullRequest } from "lucide-react";
+import { IconPullRequest } from "central-icons";
 import { useState } from "react";
 import type { LinkedPullRequest, PullRequest } from "../../src/shared/github";
 import type { RosterHost } from "../../src/shared/sessions";
@@ -25,7 +25,7 @@ export function SessionPullRequestsTab({ pullRequests, hosts, version, current }
 	const [picked, setPicked] = useState<PullRequest | null>(null);
 	const [tab, setTab] = useState<PullRequestDetailTab>("summary");
 	const shown = picked ?? pullRequests[0];
-	if (!shown) return <DetailsEmpty icon={GitPullRequest} title="No pull request yet" description="Pull requests this session opens or works on show here." />;
+	if (!shown) return <DetailsEmpty icon={IconPullRequest} title="No pull request yet" description="Pull requests this session opens or works on show here." />;
 	const pick = (pr: PullRequest): void => {
 		setPicked(pr);
 		setTab("summary");

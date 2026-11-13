@@ -1,5 +1,5 @@
 /** Chips for what a todo points to: links into the dashboard, its work state, and the session that added it. */
-import { Bot, X } from "lucide-react";
+import { IconAiBotHead, IconCrossMedium } from "central-icons";
 import { hashForSession, type PastSession, type RosterHost } from "../../../src/shared/sessions";
 import type { UserTodoLink } from "../../../src/user-todos-shared";
 import { hostLabel, pastLabel } from "../../labels";
@@ -75,7 +75,7 @@ export function TodoLinkChip({ link, sessions, onRemove, compact = false }: Todo
 			{onRemove && (
 				<Tooltip content="Unlink">
 					<button type="button" aria-label={`Unlink ${label}`} onClick={onRemove} className="hover:text-foreground [&>svg]:size-3">
-						<X />
+						<IconCrossMedium />
 					</button>
 				</Tooltip>
 			)}
@@ -121,7 +121,7 @@ export function AddedByChip({ sessionId, sessions }: { sessionId: string; sessio
 	return (
 		<Tooltip content={`Added by the agent of ${name}`}>
 			<a href={hashForSession(sessionId)} className="inline-flex max-w-48 items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground [&>svg]:size-3 [&>svg]:shrink-0">
-				<Bot />
+				<IconAiBotHead />
 				<span className="truncate">{name}</span>
 			</a>
 		</Tooltip>

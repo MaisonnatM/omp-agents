@@ -1,4 +1,4 @@
-import { ChevronRight } from "lucide-react";
+import { IconChevronRight } from "central-icons";
 import { Fragment, useMemo } from "react";
 import type { ChangedEntry } from "../../../src/shared/changes";
 import { fileTree, treeOrder } from "../../changes-model";
@@ -86,7 +86,7 @@ export function ChangesExplorer({ files, path, fileUrl, version, ...opener }: Ch
 						<p className="flex min-w-0 flex-1 items-center gap-1 font-mono text-xs text-muted-foreground" title={`${entry.path}: ${statusLabel(entry)}`}>
 							{entry.path.split("/").map((part, index, parts) => (
 								<Fragment key={index}>
-									{index > 0 && <ChevronRight aria-hidden className="size-3 shrink-0" />}
+									{index > 0 && <IconChevronRight className="size-3 shrink-0" />}
 									<span className={index === parts.length - 1 ? "truncate text-foreground" : "shrink-0"}>{part}</span>
 								</Fragment>
 							))}

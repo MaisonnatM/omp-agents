@@ -1,4 +1,4 @@
-import { Brain } from "lucide-react";
+import { IconBrain } from "central-icons";
 import type { ModelOption } from "../../src/shared/models";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { ModelList } from "../reads";
@@ -40,7 +40,7 @@ export function ModelSlot({ subject, models, open, onOpenChange, onSetModel, onS
 				)}
 				{thinking && (
 					<span className="flex shrink-0 items-center gap-1">
-						<Brain aria-hidden="true" className="size-3.5" />
+						<IconBrain aria-hidden="true" className="size-3.5" />
 						<span className="sr-only">Thinking level:</span>
 						{thinking}
 					</span>

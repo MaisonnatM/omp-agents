@@ -1,5 +1,5 @@
 /** `SlackAppForm`: the steps to a Slack app and the fields for its client ID, secret, and user scopes. */
-import { CircleAlert } from "lucide-react";
+import { IconExclamationCircle } from "central-icons";
 import { type FormEvent, type RefObject, useId, useRef, useState } from "react";
 import { normalizeSlackScope, SLACK_USER_SCOPES, type SlackClientInput, type SlackSetup, slackRedirectError, type McpIntegration } from "../../../src/shared/accounts";
 import { Button } from "@/components/ui/button";
@@ -243,11 +243,11 @@ export function SlackAppForm({ setup, connected, onDone }: SlackAppFormProps) {
 					className={`${CONTROL} block min-h-16 py-1.5 font-mono text-xs`}
 				/>
 			</Field>
-			<Callout tone="warning" icon={CircleAlert}>
+			<Callout tone="warning" icon={IconExclamationCircle}>
 				Token rotation is irreversible. Turn it on in Slack for this new app only. Slack cannot turn it off later. A sign-in without a refresh token is refused.
 			</Callout>
 			{write.error && (
-				<Callout tone="danger" icon={CircleAlert} role="alert">
+				<Callout tone="danger" icon={IconExclamationCircle} role="alert">
 					Cannot save the app settings: {write.error}
 				</Callout>
 			)}

@@ -4,7 +4,7 @@
  * their place in the transcript into the column; a click on one scrolls the transcript to it and tints its bubble.
  */
 import { motion, useReducedMotion } from "framer-motion";
-import { History, X } from "lucide-react";
+import { IconCrossMedium, IconHistory } from "central-icons";
 import { type KeyboardEvent, memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { View } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
@@ -57,7 +57,7 @@ export const PromptHistoryButton = memo(function PromptHistoryButton({ view }: {
 				aria-controls={open ? panelId(view) : undefined}
 				onClick={() => opened.set(hashForView(view), !open)}
 			>
-				{open ? <X aria-hidden="true" /> : <History aria-hidden="true" />}
+				{open ? <IconCrossMedium aria-hidden="true" /> : <IconHistory aria-hidden="true" />}
 			</Button>
 		</Tooltip>
 	);

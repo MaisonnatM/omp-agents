@@ -22,9 +22,9 @@
   **Sessions** counts the sessions of the picked workspace that need you: each that asks you something, or finished a turn you have not looked at since.
   A finished turn you have read leaves the count, though its session stays idle.
   So does a finished turn of a session waiting on its subagents, until they stop.
-- The header's tabs run across the top right of the sidebar: Back and Forward, a tab for each page and session you opened lately, **New session** as a +, and What's new, the bell, and Settings at the right end.
-  Clicking a tab focuses its page or session, and opening a page or a session that has no tab adds one at the end; the row keeps eight, dropping the one seen longest ago.
-  The × on a tab, or a middle-click, closes it, and closing the one on screen shows its neighbor.
+- The header's tabs run across the top right of the sidebar: Back and Forward, your tabs, a + that opens a new tab, and What's new, the bell, and Settings at the right end.
+  A tab works as in Capy: opening a page or a session, from the sidebar or anywhere else, shows it in the tab on screen, and a session another tab already shows switches to that tab; only the + adds a tab, on New session.
+  The × on a tab, or a middle-click, closes it, closing the one on screen shows its neighbor, and closing the last one leaves a new tab on New session.
   Drag a tab to move it, or focus it and press Alt+Shift+← or →; this browser keeps the tabs and their order across reloads.
   In the desktop app on macOS the row is the window's title bar: it starts after the window's buttons and drags the window.
 - The dot before each session shows when it waits on you.

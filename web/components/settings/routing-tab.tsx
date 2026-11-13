@@ -1,4 +1,4 @@
-import { Check, Plus, X } from "lucide-react";
+import { IconCheckmark1, IconCrossMedium, IconPlusLarge } from "central-icons";
 import { type ReactNode, useState } from "react";
 import { type ModelChain, type ModelProfileEdit, type ModelProfileSummary, type ModelRouting, type OmpSettings, type RetrySettings, type RoleRoute, type RoutingEdit } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
@@ -79,11 +79,11 @@ function ChainEditor({ chain, catalog, onChange }: { chain: string[]; catalog: C
 							}}
 						/>
 						<Button variant="ghost" size="icon-compact" aria-label="Stop adding a fallback" onClick={() => setAdding(false)}>
-							<X />
+							<IconCrossMedium />
 						</Button>
 					</div>
 				) : (
-					<Button variant="ghost" size="compact" leadingIcon={Plus} onClick={() => setAdding(true)}>
+					<Button variant="ghost" size="compact" leadingIcon={IconPlusLarge} onClick={() => setAdding(true)}>
 						Add fallback
 					</Button>
 				)
@@ -225,7 +225,7 @@ function ProviderPicker({ providers, onPick }: { providers: string[]; onPick: (p
 	return (
 		<CommandPicker
 			trigger="Add provider"
-			icon={Plus}
+			icon={IconPlusLarge}
 			chevron={false}
 			disabled={providers.length === 0}
 			search={{ label: "Search providers" }}
@@ -311,7 +311,7 @@ function ProfilesSection({ profiles, editing }: { profiles: ModelProfileSummary[
 			meta="Running sessions keep their model; new sessions use the profile."
 			actions={
 				naming === null && (
-					<Button variant="tertiary" size="compact" leadingIcon={Plus} disabled={busy} onClick={() => setNaming("")}>
+					<Button variant="tertiary" size="compact" leadingIcon={IconPlusLarge} disabled={busy} onClick={() => setNaming("")}>
 						Save current as…
 					</Button>
 				)
@@ -358,7 +358,7 @@ function ProfilesSection({ profiles, editing }: { profiles: ModelProfileSummary[
 									size="compact"
 									active={profile.active}
 									aria-current={profile.active || undefined}
-									leadingIcon={profile.active ? Check : undefined}
+									leadingIcon={profile.active ? IconCheckmark1 : undefined}
 									loading={saving.saving === keyOf(apply)}
 									disabled={busy}
 									onClick={() => {

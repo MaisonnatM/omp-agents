@@ -1,5 +1,6 @@
 /** `ArtifactView`: one artifact version drawn as its kind draws, or as its source; and the kind table the card and the Artifacts tab share. */
-import { FileCode2, FileText, Image, type LucideIcon } from "lucide-react";
+import { IconCode, IconFileText, IconImages1 } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import type { ReactNode } from "react";
 import type { ArtifactKind } from "../../src/shared/artifacts";
 import type { Loaded } from "../artifact-links";
@@ -14,10 +15,10 @@ interface RenderedProps {
 }
 
 /** Each kind's name, icon, and how it draws. */
-export const ARTIFACT_KIND: Record<ArtifactKind, { label: string; icon: LucideIcon; Rendered: (props: RenderedProps) => ReactNode }> = {
-	html: { label: "HTML", icon: FileCode2, Rendered: HtmlFrame },
-	markdown: { label: "Markdown", icon: FileText, Rendered: MarkdownText },
-	svg: { label: "SVG", icon: Image, Rendered: SvgImage },
+export const ARTIFACT_KIND: Record<ArtifactKind, { label: string; icon: IconComponent; Rendered: (props: RenderedProps) => ReactNode }> = {
+	html: { label: "HTML", icon: IconCode, Rendered: HtmlFrame },
+	markdown: { label: "Markdown", icon: IconFileText, Rendered: MarkdownText },
+	svg: { label: "SVG", icon: IconImages1, Rendered: SvgImage },
 };
 
 /**

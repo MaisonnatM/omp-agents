@@ -1,4 +1,4 @@
-import { RotateCw } from "lucide-react";
+import { IconArrowRotateClockwise } from "central-icons";
 import { useMemo, useState } from "react";
 import type { SessionChanges } from "../../../src/shared/changes";
 import type { ChangedFile } from "../../../src/shared/transcript";
@@ -69,7 +69,7 @@ export function SessionChangesDialog({ sessionId, cwd, path, work, working, onCl
 			</SizeProvider>
 			<Tooltip content="Read the changes again" side="bottom">
 				<Button {...activityControl("changes-dialog.refresh")} variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Read the changes again" loading={list.refreshing} onClick={() => setReads(count => count + 1)}>
-					<RotateCw />
+					<IconArrowRotateClockwise />
 				</Button>
 			</Tooltip>
 		</>

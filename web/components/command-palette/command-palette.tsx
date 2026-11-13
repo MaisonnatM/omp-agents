@@ -1,28 +1,7 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Command as CommandPrimitive } from "cmdk";
-import {
-	ArrowDown,
-	ArrowLeftRight,
-	ArrowLeft,
-	ArrowRight,
-	ArrowUp,
-	Command,
-	Folder,
-	GitPullRequestCreate,
-	History,
-	Keyboard,
-	Layers,
-	ListTodo,
-	type LucideIcon,
-	PanelLeft,
-	PanelRight,
-	Plus,
-	RefreshCw,
-	Search,
-	SquareTerminal,
-	Wrench,
-	Target,
-} from "lucide-react";
+import { IconArrowDown, IconArrowLeft, IconArrowLeftRight, IconArrowRight, IconArrowRotateClockwise, IconArrowUp, IconCmd, IconConsole, IconFolder1, IconHistory, IconKeyboard, IconLayersTwo, IconMagnifyingGlass, IconPlusLarge, IconPullRequest, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide, IconTarget, IconTodos, IconToolbox } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { type DashboardUpdateStatus, didNotStart, shortCommit } from "../../../src/shared/dashboard-update";
 import type { PastSession, RosterHost, View } from "../../../src/shared/sessions";
@@ -69,20 +48,20 @@ import { ActionPanel } from "./action-panel";
 import { PaletteFooter } from "./palette-footer";
 import { commandKey, record } from "../../activity";
 
-const COMMAND_ICON: Partial<Record<ShortcutId, LucideIcon>> = {
-	newSession: Plus,
-	switchSpace: ArrowLeftRight,
-	previousSession: ArrowUp,
-	nextSession: ArrowDown,
-	back: ArrowLeft,
-	forward: ArrowRight,
-	openPullRequest: GitPullRequestCreate,
-	setGoal: Target,
-	tools: Wrench,
-	sessionsSidebar: PanelLeft,
-	detailsSidebar: PanelRight,
+const COMMAND_ICON: Partial<Record<ShortcutId, IconComponent>> = {
+	newSession: IconPlusLarge,
+	switchSpace: IconArrowLeftRight,
+	previousSession: IconArrowUp,
+	nextSession: IconArrowDown,
+	back: IconArrowLeft,
+	forward: IconArrowRight,
+	openPullRequest: IconPullRequest,
+	setGoal: IconTarget,
+	tools: IconToolbox,
+	sessionsSidebar: IconSidebarSimpleLeftWide,
+	detailsSidebar: IconSidebarSimpleRightWide,
 	settings: PAGE_ICON.settings,
-	help: Keyboard,
+	help: IconKeyboard,
 	"pull-requests": PAGE_ICON["pull-requests"],
 	tickets: PAGE_ICON.tickets,
 	newTicket: PAGE_ICON.tickets,
@@ -92,7 +71,7 @@ const COMMAND_ICON: Partial<Record<ShortcutId, LucideIcon>> = {
 	calendar: PAGE_ICON.calendar,
 	email: PAGE_ICON.email,
 	sport: PAGE_ICON.sport,
-	terminal: SquareTerminal,
+	terminal: IconConsole,
 };
 
 interface CommandPaletteProps {
@@ -207,7 +186,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 						title: pastLabel(entry.session),
 						subtitle: row.cwdDisplay,
 						keywords,
-						icon: History,
+						icon: IconHistory,
 						accessories: [{ kind: "age", at: entry.session.modifiedAt }],
 						kind: "Session",
 						actions,
@@ -217,7 +196,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 	}, [hosts, past, pinned, resuming, ending, onOpenSession, onTogglePin, start, send, end, workspaceSettings]);
 
 	const commandItems = useMemo((): PaletteItem[] => {
-		const pushItem = (id: string, title: string, icon: LucideIcon, target: PaletteViewId, keywords: string[], keys: readonly string[]): PaletteItem => ({
+		const pushItem = (id: string, title: string, icon: IconComponent, target: PaletteViewId, keywords: string[], keys: readonly string[]): PaletteItem => ({
 			id,
 			section: "commands",
 			title,
@@ -241,10 +220,10 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 									? `omp-agents is current with origin/${status.branch}`
 									: `${status.behind === 1 ? "1 new commit" : `${status.behind} new commits`} on ${status.branch}`,
 							keywords: ["omp-agents", "pull", "restart", "upgrade"],
-							icon: RefreshCw,
+							icon: IconArrowRotateClockwise,
 							accessories: [],
 							kind: "Command",
-							actions: [[{ id: "run", title: status.failed ? "Check for a newer commit" : "Pull and restart", icon: RefreshCw, run: { kind: "do", fn: () => void updateDashboard() } }]],
+							actions: [[{ id: "run", title: status.failed ? "Check for a newer commit" : "Pull and restart", icon: IconArrowRotateClockwise, run: { kind: "do", fn: () => void updateDashboard() } }]],
 						},
 					]
 				: [];
@@ -255,18 +234,18 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 					section: "commands",
 					title: command,
 					keywords: [label],
-					icon: COMMAND_ICON[id] ?? Command,
+					icon: COMMAND_ICON[id] ?? IconCmd,
 					accessories: [{ kind: "keys", labels: tabShortcutLabels(id, tabs) }],
 					kind: "Command",
 					// A command runs as its shortcut's first key does.
-					actions: [[{ id: "run", title: "Run command", icon: COMMAND_ICON[id] ?? Command, run: { kind: "do", fn: () => {
+					actions: [[{ id: "run", title: "Run command", icon: COMMAND_ICON[id] ?? IconCmd, run: { kind: "do", fn: () => {
 						record("command", commandKey(id), "palette");
 						void handlers[id]?.(0);
 					} } }]],
 				}),
 			),
-			pushItem("command:workspace", "Choose workspace…", Folder, "workspaces", ["switch workspace", "directory"], shortcutLabels("workspace")),
-			pushItem("command:create-todo", "Create todo", ListTodo, "createTodo", ["add todo", "task"], []),
+			pushItem("command:workspace", "Choose workspace…", IconFolder1, "workspaces", ["switch workspace", "directory"], shortcutLabels("workspace")),
+			pushItem("command:create-todo", "Create todo", IconTodos, "createTodo", ["add todo", "task"], []),
 			...updateItem(selfUpdate),
 		];
 	}, [handlers, unavailable, tabs, selfUpdate]);
@@ -275,7 +254,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 		const pickWorkspace = (cwd: string | null): void => {
 			if (cwd !== workspace) onPickWorkspace(cwd);
 		};
-		const workspaceItem = (id: string, title: string, subtitle: string | undefined, icon: LucideIcon, cwd: string | null): PaletteItem => ({
+		const workspaceItem = (id: string, title: string, subtitle: string | undefined, icon: IconComponent, cwd: string | null): PaletteItem => ({
 			id,
 			section: "workspaces",
 			title,
@@ -287,8 +266,8 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 			actions: [[{ id: "pick", title: "Show its sessions", icon, run: { kind: "do", fn: () => pickWorkspace(cwd) } }]],
 		});
 		return [
-			workspaceItem("workspace:all", ALL_OF_SPACE[space], undefined, Layers, null),
-			...workspaces.map(({ cwd, cwdDisplay }) => workspaceItem(`workspace:${cwd}`, workspaceName(cwdDisplay, personal) ?? cwdDisplay, cwdDisplay, Folder, cwd)),
+			workspaceItem("workspace:all", ALL_OF_SPACE[space], undefined, IconLayersTwo, null),
+			...workspaces.map(({ cwd, cwdDisplay }) => workspaceItem(`workspace:${cwd}`, workspaceName(cwdDisplay, personal) ?? cwdDisplay, cwdDisplay, IconFolder1, cwd)),
 		];
 	}, [workspaces, workspace, space, personal, onPickWorkspace]);
 
@@ -316,10 +295,10 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 							title,
 							subtitle,
 							keywords: [],
-							icon: ListTodo,
+							icon: IconTodos,
 							accessories: [],
 							kind: "Todo",
-							actions: [[{ id: "create", title: "Create todo", icon: ListTodo, run: { kind: "do", fn: createTodo } }]],
+							actions: [[{ id: "create", title: "Create todo", icon: IconTodos, run: { kind: "do", fn: createTodo } }]],
 						},
 					]
 				: [];
@@ -420,11 +399,11 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 									onClick={() => dispatch({ type: "pop" })}
 									className="inline-flex h-6 shrink-0 items-center gap-1 rounded-md bg-muted px-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
 								>
-									<ArrowLeft className="size-3.5" />
+									<IconArrowLeft className="size-3.5" />
 									{view.title}
 								</button>
 							) : (
-								<Search className="size-4 shrink-0 text-muted-foreground" />
+								<IconMagnifyingGlass className="size-4 shrink-0 text-muted-foreground" />
 							)}
 							<CommandPrimitive.Input
 								ref={inputRef}

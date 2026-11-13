@@ -1,5 +1,5 @@
 /** The Summary tab: reviewers and labels, the description and its editor, the checks, and the comments. */
-import { Pencil, Tag, Users } from "lucide-react";
+import { IconGroup1, IconPencil, IconTag } from "central-icons";
 import { type CSSProperties, useState } from "react";
 import { MAX_PULL_REQUEST_BODY, type PullRequestDetail } from "../../../../src/shared/github";
 import { Button } from "@/components/ui/button";
@@ -48,7 +48,7 @@ function Description({ detail, send }: { detail: PullRequestDetail; send: SendPu
 			actions={
 				!editing && (
 					<Button size="icon-xs" variant="ghost-muted" aria-label="Edit description" onClick={() => setDraft({ body: detail.body, original: detail.body })}>
-						<Pencil aria-hidden className="size-3" />
+						<IconPencil className="size-3" />
 					</Button>
 				)
 			}
@@ -105,12 +105,12 @@ export function Summary({ detail, options, save, send }: SummaryProps) {
 	return (
 		<div>
 			<section className="space-y-2 px-4 pt-2.5 pb-1" aria-label="Pull request metadata">
-				<MetaRow icon={Users} label="Reviewers">
+				<MetaRow icon={IconGroup1} label="Reviewers">
 					<ReviewersField pr={detail} options={options} onChange={(change, reviewers) => save(change, { reviewers })}>
 						{detail.reviewers.length ? <Reviewers reviewers={detail.reviewers} /> : <span className="text-muted-foreground">None</span>}
 					</ReviewersField>
 				</MetaRow>
-				<MetaRow icon={Tag} label="Labels">
+				<MetaRow icon={IconTag} label="Labels">
 					<LabelsField detail={detail} options={options} save={save}>
 						<LabelChips labels={detail.labels} />
 					</LabelsField>

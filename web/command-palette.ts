@@ -1,5 +1,6 @@
 import { defaultFilter } from "cmdk";
-import { Command, Folder, ListTodo, type LucideIcon } from "lucide-react";
+import { IconCmd, IconFolder1, IconTodos } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { everyWord } from "../src/shared/every-word";
 import type { HostStatus } from "../src/shared/sessions";
 import { type Chord, type KeyEvent, pressesChord, SHORTCUTS, type Shortcut, type ShortcutHandlers, type ShortcutId } from "./shortcuts";
@@ -10,16 +11,16 @@ export type PaletteViewId = "root" | "workspaces" | "createTodo";
 export interface PaletteView {
 	/** What the footer and the back chip name the view. */
 	title: string;
-	icon: LucideIcon;
+	icon: IconComponent;
 	placeholder: string;
 	/** How many of the most used items an empty search leads with. */
 	suggestions: number;
 }
 
 export const PALETTE_VIEWS: Record<PaletteViewId, PaletteView> = {
-	root: { title: "omp agents", icon: Command, placeholder: "Search sessions, todos, tickets, pull requests, and commands…", suggestions: 5 },
-	workspaces: { title: "Choose workspace", icon: Folder, placeholder: "Search workspaces…", suggestions: 0 },
-	createTodo: { title: "Create todo", icon: ListTodo, placeholder: "Todo title, optionally ending in a due day or #category", suggestions: 0 },
+	root: { title: "omp agents", icon: IconCmd, placeholder: "Search sessions, todos, tickets, pull requests, and commands…", suggestions: 5 },
+	workspaces: { title: "Choose workspace", icon: IconFolder1, placeholder: "Search workspaces…", suggestions: 0 },
+	createTodo: { title: "Create todo", icon: IconTodos, placeholder: "Todo title, optionally ending in a due day or #category", suggestions: 0 },
 };
 
 export type ActionRun =
@@ -32,7 +33,7 @@ export interface PaletteAction<Run extends ActionRun = ActionRun> {
 	/** Unique among its item's actions. */
 	id: string;
 	title: string;
-	icon: LucideIcon;
+	icon: IconComponent;
 	/** Runs the action from the list and the action panel without choosing it. The first two actions take Enter and ⌘Enter instead. */
 	chord?: Chord;
 	tone?: "destructive";
@@ -65,7 +66,7 @@ export interface PaletteItem {
 	subtitle?: string;
 	/** Words a search also matches besides the title and subtitle. */
 	keywords: readonly string[];
-	icon: LucideIcon;
+	icon: IconComponent;
 	accessories: readonly Accessory[];
 	/** The type label at the row's end: `Session`, `Todo`, `Ticket`, `PR`, `Command`, `Workspace`, `Settings`. */
 	kind: string;

@@ -1,5 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { Check, Circle, LoaderCircle, RefreshCw, Trash2, X } from "lucide-react";
+import { IconArrowRotateClockwise, IconCheckmark1, IconFormCircle, IconCrossMedium, IconLoadingCircle, IconTrashCan } from "central-icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorText } from "../../../src/json";
 import { CACHE_STEP, CLEANUP_STEPS, isSandboxStep, PREVIEW_SOURCE, PREVIEW_SOURCES, type CleanupStep, type PreviewSource, type Previews, type SandboxPlan, type StorageUsage } from "../../../src/shared/storage";
@@ -75,9 +75,9 @@ function ChecklistRow({ row, status, loading, finished, disabled, checked, onChe
 			</label>
 			{status && (
 				<p role="status" className="mt-2 flex items-center gap-2 pl-6 text-xs tabular-nums">
-					{status.state === "running" ? <LoaderCircle aria-hidden className="size-3 motion-safe:animate-spin" />
-						: status.state === "done" ? <Check aria-hidden className="size-3" />
-						: status.state === "failed" ? <X aria-hidden className="size-3" /> : <Circle aria-hidden className="size-3" />}
+					{status.state === "running" ? <IconLoadingCircle className="size-3 motion-safe:animate-spin" />
+						: status.state === "done" ? <IconCheckmark1 className="size-3" />
+						: status.state === "failed" ? <IconCrossMedium className="size-3" /> : <IconFormCircle className="size-3" />}
 					{status.state === "waiting" && finished ? "Not run" : status.text}
 				</p>
 			)}
@@ -183,7 +183,7 @@ function ConfirmDialog({ open, onOpenChange, chosen, sandboxes, label, onConfirm
 					))}
 					<div className="mt-5 flex justify-end gap-2">
 						<Button variant="secondary" size="compact" onClick={() => onOpenChange(false)}>Cancel</Button>
-						<Button variant="destructive-outline" size="compact" className="tabular-nums" leadingIcon={Trash2} onClick={onConfirm}>{label}</Button>
+						<Button variant="destructive-outline" size="compact" className="tabular-nums" leadingIcon={IconTrashCan} onClick={onConfirm}>{label}</Button>
 					</div>
 				</Dialog.Content>
 			</Dialog.Portal>
@@ -290,7 +290,7 @@ export function StorageTab({ active, cwd, onSaved }: { active: boolean; cwd: str
 			<Section
 				title="Clean up"
 				meta="Nothing changes until you confirm. Sandbox and package cache sizes are upper bounds; they, archive sizes, and compression savings are not included in the estimate."
-				actions={<Button variant="ghost" size="compact" leadingIcon={RefreshCw} loading={checking} disabled={busy} onClick={checkAgain}>Check again</Button>}
+				actions={<Button variant="ghost" size="compact" leadingIcon={IconArrowRotateClockwise} loading={checking} disabled={busy} onClick={checkAgain}>Check again</Button>}
 			>
 				{PREVIEW_SOURCES.map(source => errors[source] && <ErrorText key={source}>{PREVIEW_FAILED[source](errors[source])}</ErrorText>)}
 				<div className="divide-y divide-border">
@@ -340,7 +340,7 @@ export function StorageTab({ active, cwd, onSaved }: { active: boolean; cwd: str
 							variant="destructive-outline"
 							size="compact"
 							className="tabular-nums"
-							leadingIcon={Trash2}
+							leadingIcon={IconTrashCan}
 							disabled={checking || run !== null || !usage || !!usage.settingsError || chosen.length === 0}
 							onClick={() => setConfirm(true)}
 						>

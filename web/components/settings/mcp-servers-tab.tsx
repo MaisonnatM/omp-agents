@@ -1,4 +1,4 @@
-import { Plus, RefreshCw } from "lucide-react";
+import { IconArrowRotateClockwise, IconPlusLarge } from "central-icons";
 import { useState } from "react";
 import { MCP_SERVICES } from "../../../src/shared/accounts";
 import { type McpServersAnswer, type OwnServer, ownServers } from "../../../src/shared/mcp-servers";
@@ -65,10 +65,10 @@ export function McpServersTab({ active }: { active: boolean }) {
 			meta={read ? `${meta} · updated ${readTime(read.at)}` : meta}
 			actions={
 				<>
-					<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={() => void mcpServersStore.refresh(null, { fresh: true })}>
+					<Button variant="ghost" size="compact" leadingIcon={IconArrowRotateClockwise} disabled={refreshing} onClick={() => void mcpServersStore.refresh(null, { fresh: true })}>
 						{refreshing ? "Refreshing…" : "Refresh"}
 					</Button>
-					<Button variant="secondary" size="compact" leadingIcon={Plus} disabled={adding} onClick={() => setAdding(true)}>
+					<Button variant="secondary" size="compact" leadingIcon={IconPlusLarge} disabled={adding} onClick={() => setAdding(true)}>
 						Add server
 					</Button>
 				</>

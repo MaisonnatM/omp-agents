@@ -1,5 +1,5 @@
 /** A Bot's page, its one conversation under a header whose name shows or hides its details in the right sidebar, the card of its routines or a routine's editor in place of the conversation, and the New Bot form. */
-import { BookmarkCheck, Send } from "lucide-react";
+import { IconBookmarkCheck, IconSend } from "central-icons";
 import { type KeyboardEvent, useId, useMemo, useRef, useState } from "react";
 import type { RoutineSpec } from "../../../src/routines";
 import {
@@ -173,11 +173,11 @@ export function BotPage({ open, bots, past, lastHosts, models, workspaces, conne
 	const names = useMemo(() => new Map(bots.map(({ id, name }) => [id, name])), [bots]);
 	const toolChips = useMemo<ToolChipLabels>(
 		() => ({
-			[REMEMBER_TOOL]: { label: () => `Updated memory for ${bot.name}`, icon: BookmarkCheck },
+			[REMEMBER_TOOL]: { label: () => `Updated memory for ${bot.name}`, icon: IconBookmarkCheck },
 			[MESSAGE_BOT_TOOL]: {
 				label: tool => `Messaged ${(tool.to && names.get(tool.to)) ?? "a Bot"}`,
 				href: tool => (tool.to && names.has(tool.to) ? hashForBots(tool.to) : null),
-				icon: Send,
+				icon: IconSend,
 			},
 		}),
 		[bot.name, names],

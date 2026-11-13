@@ -1,5 +1,5 @@
 /** The home's empty state, when no session or page shows. */
-import { CircleAlert, Plus } from "lucide-react";
+import { IconExclamationCircle, IconPlusLarge } from "central-icons";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { SPLIT_CLICK } from "../labels";
@@ -16,7 +16,7 @@ export function EmptyHome({ live, rosterError }: { live: boolean; rosterError: s
 				<EmptyDescription>{live ? `Choose a session to see its conversation. ${SPLIT_CLICK} more to see up to four side by side.` : "Start a session here, or return to setup whenever you need it."}</EmptyDescription>
 			</EmptyHeader>
 			<div className="flex flex-wrap justify-center gap-2">
-				<Button size="compact" leadingIcon={Plus} onClick={() => openNewSession()}>
+				<Button size="compact" leadingIcon={IconPlusLarge} onClick={() => openNewSession()}>
 					New session
 				</Button>
 				<Button variant="secondary" size="compact" render={<a href="#get-started" />}>
@@ -24,7 +24,7 @@ export function EmptyHome({ live, rosterError }: { live: boolean; rosterError: s
 				</Button>
 			</div>
 			{rosterError && (
-				<Callout tone="warning" icon={CircleAlert}>
+				<Callout tone="warning" icon={IconExclamationCircle}>
 					Registry error: {rosterError}
 				</Callout>
 			)}

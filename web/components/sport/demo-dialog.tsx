@@ -1,5 +1,5 @@
 /** The demo dialog: one exercise's video, its three cues and caution, and the workout's other demos to step through. */
-import { ChevronLeft, ChevronRight, Play, TriangleAlert } from "lucide-react";
+import { IconChevronLeft, IconChevronRight, IconExclamationTriangle, IconPlay } from "central-icons";
 import { useEffect, useRef, useState } from "react";
 import type { Exercise } from "../../../src/shared/sport";
 import { Button } from "@/components/ui/button";
@@ -60,7 +60,7 @@ export function DemoDialog({ title, demos, at, onAt, onClose }: DemoDialogProps)
 								className="size-full text-sm"
 								badge={
 									<span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform group-hover:scale-105">
-										<Play aria-hidden className="size-6 fill-current" />
+										<IconPlay className="size-6 icon-shapes:fill-current" />
 									</span>
 								}
 							/>
@@ -76,7 +76,7 @@ export function DemoDialog({ title, demos, at, onAt, onClose }: DemoDialogProps)
 					))}
 				</ol>
 				{demo.caution && (
-					<Callout tone="warning" icon={TriangleAlert}>
+					<Callout tone="warning" icon={IconExclamationTriangle}>
 						{demo.caution}
 					</Callout>
 				)}
@@ -98,13 +98,13 @@ export function DemoDialog({ title, demos, at, onAt, onClose }: DemoDialogProps)
 			</div>
 			<div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
 				<Tooltip content="Démo précédente" shortcut={shortcutLabels("sportPreviousDemo")} side="top" disabled={at === 0}>
-					<Button variant="tertiary" size="compact" leadingIcon={ChevronLeft} disabled={at === 0} onClick={() => onAt(at - 1)} {...activityControl("sport.demo.step")}>Précédent</Button>
+					<Button variant="tertiary" size="compact" leadingIcon={IconChevronLeft} disabled={at === 0} onClick={() => onAt(at - 1)} {...activityControl("sport.demo.step")}>Précédent</Button>
 				</Tooltip>
 				{last ? (
 					<Button size="compact" onClick={onClose}>Terminé</Button>
 				) : (
 					<Tooltip content="Démo suivante" shortcut={shortcutLabels("sportNextDemo")} side="top">
-						<Button size="compact" trailingIcon={ChevronRight} onClick={() => onAt(at + 1)} {...activityControl("sport.demo.step")}>Suivant</Button>
+						<Button size="compact" trailingIcon={IconChevronRight} onClick={() => onAt(at + 1)} {...activityControl("sport.demo.step")}>Suivant</Button>
 					</Tooltip>
 				)}
 			</div>

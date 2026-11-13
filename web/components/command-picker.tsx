@@ -1,5 +1,5 @@
 /** `CommandPicker`, the searchable grouped list behind the branch, workspace, skill, and settings pickers, and `CommandResults`, which the model menu's search shares. */
-import { Check, ChevronsUpDown } from "lucide-react";
+import { IconCheckmark1, IconChevronGrabberVertical } from "central-icons";
 import { type KeyboardEvent, type ReactNode, type Ref, useContext, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -100,7 +100,7 @@ export function CommandResults({ search, list, empty, disabled, selectionDisable
 												{item.icon && <item.icon />}
 												{item.label}
 											</span>
-											{item.selected !== undefined && <Check className={item.selected ? "opacity-100" : "opacity-0"} />}
+											{item.selected !== undefined && <IconCheckmark1 className={item.selected ? "opacity-100" : "opacity-0"} />}
 										</CommandItem>
 									))}
 								</CommandGroup>
@@ -164,7 +164,7 @@ export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, ariaLa
 				variant="ghost"
 				size="compact"
 				leadingIcon={icon}
-				trailingIcon={chevron ? ChevronsUpDown : undefined}
+				trailingIcon={chevron ? IconChevronGrabberVertical : undefined}
 				aria-label={ariaLabel}
 				aria-labelledby={ariaLabelledby}
 				// Keeps Radix's popover `data-state` contract under a Tooltip trigger, which stamps its own.

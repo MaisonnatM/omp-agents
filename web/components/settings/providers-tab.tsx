@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, ExternalLink, KeyRound, LoaderCircle, LogOut, Plus, RefreshCw } from "lucide-react";
+import { IconArrowBoxLeft, IconArrowRotateClockwise, IconCircleCheck, IconExclamationCircle, IconKey1, IconLoadingCircle, IconPlusLarge, IconSquareArrowTopRight } from "central-icons";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -76,7 +76,7 @@ function LoginCallout({ login }: { login: ProviderLogin }) {
 		return (
 			<Callout
 				tone="danger"
-				icon={CircleAlert}
+				icon={IconExclamationCircle}
 				role="alert"
 				action={
 					<Button variant="ghost" size="compact" onClick={() => void cancelLogin()}>
@@ -92,7 +92,7 @@ function LoginCallout({ login }: { login: ProviderLogin }) {
 		return (
 			<Callout
 				tone="info"
-				icon={CircleCheck}
+				icon={IconCircleCheck}
 				role="alert"
 				action={
 					<Button variant="ghost" size="compact" onClick={() => void cancelLogin()}>
@@ -109,7 +109,7 @@ function LoginCallout({ login }: { login: ProviderLogin }) {
 		<div className="space-y-3">
 			<Callout
 				tone="info"
-				icon={apiKey && prompt ? KeyRound : LoaderCircle}
+				icon={apiKey && prompt ? IconKey1 : IconLoadingCircle}
 				role="status"
 				spin={!apiKey || !prompt}
 				action={
@@ -118,7 +118,7 @@ function LoginCallout({ login }: { login: ProviderLogin }) {
 							Cancel
 						</Button>
 						{url && (
-							<Button variant="secondary" size="compact" leadingIcon={ExternalLink} render={<a href={url} target="_blank" rel="noreferrer" />}>
+							<Button variant="secondary" size="compact" leadingIcon={IconSquareArrowTopRight} render={<a href={url} target="_blank" rel="noreferrer" />}>
 								Open sign-in page
 							</Button>
 						)}
@@ -150,7 +150,7 @@ function AccountLine({ provider, account, numbered, place }: { provider: ModelPr
 		// The sign-out lives in the question, so Cancel drops a failure with it.
 		return (
 			<Confirm
-				icon={LogOut}
+				icon={IconArrowBoxLeft}
 				question={`Sign omp out of ${account.label}?`}
 				detail={`Sessions stop using it for ${provider.name}.`}
 				confirm="Sign out"
@@ -175,7 +175,7 @@ function AccountLine({ provider, account, numbered, place }: { provider: ModelPr
 					<OrderButton label={account.label} direction="down" disabled={place.index === place.count - 1} onClick={() => place.move(place.index, 1)} />
 				</div>
 			)}
-			<Button variant="ghost" size="compact" leadingIcon={LogOut} onClick={() => setConfirming(true)}>
+			<Button variant="ghost" size="compact" leadingIcon={IconArrowBoxLeft} onClick={() => setConfirming(true)}>
 				Sign out
 			</Button>
 		</div>
@@ -216,7 +216,7 @@ function ProviderRow({ provider, login }: { provider: ModelProvider; login: Prov
 				<MoreActionsMenu name={provider.name} disabled={starting}>
 					{(connected ? provider.methods : others).map(method => (
 						<MenuItem key={method.id} onClick={() => start.run(method.id)}>
-							{method.id === ANTHROPIC_API_KEY_METHOD ? <KeyRound /> : <Plus />}
+							{method.id === ANTHROPIC_API_KEY_METHOD ? <IconKey1 /> : <IconPlusLarge />}
 							{method.id === ANTHROPIC_API_KEY_METHOD ? (provider.accounts.some(account => account.kind === "api_key") ? "Replace API key" : "Add API key") : method.id === first!.id ? verb : `${verb} with ${method.name}`}
 						</MenuItem>
 					))}
@@ -269,7 +269,7 @@ function ProviderRow({ provider, login }: { provider: ModelProvider; login: Prov
 					})}
 					{ordering && <p className="text-xs text-muted-foreground">omp tries these accounts from the top, and moves to the next when one nears its usage limit or fails.</p>}
 					{reorder.error && (
-						<Callout tone="danger" icon={CircleAlert} role="alert">
+						<Callout tone="danger" icon={IconExclamationCircle} role="alert">
 							Cannot save the account order: {reorder.error}
 						</Callout>
 					)}
@@ -280,7 +280,7 @@ function ProviderRow({ provider, login }: { provider: ModelProvider; login: Prov
 					)}
 					{login && <LoginCallout login={login} />}
 					{startError && (
-						<Callout tone="danger" icon={CircleAlert} role="alert">
+						<Callout tone="danger" icon={IconExclamationCircle} role="alert">
 							Cannot start the sign-in: {startError}
 						</Callout>
 					)}
@@ -369,7 +369,7 @@ export function ProvidersTab({ active }: { active: boolean }) {
 		<Section
 			meta={read ? `${meta} · updated ${readTime(read.at)}` : meta}
 			actions={
-				<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing && !running} onClick={() => void refresh()}>
+				<Button variant="ghost" size="compact" leadingIcon={IconArrowRotateClockwise} disabled={refreshing && !running} onClick={() => void refresh()}>
 					{refreshing && !running ? "Refreshing…" : "Refresh"}
 				</Button>
 			}

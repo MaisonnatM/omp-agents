@@ -1,5 +1,5 @@
 /** The Sport page's journal: every logged session by week, newest first, beside the open one's figures. */
-import { NotebookPen } from "lucide-react";
+import { IconNotebook } from "central-icons";
 import type { ReactNode } from "react";
 import type { SportChange, SportState, WorkoutLog } from "../../../src/shared/sport";
 import { records } from "../../../src/sport-week";
@@ -116,7 +116,7 @@ export function JournalTab({ state, open, disabled, onChange, onEdit, keys }: Jo
 			widthKey="omp-agents.sport-journal-width"
 			resizeLabel="Redimensionner le journal"
 			detailLabel="Séance ouverte"
-			empty={{ icon: NotebookPen, title: "Aucune séance ouverte", hint: "Clique une séance pour voir ses charges, ses réussites et sa note." }}
+			empty={{ icon: IconNotebook, title: "Aucune séance ouverte", hint: "Clique une séance pour voir ses charges, ses réussites et sa note." }}
 			list={list}
 			detail={
 				shown === null ? null : (

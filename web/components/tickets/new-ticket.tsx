@@ -1,4 +1,4 @@
-import { ChevronRight, Maximize2, Minimize2, Paperclip, UsersRound, X } from "lucide-react";
+import { IconChevronRight, IconCrossMedium, IconExpand, IconMinimize, IconPaperclip1, IconUserGroup } from "central-icons";
 import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
 import { errorText } from "../../../src/json";
 import { MAX_TICKET_ATTACHMENT_BYTES, type TicketChoice, type TicketDraft, type TicketLabel, type TicketOptions, type TicketPriority, type TicketStatus, type TicketTeam } from "../../../src/shared/tickets";
@@ -67,7 +67,7 @@ export function NewTicketDialog({ title, onClose }: { title: string; onClose: ()
 				actions={
 					<Tooltip content={expanded ? "Shrink the dialog" : "Expand the dialog"} side="bottom">
 						<Button variant="ghost" size="icon-compact" aria-label={expanded ? "Shrink" : "Expand"} onClick={() => setExpanded(!expanded)}>
-							{expanded ? <Minimize2 /> : <Maximize2 />}
+							{expanded ? <IconMinimize /> : <IconExpand />}
 						</Button>
 					</Tooltip>
 				}
@@ -191,7 +191,7 @@ function NewTicketForm({ title: initialTitle, submit, onSubmit: setSubmit, onCre
 								current={team.name}
 								trigger={
 									<>
-										<UsersRound aria-hidden className="size-3.5 text-violet-500" />
+										<IconUserGroup className="size-3.5 text-violet-500" />
 										<span className="font-medium">{team.key}</span>
 									</>
 								}
@@ -210,7 +210,7 @@ function NewTicketForm({ title: initialTitle, submit, onSubmit: setSubmit, onCre
 								{teams.error ? `Cannot read Linear's teams: ${teams.error}` : teams.data ? "Linear lists no team to open the issue in." : "Reading teams…"}
 							</span>
 						)}
-						<ChevronRight aria-hidden className="size-3.5 text-muted-foreground" />
+						<IconChevronRight className="size-3.5 text-muted-foreground" />
 					</>
 				}
 			/>
@@ -246,10 +246,10 @@ function NewTicketForm({ title: initialTitle, submit, onSubmit: setSubmit, onCre
 					<ul aria-label="Files to attach" className="flex flex-wrap gap-1.5 py-1">
 						{files.map((file, index) => (
 							<li key={`${file.name}-${index}`} className="flex h-6 items-center gap-1 rounded-full border border-border pr-0.5 pl-2.5 text-xs">
-								<Paperclip aria-hidden className="size-3 text-muted-foreground" />
+								<IconPaperclip1 className="size-3 text-muted-foreground" />
 								<span className="max-w-48 truncate">{file.name}</span>
 								<Button type="button" variant="ghost" size="icon-compact" className="size-5 rounded-full" aria-label={`Remove ${file.name}`} disabled={creating} onClick={() => setFiles(current => current.filter((_, at) => at !== index))}>
-									<X />
+									<IconCrossMedium />
 								</Button>
 							</li>
 						))}
@@ -297,7 +297,7 @@ function NewTicketForm({ title: initialTitle, submit, onSubmit: setSubmit, onCre
 				/>
 				<Tooltip content={`Attach files, up to ${MAX_ATTACHMENT_MB} MB each`} side="top">
 					<Button type="button" variant="ghost" size="icon-compact" className="rounded-full" aria-label="Attach files" disabled={creating} onClick={() => fileRef.current?.click()}>
-						<Paperclip />
+						<IconPaperclip1 />
 					</Button>
 				</Tooltip>
 				<label className="ml-auto flex cursor-pointer items-center gap-2 text-xs text-muted-foreground select-none">

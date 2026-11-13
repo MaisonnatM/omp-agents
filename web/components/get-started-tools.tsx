@@ -2,7 +2,8 @@
  * Get started's Tools and workflows step: GitHub, every Settings › Integrations service, and pstack, what still needs
  * you above what is ready, each folded to its name, status, and summary, and opening in place on its full row.
  */
-import { Check, ChevronDown, ChevronUp, GitPullRequest, type LucideIcon, Workflow } from "lucide-react";
+import { IconAgentNetwork, IconCheckmark1, IconChevronBottom, IconChevronTop, IconPullRequest } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { type MouseEvent, type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { connectionsOf, type IntegrationsAnswer, MCP_INTEGRATIONS, MCP_SERVICES, type McpIntegrationId, signedIn } from "../../src/shared/accounts";
@@ -25,7 +26,7 @@ interface Item {
 	id: ItemId;
 	name: string;
 	logo: BrandLogo | null;
-	icon: LucideIcon | undefined;
+	icon: IconComponent | undefined;
 	/** Its fact is still being read. */
 	checking: boolean;
 	/** Connected, signed in, or loaded. */
@@ -62,7 +63,7 @@ function itemsOf({ github, integrations, kit }: ToolsFacts, onKitStep: () => voi
 			id: "github",
 			name: "GitHub",
 			logo: null,
-			icon: GitPullRequest,
+			icon: IconPullRequest,
 			checking: github.kind === "checking",
 			ready: githubSignedIn(github),
 			status: githubStatus(github),
@@ -87,7 +88,7 @@ function itemsOf({ github, integrations, kit }: ToolsFacts, onKitStep: () => voi
 			id: "pstack",
 			name: "pstack",
 			logo: null,
-			icon: Workflow,
+			icon: IconAgentNetwork,
 			checking: kit.kind === "checking",
 			ready: pstackLoaded(kit),
 			status: pstackStatus(kit),
@@ -114,7 +115,7 @@ function Disclosure({ item, open, onToggle }: { item: Item; open: boolean; onTog
 					{item.row}
 				</ul>
 				<Button variant="ghost" size="icon-compact" aria-expanded aria-label={`Fold ${item.name}`} className="absolute end-4 top-4" onClick={onToggle}>
-					<ChevronUp />
+					<IconChevronTop />
 				</Button>
 			</li>
 		);
@@ -136,7 +137,7 @@ function Disclosure({ item, open, onToggle }: { item: Item; open: boolean; onTog
 					<span className="mt-0.5 block text-[13px] text-pretty text-muted-foreground">{item.summary}</span>
 				</span>
 				<span aria-hidden className="flex size-7 shrink-0 items-center justify-center text-muted-foreground">
-					<ChevronDown className="size-3.5" />
+					<IconChevronBottom className="size-3.5" />
 				</span>
 			</button>
 		</li>
@@ -168,7 +169,7 @@ function Groups({ items }: { items: Item[] }) {
 	return (
 		<div className="space-y-5">
 			{needs.length === 0 && (
-				<Callout tone="info" icon={Check}>
+				<Callout tone="info" icon={IconCheckmark1}>
 					Everything is set up. New sessions get these tools and pstack's skills.
 				</Callout>
 			)}

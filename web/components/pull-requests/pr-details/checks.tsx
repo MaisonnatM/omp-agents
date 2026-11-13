@@ -1,4 +1,5 @@
-import { CircleCheck, CircleDot, CircleSlash, CircleX, LoaderCircle, type LucideIcon } from "lucide-react";
+import { IconCircleBanSign, IconCircleCheck, IconRecord, IconCircleX, IconLoadingCircle } from "central-icons";
+import type { IconComponent } from "@/lib/icon-context";
 import { useState } from "react";
 import type { CheckRunState, PullRequestCheck } from "../../../../src/shared/github";
 import { Button } from "@/components/ui/button";
@@ -7,18 +8,18 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { type ChecksPresentation, presentChecks } from "../../../pull-request-checks";
 
-const CHECK_RUN: Record<CheckRunState, { Icon: LucideIcon; color: string; label: string }> = {
-	failing: { Icon: CircleX, color: "text-destructive", label: "Failed" },
-	pending: { Icon: LoaderCircle, color: "text-amber-500 motion-safe:animate-spin", label: "Running" },
-	passing: { Icon: CircleCheck, color: "text-emerald-600 dark:text-emerald-300/90", label: "Passed" },
-	skipped: { Icon: CircleSlash, color: "text-muted-foreground/70", label: "Skipped" },
+const CHECK_RUN: Record<CheckRunState, { Icon: IconComponent; color: string; label: string }> = {
+	failing: { Icon: IconCircleX, color: "text-destructive", label: "Failed" },
+	pending: { Icon: IconLoadingCircle, color: "text-amber-500 motion-safe:animate-spin", label: "Running" },
+	passing: { Icon: IconCircleCheck, color: "text-emerald-600 dark:text-emerald-300/90", label: "Passed" },
+	skipped: { Icon: IconCircleBanSign, color: "text-muted-foreground/70", label: "Skipped" },
 };
 
 const CHECKS_STATE = {
 	failing: CHECK_RUN.failing,
-	pending: { Icon: CircleDot, color: "text-amber-600 dark:text-amber-400/90" },
+	pending: { Icon: IconRecord, color: "text-amber-600 dark:text-amber-400/90" },
 	passing: CHECK_RUN.passing,
-	none: { Icon: CircleDot, color: "text-muted-foreground" },
+	none: { Icon: IconRecord, color: "text-muted-foreground" },
 };
 
 function CheckRow({ check: { name, state, url } }: { check: PullRequestCheck }) {

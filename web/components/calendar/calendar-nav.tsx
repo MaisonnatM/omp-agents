@@ -1,5 +1,5 @@
 /** The Calendar page's own list: the calendar, the Google calendars it can show by account, and whether it shows routine runs (`CalendarNav`). */
-import { Check } from "lucide-react";
+import { IconCheckmark1 } from "central-icons";
 import { type CalendarShownInput, calendarKey, type GoogleCalendar, type GoogleStatus } from "../../../src/shared/calendar";
 import type { Space } from "../../../src/shared/workspaces";
 import { useCalendarMonth, useCalendarYear } from "@/components/kibo-ui/calendar";
@@ -82,7 +82,7 @@ function CalendarItem({ calendar }: { calendar: GoogleCalendar }) {
 					className="flex size-3.5 shrink-0 items-center justify-center rounded-[3px] border-2"
 					style={{ borderColor: calendar.color, backgroundColor: shown ? calendar.color : undefined }}
 				>
-					{shown && <Check className="size-2.5 text-white" strokeWidth={3.5} />}
+					{shown && <IconCheckmark1 className="size-2.5 text-white icon-shapes:stroke-[3.5]" />}
 				</span>
 				<span className="truncate">{name}</span>
 			</SidebarMenuButton>

@@ -1,5 +1,5 @@
 /** The left sidebar's page list: New session, each shown tab's page with its count, and Settings; while the sidebar floats, the page on screen holds its own list beneath its row. */
-import { SquarePen } from "lucide-react";
+import { IconEditBig } from "central-icons";
 import { Fragment, type ReactNode } from "react";
 import { SidebarGroup, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarMenuNested } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -47,7 +47,7 @@ export function SidebarNav({ tabs, current, counts, list, newSessionLabel, onNew
 				<SidebarMenu className="gap-px">
 					<SidebarMenuItem>
 						<Tooltip content={newSessionLabel} shortcut={shortcutLabels("newSession")} side="right">
-							<SidebarMenuButton size="short" icon={SquarePen} isActive={current === "new"} aria-label={newSessionLabel} onClick={onNewSession}>
+							<SidebarMenuButton size="short" icon={IconEditBig} isActive={current === "new"} aria-label={newSessionLabel} onClick={onNewSession}>
 								{newSessionLabel}
 							</SidebarMenuButton>
 						</Tooltip>
