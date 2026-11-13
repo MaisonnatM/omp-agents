@@ -15,7 +15,8 @@ import { sessionProcessesStore, useRead, writeProcessStop } from "../reads";
 import { hashForSettings } from "../routing";
 import { useAction } from "../use-action";
 import { useHoverPopover } from "../use-hover-popover";
-import { GaugeRing, GaugeText, PlanUsageList, TILE, TILE_CELL, type Tone } from "./plan-usage";
+import { GaugeCell, GaugeTile, type Tone } from "./gauge-tile";
+import { NO_PLANS, PlanNote, PlanTiles } from "./plan-usage";
 import { LoadNote } from "./sheet-details";
 
 /** How often the sidebar reads the machine's load again while the page is visible. */
@@ -29,19 +30,24 @@ const usedTone = (used: number): Tone => (used > 0.95 ? "out" : used > 0.8 ? "lo
 /** A `ps` CPU percent, of one core, rounded; a share that rounds to nothing but is not idle reads `<1%`. */
 const cpuLabel = (percent: number): string => (percent > 0 && percent < 0.5 ? "<1%" : `${Math.round(percent)}%`);
 
-/** The CPU fact, whose popover lists what every live session runs, busiest session first, read again every few seconds while it is open. */
+/** The CPU tile, whose popover lists what every live session runs, busiest session first, read again every few seconds while it is open. */
 function CpuFact({ percent, titles }: { percent: number; titles: SessionTitles }) {
 	const popover = useHoverPopover();
 	const cpu = `${Math.round(percent)}%`;
 	return (
 		<Popover {...popover.root}>
 			<PopoverTrigger asChild>
-				<button {...activityControl("sidebar.cpu")} {...popover.trigger} type="button" aria-label={`CPU: ${cpu} busy`} className={TILE}>
-					<GaugeRing fill={percent / 100} tone={usedTone(percent / 100)}>
-						<IconProcessor className={ICON} />
-					</GaugeRing>
-					<GaugeText value={cpu} caption="CPU" tone={usedTone(percent / 100)} />
-				</button>
+				<GaugeTile
+					{...activityControl("sidebar.cpu")}
+					{...popover.trigger}
+					as="button"
+					label={`CPU: ${cpu} busy`}
+					fill={percent / 100}
+					tone={usedTone(percent / 100)}
+					icon={<IconProcessor className={ICON} />}
+					value={cpu}
+					caption="CPU"
+				/>
 			</PopoverTrigger>
 			<PopoverContent {...popover.content} side="right" align="end" aria-label="Sessions' processes" className="w-96 p-0">
 				<div className="border-b border-border px-3 py-2">
@@ -130,17 +136,22 @@ function ProcessItem({ instanceId, process, readAt }: { instanceId: string; proc
 function DiskFact({ available, total }: { available: number; total: number }) {
 	const popover = useHoverPopover();
 	const used = total - available;
-	const percent = total > 0 ? Math.round((used / total) * 100) : 0;
-	const tone = usedTone(total > 0 ? used / total : 0);
+	const share = total > 0 ? used / total : null;
+	const percent = Math.round((share ?? 0) * 100);
 	return (
 		<Popover {...popover.root}>
 			<PopoverTrigger asChild>
-				<button {...activityControl("sidebar.disk")} {...popover.trigger} type="button" aria-label={`Disk free: ${formatBytes(available)} of ${formatBytes(total)}`} className={TILE}>
-					<GaugeRing fill={total > 0 ? used / total : null} tone={tone}>
-						<IconStorage className={ICON} />
-					</GaugeRing>
-					<GaugeText value={formatBytes(available)} caption="Disk free" tone={tone} />
-				</button>
+				<GaugeTile
+					{...activityControl("sidebar.disk")}
+					{...popover.trigger}
+					as="button"
+					label={`Disk free: ${formatBytes(available)} of ${formatBytes(total)}`}
+					fill={share}
+					tone={usedTone(share ?? 0)}
+					icon={<IconStorage className={ICON} />}
+					value={formatBytes(available)}
+					caption="Disk free"
+				/>
 			</PopoverTrigger>
 			<PopoverContent {...popover.content} side="right" align="end" aria-label="Disk space" className="w-64 space-y-3 text-xs">
 				<p className="text-sm font-medium tabular-nums">{`Disk ${percent}% used`}</p>
@@ -157,39 +168,47 @@ function DiskFact({ available, total }: { available: number; total: number }) {
 	);
 }
 
-/** The machine's CPU percent, available memory, and free disk space as cells of the foot's grid, read again every few seconds while the page is visible. */
-function MachineLoad({ titles }: { titles: SessionTitles }) {
+/** The machine's load, read again every few seconds while the page is visible; never on a paired phone, where it would describe the Mac. */
+function useSystemLoad(): SystemLoad | null {
+	const phone = isPhonePage();
 	const [tick, setTick] = useState(0);
 	useEffect(() => {
+		if (phone) return;
 		const timer = setInterval(() => {
 			if (!document.hidden) setTick(count => count + 1);
 		}, POLL_MS);
 		return () => clearInterval(timer);
-	}, []);
-	const load = useRead<SystemLoad>("/api/system", tick).data;
-	if (!load) return null;
+	}, [phone]);
+	return useRead<SystemLoad>(phone ? null : "/api/system", tick).data;
+}
+
+/** The machine's CPU percent, available memory, and free disk space as cells of the foot's grid. */
+function MachineLoad({ load, titles }: { load: SystemLoad; titles: SessionTitles }) {
 	const memory = `Memory free: ${formatBytes(load.memoryAvailable)} of ${formatBytes(load.memoryTotal)}`;
-	const memoryUsed = load.memoryTotal > 0 ? 1 - load.memoryAvailable / load.memoryTotal : 0;
+	const memoryUsed = load.memoryTotal > 0 ? 1 - load.memoryAvailable / load.memoryTotal : null;
 	return (
 		<>
 			{load.cpuPercent !== null && (
-				<li className={TILE_CELL}>
+				<GaugeCell>
 					<CpuFact percent={load.cpuPercent} titles={titles} />
-				</li>
+				</GaugeCell>
 			)}
-			<li className={TILE_CELL}>
+			<GaugeCell>
 				<Tooltip content={memory} side="top">
-					<span tabIndex={0} role="img" aria-label={memory} className={TILE}>
-						<GaugeRing fill={memoryUsed} tone={usedTone(memoryUsed)}>
-							<IconSdCard className={ICON} />
-						</GaugeRing>
-						<GaugeText value={formatBytes(load.memoryAvailable)} caption="Memory free" tone={usedTone(memoryUsed)} />
-					</span>
+					<GaugeTile
+						as="img"
+						label={memory}
+						fill={memoryUsed}
+						tone={usedTone(memoryUsed ?? 0)}
+						icon={<IconSdCard className={ICON} />}
+						value={formatBytes(load.memoryAvailable)}
+						caption="Memory free"
+					/>
 				</Tooltip>
-			</li>
-			<li className={TILE_CELL}>
+			</GaugeCell>
+			<GaugeCell>
 				<DiskFact available={load.diskAvailable} total={load.diskTotal} />
-			</li>
+			</GaugeCell>
 		</>
 	);
 }
@@ -205,7 +224,7 @@ interface SidebarStatusProps {
 	bots: readonly Bot[] | null;
 }
 
-/** The sidebar's foot: plan quota, then the machine's load in the same rings, left out on a paired phone, where it would describe the Mac. */
+/** The sidebar's foot: plan quota, then the machine's load in the same rings. */
 export function SidebarStatus({ usage, hosts, bots }: SidebarStatusProps) {
 	const titles = useMemo(() => {
 		const botNames = new Map((bots ?? []).flatMap(bot => (bot.sessionId === null ? [] : [[bot.sessionId, bot.name] as const])));
@@ -214,9 +233,22 @@ export function SidebarStatus({ usage, hosts, bots }: SidebarStatusProps) {
 			return [host.instanceId, botName === undefined ? hostLabel(host) : `${botName} · Bot`];
 		}));
 	}, [hosts, bots]);
+	const load = useSystemLoad();
+	return <SidebarFoot usage={usage} load={load} titles={titles} />;
+}
+
+/** The foot's note on plan usage, then its grid of ring tiles: one per plan account, then the machine's load once read. */
+export function SidebarFoot({ usage, load, titles }: { usage: DashboardState["usage"]; load: SystemLoad | null; titles: SessionTitles }) {
+	const plans = usage?.error === null ? usage.plans : NO_PLANS;
 	return (
-		<footer className="mx-2 flex shrink-0 flex-col gap-2 border-t border-border pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] text-xs">
-			<PlanUsageList usage={usage} after={isPhonePage() ? null : <MachineLoad titles={titles} />} />
+		<footer data-sidebar="footer" className="mx-2 flex shrink-0 flex-col gap-2 border-t border-border pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] text-xs">
+			<PlanNote usage={usage} />
+			{(plans.length > 0 || load) && (
+				<ul aria-label="Plan usage and machine load" className="grid grid-cols-4 gap-1">
+					<PlanTiles plans={plans} />
+					{load && <MachineLoad load={load} titles={titles} />}
+				</ul>
+			)}
 		</footer>
 	);
 }

@@ -53,7 +53,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Left sidebar: `AppSidebar` in `web/components/app-sidebar.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which slides it open and shut and draws its toggle at the end of the sidebar's top row.
   The top row holds `AppMark` from `web/components/app-mark.tsx`, which draws `web/favicon.svg`, and the command menu button; the page list is `SidebarNav` in `web/components/sidebar-nav.tsx`, whose current row `navRowOf` in `web/sidebar-tabs.ts` picks, the roster under it `Roster` in `web/components/roster.tsx`, whose folders `rosterFolders` in `web/sessions.ts` lays out and `WorkspaceFolder` there draws, and a row is `web/components/session-row.tsx`.
   The open page's own list, such as the Bots or the Settings sections, is `PageList` in `web/components/page-list.tsx`, which `web/app.tsx` draws in `PageListColumn` at the page's left, or hands `SidebarNav` to nest under its row while the sidebar floats.
-  Its foot is `SidebarStatus` in `web/components/sidebar-status.tsx`, which shows plan quota and the machine's CPU, memory, and disk.
+  Its foot is `SidebarStatus` in `web/components/sidebar-status.tsx`, which `web/app.tsx` mounts under `AppSidebar` in the same `DashboardSidebar`, and which shows plan quota and the machine's CPU, memory, and disk.
 - Right sidebar, the session details: `SessionDetails` in `web/components/session-details.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which `web/app.tsx` mounts.
   Its tabs are **Overview**, `SessionOverview` in `session-overview.tsx`, then **PRs** in `session-pull-requests-tab.tsx`, **Browser** in `browser-panel.tsx`, **Tickets** in `session-tickets-tab.tsx`, and **Artifacts** in `artifacts-panel.tsx`, all in `web/components/`.
   **Overview** stacks the view's subagents and what its agents changed, each section shown once it has something to list.
@@ -77,7 +77,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   A row's or card's right-click menu is `RowContextMenu` in `pr-row.tsx`, which lists the `⋯` menu's `PullRequestMenuItems` from `pr-menu.tsx`, with its **Reviewers** submenu.
 - Sidebar foot, with plan quota and the machine's CPU, memory, and disk: `SidebarStatus` in `web/components/sidebar-status.tsx`, whose CPU card lists every live session's processes with **Stop**; the terminal panel, `web/components/terminal/terminal-panel.tsx`, is parked and not mounted.
   The disk card's **Clean up…** link opens Settings › Storage.
-  Each plan's quota, its windows and the **API credits** row with its grant and its red `used up` once a provider refuses requests for lack of credit, is `PlanUsageList` in `web/components/plan-usage.tsx`, drawn one plan per row.
+  Each plan's quota, its windows and the **API credits** tile with its grant and its red `used up` once a provider refuses requests for lack of credit, is `PlanTiles` in `web/components/plan-usage.tsx`, one ring tile per plan account in a four-column grid that the machine's tiles continue, each a `GaugeTile` from `web/components/gauge-tile.tsx`.
 - The three things called Files:
   - The **Overview** tab's **Files** section, a session's changed files: `ChangedFileList` in `web/components/changed-files-section.tsx`.
   - The session changes dialog that a file or **Review** opens: `web/components/changes/session-changes-dialog.tsx`, with its explorer in `changes-explorer.tsx` and tree in `file-tree.tsx` beside it.

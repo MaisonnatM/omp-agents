@@ -32,6 +32,7 @@ import { ProjectTrustDialog } from "./components/project-trust-dialog";
 import { GetStarted } from "./components/get-started";
 import { firstSessionFact } from "./get-started-model";
 import { DashboardSidebar, useSidebarPanels } from "./components/sidebar-panel";
+import { SidebarStatus } from "./components/sidebar-status";
 import { subjectOf } from "./components/subject";
 import { NewTicketDialog } from "./components/tickets/new-ticket";
 import { ActivityVisibility, ToolsExpanded } from "./components/transcript";
@@ -282,10 +283,8 @@ export function App() {
 										settings={settings}
 										onPickWorkspace={switchWorkspace}
 										onSearch={showSearch}
-										usage={state.usage}
-										hosts={state.hosts}
-										bots={state.bots}
 									/>
+									<SidebarStatus usage={state.usage} hosts={state.hosts} bots={state.bots} />
 								</DashboardSidebar>
 								<HeaderTabs className="[grid-area:tabs]" address={address} hosts={state.hosts} past={state.past} controls={headerControls} />
 								<SidebarInset className="inset-panel [grid-area:page] group-has-[#sessions-sidebar[inert]]/window:ml-1.5">

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { PlanUsage, PlanWindow } from "../../src/shared/models";
-import { accountTags, creditView, PlanCard, planGauge, PlanUsageList, spendLabel } from "./plan-usage";
+import { accountTags, creditView, PlanCard, planGauge, spendLabel } from "./plan-usage";
 
 const apiCredits: PlanUsage = { provider: "anthropic-api", name: "API credits", account: null, windows: [], extra: null, resetCredits: null };
 const tile = (plan: PlanUsage) => planGauge(plan, undefined);
@@ -29,12 +29,15 @@ test("the API credits amount and tone: red once the grant or the prepaid balance
 	for (const [balance, amount, tone] of cases) expect(creditView(balance)).toMatchObject({ amount, tone });
 });
 
-test("a provider refusing requests for lack of credit reads used up and red, with or without a balance to show", () => {
-	expect(tile({ ...apiCredits, outOfCreditSince: Date.parse("2026-11-07T08:46:51Z") })).toMatchObject({ value: "used up", tone: "out" });
-	expect(tile(apiCredits)).toMatchObject({ value: null, left: null });
+test("a provider refusing requests for lack of credit reads used up and red, with or without a balance to show, and says why on hover", () => {
+	const since = Date.parse("2026-11-07T08:46:51Z");
+	const refused = ` Requests refused for lack of credit since ${new Date(since).toLocaleString()}.`;
+	expect(tile({ ...apiCredits, outOfCreditSince: since })).toMatchObject({ value: "used up", tone: "out", detail: { kind: "tooltip", text: `API credits: used up.${refused}` } });
+	expect(tile(apiCredits)).toEqual({ left: null, value: null, tone: "ok", caption: "API credits", label: "API credits: omp usage reports no balance.", detail: { kind: "tooltip", text: "API credits: omp usage reports no balance." } });
 	const grant = { ...apiCredits, balance: { kind: "grant", used: 120, limit: 200, expiresAt: null } } as const;
-	expect(tile({ ...grant, outOfCreditSince: 1 })).toMatchObject({ value: "$120.00 / $200.00", tone: "out" });
+	expect(tile({ ...grant, outOfCreditSince: since })).toMatchObject({ value: "$120.00 / $200.00", tone: "out", label: `API credits: $120.00 / $200.00 spent.${refused}` });
 	expect(tile(grant)).toMatchObject({ tone: "ok", left: 0.4 });
+	expect(tile({ ...apiCredits, balance: { kind: "grant", used: 0, limit: 0, expiresAt: null } }).left).toBeNull();
 	expect(tile({ ...apiCredits, balance: { kind: "prepaid", left: 3 }, outOfCreditSince: 1 })).toMatchObject({ value: "$3.00 left", tone: "out" });
 });
 
@@ -45,14 +48,21 @@ const claude: PlanUsage = { provider: "anthropic", name: "Anthropic", account: "
 
 test("a tile reads the tightest open window, turns red when any window is used up, and names the account when the provider has several", () => {
 	const windows = [planWindow("7d", 0.9), planWindow("5h", 0.43), planWindow("fable", 0, NOW + HOUR)];
-	expect(planGauge({ ...claude, windows }, undefined)).toEqual({ left: 0.43, value: "43%", tone: "out", caption: "5h", usedUp: 1 });
-	expect(planGauge({ ...claude, windows: windows.slice(0, 2) }, undefined)).toMatchObject({ tone: "ok", usedUp: 0 });
-	expect(planGauge({ ...claude, windows: [planWindow("5h", 0.1)] }, "gmail")).toMatchObject({ tone: "low", caption: "gmail" });
-	expect(tile({ ...claude, windows: [planWindow("5h", 0, NOW + 3 * HOUR)] })).toMatchObject({ value: "used up", tone: "out", left: 0 });
+	expect(planGauge({ ...claude, windows }, undefined)).toEqual({ left: 0.43, value: "43%", tone: "out", caption: "5h", label: "Anthropic, maxence@yampa.ai, 5h, 43% left, 1 used up", detail: { kind: "card" } });
+	expect(planGauge({ ...claude, windows: windows.slice(0, 2) }, undefined)).toMatchObject({ tone: "ok", label: "Anthropic, maxence@yampa.ai, 5h, 43% left" });
+	expect(planGauge({ ...claude, account: "max@gmail.com", windows: [planWindow("5h", 0.1)] }, "max@gmail.com")).toMatchObject({ tone: "low", caption: "max@gmail.com", label: "Anthropic, max@gmail.com, 10% left" });
+	expect(tile({ ...claude, windows: [planWindow("5h", 0, NOW + 3 * HOUR)] })).toMatchObject({ value: "used up", tone: "out", left: 0, label: "Anthropic, maxence@yampa.ai, used up" });
 });
 
-test("a plan with no windows shows its spend past the plan, amber past most of its cap", () => {
-	expect(tile({ ...claude, extra: { title: "Extra usage", used: 45, limit: 50, currency: "USD", exhausted: false } })).toMatchObject({ value: "$45.00 / $50.00", tone: "low" });
+test("a plan with no windows shows its spend past the plan, amber past most of its cap, and a cap of nothing leaves the ring empty", () => {
+	const extra = { title: "Extra usage", used: 45, limit: 50, currency: "USD", exhausted: false };
+	expect(tile({ ...claude, extra })).toMatchObject({ value: "$45.00 / $50.00", tone: "low", label: "Anthropic, maxence@yampa.ai, extra, $45.00 / $50.00 spent", detail: { kind: "card" } });
+	expect(tile({ ...claude, extra: { ...extra, used: 0, limit: 0 } }).left).toBeNull();
+});
+
+test("reset credits on an account with no windows open its card instead of hiding behind its name", () => {
+	expect(tile({ ...claude, resetCredits: { count: 3, nextExpiresAt: null } })).toMatchObject({ value: "✦ 3", label: "Anthropic, maxence@yampa.ai, 3 reset credits", detail: { kind: "card" } });
+	expect(tile({ ...apiCredits, resetCredits: { count: 1, nextExpiresAt: null }, balance: { kind: "prepaid", left: 3 } }).detail.kind).toBe("tooltip");
 });
 
 test("a provider with several accounts names each by its full email; a lone account goes unnamed", () => {
@@ -61,13 +71,6 @@ test("a provider with several accounts names each by its full email; a lone acco
 	const openai = { ...claude, provider: "openai-codex", account: "maxence@yampa.ai" };
 	const tags = accountTags([yampa, gmail, openai]);
 	expect([tags.get(yampa), tags.get(gmail), tags.get(openai)]).toEqual(["maxence@yampa.ai", "max@gmail.com", undefined]);
-});
-
-test("the machine's tiles still show when plan usage cannot be read, under the reason", () => {
-	const markup = renderToStaticMarkup(<PlanUsageList usage={{ plans: [], error: "omp not found" }} after={<span>CPU tile</span>} />).replaceAll("<!-- -->", "");
-	expect(markup).toContain("Cannot read plan usage: omp not found");
-	expect(markup).toContain("CPU tile");
-	expect(markup).not.toContain("API credits");
 });
 
 test("the card gives every window its share left and when it resets, with the date", () => {

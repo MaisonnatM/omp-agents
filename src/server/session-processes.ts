@@ -15,7 +15,7 @@ import { errorText } from "../json";
 /** How long a stopped job gets to exit on SIGTERM before SIGKILL. */
 const STOP_GRACE_MS = 3_000;
 
-/** How old a sample {@link SessionProcessWatch.list} answers from may be, so every open window's status bar shares one `ps` and `lsof`. */
+/** How old a sample {@link SessionProcessWatch.list} answers from may be, so every open window's CPU card shares one `ps` and `lsof`. */
 export const LIST_REUSE_MS = 2_000;
 
 /** A live session, as the roster has it. */
