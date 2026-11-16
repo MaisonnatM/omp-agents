@@ -3,7 +3,7 @@ import { PULL_REQUEST_ACTIONS, type PullRequestActionId, pullRequestActions } fr
 import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestChange, type PullRequestDetail, type Repo, type RepoPullRequests, type Reviewer, prKey, pullRequestName, repoKey, samePullRequest, type SettableState, type StackedPullRequest, unresolvedOf } from "../src/shared/github";
 import { type AgentOn, hasOpenThreads, type MoveId, moveOf, readyOnceChecksPass } from "../src/shared/moves";
 import type { ReviewDraft } from "../src/shared/review-drafts";
-import { moveKey, type Where } from "./order";
+import { moveKey, stepTarget, type Where } from "./order";
 
 /** Whose move it is, or for your approved pull requests that need no fix, that they are approved; the list's sections, in page order. */
 export type MoveGroup = "Your move" | "Agent on it" | "Approved" | "Waiting on others" | "Drafts" | "Recently merged";
@@ -248,6 +248,22 @@ export const sectionTitles = (order: PullRequestOrder): MoveGroup[] => inOrder(G
 
 /** The list's repositories in page order. */
 export const orderedRepos = <R extends Repo>(repos: readonly R[], order: PullRequestOrder): R[] => inOrder(repos, repoKey, order.repos);
+
+/** The list without the repositories you hid, by `repoKey`; the same list while you hide none. */
+export const withoutHidden = (list: PullRequestList, hidden: ReadonlySet<string>): PullRequestList =>
+	hidden.size === 0 ? list : { ...list, repos: list.repos.filter(repo => !hidden.has(repoKey(repo))) };
+
+/** `order` with the repository `key` put on the `where` side of `beside`, among `keys`, the list's repositories in page order; the repositories `keys` leaves out keep their place behind them. */
+export const withRepoMoved = (order: PullRequestOrder, keys: readonly string[], key: string, beside: string, where: Where): PullRequestOrder => ({
+	...order,
+	repos: moveKey([...keys, ...order.repos.filter(other => !keys.includes(other))], key, beside, where),
+});
+
+/** `order` with the repository `key` one place `by` among `keys`, which page order puts it in; `null` at the edge. */
+export function withRepoStepped(order: PullRequestOrder, keys: readonly string[], key: string, by: 1 | -1): PullRequestOrder | null {
+	const step = stepTarget(keys, key, by);
+	return step && withRepoMoved(order, keys, key, step.target, step.where);
+}
 
 /** A repository's pull requests by whose move it is, leaving out the empty sections, each row with its move and its place in a stack. */
 export function pullRequestSections(pullRequests: PullRequestSummary[], order: PullRequestOrder, agentOn: AgentOn): PullRequestSection[] {

@@ -10,7 +10,7 @@ import { type PullRequest, prKey, pullRequestName, samePullRequest } from "../..
 import { spring } from "@/lib/springs";
 import { cn } from "@/lib/utils";
 import { type BoardCard, type BoardColumn, type BoardDrop, boardColumns, boardDrop, boardFoldedByDefault, type ListChange, type MoveGroup, reason, shownBoardPullRequests } from "../../pull-requests-model";
-import { type SectionTarget, sectionId } from "../../section";
+import { sectionId } from "../../section";
 import { useShortcuts } from "../../shortcuts";
 import { useAction } from "../../use-action";
 import { usePointerDrag } from "../../use-pointer-drag";
@@ -41,9 +41,6 @@ const LIFT_DISTANCE = 4;
 
 const SETTLE = { type: "spring", stiffness: 700, damping: 42 } as const;
 
-/** The board's column `title`, which a sidebar link unfolds, scrolls to, and focuses. */
-export const boardColumnTarget = (title: MoveGroup): SectionTarget => ({ id: sectionId("pull-requests-column", title), folds: [title] });
-
 /** What a drop would do, as the slot, the card in hand, and the announcement say it. */
 const dropText = (drop: BoardDrop): string => (drop.kind === "refused" ? drop.why : drop.label);
 
@@ -65,7 +62,7 @@ function usePullRequestsColumns(pulls: PullRequests): { columns: BoardColumn[]; 
 	const reveal = target && column ? { id: rowId(target), folds: [column.title] } : null;
 	useReveal(reveal, folds, { token: reveal?.id, block: "nearest", focus: false });
 	const shown = useMemo(() => shownBoardPullRequests(columns, folds.isFolded), [columns, folds.isFolded]);
-	usePullRequestKeys(pulls, shown, true);
+	usePullRequestKeys(pulls, shown);
 	return { columns, folds };
 }
 
@@ -105,16 +102,14 @@ interface ColumnProps {
  * cannot, then its cards. A folded or empty column is a narrow strip that still takes a drop.
  */
 function Column({ column: { title, cards }, open, toggle, drop, slotHeight, cardProps }: ColumnProps) {
-	const { id } = boardColumnTarget(title);
 	const listId = sectionId("pull-requests-board", title);
 	const lands = drop !== null && drop.kind !== "refused";
 	const look = cn(
-		"shrink-0 scroll-mt-6 rounded-xl outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+		"shrink-0 rounded-xl transition-colors",
 		lands && "bg-primary/5 ring-1 ring-primary/40",
 		drop?.kind === "refused" && "bg-red-500/5 ring-1 ring-red-500/40",
 	);
-	// Focused when its sidebar link is chosen.
-	const section = { id, tabIndex: -1, [COLUMN_KEY]: title };
+	const section = { [COLUMN_KEY]: title };
 	if (!open || cards.length === 0) {
 		return (
 			<section {...section} aria-label={title} className={cn(look, "flex min-h-48 w-10 flex-col items-center self-stretch py-2", !drop && "bg-muted/30")}>
@@ -167,15 +162,14 @@ function Column({ column: { title, cards }, open, toggle, drop, slotHeight, card
 }
 
 /**
- * The board of `pulls`, whose sidebar link `section` unfolds, scrolls to, and focuses a column. A card dragged past a
- * few pixels lifts and tilts with its speed; the column under it shows the slot it would land in, labeled with what the
- * drop does, or turns red with why it cannot. Releasing settles the card into the slot and runs the drop, or springs it
- * back; Esc puts it back. Space on a focused card picks it up for the keys, and a live region says each step.
+ * The board of `pulls`. A card dragged past a few pixels lifts and tilts with its speed; the column under it shows the
+ * slot it would land in, labeled with what the drop does, or turns red with why it cannot. Releasing settles the card
+ * into the slot and runs the drop, or springs it back; Esc puts it back. Space on a focused card picks it up for the
+ * keys, and a live region says each step.
  */
-export function PullRequestsKanban({ pulls, section }: { pulls: PullRequests; section: SectionTarget | null }) {
+export function PullRequestsKanban({ pulls }: { pulls: PullRequests }) {
 	const { rowBase, onQuickAction, onChange } = pulls;
 	const { columns, folds } = usePullRequestsColumns(pulls);
-	useReveal(section, folds, { token: section, block: "start", focus: true });
 	const reduced = useReducedMotion();
 	const scroller = useRef<HTMLDivElement>(null);
 	const [hold, setHold] = useState<Hold | null>(null);

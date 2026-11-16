@@ -90,7 +90,7 @@ export function updateStored<T>(key: string, decode: (raw: string | null) => T, 
  * across renders. `decode` turns what is stored into a value; what it makes of `null`, when nothing is stored, is the
  * default. The default is removed rather than stored, so a value reset to it follows the default if it changes.
  * The setter also takes an update of the value it last set, so two in one event both apply. Every component that holds
- * the same key, in this tab or another, sees the write, such as the sidebar's pull request list and the Pull requests page.
+ * the same key, in this tab or another, sees the write, such as the Pull requests page and the Pull requests tab's count.
  */
 export function useStoredState<T>(key: string, decode: (raw: string | null) => T, encode: (value: T) => string = String): [T, (next: T | ((prev: T) => T)) => void] {
 	const codec = useRef({ decode, encode });

@@ -30,6 +30,9 @@ import {
 	withPullRequestReviewers,
 	withPullRequestState,
 	withThreadResolved,
+	withoutHidden,
+	withRepoMoved,
+	withRepoStepped,
 	yourMoveCount,
 } from "./pull-requests-model";
 
@@ -399,6 +402,32 @@ describe("pull request order", () => {
 		expect(decodeOrder(null)).toEqual(DEFAULT_ORDER);
 		expect(decodeOrder("{not json")).toEqual(DEFAULT_ORDER);
 		expect(decodeOrder(JSON.stringify({ repos: ["acme/a", 3], sort: "random", manual: "acme/a#1" }))).toEqual({ repos: ["acme/a"], sections: [], sort: "updated", manual: [] });
+	});
+});
+
+describe("hidden repositories", () => {
+	const repo = (name: string, pullRequests: PullRequestSummary[]): RepoPullRequests => ({ owner: "acme", repo: name, cwds: [`/code/${name}`], pullRequests });
+	const list = {
+		repos: [repo("webapp", [pr(1), pr(2, { review: "changes-requested" })]), repo("api", [pr(3, { repo: "api", review: "changes-requested" }), pr(4, { repo: "api", state: "draft" })])],
+		unmatched: ["/x"],
+	};
+
+	test("drop out of the shown pull requests, the your-move count, and the board's columns", () => {
+		const shown = withoutHidden(list, new Set(["acme/api"]));
+		expect(yourMoveCount(list, noAgent)).toBe(2);
+		expect(yourMoveCount(shown, noAgent)).toBe(1);
+		expect(shownPullRequests(shown, () => false, DEFAULT_ORDER, noAgent).map(({ repo, number }) => `${repo}#${number}`)).toEqual(["webapp#2", "webapp#1"]);
+		expect(boardColumns(shown, DEFAULT_ORDER, noAgent).flatMap(({ cards }) => cards.map(({ repo, row }) => `${repo}#${row.pr.number}`))).toEqual(["acme/webapp#2", "acme/webapp#1"]);
+		expect(shown.unmatched).toEqual(["/x"]);
+	});
+
+	test("keep their place: a step in Repositories passes over them, and a move among the shown repositories leaves them where they were", () => {
+		const keys = ["acme/a", "acme/b", "acme/c", "acme/d"];
+		const order: PullRequestOrder = { ...DEFAULT_ORDER, repos: keys };
+		expect(withRepoStepped(order, keys, "acme/c", -1)?.repos).toEqual(["acme/a", "acme/c", "acme/b", "acme/d"]);
+		expect(withRepoStepped(order, keys, "acme/a", -1)).toBeNull();
+		// With acme/b hidden, the page moves acme/d one place up among a, c, and d.
+		expect(withRepoMoved(order, keys, "acme/d", "acme/c", "before").repos).toEqual(["acme/a", "acme/b", "acme/d", "acme/c"]);
 	});
 });
 

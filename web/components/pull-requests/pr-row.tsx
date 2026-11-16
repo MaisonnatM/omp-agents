@@ -1,4 +1,4 @@
-/** A pull request's row in the lists, or its card on the board, with its move badge, review draft tag, who started the threads a **Reply** waits on, checks icon, reviewers picker, diff size, and `⋯` menu, whose actions also open on right-click. */
+/** A pull request's row in the page's table, or its card on the board, with its move badge, review draft tag, who started the threads a **Reply** waits on, checks icon, reviewers picker, diff size, and `⋯` menu, whose actions also open on right-click. */
 import { IconArrowsRepeatRightLeft, IconBubbleQuestion, IconBubbleText, IconCircleCheck, IconCircleX, IconClipboard, IconClock, IconEyeOpen, IconLayersTwo, IconMerged, IconSparklesTwo, IconUser, IconUserAdd, IconUserAdded, IconUserRemove } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { memo, type MouseEvent, type ReactElement, type ReactNode, useRef, useState } from "react";
@@ -543,65 +543,6 @@ function TitleLink({ pr, targeted, className }: { pr: PullRequestSummary; target
 		</Tooltip>
 	);
 }
-
-/**
- * A pull request in the sidebar's list: its title and age, then its move and why it waits on it, with its `⋯` menu on
- * hover. A rail on the left joins the rows of a stack.
- */
-export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, stack }, sessions, targeted, onOpen, drag, moveId, onChange, ...actions }: RowProps) {
-	const change = useRowChange(pr, onChange);
-	const options = usePullRequestOptions(pr);
-	const review = useReviewRequests(pr, options, onChange);
-	const items = rowMenuItems({ pr, change, review, options, ...actions });
-	return (
-		<RowContextMenu
-			items={items}
-			render={
-				<li
-					id={rowId(pr)}
-					{...drag.handle}
-					{...drag.target}
-					data-move={moveId}
-					onClick={event => openFromRow(event, pr)}
-					className={cn("group/row relative cursor-pointer", drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}
-				/>
-			}
-		>
-			{stack?.joinsAbove && <span aria-hidden className="absolute top-0 left-1 h-4 w-px bg-border" />}
-			{stack?.joinsBelow && <span aria-hidden className="absolute top-4 bottom-0 left-1 w-px bg-border" />}
-			{stack && <span aria-hidden className="absolute top-3.5 left-[2.5px] size-1 rounded-full bg-muted-foreground/60" />}
-			<div className={cn("space-y-1 rounded-md py-1.5 pr-2 pl-3", targeted ? "bg-sidebar-accent" : "group-hover/row:bg-sidebar-accent/50")}>
-				<div className="flex min-w-0 items-start gap-2">
-					<TitleLink pr={pr} targeted={targeted} className="line-clamp-2 flex-1 leading-5" />
-					<Age at={pr.updatedAt} compact exact className="w-7 shrink-0 text-right text-xs leading-5 tabular-nums text-muted-foreground" />
-				</div>
-				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
-					<RowMoveBadge pr={pr} move={move} {...actions} />
-					<StateTag pr={pr} move={move} />
-					<ReviewDraftTag pr={pr} />
-					<span className="shrink-0 tabular-nums">#{pr.number}</span>
-					<span aria-hidden>·</span>
-					<span className="min-w-0 truncate">{reason(pr, move)}</span>
-					<ThreadStartersTag pr={pr} move={move} />
-					<span className="ml-auto flex min-w-0 shrink-0 items-center gap-1.5">
-						<StackInfo stack={stack} base={pr.stackedOn} />
-						<SessionChips sessions={sessions} onOpen={onOpen} compact />
-						<ConversationCount pr={pr} />
-						<ChecksIcon checks={pr.checks} className="[&_svg]:size-3.5" />
-					</span>
-				</p>
-			</div>
-			<span
-				className={cn(
-					"absolute top-1 right-1 rounded-md bg-sidebar transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 has-[[data-popup-open]]:opacity-100 [@media(hover:none)]:opacity-100",
-					actions.pending === null && !change.pending && "opacity-0",
-				)}
-			>
-				<RowMenu items={items} {...actions} />
-			</span>
-		</RowContextMenu>
-	);
-}, sameRowProps);
 
 /**
  * The page's columns: move, title, sessions, stack, checks, review, size, age, and the `⋯` menu. The sessions, stack,

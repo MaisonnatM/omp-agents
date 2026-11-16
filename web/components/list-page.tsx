@@ -128,12 +128,12 @@ export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, no
 /**
  * Moves keyboard focus by one row in the list `items`, scrolling the new row into view. Returns `true` if focus moved.
  * `rowOf` looks up the row's element by item; each row holds the focusable link. With nothing focused inside the list,
- * the focus enters the list only when `entersList` (default `true`); false leaves the row unchanged.
+ * the focus enters it at its first row, or its last going up.
  */
-export function stepRows<T>(items: readonly T[], rowOf: (item: T) => HTMLElement | null, by: 1 | -1, entersList = true): boolean {
+export function stepRows<T>(items: readonly T[], rowOf: (item: T) => HTMLElement | null, by: 1 | -1): boolean {
 	const active = document.activeElement;
 	const at = items.findIndex(item => rowOf(item)?.contains(active) ?? false);
-	const next = at >= 0 ? items[at + by] : entersList ? items[by === 1 ? 0 : items.length - 1] : undefined;
+	const next = at >= 0 ? items[at + by] : items[by === 1 ? 0 : items.length - 1];
 	if (!next) return at >= 0;
 	const row = rowOf(next);
 	return (row !== null && focusRow(row)) || at >= 0;

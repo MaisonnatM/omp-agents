@@ -2,47 +2,49 @@
  * The Pull requests page: every pull request in a table, by repository, in a card per section named after whose move it
  * is; or on a board, a column per section. Either docks the details of the pull request it shows beside it.
  */
-import { IconArrowRotateClockwise, IconCrossMedium, IconExpand } from "central-icons";
+import { IconArrowRotateClockwise, IconCrossMedium, IconExpand, IconSettingsSliderHor } from "central-icons";
 import { type PullRequest, prKey, repoKey } from "../../../src/shared/github";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
+import { shownPullRequests, withRepoStepped } from "../../pull-requests-model";
 import { hashForPullRequestFiles, hashForPullRequests, type PullRequestsRoute } from "../../routing";
-import type { SectionTarget } from "../../section";
 import { useRebasing } from "../../pull-request-rebases";
 import { useStoredState } from "../../stored-state";
 import { DROP_LINE } from "../../order";
 import { useInlineConfirm } from "../../use-inline-confirm";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { Separator, useDragSeparator } from "../drag-separator";
-import { FoldButton, useReveal } from "../fold";
+import { FoldButton } from "../fold";
 import { ListPage } from "../list-page";
 import { QuickStartNotice } from "../quick-actions";
 import { SegmentedTab, SegmentedTabs, SegmentedTabsList } from "../segmented-tabs";
+import { OrderButton } from "../settings/editor";
 import { Spinner } from "../spinner";
+import { ToggleSwitch } from "../toggle-switch";
 import {
 	type PullRequests,
 	type PullRequestsView,
-	pullRequestSectionTarget,
-	pullRequestsPageShows,
 	RepoReadError,
 	type RepoView,
 	type SectionView,
 	SortMenu,
 	UnmatchedTip,
+	usePullRequestKeys,
 	usePullRequests,
 	usePullRequestsBoard,
+	usePullRequestsFolds,
 	usePullRequestDetailsPlacement,
 	usePullRequestsView,
 	workspacesLabel,
 } from "./pull-requests-board";
 import { PullRequestsKanban } from "./pull-requests-kanban";
 import type { PullRequestDetailTab } from "./pr-details";
-import { SectionCount } from "./pull-requests-nav";
 import { PullRequestDetailPage, PullRequestDetails, usePullRequestCopyShortcuts } from "./pr-page";
 import { PullRequestTableRow } from "./pr-row";
 
@@ -57,28 +59,38 @@ const STEP = 16;
 
 const clampDetails = (width: number, room: number): number => Math.round(Math.max(MIN_DETAILS, Math.min(MAX_DETAILS, room - MIN_LIST, width)));
 
-function SectionCard({ repo, view }: { repo: string; view: SectionView }) {
+/** How many pull requests a section lists; folded, it sums up their moves in its tooltip. */
+function SectionCount({ section: { section, summary } }: { section: SectionView }) {
+	const { length } = section.rows;
+	const yours = section.title === "Your move";
+	const label = `${length} pull request${length === 1 ? "" : "s"}${summary ? `: ${summary}` : ""}`;
+	const count = (
+		<span
+			aria-label={label}
+			className={cn("text-xs tabular-nums text-muted-foreground", yours && "text-foreground")}
+			style={yours ? { fontVariationSettings: fontWeights.semibold } : undefined}
+		>
+			{length}
+		</span>
+	);
+	return summary ? <Tooltip content={summary}>{count}</Tooltip> : count;
+}
+
+function SectionCard({ view }: { view: SectionView }) {
 	const { section, listId, open, toggle, drag, moveId, rows } = view;
-	const { id } = pullRequestSectionTarget(repo, section.title);
+	const headingId = `${listId}-heading`;
 	return (
 		<section
-			id={id}
-			// Focused when its sidebar link is chosen.
-			tabIndex={-1}
-			aria-labelledby={`${id}-heading`}
+			aria-labelledby={headingId}
 			{...drag.target}
 			data-move={moveId}
-			className={cn(
-				"relative scroll-mt-6 rounded-md border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring",
-				drag.dragging && "opacity-50",
-				drag.dropAt && DROP_LINE[drag.dropAt],
-			)}
+			className={cn("relative rounded-md border border-border", drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}
 		>
-			<h3 id={`${id}-heading`} {...drag.handle} className="flex items-center gap-2 rounded-t-md bg-muted/50 px-3 py-1.5 text-sm font-medium">
+			<h3 id={headingId} {...drag.handle} className="flex items-center gap-2 rounded-t-md bg-muted/50 px-3 py-1.5 text-sm font-medium">
 				<FoldButton open={open} onToggle={toggle} controls={listId} className="items-center">
 					{section.title}
 				</FoldButton>
-				<SectionCount section={view} className="text-xs text-muted-foreground" />
+				<SectionCount section={view} />
 			</h3>
 			{open && (
 				<ul id={listId} aria-label={section.title} className="divide-y divide-border border-t border-border">
@@ -92,7 +104,7 @@ function SectionCard({ repo, view }: { repo: string; view: SectionView }) {
 }
 
 function RepoTable({ view }: { view: RepoView }) {
-	const { repo, key, name, bodyId, open, toggle, drag, moveId, sections } = view;
+	const { repo, name, bodyId, open, toggle, drag, moveId, sections } = view;
 	const workspaces = workspacesLabel(repo);
 	return (
 		<section aria-label={name} {...drag.target} data-move={moveId} className={cn("@container/pull-requests relative space-y-3", drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}>
@@ -115,7 +127,7 @@ function RepoTable({ view }: { view: RepoView }) {
 					) : sections.length === 0 ? (
 						note("No open pull requests of yours and no reviews waiting on you.")
 					) : (
-						sections.map(section => <SectionCard key={section.section.title} repo={key} view={section} />)
+						sections.map(section => <SectionCard key={section.section.title} view={section} />)
 					)}
 				</div>
 			)}
@@ -123,11 +135,54 @@ function RepoTable({ view }: { view: RepoView }) {
 	);
 }
 
-/** The list view's tables, one per repository, whose sidebar link `section` unfolds, scrolls to, and focuses a section. */
-function RepoTables({ pulls, section }: { pulls: PullRequests; section: SectionTarget | null }) {
-	const { folds, repos } = usePullRequestsBoard(pulls, true);
-	useReveal(section, folds, { token: section, block: "start", focus: true });
+/** The list view's tables, one per repository. */
+function RepoTables({ pulls }: { pulls: PullRequests }) {
+	const { repos } = usePullRequestsBoard(pulls);
 	return repos.map(each => <RepoTable key={each.key} view={each} />);
+}
+
+/** **Repositories**: every repository of the list in page order, each with a switch that shows or hides it and buttons that move it one place. */
+function RepositoriesMenu({ pulls: { everyRepo, hidden, onToggleHidden, order, setOrder } }: { pulls: PullRequests }) {
+	const [open, setOpen] = useState(false);
+	const keys = everyRepo.map(repoKey);
+	const hiddenCount = keys.filter(key => hidden.has(key)).length;
+	const label = hiddenCount === 0 ? "Repositories" : `Repositories: ${hiddenCount} hidden`;
+	const move = (key: string, by: 1 | -1): void => {
+		const next = withRepoStepped(order, keys, key, by);
+		if (next) setOrder(next);
+	};
+	return (
+		<Popover open={open} onOpenChange={setOpen}>
+			<Tooltip content={label} forceOpen={open ? false : undefined}>
+				<PopoverTrigger asChild>
+					<Button variant="ghost" size="icon-compact" aria-label={`${label}. Hide repositories or change their order`} data-state={open ? "open" : "closed"} active={open}>
+						<IconSettingsSliderHor />
+					</Button>
+				</PopoverTrigger>
+			</Tooltip>
+			<PopoverContent align="end" collisionPadding={8} aria-labelledby="pull-requests-repositories" className="w-80 max-w-[calc(100vw-2rem)] space-y-2 p-3">
+				<h2 id="pull-requests-repositories" className="text-sm font-medium">
+					Repositories
+				</h2>
+				<ol className="space-y-1 text-sm">
+					{everyRepo.map((repo, index) => {
+						const key = keys[index]!;
+						const name = `${repo.owner}/${repo.repo}`;
+						return (
+							<li key={key} className="flex items-center gap-2">
+								<span className={cn("min-w-0 flex-1 truncate", hidden.has(key) && "text-muted-foreground")} title={name}>
+									{name}
+								</span>
+								<ToggleSwitch checked={!hidden.has(key)} onCheckedChange={() => onToggleHidden(key)} aria-label={`Show ${name}`} />
+								<OrderButton label={name} direction="up" disabled={index === 0} onClick={() => move(key, -1)} />
+								<OrderButton label={name} direction="down" disabled={index === everyRepo.length - 1} onClick={() => move(key, 1)} />
+							</li>
+						);
+					})}
+				</ol>
+			</PopoverContent>
+		</Popover>
+	);
 }
 
 /** The details of the pull request `route` names, docked beside the list or the board at the width you drag their edge to, with buttons that show them as a page or close them. */
@@ -207,8 +262,6 @@ function RebaseBehindButton({ pulls }: { pulls: PullRequests }) {
 interface PullRequestsPageProps {
 	hosts: RosterHost[];
 	past: PastSession[];
-	/** The section or column a sidebar link last chose, to unfold, scroll to, and focus. */
-	section: SectionTarget | null;
 	/** The pull request whose details the page shows: docked beside the list or the board, or on a page of their own. */
 	route: PullRequestsRoute;
 }
@@ -217,18 +270,27 @@ interface PullRequestsPageProps {
 export function PullRequestsPage(props: PullRequestsPageProps) {
 	const [view, setView] = usePullRequestsView();
 	const [placement, setPlacement] = usePullRequestDetailsPlacement();
-	const { hosts, route } = props;
-	// Checking the target first narrows the route to one with its files.
-	if (route.target && pullRequestsPageShows(view, placement, route) === "details")
-		return <PullRequestDetailPage key={prKey(route.target)} hosts={hosts} target={route.target} files={route.files} onDock={() => setPlacement("beside")} />;
+	const { hosts, past, route } = props;
+	if (route.target && placement === "page")
+		return <DetailsPage key={prKey(route.target)} hosts={hosts} past={past} route={route} onDock={() => setPlacement("beside")} />;
 	return <PullRequestsOverview {...props} view={view} onView={setView} onExpand={() => setPlacement("page")} />;
+}
+
+/** A pull request's details on a page of their own, whose keys step through the list's pull requests in its order, leaving out what its folds hide. */
+function DetailsPage({ hosts, past, route, onDock }: { hosts: RosterHost[]; past: PastSession[]; route: Extract<PullRequestsRoute, { target: PullRequest }>; onDock: () => void }) {
+	const pulls = usePullRequests({ hosts, past, route });
+	const { isFolded } = usePullRequestsFolds();
+	const { list, order, agent } = pulls;
+	const shown = useMemo(() => (list ? shownPullRequests(list, isFolded, order, agent) : []), [list, isFolded, order, agent]);
+	usePullRequestKeys(pulls, shown);
+	return <PullRequestDetailPage hosts={hosts} target={route.target} files={route.files} onDock={onDock} />;
 }
 
 /**
  * The pull requests in the main area, as a table or a board: those of the sidebar's workspace, or of every workspace,
- * read from GitHub. It keeps the sidebar list's order, folds, and keys; the browser keeps which view it shows.
+ * read from GitHub, leaving out the repositories you hid. The browser keeps which view it shows.
  */
-function PullRequestsOverview({ hosts, past, section, route, view, onView, onExpand }: PullRequestsPageProps & { view: PullRequestsView; onView: (view: PullRequestsView) => void; onExpand: () => void }) {
+function PullRequestsOverview({ hosts, past, route, view, onView, onExpand }: PullRequestsPageProps & { view: PullRequestsView; onView: (view: PullRequestsView) => void; onExpand: () => void }) {
 	const { dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
 	const pulls = usePullRequests({ hosts, past, route });
@@ -255,18 +317,20 @@ function PullRequestsOverview({ hosts, past, section, route, view, onView, onExp
 								</SegmentedTabsList>
 							</SegmentedTabs>
 							<SortMenu order={pulls.order} onSort={pulls.onSort} onReset={pulls.onReset} />
+							{pulls.everyRepo.length > 0 && <RepositoriesMenu pulls={pulls} />}
 						</>
 					}
 					notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
 					className={view === "board" ? "max-w-none space-y-4" : "max-w-7xl space-y-8"}
 				>
 					{() => {
-						if (pulls.repos.length === 0) return note("No session ran in a GitHub repository.");
-						if (view === "list") return <RepoTables pulls={pulls} section={section} />;
+						if (pulls.everyRepo.length === 0) return note("No session ran in a GitHub repository.");
+						if (pulls.repos.length === 0) return note("Every repository is hidden. Show them from Repositories.");
+						if (view === "list") return <RepoTables pulls={pulls} />;
 						return (
 							<>
 								{pulls.repos.map(repo => ("error" in repo ? <RepoReadError key={repoKey(repo)} name={`${repo.owner}/${repo.repo}`} error={repo.error} className="text-sm" /> : null))}
-								<PullRequestsKanban pulls={pulls} section={section} />
+								<PullRequestsKanban pulls={pulls} />
 							</>
 						);
 					}}

@@ -39,7 +39,7 @@ export type SidebarTab = (typeof CORE_TABS)[number]["value"] | WebModuleId;
 const PAST_PREFIX = "past/";
 
 /**
- * The sidebar's pull request list, and the pull request the main content shows: its details, or with `files` its changes page open
+ * The pull request the Pull requests page shows: its details, or with `files` its changes page open
  * on the file at `path`, `null` for the first. A `null` target keeps the panes.
  */
 export type PullRequestsRoute = { target: null } | { target: PullRequest; files: { path: string | null } | null };

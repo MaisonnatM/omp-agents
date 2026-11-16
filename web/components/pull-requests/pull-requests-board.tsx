@@ -1,4 +1,4 @@
-/** What the views of the pull requests share, the sidebar's list and the page's list and board: their state, their keys, and the list's repositories, sections, and rows. */
+/** What the page's list and board of the pull requests share: their state, their keys, and the list's repositories, sections, and rows. */
 import { IconArrowBottomTop, IconCloudSimpleDisconnected } from "central-icons";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { PullRequestActionId } from "../../../src/pull-request-actions";
@@ -18,7 +18,6 @@ import {
 	type PullRequestOrder,
 	type SectionRow,
 	type PullRequestSection,
-	type MoveGroup,
 	type PullRequestSort,
 	pullRequestSections,
 	listedPullRequest,
@@ -30,6 +29,8 @@ import {
 	rebaseOrder,
 	sectionTitles,
 	shownPullRequests,
+	withoutHidden,
+	withRepoMoved,
 } from "../../pull-requests-model";
 import { moveKey, stepTarget, type Where } from "../../order";
 import { folderName } from "../../labels";
@@ -39,9 +40,9 @@ import { type RebaseHooks, type RebaseJob, rebasePullRequest, rebasePullRequests
 import type { PolledEntry } from "../../polled-store";
 import { pullRequestsStore, writePullRequest } from "../../reads";
 import { hashForPullRequests, type PullRequestsRoute } from "../../routing";
-import { type SectionTarget, sectionId } from "../../section";
+import { sectionId } from "../../section";
 import { useShortcuts } from "../../shortcuts";
-import { useStoredState } from "../../stored-state";
+import { useStoredKeys, useStoredState } from "../../stored-state";
 import { type DragItem, useDragOrder } from "../../use-drag-order";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { type Folds, useFolds, useReveal } from "../fold";
@@ -54,21 +55,22 @@ const FOLDS_KEY = "omp-agents.inbox-collapsed";
 const ORDER_KEY = "omp-agents.inbox-order";
 const VIEW_KEY = "omp-agents.pull-requests-view";
 const PLACEMENT_KEY = "omp-agents.pull-request-details-placement";
+const HIDDEN_KEY = "omp-agents.pull-requests-hidden";
 
 const SORTS = Object.keys(PULL_REQUEST_SORTS) as PullRequestSort[];
 
-/** The pull request list's order, which every list of it shares and the browser keeps. */
-export const usePullRequestsOrder = () => useStoredState(ORDER_KEY, decodeOrder, JSON.stringify);
-
-/** The pull request list's folds, which the page and the sidebar share and the browser keeps. */
+/** The pull request list's folds, which the list view and the details page's keys share and the browser keeps. */
 export const usePullRequestsFolds = (): Folds => useFolds(FOLDS_KEY, foldedByDefault);
+
+/** The repositories you hid from the Pull requests page, by `repoKey`, which the browser keeps apart from their order. */
+export const useHiddenRepos = () => useStoredKeys(HIDDEN_KEY);
 
 /** How the Pull requests page shows the pull requests: a table per repository, or a board with a column per section. */
 export type PullRequestsView = "list" | "board";
 
 const decodeView = (raw: string | null): PullRequestsView => (raw === "board" ? "board" : "list");
 
-/** The Pull requests page's view, which the browser keeps and the page and the sidebar both follow. */
+/** The Pull requests page's view, which the browser keeps. */
 export const usePullRequestsView = () => useStoredState(VIEW_KEY, decodeView);
 
 /** Where the Pull requests page shows a pull request's details: docked beside the list or the board, or on a page of their own. */
@@ -76,21 +78,8 @@ export type PullRequestDetailsPlacement = "beside" | "page";
 
 const decodePlacement = (raw: string | null): PullRequestDetailsPlacement => (raw === "page" ? "page" : "beside");
 
-/** Where the details show, which the browser keeps and the page and the sidebar both follow. */
+/** Where the details show, which the browser keeps. */
 export const usePullRequestDetailsPlacement = () => useStoredState(PLACEMENT_KEY, decodePlacement);
-
-/**
- * What the Pull requests page shows for `route`: the list or the board, with the details of the pull request `route`
- * names docked beside it, or those details on a page of their own while `placement` is `page`.
- */
-export const pullRequestsPageShows = (view: PullRequestsView, placement: PullRequestDetailsPlacement, route: PullRequestsRoute): PullRequestsView | "details" =>
-	placement === "page" && route.target !== null ? "details" : view;
-
-/** `order` with the repository `key` put on the `where` side of `beside`; the repositories a list does not show, `shown` being those it does, keep their place behind them. */
-export const withRepoMoved = (order: PullRequestOrder, shown: string[], key: string, beside: string, where: Where): PullRequestOrder => ({
-	...order,
-	repos: moveKey([...shown, ...order.repos.filter(other => !shown.includes(other))], key, beside, where),
-});
 
 /** Moves a focused heading or row one place; `false` at the edge. */
 type Move = (by: 1 | -1) => boolean;
@@ -109,13 +98,12 @@ function placeOf(list: PullRequestList, pr: PullRequest, agent: AgentOn): { repo
 /**
  * Binds the keys of a view of `pulls`, over `shown`, the pull requests it shows in order. Mount it once per screen,
  * since its keys are global. ↓ and ↑ move between those rows or cards, or, while the main area shows a pull request's
- * details, show the next or previous one; on its changes page they step through its files instead. With nothing
- * focused they enter the view only when `entersList`, so the sidebar's list leaves them to scroll the panes. O opens
- * the pull request on GitHub, `.` opens a row's `⋯` menu, and E starts the quick action that makes the move of the
- * focused row's pull request, or the one the main area shows, the one its row's menu would. A key that has nothing to
- * act on keeps its usual meaning.
+ * details, show the next or previous one; on its changes page they step through its files instead. O opens the pull
+ * request on GitHub, `.` opens a row's `⋯` menu, and E starts the quick action that makes the move of the focused
+ * row's pull request, or the one the main area shows, the one its row's menu would. A key that has nothing to act on
+ * keeps its usual meaning.
  */
-export function usePullRequestKeys({ list, agent, route, onActionsOpenChange }: PullRequests, shown: PullRequestSummary[], entersList: boolean): void {
+export function usePullRequestKeys({ list, agent, route, onActionsOpenChange }: PullRequests, shown: PullRequestSummary[]): void {
 	const { start } = useDashboardActions();
 	const { target } = route;
 	const current = (): number =>
@@ -129,7 +117,7 @@ export function usePullRequestKeys({ list, agent, route, onActionsOpenChange }: 
 			if (next) location.hash = hashForPullRequests(next);
 			return true;
 		}
-		return stepRows(shown, pr => rowElement(pr), by, entersList);
+		return stepRows(shown, pr => rowElement(pr), by);
 	};
 	const giveToAgent = (pr: PullRequest): boolean => {
 		const listed = list && listedPullRequest(list, pr);
@@ -243,9 +231,6 @@ interface Placed {
 	moveId: string;
 }
 
-/** The Pull requests page's card for the section `title` of the repository `repo`, which a sidebar link scrolls to. */
-export const pullRequestSectionTarget = (repo: string, title: MoveGroup): SectionTarget => ({ id: sectionId("pull-requests-section", repo, title), folds: [repo, sectionFoldKey(repo, title)] });
-
 export interface SectionView extends Placed {
 	section: PullRequestSection;
 	foldKey: string;
@@ -275,7 +260,7 @@ export interface RepoView extends Placed {
 export interface PullRequests {
 	poll: PolledEntry<PullRequestList>;
 	refresh: () => void;
-	/** The list GitHub last returned, or `null` until it answers. */
+	/** The list GitHub last returned, without the repositories you hid, or `null` until it answers. */
 	list: PullRequestList | null;
 	/** What the main area shows: its pull request's row stays highlighted while its details or changes show. */
 	route: PullRequestsRoute;
@@ -284,9 +269,13 @@ export interface PullRequests {
 	setOrder: (order: PullRequestOrder) => void;
 	onSort: (sort: PullRequestSort) => void;
 	onReset: () => void;
-	/** The repositories in the list's order, and the sections of each, at the same index. */
+	/** The repositories you did not hide, in the list's order, and the sections of each, at the same index. */
 	repos: RepoPullRequests[];
 	sectionsOf: PullRequestSection[][];
+	/** Every repository in the list's order, those you hid too. */
+	everyRepo: RepoPullRequests[];
+	hidden: ReadonlySet<string>;
+	onToggleHidden: (key: string) => void;
 	/** Every pull request's key in the order the list shows them now; placing one by hand starts the manual sort from it. */
 	shownOrder: string[];
 	/** What a list row or a board card of `row` takes, from functions every row shares, so a row's props change only with what it shows. */
@@ -354,8 +343,10 @@ export function usePullRequests({ hosts, past, route }: PullRequestsProps): Pull
 	const { open, start } = useDashboardActions();
 	const { starts: { quick }, pullRequestsScope: scope } = useDashboardStatus();
 	const poll = pullRequestsStore.use(scope);
-	const list = poll.read?.data ?? null;
-	const [order, setOrder] = usePullRequestsOrder();
+	const read = poll.read?.data ?? null;
+	const [hidden, onToggleHidden] = useHiddenRepos();
+	const list = useMemo(() => read && withoutHidden(read, hidden), [read, hidden]);
+	const [order, setOrder] = useStoredState(ORDER_KEY, decodeOrder, JSON.stringify);
 	const agent = useMemo(() => agentOn(hosts), [hosts]);
 	const sessions = useSessionsByPullRequest(hosts, past);
 	/** The row, by {@link rowId}, whose `⋯` menu is open. */
@@ -390,6 +381,7 @@ export function usePullRequests({ hosts, past, route }: PullRequestsProps): Pull
 		},
 		[sessions, targetKey, open, quick, actionsOpen, onQuickAction, onRebase, onActionsOpenChange, onChange],
 	);
+	const everyRepo = useMemo(() => (read ? orderedRepos(read.repos, order) : []), [read, order]);
 	const repos = useMemo(() => (list ? orderedRepos(list.repos, order) : []), [list, order]);
 	const sectionsOf = useMemo(() => repos.map(repo => ("error" in repo ? [] : pullRequestSections(repo.pullRequests, order, agent))), [repos, order, agent]);
 	const behind = useMemo(
@@ -417,6 +409,9 @@ export function usePullRequests({ hosts, past, route }: PullRequestsProps): Pull
 		onReset: () => setOrder(DEFAULT_ORDER),
 		repos,
 		sectionsOf,
+		everyRepo,
+		hidden,
+		onToggleHidden,
 		shownOrder,
 		rowBase,
 		onQuickAction,
@@ -430,11 +425,12 @@ export function usePullRequests({ hosts, past, route }: PullRequestsProps): Pull
 
 /**
  * The list of `pulls`: its repositories, sections, and rows, with their folds and the keys that move through them.
- * Dragging or Alt+Shift+↑ and ↓ reorder its repositories, sections, and the pull requests in a section; the browser
- * keeps the order. Mount it once per screen, since its keys act on the rows it lists.
+ * Dragging or Alt+Shift+↑ and ↓ reorder its repositories, sections, and the pull requests in a section; a hidden
+ * repository keeps its place. The browser keeps the order. Mount it once per screen, since its keys act on the rows it
+ * lists.
  */
-export function usePullRequestsBoard(pulls: PullRequests, entersList: boolean): { folds: Folds; repos: RepoView[] } {
-	const { list, route: { target }, agent, order, setOrder, repos, sectionsOf, shownOrder, rowBase } = pulls;
+export function usePullRequestsBoard(pulls: PullRequests): { folds: Folds; repos: RepoView[] } {
+	const { list, route: { target }, agent, order, setOrder, repos, sectionsOf, everyRepo, shownOrder, rowBase } = pulls;
 	const targetKey = target ? prKey(target) : null;
 	const folds = usePullRequestsFolds();
 	const drag = useDragOrder();
@@ -442,12 +438,13 @@ export function usePullRequestsBoard(pulls: PullRequests, entersList: boolean): 
 	const reveal = target && place ? { id: rowId(target), folds: [place.repo, place.section] } : null;
 	useReveal(reveal, folds, { token: reveal?.id, block: "nearest", focus: false });
 	const shown = useMemo(() => (list ? shownPullRequests(list, folds.isFolded, order, agent) : []), [list, folds.isFolded, order, agent]);
-	usePullRequestKeys(pulls, shown, entersList);
+	usePullRequestKeys(pulls, shown);
 
 	const layout = useMemo(() => {
 		const moves = new Map<string, Move>();
 		const repoKeys = repos.map(repoKey);
-		const moveRepo = (key: string, beside: string, where: Where): void => setOrder(withRepoMoved(order, repoKeys, key, beside, where));
+		const everyKey = everyRepo.map(repoKey);
+		const moveRepo = (key: string, beside: string, where: Where): void => setOrder(withRepoMoved(order, everyKey, key, beside, where));
 		const moveSection = (title: string, beside: string, where: Where): void => setOrder({ ...order, sections: moveKey(sectionTitles(order), title, beside, where) });
 
 		const repoLayout = (repo: RepoPullRequests, at: number): RepoLayout => {
@@ -512,7 +509,7 @@ export function usePullRequestsBoard(pulls: PullRequests, entersList: boolean): 
 			};
 		};
 		return { repos: repos.map(repoLayout), moves };
-	}, [repos, sectionsOf, shownOrder, order, setOrder, folds]);
+	}, [repos, sectionsOf, everyRepo, shownOrder, order, setOrder, folds]);
 	useMoveKeys(layout.moves);
 
 	// What changes with a drag, the roster, the target, a pending start, or an open menu: a cheap pass over the layout.
