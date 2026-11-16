@@ -6,6 +6,7 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-16
 
 - A workspace's new-session button in the sidebar now sits level with the workspace name and its chevron, instead of a few pixels lower.
+- In the desktop app, the sidebar toggle and the back and forward buttons above the sidebar respond to clicks again, instead of dragging the window.
 - In poteto mode, a Babysit run's todo list now holds only the steps its mode runs, so a one-time rebase or a review-thread fix no longer ends with a turn spent ticking off polling and merge steps.
 - A session's subagents now show only in the right sidebar's Overview tab. The conversation no longer lists them under the task call that started them, so that call's tool group folds like any other once it finishes.
 - Clicking a subagent in the right sidebar now opens its conversation in a sidebar tab named after it, with its composer, so the session's own conversation stays in the main pane. Cmd-click still opens it in a split.
