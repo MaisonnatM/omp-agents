@@ -22,7 +22,7 @@ const DEFAULT_SLACK_CALLBACK_PORT = 3000;
 export class ClientConfigError extends Error {}
 
 /** A server entry a save writes, under its name in omp's MCP config. */
-export interface ServerWrite {
+interface ServerWrite {
 	name: string;
 	server: McpServerConfig;
 }

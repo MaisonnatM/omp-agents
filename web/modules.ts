@@ -28,7 +28,7 @@ export interface PageStore<Value, Change> {
 	apply(value: Value, change: Change): Value | null;
 }
 
-export interface PageModule<Id extends string, Route, Shortcut extends string = never, Control extends string = never> {
+interface PageModule<Id extends string, Route, Shortcut extends string = never, Control extends string = never> {
 	readonly id: Id;
 	/** The module's sidebar tab, whose id is the module's. `place` orders it among every tab, the core's too, lowest first. */
 	readonly tab: { label: string; icon: IconComponent; place: number };

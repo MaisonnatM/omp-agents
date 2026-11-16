@@ -34,8 +34,8 @@ import { type SignedFetch, signedFetch } from "./signed-fetch";
 
 const serversOf = (id: McpIntegrationId): Promise<McpServer[]> => findMcpServers(MCP_SERVICES[id].host);
 
-/** omp's server for `id`, which reads and writes the service through its tools. */
-export async function integrationServer(id: McpIntegrationId): Promise<McpServer> {
+/** omp's server for `id`, whose sign-in calls the service's APIs. */
+async function integrationServer(id: McpIntegrationId): Promise<McpServer> {
 	const [server] = await serversOf(id);
 	if (!server) throw new Error(`${MCP_SERVICES[id].label} is not connected. Connect it in Settings › Integrations.`);
 	return server;

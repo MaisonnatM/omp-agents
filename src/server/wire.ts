@@ -426,7 +426,7 @@ export function parseClientMsg(raw: string | Buffer): Parsed<ClientFrame> {
 }
 
 /** A UUID as `crypto.randomUUID()` writes it, lowercase. */
-export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /** The `page` of a `/ws` address: the id a page load picks once, `crypto.randomUUID()`; `null` when absent or not one. */
 export const parsePageId = (value: string | null): string | null => (value !== null && UUID.test(value) ? value : null);

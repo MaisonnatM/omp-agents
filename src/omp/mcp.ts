@@ -4,11 +4,11 @@
  * sign-in, and handing that sign-in to `signedFetch` for the APIs of the service behind a server.
  */
 import { createCache } from "../cache";
-import { isObject, str } from "../json";
+import { isObject } from "../json";
 import { runChecked } from "../proc";
 import { ApiError, type Bearer } from "../signed-fetch";
 import { ompCommand } from "./install";
-import { auth, dirs, discoveryHelpers, mcpClient, mcpConfig, mcpConfigWriter, mcpCredentials, mcpOAuthDiscovery, mcpOAuthFlow, mcpRpc } from "./modules";
+import { auth, dirs, discoveryHelpers, mcpClient, mcpConfig, mcpConfigWriter, mcpCredentials, mcpOAuthDiscovery, mcpOAuthFlow } from "./modules";
 import type { McpConnection, McpServerConfig, McpSourceMeta, McpToolDefinition } from "./module-types/mcp";
 import { withDiscovery } from "./scoped-discovery";
 
@@ -296,16 +296,6 @@ export function credentialFor(name: string, config: McpServerConfig): McpServer 
 	return { name, url, credentialId, config };
 }
 
-/** A failed tool call's text is the server's error, sometimes as JSON with a `message`. */
-function toolError(text: string): string {
-	try {
-		const parsed: unknown = JSON.parse(text);
-		const message = isObject(parsed) ? str(parsed.message) : undefined;
-		if (message) return message;
-	} catch {}
-	return text || "The MCP server reported an error";
-}
-
 /** The server refused omp's sign-in, so only a new sign-in helps. */
 export class McpRefused extends Error {}
 
@@ -317,33 +307,3 @@ function refused(server: McpServer): McpRefused {
 
 /** omp's sign-in to `server`, for a `signedFetch` to the APIs of the service behind it: a 401 forgets it and throws {@link McpRefused}. */
 export const mcpBearer = async (server: McpServer): Promise<Bearer> => ({ token: await tokenOf(server.credentialId), refused: () => refused(server) });
-
-/** `method`'s result on `server`, called with omp's sign-in for it; the server's own message thrown when it answers an error. */
-async function request(server: McpServer, method: string, params: Record<string, unknown>): Promise<unknown> {
-	const response = await mcpRpc.callMCP(server.url, method, params, {
-		headers: { Authorization: `Bearer ${await tokenOf(server.credentialId)}` },
-		signal: AbortSignal.timeout(TIMEOUT_MS),
-		onHttpError: ({ status }) => (status === 401 ? refused(server) : new ApiError(`The "${server.name}" MCP server answered HTTP ${status}`, status)),
-	});
-	if (response.error) throw new Error(response.error.message || "The MCP server answered an error");
-	return response.result;
-}
-
-/** The text that `tool` answers for `args` on `server`; the server's own message thrown when the call fails. */
-export async function callMcpTool(server: McpServer, tool: string, args: Record<string, unknown>): Promise<string> {
-	const answered = await request(server, "tools/call", { name: tool, arguments: args });
-	const result = isObject(answered) ? answered : {};
-	const content = Array.isArray(result.content) ? result.content : [];
-	const text = content.map(part => (isObject(part) && part.type === "text" ? str(part.text) : undefined)).find(part => part !== undefined) ?? "";
-	if (result.isError === true) throw new Error(toolError(text));
-	return text;
-}
-
-/** `text`, what `service`'s `tool` answered, as JSON; the start of the text thrown when it is not JSON. */
-export function toolJson(service: string, tool: string, text: string): unknown {
-	try {
-		return JSON.parse(text);
-	} catch {
-		throw new Error(`${service}'s ${tool} answered something other than JSON: ${text.slice(0, 200)}`);
-	}
-}

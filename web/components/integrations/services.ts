@@ -19,7 +19,7 @@ export const SERVICES: Record<McpIntegrationId, Service> = {
 	},
 };
 
-export const STATUS: Record<McpConnection["kind"], StatusLabel> = { absent: { label: "Not connected", color: "gray" }, ...REMOTE_STATUS };
+const STATUS: Record<McpConnection["kind"], StatusLabel> = { absent: { label: "Not connected", color: "gray" }, ...REMOTE_STATUS };
 
 /** A service row's badge: a sign-in waiting on you, else a missing OAuth client, else its connection. */
 export function integrationStatus(integration: McpIntegration): StatusLabel {
