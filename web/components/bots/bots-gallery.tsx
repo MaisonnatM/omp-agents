@@ -6,7 +6,7 @@ import { jobLine } from "../../../src/shared/bots";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { botAsking, botGroupKey, botGroupLabel, botGroupListName, botGroups, botRoutines, botSections, botsGrouped, botStatus, type BotRow } from "../../bots-model";
-import { mailTime } from "../../labels";
+import { listTime } from "../../labels";
 import { hashForBots, hashForNewBot } from "../../routing";
 import { PageFrame } from "../list-page";
 import { BotAvatar } from "./bot-avatar";
@@ -46,7 +46,7 @@ function BotCard({ row: { bot, host, unread, at }, routineCount, sections, onNam
 					)}
 					<span aria-hidden>·</span>
 					<time dateTime={new Date(at).toISOString()} className="shrink-0 tabular-nums">
-						{mailTime(at)}
+						{listTime(at)}
 					</time>
 				</span>
 			</a>

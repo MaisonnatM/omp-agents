@@ -13,7 +13,6 @@ import { ensurePrivateRepo } from "./github";
 import { canonicalJson, errorText, isNonEmpty, isObject, isSafeInteger, isTexts, type Parsed, parseAll, parseJson } from "./json";
 import { isRoutineMachine, parseRoutineSpec, type Routine, type RoutineMachine } from "./routines";
 import { SerialLane } from "./serial-lane";
-import type { HiddenCalendars } from "./server/calendars-file";
 import type { ListKind } from "./server/list-registry";
 import type { Bot } from "./shared/bots";
 import type { PagePreferences } from "./shared/preferences";
@@ -425,7 +424,6 @@ export interface SyncedFiles {
 	preferences: SyncedFile<PagePreferences | null>;
 	processes: SyncedFile<ProcessSettings>;
 	workspaces: SyncedFile<WorkspaceList>;
-	calendars: SyncedFile<HiddenCalendars>;
 	bots: SyncedFile<Bot[]>;
 	/** Where each Bot's memory directory is. */
 	botsDir: string;
@@ -453,8 +451,6 @@ export function syncStores(files: SyncedFiles, home: string, changed: (list: Lis
 		todos: fileStore(files.todos, () => changed("user-todos"), todoCarriage(home)),
 		preferences: partsStore({ page: fileStore(files.preferences, () => changed("preferences"), PAGE_VALUES), processes: fileStore(files.processes) }),
 		workspaces: fileStore(files.workspaces, () => changed("workspaces"), homePaths(home)),
-		// The Calendar page asks for its calendars again, and the server reads which are hidden as it answers.
-		calendars: fileStore(files.calendars),
 		bots: botsStore(files, home, changed),
 	};
 }

@@ -1,8 +1,7 @@
-/** The Notifications page: pull request, Slack, provider, sign-in, calendar, stopped-session, and update notices, with its tabs, **Filter**, **Display**, and search, each drawn from its {@link presentNotice} projection. */
-import { IconArrowLoopDownLeft, IconArrowsRepeatRightLeft, IconBell, IconBubbleText, IconCalendarClock, IconCalendarClock4, IconCircleX, IconCrossMedium, IconDoubleCheckmark1, IconExclamationCircle, IconEyeOpen, IconGauge, IconKey1, IconLayersTwo, IconMerged, IconSparklesTwo, IconWallet1 } from "central-icons";
+/** The Notifications page: pull request, Slack, provider, stopped-session, and update notices, with its tabs, **Filter**, **Display**, and search, each drawn from its {@link presentNotice} projection. */
+import { IconArrowLoopDownLeft, IconArrowsRepeatRightLeft, IconBell, IconBubbleText, IconCalendarClock4, IconCircleX, IconCrossMedium, IconDoubleCheckmark1, IconExclamationCircle, IconEyeOpen, IconGauge, IconLayersTwo, IconMerged, IconSparklesTwo, IconWallet1 } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useRef, useState } from "react";
-import { type AccountsService, MCP_SERVICES } from "../../src/shared/accounts";
 import type { PullRequestSummary } from "../../src/shared/github";
 import type { YourMove } from "../../src/shared/moves";
 import type { Notice } from "../../src/shared/notices";
@@ -34,7 +33,7 @@ import { pendingOf, pullRequestStart, QUICK_ACTIONS } from "../quick-actions";
 import { providerLabel, providerOrg } from "../labels";
 import { Age } from "./age";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
-import { BrandMark, type BrandLogo, GMAIL_LOGO, GOOGLE_CALENDAR_LOGO, SLACK_LOGO } from "./integrations/brand-logos";
+import { BrandMark, SLACK_LOGO } from "./integrations/brand-logos";
 import { OrgIcon } from "./org-icon";
 import { MergePopover, useMergeTarget } from "./pull-requests/merge-popover";
 
@@ -49,10 +48,7 @@ const MOVE_BADGE: Record<YourMove, { icon: IconComponent; tone: string }> = {
 	reply: { icon: IconBubbleText, tone: "bg-amber-500 text-white" },
 };
 
-/** Each Google service's logo, which its sign-in notice shows. */
-const SERVICE_LOGO: Record<AccountsService, BrandLogo> = { gmail: GMAIL_LOGO, "google-calendar": GOOGLE_CALENDAR_LOGO };
-
-/** Where a notice came from, as a logo and a name: GitHub, Slack, the provider, the Google service, Google Calendar or this computer's calendar, omp, or omp-agents. */
+/** Where a notice came from, as a logo and a name: GitHub, Slack, the provider, omp, or omp-agents. */
 function originOf(notice: Notice): { logo: ReactNode; label: string } {
 	const mark = "size-3.5 shrink-0";
 	const sparkles = <IconSparklesTwo className={cn(mark, "text-violet-600 dark:text-violet-400")} />;
@@ -66,10 +62,6 @@ function originOf(notice: Notice): { logo: ReactNode; label: string } {
 			const Icon = notice.kind === "plan" ? IconGauge : IconWallet1;
 			return { logo: <OrgIcon org={providerOrg(notice.provider)} className={mark} fallback={<Icon aria-hidden className={mark} />} />, label: providerLabel(notice.provider) };
 		}
-		case "event":
-			return notice.calendar === null
-				? { logo: <IconCalendarClock className={mark} />, label: "Calendar" }
-				: { logo: <BrandMark logo={GOOGLE_CALENDAR_LOGO} className={mark} />, label: "Google Calendar" };
 		case "omp":
 		case "model":
 			return { logo: sparkles, label: "omp" };
@@ -78,8 +70,6 @@ function originOf(notice: Notice): { logo: ReactNode; label: string } {
 			return { logo: sparkles, label: "omp-agents" };
 		case "stopped":
 			return { logo: <IconExclamationCircle className={cn(mark, "text-amber-600 dark:text-amber-400")} />, label: "omp-agents" };
-		case "sign-in":
-			return { logo: <BrandMark logo={SERVICE_LOGO[notice.service]} className={mark} />, label: MCP_SERVICES[notice.service].label };
 		default: {
 			const unhandled: never = notice;
 			return unhandled;
@@ -99,19 +89,13 @@ export function NoticeOrigin({ notice }: { notice: Notice }) {
 }
 const BADGE = "absolute -right-1 -bottom-1 flex size-4 items-center justify-center rounded-full ring-2 ring-popover";
 
-/** A notice's picture: who it comes from with a badge for its source; an update's, a stopped session's, or a move nobody made's source tile; or a provider's or Google service's logo with a warning badge. */
+/** A notice's picture: who it comes from with a badge for its source; an update's, a stopped session's, or a move nobody made's source tile; or a provider's logo with a warning badge. */
 function Face({ face }: { face: NoticeFace }) {
 	switch (face.kind) {
 		case "update":
 			return (
 				<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-violet-500/10">
 					<IconSparklesTwo className="m-auto size-4 text-violet-600 dark:text-violet-400" />
-				</span>
-			);
-		case "event":
-			return (
-				<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-muted">
-					<IconCalendarClock className="m-auto size-4" style={{ color: face.color ?? undefined }} />
 				</span>
 			);
 		case "stopped":
@@ -131,15 +115,6 @@ function Face({ face }: { face: NoticeFace }) {
 				</span>
 			);
 		}
-		case "sign-in":
-			return (
-				<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-muted">
-					<BrandMark logo={SERVICE_LOGO[face.service]} className="m-auto size-4" />
-					<span className={cn(BADGE, "bg-red-500 text-white")}>
-						<IconKey1 className="size-2.5 icon-shapes:stroke-[2.5]" />
-					</span>
-				</span>
-			);
 		case "move": {
 			const { icon: Icon, tone } = MOVE_BADGE[face.move];
 			if (!face.person) {
@@ -371,7 +346,7 @@ export function NotificationsPage({ notices }: { notices: Notice[] }) {
 					<IconBell className="size-4 text-muted-foreground" />
 				</span>
 				<p className="text-sm font-medium">You're all caught up</p>
-				<p className="max-w-sm text-xs text-muted-foreground">Pull requests that wait on you, Slack messages for you, providers that stop serving, events about to start, and updates land here.</p>
+				<p className="max-w-sm text-xs text-muted-foreground">Pull requests that wait on you, Slack messages for you, providers that stop serving, and updates land here.</p>
 			</div>
 		);
 	};

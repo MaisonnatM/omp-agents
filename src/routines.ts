@@ -1,5 +1,5 @@
 /** The rules of routines: when one is due, how a change edits the list, and which routine the page and `routines.json` may hold. */
-import { fields, isNonEmpty, isObject, isSafeInteger, isString, nullable, oneOf, type Parsed } from "./json";
+import { fields, isNonEmpty, isObject, isSafeInteger, isString, nullable, oneOf, parseAll, type Parsed } from "./json";
 import { type BotId, parseBotId } from "./shared/bots";
 
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -11,10 +11,10 @@ export type Schedule =
 	| { kind: "weekly"; days: Weekday[]; time: { hour: number; minute: number } };
 
 /**
- * What the dashboard already watches that starts a run when it happens: a Slack message that waits on you, a pull
- * request of a workspace whose status changes, a calendar event about to start, or unread mail in a Gmail inbox.
+ * What the dashboard already watches that starts a run when it happens: a Slack message that waits on you, or a pull
+ * request of a workspace whose status changes.
  */
-export const TRIGGER_KINDS = ["slack", "pull-request", "event", "gmail"] as const;
+export const TRIGGER_KINDS = ["slack", "pull-request"] as const;
 export type TriggerKind = (typeof TRIGGER_KINDS)[number];
 
 export interface Trigger {
@@ -254,11 +254,18 @@ function parseSchedules(value: unknown): Parsed<Schedule[]> {
 
 export const isTriggerKind = oneOf(TRIGGER_KINDS);
 
+/** Whether `entry`, a trigger or what one saw, names a kind routines no longer watch, which a saved routine or run drops. */
+export const isRetiredTrigger = (entry: unknown): boolean => isObject(entry) && typeof entry.kind === "string" && !isTriggerKind(entry.kind);
+
 const isTriggerEvent = fields<TriggerEvent>({ kind: isTriggerKind, title: isString, detail: isString, url: nullable(isString) });
 
-/** A trigger event as `routines.json` and a routine's message keep it, without other fields, or `null`. */
-export function parseTriggerEvent(value: unknown): TriggerEvent | null {
-	return isTriggerEvent(value) ? { kind: value.kind, title: value.title, detail: value.detail, url: value.url } : null;
+/** What started a run, as `routines.json` and a routine's message keep it, each event without other fields, or `null`. */
+export function parseTriggeredBy(value: unknown): TriggerEvent[] | null {
+	if (!Array.isArray(value)) return null;
+	return parseAll(
+		value.filter(event => !isRetiredTrigger(event)),
+		event => (isTriggerEvent(event) ? { kind: event.kind, title: event.title, detail: event.detail, url: event.url } : null),
+	);
 }
 
 /** A run's command as `routines.json` keeps it, or `null`. */
@@ -285,6 +292,7 @@ function parseTriggers(value: unknown): Parsed<Trigger[]> {
 	if (!Array.isArray(value)) return null;
 	const triggers: Trigger[] = [];
 	for (const entry of value) {
+		if (isRetiredTrigger(entry)) continue;
 		if (!isObject(entry) || !isTriggerKind(entry.kind) || triggers.some(({ kind }) => kind === entry.kind)) return null;
 		triggers.push({ kind: entry.kind });
 	}

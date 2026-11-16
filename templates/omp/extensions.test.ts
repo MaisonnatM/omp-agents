@@ -117,17 +117,6 @@ if (input.subToolStart) {
 	// Each mode starts the same session file again, as a resume does; the entries are what the file gained.
 	for (const mode of input.starts) await hooks.session_start({ type: "session_start" }, { mode, sessionManager: { getBranch: () => entries } });
 	console.log(JSON.stringify({ entries }));
-} else if (input.agentStart) {
-	const result = await hooks.before_agent_start({ systemPrompt: ["base"] }, { cwd: input.cwd ?? process.cwd(), sessionManager, agent: { kind: "main" } });
-	console.log(JSON.stringify({ prompt: result?.systemPrompt ?? null }));
-} else if (input.toolResults) {
-	// Each result as omp hands it to tool_result handlers after the call; null where the handler leaves it alone.
-	const results = [];
-	for (const [i, result] of input.toolResults.entries()) {
-		const changed = await hooks.tool_result({ type: "tool_result", toolCallId: String(i), input: {}, details: undefined, ...result }, { cwd: process.cwd(), hasUI: false, sessionManager });
-		results.push(changed ? { isError: changed.isError ?? false, text: changed.content.map(part => part.text).join("\\n") } : null);
-	}
-	console.log(JSON.stringify({ toolResults: results }));
 } else if (input.runs) {
 	// Several calls in one session, one after another, or all at once with parallel, as an agent's parallel tool calls run.
 	const call = params => tool.execute("call", params, undefined, undefined, { cwd: input.cwd ?? process.cwd(), hasUI: false, sessionManager, agent: { kind: input.agent ?? "main" } });
@@ -144,15 +133,13 @@ if (input.subToolStart) {
 }
 `;
 
-function exercise(name: "artifact" | "ship" | "todos" | "events" | "worktree-guard" | "google-accounts" | "pr-description" | "headless-mark" | "arena" | "chrome-devtools-page", input: object, env: Record<string, string> = {}): {
+function exercise(name: "artifact" | "ship" | "todos" | "worktree-guard" | "pr-description" | "headless-mark" | "arena" | "chrome-devtools-page", input: object, env: Record<string, string> = {}): {
 	result: { block?: boolean; reason?: string; input?: Record<string, unknown> } | null;
 	confirmations: number;
 	valid: boolean;
 	run: { isError: boolean; stage: string | null };
 	runs: { isError: boolean; text: string | null; details: unknown }[];
 	text: string | null;
-	prompt: string[] | null;
-	toolResults: ({ isError: boolean; text: string } | null)[];
 	results: (string | null)[];
 	executed: string[][];
 	entries: { customType: string; data: unknown }[];
@@ -1056,131 +1043,6 @@ describe("user_todo Workspace", () => {
 
 	test("list names each todo's Workspace by its folder", () => {
 		expect(call({ action: "list" }).text?.split("\n").slice(0, 2)).toEqual(["- Ship the release (id t1, Workspace app)", "  - Tag it (id c1)"]);
-	});
-});
-
-describe("user_event", () => {
-	const root = mkdtempSync(join(tmpdir(), "events-extension-"));
-	afterAll(() => rmSync(root, { recursive: true, force: true }));
-	const env = { XDG_CONFIG_HOME: join(root, "config"), TZ: "America/New_York" };
-	const config = join(root, "config", "omp-agents");
-	const inbox = join(config, "event-inbox");
-	const dentist = { id: "e1", title: "Dentist", when: { allDay: false, start: Date.parse("2030-01-02T08:00:00Z"), end: Date.parse("2030-01-02T09:00:00Z") } };
-	mkdirSync(config, { recursive: true });
-	writeFileSync(join(config, "events.json"), JSON.stringify({ events: [dentist] }));
-	const call = (params: object, sessionId = "s1") => exercise("events", { run: true, params, sessionId }, env);
-	const left = () => readdirSync(inbox).sort().map(name => JSON.parse(readFileSync(join(inbox, name), "utf8")));
-
-	test("add leaves a reminder in local time for the dashboard, which lists before it applies it, and adding it again gives its id back", () => {
-		const first = call({ action: "add", title: "Check the build time", start: "2030-01-03T14:30", minutes: "" });
-		const [added] = left();
-		expect(first.run.isError).toBe(false);
-		expect(added).toEqual({
-			op: "add",
-			event: { id: added.event.id, title: "Check the build time", when: { allDay: false, start: Date.parse("2030-01-03T14:30-05:00"), end: Date.parse("2030-01-03T15:00-05:00") }, sessionId: "s1" },
-		});
-		expect(call({ action: "add", title: " Check the build time ", start: "2030-01-03T14:30" }).text).toContain(`already added it (id ${added.event.id})`);
-		expect(left()).toHaveLength(1);
-		const lines = call({ action: "list" }).text?.split("\n");
-		expect(lines?.map(line => line.split(" (")[0])).toEqual(["- Dentist", "- Check the build time"]);
-		expect(lines?.[1]).toContain(`id ${added.event.id}`);
-		expect(lines?.[1]).toEndWith(", added by this session)");
-	});
-
-	test("add refuses a start in the past or without a time of day", () => {
-		expect(call({ action: "add", title: "Too late", start: "2020-01-01T09:00:00Z" }).run.isError).toBe(true);
-		expect(call({ action: "add", title: "No time", start: "2030-01-03" }).run.isError).toBe(true);
-	});
-
-	test("remove takes only an event this session added", () => {
-		const before = left().length;
-		expect(call({ action: "remove", id: "e1" }).run.isError).toBe(true);
-		const [added] = left();
-		expect(call({ action: "remove", id: added.event.id }, "s2").run.isError).toBe(true);
-		expect(left()).toHaveLength(before);
-		expect(call({ action: "remove", id: added.event.id }).run.isError).toBe(false);
-		expect(left().at(-1)).toEqual({ op: "remove", id: added.event.id, sessionId: "s1" });
-		expect(call({ action: "list" }).text).not.toContain("Check the build time");
-	});
-});
-
-describe("google accounts", () => {
-	const root = mkdtempSync(join(tmpdir(), "google-accounts-extension-"));
-	afterAll(() => rmSync(root, { recursive: true, force: true }));
-	const env = { XDG_CONFIG_HOME: join(root, "config"), PI_CODING_AGENT_DIR: join(root, "agent") };
-	mkdirSync(join(root, "config", "omp-agents"), { recursive: true });
-	mkdirSync(join(root, "agent"));
-	writeFileSync(
-		join(root, "config", "omp-agents", "google-accounts.json"),
-		JSON.stringify({ addresses: { gmail: "ana@example.com", "gmail-2": "ana@work.example" } }),
-	);
-	const servers = (names: string[]) =>
-		writeFileSync(join(root, "agent", "mcp.json"), JSON.stringify({ mcpServers: Object.fromEntries(names.map(name => [name, { type: "http", url: "https://gmailmcp.googleapis.com/mcp/v1" }])) }));
-
-	test("a session hears each account of omp's mcp.json; one account tells nothing", () => {
-		servers(["gmail", "gmail-2"]);
-		expect(exercise("google-accounts", { agentStart: true, omp: true }, env).prompt).toEqual([
-			"base",
-			[
-				"omp is signed in to several Google accounts, one MCP server each, and each server's tools start with its prefix.",
-				"Gmail:",
-				"- gmail: ana@example.com, tools `mcp__gmail_`",
-				"- gmail-2: ana@work.example, tools `mcp__gmail_2_`",
-			].join("\n"),
-		]);
-		servers(["gmail"]);
-		expect(exercise("google-accounts", { agentStart: true, omp: true }, env).prompt).toBeNull();
-	});
-
-	test("a Google server's 401 tells the session to ask the user to sign in again, and reports the account once; other failures pass", () => {
-		writeFileSync(
-			join(root, "agent", "mcp.json"),
-			JSON.stringify({
-				mcpServers: {
-					"google-calendar": { type: "http", url: "https://calendarmcp.googleapis.com/mcp/v1", enabled: false },
-					gmail: { type: "http", url: "https://gmailmcp.googleapis.com/mcp/v1" },
-					linear: { type: "http", url: "https://mcp.linear.app/mcp" },
-				},
-			}),
-		);
-		// As omp's formatMCPToolFailure words a failed MCP call.
-		const failure = (server: string, code: number) =>
-			[
-				"MCP failure",
-				`server: ${server}`,
-				"tool: list_events",
-				"transport: http",
-				"stage: request",
-				"failure: http_status",
-				"retryable: no",
-				`message: HTTP ${code}: Unauthorized`,
-				`code: ${code}`,
-				"next: Check the MCP endpoint and authentication configuration.",
-			].join("\n");
-		const result = (toolName: string, text: string, isError = true) => ({ toolName, content: [{ type: "text", text }], isError });
-		const signedOut =
-			"Google Calendar is signed out: its MCP server google-calendar answered HTTP 401. Do not retry this tool or any other Google Calendar tool, and do not try to sign in yourself. Tell the user Google Calendar is signed out and ask them to sign in to it again in the omp-agents dashboard, under Settings › Integrations.";
-		const before = Date.now();
-		const { toolResults } = exercise(
-			"google-accounts",
-			{
-				omp: true,
-				toolResults: [
-					result("mcp__google_calendar_list_events", failure("google-calendar", 401)),
-					// The same call made through an xd:// device, whose write hands on the device's result.
-					result("write", failure("google-calendar", 401)),
-					result("mcp__linear_list_issues", failure("linear", 401)),
-					result("mcp__gmail_search_threads", failure("gmail", 500)),
-					result("mcp__gmail_search_threads", failure("gmail", 401), false),
-				],
-			},
-			env,
-		);
-		expect(toolResults).toEqual([{ isError: true, text: signedOut }, { isError: true, text: signedOut }, null, null, null]);
-		const inbox = join(root, "config", "omp-agents", "sign-in-inbox");
-		const reports = readdirSync(inbox).map(name => JSON.parse(readFileSync(join(inbox, name), "utf8")));
-		expect(reports).toEqual([{ v: 1, server: "google-calendar", at: expect.any(Number) }]);
-		expect(reports[0].at).toBeGreaterThanOrEqual(before);
 	});
 });
 

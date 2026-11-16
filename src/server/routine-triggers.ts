@@ -1,15 +1,11 @@
 /**
- * What routines' triggers see: the pull requests, Slack messages, and calendar events the bell's checks read, and the
- * Gmail inboxes the Email page reads, turned into sightings, and the watch that tells which sightings are new since the
- * last answer for their scope.
+ * What routines' triggers see: the pull requests and Slack messages the bell's checks read, turned into sightings, and
+ * the watch that tells which sightings are new since the last answer for their scope.
  */
 import { MAX_TRIGGER_DETAIL, type TriggerEvent } from "../routines";
-import type { EmailAnswer } from "../shared/gmail";
 import { prKey, pullRequestName, pullRequestUrl, type PullRequestList, repoKey } from "../shared/github";
 import { type AgentOn, type YourMove, yourMoves } from "../shared/moves";
-import { EVENT_LEAD_MS } from "../shared/notices";
 import type { SlackFound } from "../slack-messages";
-import type { FoundEvent } from "./notices";
 
 /**
  * One thing a check found that a trigger may start a run for. `id` names it in the state that made it, so a change, such
@@ -109,47 +105,5 @@ export function slackSightings(found: SlackFound[]): Seen {
 					: `${message.from} wrote to you${message.type === "group-dm" ? " in a group message" : ""}${message.count > 1 ? ` (${message.count} messages)` : ""}`;
 			return { id: message.id, scope: SLACK_SCOPE, event: { kind: "slack", title, detail: clip(message.text), url: message.permalink } };
 		}),
-	};
-}
-
-/** Each unread conversation of the Gmail inboxes that answered, by its last message: new mail, there or in a conversation of its own, is a new sighting. */
-export function gmailSightings(answer: EmailAnswer): Seen {
-	const scope = (account: string): string => `gmail:${account}`;
-	return {
-		scopes: answer.accounts.flatMap(({ account, error }) => (error === null ? [scope(account)] : [])),
-		sightings: answer.threads
-			.filter(thread => thread.unread)
-			.map(({ account, id, at, from, subject, snippet, url }) => ({
-				id: `${account}:${id}:${at}`,
-				scope: scope(account),
-				event: { kind: "gmail", title: `${from} wrote: ${subject || "(no subject)"}`, detail: clip(snippet), url },
-			})),
-	};
-}
-
-const timeOfDay = (at: number): string => new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-/**
- * The timed events of each calendar that answered, `event:local` for this computer's and `event:google/<account>` for a
- * Google account's, that start within {@link EVENT_LEAD_MS} after `now`: an event is a new sighting once, as it comes
- * within that lead, and again if it moves.
- */
-export function eventSightings(calendars: { scope: string; events: FoundEvent[] }[], now: number): Seen {
-	return {
-		scopes: calendars.map(({ scope }) => scope),
-		sightings: calendars.flatMap(({ scope, events }) =>
-			events
-				.filter(event => event.start > now && event.start <= now + EVENT_LEAD_MS)
-				.map(event => ({
-					id: `${event.ref}:${event.start}`,
-					scope,
-					event: {
-						kind: "event",
-						title: `${event.title} starts at ${timeOfDay(event.start)}`,
-						detail: clip(`From ${timeOfDay(event.start)} to ${timeOfDay(event.end)}${event.calendar ? `, on ${event.calendar}` : ""}.`),
-						url: event.url,
-					},
-				})),
-		),
 	};
 }

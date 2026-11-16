@@ -12,7 +12,7 @@ import { SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabe
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { botAsking, type BotGroup, botGroupKey, botGroupLabel, botGroupListName, botGroups, botMovesTo, type BotPlace, botSections, botsGrouped, botStatus, type BotRow } from "../../bots-model";
-import { mailTime } from "../../labels";
+import { listTime } from "../../labels";
 import { hashForBots, hashForNewBot } from "../../routing";
 import { useStoredKeys } from "../../stored-state";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
@@ -208,7 +208,7 @@ function BotRowLink({ row: { bot, host, unread, preview, at }, active, sections,
 						<span className="flex items-baseline gap-2">
 							<span className={cn("truncate text-foreground", unread ? "font-semibold" : "font-medium")}>{bot.name}</span>
 							<time dateTime={when.toISOString()} className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">
-								{mailTime(at)}
+								{listTime(at)}
 							</time>
 						</span>
 						<span className="flex items-center gap-2">

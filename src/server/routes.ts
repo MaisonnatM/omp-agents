@@ -1,23 +1,20 @@
 /**
  * The HTTP API the page reads and writes omp's settings, analytics, pull requests, git checkouts, worktrees,
- * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, the model providers omp signs in to, Linear tickets and their files, the Linear issue a todo opens, Google Calendar and the events kept on this computer, your Gmail inbox, prompt images, the text files agent text names through, each module's own routes, and the dashboard's own build and update.
+ * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, the model providers omp signs in to, Linear tickets and their files, the Linear issue a todo opens, prompt images, the text files agent text names through, each module's own routes, and the dashboard's own build and update.
  * Every read goes through `get` and every write through `write`; each route group takes only the part of {@link RouteEnv} it reads.
  */
 import { isObject } from "../json";
 import { moduleRoutes } from "../modules";
-import type { GmailAccounts } from "../gmail";
 import type { Integrations } from "../integrations";
 import { readCollabAutoStart, shareTerminalSessions } from "../omp/config";
 import { isTerminalAccess } from "../shared/readiness";
 import { answer, fail, type Guards } from "./http";
 import { activityRoutes, type ActivityRoutesEnv } from "./activity-routes";
-import { calendarRoutes, type CalendarRoutesEnv } from "./calendar-routes";
 import { readStarterKitStatus } from "../readiness";
 import { storageRoutes, type StorageRoutesEnv } from "./storage-routes";
 import { routeKit, type Routes, type SessionRoutesEnv } from "./route-kit";
 import { dashboardRoutes, type DashboardRoutesEnv } from "./dashboard-routes";
 import { fileRoutes, type FileRoutesEnv } from "./file-routes";
-import { gmailRoutes } from "./gmail-routes";
 import { integrationRoutes } from "./integration-routes";
 import { processRoutes, type ProcessRoutesEnv } from "./process-routes";
 import { providerRoutes } from "./provider-routes";
@@ -32,10 +29,7 @@ import { artifactRoutes, type ArtifactRoutesEnv } from "./artifact-routes";
 export interface RouteEnv {
 	guards: Guards;
 	sessions: SessionRoutesEnv;
-	/** The MCP integrations, Gmail's and Google Calendar's accounts included. */
 	integrations: Integrations;
-	calendar: CalendarRoutesEnv;
-	gmail: GmailAccounts;
 	files: FileRoutesEnv;
 	artifacts: ArtifactRoutesEnv;
 	todos: TodoRoutesEnv;
@@ -67,8 +61,6 @@ export function createRoutes(env: RouteEnv): Routes {
 		},
 		...integrationRoutes(kit, env.integrations),
 		...providerRoutes(kit),
-		...calendarRoutes(kit, env.calendar),
-		...gmailRoutes(kit, env.gmail),
 		...pullRequestRoutes(kit, env.pullRequests),
 		...fileRoutes(kit, env.files),
 		...artifactRoutes(kit, env.artifacts),

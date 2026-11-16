@@ -127,7 +127,6 @@ test("a key matches only its intended scope, with no Esc interrupt, and Cmd+/ at
 		{ id: "browserRestore", scope: "anywhere", key: 0 },
 		{ id: "todoClose", scope: "outside-fields", key: 0 },
 		{ id: "sportJournalClose", scope: "outside-fields", key: 0 },
-		{ id: "emailClose", scope: "outside-fields", key: 0 },
 	]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true }), null, false)).toEqual([{ id: "attachFiles", scope: "composer", key: 0 }]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true, alt: true }), null, false)).toEqual([{ id: "model", scope: "anywhere", key: 0 }]);
@@ -143,11 +142,11 @@ test("a key matches only its intended scope, with no Esc interrupt, and Cmd+/ at
 	]);
 });
 
-test("↓ and ↑, or J and K, step through sessions, pull requests, todos, sport logs, conversations, and changed files, and ↑ also takes back a queued message", () => {
-	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "sportJournalNext", "emailNext", "nextChangedFile"]);
-	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "sportJournalPrevious", "emailPrevious", "previousChangedFile"]);
-	expect(press("j", "KeyJ")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "sportJournalNext", "emailNext", "nextChangedFile"]);
-	expect(press("k", "KeyK")).toEqual(["sessionsPrevious", "previousPullRequest", "todoPrevious", "sportJournalPrevious", "emailPrevious", "previousChangedFile"]);
+test("↓ and ↑, or J and K, step through sessions, pull requests, todos, sport logs, and changed files, and ↑ also takes back a queued message", () => {
+	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "sportJournalNext", "nextChangedFile"]);
+	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "sportJournalPrevious", "previousChangedFile"]);
+	expect(press("j", "KeyJ")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "sportJournalNext", "nextChangedFile"]);
+	expect(press("k", "KeyK")).toEqual(["sessionsPrevious", "previousPullRequest", "todoPrevious", "sportJournalPrevious", "previousChangedFile"]);
 	expect(shortcutsFor(keyEvent("j", "KeyJ"), null, false).map(({ scope }) => scope)).not.toContain("anywhere");
 });
 
@@ -184,12 +183,12 @@ test("the Browser's preload hands over exactly the keys of the pick mode shortcu
 	expect(keys.toSorted()).toEqual([...PICK_MODE_KEYS].toSorted());
 });
 
-test("G then W or M goes to a page only right after a plain G, and P picks a todo's priority", () => {
+test("G then W goes to a page only right after a plain G, and P picks a todo's priority", () => {
 	const after = (previous: string | null, key: string, mods: Mods = {}) => pressOn(false, key, `Key${key.toUpperCase()}`, mods, previous);
-	// R alone switches the Browser's pick mode or replies on an open conversation, and a G before it changes nothing.
-	expect(after("g", "r")).toEqual(["browserPickRegion", "emailReply"]);
+	// R alone switches the Browser's pick mode, and a G before it changes nothing.
+	expect(after("g", "r")).toEqual(["browserPickRegion"]);
 	expect(after("g", "w")).toEqual(["workspace"]);
-	expect(after("g", "m")).toEqual(["email"]);
+	expect(after("g", "m")).toEqual([]);
 	expect(pressOn(false, ",", "Comma", {}, "g")).toEqual([]);
 	expect(pressOn(false, ",", "Comma")).toEqual([]);
 	expect(after(null, "n")).toEqual([]);

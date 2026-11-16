@@ -12,7 +12,7 @@ test("only a tab's or Settings' own page has a list; the panes, New session, Not
 	expect(listPageOf({ kind: "notifications" }, "notifications")).toBeNull();
 	expect(listPageOf({ kind: "pull-requests", target: null }, "pull-requests")).toBeNull();
 	expect(listPageOf({ kind: "tickets", target: null }, "tickets")).toBeNull();
-	expect(listPageOf({ kind: "calendar" } as Page, "calendar")).not.toBeNull();
+	expect(listPageOf({ kind: "sport", tab: "week", day: null } as Page, "sport")).not.toBeNull();
 	expect(listPageOf(BOTS, null)).toBeNull();
 });
 

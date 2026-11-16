@@ -6,7 +6,6 @@ import type { Notice } from "../../src/shared/notices";
 import { NoticeOrigin } from "./notices";
 
 const base = { id: "n", at: 0, seen: false, read: false };
-const event = { ...base, kind: "event", title: "Standup", start: 0, end: 1, color: null, sessionId: null } as const;
 
 const sourceOf = (notice: Notice) => renderToStaticMarkup(<NoticeOrigin notice={notice} />);
 
@@ -28,13 +27,6 @@ test("a toast names the source of its notice beside that source's logo", () => {
 
 	const omp = sourceOf({ ...base, kind: "omp", current: "1.0.0", latest: "1.1.0", status: { state: "available" } });
 	expect(omp).toContain(">omp</span>");
-});
-
-test("an event names Google Calendar only when it comes from a Google calendar", () => {
-	expect(sourceOf({ ...event, calendar: "Work", url: "https://calendar.google.com/e" })).toContain(">Google Calendar</span>");
-	const local = sourceOf({ ...event, calendar: null, url: null });
-	expect(local).toContain(">Calendar</span>");
-	expect(local).not.toContain("Google");
 });
 
 test("a provider without a known logo still shows its name", () => {

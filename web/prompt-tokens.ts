@@ -71,7 +71,7 @@ const PATTERNS: readonly Pattern[] = [
 	},
 	{
 		// The `@` menu's category prefixes are a query still being typed, not a path.
-		re: /(?<=^|\s)@(?!(?:file|todo|ticket|pr|person|mail|event|session):)("[^"\n]+"|[^\s"]+)(?=\s|$)/g,
+		re: /(?<=^|\s)@(?!(?:file|todo|ticket|pr|person|session):)("[^"\n]+"|[^\s"]+)(?=\s|$)/g,
 		token: m => {
 			const path = m[1].replace(/^"(.*)"$/, "$1");
 			const directory = path.endsWith("/");

@@ -22,10 +22,9 @@ import {
 } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
 import { ClientConfigError } from "../mcp-clients";
-import { GOOGLE_SERVICES, type GoogleService, type IntegrationTarget, type McpIntegration } from "../shared/accounts";
+import type { IntegrationTarget, McpIntegration } from "../shared/accounts";
 import { answer, checked, fail } from "./http";
 import {
-	parseGoogleClient,
 	parseIntegrationTarget,
 	parseMcpServerAdd,
 	parseMcpServerEnabled,
@@ -41,34 +40,23 @@ import type { Handler, RouteKit, Routes } from "./route-kit";
 
 /** The MCP integrations, the other MCP servers omp loads, and Linear tickets. */
 export function integrationRoutes({ get, media, write }: RouteKit, integrations: Integrations): Routes {
-	/** `GET /api/integrations[?fresh]`: where omp stands with each MCP integration's server or accounts, and the sign-in the page last started. */
+	/** `GET /api/integrations[?fresh]`: where omp stands with each MCP integration's server, and the sign-in the page last started. */
 	const loaded = get((params) => answer(() => integrations.load(params.has("fresh"))));
 
-	/** A write of `{ id, account }` naming an MCP integration and one of its accounts, answered with that integration as `act` leaves it. */
+	/** A write of `{ id }` naming an MCP integration, answered with that integration as `act` leaves it. */
 	const integrationWrite = (act: (target: IntegrationTarget) => Promise<McpIntegration>): Handler =>
-		write(
-			(body) => checked(parseIntegrationTarget(body), "Expected { id, account } naming an integration and, for Gmail or Google Calendar, an account or null"),
-			act,
-		);
+		write((body) => checked(parseIntegrationTarget(body), "Expected { id } naming an integration"), act);
 
-	/** `PUT /api/integrations/sign-in`: starts a sign-in to an account, or adds one, and answers with its authorization address to open. */
+	/** `PUT /api/integrations/sign-in`: starts a sign-in, and answers with its authorization address to open. */
 	const integrationSignIn = integrationWrite(integrations.startSignIn);
 
-	/** `PUT /api/integrations/remove`: signs out of the integration's server, as `/mcp unauth` does, and removes an account's server unless it is the last. */
+	/** `PUT /api/integrations/remove`: signs out of the integration's server, as `/mcp unauth` does. */
 	const integrationRemove = integrationWrite(integrations.remove);
 
 	const refuseClient = (err: unknown): Response | null => (err instanceof ClientConfigError ? fail(400, err.message) : null);
 
 	/** `PUT /api/integrations/slack/client`: `{ clientId, clientSecret?, redirectUri, callbackPort, scope }` of your Slack app. */
 	const slackClient = write((body) => checked(parseSlackClient(body)), integrations.saveSlackClient, refuseClient);
-
-	/** `PUT /api/integrations/<google-calendar|gmail>/client`: `{ clientId, clientSecret?, callbackPort }` of your Google OAuth client for that service. */
-	const googleClient = (id: GoogleService): Handler =>
-		write(
-			(body) => checked(parseGoogleClient(body)),
-			(input) => integrations.saveGoogleClient(id, input),
-			refuseClient,
-		);
 
 	/** `GET /api/mcp-servers[?fresh]`: every user-level MCP server omp loads, where omp stands with each, and its sign-in under way. */
 	const mcpServers = get((params) => answer(() => loadMcpServers(params.has("fresh"))));
@@ -161,7 +149,6 @@ export function integrationRoutes({ get, media, write }: RouteKit, integrations:
 		"/api/mcp-servers/enabled": { PUT: mcpServerEnabled },
 		"/api/mcp-servers/remove": { PUT: mcpServerRemove },
 		"/api/integrations/slack/client": { PUT: slackClient },
-		...Object.fromEntries(GOOGLE_SERVICES.map((id) => [`/api/integrations/${id}/client`, { PUT: googleClient(id) }])),
 		"/api/tickets": { GET: tickets },
 		"/api/linear/teams": { GET: teams },
 		"/api/linear/users": { GET: linearUsers },

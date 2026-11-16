@@ -6,7 +6,6 @@ import { canonicalJson } from "./json";
 import { runChecked } from "./proc";
 import { isDue, type RoutineSpec } from "./routines";
 import { BotsFile } from "./server/bots-file";
-import { CalendarsFile } from "./server/calendars-file";
 import type { ListKind } from "./server/list-registry";
 import { PreferencesFile } from "./server/preferences-file";
 import { ProcessSettingsFile } from "./server/process-settings-file";
@@ -40,7 +39,7 @@ const text = (value: string) => ({ text: value, executable: false });
 /** Stores that read `values`, `{}` for the rest, and take whatever sync writes. */
 const fixedStores = (values: Partial<Record<SyncStoreId, unknown>> = {}): Record<SyncStoreId, SyncStore> => {
 	const store = (id: SyncStoreId): SyncStore => ({ read: () => values[id] ?? {}, parse: value => ({ ok: value }), write: () => {} });
-	return { "source-control": store("source-control"), todos: store("todos"), preferences: store("preferences"), workspaces: store("workspaces"), calendars: store("calendars"), bots: store("bots") };
+	return { "source-control": store("source-control"), todos: store("todos"), preferences: store("preferences"), workspaces: store("workspaces"), bots: store("bots") };
 };
 
 describe("what syncs", () => {
@@ -82,7 +81,6 @@ describe("what syncs", () => {
 			"dashboard/preferences.json": text("{}\n"),
 			"dashboard/workspaces.json": text("{}\n"),
 			"dashboard/bots.json": text("{}\n"),
-			"dashboard/calendars.json": text("{}\n"),
 		});
 		expect(skipped.sort((a, b) => a.path.localeCompare(b.path))).toEqual([
 			{ path: "dashboard/todos.json", reason: "credential" },
@@ -232,7 +230,6 @@ function machine(root: string, remote: string) {
 		preferences: new PreferencesFile(config("preferences.json")),
 		processes: new ProcessSettingsFile(config("processes.json")),
 		workspaces: new WorkspacesFile(config("workspaces.json")),
-		calendars: new CalendarsFile(config("calendars.json")),
 		bots: new BotsFile(config("bots.json")),
 		botsDir: join(root, "data", "bots"),
 		routines: new RoutinesFile(config("routines.json")),
@@ -275,7 +272,7 @@ describe("SettingsSync", () => {
 		put(agentsMd(a), `Notes live in ${a.home}/notes.\n`);
 		put(join(a.omp, "skills", "alpha", "SKILL.md"), "# Alpha\n");
 		a.sourceControl.apply({ op: "repo", repo: join(a.home, "code", "app"), on: true });
-		const sent = ["bots", "calendars", "preferences", "source-control", "todos", "workspaces"].map(name => `dashboard/${name}.json`);
+		const sent = ["bots", "preferences", "source-control", "todos", "workspaces"].map(name => `dashboard/${name}.json`);
 		expect((await a.sync.sync()).last).toMatchObject({ kind: "synced", received: [], sent: [...sent, "omp/AGENTS.md", "omp/skills/alpha/SKILL.md"] });
 		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: ["dashboard/source-control.json", "omp/AGENTS.md", "omp/skills/alpha/SKILL.md"], sent: [] });
 		expect(readFileSync(agentsMd(b), "utf8")).toBe("Notes live in ~/notes.\n");

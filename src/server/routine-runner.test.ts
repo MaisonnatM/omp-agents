@@ -168,7 +168,7 @@ describe("RoutineRunner", () => {
 			const file = new RoutinesFile(routinesPath());
 			saveTriggered(file, "slack", ["slack"]);
 			saveTriggered(file, "prs", ["pull-request"], []);
-			saveTriggered(file, "events", ["event"]);
+			saveTriggered(file, "scheduled", []);
 			saveTriggered(file, "paused", ["slack"], [everyHour], false);
 			const { runner, fake } = harness(file);
 			fake.now = T0 + HOUR / 2;

@@ -7,7 +7,7 @@ import { completionTrigger, type Trigger } from "../completion-trigger";
 import { type Composer, completionOption, fileSearch, mentionMenu, mentionQuery, type MenuOption, type MenuSection, wants } from "../mentions";
 import type { Completions } from "../pane-store";
 import type { TicketChoice } from "../../src/shared/tickets";
-import { useMailAndEvents, useRead, useSearchSources } from "../reads";
+import { useRead, useSearchSources } from "../reads";
 import { useDashboardStatus, useMentionLists } from "./dashboard-context";
 import type { PromptEditorHandle } from "./prompt-editor";
 
@@ -108,13 +108,12 @@ export function useCompletion({ editorRef, draft, setDraft, completions, onCompl
 	const query = token && mentionQuery(token);
 	const { pullRequestsScope } = useDashboardStatus();
 	const { tickets, pullRequestRepos } = useSearchSources(query !== null && wants(query, "ticket"), pullRequestsScope);
-	const { threads, events } = useMailAndEvents(query !== null && wants(query, "mail"), query !== null && wants(query, "event"));
 	const linearUsers = useRead<TicketChoice[]>(query !== null && wants(query, "person") ? "/api/linear/users" : null).data ?? NO_USERS;
 	const answer = completions && completions.reqId === menu?.reqId ? completions : null;
 	// omp answers `/` with a `skill:` row besides its commands, and `/skill:` with skills only; each list keeps its own kind.
 	const ompItems = menu && menu.trigger.kind !== "mention" ? (answer?.items ?? []).filter(item => item.kind === menu.trigger.kind) : [];
 	const sections: MenuSection[] = token
-		? mentionMenu({ text: draft, token, data: { ...lists, tickets, pullRequestRepos, linearUsers, threads, events }, composer, files: answer?.items ?? null })
+		? mentionMenu({ text: draft, token, data: { ...lists, tickets, pullRequestRepos, linearUsers }, composer, files: answer?.items ?? null })
 		: ompItems.length
 			? [{ title: null, options: ompItems.map(completionOption) }]
 			: [];

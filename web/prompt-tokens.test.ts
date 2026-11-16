@@ -36,7 +36,7 @@ test("a reference that ends at the caret is still being typed", () => {
 });
 
 test("the @ menu's category prefixes and mid-word @ are not paths", () => {
-	expect(kinds("@todo: @ticket:ENG @person:ana @mail:x @event:y user@host.com")).toEqual([]);
+	expect(kinds("@todo: @ticket:ENG @person:ana @session:x user@host.com")).toEqual([]);
 });
 
 test("a Browser annotation reads back as one chip, whatever backticks, quotes, and lines its text holds", () => {
