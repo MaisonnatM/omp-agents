@@ -41,7 +41,7 @@ import { toasts } from "./components/toaster";
 import { botRows } from "./bots-model";
 import { routeOf } from "./dashboard-state";
 import { useOpenPullRequest } from "./open-pull-request";
-import { integrationsStore } from "./reads";
+import { integrationsStore, UNREAD } from "./reads";
 import { onArtifactOpen, onArtifactsReveal } from "./artifact-requests";
 import { onReviewRequest } from "./review-pages";
 import { revealDetailsTab } from "./details-tabs";
@@ -346,16 +346,28 @@ export function App() {
 								{(detailsView || openBot) && (
 									<DashboardSidebar side="right" className="[grid-area:details]" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")} address={address}>
 										{detailsView ? (
-											<SessionDetails
-												key={hashForView(detailsView)}
-												view={detailsView}
-												working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
-												cwd={focused.cwd ?? null}
-												hosts={visible.hosts}
-												sessionId={focused.sessionId}
-												host={focused.host ?? null}
-												row={focused.row ?? null}
-											/>
+											// The **Subagent** tab draws a conversation, which reads the same settings the panes do.
+											<Plans value={state.usage?.plans ?? NO_PLANS}>
+												<ActivityVisibility.Provider value={display.activityVisibility}>
+													<ToolsExpanded value={display.toolsExpanded}>
+														<MentionListsContext.Provider value={mentionLists}>
+															<SessionDetails
+																key={hashForView(detailsView)}
+																view={detailsView}
+																working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
+																cwd={focused.cwd ?? null}
+																hosts={visible.hosts}
+																sessionId={focused.sessionId}
+																host={focused.host ?? null}
+																lastHost={focused.lastHost}
+																row={focused.row ?? null}
+																models={(detailsView.kind === "live" && state.models.get(detailsView.instanceId)) || UNREAD}
+																workspaces={workspaces}
+															/>
+														</MentionListsContext.Provider>
+													</ToolsExpanded>
+												</ActivityVisibility.Provider>
+											</Plans>
 										) : (
 											openBot && (
 												<BotDetails

@@ -4,9 +4,9 @@
   It follows a live session, one of its subagents, or a past session.
   It hides for a pull request's details, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side; a maximized pane brings it back.
 - It works as Capy's side panel: its header shows the tabs you opened, and **+** after them lists every tab the view can show, the one on screen checked, with its item count.
-  The tabs are **Overview**, **PRs**, **Tickets**, which shows only for a session with a Linear issue, **Browser**, which shows only in the [desktop app](desktop-app.md) for a live session or subagent, and **Artifacts**, which shows only once the agent saved an artifact.
+  The tabs are **Overview**, the subagent you opened from it, **PRs**, **Tickets**, which shows only for a session with a Linear issue, **Browser**, which shows only in the [desktop app](desktop-app.md) for a live session or subagent, and **Artifacts**, which shows only once the agent saved an artifact.
   Pick one in the **+** menu to open it as a tab, or to show it when it is already open; **Overview** is always open.
-  Below the tabs, the menu lists a running session's subagents, each opening its view, then **New terminal**, which opens the [terminal](terminal.md) panel on a new shell; a paired phone leaves **New terminal** out.
+  Below the tabs, the menu lists a running session's subagents, each opening in the sidebar as **Overview**'s rows do, then **New terminal**, which opens the [terminal](terminal.md) panel on a new shell; a paired phone leaves **New terminal** out.
   Each other tab shows its count after its name, and its ×, on hover and always on the tab on screen, closes it; so does Delete on a focused tab, and closing the one on screen shows the tab before it.
   The left and right arrows move between the open tabs.
   ⇧⌘G shows **Overview** while the sidebar shows, and pressed again on **Overview** it reviews the session's changes from its first changed file.
@@ -17,6 +17,9 @@
 - **Overview** lists the view's **Subagents**, then the **Files**, **Images**, and **Sources** of [Changed files and images](changed-files-and-images.md), each under a filled header with its count that folds on a click; see [Conversations](conversations.md) for the **Subagents** section.
   A section shows once it has something to list, and the tab says **Nothing yet** once the session's lists have loaded and none has.
   A past session's view shows its files, images, and sources but no subagents.
+- Clicking a subagent in **Overview** opens its conversation in a tab named after it, after **Overview**, while the session's own conversation stays in the pane.
+  The tab streams the subagent's transcript and has its composer, which steers or messages the subagent as its own view's does; picking another subagent shows it in the same tab.
+  Cmd-click (Ctrl-click on Linux and Windows) still opens the subagent in a split, and middle-click in the app window.
 - **PRs** shows the pull requests the session and its subagents submitted or worked on, as its header lists them, the session's own first; a subagent's view shows its session's.
   A pull request the session only read shows only when the session's own prompt names it, as `#7049` or `PR 7049`; see [Pull requests](pull-requests.md).
   The pull requests the session worked on, such as one it opened, pushed, or edited, come before those its prompt only links or names, so the one it opened shows before the one the prompt linked.

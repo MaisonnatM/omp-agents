@@ -71,7 +71,7 @@
   A second line names its model after the logo of the org that makes it, labeled as the composer labels models, then its type and how long it has run, such as `Haiku 5.5 · task · 5m`; the time counts up while the subagent runs and stops when it does.
   A subagent the dashboard did not see start, or saw stopped without seeing when, shows no time; hover a row for its full activity.
   The section's title counts the subagents, and how many are running.
-  Click a row to open the subagent in this pane, in place of the conversation, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split beside the conversation, or middle-click to open it in the app window in place of what it shows.
+  Click a row to open the subagent's conversation in a sidebar tab named after it, beside the session's own in the pane, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split beside the conversation, or middle-click to open it in the app window in place of what it shows.
   A subagent's own view lists only the subagents it started, and theirs; a past session shows no section, because the dashboard opens subagents only of a running session.
   When the agent gives two or more subagents the same task and records them with the kit's `arena` tool, those runners show above the other rows in an **Arena** box with the task, as cards side by side lettered A, B, C in the order it started them.
   Each card shows the runner's id, its status, what it is doing, and the same model, type, and time line as a row; the judge, once the agent records one, sits on a row under the cards.
