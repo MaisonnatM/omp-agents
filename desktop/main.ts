@@ -28,7 +28,7 @@ import {
 	type WebContents,
 } from "electron";
 import { errorText, isObject, num } from "../src/json";
-import { ACCESS_CHANNEL, INSTALL_STARTER_KIT_CHANNEL, isWebUrl, OPEN_DASHBOARD_CHANNEL, PICK_DIRECTORY_CHANNEL, PREVIEW_PARTITION, SIGN_IN_CHANNEL, type StarterKitInstallResult, TARGET_URL_CHANNEL } from "../src/shared/desktop-bridge";
+import { ACCESS_CHANNEL, INSTALL_STARTER_KIT_CHANNEL, isWebUrl, OPEN_DASHBOARD_CHANNEL, PICK_DIRECTORY_CHANNEL, PREVIEW_PARTITION, SIGN_IN_CHANNEL, type StarterKitInstallResult } from "../src/shared/desktop-bridge";
 import { tokenFile } from "../src/paths";
 import { dashboardHosts, originOf, portFromEnv, QUICK_TODO_EVENT } from "../src/server/address";
 import { helloProof, loadToken, pageAccess } from "../src/server/auth";
@@ -282,14 +282,6 @@ function createWindow(): BrowserWindow {
 	});
 
 	const contents = win.webContents;
-	const sendTargetURL = (url: string): void => {
-		if (isDashboard(contents.getURL())) contents.send(TARGET_URL_CHANNEL, url);
-	};
-	contents.on("update-target-url", (_event, url) => sendTargetURL(url));
-	contents.on("did-start-navigation", details => {
-		if (details.isMainFrame) sendTargetURL("");
-	});
-	win.on("blur", () => sendTargetURL(""));
 	// A browser cannot sign in, so a session link opened as a new window, such as by a middle-click, opens here instead.
 	contents.setWindowOpenHandler(({ url }) => {
 		const page = dashboardPage(url);

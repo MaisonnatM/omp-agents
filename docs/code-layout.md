@@ -26,7 +26,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   Its header is `ConversationHeader` in `web/components/conversation-header.tsx`, which draws a private session's lock, and a past session's view is `web/components/past-conversation.tsx`.
   The session title in either header, which a click turns into a field that renames the session, is `SessionTitle` in `web/components/session-title.tsx`.
   Which split a plain click brings back, and each split's sizes, live in `web/pane-navigation.ts`, which `web/dashboard-state.ts` runs for every pane change.
-- Desktop link address at the bottom left: `DesktopLinkPreview` in `web/components/desktop-link-preview.tsx`, mounted by `web/app.tsx`.
+- Link preview card, over a link to another site: `LinkPreviewCard` in `web/components/link-preview-card.tsx`, mounted by `web/app.tsx`, on the shared `Popover`; agent text opts its links out of page reads with `linkPages` in `MarkdownPreset` (`web/components/message-markdown.tsx`), and the site's icon and address are `SiteIcon` and `SiteAddress` in `web/components/site-icon.tsx`, which the Overview's Sources rows share.
 - Transcript: `web/components/transcript.tsx`, with message bubbles from `web/components/ui/chat-message.tsx` and tool calls and thinking as `ActivityGroup`, on shadcn's `Trace` from `web/components/ui/trace.tsx`.
   A message's code block is `CodeBlock` from `web/components/ui/code-block.tsx`, which `web/components/message-markdown.tsx` renders for each fence.
   In a session's conversation, a `mermaid` or `chart` fence is `SessionVisual` from `web/components/session-visual.tsx` instead, through the `SESSION_AGENT_PRESET` and `SESSION_PROMPT_PRESET` that `MessageRow` passes, and its chart is shadcn's `web/components/ui/chart.tsx`.

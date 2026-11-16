@@ -96,8 +96,8 @@ test("the inbox lists each thread in Gmail's order with its last sender, first s
 
 test("a snippet's HTML entities read as the characters they stand for", async () => {
 	const answers = twoThreads();
-	answers[INBOX] = { threads: [{ id: "18f2a", snippet: "Tom &amp; Jerry&#39;s &lt;draft&gt; is &quot;ready&quot; &#x1F44B; &nbsp;" }] };
-	expect((await clientOf(answers).client.inbox()).map(thread => thread.snippet)).toEqual(["Tom & Jerry's <draft> is \"ready\" 👋 &nbsp;"]);
+	answers[INBOX] = { threads: [{ id: "18f2a", snippet: "Tom &amp; Jerry&#39;s &lt;draft&gt; is &quot;ready&quot; &#x1F44B; &nbsp; &bogus;" }] };
+	expect((await clientOf(answers).client.inbox()).map(thread => thread.snippet)).toEqual(["Tom & Jerry's <draft> is \"ready\" 👋 \u00a0 &bogus;"]);
 });
 
 test("a thread without an id or without messages is left out", async () => {

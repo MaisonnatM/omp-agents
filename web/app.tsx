@@ -16,7 +16,7 @@ import {
 	MentionListsContext,
 	UserTodosContext,
 } from "./components/dashboard-context";
-import { DesktopLinkPreview } from "./components/desktop-link-preview";
+import { LinkPreviewCard } from "./components/link-preview-card";
 import { FileDialog } from "./components/file-dialog";
 import { textFileUrl } from "./file-paths";
 import { PageSwitch } from "./components/page-switch";
@@ -418,7 +418,7 @@ export function App() {
 									onCreateTicket={setNewTicket}
 								/>
 							</SidebarProvider>
-							<DesktopLinkPreview />
+							<LinkPreviewCard />
 						</div>
 					</UserTodosContext.Provider>
 				</ScheduledSends.Provider>
