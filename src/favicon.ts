@@ -1,13 +1,13 @@
 /**
- * The icons of the web sites the Overview tab's Sources section lists, fetched by the server so the page's policy can
- * keep refusing outside images and no third-party icon service learns which sites a session opened.
+ * The icons of the web sites the page names, such as the Overview tab's Sources and the link preview card, fetched by the
+ * server so the page's policy can keep refusing outside images and no third-party icon service learns which sites a session opened.
  * A site's icon is its `/favicon.ico`, else the first icon its home page links; only public HTTPS hosts are asked.
  */
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
 const MAX_ICON_BYTES = 256 * 1024;
-const MAX_PAGE_BYTES = 512 * 1024;
+export const MAX_PAGE_BYTES = 512 * 1024;
 const TIMEOUT_MS = 8000;
 const MAX_REDIRECTS = 3;
 const CACHE_TTL_MS = 24 * 60 * 60_000;
@@ -18,8 +18,22 @@ const PUBLIC_HOST = /^(?=.{1,253}$)(?:[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?\.)+[a-z]
 const LOCAL_SUFFIX = /\.(?:local|localhost|internal|lan|home|arpa)$/;
 /** Each `<link>` tag of a page, whose `rel` and `href` the reader takes apart. */
 const LINK_TAG = /<link\b[^>]*>/gi;
-/** A host's icon, or `null` when it has none; misses are kept too, so a site without one is asked once a day. */
-const cache = new Map<string, { at: number; icon: Blob | null }>();
+
+/** `load` remembered for a day per key, up to 256 keys, the oldest dropped first; a miss or a failure is kept as `null` too, so a key is asked once a day. */
+export function dailyCache<T>(load: (key: string, signal: AbortSignal) => Promise<T | null>): (key: string) => Promise<T | null> {
+	const cache = new Map<string, { at: number; value: T | null }>();
+	return async key => {
+		const now = Date.now();
+		let entry = cache.get(key);
+		if (!entry || now - entry.at >= CACHE_TTL_MS) {
+			entry = { at: now, value: await load(key, AbortSignal.timeout(TIMEOUT_MS)).catch(() => null) };
+			cache.delete(key);
+			cache.set(key, entry);
+			if (cache.size > MAX_CACHE_ENTRIES) cache.delete(cache.keys().next().value!);
+		}
+		return entry.value;
+	};
+}
 
 /** Whether `address` is an IPv4 or IPv6 address only this computer or its network reaches. */
 function privateAddress(address: string): boolean {
@@ -41,8 +55,11 @@ async function publicHost(host: string): Promise<string | null> {
 	return addresses.length > 0 && !addresses.some(({ address }) => privateAddress(address)) ? name : null;
 }
 
-/** The body of `url` when it answers OK with a type `accept` takes and at most `limit` bytes, following redirects to public HTTPS hosts; `null` otherwise. */
-async function fetchPublic(url: URL, accept: RegExp, limit: number, signal: AbortSignal): Promise<{ url: URL; body: Blob } | null> {
+/**
+ * The body of `url` when it answers OK with a type `accept` takes, following redirects to public HTTPS hosts; `null` otherwise.
+ * A body past `limit` bytes is refused, or with `cut` kept to its first `limit` bytes, enough for a page's `<head>`.
+ */
+export async function fetchPublic(url: URL, accept: RegExp, limit: number, signal: AbortSignal, cut = false): Promise<{ url: URL; body: Blob } | null> {
 	for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
 		if (url.protocol !== "https:" || url.port || url.username || url.password || !(await publicHost(url.hostname))) return null;
 		const response = await fetch(url.href, { redirect: "manual", signal, headers: { Accept: "image/*, text/html;q=0.5" } });
@@ -55,15 +72,20 @@ async function fetchPublic(url: URL, accept: RegExp, limit: number, signal: Abor
 			continue;
 		}
 		const type = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
-		if (!response.ok || !accept.test(type) || Number(response.headers.get("content-length")) > limit) {
+		if (!response.ok || !accept.test(type) || (!cut && Number(response.headers.get("content-length")) > limit)) {
 			await response.body?.cancel();
 			return null;
 		}
 		const chunks: BlobPart[] = [];
 		let size = 0;
 		for await (const chunk of response.body ?? []) {
+			if (size + chunk.byteLength > limit) {
+				if (!cut) return null;
+				chunks.push(chunk.subarray(0, limit - size));
+				size = limit;
+				break;
+			}
 			size += chunk.byteLength;
-			if (size > limit) return null;
 			chunks.push(chunk);
 		}
 		return size === 0 ? null : { url, body: new Blob(chunks, { type }) };
@@ -82,34 +104,26 @@ function linkedIcon(html: string, base: URL): URL | null {
 	return (icons.find(icon => !icon.touch) ?? icons[0])?.url ?? null;
 }
 
-async function fetchIcon(host: string, signal: AbortSignal): Promise<Blob | null> {
+const iconOf = dailyCache(async (host, signal): Promise<Blob | null> => {
 	const icon = /^image\/[a-z\d.+-]+$/;
 	const direct = await fetchPublic(new URL(`https://${host}/favicon.ico`), icon, MAX_ICON_BYTES, signal);
 	if (direct) return direct.body;
 	const page = await fetchPublic(new URL(`https://${host}/`), /^text\/html$/, MAX_PAGE_BYTES, signal);
 	const linked = page && linkedIcon(await page.body.text(), page.url);
 	return linked ? ((await fetchPublic(linked, icon, MAX_ICON_BYTES, signal))?.body ?? null) : null;
-}
+});
 
 /** `GET /api/favicon?host=`: the icon of public site `host`, or 404 when it has none or is not public; upstream headers never cross. */
 export async function readFavicon(host: string | null): Promise<Response> {
 	const missing = () => new Response(null, { status: 404, headers: { "Cache-Control": "private, max-age=3600" } });
 	const name = host?.toLowerCase() ?? "";
 	if (!PUBLIC_HOST.test(name) || LOCAL_SUFFIX.test(name)) return missing();
-	const now = Date.now();
-	let entry = cache.get(name);
-	if (!entry || now - entry.at >= CACHE_TTL_MS) {
-		const icon = await fetchIcon(name, AbortSignal.timeout(TIMEOUT_MS)).catch(() => null);
-		entry = { at: now, icon };
-		cache.delete(name);
-		cache.set(name, entry);
-		if (cache.size > MAX_CACHE_ENTRIES) cache.delete(cache.keys().next().value!);
-	}
-	if (!entry.icon) return missing();
-	return new Response(entry.icon, {
+	const icon = await iconOf(name);
+	if (!icon) return missing();
+	return new Response(icon, {
 		headers: {
 			// An icon that claims to be SVG still draws only as an image here: the sandbox keeps any script in it from running.
-			"Content-Type": entry.icon.type,
+			"Content-Type": icon.type,
 			"Cache-Control": "private, max-age=86400",
 			"X-Content-Type-Options": "nosniff",
 			"Content-Security-Policy": "sandbox; default-src 'none'",

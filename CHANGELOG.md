@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-16
 
+- Resting the pointer on a link to another site shows a card with the site, the page's title and description, and the address, in place of the address at the bottom left of the window.
 - Linear tickets has the Pull requests header: a search, All, Active, Todo, and Backlog tabs, a Filter by status, priority, label, project, team, and dates, and a Display menu to group by status, priority, project, or nothing.
 - Todo has Filter and Display above its list: filter by priority, assignee, link, due date, and creation date, and group by status, priority, assignee, or nothing.
 - Notifications has a search, All and Unread tabs, a Filter by source and date in place of the source buttons, and a Display menu to group by new and earlier, source, or nothing.

@@ -52,4 +52,5 @@
   A page that fails shows the same in its place, and opening another view clears it.
 - Session conversations, their composers, and the new-session composer are at most 48rem wide.
 - A session header shows its **Copy session ID** and trajectory buttons only while the pointer is over the title, while one of them has keyboard focus, or always on a touch screen.
-- Pointing at or tabbing to a link shows its address at the bottom left of the window.
+- Resting the pointer on a link to another site, or tabbing to it, shows a card under it with the site's icon and name, the page's title and description, and the address; a page that is private or not on the public internet shows only its address.
+  Escape, a click, or a scroll closes it.

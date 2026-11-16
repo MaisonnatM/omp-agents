@@ -9,7 +9,6 @@ import { arrayOf, fields, type Guard, isBoolean, isNumber, isString, oneOf, opti
 export const DESKTOP_BRIDGE = "ompDesktop";
 export const BADGE_CHANNEL = "omp-agents:badge";
 export const ALERT_CHANNEL = "omp-agents:alert";
-export const TARGET_URL_CHANNEL = "omp-agents:target-url";
 export const SOUND_CHANNEL = "omp-agents:sound";
 export const SIGN_IN_CHANNEL = "omp-agents:sign-in";
 /** Asked synchronously by the preload before the page's scripts run: the localStorage entries that sign the page in, or `null`. */
@@ -219,8 +218,6 @@ export interface DesktopBridge {
 	alert(alert: SessionAlert): void;
 	/** Plays `sound` now, for a preview or an alert while the window has focus; absent in an app built before it. */
 	playSound?(sound: NotificationSound): void;
-	/** Reports the hovered or focused link's URL; an empty string clears it. Returns the subscription's cleanup; absent in an app built before it. */
-	onTargetURL?(listener: (url: string) => void): () => void;
 	/** Loads the page again with the current token, keeping its hash, when the token file holds a newer one; absent in an app built before it. */
 	signIn?(): void;
 	/** Tells the shell the {@link BrowserPorts} of the Browser's guest `guestId`, for {@link appAddress}; absent in an app built before it. */
