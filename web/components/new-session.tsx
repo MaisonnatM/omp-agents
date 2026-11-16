@@ -116,10 +116,14 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			: pickedChoice;
 	const starting = launch?.phase === "starting" || (scheduled?.busy ?? false);
 	const typeable = connected && !starting;
-	// The draft takes the keyboard whenever its directory is chosen, from the composer's picker or a sidebar's new session, and once it can be typed in.
+	// Choosing the draft's directory, from the composer's picker or a sidebar's new session, hands it the keyboard.
 	useEffect(() => {
 		if (typeable) editorRef.current?.focus();
-	}, [cwd, typeable]);
+	}, [cwd]);
+	// Once it can be typed in, it takes the keyboard only if nothing else holds it, so a reconnect never pulls the caret out of another field.
+	useEffect(() => {
+		if (typeable && document.activeElement === document.body) editorRef.current?.focus();
+	}, [typeable]);
 	const privacy = todo ? null : <PrivatePill on={isPrivate} onToggle={() => setPrivate(on => !on)} disabled={starting} />;
 	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] } });
 	const { send } = useDashboardActions();

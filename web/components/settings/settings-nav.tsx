@@ -2,13 +2,14 @@ import { useState } from "react";
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { isPhonePage } from "../../api";
 import { hashForSettings, type SettingsRoute, settingsMatching } from "../../routing";
+import { Kbd } from "../kbd";
 import { SidebarSearch } from "../sidebar-search";
 
 /** The sidebar while the Settings page is open: a search over the sections' names and keywords, where Enter opens the first match, then each group's sections under its label, those the workspace picker changes last. */
 export function SettingsNav({ route: { section } }: { route: SettingsRoute }) {
 	const [query, setQuery] = useState("");
 	const groups = settingsMatching(query, { phone: isPhonePage() });
-	const first = groups[0]?.entries[0];
+	const first = query.trim() ? groups[0]?.entries[0] : undefined;
 	return (
 		<>
 			<SidebarGroup>
@@ -17,7 +18,7 @@ export function SettingsNav({ route: { section } }: { route: SettingsRoute }) {
 					placeholder="Search settings"
 					query={query}
 					onQuery={setQuery}
-					onEnter={first && query.trim() ? () => (location.hash = hashForSettings(first.value)) : undefined}
+					onEnter={first ? () => (location.hash = hashForSettings(first.value)) : undefined}
 				/>
 			</SidebarGroup>
 			{groups.length === 0 && (
@@ -36,6 +37,7 @@ export function SettingsNav({ route: { section } }: { route: SettingsRoute }) {
 										{label}
 									</a>
 								</SidebarMenuButton>
+								{value === first?.value && <Kbd aria-hidden className="pointer-events-none absolute top-1/2 right-2 h-5 min-w-5 -translate-y-1/2 px-1 text-[11px]">↵</Kbd>}
 							</SidebarMenuItem>
 						))}
 					</SidebarMenu>
