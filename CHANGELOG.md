@@ -17,6 +17,8 @@ The dashboard shows the same lines in Settings › What's new.
 - Pinned tabs sit first and show only their icon, and stay open until you unpin them, even after a reload.
 - A header tab's right-click menu also has Duplicate tab, which opens the same page in a new tab right after it, Copy URL, and Close tabs to the right, which keeps pinned tabs.
 - Cmd+L copies the address of the header tab on screen.
+- Each header tab keeps its own Back and Forward, as in Capy: the buttons, Cmd+[ and Cmd+], and the mouse's back and forward buttons go through what the tab on screen showed, and switching tabs no longer mixes them up.
+- A tab's Back and Forward stay after a reload, after pinning it, and after Cmd+Shift+T brings it back.
 - The Pull requests page no longer has a Board view, so it always shows the list.
 - The Pull requests page no longer shows a list at its left, so the table takes the whole page.
 - Repositories, at the top of the Pull requests page, hides or shows each repository and moves it up or down.

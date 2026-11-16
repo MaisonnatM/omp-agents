@@ -14,11 +14,13 @@
   So does a finished turn of a session waiting on its subagents, until they stop.
 - The header's tabs run across the top right of the sidebar: Back and Forward, your tabs, and a + that opens a new tab.
   A tab works as in Capy: opening a page or a session, from the sidebar or anywhere else, shows it in the tab on screen, and a session another tab already shows switches to that tab; only the + or Cmd+T adds a tab, on New session.
+  Back and Forward, Cmd+[ and Cmd+], and the mouse's back and forward buttons move through what the tab on screen showed, as Capy's do: each tab keeps its own history, so switching tabs leaves it as it was, and it stays across reloads.
+  A page that picks what it opens, such as Bots opening its latest Bot, or a click into another pane, changes the entry on screen rather than adding one.
   Cmd+1 through Cmd+9 go to the first through ninth tab, and Ctrl+Tab and Ctrl+Shift+Tab, or Cmd+Alt+→ and Cmd+Alt+←, to the next and previous one.
   The × on a tab, a middle-click, or Cmd+W closes it, closing the one on screen shows its neighbor, and closing the last one leaves a new tab on New session; Cmd+Alt+W closes every tab but the pinned ones and the one on screen.
-  Cmd+Shift+T reopens the last closed tab where it was, on the page it showed, and pressed again brings back the one closed before; a closed session that another tab shows by then switches to that tab instead.
-  Right-click a tab for **Pin tab** or **Unpin tab**, **New tab**, **Duplicate tab**, **Copy URL**, **Close tab**, **Close other tabs**, and **Close tabs to the right**, as in Capy; Ctrl+Shift+P pins or unpins the tab on screen, and Cmd+L copies its URL.
-  **Duplicate tab** opens what the tab shows in a new tab right after it, or right after the pinned tabs for a pinned one; a duplicated session shows in both tabs, and opening it from another tab goes to the first of them.
+  Cmd+Shift+T reopens the last closed tab where it was, on the page it showed and with its Back and Forward, and pressed again brings back the one closed before; a closed session that another tab shows by then switches to that tab instead.
+  Right-click a tab for **Pin tab** or **Unpin tab**, **New tab**, **Duplicate tab**, **Copy URL**, **Close tab**, **Close other tabs**, and **Close tabs to the right**, as in Capy; Ctrl+Shift+P pins or unpins the tab on screen.
+  **Duplicate tab** opens what the tab shows, with its Back and Forward, in a new tab right after it, or right after the pinned tabs for a pinned one; a duplicated session shows in both tabs, and opening it from another tab goes to the first of them.
   **Close tabs to the right** keeps the pinned tabs, and when it closes the tab on screen it shows the one you right-clicked.
   Pinned tabs sit first and show only their icon, and the ×, a middle-click, and Cmd+W leave them open until you unpin them.
   Drag a tab from anywhere on it to move it among the pinned or the other tabs, or focus it and press Alt+Shift+← or →; this browser keeps the tabs, their order, which are pinned, and the last 20 closed across reloads.

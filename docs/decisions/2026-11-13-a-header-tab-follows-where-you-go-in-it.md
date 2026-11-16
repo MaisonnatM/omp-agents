@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-16-each-header-tab-keeps-its-own-back-and-forward
 date: 2026-11-13
 decision-makers: Maxence
 ---

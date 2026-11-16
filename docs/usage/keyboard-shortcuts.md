@@ -13,7 +13,7 @@ Alt is Option on macOS.
 | Alt+M | Composer | Dictate a prompt, or stop dictating |
 | Cmd+/ | Composer | Attach files to the prompt |
 | Cmd+K | Anywhere | Open the command menu |
-| Cmd+[ / Cmd+] | Anywhere | Go back or forward, as the Back and Forward buttons at the start of the header's tabs do |
+| Cmd+[ / Cmd+] | Anywhere | Go back or forward in the header tab on screen, as its Back and Forward buttons and the mouse's back and forward buttons do |
 | Alt+Shift+← / Alt+Shift+→ | A focused header tab | Move the tab left or right |
 | Cmd+Shift+O / S | Anywhere / outside text fields | Start a new session; on the tickets page, Cmd+Shift+O creates a Linear ticket |
 | Cmd+F | Anywhere | Find text in the focused session's conversation, or in the pull request the Pull requests page shows |

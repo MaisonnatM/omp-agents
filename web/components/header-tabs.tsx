@@ -9,6 +9,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl, record } from "../activity";
 import { pageTitle, viewTitle } from "../document-title";
+import { showInPlace, windowPushed } from "../header-tab-history";
 import {
 	closeHeaderTab,
 	closeOtherHeaderTabs,
@@ -196,8 +197,8 @@ interface HeaderTabsProps {
 }
 
 /**
- * The row of header tabs, kept in this browser, working as Capy's desktop tabs do: going to a page shows it in the tab on screen,
- * a session another tab shows focuses that tab, and only + or ⌘T opens a new tab. ⌘1 to ⌘9 go to the tab of that place, and ⌃⇥
+ * The row of header tabs, kept in this browser, working as Capy's desktop tabs do: going to a page shows it in the tab on screen, in its own Back and
+ * Forward history, a session another tab shows focuses that tab, and only + or ⌘T opens a new tab. ⌘1 to ⌘9 go to the tab of that place, and ⌃⇥
  * and ⌃⇧⇥ to the next and previous. Drag one, or press Alt+Shift+← or → on it, to reorder; its × or a middle-click closes it,
  * closing the one on screen shows its neighbour, closing the last leaves a new one, and ⌥⌘W closes all but the pinned ones and the one on screen.
  * ⇧⌘T reopens the last closed tab where it was. Pin or Unpin in a tab's menu, or ⌃⇧P on the one on screen, moves it among the pinned
@@ -209,7 +210,8 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 	const [row, setRow] = useStoredState(HEADER_TABS_KEY, decodeHeaderTabs, encodeHeaderTabs);
 	const clipboard = useClipboard();
 	useEffect(() => {
-		setRow(current => visitHeaderTab(current, address, false, crypto.randomUUID()));
+		const visit = windowPushed() ? "push" : "replace";
+		setRow(current => visitHeaderTab(current, address, visit, crypto.randomUUID()));
 	}, [address, setRow]);
 	const { tabs } = row;
 	const activeId = tabs[row.active]?.id ?? null;
@@ -242,18 +244,18 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 	};
 	const select = (index: number): void => {
 		setRow(current => ({ ...current, active: index }));
-		location.hash = tabs[index]?.hash ?? "";
+		showInPlace(tabs[index]?.hash ?? "");
 	};
 	/** Opens a new tab on the new-session page, as + does. */
 	const openTab = (): void => {
-		setRow(current => visitHeaderTab(current, NEW_TAB_HASH, true, crypto.randomUUID()));
+		setRow(current => visitHeaderTab(current, NEW_TAB_HASH, "new-tab", crypto.randomUUID()));
 		openNewSession();
 	};
 	/** Applies a change that may move the screen elsewhere, as closing the tab on screen does. */
 	const apply = (change: { row: typeof row; go: string | null } | null): boolean => {
 		if (change === null) return false;
 		setRow(change.row);
-		if (change.go !== null) location.hash = change.go;
+		if (change.go !== null) showInPlace(change.go);
 		return true;
 	};
 	const close = (id: string): void => {
