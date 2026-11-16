@@ -3,21 +3,21 @@ import { IconChevronLeft, IconChevronRight } from "central-icons";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
+import { goInHeaderTab, useHeaderTabHistory } from "../header-tab-history";
 import { shortcutLabels } from "../shortcuts";
-import { useHistoryPosition } from "../use-history-position";
 
-/** The buttons act through `history`, as the shortcuts do in any browser. */
+/** The buttons move through the history of the header tab on screen, as the shortcuts and the mouse's buttons do. */
 export function HistoryButtons() {
-	const { canGoBack, canGoForward } = useHistoryPosition();
+	const { canGoBack, canGoForward } = useHeaderTabHistory();
 	return (
 		<div className="flex shrink-0 items-center gap-0.5">
 			<Tooltip content="Back" shortcut={shortcutLabels("back")} side="bottom" disabled={!canGoBack}>
-				<Button {...activityControl("header.back")} variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Back" disabled={!canGoBack} onClick={() => history.back()}>
+				<Button {...activityControl("header.back")} variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Back" disabled={!canGoBack} onClick={() => goInHeaderTab(-1)}>
 					<IconChevronLeft />
 				</Button>
 			</Tooltip>
 			<Tooltip content="Forward" shortcut={shortcutLabels("forward")} side="bottom" disabled={!canGoForward}>
-				<Button {...activityControl("header.forward")} variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Forward" disabled={!canGoForward} onClick={() => history.forward()}>
+				<Button {...activityControl("header.forward")} variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Forward" disabled={!canGoForward} onClick={() => goInHeaderTab(1)}>
 					<IconChevronRight />
 				</Button>
 			</Tooltip>

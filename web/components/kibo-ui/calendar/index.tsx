@@ -1,7 +1,7 @@
 "use client";
 
 import { atom, useAtom } from "jotai";
-import { IconCheckmark1, IconChevronBottom, IconChevronLeft, IconChevronRight } from "central-icons";
+import { IconCheckmark1, IconChevronDownSmall, IconChevronLeft, IconChevronRight } from "central-icons";
 import {
   createContext,
   type ReactNode,
@@ -106,7 +106,7 @@ const Combobox = <T extends number,>({
         <Button
           aria-expanded={open}
           className={cn("px-2 font-semibold text-[15px] text-foreground capitalize", className)}
-          trailingIcon={IconChevronBottom}
+          trailingIcon={IconChevronDownSmall}
           variant="ghost"
         >
           {data.find((item) => item.value === value)?.label}

@@ -242,7 +242,7 @@ const SECTIONS: Record<HomeSection, { heading: string | null; listing: Listing }
 	running: { heading: "Running", listing: "browsed" },
 	past: { heading: "Past", listing: "browsed" },
 	todos: { heading: "Todos", listing: "searched" },
-	tickets: { heading: "Tickets", listing: "searched" },
+	tickets: { heading: "Linear tickets", listing: "searched" },
 	pullRequests: { heading: "Pull requests", listing: "searched" },
 	conversations: { heading: "In conversations", listing: "found" },
 	commands: { heading: "Commands", listing: "browsed" },

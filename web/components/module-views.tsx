@@ -17,7 +17,6 @@ import { EmailNav } from "./email/email-nav";
 import { EmailPage } from "./email/email-page";
 import { SportNav } from "./sport/nav";
 import { SportPage } from "./sport/page";
-import { TicketsNav } from "./tickets/tickets-nav";
 import { TicketsPage } from "./tickets/tickets-page";
 
 /** The core's data a module's page reads but does not own. */
@@ -58,12 +57,12 @@ type PageProps<I extends WebModuleId> = { route: ModuleRoutes[I]; core: CoreData
 
 interface ModuleViews<I extends WebModuleId> {
 	Page: ComponentType<PageProps<I>>;
-	/** The module's list in the page column, for the route its page shows. */
-	Nav: ComponentType<NavProps<ModuleRoutes[I]>>;
+	/** The module's list in the page column, for the route its page shows; none for a module whose page `listsItself`. */
+	Nav?: ComponentType<NavProps<ModuleRoutes[I]>>;
 }
 
 const MODULE_VIEWS: { readonly [I in WebModuleId]: ModuleViews<I> } = {
-	tickets: { Page: TicketsPage, Nav: TicketsNav },
+	tickets: { Page: TicketsPage },
 	calendar: { Page: CalendarPage, Nav: CalendarNav },
 	sport: { Page: SportPage, Nav: SportNav },
 	email: { Page: EmailPage, Nav: EmailNav },
@@ -77,8 +76,8 @@ export function ModulePageView({ page, states, disabled, core }: { page: ModuleP
 	return <Page route={page} core={core} {...stored} />;
 }
 
-/** Module `page.kind`'s list in the page column. */
+/** Module `page.kind`'s list in the page column, if it has one. */
 export function ModuleNavView({ page, section, onSection }: { page: ModulePage } & Omit<NavProps<unknown>, "route">) {
 	const { Nav } = MODULE_VIEWS[page.kind] as ModuleViews<WebModuleId>;
-	return <Nav route={page} section={section} onSection={onSection} />;
+	return Nav ? <Nav route={page} section={section} onSection={onSection} /> : null;
 }

@@ -1,4 +1,4 @@
-import { IconArrowBottomTop, IconBubbleText, IconChevronBottom, IconCircleCheck, IconCode, IconCommits, IconMerged, IconPullRequest, IconPullRequestClosedSimple, IconSquareArrowTopRight, IconThumbsUp } from "central-icons";
+import { IconArrowBottomTop, IconBubbleText, IconChevronDownSmall, IconCircleCheck, IconCode, IconCommits, IconMerged, IconPullRequest, IconPullRequestClosedSimple, IconSquareArrowTopRight, IconThumbsUp } from "central-icons";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { type Person, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestThread, prKey, type ReactionContent } from "../../../src/shared/github";
 import { Button } from "@/components/ui/button";
@@ -78,7 +78,7 @@ function ConversationGroup({ detail, events }: { detail: PullRequestDetail; even
 					<span className="block text-sm font-semibold">{events.length} {events.length === 1 ? "comment" : "comments"}</span>
 					<span className="block truncate text-2xs text-muted-foreground">{authors.size} {authors.size === 1 ? "author" : "authors"} · <RelativeTime at={first.at} /></span>
 				</span>
-				<IconChevronBottom className={cn("size-3.5 shrink-0 text-muted-foreground", open && "rotate-180")} />
+				<IconChevronDownSmall className={cn("size-3.5 shrink-0 text-muted-foreground", open && "rotate-180")} />
 			</button>
 			<div id={id} hidden={!open} className="mt-1 space-y-1">
 				{open && events.map((event, index) => <ConversationCard key={event.url ?? index} detail={detail} comment={event} action={event.review ? "reviewed" : "commented"} />)}
@@ -105,7 +105,7 @@ function Thread({ detail, thread, root, replies }: { detail: PullRequestDetail; 
 				{thread.outdated && <span className="font-medium">Outdated</span>}
 				<button type="button" aria-label={`${expanded ? "Collapse" : "Expand"} thread on ${thread.path}`} aria-expanded={expanded} aria-controls={id} onClick={() => setExpanded(value => !value)} className={cn("ml-auto flex min-h-6 items-center gap-1 hover:text-foreground", FOCUS_CLASS)}>
 					{!expanded && <span className="text-2xs">· {root.author.login}{replyCount > 0 && ` · ${replyCount} ${replyCount === 1 ? "reply" : "replies"}`}</span>}
-					<IconChevronBottom className={cn("size-3.5 shrink-0", expanded && "rotate-180")} />
+					<IconChevronDownSmall className={cn("size-3.5 shrink-0", expanded && "rotate-180")} />
 				</button>
 			</div>
 			<div id={id} hidden={!expanded}>
@@ -114,7 +114,7 @@ function Thread({ detail, thread, root, replies }: { detail: PullRequestDetail; 
 					{replies.length > 0 && <div className="ml-2 border-l border-border/60 pl-3">
 						<button type="button" aria-expanded={repliesOpen} aria-controls={repliesId} onClick={() => setRepliesOpen(value => !value)} className={cn("flex min-h-6 items-center gap-2 py-1 text-sm text-muted-foreground hover:text-foreground", FOCUS_CLASS)}>
 							{repliesOpen ? "Hide replies" : `${replies.length} more ${replies.length === 1 ? "reply" : "replies"}`}
-							<IconChevronBottom className={cn("size-3", repliesOpen && "rotate-180")} />
+							<IconChevronDownSmall className={cn("size-3", repliesOpen && "rotate-180")} />
 						</button>
 						<div id={repliesId} hidden={!repliesOpen} className="space-y-1">
 							{repliesOpen && replies.map((reply, index) => <ConversationCard key={reply.url ?? index} detail={detail} comment={reply} action="replied" />)}

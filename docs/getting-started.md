@@ -52,7 +52,7 @@ Each service there reaches omp's sessions through an MCP server, so connecting i
 
 1. Make sure nothing listens on port 3000: Linear sends the browser back to `localhost:3000`.
 2. Click **Connect** on the Linear row and sign in.
-3. Open the **Tickets** tab.
+3. Open the **Linear tickets** tab.
 
 ### Google Calendar
 

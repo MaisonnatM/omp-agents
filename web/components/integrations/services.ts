@@ -15,7 +15,7 @@ interface Service {
 export const SERVICES: Record<McpIntegrationId, Service> = {
 	linear: {
 		logo: LINEAR_LOGO,
-		gives: "Your assigned issues on the Tickets tab, and Linear's tools in every omp session.",
+		gives: "Your assigned issues on the Linear tickets tab, and Linear's tools in every omp session.",
 	},
 	slack: {
 		logo: SLACK_LOGO,

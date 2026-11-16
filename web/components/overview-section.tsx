@@ -1,5 +1,5 @@
 /** `OverviewSection`, the folding section each part of the right sidebar's **Overview** tab sits in. */
-import { IconChevronBottom } from "central-icons";
+import { IconChevronDownSmall } from "central-icons";
 import type { ReactNode } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -34,7 +34,7 @@ export function OverviewSection({ title, count, detail, open, onToggle, fold, ac
 						<span className="truncate">{title}</span>
 						<span className="shrink-0 font-normal text-muted-foreground tabular-nums">{count}</span>
 						{detail}
-						<IconChevronBottom aria-hidden className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none", !open && "-rotate-90")} />
+						<IconChevronDownSmall aria-hidden className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none", !open && "-rotate-90")} />
 					</CollapsibleTrigger>
 				</h3>
 				{action}

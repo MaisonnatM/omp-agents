@@ -22,8 +22,8 @@ const SCOPE = { kind: "project", runtimeDir: "/run/repo", projectDir: "/repo" } 
 const BROWSER_DAEMON = { snapshot: { name: "browser", id: "g1", state: "running", pid: 300, startedAt: T0 }, supervised: true } as const;
 const API_DAEMON = { snapshot: { name: "api", id: "g2", state: "running", startedAt: T0, owner: "sa" }, command: "bun api.ts", supervised: true } as const;
 
-const A: WatchedSession = { instanceId: "a", sessionId: "sa", pid: 100, cwd: "/repo", status: "idle" };
-const B: WatchedSession = { instanceId: "b", sessionId: "sb", pid: 200, cwd: "/repo/wt", status: "working" };
+const A: WatchedSession = { instanceId: "a", sessionId: "sa", pid: 100, cwd: "/repo", status: "idle", awaitsSubagents: false, stopsWhenIdle: true };
+const B: WatchedSession = { instanceId: "b", sessionId: "sb", pid: 200, cwd: "/repo/wt", status: "working", awaitsSubagents: false, stopsWhenIdle: true };
 
 /** A watch over a computer whose processes, daemons, sessions, and clock the test sets; a stop takes what it stopped off the computer. */
 function computer(daemons: DaemonReport["daemons"] = [BROWSER_DAEMON, API_DAEMON]) {
@@ -34,6 +34,9 @@ function computer(daemons: DaemonReport["daemons"] = [BROWSER_DAEMON, API_DAEMON
 		sessions: [A, B],
 		owner: true,
 		minutes: 30 as number | null,
+		hours: 24 as number | null,
+		/** When omp last wrote each session's file, by instance id. */
+		written: new Map<string, number>(),
 		/** What `lsof` finds listening, by pid; `null` when it fails. Pid 400 is your own server of the same app, pid 500 an API in Docker. */
 		listeners: new Map([
 			[111, [5173, 24678]],
@@ -69,9 +72,14 @@ function computer(daemons: DaemonReport["daemons"] = [BROWSER_DAEMON, API_DAEMON
 			state.ps = state.ps.filter(line => !processes.has(Number(line.trim().split(/\s+/)[0])));
 		},
 		sessions: () => state.sessions,
+		endSession: async instanceId => {
+			stopped.push(`session ${instanceId}`);
+			state.sessions = state.sessions.filter(session => session.instanceId !== instanceId);
+		},
+		lastWrittenAt: instanceId => state.written.get(instanceId) ?? null,
 		now: () => state.now,
 		owner: () => state.owner,
-		stopIdleAfterMinutes: () => state.minutes,
+		settings: () => ({ stopIdleAfterMinutes: state.minutes, stopIdleSessionsAfterHours: state.hours }),
 	});
 	/** Samples at `count` minutes past the start. */
 	const tickAt = (count: number): Promise<void> => {
@@ -153,19 +161,72 @@ describe("SessionProcessWatch", () => {
 		state.owner = false;
 		state.sessions = [A, { ...B, status: "idle" }];
 		await tickAt(0);
-		await tickAt(600);
+		await tickAt(48 * 60);
 		expect(stopped).toEqual([]);
 		expect((await processesOf("a"))?.map(item => item.stopsAt)).toEqual([null, null, null]);
 	});
 
-	test("with the idle stop off nothing stops", async () => {
+	test("with both idle stops off nothing stops", async () => {
 		const { state, stopped, tickAt, processesOf } = computer();
 		state.minutes = null;
+		state.hours = null;
 		state.sessions = [A, { ...B, status: "idle" }];
 		await tickAt(0);
-		await tickAt(600);
+		await tickAt(48 * 60);
 		expect(stopped).toEqual([]);
 		expect((await processesOf("b"))?.map(item => item.stopsAt)).toEqual([null]);
+	});
+
+	test("an idle session ends exactly the setting's hours after it was last seen busy or waiting on a subagent, and once", async () => {
+		const { state, stopped, watch, tickAt } = computer([]);
+		state.minutes = null;
+		state.sessions = [{ ...A, status: "working" }, B];
+		await tickAt(0);
+		await tickAt(60);
+		state.sessions = [{ ...A, awaitsSubagents: true }, B];
+		await tickAt(120);
+		state.sessions = [A, B];
+		await tickAt(121);
+		state.now = minutes(120 + 24 * 60) - 1;
+		await watch.tick();
+		expect(stopped).toEqual([]);
+		await tickAt(120 + 24 * 60);
+		expect(stopped).toEqual(["session a"]);
+		await tickAt(200 + 24 * 60);
+		expect(stopped).toEqual(["session a"]);
+	});
+
+	test("a session that works, asks a question, or waits on a subagent never ends", async () => {
+		const { state, stopped, tickAt } = computer([]);
+		state.minutes = null;
+		state.sessions = [{ ...A, status: "needs-input" }, B, { ...B, instanceId: "c", sessionId: "sc", status: "idle", awaitsSubagents: true }];
+		await tickAt(0);
+		await tickAt(48 * 60);
+		expect(stopped).toEqual([]);
+	});
+
+	test("a session the idle session stop leaves alone never ends: one started in a terminal, a private one, or a Bot's", async () => {
+		const { state, stopped, tickAt } = computer([]);
+		state.minutes = null;
+		state.sessions = [{ ...A, stopsWhenIdle: false }, { ...B, status: "idle", stopsWhenIdle: false }];
+		await tickAt(0);
+		await tickAt(48 * 60);
+		expect(stopped).toEqual([]);
+	});
+
+	test("a server that first sees a session idle counts from its file's last write, and one it first sees busy from now", async () => {
+		const { state, stopped, tickAt } = computer([]);
+		state.minutes = null;
+		state.written.set("a", minutes(-23 * 60));
+		state.written.set("b", minutes(-48 * 60));
+		await tickAt(0);
+		await tickAt(59);
+		expect(stopped).toEqual([]);
+		await tickAt(60);
+		expect(stopped).toEqual(["session a"]);
+		state.sessions = [{ ...B, status: "idle" }];
+		await tickAt(24 * 60 - 1);
+		expect(stopped).toEqual(["session a"]);
 	});
 
 	test("a session that left the roster has its services and reparented jobs stopped once its omp exits, and not before", async () => {

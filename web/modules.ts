@@ -62,6 +62,8 @@ export interface PageModule<Id extends string, Route, Shortcut extends string = 
 	readonly controls: readonly { id: Control; label: string; area: string }[];
 	/** The page splits its list from its open item, so beside the page column it needs a list's width and the item's. */
 	readonly split?: true;
+	/** The page lists its items itself, so its sidebar row holds no list and the page gets no column at its left. */
+	readonly listsItself?: true;
 	/** The path prefix of the module's `PUT` routes, which Settings › Activity sets apart with the tab while it is signed out. */
 	readonly api?: string;
 }

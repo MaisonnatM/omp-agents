@@ -1,5 +1,5 @@
 import { Select as SelectPrimitive } from "@base-ui/react/select"
-import { IconCheckmark1, IconChevronBottom, IconChevronTop } from "central-icons";
+import { IconCheckmark1, IconChevronDownSmall, IconChevronTop } from "central-icons";
 
 import { cn } from "@/lib/utils"
 
@@ -31,7 +31,7 @@ function SelectTrigger({
     >
       {children}
       <SelectPrimitive.Icon className="pointer-events-none flex shrink-0 text-muted-foreground">
-        <IconChevronBottom className="size-3.5" />
+        <IconChevronDownSmall className="size-3.5" />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   )
@@ -74,7 +74,7 @@ function SelectContent({
           </SelectPrimitive.ScrollUpArrow>
           <SelectPrimitive.List>{children}</SelectPrimitive.List>
           <SelectPrimitive.ScrollDownArrow className="bottom-0 z-10 flex w-full cursor-default items-center justify-center bg-popover py-1">
-            <IconChevronBottom className="size-4" />
+            <IconChevronDownSmall className="size-4" />
           </SelectPrimitive.ScrollDownArrow>
         </SelectPrimitive.Popup>
       </SelectPrimitive.Positioner>
