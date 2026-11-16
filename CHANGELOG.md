@@ -5,6 +5,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-16
 
+- The session sidebar has a Diffs tab: a row per changed file, and a click shows that file's diff, with Previous and Next to step through them.
+- The session sidebar's + menu starts with a search field that narrows its tabs, subagents, and New terminal as you type.
 - Down chevrons, on menus, pickers, and folding rows, use the smaller chevron-down-small icon.
 - A session left idle for 12 hours now stops on its own and moves to Past, keeping its worktree, so Resume picks it back up where it was. A session still waiting on a subagent is not idle.
 - Settings › Preferences has a new Stop idle sessions choice: Off, or after 4 hours, 12 hours, 24 hours, or 3 days. Sessions started in a terminal, private sessions, and Bots' conversations keep running.
