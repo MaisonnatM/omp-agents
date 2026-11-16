@@ -1,35 +1,35 @@
 import { describe, expect, test } from "bun:test";
-import { type LinkedPullRequest, type PullRequestSummary, type PullRequestComment, type PullRequestDetail, type PullRequestThread, pullRequestName, type RepoPullRequests, type Reviewer, type StackedPullRequest } from "../src/shared/github";
+import { type LinkedPullRequest, type PullRequestSummary, type PullRequestComment, type PullRequestDetail, type PullRequestThread, type RepoPullRequests, type Reviewer, type StackedPullRequest, repoKey } from "../src/shared/github";
 import { type AgentOn, actionFacts, agentOn, moveOf } from "../src/shared/moves";
 import { pullRequestActions } from "../src/pull-request-actions";
 import type { RosterHost } from "../src/shared/sessions";
 import type { ReviewDraft } from "../src/shared/review-drafts";
 import {
-	boardColumns,
-	boardDrop,
-	boardFoldedByDefault,
 	commentCount,
 	DEFAULT_ORDER,
 	decodeOrder,
 	lineCommentsBlocked,
 	foldedByDefault,
-	type MoveGroup,
 	type PullRequestOrder,
 	pullRequestSections,
+	listedPullRequest,
 	listedPullRequests,
 	moveAction,
 	movesSummary,
 	orderedRepos,
 	placedManual,
 	reason,
+	sectionsOfRepos,
 	sectionTitles,
-	shownBoardPullRequests,
 	shownPullRequests,
 	rebaseOrder,
 	threadStarters,
 	withPullRequestReviewers,
 	withPullRequestState,
 	withThreadResolved,
+	withoutHidden,
+	withRepoMoved,
+	withRepoStepped,
 	yourMoveCount,
 } from "./pull-requests-model";
 
@@ -61,6 +61,12 @@ const pr = (number: number, fields: Partial<PullRequestSummary> = {}): PullReque
 const teammate = { login: "teammate", avatarUrl: null };
 
 const noAgent: AgentOn = () => null;
+
+/** The pull requests the page shows of `repos` in `order`, less what `isFolded` folds, as `owner#number`. */
+function shownOf(repos: readonly RepoPullRequests[], order: PullRequestOrder, isFolded: (key: string) => boolean = () => false): string[] {
+	const ordered = orderedRepos(repos, order);
+	return shownPullRequests(ordered, sectionsOfRepos(ordered, order, noAgent), isFolded).map(({ repo, number }) => `${repo}#${number}`);
+}
 
 describe("next move", () => {
 	test("each pull request waits on the first move that applies", () => {
@@ -268,88 +274,7 @@ test("the shown pull requests follow page order and leave out folded repositorie
 		unmatched: [],
 	};
 	const folded = new Set(["acme/folded", "acme/webapp:Recently merged"]);
-	expect(shownPullRequests(list, key => folded.has(key), DEFAULT_ORDER, noAgent).map(({ repo, number }) => `${repo}#${number}`)).toEqual(["webapp#2", "webapp#1", "webapp#4"]);
-});
-
-describe("pull request board", () => {
-	const repo = (name: string, pullRequests: PullRequestSummary[], cwds = [`/code/${name}`]): RepoPullRequests => ({ owner: "acme", repo: name, cwds, pullRequests });
-
-	test("each column holds its section of every readable repository, repository by repository in page order, and empty columns stay", () => {
-		const list = {
-			repos: [
-				repo("webapp", [pr(1), pr(2, { state: "draft" })]),
-				{ owner: "acme", repo: "down", cwds: ["/code/down"], error: "rate limited" },
-				repo("api", [pr(3), pr(4, { role: "reviewer", author: teammate })]),
-				repo("nowhere", [pr(5)], []),
-			],
-			unmatched: [],
-		};
-		const order: PullRequestOrder = { ...DEFAULT_ORDER, repos: ["acme/api", "acme/webapp"] };
-		const columns = boardColumns(list, order, noAgent).map(({ title, cards }) => [title, cards.map(({ row, repo, cwd }) => `${repo}#${row.pr.number} ${cwd}`)]);
-		expect(columns).toEqual([
-			["Your move", ["acme/api#4 /code/api"]],
-			["Agent on it", []],
-			["Approved", []],
-			["Waiting on others", ["acme/api#3 /code/api", "acme/webapp#1 /code/webapp"]],
-			["Drafts", ["acme/webapp#2 /code/webapp"]],
-			["Recently merged", []],
-		]);
-	});
-
-	test("only Recently merged starts folded", () => {
-		expect(sectionTitles(DEFAULT_ORDER).filter(boardFoldedByDefault)).toEqual(["Recently merged"]);
-	});
-
-	test("the shown pull requests follow the columns in order and leave out folded columns", () => {
-		const list = { repos: [repo("webapp", [pr(1), pr(2, { role: "reviewer", author: teammate }), pr(3, { state: "draft" }), pr(4, { state: "merged" })]), repo("api", [pr(5)])], unmatched: [] };
-		const columns = boardColumns(list, DEFAULT_ORDER, noAgent);
-		const folded = new Set(["Drafts", "Recently merged"]);
-		expect(shownBoardPullRequests(columns, title => folded.has(title)).map(({ number }) => number)).toEqual([2, 1, 5]);
-	});
-
-	describe("a drop", () => {
-		const drop = (summary: PullRequestSummary, to: MoveGroup, agent: AgentOn = noAgent, moving: PullRequestSummary | null = null) => {
-			const [section] = pullRequestSections([summary], DEFAULT_ORDER, agent);
-			return boardDrop(section!.rows[0]!, section!.title, to, moving);
-		};
-
-		test("on its own column does nothing", () => {
-			expect(drop(pr(1), "Waiting on others")).toBeNull();
-		});
-
-		test("on Agent on it starts the quick action of the pull request's move, and is refused when no action takes the move", () => {
-			expect(drop(pr(1, { checks: "failing" }), "Agent on it")).toEqual({ kind: "agent", action: "fix-ci", label: "Fix CI with an agent" });
-			expect(drop(pr(2, { role: "reviewer", author: teammate }), "Agent on it")).toEqual({ kind: "agent", action: "review", label: "Review with an agent" });
-			expect(drop(pr(3), "Agent on it")).toEqual({ kind: "refused", why: "No agent step applies: waiting for review" });
-		});
-
-		test("on Recently merged merges a pull request ready to merge, or once its running checks pass, and is refused with what stands in the way otherwise", () => {
-			expect(drop(pr(1, { review: "approved" }), "Recently merged")).toEqual({ kind: "merge", label: "Merge" });
-			expect(drop(pr(2, { review: "approved", checks: "pending" }), "Recently merged")).toEqual({ kind: "merge", label: "Merge once checks pass" });
-			expect(drop(pr(3, { review: "approved", conflicts: true }), "Recently merged")).toEqual({ kind: "refused", why: `Not ready to merge: ${reason(pr(3, { review: "approved", conflicts: true }), "rebase")}` });
-			expect(drop(pr(4, { review: "approved" }), "Recently merged", () => "working")).toMatchObject({ kind: "refused" });
-		});
-
-		test("on Drafts converts your open pull request to a draft, and on an open column marks your draft ready for review", () => {
-			expect(drop(pr(1), "Drafts")).toEqual({ kind: "state", state: "draft", label: "Convert to draft" });
-			for (const to of ["Your move", "Approved", "Waiting on others"] as const) expect(drop(pr(2, { state: "draft" }), to)).toEqual({ kind: "state", state: "open", label: "Ready for review" });
-		});
-
-		test("that changes a state waits while GitHub still moves another card, so the board makes one move at a time", () => {
-			const moving = pr(9, { state: "draft" });
-			expect(drop(pr(1), "Drafts", noAgent, moving)).toEqual({ kind: "refused", why: `Wait until GitHub moves ${pullRequestName(moving)}` });
-			expect(drop(pr(2, { state: "draft" }), "Your move", noAgent, moving)).toMatchObject({ kind: "refused" });
-			expect(drop(pr(3, { checks: "failing" }), "Agent on it", noAgent, moving)).toMatchObject({ kind: "agent" });
-		});
-
-		test("is refused for a pull request you do not author, a merged one, and a column only GitHub fills, which outranks authorship", () => {
-			expect(drop(pr(1, { role: "reviewer", author: teammate }), "Drafts")).toEqual({ kind: "refused", why: "Only its author changes whether it is a draft" });
-			expect(drop(pr(5, { role: "reviewer", author: teammate }), "Approved")).toEqual({ kind: "refused", why: "Approved fills from GitHub; no step moves it there" });
-			expect(drop(pr(2, { state: "merged" }), "Your move")).toEqual({ kind: "refused", why: "It is merged already" });
-			expect(drop(pr(3), "Approved")).toEqual({ kind: "refused", why: "Approved fills from GitHub; no step moves it there" });
-			expect(drop(pr(4, { state: "draft" }), "Drafts")).toBeNull();
-		});
-	});
+	expect(shownOf(list.repos, DEFAULT_ORDER, key => folded.has(key))).toEqual(["webapp#2", "webapp#1", "webapp#4"]);
 });
 
 describe("pull request order", () => {
@@ -391,14 +316,42 @@ describe("pull request order", () => {
 	test("the shown pull requests follow the custom order", () => {
 		const repo = (name: string, pullRequests: PullRequestSummary[]): RepoPullRequests => ({ owner: "acme", repo: name, cwds: [], pullRequests });
 		const list = { repos: [repo("webapp", [pr(1), pr(2, { role: "reviewer", author: teammate })]), repo("api", [pr(3, { repo: "api" })])], unmatched: [] };
-		const shown = shownPullRequests(list, () => false, order({ repos: ["acme/api"], sections: ["Waiting on others"] }), noAgent);
-		expect(shown.map(({ repo, number }) => `${repo}#${number}`)).toEqual(["api#3", "webapp#1", "webapp#2"]);
+		expect(shownOf(list.repos, order({ repos: ["acme/api"], sections: ["Waiting on others"] }))).toEqual(["api#3", "webapp#1", "webapp#2"]);
 	});
 
 	test("a stored order that cannot be read falls back to the default, field by field", () => {
 		expect(decodeOrder(null)).toEqual(DEFAULT_ORDER);
 		expect(decodeOrder("{not json")).toEqual(DEFAULT_ORDER);
 		expect(decodeOrder(JSON.stringify({ repos: ["acme/a", 3], sort: "random", manual: "acme/a#1" }))).toEqual({ repos: ["acme/a"], sections: [], sort: "updated", manual: [] });
+	});
+});
+
+describe("hidden repositories", () => {
+	const repo = (name: string, pullRequests: PullRequestSummary[]): RepoPullRequests => ({ owner: "acme", repo: name, cwds: [`/code/${name}`], pullRequests });
+	const list = {
+		repos: [repo("webapp", [pr(1), pr(2, { review: "changes-requested" })]), repo("api", [pr(3, { repo: "api", review: "changes-requested" }), pr(4, { repo: "api", state: "draft" })])],
+		unmatched: ["/x"],
+	};
+
+	test("drop out of the shown pull requests and the your-move count, yet E still finds their pull requests", () => {
+		const hidden = new Set(["acme/api"]);
+		const counted = withoutHidden(list, hidden);
+		expect(yourMoveCount(list, noAgent)).toBe(2);
+		expect(yourMoveCount(counted, noAgent)).toBe(1);
+		expect(counted.unmatched).toEqual(["/x"]);
+		expect(shownOf(list.repos.filter(repo => !hidden.has(repoKey(repo))), DEFAULT_ORDER)).toEqual(["webapp#2", "webapp#1"]);
+		// E on the details page of a hidden repository's pull request looks it up in what GitHub returned, hidden repositories included.
+		expect(listedPullRequest(list, pr(3, { repo: "api" }))).toMatchObject({ pr: { repo: "api", number: 3 }, cwd: "/code/api" });
+	});
+
+	test("keep their place: Repositories steps among every repository, and Alt+Shift+↑ steps over the hidden ones and leaves them where they were", () => {
+		const keys = ["acme/a", "acme/b", "acme/c", "acme/d"];
+		const order: PullRequestOrder = { ...DEFAULT_ORDER, repos: keys };
+		expect(withRepoStepped(order, keys, keys, "acme/c", -1)?.repos).toEqual(["acme/a", "acme/c", "acme/b", "acme/d"]);
+		expect(withRepoStepped(order, keys, keys, "acme/a", -1)).toBeNull();
+		const shown = ["acme/a", "acme/c", "acme/d"];
+		expect(withRepoStepped(order, keys, shown, "acme/d", -1)?.repos).toEqual(["acme/a", "acme/b", "acme/d", "acme/c"]);
+		expect(withRepoStepped(order, keys, shown, "acme/c", -1)?.repos).toEqual(["acme/c", "acme/a", "acme/b", "acme/d"]);
 	});
 });
 

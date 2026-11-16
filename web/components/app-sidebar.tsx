@@ -8,7 +8,8 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
 import { type BotRow, botsNeedingYou } from "../bots-model";
 import { folderName, sessionsWaiting } from "../labels";
-import { yourMoveCount } from "../pull-requests-model";
+import { withoutHidden, yourMoveCount } from "../pull-requests-model";
+import { useHiddenRepos } from "../pull-requests-state";
 import { pullRequestsStore } from "../reads";
 import type { Page, SettingsRoute, SidebarTab } from "../routing";
 import { shortcutLabels } from "../shortcuts";
@@ -66,12 +67,13 @@ export const AppSidebar = memo(function AppSidebar({
 	const { connected, pullRequestsScope } = useDashboardStatus();
 	const scheduled = useContext(ScheduledSends);
 	const pullRequestRead = pullRequestsStore.use(pullRequestsScope).read;
+	const [hiddenRepos] = useHiddenRepos();
 	const counts = useMemo(
 		(): Partial<Record<SidebarTab, NavCount>> => ({
 			bots: { count: botList ? botsNeedingYou(botList) : 0, says: sessionsWaiting },
-			"pull-requests": { count: pullRequestRead ? yourMoveCount(pullRequestRead.data, agentOn(visible.hosts)) : 0, says: count => `${count} your move` },
+			"pull-requests": { count: pullRequestRead ? yourMoveCount(withoutHidden(pullRequestRead.data, hiddenRepos), agentOn(visible.hosts)) : 0, says: count => `${count} your move` },
 		}),
-		[botList, pullRequestRead, visible.hosts],
+		[botList, pullRequestRead, hiddenRepos, visible.hosts],
 	);
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
 	const newSessionLabel = selectedWorkspace ? `New session in ${folderName(selectedWorkspace.cwdDisplay) ?? selectedWorkspace.cwdDisplay}` : "New session";

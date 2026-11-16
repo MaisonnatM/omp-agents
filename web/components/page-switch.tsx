@@ -163,7 +163,7 @@ export const PageSwitch = memo(function PageSwitch({
 				/>
 			);
 		case "pull-requests":
-			return <PullRequestsPage hosts={visible.hosts} past={visible.past} section={sectionTarget} route={page} />;
+			return <PullRequestsPage hosts={visible.hosts} past={visible.past} route={page} />;
 		case "todo":
 			// A linked session resolves wherever it ran, even in a directory the sidebar does not list.
 			return (

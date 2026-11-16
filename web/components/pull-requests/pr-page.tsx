@@ -112,7 +112,7 @@ export function usePullRequestCopyShortcuts(target: PullRequest): void {
 interface PullRequestDetailPageProps extends Pick<PullRequestDetailsProps, "hosts" | "target"> {
 	/** The route's Code tab and the changed file it opens; `null` for another tab. */
 	files: { path: string | null } | null;
-	/** Brings the list or the board back, with these details docked beside it. */
+	/** Brings the list back, with these details docked beside it. */
 	onDock: () => void;
 }
 

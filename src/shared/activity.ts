@@ -161,13 +161,15 @@ export const CONTROLS = [
 	{ id: "browser.maximize", label: "Browser Maximize", area: "Browser" },
 	{ id: "browser.open-in-browser", label: "Browser Open in default browser", area: "Browser" },
 	{ id: "browser.tab", label: "Browser tab", area: "Browser" },
-	{ id: "pull-requests.view.list", label: "Pull requests list view", area: "Pull requests" },
-	{ id: "pull-requests.view.board", label: "Pull requests board view", area: "Pull requests" },
 	{ id: "pr-details.tab.summary", label: "Pull request Summary tab", area: "Pull requests" },
 	{ id: "pr-details.tab.timeline", label: "Pull request Timeline tab", area: "Pull requests" },
 	{ id: "pr-details.tab.code", label: "Pull request Code tab", area: "Pull requests" },
 	{ id: "pr-details.tab.review", label: "Pull request Review draft tab", area: "Pull requests" },
 	{ id: "pr-details.checkout", label: "Check out menu", area: "Pull requests" },
+	{ id: "pull-requests.repositories", label: "Repositories menu", area: "Pull requests" },
+	{ id: "pull-requests.repository.toggle", label: "Show repository switch", area: "Pull requests" },
+	{ id: "pull-requests.repository.move", label: "Move repository", area: "Pull requests" },
+	{ id: "pull-requests.repositories.show-all", label: "Show all repositories", area: "Pull requests" },
 	{ id: "storage.stop", label: "Stop after this step", area: "Settings" },
 ] as const satisfies readonly { id: string; label: string; area: string }[];
 

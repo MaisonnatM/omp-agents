@@ -1,5 +1,5 @@
 /** Shared Settings editors, native setting rows and controls, queued writes, save errors, and sections. */
-import { IconArrowDown, IconArrowUp, IconCrossMedium, IconLock, IconPencil } from "central-icons";
+import { IconCrossMedium, IconLock, IconPencil } from "central-icons";
 import { type ComponentProps, type ReactNode, useId, useState } from "react";
 import type { AgentSettingChange, AgentSettingEdit, AgentSettingOption, AgentSettingRow } from "../../../src/shared/agent-settings";
 import type { CatalogModel, OmpFile, OmpSettings } from "../../../src/shared/models";
@@ -14,6 +14,7 @@ import { formatValue, isChanged, valueOf } from "../../omp-settings";
 import type { ReadState } from "../../reads";
 import { hashForSettings } from "../../routing";
 import { useAction } from "../../use-action";
+import { OrderButton } from "../order-button";
 import { ToggleSwitch } from "../toggle-switch";
 
 /** A settings text field or select. */
@@ -180,20 +181,6 @@ export function Section({ title, meta, actions, children }: { title?: string; me
 			</div>
 			{children}
 		</section>
-	);
-}
-
-export function OrderButton({ label, direction, disabled, onClick }: { label: string; direction: "up" | "down"; disabled: boolean; onClick: () => void }) {
-	const name = direction === "up" ? "up" : "down";
-	const button = (
-		<Button variant="ghost" size="icon-compact" aria-label={`Move ${label} ${name}`} disabled={disabled} onClick={onClick}>
-			{direction === "up" ? <IconArrowUp /> : <IconArrowDown />}
-		</Button>
-	);
-	return (
-		<Tooltip content={disabled ? `${label} is already ${direction === "up" ? "first" : "last"}` : `Move ${label} ${name}`} disabled={disabled}>
-			{button}
-		</Tooltip>
 	);
 }
 

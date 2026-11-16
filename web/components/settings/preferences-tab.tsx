@@ -11,9 +11,10 @@ import { hideTab, moveTab, TAB_ROWS, useSidebarTabs } from "../../sidebar-tabs";
 import { type Theme, THEMES, useTheme } from "../../theme";
 import { playSound, useSessionNotifications } from "../../use-attention";
 import { useSkills } from "../../use-skills";
+import { ShownOrderList } from "../shown-order-list";
 import { SkillPicker } from "../skill-picker";
 import { ActivityVisibility } from "../transcript";
-import { LINK, OrderButton, Section } from "./editor";
+import { LINK, Section } from "./editor";
 import { isWebModuleId } from "../../modules";
 import { useModulesOff } from "../../modules-off";
 import { hashForSettings } from "../../routing";
@@ -48,38 +49,31 @@ function SidebarTabs() {
 			title="Sidebar tabs"
 			meta="The pages the sidebar lists, in order. A hidden tab's page, command, and links still work. Saved in this app."
 		>
-			<ol className="space-y-1 text-sm">
-				{layout.map(({ tab, hidden }, index) => {
+			<ShownOrderList
+				rows={layout.map(({ tab, hidden }) => {
 					const row = TAB_ROWS[tab];
-					return (
-						<li key={tab} className="flex items-center gap-2">
-							<row.icon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-							<div className="min-w-0 flex-1">
-								{row.label}
-								{isWebModuleId(tab) && off.has(tab) ? (
-									<p className="text-xs text-muted-foreground">
-										Shows only while turned on in{" "}
-										<a href={hashForSettings("modules")} className={LINK}>
-											Settings › Modules
-										</a>
-										.
-									</p>
-								) : (
-									row.integration !== undefined &&
-									signedOut.has(tab) && <p className="text-xs text-muted-foreground">Shows only while {MCP_SERVICES[row.integration].label} is connected.</p>
-								)}
-							</div>
-							<ToggleSwitch
-								checked={!hidden}
-								onCheckedChange={checked => setLayout(prev => hideTab(prev, tab, !checked))}
-								aria-label={`Show ${row.label}`}
-							/>
-							<OrderButton label={row.label} direction="up" disabled={index === 0} onClick={() => setLayout(prev => moveTab(prev, tab, -1))} />
-							<OrderButton label={row.label} direction="down" disabled={index === layout.length - 1} onClick={() => setLayout(prev => moveTab(prev, tab, 1))} />
-						</li>
-					);
+					return {
+						key: tab,
+						label: row.label,
+						shown: !hidden,
+						icon: row.icon,
+						note:
+							isWebModuleId(tab) && off.has(tab) ? (
+								<>
+									Shows only while turned on in{" "}
+									<a href={hashForSettings("modules")} className={LINK}>
+										Settings › Modules
+									</a>
+									.
+								</>
+							) : row.integration !== undefined && signedOut.has(tab) ? (
+								`Shows only while ${MCP_SERVICES[row.integration].label} is connected.`
+							) : undefined,
+					};
 				})}
-			</ol>
+				onShow={(tab, shown) => setLayout(prev => hideTab(prev, tab, !shown))}
+				onMove={(tab, by) => setLayout(prev => moveTab(prev, tab, by))}
+			/>
 		</Section>
 	);
 }

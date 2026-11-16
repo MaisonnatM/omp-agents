@@ -9,10 +9,11 @@ import { readTime } from "../../labels";
 import { providersStore } from "../../reads";
 import { useAction } from "../../use-action";
 import { MoreActionsMenu } from "../more-actions-menu";
+import { OrderButton } from "../order-button";
 import { LoadNote } from "../sheet-details";
 import { Callout, IntegrationList, MetaDot } from "../integrations/integration-row";
 import { Confirm } from "../integrations/mcp-connection-controls";
-import { OrderButton, Section } from "./editor";
+import { Section } from "./editor";
 import { ProviderLogo } from "./provider-logos";
 
 /** How often the page asks again while a sign-in runs, so its page, code, and question show soon after the provider names them. */

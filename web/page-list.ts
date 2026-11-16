@@ -3,8 +3,14 @@ import { isModulePage, moduleOf } from "./modules";
 import type { Page } from "./routing";
 import type { NavRow } from "./sidebar-tabs";
 
-/** A page whose sidebar row holds a list of its own: every tab's page and Settings; the Sessions panes have the roster instead, and New session and Notifications have none. */
-export type ListPage = Extract<Page, { kind: Exclude<NavRow, "new" | "notifications" | "sessions"> }>;
+/** The rows with no list of their own: the Pull requests page lists its repositories itself, and New session and Notifications have none. */
+const NO_LIST = ["new", "notifications", "pull-requests"] as const satisfies readonly NavRow[];
+
+/** A page whose sidebar row holds a list of its own: every other tab's page and Settings; the Sessions panes have the roster instead. */
+export type ListPage = Extract<Page, { kind: Exclude<NavRow, (typeof NO_LIST)[number]> }>;
+
+/** Whether `page` is the page of `row`, a row with a list of its own. */
+const listsOwnPage = (page: Page, row: NavRow): page is ListPage => page.kind === row && !NO_LIST.some(other => other === row);
 
 /** Narrowest and widest the column gets, in px, and its width until the user drags it. */
 export const COLUMN_MIN = 192;
@@ -19,8 +25,7 @@ const SPLIT_PAGES: Partial<Record<ListPage["kind"], true>> = { todo: true };
 
 /** The page `row` lists, `null` when the row has no list of its own or `page` is not its page. */
 export function listPageOf(page: Page | null, row: NavRow | null): ListPage | null {
-	if (page === null || row === null || row === "new" || row === "notifications" || page.kind !== row) return null;
-	return page as ListPage;
+	return page !== null && row !== null && listsOwnPage(page, row) ? page : null;
 }
 
 /**

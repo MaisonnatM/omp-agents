@@ -241,9 +241,6 @@ export function App() {
 			listPage && (
 				<PageList
 					page={listPage}
-					listed={state.listed}
-					hosts={visible.hosts}
-					past={visible.past}
 					todoSessions={{ hosts: state.hosts, past: state.past }}
 					botList={botList}
 					userTodos={state.userTodos}
@@ -252,7 +249,7 @@ export function App() {
 					onSectionTarget={setSectionTarget}
 				/>
 			),
-		[listPage, state.listed, visible, state.hosts, state.past, botList, state.userTodos, todoView, sectionTarget],
+		[listPage, state.hosts, state.past, botList, state.userTodos, todoView, sectionTarget],
 	);
 	const showSearch = useCallback(() => dispatchPalette({ type: "open" }), [dispatchPalette]);
 	const unreadNotices = useMemo(() => state.notices.filter(notice => !notice.read).length, [state.notices]);

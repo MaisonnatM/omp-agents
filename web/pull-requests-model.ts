@@ -1,9 +1,9 @@
-/** What each pull request waits on next, the list's sections and stacks, the board's columns and what a drop on one does, what stands between a pull request and its merge, its open review threads, and the state changes it offers. */
-import { PULL_REQUEST_ACTIONS, type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
-import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestChange, type PullRequestDetail, type Repo, type RepoPullRequests, type Reviewer, prKey, pullRequestName, repoKey, samePullRequest, type SettableState, type StackedPullRequest, unresolvedOf } from "../src/shared/github";
-import { type AgentOn, hasOpenThreads, type MoveId, moveOf, readyOnceChecksPass } from "../src/shared/moves";
+/** What each pull request waits on next, the list's sections and stacks, what stands between a pull request and its merge, its open review threads, and the state changes it offers. */
+import { type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
+import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestChange, type PullRequestDetail, type Repo, type RepoPullRequests, type Reviewer, prKey, repoKey, samePullRequest, type SettableState, type StackedPullRequest, unresolvedOf } from "../src/shared/github";
+import { type AgentOn, hasOpenThreads, type MoveId, moveOf } from "../src/shared/moves";
 import type { ReviewDraft } from "../src/shared/review-drafts";
-import { moveKey, type Where } from "./order";
+import { moveKey, stepTarget, type Where } from "./order";
 
 /** Whose move it is, or for your approved pull requests that need no fix, that they are approved; the list's sections, in page order. */
 export type MoveGroup = "Your move" | "Agent on it" | "Approved" | "Waiting on others" | "Drafts" | "Recently merged";
@@ -35,18 +35,16 @@ export const MOVES: Record<MoveId, Move> = {
 const MOVE_IDS = Object.keys(MOVES) as MoveId[];
 
 /**
- * The list's sections in page order, whether each starts folded in the list, and whether it starts folded on the board.
- * The list folds those that hold nothing for you or an agent to do now; Drafts stay open, since they are your work in
- * progress. The board folds only **Recently merged**, a week of merges, since a column of what waits on others is where
- * a drop starts.
+ * The list's sections in page order, and whether each starts folded. The list folds those that hold nothing for you or
+ * an agent to do now; Drafts stay open, since they are your work in progress.
  */
-const GROUPS: Record<MoveGroup, { folded: boolean; boardFolded: boolean }> = {
-	"Your move": { folded: false, boardFolded: false },
-	"Agent on it": { folded: false, boardFolded: false },
-	Approved: { folded: false, boardFolded: false },
-	"Waiting on others": { folded: true, boardFolded: false },
-	Drafts: { folded: false, boardFolded: false },
-	"Recently merged": { folded: true, boardFolded: true },
+const GROUPS: Record<MoveGroup, { folded: boolean }> = {
+	"Your move": { folded: false },
+	"Agent on it": { folded: false },
+	Approved: { folded: false },
+	"Waiting on others": { folded: true },
+	Drafts: { folded: false },
+	"Recently merged": { folded: true },
 };
 
 const GROUP_TITLES = Object.keys(GROUPS) as MoveGroup[];
@@ -249,6 +247,25 @@ export const sectionTitles = (order: PullRequestOrder): MoveGroup[] => inOrder(G
 /** The list's repositories in page order. */
 export const orderedRepos = <R extends Repo>(repos: readonly R[], order: PullRequestOrder): R[] => inOrder(repos, repoKey, order.repos);
 
+/** The list without the repositories you hid, by `repoKey`; the same list while you hide none. */
+export const withoutHidden = (list: PullRequestList, hidden: ReadonlySet<string>): PullRequestList =>
+	hidden.size === 0 ? list : { ...list, repos: list.repos.filter(repo => !hidden.has(repoKey(repo))) };
+
+/** `order` with the repository `key` put on the `where` side of `beside`, among `keys`, the list's repositories in page order; the repositories `keys` leaves out keep their place behind them. */
+export const withRepoMoved = (order: PullRequestOrder, keys: readonly string[], key: string, beside: string, where: Where): PullRequestOrder => ({
+	...order,
+	repos: moveKey([...keys, ...order.repos.filter(other => !keys.includes(other))], key, beside, where),
+});
+
+/**
+ * `order` with the repository `key` one place `by` among `among`, the repositories the page shows in page order, placed
+ * among `every`, all of them in page order, so the ones `among` leaves out keep their place; `null` at the edge.
+ */
+export function withRepoStepped(order: PullRequestOrder, every: readonly string[], among: readonly string[], key: string, by: 1 | -1): PullRequestOrder | null {
+	const step = stepTarget(among, key, by);
+	return step && withRepoMoved(order, every, key, step.target, step.where);
+}
+
 /** A repository's pull requests by whose move it is, leaving out the empty sections, each row with its move and its place in a stack. */
 export function pullRequestSections(pullRequests: PullRequestSummary[], order: PullRequestOrder, agentOn: AgentOn): PullRequestSection[] {
 	const members = stackMembers(pullRequests);
@@ -276,6 +293,10 @@ export function pullRequestSections(pullRequests: PullRequestSummary[], order: P
 		return [{ title, rows }];
 	});
 }
+
+/** The sections of each of `repos`, at the same index; none for a repository GitHub could not read. */
+export const sectionsOfRepos = (repos: readonly RepoPullRequests[], order: PullRequestOrder, agentOn: AgentOn): PullRequestSection[][] =>
+	repos.map(repo => ("error" in repo ? [] : pullRequestSections(repo.pullRequests, order, agentOn)));
 
 /** What a section holds by move, in rank order, such as `2 in review · 1 CI running`; `null` for a section only one move goes in, whose count says it all. */
 export function movesSummary({ title, rows }: PullRequestSection): string | null {
@@ -310,94 +331,14 @@ export const sectionFoldKey = (repo: string, title: string): string => `${repo}:
 /** Whether the list folds the repository or section that `key` names until you unfold it. */
 export const foldedByDefault = (key: string): boolean => GROUP_TITLES.some(title => GROUPS[title].folded && key.endsWith(`:${title}`));
 
-/** The pull requests the list shows, in its order: those of readable repositories and sections that `isFolded` leaves open. */
-export function shownPullRequests({ repos }: PullRequestList, isFolded: (key: string) => boolean, order: PullRequestOrder, agentOn: AgentOn): PullRequestSummary[] {
-	return orderedRepos(repos, order).flatMap(repo => {
+/** The pull requests the list shows, in its order: those of `repos` in the repositories and sections that `isFolded` leaves open, with `sectionsOf` each one's sections at the same index. */
+export function shownPullRequests(repos: readonly Repo[], sectionsOf: readonly PullRequestSection[][], isFolded: (key: string) => boolean): PullRequestSummary[] {
+	return repos.flatMap((repo, at) => {
 		const key = repoKey(repo);
-		if ("error" in repo || isFolded(key)) return [];
-		return pullRequestSections(repo.pullRequests, order, agentOn).flatMap(({ title, rows }) => (isFolded(sectionFoldKey(key, title)) ? [] : rows.map(row => row.pr)));
+		if (isFolded(key)) return [];
+		return sectionsOf[at]!.flatMap(({ title, rows }) => (isFolded(sectionFoldKey(key, title)) ? [] : rows.map(row => row.pr)));
 	});
 }
-
-/** A pull request on the board, with its repository's key and the workspace a session on it starts in. */
-export interface BoardCard {
-	row: SectionRow;
-	repo: string;
-	cwd: string;
-}
-
-/** One of the board's columns: a section, with every readable repository's pull requests in it, repository by repository. */
-export interface BoardColumn {
-	title: MoveGroup;
-	cards: BoardCard[];
-}
-
-/** The board: one column per section in page order, empty ones too, since a pull request can be dropped on them. */
-export function boardColumns({ repos }: PullRequestList, order: PullRequestOrder, agentOn: AgentOn): BoardColumn[] {
-	const cards = new Map<MoveGroup, BoardCard[]>(sectionTitles(order).map(title => [title, []]));
-	for (const repo of orderedRepos(repos, order)) {
-		const cwd = repo.cwds[0];
-		if ("error" in repo || cwd === undefined) continue;
-		const key = repoKey(repo);
-		for (const { title, rows } of pullRequestSections(repo.pullRequests, order, agentOn)) cards.get(title)!.push(...rows.map(row => ({ row, repo: key, cwd })));
-	}
-	return [...cards].map(([title, held]) => ({ title, cards: held }));
-}
-
-/** Whether the board folds the column `title` until you unfold it. */
-export const boardFoldedByDefault = (title: string): boolean => GROUP_TITLES.some(each => GROUPS[each].boardFolded && title === each);
-
-/** The pull requests the board shows, in its order: column by column, leaving out those that `isFolded` folds. */
-export const shownBoardPullRequests = (columns: readonly BoardColumn[], isFolded: (title: string) => boolean): PullRequestSummary[] =>
-	columns.flatMap(({ title, cards }) => (isFolded(title) ? [] : cards.map(({ row }) => row.pr)));
-
-/**
- * What dropping a pull request on another column does. A column follows where the pull request stands on GitHub, so a
- * drop runs the step that moves it there, or is refused with why.
- */
-export type BoardDrop =
-	| { kind: "agent"; action: PullRequestActionId; label: string }
-	| { kind: "merge"; label: string }
-	| { kind: "state"; state: Extract<SettableState, "open" | "draft">; label: string }
-	| { kind: "refused"; why: string };
-
-/** The columns a draft lands in once it is ready for review, whichever its move then picks. */
-const READY_COLUMNS: MoveGroup[] = ["Your move", "Approved", "Waiting on others"];
-
-const refused = (why: string): BoardDrop => ({ kind: "refused", why });
-
-/**
- * What dropping `row` from the column `from` on the column `to` does; `null` when it stays in its column. **Agent on it**
- * starts the quick action of its move, **Recently merged** merges it when its row offers the merge, **Drafts** converts
- * your open pull request to a draft, and an open column marks your draft ready for review. The board changes one pull
- * request's state at a time, so those two wait while GitHub still makes the change for `moving`.
- */
-export function boardDrop({ pr, move }: SectionRow, from: MoveGroup, to: MoveGroup, moving: PullRequest | null): BoardDrop | null {
-	if (from === to) return null;
-	if (pr.state === "merged") return refused("It is merged already");
-	if (to === "Agent on it") {
-		const action = moveAction(pr, move);
-		return action ? { kind: "agent", action, label: `${PULL_REQUEST_ACTIONS[action].label} with an agent` } : refused(`No agent step applies: ${reason(pr, move)}`);
-	}
-	if (to === "Recently merged") {
-		if (move === "merge") return { kind: "merge", label: "Merge" };
-		if (move === "checks-running" && readyOnceChecksPass(pr)) return { kind: "merge", label: "Merge once checks pass" };
-		return refused(`Not ready to merge: ${reason(pr, move)}`);
-	}
-	if (to === "Drafts") {
-		if (pr.state !== "open") return refused("It is a draft already");
-		if (pr.role !== "author") return refused("Only its author changes whether it is a draft");
-		return stateDrop("draft", "Convert to draft", moving);
-	}
-	if (pr.state === "draft" && READY_COLUMNS.includes(to)) {
-		if (pr.role !== "author") return refused("Only its author changes whether it is a draft");
-		return stateDrop("open", "Ready for review", moving);
-	}
-	return refused(`${to} fills from GitHub; no step moves it there`);
-}
-
-const stateDrop = (state: Extract<SettableState, "open" | "draft">, label: string, moving: PullRequest | null): BoardDrop =>
-	moving ? refused(`Wait until GitHub moves ${pullRequestName(moving)}`) : { kind: "state", state, label };
 
 /** The pull request as `list` holds it, with the workspace a session on it starts in; `null` when `list` leaves it out. */
 export function listedPullRequest(list: PullRequestList, pr: PullRequest): { pr: PullRequestSummary; cwd: string } | null {

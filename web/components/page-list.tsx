@@ -13,8 +13,6 @@ import { TAB_ROWS } from "../sidebar-tabs";
 import { BotsNav } from "./bots/bots-nav";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { ModuleNavView } from "./module-views";
-import { pullRequestsPageShows, usePullRequestDetailsPlacement, usePullRequestsView } from "./pull-requests/pull-requests-board";
-import { PullRequestsBoardIndex, PullRequestsIndex, PullRequestsNav } from "./pull-requests/pull-requests-nav";
 import { SettingsNav } from "./settings/settings-nav";
 import { TodoCategories } from "./todo/categories";
 import { Separator, useDragSeparator } from "./drag-separator";
@@ -23,11 +21,6 @@ const COLUMN_STEP = 16;
 
 interface PageListProps {
 	page: ListPage;
-	/** The server has sent the session lists. */
-	listed: boolean;
-	/** The sessions, live and past, which the pull request lists ask GitHub about. */
-	hosts: RosterHost[];
-	past: PastSession[];
 	/** Every session, including those in directories the sidebar hides, so a todo's linked session resolves. */
 	todoSessions: { hosts: RosterHost[]; past: PastSession[] };
 	botList: BotRow[] | null;
@@ -37,22 +30,11 @@ interface PageListProps {
 	onSectionTarget: (target: SectionTarget) => void;
 }
 
-export function PageList({ page, listed, hosts, past, todoSessions, botList, userTodos, todoView, sectionTarget, onSectionTarget }: PageListProps) {
+export function PageList({ page, todoSessions, botList, userTodos, todoView, sectionTarget, onSectionTarget }: PageListProps) {
 	const { changeTodo } = useDashboardActions();
 	const { connected } = useDashboardStatus();
-	const [pullRequestsView] = usePullRequestsView();
-	const [detailsPlacement] = usePullRequestDetailsPlacement();
 	if (isModulePage(page)) return <ModuleNavView page={page} section={sectionTarget} onSection={onSectionTarget} />;
 	switch (page.kind) {
-		case "pull-requests": {
-			// Until the sessions are listed, the saved workspace reads as all workspaces, which would ask GitHub about every repository.
-			if (!listed) return <p className="px-3 py-1 text-xs text-muted-foreground">Listing sessions…</p>;
-			// The page lists the pull requests itself, so its list links to the page's sections or columns, and lists them only beside a pull request's details.
-			const shows = pullRequestsPageShows(pullRequestsView, detailsPlacement, page);
-			if (shows === "list") return <PullRequestsIndex hosts={hosts} target={sectionTarget} onTarget={onSectionTarget} />;
-			if (shows === "board") return <PullRequestsBoardIndex hosts={hosts} target={sectionTarget} onTarget={onSectionTarget} />;
-			return <PullRequestsNav hosts={hosts} past={past} route={page} />;
-		}
 		case "bots":
 			return <BotsNav rows={botList} openId={page.target === null ? (page.adding ? null : undefined) : page.target} />;
 		case "todo":

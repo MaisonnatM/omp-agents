@@ -1,4 +1,4 @@
-/** A pull request's row in the lists, or its card on the board, with its move badge, review draft tag, who started the threads a **Reply** waits on, checks icon, reviewers picker, diff size, and `⋯` menu, whose actions also open on right-click. */
+/** A pull request's row in the page's table, with its move badge, review draft tag, who started the threads a **Reply** waits on, checks icon, reviewers picker, diff size, and `⋯` menu, whose actions also open on right-click. */
 import { IconArrowsRepeatRightLeft, IconBubbleQuestion, IconBubbleText, IconCircleCheck, IconCircleX, IconClipboard, IconClock, IconEyeOpen, IconLayersTwo, IconMerged, IconSparklesTwo, IconUser, IconUserAdd, IconUserAdded, IconUserRemove } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { memo, type MouseEvent, type ReactElement, type ReactNode, useRef, useState } from "react";
@@ -96,9 +96,9 @@ function BadgeFace({ move }: { move: MoveId }) {
 }
 
 /** The move a pull request waits on, as a fixed-width verb; an agent's work leads with the green dot of a working session. */
-export function MoveBadge({ move, className }: { move: MoveId; className?: string }) {
+function MoveBadge({ move }: { move: MoveId }) {
 	return (
-		<span className={cn(BADGE, MOVE_LOOK[move][0], className)} style={{ fontVariationSettings: fontWeights.semibold }}>
+		<span className={cn(BADGE, MOVE_LOOK[move][0])} style={{ fontVariationSettings: fontWeights.semibold }}>
 			<BadgeFace move={move} />
 		</span>
 	);
@@ -135,21 +135,16 @@ function useReviewRequests(pr: PullRequestSummary, options: PullRequestOptionsRe
 	return { shown: { ...pr, reviewers }, send };
 }
 
-/** A merge confirmation's open state. */
-interface MergeOpen {
-	open: boolean;
-	onOpenChange: (open: boolean) => void;
-}
-
 /**
  * A **Merge** badge, or a **Checks running** one on a pull request that is ready but for them: a button that merges after the
  * same confirmation as the details, reading what the merge needs while it is open; once queued, **Queued** or **Stopped**.
  */
-function MergeBadge({ pr, move, open, onOpenChange }: { pr: PullRequestSummary; move: "merge" | "checks-running" } & MergeOpen) {
+function MergeBadge({ pr, move }: { pr: PullRequestSummary; move: "merge" | "checks-running" }) {
+	const [open, setOpen] = useState(false);
 	const target = useMergeTarget(pr, open);
 	const label = move === "merge" ? `Merge ${pullRequestName(pr)} on GitHub` : `Checks running: merge ${pullRequestName(pr)} once they pass`;
 	return (
-		<MergePopover pr={pr} target={target.data} error={target.error} open={open} onOpenChange={onOpenChange} tooltip={label} align="start">
+		<MergePopover pr={pr} target={target.data} error={target.error} open={open} onOpenChange={setOpen} tooltip={label} align="start">
 			{({ queued, pending }) => (
 				<button
 					type="button"
@@ -171,12 +166,6 @@ function MergeBadge({ pr, move, open, onOpenChange }: { pr: PullRequestSummary; 
 			)}
 		</MergePopover>
 	);
-}
-
-/** A list row's {@link MergeBadge}, which holds whether its confirmation is open; the board's card holds its own, since a drop opens it. */
-function RowMergeBadge(props: { pr: PullRequestSummary; move: "merge" | "checks-running" }) {
-	const [open, setOpen] = useState(false);
-	return <MergeBadge {...props} open={open} onOpenChange={setOpen} />;
 }
 
 /**
@@ -201,10 +190,10 @@ function RowBusyBadge({ busy }: { busy: Busy }) {
  * **Checks running** on a pull request ready but for them, a button that merges; else a button that starts the quick
  * action handing the move to an agent, when one applies; else the plain badge.
  */
-function RowMoveBadge({ pr, move, pending, cwd, onQuickAction, merge }: { pr: PullRequestSummary; move: MoveId; merge?: MergeOpen } & Pick<RowProps, "pending" | "cwd" | "onQuickAction">) {
+function RowMoveBadge({ pr, move, pending, cwd, onQuickAction }: { pr: PullRequestSummary; move: MoveId } & Pick<RowProps, "pending" | "cwd" | "onQuickAction">) {
 	const busy = useBusy(pr, pending);
 	if (busy) return <RowBusyBadge busy={busy} />;
-	if (move === "merge" || (move === "checks-running" && readyOnceChecksPass(pr))) return merge ? <MergeBadge pr={pr} move={move} {...merge} /> : <RowMergeBadge pr={pr} move={move} />;
+	if (move === "merge" || (move === "checks-running" && readyOnceChecksPass(pr))) return <MergeBadge pr={pr} move={move} />;
 	const action = moveAction(pr, move);
 	if (!action) return <MoveBadge move={move} />;
 	const label = `${MOVES[move].label}: ${QUICK_ACTIONS[action].label}`;
@@ -231,9 +220,9 @@ const CHECKS_ICON: Record<PullRequestSummary["checks"], [IconComponent, string, 
 };
 
 /** How the head commit's checks went; nothing for a pull request without checks. */
-export function ChecksIcon({ checks, className }: { checks: PullRequestSummary["checks"]; className?: string }) {
+export function ChecksIcon({ checks }: { checks: PullRequestSummary["checks"] }) {
 	const icon = CHECKS_ICON[checks];
-	return icon && <IconTip icon={icon} className={className} />;
+	return icon && <IconTip icon={icon} />;
 }
 
 const REVIEW_ICON: Record<PullRequestSummary["review"], [IconComponent, string, string] | null> = {
@@ -341,11 +330,8 @@ export function sessionsByPullRequest(hosts: RosterHost[], past: PastSession[]):
 	return byKey;
 }
 
-/**
- * The first session on the pull request as a chip, then the others behind a `+N` menu that lists every one. A `compact`
- * chip shows the session's status alone and names it in its tooltip, for a row too narrow to fit its name whole.
- */
-function SessionChips({ sessions, onOpen, compact }: { sessions: SessionLink[]; onOpen: (view: View, mode: OpenMode) => void; compact: boolean }) {
+/** The first session on the pull request as a chip, then the others behind a `+N` menu that lists every one. */
+function SessionChips({ sessions, onOpen }: { sessions: SessionLink[]; onOpen: (view: View, mode: OpenMode) => void }) {
 	const [menuOpen, setMenuOpen] = useState(false);
 	const [first] = sessions;
 	if (!first) return null;
@@ -356,7 +342,6 @@ function SessionChips({ sessions, onOpen, compact }: { sessions: SessionLink[]; 
 				status={first.status}
 				title={`Open the session that ${LINK_VERB[first.link]} it${first.status ? `, ${statusLabel(first.status)}` : ""} (${SPLIT_CLICK} to split)`}
 				filled={first.link === "submitted"}
-				compact={compact}
 				onClick={event => onOpen(first.view, modeOf(event))}
 			/>
 			{sessions.length > 1 && (
@@ -407,11 +392,10 @@ function StackInfo({ stack, base }: { stack: StackPlace | null; base: string | n
 /** The DOM id of a pull request's row, which a link to that PR on the Pull requests page scrolls to. */
 export const rowId = (pr: PullRequest): string => `pull-request-${repoKey(pr)}/${pr.number}`;
 
-/** The row's element and its link: what the list's keys reach by id, so the markup below is their contract. */
+/** The row's element: what the list's keys reach by id, so the markup below is their contract. */
 export const rowElement = (pr: PullRequest): HTMLElement | null => document.getElementById(rowId(pr));
-export const rowLink = (pr: PullRequest): HTMLAnchorElement | null => rowElement(pr)?.querySelector("a") ?? null;
 
-/** What a pull request's row and its card on the board both take. */
+/** What a pull request's row takes from the functions every row shares; the list adds its drag and move id. */
 export interface RowBase {
 	row: SectionRow;
 	sessions: SessionLink[];
@@ -447,20 +431,13 @@ const sameStack = (a: StackPlace | null, b: StackPlace | null): boolean =>
 export const sameSessions = (a: SessionLink[], b: SessionLink[]): boolean =>
 	a.length === b.length && a.every((link, at) => link.sessionId === b[at]!.sessionId && link.label === b[at]!.label && link.link === b[at]!.link && link.status === b[at]!.status && sameView(link.view, b[at]!.view));
 
-/** How each prop of a component is compared, which decides whether it draws again. */
-type PropEqual<Props> = { [K in keyof Props]: (a: Props[K], b: Props[K]) => boolean };
-
-const sameProps =
-	<Props,>(equal: PropEqual<Props>) =>
-	(a: Props, b: Props): boolean =>
-		(Object.keys(equal) as (keyof Props)[]).every(key => equal[key](a[key], b[key]));
-
 /**
- * How each prop of a row or card is compared. The board keeps each prop the same object while what it shows holds,
- * `sessions` included, except the row's data, which it rebuilds whenever the roster or the sort changes, compared by
- * what it holds.
+ * How each prop of a row is compared, which decides whether it draws again. The list keeps each prop the same object
+ * while what it shows holds, `sessions` included, except the row's data, which it rebuilds whenever the roster or the
+ * sort changes, compared by what it holds, and its drag item, compared by its handlers, which stay the same, and where a
+ * drop would land.
  */
-const ROW_EQUAL: PropEqual<RowBase> = {
+const ROW_EQUAL: { [K in keyof RowProps]: (a: RowProps[K], b: RowProps[K]) => boolean } = {
 	row: (a, b) => a === b || (a.pr === b.pr && a.move === b.move && a.unit === b.unit && sameStack(a.stack, b.stack)),
 	sessions: Object.is,
 	targeted: Object.is,
@@ -472,14 +449,11 @@ const ROW_EQUAL: PropEqual<RowBase> = {
 	actionsOpen: Object.is,
 	onActionsOpenChange: Object.is,
 	onChange: Object.is,
-};
-
-/** A list row adds its drag item, which the board rebuilds too, compared by its handlers, which stay the same, and where a drop would land. */
-const sameRowProps = sameProps<RowProps>({
-	...ROW_EQUAL,
 	drag: (a, b) => a.handle === b.handle && a.target === b.target && a.dropAt === b.dropAt && a.dragging === b.dragging,
 	moveId: Object.is,
-});
+};
+
+const sameRowProps = (a: RowProps, b: RowProps): boolean => (Object.keys(ROW_EQUAL) as (keyof RowProps)[]).every(<K extends keyof RowProps>(key: K) => ROW_EQUAL[key](a[key], b[key]));
 
 /** What a row's `⋯` menu and its right-click menu list. */
 function rowMenuItems({ pr, change, review, options, pending, cwd, onQuickAction, onRebase }: Pick<RowProps, "pending" | "cwd" | "onQuickAction" | "onRebase"> & { pr: PullRequestSummary; change: Action<[ListChange]>; review: ReviewRequests; options: PullRequestOptionsRead }): PullRequestMenuItemsProps {
@@ -517,7 +491,7 @@ function openFromRow(event: MouseEvent<HTMLElement>, pr: PullRequest): void {
 	const target = event.target;
 	if (!(target instanceof Element) || event.defaultPrevented || !event.currentTarget.contains(target) || target.closest("a, button, [role=menuitem]")) return;
 	if (window.getSelection()?.isCollapsed === false) return;
-	rowLink(pr)?.dispatchEvent(new window.MouseEvent("click", {
+	rowElement(pr)?.querySelector("a")?.dispatchEvent(new window.MouseEvent("click", {
 		bubbles: true,
 		cancelable: true,
 		metaKey: event.metaKey,
@@ -543,65 +517,6 @@ function TitleLink({ pr, targeted, className }: { pr: PullRequestSummary; target
 		</Tooltip>
 	);
 }
-
-/**
- * A pull request in the sidebar's list: its title and age, then its move and why it waits on it, with its `⋯` menu on
- * hover. A rail on the left joins the rows of a stack.
- */
-export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, stack }, sessions, targeted, onOpen, drag, moveId, onChange, ...actions }: RowProps) {
-	const change = useRowChange(pr, onChange);
-	const options = usePullRequestOptions(pr);
-	const review = useReviewRequests(pr, options, onChange);
-	const items = rowMenuItems({ pr, change, review, options, ...actions });
-	return (
-		<RowContextMenu
-			items={items}
-			render={
-				<li
-					id={rowId(pr)}
-					{...drag.handle}
-					{...drag.target}
-					data-move={moveId}
-					onClick={event => openFromRow(event, pr)}
-					className={cn("group/row relative cursor-pointer", drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}
-				/>
-			}
-		>
-			{stack?.joinsAbove && <span aria-hidden className="absolute top-0 left-1 h-4 w-px bg-border" />}
-			{stack?.joinsBelow && <span aria-hidden className="absolute top-4 bottom-0 left-1 w-px bg-border" />}
-			{stack && <span aria-hidden className="absolute top-3.5 left-[2.5px] size-1 rounded-full bg-muted-foreground/60" />}
-			<div className={cn("space-y-1 rounded-md py-1.5 pr-2 pl-3", targeted ? "bg-sidebar-accent" : "group-hover/row:bg-sidebar-accent/50")}>
-				<div className="flex min-w-0 items-start gap-2">
-					<TitleLink pr={pr} targeted={targeted} className="line-clamp-2 flex-1 leading-5" />
-					<Age at={pr.updatedAt} compact exact className="w-7 shrink-0 text-right text-xs leading-5 tabular-nums text-muted-foreground" />
-				</div>
-				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
-					<RowMoveBadge pr={pr} move={move} {...actions} />
-					<StateTag pr={pr} move={move} />
-					<ReviewDraftTag pr={pr} />
-					<span className="shrink-0 tabular-nums">#{pr.number}</span>
-					<span aria-hidden>·</span>
-					<span className="min-w-0 truncate">{reason(pr, move)}</span>
-					<ThreadStartersTag pr={pr} move={move} />
-					<span className="ml-auto flex min-w-0 shrink-0 items-center gap-1.5">
-						<StackInfo stack={stack} base={pr.stackedOn} />
-						<SessionChips sessions={sessions} onOpen={onOpen} compact />
-						<ConversationCount pr={pr} />
-						<ChecksIcon checks={pr.checks} className="[&_svg]:size-3.5" />
-					</span>
-				</p>
-			</div>
-			<span
-				className={cn(
-					"absolute top-1 right-1 rounded-md bg-sidebar transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 has-[[data-popup-open]]:opacity-100 [@media(hover:none)]:opacity-100",
-					actions.pending === null && !change.pending && "opacity-0",
-				)}
-			>
-				<RowMenu items={items} {...actions} />
-			</span>
-		</RowContextMenu>
-	);
-}, sameRowProps);
 
 /**
  * The page's columns: move, title, sessions, stack, checks, review, size, age, and the `⋯` menu. The sessions, stack,
@@ -655,7 +570,7 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 				</p>
 			</div>
 			<span className={cn(WIDE, "min-w-0 text-xs")}>
-				<SessionChips sessions={sessions} onOpen={onOpen} compact={false} />
+				<SessionChips sessions={sessions} onOpen={onOpen} />
 			</span>
 			<span className={cn(WIDE, "min-w-0 text-xs text-muted-foreground")}>
 				<StackInfo stack={stack} base={pr.stackedOn} />
@@ -672,84 +587,3 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 		</RowContextMenu>
 	);
 }, sameRowProps);
-
-/** A card on the Pull requests board: what a row takes, and what the board adds. */
-export interface CardProps extends RowBase {
-	/** `owner/repo`, when the board holds several repositories; `null` when it holds one. */
-	repo: string | null;
-	/** Whether its merge confirmation is open, which a drop on **Recently merged** opens. */
-	mergeOpen: boolean;
-	/** The same function for every card, like `onQuickAction`. */
-	onMergeOpenChange: (pr: PullRequest, open: boolean) => void;
-	/** What a drag does to it: `lifted` leaves this faded copy behind the card in the pointer's hand, `picked` marks the card the keys carry, and `moving` waits on GitHub after a drop. */
-	held: "lifted" | "picked" | "moving" | null;
-}
-
-const sameCardProps = sameProps<CardProps>({ ...ROW_EQUAL, repo: Object.is, mergeOpen: Object.is, onMergeOpenChange: Object.is, held: Object.is });
-
-/** The DOM attribute that names a card by {@link prKey}, which the board's drag reads under the pointer. */
-export const CARD_KEY = "data-card";
-
-/**
- * A pull request on the Pull requests board: its move badge, tags, and age, its title, its repository, number, and why it
- * waits, then its sessions, stack, checks, review, and size, with its `⋯` menu on hover. A click shows its details
- * beside the board.
- */
-export const PullRequestCard = memo(function PullRequestCard({ row: { pr, move, stack }, repo, sessions, targeted, onOpen, onChange, mergeOpen, onMergeOpenChange, held, ...actions }: CardProps) {
-	const change = useRowChange(pr, onChange);
-	const options = usePullRequestOptions(pr);
-	const review = useReviewRequests(pr, options, onChange);
-	const items = rowMenuItems({ pr, change, review, options, ...actions });
-	return (
-		<RowContextMenu
-			items={items}
-			render={
-				<li
-					id={rowId(pr)}
-					{...{ [CARD_KEY]: prKey(pr) }}
-					aria-busy={held === "moving" || undefined}
-					onClick={event => openFromRow(event, pr)}
-					className={cn(
-						"group/card relative cursor-grab touch-pan-y select-none space-y-1.5 rounded-lg border border-border bg-background p-2.5 shadow-xs/5 transition-[border-color,opacity] hover:border-foreground/20",
-						targeted && "border-ring ring-1 ring-ring",
-						held === "lifted" && "border-dashed opacity-35 shadow-none",
-						held === "picked" && "ring-2 ring-ring",
-						held === "moving" && "motion-safe:animate-pulse",
-					)}
-				/>
-			}
-		>
-			<div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-				<RowMoveBadge pr={pr} move={move} merge={{ open: mergeOpen, onOpenChange: open => onMergeOpenChange(pr, open) }} {...actions} />
-				<StateTag pr={pr} move={move} />
-				<ReviewDraftTag pr={pr} />
-				<Age at={pr.updatedAt} compact exact className="ml-auto shrink-0 tabular-nums" />
-			</div>
-			<TitleLink pr={pr} targeted={targeted} className="line-clamp-2 block pr-6 leading-5" />
-			<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
-				<span className="min-w-0 shrink truncate tabular-nums">{repo ? `${repo}#${pr.number}` : `#${pr.number}`}</span>
-				<span aria-hidden>·</span>
-				<span className="min-w-0 flex-1 truncate">{reason(pr, move)}</span>
-				<ThreadStartersTag pr={pr} move={move} />
-			</p>
-			<div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-				<SessionChips sessions={sessions} onOpen={onOpen} compact />
-				<StackInfo stack={stack} base={pr.stackedOn} />
-				<ConversationCount pr={pr} />
-				<ChecksIcon checks={pr.checks} className="[&_svg]:size-3.5" />
-				<span className="ml-auto flex min-w-0 items-center gap-2">
-					<ReviewPicker options={options} review={review} />
-					<DiffSize pr={pr} />
-				</span>
-			</div>
-			<span
-				className={cn(
-					"absolute top-8 right-1.5 rounded-md bg-background transition-opacity group-focus-within/card:opacity-100 group-hover/card:opacity-100 has-[[data-popup-open]]:opacity-100 [@media(hover:none)]:opacity-100",
-					actions.pending === null && !change.pending && "opacity-0",
-				)}
-			>
-				<RowMenu items={items} {...actions} />
-			</span>
-		</RowContextMenu>
-	);
-}, sameCardProps);

@@ -28,7 +28,7 @@
   The ticket step links the issue you named or one that matches the work, and passes without one rather than creating a ticket.
   In the plan step the agent compares up to three ways to build the change and posts the one it chose on the Linear issue, or in the PR body when there is no issue.
   omp writes each step to its session file, and the dashboard reads those entries for running and past sessions; a todo whose linked session's run reached merged shows **Shipped**, as [Todo list](todo-list.md) says.
-- The sidebar's page list switches pages: **Pull requests**, **Tickets**, **Bots**, **Calendar**, **Todo**, **Sport**, and **Email**, each with its page's own list in a column at the page's left while it is open.
+- The sidebar's page list switches pages: **Pull requests**, **Tickets**, **Bots**, **Calendar**, **Todo**, **Sport**, and **Email**, each but **Pull requests** with its page's own list in a column at the page's left while it is open.
   Click a tab or use the left and right arrow keys while a bar tab has focus to switch pages.
   **Tickets** shows only once Linear is connected; see [Linear tickets](linear-tickets.md).
   **Email** shows only once Gmail is connected; see [Email](email.md).
@@ -39,11 +39,9 @@
   **Calendar** opens a month of Google events, routine runs, and due todos and tickets; see [Calendar](calendar.md).
   The tabs show their names, and when the sidebar is too narrow for every name, their icons alone, the row only as wide as its tabs; hover an icon for its name.
   The tabs never spill past the sidebar.
-  **Pull requests** opens the Pull requests page, a table of your pull requests, and lists its sections in the sidebar, each with its count; click one to unfold its card on the page and scroll to it.
-  Once you open a session from the Pull requests page, or a pull request's details as a page, the sidebar lists the pull requests instead, beside the details or the session panes.
-  In the board view, the sidebar lists the board's columns instead, each with its count; click one to unfold the column and scroll to it, while a pull request's details stay docked beside the board.
+  **Pull requests** opens the Pull requests page, a table of your pull requests, with no list of its own at its left.
   The tab stays on **Pull requests** while you open sessions from it, until you choose **Sessions**.
-  The **Your move** count stands out in bold.
+  On the page, a section's **Your move** count stands out in bold.
   The **Pull requests** tab counts the pull requests that wait on your move, for the workspace that the sidebar's picker shows, and reads GitHub every minute on every page so the count stays current.
   A `#pull-requests` address opens the Pull requests page.
   The pull request list covers the GitHub repository of the workspace that the sidebar's picker shows, or under **All workspaces** every repository that a session ran in, one section per repository.
@@ -51,11 +49,11 @@
   A directory removed since its sessions ran, such as a deleted worktree, is no longer a workspace, so quick actions start in a workspace that still exists.
   Each repository lists your open pull requests, your merges from the last seven days, and the open pull requests that ask you for a review.
   They sort by whose move it is: **Your move**, **Agent on it**, **Approved**, **Waiting on others**, **Drafts**, and **Recently merged**.
-  A sidebar row shows the title on up to two lines with its age beside it, such as `<1m`, `19m`, `17h`, or `2d`, which counts up each minute without a reload, then a badge that names its move, its number, the reason for the move, its place in a stack, its sessions, its conversations, and its checks.
+  A pull request's age, such as `<1m`, `19m`, `17h`, or `2d`, counts up each minute without a reload.
   A badge is coloured only for your moves, each with its own icon and colour, such as red for **Fix CI** and orange for **Rebase**; every other move is grey.
   The Pull requests page's table shows each section as a card, one row per pull request: the move's badge, the title with its author's picture and name, number, conversations, and reason under it, the sessions on it, its place in a stack, its checks, its reviewers or review state, the lines added and removed, its age, and its `⋯` menu at the far right.
   Conversations count the pull request's comments and review threads, resolved ones too, as GitHub's own list does, beside a speech bubble; a pull request with none shows no count.
-  Hover the count, in the sidebar, the table, or a board card, for a card of the five latest conversations, newest first, each with its author, age, file and line for a review thread, and the start of its first comment.
+  Hover the count in the table for a card of the five latest conversations, newest first, each with its author, age, file and line for a review thread, and the start of its first comment.
   The card reads the pull request from GitHub when it opens, leaves out what the **Comments** filter on the details' **Summary** hides, and says how many older or hidden conversations it left out.
   A narrow page drops the sessions, stack, and line columns.
   Each pull request takes the first move that applies, in this order.
@@ -78,11 +76,10 @@
   A row shows one session chip: a running session first, since one may be working on the pull request now, then one that submitted it, then one that worked on it.
   A submitter's chip is filled and a worker's chip is outlined, and a chip's tooltip says which it is.
   A running session's chip starts with the sidebar's status dot: none while it works, amber while it waits on a question, blue once its turn ended.
-  In the sidebar the chip shows only an agent icon and that dot, with the session's name in its tooltip; the table shows the name.
   `+N` after the chip lists every session on the pull request, each with whether it submitted or worked on it; choose one to open it.
-  A pull request whose **Review** session saved a review draft you have not posted shows a violet **Review draft** tag before its number, in the sidebar and in the table.
+  A pull request whose **Review** session saved a review draft you have not posted shows a violet **Review draft** tag before its number in the table.
   The table shows up to two reviewers' pictures and lists the rest under `+N`; with no reviewer, an icon shows the review state.
-  Click a table row's or a board card's reviewers to ask someone for a review, or to withdraw a request, from the repository's people, as the details' **Reviewers** field does; with no reviewer and no review state, a muted person icon stands in its place.
+  Click a table row's reviewers to ask someone for a review, or to withdraw a request, from the repository's people, as the details' **Reviewers** field does; with no reviewer and no review state, a muted person icon stands in its place.
   A pick shows at once and goes to GitHub after the ones before it; when GitHub refuses one, the row drops it and a toast says why.
   A merged pull request's reviewers do not change.
   A pull request with more than 100 review conversations shows the count among the first 100 with a `+`, for example `12+ open threads`.
@@ -110,7 +107,7 @@
   A repository's heading names its workspaces only when their folder differs from the repository's name, and an unplugged icon in the header lists the workspaces whose repository could not be read.
   **Waiting on others** and **Recently merged** start folded, since they hold nothing to do now, and stay unfolded once you unfold them.
   Click the row to show the pull request's details docked at the right of the table, with the row highlighted; session chips, move badges, the reviewers, and the `⋯` menu keep their own clicks.
-  Drag the details' left edge to resize them, or focus it and press ← or →, with Shift for larger steps; double-click it to reset the width, which the app keeps for the table and the board alike.
+  Drag the details' left edge to resize them, or focus it and press ← or →, with Shift for larger steps; double-click it to reset the width, which the app keeps.
   The title remains a link for keyboard and modifier-click navigation.
   **Open as a page** in the docked details shows them on a page of their own, on the tab they showed, and the close button hides them.
   The app keeps that choice, so the next pull request you open shows as a page too, until the back arrow at the start of the page header, **Back to Pull requests**, brings the list back with the details docked beside it.
@@ -133,33 +130,24 @@
   Drag a pull request within its section to place it by hand, which switches the sort to **Manual** and keeps the order the section showed until then.
   In **Manual**, a pull request you never placed comes first, most recently updated first.
   A stack moves as one, and its pull requests keep their order from the top of the stack.
-  Drag a repository's name on the page or in its sidebar index to reorder the repositories, and a section's heading on the page to reorder the sections, which applies to every repository.
+  Drag a repository's name on the page to reorder the repositories, and a section's heading on the page to reorder the sections, which applies to every repository.
   Alt+Shift+↑ and ↓ move the focused pull request, section heading, or repository name one place, as dragging does.
   The app keeps the order across reloads, and **Reset the order** in the sort menu restores the default.
-- **List** and **Board** at the top of the Pull requests page switch its view, and the app keeps the choice.
-  The board shows a column per section, in the sections' order, each holding the pull requests of every repository as cards: the move's badge, state, and age, the title, the repository and number with the reason, then the sessions, stack, conversations, checks, reviewers, and lines added and removed.
-  The repository shows on a card only when the board spans more than one.
-  **Recently merged** starts folded; click a column's title to fold it to a narrow strip with its count, and click the strip to unfold it.
-  An empty column is a strip too, and every strip still takes a drop.
-  Drag a card onto another column to run the step that moves it there.
-  The card follows the pointer, and the column under it shows a dashed slot named after the step, or turns red and says why no step applies.
-  **Agent on it** starts the quick action of the card's move, such as **Fix CI** with an agent.
-  **Recently merged** opens the card's merge confirmation, for a pull request that is **Merge**, or **CI running** and ready but for its checks; the merge happens only once you confirm it.
-  **Drafts** converts your open pull request to a draft, and **Your move**, **Approved**, or **Waiting on others** marks your draft ready for review.
-  Every other column fills from GitHub, so a drop there is refused, as is one on a merged pull request or on someone else's draft state.
-  A refused drop, Escape, or a release outside the columns springs the card back.
-  Space on a focused card's title picks it up, ← and → choose its column, Space or Enter drops it, and Escape or Tab puts it back; a screen reader hears each step.
-  Click a card to show the pull request's details docked at the right of the board, with ↓ and ↑ stepping through the cards column by column.
-  **Open as a page** and the close button work as in the table.
+- **Repositories** at the top of the Pull requests page, beside the sort button, lists every repository the page covers, each with a switch that shows or hides it and buttons that move it up or down.
+  Its line under the title says that a hidden repository also leaves the tab's count, and that the browser keeps the choice.
+  While you hide any, the button reads **N hidden** and its tooltip **Repositories: N hidden**.
+  A hidden repository leaves the table, **Rebase N behind**, ↓ and ↑, and the **Pull requests** tab's count, and keeps its place in the order, so it comes back where it was.
+  E still works on the details of a hidden repository's pull request.
+  **Reset the order** leaves the hidden repositories hidden, and the browser keeps the choice across reloads.
+  When every repository is hidden, the page says "Every repository is hidden. Show them from Repositories." above a **Show all repositories** button.
 
 - The Pull requests page works from the keyboard, outside text fields, while its tab shows.
   ↓ and ↑ move to the next and previous row, and Enter shows the focused row's details.
   While the details show, ↓ and ↑ show the next and previous pull request; while the **Code** tab shows, they open the next and previous file.
-  The sidebar's pull request list, which stays while you work in the sessions, takes ↓ and ↑ only once one of its rows has focus, so they keep scrolling a session.
   O opens the focused row's pull request, or the one whose details show, on GitHub, and `.` opens the focused row's `⋯` menu.
   E gives the focused row's move, or the move of the pull request whose details show, to an agent, when a quick action makes that move.
 - `#pull-requests/<owner>/<repo>/<number>` shows one pull request's details.
-  The sidebar unfolds its row's repository and section, scrolls the row into view, and highlights it.
+  Beside the table, the page unfolds its row's repository and section, scrolls the row into view, and highlights it.
   When the list does not include that pull request, a note says why, and the details still show.
   `#pull-requests/<owner>/<repo>/<number>/files` opens the details on the **Code** tab at the first file, and `#pull-requests/<owner>/<repo>/<number>/files/<path>` at the file at that path, encoded; choosing **Code** puts that address in the location bar, and another tab takes it out.
 - The quick actions in a row's `⋯` menu on the Pull requests page, and buttons in the pull request's details, start a new dashboard session in the background, from the repository's most recently used workspace, with a prompt that names the pull request and its branch.
