@@ -137,8 +137,8 @@
 - The magnifier in the page header opens a search field that keeps the pull requests whose title, number, branch, author, or repository contain every word you type; Escape or its × clears it.
   The page forgets the search when you leave it.
 - **Display**, the sliders button beside **Filter**, holds **Grouping**, **Ordering**, **Show empty sections**, and **Repositories…**.
-  **Grouping** lays the list out by **Repository**, the default, by **Section** with a table per repository under each section, by **Author**, most pull requests first, with a table per repository under each author, or with **No grouping**, one table of every pull request, in section order.
-  Every grouping but **Repository** folds its own headings, keeps no drag, and starts with **Recently merged** folded when grouped by section.
+  **Grouping** lays the list out by **Repository**, the default, by **Section** with a table per repository under each section, by **Author**, most pull requests first, with a table per section under each author, or with **No grouping**, one table of every pull request, in section order.
+  Every grouping but **Repository** folds its own headings and keeps no drag; **Waiting on others** and **Recently merged** start folded there too.
   **Ordering** orders the pull requests within each section: **Recently updated**, the default, **Newest first** and **Oldest first** by number, or **Manual**.
   Any order but **Manual** keeps your moves in their order and sorts within each move.
   Drag a pull request within its section to place it by hand, which switches the order to **Manual** and keeps the order the section showed until then.

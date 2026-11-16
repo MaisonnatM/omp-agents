@@ -147,11 +147,11 @@ export interface GroupedRow {
 	repo: RepoPullRequests;
 }
 
-/** A table under a heading: a repository's rows, or every row under no grouping. */
+/** A table under a heading: a repository's rows under a section, a section's rows under an author, or every row under no grouping. */
 export interface ListCard {
 	key: string;
 	title: string;
-	/** The section it lists, under the grouping by section, whose count **Your move** draws stronger. */
+	/** The section it lists, under the grouping by section or author, whose count **Your move** draws stronger. */
 	section: MoveGroup | null;
 	rows: GroupedRow[];
 }
@@ -174,36 +174,50 @@ const relinked = (rows: GroupedRow[]): GroupedRow[] =>
 		return stack ? { ...item, row: { ...item.row, stack: { ...stack, joinsAbove: joins(rows[at - 1], item), joinsBelow: joins(item, rows[at + 1]) } } } : item;
 	});
 
-/** The cards of `rows`, one per repository, in the order of the rows' repositories. */
-const cardsByRepo = (rows: GroupedRow[], section: MoveGroup | null): ListCard[] =>
-	[...Map.groupBy(rows, ({ repo }) => repoKey(repo))].map(([key, rows]) => ({ key, title: repoName(rows[0]!.repo), section, rows: relinked(rows) }));
-
 /**
  * The list under `grouping`, from `repos` and their sections at the same index: by section, a heading per section in
  * page order with a table per repository; by author, a heading per author, most pull requests first, with a table per
- * repository; or with no grouping, one table of every row. A heading with no table leaves the list.
+ * section in page order; or with no grouping, one table of every row. A heading with no table leaves the list.
  */
 export function groupedList(grouping: Exclude<PullRequestGrouping, "repository">, repos: readonly RepoPullRequests[], sectionsOf: readonly PullRequestSection[][], order: PullRequestOrder): ListGroup[] {
+	const titles = sectionTitles(order);
 	if (grouping === "section")
-		return sectionTitles(order).flatMap((title): ListGroup[] => {
+		return titles.flatMap((title): ListGroup[] => {
 			const cards = repos.flatMap((repo, at): ListCard[] => {
 				const section = sectionsOf[at]!.find(each => each.title === title);
 				return section ? [{ key: repoKey(repo), title: repoName(repo), section: title, rows: section.rows.map(row => ({ row, repo })) }] : [];
 			});
 			return cards.length === 0 ? [] : [{ key: title, title, cards }];
 		});
-	const rows = repos.flatMap((repo, at) => sectionsOf[at]!.flatMap(section => section.rows.map(row => ({ row, repo }))));
-	if (grouping === "none") return rows.length === 0 ? [] : [{ key: "all", title: null, cards: [{ key: "all", title: "Pull requests", section: null, rows: relinked(rows) }] }];
-	return [...Map.groupBy(rows, ({ row }) => row.pr.author.login)]
+	if (grouping === "none") {
+		const rows = repos.flatMap((repo, at) => sectionsOf[at]!.flatMap(section => section.rows.map(row => ({ row, repo }))));
+		return rows.length === 0 ? [] : [{ key: "all", title: null, cards: [{ key: "all", title: "Pull requests", section: null, rows: relinked(rows) }] }];
+	}
+	const bySection = titles.map(title => ({
+		title,
+		rows: repos.flatMap((repo, at) => (sectionsOf[at]!.find(each => each.title === title)?.rows ?? []).map(row => ({ row, repo }))),
+	}));
+	const logins = Map.groupBy(
+		bySection.flatMap(({ rows }) => rows),
+		({ row }) => row.pr.author.login,
+	);
+	return [...logins]
 		.toSorted(([a, aRows], [b, bRows]) => bRows.length - aRows.length || a.localeCompare(b))
-		.map(([login, rows]) => ({ key: login, title: login, cards: cardsByRepo(rows, null) }));
+		.map(([login]) => ({
+			key: login,
+			title: login,
+			cards: bySection.flatMap(({ title, rows }): ListCard[] => {
+				const own = rows.filter(({ row }) => row.pr.author.login === login);
+				return own.length === 0 ? [] : [{ key: title, title, section: title, rows: relinked(own) }];
+			}),
+		}));
 }
 
 /** A heading's fold key under `grouping`; a section's heading ends in `:` and its title, so the sections that start folded do too. */
 export const groupFoldKey = (grouping: PullRequestGrouping, group: string): string => `${grouping}:${group}`;
 
-/** A table's fold key under its heading's. */
-export const cardFoldKey = (groupKey: string, card: string): string => `${groupKey}|${card}`;
+/** A table's fold key under its heading's; a section's table ends in `:` and its title too, so it starts folded as its section does. */
+export const cardFoldKey = (groupKey: string, card: string): string => `${groupKey}:${card}`;
 
 /** The pull requests `groups` shows, in its order, less those under the headings and tables `isFolded` folds. */
 export const groupedPullRequests = (grouping: PullRequestGrouping, groups: readonly ListGroup[], isFolded: (key: string) => boolean): PullRequestSummary[] =>

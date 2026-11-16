@@ -33,11 +33,15 @@ import {
 	yourMoveCount,
 } from "./pull-requests-model";
 import {
+	DEFAULT_DISPLAY,
+	decodeDisplay,
 	decodeFilter,
+	encodeDisplay,
 	encodeFilter,
 	EVERY_SECTION,
 	groupedList,
 	groupedPullRequests,
+	cardFoldKey,
 	groupFoldKey,
 	keepsPullRequest,
 	type ListGroup,
@@ -390,6 +394,13 @@ describe("shown sections", () => {
 		for (const raw of [null, "{", "[]", '{"sections":["Gone"]}']) expect(decodeFilter(raw)).toEqual(NO_FILTER);
 		expect(decodeFilter('{"sections":["Gone","Drafts"],"created":5}')).toEqual({ ...NO_FILTER, sections: new Set(["Drafts"]) });
 	});
+
+	test("the stored display round-trips, and a missing or unknown grouping falls back to grouping by repository", () => {
+		const picked = { grouping: "author", empty: true } as const;
+		expect(decodeDisplay(encodeDisplay(picked))).toEqual(picked);
+		for (const raw of [null, "{", '{"grouping":"board"}']) expect(decodeDisplay(raw)).toEqual(DEFAULT_DISPLAY);
+		expect(decodeDisplay('{"grouping":"section","empty":"yes"}')).toEqual({ grouping: "section", empty: false });
+	});
 });
 
 describe("filtering and searching pull requests", () => {
@@ -427,8 +438,19 @@ describe("grouping", () => {
 		]);
 	});
 
-	test("by author, the author with the most pull requests first; under no grouping, one table in the list's order", () => {
-		expect(groupedList("author", repos, sectionsOf, DEFAULT_ORDER).map(({ title }) => title)).toEqual(["me", "teammate"]);
+	test("by author, the author with the most pull requests first, a table per section across repositories; under no grouping, one table in the list's order", () => {
+		const byAuthor = groupedList("author", repos, sectionsOf, DEFAULT_ORDER);
+		expect(shape(byAuthor)).toEqual([
+			[
+				"me",
+				[
+					["Your move", ["webapp#2", "api#4"]],
+					["Waiting on others", ["webapp#1"]],
+				],
+			],
+			["teammate", [["Your move", ["api#3"]]]],
+		]);
+		expect(foldedByDefault(cardFoldKey(groupFoldKey("author", "me"), "Waiting on others"))).toBe(true);
 		const none = groupedList("none", repos, sectionsOf, DEFAULT_ORDER);
 		expect(none).toHaveLength(1);
 		expect(none[0]!.title).toBeNull();
