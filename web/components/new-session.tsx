@@ -1,5 +1,5 @@
 import { IconCrossMedium, IconLock, IconSparklesTwo, IconUnlocked } from "central-icons";
-import { type KeyboardEvent, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { RetroGrid } from "@/components/dithercn/retro-grid";
 import type { BranchChoice } from "../../src/shared/git";
 import type { NewSessionRequest } from "../../src/shared/sessions";
@@ -115,6 +115,15 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			? { kind: "existing", name: pickedChoice.name }
 			: pickedChoice;
 	const starting = launch?.phase === "starting" || (scheduled?.busy ?? false);
+	const typeable = connected && !starting;
+	// Choosing the draft's directory, from the composer's picker or a sidebar's new session, hands it the keyboard.
+	useEffect(() => {
+		if (typeable) editorRef.current?.focus();
+	}, [cwd]);
+	// Once it can be typed in, it takes the keyboard only if nothing else holds it, so a reconnect never pulls the caret out of another field.
+	useEffect(() => {
+		if (typeable && document.activeElement === document.body) editorRef.current?.focus();
+	}, [typeable]);
 	const privacy = todo ? null : <PrivatePill on={isPrivate} onToggle={() => setPrivate(on => !on)} disabled={starting} />;
 	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] } });
 	const { send } = useDashboardActions();
@@ -261,7 +270,6 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 								...completion.editorProps,
 								onKeyDown,
 								onPaste: scheduled ? undefined : attachments.onPaste,
-								autoFocus: true,
 							}}
 						/>
 					</div>

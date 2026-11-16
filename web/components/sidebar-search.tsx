@@ -15,10 +15,12 @@ interface SidebarSearchProps {
 	autoFocus?: boolean;
 	/** Called when the cursor leaves the field. */
 	onLeave?: () => void;
+	/** Called on Enter, such as to open the first match. */
+	onEnter?: () => void;
 }
 
 /** A sidebar list's search field; Esc clears it and leaves it. */
-export function SidebarSearch({ label, placeholder, query, onQuery, shortcut, autoFocus, onLeave }: SidebarSearchProps) {
+export function SidebarSearch({ label, placeholder, query, onQuery, shortcut, autoFocus, onLeave, onEnter }: SidebarSearchProps) {
 	const ref = useRef<HTMLInputElement>(null);
 	const focusField = (): boolean => {
 		const input = ref.current;
@@ -43,6 +45,11 @@ export function SidebarSearch({ label, placeholder, query, onQuery, shortcut, au
 				onChange={event => onQuery(event.target.value)}
 				onBlur={onLeave}
 				onKeyDown={event => {
+					if (event.key === "Enter" && onEnter && !event.nativeEvent.isComposing) {
+						event.preventDefault();
+						onEnter();
+						return;
+					}
 					if (event.key !== "Escape") return;
 					onQuery("");
 					event.currentTarget.blur();

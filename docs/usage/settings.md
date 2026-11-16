@@ -2,7 +2,8 @@
 
 - The sidebar's **Settings** row opens **Settings**; Cmd+, does the same, and pressing it again returns to the panes.
   While Settings is open the sidebar lists its sections under its **Settings** row; select another row, such as **Sessions**, to leave.
-  The sidebar lists twenty-three sections in four groups.
+  **Search settings** filters them by name or keyword; Enter opens the first.
+  It lists twenty-three sections in four groups.
   **Usage** holds **Analytics** and **Activity**, **General** holds **Preferences**, **Keyboard**, **Modules**, **Workspaces**, **Sync**, **Phone access**, **Storage**, and **What's new**, and **Connections** holds **Providers**, **Integrations**, **MCP servers**, and **Source control**; these are the same whatever the workspace.
   **This workspace** holds **Models**, **Agents**, **omp settings**, **omp memory**, **Files**, **Extensions**, **Workflows**, **Decisions**, and **Worktrees**, which show omp's config and files, package discovery, and the repository's records and worktrees, as a session in the sidebar's workspace sees them; only these sections show the workspace picker.
   The command menu finds a section by its name or by what it holds, such as "theme" or "github", under **Settings**.

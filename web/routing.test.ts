@@ -26,6 +26,7 @@ import {
 	type Page,
 	type Route,
 	routeFromHash,
+	settingsMatching,
 	settingsSection,
 	swapView,
 	viewForSession,
@@ -350,5 +351,30 @@ describe("session links", () => {
 	test("the link a pull request's description carries opens the session it names", () => {
 		const sessionId = "01a0f6a5-181e/#x y";
 		expect(routeFromHash(hashForSession(sessionId))).toEqual({ kind: "session", sessionId });
+	});
+});
+
+describe("searching settings", () => {
+	const shown = (query: string, phone = false) => settingsMatching(query, { phone }).map(({ group, entries }) => [group.value, entries.map(entry => entry.value)]);
+
+	test("a keyword finds sections whose names do not contain it, grouped in the sidebar's order", () => {
+		expect(shown("git")).toEqual([
+			["general", ["sync"]],
+			["connections", ["integrations", "source-control"]],
+		]);
+	});
+
+	test("the match ignores case and surrounding spaces, so Enter opens the same first section", () => {
+		expect(shown("  KEYBOARD ")[0]).toEqual(["general", ["keyboard"]]);
+	});
+
+	test("an empty query lists every section, and a paired phone never lists Phone access", () => {
+		expect(shown("").flatMap(([, values]) => values)).toContain("phone");
+		expect(shown("", true).flatMap(([, values]) => values)).not.toContain("phone");
+		expect(shown("tailscale", true)).toEqual([]);
+	});
+
+	test("a query nothing matches leaves no group", () => {
+		expect(shown("zzz")).toEqual([]);
 	});
 });

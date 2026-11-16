@@ -5,6 +5,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-16
 
+- Settings has a search field above its sections: type a name or a related word, such as git, to list only the matching sections, and press Enter to open the first one.
+- The message box of a new session now takes the cursor when you pick its project, start a new session from a workspace in the sidebar, or open the page before the dashboard has connected.
 - The sidebar's foot now shows plan usage as full-width rows with a bar, instead of a grid of rings, so long account emails read in full.
 - The Mac's CPU, free memory, and free disk no longer show in the sidebar; Settings › Storage still shows the free disk space.
 - A workspace's new-session button in the sidebar now sits level with the workspace name and its chevron, instead of a few pixels lower.
