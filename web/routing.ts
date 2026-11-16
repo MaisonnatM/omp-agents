@@ -68,7 +68,7 @@ export const SETTINGS_GROUP_LABEL = Object.fromEntries(SETTINGS_GROUPS.map(group
 export const SETTINGS_SECTIONS = [
 	{ value: "analytics", label: "Analytics", icon: IconChart3, group: "usage", keywords: ["usage", "cost", "tokens", "spend"] },
 	{ value: "activity", label: "Activity", icon: IconCursorClick, group: "usage", keywords: ["features", "used", "time"] },
-	{ value: "preferences", label: "Preferences", icon: IconSettingsSliderHor, group: "general", keywords: ["theme", "dark mode", "notifications", "sound", "sidebar tabs", "transcript", "idle processes"] },
+	{ value: "preferences", label: "Preferences", icon: IconSettingsSliderHor, group: "general", keywords: ["theme", "dark mode", "notifications", "sound", "sidebar tabs", "transcript", "idle processes", "idle sessions"] },
 	{ value: "keyboard", label: "Keyboard", icon: IconKeyboard, group: "general", keywords: ["shortcuts", "keys", "hotkeys", "keybindings"] },
 	{ value: "modules", label: "Modules", icon: IconWidgets, group: "general", keywords: [...MODULE_LIST.map(({ tab }) => tab.label.toLowerCase()), "turn off", "enable", "disable", "add", "new"] },
 	{ value: "workspaces", label: "Workspaces", icon: IconFolders, group: "general", keywords: ["directories", "folders", "hide"] },

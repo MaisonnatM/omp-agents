@@ -6,7 +6,7 @@
  * No constructor calls either; nothing follows the registry, watches a directory, or publishes before {@link Dashboard.start}.
  */
 import { randomUUID } from "node:crypto";
-import { rmSync } from "node:fs";
+import { rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { Server } from "bun";
 import { ForeignUsage } from "../foreign/usage";
@@ -45,7 +45,7 @@ import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
 import { MCP_SERVICES } from "../shared/accounts";
 import { agentOn } from "../shared/moves";
-import type { StartRequest, StartResult, View } from "../shared/sessions";
+import { awaitsSubagents, type StartRequest, type StartResult, type View } from "../shared/sessions";
 import { inAppData } from "../shared/workspaces";
 import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
@@ -182,7 +182,7 @@ export class Dashboard {
 	readonly #worktrees: Worktrees;
 	/** omp's isolation sandboxes whose omp exited, removed once a day by the owner. */
 	readonly #isolationSweep: IsolationSweep;
-	/** What each live session runs besides omp, which it stops on request, when idle, and once the session left. */
+	/** What each live session runs besides omp, which it stops on request, when idle, and once the session left; it also ends sessions left idle for hours. */
 	readonly #processWatch: SessionProcessWatch;
 	readonly #startSession: (request: StartRequest) => Promise<StartResult>;
 	readonly #reattached = Promise.withResolvers<void>();
@@ -425,12 +425,31 @@ export class Dashboard {
 			readCwds,
 			appOf: readAppOf,
 			stopProcesses,
-			sessions: () => sessions.rows(factsOf),
+			sessions: () => {
+				const botConversations = new Set(this.#bots.list.flatMap(bot => bot.sessionId ?? []));
+				return sessions.rows(factsOf).map(row => ({
+					instanceId: row.instanceId,
+					sessionId: row.sessionId,
+					pid: row.pid,
+					cwd: row.cwd,
+					status: row.status,
+					awaitsSubagents: awaitsSubagents(row),
+					// A Bot ends its own idle conversation, and a private session's end deletes it.
+					stopsWhenIdle: row.source === "dashboard" && !row.private && !botConversations.has(row.sessionId),
+				}));
+			},
+			endSession: async instanceId => {
+				await sessions.started(instanceId)?.end();
+			},
+			lastWrittenAt: instanceId => {
+				const path = sessions.get(instanceId)?.transcriptPath(null, files.pathOf);
+				return path ? (statSync(path, { throwIfNoEntry: false })?.mtimeMs ?? null) : null;
+			},
 			now: Date.now,
 			owner: () => ownerLock.held,
-			stopIdleAfterMinutes: () => {
+			settings: () => {
 				this.#processSettings.reload();
-				return this.#processSettings.value.stopIdleAfterMinutes;
+				return this.#processSettings.value;
 			},
 		});
 		const startSession = (this.#startSession = request => worktrees.start(() => starter(request), request.kind === "new" && request.branch !== null));

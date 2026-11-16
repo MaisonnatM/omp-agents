@@ -51,7 +51,7 @@ A message flagged only `Transient`, such as a failed DNS lookup, a stalled strea
 See [Scheduled sends](scheduled-sends.md) for the continue the server schedules for a session it started, including one it attached to after a restart.
 A dashboard session reports `turn-ended` before the roster update that shows it idle, so the server holds a session the failure stopped before the cleanup after a merge sees it idle.
 Each main-agent `agent_start` makes the session report `turn-started` once its status reads working, whoever prompted it, which cancels a continue the session waits on.
-A session keeps running when the server stops, restarts, or crashes; only **End session**, or omp exiting on its own, ends it.
+A session keeps running when the server stops, restarts, or crashes; only **End session**, omp exiting on its own, or [the idle session stop](session-processes.md#the-idle-session-stop) ends it.
 The transcripts stay on disk, and **Resume**, or `omp --resume <session id>` in a terminal, continues one that ended.
 Ending a session removes the linked worktree it worked in, and `src/server/session-end.ts` keeps its path, repository, and branch by session id in `ended-worktrees.json`.
 A resume first adds a missing one back, as `checkoutDir` adds a work branch, and fails with `Cannot resume: the repository … no longer exists` when the repository is gone.
